@@ -40,7 +40,8 @@ if (!(globalThis as any).navigator) {
   })
 }
 
-import { Effect, Layer, Cause, Console, Config, ConfigError, Option } from "effect"
+import { Effect, Layer, Config, ConfigError } from "effect"
+import { NodeRuntime } from "@effect/platform-node"
 import { HulyConfigService, type HulyConfigError } from "./config/config.js"
 import { HulyClient, type HulyClientError } from "./huly/client.js"
 import { McpServerService, McpServerError, type McpTransportType } from "./mcp/server.js"
@@ -120,101 +121,19 @@ export const main: Effect.Effect<void, AppError> = Effect.gen(function* () {
   )
 })
 
-/**
- * Format error for display.
- */
-const formatError = (error: unknown): string => {
-  if (error instanceof Error) {
-    const tagged = error as { _tag?: string; field?: string }
-    if (tagged._tag) {
-      if (tagged._tag === "ConfigValidationError") {
-        const field = tagged.field ? ` (${tagged.field})` : ""
-        return `Configuration error${field}: ${error.message}`
-      }
-      if (tagged._tag === "ConfigFileError") {
-        return `Config file error: ${error.message}`
-      }
-      if (tagged._tag === "HulyConnectionError") {
-        return `Connection error: ${error.message}`
-      }
-      if (tagged._tag === "HulyAuthError") {
-        return `Authentication error: ${error.message}`
-      }
-      if (tagged._tag === "McpServerError") {
-        return `Server error: ${error.message}`
-      }
-    }
-    return error.message
+// Run with NodeRuntime.runMain - handles errors, exit codes, and interrupts automatically
+// Only run when executed directly (not when imported for testing)
+const isMainModule = (() => {
+  // CJS bundled: require.main === module
+  if (typeof require !== "undefined" && require.main === module) return true
+  // ESM: check if process.argv[1] matches this file
+  if (typeof import.meta !== "undefined" && process.argv[1]) {
+    const arg = process.argv[1]
+    return arg.endsWith("index.ts") || arg.endsWith("index.cjs") || arg.endsWith("index.js")
   }
-  return String(error)
-}
+  return false
+})()
 
-/**
- * Handle program failure by logging and exiting.
- */
-const handleFailure = (cause: Cause.Cause<AppError>): Effect.Effect<void> =>
-  Effect.gen(function* () {
-    if (Cause.isFailure(cause)) {
-      const error = Cause.failureOption(cause)
-      if (Option.isSome(error)) {
-        yield* Console.error(`Error: ${formatError(error.value)}`)
-      }
-    } else if (Cause.isDie(cause)) {
-      const defect = Cause.dieOption(cause)
-      if (Option.isSome(defect)) {
-        yield* Console.error(`Fatal error: ${formatError(defect.value)}`)
-      }
-    } else if (Cause.isInterrupted(cause)) {
-      yield* Console.log("Server interrupted")
-    } else {
-      yield* Console.error(`Unexpected error: ${Cause.pretty(cause)}`)
-    }
-  })
-
-/**
- * Run the main program with error handling.
- */
-export const run = (): Promise<void> =>
-  Effect.runPromise(
-    main.pipe(
-      Effect.catchAllCause((cause) =>
-        handleFailure(cause).pipe(
-          Effect.flatMap(() => Effect.fail(cause))
-        )
-      ),
-      Effect.catchAll(() => Effect.void)
-    )
-  )
-
-// Always run when executed (works in both ESM and CommonJS after bundling)
-if (typeof require !== 'undefined' && require.main === module) {
-  // CommonJS entry point (bundled)
-  run().catch((error) => {
-    console.error("Unhandled error:", error)
-    process.exit(1)
-  })
-} else if (typeof import.meta !== 'undefined') {
-  // ESM entry point
-  try {
-    const moduleUrl = new URL(import.meta.url)
-    const argPath = process.argv[1]
-
-    if (argPath) {
-      const modulePath = moduleUrl.pathname
-      const normalizedArgPath = argPath.startsWith("file://")
-        ? new URL(argPath).pathname
-        : argPath
-
-      if (modulePath === normalizedArgPath ||
-          modulePath.endsWith(normalizedArgPath) ||
-          normalizedArgPath.endsWith(modulePath.split("/").pop() ?? "")) {
-        run().catch((error) => {
-          console.error("Unhandled error:", error)
-          process.exit(1)
-        })
-      }
-    }
-  } catch {
-    // Not main module
-  }
+if (isMainModule) {
+  NodeRuntime.runMain(main)
 }
