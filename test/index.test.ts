@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest"
-import { Effect, Layer, Exit, Cause } from "effect"
+import { describe, it, beforeEach, afterEach } from "@effect/vitest"
+import { expect } from "vitest"
+import { Effect, Layer, Cause } from "effect"
 import { HulyConfigService } from "../src/config/config.js"
 import { HulyClient } from "../src/huly/client.js"
 import { McpServerService, McpServerError } from "../src/mcp/server.js"
@@ -52,124 +53,107 @@ describe("Main Entry Point", () => {
 
   describe("main program", () => {
     // test-revizorro: approved
-    it("fails on missing config", async () => {
-      // Don't set any env vars - config should fail
-      const exit = await Effect.runPromiseExit(main)
+    it.effect("fails on missing config", () =>
+      Effect.gen(function* () {
+        // Don't set any env vars - config should fail
+        const error = yield* Effect.flip(main)
 
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const error = Cause.failureOption(exit.cause)
-        expect(error._tag).toBe("Some")
-        // Config errors bubble up - verify we got a config-related error
-        if (error._tag === "Some") {
-          expect(error.value).toBeDefined()
-        }
-      }
-    })
+        expect(error).toBeDefined()
+      })
+    )
   })
 
   describe("layer composition", () => {
     // test-revizorro: approved
-    it("McpServerService layer composes with HulyClient", async () => {
-      const hulyClientLayer = HulyClient.testLayer({})
-      const mcpServerLayer = McpServerService.layer({ transport: "stdio" }).pipe(
-        Layer.provide(hulyClientLayer)
-      )
+    it.scoped("McpServerService layer composes with HulyClient", () =>
+      Effect.gen(function* () {
+        const hulyClientLayer = HulyClient.testLayer({})
+        const mcpServerLayer = McpServerService.layer({ transport: "stdio" }).pipe(
+          Layer.provide(hulyClientLayer)
+        )
 
-      const exit = await Effect.runPromiseExit(
-        Layer.build(mcpServerLayer).pipe(Effect.scoped)
-      )
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-    })
+        yield* Layer.build(mcpServerLayer)
+      })
+    )
   })
 
   describe("error handling", () => {
     // test-revizorro: approved
-    it("reports config validation errors clearly", async () => {
-      // Invalid URL
-      process.env["HULY_URL"] = "not-a-valid-url"
-      process.env["HULY_EMAIL"] = "test@example.com"
-      process.env["HULY_PASSWORD"] = "test-password"
-      process.env["HULY_WORKSPACE"] = "test-workspace"
+    it.effect("reports config validation errors clearly", () =>
+      Effect.gen(function* () {
+        // Invalid URL
+        process.env["HULY_URL"] = "not-a-valid-url"
+        process.env["HULY_EMAIL"] = "test@example.com"
+        process.env["HULY_PASSWORD"] = "test-password"
+        process.env["HULY_WORKSPACE"] = "test-workspace"
 
-      const exit = await Effect.runPromiseExit(main)
+        const error = yield* Effect.flip(main)
 
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const error = Cause.failureOption(exit.cause)
-        expect(error._tag).toBe("Some")
-      }
-    })
+        expect(error).toBeDefined()
+      })
+    )
 
     // test-revizorro: approved
-    it("reports missing required config", async () => {
-      // Missing HULY_PASSWORD
-      process.env["HULY_URL"] = "https://test.huly.app"
-      process.env["HULY_EMAIL"] = "test@example.com"
-      process.env["HULY_WORKSPACE"] = "test-workspace"
+    it.effect("reports missing required config", () =>
+      Effect.gen(function* () {
+        // Missing HULY_PASSWORD
+        process.env["HULY_URL"] = "https://test.huly.app"
+        process.env["HULY_EMAIL"] = "test@example.com"
+        process.env["HULY_WORKSPACE"] = "test-workspace"
 
-      const exit = await Effect.runPromiseExit(main)
+        const error = yield* Effect.flip(main)
 
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const error = Cause.failureOption(exit.cause)
-        expect(error._tag).toBe("Some")
-      }
-    })
+        expect(error).toBeDefined()
+      })
+    )
   })
 
   describe("McpServerService integration", () => {
     // test-revizorro: approved
-    it("server run/stop cycle works", async () => {
-      let runCalled = false
-      let stopCalled = false
+    it.effect("server run/stop cycle works", () =>
+      Effect.gen(function* () {
+        let runCalled = false
+        let stopCalled = false
 
-      const mockServerLayer = McpServerService.testLayer({
-        run: () =>
-          Effect.sync(() => {
-            runCalled = true
-          }),
-        stop: () =>
-          Effect.sync(() => {
-            stopCalled = true
-          }),
-      })
+        const mockServerLayer = McpServerService.testLayer({
+          run: () =>
+            Effect.sync(() => {
+              runCalled = true
+            }),
+          stop: () =>
+            Effect.sync(() => {
+              stopCalled = true
+            }),
+        })
 
-      await Effect.runPromise(
-        Effect.gen(function* () {
+        yield* Effect.gen(function* () {
           const server = yield* McpServerService
           yield* server.run()
           yield* server.stop()
         }).pipe(Effect.provide(mockServerLayer))
-      )
 
-      expect(runCalled).toBe(true)
-      expect(stopCalled).toBe(true)
-    })
+        expect(runCalled).toBe(true)
+        expect(stopCalled).toBe(true)
+      })
+    )
 
     // test-revizorro: approved
-    it("server error is properly typed", async () => {
-      const mockServerLayer = McpServerService.testLayer({
-        run: () => new McpServerError({ message: "Connection refused" }),
+    it.effect("server error is properly typed", () =>
+      Effect.gen(function* () {
+        const mockServerLayer = McpServerService.testLayer({
+          run: () => new McpServerError({ message: "Connection refused" }),
+        })
+
+        const error = yield* Effect.flip(
+          Effect.gen(function* () {
+            const server = yield* McpServerService
+            yield* server.run()
+          }).pipe(Effect.provide(mockServerLayer))
+        )
+
+        expect(error._tag).toBe("McpServerError")
+        expect(error.message).toBe("Connection refused")
       })
-
-      const exit = await Effect.runPromiseExit(
-        Effect.gen(function* () {
-          const server = yield* McpServerService
-          yield* server.run()
-        }).pipe(Effect.provide(mockServerLayer))
-      )
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const error = Cause.failureOption(exit.cause)
-        expect(error._tag).toBe("Some")
-        if (error._tag === "Some") {
-          expect((error.value as McpServerError)._tag).toBe("McpServerError")
-          expect((error.value as McpServerError).message).toBe("Connection refused")
-        }
-      }
-    })
+    )
   })
 })

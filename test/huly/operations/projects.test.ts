@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest"
+import { describe, it } from "@effect/vitest"
+import { expect } from "vitest"
 import { Effect } from "effect"
 import type {
   Doc,
@@ -81,196 +82,196 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 
 describe("listProjects", () => {
   describe("basic functionality", () => {
-    it("returns all active projects by default", async () => {
-      const projects = [
-        makeProject({ identifier: "PROJ1", name: "Project 1", archived: false }),
-        makeProject({ identifier: "PROJ2", name: "Project 2", archived: false }),
-        makeProject({ identifier: "ARCHIVED", name: "Archived Project", archived: true }),
-      ]
+    it.effect("returns all active projects by default", () =>
+      Effect.gen(function* () {
+        const projects = [
+          makeProject({ identifier: "PROJ1", name: "Project 1", archived: false }),
+          makeProject({ identifier: "PROJ2", name: "Project 2", archived: false }),
+          makeProject({ identifier: "ARCHIVED", name: "Archived Project", archived: true }),
+        ]
 
-      const testLayer = createTestLayerWithMocks({ projects })
+        const testLayer = createTestLayerWithMocks({ projects })
 
-      const result = await Effect.runPromise(
-        listProjects({}).pipe(Effect.provide(testLayer))
-      )
+        const result = yield* listProjects({}).pipe(Effect.provide(testLayer))
 
-      expect(result.projects).toHaveLength(2)
-      expect(result.projects.map(p => p.identifier)).toEqual(["PROJ1", "PROJ2"])
-      expect(result.total).toBe(2)
-    })
-
-    it("transforms project fields correctly", async () => {
-      const project = makeProject({
-        identifier: "TEST",
-        name: "Test Project",
-        description: "A description",
-        archived: false,
+        expect(result.projects).toHaveLength(2)
+        expect(result.projects.map(p => p.identifier)).toEqual(["PROJ1", "PROJ2"])
+        expect(result.total).toBe(2)
       })
+    )
 
-      const testLayer = createTestLayerWithMocks({ projects: [project] })
+    it.effect("transforms project fields correctly", () =>
+      Effect.gen(function* () {
+        const project = makeProject({
+          identifier: "TEST",
+          name: "Test Project",
+          description: "A description",
+          archived: false,
+        })
 
-      const result = await Effect.runPromise(
-        listProjects({}).pipe(Effect.provide(testLayer))
-      )
+        const testLayer = createTestLayerWithMocks({ projects: [project] })
 
-      expect(result.projects).toHaveLength(1)
-      expect(result.projects[0]).toEqual({
-        identifier: "TEST",
-        name: "Test Project",
-        description: "A description",
-        archived: false,
+        const result = yield* listProjects({}).pipe(Effect.provide(testLayer))
+
+        expect(result.projects).toHaveLength(1)
+        expect(result.projects[0]).toEqual({
+          identifier: "TEST",
+          name: "Test Project",
+          description: "A description",
+          archived: false,
+        })
       })
-    })
+    )
 
-    it("handles empty description", async () => {
-      const project = makeProject({
-        identifier: "TEST",
-        name: "No Description",
-        description: "",
+    it.effect("handles empty description", () =>
+      Effect.gen(function* () {
+        const project = makeProject({
+          identifier: "TEST",
+          name: "No Description",
+          description: "",
+        })
+
+        const testLayer = createTestLayerWithMocks({ projects: [project] })
+
+        const result = yield* listProjects({}).pipe(Effect.provide(testLayer))
+
+        expect(result.projects[0].description).toBeUndefined()
       })
+    )
 
-      const testLayer = createTestLayerWithMocks({ projects: [project] })
+    it.effect("returns empty array when no projects", () =>
+      Effect.gen(function* () {
+        const testLayer = createTestLayerWithMocks({ projects: [] })
 
-      const result = await Effect.runPromise(
-        listProjects({}).pipe(Effect.provide(testLayer))
-      )
+        const result = yield* listProjects({}).pipe(Effect.provide(testLayer))
 
-      expect(result.projects[0].description).toBeUndefined()
-    })
-
-    it("returns empty array when no projects", async () => {
-      const testLayer = createTestLayerWithMocks({ projects: [] })
-
-      const result = await Effect.runPromise(
-        listProjects({}).pipe(Effect.provide(testLayer))
-      )
-
-      expect(result.projects).toHaveLength(0)
-      expect(result.total).toBe(0)
-    })
+        expect(result.projects).toHaveLength(0)
+        expect(result.total).toBe(0)
+      })
+    )
   })
 
   describe("archived filtering", () => {
-    it("excludes archived projects by default", async () => {
-      const captureQuery: MockConfig["captureQuery"] = {}
-      const projects = [
-        makeProject({ identifier: "ACTIVE", archived: false }),
-        makeProject({ identifier: "ARCHIVED", archived: true }),
-      ]
+    it.effect("excludes archived projects by default", () =>
+      Effect.gen(function* () {
+        const captureQuery: MockConfig["captureQuery"] = {}
+        const projects = [
+          makeProject({ identifier: "ACTIVE", archived: false }),
+          makeProject({ identifier: "ARCHIVED", archived: true }),
+        ]
 
-      const testLayer = createTestLayerWithMocks({ projects, captureQuery })
+        const testLayer = createTestLayerWithMocks({ projects, captureQuery })
 
-      await Effect.runPromise(
-        listProjects({}).pipe(Effect.provide(testLayer))
-      )
+        yield* listProjects({}).pipe(Effect.provide(testLayer))
 
-      expect(captureQuery.query?.archived).toBe(false)
-    })
+        expect(captureQuery.query?.archived).toBe(false)
+      })
+    )
 
-    it("includes archived when includeArchived=true", async () => {
-      const captureQuery: MockConfig["captureQuery"] = {}
-      const projects = [
-        makeProject({ identifier: "ACTIVE", archived: false }),
-        makeProject({ identifier: "ARCHIVED", archived: true }),
-      ]
+    it.effect("includes archived when includeArchived=true", () =>
+      Effect.gen(function* () {
+        const captureQuery: MockConfig["captureQuery"] = {}
+        const projects = [
+          makeProject({ identifier: "ACTIVE", archived: false }),
+          makeProject({ identifier: "ARCHIVED", archived: true }),
+        ]
 
-      const testLayer = createTestLayerWithMocks({ projects, captureQuery })
+        const testLayer = createTestLayerWithMocks({ projects, captureQuery })
 
-      const result = await Effect.runPromise(
-        listProjects({ includeArchived: true }).pipe(Effect.provide(testLayer))
-      )
+        const result = yield* listProjects({ includeArchived: true }).pipe(Effect.provide(testLayer))
 
-      // When includeArchived=true, no filter applied (shows all)
-      expect(captureQuery.query?.archived).toBeUndefined()
-      expect(result.projects).toHaveLength(2)
-      expect(result.total).toBe(2)
-    })
+        // When includeArchived=true, no filter applied (shows all)
+        expect(captureQuery.query?.archived).toBeUndefined()
+        expect(result.projects).toHaveLength(2)
+        expect(result.total).toBe(2)
+      })
+    )
 
-    it("excludes archived when includeArchived=false explicitly", async () => {
-      const captureQuery: MockConfig["captureQuery"] = {}
-      const projects = [
-        makeProject({ identifier: "ACTIVE", archived: false }),
-      ]
+    it.effect("excludes archived when includeArchived=false explicitly", () =>
+      Effect.gen(function* () {
+        const captureQuery: MockConfig["captureQuery"] = {}
+        const projects = [
+          makeProject({ identifier: "ACTIVE", archived: false }),
+        ]
 
-      const testLayer = createTestLayerWithMocks({ projects, captureQuery })
+        const testLayer = createTestLayerWithMocks({ projects, captureQuery })
 
-      await Effect.runPromise(
-        listProjects({ includeArchived: false }).pipe(Effect.provide(testLayer))
-      )
+        yield* listProjects({ includeArchived: false }).pipe(Effect.provide(testLayer))
 
-      expect(captureQuery.query?.archived).toBe(false)
-    })
+        expect(captureQuery.query?.archived).toBe(false)
+      })
+    )
   })
 
   describe("limit handling", () => {
-    it("uses default limit of 50", async () => {
-      const captureQuery: MockConfig["captureQuery"] = {}
+    it.effect("uses default limit of 50", () =>
+      Effect.gen(function* () {
+        const captureQuery: MockConfig["captureQuery"] = {}
 
-      const testLayer = createTestLayerWithMocks({ projects: [], captureQuery })
+        const testLayer = createTestLayerWithMocks({ projects: [], captureQuery })
 
-      await Effect.runPromise(
-        listProjects({}).pipe(Effect.provide(testLayer))
-      )
+        yield* listProjects({}).pipe(Effect.provide(testLayer))
 
-      expect(captureQuery.options?.limit).toBe(50)
-    })
+        expect(captureQuery.options?.limit).toBe(50)
+      })
+    )
 
-    it("uses provided limit", async () => {
-      const captureQuery: MockConfig["captureQuery"] = {}
+    it.effect("uses provided limit", () =>
+      Effect.gen(function* () {
+        const captureQuery: MockConfig["captureQuery"] = {}
 
-      const testLayer = createTestLayerWithMocks({ projects: [], captureQuery })
+        const testLayer = createTestLayerWithMocks({ projects: [], captureQuery })
 
-      await Effect.runPromise(
-        listProjects({ limit: 10 }).pipe(Effect.provide(testLayer))
-      )
+        yield* listProjects({ limit: 10 }).pipe(Effect.provide(testLayer))
 
-      expect(captureQuery.options?.limit).toBe(10)
-    })
+        expect(captureQuery.options?.limit).toBe(10)
+      })
+    )
 
-    it("enforces max limit of 200", async () => {
-      const captureQuery: MockConfig["captureQuery"] = {}
+    it.effect("enforces max limit of 200", () =>
+      Effect.gen(function* () {
+        const captureQuery: MockConfig["captureQuery"] = {}
 
-      const testLayer = createTestLayerWithMocks({ projects: [], captureQuery })
+        const testLayer = createTestLayerWithMocks({ projects: [], captureQuery })
 
-      await Effect.runPromise(
-        listProjects({ limit: 500 }).pipe(Effect.provide(testLayer))
-      )
+        yield* listProjects({ limit: 500 }).pipe(Effect.provide(testLayer))
 
-      expect(captureQuery.options?.limit).toBe(200)
-    })
+        expect(captureQuery.options?.limit).toBe(200)
+      })
+    )
   })
 
   describe("sorting", () => {
-    it("sorts by name ascending", async () => {
-      const captureQuery: MockConfig["captureQuery"] = {}
+    it.effect("sorts by name ascending", () =>
+      Effect.gen(function* () {
+        const captureQuery: MockConfig["captureQuery"] = {}
 
-      const testLayer = createTestLayerWithMocks({ projects: [], captureQuery })
+        const testLayer = createTestLayerWithMocks({ projects: [], captureQuery })
 
-      await Effect.runPromise(
-        listProjects({}).pipe(Effect.provide(testLayer))
-      )
+        yield* listProjects({}).pipe(Effect.provide(testLayer))
 
-      // SortingOrder.Ascending = 1
-      expect((captureQuery.options?.sort as Record<string, number>)?.name).toBe(1)
-    })
+        // SortingOrder.Ascending = 1
+        expect((captureQuery.options?.sort as Record<string, number>)?.name).toBe(1)
+      })
+    )
   })
 
   describe("pagination info", () => {
-    it("returns total count", async () => {
-      const projects = [
-        makeProject({ identifier: "P1", archived: false }),
-        makeProject({ identifier: "P2", archived: false }),
-        makeProject({ identifier: "P3", archived: false }),
-      ]
+    it.effect("returns total count", () =>
+      Effect.gen(function* () {
+        const projects = [
+          makeProject({ identifier: "P1", archived: false }),
+          makeProject({ identifier: "P2", archived: false }),
+          makeProject({ identifier: "P3", archived: false }),
+        ]
 
-      const testLayer = createTestLayerWithMocks({ projects })
+        const testLayer = createTestLayerWithMocks({ projects })
 
-      const result = await Effect.runPromise(
-        listProjects({ limit: 2 }).pipe(Effect.provide(testLayer))
-      )
+        const result = yield* listProjects({ limit: 2 }).pipe(Effect.provide(testLayer))
 
-      expect(result.projects).toHaveLength(2)
-      expect(result.total).toBe(3)
-    })
+        expect(result.projects).toHaveLength(2)
+        expect(result.total).toBe(3)
+      })
+    )
   })
 })
