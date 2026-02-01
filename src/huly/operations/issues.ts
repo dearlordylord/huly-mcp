@@ -175,13 +175,6 @@ const isCanceledStatus = (statusRef: Ref<Status>, statuses: ReadonlyArray<Status
 
 /**
  * List issues with filters.
- *
- * Filters:
- * - project (required): Project identifier
- * - status: "open" | "done" | "canceled" | specific status name
- * - assignee: Email or person name
- * - limit: Max results (default 50, max 200)
- *
  * Results sorted by modifiedOn descending.
  */
 export const listIssues = (
@@ -190,38 +183,29 @@ export const listIssues = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    // 1. Find project by identifier
     const projectResult = yield* client.findOne<HulyProject>(
       tracker.class.Project,
       { identifier: params.project }
     )
-
     if (projectResult === undefined) {
       return yield* new ProjectNotFoundError({ identifier: params.project })
     }
-
-    // projectResult is WithLookup<HulyProject> which extends HulyProject
     const project = projectResult
 
-    // 2. Get all statuses for status name resolution
     const allStatuses = yield* client.findAll<Status>(
       tracker.class.IssueStatus,
       {}
     )
-    // Cast to StatusWithCategory which has the category field
     const statusList = allStatuses as ReadonlyArray<StatusWithCategory>
 
-    // 3. Build query based on filters
     const query: Record<string, unknown> = {
       space: project._id
     }
 
-    // 3a. Handle status filter
     if (params.status !== undefined) {
       const statusFilter = params.status.toLowerCase()
 
       if (statusFilter === "open") {
-        // Open = not done and not canceled
         const doneAndCanceledStatuses = statusList
           .filter(s =>
             isDoneStatus(s._id, statusList)
@@ -233,7 +217,6 @@ export const listIssues = (
           query.status = { $nin: doneAndCanceledStatuses }
         }
       } else if (statusFilter === "done") {
-        // Done = completed successfully
         const doneStatuses = statusList
           .filter(s => isDoneStatus(s._id, statusList))
           .map(s => s._id)
@@ -241,11 +224,9 @@ export const listIssues = (
         if (doneStatuses.length > 0) {
           query.status = { $in: doneStatuses }
         } else {
-          // No done statuses found, return empty
           return []
         }
       } else if (statusFilter === "canceled") {
-        // Canceled
         const canceledStatuses = statusList
           .filter(s => isCanceledStatus(s._id, statusList))
           .map(s => s._id)
@@ -256,7 +237,6 @@ export const listIssues = (
           return []
         }
       } else {
-        // Specific status name - case insensitive match
         const matchingStatus = statusList.find(
           s => s.name.toLowerCase() === statusFilter
         )
@@ -272,18 +252,15 @@ export const listIssues = (
       }
     }
 
-    // 3b. Handle assignee filter
     if (params.assignee !== undefined) {
       const assigneePerson = yield* findPersonByEmailOrName(client, params.assignee)
       if (assigneePerson !== undefined) {
         query.assignee = assigneePerson._id
       } else {
-        // Assignee not found - return empty results
         return []
       }
     }
 
-    // 4. Execute query
     const limit = Math.min(params.limit ?? 50, 200)
 
     const issues = yield* client.findAll<HulyIssue>(
@@ -297,7 +274,6 @@ export const listIssues = (
       }
     )
 
-    // 5. Batch fetch all assignees (fix N+1 query)
     const assigneeIds = [
       ...new Set(
         issues.filter(i => i.assignee !== null).map(i => i.assignee!)
@@ -313,13 +289,9 @@ export const listIssues = (
 
     const personMap = new Map(persons.map(p => [p._id, p]))
 
-    // 6. Transform to IssueSummary
     const summaries: Array<IssueSummary> = issues.map(issue => {
-      // Look up status name using string comparison
       const statusDoc = statusList.find(s => String(s._id) === String(issue.status))
       const statusName = statusDoc?.name ?? "Unknown"
-
-      // Look up assignee name from pre-fetched map
       const assigneeName = issue.assignee !== null
         ? personMap.get(issue.assignee)?.name
         : undefined
@@ -345,14 +317,12 @@ const findPersonByEmailOrName = (
   emailOrName: string
 ): Effect.Effect<Person | undefined, HulyClientError> =>
   Effect.gen(function*() {
-    // First try to find by email in channels
     const channels = yield* client.findAll<Channel>(
       contact.class.Channel,
       { value: emailOrName }
     )
 
     if (channels.length > 0) {
-      // Get the person attached to this channel
       const channel = channels[0]
       const person = yield* client.findOne<Person>(
         contact.class.Person,
@@ -363,7 +333,6 @@ const findPersonByEmailOrName = (
       }
     }
 
-    // Fall back to name search
     const persons = yield* client.findAll<Person>(
       contact.class.Person,
       { name: emailOrName }
@@ -373,7 +342,6 @@ const findPersonByEmailOrName = (
       return persons[0]
     }
 
-    // Try partial name match
     const allPersons = yield* client.findAll<Person>(
       contact.class.Person,
       {}
@@ -404,7 +372,6 @@ const parseIssueIdentifier = (
 ): { fullIdentifier: string; number: number | null } => {
   const idStr = String(identifier).trim()
 
-  // Check if it's a full identifier like "HULY-123"
   const match = idStr.match(/^([A-Z]+)-(\d+)$/i)
   if (match) {
     return {
@@ -413,7 +380,6 @@ const parseIssueIdentifier = (
     }
   }
 
-  // Check if it's just a number
   const numMatch = idStr.match(/^\d+$/)
   if (numMatch) {
     const num = parseInt(idStr, 10)
@@ -423,7 +389,6 @@ const parseIssueIdentifier = (
     }
   }
 
-  // Not a valid format, return as-is for the query to fail gracefully
   return { fullIdentifier: idStr, number: null }
 }
 
@@ -450,26 +415,20 @@ export const getIssue = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    // 1. Find project by identifier
     const projectResult = yield* client.findOne<HulyProject>(
       tracker.class.Project,
       { identifier: params.project }
     )
-
     if (projectResult === undefined) {
       return yield* new ProjectNotFoundError({ identifier: params.project })
     }
-
-    // projectResult is WithLookup<HulyProject> which extends HulyProject
     const project = projectResult
 
-    // 2. Parse the identifier
     const { fullIdentifier, number } = parseIssueIdentifier(
       params.identifier,
       params.project
     )
 
-    // 3. Find the issue - try by full identifier first, then by number
     let issue = yield* client.findOne<HulyIssue>(
       tracker.class.Issue,
       {
@@ -477,8 +436,6 @@ export const getIssue = (
         identifier: fullIdentifier
       }
     )
-
-    // If not found by identifier and we have a number, try by number
     if (issue === undefined && number !== null) {
       issue = yield* client.findOne<HulyIssue>(
         tracker.class.Issue,
@@ -488,7 +445,6 @@ export const getIssue = (
         }
       )
     }
-
     if (issue === undefined) {
       return yield* new IssueNotFoundError({
         identifier: params.identifier,
@@ -496,17 +452,14 @@ export const getIssue = (
       })
     }
 
-    // 4. Get all statuses for status name resolution
     const statusList = yield* client.findAll<Status>(
       tracker.class.IssueStatus,
       {}
     )
 
-    // 5. Look up status name using string comparison
     const statusDoc = statusList.find(s => String(s._id) === String(issue!.status))
     const statusName = statusDoc?.name ?? "Unknown"
 
-    // 6. Look up assignee name if assigned
     let assigneeName: string | undefined
     let assigneeRef: Issue["assigneeRef"]
     if (issue.assignee !== null) {
@@ -523,7 +476,6 @@ export const getIssue = (
       }
     }
 
-    // 7. Fetch markdown description if present
     let description: string | undefined
     if (issue.description) {
       description = yield* client.fetchMarkup(
@@ -535,7 +487,6 @@ export const getIssue = (
       )
     }
 
-    // 8. Build and return the full Issue
     const result: Issue = {
       identifier: issue.identifier,
       title: issue.title,
@@ -585,23 +536,17 @@ export const createIssue = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    // 1. Find project by identifier
     const projectResult = yield* client.findOne<HulyProject>(
       tracker.class.Project,
       { identifier: params.project }
     )
-
     if (projectResult === undefined) {
       return yield* new ProjectNotFoundError({ identifier: params.project })
     }
-
-    // projectResult is WithLookup<HulyProject> which extends HulyProject
     const project = projectResult
 
-    // 2. Generate unique issue ID
     const issueId: Ref<HulyIssue> = generateId()
 
-    // 3. Increment project sequence to get issue number
     const incOps: DocumentUpdate<HulyProject> = { $inc: { sequence: 1 } }
     const incResult = yield* client.updateDoc(
       tracker.class.Project,
@@ -610,60 +555,44 @@ export const createIssue = (
       incOps,
       true
     )
-
-    // Extract sequence from result
     const sequence = (incResult as { object?: { sequence?: number } }).object?.sequence ?? project.sequence + 1
 
-    // 4. Resolve status
     let statusRef: Ref<Status> = project.defaultIssueStatus
-
     if (params.status !== undefined) {
-      // Get all statuses and find matching one
       const allStatuses = yield* client.findAll<Status>(
         tracker.class.IssueStatus,
         {}
       )
-
       const statusFilter = params.status.toLowerCase()
       const matchingStatus = allStatuses.find(
         s => s.name.toLowerCase() === statusFilter
       )
-
       if (matchingStatus === undefined) {
         return yield* new InvalidStatusError({
           status: params.status,
           project: params.project
         })
       }
-
       statusRef = matchingStatus._id
     }
 
-    // 5. Resolve assignee (if provided)
     let assigneeRef: Ref<Person> | null = null
-
     if (params.assignee !== undefined) {
       const person = yield* findPersonByEmailOrName(client, params.assignee)
-
       if (person === undefined) {
         return yield* new PersonNotFoundError({ identifier: params.assignee })
       }
-
       assigneeRef = person._id
     }
 
-    // 6. Calculate rank (append to end)
     const lastIssue = yield* client.findOne<HulyIssue>(
       tracker.class.Issue,
       { space: project._id },
       { sort: { rank: SortingOrder.Descending } }
     )
-
     const rank = makeRank(lastIssue?.rank, undefined)
 
-    // 7. Upload description if provided
     let descriptionMarkupRef: MarkupBlobRef | null = null
-
     if (params.description !== undefined && params.description.trim() !== "") {
       descriptionMarkupRef = yield* client.uploadMarkup(
         tracker.class.Issue,
@@ -674,13 +603,9 @@ export const createIssue = (
       )
     }
 
-    // 8. Map priority
     const priority = stringToPriority(params.priority)
-
-    // 9. Build identifier
     const identifier = `${project.identifier}-${sequence}`
 
-    // 10. Create issue using addCollection
     const issueData: AttachedData<HulyIssue> = {
       title: params.title,
       description: descriptionMarkupRef,
@@ -747,26 +672,20 @@ export const updateIssue = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    // 1. Find project by identifier
     const projectResult = yield* client.findOne<HulyProject>(
       tracker.class.Project,
       { identifier: params.project }
     )
-
     if (projectResult === undefined) {
       return yield* new ProjectNotFoundError({ identifier: params.project })
     }
-
-    // projectResult is WithLookup<HulyProject> which extends HulyProject
     const project = projectResult
 
-    // 2. Parse the identifier and find the issue
     const { fullIdentifier, number } = parseIssueIdentifier(
       params.identifier,
       params.project
     )
 
-    // 3. Find the issue - try by full identifier first, then by number
     let issue = yield* client.findOne<HulyIssue>(
       tracker.class.Issue,
       {
@@ -774,8 +693,6 @@ export const updateIssue = (
         identifier: fullIdentifier
       }
     )
-
-    // If not found by identifier and we have a number, try by number
     if (issue === undefined && number !== null) {
       issue = yield* client.findOne<HulyIssue>(
         tracker.class.Issue,
@@ -785,7 +702,6 @@ export const updateIssue = (
         }
       )
     }
-
     if (issue === undefined) {
       return yield* new IssueNotFoundError({
         identifier: params.identifier,
@@ -793,18 +709,14 @@ export const updateIssue = (
       })
     }
 
-    // 4. Build update operations based on provided fields
     const updateOps: DocumentUpdate<HulyIssue> = {}
 
-    // 4a. Handle title update
     if (params.title !== undefined) {
       updateOps.title = params.title
     }
 
-    // 4b. Handle description update - need to upload markdown first
     if (params.description !== undefined) {
       if (params.description.trim() === "") {
-        // Empty description means clear it
         updateOps.description = null
       } else {
         const descriptionMarkupRef = yield* client.uploadMarkup(
@@ -818,56 +730,44 @@ export const updateIssue = (
       }
     }
 
-    // 4c. Handle status update
     if (params.status !== undefined) {
       const allStatuses = yield* client.findAll<Status>(
         tracker.class.IssueStatus,
         {}
       )
-
       const statusFilter = params.status.toLowerCase()
       const matchingStatus = allStatuses.find(
         s => s.name.toLowerCase() === statusFilter
       )
-
       if (matchingStatus === undefined) {
         return yield* new InvalidStatusError({
           status: params.status,
           project: params.project
         })
       }
-
       updateOps.status = matchingStatus._id
     }
 
-    // 4d. Handle priority update
     if (params.priority !== undefined) {
       updateOps.priority = stringToPriority(params.priority)
     }
 
-    // 4e. Handle assignee update (null means unassign)
     if (params.assignee !== undefined) {
       if (params.assignee === null) {
-        // Unassign
         updateOps.assignee = null
       } else {
-        // Look up person by email or name
         const person = yield* findPersonByEmailOrName(client, params.assignee)
-
         if (person === undefined) {
           return yield* new PersonNotFoundError({ identifier: params.assignee })
         }
-
         updateOps.assignee = person._id
       }
     }
 
-    // 5. Check if there's anything to update
     if (Object.keys(updateOps).length === 0) {
       return { identifier: issue.identifier, updated: false }
     }
 
-    // 6. Perform the update
     yield* client.updateDoc(
       tracker.class.Issue,
       project._id,
@@ -907,26 +807,20 @@ export const addLabel = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    // 1. Find project by identifier
     const projectResult = yield* client.findOne<HulyProject>(
       tracker.class.Project,
       { identifier: params.project }
     )
-
     if (projectResult === undefined) {
       return yield* new ProjectNotFoundError({ identifier: params.project })
     }
-
-    // projectResult is WithLookup<HulyProject> which extends HulyProject
     const project = projectResult
 
-    // 2. Parse the identifier and find the issue
     const { fullIdentifier, number } = parseIssueIdentifier(
       params.identifier,
       params.project
     )
 
-    // 3. Find the issue - try by full identifier first, then by number
     let issue = yield* client.findOne<HulyIssue>(
       tracker.class.Issue,
       {
@@ -934,8 +828,6 @@ export const addLabel = (
         identifier: fullIdentifier
       }
     )
-
-    // If not found by identifier and we have a number, try by number
     if (issue === undefined && number !== null) {
       issue = yield* client.findOne<HulyIssue>(
         tracker.class.Issue,
@@ -945,7 +837,6 @@ export const addLabel = (
         }
       )
     }
-
     if (issue === undefined) {
       return yield* new IssueNotFoundError({
         identifier: params.identifier,
@@ -953,7 +844,6 @@ export const addLabel = (
       })
     }
 
-    // 4. Check if label already exists on this issue
     const existingLabels = yield* client.findAll<TagReference>(
       tags.class.TagReference,
       {
@@ -962,21 +852,16 @@ export const addLabel = (
       }
     )
 
-    // Check if a label with same title already exists
     const labelTitle = params.label.trim()
     const labelExists = existingLabels.some(
       (l) => l.title.toLowerCase() === labelTitle.toLowerCase()
     )
-
     if (labelExists) {
-      // Idempotent - label already attached
       return { identifier: issue.identifier, labelAdded: false }
     }
 
-    // 5. Find or create the TagElement
     const color = params.color ?? 0
 
-    // Look for existing TagElement with this title targeting Issue class
     let tagElement = yield* client.findOne<TagElement>(
       tags.class.TagElement,
       {
@@ -986,9 +871,7 @@ export const addLabel = (
     )
 
     if (tagElement === undefined) {
-      // Create new TagElement
       const tagElementId: Ref<TagElement> = generateId()
-
       const tagElementData: Data<TagElement> = {
         title: labelTitle,
         description: "",
@@ -1002,8 +885,6 @@ export const addLabel = (
         tagElementData,
         tagElementId
       )
-
-      // Fetch the created tag element
       tagElement = yield* client.findOne<TagElement>(
         tags.class.TagElement,
         { _id: tagElementId }
@@ -1011,11 +892,9 @@ export const addLabel = (
     }
 
     if (tagElement === undefined) {
-      // Shouldn't happen, but guard against it
       return { identifier: issue.identifier, labelAdded: false }
     }
 
-    // 6. Attach the TagReference to the issue
     const tagRefData: AttachedData<TagReference> = {
       title: tagElement.title,
       color: tagElement.color,
