@@ -98,8 +98,8 @@ export type ProjectSummary = Schema.Schema.Type<typeof ProjectSummarySchema>
  * Parameters for list_projects tool.
  */
 export const ListProjectsParamsSchema = Schema.Struct({
-  archived: Schema.optional(Schema.Boolean.annotations({
-    description: "Include archived projects (default: false, showing only active)",
+  includeArchived: Schema.optional(Schema.Boolean.annotations({
+    description: "Include archived projects in results (default: false, showing only active)",
   })),
   limit: Schema.optional(Schema.Number.pipe(
     Schema.int(),

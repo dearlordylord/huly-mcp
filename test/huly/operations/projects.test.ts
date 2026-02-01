@@ -167,7 +167,7 @@ describe("listProjects", () => {
       expect(captureQuery.query?.archived).toBe(false)
     })
 
-    it("includes archived when archived=true", async () => {
+    it("includes archived when includeArchived=true", async () => {
       const captureQuery: MockConfig["captureQuery"] = {}
       const projects = [
         makeProject({ identifier: "ACTIVE", archived: false }),
@@ -177,16 +177,16 @@ describe("listProjects", () => {
       const testLayer = createTestLayerWithMocks({ projects, captureQuery })
 
       const result = await Effect.runPromise(
-        listProjects({ archived: true }).pipe(Effect.provide(testLayer))
+        listProjects({ includeArchived: true }).pipe(Effect.provide(testLayer))
       )
 
-      // When archived=true, no filter applied (shows all)
+      // When includeArchived=true, no filter applied (shows all)
       expect(captureQuery.query?.archived).toBeUndefined()
       expect(result.projects).toHaveLength(2)
       expect(result.total).toBe(2)
     })
 
-    it("excludes archived when archived=false explicitly", async () => {
+    it("excludes archived when includeArchived=false explicitly", async () => {
       const captureQuery: MockConfig["captureQuery"] = {}
       const projects = [
         makeProject({ identifier: "ACTIVE", archived: false }),
@@ -195,7 +195,7 @@ describe("listProjects", () => {
       const testLayer = createTestLayerWithMocks({ projects, captureQuery })
 
       await Effect.runPromise(
-        listProjects({ archived: false }).pipe(Effect.provide(testLayer))
+        listProjects({ includeArchived: false }).pipe(Effect.provide(testLayer))
       )
 
       expect(captureQuery.query?.archived).toBe(false)

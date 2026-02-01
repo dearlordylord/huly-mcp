@@ -44,8 +44,7 @@ export const listProjects = (
     const query: Record<string, unknown> = {}
 
     // By default, exclude archived projects
-    const includeArchived = params.archived ?? false
-    if (!includeArchived) {
+    if (!params.includeArchived) {
       query.archived = false
     }
 

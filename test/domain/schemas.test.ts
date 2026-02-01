@@ -423,12 +423,12 @@ describe("Domain Schemas", () => {
     it("parses with all options", async () => {
       const result = await Effect.runPromise(
         parseListProjectsParams({
-          archived: true,
+          includeArchived: true,
           limit: 25,
         })
       )
       expect(result).toEqual({
-        archived: true,
+        includeArchived: true,
         limit: 25,
       })
     })
@@ -470,7 +470,7 @@ describe("Domain Schemas", () => {
       expect(schema.type).toBe("object")
       // No required fields for list_projects (empty array or undefined)
       expect(schema.required?.length ?? 0).toBe(0)
-      expect(schema.properties).toHaveProperty("archived")
+      expect(schema.properties).toHaveProperty("includeArchived")
       expect(schema.properties).toHaveProperty("limit")
     })
 
