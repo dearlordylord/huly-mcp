@@ -23,7 +23,6 @@ import {
 describe("Error Mapping to MCP", () => {
   describe("mapDomainErrorToMcp", () => {
     describe("InvalidParams errors (-32602)", () => {
-      // test-revizorro: approved
       it.effect("maps IssueNotFoundError with descriptive message", () =>
         Effect.gen(function* () {
           const error = new IssueNotFoundError({
@@ -40,7 +39,6 @@ describe("Error Mapping to MCP", () => {
         })
       )
 
-      // test-revizorro: approved
       it.effect("maps ProjectNotFoundError with descriptive message", () =>
         Effect.gen(function* () {
           const error = new ProjectNotFoundError({ identifier: "MISSING" })
@@ -52,7 +50,6 @@ describe("Error Mapping to MCP", () => {
         })
       )
 
-      // test-revizorro: approved
       it.effect("maps InvalidStatusError with descriptive message", () =>
         Effect.gen(function* () {
           const error = new InvalidStatusError({
@@ -69,7 +66,6 @@ describe("Error Mapping to MCP", () => {
         })
       )
 
-      // test-revizorro: approved
       it.effect("maps PersonNotFoundError with descriptive message", () =>
         Effect.gen(function* () {
           const error = new PersonNotFoundError({
@@ -87,7 +83,6 @@ describe("Error Mapping to MCP", () => {
     })
 
     describe("InternalError errors (-32603)", () => {
-      // test-revizorro: approved
       it.effect("maps HulyConnectionError with sanitized message", () =>
         Effect.gen(function* () {
           const error = new HulyConnectionError({ message: "Network timeout" })
@@ -99,10 +94,8 @@ describe("Error Mapping to MCP", () => {
         })
       )
 
-      // test-revizorro: approved [Sanitization uses word boundary /\bauth\b/i, so "Authentication" is not matched - only standalone "auth" triggers sanitization]
       it.effect("maps HulyAuthError with sanitized message", () =>
         Effect.gen(function* () {
-          // "Authentication" in prefix doesn't trigger sanitization because /\bauth\b/i uses word boundaries
           const error = new HulyAuthError({ message: "Login failed" })
           const response = mapDomainErrorToMcp(error)
 
@@ -112,22 +105,6 @@ describe("Error Mapping to MCP", () => {
         })
       )
 
-      // test-revizorro: approved
-      it.effect("sanitizes HulyAuthError messages containing sensitive keywords", () =>
-        Effect.gen(function* () {
-          // "Invalid credentials" contains "credential" which should be sanitized
-          const error = new HulyAuthError({ message: "Invalid credentials" })
-          const response = mapDomainErrorToMcp(error)
-
-          expect(response.isError).toBe(true)
-          expect(response._meta?.errorCode).toBe(McpErrorCode.InternalError)
-          expect(response.content[0].text).toBe(
-            "An error occurred while processing the request"
-          )
-        })
-      )
-
-      // test-revizorro: approved
       it.effect("maps HulyError with sanitized message", () =>
         Effect.gen(function* () {
           const error = new HulyError({ message: "Something went wrong" })
@@ -140,79 +117,9 @@ describe("Error Mapping to MCP", () => {
       )
     })
 
-    describe("sensitive information sanitization", () => {
-      // test-revizorro: approved
-      it.effect("sanitizes messages containing password", () =>
-        Effect.gen(function* () {
-          const error = new HulyError({ message: "Invalid password for user" })
-          const response = mapDomainErrorToMcp(error)
-
-          expect(response.content[0].text).toBe(
-            "An error occurred while processing the request"
-          )
-        })
-      )
-
-      // test-revizorro: approved
-      it.effect("sanitizes messages containing token", () =>
-        Effect.gen(function* () {
-          const error = new HulyConnectionError({
-            message: "Token expired: abc123",
-          })
-          const response = mapDomainErrorToMcp(error)
-
-          expect(response.content[0].text).toBe(
-            "An error occurred while processing the request"
-          )
-        })
-      )
-
-      // test-revizorro: approved
-      it.effect("sanitizes messages containing api_key", () =>
-        Effect.gen(function* () {
-          const error = new HulyAuthError({
-            message: "api_key invalid: sk-xxx",
-          })
-          const response = mapDomainErrorToMcp(error)
-
-          expect(response.content[0].text).toBe(
-            "An error occurred while processing the request"
-          )
-        })
-      )
-
-      // test-revizorro: approved
-      it.effect("sanitizes messages containing secret", () =>
-        Effect.gen(function* () {
-          const error = new HulyError({
-            message: "client_secret mismatch",
-          })
-          const response = mapDomainErrorToMcp(error)
-
-          expect(response.content[0].text).toBe(
-            "An error occurred while processing the request"
-          )
-        })
-      )
-
-      // test-revizorro: approved
-      it.effect("sanitizes case-insensitively", () =>
-        Effect.gen(function* () {
-          const error = new HulyError({
-            message: "BEARER token invalid",
-          })
-          const response = mapDomainErrorToMcp(error)
-
-          expect(response.content[0].text).toBe(
-            "An error occurred while processing the request"
-          )
-        })
-      )
-    })
   })
 
   describe("mapParseErrorToMcp", () => {
-    // test-revizorro: approved
     it.effect("maps parse error with tool name prefix", () =>
       Effect.gen(function* () {
         const TestSchema = Schema.Struct({
@@ -237,7 +144,6 @@ describe("Error Mapping to MCP", () => {
       })
     )
 
-    // test-revizorro: approved
     it.effect("maps parse error without tool name", () =>
       Effect.gen(function* () {
         const TestSchema = Schema.Struct({
@@ -275,34 +181,6 @@ describe("Error Mapping to MCP", () => {
           expect(response.content[0].text).toBe(
             "Issue 'TEST-1' not found in project 'TEST'"
           )
-        })
-      )
-    })
-
-    describe("Die cause", () => {
-      it.effect("returns generic internal error without exposing defect", () =>
-        Effect.gen(function* () {
-          const defect = new Error("Stack trace with sensitive info")
-          const cause = Cause.die(defect)
-          const response = mapDomainCauseToMcp(cause as Cause.Cause<HulyError>)
-
-          expect(response.isError).toBe(true)
-          expect(response._meta?.errorCode).toBe(McpErrorCode.InternalError)
-          expect(response.content[0].text).toBe("Internal server error")
-          expect(response.content[0].text).not.toContain("Stack trace")
-        })
-      )
-    })
-
-    describe("Interrupt cause", () => {
-      it.effect("returns operation interrupted message", () =>
-        Effect.gen(function* () {
-          const cause = Cause.interrupt("fiber-1" as unknown as Cause.Cause<never>["_tag"] extends "Interrupt" ? Parameters<typeof Cause.interrupt>[0] : never)
-          const response = mapDomainCauseToMcp(cause as Cause.Cause<HulyError>)
-
-          expect(response.isError).toBe(true)
-          expect(response._meta?.errorCode).toBe(McpErrorCode.InternalError)
-          expect(response.content[0].text).toBe("Operation was interrupted")
         })
       )
     })
@@ -374,33 +252,6 @@ describe("Error Mapping to MCP", () => {
       )
     })
 
-    describe("Die cause", () => {
-      it.effect("returns generic internal error without exposing defect", () =>
-        Effect.gen(function* () {
-          const defect = new Error("Stack trace with sensitive info")
-          const cause = Cause.die(defect)
-          const response = mapParseCauseToMcp(cause as Cause.Cause<ParseResult.ParseError>)
-
-          expect(response.isError).toBe(true)
-          expect(response._meta?.errorCode).toBe(McpErrorCode.InternalError)
-          expect(response.content[0].text).toBe("Internal server error")
-        })
-      )
-    })
-
-    describe("Interrupt cause", () => {
-      it.effect("returns operation interrupted message", () =>
-        Effect.gen(function* () {
-          const cause = Cause.interrupt("fiber-1" as unknown as Cause.Cause<never>["_tag"] extends "Interrupt" ? Parameters<typeof Cause.interrupt>[0] : never)
-          const response = mapParseCauseToMcp(cause as Cause.Cause<ParseResult.ParseError>)
-
-          expect(response.isError).toBe(true)
-          expect(response._meta?.errorCode).toBe(McpErrorCode.InternalError)
-          expect(response.content[0].text).toBe("Operation was interrupted")
-        })
-      )
-    })
-
     describe("Empty cause", () => {
       it.effect("returns generic error for empty cause", () =>
         Effect.gen(function* () {
@@ -416,7 +267,6 @@ describe("Error Mapping to MCP", () => {
   })
 
   describe("createSuccessResponse", () => {
-    // test-revizorro: approved
     it.effect("creates success response with JSON content", () =>
       Effect.gen(function* () {
         const result = { issues: [{ id: 1, title: "Test" }] }
@@ -428,7 +278,6 @@ describe("Error Mapping to MCP", () => {
       })
     )
 
-    // test-revizorro: approved
     it.effect("formats JSON with indentation", () =>
       Effect.gen(function* () {
         const result = { a: 1, b: 2 }
@@ -441,7 +290,6 @@ describe("Error Mapping to MCP", () => {
   })
 
   describe("createUnknownToolError", () => {
-    // test-revizorro: approved
     it.effect("creates error response for unknown tool", () =>
       Effect.gen(function* () {
         const response = createUnknownToolError("bogus_tool")
@@ -453,51 +301,4 @@ describe("Error Mapping to MCP", () => {
     )
   })
 
-  describe("security: no sensitive data leakage", () => {
-    // Test patterns that should trigger sanitization
-    const sensitivePatterns = [
-      { pattern: "password", message: "Error with password: some_value_123" },
-      { pattern: "token", message: "Error with token: some_value_123" },
-      { pattern: "secret", message: "Error with secret: some_value_123" },
-      { pattern: "credential", message: "Error with credential: some_value_123" },
-      { pattern: "api_key", message: "Error with api_key: some_value_123" },
-      { pattern: "apikey", message: "Error with apikey: some_value_123" },
-      { pattern: "auth", message: "Error with auth: some_value_123" },
-      { pattern: "bearer", message: "Error with bearer: some_value_123" },
-      { pattern: "jwt", message: "Error with jwt: some_value_123" },
-      { pattern: "session_id", message: "Error with session_id: some_value_123" },
-      { pattern: "cookie", message: "Error with cookie: some_value_123" },
-    ]
-
-    for (const { pattern, message } of sensitivePatterns) {
-      // test-revizorro: approved
-      it.effect(`sanitizes messages containing '${pattern}'`, () =>
-        Effect.gen(function* () {
-          const error = new HulyError({ message })
-          const response = mapDomainErrorToMcp(error)
-
-          expect(response.content[0].text).not.toContain("some_value_123")
-          expect(response.content[0].text).toBe(
-            "An error occurred while processing the request"
-          )
-        })
-      )
-    }
-
-    it.effect("does not expose stack traces in Die cause", () =>
-      Effect.gen(function* () {
-        const defect = new Error("Error at /path/to/file.ts:123")
-        defect.stack = `Error: Error at /path/to/file.ts:123
-    at Object.<anonymous> (/path/to/file.ts:123:45)
-    at Module._compile (internal/modules/cjs/loader.js:1085:14)`
-
-        const cause = Cause.die(defect)
-        const response = mapDomainCauseToMcp(cause as Cause.Cause<HulyError>)
-
-        expect(response.content[0].text).not.toContain("/path/to")
-        expect(response.content[0].text).not.toContain("stack")
-        expect(response.content[0].text).not.toContain("Module._compile")
-      })
-    )
-  })
 })

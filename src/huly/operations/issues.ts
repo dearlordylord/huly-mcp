@@ -24,7 +24,7 @@ import {
 import { makeRank } from "@hcengineering/rank"
 import type { TagElement, TagReference } from "@hcengineering/tags"
 import { type Issue as HulyIssue, IssuePriority, type Project as HulyProject } from "@hcengineering/tracker"
-import { Effect } from "effect"
+import { absurd, Effect } from 'effect';
 
 import type {
   AddLabelParams,
@@ -52,36 +52,22 @@ const tags = require("@hcengineering/tags").default as typeof import("@hcenginee
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
 
-// --- Types ---
-
-/**
- * Errors that listIssues can produce.
- */
 export type ListIssuesError =
   | HulyClientError
   | ProjectNotFoundError
   | InvalidStatusError
 
-/**
- * Errors that getIssue can produce.
- */
 export type GetIssueError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueNotFoundError
 
-/**
- * Errors that createIssue can produce.
- */
 export type CreateIssueError =
   | HulyClientError
   | ProjectNotFoundError
   | InvalidStatusError
   | PersonNotFoundError
 
-/**
- * Errors that updateIssue can produce.
- */
 export type UpdateIssueError =
   | HulyClientError
   | ProjectNotFoundError
@@ -89,27 +75,16 @@ export type UpdateIssueError =
   | InvalidStatusError
   | PersonNotFoundError
 
-/**
- * Errors that addLabel can produce.
- */
 export type AddLabelError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueNotFoundError
 
-/**
- * Errors that deleteIssue can produce.
- */
 export type DeleteIssueError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueNotFoundError
 
-// --- Priority Mapping ---
-
-/**
- * Map Huly numeric priority to string.
- */
 const priorityToString = (priority: IssuePriority): IssuePriorityStr => {
   switch (priority) {
     case IssuePriority.Urgent:
@@ -121,15 +96,14 @@ const priorityToString = (priority: IssuePriority): IssuePriorityStr => {
     case IssuePriority.Low:
       return "low"
     case IssuePriority.NoPriority:
-    default:
       return "no-priority"
+    default:
+      absurd(priority);
+      throw new Error("Invalid priority");
   }
 }
 
-/**
- * Map string priority to Huly numeric priority.
- */
-const stringToPriority = (priority: IssuePriorityStr | undefined): IssuePriority => {
+const stringToPriority = (priority: IssuePriorityStr): IssuePriority => {
   switch (priority) {
     case "urgent":
       return IssuePriority.Urgent
@@ -140,17 +114,14 @@ const stringToPriority = (priority: IssuePriorityStr | undefined): IssuePriority
     case "low":
       return IssuePriority.Low
     case "no-priority":
-    default:
       return IssuePriority.NoPriority
+    default:
+      absurd(priority);
+      throw new Error("Invalid priority");
   }
 }
 
-// --- Status Category Helpers ---
 
-/**
- * Status with category information for filtering.
- * Status._id is Ref<Status> which is a branded string, compatible with Ref<Doc>.
- */
 type StatusWithCategory = Status & { category?: Ref<StatusCategory> }
 
 /**
@@ -612,7 +583,7 @@ export const createIssue = (
       )
     }
 
-    const priority = stringToPriority(params.priority)
+    const priority = stringToPriority(params.priority || "no-priority")
     const identifier = `${project.identifier}-${sequence}`
 
     const issueData: AttachedData<HulyIssue> = {

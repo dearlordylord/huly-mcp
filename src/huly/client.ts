@@ -1,11 +1,4 @@
 /**
- * HulyClient service for Huly MCP server.
- *
- * Provides authenticated connection to Huly platform with:
- * - REST-based connection (stateless HTTP requests)
- * - Retry on connection failures
- * - Error mapping to HulyConnectionError/HulyAuthError
- *
  * @module
  */
 import {
@@ -42,41 +35,22 @@ import { Context, Effect, Layer, Redacted, Schedule } from "effect"
 import { HulyConfigService } from "../config/config.js"
 import { HulyAuthError, HulyConnectionError } from "./errors.js"
 
-// --- Error Type ---
-
-/**
- * Union of errors that HulyClient operations can produce.
- */
 export type HulyClientError = HulyConnectionError | HulyAuthError
 
-// --- HulyClient Service Interface ---
 
-/**
- * Operations exposed by the HulyClient service.
- * Wraps TxOperations methods with Effect error handling.
- */
 export interface HulyClientOperations {
-  /**
-   * Find multiple documents.
-   */
   readonly findAll: <T extends Doc>(
     _class: Ref<Class<T>>,
     query: DocumentQuery<T>,
     options?: FindOptions<T>
   ) => Effect.Effect<FindResult<T>, HulyClientError>
 
-  /**
-   * Find a single document.
-   */
   readonly findOne: <T extends Doc>(
     _class: Ref<Class<T>>,
     query: DocumentQuery<T>,
     options?: FindOptions<T>
   ) => Effect.Effect<WithLookup<T> | undefined, HulyClientError>
 
-  /**
-   * Create a new document.
-   */
   readonly createDoc: <T extends Doc>(
     _class: Ref<Class<T>>,
     space: Ref<Space>,
@@ -84,9 +58,6 @@ export interface HulyClientOperations {
     id?: Ref<T>
   ) => Effect.Effect<Ref<T>, HulyClientError>
 
-  /**
-   * Update an existing document.
-   */
   readonly updateDoc: <T extends Doc>(
     _class: Ref<Class<T>>,
     space: Ref<Space>,
@@ -95,9 +66,6 @@ export interface HulyClientOperations {
     retrieve?: boolean
   ) => Effect.Effect<TxResult, HulyClientError>
 
-  /**
-   * Add a document to a collection.
-   */
   readonly addCollection: <T extends Doc, P extends AttachedDoc>(
     _class: Ref<Class<P>>,
     space: Ref<Space>,
@@ -108,18 +76,12 @@ export interface HulyClientOperations {
     id?: Ref<P>
   ) => Effect.Effect<Ref<P>, HulyClientError>
 
-  /**
-   * Remove a document.
-   */
   readonly removeDoc: <T extends Doc>(
     _class: Ref<Class<T>>,
     space: Ref<Space>,
     objectId: Ref<T>
   ) => Effect.Effect<TxResult, HulyClientError>
 
-  /**
-   * Upload markup content.
-   */
   readonly uploadMarkup: (
     objectClass: Ref<Class<Doc>>,
     objectId: Ref<Doc>,
@@ -128,9 +90,6 @@ export interface HulyClientOperations {
     format: MarkupFormat
   ) => Effect.Effect<MarkupRef, HulyClientError>
 
-  /**
-   * Fetch markup content.
-   */
   readonly fetchMarkup: (
     objectClass: Ref<Class<Doc>>,
     objectId: Ref<Doc>,
@@ -140,20 +99,10 @@ export interface HulyClientOperations {
   ) => Effect.Effect<string, HulyClientError>
 }
 
-// --- HulyClient Service Tag ---
-
-/**
- * HulyClient service tag.
- * Provides authenticated access to Huly platform operations.
- */
 export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
   HulyClient,
   HulyClientOperations
 >() {
-  /**
-   * Production layer - connects to Huly platform via REST.
-   * Uses stateless HTTP requests instead of WebSocket.
-   */
   static readonly layer: Layer.Layer<
     HulyClient,
     HulyClientError,
@@ -192,7 +141,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
           withClient(
             (client) => client.findAll(_class, query, options),
             "findAll failed"
-          ) as Effect.Effect<FindResult<T>, HulyClientError>,
+          ),
 
         findOne: <T extends Doc>(
           _class: Ref<Class<T>>,
@@ -202,7 +151,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
           withClient(
             (client) => client.findOne(_class, query, options),
             "findOne failed"
-          ) as Effect.Effect<WithLookup<T> | undefined, HulyClientError>,
+          ),
 
         createDoc: <T extends Doc>(
           _class: Ref<Class<T>>,
@@ -213,7 +162,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
           withClient(
             (client) => client.createDoc(_class, space, attributes, id),
             "createDoc failed"
-          ) as Effect.Effect<Ref<T>, HulyClientError>,
+          ),
 
         updateDoc: <T extends Doc>(
           _class: Ref<Class<T>>,
@@ -248,7 +197,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
                 id
               ),
             "addCollection failed"
-          ) as Effect.Effect<Ref<P>, HulyClientError>,
+          ),
 
         removeDoc: <T extends Doc>(
           _class: Ref<Class<T>>,
@@ -285,10 +234,6 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
     })
   )
 
-  /**
-   * Create a test layer with mock operations.
-   * For unit testing without actual Huly connection.
-   */
   static testLayer(
     mockOperations: Partial<HulyClientOperations>
   ): Layer.Layer<HulyClient> {
@@ -335,11 +280,6 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
   }
 }
 
-// --- Internal Types ---
-
-/**
- * Connection config for internal use.
- */
 interface ConnectionConfig {
   url: string
   email: string
@@ -347,9 +287,6 @@ interface ConnectionConfig {
   workspace: string
 }
 
-/**
- * Markup operations interface (matches internal Huly implementation).
- */
 interface MarkupOperations {
   fetchMarkup: (
     objectClass: Ref<Class<Doc>>,
@@ -367,28 +304,17 @@ interface MarkupOperations {
   ) => Promise<MarkupRef>
 }
 
-/**
- * REST connection result.
- */
 interface RestConnection {
   client: TxOperations
   markupOps: MarkupOperations
 }
 
-// --- Internal Functions ---
-
-/**
- * Concatenate URL host and path.
- */
 const concatLink = (host: string, path: string): string => {
   const trimmedHost = host.endsWith("/") ? host.slice(0, -1) : host
   const trimmedPath = path.startsWith("/") ? path : `/${path}`
   return `${trimmedHost}${trimmedPath}`
 }
 
-/**
- * Check if error looks like an auth error.
- */
 const isAuthError = (error: unknown): boolean => {
   const msg = String(error).toLowerCase()
   return (
@@ -403,10 +329,6 @@ const isAuthError = (error: unknown): boolean => {
   )
 }
 
-/**
- * Create markup operations using collaborator client.
- * This is HTTP-based and independent of transport.
- */
 function createMarkupOps(
   url: string,
   workspace: WorkspaceUuid,

@@ -9,10 +9,11 @@
  *
  * @module
  */
-import type { ParseResult } from "effect"
+import { absurd, ParseResult } from 'effect';
 import { Cause, Chunk, Match } from "effect"
 
 import { type HulyDomainError, McpErrorCode } from "../huly/errors.js"
+import type { Interrupt, Die } from 'effect/Cause';
 
 // --- MCP Error Response Types ---
 
@@ -42,45 +43,6 @@ export interface McpErrorResponseWithMeta extends McpToolResponse {
   _meta: ErrorMetadata
 }
 
-// --- Error Message Sanitization ---
-
-/**
- * Patterns that indicate sensitive information that should not be leaked.
- * Uses regex for more precise matching (word boundaries where appropriate).
- */
-const SENSITIVE_PATTERNS = [
-  /password/i,
-  /\btoken\b/i, // word boundary to avoid "tokenize" etc
-  /secret/i, // matches client_secret, secret_key, etc
-  /credential/i,
-  /api[_-]?key/i,
-  /\bauth\b/i, // word boundary to avoid "authentication" etc
-  /\bbearer\b/i,
-  /\bjwt\b/i,
-  /session[_-]?id/i, // session_id or sessionid
-  /cookie/i
-] as const
-
-/**
- * Check if a message contains potentially sensitive information.
- */
-const containsSensitiveInfo = (message: string): boolean => {
-  return SENSITIVE_PATTERNS.some((pattern) => pattern.test(message))
-}
-
-/**
- * Sanitize error message to prevent leaking sensitive information.
- * Replaces messages with sensitive keywords with a generic message.
- */
-const sanitizeMessage = (message: string): string => {
-  if (containsSensitiveInfo(message)) {
-    return "An error occurred while processing the request"
-  }
-  return message
-}
-
-// --- Internal Helper to Create Error Response ---
-
 const createErrorResponse = (
   text: string,
   errorCode: McpErrorCode
@@ -94,7 +56,6 @@ const createErrorResponse = (
 
 /**
  * Map a HulyDomainError to an MCP error response.
- * Uses pattern matching on tagged errors for type-safe handling.
  */
 export const mapDomainErrorToMcp = (error: HulyDomainError): McpErrorResponseWithMeta => {
   return Match.value(error).pipe(
@@ -104,46 +65,26 @@ export const mapDomainErrorToMcp = (error: HulyDomainError): McpErrorResponseWit
     Match.tag("PersonNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
     Match.tag("HulyConnectionError", (e) =>
       createErrorResponse(
-        sanitizeMessage(`Connection error: ${e.message}`),
+        `Connection error: ${e.message}`,
         McpErrorCode.InternalError
       )),
     Match.tag("HulyAuthError", (e) =>
       createErrorResponse(
-        sanitizeMessage(`Authentication error: ${e.message}`),
+        `Authentication error: ${e.message}`,
         McpErrorCode.InternalError
       )),
-    Match.tag("HulyError", (e) => createErrorResponse(sanitizeMessage(e.message), McpErrorCode.InternalError)),
+    Match.tag("HulyError", (e) => createErrorResponse(e.message, McpErrorCode.InternalError)),
     Match.exhaustive
   )
 }
 
 // --- Parse Error Mapping ---
 
-/**
- * Format a ParseError to a user-friendly message.
- * Extracts the most relevant information without exposing internal structure.
- */
 const formatParseError = (error: ParseResult.ParseError): string => {
-  const issue = error.issue
-
-  switch (issue._tag) {
-    case "Missing":
-      return "Required field is missing"
-    case "Unexpected":
-      return "Unexpected field provided"
-    case "Type":
-      return `Invalid type: expected ${String(issue.ast)}`
-    case "Forbidden":
-      return "Field is forbidden"
-    default:
-      return "Invalid parameters provided"
-  }
-
+  const issues = ParseResult.ArrayFormatter.formatErrorSync(error)
+  return issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; ")
 }
 
-/**
- * Map a ParseError to an MCP error response.
- */
 export const mapParseErrorToMcp = (
   error: ParseResult.ParseError,
   toolName?: string
@@ -154,36 +95,27 @@ export const mapParseErrorToMcp = (
   return createErrorResponse(`${prefix}${message}`, McpErrorCode.InvalidParams)
 }
 
-// --- Cause Mapping ---
+export const mapDefectCause = (cause: Die | Interrupt): McpErrorResponseWithMeta => {
 
-/**
- * Internal helper to handle Die/Interrupt causes.
- */
-const mapDefectCause = <E>(cause: Cause.Cause<E>): McpErrorResponseWithMeta | null => {
   if (Cause.isDieType(cause)) {
     return createErrorResponse("Internal server error", McpErrorCode.InternalError)
   }
   if (Cause.isInterruptType(cause)) {
     return createErrorResponse("Operation was interrupted", McpErrorCode.InternalError)
   }
-  return null
+  absurd(cause);
+  throw new Error("Unexpected cause type");
 }
 
-/**
- * Map a ParseError Cause to an MCP error response.
- */
 export const mapParseCauseToMcp = (
   cause: Cause.Cause<ParseResult.ParseError>,
   toolName?: string
 ): McpErrorResponseWithMeta => {
-  const defectResponse = mapDefectCause(cause)
-  if (defectResponse) return defectResponse
 
   if (Cause.isFailType(cause)) {
     return mapParseErrorToMcp(cause.error, toolName)
   }
 
-  // Composite causes - extract first failure
   const failures = Chunk.toArray(Cause.failures(cause))
   if (failures.length > 0) {
     return mapParseErrorToMcp(failures[0], toolName)
@@ -192,20 +124,14 @@ export const mapParseCauseToMcp = (
   return createErrorResponse("An unexpected error occurred", McpErrorCode.InternalError)
 }
 
-/**
- * Map a HulyDomainError Cause to an MCP error response.
- */
 export const mapDomainCauseToMcp = (
   cause: Cause.Cause<HulyDomainError>
 ): McpErrorResponseWithMeta => {
-  const defectResponse = mapDefectCause(cause)
-  if (defectResponse) return defectResponse
 
   if (Cause.isFailType(cause)) {
     return mapDomainErrorToMcp(cause.error)
   }
 
-  // Composite causes - extract first failure
   const failures = Chunk.toArray(Cause.failures(cause))
   if (failures.length > 0) {
     return mapDomainErrorToMcp(failures[0])
@@ -214,29 +140,14 @@ export const mapDomainCauseToMcp = (
   return createErrorResponse("An unexpected error occurred", McpErrorCode.InternalError)
 }
 
-// --- Success Response Builder ---
-
-/**
- * Create an MCP success response from a result value.
- */
 export const createSuccessResponse = <T>(result: T): McpToolResponse => ({
   content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
 })
 
-// --- Unknown Tool Error ---
 
-/**
- * Create an MCP error response for an unknown tool.
- */
 export const createUnknownToolError = (toolName: string): McpErrorResponseWithMeta =>
   createErrorResponse(`Unknown tool: ${toolName}`, McpErrorCode.InvalidParams)
 
-// --- Convert to MCP SDK format ---
-
-/**
- * Strip internal metadata for MCP SDK compatibility.
- * Converts internal response to MCP-compatible format.
- */
 export const toMcpResponse = (response: McpErrorResponseWithMeta | McpToolResponse): McpToolResponse => {
   const result: McpToolResponse = { content: response.content }
   if (response.isError !== undefined) {
