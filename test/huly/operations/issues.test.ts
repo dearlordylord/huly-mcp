@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest"
-import { Effect, Exit } from "effect"
+import { describe, it } from "@effect/vitest"
+import { expect } from "vitest"
+import { Effect } from "effect"
 import type {
   Doc,
   FindResult,
@@ -345,840 +346,616 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 describe("listIssues", () => {
   describe("basic functionality", () => {
     // test-revizorro: approved
-    it("returns issues for a project", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      // Input: older issue first (opposite of expected output order)
-      const issues = [
-        makeIssue({ identifier: "TEST-2", title: "Issue 2", modifiedOn: 1000 }),
-        makeIssue({ identifier: "TEST-1", title: "Issue 1", modifiedOn: 2000 }),
-      ]
-      const statuses = [
-        makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" }),
-      ]
+    it.effect("returns issues for a project", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        // Input: older issue first (opposite of expected output order)
+        const issues = [
+          makeIssue({ identifier: "TEST-2", title: "Issue 2", modifiedOn: 1000 }),
+          makeIssue({ identifier: "TEST-1", title: "Issue 1", modifiedOn: 2000 }),
+        ]
+        const statuses = [
+          makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" }),
+        ]
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues,
-        statuses,
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues,
+          statuses,
+        })
+
+        const result = yield* listIssues({ project: "TEST" }).pipe(Effect.provide(testLayer))
+
+        expect(result).toHaveLength(2)
+        // Expect sorted by modifiedOn descending (newer first)
+        expect(result[0].identifier).toBe("TEST-1")
+        expect(result[1].identifier).toBe("TEST-2")
       })
-
-      const result = await Effect.runPromise(
-        listIssues({ project: "TEST" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(result).toHaveLength(2)
-      // Expect sorted by modifiedOn descending (newer first)
-      expect(result[0].identifier).toBe("TEST-1")
-      expect(result[1].identifier).toBe("TEST-2")
-    })
+    )
 
     // test-revizorro: approved
-    it("transforms priority correctly", async () => {
-      const project = makeProject()
-      const issues = [
-        makeIssue({ identifier: "TEST-1", priority: IssuePriority.Urgent }),
-        makeIssue({ identifier: "TEST-2", priority: IssuePriority.High }),
-        makeIssue({ identifier: "TEST-3", priority: IssuePriority.Medium }),
-        makeIssue({ identifier: "TEST-4", priority: IssuePriority.Low }),
-        makeIssue({ identifier: "TEST-5", priority: IssuePriority.NoPriority }),
-      ]
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("transforms priority correctly", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const issues = [
+          makeIssue({ identifier: "TEST-1", priority: IssuePriority.Urgent }),
+          makeIssue({ identifier: "TEST-2", priority: IssuePriority.High }),
+          makeIssue({ identifier: "TEST-3", priority: IssuePriority.Medium }),
+          makeIssue({ identifier: "TEST-4", priority: IssuePriority.Low }),
+          makeIssue({ identifier: "TEST-5", priority: IssuePriority.NoPriority }),
+        ]
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues,
-        statuses,
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues,
+          statuses,
+        })
+
+        const result = yield* listIssues({ project: "TEST" }).pipe(Effect.provide(testLayer))
+
+        expect(result[0].priority).toBe("urgent")
+        expect(result[1].priority).toBe("high")
+        expect(result[2].priority).toBe("medium")
+        expect(result[3].priority).toBe("low")
+        expect(result[4].priority).toBe("no-priority")
       })
-
-      const result = await Effect.runPromise(
-        listIssues({ project: "TEST" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(result[0].priority).toBe("urgent")
-      expect(result[1].priority).toBe("high")
-      expect(result[2].priority).toBe("medium")
-      expect(result[3].priority).toBe("low")
-      expect(result[4].priority).toBe("no-priority")
-    })
+    )
 
     // test-revizorro: approved
-    it("includes assignee name when assigned", async () => {
-      const project = makeProject()
-      const person = makePerson({ _id: "person-1" as Ref<Person>, name: "Jane Doe" })
-      const issues = [
-        makeIssue({ assignee: "person-1" as Ref<Person> }),
-      ]
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("includes assignee name when assigned", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const person = makePerson({ _id: "person-1" as Ref<Person>, name: "Jane Doe" })
+        const issues = [
+          makeIssue({ assignee: "person-1" as Ref<Person> }),
+        ]
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues,
-        statuses,
-        persons: [person],
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues,
+          statuses,
+          persons: [person],
+        })
+
+        const result = yield* listIssues({ project: "TEST" }).pipe(Effect.provide(testLayer))
+
+        expect(result[0].assignee).toBe("Jane Doe")
       })
-
-      const result = await Effect.runPromise(
-        listIssues({ project: "TEST" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(result[0].assignee).toBe("Jane Doe")
-    })
+    )
   })
 
   describe("error handling", () => {
     // test-revizorro: scheduled
-    it("returns ProjectNotFoundError when project doesn't exist", async () => {
-      const testLayer = createTestLayerWithMocks({
-        projects: [],
-        issues: [],
-        statuses: [],
+    it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
+      Effect.gen(function* () {
+        const testLayer = createTestLayerWithMocks({
+          projects: [],
+          issues: [],
+          statuses: [],
+        })
+
+        const error = yield* Effect.flip(
+          listIssues({ project: "NONEXISTENT" }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("ProjectNotFoundError")
+        expect((error as ProjectNotFoundError).identifier).toBe("NONEXISTENT")
       })
-
-      const exit = await Effect.runPromiseExit(
-        listIssues({ project: "NONEXISTENT" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const cause = exit.cause
-        expect(cause._tag).toBe("Fail")
-        if (cause._tag === "Fail") {
-          expect((cause.error as ProjectNotFoundError)._tag).toBe("ProjectNotFoundError")
-          expect((cause.error as ProjectNotFoundError).identifier).toBe("NONEXISTENT")
-        }
-      }
-    })
+    )
 
     // test-revizorro: approved
-    it("returns InvalidStatusError for unknown status name", async () => {
-      const project = makeProject()
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("returns InvalidStatusError for unknown status name", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses,
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses,
+        })
+
+        const error = yield* Effect.flip(
+          listIssues({ project: "TEST", status: "InvalidStatus" }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("InvalidStatusError")
+        expect((error as InvalidStatusError).status).toBe("InvalidStatus")
       })
-
-      const exit = await Effect.runPromiseExit(
-        listIssues({ project: "TEST", status: "InvalidStatus" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const cause = exit.cause
-        if (cause._tag === "Fail") {
-          expect((cause.error as InvalidStatusError)._tag).toBe("InvalidStatusError")
-          expect((cause.error as InvalidStatusError).status).toBe("InvalidStatus")
-        }
-      }
-    })
+    )
   })
 
   describe("status filtering", () => {
     // test-revizorro: approved
-    it("filters by exact status name (case insensitive)", async () => {
-      const project = makeProject()
-      const inProgressStatus = makeStatus({ _id: "status-progress" as Ref<Status>, name: "In Progress" })
-      const todoStatus = makeStatus({ _id: "status-todo" as Ref<Status>, name: "Todo" })
-      const statuses = [inProgressStatus, todoStatus]
-      const issues = [
-        makeIssue({ status: "status-progress" as Ref<Status> }),
-      ]
+    it.effect("filters by exact status name (case insensitive)", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const inProgressStatus = makeStatus({ _id: "status-progress" as Ref<Status>, name: "In Progress" })
+        const todoStatus = makeStatus({ _id: "status-todo" as Ref<Status>, name: "Todo" })
+        const statuses = [inProgressStatus, todoStatus]
+        const issues = [
+          makeIssue({ status: "status-progress" as Ref<Status> }),
+        ]
 
-      const captureQuery: MockConfig["captureIssueQuery"] = {}
+        const captureQuery: MockConfig["captureIssueQuery"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues,
-        statuses,
-        captureIssueQuery: captureQuery,
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues,
+          statuses,
+          captureIssueQuery: captureQuery,
+        })
+
+        // "in progress" (lowercase) should match "In Progress" status
+        yield* listIssues({ project: "TEST", status: "in progress" }).pipe(Effect.provide(testLayer))
+
+        expect(captureQuery.query?.status).toBe("status-progress")
       })
-
-      // "in progress" (lowercase) should match "In Progress" status
-      await Effect.runPromise(
-        listIssues({ project: "TEST", status: "in progress" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(captureQuery.query?.status).toBe("status-progress")
-    })
+    )
 
     // test-revizorro: approved
-    it("reserved word 'open' filters by category (not done/canceled)", async () => {
-      const project = makeProject()
-      // Statuses with proper categories: Active (open), Won (done), Lost (canceled)
-      const statuses = [
-        makeStatus({
-          _id: "status-open" as Ref<Status>,
-          name: "Open",
-          category: task.statusCategory.Active as Ref<StatusCategory>,
-        }),
-        makeStatus({
-          _id: "status-done" as Ref<Status>,
-          name: "Done",
-          category: task.statusCategory.Won as Ref<StatusCategory>,
-        }),
-        makeStatus({
-          _id: "status-canceled" as Ref<Status>,
-          name: "Canceled",
-          category: task.statusCategory.Lost as Ref<StatusCategory>,
-        }),
-      ]
-      const issues = [makeIssue({ status: "status-open" as Ref<Status> })]
+    it.effect("reserved word 'open' filters by category (not done/canceled)", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        // Statuses with proper categories: Active (open), Won (done), Lost (canceled)
+        const statuses = [
+          makeStatus({
+            _id: "status-open" as Ref<Status>,
+            name: "Open",
+            category: task.statusCategory.Active as Ref<StatusCategory>,
+          }),
+          makeStatus({
+            _id: "status-done" as Ref<Status>,
+            name: "Done",
+            category: task.statusCategory.Won as Ref<StatusCategory>,
+          }),
+          makeStatus({
+            _id: "status-canceled" as Ref<Status>,
+            name: "Canceled",
+            category: task.statusCategory.Lost as Ref<StatusCategory>,
+          }),
+        ]
+        const issues = [makeIssue({ status: "status-open" as Ref<Status> })]
 
-      const captureQuery: MockConfig["captureIssueQuery"] = {}
+        const captureQuery: MockConfig["captureIssueQuery"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues,
-        statuses,
-        captureIssueQuery: captureQuery,
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues,
+          statuses,
+          captureIssueQuery: captureQuery,
+        })
+
+        yield* listIssues({ project: "TEST", status: "open" }).pipe(Effect.provide(testLayer))
+
+        // "open" filter should exclude done (Won) and canceled (Lost) statuses
+        expect(captureQuery.query?.status).toEqual({
+          $nin: ["status-done", "status-canceled"],
+        })
       })
-
-      await Effect.runPromise(
-        listIssues({ project: "TEST", status: "open" }).pipe(Effect.provide(testLayer))
-      )
-
-      // "open" filter should exclude done (Won) and canceled (Lost) statuses
-      expect(captureQuery.query?.status).toEqual({
-        $nin: ["status-done", "status-canceled"],
-      })
-    })
+    )
   })
 
   describe("assignee filtering", () => {
     // test-revizorro: approved
-    it("filters by assignee email", async () => {
-      const project = makeProject()
-      const person = makePerson({ _id: "person-1" as Ref<Person> })
-      const channel = makeChannel({ attachedTo: "person-1" as Ref<Doc>, value: "john@example.com" })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
-      const issues = [makeIssue({ assignee: "person-1" as Ref<Person> })]
+    it.effect("filters by assignee email", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const person = makePerson({ _id: "person-1" as Ref<Person> })
+        const channel = makeChannel({ attachedTo: "person-1" as Ref<Doc>, value: "john@example.com" })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+        const issues = [makeIssue({ assignee: "person-1" as Ref<Person> })]
 
-      const captureQuery: MockConfig["captureIssueQuery"] = {}
+        const captureQuery: MockConfig["captureIssueQuery"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues,
-        statuses,
-        persons: [person],
-        channels: [channel],
-        captureIssueQuery: captureQuery,
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues,
+          statuses,
+          persons: [person],
+          channels: [channel],
+          captureIssueQuery: captureQuery,
+        })
+
+        yield* listIssues({ project: "TEST", assignee: "john@example.com" }).pipe(Effect.provide(testLayer))
+
+        expect(captureQuery.query?.assignee).toBe("person-1")
       })
-
-      await Effect.runPromise(
-        listIssues({ project: "TEST", assignee: "john@example.com" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(captureQuery.query?.assignee).toBe("person-1")
-    })
+    )
 
     // test-revizorro: approved
-    it("returns empty results when assignee not found", async () => {
-      const project = makeProject()
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("returns empty results when assignee not found", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses,
-        persons: [],
-        channels: [],
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses,
+          persons: [],
+          channels: [],
+        })
+
+        const result = yield* listIssues({ project: "TEST", assignee: "nonexistent@example.com" }).pipe(Effect.provide(testLayer))
+
+        expect(result).toHaveLength(0)
       })
-
-      const result = await Effect.runPromise(
-        listIssues({ project: "TEST", assignee: "nonexistent@example.com" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(result).toHaveLength(0)
-    })
+    )
   })
 
   describe("limit handling", () => {
     // test-revizorro: approved
-    it("uses default limit of 50", async () => {
-      const project = makeProject()
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("uses default limit of 50", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const captureQuery: MockConfig["captureIssueQuery"] = {}
+        const captureQuery: MockConfig["captureIssueQuery"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses,
-        captureIssueQuery: captureQuery,
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses,
+          captureIssueQuery: captureQuery,
+        })
+
+        yield* listIssues({ project: "TEST" }).pipe(Effect.provide(testLayer))
+
+        expect(captureQuery.options?.limit).toBe(50)
       })
-
-      await Effect.runPromise(
-        listIssues({ project: "TEST" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(captureQuery.options?.limit).toBe(50)
-    })
+    )
 
     // test-revizorro: approved
-    it("enforces max limit of 200", async () => {
-      const project = makeProject()
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("enforces max limit of 200", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const captureQuery: MockConfig["captureIssueQuery"] = {}
+        const captureQuery: MockConfig["captureIssueQuery"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses,
-        captureIssueQuery: captureQuery,
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses,
+          captureIssueQuery: captureQuery,
+        })
+
+        yield* listIssues({ project: "TEST", limit: 500 }).pipe(Effect.provide(testLayer))
+
+        expect(captureQuery.options?.limit).toBe(200)
       })
-
-      await Effect.runPromise(
-        listIssues({ project: "TEST", limit: 500 }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(captureQuery.options?.limit).toBe(200)
-    })
+    )
 
     // test-revizorro: approved
-    it("uses provided limit when under max", async () => {
-      const project = makeProject()
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("uses provided limit when under max", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const captureQuery: MockConfig["captureIssueQuery"] = {}
+        const captureQuery: MockConfig["captureIssueQuery"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses,
-        captureIssueQuery: captureQuery,
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses,
+          captureIssueQuery: captureQuery,
+        })
+
+        yield* listIssues({ project: "TEST", limit: 25 }).pipe(Effect.provide(testLayer))
+
+        expect(captureQuery.options?.limit).toBe(25)
       })
-
-      await Effect.runPromise(
-        listIssues({ project: "TEST", limit: 25 }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(captureQuery.options?.limit).toBe(25)
-    })
+    )
   })
 
   describe("sorting", () => {
     // test-revizorro: approved
-    it("sorts by modifiedOn descending", async () => {
-      const project = makeProject()
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("sorts by modifiedOn descending", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const captureQuery: MockConfig["captureIssueQuery"] = {}
+        const captureQuery: MockConfig["captureIssueQuery"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses,
-        captureIssueQuery: captureQuery,
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses,
+          captureIssueQuery: captureQuery,
+        })
+
+        yield* listIssues({ project: "TEST" }).pipe(Effect.provide(testLayer))
+
+        // SortingOrder.Descending = -1
+        expect((captureQuery.options?.sort as Record<string, number>)?.modifiedOn).toBe(-1)
       })
-
-      await Effect.runPromise(
-        listIssues({ project: "TEST" }).pipe(Effect.provide(testLayer))
-      )
-
-      // SortingOrder.Descending = -1
-      expect((captureQuery.options?.sort as Record<string, number>)?.modifiedOn).toBe(-1)
-    })
+    )
   })
 })
 
 describe("getIssue", () => {
   describe("basic functionality", () => {
     // test-revizorro: approved
-    it("returns issue with full identifier", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({
-        identifier: "TEST-1",
-        title: "Test Issue",
-        number: 1,
-        modifiedOn: 1000,
-        createdOn: 500,
+    it.effect("returns issue with full identifier", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({
+          identifier: "TEST-1",
+          title: "Test Issue",
+          number: 1,
+          modifiedOn: 1000,
+          createdOn: 500,
+        })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+        })
+
+        const result = yield* getIssue({ project: "TEST", identifier: "TEST-1" }).pipe(Effect.provide(testLayer))
+
+        expect(result.identifier).toBe("TEST-1")
+        expect(result.title).toBe("Test Issue")
+        expect(result.status).toBe("Open")
+        expect(result.project).toBe("TEST")
       })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
-
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-      })
-
-      const result = await Effect.runPromise(
-        getIssue({ project: "TEST", identifier: "TEST-1" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(result.identifier).toBe("TEST-1")
-      expect(result.title).toBe("Test Issue")
-      expect(result.status).toBe("Open")
-      expect(result.project).toBe("TEST")
-    })
+    )
 
     // test-revizorro: approved
-    it("returns issue with numeric identifier", async () => {
-      const project = makeProject({ identifier: "HULY" })
-      const issue = makeIssue({
-        identifier: "HULY-123",
-        title: "Numeric Lookup Issue",
-        number: 123,
+    it.effect("returns issue with numeric identifier", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "HULY" })
+        const issue = makeIssue({
+          identifier: "HULY-123",
+          title: "Numeric Lookup Issue",
+          number: 123,
+        })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+        })
+
+        const result = yield* getIssue({ project: "HULY", identifier: "123" }).pipe(Effect.provide(testLayer))
+
+        expect(result.identifier).toBe("HULY-123")
+        expect(result.title).toBe("Numeric Lookup Issue")
       })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
-
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-      })
-
-      const result = await Effect.runPromise(
-        getIssue({ project: "HULY", identifier: "123" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(result.identifier).toBe("HULY-123")
-      expect(result.title).toBe("Numeric Lookup Issue")
-    })
+    )
 
     // test-revizorro: approved
-    it("returns issue with lowercase identifier", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-5", number: 5 })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("returns issue with lowercase identifier", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-5", number: 5 })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+        })
+
+        const result = yield* getIssue({ project: "TEST", identifier: "test-5" }).pipe(Effect.provide(testLayer))
+
+        expect(result.identifier).toBe("TEST-5")
       })
-
-      const result = await Effect.runPromise(
-        getIssue({ project: "TEST", identifier: "test-5" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(result.identifier).toBe("TEST-5")
-    })
+    )
 
     // test-revizorro: approved
-    it("fetches markdown description", async () => {
-      const project = makeProject()
-      const issue = makeIssue({
-        identifier: "TEST-1",
-        description: "markup-id-123" as unknown as null,
+    it.effect("fetches markdown description", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const issue = makeIssue({
+          identifier: "TEST-1",
+          description: "markup-id-123" as unknown as null,
+        })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          markupContent: {
+            "markup-id-123": "# Hello World\n\nThis is markdown content.",
+          },
+        })
+
+        const result = yield* getIssue({ project: "TEST", identifier: "TEST-1" }).pipe(Effect.provide(testLayer))
+
+        expect(result.description).toBe("# Hello World\n\nThis is markdown content.")
       })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
-
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-        markupContent: {
-          "markup-id-123": "# Hello World\n\nThis is markdown content.",
-        },
-      })
-
-      const result = await Effect.runPromise(
-        getIssue({ project: "TEST", identifier: "TEST-1" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(result.description).toBe("# Hello World\n\nThis is markdown content.")
-    })
+    )
 
     // test-revizorro: approved
-    it("includes assignee name when assigned", async () => {
-      const project = makeProject()
-      const person = makePerson({ _id: "person-1" as Ref<Person>, name: "Jane Developer" })
-      const issue = makeIssue({
-        identifier: "TEST-1",
-        assignee: "person-1" as Ref<Person>,
+    it.effect("includes assignee name when assigned", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const person = makePerson({ _id: "person-1" as Ref<Person>, name: "Jane Developer" })
+        const issue = makeIssue({
+          identifier: "TEST-1",
+          assignee: "person-1" as Ref<Person>,
+        })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          persons: [person],
+        })
+
+        const result = yield* getIssue({ project: "TEST", identifier: "TEST-1" }).pipe(Effect.provide(testLayer))
+
+        expect(result.assignee).toBe("Jane Developer")
+        expect(result.assigneeRef?.id).toBe("person-1")
+        expect(result.assigneeRef?.name).toBe("Jane Developer")
       })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
-
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-        persons: [person],
-      })
-
-      const result = await Effect.runPromise(
-        getIssue({ project: "TEST", identifier: "TEST-1" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(result.assignee).toBe("Jane Developer")
-      expect(result.assigneeRef?.id).toBe("person-1")
-      expect(result.assigneeRef?.name).toBe("Jane Developer")
-    })
+    )
 
     // test-revizorro: approved
-    it("transforms priority correctly", async () => {
-      const project = makeProject()
-      const issue = makeIssue({
-        identifier: "TEST-1",
-        priority: IssuePriority.High,
+    it.effect("transforms priority correctly", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const issue = makeIssue({
+          identifier: "TEST-1",
+          priority: IssuePriority.High,
+        })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+        })
+
+        const result = yield* getIssue({ project: "TEST", identifier: "TEST-1" }).pipe(Effect.provide(testLayer))
+
+        expect(result.priority).toBe("high")
       })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
-
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-      })
-
-      const result = await Effect.runPromise(
-        getIssue({ project: "TEST", identifier: "TEST-1" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(result.priority).toBe("high")
-    })
+    )
 
     // test-revizorro: approved
-    it("returns undefined description when not set", async () => {
-      const project = makeProject()
-      const issue = makeIssue({
-        identifier: "TEST-1",
-        description: null,
+    it.effect("returns undefined description when not set", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const issue = makeIssue({
+          identifier: "TEST-1",
+          description: null,
+        })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+        })
+
+        const result = yield* getIssue({ project: "TEST", identifier: "TEST-1" }).pipe(Effect.provide(testLayer))
+
+        expect(result.description).toBeUndefined()
       })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
-
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-      })
-
-      const result = await Effect.runPromise(
-        getIssue({ project: "TEST", identifier: "TEST-1" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(result.description).toBeUndefined()
-    })
+    )
   })
 
   describe("error handling", () => {
     // test-revizorro: approved
-    it("returns ProjectNotFoundError when project doesn't exist", async () => {
-      const testLayer = createTestLayerWithMocks({
-        projects: [],
-        issues: [],
-        statuses: [],
+    it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
+      Effect.gen(function* () {
+        const testLayer = createTestLayerWithMocks({
+          projects: [],
+          issues: [],
+          statuses: [],
+        })
+
+        const error = yield* Effect.flip(
+          getIssue({ project: "NONEXISTENT", identifier: "1" }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("ProjectNotFoundError")
+        expect((error as ProjectNotFoundError).identifier).toBe("NONEXISTENT")
       })
-
-      const exit = await Effect.runPromiseExit(
-        getIssue({ project: "NONEXISTENT", identifier: "1" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const cause = exit.cause
-        expect(cause._tag).toBe("Fail")
-        if (cause._tag === "Fail") {
-          expect((cause.error as ProjectNotFoundError)._tag).toBe("ProjectNotFoundError")
-          expect((cause.error as ProjectNotFoundError).identifier).toBe("NONEXISTENT")
-        }
-      }
-    })
+    )
 
     // test-revizorro: approved
-    it("returns IssueNotFoundError when issue doesn't exist", async () => {
-      const project = makeProject()
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("returns IssueNotFoundError when issue doesn't exist", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses,
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses,
+        })
+
+        const error = yield* Effect.flip(
+          getIssue({ project: "TEST", identifier: "TEST-999" }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("IssueNotFoundError")
+        expect((error as IssueNotFoundError).identifier).toBe("TEST-999")
+        expect((error as IssueNotFoundError).project).toBe("TEST")
       })
-
-      const exit = await Effect.runPromiseExit(
-        getIssue({ project: "TEST", identifier: "TEST-999" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const cause = exit.cause
-        expect(cause._tag).toBe("Fail")
-        if (cause._tag === "Fail") {
-          expect((cause.error as IssueNotFoundError)._tag).toBe("IssueNotFoundError")
-          expect((cause.error as IssueNotFoundError).identifier).toBe("TEST-999")
-          expect((cause.error as IssueNotFoundError).project).toBe("TEST")
-        }
-      }
-    })
+    )
 
     // test-revizorro: approved
-    it("returns IssueNotFoundError with helpful message", async () => {
-      const project = makeProject()
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("returns IssueNotFoundError with helpful message", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses,
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses,
+        })
+
+        const error = yield* Effect.flip(
+          getIssue({ project: "TEST", identifier: "42" }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error.message).toContain("42")
+        expect(error.message).toContain("TEST")
       })
-
-      const exit = await Effect.runPromiseExit(
-        getIssue({ project: "TEST", identifier: "42" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const cause = exit.cause
-        if (cause._tag === "Fail") {
-          const error = cause.error as IssueNotFoundError
-          expect(error.message).toContain("42")
-          expect(error.message).toContain("TEST")
-        }
-      }
-    })
+    )
   })
 
   describe("identifier parsing", () => {
     // test-revizorro: approved
-    it("handles prefixed identifier HULY-123", async () => {
-      const project = makeProject({ identifier: "HULY" })
-      const issue = makeIssue({ identifier: "HULY-123", number: 123 })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("handles prefixed identifier HULY-123", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "HULY" })
+        const issue = makeIssue({ identifier: "HULY-123", number: 123 })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+        })
+
+        const result = yield* getIssue({ project: "HULY", identifier: "HULY-123" }).pipe(Effect.provide(testLayer))
+
+        expect(result.identifier).toBe("HULY-123")
       })
-
-      const result = await Effect.runPromise(
-        getIssue({ project: "HULY", identifier: "HULY-123" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(result.identifier).toBe("HULY-123")
-    })
+    )
 
     // test-revizorro: approved
-    it("handles just number 123", async () => {
-      const project = makeProject({ identifier: "PROJ" })
-      const issue = makeIssue({ identifier: "PROJ-42", number: 42 })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("handles just number 123", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "PROJ" })
+        const issue = makeIssue({ identifier: "PROJ-42", number: 42 })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+        })
+
+        const result = yield* getIssue({ project: "PROJ", identifier: "42" }).pipe(Effect.provide(testLayer))
+
+        expect(result.identifier).toBe("PROJ-42")
       })
-
-      const result = await Effect.runPromise(
-        getIssue({ project: "PROJ", identifier: "42" }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(result.identifier).toBe("PROJ-42")
-    })
+    )
   })
 })
 
 describe("createIssue", () => {
   describe("basic functionality", () => {
     // test-revizorro: approved
-    it("creates issue with minimal parameters", async () => {
-      const project = makeProject({ identifier: "TEST", sequence: 5 })
+    it.effect("creates issue with minimal parameters", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST", sequence: 5 })
 
-      const captureAddCollection: MockConfig["captureAddCollection"] = {}
-
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses: [],
-        captureAddCollection,
-        updateDocResult: { object: { sequence: 6 } },
-      })
-
-      const result = await Effect.runPromise(
-        createIssue({
-          project: "TEST",
-          title: "New Issue",
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(result.identifier).toBe("TEST-6")
-      expect(captureAddCollection.attributes?.title).toBe("New Issue")
-    })
-
-    // test-revizorro: approved
-    it("creates issue with description", async () => {
-      const project = makeProject({ identifier: "TEST", sequence: 1 })
-
-      const captureAddCollection: MockConfig["captureAddCollection"] = {}
-      const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
-
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses: [],
-        captureAddCollection,
-        captureUploadMarkup,
-        updateDocResult: { object: { sequence: 2 } },
-      })
-
-      const result = await Effect.runPromise(
-        createIssue({
-          project: "TEST",
-          title: "Issue with Description",
-          description: "# Markdown\n\nThis is a description.",
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(result.identifier).toBe("TEST-2")
-      expect(captureUploadMarkup.markup).toBe("# Markdown\n\nThis is a description.")
-      expect(captureAddCollection.attributes?.description).toBe("markup-ref-123")
-    })
-
-    // test-revizorro: approved
-    it("creates issue with priority", async () => {
-      const project = makeProject({ identifier: "TEST", sequence: 1 })
-
-      const captureAddCollection: MockConfig["captureAddCollection"] = {}
-
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses: [],
-        captureAddCollection,
-        updateDocResult: { object: { sequence: 2 } },
-      })
-
-      await Effect.runPromise(
-        createIssue({
-          project: "TEST",
-          title: "High Priority Issue",
-          priority: "high",
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      // IssuePriority.High = 2
-      expect(captureAddCollection.attributes?.priority).toBe(2)
-    })
-
-    // test-revizorro: approved
-    it("creates issue with assignee by email", async () => {
-      const project = makeProject({ identifier: "TEST", sequence: 1 })
-      const person = makePerson({ _id: "person-1" as Ref<Person>, name: "John Doe" })
-      const channel = makeChannel({ attachedTo: "person-1" as Ref<Doc>, value: "john@example.com" })
-
-      const captureAddCollection: MockConfig["captureAddCollection"] = {}
-
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses: [],
-        persons: [person],
-        channels: [channel],
-        captureAddCollection,
-        updateDocResult: { object: { sequence: 2 } },
-      })
-
-      await Effect.runPromise(
-        createIssue({
-          project: "TEST",
-          title: "Assigned Issue",
-          assignee: "john@example.com",
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(captureAddCollection.attributes?.assignee).toBe("person-1")
-    })
-
-    // test-revizorro: approved
-    it("creates issue with specific status", async () => {
-      const project = makeProject({ identifier: "TEST", sequence: 1 })
-      const todoStatus = makeStatus({ _id: "status-todo" as Ref<Status>, name: "Todo" })
-      const inProgressStatus = makeStatus({ _id: "status-progress" as Ref<Status>, name: "In Progress" })
-
-      const captureAddCollection: MockConfig["captureAddCollection"] = {}
-
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses: [todoStatus, inProgressStatus],
-        captureAddCollection,
-        updateDocResult: { object: { sequence: 2 } },
-      })
-
-      await Effect.runPromise(
-        createIssue({
-          project: "TEST",
-          title: "In Progress Issue",
-          status: "In Progress",
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(captureAddCollection.attributes?.status).toBe("status-progress")
-    })
-
-    // test-revizorro: approved
-    it("uses project default status when not specified", async () => {
-      const project = makeProject({
-        identifier: "TEST",
-        sequence: 1,
-        defaultIssueStatus: "status-default" as Ref<Status>,
-      })
-
-      const captureAddCollection: MockConfig["captureAddCollection"] = {}
-
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses: [],
-        captureAddCollection,
-        updateDocResult: { object: { sequence: 2 } },
-      })
-
-      await Effect.runPromise(
-        createIssue({
-          project: "TEST",
-          title: "Default Status Issue",
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(captureAddCollection.attributes?.status).toBe("status-default")
-    })
-
-    // test-revizorro: approved
-    it("calculates rank for new issue", async () => {
-      const project = makeProject({ identifier: "TEST", sequence: 1 })
-      const existingIssue = makeIssue({ rank: "0|hzzzzz:" })
-
-      const captureAddCollection: MockConfig["captureAddCollection"] = {}
-
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [existingIssue],
-        statuses: [],
-        captureAddCollection,
-        updateDocResult: { object: { sequence: 2 } },
-      })
-
-      await Effect.runPromise(
-        createIssue({
-          project: "TEST",
-          title: "Ranked Issue",
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      // Should have calculated a rank greater than the existing issue's rank
-      expect(captureAddCollection.attributes?.rank).toBeDefined()
-      expect(typeof captureAddCollection.attributes?.rank).toBe("string")
-      expect(captureAddCollection.attributes?.rank > existingIssue.rank).toBe(true)
-    })
-
-    // test-revizorro: approved
-    it("maps priority strings correctly", async () => {
-      const project = makeProject({ identifier: "TEST", sequence: 0 })
-
-      const priorities: Array<{ input: "urgent" | "high" | "medium" | "low" | "no-priority"; expected: number }> = [
-        { input: "urgent", expected: 1 },    // IssuePriority.Urgent
-        { input: "high", expected: 2 },      // IssuePriority.High
-        { input: "medium", expected: 3 },    // IssuePriority.Medium
-        { input: "low", expected: 4 },       // IssuePriority.Low
-        { input: "no-priority", expected: 0 }, // IssuePriority.NoPriority
-      ]
-
-      for (const { input, expected } of priorities) {
         const captureAddCollection: MockConfig["captureAddCollection"] = {}
 
         const testLayer = createTestLayerWithMocks({
@@ -1186,1081 +963,1231 @@ describe("createIssue", () => {
           issues: [],
           statuses: [],
           captureAddCollection,
-          updateDocResult: { object: { sequence: 1 } },
+          updateDocResult: { object: { sequence: 6 } },
         })
 
-        await Effect.runPromise(
-          createIssue({
+        const result = yield* createIssue({
+          project: "TEST",
+          title: "New Issue",
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result.identifier).toBe("TEST-6")
+        expect(captureAddCollection.attributes?.title).toBe("New Issue")
+      })
+    )
+
+    // test-revizorro: approved
+    it.effect("creates issue with description", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST", sequence: 1 })
+
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+        const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [],
+          captureAddCollection,
+          captureUploadMarkup,
+          updateDocResult: { object: { sequence: 2 } },
+        })
+
+        const result = yield* createIssue({
+          project: "TEST",
+          title: "Issue with Description",
+          description: "# Markdown\n\nThis is a description.",
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result.identifier).toBe("TEST-2")
+        expect(captureUploadMarkup.markup).toBe("# Markdown\n\nThis is a description.")
+        expect(captureAddCollection.attributes?.description).toBe("markup-ref-123")
+      })
+    )
+
+    // test-revizorro: approved
+    it.effect("creates issue with priority", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST", sequence: 1 })
+
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [],
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 2 } },
+        })
+
+        yield* createIssue({
+          project: "TEST",
+          title: "High Priority Issue",
+          priority: "high",
+        }).pipe(Effect.provide(testLayer))
+
+        // IssuePriority.High = 2
+        expect(captureAddCollection.attributes?.priority).toBe(2)
+      })
+    )
+
+    // test-revizorro: approved
+    it.effect("creates issue with assignee by email", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST", sequence: 1 })
+        const person = makePerson({ _id: "person-1" as Ref<Person>, name: "John Doe" })
+        const channel = makeChannel({ attachedTo: "person-1" as Ref<Doc>, value: "john@example.com" })
+
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [],
+          persons: [person],
+          channels: [channel],
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 2 } },
+        })
+
+        yield* createIssue({
+          project: "TEST",
+          title: "Assigned Issue",
+          assignee: "john@example.com",
+        }).pipe(Effect.provide(testLayer))
+
+        expect(captureAddCollection.attributes?.assignee).toBe("person-1")
+      })
+    )
+
+    // test-revizorro: approved
+    it.effect("creates issue with specific status", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST", sequence: 1 })
+        const todoStatus = makeStatus({ _id: "status-todo" as Ref<Status>, name: "Todo" })
+        const inProgressStatus = makeStatus({ _id: "status-progress" as Ref<Status>, name: "In Progress" })
+
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [todoStatus, inProgressStatus],
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 2 } },
+        })
+
+        yield* createIssue({
+          project: "TEST",
+          title: "In Progress Issue",
+          status: "In Progress",
+        }).pipe(Effect.provide(testLayer))
+
+        expect(captureAddCollection.attributes?.status).toBe("status-progress")
+      })
+    )
+
+    // test-revizorro: approved
+    it.effect("uses project default status when not specified", () =>
+      Effect.gen(function* () {
+        const project = makeProject({
+          identifier: "TEST",
+          sequence: 1,
+          defaultIssueStatus: "status-default" as Ref<Status>,
+        })
+
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [],
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 2 } },
+        })
+
+        yield* createIssue({
+          project: "TEST",
+          title: "Default Status Issue",
+        }).pipe(Effect.provide(testLayer))
+
+        expect(captureAddCollection.attributes?.status).toBe("status-default")
+      })
+    )
+
+    // test-revizorro: approved
+    it.effect("calculates rank for new issue", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST", sequence: 1 })
+        const existingIssue = makeIssue({ rank: "0|hzzzzz:" })
+
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [existingIssue],
+          statuses: [],
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 2 } },
+        })
+
+        yield* createIssue({
+          project: "TEST",
+          title: "Ranked Issue",
+        }).pipe(Effect.provide(testLayer))
+
+        // Should have calculated a rank greater than the existing issue's rank
+        expect(captureAddCollection.attributes?.rank).toBeDefined()
+        expect(typeof captureAddCollection.attributes?.rank).toBe("string")
+        expect(captureAddCollection.attributes?.rank > existingIssue.rank).toBe(true)
+      })
+    )
+
+    // test-revizorro: approved
+    it.effect("maps priority strings correctly", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST", sequence: 0 })
+
+        const priorities: Array<{ input: "urgent" | "high" | "medium" | "low" | "no-priority"; expected: number }> = [
+          { input: "urgent", expected: 1 },    // IssuePriority.Urgent
+          { input: "high", expected: 2 },      // IssuePriority.High
+          { input: "medium", expected: 3 },    // IssuePriority.Medium
+          { input: "low", expected: 4 },       // IssuePriority.Low
+          { input: "no-priority", expected: 0 }, // IssuePriority.NoPriority
+        ]
+
+        for (const { input, expected } of priorities) {
+          const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+          const testLayer = createTestLayerWithMocks({
+            projects: [project],
+            issues: [],
+            statuses: [],
+            captureAddCollection,
+            updateDocResult: { object: { sequence: 1 } },
+          })
+
+          yield* createIssue({
             project: "TEST",
             title: `Priority ${input}`,
             priority: input,
           }).pipe(Effect.provide(testLayer))
-        )
 
-        expect(captureAddCollection.attributes?.priority).toBe(expected)
-      }
-    })
+          expect(captureAddCollection.attributes?.priority).toBe(expected)
+        }
+      })
+    )
   })
 
   describe("error handling", () => {
     // test-revizorro: approved
-    it("returns ProjectNotFoundError when project doesn't exist", async () => {
-      const testLayer = createTestLayerWithMocks({
-        projects: [],
-        issues: [],
-        statuses: [],
+    it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
+      Effect.gen(function* () {
+        const testLayer = createTestLayerWithMocks({
+          projects: [],
+          issues: [],
+          statuses: [],
+        })
+
+        const error = yield* Effect.flip(
+          createIssue({
+            project: "NONEXISTENT",
+            title: "Test Issue",
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("ProjectNotFoundError")
+        expect((error as ProjectNotFoundError).identifier).toBe("NONEXISTENT")
       })
-
-      const exit = await Effect.runPromiseExit(
-        createIssue({
-          project: "NONEXISTENT",
-          title: "Test Issue",
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const cause = exit.cause
-        expect(cause._tag).toBe("Fail")
-        if (cause._tag === "Fail") {
-          expect((cause.error as ProjectNotFoundError)._tag).toBe("ProjectNotFoundError")
-          expect((cause.error as ProjectNotFoundError).identifier).toBe("NONEXISTENT")
-        }
-      }
-    })
+    )
 
     // test-revizorro: approved
-    it("returns InvalidStatusError for unknown status", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const todoStatus = makeStatus({ _id: "status-todo" as Ref<Status>, name: "Todo" })
+    it.effect("returns InvalidStatusError for unknown status", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const todoStatus = makeStatus({ _id: "status-todo" as Ref<Status>, name: "Todo" })
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses: [todoStatus],
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [todoStatus],
+        })
+
+        const error = yield* Effect.flip(
+          createIssue({
+            project: "TEST",
+            title: "Test Issue",
+            status: "InvalidStatus",
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("InvalidStatusError")
+        expect((error as InvalidStatusError).status).toBe("InvalidStatus")
       })
-
-      const exit = await Effect.runPromiseExit(
-        createIssue({
-          project: "TEST",
-          title: "Test Issue",
-          status: "InvalidStatus",
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const cause = exit.cause
-        expect(cause._tag).toBe("Fail")
-        if (cause._tag === "Fail") {
-          expect((cause.error as InvalidStatusError)._tag).toBe("InvalidStatusError")
-          expect((cause.error as InvalidStatusError).status).toBe("InvalidStatus")
-        }
-      }
-    })
+    )
 
     // test-revizorro: scheduled
-    it("returns PersonNotFoundError when assignee not found", async () => {
-      const project = makeProject({ identifier: "TEST" })
+    it.effect("returns PersonNotFoundError when assignee not found", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses: [],
-        persons: [],
-        channels: [],
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [],
+          persons: [],
+          channels: [],
+        })
+
+        const error = yield* Effect.flip(
+          createIssue({
+            project: "TEST",
+            title: "Test Issue",
+            assignee: "nonexistent@example.com",
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("PersonNotFoundError")
+        expect((error as PersonNotFoundError).identifier).toBe("nonexistent@example.com")
       })
-
-      const exit = await Effect.runPromiseExit(
-        createIssue({
-          project: "TEST",
-          title: "Test Issue",
-          assignee: "nonexistent@example.com",
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const cause = exit.cause
-        expect(cause._tag).toBe("Fail")
-        if (cause._tag === "Fail") {
-          expect((cause.error as PersonNotFoundError)._tag).toBe("PersonNotFoundError")
-          expect((cause.error as PersonNotFoundError).identifier).toBe("nonexistent@example.com")
-        }
-      }
-    })
+    )
 
     // test-revizorro: approved
-    it("PersonNotFoundError has helpful message", async () => {
-      const project = makeProject({ identifier: "TEST" })
+    it.effect("PersonNotFoundError has helpful message", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses: [],
-        persons: [],
-        channels: [],
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [],
+          persons: [],
+          channels: [],
+        })
+
+        const error = yield* Effect.flip(
+          createIssue({
+            project: "TEST",
+            title: "Test Issue",
+            assignee: "jane@example.com",
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error.message).toContain("jane@example.com")
       })
-
-      const exit = await Effect.runPromiseExit(
-        createIssue({
-          project: "TEST",
-          title: "Test Issue",
-          assignee: "jane@example.com",
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const cause = exit.cause
-        if (cause._tag === "Fail") {
-          const error = cause.error as PersonNotFoundError
-          expect(error.message).toContain("jane@example.com")
-        }
-      }
-    })
+    )
   })
 
   describe("status resolution", () => {
     // test-revizorro: approved
-    it("matches status case-insensitively", async () => {
-      const project = makeProject({ identifier: "TEST", sequence: 1 })
-      const inProgressStatus = makeStatus({ _id: "status-progress" as Ref<Status>, name: "In Progress" })
+    it.effect("matches status case-insensitively", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST", sequence: 1 })
+        const inProgressStatus = makeStatus({ _id: "status-progress" as Ref<Status>, name: "In Progress" })
 
-      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses: [inProgressStatus],
-        captureAddCollection,
-        updateDocResult: { object: { sequence: 2 } },
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [inProgressStatus],
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 2 } },
+        })
 
-      await Effect.runPromise(
-        createIssue({
+        yield* createIssue({
           project: "TEST",
           title: "Test Issue",
           status: "in progress",  // lowercase
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(captureAddCollection.attributes?.status).toBe("status-progress")
-    })
+        expect(captureAddCollection.attributes?.status).toBe("status-progress")
+      })
+    )
   })
 
   describe("assignee resolution", () => {
     // test-revizorro: approved
-    it("resolves assignee by name when email not found", async () => {
-      const project = makeProject({ identifier: "TEST", sequence: 1 })
-      const person = makePerson({ _id: "person-2" as Ref<Person>, name: "Jane Developer" })
+    it.effect("resolves assignee by name when email not found", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST", sequence: 1 })
+        const person = makePerson({ _id: "person-2" as Ref<Person>, name: "Jane Developer" })
 
-      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses: [],
-        persons: [person],
-        channels: [],  // No email channels
-        captureAddCollection,
-        updateDocResult: { object: { sequence: 2 } },
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [],
+          persons: [person],
+          channels: [],  // No email channels
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 2 } },
+        })
 
-      await Effect.runPromise(
-        createIssue({
+        yield* createIssue({
           project: "TEST",
           title: "Test Issue",
           assignee: "Jane Developer",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(captureAddCollection.attributes?.assignee).toBe("person-2")
-    })
+        expect(captureAddCollection.attributes?.assignee).toBe("person-2")
+      })
+    )
   })
 
   describe("description handling", () => {
     // test-revizorro: approved
-    it("skips upload for empty description", async () => {
-      const project = makeProject({ identifier: "TEST", sequence: 1 })
+    it.effect("skips upload for empty description", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST", sequence: 1 })
 
-      const captureAddCollection: MockConfig["captureAddCollection"] = {}
-      const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+        const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses: [],
-        captureAddCollection,
-        captureUploadMarkup,
-        updateDocResult: { object: { sequence: 2 } },
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [],
+          captureAddCollection,
+          captureUploadMarkup,
+          updateDocResult: { object: { sequence: 2 } },
+        })
 
-      await Effect.runPromise(
-        createIssue({
+        yield* createIssue({
           project: "TEST",
           title: "Issue without description",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(captureUploadMarkup.markup).toBeUndefined()
-      expect(captureAddCollection.attributes?.description).toBeNull()
-    })
+        expect(captureUploadMarkup.markup).toBeUndefined()
+        expect(captureAddCollection.attributes?.description).toBeNull()
+      })
+    )
 
     // test-revizorro: approved
-    it("skips upload for whitespace-only description", async () => {
-      const project = makeProject({ identifier: "TEST", sequence: 1 })
+    it.effect("skips upload for whitespace-only description", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST", sequence: 1 })
 
-      const captureAddCollection: MockConfig["captureAddCollection"] = {}
-      const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+        const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses: [],
-        captureAddCollection,
-        captureUploadMarkup,
-        updateDocResult: { object: { sequence: 2 } },
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [],
+          captureAddCollection,
+          captureUploadMarkup,
+          updateDocResult: { object: { sequence: 2 } },
+        })
 
-      await Effect.runPromise(
-        createIssue({
+        yield* createIssue({
           project: "TEST",
           title: "Issue with whitespace description",
           description: "   \n\t  ",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(captureUploadMarkup.markup).toBeUndefined()
-      expect(captureAddCollection.attributes?.description).toBeNull()
-    })
+        expect(captureUploadMarkup.markup).toBeUndefined()
+        expect(captureAddCollection.attributes?.description).toBeNull()
+      })
+    )
   })
 })
 
 describe("updateIssue", () => {
   describe("basic functionality", () => {
     // test-revizorro: approved
-    it("updates issue title", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1", title: "Old Title", number: 1 })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("updates issue title", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", title: "Old Title", number: 1 })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-        captureUpdateDoc,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          captureUpdateDoc,
+        })
 
-      const result = await Effect.runPromise(
-        updateIssue({
+        const result = yield* updateIssue({
           project: "TEST",
           identifier: "TEST-1",
           title: "New Title",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(result.identifier).toBe("TEST-1")
-      expect(result.updated).toBe(true)
-      expect(captureUpdateDoc.operations?.title).toBe("New Title")
-    })
+        expect(result.identifier).toBe("TEST-1")
+        expect(result.updated).toBe(true)
+        expect(captureUpdateDoc.operations?.title).toBe("New Title")
+      })
+    )
 
     // test-revizorro: approved
-    it("updates issue priority", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1", priority: IssuePriority.Low })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("updates issue priority", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", priority: IssuePriority.Low })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-        captureUpdateDoc,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          captureUpdateDoc,
+        })
 
-      await Effect.runPromise(
-        updateIssue({
+        yield* updateIssue({
           project: "TEST",
           identifier: "TEST-1",
           priority: "urgent",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      // IssuePriority.Urgent = 1
-      expect(captureUpdateDoc.operations?.priority).toBe(1)
-    })
+        // IssuePriority.Urgent = 1
+        expect(captureUpdateDoc.operations?.priority).toBe(1)
+      })
+    )
 
     // test-revizorro: approved
-    it("updates issue status", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1", status: "status-open" as Ref<Status> })
-      const todoStatus = makeStatus({ _id: "status-todo" as Ref<Status>, name: "Todo" })
-      const doneStatus = makeStatus({ _id: "status-done" as Ref<Status>, name: "Done" })
-      const statuses = [todoStatus, doneStatus]
+    it.effect("updates issue status", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", status: "status-open" as Ref<Status> })
+        const todoStatus = makeStatus({ _id: "status-todo" as Ref<Status>, name: "Todo" })
+        const doneStatus = makeStatus({ _id: "status-done" as Ref<Status>, name: "Done" })
+        const statuses = [todoStatus, doneStatus]
 
-      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-        captureUpdateDoc,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          captureUpdateDoc,
+        })
 
-      await Effect.runPromise(
-        updateIssue({
+        yield* updateIssue({
           project: "TEST",
           identifier: "TEST-1",
           status: "Done",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(captureUpdateDoc.operations?.status).toBe("status-done")
-    })
+        expect(captureUpdateDoc.operations?.status).toBe("status-done")
+      })
+    )
 
     // test-revizorro: approved
-    it("updates issue description", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1" })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("updates issue description", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1" })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
-      const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-        captureUpdateDoc,
-        captureUploadMarkup,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          captureUpdateDoc,
+          captureUploadMarkup,
+        })
 
-      await Effect.runPromise(
-        updateIssue({
+        yield* updateIssue({
           project: "TEST",
           identifier: "TEST-1",
           description: "# New Description\n\nUpdated content.",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(captureUploadMarkup.markup).toBe("# New Description\n\nUpdated content.")
-      expect(captureUpdateDoc.operations?.description).toBe("markup-ref-123")
-    })
+        expect(captureUploadMarkup.markup).toBe("# New Description\n\nUpdated content.")
+        expect(captureUpdateDoc.operations?.description).toBe("markup-ref-123")
+      })
+    )
 
     // test-revizorro: approved
-    it("updates issue assignee", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1", assignee: null })
-      const person = makePerson({ _id: "person-1" as Ref<Person>, name: "Jane Doe" })
-      const channel = makeChannel({ attachedTo: "person-1" as Ref<Doc>, value: "jane@example.com" })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("updates issue assignee", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", assignee: null })
+        const person = makePerson({ _id: "person-1" as Ref<Person>, name: "Jane Doe" })
+        const channel = makeChannel({ attachedTo: "person-1" as Ref<Doc>, value: "jane@example.com" })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-        persons: [person],
-        channels: [channel],
-        captureUpdateDoc,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          persons: [person],
+          channels: [channel],
+          captureUpdateDoc,
+        })
 
-      await Effect.runPromise(
-        updateIssue({
+        yield* updateIssue({
           project: "TEST",
           identifier: "TEST-1",
           assignee: "jane@example.com",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(captureUpdateDoc.operations?.assignee).toBe("person-1")
-    })
+        expect(captureUpdateDoc.operations?.assignee).toBe("person-1")
+      })
+    )
 
     // test-revizorro: approved
-    it("unassigns issue when assignee is null", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1", assignee: "person-1" as Ref<Person> })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("unassigns issue when assignee is null", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", assignee: "person-1" as Ref<Person> })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-        captureUpdateDoc,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          captureUpdateDoc,
+        })
 
-      await Effect.runPromise(
-        updateIssue({
+        yield* updateIssue({
           project: "TEST",
           identifier: "TEST-1",
           assignee: null,
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(captureUpdateDoc.operations?.assignee).toBeNull()
-    })
+        expect(captureUpdateDoc.operations?.assignee).toBeNull()
+      })
+    )
 
     // test-revizorro: approved
-    it("returns updated=false when no fields provided", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1" })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("returns updated=false when no fields provided", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1" })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+        })
 
-      const result = await Effect.runPromise(
-        updateIssue({
+        const result = yield* updateIssue({
           project: "TEST",
           identifier: "TEST-1",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(result.identifier).toBe("TEST-1")
-      expect(result.updated).toBe(false)
-    })
+        expect(result.identifier).toBe("TEST-1")
+        expect(result.updated).toBe(false)
+      })
+    )
 
     // test-revizorro: approved
-    it("updates multiple fields at once", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1" })
-      const doneStatus = makeStatus({ _id: "status-done" as Ref<Status>, name: "Done" })
-      const statuses = [doneStatus]
+    it.effect("updates multiple fields at once", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1" })
+        const doneStatus = makeStatus({ _id: "status-done" as Ref<Status>, name: "Done" })
+        const statuses = [doneStatus]
 
-      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-        captureUpdateDoc,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          captureUpdateDoc,
+        })
 
-      await Effect.runPromise(
-        updateIssue({
+        yield* updateIssue({
           project: "TEST",
           identifier: "TEST-1",
           title: "Updated Title",
           priority: "high",
           status: "Done",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(captureUpdateDoc.operations?.title).toBe("Updated Title")
-      expect(captureUpdateDoc.operations?.priority).toBe(2) // IssuePriority.High
-      expect(captureUpdateDoc.operations?.status).toBe("status-done")
-    })
+        expect(captureUpdateDoc.operations?.title).toBe("Updated Title")
+        expect(captureUpdateDoc.operations?.priority).toBe(2) // IssuePriority.High
+        expect(captureUpdateDoc.operations?.status).toBe("status-done")
+      })
+    )
 
     // test-revizorro: approved
-    it("clears description when empty string provided", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1", description: "markup-old" as unknown as null })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("clears description when empty string provided", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", description: "markup-old" as unknown as null })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-        captureUpdateDoc,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          captureUpdateDoc,
+        })
 
-      await Effect.runPromise(
-        updateIssue({
+        yield* updateIssue({
           project: "TEST",
           identifier: "TEST-1",
           description: "",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(captureUpdateDoc.operations?.description).toBeNull()
-    })
+        expect(captureUpdateDoc.operations?.description).toBeNull()
+      })
+    )
   })
 
   describe("identifier parsing", () => {
     // test-revizorro: approved
-    it("finds issue by full identifier", async () => {
-      const project = makeProject({ identifier: "HULY" })
-      const issue = makeIssue({ identifier: "HULY-42", number: 42 })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("finds issue by full identifier", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "HULY" })
+        const issue = makeIssue({ identifier: "HULY-42", number: 42 })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-        captureUpdateDoc,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          captureUpdateDoc,
+        })
 
-      const result = await Effect.runPromise(
-        updateIssue({
+        const result = yield* updateIssue({
           project: "HULY",
           identifier: "HULY-42",
           title: "Updated",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(result.identifier).toBe("HULY-42")
-    })
+        expect(result.identifier).toBe("HULY-42")
+      })
+    )
 
     // test-revizorro: approved
-    it("finds issue by numeric identifier", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-99", number: 99 })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("finds issue by numeric identifier", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-99", number: 99 })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-        captureUpdateDoc,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          captureUpdateDoc,
+        })
 
-      const result = await Effect.runPromise(
-        updateIssue({
+        const result = yield* updateIssue({
           project: "TEST",
           identifier: "99",
           title: "Updated",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(result.identifier).toBe("TEST-99")
-    })
+        expect(result.identifier).toBe("TEST-99")
+      })
+    )
   })
 
   describe("error handling", () => {
     // test-revizorro: approved
-    it("returns ProjectNotFoundError when project doesn't exist", async () => {
-      const testLayer = createTestLayerWithMocks({
-        projects: [],
-        issues: [],
-        statuses: [],
+    it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
+      Effect.gen(function* () {
+        const testLayer = createTestLayerWithMocks({
+          projects: [],
+          issues: [],
+          statuses: [],
+        })
+
+        const error = yield* Effect.flip(
+          updateIssue({
+            project: "NONEXISTENT",
+            identifier: "1",
+            title: "New Title",
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("ProjectNotFoundError")
+        expect((error as ProjectNotFoundError).identifier).toBe("NONEXISTENT")
       })
-
-      const exit = await Effect.runPromiseExit(
-        updateIssue({
-          project: "NONEXISTENT",
-          identifier: "1",
-          title: "New Title",
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const cause = exit.cause
-        expect(cause._tag).toBe("Fail")
-        if (cause._tag === "Fail") {
-          expect((cause.error as ProjectNotFoundError)._tag).toBe("ProjectNotFoundError")
-          expect((cause.error as ProjectNotFoundError).identifier).toBe("NONEXISTENT")
-        }
-      }
-    })
+    )
 
     // test-revizorro: approved
-    it("returns IssueNotFoundError when issue doesn't exist", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("returns IssueNotFoundError when issue doesn't exist", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
-        statuses,
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses,
+        })
+
+        const error = yield* Effect.flip(
+          updateIssue({
+            project: "TEST",
+            identifier: "TEST-999",
+            title: "New Title",
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("IssueNotFoundError")
+        expect((error as IssueNotFoundError).identifier).toBe("TEST-999")
+        expect((error as IssueNotFoundError).project).toBe("TEST")
       })
-
-      const exit = await Effect.runPromiseExit(
-        updateIssue({
-          project: "TEST",
-          identifier: "TEST-999",
-          title: "New Title",
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const cause = exit.cause
-        expect(cause._tag).toBe("Fail")
-        if (cause._tag === "Fail") {
-          expect((cause.error as IssueNotFoundError)._tag).toBe("IssueNotFoundError")
-          expect((cause.error as IssueNotFoundError).identifier).toBe("TEST-999")
-          expect((cause.error as IssueNotFoundError).project).toBe("TEST")
-        }
-      }
-    })
+    )
 
     // test-revizorro: approved
-    it("returns InvalidStatusError for unknown status", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1" })
-      const todoStatus = makeStatus({ _id: "status-todo" as Ref<Status>, name: "Todo" })
+    it.effect("returns InvalidStatusError for unknown status", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1" })
+        const todoStatus = makeStatus({ _id: "status-todo" as Ref<Status>, name: "Todo" })
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses: [todoStatus],
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses: [todoStatus],
+        })
+
+        const error = yield* Effect.flip(
+          updateIssue({
+            project: "TEST",
+            identifier: "TEST-1",
+            status: "InvalidStatus",
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("InvalidStatusError")
+        expect((error as InvalidStatusError).status).toBe("InvalidStatus")
+        expect((error as InvalidStatusError).project).toBe("TEST")
       })
-
-      const exit = await Effect.runPromiseExit(
-        updateIssue({
-          project: "TEST",
-          identifier: "TEST-1",
-          status: "InvalidStatus",
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const cause = exit.cause
-        expect(cause._tag).toBe("Fail")
-        if (cause._tag === "Fail") {
-          expect((cause.error as InvalidStatusError)._tag).toBe("InvalidStatusError")
-          expect((cause.error as InvalidStatusError).status).toBe("InvalidStatus")
-          expect((cause.error as InvalidStatusError).project).toBe("TEST")
-        }
-      }
-    })
+    )
 
     // test-revizorro: scheduled
-    it("returns PersonNotFoundError when assignee not found", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1" })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("returns PersonNotFoundError when assignee not found", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1" })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-        persons: [],
-        channels: [],
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          persons: [],
+          channels: [],
+        })
+
+        const error = yield* Effect.flip(
+          updateIssue({
+            project: "TEST",
+            identifier: "TEST-1",
+            assignee: "nonexistent@example.com",
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("PersonNotFoundError")
+        expect((error as PersonNotFoundError).identifier).toBe("nonexistent@example.com")
       })
-
-      const exit = await Effect.runPromiseExit(
-        updateIssue({
-          project: "TEST",
-          identifier: "TEST-1",
-          assignee: "nonexistent@example.com",
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const cause = exit.cause
-        expect(cause._tag).toBe("Fail")
-        if (cause._tag === "Fail") {
-          expect((cause.error as PersonNotFoundError)._tag).toBe("PersonNotFoundError")
-          expect((cause.error as PersonNotFoundError).identifier).toBe("nonexistent@example.com")
-        }
-      }
-    })
+    )
   })
 
   describe("status resolution", () => {
     // test-revizorro: approved
-    it("matches status case-insensitively", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1" })
-      const inProgressStatus = makeStatus({ _id: "status-progress" as Ref<Status>, name: "In Progress" })
+    it.effect("matches status case-insensitively", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1" })
+        const inProgressStatus = makeStatus({ _id: "status-progress" as Ref<Status>, name: "In Progress" })
 
-      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses: [inProgressStatus],
-        captureUpdateDoc,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses: [inProgressStatus],
+          captureUpdateDoc,
+        })
 
-      await Effect.runPromise(
-        updateIssue({
+        yield* updateIssue({
           project: "TEST",
           identifier: "TEST-1",
           status: "in progress",  // lowercase
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(captureUpdateDoc.operations?.status).toBe("status-progress")
-    })
+        expect(captureUpdateDoc.operations?.status).toBe("status-progress")
+      })
+    )
   })
 
   describe("assignee resolution", () => {
     // test-revizorro: approved
-    it("resolves assignee by name when email not found", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1" })
-      const person = makePerson({ _id: "person-2" as Ref<Person>, name: "Jane Developer" })
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.effect("resolves assignee by name when email not found", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1" })
+        const person = makePerson({ _id: "person-2" as Ref<Person>, name: "Jane Developer" })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        statuses,
-        persons: [person],
-        channels: [],  // No email channels
-        captureUpdateDoc,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          persons: [person],
+          channels: [],  // No email channels
+          captureUpdateDoc,
+        })
 
-      await Effect.runPromise(
-        updateIssue({
+        yield* updateIssue({
           project: "TEST",
           identifier: "TEST-1",
           assignee: "Jane Developer",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(captureUpdateDoc.operations?.assignee).toBe("person-2")
-    })
+        expect(captureUpdateDoc.operations?.assignee).toBe("person-2")
+      })
+    )
   })
 })
 
 describe("addLabel", () => {
   describe("basic functionality", () => {
     // test-revizorro: approved
-    it("adds a new label to an issue", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1", number: 1 })
+    it.effect("adds a new label to an issue", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", number: 1 })
 
-      const captureAddCollection: MockConfig["captureAddCollection"] = {}
-      const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+        const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        tagElements: [],
-        tagReferences: [],
-        captureAddCollection,
-        captureCreateDoc,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          tagElements: [],
+          tagReferences: [],
+          captureAddCollection,
+          captureCreateDoc,
+        })
 
-      const result = await Effect.runPromise(
-        addLabel({
+        const result = yield* addLabel({
           project: "TEST",
           identifier: "TEST-1",
           label: "Bug",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(result.identifier).toBe("TEST-1")
-      expect(result.labelAdded).toBe(true)
-      // Should have created a new tag element
-      expect(captureCreateDoc.attributes?.title).toBe("Bug")
-      // Should have added the tag reference
-      expect(captureAddCollection.class).toBe(tags.class.TagReference)
-      expect(captureAddCollection.attributes?.title).toBe("Bug")
-    })
+        expect(result.identifier).toBe("TEST-1")
+        expect(result.labelAdded).toBe(true)
+        // Should have created a new tag element
+        expect(captureCreateDoc.attributes?.title).toBe("Bug")
+        // Should have added the tag reference
+        expect(captureAddCollection.class).toBe(tags.class.TagReference)
+        expect(captureAddCollection.attributes?.title).toBe("Bug")
+      })
+    )
 
     // test-revizorro: approved
-    it("uses existing tag element when label already exists in project", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1", number: 1 })
-      const existingTag = makeTagElement({
-        _id: "tag-existing" as Ref<TagElement>,
-        title: "Bug",
-        color: 5,
-      })
+    it.effect("uses existing tag element when label already exists in project", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", number: 1 })
+        const existingTag = makeTagElement({
+          _id: "tag-existing" as Ref<TagElement>,
+          title: "Bug",
+          color: 5,
+        })
 
-      const captureAddCollection: MockConfig["captureAddCollection"] = {}
-      const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+        const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        tagElements: [existingTag],
-        tagReferences: [],
-        captureAddCollection,
-        captureCreateDoc,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          tagElements: [existingTag],
+          tagReferences: [],
+          captureAddCollection,
+          captureCreateDoc,
+        })
 
-      const result = await Effect.runPromise(
-        addLabel({
+        const result = yield* addLabel({
           project: "TEST",
           identifier: "TEST-1",
           label: "Bug",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(result.identifier).toBe("TEST-1")
-      expect(result.labelAdded).toBe(true)
-      // Should NOT have created a new tag element
-      expect(captureCreateDoc.attributes).toBeUndefined()
-      // Should have added the tag reference with existing tag's color
-      expect(captureAddCollection.attributes?.color).toBe(5)
-      expect(captureAddCollection.attributes?.tag).toBe("tag-existing")
-    })
+        expect(result.identifier).toBe("TEST-1")
+        expect(result.labelAdded).toBe(true)
+        // Should NOT have created a new tag element
+        expect(captureCreateDoc.attributes).toBeUndefined()
+        // Should have added the tag reference with existing tag's color
+        expect(captureAddCollection.attributes?.color).toBe(5)
+        expect(captureAddCollection.attributes?.tag).toBe("tag-existing")
+      })
+    )
 
     // test-revizorro: approved
-    it("returns labelAdded=false when label already attached (idempotent)", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1", number: 1 })
-      const existingTag = makeTagElement({
-        _id: "tag-existing" as Ref<TagElement>,
-        title: "Bug",
-      })
-      const existingRef = makeTagReference({
-        attachedTo: "issue-1" as Ref<Doc>,
-        attachedToClass: tracker.class.Issue,
-        title: "Bug",
-        tag: "tag-existing" as Ref<TagElement>,
-      })
+    it.effect("returns labelAdded=false when label already attached (idempotent)", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", number: 1 })
+        const existingTag = makeTagElement({
+          _id: "tag-existing" as Ref<TagElement>,
+          title: "Bug",
+        })
+        const existingRef = makeTagReference({
+          attachedTo: "issue-1" as Ref<Doc>,
+          attachedToClass: tracker.class.Issue,
+          title: "Bug",
+          tag: "tag-existing" as Ref<TagElement>,
+        })
 
-      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        tagElements: [existingTag],
-        tagReferences: [existingRef],
-        captureAddCollection,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          tagElements: [existingTag],
+          tagReferences: [existingRef],
+          captureAddCollection,
+        })
 
-      const result = await Effect.runPromise(
-        addLabel({
+        const result = yield* addLabel({
           project: "TEST",
           identifier: "TEST-1",
           label: "Bug",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(result.identifier).toBe("TEST-1")
-      expect(result.labelAdded).toBe(false)
-      // Should NOT have called addCollection
-      expect(captureAddCollection.attributes).toBeUndefined()
-    })
+        expect(result.identifier).toBe("TEST-1")
+        expect(result.labelAdded).toBe(false)
+        // Should NOT have called addCollection
+        expect(captureAddCollection.attributes).toBeUndefined()
+      })
+    )
 
     // test-revizorro: approved
-    it("handles case-insensitive label matching for idempotency", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1", number: 1 })
-      const existingRef = makeTagReference({
-        attachedTo: "issue-1" as Ref<Doc>,
-        attachedToClass: tracker.class.Issue,
-        title: "Bug",
-      })
+    it.effect("handles case-insensitive label matching for idempotency", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", number: 1 })
+        const existingRef = makeTagReference({
+          attachedTo: "issue-1" as Ref<Doc>,
+          attachedToClass: tracker.class.Issue,
+          title: "Bug",
+        })
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        tagReferences: [existingRef],
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          tagReferences: [existingRef],
+        })
 
-      const result = await Effect.runPromise(
-        addLabel({
+        const result = yield* addLabel({
           project: "TEST",
           identifier: "TEST-1",
           label: "BUG",  // uppercase
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(result.labelAdded).toBe(false)
-    })
+        expect(result.labelAdded).toBe(false)
+      })
+    )
 
     // test-revizorro: approved
-    it("uses provided color when creating new tag", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1", number: 1 })
+    it.effect("uses provided color when creating new tag", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", number: 1 })
 
-      const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
+        const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        tagElements: [],
-        tagReferences: [],
-        captureCreateDoc,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          tagElements: [],
+          tagReferences: [],
+          captureCreateDoc,
+        })
 
-      await Effect.runPromise(
-        addLabel({
+        yield* addLabel({
           project: "TEST",
           identifier: "TEST-1",
           label: "Feature",
           color: 7,
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(captureCreateDoc.attributes?.color).toBe(7)
-    })
+        expect(captureCreateDoc.attributes?.color).toBe(7)
+      })
+    )
 
     // test-revizorro: approved
-    it("uses default color 0 when not specified", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1", number: 1 })
+    it.effect("uses default color 0 when not specified", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", number: 1 })
 
-      const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
+        const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        tagElements: [],
-        tagReferences: [],
-        captureCreateDoc,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          tagElements: [],
+          tagReferences: [],
+          captureCreateDoc,
+        })
 
-      await Effect.runPromise(
-        addLabel({
+        yield* addLabel({
           project: "TEST",
           identifier: "TEST-1",
           label: "Enhancement",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(captureCreateDoc.attributes?.color).toBe(0)
-    })
+        expect(captureCreateDoc.attributes?.color).toBe(0)
+      })
+    )
 
     // test-revizorro: approved
-    it("trims whitespace from label name", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-1", number: 1 })
+    it.effect("trims whitespace from label name", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", number: 1 })
 
-      const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
+        const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        tagElements: [],
-        tagReferences: [],
-        captureCreateDoc,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          tagElements: [],
+          tagReferences: [],
+          captureCreateDoc,
+        })
 
-      await Effect.runPromise(
-        addLabel({
+        yield* addLabel({
           project: "TEST",
           identifier: "TEST-1",
           label: "  Trimmed Label  ",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(captureCreateDoc.attributes?.title).toBe("Trimmed Label")
-    })
+        expect(captureCreateDoc.attributes?.title).toBe("Trimmed Label")
+      })
+    )
   })
 
   describe("identifier parsing", () => {
     // test-revizorro: approved
-    it("finds issue by full identifier", async () => {
-      const project = makeProject({ identifier: "HULY" })
-      const issue = makeIssue({ identifier: "HULY-42", number: 42 })
+    it.effect("finds issue by full identifier", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "HULY" })
+        const issue = makeIssue({ identifier: "HULY-42", number: 42 })
 
-      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        tagElements: [],
-        tagReferences: [],
-        captureAddCollection,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          tagElements: [],
+          tagReferences: [],
+          captureAddCollection,
+        })
 
-      const result = await Effect.runPromise(
-        addLabel({
+        const result = yield* addLabel({
           project: "HULY",
           identifier: "HULY-42",
           label: "Bug",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(result.identifier).toBe("HULY-42")
-      expect(result.labelAdded).toBe(true)
-      // Verify addCollection was called to create TagReference
-      expect(captureAddCollection.attributes).toBeDefined()
-      expect(captureAddCollection.attributes?.title).toBe("Bug")
-    })
+        expect(result.identifier).toBe("HULY-42")
+        expect(result.labelAdded).toBe(true)
+        // Verify addCollection was called to create TagReference
+        expect(captureAddCollection.attributes).toBeDefined()
+        expect(captureAddCollection.attributes?.title).toBe("Bug")
+      })
+    )
 
     // test-revizorro: approved
-    it("finds issue by numeric identifier", async () => {
-      const project = makeProject({ identifier: "TEST" })
-      const issue = makeIssue({ identifier: "TEST-99", number: 99 })
+    it.effect("finds issue by numeric identifier", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-99", number: 99 })
 
-      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue],
-        tagElements: [],
-        tagReferences: [],
-        captureAddCollection,
-      })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          tagElements: [],
+          tagReferences: [],
+          captureAddCollection,
+        })
 
-      const result = await Effect.runPromise(
-        addLabel({
+        const result = yield* addLabel({
           project: "TEST",
           identifier: "99",
           label: "Bug",
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(result.identifier).toBe("TEST-99")
-      expect(result.labelAdded).toBe(true)
-    })
+        expect(result.identifier).toBe("TEST-99")
+        expect(result.labelAdded).toBe(true)
+      })
+    )
   })
 
   describe("error handling", () => {
     // test-revizorro: approved
-    it("returns ProjectNotFoundError when project doesn't exist", async () => {
-      const testLayer = createTestLayerWithMocks({
-        projects: [],
-        issues: [],
+    it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
+      Effect.gen(function* () {
+        const testLayer = createTestLayerWithMocks({
+          projects: [],
+          issues: [],
+        })
+
+        const error = yield* Effect.flip(
+          addLabel({
+            project: "NONEXISTENT",
+            identifier: "1",
+            label: "Bug",
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("ProjectNotFoundError")
+        expect((error as ProjectNotFoundError).identifier).toBe("NONEXISTENT")
       })
-
-      const exit = await Effect.runPromiseExit(
-        addLabel({
-          project: "NONEXISTENT",
-          identifier: "1",
-          label: "Bug",
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const cause = exit.cause
-        expect(cause._tag).toBe("Fail")
-        if (cause._tag === "Fail") {
-          expect((cause.error as ProjectNotFoundError)._tag).toBe("ProjectNotFoundError")
-          expect((cause.error as ProjectNotFoundError).identifier).toBe("NONEXISTENT")
-        }
-      }
-    })
+    )
 
     // test-revizorro: approved
-    it("returns IssueNotFoundError when issue doesn't exist", async () => {
-      const project = makeProject({ identifier: "TEST" })
+    it.effect("returns IssueNotFoundError when issue doesn't exist", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ identifier: "TEST" })
 
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [],
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+        })
+
+        const error = yield* Effect.flip(
+          addLabel({
+            project: "TEST",
+            identifier: "TEST-999",
+            label: "Bug",
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("IssueNotFoundError")
+        expect((error as IssueNotFoundError).identifier).toBe("TEST-999")
+        expect((error as IssueNotFoundError).project).toBe("TEST")
       })
-
-      const exit = await Effect.runPromiseExit(
-        addLabel({
-          project: "TEST",
-          identifier: "TEST-999",
-          label: "Bug",
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const cause = exit.cause
-        expect(cause._tag).toBe("Fail")
-        if (cause._tag === "Fail") {
-          expect((cause.error as IssueNotFoundError)._tag).toBe("IssueNotFoundError")
-          expect((cause.error as IssueNotFoundError).identifier).toBe("TEST-999")
-          expect((cause.error as IssueNotFoundError).project).toBe("TEST")
-        }
-      }
-    })
+    )
   })
 })

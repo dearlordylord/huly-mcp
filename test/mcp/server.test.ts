@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest"
-import { Effect, Exit, Layer } from "effect"
+import { describe, it } from "@effect/vitest"
+import { expect } from "vitest"
+import { Effect, Layer } from "effect"
 import type {
   Doc,
   FindResult,
@@ -133,292 +134,306 @@ const createMockHulyClientLayer = (config: {
 
 describe("TOOL_DEFINITIONS", () => {
   // test-revizorro: approved
-  it("exports 6 tool definitions", () => {
-    const tools = Object.keys(TOOL_DEFINITIONS)
-    expect(tools).toHaveLength(6)
-    expect(tools).toContain("list_projects")
-    expect(tools).toContain("list_issues")
-    expect(tools).toContain("get_issue")
-    expect(tools).toContain("create_issue")
-    expect(tools).toContain("update_issue")
-    expect(tools).toContain("add_issue_label")
-  })
+  it.effect("exports 6 tool definitions", () =>
+    Effect.gen(function* () {
+      const tools = Object.keys(TOOL_DEFINITIONS)
+      expect(tools).toHaveLength(6)
+      expect(tools).toContain("list_projects")
+      expect(tools).toContain("list_issues")
+      expect(tools).toContain("get_issue")
+      expect(tools).toContain("create_issue")
+      expect(tools).toContain("update_issue")
+      expect(tools).toContain("add_issue_label")
+    })
+  )
 
   // test-revizorro: approved
-  it("each tool has name, description, and inputSchema", () => {
-    for (const [key, tool] of Object.entries(TOOL_DEFINITIONS)) {
-      expect(tool.name).toBe(key)
-      expect(typeof tool.description).toBe("string")
-      expect(tool.description.length).toBeGreaterThan(10)
-      expect(tool.inputSchema).toBeDefined()
-      expect(typeof tool.inputSchema).toBe("object")
-    }
-  })
+  it.effect("each tool has name, description, and inputSchema", () =>
+    Effect.gen(function* () {
+      for (const [key, tool] of Object.entries(TOOL_DEFINITIONS)) {
+        expect(tool.name).toBe(key)
+        expect(typeof tool.description).toBe("string")
+        expect(tool.description.length).toBeGreaterThan(10)
+        expect(tool.inputSchema).toBeDefined()
+        expect(typeof tool.inputSchema).toBe("object")
+      }
+    })
+  )
 
   describe("inputSchema format", () => {
     // test-revizorro: approved
-    it("list_issues schema has correct structure", () => {
-      const schema = TOOL_DEFINITIONS.list_issues.inputSchema
-      expect(schema).toHaveProperty("type", "object")
-      expect(schema).toHaveProperty("properties")
-      const props = (schema as { properties: Record<string, unknown> }).properties
-      expect(props).toHaveProperty("project")
-      expect(props).toHaveProperty("status")
-      expect(props).toHaveProperty("assignee")
-      expect(props).toHaveProperty("limit")
-    })
+    it.effect("list_issues schema has correct structure", () =>
+      Effect.gen(function* () {
+        const schema = TOOL_DEFINITIONS.list_issues.inputSchema
+        expect(schema).toHaveProperty("type", "object")
+        expect(schema).toHaveProperty("properties")
+        const props = (schema as { properties: Record<string, unknown> }).properties
+        expect(props).toHaveProperty("project")
+        expect(props).toHaveProperty("status")
+        expect(props).toHaveProperty("assignee")
+        expect(props).toHaveProperty("limit")
+      })
+    )
 
     // test-revizorro: approved
-    it("get_issue schema has correct structure", () => {
-      const schema = TOOL_DEFINITIONS.get_issue.inputSchema
-      expect(schema).toHaveProperty("type", "object")
-      expect(schema).toHaveProperty("properties")
-      expect((schema as { properties: Record<string, unknown> }).properties).toHaveProperty("project")
-      expect((schema as { properties: Record<string, unknown> }).properties).toHaveProperty("identifier")
-    })
+    it.effect("get_issue schema has correct structure", () =>
+      Effect.gen(function* () {
+        const schema = TOOL_DEFINITIONS.get_issue.inputSchema
+        expect(schema).toHaveProperty("type", "object")
+        expect(schema).toHaveProperty("properties")
+        expect((schema as { properties: Record<string, unknown> }).properties).toHaveProperty("project")
+        expect((schema as { properties: Record<string, unknown> }).properties).toHaveProperty("identifier")
+      })
+    )
 
     // test-revizorro: approved
-    it("create_issue schema has correct structure", () => {
-      const schema = TOOL_DEFINITIONS.create_issue.inputSchema
-      expect(schema).toHaveProperty("type", "object")
-      expect(schema).toHaveProperty("properties")
-      expect((schema as { properties: Record<string, unknown> }).properties).toHaveProperty("project")
-      expect((schema as { properties: Record<string, unknown> }).properties).toHaveProperty("title")
-    })
+    it.effect("create_issue schema has correct structure", () =>
+      Effect.gen(function* () {
+        const schema = TOOL_DEFINITIONS.create_issue.inputSchema
+        expect(schema).toHaveProperty("type", "object")
+        expect(schema).toHaveProperty("properties")
+        expect((schema as { properties: Record<string, unknown> }).properties).toHaveProperty("project")
+        expect((schema as { properties: Record<string, unknown> }).properties).toHaveProperty("title")
+      })
+    )
 
     // test-revizorro: approved
-    it("update_issue schema has correct structure", () => {
-      const schema = TOOL_DEFINITIONS.update_issue.inputSchema
-      expect(schema).toHaveProperty("type", "object")
-      expect(schema).toHaveProperty("properties")
-      const props = (schema as { properties: Record<string, unknown> }).properties
-      expect(props).toHaveProperty("project")
-      expect(props).toHaveProperty("identifier")
-      expect(props).toHaveProperty("title")
-      expect(props).toHaveProperty("description")
-      expect(props).toHaveProperty("priority")
-      expect(props).toHaveProperty("assignee")
-      expect(props).toHaveProperty("status")
-    })
+    it.effect("update_issue schema has correct structure", () =>
+      Effect.gen(function* () {
+        const schema = TOOL_DEFINITIONS.update_issue.inputSchema
+        expect(schema).toHaveProperty("type", "object")
+        expect(schema).toHaveProperty("properties")
+        const props = (schema as { properties: Record<string, unknown> }).properties
+        expect(props).toHaveProperty("project")
+        expect(props).toHaveProperty("identifier")
+        expect(props).toHaveProperty("title")
+        expect(props).toHaveProperty("description")
+        expect(props).toHaveProperty("priority")
+        expect(props).toHaveProperty("assignee")
+        expect(props).toHaveProperty("status")
+      })
+    )
 
     // test-revizorro: approved
-    it("add_issue_label schema has correct structure", () => {
-      const schema = TOOL_DEFINITIONS.add_issue_label.inputSchema
-      expect(schema).toHaveProperty("type", "object")
-      expect(schema).toHaveProperty("properties")
-      const props = (schema as { properties: Record<string, unknown> }).properties
-      expect(props).toHaveProperty("project")
-      expect(props).toHaveProperty("identifier")
-      expect(props).toHaveProperty("label")
-      expect(props).toHaveProperty("color")
-    })
+    it.effect("add_issue_label schema has correct structure", () =>
+      Effect.gen(function* () {
+        const schema = TOOL_DEFINITIONS.add_issue_label.inputSchema
+        expect(schema).toHaveProperty("type", "object")
+        expect(schema).toHaveProperty("properties")
+        const props = (schema as { properties: Record<string, unknown> }).properties
+        expect(props).toHaveProperty("project")
+        expect(props).toHaveProperty("identifier")
+        expect(props).toHaveProperty("label")
+        expect(props).toHaveProperty("color")
+      })
+    )
   })
 })
 
 describe("McpServerService", () => {
   describe("layer creation", () => {
     // test-revizorro: approved
-    it("can create layer with stdio transport config", async () => {
-      const project = makeProject()
-      const issues = [makeIssue()]
-      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+    it.scoped("can create layer with stdio transport config", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const issues = [makeIssue()]
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
-      const hulyClientLayer = createMockHulyClientLayer({
-        projects: [project],
-        issues,
-        statuses,
+        const hulyClientLayer = createMockHulyClientLayer({
+          projects: [project],
+          issues,
+          statuses,
+        })
+
+        const serverLayer = McpServerService.layer({ transport: "stdio" }).pipe(
+          Layer.provide(hulyClientLayer)
+        )
+
+        // Verify we can build the layer (this tests the Effect.gen runs without error)
+        yield* Layer.build(serverLayer)
       })
-
-      const serverLayer = McpServerService.layer({ transport: "stdio" }).pipe(
-        Layer.provide(hulyClientLayer)
-      )
-
-      // Verify we can build the layer (this tests the Effect.gen runs without error)
-      const exit = await Effect.runPromiseExit(
-        Layer.build(serverLayer).pipe(Effect.scoped)
-      )
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-    })
+    )
 
     // test-revizorro: approved
-    it("can create layer with http transport config", async () => {
-      const project = makeProject()
-      const hulyClientLayer = createMockHulyClientLayer({
-        projects: [project],
-        issues: [],
-        statuses: [],
+    it.scoped("can create layer with http transport config", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const hulyClientLayer = createMockHulyClientLayer({
+          projects: [project],
+          issues: [],
+          statuses: [],
+        })
+
+        const serverLayer = McpServerService.layer({
+          transport: "http",
+          httpPort: 3000,
+        }).pipe(Layer.provide(hulyClientLayer))
+
+        yield* Layer.build(serverLayer)
       })
-
-      const serverLayer = McpServerService.layer({
-        transport: "http",
-        httpPort: 3000,
-      }).pipe(Layer.provide(hulyClientLayer))
-
-      const exit = await Effect.runPromiseExit(
-        Layer.build(serverLayer).pipe(Effect.scoped)
-      )
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-    })
+    )
   })
 
   describe("testLayer", () => {
     // test-revizorro: approved
-    it("creates a test layer with default operations", async () => {
-      const testLayer = McpServerService.testLayer({})
+    it.effect("creates a test layer with default operations", () =>
+      Effect.gen(function* () {
+        const testLayer = McpServerService.testLayer({})
 
-      const result = await Effect.runPromise(
-        Effect.gen(function* () {
+        const result = yield* Effect.gen(function* () {
           const server = yield* McpServerService
           // run() should return void immediately with default mock
           yield* server.run()
           yield* server.stop()
           return "success"
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(result).toBe("success")
-    })
+        expect(result).toBe("success")
+      })
+    )
 
     // test-revizorro: approved
-    it("allows overriding run operation", async () => {
-      let runCalled = false
+    it.effect("allows overriding run operation", () =>
+      Effect.gen(function* () {
+        let runCalled = false
 
-      const testLayer = McpServerService.testLayer({
-        run: () =>
-          Effect.sync(() => {
-            runCalled = true
-          }),
-      })
+        const testLayer = McpServerService.testLayer({
+          run: () =>
+            Effect.sync(() => {
+              runCalled = true
+            }),
+        })
 
-      await Effect.runPromise(
-        Effect.gen(function* () {
+        yield* Effect.gen(function* () {
           const server = yield* McpServerService
           yield* server.run()
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(runCalled).toBe(true)
-    })
+        expect(runCalled).toBe(true)
+      })
+    )
 
     // test-revizorro: approved
-    it("allows overriding stop operation", async () => {
-      let stopCalled = false
+    it.effect("allows overriding stop operation", () =>
+      Effect.gen(function* () {
+        let stopCalled = false
 
-      const testLayer = McpServerService.testLayer({
-        stop: () =>
-          Effect.sync(() => {
-            stopCalled = true
-          }),
-      })
+        const testLayer = McpServerService.testLayer({
+          stop: () =>
+            Effect.sync(() => {
+              stopCalled = true
+            }),
+        })
 
-      await Effect.runPromise(
-        Effect.gen(function* () {
+        yield* Effect.gen(function* () {
           const server = yield* McpServerService
           yield* server.stop()
         }).pipe(Effect.provide(testLayer))
-      )
 
-      expect(stopCalled).toBe(true)
-    })
+        expect(stopCalled).toBe(true)
+      })
+    )
 
     // test-revizorro: approved
-    it("can mock run to fail with error", async () => {
-      const testLayer = McpServerService.testLayer({
-        run: () =>
-          new McpServerError({ message: "Test error" }),
+    it.effect("can mock run to fail with error", () =>
+      Effect.gen(function* () {
+        const testLayer = McpServerService.testLayer({
+          run: () =>
+            new McpServerError({ message: "Test error" }),
+        })
+
+        const error = yield* Effect.flip(
+          Effect.gen(function* () {
+            const server = yield* McpServerService
+            yield* server.run()
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("McpServerError")
+        expect(error.message).toBe("Test error")
       })
-
-      const exit = await Effect.runPromiseExit(
-        Effect.gen(function* () {
-          const server = yield* McpServerService
-          yield* server.run()
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const cause = exit.cause
-        expect(cause._tag).toBe("Fail")
-        if (cause._tag === "Fail") {
-          expect((cause.error as McpServerError)._tag).toBe("McpServerError")
-          expect((cause.error as McpServerError).message).toBe("Test error")
-        }
-      }
-    })
+    )
   })
 })
 
 describe("McpServerError", () => {
   // test-revizorro: approved
-  it("creates error with message", () => {
-    const error = new McpServerError({ message: "Connection failed" })
-    expect(error._tag).toBe("McpServerError")
-    expect(error.message).toBe("Connection failed")
-  })
-
-  // test-revizorro: approved
-  it("creates error with message and cause", () => {
-    const cause = new Error("Original error")
-    const error = new McpServerError({
-      message: "Connection failed",
-      cause,
+  it.effect("creates error with message", () =>
+    Effect.gen(function* () {
+      const error = new McpServerError({ message: "Connection failed" })
+      expect(error._tag).toBe("McpServerError")
+      expect(error.message).toBe("Connection failed")
     })
-    expect(error._tag).toBe("McpServerError")
-    expect(error.message).toBe("Connection failed")
-    expect(error.cause).toBe(cause)
-  })
+  )
 
   // test-revizorro: approved
-  it("can be used as Effect error", async () => {
-    const effect = Effect.fail(new McpServerError({ message: "Test" }))
+  it.effect("creates error with message and cause", () =>
+    Effect.gen(function* () {
+      const cause = new Error("Original error")
+      const error = new McpServerError({
+        message: "Connection failed",
+        cause,
+      })
+      expect(error._tag).toBe("McpServerError")
+      expect(error.message).toBe("Connection failed")
+      expect(error.cause).toBe(cause)
+    })
+  )
 
-    const exit = await Effect.runPromiseExit(effect)
+  // test-revizorro: approved
+  it.effect("can be used as Effect error", () =>
+    Effect.gen(function* () {
+      const effect = Effect.fail(new McpServerError({ message: "Test" }))
 
-    expect(Exit.isFailure(exit)).toBe(true)
-    if (Exit.isFailure(exit)) {
-      const cause = exit.cause
-      expect(cause._tag).toBe("Fail")
-      if (cause._tag === "Fail") {
-        expect((cause.error as McpServerError)._tag).toBe("McpServerError")
-      }
-    }
-  })
+      const error = yield* Effect.flip(effect)
+
+      expect(error._tag).toBe("McpServerError")
+    })
+  )
 })
 
 describe("Tool definition descriptions", () => {
   // test-revizorro: approved
-  it("list_issues has helpful description", () => {
-    expect(TOOL_DEFINITIONS.list_issues.description).toContain("Query")
-    expect(TOOL_DEFINITIONS.list_issues.description).toContain("issues")
-    expect(TOOL_DEFINITIONS.list_issues.description).toContain("filter")
-  })
+  it.effect("list_issues has helpful description", () =>
+    Effect.gen(function* () {
+      expect(TOOL_DEFINITIONS.list_issues.description).toContain("Query")
+      expect(TOOL_DEFINITIONS.list_issues.description).toContain("issues")
+      expect(TOOL_DEFINITIONS.list_issues.description).toContain("filter")
+    })
+  )
 
   // test-revizorro: approved
-  it("get_issue has helpful description", () => {
-    expect(TOOL_DEFINITIONS.get_issue.description).toContain("Retrieve")
-    expect(TOOL_DEFINITIONS.get_issue.description).toContain("full details")
-    expect(TOOL_DEFINITIONS.get_issue.description).toContain("markdown")
-  })
+  it.effect("get_issue has helpful description", () =>
+    Effect.gen(function* () {
+      expect(TOOL_DEFINITIONS.get_issue.description).toContain("Retrieve")
+      expect(TOOL_DEFINITIONS.get_issue.description).toContain("full details")
+      expect(TOOL_DEFINITIONS.get_issue.description).toContain("markdown")
+    })
+  )
 
   // test-revizorro: approved
-  it("create_issue has helpful description", () => {
-    expect(TOOL_DEFINITIONS.create_issue.description).toContain("Create")
-    expect(TOOL_DEFINITIONS.create_issue.description).toContain("issue")
-    expect(TOOL_DEFINITIONS.create_issue.description).toContain("markdown")
-  })
+  it.effect("create_issue has helpful description", () =>
+    Effect.gen(function* () {
+      expect(TOOL_DEFINITIONS.create_issue.description).toContain("Create")
+      expect(TOOL_DEFINITIONS.create_issue.description).toContain("issue")
+      expect(TOOL_DEFINITIONS.create_issue.description).toContain("markdown")
+    })
+  )
 
   // test-revizorro: approved
-  it("update_issue has helpful description", () => {
-    expect(TOOL_DEFINITIONS.update_issue.description).toContain("Update")
-    expect(TOOL_DEFINITIONS.update_issue.description).toContain("modified")
-    expect(TOOL_DEFINITIONS.update_issue.description.length).toBeGreaterThan(30)
-  })
+  it.effect("update_issue has helpful description", () =>
+    Effect.gen(function* () {
+      expect(TOOL_DEFINITIONS.update_issue.description).toContain("Update")
+      expect(TOOL_DEFINITIONS.update_issue.description).toContain("modified")
+      expect(TOOL_DEFINITIONS.update_issue.description.length).toBeGreaterThan(30)
+    })
+  )
 
   // test-revizorro: approved
-  it("add_issue_label has helpful description", () => {
-    expect(TOOL_DEFINITIONS.add_issue_label.description).toContain("label")
-    expect(TOOL_DEFINITIONS.add_issue_label.description).toContain("tag")
-  })
+  it.effect("add_issue_label has helpful description", () =>
+    Effect.gen(function* () {
+      expect(TOOL_DEFINITIONS.add_issue_label.description).toContain("label")
+      expect(TOOL_DEFINITIONS.add_issue_label.description).toContain("tag")
+    })
+  )
 })
