@@ -32,7 +32,9 @@ Search examples for real usage patterns when implementing MCP tools.
 ## Publishing
 
 ```bash
-npm version patch && npm publish && git push
+npm run build && npm version patch && npm publish && git push
 ```
+
+**Note:** Must run `npm run build` before publish - dist is not auto-built.
 
 Package: `@firfi/huly-mcp` on npm.
