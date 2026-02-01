@@ -14,19 +14,20 @@ import { JSONSchema, Schema } from "effect"
 // --- Primitive Schemas ---
 
 /**
- * Non-empty string schema.
+ * Non-empty string schema that trims whitespace before validation.
+ * Uses built-in Schema.Trim transformation followed by nonEmptyString filter.
  */
-const NonEmptyString = Schema.String.pipe(
-  Schema.filter((s) => s.trim().length > 0, { message: () => "Must not be empty" })
-)
+const NonEmptyString = Schema.Trim.pipe(Schema.nonEmptyString())
 
 /**
  * ISO timestamp schema (number representing milliseconds since epoch).
+ * Uses built-in Schema.NonNegativeInt for cleaner definition.
  */
-const Timestamp = Schema.Number.pipe(
-  Schema.int({ message: () => "Timestamp must be an integer" }),
-  Schema.nonNegative({ message: () => "Timestamp must be non-negative" })
-)
+const Timestamp = Schema.NonNegativeInt.annotations({
+  identifier: "Timestamp",
+  title: "Timestamp",
+  description: "Unix timestamp in milliseconds (non-negative integer)",
+})
 
 // --- Priority Schema ---
 
