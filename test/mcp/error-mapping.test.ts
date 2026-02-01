@@ -4,7 +4,8 @@ import { Cause, Effect, ParseResult, Schema } from "effect"
 import {
   mapDomainErrorToMcp,
   mapParseErrorToMcp,
-  mapCauseToMcp,
+  mapDomainCauseToMcp,
+  mapParseCauseToMcp,
   createSuccessResponse,
   createUnknownToolError,
 } from "../../src/mcp/error-mapping.js"
@@ -258,9 +259,8 @@ describe("Error Mapping to MCP", () => {
     )
   })
 
-  describe("mapCauseToMcp", () => {
+  describe("mapDomainCauseToMcp", () => {
     describe("Fail cause", () => {
-      // test-revizorro: approved
       it.effect("handles HulyDomainError in Fail cause", () =>
         Effect.gen(function* () {
           const error = new IssueNotFoundError({
@@ -268,7 +268,7 @@ describe("Error Mapping to MCP", () => {
             project: "TEST",
           })
           const cause = Cause.fail(error)
-          const response = mapCauseToMcp(cause)
+          const response = mapDomainCauseToMcp(cause)
 
           expect(response.isError).toBe(true)
           expect(response._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
@@ -277,74 +277,28 @@ describe("Error Mapping to MCP", () => {
           )
         })
       )
-
-      // test-revizorro: approved
-      it.effect("handles ParseError in Fail cause", () =>
-        Effect.gen(function* () {
-          const TestSchema = Schema.Struct({ x: Schema.Number })
-          const error = yield* Effect.flip(
-            Schema.decodeUnknown(TestSchema)({ x: "not a number" })
-          )
-
-          const cause = Cause.fail(error)
-          const response = mapCauseToMcp(cause, "test_tool")
-
-          expect(response.isError).toBe(true)
-          expect(response._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response.content[0].text).toContain("Invalid parameters")
-        })
-      )
-
-      // test-revizorro: approved
-      it.effect("handles unknown error in Fail cause with sanitized message", () =>
-        Effect.gen(function* () {
-          const error = { message: "Custom error" }
-          const cause = Cause.fail(error)
-          const response = mapCauseToMcp(cause)
-
-          expect(response.isError).toBe(true)
-          expect(response._meta?.errorCode).toBe(McpErrorCode.InternalError)
-          expect(response.content[0].text).toBe("Custom error")
-        })
-      )
-
-      // test-revizorro: approved
-      it.effect("sanitizes sensitive unknown errors", () =>
-        Effect.gen(function* () {
-          const error = { message: "Token abc123 is invalid" }
-          const cause = Cause.fail(error)
-          const response = mapCauseToMcp(cause)
-
-          expect(response.content[0].text).toBe(
-            "An error occurred while processing the request"
-          )
-        })
-      )
     })
 
     describe("Die cause", () => {
-      // test-revizorro: approved
       it.effect("returns generic internal error without exposing defect", () =>
         Effect.gen(function* () {
           const defect = new Error("Stack trace with sensitive info")
           const cause = Cause.die(defect)
-          const response = mapCauseToMcp(cause)
+          const response = mapDomainCauseToMcp(cause as Cause.Cause<HulyError>)
 
           expect(response.isError).toBe(true)
           expect(response._meta?.errorCode).toBe(McpErrorCode.InternalError)
           expect(response.content[0].text).toBe("Internal server error")
-          // Ensure no stack trace or sensitive info
           expect(response.content[0].text).not.toContain("Stack trace")
         })
       )
     })
 
     describe("Interrupt cause", () => {
-      // test-revizorro: approved
       it.effect("returns operation interrupted message", () =>
         Effect.gen(function* () {
           const cause = Cause.interrupt("fiber-1" as unknown as Cause.Cause<never>["_tag"] extends "Interrupt" ? Parameters<typeof Cause.interrupt>[0] : never)
-          const response = mapCauseToMcp(cause as Cause.Cause<never>)
+          const response = mapDomainCauseToMcp(cause as Cause.Cause<HulyError>)
 
           expect(response.isError).toBe(true)
           expect(response._meta?.errorCode).toBe(McpErrorCode.InternalError)
@@ -354,11 +308,10 @@ describe("Error Mapping to MCP", () => {
     })
 
     describe("Empty cause", () => {
-      // test-revizorro: scheduled
       it.effect("returns generic error for empty cause", () =>
         Effect.gen(function* () {
           const cause = Cause.empty
-          const response = mapCauseToMcp(cause)
+          const response = mapDomainCauseToMcp(cause as Cause.Cause<HulyError>)
 
           expect(response.isError).toBe(true)
           expect(response._meta?.errorCode).toBe(McpErrorCode.InternalError)
@@ -368,7 +321,6 @@ describe("Error Mapping to MCP", () => {
     })
 
     describe("Sequential cause", () => {
-      // test-revizorro: approved
       it.effect("extracts first meaningful error from sequential cause", () =>
         Effect.gen(function* () {
           const error1 = new ProjectNotFoundError({ identifier: "PROJ" })
@@ -377,7 +329,7 @@ describe("Error Mapping to MCP", () => {
             project: "Y",
           })
           const cause = Cause.sequential(Cause.fail(error1), Cause.fail(error2))
-          const response = mapCauseToMcp(cause)
+          const response = mapDomainCauseToMcp(cause)
 
           expect(response.isError).toBe(true)
           expect(response._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
@@ -387,19 +339,77 @@ describe("Error Mapping to MCP", () => {
     })
 
     describe("Parallel cause", () => {
-      // test-revizorro: approved
       it.effect("extracts first meaningful error from parallel cause", () =>
         Effect.gen(function* () {
           const error1 = new InvalidStatusError({ status: "bad", project: "P" })
           const error2 = new HulyConnectionError({ message: "timeout" })
           const cause = Cause.parallel(Cause.fail(error1), Cause.fail(error2))
-          const response = mapCauseToMcp(cause)
+          const response = mapDomainCauseToMcp(cause)
 
           expect(response.isError).toBe(true)
-          // First error should be extracted
           expect(response.content[0].text).toBe(
             "Invalid status 'bad' for project 'P'"
           )
+        })
+      )
+    })
+  })
+
+  describe("mapParseCauseToMcp", () => {
+    describe("Fail cause", () => {
+      it.effect("handles ParseError in Fail cause", () =>
+        Effect.gen(function* () {
+          const TestSchema = Schema.Struct({ x: Schema.Number })
+          const error = yield* Effect.flip(
+            Schema.decodeUnknown(TestSchema)({ x: "not a number" })
+          )
+
+          const cause = Cause.fail(error)
+          const response = mapParseCauseToMcp(cause, "test_tool")
+
+          expect(response.isError).toBe(true)
+          expect(response._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
+          expect(response.content[0].text).toContain("Invalid parameters")
+        })
+      )
+    })
+
+    describe("Die cause", () => {
+      it.effect("returns generic internal error without exposing defect", () =>
+        Effect.gen(function* () {
+          const defect = new Error("Stack trace with sensitive info")
+          const cause = Cause.die(defect)
+          const response = mapParseCauseToMcp(cause as Cause.Cause<ParseResult.ParseError>)
+
+          expect(response.isError).toBe(true)
+          expect(response._meta?.errorCode).toBe(McpErrorCode.InternalError)
+          expect(response.content[0].text).toBe("Internal server error")
+        })
+      )
+    })
+
+    describe("Interrupt cause", () => {
+      it.effect("returns operation interrupted message", () =>
+        Effect.gen(function* () {
+          const cause = Cause.interrupt("fiber-1" as unknown as Cause.Cause<never>["_tag"] extends "Interrupt" ? Parameters<typeof Cause.interrupt>[0] : never)
+          const response = mapParseCauseToMcp(cause as Cause.Cause<ParseResult.ParseError>)
+
+          expect(response.isError).toBe(true)
+          expect(response._meta?.errorCode).toBe(McpErrorCode.InternalError)
+          expect(response.content[0].text).toBe("Operation was interrupted")
+        })
+      )
+    })
+
+    describe("Empty cause", () => {
+      it.effect("returns generic error for empty cause", () =>
+        Effect.gen(function* () {
+          const cause = Cause.empty
+          const response = mapParseCauseToMcp(cause as Cause.Cause<ParseResult.ParseError>)
+
+          expect(response.isError).toBe(true)
+          expect(response._meta?.errorCode).toBe(McpErrorCode.InternalError)
+          expect(response.content[0].text).toBe("An unexpected error occurred")
         })
       )
     })
@@ -474,7 +484,6 @@ describe("Error Mapping to MCP", () => {
       )
     }
 
-    // test-revizorro: approved
     it.effect("does not expose stack traces in Die cause", () =>
       Effect.gen(function* () {
         const defect = new Error("Error at /path/to/file.ts:123")
@@ -483,7 +492,7 @@ describe("Error Mapping to MCP", () => {
     at Module._compile (internal/modules/cjs/loader.js:1085:14)`
 
         const cause = Cause.die(defect)
-        const response = mapCauseToMcp(cause)
+        const response = mapDomainCauseToMcp(cause as Cause.Cause<HulyError>)
 
         expect(response.content[0].text).not.toContain("/path/to")
         expect(response.content[0].text).not.toContain("stack")
