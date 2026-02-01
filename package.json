@@ -4,7 +4,9 @@
   "description": "MCP server for Huly integration",
   "type": "module",
   "main": "./dist/index.cjs",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },
@@ -33,6 +35,7 @@
   "license": "ISC",
   "dependencies": {
     "@effect/platform": "^0.94.2",
+    "@effect/platform-node": "^0.104.1",
     "@hcengineering/api-client": "^0.7.3",
     "@hcengineering/contact": "^0.7.0",
     "@hcengineering/core": "^0.7.4",
