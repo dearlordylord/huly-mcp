@@ -2,6 +2,7 @@
  * @module
  */
 import {
+  type AuthOptions,
   createRestTxOperations,
   getWorkspaceToken,
   loadServerConfig,
@@ -32,7 +33,7 @@ import { htmlToJSON, jsonToHTML, jsonToMarkup, markupToJSON } from "@hcengineeri
 import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown"
 import { absurd, Context, Effect, Layer, Redacted, Schedule } from "effect"
 
-import { HulyConfigService } from "../config/config.js"
+import { type Auth, HulyConfigService } from "../config/config.js"
 import { HulyAuthError, HulyConnectionError } from "./errors.js"
 
 export type HulyClientError = HulyConnectionError | HulyAuthError
@@ -113,8 +114,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
 
       const { client, markupOps } = yield* connectRestWithRetry({
         url: config.url,
-        email: config.email,
-        password: Redacted.value(config.password),
+        auth: config.auth,
         workspace: config.workspace
       })
 
@@ -281,8 +281,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
 
 interface ConnectionConfig {
   url: string
-  email: string
-  password: string
+  auth: Auth
   workspace: string
 }
 
@@ -373,18 +372,27 @@ function createMarkupOps(
   }
 }
 
+const authToOptions = (auth: Auth, workspace: string): AuthOptions => {
+  switch (auth._tag) {
+    case "token":
+      return { token: Redacted.value(auth.token), workspace }
+    case "password":
+      return { email: auth.email, password: Redacted.value(auth.password), workspace }
+    default:
+      return absurd(auth)
+  }
+}
+
 const connectRest = async (
   config: ConnectionConfig
 ): Promise<RestConnection> => {
   const serverConfig = await loadServerConfig(config.url)
 
+  const authOptions = authToOptions(config.auth, config.workspace)
+
   const { endpoint, token, workspaceId } = await getWorkspaceToken(
     config.url,
-    {
-      email: config.email,
-      password: config.password,
-      workspace: config.workspace
-    },
+    authOptions,
     serverConfig
   )
 
