@@ -4,6 +4,10 @@
 
 Use `pnpm`, not npm.
 
+## Code Style
+
+No comments that repeat the code. If the code says what it does, don't add a comment saying the same thing.
+
 <!-- effect-solutions:start -->
 ## Effect Best Practices
 
