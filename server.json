@@ -1,0 +1,57 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.dearlordylord/huly-mcp",
+  "description": "MCP server for Huly integration",
+  "repository": {
+    "url": "https://github.com/dearlordylord/huly-mcp",
+    "source": "github"
+  },
+  "version": "0.1.7",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@firfi/huly-mcp",
+      "version": "0.1.7",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "HULY_URL",
+          "description": "Huly API URL (e.g., https://huly.app)",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "HULY_EMAIL",
+          "description": "Your Huly account email",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "HULY_PASSWORD",
+          "description": "Your Huly account password",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "HULY_WORKSPACE",
+          "description": "Huly workspace identifier",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "HULY_CONNECTION_TIMEOUT",
+          "description": "Connection timeout in milliseconds (default: 30000)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}
