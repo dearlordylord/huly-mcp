@@ -126,24 +126,19 @@ export const mapDomainErrorToMcp = (error: HulyDomainError): McpErrorResponseWit
 const formatParseError = (error: ParseResult.ParseError): string => {
   const issue = error.issue
 
-  // Handle ArrayFormatter-like output for clearer messages
-  if ("_tag" in issue) {
-    switch (issue._tag) {
-      case "Missing":
-        return "Required field is missing"
-      case "Unexpected":
-        return "Unexpected field provided"
-      case "Type":
-        return `Invalid type: expected ${String(issue.ast)}`
-      case "Forbidden":
-        return "Field is forbidden"
-      default:
-        // For complex issues, provide a general message
-        return "Invalid parameters provided"
-    }
+  switch (issue._tag) {
+    case "Missing":
+      return "Required field is missing"
+    case "Unexpected":
+      return "Unexpected field provided"
+    case "Type":
+      return `Invalid type: expected ${String(issue.ast)}`
+    case "Forbidden":
+      return "Field is forbidden"
+    default:
+      return "Invalid parameters provided"
   }
 
-  return "Invalid parameters provided"
 }
 
 /**

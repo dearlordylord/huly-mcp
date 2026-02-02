@@ -2,20 +2,6 @@
 /**
  * Main entry point for Huly MCP server.
  *
- * Loads configuration, builds Layer stack, and starts the MCP server.
- * Handles graceful shutdown on SIGTERM/SIGINT.
- *
- * Usage:
- *   npm start
- *
- * Environment variables:
- *   HULY_URL           - Huly platform URL (required)
- *   HULY_EMAIL         - User email (required)
- *   HULY_PASSWORD      - User password (required)
- *   HULY_WORKSPACE     - Default workspace (required)
- *   HULY_CONNECTION_TIMEOUT - Connection timeout in ms (default: 30000)
- *   MCP_TRANSPORT      - Transport mode: stdio (default: stdio)
- *
  * @module
  */
 
@@ -31,6 +17,7 @@ import { type McpServerError, McpServerService, type McpTransportType } from "./
 ;(globalThis as any).indexedDB = fakeIndexedDB
 
 // Mock window with basic event handling
+// - dirtiest hack here. current api package is frontend-oriented, but we somehow run it on the server and it somehow works. hooray?
 const mockWindow: any = {
   addEventListener: () => {},
   removeEventListener: () => {},
@@ -47,19 +34,8 @@ if (!(globalThis as any).navigator) {
   })
 }
 
-// --- Types ---
-
-/**
- * Application error - wraps all startup/runtime errors.
- */
 export type AppError = HulyConfigError | HulyClientError | McpServerError | ConfigError.ConfigError
 
-// --- Main Program ---
-
-/**
- * Get transport type from environment.
- * Defaults to "stdio" if not set.
- */
 const getTransportType = Config.string("MCP_TRANSPORT").pipe(
   Config.withDefault("stdio"),
   Effect.map((t): McpTransportType => {
@@ -68,18 +44,10 @@ const getTransportType = Config.string("MCP_TRANSPORT").pipe(
   })
 )
 
-/**
- * Get HTTP port from environment.
- * Defaults to 3000 if not set.
- */
 const getHttpPort = Config.integer("MCP_HTTP_PORT").pipe(
   Config.withDefault(3000)
 )
 
-/**
- * Build the full application layer stack.
- * Config → HulyClient → McpServer
- */
 export const buildAppLayer = (
   transport: McpTransportType,
   httpPort: number
@@ -96,10 +64,6 @@ export const buildAppLayer = (
   return mcpServerLayer
 }
 
-/**
- * Main program that starts the MCP server.
- * Runs until shutdown signal is received.
- */
 export const main: Effect.Effect<void, AppError> = Effect.gen(function*() {
   const transport = yield* getTransportType
   const httpPort = yield* getHttpPort

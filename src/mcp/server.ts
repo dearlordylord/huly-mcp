@@ -1,12 +1,6 @@
 /**
  * MCP Server infrastructure for Huly MCP server.
- *
- * Provides:
- * - McpServer service wrapping @modelcontextprotocol/sdk
- * - Tool registration with JSON Schema from Effect schemas
- * - Transport selection (stdio/HTTP)
- * - Graceful shutdown handling
- *
+
  * @module
  */
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
@@ -42,24 +36,13 @@ import {
   toMcpResponse
 } from "./error-mapping.js"
 
-// --- Types ---
-
-/**
- * Transport type for MCP server.
- */
 export type McpTransportType = "stdio" | "http"
 
-/**
- * Configuration for MCP server.
- */
 export interface McpServerConfig {
   readonly transport: McpTransportType
   readonly httpPort?: number
 }
 
-/**
- * MCP server error.
- */
 export class McpServerError extends Schema.TaggedError<McpServerError>()(
   "McpServerError",
   {
@@ -68,12 +51,6 @@ export class McpServerError extends Schema.TaggedError<McpServerError>()(
   }
 ) {}
 
-// --- Tool Definitions ---
-
-/**
- * Tool definitions for MCP.
- * Maps tool names to their descriptions and JSON schemas.
- */
 export const TOOL_DEFINITIONS = {
   list_projects: {
     name: "list_projects",
@@ -113,11 +90,6 @@ export const TOOL_DEFINITIONS = {
 
 type ToolName = keyof typeof TOOL_DEFINITIONS
 
-// --- MCP Server Service ---
-
-/**
- * MCP Server service interface.
- */
 export interface McpServerOperations {
   /**
    * Start the MCP server and connect to transport.
@@ -131,9 +103,6 @@ export interface McpServerOperations {
   readonly stop: () => Effect.Effect<void, McpServerError>
 }
 
-/**
- * MCP Server service tag.
- */
 export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
   McpServerService,
   McpServerOperations
