@@ -1,23 +1,10 @@
 # @firfi/huly-mcp
 
-MCP server for Huly integration with Claude Code.
+MCP server for Huly integration.
 
 ## Installation
 
-### Claude Code CLI
-
-```bash
-claude mcp add huly \
-  -e HULY_URL=https://huly.app \
-  -e HULY_EMAIL=your@email.com \
-  -e HULY_PASSWORD=yourpassword \
-  -e HULY_WORKSPACE=yourworkspace \
-  -- npx -y @firfi/huly-mcp@latest
-```
-
-### JSON Config
-
-Add to `~/.claude.json` or `.mcp.json`:
+The standard configuration works with most MCP clients:
 
 ```json
 {
@@ -36,6 +23,70 @@ Add to `~/.claude.json` or `.mcp.json`:
 }
 ```
 
+<details>
+<summary>Claude Code</summary>
+
+```bash
+claude mcp add huly \
+  -e HULY_URL=https://huly.app \
+  -e HULY_EMAIL=your@email.com \
+  -e HULY_PASSWORD=yourpassword \
+  -e HULY_WORKSPACE=yourworkspace \
+  -- npx -y @firfi/huly-mcp@latest
+```
+
+Or add to `~/.claude.json` using the standard config above.
+
+</details>
+
+<details>
+<summary>Claude Desktop</summary>
+
+Add the standard config to your `claude_desktop_config.json`:
+
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+</details>
+
+<details>
+<summary>VS Code</summary>
+
+Add to your user settings (`.vscode/mcp.json`) or use Command Palette → "MCP: Add Server":
+
+```json
+{
+  "servers": {
+    "huly": {
+      "command": "npx",
+      "args": ["-y", "@firfi/huly-mcp@latest"],
+      "env": {
+        "HULY_URL": "https://huly.app",
+        "HULY_EMAIL": "your@email.com",
+        "HULY_PASSWORD": "yourpassword",
+        "HULY_WORKSPACE": "yourworkspace"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary>Cursor</summary>
+
+Add the standard config to `~/.cursor/mcp.json`, or via Settings → Tools & Integrations → New MCP Server.
+
+</details>
+
+<details>
+<summary>Windsurf</summary>
+
+Add the standard config to your Windsurf MCP configuration file.
+
+</details>
+
 ## Environment Variables
 
 | Variable | Required | Description |
@@ -45,11 +96,3 @@ Add to `~/.claude.json` or `.mcp.json`:
 | `HULY_PASSWORD` | Yes | Account password |
 | `HULY_WORKSPACE` | Yes | Workspace identifier |
 | `HULY_CONNECTION_TIMEOUT` | No | Connection timeout in ms (default: 30000) |
-
-## Verify
-
-```bash
-claude mcp list
-# or inside Claude Code:
-/mcp
-```
