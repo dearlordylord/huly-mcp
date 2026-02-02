@@ -2,20 +2,20 @@
  * HulyClient service for Huly MCP server.
  *
  * Provides authenticated connection to Huly platform with:
- * - Eager connection (connects when layer is built)
- * - Graceful shutdown (closes on scope finalization)
+ * - REST-based connection (stateless HTTP requests)
  * - Retry on connection failures
  * - Error mapping to HulyConnectionError/HulyAuthError
  *
  * @module
  */
 import {
-  connect,
+  createRestTxOperations,
+  getWorkspaceToken,
+  loadServerConfig,
   type MarkupFormat,
-  type MarkupRef,
-  NodeWebSocketFactory,
-  type PlatformClient
+  type MarkupRef
 } from "@hcengineering/api-client"
+import { getClient as getCollaboratorClient } from "@hcengineering/collaborator-client"
 import {
   type AttachedData,
   type AttachedDoc,
@@ -26,12 +26,17 @@ import {
   type DocumentUpdate,
   type FindOptions,
   type FindResult,
+  makeCollabId,
   type Ref,
   type Space,
   toFindResult,
+  type TxOperations,
   type TxResult,
-  type WithLookup
+  type WithLookup,
+  type WorkspaceUuid
 } from "@hcengineering/core"
+import { htmlToJSON, jsonToHTML, jsonToMarkup, markupToJSON } from "@hcengineering/text"
+import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown"
 import { Context, Effect, Layer, Redacted, Schedule } from "effect"
 
 import { HulyConfigService } from "../config/config.js"
@@ -48,7 +53,7 @@ export type HulyClientError = HulyConnectionError | HulyAuthError
 
 /**
  * Operations exposed by the HulyClient service.
- * Wraps PlatformClient methods with Effect error handling.
+ * Wraps TxOperations methods with Effect error handling.
  */
 export interface HulyClientOperations {
   /**
@@ -104,6 +109,15 @@ export interface HulyClientOperations {
   ) => Effect.Effect<Ref<P>, HulyClientError>
 
   /**
+   * Remove a document.
+   */
+  readonly removeDoc: <T extends Doc>(
+    _class: Ref<Class<T>>,
+    space: Ref<Space>,
+    objectId: Ref<T>
+  ) => Effect.Effect<TxResult, HulyClientError>
+
+  /**
    * Upload markup content.
    */
   readonly uploadMarkup: (
@@ -137,9 +151,8 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
   HulyClientOperations
 >() {
   /**
-   * Production layer - connects to Huly platform.
-   * Connection is eager (on layer build) for simpler lifecycle.
-   * Handles graceful shutdown on scope finalization.
+   * Production layer - connects to Huly platform via REST.
+   * Uses stateless HTTP requests instead of WebSocket.
    */
   static readonly layer: Layer.Layer<
     HulyClient,
@@ -150,25 +163,17 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
     Effect.gen(function*() {
       const config = yield* HulyConfigService
 
-      // Eager connection - connect immediately when layer is built
-      const client = yield* connectWithRetry({
+      // Connect via REST with retry
+      const { client, markupOps } = yield* connectRestWithRetry({
         url: config.url,
         email: config.email,
         password: Redacted.value(config.password),
-        workspace: config.workspace,
-        connectionTimeout: config.connectionTimeout
+        workspace: config.workspace
       })
 
-      // Register cleanup on scope finalization
-      yield* Effect.addFinalizer(() =>
-        Effect.promise(() => client.close()).pipe(
-          Effect.catchAll(() => Effect.void)
-        )
-      )
-
-      // Helper to wrap operations with the connected client
+      // Helper to wrap operations with error handling
       const withClient = <A>(
-        op: (client: PlatformClient) => Promise<A>,
+        op: (client: TxOperations) => Promise<A>,
         errorMsg: string
       ): Effect.Effect<A, HulyClientError> =>
         Effect.tryPromise({
@@ -209,13 +214,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
           id?: Ref<T>
         ) =>
           withClient(
-            (client) =>
-              client.createDoc(
-                _class,
-                space,
-                attributes as Parameters<typeof client.createDoc>[2],
-                id
-              ),
+            (client) => client.createDoc(_class, space, attributes, id),
             "createDoc failed"
           ) as Effect.Effect<Ref<T>, HulyClientError>,
 
@@ -227,14 +226,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
           retrieve?: boolean
         ) =>
           withClient(
-            (client) =>
-              client.updateDoc(
-                _class,
-                space,
-                objectId,
-                ops as Parameters<typeof client.updateDoc>[3],
-                retrieve
-              ),
+            (client) => client.updateDoc(_class, space, objectId, ops, retrieve),
             "updateDoc failed"
           ),
 
@@ -255,23 +247,41 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
                 attachedTo,
                 attachedToClass,
                 collection,
-                attributes as Parameters<typeof client.addCollection>[5],
+                attributes,
                 id
               ),
             "addCollection failed"
           ) as Effect.Effect<Ref<P>, HulyClientError>,
 
-        uploadMarkup: (objectClass, objectId, objectAttr, markup, format) =>
+        removeDoc: <T extends Doc>(
+          _class: Ref<Class<T>>,
+          space: Ref<Space>,
+          objectId: Ref<T>
+        ) =>
           withClient(
-            (client) => client.uploadMarkup(objectClass, objectId, objectAttr, markup, format),
-            "uploadMarkup failed"
+            (client) => client.removeDoc(_class, space, objectId),
+            "removeDoc failed"
           ),
 
+        uploadMarkup: (objectClass, objectId, objectAttr, markup, format) =>
+          Effect.tryPromise({
+            try: () => markupOps.uploadMarkup(objectClass, objectId, objectAttr, markup, format),
+            catch: (e) =>
+              new HulyConnectionError({
+                message: `uploadMarkup failed: ${String(e)}`,
+                cause: e
+              })
+          }),
+
         fetchMarkup: (objectClass, objectId, objectAttr, id, format) =>
-          withClient(
-            (client) => client.fetchMarkup(objectClass, objectId, objectAttr, id, format),
-            "fetchMarkup failed"
-          )
+          Effect.tryPromise({
+            try: () => markupOps.fetchMarkup(objectClass, objectId, objectAttr, id, format),
+            catch: (e) =>
+              new HulyConnectionError({
+                message: `fetchMarkup failed: ${String(e)}`,
+                cause: e
+              })
+          })
       }
 
       return operations
@@ -307,6 +317,8 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       P extends AttachedDoc
     >(): Effect.Effect<Ref<P>, HulyClientError> => Effect.succeed("" as Ref<P>)
 
+    const noopRemoveDoc = (): Effect.Effect<TxResult, HulyClientError> => Effect.succeed({})
+
     const noopUploadMarkup = (): Effect.Effect<MarkupRef, HulyClientError> => Effect.succeed("" as MarkupRef)
 
     const noopFetchMarkup = (): Effect.Effect<string, HulyClientError> => Effect.succeed("")
@@ -317,6 +329,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       createDoc: noopCreateDoc,
       updateDoc: noopUpdateDoc,
       addCollection: noopAddCollection,
+      removeDoc: noopRemoveDoc,
       uploadMarkup: noopUploadMarkup,
       fetchMarkup: noopFetchMarkup
     }
@@ -325,7 +338,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
   }
 }
 
-// --- Internal Functions ---
+// --- Internal Types ---
 
 /**
  * Connection config for internal use.
@@ -335,7 +348,45 @@ interface ConnectionConfig {
   email: string
   password: string
   workspace: string
-  connectionTimeout: number
+}
+
+/**
+ * Markup operations interface (matches internal Huly implementation).
+ */
+interface MarkupOperations {
+  fetchMarkup: (
+    objectClass: Ref<Class<Doc>>,
+    objectId: Ref<Doc>,
+    objectAttr: string,
+    id: MarkupRef,
+    format: MarkupFormat
+  ) => Promise<string>
+  uploadMarkup: (
+    objectClass: Ref<Class<Doc>>,
+    objectId: Ref<Doc>,
+    objectAttr: string,
+    markup: string,
+    format: MarkupFormat
+  ) => Promise<MarkupRef>
+}
+
+/**
+ * REST connection result.
+ */
+interface RestConnection {
+  client: TxOperations
+  markupOps: MarkupOperations
+}
+
+// --- Internal Functions ---
+
+/**
+ * Concatenate URL host and path.
+ */
+const concatLink = (host: string, path: string): string => {
+  const trimmedHost = host.endsWith("/") ? host.slice(0, -1) : host
+  const trimmedPath = path.startsWith("/") ? path : `/${path}`
+  return `${trimmedHost}${trimmedPath}`
 }
 
 /**
@@ -351,25 +402,96 @@ const isAuthError = (error: unknown): boolean => {
     || msg.includes("401")
     || msg.includes("invalid password")
     || msg.includes("invalid email")
+    || msg.includes("login failed")
   )
+}
+
+/**
+ * Create markup operations using collaborator client.
+ * This is HTTP-based and independent of transport.
+ */
+function createMarkupOps(
+  url: string,
+  workspace: WorkspaceUuid,
+  token: string,
+  collaboratorUrl: string
+): MarkupOperations {
+  const refUrl = concatLink(url, `/browse?workspace=${workspace}`)
+  const imageUrl = concatLink(url, `/files?workspace=${workspace}&file=`)
+  const collaborator = getCollaboratorClient(workspace, token, collaboratorUrl)
+
+  return {
+    async fetchMarkup(objectClass, objectId, objectAttr, doc, format) {
+      const collabId = makeCollabId(objectClass, objectId, objectAttr)
+      const markup = await collaborator.getMarkup(collabId, doc)
+      const json = markupToJSON(markup)
+      switch (format) {
+        case "markup":
+          return markup
+        case "html":
+          return jsonToHTML(json)
+        case "markdown":
+          return markupToMarkdown(json, { refUrl, imageUrl })
+      }
+    },
+
+    async uploadMarkup(objectClass, objectId, objectAttr, value, format) {
+      const collabId = makeCollabId(objectClass, objectId, objectAttr)
+      switch (format) {
+        case "markup":
+          return await collaborator.createMarkup(collabId, value)
+        case "html":
+          return await collaborator.createMarkup(collabId, jsonToMarkup(htmlToJSON(value)))
+        case "markdown":
+          return await collaborator.createMarkup(collabId, jsonToMarkup(markdownToMarkup(value, { refUrl, imageUrl })))
+      }
+    }
+  }
+}
+
+/**
+ * Connect to Huly via REST API.
+ */
+const connectRest = async (
+  config: ConnectionConfig
+): Promise<RestConnection> => {
+  // Load server configuration
+  const serverConfig = await loadServerConfig(config.url)
+
+  // Get workspace token via account service
+  const { endpoint, token, workspaceId } = await getWorkspaceToken(
+    config.url,
+    {
+      email: config.email,
+      password: config.password,
+      workspace: config.workspace
+    },
+    serverConfig
+  )
+
+  // Create REST-based TxOperations
+  const client = await createRestTxOperations(endpoint, workspaceId, token)
+
+  // Create markup operations using collaborator client
+  const markupOps = createMarkupOps(
+    config.url,
+    workspaceId,
+    token,
+    serverConfig.COLLABORATOR_URL
+  )
+
+  return { client, markupOps }
 }
 
 /**
  * Connect to Huly with retry policy.
  * Retries on transient connection errors, fails fast on auth errors.
  */
-const connectWithRetry = (
+const connectRestWithRetry = (
   config: ConnectionConfig
-): Effect.Effect<PlatformClient, HulyClientError> => {
-  const attemptConnect: Effect.Effect<PlatformClient, HulyClientError> = Effect.tryPromise({
-    try: () =>
-      connect(config.url, {
-        email: config.email,
-        password: config.password,
-        workspace: config.workspace,
-        socketFactory: NodeWebSocketFactory,
-        connectionTimeout: config.connectionTimeout
-      }),
+): Effect.Effect<RestConnection, HulyClientError> => {
+  const attemptConnect: Effect.Effect<RestConnection, HulyClientError> = Effect.tryPromise({
+    try: () => connectRest(config),
     catch: (e) => {
       if (isAuthError(e)) {
         return new HulyAuthError({
