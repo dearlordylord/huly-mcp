@@ -162,7 +162,6 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
           }
         )
 
-        // Register tool list handler
         server.setRequestHandler(ListToolsRequestSchema, async () => ({
           tools: Object.values(TOOL_DEFINITIONS).map((tool) => ({
             name: tool.name,
@@ -175,7 +174,6 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
           }))
         }))
 
-        // Register tool call handler
         server.setRequestHandler(CallToolRequestSchema, async (request) => {
           const { arguments: args, name } = request.params
 
@@ -184,8 +182,6 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
             args ?? {},
             hulyClient
           )
-
-          // Convert internal response to MCP SDK format
           return toMcpResponse(result)
         })
 
@@ -203,7 +199,6 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 
               yield* Ref.set(isRunning, true)
 
-              // Create and connect transport based on config
               if (config.transport === "stdio") {
                 const transport = new StdioServerTransport()
 
@@ -234,7 +229,6 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                   })
                 })
 
-                // Close server on shutdown
                 yield* Effect.tryPromise({
                   try: () => server.close(),
                   catch: (e) =>
@@ -375,7 +369,6 @@ async function runToolHandler<A, P>(
   operation: (params: P) => Effect.Effect<A, HulyDomainError, HulyClient>,
   hulyClient: HulyClient["Type"]
 ): Promise<McpToolResponse> {
-  // Parse and validate input
   const parseResult = await Effect.runPromiseExit(parse(args))
 
   if (Exit.isFailure(parseResult)) {
@@ -384,7 +377,6 @@ async function runToolHandler<A, P>(
 
   const params = parseResult.value
 
-  // Execute the operation with HulyClient provided
   const operationResult = await Effect.runPromiseExit(
     operation(params).pipe(Effect.provideService(HulyClient, hulyClient))
   )
@@ -393,6 +385,5 @@ async function runToolHandler<A, P>(
     return mapCauseToMcp(operationResult.cause, toolName)
   }
 
-  // Success - create response
   return createSuccessResponse(operationResult.value)
 }

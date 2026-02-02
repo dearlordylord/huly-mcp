@@ -1,6 +1,8 @@
 # @firfi/huly-mcp
 
-MCP server for Huly integration.
+[![npm](https://img.shields.io/npm/v/@firfi/huly-mcp)](https://www.npmjs.com/package/@firfi/huly-mcp)
+
+MCP server for [Huly](https://huly.io/) integration.
 
 ## Installation
 

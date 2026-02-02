@@ -105,7 +105,8 @@ export const ListProjectsParamsSchema = Schema.Struct({
   limit: Schema.optional(
     Schema.Number.pipe(
       Schema.int(),
-      Schema.positive()
+      Schema.positive(),
+      Schema.lessThanOrEqualTo(200)
     ).annotations({
       description: "Maximum number of projects to return (default: 50)"
     })
@@ -208,9 +209,10 @@ export const ListIssuesParamsSchema = Schema.Struct({
   limit: Schema.optional(
     Schema.Number.pipe(
       Schema.int(),
-      Schema.positive()
+      Schema.positive(),
+      Schema.lessThanOrEqualTo(200)
     ).annotations({
-      description: "Maximum number of issues to return (default: 20)"
+      description: "Maximum number of issues to return (default: 50)"
     })
   )
 }).annotations({

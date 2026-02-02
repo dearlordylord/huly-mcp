@@ -163,7 +163,6 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
     Effect.gen(function*() {
       const config = yield* HulyConfigService
 
-      // Connect via REST with retry
       const { client, markupOps } = yield* connectRestWithRetry({
         url: config.url,
         email: config.email,
@@ -171,7 +170,6 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
         workspace: config.workspace
       })
 
-      // Helper to wrap operations with error handling
       const withClient = <A>(
         op: (client: TxOperations) => Promise<A>,
         errorMsg: string
@@ -185,7 +183,6 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
             })
         })
 
-      // Create service operations
       const operations: HulyClientOperations = {
         findAll: <T extends Doc>(
           _class: Ref<Class<T>>,
@@ -455,10 +452,8 @@ function createMarkupOps(
 const connectRest = async (
   config: ConnectionConfig
 ): Promise<RestConnection> => {
-  // Load server configuration
   const serverConfig = await loadServerConfig(config.url)
 
-  // Get workspace token via account service
   const { endpoint, token, workspaceId } = await getWorkspaceToken(
     config.url,
     {
@@ -469,10 +464,7 @@ const connectRest = async (
     serverConfig
   )
 
-  // Create REST-based TxOperations
   const client = await createRestTxOperations(endpoint, workspaceId, token)
-
-  // Create markup operations using collaborator client
   const markupOps = createMarkupOps(
     config.url,
     workspaceId,

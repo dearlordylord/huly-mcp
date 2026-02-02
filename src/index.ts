@@ -84,12 +84,10 @@ export const buildAppLayer = (
   transport: McpTransportType,
   httpPort: number
 ): Layer.Layer<McpServerService, HulyConfigError | HulyClientError, never> => {
-  // HulyClient requires HulyConfig
   const hulyClientLayer = HulyClient.layer.pipe(
     Layer.provide(HulyConfigService.layer)
   )
 
-  // McpServer requires HulyClient
   const mcpServerLayer = McpServerService.layer({
     transport,
     httpPort
@@ -103,16 +101,11 @@ export const buildAppLayer = (
  * Runs until shutdown signal is received.
  */
 export const main: Effect.Effect<void, AppError> = Effect.gen(function*() {
-  // Get transport configuration
   const transport = yield* getTransportType
   const httpPort = yield* getHttpPort
-
-  // Note: No console output here - stdout reserved for MCP protocol in stdio mode
-
-  // Build layer stack
+  // stdout reserved for MCP protocol in stdio mode - no console output here
   const appLayer = buildAppLayer(transport, httpPort)
 
-  // Get server service and run
   yield* Effect.gen(function*() {
     const server = yield* McpServerService
     yield* server.run()

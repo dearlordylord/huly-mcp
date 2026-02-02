@@ -28,11 +28,6 @@ export type ListProjectsError = HulyClientError
 
 /**
  * List projects with optional filters.
- *
- * Filters:
- * - archived: Include archived projects (default: false)
- * - limit: Max results (default 50, max 200)
- *
  * Results sorted by name ascending.
  */
 export const listProjects = (
@@ -41,18 +36,13 @@ export const listProjects = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    // Build query based on filters
     const query: Record<string, unknown> = {}
-
-    // By default, exclude archived projects
     if (!params.includeArchived) {
       query.archived = false
     }
 
-    // Calculate limit
     const limit = Math.min(params.limit ?? 50, 200)
 
-    // Execute query - FindResult includes total count
     const projects = yield* client.findAll<HulyProject>(
       tracker.class.Project,
       query,
@@ -66,7 +56,6 @@ export const listProjects = (
 
     const total = projects.total ?? projects.length
 
-    // Transform to ProjectSummary
     const summaries: Array<ProjectSummary> = projects.map((project) => ({
       identifier: project.identifier,
       name: project.name,
