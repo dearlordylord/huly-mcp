@@ -1,5 +1,9 @@
 # Project Instructions
 
+## Package Manager
+
+Use `pnpm`, not npm.
+
 <!-- effect-solutions:start -->
 ## Effect Best Practices
 
