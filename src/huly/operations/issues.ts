@@ -271,35 +271,40 @@ export const listIssues = (
       }
     )
 
-    // 5. Transform to IssueSummary
-    const summaries: IssueSummary[] = []
+    // 5. Batch fetch all assignees (fix N+1 query)
+    const assigneeIds = [...new Set(
+      issues.filter(i => i.assignee !== null).map(i => i.assignee!)
+    )]
 
-    for (const issue of issues) {
+    const persons = assigneeIds.length > 0
+      ? yield* client.findAll<Person>(
+          contact.class.Person,
+          { _id: { $in: assigneeIds } }
+        )
+      : []
+
+    const personMap = new Map(persons.map(p => [p._id, p]))
+
+    // 6. Transform to IssueSummary
+    const summaries: IssueSummary[] = issues.map(issue => {
       // Look up status name
       const statusDoc = statusList.find(s => s._id === issue.status as Ref<Doc>)
       const statusName = statusDoc?.name ?? "Unknown"
 
-      // Look up assignee name if assigned
-      let assigneeName: string | undefined
-      if (issue.assignee !== null) {
-        const person = yield* client.findOne<Person>(
-          contact.class.Person,
-          { _id: issue.assignee }
-        )
-        if (person) {
-          assigneeName = person.name
-        }
-      }
+      // Look up assignee name from pre-fetched map
+      const assigneeName = issue.assignee !== null
+        ? personMap.get(issue.assignee)?.name
+        : undefined
 
-      summaries.push({
+      return {
         identifier: issue.identifier,
         title: issue.title,
         status: statusName,
         priority: priorityToString(issue.priority),
         assignee: assigneeName,
         modifiedOn: issue.modifiedOn,
-      })
-    }
+      }
+    })
 
     return summaries
   })
