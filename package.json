@@ -29,7 +29,8 @@
     "lint:fix": "eslint src --ext .ts --fix"
   },
   "bin": {
-    "huly-mcp": "./dist/index.cjs"
+    "huly-mcp": "./dist/index.cjs",
+    "@firfi/huly-mcp": "./dist/index.cjs"
   },
   "keywords": [],
   "author": "",
