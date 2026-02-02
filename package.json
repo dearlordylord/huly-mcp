@@ -1,9 +1,13 @@
 {
-  "name": "hulymcp",
-  "version": "1.0.0",
-  "description": "",
+  "name": "@firfi/huly-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Huly integration",
   "type": "module",
-  "main": "index.js",
+  "main": "./dist/index.cjs",
+  "files": ["dist"],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "prepare": "husky",
     "start": "node dist/index.cjs",
@@ -14,7 +18,7 @@
     "lint": "tsc -p tsconfig.json --noEmit"
   },
   "bin": {
-    "hulymcp": "src/index.ts"
+    "huly-mcp": "./dist/index.cjs"
   },
   "keywords": [],
   "author": "",
