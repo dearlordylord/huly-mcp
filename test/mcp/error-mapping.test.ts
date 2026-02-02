@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { Cause, Effect, ParseResult, Schema } from "effect"
+import { Cause, Effect, Exit, ParseResult, Schema } from "effect"
 import {
   mapDomainErrorToMcp,
   mapParseErrorToMcp,
@@ -87,9 +87,9 @@ describe("Error Mapping to MCP", () => {
         expect(response.content[0].text).toBe("Connection error: Network timeout")
       })
 
-      // test-revizorro: suspect [Test expects "Authentication error: ..." but prefix contains "auth" keyword which should trigger sanitization to generic message]
+      // test-revizorro: approved [Sanitization uses word boundary /\bauth\b/i, so "Authentication" is not matched - only standalone "auth" triggers sanitization]
       it("maps HulyAuthError with sanitized message", () => {
-        // Use a message without sensitive keywords
+        // "Authentication" in prefix doesn't trigger sanitization because /\bauth\b/i uses word boundaries
         const error = new HulyAuthError({ message: "Login failed" })
         const response = mapDomainErrorToMcp(error)
 
@@ -255,13 +255,14 @@ describe("Error Mapping to MCP", () => {
         )
       })
 
-      // test-revizorro: suspect [Conditional assertion (if Failure) - test passes if validation succeeds, weak assertion misses tool name in message]
+      // test-revizorro: approved
       it("handles ParseError in Fail cause", async () => {
         const TestSchema = Schema.Struct({ x: Schema.Number })
         const result = await Effect.runPromiseExit(
           Schema.decodeUnknown(TestSchema)({ x: "not a number" })
         )
 
+        expect(Exit.isFailure(result)).toBe(true)
         if (result._tag === "Failure") {
           const response = mapCauseToMcp(result.cause, "test_tool")
 

@@ -6,6 +6,7 @@ import type {
   Ref,
   Space,
   Status,
+  StatusCategory,
 } from "@hcengineering/core"
 import { type Issue as HulyIssue, type Project as HulyProject, IssuePriority } from "@hcengineering/tracker"
 import type { Person, Channel } from "@hcengineering/contact"
@@ -21,6 +22,8 @@ const tracker = require("@hcengineering/tracker").default as typeof import("@hce
 const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const tags = require("@hcengineering/tags").default as typeof import("@hcengineering/tags").default
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const task = require("@hcengineering/task").default as typeof import("@hcengineering/task").default
 
 // --- Mock Data Builders ---
 
@@ -190,7 +193,15 @@ const createTestLayerWithMocks = (config: MockConfig) => {
         config.captureIssueQuery.query = query as Record<string, unknown>
         config.captureIssueQuery.options = options as Record<string, unknown>
       }
-      return Effect.succeed(issues as unknown as FindResult<Doc>)
+      // Apply sorting if specified in options
+      const opts = options as { sort?: Record<string, number> } | undefined
+      let result = [...issues]
+      if (opts?.sort?.modifiedOn !== undefined) {
+        // SortingOrder.Descending = -1, Ascending = 1
+        const direction = opts.sort.modifiedOn
+        result = result.sort((a, b) => direction * (a.modifiedOn - b.modifiedOn))
+      }
+      return Effect.succeed(result as unknown as FindResult<Doc>)
     }
     if (_class === tracker.class.IssueStatus) {
       return Effect.succeed(statuses as unknown as FindResult<Doc>)
@@ -228,10 +239,11 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     }
     if (_class === tracker.class.Issue) {
       const q = query as Record<string, unknown>
-      // Find by identifier or number
+      // Find by identifier, number, or space (for rank queries)
       const found = issues.find(i =>
         (q.identifier && i.identifier === q.identifier) ||
-        (q.number && i.number === q.number)
+        (q.number && i.number === q.number) ||
+        (q.space && i.space === q.space)
       )
       return Effect.succeed(found as Doc | undefined)
     }
@@ -332,12 +344,13 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 
 describe("listIssues", () => {
   describe("basic functionality", () => {
-    // test-revizorro: suspect [Mock doesn't implement sorting - test passes by array order coincidence, not real sort logic]
+    // test-revizorro: approved
     it("returns issues for a project", async () => {
       const project = makeProject({ identifier: "TEST" })
+      // Input: older issue first (opposite of expected output order)
       const issues = [
-        makeIssue({ identifier: "TEST-1", title: "Issue 1", modifiedOn: 2000 }),
         makeIssue({ identifier: "TEST-2", title: "Issue 2", modifiedOn: 1000 }),
+        makeIssue({ identifier: "TEST-1", title: "Issue 1", modifiedOn: 2000 }),
       ]
       const statuses = [
         makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" }),
@@ -354,6 +367,7 @@ describe("listIssues", () => {
       )
 
       expect(result).toHaveLength(2)
+      // Expect sorted by modifiedOn descending (newer first)
       expect(result[0].identifier).toBe("TEST-1")
       expect(result[1].identifier).toBe("TEST-2")
     })
@@ -489,13 +503,26 @@ describe("listIssues", () => {
       expect(captureQuery.query?.status).toBe("status-progress")
     })
 
-    // test-revizorro: suspect [Statuses lack categories - tests edge case (no filter applied) not actual category filtering behavior]
+    // test-revizorro: approved
     it("reserved word 'open' filters by category (not done/canceled)", async () => {
       const project = makeProject()
-      // No statuses have categories in this mock, so "open" means no filter
+      // Statuses with proper categories: Active (open), Won (done), Lost (canceled)
       const statuses = [
-        makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" }),
-        makeStatus({ _id: "status-done" as Ref<Status>, name: "Done" }),
+        makeStatus({
+          _id: "status-open" as Ref<Status>,
+          name: "Open",
+          category: task.statusCategory.Active as Ref<StatusCategory>,
+        }),
+        makeStatus({
+          _id: "status-done" as Ref<Status>,
+          name: "Done",
+          category: task.statusCategory.Won as Ref<StatusCategory>,
+        }),
+        makeStatus({
+          _id: "status-canceled" as Ref<Status>,
+          name: "Canceled",
+          category: task.statusCategory.Lost as Ref<StatusCategory>,
+        }),
       ]
       const issues = [makeIssue({ status: "status-open" as Ref<Status> })]
 
@@ -512,9 +539,10 @@ describe("listIssues", () => {
         listIssues({ project: "TEST", status: "open" }).pipe(Effect.provide(testLayer))
       )
 
-      // Since no statuses have categories, no status filter is applied
-      // (all statuses are considered "open" by default)
-      expect(captureQuery.query?.status).toBeUndefined()
+      // "open" filter should exclude done (Won) and canceled (Lost) statuses
+      expect(captureQuery.query?.status).toEqual({
+        $nin: ["status-done", "status-canceled"],
+      })
     })
   })
 
@@ -1110,7 +1138,7 @@ describe("createIssue", () => {
       expect(captureAddCollection.attributes?.status).toBe("status-default")
     })
 
-    // test-revizorro: suspect [Only checks rank is defined+string, not correctness. Would pass with any string including empty/wrong values. Doesnt verify rank ordering or makeRank logic]
+    // test-revizorro: approved
     it("calculates rank for new issue", async () => {
       const project = makeProject({ identifier: "TEST", sequence: 1 })
       const existingIssue = makeIssue({ rank: "0|hzzzzz:" })
@@ -1132,9 +1160,10 @@ describe("createIssue", () => {
         }).pipe(Effect.provide(testLayer))
       )
 
-      // Should have calculated a rank
+      // Should have calculated a rank greater than the existing issue's rank
       expect(captureAddCollection.attributes?.rank).toBeDefined()
       expect(typeof captureAddCollection.attributes?.rank).toBe("string")
+      expect(captureAddCollection.attributes?.rank > existingIssue.rank).toBe(true)
     })
 
     // test-revizorro: approved
