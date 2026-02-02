@@ -46,6 +46,7 @@
     "@hcengineering/task": "^0.7.0",
     "@hcengineering/tracker": "^0.7.0",
     "@modelcontextprotocol/sdk": "^1.0.4",
+    "@total-typescript/ts-reset": "^0.6.1",
     "effect": "^3.19.15",
     "fake-indexeddb": "^6.2.5"
   },

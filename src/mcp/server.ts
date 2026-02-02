@@ -97,6 +97,10 @@ export const TOOL_DEFINITIONS = {
 
 type ToolName = keyof typeof TOOL_DEFINITIONS
 
+const ToolNameSchema = Schema.Literal(
+  ...Object.keys(TOOL_DEFINITIONS) as [ToolName, ...ToolName[]]
+)
+
 export interface McpServerOperations {
   /**
    * Start the MCP server and connect to transport.
@@ -156,15 +160,19 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
         server.setRequestHandler(CallToolRequestSchema, async (request) => {
           const { arguments: args, name } = request.params
 
+          const toolNameResult = Schema.decodeUnknownEither(ToolNameSchema)(name)
+          if (toolNameResult._tag === "Left") {
+            return toMcpResponse(createUnknownToolError(name))
+          }
+
           const result = await handleToolCall(
-            name as ToolName,
+            toolNameResult.right,
             args ?? {},
             hulyClient
           )
           return toMcpResponse(result)
         })
 
-        // Track server state using Effect's Ref for purity
         const isRunning = yield* Ref.make(false)
 
         const operations: McpServerOperations = {
@@ -271,7 +279,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
  * Returns MCP protocol response with proper error codes.
  */
 async function handleToolCall(
-  toolName: ToolName | string,
+  toolName: ToolName,
   args: Record<string, unknown>,
   hulyClient: HulyClient["Type"]
 ): Promise<McpToolResponse> {
