@@ -3,6 +3,7 @@ import { expect } from "vitest"
 import { Effect, Layer, Cause } from "effect"
 import { HulyConfigService } from "../src/config/config.js"
 import { HulyClient } from "../src/huly/client.js"
+import { HulyStorageClient } from "../src/huly/storage.js"
 import { McpServerService, McpServerError } from "../src/mcp/server.js"
 import { main } from "../src/index.js"
 
@@ -63,11 +64,12 @@ describe("Main Entry Point", () => {
   })
 
   describe("layer composition", () => {
-        it.scoped("McpServerService layer composes with HulyClient", () =>
+        it.scoped("McpServerService layer composes with HulyClient and HulyStorageClient", () =>
       Effect.gen(function* () {
         const hulyClientLayer = HulyClient.testLayer({})
+        const storageClientLayer = HulyStorageClient.testLayer({})
         const mcpServerLayer = McpServerService.layer({ transport: "stdio" }).pipe(
-          Layer.provide(hulyClientLayer)
+          Layer.provide(Layer.merge(hulyClientLayer, storageClientLayer))
         )
 
         yield* Layer.build(mcpServerLayer)

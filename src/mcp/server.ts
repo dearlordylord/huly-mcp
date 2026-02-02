@@ -36,8 +36,10 @@ import {
   parseListTeamspacesParams,
   parseUpdateDocumentParams,
   parseUpdateIssueParams,
+  parseUploadFileParams,
   updateDocumentParamsJsonSchema,
-  updateIssueParamsJsonSchema
+  updateIssueParamsJsonSchema,
+  uploadFileParamsJsonSchema
 } from "../domain/schemas.js"
 import { HulyClient } from "../huly/client.js"
 import type { HulyDomainError } from "../huly/errors.js"
@@ -51,6 +53,8 @@ import {
 } from "../huly/operations/documents.js"
 import { addLabel, createIssue, deleteIssue, getIssue, listIssues, updateIssue } from "../huly/operations/issues.js"
 import { listProjects } from "../huly/operations/projects.js"
+import { uploadFile } from "../huly/operations/storage.js"
+import { HulyStorageClient } from "../huly/storage.js"
 import {
   createSuccessResponse,
   createUnknownToolError,
@@ -149,6 +153,12 @@ export const TOOL_DEFINITIONS = {
     name: "delete_document",
     description: "Permanently delete a Huly document. This action cannot be undone.",
     inputSchema: deleteDocumentParamsJsonSchema
+  },
+  upload_file: {
+    name: "upload_file",
+    description:
+      "Upload a file to Huly storage. Provide ONE of: filePath (local file - preferred), fileUrl (fetch from URL), or data (base64 - for small files only). Returns blob ID and URL for referencing the file.",
+    inputSchema: uploadFileParamsJsonSchema
   }
 } as const
 
@@ -175,7 +185,10 @@ export interface McpServerOperations {
  * Create a configured MCP Server instance with tool handlers.
  * Used for both stdio and HTTP transports.
  */
-export const createMcpServer = (hulyClient: HulyClient["Type"]): Server => {
+export const createMcpServer = (
+  hulyClient: HulyClient["Type"],
+  storageClient: HulyStorageClient["Type"]
+): Server => {
   const server = new Server(
     {
       name: "huly-mcp",
@@ -211,7 +224,8 @@ export const createMcpServer = (hulyClient: HulyClient["Type"]): Server => {
     const result = await handleToolCall(
       toolNameResult.right,
       args ?? {},
-      hulyClient
+      hulyClient,
+      storageClient
     )
     return toMcpResponse(result)
   })
@@ -225,19 +239,20 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 >() {
   /**
    * Create the MCP server layer.
-   * Requires HulyClient to be available.
+   * Requires HulyClient and HulyStorageClient.
    */
   static layer(
     config: McpServerConfig
-  ): Layer.Layer<McpServerService, never, HulyClient> {
+  ): Layer.Layer<McpServerService, never, HulyClient | HulyStorageClient> {
     return Layer.effect(
       McpServerService,
       Effect.gen(function*() {
         const hulyClient = yield* HulyClient
+        const storageClient = yield* HulyStorageClient
 
         // For stdio, we create a single server instance
         // For HTTP, we create a new server per request (stateless mode)
-        const server = config.transport === "stdio" ? createMcpServer(hulyClient) : null
+        const server = config.transport === "stdio" ? createMcpServer(hulyClient, storageClient) : null
 
         const isRunning = yield* Ref.make(false)
 
@@ -297,7 +312,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 
                 yield* startHttpTransport(
                   { port, host },
-                  () => createMcpServer(hulyClient)
+                  () => createMcpServer(hulyClient, storageClient)
                 ).pipe(
                   Effect.scoped,
                   Effect.mapError(
@@ -363,7 +378,8 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 async function handleToolCall(
   toolName: ToolName,
   args: Record<string, unknown>,
-  hulyClient: HulyClient["Type"]
+  hulyClient: HulyClient["Type"],
+  storageClient: HulyStorageClient["Type"]
 ): Promise<McpToolResponse> {
   switch (toolName) {
     case "list_projects":
@@ -483,6 +499,15 @@ async function handleToolCall(
         hulyClient
       )
 
+    case "upload_file":
+      return runStorageToolHandler(
+        toolName,
+        args,
+        parseUploadFileParams,
+        (params) => uploadFile(params),
+        storageClient
+      )
+
     default:
       return createUnknownToolError(toolName)
   }
@@ -511,6 +536,35 @@ async function runToolHandler<A, P>(
 
   const operationResult = await Effect.runPromiseExit(
     operation(params).pipe(Effect.provideService(HulyClient, hulyClient))
+  )
+
+  if (Exit.isFailure(operationResult)) {
+    return mapDomainCauseToMcp(operationResult.cause)
+  }
+
+  return createSuccessResponse(operationResult.value)
+}
+
+/**
+ * Execute a storage tool handler with proper error mapping to MCP protocol.
+ */
+async function runStorageToolHandler<A, P>(
+  toolName: string,
+  args: unknown,
+  parse: (input: unknown) => Effect.Effect<P, ParseResult.ParseError>,
+  operation: (params: P) => Effect.Effect<A, HulyDomainError, HulyStorageClient>,
+  storageClient: HulyStorageClient["Type"]
+): Promise<McpToolResponse> {
+  const parseResult = await Effect.runPromiseExit(parse(args))
+
+  if (Exit.isFailure(parseResult)) {
+    return mapParseCauseToMcp(parseResult.cause, toolName)
+  }
+
+  const params = parseResult.value
+
+  const operationResult = await Effect.runPromiseExit(
+    operation(params).pipe(Effect.provideService(HulyStorageClient, storageClient))
   )
 
   if (Exit.isFailure(operationResult)) {
