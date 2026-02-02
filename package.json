@@ -8,6 +8,14 @@
   "publishConfig": {
     "access": "public"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dearlordylord/huly-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dearlordylord/huly-mcp/issues"
+  },
+  "homepage": "https://github.com/dearlordylord/huly-mcp#readme",
   "scripts": {
     "prepare": "husky",
     "start": "node dist/index.cjs",
