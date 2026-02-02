@@ -19,6 +19,10 @@
  * @module
  */
 
+// CRITICAL: Must be imported FIRST, before any @hcengineering imports
+// Patches msgpackr to handle raw text heartbeat messages from Huly server
+import "./huly/msgpack-patch.js"
+
 // Polyfill browser globals for Node.js (required by @hcengineering packages)
 import { NodeRuntime } from "@effect/platform-node"
 import type { ConfigError } from "effect"
