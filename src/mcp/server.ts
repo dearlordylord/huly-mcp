@@ -36,7 +36,8 @@ import { listProjects } from "../huly/operations/projects.js"
 import {
   createSuccessResponse,
   createUnknownToolError,
-  mapCauseToMcp,
+  mapDomainCauseToMcp,
+  mapParseCauseToMcp,
   type McpToolResponse,
   toMcpResponse
 } from "./error-mapping.js"
@@ -372,7 +373,7 @@ async function runToolHandler<A, P>(
   const parseResult = await Effect.runPromiseExit(parse(args))
 
   if (Exit.isFailure(parseResult)) {
-    return mapCauseToMcp(parseResult.cause, toolName)
+    return mapParseCauseToMcp(parseResult.cause, toolName)
   }
 
   const params = parseResult.value
@@ -382,7 +383,7 @@ async function runToolHandler<A, P>(
   )
 
   if (Exit.isFailure(operationResult)) {
-    return mapCauseToMcp(operationResult.cause, toolName)
+    return mapDomainCauseToMcp(operationResult.cause)
   }
 
   return createSuccessResponse(operationResult.value)

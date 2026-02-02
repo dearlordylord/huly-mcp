@@ -162,89 +162,60 @@ export const mapParseErrorToMcp = (
 // --- Cause Mapping ---
 
 /**
- * Check if an error is a HulyDomainError.
+ * Internal helper to handle Die/Interrupt causes.
  */
-const isHulyDomainError = (error: unknown): error is HulyDomainError => {
-  if (!error || typeof error !== "object") return false
-  if (!("_tag" in error)) return false
-
-  const tag = (error as { _tag: string })._tag
-  return [
-    "HulyError",
-    "HulyConnectionError",
-    "HulyAuthError",
-    "IssueNotFoundError",
-    "ProjectNotFoundError",
-    "InvalidStatusError",
-    "PersonNotFoundError"
-  ].includes(tag)
-}
-
-/**
- * Check if an error is a ParseError.
- */
-const isParseError = (error: unknown): error is ParseResult.ParseError => {
-  if (!error || typeof error !== "object") return false
-  if (!("_tag" in error)) return false
-  return (error as { _tag: string })._tag === "ParseError"
-}
-
-/**
- * Map an Effect Cause to an MCP error response.
- * Handles Fail, Die, and Interrupt causes appropriately.
- */
-export const mapCauseToMcp = <E>(
-  cause: Cause.Cause<E>,
-  toolName?: string
-): McpErrorResponseWithMeta => {
-  // Handle Fail cause (expected errors)
-  if (Cause.isFailType(cause)) {
-    const error = cause.error
-
-    // Check for ParseError
-    if (isParseError(error)) {
-      return mapParseErrorToMcp(error, toolName)
-    }
-
-    // Check for HulyDomainError
-    if (isHulyDomainError(error)) {
-      return mapDomainErrorToMcp(error)
-    }
-
-    // Unknown error type - provide sanitized message
-    const message = error && typeof error === "object" && "message" in error
-      ? sanitizeMessage(String((error as { message: unknown }).message))
-      : "An unexpected error occurred"
-
-    return createErrorResponse(message, McpErrorCode.InternalError)
-  }
-
-  // Handle Die cause (defects/unexpected errors)
+const mapDefectCause = <E>(cause: Cause.Cause<E>): McpErrorResponseWithMeta | null => {
   if (Cause.isDieType(cause)) {
-    // Never expose defect details - could contain sensitive stack traces
     return createErrorResponse("Internal server error", McpErrorCode.InternalError)
   }
-
-  // Handle Interrupt cause
   if (Cause.isInterruptType(cause)) {
     return createErrorResponse("Operation was interrupted", McpErrorCode.InternalError)
   }
+  return null
+}
 
-  // Handle composite causes (Sequential, Parallel)
-  // Extract the first meaningful error
-  const failuresChunk = Cause.failures(cause)
-  const failures = Chunk.toArray(failuresChunk)
-  if (failures.length > 0) {
-    const firstError = failures[0]
-    if (isParseError(firstError)) {
-      return mapParseErrorToMcp(firstError, toolName)
-    }
-    if (isHulyDomainError(firstError)) {
-      return mapDomainErrorToMcp(firstError)
-    }
+/**
+ * Map a ParseError Cause to an MCP error response.
+ */
+export const mapParseCauseToMcp = (
+  cause: Cause.Cause<ParseResult.ParseError>,
+  toolName?: string
+): McpErrorResponseWithMeta => {
+  const defectResponse = mapDefectCause(cause)
+  if (defectResponse) return defectResponse
+
+  if (Cause.isFailType(cause)) {
+    return mapParseErrorToMcp(cause.error, toolName)
   }
 
-  // Fallback for any other cause types
+  // Composite causes - extract first failure
+  const failures = Chunk.toArray(Cause.failures(cause))
+  if (failures.length > 0) {
+    return mapParseErrorToMcp(failures[0], toolName)
+  }
+
+  return createErrorResponse("An unexpected error occurred", McpErrorCode.InternalError)
+}
+
+/**
+ * Map a HulyDomainError Cause to an MCP error response.
+ */
+export const mapDomainCauseToMcp = (
+  cause: Cause.Cause<HulyDomainError>
+): McpErrorResponseWithMeta => {
+  const defectResponse = mapDefectCause(cause)
+  if (defectResponse) return defectResponse
+
+  if (Cause.isFailType(cause)) {
+    return mapDomainErrorToMcp(cause.error)
+  }
+
+  // Composite causes - extract first failure
+  const failures = Chunk.toArray(Cause.failures(cause))
+  if (failures.length > 0) {
+    return mapDomainErrorToMcp(failures[0])
+  }
+
   return createErrorResponse("An unexpected error occurred", McpErrorCode.InternalError)
 }
 
