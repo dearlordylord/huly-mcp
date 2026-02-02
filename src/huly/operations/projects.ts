@@ -17,19 +17,9 @@ import { HulyClient, type HulyClientError } from "../client.js"
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
 
-// --- Types ---
-
-/**
- * Errors that listProjects can produce.
- */
 export type ListProjectsError = HulyClientError
 
-// --- Operations ---
 
-/**
- * List projects with optional filters.
- * Results sorted by name ascending.
- */
 export const listProjects = (
   params: ListProjectsParams
 ): Effect.Effect<ListProjectsResult, ListProjectsError, HulyClient> =>

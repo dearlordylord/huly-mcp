@@ -1,21 +1,14 @@
 /**
  * Configuration module for Huly MCP server.
  *
- * Loads config from environment variables and optional .hulyrc.json file.
- * Credentials (email, password) only from env vars for security.
- * Non-sensitive config (url, workspace, timeout) can come from file.
- * Env vars always override file config.
+ * Loads config from environment variables.
  *
  * @module
  */
-import * as fs from "node:fs"
-import * as path from "node:path"
-
 import type { ConfigError } from "effect"
-import { Config, ConfigProvider, Context, Effect, Layer, Option, Redacted, Schema } from "effect"
+import { Config, Context, Effect, Layer, Redacted, Schema } from "effect"
 
 const DEFAULT_TIMEOUT = 30000
-const CONFIG_FILE_NAME = ".hulyrc.json"
 
 /**
  * Schema for URL validation - must be valid http/https URL.
@@ -50,7 +43,7 @@ const PositiveInt = Schema.Number.pipe(
 )
 
 /**
- * Schema for positive integer from string (for env vars/config).
+ * Schema for positive integer from string (for env vars).
  */
 const PositiveIntFromString = Schema.NumberFromString.pipe(
   Schema.int({ message: () => "Must be an integer" }),
@@ -58,19 +51,7 @@ const PositiveIntFromString = Schema.NumberFromString.pipe(
 )
 
 /**
- * Schema for optional config file content (.hulyrc.json).
- * Only non-sensitive values allowed.
- */
-export const FileConfigSchema = Schema.Struct({
-  url: Schema.optional(UrlSchema),
-  workspace: Schema.optional(NonWhitespaceString),
-  connectionTimeout: Schema.optional(PositiveInt)
-})
-
-export type FileConfig = Schema.Schema.Type<typeof FileConfigSchema>
-
-/**
- * Full configuration schema after merging sources.
+ * Full configuration schema.
  */
 export const HulyConfigSchema = Schema.Struct({
   url: UrlSchema,
@@ -91,84 +72,7 @@ export class ConfigValidationError extends Schema.TaggedError<ConfigValidationEr
   }
 ) {}
 
-export class ConfigFileError extends Schema.TaggedError<ConfigFileError>()(
-  "ConfigFileError",
-  {
-    message: Schema.String,
-    path: Schema.String,
-    cause: Schema.optional(Schema.Defect)
-  }
-) {}
-
-export type HulyConfigError = ConfigValidationError | ConfigFileError
-
-const toError = (e: unknown): Error => e instanceof Error ? e : new Error(String(e))
-
-const loadFileConfigProvider = (
-  filePath: string
-): Effect.Effect<Option.Option<ConfigProvider.ConfigProvider>, ConfigFileError> =>
-  Effect.gen(function*() {
-    const exists = yield* Effect.sync(() => fs.existsSync(filePath))
-
-    if (!exists) {
-      return Option.none()
-    }
-
-    const content = yield* Effect.try({
-      try: () => fs.readFileSync(filePath, "utf-8"),
-      catch: (e) =>
-        new ConfigFileError({
-          message: "Failed to read config file",
-          path: filePath,
-          cause: toError(e)
-        })
-    })
-
-    const parsed = yield* Effect.try({
-      try: () => JSON.parse(content) as unknown,
-      catch: (e) =>
-        new ConfigFileError({
-          message: "Config file is not valid JSON",
-          path: filePath,
-          cause: toError(e)
-        })
-    })
-
-    const decoded = yield* Schema.decodeUnknown(FileConfigSchema)(parsed).pipe(
-      Effect.mapError(
-        (e) =>
-          new ConfigFileError({
-            message: `Config file validation failed: ${e.message}`,
-            path: filePath
-          })
-      )
-    )
-
-    const configMap = Object.fromEntries(
-      [
-        ["HULY_URL", decoded.url],
-        ["HULY_WORKSPACE", decoded.workspace],
-        ["HULY_CONNECTION_TIMEOUT", decoded.connectionTimeout?.toString()]
-      ].filter((entry): entry is [string, string] => entry[1] !== undefined)
-    )
-
-    return Option.some(ConfigProvider.fromJson(configMap))
-  })
-
-/**
- * Build a ConfigProvider that reads from env vars first, then falls back to file.
- * Defers process.cwd() evaluation to runtime.
- */
-const buildConfigProvider = (): Effect.Effect<ConfigProvider.ConfigProvider, ConfigFileError> =>
-  Effect.gen(function*() {
-    const configPath = yield* Effect.sync(() => path.resolve(process.cwd(), CONFIG_FILE_NAME))
-    const fileProviderOption = yield* loadFileConfigProvider(configPath)
-
-    return Option.match(fileProviderOption, {
-      onNone: () => ConfigProvider.fromEnv(),
-      onSome: (fileProvider) => ConfigProvider.orElse(ConfigProvider.fromEnv(), () => fileProvider)
-    })
-  })
+export type HulyConfigError = ConfigValidationError
 
 /**
  * Config definition using Effect's Config module.
@@ -184,20 +88,15 @@ const HulyConfigFromEnv = Config.all({
   )
 })
 
-const loadConfig: Effect.Effect<HulyConfig, HulyConfigError> = Effect.gen(function*() {
-  const provider = yield* buildConfigProvider()
-
-  return yield* HulyConfigFromEnv.pipe(
-    Effect.provide(Layer.setConfigProvider(provider)),
-    Effect.mapError((e) =>
-      new ConfigValidationError({
-        message: `Configuration error: ${e.message}`,
-        field: extractFieldFromConfigError(e),
-        cause: e
-      })
-    )
+const loadConfig: Effect.Effect<HulyConfig, HulyConfigError> = HulyConfigFromEnv.pipe(
+  Effect.mapError((e) =>
+    new ConfigValidationError({
+      message: `Configuration error: ${e.message}`,
+      field: extractFieldFromConfigError(e),
+      cause: e
+    })
   )
-})
+)
 
 const extractFieldFromConfigError = (error: ConfigError.ConfigError): string | undefined => {
   const message = error.message
@@ -211,7 +110,6 @@ export class HulyConfigService extends Context.Tag("@hulymcp/HulyConfig")<
   HulyConfig
 >() {
   static readonly DEFAULT_TIMEOUT = DEFAULT_TIMEOUT
-  static readonly CONFIG_FILE_NAME = CONFIG_FILE_NAME
 
   static readonly layer: Layer.Layer<HulyConfigService, HulyConfigError> = Layer.effect(
     HulyConfigService,

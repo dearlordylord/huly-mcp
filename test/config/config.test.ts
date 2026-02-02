@@ -1,15 +1,11 @@
 import { describe, it, beforeEach, afterEach } from "@effect/vitest"
 import { expect } from "vitest"
-import { Effect, Redacted, Schema, Cause } from "effect"
+import { Effect, Redacted, Schema } from "effect"
 import {
   HulyConfigService,
   HulyConfigSchema,
-  FileConfigSchema,
   ConfigValidationError,
-  ConfigFileError,
 } from "../../src/config/config.js"
-import * as fs from "node:fs"
-import * as path from "node:path"
 
 describe("Config Module", () => {
   // Store original env vars
@@ -38,12 +34,6 @@ describe("Config Module", () => {
       } else {
         delete process.env[key]
       }
-    }
-
-    // Clean up config file if created
-    const configPath = path.resolve(process.cwd(), ".hulyrc.json")
-    if (fs.existsSync(configPath)) {
-      fs.unlinkSync(configPath)
     }
   })
 
@@ -160,62 +150,6 @@ describe("Config Module", () => {
     )
   })
 
-  describe("FileConfigSchema", () => {
-    // test-revizorro: approved
-    it.effect("validates valid file config", () =>
-      Effect.gen(function* () {
-        const config = {
-          url: "https://huly.app",
-          workspace: "default",
-          connectionTimeout: 30000,
-        }
-
-        const result = Schema.decodeUnknownSync(FileConfigSchema)(config)
-        expect(result.url).toBe("https://huly.app")
-        expect(result.workspace).toBe("default")
-        expect(result.connectionTimeout).toBe(30000)
-      })
-    )
-
-    // test-revizorro: approved
-    it.effect("allows partial config", () =>
-      Effect.gen(function* () {
-        const config = { url: "https://huly.app" }
-        const result = Schema.decodeUnknownSync(FileConfigSchema)(config)
-        expect(result.url).toBe("https://huly.app")
-        expect(result.workspace).toBeUndefined()
-        expect(result.connectionTimeout).toBeUndefined()
-      })
-    )
-
-    // test-revizorro: approved
-    it.effect("allows empty config", () =>
-      Effect.gen(function* () {
-        const config = {}
-        const result = Schema.decodeUnknownSync(FileConfigSchema)(config)
-        expect(result.url).toBeUndefined()
-        expect(result.workspace).toBeUndefined()
-        expect(result.connectionTimeout).toBeUndefined()
-      })
-    )
-
-    // test-revizorro: approved
-    it.effect("ignores credentials in file config (extra fields stripped)", () =>
-      Effect.gen(function* () {
-        const config = {
-          url: "https://huly.app",
-          email: "user@example.com",
-          password: "secret",
-        }
-
-        // Extra fields are stripped - FileConfigSchema only has url, workspace, connectionTimeout
-        const result = Schema.decodeUnknownSync(FileConfigSchema)(config)
-        expect((result as Record<string, unknown>)["email"]).toBeUndefined()
-        expect((result as Record<string, unknown>)["password"]).toBeUndefined()
-      })
-    )
-  })
-
   describe("ConfigValidationError", () => {
     // test-revizorro: approved
     it.effect("creates with message", () =>
@@ -246,21 +180,6 @@ describe("Config Module", () => {
           cause,
         })
         expect(error.cause).toBe(cause)
-      })
-    )
-  })
-
-  describe("ConfigFileError", () => {
-    // test-revizorro: approved
-    it.effect("creates with message and path", () =>
-      Effect.gen(function* () {
-        const error = new ConfigFileError({
-          message: "Failed to read",
-          path: "/path/to/config",
-        })
-        expect(error._tag).toBe("ConfigFileError")
-        expect(error.message).toBe("Failed to read")
-        expect(error.path).toBe("/path/to/config")
       })
     )
   })
@@ -498,151 +417,11 @@ describe("Config Module", () => {
     )
   })
 
-  describe("HulyConfigService.layer (file config)", () => {
-    // test-revizorro: approved
-    it.effect("loads non-sensitive config from file", () =>
-      Effect.gen(function* () {
-        // Write config file
-        const configPath = path.resolve(process.cwd(), ".hulyrc.json")
-        fs.writeFileSync(
-          configPath,
-          JSON.stringify({
-            url: "https://file.huly.app",
-            workspace: "file-workspace",
-            connectionTimeout: 45000,
-          })
-        )
-
-        // Provide only credentials via env vars
-        process.env["HULY_EMAIL"] = "user@example.com"
-        process.env["HULY_PASSWORD"] = "secret123"
-
-        const config = yield* HulyConfigService.pipe(
-          Effect.provide(HulyConfigService.layer)
-        )
-
-        expect(config.url).toBe("https://file.huly.app")
-        expect(config.workspace).toBe("file-workspace")
-        expect(config.connectionTimeout).toBe(45000)
-        // Verify credentials came from env vars
-        expect(config.email).toBe("user@example.com")
-        expect(Redacted.value(config.password)).toBe("secret123")
-      })
-    )
-
-    // test-revizorro: approved
-    it.effect("env vars override file config", () =>
-      Effect.gen(function* () {
-        // Write config file
-        const configPath = path.resolve(process.cwd(), ".hulyrc.json")
-        fs.writeFileSync(
-          configPath,
-          JSON.stringify({
-            url: "https://file.huly.app",
-            workspace: "file-workspace",
-            connectionTimeout: 45000,
-          })
-        )
-
-        // Provide all via env vars (should override file)
-        process.env["HULY_URL"] = "https://env.huly.app"
-        process.env["HULY_EMAIL"] = "user@example.com"
-        process.env["HULY_PASSWORD"] = "secret123"
-        process.env["HULY_WORKSPACE"] = "env-workspace"
-        process.env["HULY_CONNECTION_TIMEOUT"] = "15000"
-
-        const config = yield* HulyConfigService.pipe(
-          Effect.provide(HulyConfigService.layer)
-        )
-
-        expect(config.url).toBe("https://env.huly.app")
-        expect(config.workspace).toBe("env-workspace")
-        expect(config.connectionTimeout).toBe(15000)
-      })
-    )
-
-    // test-revizorro: approved
-    it.effect("handles missing config file gracefully", () =>
-      Effect.gen(function* () {
-        // Ensure no config file exists
-        const configPath = path.resolve(process.cwd(), ".hulyrc.json")
-        if (fs.existsSync(configPath)) {
-          fs.unlinkSync(configPath)
-        }
-
-        // Provide all config via env vars
-        process.env["HULY_URL"] = "https://huly.app"
-        process.env["HULY_EMAIL"] = "user@example.com"
-        process.env["HULY_PASSWORD"] = "secret123"
-        process.env["HULY_WORKSPACE"] = "my-workspace"
-
-        const config = yield* HulyConfigService.pipe(
-          Effect.provide(HulyConfigService.layer)
-        )
-
-        expect(config.url).toBe("https://huly.app")
-        expect(config.email).toBe("user@example.com")
-        expect(Redacted.value(config.password)).toBe("secret123")
-        expect(config.workspace).toBe("my-workspace")
-        expect(config.connectionTimeout).toBe(HulyConfigService.DEFAULT_TIMEOUT)
-      })
-    )
-
-    // test-revizorro: approved
-    it.effect("fails on invalid JSON in config file", () =>
-      Effect.gen(function* () {
-        // Write invalid config file
-        const configPath = path.resolve(process.cwd(), ".hulyrc.json")
-        fs.writeFileSync(configPath, "{ invalid json }")
-
-        process.env["HULY_EMAIL"] = "user@example.com"
-        process.env["HULY_PASSWORD"] = "secret123"
-
-        const error = yield* Effect.flip(
-          HulyConfigService.pipe(Effect.provide(HulyConfigService.layer))
-        )
-
-        expect(error._tag).toBe("ConfigFileError")
-      })
-    )
-
-    // test-revizorro: approved
-    it.effect("fails on invalid values in config file", () =>
-      Effect.gen(function* () {
-        // Write config file with invalid URL
-        const configPath = path.resolve(process.cwd(), ".hulyrc.json")
-        fs.writeFileSync(
-          configPath,
-          JSON.stringify({
-            url: "not-a-valid-url",
-            workspace: "test",
-          })
-        )
-
-        process.env["HULY_EMAIL"] = "user@example.com"
-        process.env["HULY_PASSWORD"] = "secret123"
-
-        const error = yield* Effect.flip(
-          HulyConfigService.pipe(Effect.provide(HulyConfigService.layer))
-        )
-
-        expect(error).toBeDefined()
-      })
-    )
-  })
-
   describe("Constants", () => {
     // test-revizorro: approved
     it.effect("has correct default timeout", () =>
       Effect.gen(function* () {
         expect(HulyConfigService.DEFAULT_TIMEOUT).toBe(30000)
-      })
-    )
-
-    // test-revizorro: approved
-    it.effect("has correct config file name", () =>
-      Effect.gen(function* () {
-        expect(HulyConfigService.CONFIG_FILE_NAME).toBe(".hulyrc.json")
       })
     )
   })

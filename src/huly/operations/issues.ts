@@ -151,6 +151,70 @@ const isCanceledStatus = (statusRef: Ref<Status>, statuses: ReadonlyArray<Status
   return status.category === lostCategory
 }
 
+// --- Helpers ---
+
+const findProject = (
+  projectIdentifier: string
+): Effect.Effect<
+  { client: HulyClient["Type"]; project: HulyProject },
+  ProjectNotFoundError | HulyClientError,
+  HulyClient
+> =>
+  Effect.gen(function*() {
+    const client = yield* HulyClient
+
+    const project = yield* client.findOne<HulyProject>(
+      tracker.class.Project,
+      { identifier: projectIdentifier }
+    )
+    if (project === undefined) {
+      return yield* new ProjectNotFoundError({ identifier: projectIdentifier })
+    }
+
+    return { client, project }
+  })
+
+const findProjectAndIssue = (
+  params: { project: string; identifier: string }
+): Effect.Effect<
+  { client: HulyClient["Type"]; project: HulyProject; issue: HulyIssue },
+  ProjectNotFoundError | IssueNotFoundError | HulyClientError,
+  HulyClient
+> =>
+  Effect.gen(function*() {
+    const { client, project } = yield* findProject(params.project)
+
+    const { fullIdentifier, number } = parseIssueIdentifier(
+      params.identifier,
+      params.project
+    )
+
+    let issue = yield* client.findOne<HulyIssue>(
+      tracker.class.Issue,
+      {
+        space: project._id,
+        identifier: fullIdentifier
+      }
+    )
+    if (issue === undefined && number !== null) {
+      issue = yield* client.findOne<HulyIssue>(
+        tracker.class.Issue,
+        {
+          space: project._id,
+          number
+        }
+      )
+    }
+    if (issue === undefined) {
+      return yield* new IssueNotFoundError({
+        identifier: params.identifier,
+        project: params.project
+      })
+    }
+
+    return { client, project, issue }
+  })
+
 // --- Operations ---
 
 /**
@@ -161,16 +225,7 @@ export const listIssues = (
   params: ListIssuesParams
 ): Effect.Effect<Array<IssueSummary>, ListIssuesError, HulyClient> =>
   Effect.gen(function*() {
-    const client = yield* HulyClient
-
-    const projectResult = yield* client.findOne<HulyProject>(
-      tracker.class.Project,
-      { identifier: params.project }
-    )
-    if (projectResult === undefined) {
-      return yield* new ProjectNotFoundError({ identifier: params.project })
-    }
-    const project = projectResult
+    const { client, project } = yield* findProject(params.project)
 
     const allStatuses = yield* client.findAll<Status>(
       tracker.class.IssueStatus,
@@ -393,51 +448,14 @@ export const getIssue = (
   params: GetIssueParams
 ): Effect.Effect<Issue, GetIssueError, HulyClient> =>
   Effect.gen(function*() {
-    const client = yield* HulyClient
-
-    const projectResult = yield* client.findOne<HulyProject>(
-      tracker.class.Project,
-      { identifier: params.project }
-    )
-    if (projectResult === undefined) {
-      return yield* new ProjectNotFoundError({ identifier: params.project })
-    }
-    const project = projectResult
-
-    const { fullIdentifier, number } = parseIssueIdentifier(
-      params.identifier,
-      params.project
-    )
-
-    let issue = yield* client.findOne<HulyIssue>(
-      tracker.class.Issue,
-      {
-        space: project._id,
-        identifier: fullIdentifier
-      }
-    )
-    if (issue === undefined && number !== null) {
-      issue = yield* client.findOne<HulyIssue>(
-        tracker.class.Issue,
-        {
-          space: project._id,
-          number
-        }
-      )
-    }
-    if (issue === undefined) {
-      return yield* new IssueNotFoundError({
-        identifier: params.identifier,
-        project: params.project
-      })
-    }
+    const { client, issue } = yield* findProjectAndIssue(params)
 
     const statusList = yield* client.findAll<Status>(
       tracker.class.IssueStatus,
       {}
     )
 
-    const statusDoc = statusList.find(s => String(s._id) === String(issue!.status))
+    const statusDoc = statusList.find(s => String(s._id) === String(issue.status))
     const statusName = statusDoc?.name ?? "Unknown"
 
     let assigneeName: string | undefined
@@ -514,16 +532,7 @@ export const createIssue = (
   params: CreateIssueParams
 ): Effect.Effect<CreateIssueResult, CreateIssueError, HulyClient> =>
   Effect.gen(function*() {
-    const client = yield* HulyClient
-
-    const projectResult = yield* client.findOne<HulyProject>(
-      tracker.class.Project,
-      { identifier: params.project }
-    )
-    if (projectResult === undefined) {
-      return yield* new ProjectNotFoundError({ identifier: params.project })
-    }
-    const project = projectResult
+    const { client, project } = yield* findProject(params.project)
 
     const issueId: Ref<HulyIssue> = generateId()
 
@@ -650,44 +659,7 @@ export const updateIssue = (
   params: UpdateIssueParams
 ): Effect.Effect<UpdateIssueResult, UpdateIssueError, HulyClient> =>
   Effect.gen(function*() {
-    const client = yield* HulyClient
-
-    const projectResult = yield* client.findOne<HulyProject>(
-      tracker.class.Project,
-      { identifier: params.project }
-    )
-    if (projectResult === undefined) {
-      return yield* new ProjectNotFoundError({ identifier: params.project })
-    }
-    const project = projectResult
-
-    const { fullIdentifier, number } = parseIssueIdentifier(
-      params.identifier,
-      params.project
-    )
-
-    let issue = yield* client.findOne<HulyIssue>(
-      tracker.class.Issue,
-      {
-        space: project._id,
-        identifier: fullIdentifier
-      }
-    )
-    if (issue === undefined && number !== null) {
-      issue = yield* client.findOne<HulyIssue>(
-        tracker.class.Issue,
-        {
-          space: project._id,
-          number
-        }
-      )
-    }
-    if (issue === undefined) {
-      return yield* new IssueNotFoundError({
-        identifier: params.identifier,
-        project: params.project
-      })
-    }
+    const { client, project, issue } = yield* findProjectAndIssue(params)
 
     const updateOps: DocumentUpdate<HulyIssue> = {}
 
@@ -785,44 +757,7 @@ export const addLabel = (
   params: AddLabelParams
 ): Effect.Effect<AddLabelResult, AddLabelError, HulyClient> =>
   Effect.gen(function*() {
-    const client = yield* HulyClient
-
-    const projectResult = yield* client.findOne<HulyProject>(
-      tracker.class.Project,
-      { identifier: params.project }
-    )
-    if (projectResult === undefined) {
-      return yield* new ProjectNotFoundError({ identifier: params.project })
-    }
-    const project = projectResult
-
-    const { fullIdentifier, number } = parseIssueIdentifier(
-      params.identifier,
-      params.project
-    )
-
-    let issue = yield* client.findOne<HulyIssue>(
-      tracker.class.Issue,
-      {
-        space: project._id,
-        identifier: fullIdentifier
-      }
-    )
-    if (issue === undefined && number !== null) {
-      issue = yield* client.findOne<HulyIssue>(
-        tracker.class.Issue,
-        {
-          space: project._id,
-          number
-        }
-      )
-    }
-    if (issue === undefined) {
-      return yield* new IssueNotFoundError({
-        identifier: params.identifier,
-        project: params.project
-      })
-    }
+    const { client, project, issue } = yield* findProjectAndIssue(params)
 
     const existingLabels = yield* client.findAll<TagReference>(
       tags.class.TagReference,
@@ -916,44 +851,7 @@ export const deleteIssue = (
   params: DeleteIssueParams
 ): Effect.Effect<DeleteIssueResult, DeleteIssueError, HulyClient> =>
   Effect.gen(function*() {
-    const client = yield* HulyClient
-
-    const projectResult = yield* client.findOne<HulyProject>(
-      tracker.class.Project,
-      { identifier: params.project }
-    )
-    if (projectResult === undefined) {
-      return yield* new ProjectNotFoundError({ identifier: params.project })
-    }
-    const project = projectResult
-
-    const { fullIdentifier, number } = parseIssueIdentifier(
-      params.identifier,
-      params.project
-    )
-
-    let issue = yield* client.findOne<HulyIssue>(
-      tracker.class.Issue,
-      {
-        space: project._id,
-        identifier: fullIdentifier
-      }
-    )
-    if (issue === undefined && number !== null) {
-      issue = yield* client.findOne<HulyIssue>(
-        tracker.class.Issue,
-        {
-          space: project._id,
-          number
-        }
-      )
-    }
-    if (issue === undefined) {
-      return yield* new IssueNotFoundError({
-        identifier: params.identifier,
-        project: params.project
-      })
-    }
+    const { client, project, issue } = yield* findProjectAndIssue(params)
 
     yield* client.removeDoc(
       tracker.class.Issue,
