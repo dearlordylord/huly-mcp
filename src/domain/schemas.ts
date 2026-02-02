@@ -284,7 +284,6 @@ export const updateIssueParamsJsonSchema = makeJsonSchema(UpdateIssueParamsSchem
 export const addLabelParamsJsonSchema = makeJsonSchema(AddLabelParamsSchema)
 export const deleteIssueParamsJsonSchema = makeJsonSchema(DeleteIssueParamsSchema)
 
-
 export const parseIssue = Schema.decodeUnknown(IssueSchema)
 
 export const parseIssueSummary = Schema.decodeUnknown(IssueSummarySchema)

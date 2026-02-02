@@ -133,8 +133,7 @@ const createMockHulyClientLayer = (config: {
 // --- Tests ---
 
 describe("TOOL_DEFINITIONS", () => {
-  // test-revizorro: approved
-  it.effect("exports 7 tool definitions", () =>
+    it.effect("exports 7 tool definitions", () =>
     Effect.gen(function* () {
       const tools = Object.keys(TOOL_DEFINITIONS)
       expect(tools).toHaveLength(7)
@@ -148,8 +147,7 @@ describe("TOOL_DEFINITIONS", () => {
     })
   )
 
-  // test-revizorro: approved
-  it.effect("each tool has name, description, and inputSchema", () =>
+    it.effect("each tool has name, description, and inputSchema", () =>
     Effect.gen(function* () {
       for (const [key, tool] of Object.entries(TOOL_DEFINITIONS)) {
         expect(tool.name).toBe(key)
@@ -162,8 +160,7 @@ describe("TOOL_DEFINITIONS", () => {
   )
 
   describe("inputSchema format", () => {
-    // test-revizorro: approved
-    it.effect("list_issues schema has correct structure", () =>
+        it.effect("list_issues schema has correct structure", () =>
       Effect.gen(function* () {
         const schema = TOOL_DEFINITIONS.list_issues.inputSchema
         expect(schema).toHaveProperty("type", "object")
@@ -176,8 +173,7 @@ describe("TOOL_DEFINITIONS", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("get_issue schema has correct structure", () =>
+        it.effect("get_issue schema has correct structure", () =>
       Effect.gen(function* () {
         const schema = TOOL_DEFINITIONS.get_issue.inputSchema
         expect(schema).toHaveProperty("type", "object")
@@ -187,8 +183,7 @@ describe("TOOL_DEFINITIONS", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("create_issue schema has correct structure", () =>
+        it.effect("create_issue schema has correct structure", () =>
       Effect.gen(function* () {
         const schema = TOOL_DEFINITIONS.create_issue.inputSchema
         expect(schema).toHaveProperty("type", "object")
@@ -198,8 +193,7 @@ describe("TOOL_DEFINITIONS", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("update_issue schema has correct structure", () =>
+        it.effect("update_issue schema has correct structure", () =>
       Effect.gen(function* () {
         const schema = TOOL_DEFINITIONS.update_issue.inputSchema
         expect(schema).toHaveProperty("type", "object")
@@ -215,8 +209,7 @@ describe("TOOL_DEFINITIONS", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("add_issue_label schema has correct structure", () =>
+        it.effect("add_issue_label schema has correct structure", () =>
       Effect.gen(function* () {
         const schema = TOOL_DEFINITIONS.add_issue_label.inputSchema
         expect(schema).toHaveProperty("type", "object")
@@ -244,8 +237,7 @@ describe("TOOL_DEFINITIONS", () => {
 
 describe("McpServerService", () => {
   describe("layer creation", () => {
-    // test-revizorro: approved
-    it.scoped("can create layer with stdio transport config", () =>
+        it.scoped("can create layer with stdio transport config", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const issues = [makeIssue()]
@@ -266,8 +258,7 @@ describe("McpServerService", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.scoped("can create layer with http transport config", () =>
+        it.scoped("can create layer with http transport config", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const hulyClientLayer = createMockHulyClientLayer({
@@ -287,8 +278,7 @@ describe("McpServerService", () => {
   })
 
   describe("testLayer", () => {
-    // test-revizorro: approved
-    it.effect("creates a test layer with default operations", () =>
+        it.effect("creates a test layer with default operations", () =>
       Effect.gen(function* () {
         const testLayer = McpServerService.testLayer({})
 
@@ -304,8 +294,7 @@ describe("McpServerService", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("allows overriding run operation", () =>
+        it.effect("allows overriding run operation", () =>
       Effect.gen(function* () {
         let runCalled = false
 
@@ -325,8 +314,7 @@ describe("McpServerService", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("allows overriding stop operation", () =>
+        it.effect("allows overriding stop operation", () =>
       Effect.gen(function* () {
         let stopCalled = false
 
@@ -346,8 +334,7 @@ describe("McpServerService", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("can mock run to fail with error", () =>
+        it.effect("can mock run to fail with error", () =>
       Effect.gen(function* () {
         const testLayer = McpServerService.testLayer({
           run: () =>
@@ -369,8 +356,7 @@ describe("McpServerService", () => {
 })
 
 describe("McpServerError", () => {
-  // test-revizorro: approved
-  it.effect("creates error with message", () =>
+    it.effect("creates error with message", () =>
     Effect.gen(function* () {
       const error = new McpServerError({ message: "Connection failed" })
       expect(error._tag).toBe("McpServerError")
@@ -378,8 +364,7 @@ describe("McpServerError", () => {
     })
   )
 
-  // test-revizorro: approved
-  it.effect("creates error with message and cause", () =>
+    it.effect("creates error with message and cause", () =>
     Effect.gen(function* () {
       const cause = new Error("Original error")
       const error = new McpServerError({
@@ -392,8 +377,7 @@ describe("McpServerError", () => {
     })
   )
 
-  // test-revizorro: approved
-  it.effect("can be used as Effect error", () =>
+    it.effect("can be used as Effect error", () =>
     Effect.gen(function* () {
       const effect = Effect.fail(new McpServerError({ message: "Test" }))
 
@@ -405,8 +389,7 @@ describe("McpServerError", () => {
 })
 
 describe("Tool definition descriptions", () => {
-  // test-revizorro: approved
-  it.effect("list_issues has helpful description", () =>
+    it.effect("list_issues has helpful description", () =>
     Effect.gen(function* () {
       expect(TOOL_DEFINITIONS.list_issues.description).toContain("Query")
       expect(TOOL_DEFINITIONS.list_issues.description).toContain("issues")
@@ -414,8 +397,7 @@ describe("Tool definition descriptions", () => {
     })
   )
 
-  // test-revizorro: approved
-  it.effect("get_issue has helpful description", () =>
+    it.effect("get_issue has helpful description", () =>
     Effect.gen(function* () {
       expect(TOOL_DEFINITIONS.get_issue.description).toContain("Retrieve")
       expect(TOOL_DEFINITIONS.get_issue.description).toContain("full details")
@@ -423,8 +405,7 @@ describe("Tool definition descriptions", () => {
     })
   )
 
-  // test-revizorro: approved
-  it.effect("create_issue has helpful description", () =>
+    it.effect("create_issue has helpful description", () =>
     Effect.gen(function* () {
       expect(TOOL_DEFINITIONS.create_issue.description).toContain("Create")
       expect(TOOL_DEFINITIONS.create_issue.description).toContain("issue")
@@ -432,8 +413,7 @@ describe("Tool definition descriptions", () => {
     })
   )
 
-  // test-revizorro: approved
-  it.effect("update_issue has helpful description", () =>
+    it.effect("update_issue has helpful description", () =>
     Effect.gen(function* () {
       expect(TOOL_DEFINITIONS.update_issue.description).toContain("Update")
       expect(TOOL_DEFINITIONS.update_issue.description).toContain("modified")
@@ -441,8 +421,7 @@ describe("Tool definition descriptions", () => {
     })
   )
 
-  // test-revizorro: approved
-  it.effect("add_issue_label has helpful description", () =>
+    it.effect("add_issue_label has helpful description", () =>
     Effect.gen(function* () {
       expect(TOOL_DEFINITIONS.add_issue_label.description).toContain("label")
       expect(TOOL_DEFINITIONS.add_issue_label.description).toContain("tag")

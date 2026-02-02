@@ -19,7 +19,6 @@ const tracker = require("@hcengineering/tracker").default as typeof import("@hce
 
 export type ListProjectsError = HulyClientError
 
-
 export const listProjects = (
   params: ListProjectsParams
 ): Effect.Effect<ListProjectsResult, ListProjectsError, HulyClient> =>

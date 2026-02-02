@@ -52,8 +52,7 @@ describe("Main Entry Point", () => {
   })
 
   describe("main program", () => {
-    // test-revizorro: approved
-    it.effect("fails on missing config", () =>
+        it.effect("fails on missing config", () =>
       Effect.gen(function* () {
         // Don't set any env vars - config should fail
         const error = yield* Effect.flip(main)
@@ -64,8 +63,7 @@ describe("Main Entry Point", () => {
   })
 
   describe("layer composition", () => {
-    // test-revizorro: approved
-    it.scoped("McpServerService layer composes with HulyClient", () =>
+        it.scoped("McpServerService layer composes with HulyClient", () =>
       Effect.gen(function* () {
         const hulyClientLayer = HulyClient.testLayer({})
         const mcpServerLayer = McpServerService.layer({ transport: "stdio" }).pipe(
@@ -78,8 +76,7 @@ describe("Main Entry Point", () => {
   })
 
   describe("error handling", () => {
-    // test-revizorro: approved
-    it.effect("reports config validation errors clearly", () =>
+        it.effect("reports config validation errors clearly", () =>
       Effect.gen(function* () {
         // Invalid URL
         process.env["HULY_URL"] = "not-a-valid-url"
@@ -93,8 +90,7 @@ describe("Main Entry Point", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("reports missing required config", () =>
+        it.effect("reports missing required config", () =>
       Effect.gen(function* () {
         // Missing HULY_PASSWORD
         process.env["HULY_URL"] = "https://test.huly.app"
@@ -109,8 +105,7 @@ describe("Main Entry Point", () => {
   })
 
   describe("McpServerService integration", () => {
-    // test-revizorro: approved
-    it.effect("server run/stop cycle works", () =>
+        it.effect("server run/stop cycle works", () =>
       Effect.gen(function* () {
         let runCalled = false
         let stopCalled = false
@@ -137,8 +132,7 @@ describe("Main Entry Point", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("server error is properly typed", () =>
+        it.effect("server error is properly typed", () =>
       Effect.gen(function* () {
         const mockServerLayer = McpServerService.testLayer({
           run: () => new McpServerError({ message: "Connection refused" }),

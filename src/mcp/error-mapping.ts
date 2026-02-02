@@ -9,11 +9,10 @@
  *
  * @module
  */
-import { absurd, ParseResult } from 'effect';
-import { Cause, Chunk, Match } from "effect"
+import { absurd, Cause, Chunk, Match, ParseResult } from "effect"
 
+import type { Die, Interrupt } from "effect/Cause"
 import { type HulyDomainError, McpErrorCode } from "../huly/errors.js"
-import type { Interrupt, Die } from 'effect/Cause';
 
 // --- MCP Error Response Types ---
 
@@ -96,22 +95,20 @@ export const mapParseErrorToMcp = (
 }
 
 export const mapDefectCause = (cause: Die | Interrupt): McpErrorResponseWithMeta => {
-
   if (Cause.isDieType(cause)) {
     return createErrorResponse("Internal server error", McpErrorCode.InternalError)
   }
   if (Cause.isInterruptType(cause)) {
     return createErrorResponse("Operation was interrupted", McpErrorCode.InternalError)
   }
-  absurd(cause);
-  throw new Error("Unexpected cause type");
+  absurd(cause)
+  throw new Error("Unexpected cause type")
 }
 
 export const mapParseCauseToMcp = (
   cause: Cause.Cause<ParseResult.ParseError>,
   toolName?: string
 ): McpErrorResponseWithMeta => {
-
   if (Cause.isFailType(cause)) {
     return mapParseErrorToMcp(cause.error, toolName)
   }
@@ -127,7 +124,6 @@ export const mapParseCauseToMcp = (
 export const mapDomainCauseToMcp = (
   cause: Cause.Cause<HulyDomainError>
 ): McpErrorResponseWithMeta => {
-
   if (Cause.isFailType(cause)) {
     return mapDomainErrorToMcp(cause.error)
   }
@@ -143,7 +139,6 @@ export const mapDomainCauseToMcp = (
 export const createSuccessResponse = <T>(result: T): McpToolResponse => ({
   content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
 })
-
 
 export const createUnknownToolError = (toolName: string): McpErrorResponseWithMeta =>
   createErrorResponse(`Unknown tool: ${toolName}`, McpErrorCode.InvalidParams)

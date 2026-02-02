@@ -24,7 +24,7 @@ import {
 import { makeRank } from "@hcengineering/rank"
 import type { TagElement, TagReference } from "@hcengineering/tags"
 import { type Issue as HulyIssue, IssuePriority, type Project as HulyProject } from "@hcengineering/tracker"
-import { absurd, Effect } from 'effect';
+import { absurd, Effect } from "effect"
 
 import type {
   AddLabelParams,
@@ -98,8 +98,8 @@ const priorityToString = (priority: IssuePriority): IssuePriorityStr => {
     case IssuePriority.NoPriority:
       return "no-priority"
     default:
-      absurd(priority);
-      throw new Error("Invalid priority");
+      absurd(priority)
+      throw new Error("Invalid priority")
   }
 }
 
@@ -116,11 +116,10 @@ const stringToPriority = (priority: IssuePriorityStr): IssuePriority => {
     case "no-priority":
       return IssuePriority.NoPriority
     default:
-      absurd(priority);
-      throw new Error("Invalid priority");
+      absurd(priority)
+      throw new Error("Invalid priority")
   }
 }
-
 
 type StatusWithCategory = Status & { category?: Ref<StatusCategory> }
 
@@ -659,7 +658,7 @@ export const updateIssue = (
   params: UpdateIssueParams
 ): Effect.Effect<UpdateIssueResult, UpdateIssueError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, project, issue } = yield* findProjectAndIssue(params)
+    const { client, issue, project } = yield* findProjectAndIssue(params)
 
     const updateOps: DocumentUpdate<HulyIssue> = {}
 
@@ -757,7 +756,7 @@ export const addLabel = (
   params: AddLabelParams
 ): Effect.Effect<AddLabelResult, AddLabelError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, project, issue } = yield* findProjectAndIssue(params)
+    const { client, issue, project } = yield* findProjectAndIssue(params)
 
     const existingLabels = yield* client.findAll<TagReference>(
       tags.class.TagReference,
@@ -851,7 +850,7 @@ export const deleteIssue = (
   params: DeleteIssueParams
 ): Effect.Effect<DeleteIssueResult, DeleteIssueError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, project, issue } = yield* findProjectAndIssue(params)
+    const { client, issue, project } = yield* findProjectAndIssue(params)
 
     yield* client.removeDoc(
       tracker.class.Issue,

@@ -345,8 +345,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 
 describe("listIssues", () => {
   describe("basic functionality", () => {
-    // test-revizorro: approved
-    it.effect("returns issues for a project", () =>
+        it.effect("returns issues for a project", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         // Input: older issue first (opposite of expected output order)
@@ -373,8 +372,7 @@ describe("listIssues", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("transforms priority correctly", () =>
+        it.effect("transforms priority correctly", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const issues = [
@@ -402,8 +400,7 @@ describe("listIssues", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("includes assignee name when assigned", () =>
+        it.effect("includes assignee name when assigned", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const person = makePerson({ _id: "person-1" as Ref<Person>, name: "Jane Doe" })
@@ -445,8 +442,7 @@ describe("listIssues", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("returns InvalidStatusError for unknown status name", () =>
+        it.effect("returns InvalidStatusError for unknown status name", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
@@ -468,8 +464,7 @@ describe("listIssues", () => {
   })
 
   describe("status filtering", () => {
-    // test-revizorro: approved
-    it.effect("filters by exact status name (case insensitive)", () =>
+        it.effect("filters by exact status name (case insensitive)", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const inProgressStatus = makeStatus({ _id: "status-progress" as Ref<Status>, name: "In Progress" })
@@ -495,8 +490,7 @@ describe("listIssues", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("reserved word 'open' filters by category (not done/canceled)", () =>
+        it.effect("reserved word 'open' filters by category (not done/canceled)", () =>
       Effect.gen(function* () {
         const project = makeProject()
         // Statuses with proper categories: Active (open), Won (done), Lost (canceled)
@@ -539,8 +533,7 @@ describe("listIssues", () => {
   })
 
   describe("assignee filtering", () => {
-    // test-revizorro: approved
-    it.effect("filters by assignee email", () =>
+        it.effect("filters by assignee email", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const person = makePerson({ _id: "person-1" as Ref<Person> })
@@ -565,8 +558,7 @@ describe("listIssues", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("returns empty results when assignee not found", () =>
+        it.effect("returns empty results when assignee not found", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
@@ -587,8 +579,7 @@ describe("listIssues", () => {
   })
 
   describe("limit handling", () => {
-    // test-revizorro: approved
-    it.effect("uses default limit of 50", () =>
+        it.effect("uses default limit of 50", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
@@ -608,8 +599,7 @@ describe("listIssues", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("enforces max limit of 200", () =>
+        it.effect("enforces max limit of 200", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
@@ -629,8 +619,7 @@ describe("listIssues", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("uses provided limit when under max", () =>
+        it.effect("uses provided limit when under max", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
@@ -652,8 +641,7 @@ describe("listIssues", () => {
   })
 
   describe("sorting", () => {
-    // test-revizorro: approved
-    it.effect("sorts by modifiedOn descending", () =>
+        it.effect("sorts by modifiedOn descending", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
@@ -678,8 +666,7 @@ describe("listIssues", () => {
 
 describe("getIssue", () => {
   describe("basic functionality", () => {
-    // test-revizorro: approved
-    it.effect("returns issue with full identifier", () =>
+        it.effect("returns issue with full identifier", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({
@@ -706,8 +693,7 @@ describe("getIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("returns issue with numeric identifier", () =>
+        it.effect("returns issue with numeric identifier", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "HULY" })
         const issue = makeIssue({
@@ -730,8 +716,7 @@ describe("getIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("returns issue with lowercase identifier", () =>
+        it.effect("returns issue with lowercase identifier", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-5", number: 5 })
@@ -749,8 +734,7 @@ describe("getIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("fetches markdown description", () =>
+        it.effect("fetches markdown description", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const issue = makeIssue({
@@ -774,8 +758,7 @@ describe("getIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("includes assignee name when assigned", () =>
+        it.effect("includes assignee name when assigned", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const person = makePerson({ _id: "person-1" as Ref<Person>, name: "Jane Developer" })
@@ -800,8 +783,7 @@ describe("getIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("transforms priority correctly", () =>
+        it.effect("transforms priority correctly", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const issue = makeIssue({
@@ -822,8 +804,7 @@ describe("getIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("returns undefined description when not set", () =>
+        it.effect("returns undefined description when not set", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const issue = makeIssue({
@@ -846,8 +827,7 @@ describe("getIssue", () => {
   })
 
   describe("error handling", () => {
-    // test-revizorro: approved
-    it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
+        it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
       Effect.gen(function* () {
         const testLayer = createTestLayerWithMocks({
           projects: [],
@@ -864,8 +844,7 @@ describe("getIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("returns IssueNotFoundError when issue doesn't exist", () =>
+        it.effect("returns IssueNotFoundError when issue doesn't exist", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
@@ -886,8 +865,7 @@ describe("getIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("returns IssueNotFoundError with helpful message", () =>
+        it.effect("returns IssueNotFoundError with helpful message", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
@@ -909,8 +887,7 @@ describe("getIssue", () => {
   })
 
   describe("identifier parsing", () => {
-    // test-revizorro: approved
-    it.effect("handles prefixed identifier HULY-123", () =>
+        it.effect("handles prefixed identifier HULY-123", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "HULY" })
         const issue = makeIssue({ identifier: "HULY-123", number: 123 })
@@ -928,8 +905,7 @@ describe("getIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("handles just number 123", () =>
+        it.effect("handles just number 123", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "PROJ" })
         const issue = makeIssue({ identifier: "PROJ-42", number: 42 })
@@ -951,8 +927,7 @@ describe("getIssue", () => {
 
 describe("createIssue", () => {
   describe("basic functionality", () => {
-    // test-revizorro: approved
-    it.effect("creates issue with minimal parameters", () =>
+        it.effect("creates issue with minimal parameters", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST", sequence: 5 })
 
@@ -976,8 +951,7 @@ describe("createIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("creates issue with description", () =>
+        it.effect("creates issue with description", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST", sequence: 1 })
 
@@ -1005,8 +979,7 @@ describe("createIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("creates issue with priority", () =>
+        it.effect("creates issue with priority", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST", sequence: 1 })
 
@@ -1031,8 +1004,7 @@ describe("createIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("creates issue with assignee by email", () =>
+        it.effect("creates issue with assignee by email", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST", sequence: 1 })
         const person = makePerson({ _id: "person-1" as Ref<Person>, name: "John Doe" })
@@ -1060,8 +1032,7 @@ describe("createIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("creates issue with specific status", () =>
+        it.effect("creates issue with specific status", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST", sequence: 1 })
         const todoStatus = makeStatus({ _id: "status-todo" as Ref<Status>, name: "Todo" })
@@ -1087,8 +1058,7 @@ describe("createIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("uses project default status when not specified", () =>
+        it.effect("uses project default status when not specified", () =>
       Effect.gen(function* () {
         const project = makeProject({
           identifier: "TEST",
@@ -1115,8 +1085,7 @@ describe("createIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("calculates rank for new issue", () =>
+        it.effect("calculates rank for new issue", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST", sequence: 1 })
         const existingIssue = makeIssue({ rank: "0|hzzzzz:" })
@@ -1143,8 +1112,7 @@ describe("createIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("maps priority strings correctly", () =>
+        it.effect("maps priority strings correctly", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST", sequence: 0 })
 
@@ -1180,8 +1148,7 @@ describe("createIssue", () => {
   })
 
   describe("error handling", () => {
-    // test-revizorro: approved
-    it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
+        it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
       Effect.gen(function* () {
         const testLayer = createTestLayerWithMocks({
           projects: [],
@@ -1201,8 +1168,7 @@ describe("createIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("returns InvalidStatusError for unknown status", () =>
+        it.effect("returns InvalidStatusError for unknown status", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const todoStatus = makeStatus({ _id: "status-todo" as Ref<Status>, name: "Todo" })
@@ -1252,8 +1218,7 @@ describe("createIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("PersonNotFoundError has helpful message", () =>
+        it.effect("PersonNotFoundError has helpful message", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
 
@@ -1279,8 +1244,7 @@ describe("createIssue", () => {
   })
 
   describe("status resolution", () => {
-    // test-revizorro: approved
-    it.effect("matches status case-insensitively", () =>
+        it.effect("matches status case-insensitively", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST", sequence: 1 })
         const inProgressStatus = makeStatus({ _id: "status-progress" as Ref<Status>, name: "In Progress" })
@@ -1307,8 +1271,7 @@ describe("createIssue", () => {
   })
 
   describe("assignee resolution", () => {
-    // test-revizorro: approved
-    it.effect("resolves assignee by name when email not found", () =>
+        it.effect("resolves assignee by name when email not found", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST", sequence: 1 })
         const person = makePerson({ _id: "person-2" as Ref<Person>, name: "Jane Developer" })
@@ -1337,8 +1300,7 @@ describe("createIssue", () => {
   })
 
   describe("description handling", () => {
-    // test-revizorro: approved
-    it.effect("skips upload for empty description", () =>
+        it.effect("skips upload for empty description", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST", sequence: 1 })
 
@@ -1364,8 +1326,7 @@ describe("createIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("skips upload for whitespace-only description", () =>
+        it.effect("skips upload for whitespace-only description", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST", sequence: 1 })
 
@@ -1396,8 +1357,7 @@ describe("createIssue", () => {
 
 describe("updateIssue", () => {
   describe("basic functionality", () => {
-    // test-revizorro: approved
-    it.effect("updates issue title", () =>
+        it.effect("updates issue title", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1", title: "Old Title", number: 1 })
@@ -1424,8 +1384,7 @@ describe("updateIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("updates issue priority", () =>
+        it.effect("updates issue priority", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1", priority: IssuePriority.Low })
@@ -1451,8 +1410,7 @@ describe("updateIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("updates issue status", () =>
+        it.effect("updates issue status", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1", status: "status-open" as Ref<Status> })
@@ -1479,8 +1437,7 @@ describe("updateIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("updates issue description", () =>
+        it.effect("updates issue description", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1" })
@@ -1508,8 +1465,7 @@ describe("updateIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("updates issue assignee", () =>
+        it.effect("updates issue assignee", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1", assignee: null })
@@ -1538,8 +1494,7 @@ describe("updateIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("unassigns issue when assignee is null", () =>
+        it.effect("unassigns issue when assignee is null", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1", assignee: "person-1" as Ref<Person> })
@@ -1564,8 +1519,7 @@ describe("updateIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("returns updated=false when no fields provided", () =>
+        it.effect("returns updated=false when no fields provided", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1" })
@@ -1587,8 +1541,7 @@ describe("updateIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("updates multiple fields at once", () =>
+        it.effect("updates multiple fields at once", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1" })
@@ -1618,8 +1571,7 @@ describe("updateIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("clears description when empty string provided", () =>
+        it.effect("clears description when empty string provided", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1", description: "markup-old" as unknown as null })
@@ -1646,8 +1598,7 @@ describe("updateIssue", () => {
   })
 
   describe("identifier parsing", () => {
-    // test-revizorro: approved
-    it.effect("finds issue by full identifier", () =>
+        it.effect("finds issue by full identifier", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "HULY" })
         const issue = makeIssue({ identifier: "HULY-42", number: 42 })
@@ -1672,8 +1623,7 @@ describe("updateIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("finds issue by numeric identifier", () =>
+        it.effect("finds issue by numeric identifier", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-99", number: 99 })
@@ -1700,8 +1650,7 @@ describe("updateIssue", () => {
   })
 
   describe("error handling", () => {
-    // test-revizorro: approved
-    it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
+        it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
       Effect.gen(function* () {
         const testLayer = createTestLayerWithMocks({
           projects: [],
@@ -1722,8 +1671,7 @@ describe("updateIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("returns IssueNotFoundError when issue doesn't exist", () =>
+        it.effect("returns IssueNotFoundError when issue doesn't exist", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
@@ -1748,8 +1696,7 @@ describe("updateIssue", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("returns InvalidStatusError for unknown status", () =>
+        it.effect("returns InvalidStatusError for unknown status", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1" })
@@ -1805,8 +1752,7 @@ describe("updateIssue", () => {
   })
 
   describe("status resolution", () => {
-    // test-revizorro: approved
-    it.effect("matches status case-insensitively", () =>
+        it.effect("matches status case-insensitively", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1" })
@@ -1833,8 +1779,7 @@ describe("updateIssue", () => {
   })
 
   describe("assignee resolution", () => {
-    // test-revizorro: approved
-    it.effect("resolves assignee by name when email not found", () =>
+        it.effect("resolves assignee by name when email not found", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1" })
@@ -1866,8 +1811,7 @@ describe("updateIssue", () => {
 
 describe("addLabel", () => {
   describe("basic functionality", () => {
-    // test-revizorro: approved
-    it.effect("adds a new label to an issue", () =>
+        it.effect("adds a new label to an issue", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1", number: 1 })
@@ -1900,8 +1844,7 @@ describe("addLabel", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("uses existing tag element when label already exists in project", () =>
+        it.effect("uses existing tag element when label already exists in project", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1", number: 1 })
@@ -1939,8 +1882,7 @@ describe("addLabel", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("returns labelAdded=false when label already attached (idempotent)", () =>
+        it.effect("returns labelAdded=false when label already attached (idempotent)", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1", number: 1 })
@@ -1978,8 +1920,7 @@ describe("addLabel", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("handles case-insensitive label matching for idempotency", () =>
+        it.effect("handles case-insensitive label matching for idempotency", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1", number: 1 })
@@ -2005,8 +1946,7 @@ describe("addLabel", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("uses provided color when creating new tag", () =>
+        it.effect("uses provided color when creating new tag", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1", number: 1 })
@@ -2032,8 +1972,7 @@ describe("addLabel", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("uses default color 0 when not specified", () =>
+        it.effect("uses default color 0 when not specified", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1", number: 1 })
@@ -2058,8 +1997,7 @@ describe("addLabel", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("trims whitespace from label name", () =>
+        it.effect("trims whitespace from label name", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1", number: 1 })
@@ -2086,8 +2024,7 @@ describe("addLabel", () => {
   })
 
   describe("identifier parsing", () => {
-    // test-revizorro: approved
-    it.effect("finds issue by full identifier", () =>
+        it.effect("finds issue by full identifier", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "HULY" })
         const issue = makeIssue({ identifier: "HULY-42", number: 42 })
@@ -2116,8 +2053,7 @@ describe("addLabel", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("finds issue by numeric identifier", () =>
+        it.effect("finds issue by numeric identifier", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-99", number: 99 })
@@ -2145,8 +2081,7 @@ describe("addLabel", () => {
   })
 
   describe("error handling", () => {
-    // test-revizorro: approved
-    it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
+        it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
       Effect.gen(function* () {
         const testLayer = createTestLayerWithMocks({
           projects: [],
@@ -2166,8 +2101,7 @@ describe("addLabel", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("returns IssueNotFoundError when issue doesn't exist", () =>
+        it.effect("returns IssueNotFoundError when issue doesn't exist", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
 

@@ -16,8 +16,7 @@ import {
 
 describe("Huly Errors", () => {
   describe("HulyError", () => {
-    // test-revizorro: approved
-    it.effect("creates with message", () =>
+        it.effect("creates with message", () =>
       Effect.gen(function* () {
         const error = new HulyError({ message: "Something went wrong" })
         expect(error._tag).toBe("HulyError")
@@ -26,8 +25,7 @@ describe("Huly Errors", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("creates with cause", () =>
+        it.effect("creates with cause", () =>
       Effect.gen(function* () {
         const cause = new Error("underlying error")
         const error = new HulyError({ message: "Wrapped error", cause })
@@ -37,8 +35,7 @@ describe("Huly Errors", () => {
   })
 
   describe("HulyConnectionError", () => {
-    // test-revizorro: approved
-    it.effect("creates with message", () =>
+        it.effect("creates with message", () =>
       Effect.gen(function* () {
         const error = new HulyConnectionError({ message: "Connection failed" })
         expect(error._tag).toBe("HulyConnectionError")
@@ -47,8 +44,7 @@ describe("Huly Errors", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("creates with cause", () =>
+        it.effect("creates with cause", () =>
       Effect.gen(function* () {
         const cause = new Error("network timeout")
         const error = new HulyConnectionError({ message: "Connection failed", cause })
@@ -58,8 +54,7 @@ describe("Huly Errors", () => {
   })
 
   describe("HulyAuthError", () => {
-    // test-revizorro: approved
-    it.effect("creates with message", () =>
+        it.effect("creates with message", () =>
       Effect.gen(function* () {
         const error = new HulyAuthError({ message: "Invalid credentials" })
         expect(error._tag).toBe("HulyAuthError")
@@ -70,8 +65,7 @@ describe("Huly Errors", () => {
   })
 
   describe("IssueNotFoundError", () => {
-    // test-revizorro: approved
-    it.effect("creates with identifier and project", () =>
+        it.effect("creates with identifier and project", () =>
       Effect.gen(function* () {
         const error = new IssueNotFoundError({ identifier: "HULY-123", project: "HULY" })
         expect(error._tag).toBe("IssueNotFoundError")
@@ -81,8 +75,7 @@ describe("Huly Errors", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("generates message from fields", () =>
+        it.effect("generates message from fields", () =>
       Effect.gen(function* () {
         const error = new IssueNotFoundError({ identifier: "HULY-123", project: "HULY" })
         expect(error.message).toBe("Issue 'HULY-123' not found in project 'HULY'")
@@ -91,8 +84,7 @@ describe("Huly Errors", () => {
   })
 
   describe("ProjectNotFoundError", () => {
-    // test-revizorro: approved
-    it.effect("creates with identifier", () =>
+        it.effect("creates with identifier", () =>
       Effect.gen(function* () {
         const error = new ProjectNotFoundError({ identifier: "MISSING" })
         expect(error._tag).toBe("ProjectNotFoundError")
@@ -101,8 +93,7 @@ describe("Huly Errors", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("generates message from fields", () =>
+        it.effect("generates message from fields", () =>
       Effect.gen(function* () {
         const error = new ProjectNotFoundError({ identifier: "MISSING" })
         expect(error.message).toBe("Project 'MISSING' not found")
@@ -111,8 +102,7 @@ describe("Huly Errors", () => {
   })
 
   describe("InvalidStatusError", () => {
-    // test-revizorro: approved
-    it.effect("creates with status and project", () =>
+        it.effect("creates with status and project", () =>
       Effect.gen(function* () {
         const error = new InvalidStatusError({ status: "bogus", project: "HULY" })
         expect(error._tag).toBe("InvalidStatusError")
@@ -122,8 +112,7 @@ describe("Huly Errors", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("generates message from fields", () =>
+        it.effect("generates message from fields", () =>
       Effect.gen(function* () {
         const error = new InvalidStatusError({ status: "bogus", project: "HULY" })
         expect(error.message).toBe("Invalid status 'bogus' for project 'HULY'")
@@ -132,8 +121,7 @@ describe("Huly Errors", () => {
   })
 
   describe("getMcpErrorCode", () => {
-    // test-revizorro: approved
-    it.effect("returns InvalidParams for domain errors", () =>
+        it.effect("returns InvalidParams for domain errors", () =>
       Effect.gen(function* () {
         expect(getMcpErrorCode(new IssueNotFoundError({ identifier: "X", project: "Y" }))).toBe(
           McpErrorCode.InvalidParams
@@ -147,8 +135,7 @@ describe("Huly Errors", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("returns InternalError for infrastructure errors", () =>
+        it.effect("returns InternalError for infrastructure errors", () =>
       Effect.gen(function* () {
         expect(getMcpErrorCode(new HulyError({ message: "X" }))).toBe(McpErrorCode.InternalError)
         expect(getMcpErrorCode(new HulyConnectionError({ message: "X" }))).toBe(
@@ -160,8 +147,7 @@ describe("Huly Errors", () => {
   })
 
   describe("Effect integration", () => {
-    // test-revizorro: approved
-    it.effect("errors are yieldable", () =>
+        it.effect("errors are yieldable", () =>
       Effect.gen(function* () {
         const program = Effect.gen(function* () {
           return yield* new IssueNotFoundError({ identifier: "HULY-1", project: "TEST" })
@@ -172,8 +158,7 @@ describe("Huly Errors", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("can pattern match with catchTag", () =>
+        it.effect("can pattern match with catchTag", () =>
       Effect.gen(function* () {
         const program = Effect.gen(function* () {
           return yield* new IssueNotFoundError({ identifier: "HULY-1", project: "TEST" })
@@ -188,8 +173,7 @@ describe("Huly Errors", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("can pattern match with Match", () =>
+        it.effect("can pattern match with Match", () =>
       Effect.gen(function* () {
         const matchError = Match.type<HulyDomainError>().pipe(
           Match.tag("IssueNotFoundError", (e) => `issue:${e.identifier}`),

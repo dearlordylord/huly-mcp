@@ -98,7 +98,7 @@ export const TOOL_DEFINITIONS = {
 type ToolName = keyof typeof TOOL_DEFINITIONS
 
 const ToolNameSchema = Schema.Literal(
-  ...Object.keys(TOOL_DEFINITIONS) as [ToolName, ...ToolName[]]
+  ...Object.keys(TOOL_DEFINITIONS) as [ToolName, ...Array<ToolName>]
 )
 
 export interface McpServerOperations {

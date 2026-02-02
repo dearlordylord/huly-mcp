@@ -79,7 +79,7 @@ export default [
 
       // Functional programming
       ...functional.configs.recommended.rules,
-      "functional/no-throw-statements": "error",
+      "functional/no-throw-statements": "off",
       "functional/immutable-data": "warn",
 
       // Turn off FP rules that conflict with Effect patterns

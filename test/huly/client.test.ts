@@ -27,8 +27,7 @@ interface TestDoc extends Doc {
 
 describe("HulyClient Service", () => {
   describe("testLayer", () => {
-    // test-revizorro: approved
-    it.effect("provides default noop operations", () =>
+        it.effect("provides default noop operations", () =>
       Effect.gen(function* () {
         const testLayer = HulyClient.testLayer({})
 
@@ -44,8 +43,7 @@ describe("HulyClient Service", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("allows overriding specific operations", () =>
+        it.effect("allows overriding specific operations", () =>
       Effect.gen(function* () {
         const mockResults: FindResult<TestDoc> = [
           { _id: "1", _class: "class" as DocRef<Class<TestDoc>>, space: "space" as DocRef<Space>, title: "Test", modifiedBy: "user" as DocRef<Doc>, modifiedOn: 0, createdBy: "user" as DocRef<Doc>, createdOn: 0 },
@@ -66,8 +64,7 @@ describe("HulyClient Service", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("default findAll returns empty array", () =>
+        it.effect("default findAll returns empty array", () =>
       Effect.gen(function* () {
         const testLayer = HulyClient.testLayer({})
 
@@ -81,8 +78,7 @@ describe("HulyClient Service", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("default findOne returns undefined", () =>
+        it.effect("default findOne returns undefined", () =>
       Effect.gen(function* () {
         const testLayer = HulyClient.testLayer({})
 
@@ -96,8 +92,7 @@ describe("HulyClient Service", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("default uploadMarkup returns empty string", () =>
+        it.effect("default uploadMarkup returns empty string", () =>
       Effect.gen(function* () {
         const testLayer = HulyClient.testLayer({})
 
@@ -114,8 +109,7 @@ describe("HulyClient Service", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("default fetchMarkup returns empty string", () =>
+        it.effect("default fetchMarkup returns empty string", () =>
       Effect.gen(function* () {
         const testLayer = HulyClient.testLayer({})
 
@@ -134,8 +128,7 @@ describe("HulyClient Service", () => {
   })
 
   describe("mock operations with errors", () => {
-    // test-revizorro: approved
-    it.effect("can mock operations to return HulyConnectionError", () =>
+        it.effect("can mock operations to return HulyConnectionError", () =>
       Effect.gen(function* () {
         const testLayer = HulyClient.testLayer({
           findAll: () =>
@@ -159,8 +152,7 @@ describe("HulyClient Service", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("can mock operations to return HulyAuthError", () =>
+        it.effect("can mock operations to return HulyAuthError", () =>
       Effect.gen(function* () {
         const testLayer = HulyClient.testLayer({
           findOne: () =>
@@ -186,8 +178,7 @@ describe("HulyClient Service", () => {
   })
 
   describe("error handling patterns", () => {
-    // test-revizorro: approved
-    it.effect("can catch HulyConnectionError with catchTag", () =>
+        it.effect("can catch HulyConnectionError with catchTag", () =>
       Effect.gen(function* () {
         const testLayer = HulyClient.testLayer({
           findAll: () =>
@@ -215,8 +206,7 @@ describe("HulyClient Service", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("can catch HulyAuthError with catchTag", () =>
+        it.effect("can catch HulyAuthError with catchTag", () =>
       Effect.gen(function* () {
         const testLayer = HulyClient.testLayer({
           createDoc: () =>
@@ -245,8 +235,7 @@ describe("HulyClient Service", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("can handle both error types with catchTags", () =>
+        it.effect("can handle both error types with catchTags", () =>
       Effect.gen(function* () {
         const connectionErrorLayer = HulyClient.testLayer({
           findAll: () =>
@@ -283,8 +272,7 @@ describe("HulyClient Service", () => {
   })
 
   describe("service composition", () => {
-    // test-revizorro: approved
-    it.effect("can be composed with other services", () =>
+        it.effect("can be composed with other services", () =>
       Effect.gen(function* () {
         // Mock a higher-level service that uses HulyClient
         const mockFindAll = <T extends Doc>() =>
@@ -314,8 +302,7 @@ describe("HulyClient Service", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("multiple operations reuse same mock layer", () =>
+        it.effect("multiple operations reuse same mock layer", () =>
       Effect.gen(function* () {
         const callCount = { findAll: 0, findOne: 0 }
 
@@ -355,8 +342,7 @@ describe("HulyClient Service", () => {
   })
 
   describe("HulyClientError type", () => {
-    // test-revizorro: approved
-    it.effect("is union of HulyConnectionError and HulyAuthError", () =>
+        it.effect("is union of HulyConnectionError and HulyAuthError", () =>
       Effect.gen(function* () {
         // Type test - this should compile
         const handleError = (error: HulyClientError): string => {
@@ -378,8 +364,7 @@ describe("HulyClient Service", () => {
   })
 
   describe("operation tracking", () => {
-    // test-revizorro: approved
-    it.effect("tracks operation calls for testing", () =>
+        it.effect("tracks operation calls for testing", () =>
       Effect.gen(function* () {
         const operations: string[] = []
 
@@ -418,16 +403,14 @@ describe("HulyClient Service", () => {
 
 describe("Connection error classification", () => {
   describe("HulyConnectionError", () => {
-    // test-revizorro: approved
-    it.effect("has correct tag", () =>
+        it.effect("has correct tag", () =>
       Effect.gen(function* () {
         const error = new HulyConnectionError({ message: "timeout" })
         expect(error._tag).toBe("HulyConnectionError")
       })
     )
 
-    // test-revizorro: approved
-    it.effect("includes cause", () =>
+        it.effect("includes cause", () =>
       Effect.gen(function* () {
         const cause = new Error("underlying")
         const error = new HulyConnectionError({
@@ -438,8 +421,7 @@ describe("Connection error classification", () => {
       })
     )
 
-    // test-revizorro: approved
-    it.effect("has mcpErrorCode", () =>
+        it.effect("has mcpErrorCode", () =>
       Effect.gen(function* () {
         const error = new HulyConnectionError({ message: "timeout" })
         expect(error.mcpErrorCode).toBe(-32603)
@@ -448,16 +430,14 @@ describe("Connection error classification", () => {
   })
 
   describe("HulyAuthError", () => {
-    // test-revizorro: approved
-    it.effect("has correct tag", () =>
+        it.effect("has correct tag", () =>
       Effect.gen(function* () {
         const error = new HulyAuthError({ message: "invalid credentials" })
         expect(error._tag).toBe("HulyAuthError")
       })
     )
 
-    // test-revizorro: approved
-    it.effect("has mcpErrorCode", () =>
+        it.effect("has mcpErrorCode", () =>
       Effect.gen(function* () {
         const error = new HulyAuthError({ message: "invalid credentials" })
         expect(error.mcpErrorCode).toBe(-32603)

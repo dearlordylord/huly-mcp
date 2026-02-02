@@ -30,13 +30,12 @@ import {
 } from "@hcengineering/core"
 import { htmlToJSON, jsonToHTML, jsonToMarkup, markupToJSON } from "@hcengineering/text"
 import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown"
-import { absurd, Context, Effect, Layer, Redacted, Schedule } from 'effect';
+import { absurd, Context, Effect, Layer, Redacted, Schedule } from "effect"
 
 import { HulyConfigService } from "../config/config.js"
 import { HulyAuthError, HulyConnectionError } from "./errors.js"
 
 export type HulyClientError = HulyConnectionError | HulyAuthError
-
 
 export interface HulyClientOperations {
   readonly findAll: <T extends Doc>(
@@ -352,7 +351,7 @@ function createMarkupOps(
         case "markdown":
           return markupToMarkdown(json, { refUrl, imageUrl })
         default:
-          absurd(format);
+          absurd(format)
           throw new Error(`Invalid format: ${format}`)
       }
     },
@@ -367,8 +366,8 @@ function createMarkupOps(
         case "markdown":
           return await collaborator.createMarkup(collabId, jsonToMarkup(markdownToMarkup(value, { refUrl, imageUrl })))
         default:
-          absurd(format);
-          throw new Error(`Invalid format: ${format}`);
+          absurd(format)
+          throw new Error(`Invalid format: ${format}`)
       }
     }
   }
