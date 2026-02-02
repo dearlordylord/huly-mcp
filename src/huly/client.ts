@@ -2,8 +2,7 @@
  * HulyClient service for Huly MCP server.
  *
  * Provides authenticated connection to Huly platform with:
- * - Lazy connection (connects on first use)
- * - Connection caching (reuses same connection)
+ * - Eager connection (connects when layer is built)
  * - Graceful shutdown (closes on scope finalization)
  * - Retry on connection failures
  * - Error mapping to HulyConnectionError/HulyAuthError
@@ -136,7 +135,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
 >() {
   /**
    * Production layer - connects to Huly platform.
-   * Connection is lazy (on first use) and cached.
+   * Connection is eager (on layer build) for simpler lifecycle.
    * Handles graceful shutdown on scope finalization.
    */
   static readonly layer: Layer.Layer<
@@ -148,59 +147,34 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
     Effect.gen(function* () {
       const config = yield* HulyConfigService
 
-      // Lazy connection - only connect when first operation is called
-      let cachedClient: PlatformClient | null = null
-
-      const getClient: Effect.Effect<PlatformClient, HulyClientError> =
-        Effect.suspend(() => {
-          if (cachedClient !== null) {
-            return Effect.succeed(cachedClient)
-          }
-
-          return connectWithRetry({
-            url: config.url,
-            email: config.email,
-            password: Redacted.value(config.password),
-            workspace: config.workspace,
-            connectionTimeout: config.connectionTimeout,
-          }).pipe(
-            Effect.tap((client) =>
-              Effect.sync(() => {
-                cachedClient = client
-              })
-            )
-          )
-        })
+      // Eager connection - connect immediately when layer is built
+      const client = yield* connectWithRetry({
+        url: config.url,
+        email: config.email,
+        password: Redacted.value(config.password),
+        workspace: config.workspace,
+        connectionTimeout: config.connectionTimeout,
+      })
 
       // Register cleanup on scope finalization
       yield* Effect.addFinalizer(() =>
-        Effect.suspend(() => {
-          if (cachedClient !== null) {
-            const client = cachedClient
-            cachedClient = null
-            return Effect.promise(() => client.close()).pipe(
-              Effect.catchAll(() => Effect.void)
-            )
-          }
-          return Effect.void
-        })
+        Effect.promise(() => client.close()).pipe(
+          Effect.catchAll(() => Effect.void)
+        )
       )
 
-      // Helper to wrap operations with connection
+      // Helper to wrap operations with the connected client
       const withClient = <A>(
         op: (client: PlatformClient) => Promise<A>,
         errorMsg: string
       ): Effect.Effect<A, HulyClientError> =>
-        Effect.gen(function* () {
-          const client = yield* getClient
-          return yield* Effect.tryPromise({
-            try: () => op(client),
-            catch: (e) =>
-              new HulyConnectionError({
-                message: `${errorMsg}: ${String(e)}`,
-                cause: e as Error,
-              }),
-          })
+        Effect.tryPromise({
+          try: () => op(client),
+          catch: (e) =>
+            new HulyConnectionError({
+              message: `${errorMsg}: ${String(e)}`,
+              cause: e as Error,
+            }),
         })
 
       // Create service operations
