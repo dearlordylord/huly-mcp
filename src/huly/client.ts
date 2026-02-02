@@ -30,7 +30,7 @@ import {
 } from "@hcengineering/core"
 import { htmlToJSON, jsonToHTML, jsonToMarkup, markupToJSON } from "@hcengineering/text"
 import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown"
-import { Context, Effect, Layer, Redacted, Schedule } from "effect"
+import { absurd, Context, Effect, Layer, Redacted, Schedule } from 'effect';
 
 import { HulyConfigService } from "../config/config.js"
 import { HulyAuthError, HulyConnectionError } from "./errors.js"
@@ -351,6 +351,9 @@ function createMarkupOps(
           return jsonToHTML(json)
         case "markdown":
           return markupToMarkdown(json, { refUrl, imageUrl })
+        default:
+          absurd(format);
+          throw new Error(`Invalid format: ${format}`)
       }
     },
 
@@ -363,14 +366,14 @@ function createMarkupOps(
           return await collaborator.createMarkup(collabId, jsonToMarkup(htmlToJSON(value)))
         case "markdown":
           return await collaborator.createMarkup(collabId, jsonToMarkup(markdownToMarkup(value, { refUrl, imageUrl })))
+        default:
+          absurd(format);
+          throw new Error(`Invalid format: ${format}`);
       }
     }
   }
 }
 
-/**
- * Connect to Huly via REST API.
- */
 const connectRest = async (
   config: ConnectionConfig
 ): Promise<RestConnection> => {
@@ -397,10 +400,6 @@ const connectRest = async (
   return { client, markupOps }
 }
 
-/**
- * Connect to Huly with retry policy.
- * Retries on transient connection errors, fails fast on auth errors.
- */
 const connectRestWithRetry = (
   config: ConnectionConfig
 ): Effect.Effect<RestConnection, HulyClientError> => {
@@ -419,10 +418,8 @@ const connectRestWithRetry = (
     }
   })
 
-  // Retry policy: 3 attempts with exponential backoff
-  // Don't retry auth errors (they won't succeed on retry)
   const retrySchedule = Schedule.exponential("100 millis").pipe(
-    Schedule.compose(Schedule.recurs(2)) // 3 total attempts
+    Schedule.compose(Schedule.recurs(2))
   )
 
   return attemptConnect.pipe(
