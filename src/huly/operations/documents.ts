@@ -362,6 +362,7 @@ export const updateDocument = (
     const { client, doc, teamspace } = yield* findTeamspaceAndDocument(params)
 
     const updateOps: DocumentUpdate<HulyDocument> = {}
+    let contentUpdatedInPlace = false
 
     if (params.title !== undefined) {
       updateOps.title = params.title
@@ -370,7 +371,18 @@ export const updateDocument = (
     if (params.content !== undefined) {
       if (params.content.trim() === "") {
         updateOps.content = null
+      } else if (doc.content) {
+        // Document already has content - update in place
+        yield* client.updateMarkup(
+          documentPlugin.class.Document,
+          doc._id,
+          "content",
+          params.content,
+          "markdown"
+        )
+        contentUpdatedInPlace = true
       } else {
+        // Document has no content yet - create new
         const contentMarkupRef = yield* client.uploadMarkup(
           documentPlugin.class.Document,
           doc._id,
@@ -382,16 +394,18 @@ export const updateDocument = (
       }
     }
 
-    if (Object.keys(updateOps).length === 0) {
+    if (Object.keys(updateOps).length === 0 && !contentUpdatedInPlace) {
       return { id: String(doc._id), updated: false }
     }
 
-    yield* client.updateDoc(
-      documentPlugin.class.Document,
-      teamspace._id,
-      doc._id,
-      updateOps
-    )
+    if (Object.keys(updateOps).length > 0) {
+      yield* client.updateDoc(
+        documentPlugin.class.Document,
+        teamspace._id,
+        doc._id,
+        updateOps
+      )
+    }
 
     return { id: String(doc._id), updated: true }
   })
