@@ -11,24 +11,44 @@ import { Context, Effect, Exit, Layer, Ref, Schema } from "effect"
 
 import {
   addLabelParamsJsonSchema,
+  createDocumentParamsJsonSchema,
   createIssueParamsJsonSchema,
+  deleteDocumentParamsJsonSchema,
   deleteIssueParamsJsonSchema,
+  getDocumentParamsJsonSchema,
   getIssueParamsJsonSchema,
+  listDocumentsParamsJsonSchema,
   listIssuesParamsJsonSchema,
   listProjectsParamsJsonSchema,
+  listTeamspacesParamsJsonSchema,
   parseAddLabelParams,
+  parseCreateDocumentParams,
   parseCreateIssueParams,
+  parseDeleteDocumentParams,
   parseDeleteIssueParams,
+  parseGetDocumentParams,
   parseGetIssueParams,
+  parseListDocumentsParams,
   parseListIssuesParams,
   parseListProjectsParams,
+  parseListTeamspacesParams,
+  parseUpdateDocumentParams,
   parseUpdateIssueParams,
   parseUploadFileParams,
+  updateDocumentParamsJsonSchema,
   updateIssueParamsJsonSchema,
   uploadFileParamsJsonSchema
 } from "../domain/schemas.js"
 import { HulyClient } from "../huly/client.js"
 import type { HulyDomainError } from "../huly/errors.js"
+import {
+  createDocument,
+  deleteDocument,
+  getDocument,
+  listDocuments,
+  listTeamspaces,
+  updateDocument
+} from "../huly/operations/documents.js"
 import { addLabel, createIssue, deleteIssue, getIssue, listIssues, updateIssue } from "../huly/operations/issues.js"
 import { listProjects } from "../huly/operations/projects.js"
 import { uploadFile } from "../huly/operations/storage.js"
@@ -97,6 +117,40 @@ export const TOOL_DEFINITIONS = {
     description: "Permanently delete a Huly issue. This action cannot be undone.",
     inputSchema: deleteIssueParamsJsonSchema
   },
+  list_teamspaces: {
+    name: "list_teamspaces",
+    description:
+      "List all Huly document teamspaces. Returns teamspaces sorted by name. Supports filtering by archived status.",
+    inputSchema: listTeamspacesParamsJsonSchema
+  },
+  list_documents: {
+    name: "list_documents",
+    description: "List documents in a Huly teamspace. Returns documents sorted by modification date (newest first).",
+    inputSchema: listDocumentsParamsJsonSchema
+  },
+  get_document: {
+    name: "get_document",
+    description:
+      "Retrieve full details for a Huly document including markdown content. Use this to view document content and metadata.",
+    inputSchema: getDocumentParamsJsonSchema
+  },
+  create_document: {
+    name: "create_document",
+    description:
+      "Create a new document in a Huly teamspace. Content supports markdown formatting. Returns the created document id.",
+    inputSchema: createDocumentParamsJsonSchema
+  },
+  update_document: {
+    name: "update_document",
+    description:
+      "Update fields on an existing Huly document. Only provided fields are modified. Content updates support markdown.",
+    inputSchema: updateDocumentParamsJsonSchema
+  },
+  delete_document: {
+    name: "delete_document",
+    description: "Permanently delete a Huly document. This action cannot be undone.",
+    inputSchema: deleteDocumentParamsJsonSchema
+  },
   upload_file: {
     name: "upload_file",
     description:
@@ -130,7 +184,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 >() {
   /**
    * Create the MCP server layer.
-   * Requires HulyClient and optionally HulyStorageClient.
+   * Requires HulyClient and HulyStorageClient.
    */
   static layer(
     config: McpServerConfig
@@ -357,6 +411,60 @@ async function handleToolCall(
         args,
         parseDeleteIssueParams,
         (params) => deleteIssue(params),
+        hulyClient
+      )
+
+    case "list_teamspaces":
+      return runToolHandler(
+        toolName,
+        args,
+        parseListTeamspacesParams,
+        (params) => listTeamspaces(params),
+        hulyClient
+      )
+
+    case "list_documents":
+      return runToolHandler(
+        toolName,
+        args,
+        parseListDocumentsParams,
+        (params) => listDocuments(params),
+        hulyClient
+      )
+
+    case "get_document":
+      return runToolHandler(
+        toolName,
+        args,
+        parseGetDocumentParams,
+        (params) => getDocument(params),
+        hulyClient
+      )
+
+    case "create_document":
+      return runToolHandler(
+        toolName,
+        args,
+        parseCreateDocumentParams,
+        (params) => createDocument(params),
+        hulyClient
+      )
+
+    case "update_document":
+      return runToolHandler(
+        toolName,
+        args,
+        parseUpdateDocumentParams,
+        (params) => updateDocument(params),
+        hulyClient
+      )
+
+    case "delete_document":
+      return runToolHandler(
+        toolName,
+        args,
+        parseDeleteDocumentParams,
+        (params) => deleteDocument(params),
         hulyClient
       )
 

@@ -70,6 +70,8 @@ export const mapDomainErrorToMcp = (error: HulyDomainError): McpErrorResponseWit
         `File upload error: ${e.message}`,
         McpErrorCode.InternalError
       )),
+    Match.tag("TeamspaceNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
+    Match.tag("DocumentNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
     Match.tag("HulyConnectionError", (e) =>
       createErrorResponse(
         `Connection error: ${e.message}`,

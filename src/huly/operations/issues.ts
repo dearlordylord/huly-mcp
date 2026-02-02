@@ -661,6 +661,7 @@ export const updateIssue = (
     const { client, issue, project } = yield* findProjectAndIssue(params)
 
     const updateOps: DocumentUpdate<HulyIssue> = {}
+    let descriptionUpdatedInPlace = false
 
     if (params.title !== undefined) {
       updateOps.title = params.title
@@ -669,7 +670,18 @@ export const updateIssue = (
     if (params.description !== undefined) {
       if (params.description.trim() === "") {
         updateOps.description = null
+      } else if (issue.description) {
+        // Issue already has description - update in place
+        yield* client.updateMarkup(
+          tracker.class.Issue,
+          issue._id,
+          "description",
+          params.description,
+          "markdown"
+        )
+        descriptionUpdatedInPlace = true
       } else {
+        // Issue has no description yet - create new
         const descriptionMarkupRef = yield* client.uploadMarkup(
           tracker.class.Issue,
           issue._id,
@@ -715,16 +727,18 @@ export const updateIssue = (
       }
     }
 
-    if (Object.keys(updateOps).length === 0) {
+    if (Object.keys(updateOps).length === 0 && !descriptionUpdatedInPlace) {
       return { identifier: issue.identifier, updated: false }
     }
 
-    yield* client.updateDoc(
-      tracker.class.Issue,
-      project._id,
-      issue._id,
-      updateOps
-    )
+    if (Object.keys(updateOps).length > 0) {
+      yield* client.updateDoc(
+        tracker.class.Issue,
+        project._id,
+        issue._id,
+        updateOps
+      )
+    }
 
     return { identifier: issue.identifier, updated: true }
   })

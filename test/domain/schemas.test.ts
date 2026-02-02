@@ -17,17 +17,29 @@ import {
   parseUpdateIssueParams,
   parseAddLabelParams,
   parseListProjectsParams,
-  parseUploadFileParams,
+  parseListTeamspacesParams,
+  parseListDocumentsParams,
+  parseGetDocumentParams,
+  parseCreateDocumentParams,
+  parseUpdateDocumentParams,
+  parseDeleteDocumentParams,
   listIssuesParamsJsonSchema,
   listProjectsParamsJsonSchema,
   getIssueParamsJsonSchema,
   createIssueParamsJsonSchema,
   updateIssueParamsJsonSchema,
   addLabelParamsJsonSchema,
-  uploadFileParamsJsonSchema,
+  listTeamspacesParamsJsonSchema,
+  listDocumentsParamsJsonSchema,
+  getDocumentParamsJsonSchema,
+  createDocumentParamsJsonSchema,
+  updateDocumentParamsJsonSchema,
+  deleteDocumentParamsJsonSchema,
+  TeamspaceSummarySchema,
+  DocumentSummarySchema,
+  DocumentSchema,
   type CreateIssueParams,
   type UpdateIssueParams,
-  type UploadFileParams,
 } from "../../src/domain/schemas.js"
 
 // Helper type for JSON Schema assertions
@@ -451,94 +463,6 @@ describe("Domain Schemas", () => {
     )
   })
 
-  describe("UploadFileParamsSchema", () => {
-    it.effect("parses valid upload params", () =>
-      Effect.gen(function* () {
-        const result = yield* parseUploadFileParams({
-          filename: "image.png",
-          data: "SGVsbG8gV29ybGQ=", // "Hello World" in base64
-          contentType: "image/png",
-        })
-        expect(result.filename).toBe("image.png")
-        expect(result.data).toBe("SGVsbG8gV29ybGQ=")
-        expect(result.contentType).toBe("image/png")
-      })
-    )
-
-    it.effect("trims whitespace from filename", () =>
-      Effect.gen(function* () {
-        const result = yield* parseUploadFileParams({
-          filename: "  document.pdf  ",
-          data: "YWJj",
-          contentType: "application/pdf",
-        })
-        expect(result.filename).toBe("document.pdf")
-      })
-    )
-
-    it.effect("rejects empty filename", () =>
-      Effect.gen(function* () {
-        const error = yield* Effect.flip(
-          parseUploadFileParams({
-            filename: "   ",
-            data: "YWJj",
-            contentType: "text/plain",
-          })
-        )
-        expect(error._tag).toBe("ParseError")
-      })
-    )
-
-    it.effect("rejects when no data source provided", () =>
-      Effect.gen(function* () {
-        const error = yield* Effect.flip(
-          parseUploadFileParams({
-            filename: "file.txt",
-            contentType: "text/plain",
-            // No filePath, fileUrl, or data
-          })
-        )
-        expect(error._tag).toBe("ParseError")
-      })
-    )
-
-    it.effect("rejects empty contentType", () =>
-      Effect.gen(function* () {
-        const error = yield* Effect.flip(
-          parseUploadFileParams({
-            filename: "file.txt",
-            data: "YWJj",
-            contentType: "",
-          })
-        )
-        expect(error._tag).toBe("ParseError")
-      })
-    )
-
-    it.effect("accepts data URL format", () =>
-      Effect.gen(function* () {
-        const dataUrl = "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
-        const result = yield* parseUploadFileParams({
-          filename: "photo.jpg",
-          data: dataUrl,
-          contentType: "image/jpeg",
-        })
-        expect(result.data).toBe(dataUrl)
-      })
-    )
-
-    it.effect("rejects missing required fields", () =>
-      Effect.gen(function* () {
-        const error = yield* Effect.flip(
-          parseUploadFileParams({
-            filename: "test.txt",
-          })
-        )
-        expect(error._tag).toBe("ParseError")
-      })
-    )
-  })
-
   describe("JSON Schema Generation", () => {
         it.effect("generates JSON Schema for ListIssuesParams", () =>
       Effect.gen(function* () {
@@ -602,26 +526,6 @@ describe("Domain Schemas", () => {
       })
     )
 
-        it.effect("generates JSON Schema for UploadFileParams", () =>
-      Effect.gen(function* () {
-        const schema = uploadFileParamsJsonSchema as JsonSchemaObject
-        expect(schema.type).toBe("object")
-        // Only filename and contentType are required
-        expect(schema.required).toContain("filename")
-        expect(schema.required).toContain("contentType")
-        // filePath, fileUrl, data are optional sources
-        expect(schema.properties).toHaveProperty("filename")
-        expect(schema.properties).toHaveProperty("contentType")
-        expect(schema.properties).toHaveProperty("filePath")
-        expect(schema.properties).toHaveProperty("fileUrl")
-        expect(schema.properties).toHaveProperty("data")
-        expect(schema.properties?.filename?.description).toBeDefined()
-        expect(schema.properties?.filePath?.description).toBeDefined()
-        expect(schema.properties?.fileUrl?.description).toBeDefined()
-        expect(schema.properties?.data?.description).toBeDefined()
-      })
-    )
-
         it.effect("makeJsonSchema works with any schema", () =>
       Effect.gen(function* () {
         const customSchema = Schema.Struct({
@@ -668,16 +572,311 @@ describe("Domain Schemas", () => {
         expect(params.title).toBe("Updated")
       })
     )
+  })
 
-        it.effect("UploadFileParams type is correctly extracted", () =>
+  // --- Document Schema Tests ---
+
+  describe("TeamspaceSummarySchema", () => {
+    it.effect("parses minimal teamspace", () =>
       Effect.gen(function* () {
-        const params: UploadFileParams = {
-          filename: "screenshot.png",
-          data: "base64data",
-          contentType: "image/png",
-        }
-        expect(params.filename).toBe("screenshot.png")
-        expect(params.contentType).toBe("image/png")
+        const result = yield* Schema.decodeUnknown(TeamspaceSummarySchema)({
+          id: "ts-1",
+          name: "My Docs",
+          archived: false,
+          private: false,
+        })
+        expect(result).toEqual({
+          id: "ts-1",
+          name: "My Docs",
+          archived: false,
+          private: false,
+        })
+      })
+    )
+
+    it.effect("parses with description", () =>
+      Effect.gen(function* () {
+        const result = yield* Schema.decodeUnknown(TeamspaceSummarySchema)({
+          id: "ts-1",
+          name: "My Docs",
+          description: "Team documentation",
+          archived: false,
+          private: true,
+        })
+        expect(result.description).toBe("Team documentation")
+        expect(result.private).toBe(true)
+      })
+    )
+  })
+
+  describe("DocumentSummarySchema", () => {
+    it.effect("parses minimal document summary", () =>
+      Effect.gen(function* () {
+        const result = yield* Schema.decodeUnknown(DocumentSummarySchema)({
+          id: "doc-1",
+          title: "Getting Started",
+          teamspace: "My Docs",
+        })
+        expect(result).toEqual({
+          id: "doc-1",
+          title: "Getting Started",
+          teamspace: "My Docs",
+        })
+      })
+    )
+
+    it.effect("parses with modifiedOn", () =>
+      Effect.gen(function* () {
+        const result = yield* Schema.decodeUnknown(DocumentSummarySchema)({
+          id: "doc-1",
+          title: "Getting Started",
+          teamspace: "My Docs",
+          modifiedOn: 1706500000000,
+        })
+        expect(result.modifiedOn).toBe(1706500000000)
+      })
+    )
+  })
+
+  describe("DocumentSchema", () => {
+    it.effect("parses minimal document", () =>
+      Effect.gen(function* () {
+        const result = yield* Schema.decodeUnknown(DocumentSchema)({
+          id: "doc-1",
+          title: "Getting Started",
+          teamspace: "My Docs",
+        })
+        expect(result.id).toBe("doc-1")
+        expect(result.title).toBe("Getting Started")
+        expect(result.content).toBeUndefined()
+      })
+    )
+
+    it.effect("parses full document", () =>
+      Effect.gen(function* () {
+        const result = yield* Schema.decodeUnknown(DocumentSchema)({
+          id: "doc-1",
+          title: "Getting Started",
+          content: "# Welcome\n\nThis is the content.",
+          teamspace: "My Docs",
+          modifiedOn: 1706500000000,
+          createdOn: 1706400000000,
+        })
+        expect(result.content).toBe("# Welcome\n\nThis is the content.")
+        expect(result.modifiedOn).toBe(1706500000000)
+        expect(result.createdOn).toBe(1706400000000)
+      })
+    )
+  })
+
+  describe("ListTeamspacesParamsSchema", () => {
+    it.effect("parses empty params", () =>
+      Effect.gen(function* () {
+        const result = yield* parseListTeamspacesParams({})
+        expect(result).toEqual({})
+      })
+    )
+
+    it.effect("parses with all options", () =>
+      Effect.gen(function* () {
+        const result = yield* parseListTeamspacesParams({
+          includeArchived: true,
+          limit: 25,
+        })
+        expect(result.includeArchived).toBe(true)
+        expect(result.limit).toBe(25)
+      })
+    )
+
+    it.effect("rejects limit over 200", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          parseListTeamspacesParams({ limit: 201 })
+        )
+        expect(error._tag).toBe("ParseError")
+      })
+    )
+  })
+
+  describe("ListDocumentsParamsSchema", () => {
+    it.effect("parses minimal params", () =>
+      Effect.gen(function* () {
+        const result = yield* parseListDocumentsParams({ teamspace: "My Docs" })
+        expect(result).toEqual({ teamspace: "My Docs" })
+      })
+    )
+
+    it.effect("parses with limit", () =>
+      Effect.gen(function* () {
+        const result = yield* parseListDocumentsParams({
+          teamspace: "My Docs",
+          limit: 100,
+        })
+        expect(result.limit).toBe(100)
+      })
+    )
+
+    it.effect("rejects empty teamspace", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          parseListDocumentsParams({ teamspace: "  " })
+        )
+        expect(error._tag).toBe("ParseError")
+      })
+    )
+  })
+
+  describe("GetDocumentParamsSchema", () => {
+    it.effect("parses valid params", () =>
+      Effect.gen(function* () {
+        const result = yield* parseGetDocumentParams({
+          teamspace: "My Docs",
+          document: "Getting Started",
+        })
+        expect(result.teamspace).toBe("My Docs")
+        expect(result.document).toBe("Getting Started")
+      })
+    )
+
+    it.effect("rejects missing document", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          parseGetDocumentParams({ teamspace: "My Docs" })
+        )
+        expect(error._tag).toBe("ParseError")
+      })
+    )
+  })
+
+  describe("CreateDocumentParamsSchema", () => {
+    it.effect("parses minimal params", () =>
+      Effect.gen(function* () {
+        const result = yield* parseCreateDocumentParams({
+          teamspace: "My Docs",
+          title: "New Document",
+        })
+        expect(result.teamspace).toBe("My Docs")
+        expect(result.title).toBe("New Document")
+        expect(result.content).toBeUndefined()
+      })
+    )
+
+    it.effect("parses with content", () =>
+      Effect.gen(function* () {
+        const result = yield* parseCreateDocumentParams({
+          teamspace: "My Docs",
+          title: "New Document",
+          content: "# Introduction\n\nSome content here.",
+        })
+        expect(result.content).toBe("# Introduction\n\nSome content here.")
+      })
+    )
+
+    it.effect("rejects empty title", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          parseCreateDocumentParams({
+            teamspace: "My Docs",
+            title: "   ",
+          })
+        )
+        expect(error._tag).toBe("ParseError")
+      })
+    )
+  })
+
+  describe("UpdateDocumentParamsSchema", () => {
+    it.effect("parses minimal params", () =>
+      Effect.gen(function* () {
+        const result = yield* parseUpdateDocumentParams({
+          teamspace: "My Docs",
+          document: "Getting Started",
+        })
+        expect(result.teamspace).toBe("My Docs")
+        expect(result.document).toBe("Getting Started")
+      })
+    )
+
+    it.effect("parses with update fields", () =>
+      Effect.gen(function* () {
+        const result = yield* parseUpdateDocumentParams({
+          teamspace: "My Docs",
+          document: "Getting Started",
+          title: "Updated Title",
+          content: "Updated content",
+        })
+        expect(result.title).toBe("Updated Title")
+        expect(result.content).toBe("Updated content")
+      })
+    )
+  })
+
+  describe("DeleteDocumentParamsSchema", () => {
+    it.effect("parses valid params", () =>
+      Effect.gen(function* () {
+        const result = yield* parseDeleteDocumentParams({
+          teamspace: "My Docs",
+          document: "Old Document",
+        })
+        expect(result.teamspace).toBe("My Docs")
+        expect(result.document).toBe("Old Document")
+      })
+    )
+  })
+
+  describe("Document JSON Schema Generation", () => {
+    it.effect("generates JSON Schema for ListTeamspacesParams", () =>
+      Effect.gen(function* () {
+        const schema = listTeamspacesParamsJsonSchema as JsonSchemaObject
+        expect(schema.$schema).toBe("http://json-schema.org/draft-07/schema#")
+        expect(schema.type).toBe("object")
+        expect(schema.properties).toHaveProperty("includeArchived")
+        expect(schema.properties).toHaveProperty("limit")
+      })
+    )
+
+    it.effect("generates JSON Schema for ListDocumentsParams", () =>
+      Effect.gen(function* () {
+        const schema = listDocumentsParamsJsonSchema as JsonSchemaObject
+        expect(schema.type).toBe("object")
+        expect(schema.required).toContain("teamspace")
+      })
+    )
+
+    it.effect("generates JSON Schema for GetDocumentParams", () =>
+      Effect.gen(function* () {
+        const schema = getDocumentParamsJsonSchema as JsonSchemaObject
+        expect(schema.type).toBe("object")
+        expect(schema.required).toContain("teamspace")
+        expect(schema.required).toContain("document")
+      })
+    )
+
+    it.effect("generates JSON Schema for CreateDocumentParams", () =>
+      Effect.gen(function* () {
+        const schema = createDocumentParamsJsonSchema as JsonSchemaObject
+        expect(schema.type).toBe("object")
+        expect(schema.required).toContain("teamspace")
+        expect(schema.required).toContain("title")
+        expect(schema.properties).toHaveProperty("content")
+      })
+    )
+
+    it.effect("generates JSON Schema for UpdateDocumentParams", () =>
+      Effect.gen(function* () {
+        const schema = updateDocumentParamsJsonSchema as JsonSchemaObject
+        expect(schema.type).toBe("object")
+        expect(schema.required).toContain("teamspace")
+        expect(schema.required).toContain("document")
+      })
+    )
+
+    it.effect("generates JSON Schema for DeleteDocumentParams", () =>
+      Effect.gen(function* () {
+        const schema = deleteDocumentParamsJsonSchema as JsonSchemaObject
+        expect(schema.type).toBe("object")
+        expect(schema.required).toContain("teamspace")
+        expect(schema.required).toContain("document")
       })
     )
   })

@@ -272,6 +272,220 @@ export const DeleteIssueParamsSchema = Schema.Struct({
 
 export type DeleteIssueParams = Schema.Schema.Type<typeof DeleteIssueParamsSchema>
 
+export const makeJsonSchema = <A, I, R>(
+  schema: Schema.Schema<A, I, R>
+): ReturnType<typeof JSONSchema.make> => JSONSchema.make(schema)
+
+export const listProjectsParamsJsonSchema = makeJsonSchema(ListProjectsParamsSchema)
+export const listIssuesParamsJsonSchema = makeJsonSchema(ListIssuesParamsSchema)
+export const getIssueParamsJsonSchema = makeJsonSchema(GetIssueParamsSchema)
+export const createIssueParamsJsonSchema = makeJsonSchema(CreateIssueParamsSchema)
+export const updateIssueParamsJsonSchema = makeJsonSchema(UpdateIssueParamsSchema)
+export const addLabelParamsJsonSchema = makeJsonSchema(AddLabelParamsSchema)
+export const deleteIssueParamsJsonSchema = makeJsonSchema(DeleteIssueParamsSchema)
+
+export const parseIssue = Schema.decodeUnknown(IssueSchema)
+
+export const parseIssueSummary = Schema.decodeUnknown(IssueSummarySchema)
+
+export const parseProject = Schema.decodeUnknown(ProjectSchema)
+
+export const parseListIssuesParams = Schema.decodeUnknown(ListIssuesParamsSchema)
+
+export const parseGetIssueParams = Schema.decodeUnknown(GetIssueParamsSchema)
+
+export const parseCreateIssueParams = Schema.decodeUnknown(CreateIssueParamsSchema)
+
+export const parseUpdateIssueParams = Schema.decodeUnknown(UpdateIssueParamsSchema)
+
+export const parseAddLabelParams = Schema.decodeUnknown(AddLabelParamsSchema)
+
+export const parseListProjectsParams = Schema.decodeUnknown(ListProjectsParamsSchema)
+
+export const parseDeleteIssueParams = Schema.decodeUnknown(DeleteIssueParamsSchema)
+
+// --- Document Schemas ---
+
+export const TeamspaceSummarySchema = Schema.Struct({
+  id: NonEmptyString,
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  archived: Schema.Boolean,
+  private: Schema.Boolean
+}).annotations({
+  title: "TeamspaceSummary",
+  description: "Teamspace summary for list operations"
+})
+
+export type TeamspaceSummary = Schema.Schema.Type<typeof TeamspaceSummarySchema>
+
+export const ListTeamspacesParamsSchema = Schema.Struct({
+  includeArchived: Schema.optional(Schema.Boolean.annotations({
+    description: "Include archived teamspaces in results (default: false, showing only active)"
+  })),
+  limit: Schema.optional(
+    Schema.Number.pipe(
+      Schema.int(),
+      Schema.positive(),
+      Schema.lessThanOrEqualTo(200)
+    ).annotations({
+      description: "Maximum number of teamspaces to return (default: 50)"
+    })
+  )
+}).annotations({
+  title: "ListTeamspacesParams",
+  description: "Parameters for listing teamspaces"
+})
+
+export type ListTeamspacesParams = Schema.Schema.Type<typeof ListTeamspacesParamsSchema>
+
+export const ListTeamspacesResultSchema = Schema.Struct({
+  teamspaces: Schema.Array(TeamspaceSummarySchema),
+  total: Schema.Number.pipe(Schema.int(), Schema.nonNegative())
+}).annotations({
+  title: "ListTeamspacesResult",
+  description: "Result of listing teamspaces"
+})
+
+export type ListTeamspacesResult = Schema.Schema.Type<typeof ListTeamspacesResultSchema>
+
+export const DocumentSummarySchema = Schema.Struct({
+  id: NonEmptyString,
+  title: Schema.String,
+  teamspace: NonEmptyString,
+  modifiedOn: Schema.optional(Timestamp)
+}).annotations({
+  title: "DocumentSummary",
+  description: "Document summary for list operations"
+})
+
+export type DocumentSummary = Schema.Schema.Type<typeof DocumentSummarySchema>
+
+export const ListDocumentsParamsSchema = Schema.Struct({
+  teamspace: NonEmptyString.annotations({
+    description: "Teamspace name or ID"
+  }),
+  limit: Schema.optional(
+    Schema.Number.pipe(
+      Schema.int(),
+      Schema.positive(),
+      Schema.lessThanOrEqualTo(200)
+    ).annotations({
+      description: "Maximum number of documents to return (default: 50)"
+    })
+  )
+}).annotations({
+  title: "ListDocumentsParams",
+  description: "Parameters for listing documents in a teamspace"
+})
+
+export type ListDocumentsParams = Schema.Schema.Type<typeof ListDocumentsParamsSchema>
+
+export const ListDocumentsResultSchema = Schema.Struct({
+  documents: Schema.Array(DocumentSummarySchema),
+  total: Schema.Number.pipe(Schema.int(), Schema.nonNegative())
+}).annotations({
+  title: "ListDocumentsResult",
+  description: "Result of listing documents"
+})
+
+export type ListDocumentsResult = Schema.Schema.Type<typeof ListDocumentsResultSchema>
+
+export const DocumentSchema = Schema.Struct({
+  id: NonEmptyString,
+  title: Schema.String,
+  content: Schema.optional(Schema.String),
+  teamspace: NonEmptyString,
+  modifiedOn: Schema.optional(Timestamp),
+  createdOn: Schema.optional(Timestamp)
+}).annotations({
+  title: "Document",
+  description: "Full document with content"
+})
+
+export type Document = Schema.Schema.Type<typeof DocumentSchema>
+
+export const GetDocumentParamsSchema = Schema.Struct({
+  teamspace: NonEmptyString.annotations({
+    description: "Teamspace name or ID"
+  }),
+  document: NonEmptyString.annotations({
+    description: "Document title or ID"
+  })
+}).annotations({
+  title: "GetDocumentParams",
+  description: "Parameters for getting a single document"
+})
+
+export type GetDocumentParams = Schema.Schema.Type<typeof GetDocumentParamsSchema>
+
+export const CreateDocumentParamsSchema = Schema.Struct({
+  teamspace: NonEmptyString.annotations({
+    description: "Teamspace name or ID"
+  }),
+  title: NonEmptyString.annotations({
+    description: "Document title"
+  }),
+  content: Schema.optional(Schema.String.annotations({
+    description: "Document content (markdown supported)"
+  }))
+}).annotations({
+  title: "CreateDocumentParams",
+  description: "Parameters for creating a document"
+})
+
+export type CreateDocumentParams = Schema.Schema.Type<typeof CreateDocumentParamsSchema>
+
+export const UpdateDocumentParamsSchema = Schema.Struct({
+  teamspace: NonEmptyString.annotations({
+    description: "Teamspace name or ID"
+  }),
+  document: NonEmptyString.annotations({
+    description: "Document title or ID"
+  }),
+  title: Schema.optional(NonEmptyString.annotations({
+    description: "New document title"
+  })),
+  content: Schema.optional(Schema.String.annotations({
+    description: "New document content (markdown supported)"
+  }))
+}).annotations({
+  title: "UpdateDocumentParams",
+  description: "Parameters for updating a document"
+})
+
+export type UpdateDocumentParams = Schema.Schema.Type<typeof UpdateDocumentParamsSchema>
+
+export const DeleteDocumentParamsSchema = Schema.Struct({
+  teamspace: NonEmptyString.annotations({
+    description: "Teamspace name or ID"
+  }),
+  document: NonEmptyString.annotations({
+    description: "Document title or ID"
+  })
+}).annotations({
+  title: "DeleteDocumentParams",
+  description: "Parameters for deleting a document"
+})
+
+export type DeleteDocumentParams = Schema.Schema.Type<typeof DeleteDocumentParamsSchema>
+
+export const listTeamspacesParamsJsonSchema = makeJsonSchema(ListTeamspacesParamsSchema)
+export const listDocumentsParamsJsonSchema = makeJsonSchema(ListDocumentsParamsSchema)
+export const getDocumentParamsJsonSchema = makeJsonSchema(GetDocumentParamsSchema)
+export const createDocumentParamsJsonSchema = makeJsonSchema(CreateDocumentParamsSchema)
+export const updateDocumentParamsJsonSchema = makeJsonSchema(UpdateDocumentParamsSchema)
+export const deleteDocumentParamsJsonSchema = makeJsonSchema(DeleteDocumentParamsSchema)
+
+export const parseListTeamspacesParams = Schema.decodeUnknown(ListTeamspacesParamsSchema)
+export const parseListDocumentsParams = Schema.decodeUnknown(ListDocumentsParamsSchema)
+export const parseGetDocumentParams = Schema.decodeUnknown(GetDocumentParamsSchema)
+export const parseCreateDocumentParams = Schema.decodeUnknown(CreateDocumentParamsSchema)
+export const parseUpdateDocumentParams = Schema.decodeUnknown(UpdateDocumentParamsSchema)
+export const parseDeleteDocumentParams = Schema.decodeUnknown(DeleteDocumentParamsSchema)
+
+// --- Upload File Schemas ---
+
 const UploadFileParamsBase = Schema.Struct({
   filename: NonEmptyString.annotations({
     description: "Name of the file (e.g., 'screenshot.png')"
@@ -320,37 +534,6 @@ export const UploadFileResultSchema = Schema.Struct({
   description: "Result of a file upload operation"
 })
 
-export const makeJsonSchema = <A, I, R>(
-  schema: Schema.Schema<A, I, R>
-): ReturnType<typeof JSONSchema.make> => JSONSchema.make(schema)
-
-export const listProjectsParamsJsonSchema = makeJsonSchema(ListProjectsParamsSchema)
-export const listIssuesParamsJsonSchema = makeJsonSchema(ListIssuesParamsSchema)
-export const getIssueParamsJsonSchema = makeJsonSchema(GetIssueParamsSchema)
-export const createIssueParamsJsonSchema = makeJsonSchema(CreateIssueParamsSchema)
-export const updateIssueParamsJsonSchema = makeJsonSchema(UpdateIssueParamsSchema)
-export const addLabelParamsJsonSchema = makeJsonSchema(AddLabelParamsSchema)
-export const deleteIssueParamsJsonSchema = makeJsonSchema(DeleteIssueParamsSchema)
 export const uploadFileParamsJsonSchema = makeJsonSchema(UploadFileParamsSchema)
-
-export const parseIssue = Schema.decodeUnknown(IssueSchema)
-
-export const parseIssueSummary = Schema.decodeUnknown(IssueSummarySchema)
-
-export const parseProject = Schema.decodeUnknown(ProjectSchema)
-
-export const parseListIssuesParams = Schema.decodeUnknown(ListIssuesParamsSchema)
-
-export const parseGetIssueParams = Schema.decodeUnknown(GetIssueParamsSchema)
-
-export const parseCreateIssueParams = Schema.decodeUnknown(CreateIssueParamsSchema)
-
-export const parseUpdateIssueParams = Schema.decodeUnknown(UpdateIssueParamsSchema)
-
-export const parseAddLabelParams = Schema.decodeUnknown(AddLabelParamsSchema)
-
-export const parseListProjectsParams = Schema.decodeUnknown(ListProjectsParamsSchema)
-
-export const parseDeleteIssueParams = Schema.decodeUnknown(DeleteIssueParamsSchema)
 
 export const parseUploadFileParams = Schema.decodeUnknown(UploadFileParamsSchema)

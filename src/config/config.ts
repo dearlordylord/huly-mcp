@@ -50,13 +50,29 @@ const PositiveIntFromString = Schema.NumberFromString.pipe(
   Schema.positive({ message: () => "Must be positive" })
 )
 
+export const TokenAuthSchema = Schema.Struct({
+  _tag: Schema.Literal("token"),
+  token: Schema.Redacted(NonWhitespaceString)
+})
+
+export const PasswordAuthSchema = Schema.Struct({
+  _tag: Schema.Literal("password"),
+  email: NonWhitespaceString,
+  password: Schema.Redacted(NonWhitespaceString)
+})
+
+export const AuthSchema = Schema.Union(TokenAuthSchema, PasswordAuthSchema)
+
+export type TokenAuth = Schema.Schema.Type<typeof TokenAuthSchema>
+export type PasswordAuth = Schema.Schema.Type<typeof PasswordAuthSchema>
+export type Auth = Schema.Schema.Type<typeof AuthSchema>
+
 /**
  * Full configuration schema.
  */
 export const HulyConfigSchema = Schema.Struct({
   url: UrlSchema,
-  email: NonWhitespaceString,
-  password: Schema.Redacted(NonWhitespaceString),
+  auth: AuthSchema,
   workspace: NonWhitespaceString,
   connectionTimeout: PositiveInt
 })
@@ -74,14 +90,28 @@ export class ConfigValidationError extends Schema.TaggedError<ConfigValidationEr
 
 export type HulyConfigError = ConfigValidationError
 
+const TokenAuthFromEnv = Config.map(
+  Schema.Config("HULY_TOKEN", Schema.Redacted(NonWhitespaceString)),
+  (token): Auth => ({ _tag: "token", token })
+)
+
+const PasswordAuthFromEnv = Config.map(
+  Config.all({
+    email: Schema.Config("HULY_EMAIL", NonWhitespaceString),
+    password: Schema.Config("HULY_PASSWORD", Schema.Redacted(NonWhitespaceString))
+  }),
+  ({ email, password }): Auth => ({ _tag: "password", email, password })
+)
+
+const AuthFromEnv = TokenAuthFromEnv.pipe(Config.orElse(() => PasswordAuthFromEnv))
+
 /**
  * Config definition using Effect's Config module.
  * Uses Schema.Config for consistent validation with NonWhitespaceString.
  */
 const HulyConfigFromEnv = Config.all({
   url: Schema.Config("HULY_URL", UrlSchema),
-  email: Schema.Config("HULY_EMAIL", NonWhitespaceString),
-  password: Schema.Config("HULY_PASSWORD", Schema.Redacted(NonWhitespaceString)),
+  auth: AuthFromEnv,
   workspace: Schema.Config("HULY_WORKSPACE", NonWhitespaceString),
   connectionTimeout: Schema.Config("HULY_CONNECTION_TIMEOUT", PositiveIntFromString).pipe(
     Config.withDefault(DEFAULT_TIMEOUT)
@@ -126,8 +156,22 @@ export class HulyConfigService extends Context.Tag("@hulymcp/HulyConfig")<
   }): Layer.Layer<HulyConfigService> {
     return Layer.succeed(HulyConfigService, {
       url: config.url,
-      email: config.email,
-      password: Redacted.make(config.password),
+      auth: { _tag: "password", email: config.email, password: Redacted.make(config.password) },
+      workspace: config.workspace,
+      connectionTimeout: config.connectionTimeout ?? DEFAULT_TIMEOUT
+    })
+  }
+
+  /** Bypasses validation - for testing only. */
+  static testLayerToken(config: {
+    url: string
+    token: string
+    workspace: string
+    connectionTimeout?: number
+  }): Layer.Layer<HulyConfigService> {
+    return Layer.succeed(HulyConfigService, {
+      url: config.url,
+      auth: { _tag: "token", token: Redacted.make(config.token) },
       workspace: config.workspace,
       connectionTimeout: config.connectionTimeout ?? DEFAULT_TIMEOUT
     })

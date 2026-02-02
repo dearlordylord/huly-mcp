@@ -2,6 +2,7 @@
  * @module
  */
 import {
+  type AuthOptions,
   createRestTxOperations,
   getWorkspaceToken,
   loadServerConfig,
@@ -32,7 +33,7 @@ import { htmlToJSON, jsonToHTML, jsonToMarkup, markupToJSON } from "@hcengineeri
 import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown"
 import { absurd, Context, Effect, Layer, Redacted, Schedule } from "effect"
 
-import { HulyConfigService } from "../config/config.js"
+import { type Auth, HulyConfigService } from "../config/config.js"
 import { HulyAuthError, HulyConnectionError } from "./errors.js"
 
 export type HulyClientError = HulyConnectionError | HulyAuthError
@@ -96,6 +97,14 @@ export interface HulyClientOperations {
     id: MarkupRef,
     format: MarkupFormat
   ) => Effect.Effect<string, HulyClientError>
+
+  readonly updateMarkup: (
+    objectClass: Ref<Class<Doc>>,
+    objectId: Ref<Doc>,
+    objectAttr: string,
+    markup: string,
+    format: MarkupFormat
+  ) => Effect.Effect<void, HulyClientError>
 }
 
 export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
@@ -113,8 +122,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
 
       const { client, markupOps } = yield* connectRestWithRetry({
         url: config.url,
-        email: config.email,
-        password: Redacted.value(config.password),
+        auth: config.auth,
         workspace: config.workspace
       })
 
@@ -226,6 +234,16 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
                 message: `fetchMarkup failed: ${String(e)}`,
                 cause: e
               })
+          }),
+
+        updateMarkup: (objectClass, objectId, objectAttr, markup, format) =>
+          Effect.tryPromise({
+            try: () => markupOps.updateMarkup(objectClass, objectId, objectAttr, markup, format),
+            catch: (e) =>
+              new HulyConnectionError({
+                message: `updateMarkup failed: ${String(e)}`,
+                cause: e
+              })
           })
       }
 
@@ -264,6 +282,8 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
 
     const noopFetchMarkup = (): Effect.Effect<string, HulyClientError> => Effect.succeed("")
 
+    const noopUpdateMarkup = (): Effect.Effect<void, HulyClientError> => Effect.succeed(undefined)
+
     const defaultOps: HulyClientOperations = {
       findAll: noopFindAll,
       findOne: noopFindOne,
@@ -272,7 +292,8 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       addCollection: noopAddCollection,
       removeDoc: noopRemoveDoc,
       uploadMarkup: noopUploadMarkup,
-      fetchMarkup: noopFetchMarkup
+      fetchMarkup: noopFetchMarkup,
+      updateMarkup: noopUpdateMarkup
     }
 
     return Layer.succeed(HulyClient, { ...defaultOps, ...mockOperations })
@@ -281,8 +302,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
 
 interface ConnectionConfig {
   url: string
-  email: string
-  password: string
+  auth: Auth
   workspace: string
 }
 
@@ -301,6 +321,13 @@ interface MarkupOperations {
     markup: string,
     format: MarkupFormat
   ) => Promise<MarkupRef>
+  updateMarkup: (
+    objectClass: Ref<Class<Doc>>,
+    objectId: Ref<Doc>,
+    objectAttr: string,
+    markup: string,
+    format: MarkupFormat
+  ) => Promise<void>
 }
 
 interface RestConnection {
@@ -369,7 +396,33 @@ function createMarkupOps(
           absurd(format)
           throw new Error(`Invalid format: ${format}`)
       }
+    },
+
+    async updateMarkup(objectClass, objectId, objectAttr, value, format) {
+      const collabId = makeCollabId(objectClass, objectId, objectAttr)
+      switch (format) {
+        case "markup":
+          return await collaborator.updateMarkup(collabId, value)
+        case "html":
+          return await collaborator.updateMarkup(collabId, jsonToMarkup(htmlToJSON(value)))
+        case "markdown":
+          return await collaborator.updateMarkup(collabId, jsonToMarkup(markdownToMarkup(value, { refUrl, imageUrl })))
+        default:
+          absurd(format)
+          throw new Error(`Invalid format: ${format}`)
+      }
     }
+  }
+}
+
+const authToOptions = (auth: Auth, workspace: string): AuthOptions => {
+  switch (auth._tag) {
+    case "token":
+      return { token: Redacted.value(auth.token), workspace }
+    case "password":
+      return { email: auth.email, password: Redacted.value(auth.password), workspace }
+    default:
+      return absurd(auth)
   }
 }
 
@@ -378,13 +431,11 @@ const connectRest = async (
 ): Promise<RestConnection> => {
   const serverConfig = await loadServerConfig(config.url)
 
+  const authOptions = authToOptions(config.auth, config.workspace)
+
   const { endpoint, token, workspaceId } = await getWorkspaceToken(
     config.url,
-    {
-      email: config.email,
-      password: config.password,
-      workspace: config.workspace
-    },
+    authOptions,
     serverConfig
   )
 

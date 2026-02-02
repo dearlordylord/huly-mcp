@@ -191,6 +191,41 @@ export class FileFetchError extends Schema.TaggedError<FileFetchError>()(
 }
 
 /**
+ * Teamspace not found in the workspace.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class TeamspaceNotFoundError extends Schema.TaggedError<TeamspaceNotFoundError>()(
+  "TeamspaceNotFoundError",
+  {
+    identifier: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Teamspace '${this.identifier}' not found`
+  }
+}
+
+/**
+ * Document not found in the specified teamspace.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class DocumentNotFoundError extends Schema.TaggedError<DocumentNotFoundError>()(
+  "DocumentNotFoundError",
+  {
+    identifier: Schema.String,
+    teamspace: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Document '${this.identifier}' not found in teamspace '${this.teamspace}'`
+  }
+}
+
+/**
  * Union of all Huly domain errors.
  */
 export type HulyDomainError =
@@ -205,6 +240,8 @@ export type HulyDomainError =
   | InvalidFileDataError
   | FileNotFoundError
   | FileFetchError
+  | TeamspaceNotFoundError
+  | DocumentNotFoundError
 
 /**
  * Schema for all Huly domain errors (for serialization).
@@ -221,7 +258,9 @@ export const HulyDomainError: Schema.Union<
     typeof FileUploadError,
     typeof InvalidFileDataError,
     typeof FileNotFoundError,
-    typeof FileFetchError
+    typeof FileFetchError,
+    typeof TeamspaceNotFoundError,
+    typeof DocumentNotFoundError
   ]
 > = Schema.Union(
   HulyError,
@@ -234,7 +273,9 @@ export const HulyDomainError: Schema.Union<
   FileUploadError,
   InvalidFileDataError,
   FileNotFoundError,
-  FileFetchError
+  FileFetchError,
+  TeamspaceNotFoundError,
+  DocumentNotFoundError
 )
 
 /**
