@@ -10,6 +10,7 @@ import type {
 } from "@hcengineering/core"
 import { type Issue as HulyIssue, type Project as HulyProject, IssuePriority } from "@hcengineering/tracker"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
+import { HulyStorageClient } from "../../src/huly/storage.js"
 import {
   McpServerService,
   McpServerError,
@@ -133,10 +134,10 @@ const createMockHulyClientLayer = (config: {
 // --- Tests ---
 
 describe("TOOL_DEFINITIONS", () => {
-    it.effect("exports 7 tool definitions", () =>
+    it.effect("exports 8 tool definitions", () =>
     Effect.gen(function* () {
       const tools = Object.keys(TOOL_DEFINITIONS)
-      expect(tools).toHaveLength(7)
+      expect(tools).toHaveLength(8)
       expect(tools).toContain("list_projects")
       expect(tools).toContain("list_issues")
       expect(tools).toContain("get_issue")
@@ -144,6 +145,7 @@ describe("TOOL_DEFINITIONS", () => {
       expect(tools).toContain("update_issue")
       expect(tools).toContain("add_issue_label")
       expect(tools).toContain("delete_issue")
+      expect(tools).toContain("upload_file")
     })
   )
 
@@ -232,6 +234,18 @@ describe("TOOL_DEFINITIONS", () => {
         expect(props).toHaveProperty("identifier")
       })
     )
+
+    it.effect("upload_file schema has correct structure", () =>
+      Effect.gen(function* () {
+        const schema = TOOL_DEFINITIONS.upload_file.inputSchema
+        expect(schema).toHaveProperty("type", "object")
+        expect(schema).toHaveProperty("properties")
+        const props = (schema as { properties: Record<string, unknown> }).properties
+        expect(props).toHaveProperty("filename")
+        expect(props).toHaveProperty("data")
+        expect(props).toHaveProperty("contentType")
+      })
+    )
   })
 })
 
@@ -248,9 +262,10 @@ describe("McpServerService", () => {
           issues,
           statuses,
         })
+        const storageClientLayer = HulyStorageClient.testLayer({})
 
         const serverLayer = McpServerService.layer({ transport: "stdio" }).pipe(
-          Layer.provide(hulyClientLayer)
+          Layer.provide(Layer.merge(hulyClientLayer, storageClientLayer))
         )
 
         // Verify we can build the layer (this tests the Effect.gen runs without error)
@@ -266,11 +281,12 @@ describe("McpServerService", () => {
           issues: [],
           statuses: [],
         })
+        const storageClientLayer = HulyStorageClient.testLayer({})
 
         const serverLayer = McpServerService.layer({
           transport: "http",
           httpPort: 3000,
-        }).pipe(Layer.provide(hulyClientLayer))
+        }).pipe(Layer.provide(Layer.merge(hulyClientLayer, storageClientLayer)))
 
         yield* Layer.build(serverLayer)
       })
@@ -432,6 +448,14 @@ describe("Tool definition descriptions", () => {
     Effect.gen(function* () {
       expect(TOOL_DEFINITIONS.delete_issue.description).toContain("delete")
       expect(TOOL_DEFINITIONS.delete_issue.description).toContain("cannot be undone")
+    })
+  )
+
+  it.effect("upload_file has helpful description", () =>
+    Effect.gen(function* () {
+      expect(TOOL_DEFINITIONS.upload_file.description).toContain("Upload")
+      expect(TOOL_DEFINITIONS.upload_file.description).toContain("file")
+      expect(TOOL_DEFINITIONS.upload_file.description).toContain("base64")
     })
   )
 })

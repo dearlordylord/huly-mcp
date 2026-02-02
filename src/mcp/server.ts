@@ -23,12 +23,16 @@ import {
   parseListIssuesParams,
   parseListProjectsParams,
   parseUpdateIssueParams,
-  updateIssueParamsJsonSchema
+  parseUploadFileParams,
+  updateIssueParamsJsonSchema,
+  uploadFileParamsJsonSchema
 } from "../domain/schemas.js"
 import { HulyClient } from "../huly/client.js"
 import type { HulyDomainError } from "../huly/errors.js"
 import { addLabel, createIssue, deleteIssue, getIssue, listIssues, updateIssue } from "../huly/operations/issues.js"
 import { listProjects } from "../huly/operations/projects.js"
+import { uploadFile } from "../huly/operations/storage.js"
+import { HulyStorageClient } from "../huly/storage.js"
 import {
   createSuccessResponse,
   createUnknownToolError,
@@ -92,6 +96,12 @@ export const TOOL_DEFINITIONS = {
     name: "delete_issue",
     description: "Permanently delete a Huly issue. This action cannot be undone.",
     inputSchema: deleteIssueParamsJsonSchema
+  },
+  upload_file: {
+    name: "upload_file",
+    description:
+      "Upload a file to Huly storage. Provide ONE of: filePath (local file - preferred), fileUrl (fetch from URL), or data (base64 - for small files only). Returns blob ID and URL for referencing the file.",
+    inputSchema: uploadFileParamsJsonSchema
   }
 } as const
 
@@ -120,15 +130,16 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 >() {
   /**
    * Create the MCP server layer.
-   * Requires HulyClient to be available.
+   * Requires HulyClient and optionally HulyStorageClient.
    */
   static layer(
     config: McpServerConfig
-  ): Layer.Layer<McpServerService, never, HulyClient> {
+  ): Layer.Layer<McpServerService, never, HulyClient | HulyStorageClient> {
     return Layer.effect(
       McpServerService,
       Effect.gen(function*() {
         const hulyClient = yield* HulyClient
+        const storageClient = yield* HulyStorageClient
 
         // Using low-level Server API (not McpServer) because we use Effect Schema
         // for validation and custom JSON Schema generation - this qualifies as an
@@ -168,7 +179,8 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
           const result = await handleToolCall(
             toolNameResult.right,
             args ?? {},
-            hulyClient
+            hulyClient,
+            storageClient
           )
           return toMcpResponse(result)
         })
@@ -281,7 +293,8 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 async function handleToolCall(
   toolName: ToolName,
   args: Record<string, unknown>,
-  hulyClient: HulyClient["Type"]
+  hulyClient: HulyClient["Type"],
+  storageClient: HulyStorageClient["Type"]
 ): Promise<McpToolResponse> {
   switch (toolName) {
     case "list_projects":
@@ -347,6 +360,15 @@ async function handleToolCall(
         hulyClient
       )
 
+    case "upload_file":
+      return runStorageToolHandler(
+        toolName,
+        args,
+        parseUploadFileParams,
+        (params) => uploadFile(params),
+        storageClient
+      )
+
     default:
       return createUnknownToolError(toolName)
   }
@@ -375,6 +397,35 @@ async function runToolHandler<A, P>(
 
   const operationResult = await Effect.runPromiseExit(
     operation(params).pipe(Effect.provideService(HulyClient, hulyClient))
+  )
+
+  if (Exit.isFailure(operationResult)) {
+    return mapDomainCauseToMcp(operationResult.cause)
+  }
+
+  return createSuccessResponse(operationResult.value)
+}
+
+/**
+ * Execute a storage tool handler with proper error mapping to MCP protocol.
+ */
+async function runStorageToolHandler<A, P>(
+  toolName: string,
+  args: unknown,
+  parse: (input: unknown) => Effect.Effect<P, ParseResult.ParseError>,
+  operation: (params: P) => Effect.Effect<A, HulyDomainError, HulyStorageClient>,
+  storageClient: HulyStorageClient["Type"]
+): Promise<McpToolResponse> {
+  const parseResult = await Effect.runPromiseExit(parse(args))
+
+  if (Exit.isFailure(parseResult)) {
+    return mapParseCauseToMcp(parseResult.cause, toolName)
+  }
+
+  const params = parseResult.value
+
+  const operationResult = await Effect.runPromiseExit(
+    operation(params).pipe(Effect.provideService(HulyStorageClient, storageClient))
   )
 
   if (Exit.isFailure(operationResult)) {

@@ -17,14 +17,17 @@ import {
   parseUpdateIssueParams,
   parseAddLabelParams,
   parseListProjectsParams,
+  parseUploadFileParams,
   listIssuesParamsJsonSchema,
   listProjectsParamsJsonSchema,
   getIssueParamsJsonSchema,
   createIssueParamsJsonSchema,
   updateIssueParamsJsonSchema,
   addLabelParamsJsonSchema,
+  uploadFileParamsJsonSchema,
   type CreateIssueParams,
   type UpdateIssueParams,
+  type UploadFileParams,
 } from "../../src/domain/schemas.js"
 
 // Helper type for JSON Schema assertions
@@ -448,6 +451,94 @@ describe("Domain Schemas", () => {
     )
   })
 
+  describe("UploadFileParamsSchema", () => {
+    it.effect("parses valid upload params", () =>
+      Effect.gen(function* () {
+        const result = yield* parseUploadFileParams({
+          filename: "image.png",
+          data: "SGVsbG8gV29ybGQ=", // "Hello World" in base64
+          contentType: "image/png",
+        })
+        expect(result.filename).toBe("image.png")
+        expect(result.data).toBe("SGVsbG8gV29ybGQ=")
+        expect(result.contentType).toBe("image/png")
+      })
+    )
+
+    it.effect("trims whitespace from filename", () =>
+      Effect.gen(function* () {
+        const result = yield* parseUploadFileParams({
+          filename: "  document.pdf  ",
+          data: "YWJj",
+          contentType: "application/pdf",
+        })
+        expect(result.filename).toBe("document.pdf")
+      })
+    )
+
+    it.effect("rejects empty filename", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          parseUploadFileParams({
+            filename: "   ",
+            data: "YWJj",
+            contentType: "text/plain",
+          })
+        )
+        expect(error._tag).toBe("ParseError")
+      })
+    )
+
+    it.effect("rejects when no data source provided", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          parseUploadFileParams({
+            filename: "file.txt",
+            contentType: "text/plain",
+            // No filePath, fileUrl, or data
+          })
+        )
+        expect(error._tag).toBe("ParseError")
+      })
+    )
+
+    it.effect("rejects empty contentType", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          parseUploadFileParams({
+            filename: "file.txt",
+            data: "YWJj",
+            contentType: "",
+          })
+        )
+        expect(error._tag).toBe("ParseError")
+      })
+    )
+
+    it.effect("accepts data URL format", () =>
+      Effect.gen(function* () {
+        const dataUrl = "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
+        const result = yield* parseUploadFileParams({
+          filename: "photo.jpg",
+          data: dataUrl,
+          contentType: "image/jpeg",
+        })
+        expect(result.data).toBe(dataUrl)
+      })
+    )
+
+    it.effect("rejects missing required fields", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          parseUploadFileParams({
+            filename: "test.txt",
+          })
+        )
+        expect(error._tag).toBe("ParseError")
+      })
+    )
+  })
+
   describe("JSON Schema Generation", () => {
         it.effect("generates JSON Schema for ListIssuesParams", () =>
       Effect.gen(function* () {
@@ -511,6 +602,26 @@ describe("Domain Schemas", () => {
       })
     )
 
+        it.effect("generates JSON Schema for UploadFileParams", () =>
+      Effect.gen(function* () {
+        const schema = uploadFileParamsJsonSchema as JsonSchemaObject
+        expect(schema.type).toBe("object")
+        // Only filename and contentType are required
+        expect(schema.required).toContain("filename")
+        expect(schema.required).toContain("contentType")
+        // filePath, fileUrl, data are optional sources
+        expect(schema.properties).toHaveProperty("filename")
+        expect(schema.properties).toHaveProperty("contentType")
+        expect(schema.properties).toHaveProperty("filePath")
+        expect(schema.properties).toHaveProperty("fileUrl")
+        expect(schema.properties).toHaveProperty("data")
+        expect(schema.properties?.filename?.description).toBeDefined()
+        expect(schema.properties?.filePath?.description).toBeDefined()
+        expect(schema.properties?.fileUrl?.description).toBeDefined()
+        expect(schema.properties?.data?.description).toBeDefined()
+      })
+    )
+
         it.effect("makeJsonSchema works with any schema", () =>
       Effect.gen(function* () {
         const customSchema = Schema.Struct({
@@ -555,6 +666,18 @@ describe("Domain Schemas", () => {
           title: "Updated",
         }
         expect(params.title).toBe("Updated")
+      })
+    )
+
+        it.effect("UploadFileParams type is correctly extracted", () =>
+      Effect.gen(function* () {
+        const params: UploadFileParams = {
+          filename: "screenshot.png",
+          data: "base64data",
+          contentType: "image/png",
+        }
+        expect(params.filename).toBe("screenshot.png")
+        expect(params.contentType).toBe("image/png")
       })
     )
   })

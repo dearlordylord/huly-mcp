@@ -129,6 +129,68 @@ export class PersonNotFoundError extends Schema.TaggedError<PersonNotFoundError>
 }
 
 /**
+ * File upload error - storage operation failed.
+ * Maps to MCP -32603 (Internal error).
+ */
+export class FileUploadError extends Schema.TaggedError<FileUploadError>()(
+  "FileUploadError",
+  {
+    message: Schema.String,
+    cause: Schema.optional(Schema.Defect)
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InternalError
+}
+
+/**
+ * Invalid file data error - e.g., malformed base64.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class InvalidFileDataError extends Schema.TaggedError<InvalidFileDataError>()(
+  "InvalidFileDataError",
+  {
+    message: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+}
+
+/**
+ * File not found at specified path.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class FileNotFoundError extends Schema.TaggedError<FileNotFoundError>()(
+  "FileNotFoundError",
+  {
+    filePath: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `File not found: ${this.filePath}`
+  }
+}
+
+/**
+ * Failed to fetch file from URL.
+ * Maps to MCP -32603 (Internal error).
+ */
+export class FileFetchError extends Schema.TaggedError<FileFetchError>()(
+  "FileFetchError",
+  {
+    fileUrl: Schema.String,
+    reason: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InternalError
+
+  override get message(): string {
+    return `Failed to fetch file from ${this.fileUrl}: ${this.reason}`
+  }
+}
+
+/**
  * Union of all Huly domain errors.
  */
 export type HulyDomainError =
@@ -139,6 +201,10 @@ export type HulyDomainError =
   | ProjectNotFoundError
   | InvalidStatusError
   | PersonNotFoundError
+  | FileUploadError
+  | InvalidFileDataError
+  | FileNotFoundError
+  | FileFetchError
 
 /**
  * Schema for all Huly domain errors (for serialization).
@@ -151,7 +217,11 @@ export const HulyDomainError: Schema.Union<
     typeof IssueNotFoundError,
     typeof ProjectNotFoundError,
     typeof InvalidStatusError,
-    typeof PersonNotFoundError
+    typeof PersonNotFoundError,
+    typeof FileUploadError,
+    typeof InvalidFileDataError,
+    typeof FileNotFoundError,
+    typeof FileFetchError
   ]
 > = Schema.Union(
   HulyError,
@@ -160,7 +230,11 @@ export const HulyDomainError: Schema.Union<
   IssueNotFoundError,
   ProjectNotFoundError,
   InvalidStatusError,
-  PersonNotFoundError
+  PersonNotFoundError,
+  FileUploadError,
+  InvalidFileDataError,
+  FileNotFoundError,
+  FileFetchError
 )
 
 /**

@@ -9,6 +9,10 @@ import {
   ProjectNotFoundError,
   InvalidStatusError,
   PersonNotFoundError,
+  FileUploadError,
+  InvalidFileDataError,
+  FileNotFoundError,
+  FileFetchError,
   McpErrorCode,
   getMcpErrorCode,
   type HulyDomainError,
@@ -120,6 +124,61 @@ describe("Huly Errors", () => {
     )
   })
 
+  describe("FileUploadError", () => {
+        it.effect("creates with message", () =>
+      Effect.gen(function* () {
+        const error = new FileUploadError({ message: "Storage quota exceeded" })
+        expect(error._tag).toBe("FileUploadError")
+        expect(error.message).toBe("Storage quota exceeded")
+        expect(error.mcpErrorCode).toBe(McpErrorCode.InternalError)
+      })
+    )
+
+        it.effect("creates with cause", () =>
+      Effect.gen(function* () {
+        const cause = new Error("network error")
+        const error = new FileUploadError({ message: "Upload failed", cause })
+        expect(error.cause).toBe(cause)
+      })
+    )
+  })
+
+  describe("InvalidFileDataError", () => {
+        it.effect("creates with message", () =>
+      Effect.gen(function* () {
+        const error = new InvalidFileDataError({ message: "Invalid base64 encoding" })
+        expect(error._tag).toBe("InvalidFileDataError")
+        expect(error.message).toBe("Invalid base64 encoding")
+        expect(error.mcpErrorCode).toBe(McpErrorCode.InvalidParams)
+      })
+    )
+  })
+
+  describe("FileNotFoundError", () => {
+        it.effect("creates with filePath", () =>
+      Effect.gen(function* () {
+        const error = new FileNotFoundError({ filePath: "/tmp/missing.txt" })
+        expect(error._tag).toBe("FileNotFoundError")
+        expect(error.filePath).toBe("/tmp/missing.txt")
+        expect(error.message).toBe("File not found: /tmp/missing.txt")
+        expect(error.mcpErrorCode).toBe(McpErrorCode.InvalidParams)
+      })
+    )
+  })
+
+  describe("FileFetchError", () => {
+        it.effect("creates with fileUrl and reason", () =>
+      Effect.gen(function* () {
+        const error = new FileFetchError({ fileUrl: "https://example.com/img.png", reason: "404 Not Found" })
+        expect(error._tag).toBe("FileFetchError")
+        expect(error.fileUrl).toBe("https://example.com/img.png")
+        expect(error.reason).toBe("404 Not Found")
+        expect(error.message).toBe("Failed to fetch file from https://example.com/img.png: 404 Not Found")
+        expect(error.mcpErrorCode).toBe(McpErrorCode.InternalError)
+      })
+    )
+  })
+
   describe("getMcpErrorCode", () => {
         it.effect("returns InvalidParams for domain errors", () =>
       Effect.gen(function* () {
@@ -132,6 +191,12 @@ describe("Huly Errors", () => {
         expect(getMcpErrorCode(new InvalidStatusError({ status: "X", project: "Y" }))).toBe(
           McpErrorCode.InvalidParams
         )
+        expect(getMcpErrorCode(new InvalidFileDataError({ message: "bad data" }))).toBe(
+          McpErrorCode.InvalidParams
+        )
+        expect(getMcpErrorCode(new FileNotFoundError({ filePath: "/missing" }))).toBe(
+          McpErrorCode.InvalidParams
+        )
       })
     )
 
@@ -142,6 +207,8 @@ describe("Huly Errors", () => {
           McpErrorCode.InternalError
         )
         expect(getMcpErrorCode(new HulyAuthError({ message: "X" }))).toBe(McpErrorCode.InternalError)
+        expect(getMcpErrorCode(new FileUploadError({ message: "X" }))).toBe(McpErrorCode.InternalError)
+        expect(getMcpErrorCode(new FileFetchError({ fileUrl: "http://x", reason: "fail" }))).toBe(McpErrorCode.InternalError)
       })
     )
   })
@@ -180,6 +247,10 @@ describe("Huly Errors", () => {
           Match.tag("ProjectNotFoundError", (e) => `project:${e.identifier}`),
           Match.tag("InvalidStatusError", (e) => `status:${e.status}`),
           Match.tag("PersonNotFoundError", (e) => `person:${e.identifier}`),
+          Match.tag("FileUploadError", (e) => `upload:${e.message}`),
+          Match.tag("InvalidFileDataError", (e) => `data:${e.message}`),
+          Match.tag("FileNotFoundError", (e) => `notfound:${e.filePath}`),
+          Match.tag("FileFetchError", (e) => `fetch:${e.fileUrl}`),
           Match.tag("HulyConnectionError", () => "connection"),
           Match.tag("HulyAuthError", () => "auth"),
           Match.tag("HulyError", () => "generic"),
@@ -190,6 +261,10 @@ describe("Huly Errors", () => {
         expect(matchError(new ProjectNotFoundError({ identifier: "Z" }))).toBe("project:Z")
         expect(matchError(new InvalidStatusError({ status: "bad", project: "P" }))).toBe("status:bad")
         expect(matchError(new PersonNotFoundError({ identifier: "john@example.com" }))).toBe("person:john@example.com")
+        expect(matchError(new FileUploadError({ message: "quota exceeded" }))).toBe("upload:quota exceeded")
+        expect(matchError(new InvalidFileDataError({ message: "bad base64" }))).toBe("data:bad base64")
+        expect(matchError(new FileNotFoundError({ filePath: "/path/to/file" }))).toBe("notfound:/path/to/file")
+        expect(matchError(new FileFetchError({ fileUrl: "https://example.com/img.png", reason: "404" }))).toBe("fetch:https://example.com/img.png")
         expect(matchError(new HulyConnectionError({ message: "fail" }))).toBe("connection")
         expect(matchError(new HulyAuthError({ message: "denied" }))).toBe("auth")
         expect(matchError(new HulyError({ message: "oops" }))).toBe("generic")
