@@ -62,6 +62,8 @@ export const mapDomainErrorToMcp = (error: HulyDomainError): McpErrorResponseWit
     Match.tag("ProjectNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
     Match.tag("InvalidStatusError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
     Match.tag("PersonNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
+    Match.tag("TeamspaceNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
+    Match.tag("DocumentNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
     Match.tag("HulyConnectionError", (e) =>
       createErrorResponse(
         `Connection error: ${e.message}`,
