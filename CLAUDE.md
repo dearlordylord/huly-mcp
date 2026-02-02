@@ -28,3 +28,11 @@ Key examples to reference:
 - Contact/person handling: `examples/person-*.ts`
 
 Search examples for real usage patterns when implementing MCP tools.
+
+## Publishing
+
+```bash
+npm version patch && npm publish && git push
+```
+
+Package: `@firfi/huly-mcp` on npm.
