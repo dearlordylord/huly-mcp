@@ -9,11 +9,10 @@
  *
  * @module
  */
-import { Cause, Chunk, Match, ParseResult } from "effect"
-import {
-  McpErrorCode,
-  type HulyDomainError,
-} from "../huly/errors.js"
+import type { ParseResult } from "effect"
+import { Cause, Chunk, Match } from "effect"
+
+import { type HulyDomainError, McpErrorCode } from "../huly/errors.js"
 
 // --- MCP Error Response Types ---
 
@@ -51,15 +50,15 @@ export interface McpErrorResponseWithMeta extends McpToolResponse {
  */
 const SENSITIVE_PATTERNS = [
   /password/i,
-  /\btoken\b/i,      // word boundary to avoid "tokenize" etc
-  /secret/i,         // matches client_secret, secret_key, etc
+  /\btoken\b/i, // word boundary to avoid "tokenize" etc
+  /secret/i, // matches client_secret, secret_key, etc
   /credential/i,
   /api[_-]?key/i,
-  /\bauth\b/i,       // word boundary to avoid "authentication" etc
+  /\bauth\b/i, // word boundary to avoid "authentication" etc
   /\bbearer\b/i,
   /\bjwt\b/i,
   /session[_-]?id/i, // session_id or sessionid
-  /cookie/i,
+  /cookie/i
 ] as const
 
 /**
@@ -88,7 +87,7 @@ const createErrorResponse = (
 ): McpErrorResponseWithMeta => ({
   content: [{ type: "text" as const, text }],
   isError: true,
-  _meta: { errorCode },
+  _meta: { errorCode }
 })
 
 // --- Domain Error Mapping ---
@@ -99,33 +98,21 @@ const createErrorResponse = (
  */
 export const mapDomainErrorToMcp = (error: HulyDomainError): McpErrorResponseWithMeta => {
   return Match.value(error).pipe(
-    Match.tag("IssueNotFoundError", (e) =>
-      createErrorResponse(e.message, McpErrorCode.InvalidParams)
-    ),
-    Match.tag("ProjectNotFoundError", (e) =>
-      createErrorResponse(e.message, McpErrorCode.InvalidParams)
-    ),
-    Match.tag("InvalidStatusError", (e) =>
-      createErrorResponse(e.message, McpErrorCode.InvalidParams)
-    ),
-    Match.tag("PersonNotFoundError", (e) =>
-      createErrorResponse(e.message, McpErrorCode.InvalidParams)
-    ),
+    Match.tag("IssueNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
+    Match.tag("ProjectNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
+    Match.tag("InvalidStatusError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
+    Match.tag("PersonNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
     Match.tag("HulyConnectionError", (e) =>
       createErrorResponse(
         sanitizeMessage(`Connection error: ${e.message}`),
         McpErrorCode.InternalError
-      )
-    ),
+      )),
     Match.tag("HulyAuthError", (e) =>
       createErrorResponse(
         sanitizeMessage(`Authentication error: ${e.message}`),
         McpErrorCode.InternalError
-      )
-    ),
-    Match.tag("HulyError", (e) =>
-      createErrorResponse(sanitizeMessage(e.message), McpErrorCode.InternalError)
-    ),
+      )),
+    Match.tag("HulyError", (e) => createErrorResponse(sanitizeMessage(e.message), McpErrorCode.InternalError)),
     Match.exhaustive
   )
 }
@@ -189,7 +176,7 @@ const isHulyDomainError = (error: unknown): error is HulyDomainError => {
     "IssueNotFoundError",
     "ProjectNotFoundError",
     "InvalidStatusError",
-    "PersonNotFoundError",
+    "PersonNotFoundError"
   ].includes(tag)
 }
 
@@ -225,10 +212,9 @@ export const mapCauseToMcp = <E>(
     }
 
     // Unknown error type - provide sanitized message
-    const message =
-      error && typeof error === "object" && "message" in error
-        ? sanitizeMessage(String((error as { message: unknown }).message))
-        : "An unexpected error occurred"
+    const message = error && typeof error === "object" && "message" in error
+      ? sanitizeMessage(String((error as { message: unknown }).message))
+      : "An unexpected error occurred"
 
     return createErrorResponse(message, McpErrorCode.InternalError)
   }
@@ -268,7 +254,7 @@ export const mapCauseToMcp = <E>(
  * Create an MCP success response from a result value.
  */
 export const createSuccessResponse = <T>(result: T): McpToolResponse => ({
-  content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+  content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
 })
 
 // --- Unknown Tool Error ---

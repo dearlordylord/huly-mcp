@@ -20,31 +20,32 @@
  */
 
 // Polyfill browser globals for Node.js (required by @hcengineering packages)
+import { NodeRuntime } from "@effect/platform-node"
+import type { ConfigError } from "effect"
+import { Config, Effect, Layer } from "effect"
 import fakeIndexedDB from "fake-indexeddb"
+
+import { type HulyConfigError, HulyConfigService } from "./config/config.js"
+import { HulyClient, type HulyClientError } from "./huly/client.js"
+import { type McpServerError, McpServerService, type McpTransportType } from "./mcp/server.js"
 ;(globalThis as any).indexedDB = fakeIndexedDB
 
 // Mock window with basic event handling
 const mockWindow: any = {
   addEventListener: () => {},
   removeEventListener: () => {},
-  location: { href: '' },
-  document: {},
+  location: { href: "" },
+  document: {}
 }
 ;(globalThis as any).window = mockWindow
 
 if (!(globalThis as any).navigator) {
-  Object.defineProperty(globalThis, 'navigator', {
-    value: { userAgent: 'node' },
+  Object.defineProperty(globalThis, "navigator", {
+    value: { userAgent: "node" },
     writable: true,
     configurable: true
   })
 }
-
-import { Effect, Layer, Config, ConfigError } from "effect"
-import { NodeRuntime } from "@effect/platform-node"
-import { HulyConfigService, type HulyConfigError } from "./config/config.js"
-import { HulyClient, type HulyClientError } from "./huly/client.js"
-import { McpServerService, McpServerError, type McpTransportType } from "./mcp/server.js"
 
 // --- Types ---
 
@@ -91,7 +92,7 @@ export const buildAppLayer = (
   // McpServer requires HulyClient
   const mcpServerLayer = McpServerService.layer({
     transport,
-    httpPort,
+    httpPort
   }).pipe(Layer.provide(hulyClientLayer))
 
   return mcpServerLayer
@@ -101,7 +102,7 @@ export const buildAppLayer = (
  * Main program that starts the MCP server.
  * Runs until shutdown signal is received.
  */
-export const main: Effect.Effect<void, AppError> = Effect.gen(function* () {
+export const main: Effect.Effect<void, AppError> = Effect.gen(function*() {
   // Get transport configuration
   const transport = yield* getTransportType
   const httpPort = yield* getHttpPort
@@ -112,7 +113,7 @@ export const main: Effect.Effect<void, AppError> = Effect.gen(function* () {
   const appLayer = buildAppLayer(transport, httpPort)
 
   // Get server service and run
-  yield* Effect.gen(function* () {
+  yield* Effect.gen(function*() {
     const server = yield* McpServerService
     yield* server.run()
   }).pipe(

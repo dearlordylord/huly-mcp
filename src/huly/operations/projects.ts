@@ -9,8 +9,9 @@
 import { SortingOrder } from "@hcengineering/core"
 import { type Project as HulyProject } from "@hcengineering/tracker"
 import { Effect } from "effect"
-import { HulyClient, type HulyClientError } from "../client.js"
+
 import type { ListProjectsParams, ListProjectsResult, ProjectSummary } from "../../domain/schemas.js"
+import { HulyClient, type HulyClientError } from "../client.js"
 
 // Import plugin objects at runtime (CommonJS modules)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -37,7 +38,7 @@ export type ListProjectsError = HulyClientError
 export const listProjects = (
   params: ListProjectsParams
 ): Effect.Effect<ListProjectsResult, ListProjectsError, HulyClient> =>
-  Effect.gen(function* () {
+  Effect.gen(function*() {
     const client = yield* HulyClient
 
     // Build query based on filters
@@ -58,23 +59,23 @@ export const listProjects = (
       {
         limit,
         sort: {
-          name: SortingOrder.Ascending,
-        },
+          name: SortingOrder.Ascending
+        }
       }
     )
 
     const total = projects.total ?? projects.length
 
     // Transform to ProjectSummary
-    const summaries: ProjectSummary[] = projects.map((project) => ({
+    const summaries: Array<ProjectSummary> = projects.map((project) => ({
       identifier: project.identifier,
       name: project.name,
       description: project.description || undefined,
-      archived: project.archived,
+      archived: project.archived
     }))
 
     return {
       projects: summaries,
-      total,
+      total
     }
   })

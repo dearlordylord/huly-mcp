@@ -6,20 +6,38 @@
  *
  * @module
  */
-import { SortingOrder, type Ref, type Status, type Doc, type StatusCategory, type Space, generateId, type Class } from "@hcengineering/core"
-import type { TagElement, TagReference } from "@hcengineering/tags"
-import type { Person, Channel } from "@hcengineering/contact"
-import { type Issue as HulyIssue, type Project as HulyProject, IssuePriority } from "@hcengineering/tracker"
-import { makeRank } from "@hcengineering/rank"
-import { Effect } from "effect"
-import { HulyClient, type HulyClientError } from "../client.js"
+import type { Channel, Person } from "@hcengineering/contact"
 import {
-  ProjectNotFoundError,
-  InvalidStatusError,
-  IssueNotFoundError,
-  PersonNotFoundError,
-} from "../errors.js"
-import type { IssueSummary, ListIssuesParams, GetIssueParams, CreateIssueParams, UpdateIssueParams, AddLabelParams, Issue, IssuePriority as IssuePriorityStr } from "../../domain/schemas.js"
+  type AttachedData,
+  type Class,
+  type Data,
+  type Doc,
+  type DocumentUpdate,
+  generateId,
+  type MarkupBlobRef,
+  type Ref,
+  SortingOrder,
+  type Space,
+  type Status,
+  type StatusCategory
+} from "@hcengineering/core"
+import { makeRank } from "@hcengineering/rank"
+import type { TagElement, TagReference } from "@hcengineering/tags"
+import { type Issue as HulyIssue, IssuePriority, type Project as HulyProject } from "@hcengineering/tracker"
+import { Effect } from "effect"
+
+import type {
+  AddLabelParams,
+  CreateIssueParams,
+  GetIssueParams,
+  Issue,
+  IssuePriority as IssuePriorityStr,
+  IssueSummary,
+  ListIssuesParams,
+  UpdateIssueParams
+} from "../../domain/schemas.js"
+import { HulyClient, type HulyClientError } from "../client.js"
+import { InvalidStatusError, IssueNotFoundError, PersonNotFoundError, ProjectNotFoundError } from "../errors.js"
 
 // Import plugin objects at runtime (CommonJS modules)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -121,11 +139,18 @@ const stringToPriority = (priority: IssuePriorityStr | undefined): IssuePriority
 // --- Status Category Helpers ---
 
 /**
+ * Status with category information for filtering.
+ * Status._id is Ref<Status> which is a branded string, compatible with Ref<Doc>.
+ */
+type StatusWithCategory = Status & { category?: Ref<StatusCategory> }
+
+/**
  * Check if a status is a "done" category status.
  * Done = the issue is completed successfully.
  */
-const isDoneStatus = (statusRef: Ref<Status>, statuses: Array<{ _id: Ref<Doc>; category?: Ref<StatusCategory> }>): boolean => {
-  const status = statuses.find(s => s._id === statusRef as Ref<Doc>)
+const isDoneStatus = (statusRef: Ref<Status>, statuses: ReadonlyArray<StatusWithCategory>): boolean => {
+  // String comparison works because Ref<T> is a branded string
+  const status = statuses.find(s => String(s._id) === String(statusRef))
   if (!status?.category) return false
 
   // task.statusCategory.Won is the "done" category
@@ -136,8 +161,9 @@ const isDoneStatus = (statusRef: Ref<Status>, statuses: Array<{ _id: Ref<Doc>; c
 /**
  * Check if a status is a "canceled" category status.
  */
-const isCanceledStatus = (statusRef: Ref<Status>, statuses: Array<{ _id: Ref<Doc>; category?: Ref<StatusCategory> }>): boolean => {
-  const status = statuses.find(s => s._id === statusRef as Ref<Doc>)
+const isCanceledStatus = (statusRef: Ref<Status>, statuses: ReadonlyArray<StatusWithCategory>): boolean => {
+  // String comparison works because Ref<T> is a branded string
+  const status = statuses.find(s => String(s._id) === String(statusRef))
   if (!status?.category) return false
 
   // task.statusCategory.Lost is the "canceled" category
@@ -160,8 +186,8 @@ const isCanceledStatus = (statusRef: Ref<Status>, statuses: Array<{ _id: Ref<Doc
  */
 export const listIssues = (
   params: ListIssuesParams
-): Effect.Effect<IssueSummary[], ListIssuesError, HulyClient> =>
-  Effect.gen(function* () {
+): Effect.Effect<Array<IssueSummary>, ListIssuesError, HulyClient> =>
+  Effect.gen(function*() {
     const client = yield* HulyClient
 
     // 1. Find project by identifier
@@ -174,20 +200,20 @@ export const listIssues = (
       return yield* new ProjectNotFoundError({ identifier: params.project })
     }
 
-    const project = projectResult as HulyProject
+    // projectResult is WithLookup<HulyProject> which extends HulyProject
+    const project = projectResult
 
     // 2. Get all statuses for status name resolution
     const allStatuses = yield* client.findAll<Status>(
       tracker.class.IssueStatus,
       {}
     )
-
-    // Cast to work with status categories
-    const statusList = allStatuses as unknown as Array<Status & { _id: Ref<Doc>; category?: Ref<StatusCategory> }>
+    // Cast to StatusWithCategory which has the category field
+    const statusList = allStatuses as ReadonlyArray<StatusWithCategory>
 
     // 3. Build query based on filters
     const query: Record<string, unknown> = {
-      space: project._id,
+      space: project._id
     }
 
     // 3a. Handle status filter
@@ -198,8 +224,8 @@ export const listIssues = (
         // Open = not done and not canceled
         const doneAndCanceledStatuses = statusList
           .filter(s =>
-            isDoneStatus(s._id as Ref<Status>, statusList) ||
-            isCanceledStatus(s._id as Ref<Status>, statusList)
+            isDoneStatus(s._id, statusList)
+            || isCanceledStatus(s._id, statusList)
           )
           .map(s => s._id)
 
@@ -209,7 +235,7 @@ export const listIssues = (
       } else if (statusFilter === "done") {
         // Done = completed successfully
         const doneStatuses = statusList
-          .filter(s => isDoneStatus(s._id as Ref<Status>, statusList))
+          .filter(s => isDoneStatus(s._id, statusList))
           .map(s => s._id)
 
         if (doneStatuses.length > 0) {
@@ -221,7 +247,7 @@ export const listIssues = (
       } else if (statusFilter === "canceled") {
         // Canceled
         const canceledStatuses = statusList
-          .filter(s => isCanceledStatus(s._id as Ref<Status>, statusList))
+          .filter(s => isCanceledStatus(s._id, statusList))
           .map(s => s._id)
 
         if (canceledStatuses.length > 0) {
@@ -238,7 +264,7 @@ export const listIssues = (
         if (matchingStatus === undefined) {
           return yield* new InvalidStatusError({
             status: params.status,
-            project: params.project,
+            project: params.project
           })
         }
 
@@ -272,23 +298,25 @@ export const listIssues = (
     )
 
     // 5. Batch fetch all assignees (fix N+1 query)
-    const assigneeIds = [...new Set(
-      issues.filter(i => i.assignee !== null).map(i => i.assignee!)
-    )]
+    const assigneeIds = [
+      ...new Set(
+        issues.filter(i => i.assignee !== null).map(i => i.assignee!)
+      )
+    ]
 
     const persons = assigneeIds.length > 0
       ? yield* client.findAll<Person>(
-          contact.class.Person,
-          { _id: { $in: assigneeIds } }
-        )
+        contact.class.Person,
+        { _id: { $in: assigneeIds } }
+      )
       : []
 
     const personMap = new Map(persons.map(p => [p._id, p]))
 
     // 6. Transform to IssueSummary
-    const summaries: IssueSummary[] = issues.map(issue => {
-      // Look up status name
-      const statusDoc = statusList.find(s => s._id === issue.status as Ref<Doc>)
+    const summaries: Array<IssueSummary> = issues.map(issue => {
+      // Look up status name using string comparison
+      const statusDoc = statusList.find(s => String(s._id) === String(issue.status))
       const statusName = statusDoc?.name ?? "Unknown"
 
       // Look up assignee name from pre-fetched map
@@ -302,7 +330,7 @@ export const listIssues = (
         status: statusName,
         priority: priorityToString(issue.priority),
         assignee: assigneeName,
-        modifiedOn: issue.modifiedOn,
+        modifiedOn: issue.modifiedOn
       }
     })
 
@@ -316,7 +344,7 @@ const findPersonByEmailOrName = (
   client: HulyClient["Type"],
   emailOrName: string
 ): Effect.Effect<Person | undefined, HulyClientError> =>
-  Effect.gen(function* () {
+  Effect.gen(function*() {
     // First try to find by email in channels
     const channels = yield* client.findAll<Channel>(
       contact.class.Channel,
@@ -381,7 +409,7 @@ const parseIssueIdentifier = (
   if (match) {
     return {
       fullIdentifier: `${match[1].toUpperCase()}-${match[2]}`,
-      number: parseInt(match[2], 10),
+      number: parseInt(match[2], 10)
     }
   }
 
@@ -391,7 +419,7 @@ const parseIssueIdentifier = (
     const num = parseInt(idStr, 10)
     return {
       fullIdentifier: `${projectIdentifier.toUpperCase()}-${num}`,
-      number: num,
+      number: num
     }
   }
 
@@ -419,7 +447,7 @@ const parseIssueIdentifier = (
 export const getIssue = (
   params: GetIssueParams
 ): Effect.Effect<Issue, GetIssueError, HulyClient> =>
-  Effect.gen(function* () {
+  Effect.gen(function*() {
     const client = yield* HulyClient
 
     // 1. Find project by identifier
@@ -432,7 +460,8 @@ export const getIssue = (
       return yield* new ProjectNotFoundError({ identifier: params.project })
     }
 
-    const project = projectResult as HulyProject
+    // projectResult is WithLookup<HulyProject> which extends HulyProject
+    const project = projectResult
 
     // 2. Parse the identifier
     const { fullIdentifier, number } = parseIssueIdentifier(
@@ -445,7 +474,7 @@ export const getIssue = (
       tracker.class.Issue,
       {
         space: project._id,
-        identifier: fullIdentifier,
+        identifier: fullIdentifier
       }
     )
 
@@ -455,7 +484,7 @@ export const getIssue = (
         tracker.class.Issue,
         {
           space: project._id,
-          number,
+          number
         }
       )
     }
@@ -463,19 +492,18 @@ export const getIssue = (
     if (issue === undefined) {
       return yield* new IssueNotFoundError({
         identifier: params.identifier,
-        project: params.project,
+        project: params.project
       })
     }
 
     // 4. Get all statuses for status name resolution
-    const allStatuses = yield* client.findAll<Status>(
+    const statusList = yield* client.findAll<Status>(
       tracker.class.IssueStatus,
       {}
     )
-    const statusList = allStatuses as unknown as Array<Status & { _id: Ref<Doc> }>
 
-    // 5. Look up status name
-    const statusDoc = statusList.find(s => s._id === issue!.status as Ref<Doc>)
+    // 5. Look up status name using string comparison
+    const statusDoc = statusList.find(s => String(s._id) === String(issue!.status))
     const statusName = statusDoc?.name ?? "Unknown"
 
     // 6. Look up assignee name if assigned
@@ -490,7 +518,7 @@ export const getIssue = (
         assigneeName = person.name
         assigneeRef = {
           id: String(person._id),
-          name: person.name,
+          name: person.name
         }
       }
     }
@@ -520,7 +548,7 @@ export const getIssue = (
       modifiedOn: issue.modifiedOn,
       createdOn: issue.createdOn,
       dueDate: issue.dueDate ?? undefined,
-      estimation: issue.estimation,
+      estimation: issue.estimation
     }
 
     return result
@@ -554,7 +582,7 @@ export interface CreateIssueResult {
 export const createIssue = (
   params: CreateIssueParams
 ): Effect.Effect<CreateIssueResult, CreateIssueError, HulyClient> =>
-  Effect.gen(function* () {
+  Effect.gen(function*() {
     const client = yield* HulyClient
 
     // 1. Find project by identifier
@@ -567,17 +595,19 @@ export const createIssue = (
       return yield* new ProjectNotFoundError({ identifier: params.project })
     }
 
-    const project = projectResult as HulyProject
+    // projectResult is WithLookup<HulyProject> which extends HulyProject
+    const project = projectResult
 
     // 2. Generate unique issue ID
     const issueId: Ref<HulyIssue> = generateId()
 
     // 3. Increment project sequence to get issue number
+    const incOps: DocumentUpdate<HulyProject> = { $inc: { sequence: 1 } }
     const incResult = yield* client.updateDoc(
       tracker.class.Project,
       "core:space:Space" as Ref<Space>,
       project._id,
-      { $inc: { sequence: 1 } } as never,
+      incOps,
       true
     )
 
@@ -602,11 +632,11 @@ export const createIssue = (
       if (matchingStatus === undefined) {
         return yield* new InvalidStatusError({
           status: params.status,
-          project: params.project,
+          project: params.project
         })
       }
 
-      statusRef = matchingStatus._id as Ref<Status>
+      statusRef = matchingStatus._id
     }
 
     // 5. Resolve assignee (if provided)
@@ -632,7 +662,7 @@ export const createIssue = (
     const rank = makeRank(lastIssue?.rank, undefined)
 
     // 7. Upload description if provided
-    let descriptionMarkupRef: string | null = null
+    let descriptionMarkupRef: MarkupBlobRef | null = null
 
     if (params.description !== undefined && params.description.trim() !== "") {
       descriptionMarkupRef = yield* client.uploadMarkup(
@@ -651,32 +681,33 @@ export const createIssue = (
     const identifier = `${project.identifier}-${sequence}`
 
     // 10. Create issue using addCollection
+    const issueData: AttachedData<HulyIssue> = {
+      title: params.title,
+      description: descriptionMarkupRef,
+      status: statusRef,
+      number: sequence,
+      kind: tracker.taskTypes.Issue,
+      identifier,
+      priority,
+      assignee: assigneeRef,
+      component: null,
+      estimation: 0,
+      remainingTime: 0,
+      reportedTime: 0,
+      reports: 0,
+      subIssues: 0,
+      parents: [],
+      childInfo: [],
+      dueDate: null,
+      rank
+    }
     yield* client.addCollection(
       tracker.class.Issue,
       project._id,
       project._id,
       tracker.class.Project,
       "issues",
-      {
-        title: params.title,
-        description: descriptionMarkupRef,
-        status: statusRef,
-        number: sequence,
-        kind: tracker.taskTypes.Issue,
-        identifier,
-        priority,
-        assignee: assigneeRef,
-        component: null,
-        estimation: 0,
-        remainingTime: 0,
-        reportedTime: 0,
-        reports: 0,
-        subIssues: 0,
-        parents: [],
-        childInfo: [],
-        dueDate: null,
-        rank,
-      } as never,
+      issueData,
       issueId
     )
 
@@ -713,7 +744,7 @@ export interface UpdateIssueResult {
 export const updateIssue = (
   params: UpdateIssueParams
 ): Effect.Effect<UpdateIssueResult, UpdateIssueError, HulyClient> =>
-  Effect.gen(function* () {
+  Effect.gen(function*() {
     const client = yield* HulyClient
 
     // 1. Find project by identifier
@@ -726,7 +757,8 @@ export const updateIssue = (
       return yield* new ProjectNotFoundError({ identifier: params.project })
     }
 
-    const project = projectResult as HulyProject
+    // projectResult is WithLookup<HulyProject> which extends HulyProject
+    const project = projectResult
 
     // 2. Parse the identifier and find the issue
     const { fullIdentifier, number } = parseIssueIdentifier(
@@ -739,7 +771,7 @@ export const updateIssue = (
       tracker.class.Issue,
       {
         space: project._id,
-        identifier: fullIdentifier,
+        identifier: fullIdentifier
       }
     )
 
@@ -749,7 +781,7 @@ export const updateIssue = (
         tracker.class.Issue,
         {
           space: project._id,
-          number,
+          number
         }
       )
     }
@@ -757,12 +789,12 @@ export const updateIssue = (
     if (issue === undefined) {
       return yield* new IssueNotFoundError({
         identifier: params.identifier,
-        project: params.project,
+        project: params.project
       })
     }
 
     // 4. Build update operations based on provided fields
-    const updateOps: Record<string, unknown> = {}
+    const updateOps: DocumentUpdate<HulyIssue> = {}
 
     // 4a. Handle title update
     if (params.title !== undefined) {
@@ -801,7 +833,7 @@ export const updateIssue = (
       if (matchingStatus === undefined) {
         return yield* new InvalidStatusError({
           status: params.status,
-          project: params.project,
+          project: params.project
         })
       }
 
@@ -840,7 +872,7 @@ export const updateIssue = (
       tracker.class.Issue,
       project._id,
       issue._id,
-      updateOps as never
+      updateOps
     )
 
     return { identifier: issue.identifier, updated: true }
@@ -872,7 +904,7 @@ export interface AddLabelResult {
 export const addLabel = (
   params: AddLabelParams
 ): Effect.Effect<AddLabelResult, AddLabelError, HulyClient> =>
-  Effect.gen(function* () {
+  Effect.gen(function*() {
     const client = yield* HulyClient
 
     // 1. Find project by identifier
@@ -885,7 +917,8 @@ export const addLabel = (
       return yield* new ProjectNotFoundError({ identifier: params.project })
     }
 
-    const project = projectResult as HulyProject
+    // projectResult is WithLookup<HulyProject> which extends HulyProject
+    const project = projectResult
 
     // 2. Parse the identifier and find the issue
     const { fullIdentifier, number } = parseIssueIdentifier(
@@ -898,7 +931,7 @@ export const addLabel = (
       tracker.class.Issue,
       {
         space: project._id,
-        identifier: fullIdentifier,
+        identifier: fullIdentifier
       }
     )
 
@@ -908,7 +941,7 @@ export const addLabel = (
         tracker.class.Issue,
         {
           space: project._id,
-          number,
+          number
         }
       )
     }
@@ -916,7 +949,7 @@ export const addLabel = (
     if (issue === undefined) {
       return yield* new IssueNotFoundError({
         identifier: params.identifier,
-        project: params.project,
+        project: params.project
       })
     }
 
@@ -925,7 +958,7 @@ export const addLabel = (
       tags.class.TagReference,
       {
         attachedTo: issue._id,
-        attachedToClass: tracker.class.Issue,
+        attachedToClass: tracker.class.Issue
       }
     )
 
@@ -948,7 +981,7 @@ export const addLabel = (
       tags.class.TagElement,
       {
         title: labelTitle,
-        targetClass: tracker.class.Issue as Ref<Class<Doc>>,
+        targetClass: tracker.class.Issue as Ref<Class<Doc>>
       }
     )
 
@@ -956,16 +989,17 @@ export const addLabel = (
       // Create new TagElement
       const tagElementId: Ref<TagElement> = generateId()
 
+      const tagElementData: Data<TagElement> = {
+        title: labelTitle,
+        description: "",
+        targetClass: tracker.class.Issue as Ref<Class<Doc>>,
+        color,
+        category: tracker.category.Other
+      }
       yield* client.createDoc(
         tags.class.TagElement,
         core.space.Workspace as Ref<Space>,
-        {
-          title: labelTitle,
-          description: "",
-          targetClass: tracker.class.Issue as Ref<Class<Doc>>,
-          color,
-          category: tracker.category.Other,
-        } as never,
+        tagElementData,
         tagElementId
       )
 
@@ -982,17 +1016,18 @@ export const addLabel = (
     }
 
     // 6. Attach the TagReference to the issue
+    const tagRefData: AttachedData<TagReference> = {
+      title: tagElement.title,
+      color: tagElement.color,
+      tag: tagElement._id
+    }
     yield* client.addCollection(
       tags.class.TagReference,
       project._id,
       issue._id,
       tracker.class.Issue,
       "labels",
-      {
-        title: tagElement.title,
-        color: tagElement.color,
-        tag: tagElement._id,
-      } as never
+      tagRefData
     )
 
     return { identifier: issue.identifier, labelAdded: true }

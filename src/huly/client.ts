@@ -11,28 +11,31 @@
  */
 import {
   connect,
+  type MarkupFormat,
+  type MarkupRef,
   NodeWebSocketFactory,
-  type PlatformClient,
+  type PlatformClient
 } from "@hcengineering/api-client"
-import type {
-  AttachedData,
-  AttachedDoc,
-  Class,
-  Data,
-  Doc,
-  DocumentQuery,
-  DocumentUpdate,
-  FindOptions,
-  FindResult,
-  Ref,
-  Space,
-  TxResult,
-  WithLookup,
+import {
+  type AttachedData,
+  type AttachedDoc,
+  type Class,
+  type Data,
+  type Doc,
+  type DocumentQuery,
+  type DocumentUpdate,
+  type FindOptions,
+  type FindResult,
+  type Ref,
+  type Space,
+  toFindResult,
+  type TxResult,
+  type WithLookup
 } from "@hcengineering/core"
-import type { MarkupFormat, MarkupRef } from "@hcengineering/api-client"
 import { Context, Effect, Layer, Redacted, Schedule } from "effect"
-import { HulyAuthError, HulyConnectionError } from "./errors.js"
+
 import { HulyConfigService } from "../config/config.js"
+import { HulyAuthError, HulyConnectionError } from "./errors.js"
 
 // --- Error Type ---
 
@@ -144,7 +147,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
     HulyConfigService
   > = Layer.scoped(
     HulyClient,
-    Effect.gen(function* () {
+    Effect.gen(function*() {
       const config = yield* HulyConfigService
 
       // Eager connection - connect immediately when layer is built
@@ -153,7 +156,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
         email: config.email,
         password: Redacted.value(config.password),
         workspace: config.workspace,
-        connectionTimeout: config.connectionTimeout,
+        connectionTimeout: config.connectionTimeout
       })
 
       // Register cleanup on scope finalization
@@ -173,8 +176,8 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
           catch: (e) =>
             new HulyConnectionError({
               message: `${errorMsg}: ${String(e)}`,
-              cause: e as Error,
-            }),
+              cause: e
+            })
         })
 
       // Create service operations
@@ -260,17 +263,15 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
 
         uploadMarkup: (objectClass, objectId, objectAttr, markup, format) =>
           withClient(
-            (client) =>
-              client.uploadMarkup(objectClass, objectId, objectAttr, markup, format),
+            (client) => client.uploadMarkup(objectClass, objectId, objectAttr, markup, format),
             "uploadMarkup failed"
           ),
 
         fetchMarkup: (objectClass, objectId, objectAttr, id, format) =>
           withClient(
-            (client) =>
-              client.fetchMarkup(objectClass, objectId, objectAttr, id, format),
+            (client) => client.fetchMarkup(objectClass, objectId, objectAttr, id, format),
             "fetchMarkup failed"
-          ),
+          )
       }
 
       return operations
@@ -287,7 +288,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
     const noopFindAll = <T extends Doc>(): Effect.Effect<
       FindResult<T>,
       HulyClientError
-    > => Effect.succeed([] as unknown as FindResult<T>)
+    > => Effect.succeed(toFindResult<T>([]))
 
     const noopFindOne = <T extends Doc>(): Effect.Effect<
       WithLookup<T> | undefined,
@@ -299,20 +300,16 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       HulyClientError
     > => Effect.succeed("" as Ref<T>)
 
-    const noopUpdateDoc = (): Effect.Effect<TxResult, HulyClientError> =>
-      Effect.succeed({} as TxResult)
+    const noopUpdateDoc = (): Effect.Effect<TxResult, HulyClientError> => Effect.succeed({})
 
     const noopAddCollection = <
       _T extends Doc,
-      P extends AttachedDoc,
-    >(): Effect.Effect<Ref<P>, HulyClientError> =>
-      Effect.succeed("" as Ref<P>)
+      P extends AttachedDoc
+    >(): Effect.Effect<Ref<P>, HulyClientError> => Effect.succeed("" as Ref<P>)
 
-    const noopUploadMarkup = (): Effect.Effect<MarkupRef, HulyClientError> =>
-      Effect.succeed("" as MarkupRef)
+    const noopUploadMarkup = (): Effect.Effect<MarkupRef, HulyClientError> => Effect.succeed("" as MarkupRef)
 
-    const noopFetchMarkup = (): Effect.Effect<string, HulyClientError> =>
-      Effect.succeed("")
+    const noopFetchMarkup = (): Effect.Effect<string, HulyClientError> => Effect.succeed("")
 
     const defaultOps: HulyClientOperations = {
       findAll: noopFindAll,
@@ -321,7 +318,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       updateDoc: noopUpdateDoc,
       addCollection: noopAddCollection,
       uploadMarkup: noopUploadMarkup,
-      fetchMarkup: noopFetchMarkup,
+      fetchMarkup: noopFetchMarkup
     }
 
     return Layer.succeed(HulyClient, { ...defaultOps, ...mockOperations })
@@ -347,13 +344,13 @@ interface ConnectionConfig {
 const isAuthError = (error: unknown): boolean => {
   const msg = String(error).toLowerCase()
   return (
-    msg.includes("unauthorized") ||
-    msg.includes("authentication") ||
-    msg.includes("auth") ||
-    msg.includes("credentials") ||
-    msg.includes("401") ||
-    msg.includes("invalid password") ||
-    msg.includes("invalid email")
+    msg.includes("unauthorized")
+    || msg.includes("authentication")
+    || msg.includes("auth")
+    || msg.includes("credentials")
+    || msg.includes("401")
+    || msg.includes("invalid password")
+    || msg.includes("invalid email")
   )
 }
 
@@ -364,28 +361,27 @@ const isAuthError = (error: unknown): boolean => {
 const connectWithRetry = (
   config: ConnectionConfig
 ): Effect.Effect<PlatformClient, HulyClientError> => {
-  const attemptConnect: Effect.Effect<PlatformClient, HulyClientError> =
-    Effect.tryPromise({
-      try: () =>
-        connect(config.url, {
-          email: config.email,
-          password: config.password,
-          workspace: config.workspace,
-          socketFactory: NodeWebSocketFactory,
-          connectionTimeout: config.connectionTimeout,
-        }),
-      catch: (e) => {
-        if (isAuthError(e)) {
-          return new HulyAuthError({
-            message: `Authentication failed: ${String(e)}`,
-          })
-        }
-        return new HulyConnectionError({
-          message: `Connection failed: ${String(e)}`,
-          cause: e as Error,
+  const attemptConnect: Effect.Effect<PlatformClient, HulyClientError> = Effect.tryPromise({
+    try: () =>
+      connect(config.url, {
+        email: config.email,
+        password: config.password,
+        workspace: config.workspace,
+        socketFactory: NodeWebSocketFactory,
+        connectionTimeout: config.connectionTimeout
+      }),
+    catch: (e) => {
+      if (isAuthError(e)) {
+        return new HulyAuthError({
+          message: `Authentication failed: ${String(e)}`
         })
-      },
-    })
+      }
+      return new HulyConnectionError({
+        message: `Connection failed: ${String(e)}`,
+        cause: e
+      })
+    }
+  })
 
   // Retry policy: 3 attempts with exponential backoff
   // Don't retry auth errors (they won't succeed on retry)
@@ -396,7 +392,7 @@ const connectWithRetry = (
   return attemptConnect.pipe(
     Effect.retry({
       schedule: retrySchedule,
-      while: (e) => !(e instanceof HulyAuthError),
+      while: (e) => !(e instanceof HulyAuthError)
     })
   )
 }

@@ -11,41 +11,34 @@
  */
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js"
+import type { ParseResult } from "effect"
+import { Context, Effect, Exit, Layer, Ref, Schema } from "effect"
+
 import {
-  ListToolsRequestSchema,
-  CallToolRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js"
-import { Context, Effect, Layer, Schema, Exit, ParseResult, Ref } from "effect"
+  addLabelParamsJsonSchema,
+  createIssueParamsJsonSchema,
+  getIssueParamsJsonSchema,
+  listIssuesParamsJsonSchema,
+  listProjectsParamsJsonSchema,
+  parseAddLabelParams,
+  parseCreateIssueParams,
+  parseGetIssueParams,
+  parseListIssuesParams,
+  parseListProjectsParams,
+  parseUpdateIssueParams,
+  updateIssueParamsJsonSchema
+} from "../domain/schemas.js"
 import { HulyClient } from "../huly/client.js"
-import {
-  listIssues,
-  getIssue,
-  createIssue,
-  updateIssue,
-  addLabel,
-} from "../huly/operations/issues.js"
+import type { HulyDomainError } from "../huly/errors.js"
+import { addLabel, createIssue, getIssue, listIssues, updateIssue } from "../huly/operations/issues.js"
 import { listProjects } from "../huly/operations/projects.js"
 import {
-  listProjectsParamsJsonSchema,
-  listIssuesParamsJsonSchema,
-  getIssueParamsJsonSchema,
-  createIssueParamsJsonSchema,
-  updateIssueParamsJsonSchema,
-  addLabelParamsJsonSchema,
-  parseListProjectsParams,
-  parseListIssuesParams,
-  parseGetIssueParams,
-  parseCreateIssueParams,
-  parseUpdateIssueParams,
-  parseAddLabelParams,
-} from "../domain/schemas.js"
-import type { HulyDomainError } from "../huly/errors.js"
-import {
-  mapCauseToMcp,
   createSuccessResponse,
   createUnknownToolError,
-  toMcpResponse,
+  mapCauseToMcp,
   type McpToolResponse,
+  toMcpResponse
 } from "./error-mapping.js"
 
 // --- Types ---
@@ -70,7 +63,7 @@ export class McpServerError extends Schema.TaggedError<McpServerError>()(
   "McpServerError",
   {
     message: Schema.String,
-    cause: Schema.optional(Schema.Defect),
+    cause: Schema.optional(Schema.Defect)
   }
 ) {}
 
@@ -83,40 +76,38 @@ export class McpServerError extends Schema.TaggedError<McpServerError>()(
 export const TOOL_DEFINITIONS = {
   list_projects: {
     name: "list_projects",
-    description:
-      "List all Huly projects. Returns projects sorted by name. Supports filtering by archived status.",
-    inputSchema: listProjectsParamsJsonSchema,
+    description: "List all Huly projects. Returns projects sorted by name. Supports filtering by archived status.",
+    inputSchema: listProjectsParamsJsonSchema
   },
   list_issues: {
     name: "list_issues",
     description:
       "Query Huly issues with optional filters. Returns issues sorted by modification date (newest first). Supports filtering by project, status, assignee, and milestone.",
-    inputSchema: listIssuesParamsJsonSchema,
+    inputSchema: listIssuesParamsJsonSchema
   },
   get_issue: {
     name: "get_issue",
     description:
       "Retrieve full details for a Huly issue including markdown description. Use this to view issue content, comments, or full metadata.",
-    inputSchema: getIssueParamsJsonSchema,
+    inputSchema: getIssueParamsJsonSchema
   },
   create_issue: {
     name: "create_issue",
     description:
       "Create a new issue in a Huly project. Description supports markdown formatting. Returns the created issue identifier.",
-    inputSchema: createIssueParamsJsonSchema,
+    inputSchema: createIssueParamsJsonSchema
   },
   update_issue: {
     name: "update_issue",
     description:
       "Update fields on an existing Huly issue. Only provided fields are modified. Description updates support markdown.",
-    inputSchema: updateIssueParamsJsonSchema,
+    inputSchema: updateIssueParamsJsonSchema
   },
   add_issue_label: {
     name: "add_issue_label",
-    description:
-      "Add a tag/label to a Huly issue. Creates the tag if it doesn't exist in the project.",
-    inputSchema: addLabelParamsJsonSchema,
-  },
+    description: "Add a tag/label to a Huly issue. Creates the tag if it doesn't exist in the project.",
+    inputSchema: addLabelParamsJsonSchema
+  }
 } as const
 
 type ToolName = keyof typeof TOOL_DEFINITIONS
@@ -155,19 +146,19 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
   ): Layer.Layer<McpServerService, never, HulyClient> {
     return Layer.effect(
       McpServerService,
-      Effect.gen(function* () {
+      Effect.gen(function*() {
         const hulyClient = yield* HulyClient
 
         // Create the MCP server instance using low-level Server API
         const server = new Server(
           {
             name: "huly-mcp",
-            version: "1.0.0",
+            version: "1.0.0"
           },
           {
             capabilities: {
-              tools: {},
-            },
+              tools: {}
+            }
           }
         )
 
@@ -179,14 +170,14 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
             inputSchema: tool.inputSchema as {
               type: "object"
               properties?: Record<string, unknown>
-              required?: string[]
-            },
-          })),
+              required?: Array<string>
+            }
+          }))
         }))
 
         // Register tool call handler
         server.setRequestHandler(CallToolRequestSchema, async (request) => {
-          const { name, arguments: args } = request.params
+          const { arguments: args, name } = request.params
 
           const result = await handleToolCall(
             name as ToolName,
@@ -203,10 +194,10 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 
         const operations: McpServerOperations = {
           run: () =>
-            Effect.gen(function* () {
+            Effect.gen(function*() {
               if (yield* Ref.get(isRunning)) {
                 return yield* new McpServerError({
-                  message: "MCP server is already running",
+                  message: "MCP server is already running"
                 })
               }
 
@@ -221,8 +212,8 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                   catch: (e) =>
                     new McpServerError({
                       message: `Failed to connect stdio transport: ${String(e)}`,
-                      cause: e as Error,
-                    }),
+                      cause: e as Error
+                    })
                 })
 
                 // Keep running until stopped
@@ -249,20 +240,20 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                   catch: (e) =>
                     new McpServerError({
                       message: `Failed to close server: ${String(e)}`,
-                      cause: e as Error,
-                    }),
+                      cause: e as Error
+                    })
                 })
               } else if (config.transport === "http") {
                 // HTTP transport - for future implementation
                 // The MCP SDK provides SSE and StreamableHttp transports
                 return yield* new McpServerError({
-                  message: "HTTP transport not yet implemented",
+                  message: "HTTP transport not yet implemented"
                 })
               }
             }),
 
           stop: () =>
-            Effect.gen(function* () {
+            Effect.gen(function*() {
               if (!(yield* Ref.get(isRunning))) {
                 return
               }
@@ -274,10 +265,10 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                 catch: (e) =>
                   new McpServerError({
                     message: `Failed to stop server: ${String(e)}`,
-                    cause: e as Error,
-                  }),
+                    cause: e as Error
+                  })
               })
-            }),
+            })
         }
 
         return operations
@@ -293,7 +284,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
   ): Layer.Layer<McpServerService> {
     const defaultOps: McpServerOperations = {
       run: () => Effect.void,
-      stop: () => Effect.void,
+      stop: () => Effect.void
     }
 
     return Layer.succeed(McpServerService, { ...defaultOps, ...mockOperations })

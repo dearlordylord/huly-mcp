@@ -25,7 +25,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc -p tsconfig.json --noEmit"
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix"
   },
   "bin": {
     "huly-mcp": "./dist/index.cjs"
@@ -48,14 +49,24 @@
     "fake-indexeddb": "^6.2.5"
   },
   "devDependencies": {
+    "@effect/eslint-plugin": "^0.3.2",
     "@effect/language-service": "^0.72.0",
     "@effect/vitest": "latest",
+    "@eslint/compat": "^2.0.2",
     "@types/node": "^25.1.0",
     "@types/ws": "^8.18.1",
+    "@typescript-eslint/parser": "^8.54.0",
     "esbuild": "^0.27.2",
+    "eslint": "^9.39.2",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-functional": "^9.0.2",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
+    "eslint-plugin-sort-destructure-keys": "^2.0.0",
     "husky": "^9.1.7",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.54.0",
     "vitest": "latest"
   }
 }

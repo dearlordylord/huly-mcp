@@ -15,7 +15,7 @@ import { Schema } from "effect"
  */
 export const McpErrorCode = {
   InvalidParams: -32602,
-  InternalError: -32603,
+  InternalError: -32603
 } as const
 
 export type McpErrorCode = (typeof McpErrorCode)[keyof typeof McpErrorCode]
@@ -26,7 +26,7 @@ export type McpErrorCode = (typeof McpErrorCode)[keyof typeof McpErrorCode]
  */
 export class HulyError extends Schema.TaggedError<HulyError>()("HulyError", {
   message: Schema.String,
-  cause: Schema.optional(Schema.Defect),
+  cause: Schema.optional(Schema.Defect)
 }) {
   readonly mcpErrorCode: McpErrorCode = McpErrorCode.InternalError
 }
@@ -39,7 +39,7 @@ export class HulyConnectionError extends Schema.TaggedError<HulyConnectionError>
   "HulyConnectionError",
   {
     message: Schema.String,
-    cause: Schema.optional(Schema.Defect),
+    cause: Schema.optional(Schema.Defect)
   }
 ) {
   readonly mcpErrorCode: McpErrorCode = McpErrorCode.InternalError
@@ -52,7 +52,7 @@ export class HulyConnectionError extends Schema.TaggedError<HulyConnectionError>
 export class HulyAuthError extends Schema.TaggedError<HulyAuthError>()(
   "HulyAuthError",
   {
-    message: Schema.String,
+    message: Schema.String
   }
 ) {
   readonly mcpErrorCode: McpErrorCode = McpErrorCode.InternalError
@@ -66,7 +66,7 @@ export class IssueNotFoundError extends Schema.TaggedError<IssueNotFoundError>()
   "IssueNotFoundError",
   {
     identifier: Schema.String,
-    project: Schema.String,
+    project: Schema.String
   }
 ) {
   readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
@@ -83,7 +83,7 @@ export class IssueNotFoundError extends Schema.TaggedError<IssueNotFoundError>()
 export class ProjectNotFoundError extends Schema.TaggedError<ProjectNotFoundError>()(
   "ProjectNotFoundError",
   {
-    identifier: Schema.String,
+    identifier: Schema.String
   }
 ) {
   readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
@@ -101,7 +101,7 @@ export class InvalidStatusError extends Schema.TaggedError<InvalidStatusError>()
   "InvalidStatusError",
   {
     status: Schema.String,
-    project: Schema.String,
+    project: Schema.String
   }
 ) {
   readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
@@ -118,7 +118,7 @@ export class InvalidStatusError extends Schema.TaggedError<InvalidStatusError>()
 export class PersonNotFoundError extends Schema.TaggedError<PersonNotFoundError>()(
   "PersonNotFoundError",
   {
-    identifier: Schema.String,
+    identifier: Schema.String
   }
 ) {
   readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
@@ -151,7 +151,7 @@ export const HulyDomainError: Schema.Union<
     typeof IssueNotFoundError,
     typeof ProjectNotFoundError,
     typeof InvalidStatusError,
-    typeof PersonNotFoundError,
+    typeof PersonNotFoundError
   ]
 > = Schema.Union(
   HulyError,
