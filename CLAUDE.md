@@ -33,12 +33,20 @@ Key examples to reference:
 
 Search examples for real usage patterns when implementing MCP tools.
 
+## Manual Testing (stdio)
+
+```bash
+echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}
+{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}' | \
+HULY_URL=... HULY_EMAIL=... HULY_PASSWORD=... HULY_WORKSPACE=... timeout 5 node dist/index.cjs
+```
+
+Use short timeouts (5s) - MCP keeps connection open.
+
 ## Publishing
 
 ```bash
-npm run build && npm version patch && npm publish && git push
+pnpm build && pnpm version patch && pnpm publish && git push
 ```
-
-**Note:** Must run `npm run build` before publish - dist is not auto-built.
 
 Package: `@firfi/huly-mcp` on npm.
