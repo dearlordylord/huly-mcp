@@ -15,7 +15,7 @@ import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js"
-import { Context, Effect, Layer, Schema, Exit, ParseResult } from "effect"
+import { Context, Effect, Layer, Schema, Exit, ParseResult, Ref } from "effect"
 import { HulyClient } from "../huly/client.js"
 import {
   listIssues,
@@ -198,19 +198,19 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
           return toMcpResponse(result)
         })
 
-        // Track server state
-        let isRunning = false
+        // Track server state using Effect's Ref for purity
+        const isRunning = yield* Ref.make(false)
 
         const operations: McpServerOperations = {
           run: () =>
             Effect.gen(function* () {
-              if (isRunning) {
+              if (yield* Ref.get(isRunning)) {
                 return yield* new McpServerError({
                   message: "MCP server is already running",
                 })
               }
 
-              isRunning = true
+              yield* Ref.set(isRunning, true)
 
               // Create and connect transport based on config
               if (config.transport === "stdio") {
@@ -229,7 +229,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                 yield* Effect.async<void, McpServerError>((resume) => {
                   // Set up signal handlers for graceful shutdown
                   const cleanup = () => {
-                    isRunning = false
+                    Effect.runSync(Ref.set(isRunning, false))
                     resume(Effect.void)
                   }
 
@@ -263,11 +263,11 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 
           stop: () =>
             Effect.gen(function* () {
-              if (!isRunning) {
+              if (!(yield* Ref.get(isRunning))) {
                 return
               }
 
-              isRunning = false
+              yield* Ref.set(isRunning, false)
 
               yield* Effect.tryPromise({
                 try: () => server.close(),
