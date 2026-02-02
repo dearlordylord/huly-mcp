@@ -102,3 +102,26 @@ export const _testing = {
 
 // Flag to verify patch was applied
 export const MSGPACK_PATCH_APPLIED = true
+
+// Also patch client to handle undefined transactions gracefully
+// This is needed because server 0.7.310 sends some transactions in unexpected format
+export function patchTransactionHandler(): void {
+  try {
+    // We can't easily patch the bundled code, but we can add global error handling
+    const originalEmit = process.emit.bind(process)
+    process.emit = function(event: string, ...args: any[]) {
+      if (event === 'uncaughtException') {
+        const error = args[0] as Error
+        if (error?.message?.includes("Cannot read properties of undefined (reading '_class')")) {
+          console.error('[WARN] Skipping malformed transaction from server')
+          return false
+        }
+      }
+      return originalEmit(event, ...args)
+    } as typeof process.emit
+  } catch (e) {
+    // Ignore patching errors
+  }
+}
+
+patchTransactionHandler()

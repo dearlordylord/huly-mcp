@@ -1,0 +1,22 @@
+diff --git a/node_modules/@hcengineering/core/lib/client.js b/node_modules/@hcengineering/core/lib/client.js
+index f4d22c6..3a12975 100644
+--- a/node_modules/@hcengineering/core/lib/client.js
++++ b/node_modules/@hcengineering/core/lib/client.js
+@@ -100,7 +100,7 @@ class ClientImpl {
+     return await this.conn.tx(tx);
+   }
+   async updateFromRemote(...tx) {
+-    for (const t of tx) {
++    for (const t of tx) { if (!t) continue;
+       try {
+         if (t.objectSpace === import_component.default.space.Model) {
+           const hasTx = this.appliedModelTransactions.has(t._id);
+@@ -158,7 +158,7 @@ async function createClient(connect, modelFilter, txPersistence, _ctx) {
+     } else {
+       client.updateFromRemote(...tx);
+     }
+-    for (const t of tx) {
++    for (const t of tx) { if (!t) continue;
+       if (t._class === import_component.default.class.TxWorkspaceEvent && t.event === import_tx.WorkspaceEvent.LastTx) {
+         lastTx = t.params.lastTx;
+       }
