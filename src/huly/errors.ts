@@ -314,6 +314,23 @@ export class RecurringEventNotFoundError extends Schema.TaggedError<RecurringEve
 }
 
 /**
+ * Attachment not found.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class AttachmentNotFoundError extends Schema.TaggedError<AttachmentNotFoundError>()(
+  "AttachmentNotFoundError",
+  {
+    attachmentId: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Attachment '${this.attachmentId}' not found`
+  }
+}
+
+/**
  * Union of all Huly domain errors.
  */
 export type HulyDomainError =
@@ -335,6 +352,7 @@ export type HulyDomainError =
   | ChannelNotFoundError
   | EventNotFoundError
   | RecurringEventNotFoundError
+  | AttachmentNotFoundError
 
 /**
  * Schema for all Huly domain errors (for serialization).
@@ -358,7 +376,8 @@ export const HulyDomainError: Schema.Union<
     typeof MilestoneNotFoundError,
     typeof ChannelNotFoundError,
     typeof EventNotFoundError,
-    typeof RecurringEventNotFoundError
+    typeof RecurringEventNotFoundError,
+    typeof AttachmentNotFoundError
   ]
 > = Schema.Union(
   HulyError,
@@ -378,7 +397,8 @@ export const HulyDomainError: Schema.Union<
   MilestoneNotFoundError,
   ChannelNotFoundError,
   EventNotFoundError,
-  RecurringEventNotFoundError
+  RecurringEventNotFoundError,
+  AttachmentNotFoundError
 )
 
 /**
