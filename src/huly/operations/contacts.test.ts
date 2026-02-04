@@ -219,6 +219,52 @@ describe("Contacts Operations", () => {
       expect(result).toHaveLength(1)
       expect(result[0].city).toBeUndefined()
     })
+
+    it("correctly associates emails with multiple persons", async () => {
+      const person1 = createMockPerson({
+        _id: "person-1" as Ref<HulyPerson>,
+        name: "Doe,John"
+      })
+      const person2 = createMockPerson({
+        _id: "person-2" as Ref<HulyPerson>,
+        name: "Smith,Jane"
+      })
+      const person3 = createMockPerson({
+        _id: "person-3" as Ref<HulyPerson>,
+        name: "Brown,Bob"
+      })
+
+      const channel1 = createMockChannel({
+        _id: "channel-1" as Ref<Channel>,
+        attachedTo: "person-1" as Ref<Doc>,
+        value: "john@example.com"
+      })
+      const channel2 = createMockChannel({
+        _id: "channel-2" as Ref<Channel>,
+        attachedTo: "person-2" as Ref<Doc>,
+        value: "jane@example.com"
+      })
+      const channel3 = createMockChannel({
+        _id: "channel-3" as Ref<Channel>,
+        attachedTo: "person-3" as Ref<Doc>,
+        value: "bob@example.com"
+      })
+
+      const testLayer = createTestLayer({
+        persons: [person1, person2, person3],
+        channels: [channel1, channel2, channel3]
+      })
+
+      const result = await Effect.runPromise(
+        listPersons({ limit: 10 }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(result).toHaveLength(3)
+      const resultMap = new Map(result.map(p => [p.id, p]))
+      expect(resultMap.get("person-1")?.email).toBe("john@example.com")
+      expect(resultMap.get("person-2")?.email).toBe("jane@example.com")
+      expect(resultMap.get("person-3")?.email).toBe("bob@example.com")
+    })
   })
 
   describe("getPerson", () => {
