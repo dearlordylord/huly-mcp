@@ -9,6 +9,7 @@ import type {
 import { Effect } from "effect"
 
 import type {
+  AccountRole,
   CreateWorkspaceParams,
   ListWorkspaceMembersParams,
   ListWorkspacesParams,
@@ -24,6 +25,12 @@ import type {
 import { HulyConnectionError, InvalidPersonUuidError } from "../errors.js"
 import { validatePersonUuid } from "./shared.js"
 import { WorkspaceClient, type WorkspaceClientError } from "../workspace-client.js"
+
+const toHulyAccountRole = (role: AccountRole): HulyAccountRole => {
+  // AccountRole validated by AccountRoleSchema at API boundary.
+  // Values match HulyAccountRole enum. Cast safe after schema validation.
+  return role as HulyAccountRole
+}
 
 export type ListWorkspaceMembersError = WorkspaceClientError
 export type UpdateMemberRoleError = WorkspaceClientError
@@ -57,33 +64,33 @@ export const listWorkspaceMembers = (
 
     const limitedMembers = members.slice(0, limit)
 
-    const result: Array<WorkspaceMember> = []
-    for (const member of limitedMembers) {
-      let name: string | undefined
-      let email: string | undefined
+    const result = yield* Effect.forEach(
+      limitedMembers,
+      (member) => Effect.gen(function*() {
+        let name: string | undefined
+        let email: string | undefined
 
-      // Non-critical enrichment: person info is best-effort.
-      // If fails, still return basic member info (personId, role).
-      const personInfoResult = yield* Effect.tryPromise({
-        try: () => client.getPersonInfo(member.person),
-        catch: () => undefined
-      }).pipe(Effect.option)
+        const personInfoResult = yield* Effect.tryPromise({
+          try: () => client.getPersonInfo(member.person),
+          catch: () => undefined
+        }).pipe(Effect.option)
 
-      if (personInfoResult._tag === "Some" && personInfoResult.value !== undefined) {
-        const personInfo = personInfoResult.value
-        name = personInfo.name
-        const emailSocialId = personInfo.socialIds?.find((s) => s.type === "email")
-        email = emailSocialId?.value
-      }
+        if (personInfoResult._tag === "Some" && personInfoResult.value !== undefined) {
+          const personInfo = personInfoResult.value
+          name = personInfo.name
+          const emailSocialId = personInfo.socialIds?.find((s) => s.type === "email")
+          email = emailSocialId?.value
+        }
 
-      result.push({
-        personId: member.person,
-        role: member.role,
-        name,
-        email
-      })
-    }
-
+        return {
+          personId: member.person,
+          role: member.role,
+          name,
+          email
+        }
+      }),
+      { concurrency: 10 }
+    )
     return result
   })
 
@@ -100,7 +107,7 @@ export const updateMemberRole = (
     const { client } = yield* WorkspaceClient
 
     yield* Effect.tryPromise({
-      try: () => client.updateWorkspaceRole(params.accountId, params.role as HulyAccountRole),
+      try: () => client.updateWorkspaceRole(params.accountId, toHulyAccountRole(params.role)),
       catch: (e) =>
         new HulyConnectionError({
           message: `Failed to update member role: ${String(e)}`,
@@ -273,7 +280,7 @@ export const updateUserProfile = (
       profileUpdate.website = params.website
     }
     if (params.socialLinks !== undefined && params.socialLinks !== null) {
-      profileUpdate.socialLinks = params.socialLinks as Record<string, string>
+      profileUpdate.socialLinks = params.socialLinks
     }
     if (params.isPublic !== undefined) {
       profileUpdate.isPublic = params.isPublic
@@ -310,8 +317,9 @@ export const updateGuestSettings = (
     let updated = false
 
     if (params.allowReadOnly !== undefined) {
+      const allowReadOnly = params.allowReadOnly
       yield* Effect.tryPromise({
-        try: () => client.updateAllowReadOnlyGuests(params.allowReadOnly!),
+        try: () => client.updateAllowReadOnlyGuests(allowReadOnly),
         catch: (e) =>
           new HulyConnectionError({
             message: `Failed to update read-only guest setting: ${String(e)}`,
@@ -322,8 +330,9 @@ export const updateGuestSettings = (
     }
 
     if (params.allowSignUp !== undefined) {
+      const allowSignUp = params.allowSignUp
       yield* Effect.tryPromise({
-        try: () => client.updateAllowGuestSignUp(params.allowSignUp!),
+        try: () => client.updateAllowGuestSignUp(allowSignUp),
         catch: (e) =>
           new HulyConnectionError({
             message: `Failed to update guest sign-up setting: ${String(e)}`,
