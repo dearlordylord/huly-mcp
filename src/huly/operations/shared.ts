@@ -1,4 +1,4 @@
-import type { Class, Doc, Ref, Status, WithLookup } from "@hcengineering/core"
+import type { Class, Doc, FindOptions, Ref, Status, WithLookup } from "@hcengineering/core"
 import type { ProjectType } from "@hcengineering/task"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
 import { Effect } from "effect"
@@ -203,3 +203,17 @@ export const findProjectAndIssue = (
 
     return { client, project, issue }
   })
+
+export interface PaginationOptions {
+  limit?: number
+  offset?: number
+}
+
+export interface SearchOptions {
+  query?: string
+  fulltext?: boolean
+}
+
+export interface LookupOptions<T extends Doc> {
+  lookup?: FindOptions<T>["lookup"]
+}
