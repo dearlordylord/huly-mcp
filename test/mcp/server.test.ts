@@ -133,10 +133,10 @@ const createMockHulyClientLayer = (config: {
 // --- Tests ---
 
 describe("TOOL_DEFINITIONS", () => {
-    it.effect("exports 7 tool definitions", () =>
+    it.effect("exports 13 tool definitions", () =>
     Effect.gen(function* () {
       const tools = Object.keys(TOOL_DEFINITIONS)
-      expect(tools).toHaveLength(7)
+      expect(tools).toHaveLength(13)
       expect(tools).toContain("list_projects")
       expect(tools).toContain("list_issues")
       expect(tools).toContain("get_issue")
@@ -144,6 +144,12 @@ describe("TOOL_DEFINITIONS", () => {
       expect(tools).toContain("update_issue")
       expect(tools).toContain("add_issue_label")
       expect(tools).toContain("delete_issue")
+      expect(tools).toContain("list_teamspaces")
+      expect(tools).toContain("list_documents")
+      expect(tools).toContain("get_document")
+      expect(tools).toContain("create_document")
+      expect(tools).toContain("update_document")
+      expect(tools).toContain("delete_document")
     })
   )
 
@@ -230,6 +236,40 @@ describe("TOOL_DEFINITIONS", () => {
         const props = (schema as { properties: Record<string, unknown> }).properties
         expect(props).toHaveProperty("project")
         expect(props).toHaveProperty("identifier")
+      })
+    )
+
+    it.effect("list_teamspaces schema has correct structure", () =>
+      Effect.gen(function* () {
+        const schema = TOOL_DEFINITIONS.list_teamspaces.inputSchema
+        expect(schema).toHaveProperty("type", "object")
+        expect(schema).toHaveProperty("properties")
+        const props = (schema as { properties: Record<string, unknown> }).properties
+        expect(props).toHaveProperty("includeArchived")
+        expect(props).toHaveProperty("limit")
+      })
+    )
+
+    it.effect("get_document schema has correct structure", () =>
+      Effect.gen(function* () {
+        const schema = TOOL_DEFINITIONS.get_document.inputSchema
+        expect(schema).toHaveProperty("type", "object")
+        expect(schema).toHaveProperty("properties")
+        const props = (schema as { properties: Record<string, unknown> }).properties
+        expect(props).toHaveProperty("teamspace")
+        expect(props).toHaveProperty("document")
+      })
+    )
+
+    it.effect("create_document schema has correct structure", () =>
+      Effect.gen(function* () {
+        const schema = TOOL_DEFINITIONS.create_document.inputSchema
+        expect(schema).toHaveProperty("type", "object")
+        expect(schema).toHaveProperty("properties")
+        const props = (schema as { properties: Record<string, unknown> }).properties
+        expect(props).toHaveProperty("teamspace")
+        expect(props).toHaveProperty("title")
+        expect(props).toHaveProperty("content")
       })
     )
   })
