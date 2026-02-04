@@ -5,6 +5,7 @@ import type {
   Person as HulyPerson
 } from "@hcengineering/contact"
 import { AvatarType } from "@hcengineering/contact"
+import type { Doc } from "@hcengineering/core"
 import { type Data, type DocumentUpdate, generateId, type Ref, SortingOrder } from "@hcengineering/core"
 import { Effect } from "effect"
 
@@ -47,20 +48,31 @@ const parseName = (name: string): { firstName: string; lastName: string } => {
   return { firstName: name, lastName: "" }
 }
 
-const getEmailFromChannels = (
+const batchGetEmailsForPersons = (
   client: HulyClient["Type"],
-  personId: Ref<HulyPerson>
-): Effect.Effect<string | undefined, HulyClientError> =>
+  personIds: Array<Ref<Doc>>
+): Effect.Effect<Map<string, string>, HulyClientError> =>
   Effect.gen(function*() {
+    if (personIds.length === 0) {
+      return new Map()
+    }
+
     const channels = yield* client.findAll<Channel>(
       contact.class.Channel,
       {
-        attachedTo: personId,
-        attachedToClass: contact.class.Person,
+        attachedTo: { $in: personIds },
         provider: contact.channelProvider.Email
       }
     )
-    return channels.length > 0 ? channels[0].value : undefined
+
+    const emailMap = new Map<string, string>()
+    for (const channel of channels) {
+      const personIdStr = String(channel.attachedTo)
+      if (!emailMap.has(personIdStr)) {
+        emailMap.set(personIdStr, channel.value)
+      }
+    }
+    return emailMap
   })
 
 export const listPersons = (
@@ -79,19 +91,16 @@ export const listPersons = (
       }
     )
 
-    const summaries: Array<PersonSummary> = []
-    for (const person of persons) {
-      const email = yield* getEmailFromChannels(client, person._id)
-      summaries.push({
-        id: String(person._id),
-        name: person.name,
-        city: person.city,
-        email,
-        modifiedOn: person.modifiedOn
-      })
-    }
+    const personIds = persons.map(p => p._id as Ref<Doc>)
+    const emailMap = yield* batchGetEmailsForPersons(client, personIds)
 
-    return summaries
+    return persons.map(person => ({
+      id: String(person._id),
+      name: person.name,
+      city: person.city,
+      email: emailMap.get(String(person._id)),
+      modifiedOn: person.modifiedOn
+    }))
   })
 
 const findPersonById = (
@@ -300,20 +309,17 @@ export const listEmployees = (
       }
     )
 
-    const summaries: Array<EmployeeSummary> = []
-    for (const emp of employees) {
-      const email = yield* getEmailFromChannels(client, emp._id)
-      summaries.push({
-        id: String(emp._id),
-        name: emp.name,
-        email,
-        position: emp.position ?? undefined,
-        active: emp.active,
-        modifiedOn: emp.modifiedOn
-      })
-    }
+    const employeeIds = employees.map(e => e._id as Ref<Doc>)
+    const emailMap = yield* batchGetEmailsForPersons(client, employeeIds)
 
-    return summaries
+    return employees.map(emp => ({
+      id: String(emp._id),
+      name: emp.name,
+      email: emailMap.get(String(emp._id)),
+      position: emp.position ?? undefined,
+      active: emp.active,
+      modifiedOn: emp.modifiedOn
+    }))
   })
 
 export const listOrganizations = (

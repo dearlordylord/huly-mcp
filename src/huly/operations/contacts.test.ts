@@ -66,7 +66,13 @@ const createTestLayer = (config: MockConfig) => {
       const q = query as Record<string, unknown>
       let filtered = channels
       if (q.attachedTo !== undefined) {
-        filtered = filtered.filter(c => c.attachedTo === q.attachedTo)
+        const attachedTo = q.attachedTo as { $in?: unknown[] } | unknown
+        if (typeof attachedTo === "object" && attachedTo !== null && "$in" in attachedTo) {
+          const ids = attachedTo.$in as unknown[]
+          filtered = filtered.filter(c => ids.includes(c.attachedTo))
+        } else {
+          filtered = filtered.filter(c => c.attachedTo === q.attachedTo)
+        }
       }
       if (q.provider !== undefined) {
         filtered = filtered.filter(c => c.provider === q.provider)
