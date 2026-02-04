@@ -84,6 +84,9 @@ export const mapDomainErrorToMcp = (error: HulyDomainError): McpErrorResponseWit
     Match.tag("IssueTemplateNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
     Match.tag("NotificationNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
     Match.tag("NotificationContextNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
+    Match.tag("InvalidPersonUuidError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
+    Match.tag("FileTooLargeError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
+    Match.tag("InvalidContentTypeError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
     Match.tag("HulyConnectionError", (e) =>
       createErrorResponse(
         `Connection error: ${e.message}`,

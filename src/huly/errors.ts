@@ -489,6 +489,62 @@ export class NotificationContextNotFoundError extends Schema.TaggedError<Notific
 }
 
 /**
+ * Invalid PersonUuid format.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class InvalidPersonUuidError extends Schema.TaggedError<InvalidPersonUuidError>()(
+  "InvalidPersonUuidError",
+  {
+    uuid: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Invalid PersonUuid format: '${this.uuid}'`
+  }
+}
+
+/**
+ * File size exceeds maximum allowed.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class FileTooLargeError extends Schema.TaggedError<FileTooLargeError>()(
+  "FileTooLargeError",
+  {
+    filename: Schema.String,
+    size: Schema.Number,
+    maxSize: Schema.Number
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    const sizeMB = (this.size / 1024 / 1024).toFixed(2)
+    const maxMB = (this.maxSize / 1024 / 1024).toFixed(0)
+    return `File '${this.filename}' is too large (${sizeMB}MB). Maximum allowed: ${maxMB}MB`
+  }
+}
+
+/**
+ * Invalid content type for file upload.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class InvalidContentTypeError extends Schema.TaggedError<InvalidContentTypeError>()(
+  "InvalidContentTypeError",
+  {
+    filename: Schema.String,
+    contentType: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Invalid content type '${this.contentType}' for file '${this.filename}'`
+  }
+}
+
+/**
  * Union of all Huly domain errors.
  */
 export type HulyDomainError =
@@ -520,6 +576,9 @@ export type HulyDomainError =
   | IssueTemplateNotFoundError
   | NotificationNotFoundError
   | NotificationContextNotFoundError
+  | InvalidPersonUuidError
+  | FileTooLargeError
+  | InvalidContentTypeError
 
 /**
  * Schema for all Huly domain errors (for serialization).
@@ -553,7 +612,10 @@ export const HulyDomainError: Schema.Union<
     typeof ComponentNotFoundError,
     typeof IssueTemplateNotFoundError,
     typeof NotificationNotFoundError,
-    typeof NotificationContextNotFoundError
+    typeof NotificationContextNotFoundError,
+    typeof InvalidPersonUuidError,
+    typeof FileTooLargeError,
+    typeof InvalidContentTypeError
   ]
 > = Schema.Union(
   HulyError,
@@ -583,7 +645,10 @@ export const HulyDomainError: Schema.Union<
   ComponentNotFoundError,
   IssueTemplateNotFoundError,
   NotificationNotFoundError,
-  NotificationContextNotFoundError
+  NotificationContextNotFoundError,
+  InvalidPersonUuidError,
+  FileTooLargeError,
+  InvalidContentTypeError
 )
 
 /**
