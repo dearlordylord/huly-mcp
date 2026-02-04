@@ -24,10 +24,63 @@ import {
   FileFetchError,
   FileNotFoundError,
   FileUploadError,
+  FileTooLargeError,
   HulyAuthError,
   HulyConnectionError,
+  InvalidContentTypeError,
   InvalidFileDataError
 } from "./errors.js"
+
+export const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
+
+export const ALLOWED_CONTENT_TYPES = new Set([
+  // Images
+  "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml", "image/bmp", "image/tiff",
+  // Documents
+  "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain", "text/csv", "text/markdown", "text/html",
+  // Archives
+  "application/zip", "application/x-tar", "application/gzip", "application/x-7z-compressed", "application/x-rar-compressed",
+  // Media
+  "audio/mpeg", "audio/wav", "audio/ogg", "video/mp4", "video/webm", "video/quicktime",
+  // Code/data
+  "application/json", "application/xml", "text/xml", "application/javascript",
+  // Generic
+  "application/octet-stream"
+])
+
+export const validateFileSize = (
+  buffer: Buffer,
+  filename: string
+): Effect.Effect<void, FileTooLargeError> =>
+  buffer.length > MAX_FILE_SIZE
+    ? Effect.fail(new FileTooLargeError({ filename, size: buffer.length, maxSize: MAX_FILE_SIZE }))
+    : Effect.void
+
+export const validateContentType = (
+  contentType: string,
+  filename: string
+): Effect.Effect<void, InvalidContentTypeError> =>
+  ALLOWED_CONTENT_TYPES.has(contentType)
+    ? Effect.void
+    : Effect.fail(new InvalidContentTypeError({ filename, contentType }))
+
+export interface FileSourceParams {
+  filePath?: string
+  fileUrl?: string
+  data?: string
+}
+
+export const getBufferFromParams = (
+  params: FileSourceParams
+): Effect.Effect<Buffer, InvalidFileDataError | FileNotFoundError | FileFetchError> =>
+  params.filePath
+    ? readFromFilePath(params.filePath)
+    : params.fileUrl
+    ? fetchFromUrl(params.fileUrl)
+    : decodeBase64(params.data!)
 
 export type StorageClientError =
   | HulyConnectionError

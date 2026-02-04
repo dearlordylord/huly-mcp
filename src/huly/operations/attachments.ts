@@ -41,17 +41,19 @@ import {
   DocumentNotFoundError,
   type FileFetchError,
   type FileNotFoundError,
+  type FileTooLargeError,
+  type InvalidContentTypeError,
   type InvalidFileDataError,
   IssueNotFoundError,
   ProjectNotFoundError,
   TeamspaceNotFoundError
 } from "../errors.js"
 import {
-  decodeBase64,
-  fetchFromUrl,
+  getBufferFromParams,
   HulyStorageClient,
-  readFromFilePath,
-  type StorageClientError
+  type StorageClientError,
+  validateContentType,
+  validateFileSize
 } from "../storage.js"
 import { findProject, parseIssueIdentifier } from "./shared.js"
 
@@ -74,6 +76,8 @@ export type AddAttachmentError =
   | InvalidFileDataError
   | FileNotFoundError
   | FileFetchError
+  | FileTooLargeError
+  | InvalidContentTypeError
 
 export type UpdateAttachmentError =
   | HulyClientError
@@ -99,6 +103,8 @@ export type AddIssueAttachmentError =
   | InvalidFileDataError
   | FileNotFoundError
   | FileFetchError
+  | FileTooLargeError
+  | InvalidContentTypeError
 
 export type AddDocumentAttachmentError =
   | HulyClientError
@@ -108,6 +114,8 @@ export type AddDocumentAttachmentError =
   | InvalidFileDataError
   | FileNotFoundError
   | FileFetchError
+  | FileTooLargeError
+  | InvalidContentTypeError
 
 // --- Helpers ---
 
@@ -209,11 +217,9 @@ export const addAttachment = (
     const client = yield* HulyClient
     const storageClient = yield* HulyStorageClient
 
-    const buffer: Buffer = params.filePath
-      ? yield* readFromFilePath(params.filePath)
-      : params.fileUrl
-      ? yield* fetchFromUrl(params.fileUrl)
-      : yield* decodeBase64(params.data!)
+    const buffer = yield* getBufferFromParams(params)
+    yield* validateFileSize(buffer, params.filename)
+    yield* validateContentType(params.contentType, params.filename)
 
     const uploadResult = yield* storageClient.uploadFile(
       params.filename,
@@ -449,11 +455,9 @@ export const addIssueAttachment = (
 
     const storageClient = yield* HulyStorageClient
 
-    const buffer: Buffer = params.filePath
-      ? yield* readFromFilePath(params.filePath)
-      : params.fileUrl
-      ? yield* fetchFromUrl(params.fileUrl)
-      : yield* decodeBase64(params.data!)
+    const buffer = yield* getBufferFromParams(params)
+    yield* validateFileSize(buffer, params.filename)
+    yield* validateContentType(params.contentType, params.filename)
 
     const uploadResult = yield* storageClient.uploadFile(
       params.filename,
@@ -532,11 +536,9 @@ export const addDocumentAttachment = (
 
     const storageClient = yield* HulyStorageClient
 
-    const buffer: Buffer = params.filePath
-      ? yield* readFromFilePath(params.filePath)
-      : params.fileUrl
-      ? yield* fetchFromUrl(params.fileUrl)
-      : yield* decodeBase64(params.data!)
+    const buffer = yield* getBufferFromParams(params)
+    yield* validateFileSize(buffer, params.filename)
+    yield* validateContentType(params.contentType, params.filename)
 
     const uploadResult = yield* storageClient.uploadFile(
       params.filename,
