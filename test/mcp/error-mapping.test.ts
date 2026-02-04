@@ -17,6 +17,10 @@ import {
   ProjectNotFoundError,
   InvalidStatusError,
   PersonNotFoundError,
+  FileUploadError,
+  InvalidFileDataError,
+  FileNotFoundError,
+  FileFetchError,
   McpErrorCode,
 } from "../../src/huly/errors.js"
 
@@ -80,6 +84,32 @@ describe("Error Mapping to MCP", () => {
           )
         })
       )
+
+      it.effect("maps InvalidFileDataError with descriptive message", () =>
+        Effect.gen(function* () {
+          const error = new InvalidFileDataError({
+            message: "Invalid base64 encoding",
+          })
+          const response = mapDomainErrorToMcp(error)
+
+          expect(response.isError).toBe(true)
+          expect(response._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
+          expect(response.content[0].text).toBe("Invalid base64 encoding")
+        })
+      )
+
+      it.effect("maps FileNotFoundError with descriptive message", () =>
+        Effect.gen(function* () {
+          const error = new FileNotFoundError({
+            filePath: "/path/to/missing.txt",
+          })
+          const response = mapDomainErrorToMcp(error)
+
+          expect(response.isError).toBe(true)
+          expect(response._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
+          expect(response.content[0].text).toContain("/path/to/missing.txt")
+        })
+      )
     })
 
     describe("InternalError errors (-32603)", () => {
@@ -113,6 +143,36 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta?.errorCode).toBe(McpErrorCode.InternalError)
           expect(response.content[0].text).toBe("Something went wrong")
+        })
+      )
+
+      it.effect("maps FileUploadError with descriptive message", () =>
+        Effect.gen(function* () {
+          const error = new FileUploadError({
+            message: "Storage quota exceeded",
+          })
+          const response = mapDomainErrorToMcp(error)
+
+          expect(response.isError).toBe(true)
+          expect(response._meta?.errorCode).toBe(McpErrorCode.InternalError)
+          expect(response.content[0].text).toBe(
+            "File upload error: Storage quota exceeded"
+          )
+        })
+      )
+
+      it.effect("maps FileFetchError with descriptive message", () =>
+        Effect.gen(function* () {
+          const error = new FileFetchError({
+            fileUrl: "https://example.com/file.png",
+            reason: "404 Not Found",
+          })
+          const response = mapDomainErrorToMcp(error)
+
+          expect(response.isError).toBe(true)
+          expect(response._meta?.errorCode).toBe(McpErrorCode.InternalError)
+          expect(response.content[0].text).toContain("https://example.com/file.png")
+          expect(response.content[0].text).toContain("404 Not Found")
         })
       )
     })
