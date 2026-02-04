@@ -209,6 +209,10 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `list_channel_messages` | List messages in a Huly channel. Returns messages sorted by date (newest first). |
 | `send_channel_message` | Send a message to a Huly channel. Message body supports markdown formatting. |
 | `list_direct_messages` | List direct message conversations in Huly. Returns conversations sorted by date (newest first). |
+| `list_thread_replies` | List replies in a message thread. Returns replies sorted by date (oldest first). |
+| `add_thread_reply` | Add a reply to a message thread. Reply body supports markdown formatting. |
+| `update_thread_reply` | Update a thread reply. Only the body can be modified. |
+| `delete_thread_reply` | Permanently delete a thread reply. This action cannot be undone. |
 
 ### Calendar
 

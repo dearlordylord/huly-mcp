@@ -419,6 +419,42 @@ export class AttachmentNotFoundError extends Schema.TaggedError<AttachmentNotFou
 }
 
 /**
+ * Component not found in the specified project.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class ComponentNotFoundError extends Schema.TaggedError<ComponentNotFoundError>()(
+  "ComponentNotFoundError",
+  {
+    identifier: Schema.String,
+    project: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Component '${this.identifier}' not found in project '${this.project}'`
+  }
+}
+
+/**
+ * Issue template not found in the specified project.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class IssueTemplateNotFoundError extends Schema.TaggedError<IssueTemplateNotFoundError>()(
+  "IssueTemplateNotFoundError",
+  {
+    identifier: Schema.String,
+    project: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Issue template '${this.identifier}' not found in project '${this.project}'`
+  }
+}
+
+/**
  * Union of all Huly domain errors.
  */
 export type HulyDomainError =
@@ -446,6 +482,8 @@ export type HulyDomainError =
   | ReactionNotFoundError
   | SavedMessageNotFoundError
   | AttachmentNotFoundError
+  | ComponentNotFoundError
+  | IssueTemplateNotFoundError
 
 /**
  * Schema for all Huly domain errors (for serialization).
@@ -475,7 +513,9 @@ export const HulyDomainError: Schema.Union<
     typeof ActivityMessageNotFoundError,
     typeof ReactionNotFoundError,
     typeof SavedMessageNotFoundError,
-    typeof AttachmentNotFoundError
+    typeof AttachmentNotFoundError,
+    typeof ComponentNotFoundError,
+    typeof IssueTemplateNotFoundError
   ]
 > = Schema.Union(
   HulyError,
@@ -501,7 +541,9 @@ export const HulyDomainError: Schema.Union<
   ActivityMessageNotFoundError,
   ReactionNotFoundError,
   SavedMessageNotFoundError,
-  AttachmentNotFoundError
+  AttachmentNotFoundError,
+  ComponentNotFoundError,
+  IssueTemplateNotFoundError
 )
 
 /**

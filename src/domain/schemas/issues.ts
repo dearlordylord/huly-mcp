@@ -83,6 +83,9 @@ export const ListIssuesParamsSchema = Schema.Struct({
   descriptionSearch: Schema.optional(Schema.String.annotations({
     description: "Search issues by description content (fulltext search)"
   })),
+  component: Schema.optional(Schema.String.annotations({
+    description: "Filter by component ID or label"
+  })),
   limit: Schema.optional(
     LimitParam.annotations({
       description: "Maximum number of issues to return (default: 50)"
@@ -221,3 +224,340 @@ export const parseCreateIssueParams = Schema.decodeUnknown(CreateIssueParamsSche
 export const parseUpdateIssueParams = Schema.decodeUnknown(UpdateIssueParamsSchema)
 export const parseAddLabelParams = Schema.decodeUnknown(AddLabelParamsSchema)
 export const parseDeleteIssueParams = Schema.decodeUnknown(DeleteIssueParamsSchema)
+
+// --- Component Schemas ---
+
+export const ComponentSummarySchema = Schema.Struct({
+  id: NonEmptyString,
+  label: Schema.String,
+  lead: Schema.optional(Schema.String),
+  modifiedOn: Schema.optional(Timestamp)
+}).annotations({
+  title: "ComponentSummary",
+  description: "Component summary for list operations"
+})
+
+export type ComponentSummary = Schema.Schema.Type<typeof ComponentSummarySchema>
+
+export const ComponentSchema = Schema.Struct({
+  id: NonEmptyString,
+  label: Schema.String,
+  description: Schema.optional(Schema.String),
+  lead: Schema.optional(Schema.String),
+  project: NonEmptyString,
+  modifiedOn: Schema.optional(Timestamp),
+  createdOn: Schema.optional(Timestamp)
+}).annotations({
+  title: "Component",
+  description: "Full component with all fields"
+})
+
+export type Component = Schema.Schema.Type<typeof ComponentSchema>
+
+export const ListComponentsParamsSchema = Schema.Struct({
+  project: NonEmptyString.annotations({
+    description: "Project identifier (e.g., 'HULY')"
+  }),
+  limit: Schema.optional(
+    LimitParam.annotations({
+      description: "Maximum number of components to return (default: 50)"
+    })
+  )
+}).annotations({
+  title: "ListComponentsParams",
+  description: "Parameters for listing components"
+})
+
+export type ListComponentsParams = Schema.Schema.Type<typeof ListComponentsParamsSchema>
+
+export const GetComponentParamsSchema = Schema.Struct({
+  project: NonEmptyString.annotations({
+    description: "Project identifier (e.g., 'HULY')"
+  }),
+  component: NonEmptyString.annotations({
+    description: "Component ID or label"
+  })
+}).annotations({
+  title: "GetComponentParams",
+  description: "Parameters for getting a single component"
+})
+
+export type GetComponentParams = Schema.Schema.Type<typeof GetComponentParamsSchema>
+
+export const CreateComponentParamsSchema = Schema.Struct({
+  project: NonEmptyString.annotations({
+    description: "Project identifier (e.g., 'HULY')"
+  }),
+  label: NonEmptyString.annotations({
+    description: "Component name/label"
+  }),
+  description: Schema.optional(Schema.String.annotations({
+    description: "Component description (markdown supported)"
+  })),
+  lead: Schema.optional(Schema.String.annotations({
+    description: "Lead person email address"
+  }))
+}).annotations({
+  title: "CreateComponentParams",
+  description: "Parameters for creating a component"
+})
+
+export type CreateComponentParams = Schema.Schema.Type<typeof CreateComponentParamsSchema>
+
+export const UpdateComponentParamsSchema = Schema.Struct({
+  project: NonEmptyString.annotations({
+    description: "Project identifier (e.g., 'HULY')"
+  }),
+  component: NonEmptyString.annotations({
+    description: "Component ID or label"
+  }),
+  label: Schema.optional(NonEmptyString.annotations({
+    description: "New component name/label"
+  })),
+  description: Schema.optional(Schema.String.annotations({
+    description: "New component description (markdown supported)"
+  })),
+  lead: Schema.optional(
+    Schema.NullOr(Schema.String).annotations({
+      description: "New lead person email (null to unassign)"
+    })
+  )
+}).annotations({
+  title: "UpdateComponentParams",
+  description: "Parameters for updating a component"
+})
+
+export type UpdateComponentParams = Schema.Schema.Type<typeof UpdateComponentParamsSchema>
+
+export const SetIssueComponentParamsSchema = Schema.Struct({
+  project: NonEmptyString.annotations({
+    description: "Project identifier (e.g., 'HULY')"
+  }),
+  identifier: NonEmptyString.annotations({
+    description: "Issue identifier (e.g., 'HULY-123')"
+  }),
+  component: Schema.NullOr(NonEmptyString).annotations({
+    description: "Component ID or label (null to clear)"
+  })
+}).annotations({
+  title: "SetIssueComponentParams",
+  description: "Parameters for setting component on an issue"
+})
+
+export type SetIssueComponentParams = Schema.Schema.Type<typeof SetIssueComponentParamsSchema>
+
+export const DeleteComponentParamsSchema = Schema.Struct({
+  project: NonEmptyString.annotations({
+    description: "Project identifier (e.g., 'HULY')"
+  }),
+  component: NonEmptyString.annotations({
+    description: "Component ID or label"
+  })
+}).annotations({
+  title: "DeleteComponentParams",
+  description: "Parameters for deleting a component"
+})
+
+export type DeleteComponentParams = Schema.Schema.Type<typeof DeleteComponentParamsSchema>
+
+export const listComponentsParamsJsonSchema = makeJsonSchema(ListComponentsParamsSchema)
+export const getComponentParamsJsonSchema = makeJsonSchema(GetComponentParamsSchema)
+export const createComponentParamsJsonSchema = makeJsonSchema(CreateComponentParamsSchema)
+export const updateComponentParamsJsonSchema = makeJsonSchema(UpdateComponentParamsSchema)
+export const setIssueComponentParamsJsonSchema = makeJsonSchema(SetIssueComponentParamsSchema)
+export const deleteComponentParamsJsonSchema = makeJsonSchema(DeleteComponentParamsSchema)
+
+export const parseComponent = Schema.decodeUnknown(ComponentSchema)
+export const parseComponentSummary = Schema.decodeUnknown(ComponentSummarySchema)
+export const parseListComponentsParams = Schema.decodeUnknown(ListComponentsParamsSchema)
+export const parseGetComponentParams = Schema.decodeUnknown(GetComponentParamsSchema)
+export const parseCreateComponentParams = Schema.decodeUnknown(CreateComponentParamsSchema)
+export const parseUpdateComponentParams = Schema.decodeUnknown(UpdateComponentParamsSchema)
+export const parseSetIssueComponentParams = Schema.decodeUnknown(SetIssueComponentParamsSchema)
+export const parseDeleteComponentParams = Schema.decodeUnknown(DeleteComponentParamsSchema)
+
+// --- Issue Template Schemas ---
+
+export const IssueTemplateSummarySchema = Schema.Struct({
+  id: NonEmptyString,
+  title: Schema.String,
+  priority: Schema.optional(IssuePrioritySchema),
+  modifiedOn: Schema.optional(Timestamp)
+}).annotations({
+  title: "IssueTemplateSummary",
+  description: "Issue template summary for list operations"
+})
+
+export type IssueTemplateSummary = Schema.Schema.Type<typeof IssueTemplateSummarySchema>
+
+export const IssueTemplateSchema = Schema.Struct({
+  id: NonEmptyString,
+  title: Schema.String,
+  description: Schema.optional(Schema.String),
+  priority: Schema.optional(IssuePrioritySchema),
+  assignee: Schema.optional(Schema.String),
+  component: Schema.optional(Schema.String),
+  estimation: Schema.optional(Schema.Number),
+  project: NonEmptyString,
+  modifiedOn: Schema.optional(Timestamp),
+  createdOn: Schema.optional(Timestamp)
+}).annotations({
+  title: "IssueTemplate",
+  description: "Full issue template with all fields"
+})
+
+export type IssueTemplate = Schema.Schema.Type<typeof IssueTemplateSchema>
+
+export const ListIssueTemplatesParamsSchema = Schema.Struct({
+  project: NonEmptyString.annotations({
+    description: "Project identifier (e.g., 'HULY')"
+  }),
+  limit: Schema.optional(
+    LimitParam.annotations({
+      description: "Maximum number of templates to return (default: 50)"
+    })
+  )
+}).annotations({
+  title: "ListIssueTemplatesParams",
+  description: "Parameters for listing issue templates"
+})
+
+export type ListIssueTemplatesParams = Schema.Schema.Type<typeof ListIssueTemplatesParamsSchema>
+
+export const GetIssueTemplateParamsSchema = Schema.Struct({
+  project: NonEmptyString.annotations({
+    description: "Project identifier (e.g., 'HULY')"
+  }),
+  template: NonEmptyString.annotations({
+    description: "Template ID or title"
+  })
+}).annotations({
+  title: "GetIssueTemplateParams",
+  description: "Parameters for getting a single issue template"
+})
+
+export type GetIssueTemplateParams = Schema.Schema.Type<typeof GetIssueTemplateParamsSchema>
+
+export const CreateIssueTemplateParamsSchema = Schema.Struct({
+  project: NonEmptyString.annotations({
+    description: "Project identifier (e.g., 'HULY')"
+  }),
+  title: NonEmptyString.annotations({
+    description: "Template title"
+  }),
+  description: Schema.optional(Schema.String.annotations({
+    description: "Template description (markdown supported)"
+  })),
+  priority: Schema.optional(IssuePrioritySchema.annotations({
+    description: "Default priority for issues created from this template"
+  })),
+  assignee: Schema.optional(Schema.String.annotations({
+    description: "Default assignee email address"
+  })),
+  component: Schema.optional(Schema.String.annotations({
+    description: "Default component ID or label"
+  })),
+  estimation: Schema.optional(Schema.Number.annotations({
+    description: "Default estimation in minutes"
+  }))
+}).annotations({
+  title: "CreateIssueTemplateParams",
+  description: "Parameters for creating an issue template"
+})
+
+export type CreateIssueTemplateParams = Schema.Schema.Type<typeof CreateIssueTemplateParamsSchema>
+
+export const CreateIssueFromTemplateParamsSchema = Schema.Struct({
+  project: NonEmptyString.annotations({
+    description: "Project identifier (e.g., 'HULY')"
+  }),
+  template: NonEmptyString.annotations({
+    description: "Template ID or title"
+  }),
+  title: Schema.optional(NonEmptyString.annotations({
+    description: "Override title (uses template title if not specified)"
+  })),
+  description: Schema.optional(Schema.String.annotations({
+    description: "Override description (uses template description if not specified)"
+  })),
+  priority: Schema.optional(IssuePrioritySchema.annotations({
+    description: "Override priority"
+  })),
+  assignee: Schema.optional(Schema.String.annotations({
+    description: "Override assignee email"
+  })),
+  status: Schema.optional(Schema.String.annotations({
+    description: "Initial status (uses project default if not specified)"
+  }))
+}).annotations({
+  title: "CreateIssueFromTemplateParams",
+  description: "Parameters for creating an issue from a template"
+})
+
+export type CreateIssueFromTemplateParams = Schema.Schema.Type<typeof CreateIssueFromTemplateParamsSchema>
+
+export const UpdateIssueTemplateParamsSchema = Schema.Struct({
+  project: NonEmptyString.annotations({
+    description: "Project identifier (e.g., 'HULY')"
+  }),
+  template: NonEmptyString.annotations({
+    description: "Template ID or title"
+  }),
+  title: Schema.optional(NonEmptyString.annotations({
+    description: "New template title"
+  })),
+  description: Schema.optional(Schema.String.annotations({
+    description: "New template description (markdown supported)"
+  })),
+  priority: Schema.optional(IssuePrioritySchema.annotations({
+    description: "New default priority"
+  })),
+  assignee: Schema.optional(
+    Schema.NullOr(Schema.String).annotations({
+      description: "New default assignee email (null to unassign)"
+    })
+  ),
+  component: Schema.optional(
+    Schema.NullOr(Schema.String).annotations({
+      description: "New default component ID or label (null to clear)"
+    })
+  ),
+  estimation: Schema.optional(Schema.Number.annotations({
+    description: "New default estimation in minutes"
+  }))
+}).annotations({
+  title: "UpdateIssueTemplateParams",
+  description: "Parameters for updating an issue template"
+})
+
+export type UpdateIssueTemplateParams = Schema.Schema.Type<typeof UpdateIssueTemplateParamsSchema>
+
+export const DeleteIssueTemplateParamsSchema = Schema.Struct({
+  project: NonEmptyString.annotations({
+    description: "Project identifier (e.g., 'HULY')"
+  }),
+  template: NonEmptyString.annotations({
+    description: "Template ID or title"
+  })
+}).annotations({
+  title: "DeleteIssueTemplateParams",
+  description: "Parameters for deleting an issue template"
+})
+
+export type DeleteIssueTemplateParams = Schema.Schema.Type<typeof DeleteIssueTemplateParamsSchema>
+
+export const listIssueTemplatesParamsJsonSchema = makeJsonSchema(ListIssueTemplatesParamsSchema)
+export const getIssueTemplateParamsJsonSchema = makeJsonSchema(GetIssueTemplateParamsSchema)
+export const createIssueTemplateParamsJsonSchema = makeJsonSchema(CreateIssueTemplateParamsSchema)
+export const createIssueFromTemplateParamsJsonSchema = makeJsonSchema(CreateIssueFromTemplateParamsSchema)
+export const updateIssueTemplateParamsJsonSchema = makeJsonSchema(UpdateIssueTemplateParamsSchema)
+export const deleteIssueTemplateParamsJsonSchema = makeJsonSchema(DeleteIssueTemplateParamsSchema)
+
+export const parseIssueTemplate = Schema.decodeUnknown(IssueTemplateSchema)
+export const parseIssueTemplateSummary = Schema.decodeUnknown(IssueTemplateSummarySchema)
+export const parseListIssueTemplatesParams = Schema.decodeUnknown(ListIssueTemplatesParamsSchema)
+export const parseGetIssueTemplateParams = Schema.decodeUnknown(GetIssueTemplateParamsSchema)
+export const parseCreateIssueTemplateParams = Schema.decodeUnknown(CreateIssueTemplateParamsSchema)
+export const parseCreateIssueFromTemplateParams = Schema.decodeUnknown(CreateIssueFromTemplateParamsSchema)
+export const parseUpdateIssueTemplateParams = Schema.decodeUnknown(UpdateIssueTemplateParamsSchema)
+export const parseDeleteIssueTemplateParams = Schema.decodeUnknown(DeleteIssueTemplateParamsSchema)
