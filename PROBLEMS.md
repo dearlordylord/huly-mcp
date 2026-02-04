@@ -27,34 +27,50 @@ core.class.Status as Ref<Class<Doc>> as Ref<Class<Status>>
 
 ---
 
-## 2. IssueStatus Query Failure - FIXED
+## 2. IssueStatus/Status Query Failure - ACTIVE BUG ❌
 
-**Status**: RESOLVED via findProjectWithStatuses approach
+**Status**: NOT RESOLVED - attempted fix failed
 
-**Original Problem**: `client.findAll(tracker.class.IssueStatus, {})` failed with:
+**Original Problem**:
 ```
-TypeError: Cannot read properties of null (reading '#<Object>')
+Connection error: findAll failed: TypeError: Cannot read properties of null (reading '#<Object>')
 ```
 
-**Root Cause**: IssueStatus documents may have corrupted data on some workspaces, or Huly SDK has deserialization bug.
+**Affected Operations** (all fail):
+- `list_issues`
+- `get_issue`
+- `create_issue` with status param
+- `update_issue` with status param
 
-**Solution Implemented**:
-- Use `findProjectWithStatuses()` helper in `shared.ts`
-- Fetch Project with `lookup: { type: task.class.ProjectType }`
-- ProjectType.statuses contains ProjectStatus array with status refs
-- Batch query Status documents via `core.class.Status` with `$in` filter
-- Pre-compute `isDone` and `isCanceled` flags based on category
+**Root Cause**:
+- Querying `tracker.class.IssueStatus` fails
+- Querying `core.class.Status` ALSO fails (attempted fix)
+- Likely: Status documents have malformed/null data on this workspace
+- OR: Huly SDK has deserialization bug for Status class
 
-**Changed Operations**:
-- `listIssues` - uses findProjectWithStatuses
-- `getIssue` - uses findProjectWithStatuses
-- `createIssue` - conditionally uses findProjectWithStatuses if status param provided
-- `updateIssue` - conditionally uses findProjectWithStatuses if status param provided
+**Attempted Fix** (commit 22a1e65) - FAILED:
+- Created `findProjectWithStatuses()` helper in `shared.ts`
+- Uses Project lookup with `lookup: { type: task.class.ProjectType }`
+- Attempts to query `core.class.Status` with `$in` filter on status refs
+- **Result**: Still fails with same error on line 85-88 of shared.ts
 
-**Benefits**:
-- Avoids querying IssueStatus class directly
-- Matches pattern from official huly-examples
-- More efficient (single project lookup with statuses vs separate queries)
+**What Was Tried**:
+1. ✅ Removed `tracker.class.IssueStatus` queries
+2. ❌ Query `core.class.Status` directly - STILL FAILS
+3. Pattern matches official huly-examples approach
+
+**Next Steps to Investigate**:
+1. Test on different Huly workspace to isolate issue
+2. Check if ANY Status query works (single ID lookup vs findAll)
+3. Try string literal `"core:class:Status"` instead of class constant
+4. Check Huly SDK version compatibility
+5. Report to Huly SDK if confirmed bug
+
+**Possible Workarounds**:
+- Use `project.defaultIssueStatus` without name resolution
+- Skip status param validation entirely
+- Return status refs instead of names
+- Don't query Status class at all
 
 ---
 
@@ -90,18 +106,22 @@ printf '...' | MCP_AUTO_EXIT=true node dist/index.cjs
 - `list_teamspaces` / `list_documents` / `get_document` / `create_document` / `update_document` / `delete_document`
 - `list_persons` / `list_employees` - with emails (N+1 fix working)
 - `list_milestones` / `get_milestone` / `create_milestone` / `delete_milestone`
-- `list_channels` / `get_channel` (members resolved correctly)
+- `list_channels` / `get_channel` (members resolved correctly - 13 members)
 - `list_direct_messages` / `list_channel_messages`
 - `list_events` / `list_work_slots`
-- `create_issue` (with or without status)
+- `create_issue` (without status param only)
 - `add_issue_label` / `delete_issue`
-- **`list_issues`** ✅ FIXED
-- **`get_issue`** ✅ FIXED
-- **`update_issue`** ✅ FIXED
+
+### Broken ❌
+- **`list_issues`** - Status query fails
+- **`get_issue`** - Status query fails
+- **`create_issue` with status param** - Status query fails
+- **`update_issue`** - Status query fails (if status param provided)
 
 ### Notes
 - `create_milestone` requires `targetDate` as Unix timestamp (milliseconds)
-- All issue operations now work after IssueStatus fix
+- Status query bug blocks all issue read/list operations
+- Issue create/label/delete work when not querying status
 
 ---
 
@@ -128,7 +148,7 @@ printf '...' | MCP_AUTO_EXIT=true node dist/index.cjs
 ## 6. Type Safety Notes
 
 Per `CLAUDE.md` type cast policy:
-- Type casts (`as T`) are considered a "sin"
+- Type casts (`as T`) are considered a slop
 - Must be clearly justified with comments
 - Document evidence/API docs supporting the cast
 
