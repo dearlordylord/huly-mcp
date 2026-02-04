@@ -25,6 +25,8 @@ const contact = require("@hcengineering/contact").default as typeof import("@hce
 const tags = require("@hcengineering/tags").default as typeof import("@hcengineering/tags").default
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const task = require("@hcengineering/task").default as typeof import("@hcengineering/task").default
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
 
 // --- Mock Data Builders ---
 
@@ -221,6 +223,16 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     if (_class === tracker.class.IssueStatus) {
       return Effect.succeed(statuses as unknown as FindResult<Doc>)
     }
+    // Handle core.class.Status queries (used by findProjectWithStatuses)
+    if (String(_class) === String(core.class.Status)) {
+      const q = query as Record<string, unknown>
+      const inQuery = q._id as { $in?: Ref<Status>[] } | undefined
+      if (inQuery?.$in) {
+        const filtered = statuses.filter(s => inQuery.$in!.includes(s._id))
+        return Effect.succeed(filtered as unknown as FindResult<Doc>)
+      }
+      return Effect.succeed(statuses as unknown as FindResult<Doc>)
+    }
     if (_class === contact.class.Channel) {
       const value = (query as Record<string, unknown>).value as string
       const filtered = channels.filter(c => c.value === value)
@@ -246,11 +258,29 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     return Effect.succeed([] as unknown as FindResult<Doc>)
   }) as HulyClientOperations["findAll"]
 
-  const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown, query: unknown) => {
+  const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown, query: unknown, options?: unknown) => {
     if (_class === tracker.class.Project) {
       const identifier = (query as Record<string, unknown>).identifier as string
       const found = projects.find(p => p.identifier === identifier)
-      return Effect.succeed(found as Doc | undefined)
+      if (found === undefined) {
+        return Effect.succeed(undefined)
+      }
+      // Handle lookup option for ProjectType
+      const opts = options as { lookup?: Record<string, unknown> } | undefined
+      if (opts?.lookup?.type) {
+        // Return project with $lookup.type containing statuses
+        const projectWithLookup = {
+          ...found,
+          $lookup: {
+            type: {
+              _id: "project-type-1",
+              statuses: statuses.map(s => ({ _id: s._id }))
+            }
+          }
+        }
+        return Effect.succeed(projectWithLookup as Doc)
+      }
+      return Effect.succeed(found as Doc)
     }
     if (_class === tracker.class.Issue) {
       const q = query as Record<string, unknown>
