@@ -17,6 +17,7 @@ export interface ToolDefinition {
   readonly name: string
   readonly description: string
   readonly inputSchema: object
+  readonly category: string
 }
 
 export interface RegisteredTool extends ToolDefinition {

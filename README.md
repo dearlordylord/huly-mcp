@@ -120,9 +120,12 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `HULY_URL` | Yes | Huly instance URL |
-| `HULY_EMAIL` | Yes | Account email |
-| `HULY_PASSWORD` | Yes | Account password |
+| `HULY_EMAIL` | Auth* | Account email |
+| `HULY_PASSWORD` | Auth* | Account password |
+| `HULY_TOKEN` | Auth* | API token (alternative to email/password) |
 | `HULY_WORKSPACE` | Yes | Workspace identifier |
+
+*Auth: Provide either `HULY_EMAIL` + `HULY_PASSWORD` or `HULY_TOKEN`.
 | `HULY_CONNECTION_TIMEOUT` | No | Connection timeout in ms (default: 30000) |
 | `MCP_TRANSPORT` | No | Transport type: `stdio` (default) or `http` |
 | `MCP_HTTP_PORT` | No | HTTP server port (default: 3000) |
@@ -197,6 +200,20 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 |------|-------------|
 | `upload_file` | Upload a file to Huly storage. Provide ONE of: filePath (local file - preferred), fileUrl (fetch from URL), or data (base64 - for small files only). Returns blob ID and URL for referencing the file. |
 
+### Attachments
+
+| Tool | Description |
+|------|-------------|
+| `list_attachments` | List attachments on a Huly object (issue, document, etc.). Returns attachments sorted by modification date (newest first). |
+| `get_attachment` | Retrieve full details for a Huly attachment including download URL. |
+| `add_attachment` | Add an attachment to a Huly object. Provide ONE of: filePath (local file - preferred), fileUrl (fetch from URL), or data (base64). Returns the attachment ID and download URL. |
+| `update_attachment` | Update attachment metadata (description, pinned status). |
+| `delete_attachment` | Permanently delete an attachment. This action cannot be undone. |
+| `pin_attachment` | Pin or unpin an attachment. |
+| `download_attachment` | Get download URL for an attachment along with file metadata (name, type, size). |
+| `add_issue_attachment` | Add an attachment to a Huly issue. Convenience method that finds the issue by project and identifier. Provide ONE of: filePath, fileUrl, or data. |
+| `add_document_attachment` | Add an attachment to a Huly document. Convenience method that finds the document by teamspace and title/ID. Provide ONE of: filePath, fileUrl, or data. |
+
 ### Contacts
 
 | Tool | Description |
@@ -252,5 +269,57 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `create_work_slot` | Create a scheduled work slot. Attaches a time block to a ToDo for planning purposes. |
 | `start_timer` | Start a client-side timer on a Huly issue. Validates the issue exists and returns a start timestamp. Use log_time to record the elapsed time when done. |
 | `stop_timer` | Stop a client-side timer on a Huly issue. Returns the stop timestamp. Calculate elapsed time from start/stop timestamps and use log_time to record it. |
+
+### Search
+
+| Tool | Description |
+|------|-------------|
+| `fulltext_search` | Perform a global fulltext search across all Huly content. Searches issues, documents, messages, and other indexed content. Returns matching items sorted by relevance (newest first). |
+
+### Activity
+
+| Tool | Description |
+|------|-------------|
+| `list_activity` | List activity messages for a Huly object. Returns activity sorted by date (newest first). |
+| `add_reaction` | Add an emoji reaction to an activity message. |
+| `remove_reaction` | Remove an emoji reaction from an activity message. |
+| `list_reactions` | List reactions on an activity message. |
+| `save_message` | Save/bookmark an activity message for later reference. |
+| `unsave_message` | Remove an activity message from saved/bookmarks. |
+| `list_saved_messages` | List saved/bookmarked activity messages. |
+| `list_mentions` | List @mentions of the current user in activity messages. |
+
+### Notifications
+
+| Tool | Description |
+|------|-------------|
+| `list_notifications` | List inbox notifications. Returns notifications sorted by modification date (newest first). Supports filtering by read/archived status. |
+| `get_notification` | Retrieve full details for a notification. Use this to view notification content and metadata. |
+| `mark_notification_read` | Mark a notification as read. |
+| `mark_all_notifications_read` | Mark all unread notifications as read. Returns the count of notifications marked. |
+| `archive_notification` | Archive a notification. Archived notifications are hidden from the main inbox view. |
+| `archive_all_notifications` | Archive all notifications. Returns the count of notifications archived. |
+| `delete_notification` | Permanently delete a notification. This action cannot be undone. |
+| `get_notification_context` | Get notification context for an entity. Returns tracking information for a specific object. |
+| `list_notification_contexts` | List notification contexts. Returns contexts sorted by last update timestamp (newest first). Supports filtering by pinned status. |
+| `pin_notification_context` | Pin or unpin a notification context. Pinned contexts are highlighted in the inbox. |
+| `list_notification_settings` | List notification provider settings. Returns current notification preferences. |
+| `update_notification_provider_setting` | Update notification provider setting. Enable or disable notifications for a specific provider. |
+| `get_unread_notification_count` | Get the count of unread notifications. |
+
+### Workspace
+
+| Tool | Description |
+|------|-------------|
+| `list_workspace_members` | List members in the current Huly workspace with their roles. Returns members with account IDs and roles. |
+| `update_member_role` | Update a workspace member's role. Requires appropriate permissions. Valid roles: READONLYGUEST, DocGuest, GUEST, USER, MAINTAINER, OWNER, ADMIN. |
+| `get_workspace_info` | Get information about the current workspace including name, URL, region, and settings. |
+| `list_workspaces` | List all workspaces accessible to the current user. Returns workspace summaries sorted by last visit. |
+| `create_workspace` | Create a new Huly workspace. Returns the workspace UUID and URL. Optionally specify a region. |
+| `delete_workspace` | Permanently delete the current workspace. This action cannot be undone. Use with extreme caution. |
+| `get_user_profile` | Get the current user's profile information including bio, location, and social links. |
+| `update_user_profile` | Update the current user's profile. Supports bio, city, country, website, social links, and public visibility. |
+| `update_guest_settings` | Update workspace guest settings. Control read-only guest access and guest sign-up permissions. |
+| `get_regions` | Get available regions for workspace creation. Returns region codes and display names. |
 
 <!-- tools:end -->

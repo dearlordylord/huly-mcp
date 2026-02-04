@@ -28,10 +28,13 @@ import {
 } from "../../huly/operations/contacts.js"
 import { createToolHandler, type RegisteredTool } from "./registry.js"
 
+const CATEGORY = "Contacts" as const
+
 export const contactTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "list_persons",
     description: "List all persons in the Huly workspace. Returns persons sorted by modification date (newest first). Supports searching by name substring (nameSearch) and email substring (emailSearch).",
+    category: CATEGORY,
     inputSchema: listPersonsParamsJsonSchema,
     handler: createToolHandler(
       "list_persons",
@@ -43,6 +46,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
     name: "get_person",
     description:
       "Retrieve full details for a person including contact channels. Use personId or email to identify the person.",
+    category: CATEGORY,
     inputSchema: getPersonParamsJsonSchema,
     handler: createToolHandler(
       "get_person",
@@ -53,6 +57,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "create_person",
     description: "Create a new person in Huly. Returns the created person ID.",
+    category: CATEGORY,
     inputSchema: createPersonParamsJsonSchema,
     handler: createToolHandler(
       "create_person",
@@ -63,6 +68,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "update_person",
     description: "Update fields on an existing person. Only provided fields are modified.",
+    category: CATEGORY,
     inputSchema: updatePersonParamsJsonSchema,
     handler: createToolHandler(
       "update_person",
@@ -73,6 +79,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "delete_person",
     description: "Permanently delete a person from Huly. This action cannot be undone.",
+    category: CATEGORY,
     inputSchema: deletePersonParamsJsonSchema,
     handler: createToolHandler(
       "delete_person",
@@ -84,6 +91,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
     name: "list_employees",
     description:
       "List employees (persons who are team members). Returns employees sorted by modification date (newest first).",
+    category: CATEGORY,
     inputSchema: listEmployeesParamsJsonSchema,
     handler: createToolHandler(
       "list_employees",
@@ -95,6 +103,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
     name: "list_organizations",
     description:
       "List all organizations in the Huly workspace. Returns organizations sorted by modification date (newest first).",
+    category: CATEGORY,
     inputSchema: listOrganizationsParamsJsonSchema,
     handler: createToolHandler(
       "list_organizations",
@@ -106,6 +115,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
     name: "create_organization",
     description:
       "Create a new organization in Huly. Optionally add members by person ID or email. Returns the created organization ID.",
+    category: CATEGORY,
     inputSchema: createOrganizationParamsJsonSchema,
     handler: createToolHandler(
       "create_organization",
