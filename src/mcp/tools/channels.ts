@@ -1,30 +1,42 @@
 import {
+  addThreadReplyParamsJsonSchema,
   createChannelParamsJsonSchema,
   deleteChannelParamsJsonSchema,
+  deleteThreadReplyParamsJsonSchema,
   getChannelParamsJsonSchema,
   listChannelMessagesParamsJsonSchema,
   listChannelsParamsJsonSchema,
   listDirectMessagesParamsJsonSchema,
+  listThreadRepliesParamsJsonSchema,
+  parseAddThreadReplyParams,
   parseCreateChannelParams,
   parseDeleteChannelParams,
+  parseDeleteThreadReplyParams,
   parseGetChannelParams,
   parseListChannelMessagesParams,
   parseListChannelsParams,
   parseListDirectMessagesParams,
+  parseListThreadRepliesParams,
   parseSendChannelMessageParams,
   parseUpdateChannelParams,
+  parseUpdateThreadReplyParams,
   sendChannelMessageParamsJsonSchema,
-  updateChannelParamsJsonSchema
+  updateChannelParamsJsonSchema,
+  updateThreadReplyParamsJsonSchema
 } from "../../domain/schemas.js"
 import {
+  addThreadReply,
   createChannel,
   deleteChannel,
+  deleteThreadReply,
   getChannel,
   listChannelMessages,
   listChannels,
   listDirectMessages,
+  listThreadReplies,
   sendChannelMessage,
-  updateChannel
+  updateChannel,
+  updateThreadReply
 } from "../../huly/operations/channels.js"
 import { createToolHandler, type RegisteredTool } from "./registry.js"
 
@@ -107,6 +119,46 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
       "list_direct_messages",
       parseListDirectMessagesParams,
       (params) => listDirectMessages(params)
+    )
+  },
+  {
+    name: "list_thread_replies",
+    description: "List replies in a message thread. Returns replies sorted by date (oldest first).",
+    inputSchema: listThreadRepliesParamsJsonSchema,
+    handler: createToolHandler(
+      "list_thread_replies",
+      parseListThreadRepliesParams,
+      (params) => listThreadReplies(params)
+    )
+  },
+  {
+    name: "add_thread_reply",
+    description: "Add a reply to a message thread. Reply body supports markdown formatting.",
+    inputSchema: addThreadReplyParamsJsonSchema,
+    handler: createToolHandler(
+      "add_thread_reply",
+      parseAddThreadReplyParams,
+      (params) => addThreadReply(params)
+    )
+  },
+  {
+    name: "update_thread_reply",
+    description: "Update a thread reply. Only the body can be modified.",
+    inputSchema: updateThreadReplyParamsJsonSchema,
+    handler: createToolHandler(
+      "update_thread_reply",
+      parseUpdateThreadReplyParams,
+      (params) => updateThreadReply(params)
+    )
+  },
+  {
+    name: "delete_thread_reply",
+    description: "Permanently delete a thread reply. This action cannot be undone.",
+    inputSchema: deleteThreadReplyParamsJsonSchema,
+    handler: createToolHandler(
+      "delete_thread_reply",
+      parseDeleteThreadReplyParams,
+      (params) => deleteThreadReply(params)
     )
   }
 ]

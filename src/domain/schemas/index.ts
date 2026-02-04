@@ -202,6 +202,9 @@ export {
 } from "./contacts.js"
 
 export {
+  type AddThreadReplyParams,
+  addThreadReplyParamsJsonSchema,
+  AddThreadReplyParamsSchema,
   type Channel,
   ChannelSchema,
   type ChannelSummary,
@@ -212,6 +215,9 @@ export {
   type DeleteChannelParams,
   deleteChannelParamsJsonSchema,
   DeleteChannelParamsSchema,
+  type DeleteThreadReplyParams,
+  deleteThreadReplyParamsJsonSchema,
+  DeleteThreadReplyParamsSchema,
   type DirectMessageSummary,
   DirectMessageSummarySchema,
   type GetChannelParams,
@@ -226,22 +232,34 @@ export {
   type ListDirectMessagesParams,
   listDirectMessagesParamsJsonSchema,
   ListDirectMessagesParamsSchema,
+  type ListThreadRepliesParams,
+  listThreadRepliesParamsJsonSchema,
+  ListThreadRepliesParamsSchema,
   type MessageSummary,
   MessageSummarySchema,
+  parseAddThreadReplyParams,
   parseCreateChannelParams,
   parseDeleteChannelParams,
+  parseDeleteThreadReplyParams,
   parseGetChannelParams,
   parseListChannelMessagesParams,
   parseListChannelsParams,
   parseListDirectMessagesParams,
+  parseListThreadRepliesParams,
   parseSendChannelMessageParams,
   parseUpdateChannelParams,
+  parseUpdateThreadReplyParams,
   type SendChannelMessageParams,
   sendChannelMessageParamsJsonSchema,
   SendChannelMessageParamsSchema,
+  type ThreadMessage,
+  ThreadMessageSchema,
   type UpdateChannelParams,
   updateChannelParamsJsonSchema,
-  UpdateChannelParamsSchema
+  UpdateChannelParamsSchema,
+  type UpdateThreadReplyParams,
+  updateThreadReplyParamsJsonSchema,
+  UpdateThreadReplyParamsSchema
 } from "./channels.js"
 
 export {

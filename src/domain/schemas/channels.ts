@@ -206,6 +206,104 @@ export const ListDirectMessagesParamsSchema = Schema.Struct({
 
 export type ListDirectMessagesParams = Schema.Schema.Type<typeof ListDirectMessagesParamsSchema>
 
+// --- Thread Message Schema ---
+
+export const ThreadMessageSchema = Schema.Struct({
+  id: NonEmptyString,
+  body: Schema.String,
+  sender: Schema.optional(Schema.String),
+  senderId: Schema.optional(Schema.String),
+  createdOn: Schema.optional(Timestamp),
+  modifiedOn: Schema.optional(Timestamp),
+  editedOn: Schema.optional(Timestamp)
+}).annotations({
+  title: "ThreadMessage",
+  description: "Thread reply message"
+})
+
+export type ThreadMessage = Schema.Schema.Type<typeof ThreadMessageSchema>
+
+// --- List Thread Replies Params ---
+
+export const ListThreadRepliesParamsSchema = Schema.Struct({
+  channel: NonEmptyString.annotations({
+    description: "Channel name or ID"
+  }),
+  messageId: NonEmptyString.annotations({
+    description: "Parent message ID"
+  }),
+  limit: Schema.optional(
+    LimitParam.annotations({
+      description: "Maximum number of replies to return (default: 50)"
+    })
+  )
+}).annotations({
+  title: "ListThreadRepliesParams",
+  description: "Parameters for listing thread replies"
+})
+
+export type ListThreadRepliesParams = Schema.Schema.Type<typeof ListThreadRepliesParamsSchema>
+
+// --- Add Thread Reply Params ---
+
+export const AddThreadReplyParamsSchema = Schema.Struct({
+  channel: NonEmptyString.annotations({
+    description: "Channel name or ID"
+  }),
+  messageId: NonEmptyString.annotations({
+    description: "Parent message ID to reply to"
+  }),
+  body: NonEmptyString.annotations({
+    description: "Reply body (markdown supported)"
+  })
+}).annotations({
+  title: "AddThreadReplyParams",
+  description: "Parameters for adding a thread reply"
+})
+
+export type AddThreadReplyParams = Schema.Schema.Type<typeof AddThreadReplyParamsSchema>
+
+// --- Update Thread Reply Params ---
+
+export const UpdateThreadReplyParamsSchema = Schema.Struct({
+  channel: NonEmptyString.annotations({
+    description: "Channel name or ID"
+  }),
+  messageId: NonEmptyString.annotations({
+    description: "Parent message ID"
+  }),
+  replyId: NonEmptyString.annotations({
+    description: "Thread reply ID to update"
+  }),
+  body: NonEmptyString.annotations({
+    description: "New reply body (markdown supported)"
+  })
+}).annotations({
+  title: "UpdateThreadReplyParams",
+  description: "Parameters for updating a thread reply"
+})
+
+export type UpdateThreadReplyParams = Schema.Schema.Type<typeof UpdateThreadReplyParamsSchema>
+
+// --- Delete Thread Reply Params ---
+
+export const DeleteThreadReplyParamsSchema = Schema.Struct({
+  channel: NonEmptyString.annotations({
+    description: "Channel name or ID"
+  }),
+  messageId: NonEmptyString.annotations({
+    description: "Parent message ID"
+  }),
+  replyId: NonEmptyString.annotations({
+    description: "Thread reply ID to delete"
+  })
+}).annotations({
+  title: "DeleteThreadReplyParams",
+  description: "Parameters for deleting a thread reply"
+})
+
+export type DeleteThreadReplyParams = Schema.Schema.Type<typeof DeleteThreadReplyParamsSchema>
+
 // --- JSON Schemas for MCP ---
 
 export const listChannelsParamsJsonSchema = makeJsonSchema(ListChannelsParamsSchema)
@@ -216,6 +314,10 @@ export const deleteChannelParamsJsonSchema = makeJsonSchema(DeleteChannelParamsS
 export const listChannelMessagesParamsJsonSchema = makeJsonSchema(ListChannelMessagesParamsSchema)
 export const sendChannelMessageParamsJsonSchema = makeJsonSchema(SendChannelMessageParamsSchema)
 export const listDirectMessagesParamsJsonSchema = makeJsonSchema(ListDirectMessagesParamsSchema)
+export const listThreadRepliesParamsJsonSchema = makeJsonSchema(ListThreadRepliesParamsSchema)
+export const addThreadReplyParamsJsonSchema = makeJsonSchema(AddThreadReplyParamsSchema)
+export const updateThreadReplyParamsJsonSchema = makeJsonSchema(UpdateThreadReplyParamsSchema)
+export const deleteThreadReplyParamsJsonSchema = makeJsonSchema(DeleteThreadReplyParamsSchema)
 
 // --- Parsers ---
 
@@ -227,3 +329,7 @@ export const parseDeleteChannelParams = Schema.decodeUnknown(DeleteChannelParams
 export const parseListChannelMessagesParams = Schema.decodeUnknown(ListChannelMessagesParamsSchema)
 export const parseSendChannelMessageParams = Schema.decodeUnknown(SendChannelMessageParamsSchema)
 export const parseListDirectMessagesParams = Schema.decodeUnknown(ListDirectMessagesParamsSchema)
+export const parseListThreadRepliesParams = Schema.decodeUnknown(ListThreadRepliesParamsSchema)
+export const parseAddThreadReplyParams = Schema.decodeUnknown(AddThreadReplyParamsSchema)
+export const parseUpdateThreadReplyParams = Schema.decodeUnknown(UpdateThreadReplyParamsSchema)
+export const parseDeleteThreadReplyParams = Schema.decodeUnknown(DeleteThreadReplyParamsSchema)
