@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@firfi/huly-mcp)](https://www.npmjs.com/package/@firfi/huly-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
-[![MCP Server](https://badge.mcpx.dev?type=server&features=resources,tools)](https://github.com/dearlordylord/huly-mcp)
+[![MCP Server](https://badge.mcpx.dev?type=server&features=tools)](https://github.com/dearlordylord/huly-mcp)
 
 MCP server for [Huly](https://huly.io/) integration.
 
