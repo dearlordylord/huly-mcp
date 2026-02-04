@@ -50,6 +50,7 @@
     "@effect/platform-node": "^0.104.1",
     "@hcengineering/activity": "^0.7.0",
     "@hcengineering/api-client": "^0.7.3",
+    "@hcengineering/calendar": "^0.7.0",
     "@hcengineering/chunter": "^0.7.0",
     "@hcengineering/collaborator-client": "^0.7.17",
     "@hcengineering/contact": "^0.7.0",

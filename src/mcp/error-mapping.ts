@@ -75,6 +75,8 @@ export const mapDomainErrorToMcp = (error: HulyDomainError): McpErrorResponseWit
     Match.tag("CommentNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
     Match.tag("MilestoneNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
     Match.tag("ChannelNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
+    Match.tag("EventNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
+    Match.tag("RecurringEventNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
     Match.tag("HulyConnectionError", (e) =>
       createErrorResponse(
         `Connection error: ${e.message}`,
