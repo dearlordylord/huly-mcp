@@ -23,23 +23,45 @@ import {
 } from "@hcengineering/core"
 import { makeRank } from "@hcengineering/rank"
 import type { TagElement, TagReference } from "@hcengineering/tags"
-import { type Issue as HulyIssue, IssuePriority, type Project as HulyProject } from "@hcengineering/tracker"
+import {
+  type Component as HulyComponent,
+  type Issue as HulyIssue,
+  IssuePriority,
+  type IssueTemplate as HulyIssueTemplate,
+  type Project as HulyProject
+} from "@hcengineering/tracker"
 import { absurd, Effect } from "effect"
 
 import type {
   AddLabelParams,
+  Component,
+  ComponentSummary,
+  CreateComponentParams,
+  CreateIssueFromTemplateParams,
   CreateIssueParams,
+  CreateIssueTemplateParams,
+  DeleteComponentParams,
   DeleteIssueParams,
+  DeleteIssueTemplateParams,
+  GetComponentParams,
   GetIssueParams,
+  GetIssueTemplateParams,
   Issue,
   IssuePriority as IssuePriorityStr,
   IssueSummary,
+  IssueTemplate,
+  IssueTemplateSummary,
+  ListComponentsParams,
   ListIssuesParams,
-  UpdateIssueParams
+  ListIssueTemplatesParams,
+  SetIssueComponentParams,
+  UpdateComponentParams,
+  UpdateIssueParams,
+  UpdateIssueTemplateParams
 } from "../../domain/schemas.js"
 import type { HulyClient, HulyClientError } from "../client.js"
-import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
-import { InvalidStatusError, PersonNotFoundError } from "../errors.js"
+import type { ProjectNotFoundError } from "../errors.js"
+import { ComponentNotFoundError, InvalidStatusError, IssueNotFoundError, IssueTemplateNotFoundError, PersonNotFoundError } from "../errors.js"
 import { findProject, findProjectAndIssue, findProjectWithStatuses, parseIssueIdentifier, type StatusInfo } from "./shared.js"
 
 // Import plugin objects at runtime (CommonJS modules)
@@ -58,6 +80,7 @@ export type ListIssuesError =
   | HulyClientError
   | ProjectNotFoundError
   | InvalidStatusError
+  | ComponentNotFoundError
 
 export type GetIssueError =
   | HulyClientError
@@ -190,6 +213,15 @@ export const listIssues = (
       const assigneePerson = yield* findPersonByEmailOrName(client, params.assignee)
       if (assigneePerson !== undefined) {
         query.assignee = assigneePerson._id
+      } else {
+        return []
+      }
+    }
+
+    if (params.component !== undefined) {
+      const component = yield* findComponentByIdOrLabel(client, project._id, params.component)
+      if (component !== undefined) {
+        query.component = component._id
       } else {
         return []
       }
@@ -753,4 +785,694 @@ export const deleteIssue = (
     )
 
     return { identifier: issue.identifier, deleted: true }
+  })
+
+// --- Component Operations ---
+
+export type ListComponentsError =
+  | HulyClientError
+  | ProjectNotFoundError
+
+export type GetComponentError =
+  | HulyClientError
+  | ProjectNotFoundError
+  | ComponentNotFoundError
+
+export type CreateComponentError =
+  | HulyClientError
+  | ProjectNotFoundError
+  | PersonNotFoundError
+
+export type UpdateComponentError =
+  | HulyClientError
+  | ProjectNotFoundError
+  | ComponentNotFoundError
+  | PersonNotFoundError
+
+export type SetIssueComponentError =
+  | HulyClientError
+  | ProjectNotFoundError
+  | IssueNotFoundError
+  | ComponentNotFoundError
+
+export type DeleteComponentError =
+  | HulyClientError
+  | ProjectNotFoundError
+  | ComponentNotFoundError
+
+const findComponentByIdOrLabel = (
+  client: HulyClient["Type"],
+  projectId: Ref<HulyProject>,
+  componentIdOrLabel: string
+): Effect.Effect<HulyComponent | undefined, HulyClientError> =>
+  Effect.gen(function*() {
+    let component = yield* client.findOne<HulyComponent>(
+      tracker.class.Component,
+      {
+        space: projectId,
+        _id: componentIdOrLabel as Ref<HulyComponent>
+      }
+    )
+
+    if (component === undefined) {
+      component = yield* client.findOne<HulyComponent>(
+        tracker.class.Component,
+        {
+          space: projectId,
+          label: componentIdOrLabel
+        }
+      )
+    }
+
+    return component
+  })
+
+const findProjectAndComponent = (
+  params: { project: string; component: string }
+): Effect.Effect<
+  { client: HulyClient["Type"]; project: HulyProject; component: HulyComponent },
+  ProjectNotFoundError | ComponentNotFoundError | HulyClientError,
+  HulyClient
+> =>
+  Effect.gen(function*() {
+    const { client, project } = yield* findProject(params.project)
+
+    const component = yield* findComponentByIdOrLabel(client, project._id, params.component)
+
+    if (component === undefined) {
+      return yield* new ComponentNotFoundError({
+        identifier: params.component,
+        project: params.project
+      })
+    }
+
+    return { client, project, component }
+  })
+
+export const listComponents = (
+  params: ListComponentsParams
+): Effect.Effect<Array<ComponentSummary>, ListComponentsError, HulyClient> =>
+  Effect.gen(function*() {
+    const { client, project } = yield* findProject(params.project)
+
+    const limit = Math.min(params.limit ?? 50, 200)
+
+    const components = yield* client.findAll<HulyComponent>(
+      tracker.class.Component,
+      { space: project._id },
+      {
+        limit,
+        sort: { modifiedOn: SortingOrder.Descending }
+      }
+    )
+
+    const leadIds = [
+      ...new Set(
+        components.filter(c => c.lead !== null).map(c => c.lead!)
+      )
+    ]
+
+    const persons = leadIds.length > 0
+      ? yield* client.findAll<Person>(
+        contact.class.Person,
+        { _id: { $in: leadIds } }
+      )
+      : []
+
+    const personMap = new Map(persons.map(p => [p._id, p]))
+
+    const summaries: Array<ComponentSummary> = components.map(c => ({
+      id: String(c._id),
+      label: c.label,
+      lead: c.lead !== null ? personMap.get(c.lead)?.name : undefined,
+      modifiedOn: c.modifiedOn
+    }))
+
+    return summaries
+  })
+
+export const getComponent = (
+  params: GetComponentParams
+): Effect.Effect<Component, GetComponentError, HulyClient> =>
+  Effect.gen(function*() {
+    const { client, component } = yield* findProjectAndComponent(params)
+
+    let leadName: string | undefined
+    if (component.lead !== null) {
+      const person = yield* client.findOne<Person>(
+        contact.class.Person,
+        { _id: component.lead }
+      )
+      if (person) {
+        leadName = person.name
+      }
+    }
+
+    const result: Component = {
+      id: String(component._id),
+      label: component.label,
+      description: component.description,
+      lead: leadName,
+      project: params.project,
+      modifiedOn: component.modifiedOn,
+      createdOn: component.createdOn
+    }
+
+    return result
+  })
+
+export interface CreateComponentResult {
+  id: string
+  label: string
+}
+
+export const createComponent = (
+  params: CreateComponentParams
+): Effect.Effect<CreateComponentResult, CreateComponentError, HulyClient> =>
+  Effect.gen(function*() {
+    const { client, project } = yield* findProject(params.project)
+
+    const componentId: Ref<HulyComponent> = generateId()
+
+    let leadRef: Ref<Person> | null = null
+    if (params.lead !== undefined) {
+      const person = yield* findPersonByEmailOrName(client, params.lead)
+      if (person === undefined) {
+        return yield* new PersonNotFoundError({ identifier: params.lead })
+      }
+      leadRef = person._id
+    }
+
+    const componentData: Data<HulyComponent> = {
+      label: params.label,
+      description: params.description ?? "",
+      lead: leadRef,
+      comments: 0
+    }
+
+    yield* client.createDoc(
+      tracker.class.Component,
+      project._id,
+      componentData,
+      componentId
+    )
+
+    return { id: String(componentId), label: params.label }
+  })
+
+export interface UpdateComponentResult {
+  id: string
+  updated: boolean
+}
+
+export const updateComponent = (
+  params: UpdateComponentParams
+): Effect.Effect<UpdateComponentResult, UpdateComponentError, HulyClient> =>
+  Effect.gen(function*() {
+    const { client, component, project } = yield* findProjectAndComponent(params)
+
+    const updateOps: DocumentUpdate<HulyComponent> = {}
+
+    if (params.label !== undefined) {
+      updateOps.label = params.label
+    }
+
+    if (params.description !== undefined) {
+      updateOps.description = params.description
+    }
+
+    if (params.lead !== undefined) {
+      if (params.lead === null) {
+        updateOps.lead = null
+      } else {
+        const person = yield* findPersonByEmailOrName(client, params.lead)
+        if (person === undefined) {
+          return yield* new PersonNotFoundError({ identifier: params.lead })
+        }
+        updateOps.lead = person._id
+      }
+    }
+
+    if (Object.keys(updateOps).length === 0) {
+      return { id: String(component._id), updated: false }
+    }
+
+    yield* client.updateDoc(
+      tracker.class.Component,
+      project._id,
+      component._id,
+      updateOps
+    )
+
+    return { id: String(component._id), updated: true }
+  })
+
+export interface SetIssueComponentResult {
+  identifier: string
+  componentSet: boolean
+}
+
+export const setIssueComponent = (
+  params: SetIssueComponentParams
+): Effect.Effect<SetIssueComponentResult, SetIssueComponentError, HulyClient> =>
+  Effect.gen(function*() {
+    const { client, project } = yield* findProject(params.project)
+
+    const { fullIdentifier, number } = parseIssueIdentifier(
+      params.identifier,
+      params.project
+    )
+
+    let issue = yield* client.findOne<HulyIssue>(
+      tracker.class.Issue,
+      {
+        space: project._id,
+        identifier: fullIdentifier
+      }
+    )
+    if (issue === undefined && number !== null) {
+      issue = yield* client.findOne<HulyIssue>(
+        tracker.class.Issue,
+        {
+          space: project._id,
+          number
+        }
+      )
+    }
+    if (issue === undefined) {
+      return yield* new IssueNotFoundError({
+        identifier: params.identifier,
+        project: params.project
+      })
+    }
+
+    let componentRef: Ref<HulyComponent> | null = null
+
+    if (params.component !== null) {
+      const component = yield* findComponentByIdOrLabel(client, project._id, params.component)
+
+      if (component === undefined) {
+        return yield* new ComponentNotFoundError({
+          identifier: params.component,
+          project: params.project
+        })
+      }
+
+      componentRef = component._id
+    }
+
+    yield* client.updateDoc(
+      tracker.class.Issue,
+      project._id,
+      issue._id,
+      { component: componentRef }
+    )
+
+    return { identifier: issue.identifier, componentSet: true }
+  })
+
+export interface DeleteComponentResult {
+  id: string
+  deleted: boolean
+}
+
+export const deleteComponent = (
+  params: DeleteComponentParams
+): Effect.Effect<DeleteComponentResult, DeleteComponentError, HulyClient> =>
+  Effect.gen(function*() {
+    const { client, component, project } = yield* findProjectAndComponent(params)
+
+    yield* client.removeDoc(
+      tracker.class.Component,
+      project._id,
+      component._id
+    )
+
+    return { id: String(component._id), deleted: true }
+  })
+
+// --- Issue Template Operations ---
+
+export type ListIssueTemplatesError =
+  | HulyClientError
+  | ProjectNotFoundError
+
+export type GetIssueTemplateError =
+  | HulyClientError
+  | ProjectNotFoundError
+  | IssueTemplateNotFoundError
+
+export type CreateIssueTemplateError =
+  | HulyClientError
+  | ProjectNotFoundError
+  | PersonNotFoundError
+  | ComponentNotFoundError
+
+export type CreateIssueFromTemplateError =
+  | HulyClientError
+  | ProjectNotFoundError
+  | IssueTemplateNotFoundError
+  | InvalidStatusError
+  | PersonNotFoundError
+
+export type UpdateIssueTemplateError =
+  | HulyClientError
+  | ProjectNotFoundError
+  | IssueTemplateNotFoundError
+  | PersonNotFoundError
+  | ComponentNotFoundError
+
+export type DeleteIssueTemplateError =
+  | HulyClientError
+  | ProjectNotFoundError
+  | IssueTemplateNotFoundError
+
+const findTemplateByIdOrTitle = (
+  client: HulyClient["Type"],
+  projectId: Ref<HulyProject>,
+  templateIdOrTitle: string
+): Effect.Effect<HulyIssueTemplate | undefined, HulyClientError> =>
+  Effect.gen(function*() {
+    let template = yield* client.findOne<HulyIssueTemplate>(
+      tracker.class.IssueTemplate,
+      {
+        space: projectId,
+        _id: templateIdOrTitle as Ref<HulyIssueTemplate>
+      }
+    )
+
+    if (template === undefined) {
+      template = yield* client.findOne<HulyIssueTemplate>(
+        tracker.class.IssueTemplate,
+        {
+          space: projectId,
+          title: templateIdOrTitle
+        }
+      )
+    }
+
+    return template
+  })
+
+const findProjectAndTemplate = (
+  params: { project: string; template: string }
+): Effect.Effect<
+  { client: HulyClient["Type"]; project: HulyProject; template: HulyIssueTemplate },
+  ProjectNotFoundError | IssueTemplateNotFoundError | HulyClientError,
+  HulyClient
+> =>
+  Effect.gen(function*() {
+    const { client, project } = yield* findProject(params.project)
+
+    const template = yield* findTemplateByIdOrTitle(client, project._id, params.template)
+
+    if (template === undefined) {
+      return yield* new IssueTemplateNotFoundError({
+        identifier: params.template,
+        project: params.project
+      })
+    }
+
+    return { client, project, template }
+  })
+
+export const listIssueTemplates = (
+  params: ListIssueTemplatesParams
+): Effect.Effect<Array<IssueTemplateSummary>, ListIssueTemplatesError, HulyClient> =>
+  Effect.gen(function*() {
+    const { client, project } = yield* findProject(params.project)
+
+    const limit = Math.min(params.limit ?? 50, 200)
+
+    const templates = yield* client.findAll<HulyIssueTemplate>(
+      tracker.class.IssueTemplate,
+      { space: project._id },
+      {
+        limit,
+        sort: { modifiedOn: SortingOrder.Descending }
+      }
+    )
+
+    const summaries: Array<IssueTemplateSummary> = templates.map(t => ({
+      id: String(t._id),
+      title: t.title,
+      priority: priorityToString(t.priority),
+      modifiedOn: t.modifiedOn
+    }))
+
+    return summaries
+  })
+
+export const getIssueTemplate = (
+  params: GetIssueTemplateParams
+): Effect.Effect<IssueTemplate, GetIssueTemplateError, HulyClient> =>
+  Effect.gen(function*() {
+    const { client, template } = yield* findProjectAndTemplate(params)
+
+    let assigneeName: string | undefined
+    if (template.assignee !== null) {
+      const person = yield* client.findOne<Person>(
+        contact.class.Person,
+        { _id: template.assignee }
+      )
+      if (person) {
+        assigneeName = person.name
+      }
+    }
+
+    let componentLabel: string | undefined
+    if (template.component !== null) {
+      const component = yield* client.findOne<HulyComponent>(
+        tracker.class.Component,
+        { _id: template.component }
+      )
+      if (component) {
+        componentLabel = component.label
+      }
+    }
+
+    const result: IssueTemplate = {
+      id: String(template._id),
+      title: template.title,
+      description: template.description,
+      priority: priorityToString(template.priority),
+      assignee: assigneeName,
+      component: componentLabel,
+      estimation: template.estimation,
+      project: params.project,
+      modifiedOn: template.modifiedOn,
+      createdOn: template.createdOn
+    }
+
+    return result
+  })
+
+export interface CreateIssueTemplateResult {
+  id: string
+  title: string
+}
+
+export const createIssueTemplate = (
+  params: CreateIssueTemplateParams
+): Effect.Effect<CreateIssueTemplateResult, CreateIssueTemplateError, HulyClient> =>
+  Effect.gen(function*() {
+    const { client, project } = yield* findProject(params.project)
+
+    const templateId: Ref<HulyIssueTemplate> = generateId()
+
+    let assigneeRef: Ref<Person> | null = null
+    if (params.assignee !== undefined) {
+      const person = yield* findPersonByEmailOrName(client, params.assignee)
+      if (person === undefined) {
+        return yield* new PersonNotFoundError({ identifier: params.assignee })
+      }
+      assigneeRef = person._id
+    }
+
+    let componentRef: Ref<HulyComponent> | null = null
+    if (params.component !== undefined) {
+      const component = yield* findComponentByIdOrLabel(client, project._id, params.component)
+      if (component === undefined) {
+        return yield* new ComponentNotFoundError({
+          identifier: params.component,
+          project: params.project
+        })
+      }
+      componentRef = component._id
+    }
+
+    const priority = stringToPriority(params.priority || "no-priority")
+
+    const templateData: Data<HulyIssueTemplate> = {
+      title: params.title,
+      description: params.description ?? "",
+      priority,
+      assignee: assigneeRef,
+      component: componentRef,
+      estimation: params.estimation ?? 0,
+      children: [],
+      comments: 0
+    }
+
+    yield* client.createDoc(
+      tracker.class.IssueTemplate,
+      project._id,
+      templateData,
+      templateId
+    )
+
+    return { id: String(templateId), title: params.title }
+  })
+
+export const createIssueFromTemplate = (
+  params: CreateIssueFromTemplateParams
+): Effect.Effect<CreateIssueResult, CreateIssueFromTemplateError, HulyClient> =>
+  Effect.gen(function*() {
+    const { client, project, template } = yield* findProjectAndTemplate(params)
+
+    const title = params.title ?? template.title
+    const description = params.description ?? template.description
+    const priority = params.priority ?? priorityToString(template.priority)
+
+    let assignee = params.assignee
+    if (assignee === undefined && template.assignee !== null) {
+      const person = yield* client.findOne<Person>(
+        contact.class.Person,
+        { _id: template.assignee }
+      )
+      if (person) {
+        assignee = person.name
+      }
+    }
+
+    const issueParams: CreateIssueParams = {
+      project: params.project,
+      title,
+      description,
+      priority,
+      assignee,
+      status: params.status
+    }
+
+    const result = yield* createIssue(issueParams)
+
+    if (template.component !== null) {
+      const { fullIdentifier, number } = parseIssueIdentifier(
+        result.identifier,
+        params.project
+      )
+      let issue = yield* client.findOne<HulyIssue>(
+        tracker.class.Issue,
+        {
+          space: project._id,
+          identifier: fullIdentifier
+        }
+      )
+      if (issue === undefined && number !== null) {
+        issue = yield* client.findOne<HulyIssue>(
+          tracker.class.Issue,
+          { space: project._id, number }
+        )
+      }
+      if (issue !== undefined) {
+        yield* client.updateDoc(
+          tracker.class.Issue,
+          project._id,
+          issue._id,
+          { component: template.component }
+        )
+      }
+    }
+
+    return result
+  })
+
+export interface UpdateIssueTemplateResult {
+  id: string
+  updated: boolean
+}
+
+export const updateIssueTemplate = (
+  params: UpdateIssueTemplateParams
+): Effect.Effect<UpdateIssueTemplateResult, UpdateIssueTemplateError, HulyClient> =>
+  Effect.gen(function*() {
+    const { client, template, project } = yield* findProjectAndTemplate(params)
+
+    const updateOps: DocumentUpdate<HulyIssueTemplate> = {}
+
+    if (params.title !== undefined) {
+      updateOps.title = params.title
+    }
+
+    if (params.description !== undefined) {
+      updateOps.description = params.description
+    }
+
+    if (params.priority !== undefined) {
+      updateOps.priority = stringToPriority(params.priority)
+    }
+
+    if (params.assignee !== undefined) {
+      if (params.assignee === null) {
+        updateOps.assignee = null
+      } else {
+        const person = yield* findPersonByEmailOrName(client, params.assignee)
+        if (person === undefined) {
+          return yield* new PersonNotFoundError({ identifier: params.assignee })
+        }
+        updateOps.assignee = person._id
+      }
+    }
+
+    if (params.component !== undefined) {
+      if (params.component === null) {
+        updateOps.component = null
+      } else {
+        const component = yield* findComponentByIdOrLabel(client, project._id, params.component)
+        if (component === undefined) {
+          return yield* new ComponentNotFoundError({
+            identifier: params.component,
+            project: params.project
+          })
+        }
+        updateOps.component = component._id
+      }
+    }
+
+    if (params.estimation !== undefined) {
+      updateOps.estimation = params.estimation
+    }
+
+    if (Object.keys(updateOps).length === 0) {
+      return { id: String(template._id), updated: false }
+    }
+
+    yield* client.updateDoc(
+      tracker.class.IssueTemplate,
+      project._id,
+      template._id,
+      updateOps
+    )
+
+    return { id: String(template._id), updated: true }
+  })
+
+export interface DeleteIssueTemplateResult {
+  id: string
+  deleted: boolean
+}
+
+export const deleteIssueTemplate = (
+  params: DeleteIssueTemplateParams
+): Effect.Effect<DeleteIssueTemplateResult, DeleteIssueTemplateError, HulyClient> =>
+  Effect.gen(function*() {
+    const { client, template, project } = yield* findProjectAndTemplate(params)
+
+    yield* client.removeDoc(
+      tracker.class.IssueTemplate,
+      project._id,
+      template._id
+    )
+
+    return { id: String(template._id), deleted: true }
   })
