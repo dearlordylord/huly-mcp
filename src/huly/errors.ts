@@ -314,6 +314,58 @@ export class RecurringEventNotFoundError extends Schema.TaggedError<RecurringEve
 }
 
 /**
+ * Activity message not found.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class ActivityMessageNotFoundError extends Schema.TaggedError<ActivityMessageNotFoundError>()(
+  "ActivityMessageNotFoundError",
+  {
+    messageId: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Activity message '${this.messageId}' not found`
+  }
+}
+
+/**
+ * Reaction not found on message.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class ReactionNotFoundError extends Schema.TaggedError<ReactionNotFoundError>()(
+  "ReactionNotFoundError",
+  {
+    messageId: Schema.String,
+    emoji: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Reaction '${this.emoji}' not found on message '${this.messageId}'`
+  }
+}
+
+/**
+ * Saved message not found.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class SavedMessageNotFoundError extends Schema.TaggedError<SavedMessageNotFoundError>()(
+  "SavedMessageNotFoundError",
+  {
+    messageId: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Saved message for '${this.messageId}' not found`
+  }
+}
+
+/**
  * Union of all Huly domain errors.
  */
 export type HulyDomainError =
@@ -335,6 +387,9 @@ export type HulyDomainError =
   | ChannelNotFoundError
   | EventNotFoundError
   | RecurringEventNotFoundError
+  | ActivityMessageNotFoundError
+  | ReactionNotFoundError
+  | SavedMessageNotFoundError
 
 /**
  * Schema for all Huly domain errors (for serialization).
@@ -358,7 +413,10 @@ export const HulyDomainError: Schema.Union<
     typeof MilestoneNotFoundError,
     typeof ChannelNotFoundError,
     typeof EventNotFoundError,
-    typeof RecurringEventNotFoundError
+    typeof RecurringEventNotFoundError,
+    typeof ActivityMessageNotFoundError,
+    typeof ReactionNotFoundError,
+    typeof SavedMessageNotFoundError
   ]
 > = Schema.Union(
   HulyError,
@@ -378,7 +436,10 @@ export const HulyDomainError: Schema.Union<
   MilestoneNotFoundError,
   ChannelNotFoundError,
   EventNotFoundError,
-  RecurringEventNotFoundError
+  RecurringEventNotFoundError,
+  ActivityMessageNotFoundError,
+  ReactionNotFoundError,
+  SavedMessageNotFoundError
 )
 
 /**
