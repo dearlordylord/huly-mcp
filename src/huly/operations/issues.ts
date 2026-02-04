@@ -6,7 +6,7 @@
  *
  * @module
  */
-import type { Channel, Person } from "@hcengineering/contact"
+import type { Channel, Employee, Person } from "@hcengineering/contact"
 import {
   type AttachedData,
   type Class,
@@ -19,7 +19,6 @@ import {
   SortingOrder,
   type Space,
   type Status,
-  type StatusCategory,
   type WithLookup
 } from "@hcengineering/core"
 import { makeRank } from "@hcengineering/rank"
@@ -71,8 +70,6 @@ import { findProject, findProjectAndIssue, findProjectWithStatuses, parseIssueId
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const task = require("@hcengineering/task").default as typeof import("@hcengineering/task").default
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const tags = require("@hcengineering/tags").default as typeof import("@hcengineering/tags").default
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -249,7 +246,7 @@ export const listIssues = (
     const issues = yield* client.findAll<IssueWithLookup>(
       tracker.class.Issue,
       query,
-      withLookup(
+      withLookup<IssueWithLookup>(
         {
           limit,
           sort: {
@@ -957,13 +954,15 @@ export const createComponent = (
 
     const componentId: Ref<HulyComponent> = generateId()
 
-    let leadRef: Ref<Person> | null = null
+    let leadRef: Ref<Employee> | null = null
     if (params.lead !== undefined) {
       const person = yield* findPersonByEmailOrName(client, params.lead)
       if (person === undefined) {
         return yield* new PersonNotFoundError({ identifier: params.lead })
       }
-      leadRef = person._id
+      // Huly API: Component.lead expects Ref<Employee>, but we look up Person by email.
+      // Employee extends Person, so this is safe when person is actually an employee.
+      leadRef = person._id as Ref<Employee>
     }
 
     const componentData: Data<HulyComponent> = {
@@ -1012,7 +1011,9 @@ export const updateComponent = (
         if (person === undefined) {
           return yield* new PersonNotFoundError({ identifier: params.lead })
         }
-        updateOps.lead = person._id
+        // Huly API: Component.lead expects Ref<Employee>, but we look up Person by email.
+        // Employee extends Person, so this is safe when person is actually an employee.
+        updateOps.lead = person._id as Ref<Employee>
       }
     }
 

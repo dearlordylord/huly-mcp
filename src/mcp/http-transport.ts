@@ -109,9 +109,8 @@ export const createMcpHandlers = (
   const post = async (req: Request, res: Response): Promise<void> => {
     try {
       const server = createServer()
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined
-      })
+      // Stateless mode: no session ID generator, each request is independent
+      const transport = new StreamableHTTPServerTransport({})
 
       await server.connect(transport as Transport)
       await transport.handleRequest(req, res, req.body)

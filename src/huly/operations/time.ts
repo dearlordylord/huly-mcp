@@ -182,7 +182,7 @@ export const listTimeSpendReports = (
     const reports = yield* client.findAll<TimeSpendReportWithLookup>(
       tracker.class.TimeSpendReport,
       query,
-      withLookup(
+      withLookup<TimeSpendReportWithLookup>(
         { limit, sort: { date: SortingOrder.Descending } },
         {
           attachedTo: tracker.class.Issue,
@@ -226,7 +226,7 @@ export const getDetailedTimeReport = (
     const reports = yield* client.findAll<TimeSpendReportWithLookup>(
       tracker.class.TimeSpendReport,
       query,
-      withLookup(
+      withLookup<TimeSpendReportWithLookup>(
         { sort: { date: SortingOrder.Descending } },
         {
           attachedTo: tracker.class.Issue,

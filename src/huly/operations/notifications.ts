@@ -1,9 +1,10 @@
 import type {
   DocNotifyContext as HulyDocNotifyContext,
   InboxNotification as HulyInboxNotification,
+  NotificationProvider,
   NotificationProviderSetting as HulyNotificationProviderSetting
 } from "@hcengineering/notification"
-import type { Class, Doc, DocumentUpdate, Ref, Space } from "@hcengineering/core"
+import type { Class, Doc, DocumentUpdate, Ref } from "@hcengineering/core"
 import { SortingOrder } from "@hcengineering/core"
 import { Effect } from "effect"
 
@@ -493,7 +494,7 @@ export const updateNotificationProviderSetting = (
 
     const existingSetting = yield* client.findOne<HulyNotificationProviderSetting>(
       notification.class.NotificationProviderSetting,
-      { attachedTo: params.providerId as Ref<Doc> }
+      { attachedTo: params.providerId as Ref<NotificationProvider> }
     )
 
     if (existingSetting !== undefined) {
