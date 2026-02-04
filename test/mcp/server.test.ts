@@ -10,6 +10,7 @@ import type {
 } from "@hcengineering/core"
 import { type Issue as HulyIssue, type Project as HulyProject, IssuePriority } from "@hcengineering/tracker"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
+import { HulyStorageClient } from "../../src/huly/storage.js"
 import {
   McpServerService,
   McpServerError,
@@ -133,10 +134,10 @@ const createMockHulyClientLayer = (config: {
 // --- Tests ---
 
 describe("TOOL_DEFINITIONS", () => {
-    it.effect("exports 13 tool definitions", () =>
+    it.effect("exports 14 tool definitions", () =>
     Effect.gen(function* () {
       const tools = Object.keys(TOOL_DEFINITIONS)
-      expect(tools).toHaveLength(13)
+      expect(tools).toHaveLength(14)
       expect(tools).toContain("list_projects")
       expect(tools).toContain("list_issues")
       expect(tools).toContain("get_issue")
@@ -150,6 +151,7 @@ describe("TOOL_DEFINITIONS", () => {
       expect(tools).toContain("create_document")
       expect(tools).toContain("update_document")
       expect(tools).toContain("delete_document")
+      expect(tools).toContain("upload_file")
     })
   )
 
@@ -289,8 +291,11 @@ describe("McpServerService", () => {
           statuses,
         })
 
+        const storageClientLayer = HulyStorageClient.testLayer({})
+
         const serverLayer = McpServerService.layer({ transport: "stdio" }).pipe(
-          Layer.provide(hulyClientLayer)
+          Layer.provide(hulyClientLayer),
+          Layer.provide(storageClientLayer)
         )
 
         // Verify we can build the layer (this tests the Effect.gen runs without error)
@@ -307,10 +312,15 @@ describe("McpServerService", () => {
           statuses: [],
         })
 
+        const storageClientLayer = HulyStorageClient.testLayer({})
+
         const serverLayer = McpServerService.layer({
           transport: "http",
           httpPort: 3000,
-        }).pipe(Layer.provide(hulyClientLayer))
+        }).pipe(
+          Layer.provide(hulyClientLayer),
+          Layer.provide(storageClientLayer)
+        )
 
         yield* Layer.build(serverLayer)
       })

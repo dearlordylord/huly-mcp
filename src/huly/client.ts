@@ -2,7 +2,6 @@
  * @module
  */
 import {
-  type AuthOptions,
   createRestTxOperations,
   getWorkspaceToken,
   loadServerConfig,
@@ -31,9 +30,10 @@ import {
 } from "@hcengineering/core"
 import { htmlToJSON, jsonToHTML, jsonToMarkup, markupToJSON } from "@hcengineering/text"
 import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown"
-import { absurd, Context, Effect, Layer, Redacted, Schedule } from "effect"
+import { absurd, Context, Effect, Layer, Schedule } from "effect"
 
 import { type Auth, HulyConfigService } from "../config/config.js"
+import { authToOptions } from "./auth-utils.js"
 import { HulyAuthError, HulyConnectionError } from "./errors.js"
 
 export type HulyClientError = HulyConnectionError | HulyAuthError
@@ -412,17 +412,6 @@ function createMarkupOps(
           throw new Error(`Invalid format: ${format}`)
       }
     }
-  }
-}
-
-const authToOptions = (auth: Auth, workspace: string): AuthOptions => {
-  switch (auth._tag) {
-    case "token":
-      return { token: Redacted.value(auth.token), workspace }
-    case "password":
-      return { email: auth.email, password: Redacted.value(auth.password), workspace }
-    default:
-      return absurd(auth)
   }
 }
 

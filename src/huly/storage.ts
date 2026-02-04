@@ -8,11 +8,18 @@
 import * as fs from "node:fs/promises"
 import * as path from "node:path"
 
-import { createStorageClient, getWorkspaceToken, loadServerConfig, type StorageClient } from "@hcengineering/api-client"
+import {
+  type AuthOptions,
+  createStorageClient,
+  getWorkspaceToken,
+  loadServerConfig,
+  type StorageClient
+} from "@hcengineering/api-client"
 import type { WorkspaceUuid } from "@hcengineering/core"
-import { Context, Effect, Layer, Redacted, Schedule } from "effect"
+import { Context, Effect, Layer, Schedule } from "effect"
 
 import { HulyConfigService } from "../config/config.js"
+import { authToOptions } from "./auth-utils.js"
 import {
   FileFetchError,
   FileNotFoundError,
@@ -84,11 +91,11 @@ export class HulyStorageClient extends Context.Tag("@hulymcp/HulyStorageClient")
     Effect.gen(function*() {
       const config = yield* HulyConfigService
 
+      const authOptions = authToOptions(config.auth, config.workspace)
+
       const { baseUrl, storageClient, workspaceId } = yield* connectStorageWithRetry({
         url: config.url,
-        email: config.email,
-        password: Redacted.value(config.password),
-        workspace: config.workspace
+        ...authOptions
       })
 
       const operations: HulyStorageOperations = {
@@ -147,12 +154,9 @@ export class HulyStorageClient extends Context.Tag("@hulymcp/HulyStorageClient")
 
 // --- Internal Helpers ---
 
-interface StorageConnectionConfig {
+type StorageConnectionConfig = {
   url: string
-  email: string
-  password: string
-  workspace: string
-}
+} & AuthOptions
 
 interface StorageConnection {
   storageClient: StorageClient
@@ -192,20 +196,17 @@ const connectStorageClient = async (
   config: StorageConnectionConfig
 ): Promise<StorageConnection> => {
   // Use the same authentication flow as HulyClient to get workspace token
-  const serverConfig = await loadServerConfig(config.url)
+  const { url, ...authOptions } = config
+  const serverConfig = await loadServerConfig(url)
   const { token, workspaceId } = await getWorkspaceToken(
-    config.url,
-    {
-      email: config.email,
-      password: config.password,
-      workspace: config.workspace
-    },
+    url,
+    authOptions,
     serverConfig
   )
 
   // Construct URLs for file operations
-  const filesUrl = concatLink(config.url, `/files`)
-  const uploadUrl = concatLink(config.url, serverConfig.UPLOAD_URL ?? "/upload")
+  const filesUrl = concatLink(url, `/files`)
+  const uploadUrl = concatLink(url, serverConfig.UPLOAD_URL ?? "/upload")
 
   // Create storage client with proper authentication
   const storageClient: StorageClient = createStorageClient(
@@ -216,7 +217,7 @@ const connectStorageClient = async (
   )
 
   return {
-    baseUrl: config.url,
+    baseUrl: url,
     storageClient,
     workspaceId
   }
