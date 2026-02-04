@@ -8,6 +8,13 @@ Use `pnpm`, not npm.
 
 No comments that repeat the code. If the code says what it does, don't add a comment saying the same thing.
 
+## Type Safety
+
+Type casts (`as T`) are a sin. Avoid them. When unavoidable:
+1. Add a comment explaining WHY the cast is necessary
+2. Document what evidence/API docs support the cast being safe
+3. Consider if a generic type parameter or type guard could eliminate the cast
+
 <!-- effect-solutions:start -->
 ## Effect Best Practices
 
