@@ -364,6 +364,7 @@ export {
 } from "./time.js"
 
 export {
+<<<<<<< HEAD
   type FulltextSearchParams,
   fulltextSearchParamsJsonSchema,
   FulltextSearchParamsSchema,
@@ -416,3 +417,46 @@ export {
   unsaveMessageParamsJsonSchema,
   UnsaveMessageParamsSchema
 } from "./activity.js"
+
+export {
+  type AddAttachmentParams,
+  addAttachmentParamsJsonSchema,
+  AddAttachmentParamsSchema,
+  type AddDocumentAttachmentParams,
+  addDocumentAttachmentParamsJsonSchema,
+  AddDocumentAttachmentParamsSchema,
+  type AddIssueAttachmentParams,
+  addIssueAttachmentParamsJsonSchema,
+  AddIssueAttachmentParamsSchema,
+  type Attachment,
+  AttachmentSchema,
+  type AttachmentSummary,
+  AttachmentSummarySchema,
+  type DeleteAttachmentParams,
+  deleteAttachmentParamsJsonSchema,
+  DeleteAttachmentParamsSchema,
+  type DownloadAttachmentParams,
+  downloadAttachmentParamsJsonSchema,
+  DownloadAttachmentParamsSchema,
+  type GetAttachmentParams,
+  getAttachmentParamsJsonSchema,
+  GetAttachmentParamsSchema,
+  type ListAttachmentsParams,
+  listAttachmentsParamsJsonSchema,
+  ListAttachmentsParamsSchema,
+  parseAddAttachmentParams,
+  parseAddDocumentAttachmentParams,
+  parseAddIssueAttachmentParams,
+  parseDeleteAttachmentParams,
+  parseDownloadAttachmentParams,
+  parseGetAttachmentParams,
+  parseListAttachmentsParams,
+  parsePinAttachmentParams,
+  parseUpdateAttachmentParams,
+  type PinAttachmentParams,
+  pinAttachmentParamsJsonSchema,
+  PinAttachmentParamsSchema,
+  type UpdateAttachmentParams,
+  updateAttachmentParamsJsonSchema,
+  UpdateAttachmentParamsSchema
+} from "./attachments.js"

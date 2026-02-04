@@ -140,7 +140,7 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 
 | Tool | Description |
 |------|-------------|
-| `list_issues` | Query Huly issues with optional filters. Returns issues sorted by modification date (newest first). Supports filtering by project, status, assignee, and milestone. |
+| `list_issues` | Query Huly issues with optional filters. Returns issues sorted by modification date (newest first). Supports filtering by project, status, assignee, and milestone. Supports searching by title substring (titleSearch) and description content (descriptionSearch). |
 | `get_issue` | Retrieve full details for a Huly issue including markdown description. Use this to view issue content, comments, or full metadata. |
 | `create_issue` | Create a new issue in a Huly project. Description supports markdown formatting. Returns the created issue identifier. |
 | `update_issue` | Update fields on an existing Huly issue. Only provided fields are modified. Description updates support markdown. |
@@ -172,7 +172,7 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | Tool | Description |
 |------|-------------|
 | `list_teamspaces` | List all Huly document teamspaces. Returns teamspaces sorted by name. Supports filtering by archived status. |
-| `list_documents` | List documents in a Huly teamspace. Returns documents sorted by modification date (newest first). |
+| `list_documents` | List documents in a Huly teamspace. Returns documents sorted by modification date (newest first). Supports searching by title substring (titleSearch) and content (contentSearch). |
 | `get_document` | Retrieve full details for a Huly document including markdown content. Use this to view document content and metadata. |
 | `create_document` | Create a new document in a Huly teamspace. Content supports markdown formatting. Returns the created document id. |
 | `update_document` | Update fields on an existing Huly document. Only provided fields are modified. Content updates support markdown. |
@@ -188,7 +188,7 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 
 | Tool | Description |
 |------|-------------|
-| `list_persons` | List all persons in the Huly workspace. Returns persons sorted by modification date (newest first). |
+| `list_persons` | List all persons in the Huly workspace. Returns persons sorted by modification date (newest first). Supports searching by name substring (nameSearch) and email substring (emailSearch). |
 | `get_person` | Retrieve full details for a person including contact channels. Use personId or email to identify the person. |
 | `create_person` | Create a new person in Huly. Returns the created person ID. |
 | `update_person` | Update fields on an existing person. Only provided fields are modified. |
@@ -201,7 +201,7 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 
 | Tool | Description |
 |------|-------------|
-| `list_channels` | List all Huly channels. Returns channels sorted by name. Supports filtering by archived status. |
+| `list_channels` | List all Huly channels. Returns channels sorted by name. Supports filtering by archived status. Supports searching by name substring (nameSearch) and topic substring (topicSearch). |
 | `get_channel` | Retrieve full details for a Huly channel including topic and member list. |
 | `create_channel` | Create a new channel in Huly. Returns the created channel ID and name. |
 | `update_channel` | Update fields on an existing Huly channel. Only provided fields are modified. |

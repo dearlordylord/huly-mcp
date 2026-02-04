@@ -402,6 +402,23 @@ export class SavedMessageNotFoundError extends Schema.TaggedError<SavedMessageNo
 }
 
 /**
+ * Attachment not found.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class AttachmentNotFoundError extends Schema.TaggedError<AttachmentNotFoundError>()(
+  "AttachmentNotFoundError",
+  {
+    attachmentId: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Attachment '${this.attachmentId}' not found`
+  }
+}
+
+/**
  * Union of all Huly domain errors.
  */
 export type HulyDomainError =
@@ -428,6 +445,7 @@ export type HulyDomainError =
   | ActivityMessageNotFoundError
   | ReactionNotFoundError
   | SavedMessageNotFoundError
+  | AttachmentNotFoundError
 
 /**
  * Schema for all Huly domain errors (for serialization).
@@ -456,7 +474,8 @@ export const HulyDomainError: Schema.Union<
     typeof RecurringEventNotFoundError,
     typeof ActivityMessageNotFoundError,
     typeof ReactionNotFoundError,
-    typeof SavedMessageNotFoundError
+    typeof SavedMessageNotFoundError,
+    typeof AttachmentNotFoundError
   ]
 > = Schema.Union(
   HulyError,
@@ -481,7 +500,8 @@ export const HulyDomainError: Schema.Union<
   RecurringEventNotFoundError,
   ActivityMessageNotFoundError,
   ReactionNotFoundError,
-  SavedMessageNotFoundError
+  SavedMessageNotFoundError,
+  AttachmentNotFoundError
 )
 
 /**

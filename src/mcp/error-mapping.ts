@@ -79,6 +79,7 @@ export const mapDomainErrorToMcp = (error: HulyDomainError): McpErrorResponseWit
     Match.tag("ThreadReplyNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
     Match.tag("EventNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
     Match.tag("RecurringEventNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
+    Match.tag("AttachmentNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
     Match.tag("HulyConnectionError", (e) =>
       createErrorResponse(
         `Connection error: ${e.message}`,

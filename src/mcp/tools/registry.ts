@@ -76,3 +76,32 @@ export const createStorageToolHandler = <P, R>(
     return createSuccessResponse(operationResult.value)
   }
 }
+
+export const createCombinedToolHandler = <P, R>(
+  toolName: string,
+  parse: (input: unknown) => Effect.Effect<P, ParseResult.ParseError>,
+  operation: (params: P) => Effect.Effect<R, HulyDomainError, HulyClient | HulyStorageClient>
+): RegisteredTool["handler"] => {
+  return async (args, hulyClient, storageClient) => {
+    const parseResult = await Effect.runPromiseExit(parse(args))
+
+    if (Exit.isFailure(parseResult)) {
+      return mapParseCauseToMcp(parseResult.cause, toolName)
+    }
+
+    const params = parseResult.value
+
+    const operationResult = await Effect.runPromiseExit(
+      operation(params).pipe(
+        Effect.provideService(HulyClient, hulyClient),
+        Effect.provideService(HulyStorageClient, storageClient)
+      )
+    )
+
+    if (Exit.isFailure(operationResult)) {
+      return mapDomainCauseToMcp(operationResult.cause)
+    }
+
+    return createSuccessResponse(operationResult.value)
+  }
+}
