@@ -226,6 +226,23 @@ export class DocumentNotFoundError extends Schema.TaggedError<DocumentNotFoundEr
 }
 
 /**
+ * Channel not found in the workspace.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class ChannelNotFoundError extends Schema.TaggedError<ChannelNotFoundError>()(
+  "ChannelNotFoundError",
+  {
+    identifier: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Channel '${this.identifier}' not found`
+  }
+}
+
+/**
  * Union of all Huly domain errors.
  */
 export type HulyDomainError =
@@ -242,6 +259,7 @@ export type HulyDomainError =
   | FileFetchError
   | TeamspaceNotFoundError
   | DocumentNotFoundError
+  | ChannelNotFoundError
 
 /**
  * Schema for all Huly domain errors (for serialization).
@@ -260,7 +278,8 @@ export const HulyDomainError: Schema.Union<
     typeof FileNotFoundError,
     typeof FileFetchError,
     typeof TeamspaceNotFoundError,
-    typeof DocumentNotFoundError
+    typeof DocumentNotFoundError,
+    typeof ChannelNotFoundError
   ]
 > = Schema.Union(
   HulyError,
@@ -275,7 +294,8 @@ export const HulyDomainError: Schema.Union<
   FileNotFoundError,
   FileFetchError,
   TeamspaceNotFoundError,
-  DocumentNotFoundError
+  DocumentNotFoundError,
+  ChannelNotFoundError
 )
 
 /**
