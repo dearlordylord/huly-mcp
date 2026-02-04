@@ -245,6 +245,24 @@ export class CommentNotFoundError extends Schema.TaggedError<CommentNotFoundErro
 }
 
 /**
+ * Milestone not found in the specified project.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class MilestoneNotFoundError extends Schema.TaggedError<MilestoneNotFoundError>()(
+  "MilestoneNotFoundError",
+  {
+    identifier: Schema.String,
+    project: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Milestone '${this.identifier}' not found in project '${this.project}'`
+  }
+}
+
+/**
  * Union of all Huly domain errors.
  */
 export type HulyDomainError =
@@ -262,6 +280,7 @@ export type HulyDomainError =
   | TeamspaceNotFoundError
   | DocumentNotFoundError
   | CommentNotFoundError
+  | MilestoneNotFoundError
 
 /**
  * Schema for all Huly domain errors (for serialization).
@@ -281,7 +300,8 @@ export const HulyDomainError: Schema.Union<
     typeof FileFetchError,
     typeof TeamspaceNotFoundError,
     typeof DocumentNotFoundError,
-    typeof CommentNotFoundError
+    typeof CommentNotFoundError,
+    typeof MilestoneNotFoundError
   ]
 > = Schema.Union(
   HulyError,
@@ -297,7 +317,8 @@ export const HulyDomainError: Schema.Union<
   FileFetchError,
   TeamspaceNotFoundError,
   DocumentNotFoundError,
-  CommentNotFoundError
+  CommentNotFoundError,
+  MilestoneNotFoundError
 )
 
 /**

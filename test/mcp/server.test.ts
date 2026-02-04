@@ -134,10 +134,10 @@ const createMockHulyClientLayer = (config: {
 // --- Tests ---
 
 describe("TOOL_DEFINITIONS", () => {
-    it.effect("exports 18 tool definitions", () =>
+    it.effect("exports 24 tool definitions", () =>
     Effect.gen(function* () {
       const tools = Object.keys(TOOL_DEFINITIONS)
-      expect(tools).toHaveLength(18)
+      expect(tools).toHaveLength(24)
       expect(tools).toContain("list_projects")
       expect(tools).toContain("list_issues")
       expect(tools).toContain("get_issue")
@@ -149,6 +149,12 @@ describe("TOOL_DEFINITIONS", () => {
       expect(tools).toContain("add_comment")
       expect(tools).toContain("update_comment")
       expect(tools).toContain("delete_comment")
+      expect(tools).toContain("list_milestones")
+      expect(tools).toContain("get_milestone")
+      expect(tools).toContain("create_milestone")
+      expect(tools).toContain("update_milestone")
+      expect(tools).toContain("set_issue_milestone")
+      expect(tools).toContain("delete_milestone")
       expect(tools).toContain("list_teamspaces")
       expect(tools).toContain("list_documents")
       expect(tools).toContain("get_document")
