@@ -4,7 +4,7 @@ import { Effect, Exit } from "effect"
 import { HulyClient } from "../../huly/client.js"
 import type { HulyDomainError } from "../../huly/errors.js"
 import { HulyStorageClient } from "../../huly/storage.js"
-import { WorkspaceClient, type WorkspaceClientError } from "../../huly/workspace-client.js"
+import { WorkspaceClient } from "../../huly/workspace-client.js"
 import {
   createSuccessResponse,
   mapDomainCauseToMcp,
@@ -111,7 +111,7 @@ export const createCombinedToolHandler = <P, R>(
 export const createWorkspaceToolHandler = <P, R>(
   toolName: string,
   parse: (input: unknown) => Effect.Effect<P, ParseResult.ParseError>,
-  operation: (params: P) => Effect.Effect<R, WorkspaceClientError, WorkspaceClient>
+  operation: (params: P) => Effect.Effect<R, HulyDomainError, WorkspaceClient>
 ): RegisteredTool["handler"] => {
   return async (args, _hulyClient, _storageClient, workspaceClient) => {
     const parseResult = await Effect.runPromiseExit(parse(args))
@@ -143,7 +143,7 @@ export const createWorkspaceToolHandler = <P, R>(
 
 export const createNoParamsWorkspaceToolHandler = <R>(
   _toolName: string,
-  operation: () => Effect.Effect<R, WorkspaceClientError, WorkspaceClient>
+  operation: () => Effect.Effect<R, HulyDomainError, WorkspaceClient>
 ): RegisteredTool["handler"] => {
   return async (_args, _hulyClient, _storageClient, workspaceClient) => {
     if (!workspaceClient) {
