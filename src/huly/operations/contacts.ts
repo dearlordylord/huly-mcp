@@ -5,8 +5,7 @@ import type {
   Person as HulyPerson
 } from "@hcengineering/contact"
 import { AvatarType } from "@hcengineering/contact"
-import type { Doc } from "@hcengineering/core"
-import { type Data, type DocumentUpdate, generateId, type Ref, SortingOrder } from "@hcengineering/core"
+import { type Data, type Doc, type DocumentUpdate, generateId, type Ref, SortingOrder } from "@hcengineering/core"
 import { Effect } from "effect"
 
 import type {
@@ -48,9 +47,9 @@ const parseName = (name: string): { firstName: string; lastName: string } => {
   return { firstName: name, lastName: "" }
 }
 
-const batchGetEmailsForPersons = (
+const batchGetEmailsForPersons = <T extends Doc>(
   client: HulyClient["Type"],
-  personIds: Array<Ref<Doc>>
+  personIds: Array<Ref<T>>
 ): Effect.Effect<Map<string, string>, HulyClientError> =>
   Effect.gen(function*() {
     if (personIds.length === 0) {
@@ -91,7 +90,7 @@ export const listPersons = (
       }
     )
 
-    const personIds = persons.map(p => p._id as Ref<Doc>)
+    const personIds = persons.map(p => p._id)
     const emailMap = yield* batchGetEmailsForPersons(client, personIds)
 
     return persons.map(person => ({
@@ -309,7 +308,7 @@ export const listEmployees = (
       }
     )
 
-    const employeeIds = employees.map(e => e._id as Ref<Doc>)
+    const employeeIds = employees.map(e => e._id)
     const emailMap = yield* batchGetEmailsForPersons(client, employeeIds)
 
     return employees.map(emp => ({
