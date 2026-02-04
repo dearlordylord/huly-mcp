@@ -48,7 +48,9 @@
   "dependencies": {
     "@effect/platform": "^0.94.2",
     "@effect/platform-node": "^0.104.1",
+    "@hcengineering/activity": "^0.7.0",
     "@hcengineering/api-client": "^0.7.3",
+    "@hcengineering/chunter": "^0.7.0",
     "@hcengineering/collaborator-client": "^0.7.17",
     "@hcengineering/contact": "^0.7.0",
     "@hcengineering/core": "^0.7.4",

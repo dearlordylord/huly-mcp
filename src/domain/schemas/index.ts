@@ -99,3 +99,25 @@ export {
   type UploadFileResult,
   UploadFileResultSchema
 } from "./storage.js"
+
+export {
+  type AddCommentParams,
+  addCommentParamsJsonSchema,
+  AddCommentParamsSchema,
+  type Comment,
+  CommentSchema,
+  type DeleteCommentParams,
+  deleteCommentParamsJsonSchema,
+  DeleteCommentParamsSchema,
+  type ListCommentsParams,
+  listCommentsParamsJsonSchema,
+  ListCommentsParamsSchema,
+  parseAddCommentParams,
+  parseComment,
+  parseDeleteCommentParams,
+  parseListCommentsParams,
+  parseUpdateCommentParams,
+  type UpdateCommentParams,
+  updateCommentParamsJsonSchema,
+  UpdateCommentParamsSchema
+} from "./comments.js"

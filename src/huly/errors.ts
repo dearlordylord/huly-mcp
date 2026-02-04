@@ -226,6 +226,25 @@ export class DocumentNotFoundError extends Schema.TaggedError<DocumentNotFoundEr
 }
 
 /**
+ * Comment not found on the specified issue.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class CommentNotFoundError extends Schema.TaggedError<CommentNotFoundError>()(
+  "CommentNotFoundError",
+  {
+    commentId: Schema.String,
+    issueIdentifier: Schema.String,
+    project: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Comment '${this.commentId}' not found on issue '${this.issueIdentifier}' in project '${this.project}'`
+  }
+}
+
+/**
  * Union of all Huly domain errors.
  */
 export type HulyDomainError =
@@ -242,6 +261,7 @@ export type HulyDomainError =
   | FileFetchError
   | TeamspaceNotFoundError
   | DocumentNotFoundError
+  | CommentNotFoundError
 
 /**
  * Schema for all Huly domain errors (for serialization).
@@ -260,7 +280,8 @@ export const HulyDomainError: Schema.Union<
     typeof FileNotFoundError,
     typeof FileFetchError,
     typeof TeamspaceNotFoundError,
-    typeof DocumentNotFoundError
+    typeof DocumentNotFoundError,
+    typeof CommentNotFoundError
   ]
 > = Schema.Union(
   HulyError,
@@ -275,7 +296,8 @@ export const HulyDomainError: Schema.Union<
   FileNotFoundError,
   FileFetchError,
   TeamspaceNotFoundError,
-  DocumentNotFoundError
+  DocumentNotFoundError,
+  CommentNotFoundError
 )
 
 /**
