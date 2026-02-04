@@ -37,8 +37,10 @@ import type {
   ListIssuesParams,
   UpdateIssueParams
 } from "../../domain/schemas.js"
-import { HulyClient, type HulyClientError } from "../client.js"
-import { InvalidStatusError, IssueNotFoundError, PersonNotFoundError, ProjectNotFoundError } from "../errors.js"
+import type { HulyClient, HulyClientError } from "../client.js"
+import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
+import { InvalidStatusError, PersonNotFoundError } from "../errors.js"
+import { findProject, findProjectAndIssue } from "./shared.js"
 
 // Import plugin objects at runtime (CommonJS modules)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -149,70 +151,6 @@ const isCanceledStatus = (statusRef: Ref<Status>, statuses: ReadonlyArray<Status
   const lostCategory = task.statusCategory.Lost
   return status.category === lostCategory
 }
-
-// --- Helpers ---
-
-const findProject = (
-  projectIdentifier: string
-): Effect.Effect<
-  { client: HulyClient["Type"]; project: HulyProject },
-  ProjectNotFoundError | HulyClientError,
-  HulyClient
-> =>
-  Effect.gen(function*() {
-    const client = yield* HulyClient
-
-    const project = yield* client.findOne<HulyProject>(
-      tracker.class.Project,
-      { identifier: projectIdentifier }
-    )
-    if (project === undefined) {
-      return yield* new ProjectNotFoundError({ identifier: projectIdentifier })
-    }
-
-    return { client, project }
-  })
-
-const findProjectAndIssue = (
-  params: { project: string; identifier: string }
-): Effect.Effect<
-  { client: HulyClient["Type"]; project: HulyProject; issue: HulyIssue },
-  ProjectNotFoundError | IssueNotFoundError | HulyClientError,
-  HulyClient
-> =>
-  Effect.gen(function*() {
-    const { client, project } = yield* findProject(params.project)
-
-    const { fullIdentifier, number } = parseIssueIdentifier(
-      params.identifier,
-      params.project
-    )
-
-    let issue = yield* client.findOne<HulyIssue>(
-      tracker.class.Issue,
-      {
-        space: project._id,
-        identifier: fullIdentifier
-      }
-    )
-    if (issue === undefined && number !== null) {
-      issue = yield* client.findOne<HulyIssue>(
-        tracker.class.Issue,
-        {
-          space: project._id,
-          number
-        }
-      )
-    }
-    if (issue === undefined) {
-      return yield* new IssueNotFoundError({
-        identifier: params.identifier,
-        project: params.project
-      })
-    }
-
-    return { client, project, issue }
-  })
 
 // --- Operations ---
 
@@ -388,43 +326,6 @@ const findPersonByEmailOrName = (
 
     return matchingPerson
   })
-
-// --- Identifier Parsing ---
-
-/**
- * Parse an issue identifier.
- * Accepts:
- * - Full identifier: "HULY-123"
- * - Numeric only: "123" or 123
- *
- * Returns the full identifier if project prefix is provided,
- * or constructs it from the project identifier and number.
- */
-const parseIssueIdentifier = (
-  identifier: string | number,
-  projectIdentifier: string
-): { fullIdentifier: string; number: number | null } => {
-  const idStr = String(identifier).trim()
-
-  const match = idStr.match(/^([A-Z]+)-(\d+)$/i)
-  if (match) {
-    return {
-      fullIdentifier: `${match[1].toUpperCase()}-${match[2]}`,
-      number: parseInt(match[2], 10)
-    }
-  }
-
-  const numMatch = idStr.match(/^\d+$/)
-  if (numMatch) {
-    const num = parseInt(idStr, 10)
-    return {
-      fullIdentifier: `${projectIdentifier.toUpperCase()}-${num}`,
-      number: num
-    }
-  }
-
-  return { fullIdentifier: idStr, number: null }
-}
 
 // --- Get Issue Operation ---
 

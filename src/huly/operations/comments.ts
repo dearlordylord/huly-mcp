@@ -1,12 +1,5 @@
 import type { ChatMessage } from "@hcengineering/chunter"
-import {
-  type AttachedData,
-  type DocumentUpdate,
-  generateId,
-  type Ref,
-  SortingOrder
-} from "@hcengineering/core"
-import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
+import { type AttachedData, type DocumentUpdate, generateId, type Ref, SortingOrder } from "@hcengineering/core"
 import { Effect } from "effect"
 
 import type {
@@ -16,8 +9,10 @@ import type {
   ListCommentsParams,
   UpdateCommentParams
 } from "../../domain/schemas.js"
-import { HulyClient, type HulyClientError } from "../client.js"
-import { CommentNotFoundError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
+import type { HulyClient, HulyClientError } from "../client.js"
+import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
+import { CommentNotFoundError } from "../errors.js"
+import { findProjectAndIssue as findProjectAndIssueShared } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
@@ -48,93 +43,9 @@ export type DeleteCommentError =
 
 // --- Helpers ---
 
-const findProject = (
-  projectIdentifier: string
-): Effect.Effect<
-  { client: HulyClient["Type"]; project: HulyProject },
-  ProjectNotFoundError | HulyClientError,
-  HulyClient
-> =>
-  Effect.gen(function*() {
-    const client = yield* HulyClient
-
-    const project = yield* client.findOne<HulyProject>(
-      tracker.class.Project,
-      { identifier: projectIdentifier }
-    )
-    if (project === undefined) {
-      return yield* new ProjectNotFoundError({ identifier: projectIdentifier })
-    }
-
-    return { client, project }
-  })
-
-const parseIssueIdentifier = (
-  identifier: string | number,
-  projectIdentifier: string
-): { fullIdentifier: string; number: number | null } => {
-  const idStr = String(identifier).trim()
-
-  const match = idStr.match(/^([A-Z]+)-(\d+)$/i)
-  if (match) {
-    return {
-      fullIdentifier: `${match[1].toUpperCase()}-${match[2]}`,
-      number: parseInt(match[2], 10)
-    }
-  }
-
-  const numMatch = idStr.match(/^\d+$/)
-  if (numMatch) {
-    const num = parseInt(idStr, 10)
-    return {
-      fullIdentifier: `${projectIdentifier.toUpperCase()}-${num}`,
-      number: num
-    }
-  }
-
-  return { fullIdentifier: idStr, number: null }
-}
-
 const findProjectAndIssue = (
   params: { project: string; issueIdentifier: string }
-): Effect.Effect<
-  { client: HulyClient["Type"]; project: HulyProject; issue: HulyIssue },
-  ProjectNotFoundError | IssueNotFoundError | HulyClientError,
-  HulyClient
-> =>
-  Effect.gen(function*() {
-    const { client, project } = yield* findProject(params.project)
-
-    const { fullIdentifier, number } = parseIssueIdentifier(
-      params.issueIdentifier,
-      params.project
-    )
-
-    let issue = yield* client.findOne<HulyIssue>(
-      tracker.class.Issue,
-      {
-        space: project._id,
-        identifier: fullIdentifier
-      }
-    )
-    if (issue === undefined && number !== null) {
-      issue = yield* client.findOne<HulyIssue>(
-        tracker.class.Issue,
-        {
-          space: project._id,
-          number
-        }
-      )
-    }
-    if (issue === undefined) {
-      return yield* new IssueNotFoundError({
-        identifier: params.issueIdentifier,
-        project: params.project
-      })
-    }
-
-    return { client, project, issue }
-  })
+) => findProjectAndIssueShared({ project: params.project, identifier: params.issueIdentifier })
 
 // --- Operations ---
 
@@ -194,7 +105,7 @@ export const addComment = (
   params: AddCommentParams
 ): Effect.Effect<AddCommentResult, AddCommentError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, project, issue } = yield* findProjectAndIssue({
+    const { client, issue, project } = yield* findProjectAndIssue({
       project: params.project,
       issueIdentifier: params.issueIdentifier
     })
@@ -237,7 +148,7 @@ export const updateComment = (
   params: UpdateCommentParams
 ): Effect.Effect<UpdateCommentResult, UpdateCommentError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, project, issue } = yield* findProjectAndIssue({
+    const { client, issue, project } = yield* findProjectAndIssue({
       project: params.project,
       issueIdentifier: params.issueIdentifier
     })
@@ -301,7 +212,7 @@ export const deleteComment = (
   params: DeleteCommentParams
 ): Effect.Effect<DeleteCommentResult, DeleteCommentError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, project, issue } = yield* findProjectAndIssue({
+    const { client, issue, project } = yield* findProjectAndIssue({
       project: params.project,
       issueIdentifier: params.issueIdentifier
     })

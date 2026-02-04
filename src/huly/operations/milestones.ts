@@ -18,8 +18,10 @@ import type {
   SetIssueMilestoneParams,
   UpdateMilestoneParams
 } from "../../domain/schemas.js"
-import { HulyClient, type HulyClientError } from "../client.js"
-import { IssueNotFoundError, MilestoneNotFoundError, ProjectNotFoundError } from "../errors.js"
+import type { HulyClient, HulyClientError } from "../client.js"
+import type { ProjectNotFoundError } from "../errors.js"
+import { IssueNotFoundError, MilestoneNotFoundError } from "../errors.js"
+import { findProject, parseIssueIdentifier } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
@@ -85,27 +87,6 @@ const stringToMilestoneStatus = (status: MilestoneStatusStr): MilestoneStatus =>
   }
 }
 
-const findProject = (
-  projectIdentifier: string
-): Effect.Effect<
-  { client: HulyClient["Type"]; project: HulyProject },
-  ProjectNotFoundError | HulyClientError,
-  HulyClient
-> =>
-  Effect.gen(function*() {
-    const client = yield* HulyClient
-
-    const project = yield* client.findOne<HulyProject>(
-      tracker.class.Project,
-      { identifier: projectIdentifier }
-    )
-    if (project === undefined) {
-      return yield* new ProjectNotFoundError({ identifier: projectIdentifier })
-    }
-
-    return { client, project }
-  })
-
 const findProjectAndMilestone = (
   params: { project: string; milestone: string }
 ): Effect.Effect<
@@ -143,32 +124,6 @@ const findProjectAndMilestone = (
 
     return { client, project, milestone }
   })
-
-const parseIssueIdentifier = (
-  identifier: string | number,
-  projectIdentifier: string
-): { fullIdentifier: string; number: number | null } => {
-  const idStr = String(identifier).trim()
-
-  const match = idStr.match(/^([A-Z]+)-(\d+)$/i)
-  if (match) {
-    return {
-      fullIdentifier: `${match[1].toUpperCase()}-${match[2]}`,
-      number: parseInt(match[2], 10)
-    }
-  }
-
-  const numMatch = idStr.match(/^\d+$/)
-  if (numMatch) {
-    const num = parseInt(idStr, 10)
-    return {
-      fullIdentifier: `${projectIdentifier.toUpperCase()}-${num}`,
-      number: num
-    }
-  }
-
-  return { fullIdentifier: idStr, number: null }
-}
 
 export const listMilestones = (
   params: ListMilestonesParams
