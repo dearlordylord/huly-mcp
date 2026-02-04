@@ -1,6 +1,6 @@
 {
   "name": "@firfi/huly-mcp",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "MCP server for Huly integration",
   "mcpName": "io.github.dearlordylord/huly-mcp",
   "type": "module",
@@ -33,7 +33,16 @@
     "huly-mcp": "./dist/index.cjs",
     "@firfi/huly-mcp": "./dist/index.cjs"
   },
-  "keywords": ["mcp", "model-context-protocol", "huly", "project-management", "issue-tracker", "ai-tools", "claude", "llm"],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "huly",
+    "project-management",
+    "issue-tracker",
+    "ai-tools",
+    "claude",
+    "llm"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
