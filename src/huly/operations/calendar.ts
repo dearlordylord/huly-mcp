@@ -230,7 +230,7 @@ export const getEvent = (
       allDay: event.allDay,
       location: event.location,
       visibility: visibilityToString(event.visibility),
-      participants: participants.length > 0 ? participants : undefined,
+      participants,
       externalParticipants: event.externalParticipants,
       calendarId: event.calendar ? String(event.calendar) : undefined,
       modifiedOn: event.modifiedOn,
@@ -581,7 +581,7 @@ export const listEventInstances = (
 
     const participantMap = new Map<string, Participant[]>()
     if (params.includeParticipants) {
-      const allParticipantRefs = instances.flatMap(i => i.participants)
+      const allParticipantRefs = [...new Set(instances.flatMap(i => i.participants))]
       if (allParticipantRefs.length > 0) {
         const participants = yield* buildParticipants(client, allParticipantRefs)
         const participantById = new Map(participants.map(p => [p.id, p]))
@@ -589,9 +589,11 @@ export const listEventInstances = (
           const instanceParticipants = instance.participants
             .map(ref => participantById.get(String(ref)))
             .filter((p): p is Participant => p !== undefined)
-          if (instanceParticipants.length > 0) {
-            participantMap.set(instance.eventId, instanceParticipants)
-          }
+          participantMap.set(instance.eventId, instanceParticipants)
+        }
+      } else {
+        for (const instance of instances) {
+          participantMap.set(instance.eventId, [])
         }
       }
     }
@@ -608,7 +610,7 @@ export const listEventInstances = (
       visibility: visibilityToString(instance.visibility),
       isCancelled: instance.isCancelled,
       isVirtual: instance.virtual,
-      participants: participantMap.get(instance.eventId),
+      participants: params.includeParticipants ? (participantMap.get(instance.eventId) ?? []) : undefined,
       externalParticipants: instance.externalParticipants
     }))
 
