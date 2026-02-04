@@ -97,6 +97,14 @@ export interface HulyClientOperations {
     id: MarkupRef,
     format: MarkupFormat
   ) => Effect.Effect<string, HulyClientError>
+
+  readonly updateMarkup: (
+    objectClass: Ref<Class<Doc>>,
+    objectId: Ref<Doc>,
+    objectAttr: string,
+    markup: string,
+    format: MarkupFormat
+  ) => Effect.Effect<void, HulyClientError>
 }
 
 export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
@@ -226,6 +234,16 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
                 message: `fetchMarkup failed: ${String(e)}`,
                 cause: e
               })
+          }),
+
+        updateMarkup: (objectClass, objectId, objectAttr, markup, format) =>
+          Effect.tryPromise({
+            try: () => markupOps.updateMarkup(objectClass, objectId, objectAttr, markup, format),
+            catch: (e) =>
+              new HulyConnectionError({
+                message: `updateMarkup failed: ${String(e)}`,
+                cause: e
+              })
           })
       }
 
@@ -264,6 +282,8 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
 
     const noopFetchMarkup = (): Effect.Effect<string, HulyClientError> => Effect.succeed("")
 
+    const noopUpdateMarkup = (): Effect.Effect<void, HulyClientError> => Effect.succeed(undefined)
+
     const defaultOps: HulyClientOperations = {
       findAll: noopFindAll,
       findOne: noopFindOne,
@@ -272,7 +292,8 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       addCollection: noopAddCollection,
       removeDoc: noopRemoveDoc,
       uploadMarkup: noopUploadMarkup,
-      fetchMarkup: noopFetchMarkup
+      fetchMarkup: noopFetchMarkup,
+      updateMarkup: noopUpdateMarkup
     }
 
     return Layer.succeed(HulyClient, { ...defaultOps, ...mockOperations })
@@ -300,6 +321,13 @@ interface MarkupOperations {
     markup: string,
     format: MarkupFormat
   ) => Promise<MarkupRef>
+  updateMarkup: (
+    objectClass: Ref<Class<Doc>>,
+    objectId: Ref<Doc>,
+    objectAttr: string,
+    markup: string,
+    format: MarkupFormat
+  ) => Promise<void>
 }
 
 interface RestConnection {
@@ -364,6 +392,21 @@ function createMarkupOps(
           return await collaborator.createMarkup(collabId, jsonToMarkup(htmlToJSON(value)))
         case "markdown":
           return await collaborator.createMarkup(collabId, jsonToMarkup(markdownToMarkup(value, { refUrl, imageUrl })))
+        default:
+          absurd(format)
+          throw new Error(`Invalid format: ${format}`)
+      }
+    },
+
+    async updateMarkup(objectClass, objectId, objectAttr, value, format) {
+      const collabId = makeCollabId(objectClass, objectId, objectAttr)
+      switch (format) {
+        case "markup":
+          return await collaborator.updateMarkup(collabId, value)
+        case "html":
+          return await collaborator.updateMarkup(collabId, jsonToMarkup(htmlToJSON(value)))
+        case "markdown":
+          return await collaborator.updateMarkup(collabId, jsonToMarkup(markdownToMarkup(value, { refUrl, imageUrl })))
         default:
           absurd(format)
           throw new Error(`Invalid format: ${format}`)
