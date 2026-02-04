@@ -376,11 +376,11 @@ describe("listIssues", () => {
       Effect.gen(function* () {
         const project = makeProject()
         const issues = [
-          makeIssue({ identifier: "TEST-1", priority: IssuePriority.Urgent }),
-          makeIssue({ identifier: "TEST-2", priority: IssuePriority.High }),
-          makeIssue({ identifier: "TEST-3", priority: IssuePriority.Medium }),
-          makeIssue({ identifier: "TEST-4", priority: IssuePriority.Low }),
-          makeIssue({ identifier: "TEST-5", priority: IssuePriority.NoPriority }),
+          makeIssue({ identifier: "TEST-1", priority: IssuePriority.Urgent, modifiedOn: 5000 }),
+          makeIssue({ identifier: "TEST-2", priority: IssuePriority.High, modifiedOn: 4000 }),
+          makeIssue({ identifier: "TEST-3", priority: IssuePriority.Medium, modifiedOn: 3000 }),
+          makeIssue({ identifier: "TEST-4", priority: IssuePriority.Low, modifiedOn: 2000 }),
+          makeIssue({ identifier: "TEST-5", priority: IssuePriority.NoPriority, modifiedOn: 1000 }),
         ]
         const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
