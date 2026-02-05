@@ -15,7 +15,6 @@ import {
 } from "@hcengineering/tracker"
 import { Effect } from "effect"
 
-import { isExistent } from "../../utils/assertions.js"
 import type {
   CreateWorkSlotParams,
   DetailedTimeReport,
@@ -30,6 +29,7 @@ import type {
   TimeSpendReport,
   WorkSlot
 } from "../../domain/schemas.js"
+import { isExistent } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { IssueNotFoundError } from "../errors.js"
 import { ProjectNotFoundError } from "../errors.js"
