@@ -1,4 +1,9 @@
-import type { ActivityMessage as HulyActivityMessage, Reaction as HulyReaction, SavedMessage as HulySavedMessage, UserMentionInfo } from "@hcengineering/activity"
+import type {
+  ActivityMessage as HulyActivityMessage,
+  Reaction as HulyReaction,
+  SavedMessage as HulySavedMessage,
+  UserMentionInfo
+} from "@hcengineering/activity"
 import type { AttachedData, Class, Doc, Ref } from "@hcengineering/core"
 import { generateId, SortingOrder } from "@hcengineering/core"
 import { Effect } from "effect"
@@ -20,9 +25,9 @@ import type {
 import { HulyClient, type HulyClientError } from "../client.js"
 import { ActivityMessageNotFoundError, ReactionNotFoundError, SavedMessageNotFoundError } from "../errors.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const activity = require("@hcengineering/activity").default as typeof import("@hcengineering/activity").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
 
 export type ListActivityError = HulyClientError

@@ -8,6 +8,7 @@ import { AvatarType } from "@hcengineering/contact"
 import { type Data, type Doc, type DocumentUpdate, generateId, type Ref, SortingOrder } from "@hcengineering/core"
 import { Effect } from "effect"
 
+import { assertExists } from "../../utils/assertions.js"
 import type {
   CreateOrganizationParams,
   CreatePersonParams,
@@ -25,7 +26,7 @@ import type {
 import { HulyClient, type HulyClientError } from "../client.js"
 import { PersonNotFoundError } from "../errors.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
 
 export type ListPersonsError = HulyClientError
@@ -169,7 +170,10 @@ export const getPerson = (
 
     if (person === undefined) {
       return yield* new PersonNotFoundError({
-        identifier: params.personId ?? params.email!
+        identifier: assertExists(
+          params.personId ?? params.email,
+          "personId or email required"
+        )
       })
     }
 

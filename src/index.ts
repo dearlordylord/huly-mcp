@@ -17,19 +17,19 @@ import { HulyStorageClient, type StorageClientError } from "./huly/storage.js"
 import { WorkspaceClient, type WorkspaceClientError } from "./huly/workspace-client.js"
 import { HttpServerFactoryService } from "./mcp/http-transport.js"
 import { type McpServerError, McpServerService, type McpTransportType } from "./mcp/server.js"
-;(globalThis as any).indexedDB = fakeIndexedDB
+;(globalThis as Record<string, unknown>).indexedDB = fakeIndexedDB
 
 // Mock window with basic event handling
 // - dirtiest hack here. current api package is frontend-oriented, but we somehow run it on the server and it somehow works. hooray?
-const mockWindow: any = {
+const mockWindow: Record<string, unknown> = {
   addEventListener: () => {},
   removeEventListener: () => {},
   location: { href: "" },
   document: {}
 }
-;(globalThis as any).window = mockWindow
+;(globalThis as Record<string, unknown>).window = mockWindow
 
-if (!(globalThis as any).navigator) {
+if (!(globalThis as Record<string, unknown>).navigator) {
   Object.defineProperty(globalThis, "navigator", {
     value: { userAgent: "node" },
     writable: true,
@@ -37,7 +37,13 @@ if (!(globalThis as any).navigator) {
   })
 }
 
-export type AppError = HulyConfigError | HulyClientError | StorageClientError | WorkspaceClientError | McpServerError | ConfigError.ConfigError
+export type AppError =
+  | HulyConfigError
+  | HulyClientError
+  | StorageClientError
+  | WorkspaceClientError
+  | McpServerError
+  | ConfigError.ConfigError
 
 const getTransportType = Config.string("MCP_TRANSPORT").pipe(
   Config.withDefault("stdio"),

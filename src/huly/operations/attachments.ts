@@ -36,14 +36,14 @@ import type {
   UpdateAttachmentParams
 } from "../../domain/schemas/attachments.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import {
+import type {
   AttachmentNotFoundError,
   DocumentNotFoundError,
-  type FileFetchError,
-  type FileNotFoundError,
-  type FileTooLargeError,
-  type InvalidContentTypeError,
-  type InvalidFileDataError,
+  FileFetchError,
+  FileNotFoundError,
+  FileTooLargeError,
+  InvalidContentTypeError,
+  InvalidFileDataError,
   IssueNotFoundError,
   ProjectNotFoundError,
   TeamspaceNotFoundError
@@ -58,11 +58,11 @@ import {
 } from "../storage.js"
 import { findProject, parseIssueIdentifier } from "./shared.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const attachment = require("@hcengineering/attachment").default as typeof import("@hcengineering/attachment").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const documentPlugin = require("@hcengineering/document").default as typeof import("@hcengineering/document").default
 
 export type ListAttachmentsError = HulyClientError
@@ -300,7 +300,7 @@ export const updateAttachment = (
     if (params.description !== undefined) {
       if (params.description === null) {
         // Clear description by setting to empty string (Huly API doesn't support undefined in updates)
-        (updateOps as Record<string, unknown>).description = ""
+        ;(updateOps as Record<string, unknown>).description = ""
       } else {
         updateOps.description = params.description
       }

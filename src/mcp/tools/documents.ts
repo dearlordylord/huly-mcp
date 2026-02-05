@@ -39,7 +39,8 @@ export const documentTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "list_documents",
-    description: "List documents in a Huly teamspace. Returns documents sorted by modification date (newest first). Supports searching by title substring (titleSearch) and content (contentSearch).",
+    description:
+      "List documents in a Huly teamspace. Returns documents sorted by modification date (newest first). Supports searching by title substring (titleSearch) and content (contentSearch).",
     category: CATEGORY,
     inputSchema: listDocumentsParamsJsonSchema,
     handler: createToolHandler(

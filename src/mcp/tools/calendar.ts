@@ -33,8 +33,7 @@ const CATEGORY = "Calendar" as const
 export const calendarTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "list_events",
-    description:
-      "List calendar events. Returns events sorted by date. Supports filtering by date range.",
+    description: "List calendar events. Returns events sorted by date. Supports filtering by date range.",
     category: CATEGORY,
     inputSchema: listEventsParamsJsonSchema,
     handler: createToolHandler(
@@ -57,8 +56,7 @@ export const calendarTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "create_event",
-    description:
-      "Create a new calendar event. Description supports markdown formatting. Returns the created event ID.",
+    description: "Create a new calendar event. Description supports markdown formatting. Returns the created event ID.",
     category: CATEGORY,
     inputSchema: createEventParamsJsonSchema,
     handler: createToolHandler(

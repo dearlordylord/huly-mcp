@@ -35,7 +35,7 @@ import { HulyClient, type HulyClientError } from "../client.js"
 import { DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js"
 
 // Import plugin objects at runtime (CommonJS modules)
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const documentPlugin = require("@hcengineering/document").default as typeof import("@hcengineering/document").default
 
 export type ListTeamspacesError = HulyClientError
@@ -202,7 +202,7 @@ export const listDocuments = (
     const limit = Math.min(params.limit ?? 50, 200)
 
     // Build query with search filters
-    let query: Record<string, unknown> = {
+    const query: Record<string, unknown> = {
       space: teamspace._id
     }
 

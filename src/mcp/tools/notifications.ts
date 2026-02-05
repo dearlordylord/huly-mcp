@@ -6,16 +6,16 @@ import {
   getNotificationContextParamsJsonSchema,
   getNotificationParamsJsonSchema,
   listNotificationContextsParamsJsonSchema,
-  listNotificationsParamsJsonSchema,
   listNotificationSettingsParamsJsonSchema,
+  listNotificationsParamsJsonSchema,
   markNotificationReadParamsJsonSchema,
   parseArchiveNotificationParams,
   parseDeleteNotificationParams,
   parseGetNotificationContextParams,
   parseGetNotificationParams,
   parseListNotificationContextsParams,
-  parseListNotificationsParams,
   parseListNotificationSettingsParams,
+  parseListNotificationsParams,
   parseMarkNotificationReadParams,
   parsePinNotificationContextParams,
   parseUpdateNotificationProviderSettingParams,
@@ -44,7 +44,8 @@ const CATEGORY = "Notifications" as const
 export const notificationTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "list_notifications",
-    description: "List inbox notifications. Returns notifications sorted by modification date (newest first). Supports filtering by read/archived status.",
+    description:
+      "List inbox notifications. Returns notifications sorted by modification date (newest first). Supports filtering by read/archived status.",
     category: CATEGORY,
     inputSchema: listNotificationsParamsJsonSchema,
     handler: createToolHandler(
@@ -132,7 +133,8 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "list_notification_contexts",
-    description: "List notification contexts. Returns contexts sorted by last update timestamp (newest first). Supports filtering by pinned status.",
+    description:
+      "List notification contexts. Returns contexts sorted by last update timestamp (newest first). Supports filtering by pinned status.",
     category: CATEGORY,
     inputSchema: listNotificationContextsParamsJsonSchema,
     handler: createToolHandler(

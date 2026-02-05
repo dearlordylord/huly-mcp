@@ -19,12 +19,13 @@ import type { WorkspaceUuid } from "@hcengineering/core"
 import { Context, Effect, Layer } from "effect"
 
 import { HulyConfigService } from "../config/config.js"
+import { assertExists } from "../utils/assertions.js"
 import { authToOptions, isAuthError, withConnectionRetry } from "./auth-utils.js"
 import {
   FileFetchError,
   FileNotFoundError,
-  FileUploadError,
   FileTooLargeError,
+  FileUploadError,
   HulyAuthError,
   HulyConnectionError,
   InvalidContentTypeError,
@@ -35,18 +36,43 @@ export const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
 
 export const ALLOWED_CONTENT_TYPES = new Set([
   // Images
-  "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml", "image/bmp", "image/tiff",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/svg+xml",
+  "image/bmp",
+  "image/tiff",
   // Documents
-  "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "text/plain", "text/csv", "text/markdown", "text/html",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
+  "text/markdown",
+  "text/html",
   // Archives
-  "application/zip", "application/x-tar", "application/gzip", "application/x-7z-compressed", "application/x-rar-compressed",
+  "application/zip",
+  "application/x-tar",
+  "application/gzip",
+  "application/x-7z-compressed",
+  "application/x-rar-compressed",
   // Media
-  "audio/mpeg", "audio/wav", "audio/ogg", "video/mp4", "video/webm", "video/quicktime",
+  "audio/mpeg",
+  "audio/wav",
+  "audio/ogg",
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
   // Code/data
-  "application/json", "application/xml", "text/xml", "application/javascript",
+  "application/json",
+  "application/xml",
+  "text/xml",
+  "application/javascript",
   // Generic
   "application/octet-stream"
 ])
@@ -67,6 +93,7 @@ export const validateContentType = (
     ? Effect.void
     : Effect.fail(new InvalidContentTypeError({ filename, contentType }))
 
+// TODO better type
 export interface FileSourceParams {
   filePath?: string
   fileUrl?: string
@@ -80,7 +107,7 @@ export const getBufferFromParams = (
     ? readFromFilePath(params.filePath)
     : params.fileUrl
     ? fetchFromUrl(params.fileUrl)
-    : decodeBase64(params.data!)
+    : decodeBase64(assertExists(params.data, "data required when no filePath/fileUrl"))
 
 export type StorageClientError =
   | HulyConnectionError

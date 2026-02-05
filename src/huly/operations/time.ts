@@ -1,6 +1,13 @@
 import { AccessLevel } from "@hcengineering/calendar"
 import type { Channel, Person } from "@hcengineering/contact"
-import { type AttachedData, type DocumentUpdate, generateId, type Ref, SortingOrder, type WithLookup } from "@hcengineering/core"
+import {
+  type AttachedData,
+  type DocumentUpdate,
+  generateId,
+  type Ref,
+  SortingOrder,
+  type WithLookup
+} from "@hcengineering/core"
 import {
   type Issue as HulyIssue,
   type Project as HulyProject,
@@ -8,6 +15,7 @@ import {
 } from "@hcengineering/tracker"
 import { Effect } from "effect"
 
+import { isExistent } from "../../utils/assertions.js"
 import type {
   CreateWorkSlotParams,
   DetailedTimeReport,
@@ -28,11 +36,11 @@ import { ProjectNotFoundError } from "../errors.js"
 import { withLookup } from "./query-helpers.js"
 import { findProject, findProjectAndIssue } from "./shared.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const time = require("@hcengineering/time").default as typeof import("@hcengineering/time").default
 
 export type LogTimeError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
@@ -113,7 +121,7 @@ export const getTimeReport = (
 
     const employeeIds = [
       ...new Set(
-        reports.filter(r => r.employee !== null).map(r => r.employee!)
+        reports.map(r => r.employee).filter(isExistent)
       )
     ]
 
@@ -322,7 +330,9 @@ export const listWorkSlots = (
 
     const limit = Math.min(params.limit ?? 50, 200)
 
+    /* eslint-disable @typescript-eslint/consistent-type-imports -- inline type for generic */
     type HulyWorkSlot = import("@hcengineering/time").WorkSlot
+    /* eslint-enable @typescript-eslint/consistent-type-imports */
 
     const slots = yield* client.findAll<HulyWorkSlot>(
       time.class.WorkSlot,
@@ -349,8 +359,10 @@ export const createWorkSlot = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
+    /* eslint-disable @typescript-eslint/consistent-type-imports -- inline type for generic */
     type HulyWorkSlot = import("@hcengineering/time").WorkSlot
     type HulyToDo = import("@hcengineering/time").ToDo
+    /* eslint-enable @typescript-eslint/consistent-type-imports */
 
     const slotId: Ref<HulyWorkSlot> = generateId()
 
@@ -368,8 +380,10 @@ export const createWorkSlot = (
       reminders: [],
       visibility: "public" as const,
       eventId: "",
+      /* eslint-disable @typescript-eslint/consistent-type-imports -- inline type cast */
       calendar: "" as Ref<import("@hcengineering/calendar").Calendar>,
       user: "" as import("@hcengineering/core").PersonId,
+      /* eslint-enable @typescript-eslint/consistent-type-imports */
       blockTime: false
     }
 

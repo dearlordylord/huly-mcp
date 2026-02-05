@@ -44,24 +44,37 @@ export const RecurringRuleSchema = Schema.Struct({
   endDate: Schema.optional(Timestamp.annotations({
     description: "End date for recurrence (timestamp)"
   })),
-  count: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive()).annotations({
-    description: "Number of occurrences"
-  })),
-  interval: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive()).annotations({
-    description: "Interval between occurrences"
-  })),
-  byDay: Schema.optional(Schema.Array(Schema.String).annotations({
-    description: "Days of week (e.g., ['MO', 'WE', 'FR'] or ['1MO', '-1FR'])"
-  })),
-  byMonthDay: Schema.optional(Schema.Array(Schema.Number.pipe(Schema.int())).annotations({
-    description: "Days of month (1-31 or -31 to -1)"
-  })),
-  byMonth: Schema.optional(Schema.Array(Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(1), Schema.lessThanOrEqualTo(12))).annotations({
-    description: "Months (1-12)"
-  })),
-  bySetPos: Schema.optional(Schema.Array(Schema.Number.pipe(Schema.int())).annotations({
-    description: "Position within set (e.g., -1 for last)"
-  })),
+  count: Schema.optional(
+    Schema.Number.pipe(Schema.int(), Schema.positive()).annotations({
+      description: "Number of occurrences"
+    })
+  ),
+  interval: Schema.optional(
+    Schema.Number.pipe(Schema.int(), Schema.positive()).annotations({
+      description: "Interval between occurrences"
+    })
+  ),
+  byDay: Schema.optional(
+    Schema.Array(Schema.String).annotations({
+      description: "Days of week (e.g., ['MO', 'WE', 'FR'] or ['1MO', '-1FR'])"
+    })
+  ),
+  byMonthDay: Schema.optional(
+    Schema.Array(Schema.Number.pipe(Schema.int())).annotations({
+      description: "Days of month (1-31 or -31 to -1)"
+    })
+  ),
+  byMonth: Schema.optional(
+    Schema.Array(Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(1), Schema.lessThanOrEqualTo(12)))
+      .annotations({
+        description: "Months (1-12)"
+      })
+  ),
+  bySetPos: Schema.optional(
+    Schema.Array(Schema.Number.pipe(Schema.int())).annotations({
+      description: "Position within set (e.g., -1 for last)"
+    })
+  ),
   wkst: Schema.optional(WeekdaySchema.annotations({
     description: "Week start day"
   }))
@@ -231,9 +244,11 @@ export const CreateEventParamsSchema = Schema.Struct({
   location: Schema.optional(Schema.String.annotations({
     description: "Event location"
   })),
-  participants: Schema.optional(Schema.Array(Schema.String).annotations({
-    description: "Participant emails"
-  })),
+  participants: Schema.optional(
+    Schema.Array(Schema.String).annotations({
+      description: "Participant emails"
+    })
+  ),
   visibility: Schema.optional(VisibilitySchema.annotations({
     description: "Event visibility (public, freeBusy, private)"
   }))
@@ -322,9 +337,11 @@ export const CreateRecurringEventParamsSchema = Schema.Struct({
   location: Schema.optional(Schema.String.annotations({
     description: "Event location"
   })),
-  participants: Schema.optional(Schema.Array(Schema.String).annotations({
-    description: "Participant emails"
-  })),
+  participants: Schema.optional(
+    Schema.Array(Schema.String).annotations({
+      description: "Participant emails"
+    })
+  ),
   timeZone: Schema.optional(Schema.String.annotations({
     description: "Time zone (e.g., 'America/New_York')"
   })),

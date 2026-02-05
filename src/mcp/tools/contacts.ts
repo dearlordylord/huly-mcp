@@ -33,7 +33,8 @@ const CATEGORY = "Contacts" as const
 export const contactTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "list_persons",
-    description: "List all persons in the Huly workspace. Returns persons sorted by modification date (newest first). Supports searching by name substring (nameSearch) and email substring (emailSearch).",
+    description:
+      "List all persons in the Huly workspace. Returns persons sorted by modification date (newest first). Supports searching by name substring (nameSearch) and email substring (emailSearch).",
     category: CATEGORY,
     inputSchema: listPersonsParamsJsonSchema,
     handler: createToolHandler(

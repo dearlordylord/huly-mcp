@@ -11,6 +11,7 @@
 import { Effect } from "effect"
 
 import type { UploadFileParams } from "../../domain/schemas.js"
+import { assertExists } from "../../utils/assertions.js"
 import { type FileFetchError, type FileNotFoundError, type InvalidFileDataError } from "../errors.js"
 import {
   decodeBase64,
@@ -41,11 +42,12 @@ export const uploadFile = (
     const storageClient = yield* HulyStorageClient
 
     // Get file buffer from one of the sources (priority: filePath > fileUrl > data)
+    // Schema guarantees at least one source exists
     const buffer: Buffer = params.filePath
       ? yield* readFromFilePath(params.filePath)
       : params.fileUrl
       ? yield* fetchFromUrl(params.fileUrl)
-      : yield* decodeBase64(params.data!)
+      : yield* decodeBase64(assertExists(params.data, "data required when no filePath/fileUrl"))
 
     // Upload to storage
     const result = yield* storageClient.uploadFile(

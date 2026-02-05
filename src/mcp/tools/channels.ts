@@ -45,7 +45,8 @@ const CATEGORY = "Channels" as const
 export const channelTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "list_channels",
-    description: "List all Huly channels. Returns channels sorted by name. Supports filtering by archived status. Supports searching by name substring (nameSearch) and topic substring (topicSearch).",
+    description:
+      "List all Huly channels. Returns channels sorted by name. Supports filtering by archived status. Supports searching by name substring (nameSearch) and topic substring (topicSearch).",
     category: CATEGORY,
     inputSchema: listChannelsParamsJsonSchema,
     handler: createToolHandler(

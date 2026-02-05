@@ -5,49 +5,47 @@ import { describe, expect, it } from "vitest"
 
 import type { HulyClientOperations } from "../client.js"
 import { HulyClient } from "../client.js"
-import {
-  createPerson,
-  deletePerson,
-  getPerson,
-  listPersons,
-  updatePerson
-} from "./contacts.js"
+import { createPerson, deletePerson, getPerson, listPersons, updatePerson } from "./contacts.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
 
-const createMockPerson = (overrides: Partial<HulyPerson> = {}): HulyPerson => ({
-  _id: "person-123" as Ref<HulyPerson>,
-  _class: contact.class.Person,
-  name: "Doe,John",
-  city: "NYC",
-  space: contact.space.Contacts as Ref<Space>,
-  modifiedOn: 1700000000000,
-  modifiedBy: "user" as Ref<Doc>,
-  createdOn: 1699000000000,
-  createdBy: "user" as Ref<Doc>,
-  ...overrides
-}) as HulyPerson
+/* eslint-disable @typescript-eslint/consistent-type-assertions -- test mock factories */
+const createMockPerson = (overrides: Partial<HulyPerson> = {}): HulyPerson =>
+  ({
+    _id: "person-123" as Ref<HulyPerson>,
+    _class: contact.class.Person,
+    name: "Doe,John",
+    city: "NYC",
+    space: contact.space.Contacts as Ref<Space>,
+    modifiedOn: 1700000000000,
+    modifiedBy: "user" as Ref<Doc>,
+    createdOn: 1699000000000,
+    createdBy: "user" as Ref<Doc>,
+    ...overrides
+  }) as HulyPerson
 
-const createMockChannel = (overrides: Partial<Channel> = {}): Channel => ({
-  _id: "channel-1" as Ref<Channel>,
-  _class: contact.class.Channel,
-  space: contact.space.Contacts as Ref<Space>,
-  attachedTo: "person-123" as Ref<Doc>,
-  attachedToClass: contact.class.Person,
-  collection: "channels",
-  provider: contact.channelProvider.Email,
-  value: "john@example.com",
-  modifiedBy: "user" as Ref<Doc>,
-  modifiedOn: Date.now(),
-  createdBy: "user" as Ref<Doc>,
-  createdOn: Date.now(),
-  ...overrides
-}) as Channel
+const createMockChannel = (overrides: Partial<Channel> = {}): Channel =>
+  ({
+    _id: "channel-1" as Ref<Channel>,
+    _class: contact.class.Channel,
+    space: contact.space.Contacts as Ref<Space>,
+    attachedTo: "person-123" as Ref<Doc>,
+    attachedToClass: contact.class.Person,
+    collection: "channels",
+    provider: contact.channelProvider.Email,
+    value: "john@example.com",
+    modifiedBy: "user" as Ref<Doc>,
+    modifiedOn: Date.now(),
+    createdBy: "user" as Ref<Doc>,
+    createdOn: Date.now(),
+    ...overrides
+  }) as Channel
+/* eslint-enable @typescript-eslint/consistent-type-assertions */
 
 interface MockConfig {
-  persons?: HulyPerson[]
-  channels?: Channel[]
+  persons?: Array<HulyPerson>
+  channels?: Array<Channel>
   captureCreateDoc?: { data?: Record<string, unknown> }
   captureAddCollection?: { attributes?: Record<string, unknown> }
   captureUpdateDoc?: { operations?: Record<string, unknown> }
@@ -66,9 +64,9 @@ const createTestLayer = (config: MockConfig) => {
       const q = query as Record<string, unknown>
       let filtered = channels
       if (q.attachedTo !== undefined) {
-        const attachedTo = q.attachedTo as { $in?: unknown[] } | unknown
+        const attachedTo = q.attachedTo as { $in?: Array<unknown> } | unknown
         if (typeof attachedTo === "object" && attachedTo !== null && "$in" in attachedTo) {
-          const ids = attachedTo.$in as unknown[]
+          const ids = attachedTo.$in as Array<unknown>
           filtered = filtered.filter(c => ids.includes(c.attachedTo))
         } else {
           filtered = filtered.filter(c => c.attachedTo === q.attachedTo)
@@ -207,7 +205,7 @@ describe("Contacts Operations", () => {
     it("handles persons without city", async () => {
       // Create person without city - use a spread from a valid person and delete city
       const basePerson = createMockPerson()
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
       const { city: _city, ...personWithoutCity } = basePerson
       const mockPerson = personWithoutCity as HulyPerson
 

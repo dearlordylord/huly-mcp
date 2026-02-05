@@ -32,6 +32,7 @@ import {
 } from "@hcengineering/tracker"
 import { absurd, Effect } from "effect"
 
+import { isExistent } from "../../utils/assertions.js"
 import type {
   AddLabelParams,
   Component,
@@ -61,18 +62,30 @@ import type {
 } from "../../domain/schemas.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { ProjectNotFoundError } from "../errors.js"
-import { ComponentNotFoundError, InvalidStatusError, IssueNotFoundError, IssueTemplateNotFoundError, PersonNotFoundError } from "../errors.js"
+import {
+  ComponentNotFoundError,
+  InvalidStatusError,
+  IssueNotFoundError,
+  IssueTemplateNotFoundError,
+  PersonNotFoundError
+} from "../errors.js"
 import { withLookup } from "./query-helpers.js"
-import { findProject, findProjectAndIssue, findProjectWithStatuses, parseIssueIdentifier, type StatusInfo } from "./shared.js"
+import {
+  findProject,
+  findProjectAndIssue,
+  findProjectWithStatuses,
+  parseIssueIdentifier,
+  type StatusInfo
+} from "./shared.js"
 
 // Import plugin objects at runtime (CommonJS modules)
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const tags = require("@hcengineering/tags").default as typeof import("@hcengineering/tags").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
 
 export type ListIssuesError =
@@ -225,7 +238,7 @@ export const listIssues = (
     // Apply description search using fulltext $search operator
     // Note: $search performs fulltext search across indexed fields
     if (params.descriptionSearch !== undefined && params.descriptionSearch.trim() !== "") {
-      (query as Record<string, unknown>).$search = params.descriptionSearch
+      ;(query as Record<string, unknown>).$search = params.descriptionSearch
     }
 
     if (params.component !== undefined) {
@@ -440,10 +453,10 @@ export const createIssue = (
     const result = params.status !== undefined
       ? yield* findProjectWithStatuses(params.project)
       : yield* Effect.map(findProject(params.project), ({ client, project }) => ({
-          client,
-          project,
-          statuses: []
-        }))
+        client,
+        project,
+        statuses: []
+      }))
 
     const { client, project, statuses } = result
 
@@ -573,7 +586,7 @@ export const updateIssue = (
   Effect.gen(function*() {
     const { client, issue, project } = yield* findProjectAndIssue(params)
 
-    let statuses: StatusInfo[] = []
+    let statuses: Array<StatusInfo> = []
     if (params.status !== undefined) {
       const result = yield* findProjectWithStatuses(params.project)
       statuses = result.statuses
@@ -891,7 +904,7 @@ export const listComponents = (
 
     const leadIds = [
       ...new Set(
-        components.filter(c => c.lead !== null).map(c => c.lead!)
+        components.map(c => c.lead).filter(isExistent)
       )
     ]
 
@@ -1403,7 +1416,7 @@ export const updateIssueTemplate = (
   params: UpdateIssueTemplateParams
 ): Effect.Effect<UpdateIssueTemplateResult, UpdateIssueTemplateError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, template, project } = yield* findProjectAndTemplate(params)
+    const { client, project, template } = yield* findProjectAndTemplate(params)
 
     const updateOps: DocumentUpdate<HulyIssueTemplate> = {}
 
@@ -1473,7 +1486,7 @@ export const deleteIssueTemplate = (
   params: DeleteIssueTemplateParams
 ): Effect.Effect<DeleteIssueTemplateResult, DeleteIssueTemplateError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, template, project } = yield* findProjectAndTemplate(params)
+    const { client, project, template } = yield* findProjectAndTemplate(params)
 
     yield* client.removeDoc(
       tracker.class.IssueTemplate,

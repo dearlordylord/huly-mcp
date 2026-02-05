@@ -14,9 +14,9 @@ import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { CommentNotFoundError } from "../errors.js"
 import { findProjectAndIssue as findProjectAndIssueShared } from "./shared.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const chunter = require("@hcengineering/chunter").default as typeof import("@hcengineering/chunter").default
 
 export type ListCommentsError =

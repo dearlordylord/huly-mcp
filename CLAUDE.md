@@ -2,7 +2,15 @@
 
 ## Package Manager
 
-Use `pnpm`, not npm.
+Use `pnpm`, not npm. Prefer package.json scripts over raw commands (e.g., `pnpm typecheck` not `pnpm tsc --noEmit`).
+
+## Verification
+
+Run before considering work complete: `pnpm build && pnpm typecheck && pnpm lint && pnpm test`
+
+## Integration Testing
+
+See `INTEGRATION_TESTING.md` for manual testing against live Huly instance.
 
 ## Code Style
 

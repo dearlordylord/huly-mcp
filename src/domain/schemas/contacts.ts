@@ -81,6 +81,7 @@ export const ListPersonsParamsSchema = Schema.Struct({
 
 export type ListPersonsParams = Schema.Schema.Type<typeof ListPersonsParamsSchema>
 
+// TODO better typing (and usage)
 export const GetPersonParamsSchema = Schema.Struct({
   personId: Schema.optional(NonEmptyString.annotations({
     description: "Person ID"

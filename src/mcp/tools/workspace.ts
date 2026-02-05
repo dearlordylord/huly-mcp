@@ -26,11 +26,7 @@ import {
   updateMemberRole,
   updateUserProfile
 } from "../../huly/operations/workspace.js"
-import {
-  createNoParamsWorkspaceToolHandler,
-  createWorkspaceToolHandler,
-  type RegisteredTool
-} from "./registry.js"
+import { createNoParamsWorkspaceToolHandler, createWorkspaceToolHandler, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "Workspace" as const
 
@@ -61,8 +57,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "get_workspace_info",
-    description:
-      "Get information about the current workspace including name, URL, region, and settings.",
+    description: "Get information about the current workspace including name, URL, region, and settings.",
     category: CATEGORY,
     inputSchema: { type: "object" as const, properties: {} },
     handler: createNoParamsWorkspaceToolHandler(
@@ -84,8 +79,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "create_workspace",
-    description:
-      "Create a new Huly workspace. Returns the workspace UUID and URL. Optionally specify a region.",
+    description: "Create a new Huly workspace. Returns the workspace UUID and URL. Optionally specify a region.",
     category: CATEGORY,
     inputSchema: createWorkspaceParamsJsonSchema,
     handler: createWorkspaceToolHandler(
@@ -96,8 +90,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "delete_workspace",
-    description:
-      "Permanently delete the current workspace. This action cannot be undone. Use with extreme caution.",
+    description: "Permanently delete the current workspace. This action cannot be undone. Use with extreme caution.",
     category: CATEGORY,
     inputSchema: { type: "object" as const, properties: {} },
     handler: createNoParamsWorkspaceToolHandler(
@@ -107,8 +100,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "get_user_profile",
-    description:
-      "Get the current user's profile information including bio, location, and social links.",
+    description: "Get the current user's profile information including bio, location, and social links.",
     category: CATEGORY,
     inputSchema: { type: "object" as const, properties: {} },
     handler: createNoParamsWorkspaceToolHandler(
@@ -130,8 +122,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "update_guest_settings",
-    description:
-      "Update workspace guest settings. Control read-only guest access and guest sign-up permissions.",
+    description: "Update workspace guest settings. Control read-only guest access and guest sign-up permissions.",
     category: CATEGORY,
     inputSchema: updateGuestSettingsParamsJsonSchema,
     handler: createWorkspaceToolHandler(
@@ -142,8 +133,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "get_regions",
-    description:
-      "Get available regions for workspace creation. Returns region codes and display names.",
+    description: "Get available regions for workspace creation. Returns region codes and display names.",
     category: CATEGORY,
     inputSchema: getRegionsParamsJsonSchema,
     handler: createWorkspaceToolHandler(

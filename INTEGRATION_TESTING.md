@@ -9,11 +9,11 @@ pnpm build
 ## Environment Variables
 
 ```bash
-export HULY_URL=https://your-huly-instance.com/
-export HULY_EMAIL=your-email@example.com
-export HULY_PASSWORD=your-password
-export HULY_WORKSPACE=your-workspace
-export MCP_AUTO_EXIT=true  # For testing - exits when stdin closes
+# Source from .env.production or set manually:
+source .env.production
+
+# Required variables:
+# HULY_URL, HULY_WORKSPACE, and either HULY_TOKEN or (HULY_EMAIL + HULY_PASSWORD)
 ```
 
 ## Quick Smoke Test

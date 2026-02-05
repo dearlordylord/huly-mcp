@@ -244,7 +244,9 @@ export const UpdateNotificationProviderSettingParamsSchema = Schema.Struct({
   description: "Parameters for updating notification provider setting"
 })
 
-export type UpdateNotificationProviderSettingParams = Schema.Schema.Type<typeof UpdateNotificationProviderSettingParamsSchema>
+export type UpdateNotificationProviderSettingParams = Schema.Schema.Type<
+  typeof UpdateNotificationProviderSettingParamsSchema
+>
 
 // --- JSON Schemas for MCP ---
 
@@ -257,7 +259,9 @@ export const getNotificationContextParamsJsonSchema = makeJsonSchema(GetNotifica
 export const listNotificationContextsParamsJsonSchema = makeJsonSchema(ListNotificationContextsParamsSchema)
 export const pinNotificationContextParamsJsonSchema = makeJsonSchema(PinNotificationContextParamsSchema)
 export const listNotificationSettingsParamsJsonSchema = makeJsonSchema(ListNotificationSettingsParamsSchema)
-export const updateNotificationProviderSettingParamsJsonSchema = makeJsonSchema(UpdateNotificationProviderSettingParamsSchema)
+export const updateNotificationProviderSettingParamsJsonSchema = makeJsonSchema(
+  UpdateNotificationProviderSettingParamsSchema
+)
 
 // --- Parsers ---
 
@@ -270,4 +274,6 @@ export const parseGetNotificationContextParams = Schema.decodeUnknown(GetNotific
 export const parseListNotificationContextsParams = Schema.decodeUnknown(ListNotificationContextsParamsSchema)
 export const parsePinNotificationContextParams = Schema.decodeUnknown(PinNotificationContextParamsSchema)
 export const parseListNotificationSettingsParams = Schema.decodeUnknown(ListNotificationSettingsParamsSchema)
-export const parseUpdateNotificationProviderSettingParams = Schema.decodeUnknown(UpdateNotificationProviderSettingParamsSchema)
+export const parseUpdateNotificationProviderSettingParams = Schema.decodeUnknown(
+  UpdateNotificationProviderSettingParamsSchema
+)

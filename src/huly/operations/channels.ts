@@ -1,4 +1,10 @@
-import type { Channel as HulyChannel, ChatMessage, DirectMessage as HulyDirectMessage, ThreadMessage as HulyThreadMessage } from "@hcengineering/chunter"
+import type { ActivityMessage } from "@hcengineering/activity"
+import type {
+  Channel as HulyChannel,
+  ChatMessage,
+  DirectMessage as HulyDirectMessage,
+  ThreadMessage as HulyThreadMessage
+} from "@hcengineering/chunter"
 import type { Employee as HulyEmployee, Person, SocialIdentity, SocialIdentityRef } from "@hcengineering/contact"
 import {
   type AccountUuid,
@@ -14,7 +20,6 @@ import {
   SortingOrder,
   type Space
 } from "@hcengineering/core"
-import type { ActivityMessage } from "@hcengineering/activity"
 import { jsonToMarkup, markupToJSON } from "@hcengineering/text"
 import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown"
 import { Effect } from "effect"
@@ -41,9 +46,9 @@ import type {
 import { HulyClient, type HulyClientError } from "../client.js"
 import { ChannelNotFoundError, MessageNotFoundError, ThreadReplyNotFoundError } from "../errors.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const chunter = require("@hcengineering/chunter").default as typeof import("@hcengineering/chunter").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
 
 // --- Error Types ---
@@ -578,7 +583,7 @@ const findMessage = (
   HulyClient
 > =>
   Effect.gen(function*() {
-    const { client, channel } = yield* findChannel(channelIdentifier)
+    const { channel, client } = yield* findChannel(channelIdentifier)
 
     const message = yield* client.findOne<ChatMessage>(
       chunter.class.ChatMessage,
@@ -608,7 +613,7 @@ export const listThreadReplies = (
   params: ListThreadRepliesParams
 ): Effect.Effect<ListThreadRepliesResult, ListThreadRepliesError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, channel, message } = yield* findMessage(params.channel, params.messageId)
+    const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
 
     const limit = Math.min(params.limit ?? 50, 200)
 
@@ -667,7 +672,7 @@ export const addThreadReply = (
   params: AddThreadReplyParams
 ): Effect.Effect<AddThreadReplyResult, AddThreadReplyError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, channel, message } = yield* findMessage(params.channel, params.messageId)
+    const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
 
     const replyId: Ref<HulyThreadMessage> = generateId()
     const markup = markdownToMarkupString(params.body)
@@ -711,7 +716,7 @@ export const updateThreadReply = (
   params: UpdateThreadReplyParams
 ): Effect.Effect<UpdateThreadReplyResult, UpdateThreadReplyError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, channel, message } = yield* findMessage(params.channel, params.messageId)
+    const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
 
     const reply = yield* client.findOne<HulyThreadMessage>(
       chunter.class.ThreadMessage,
@@ -758,7 +763,7 @@ export const deleteThreadReply = (
   params: DeleteThreadReplyParams
 ): Effect.Effect<DeleteThreadReplyResult, DeleteThreadReplyError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, channel, message } = yield* findMessage(params.channel, params.messageId)
+    const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
 
     const reply = yield* client.findOne<HulyThreadMessage>(
       chunter.class.ThreadMessage,

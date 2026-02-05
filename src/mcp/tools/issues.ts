@@ -133,7 +133,8 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "list_components",
-    description: "List components in a Huly project. Components organize issues by area/feature. Returns components sorted by modification date (newest first).",
+    description:
+      "List components in a Huly project. Components organize issues by area/feature. Returns components sorted by modification date (newest first).",
     category: CATEGORY,
     inputSchema: listComponentsParamsJsonSchema,
     handler: createToolHandler(
@@ -155,7 +156,8 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "create_component",
-    description: "Create a new component in a Huly project. Components help organize issues by area/feature. Returns the created component ID and label.",
+    description:
+      "Create a new component in a Huly project. Components help organize issues by area/feature. Returns the created component ID and label.",
     category: CATEGORY,
     inputSchema: createComponentParamsJsonSchema,
     handler: createToolHandler(
@@ -199,7 +201,8 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "list_issue_templates",
-    description: "List issue templates in a Huly project. Templates define reusable issue configurations. Returns templates sorted by modification date (newest first).",
+    description:
+      "List issue templates in a Huly project. Templates define reusable issue configurations. Returns templates sorted by modification date (newest first).",
     category: CATEGORY,
     inputSchema: listIssueTemplatesParamsJsonSchema,
     handler: createToolHandler(
@@ -210,7 +213,8 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "get_issue_template",
-    description: "Retrieve full details for a Huly issue template. Use this to view template content and default values.",
+    description:
+      "Retrieve full details for a Huly issue template. Use this to view template content and default values.",
     category: CATEGORY,
     inputSchema: getIssueTemplateParamsJsonSchema,
     handler: createToolHandler(
@@ -221,7 +225,8 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "create_issue_template",
-    description: "Create a new issue template in a Huly project. Templates define default values for new issues. Returns the created template ID and title.",
+    description:
+      "Create a new issue template in a Huly project. Templates define default values for new issues. Returns the created template ID and title.",
     category: CATEGORY,
     inputSchema: createIssueTemplateParamsJsonSchema,
     handler: createToolHandler(
@@ -232,7 +237,8 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "create_issue_from_template",
-    description: "Create a new issue from a template. Applies template defaults, allowing overrides for specific fields. Returns the created issue identifier.",
+    description:
+      "Create a new issue from a template. Applies template defaults, allowing overrides for specific fields. Returns the created issue identifier.",
     category: CATEGORY,
     inputSchema: createIssueFromTemplateParamsJsonSchema,
     handler: createToolHandler(

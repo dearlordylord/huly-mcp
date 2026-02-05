@@ -6,9 +6,9 @@ import type { Doc, DocumentQuery, FindOptions } from "@hcengineering/core"
  */
 export const escapeLikeWildcards = (input: string): string =>
   input
-    .replace(/\\/g, '\\\\')
-    .replace(/%/g, '\\%')
-    .replace(/_/g, '\\_')
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_")
 
 /**
  * Add substring search to query using $like operator.
@@ -35,48 +35,10 @@ export const addSubstringSearch = <T extends Doc>(
 export const withLookup = <T extends Doc>(
   options: FindOptions<T> | undefined,
   lookups: Record<string, unknown>
-): FindOptions<T> => {
-  return {
-    ...options,
-    lookup: {
-      ...options?.lookup,
-      ...lookups
-    }
-  } as FindOptions<T>
-}
-
-/**
- * Add fulltext search to query using $search operator.
- * Searches across indexed text fields.
- */
-export const addFulltextSearch = <T extends Doc>(
-  query: DocumentQuery<T>,
-  searchTerm: string | undefined
-): DocumentQuery<T> => {
-  if (!searchTerm) return query
-  return {
-    ...query,
-    $search: searchTerm
-  } as DocumentQuery<T>
-}
-
-/**
- * Add regex search to query.
- * Supports JavaScript-style regex patterns.
- */
-export const addRegexSearch = <T extends Doc>(
-  query: DocumentQuery<T>,
-  field: keyof T & string,
-  pattern: string | undefined,
-  options?: string
-): DocumentQuery<T> => {
-  if (!pattern) return query
-  const regexQuery: Record<string, unknown> = { $regex: pattern }
-  if (options) {
-    regexQuery.$options = options
+): FindOptions<T> => ({
+  ...options,
+  lookup: {
+    ...options?.lookup,
+    ...lookups
   }
-  return {
-    ...query,
-    [field]: regexQuery
-  }
-}
+})

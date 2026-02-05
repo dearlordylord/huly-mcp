@@ -48,8 +48,7 @@ export const attachmentTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "get_attachment",
-    description:
-      "Retrieve full details for a Huly attachment including download URL.",
+    description: "Retrieve full details for a Huly attachment including download URL.",
     category: CATEGORY,
     inputSchema: getAttachmentParamsJsonSchema,
     handler: createCombinedToolHandler(
@@ -72,8 +71,7 @@ export const attachmentTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "update_attachment",
-    description:
-      "Update attachment metadata (description, pinned status).",
+    description: "Update attachment metadata (description, pinned status).",
     category: CATEGORY,
     inputSchema: updateAttachmentParamsJsonSchema,
     handler: createToolHandler(
@@ -84,8 +82,7 @@ export const attachmentTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "delete_attachment",
-    description:
-      "Permanently delete an attachment. This action cannot be undone.",
+    description: "Permanently delete an attachment. This action cannot be undone.",
     category: CATEGORY,
     inputSchema: deleteAttachmentParamsJsonSchema,
     handler: createToolHandler(
@@ -96,8 +93,7 @@ export const attachmentTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "pin_attachment",
-    description:
-      "Pin or unpin an attachment.",
+    description: "Pin or unpin an attachment.",
     category: CATEGORY,
     inputSchema: pinAttachmentParamsJsonSchema,
     handler: createToolHandler(
@@ -108,8 +104,7 @@ export const attachmentTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "download_attachment",
-    description:
-      "Get download URL for an attachment along with file metadata (name, type, size).",
+    description: "Get download URL for an attachment along with file metadata (name, type, size).",
     category: CATEGORY,
     inputSchema: downloadAttachmentParamsJsonSchema,
     handler: createCombinedToolHandler(

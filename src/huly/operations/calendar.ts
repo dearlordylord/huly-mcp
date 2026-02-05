@@ -1,14 +1,14 @@
-import type { Channel, Contact, Person } from "@hcengineering/contact"
 import {
+  AccessLevel,
+  type Calendar as HulyCalendar,
   type Event as HulyEvent,
+  generateEventId,
   type ReccuringEvent as HulyRecurringEvent,
   type ReccuringInstance as HulyRecurringInstance,
   type RecurringRule as HulyRecurringRule,
-  type Calendar as HulyCalendar,
-  type Visibility as HulyVisibility,
-  AccessLevel,
-  generateEventId
+  type Visibility as HulyVisibility
 } from "@hcengineering/calendar"
+import type { Channel, Contact, Person } from "@hcengineering/contact"
 import {
   type AttachedData,
   type Class,
@@ -41,11 +41,11 @@ import type {
 import { HulyClient, type HulyClientError } from "../client.js"
 import { EventNotFoundError, RecurringEventNotFoundError } from "../errors.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const calendar = require("@hcengineering/calendar").default as typeof import("@hcengineering/calendar").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
 
 // --- Error types ---
@@ -111,7 +111,7 @@ const findPersonsByEmails = (
 
     const allChannels = yield* client.findAll<Channel>(
       contact.class.Channel,
-      { value: { $in: emails as string[] } }
+      { value: { $in: emails as Array<string> } }
     )
 
     const personIds = [...new Set(allChannels.map(c => c.attachedTo as Ref<Person>))]
@@ -142,7 +142,7 @@ const buildParticipants = (
 
     const persons = yield* client.findAll<Person>(
       contact.class.Person,
-      { _id: { $in: participantRefs as Ref<Person>[] } }
+      { _id: { $in: participantRefs as Array<Ref<Person>> } }
     )
 
     return persons.map(p => ({
@@ -257,7 +257,7 @@ export const createEvent = (
     const eventId = generateEventId()
     const dueDate = params.dueDate ?? (params.date + ONE_HOUR_MS)
 
-    let participantRefs: Ref<Contact>[] = []
+    let participantRefs: Array<Ref<Contact>> = []
     if (params.participants && params.participants.length > 0) {
       const persons = yield* findPersonsByEmails(client, params.participants)
       participantRefs = persons.map(p => p._id as unknown as Ref<Contact>)
@@ -478,7 +478,7 @@ export const createRecurringEvent = (
     const eventId = generateEventId()
     const dueDate = params.dueDate ?? (params.startDate + ONE_HOUR_MS)
 
-    let participantRefs: Ref<Contact>[] = []
+    let participantRefs: Array<Ref<Contact>> = []
     if (params.participants && params.participants.length > 0) {
       const persons = yield* findPersonsByEmails(client, params.participants)
       participantRefs = persons.map(p => p._id as unknown as Ref<Contact>)
@@ -579,7 +579,7 @@ export const listEventInstances = (
       }
     )
 
-    const participantMap = new Map<string, Participant[]>()
+    const participantMap = new Map<string, Array<Participant>>()
     if (params.includeParticipants) {
       const allParticipantRefs = [...new Set(instances.flatMap(i => i.participants))]
       if (allParticipantRefs.length > 0) {

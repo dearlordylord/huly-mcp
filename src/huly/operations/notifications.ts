@@ -1,11 +1,11 @@
+import type { Class, Doc, DocumentUpdate, Ref } from "@hcengineering/core"
+import { SortingOrder } from "@hcengineering/core"
 import type {
   DocNotifyContext as HulyDocNotifyContext,
   InboxNotification as HulyInboxNotification,
   NotificationProvider,
   NotificationProviderSetting as HulyNotificationProviderSetting
 } from "@hcengineering/notification"
-import type { Class, Doc, DocumentUpdate, Ref } from "@hcengineering/core"
-import { SortingOrder } from "@hcengineering/core"
 import { Effect } from "effect"
 
 import type {
@@ -15,8 +15,8 @@ import type {
   GetNotificationContextParams,
   GetNotificationParams,
   ListNotificationContextsParams,
-  ListNotificationsParams,
   ListNotificationSettingsParams,
+  ListNotificationsParams,
   MarkNotificationReadParams,
   Notification,
   NotificationProviderSetting,
@@ -25,10 +25,12 @@ import type {
   UpdateNotificationProviderSettingParams
 } from "../../domain/schemas.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import { NotificationNotFoundError, NotificationContextNotFoundError } from "../errors.js"
+import { NotificationContextNotFoundError, NotificationNotFoundError } from "../errors.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const notification = require("@hcengineering/notification").default as typeof import("@hcengineering/notification").default
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop */
+const notification = require("@hcengineering/notification")
+  .default as typeof import("@hcengineering/notification").default
+/* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports */
 
 // --- Error Types ---
 
@@ -229,7 +231,11 @@ export interface MarkAllNotificationsReadResult {
   count: number
 }
 
-export const markAllNotificationsRead = (): Effect.Effect<MarkAllNotificationsReadResult, MarkAllNotificationsReadError, HulyClient> =>
+export const markAllNotificationsRead = (): Effect.Effect<
+  MarkAllNotificationsReadResult,
+  MarkAllNotificationsReadError,
+  HulyClient
+> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
 
@@ -242,12 +248,13 @@ export const markAllNotificationsRead = (): Effect.Effect<MarkAllNotificationsRe
     // Concurrent updates (10x speedup). Limited to 200/call.
     yield* Effect.forEach(
       unreadNotifications,
-      (notif) => client.updateDoc(
-        notification.class.InboxNotification,
-        notif.space,
-        notif._id,
-        { isViewed: true }
-      ),
+      (notif) =>
+        client.updateDoc(
+          notification.class.InboxNotification,
+          notif.space,
+          notif._id,
+          { isViewed: true }
+        ),
       { concurrency: 10 }
     )
 
@@ -293,7 +300,11 @@ export interface ArchiveAllNotificationsResult {
   count: number
 }
 
-export const archiveAllNotifications = (): Effect.Effect<ArchiveAllNotificationsResult, ArchiveAllNotificationsError, HulyClient> =>
+export const archiveAllNotifications = (): Effect.Effect<
+  ArchiveAllNotificationsResult,
+  ArchiveAllNotificationsError,
+  HulyClient
+> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
 
@@ -306,12 +317,13 @@ export const archiveAllNotifications = (): Effect.Effect<ArchiveAllNotifications
     // Concurrent updates (10x speedup). Limited to 200/call.
     yield* Effect.forEach(
       activeNotifications,
-      (notif) => client.updateDoc(
-        notification.class.InboxNotification,
-        notif.space,
-        notif._id,
-        { archived: true }
-      ),
+      (notif) =>
+        client.updateDoc(
+          notification.class.InboxNotification,
+          notif.space,
+          notif._id,
+          { archived: true }
+        ),
       { concurrency: 10 }
     )
 

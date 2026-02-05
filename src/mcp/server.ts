@@ -14,6 +14,7 @@ import { startHttpTransport } from "./http-transport.js"
 import { HulyClient } from "../huly/client.js"
 import { HulyStorageClient } from "../huly/storage.js"
 import { WorkspaceClient } from "../huly/workspace-client.js"
+import { assertExists } from "../utils/assertions.js"
 import { createUnknownToolError, toMcpResponse } from "./error-mapping.js"
 import { TOOL_DEFINITIONS, toolRegistry } from "./tools/index.js"
 
@@ -120,6 +121,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
         const storageClient = yield* HulyStorageClient
         const workspaceClient = yield* WorkspaceClient
 
+        // TODO better harmony with config.transport
         const server = config.transport === "stdio" ? createMcpServer(hulyClient, storageClient, workspaceClient) : null
 
         const isRunning = yield* Ref.make(false)
@@ -137,9 +139,10 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 
               if (config.transport === "stdio") {
                 const transport = new StdioServerTransport()
+                const stdioServer = assertExists(server, "server must exist for stdio transport")
 
                 yield* Effect.tryPromise({
-                  try: () => server!.connect(transport),
+                  try: () => stdioServer.connect(transport),
                   catch: (e) =>
                     new McpServerError({
                       message: `Failed to connect stdio transport: ${String(e)}`,
@@ -172,7 +175,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                 })
 
                 yield* Effect.tryPromise({
-                  try: () => server!.close(),
+                  try: () => stdioServer.close(),
                   catch: (e) =>
                     new McpServerError({
                       message: `Failed to close server: ${String(e)}`,

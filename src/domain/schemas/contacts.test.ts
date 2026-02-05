@@ -194,10 +194,12 @@ describe("Contact Schemas", () => {
 
     it("rejects empty firstName in update", () => {
       const result = Effect.runSync(
-        Effect.either(Schema.decodeUnknown(UpdatePersonParamsSchema)({
-          personId: "abc123",
-          firstName: ""
-        }))
+        Effect.either(
+          Schema.decodeUnknown(UpdatePersonParamsSchema)({
+            personId: "abc123",
+            firstName: ""
+          })
+        )
       )
       expect(Either.isLeft(result)).toBe(true)
     })

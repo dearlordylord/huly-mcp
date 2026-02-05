@@ -18,11 +18,11 @@ export const validatePersonUuid = (uuid?: string): Effect.Effect<PersonUuid | un
   return Effect.succeed(uuid as PersonUuid)
 }
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const task = require("@hcengineering/task").default as typeof import("@hcengineering/task").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
 
 export type ProjectWithType = WithLookup<HulyProject> & {
@@ -67,7 +67,7 @@ export type StatusInfo = {
 export const findProjectWithStatuses = (
   projectIdentifier: string
 ): Effect.Effect<
-  { client: HulyClient["Type"]; project: HulyProject; statuses: StatusInfo[] },
+  { client: HulyClient["Type"]; project: HulyProject; statuses: Array<StatusInfo> },
   ProjectNotFoundError | HulyClientError,
   HulyClient
 > =>
@@ -84,7 +84,7 @@ export const findProjectWithStatuses = (
     }
 
     const projectType = project.$lookup?.type
-    let statuses: StatusInfo[] = []
+    const statuses: Array<StatusInfo> = []
 
     const wonCategory = String(task.statusCategory.Won)
     const lostCategory = String(task.statusCategory.Lost)
@@ -117,9 +117,9 @@ export const findProjectWithStatuses = (
           // Fallback: use refs without names if Status query fails
           // This allows operations to work even with malformed workspace data
           yield* Effect.logWarning(
-            `Status query failed for project ${projectIdentifier}, using fallback. ` +
-            `Category-based filtering (open/done/canceled) will use name heuristics. ` +
-            `Error: ${statusDocsResult.left.message}`
+            `Status query failed for project ${projectIdentifier}, using fallback. `
+              + `Category-based filtering (open/done/canceled) will use name heuristics. `
+              + `Error: ${statusDocsResult.left.message}`
           )
           for (const ps of projectType.statuses) {
             const name = String(ps._id).split(":").pop() ?? "Unknown"

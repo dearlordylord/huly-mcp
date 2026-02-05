@@ -148,9 +148,11 @@ export const UpdateAttachmentParamsSchema = Schema.Struct({
   attachmentId: NonEmptyString.annotations({
     description: "Attachment ID"
   }),
-  description: Schema.optional(Schema.NullOr(Schema.String).annotations({
-    description: "New description (null to clear)"
-  })),
+  description: Schema.optional(
+    Schema.NullOr(Schema.String).annotations({
+      description: "New description (null to clear)"
+    })
+  ),
   pinned: Schema.optional(Schema.Boolean.annotations({
     description: "Pin or unpin the attachment"
   }))

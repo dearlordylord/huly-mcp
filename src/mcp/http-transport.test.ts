@@ -5,6 +5,7 @@
  *
  * @module
  */
+/* eslint-disable @typescript-eslint/consistent-type-assertions -- test mocks */
 import type http from "node:http"
 
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js"

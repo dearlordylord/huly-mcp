@@ -2,7 +2,7 @@ import type { ParseResult } from "effect"
 import { Effect, Exit } from "effect"
 
 import { HulyClient } from "../../huly/client.js"
-import { HulyError, type HulyDomainError } from "../../huly/errors.js"
+import { type HulyDomainError, HulyError } from "../../huly/errors.js"
 import { HulyStorageClient } from "../../huly/storage.js"
 import { WorkspaceClient } from "../../huly/workspace-client.js"
 import {

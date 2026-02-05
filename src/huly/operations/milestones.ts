@@ -23,7 +23,7 @@ import type { ProjectNotFoundError } from "../errors.js"
 import { IssueNotFoundError, MilestoneNotFoundError } from "../errors.js"
 import { findProject, parseIssueIdentifier } from "./shared.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
 
 export type ListMilestonesError =

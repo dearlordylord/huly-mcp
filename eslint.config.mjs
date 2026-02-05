@@ -56,11 +56,11 @@ export default [
 
       // TypeScript best practices - strict type assertion rules
       "@typescript-eslint/consistent-type-imports": "warn",
-      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-non-null-assertion": "warn",
-      "@typescript-eslint/consistent-type-assertions": ["warn", {
+      "@typescript-eslint/consistent-type-assertions": ["error", {
         assertionStyle: "as",
-        objectLiteralTypeAssertions: "never"
+        objectLiteralTypeAssertions: "allow-as-parameter"
       }],
       "@typescript-eslint/array-type": ["warn", {
         default: "generic",

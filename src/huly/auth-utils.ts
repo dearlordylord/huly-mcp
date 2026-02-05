@@ -3,11 +3,32 @@
  * @module
  */
 import type { AuthOptions } from "@hcengineering/api-client"
+import { PlatformError } from "@hcengineering/platform"
 import { Effect, Redacted, Schedule } from "effect"
 import { absurd } from "effect/Function"
 
 import type { Auth } from "../config/config.js"
-import { HulyAuthError, HulyConnectionError } from "./errors.js"
+import { HulyAuthError, type HulyConnectionError } from "./errors.js"
+
+/**
+ * Status codes that indicate authentication failures (should not be retried).
+ *
+ * These are StatusCode values from @hcengineering/platform (see platform.ts).
+ * The default export `platform.status.*` can't be imported due to TypeScript's
+ * verbatimModuleSyntax + NodeNext moduleResolution not resolving the re-exported
+ * default correctly. The format is `${pluginId}:status:${statusName}` where
+ * pluginId is "platform".
+ */
+const AUTH_STATUS_CODES = new Set([
+  "platform:status:Unauthorized",
+  "platform:status:TokenExpired",
+  "platform:status:TokenNotActive",
+  "platform:status:PasswordExpired",
+  "platform:status:Forbidden",
+  "platform:status:InvalidPassword",
+  "platform:status:AccountNotFound",
+  "platform:status:AccountNotConfirmed"
+])
 
 /**
  * Connection configuration shared by both HulyClient and WorkspaceClient.
@@ -37,19 +58,8 @@ export const authToOptions = (auth: Auth, workspace: string): AuthOptions => {
 /**
  * Check if an error is an authentication error (should not be retried).
  */
-export const isAuthError = (error: unknown): boolean => {
-  const msg = String(error).toLowerCase()
-  return (
-    msg.includes("unauthorized")
-    || msg.includes("authentication")
-    || msg.includes("auth")
-    || msg.includes("credentials")
-    || msg.includes("401")
-    || msg.includes("invalid password")
-    || msg.includes("invalid email")
-    || msg.includes("login failed")
-  )
-}
+export const isAuthError = (error: unknown): boolean =>
+  error instanceof PlatformError && AUTH_STATUS_CODES.has(error.status.code)
 
 /**
  * Retry schedule for connection attempts: exponential backoff, max 3 attempts.

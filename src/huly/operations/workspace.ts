@@ -2,10 +2,7 @@
  * Workspace management operations using account-client.
  * @module
  */
-import type {
-  AccountRole as HulyAccountRole,
-  WorkspaceInfoWithStatus
-} from "@hcengineering/core"
+import type { AccountRole as HulyAccountRole, WorkspaceInfoWithStatus } from "@hcengineering/core"
 import { Effect, Option } from "effect"
 
 import type {
@@ -22,9 +19,10 @@ import type {
   WorkspaceMember,
   WorkspaceSummary
 } from "../../domain/schemas/workspace.js"
-import { HulyConnectionError, InvalidPersonUuidError } from "../errors.js"
-import { validatePersonUuid } from "./shared.js"
+import type { InvalidPersonUuidError } from "../errors.js"
+import { HulyConnectionError } from "../errors.js"
 import { WorkspaceClient, type WorkspaceClientError } from "../workspace-client.js"
+import { validatePersonUuid } from "./shared.js"
 
 // Compile-time assertion: AccountRole string literals must match HulyAccountRole enum values
 // If AccountRole has values not in HulyAccountRole, this line will fail to compile
@@ -71,29 +69,30 @@ export const listWorkspaceMembers = (
 
     const result = yield* Effect.forEach(
       limitedMembers,
-      (member) => Effect.gen(function*() {
-        let name: string | undefined
-        let email: string | undefined
+      (member) =>
+        Effect.gen(function*() {
+          let name: string | undefined
+          let email: string | undefined
 
-        const personInfoResult = yield* Effect.tryPromise({
-          try: () => client.getPersonInfo(member.person),
-          catch: () => undefined
-        }).pipe(Effect.option)
+          const personInfoResult = yield* Effect.tryPromise({
+            try: () => client.getPersonInfo(member.person),
+            catch: () => undefined
+          }).pipe(Effect.option)
 
-        if (Option.isSome(personInfoResult)) {
-          const personInfo = personInfoResult.value
-          name = personInfo.name
-          const emailSocialId = personInfo.socialIds?.find((s) => s.type === "email")
-          email = emailSocialId?.value
-        }
+          if (Option.isSome(personInfoResult)) {
+            const personInfo = personInfoResult.value
+            name = personInfo.name
+            const emailSocialId = personInfo.socialIds?.find((s) => s.type === "email")
+            email = emailSocialId?.value
+          }
 
-        return {
-          personId: member.person,
-          role: member.role,
-          name,
-          email
-        }
-      }),
+          return {
+            personId: member.person,
+            role: member.role,
+            name,
+            email
+          }
+        }),
       { concurrency: 10 }
     )
     return result
