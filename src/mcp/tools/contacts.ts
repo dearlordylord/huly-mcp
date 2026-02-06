@@ -28,7 +28,7 @@ import {
 } from "../../huly/operations/contacts.js"
 import { createToolHandler, type RegisteredTool } from "./registry.js"
 
-const CATEGORY = "Contacts" as const
+const CATEGORY = "contacts" as const
 
 export const contactTools: ReadonlyArray<RegisteredTool> = [
   {

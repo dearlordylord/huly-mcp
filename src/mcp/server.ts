@@ -16,7 +16,7 @@ import { HulyStorageClient } from "../huly/storage.js"
 import { WorkspaceClient } from "../huly/workspace-client.js"
 import { assertExists } from "../utils/assertions.js"
 import { createUnknownToolError, toMcpResponse } from "./error-mapping.js"
-import { TOOL_DEFINITIONS, toolRegistry } from "./tools/index.js"
+import { CATEGORY_NAMES, createFilteredRegistry, TOOL_DEFINITIONS, toolRegistry } from "./tools/index.js"
 
 export type McpTransportType = "stdio" | "http"
 
@@ -37,11 +37,21 @@ export class McpServerError extends Schema.TaggedError<McpServerError>()(
 
 export { TOOL_DEFINITIONS }
 
-type ToolName = keyof typeof TOOL_DEFINITIONS
-
-const ToolNameSchema = Schema.Literal(
-  ...Object.keys(TOOL_DEFINITIONS) as [ToolName, ...Array<ToolName>]
-)
+const parseToolsets = (raw: string | undefined): ReadonlySet<string> | undefined => {
+  if (raw === undefined || raw.trim() === "") return undefined
+  const requested = raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
+  const enabled = new Set<string>()
+  for (const r of requested) {
+    if (CATEGORY_NAMES.has(r)) {
+      enabled.add(r)
+    } else {
+      console.error(
+        `Warning: unknown toolset category "${r}", ignoring. Valid categories: ${[...CATEGORY_NAMES].join(", ")}`
+      )
+    }
+  }
+  return enabled.size > 0 ? enabled : undefined
+}
 
 export interface McpServerOperations {
   readonly run: () => Effect.Effect<void, McpServerError, HttpServerFactoryService>
@@ -55,8 +65,13 @@ export interface McpServerOperations {
 export const createMcpServer = (
   hulyClient: HulyClient["Type"],
   storageClient: HulyStorageClient["Type"],
-  workspaceClient?: WorkspaceClient["Type"]
+  workspaceClient?: WorkspaceClient["Type"],
+  enabledCategories?: ReadonlySet<string>
 ): Server => {
+  const registry = enabledCategories
+    ? createFilteredRegistry(enabledCategories)
+    : toolRegistry
+
   const server = new Server(
     {
       name: "huly-mcp",
@@ -70,7 +85,7 @@ export const createMcpServer = (
   )
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: toolRegistry.definitions.map((tool) => ({
+    tools: registry.definitions.map((tool) => ({
       name: tool.name,
       description: tool.description,
       inputSchema: tool.inputSchema as {
@@ -84,13 +99,8 @@ export const createMcpServer = (
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { arguments: args, name } = request.params
 
-    const toolNameResult = Schema.decodeUnknownEither(ToolNameSchema)(name)
-    if (toolNameResult._tag === "Left") {
-      return toMcpResponse(createUnknownToolError(name))
-    }
-
-    const response = toolRegistry.handleToolCall(
-      toolNameResult.right,
+    const response = registry.handleToolCall(
+      name,
       args ?? {},
       hulyClient,
       storageClient,
@@ -121,8 +131,12 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
         const storageClient = yield* HulyStorageClient
         const workspaceClient = yield* WorkspaceClient
 
+        const enabledCategories = parseToolsets(process.env.TOOLSETS)
+
         // TODO better harmony with config.transport
-        const server = config.transport === "stdio" ? createMcpServer(hulyClient, storageClient, workspaceClient) : null
+        const server = config.transport === "stdio"
+          ? createMcpServer(hulyClient, storageClient, workspaceClient, enabledCategories)
+          : null
 
         const isRunning = yield* Ref.make(false)
 
@@ -188,7 +202,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 
                 yield* startHttpTransport(
                   { port, host },
-                  () => createMcpServer(hulyClient, storageClient, workspaceClient)
+                  () => createMcpServer(hulyClient, storageClient, workspaceClient, enabledCategories)
                 ).pipe(
                   Effect.scoped,
                   Effect.mapError(

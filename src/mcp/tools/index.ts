@@ -37,8 +37,8 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...workspaceTools
 ]
 
-const toolMap = new Map<string, RegisteredTool>(
-  allTools.map((t) => [t.name, t])
+export const CATEGORY_NAMES: ReadonlySet<string> = new Set(
+  allTools.map((t) => t.category)
 )
 
 type ToolRegistryData = {
@@ -58,16 +58,26 @@ type ToolRegistryMethods = {
 
 export type ToolRegistry = ToolRegistryData & ToolRegistryMethods
 
-export const toolRegistry: ToolRegistry = {
-  tools: toolMap,
-  definitions: allTools,
-  handleToolCall: (toolName, args, hulyClient, storageClient, workspaceClient) => {
-    const tool = toolMap.get(toolName)
-    if (!tool) return null
-    return tool.handler(args, hulyClient, storageClient, workspaceClient)
+const buildRegistry = (tools: ReadonlyArray<RegisteredTool>): ToolRegistry => {
+  const map = new Map<string, RegisteredTool>(
+    tools.map((t) => [t.name, t])
+  )
+  return {
+    tools: map,
+    definitions: tools,
+    handleToolCall: (toolName, args, hulyClient, storageClient, workspaceClient) => {
+      const tool = map.get(toolName)
+      if (!tool) return null
+      return tool.handler(args, hulyClient, storageClient, workspaceClient)
+    }
   }
 }
 
-export const TOOL_DEFINITIONS = Object.fromEntries(toolMap) as Record<string, RegisteredTool>
+export const createFilteredRegistry = (categories: ReadonlySet<string>): ToolRegistry =>
+  buildRegistry(allTools.filter((t) => categories.has(t.category)))
+
+export const toolRegistry: ToolRegistry = buildRegistry(allTools)
+
+export const TOOL_DEFINITIONS = Object.fromEntries(toolRegistry.tools) as Record<string, RegisteredTool>
 
 export type { RegisteredTool, ToolDefinition } from "./registry.js"

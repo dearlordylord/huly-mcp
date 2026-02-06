@@ -29,7 +29,7 @@ import {
 } from "../../huly/operations/workspace.js"
 import { createNoParamsWorkspaceToolHandler, createWorkspaceToolHandler, type RegisteredTool } from "./registry.js"
 
-const CATEGORY = "Workspace" as const
+const CATEGORY = "workspace" as const
 
 export const workspaceTools: ReadonlyArray<RegisteredTool> = [
   {

@@ -2,7 +2,7 @@ import { listProjectsParamsJsonSchema, parseListProjectsParams } from "../../dom
 import { listProjects } from "../../huly/operations/projects.js"
 import { createToolHandler, type RegisteredTool } from "./registry.js"
 
-const CATEGORY = "Projects" as const
+const CATEGORY = "projects" as const
 
 export const projectTools: ReadonlyArray<RegisteredTool> = [
   {

@@ -2,7 +2,7 @@ import { fulltextSearchParamsJsonSchema, parseFulltextSearchParams } from "../..
 import { fulltextSearch } from "../../huly/operations/search.js"
 import { createToolHandler, type RegisteredTool } from "./registry.js"
 
-const CATEGORY = "Search" as const
+const CATEGORY = "search" as const
 
 export const searchTools: ReadonlyArray<RegisteredTool> = [
   {

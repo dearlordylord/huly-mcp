@@ -28,7 +28,7 @@ import {
 } from "../../huly/operations/calendar.js"
 import { createToolHandler, type RegisteredTool } from "./registry.js"
 
-const CATEGORY = "Calendar" as const
+const CATEGORY = "calendar" as const
 
 export const calendarTools: ReadonlyArray<RegisteredTool> = [
   {

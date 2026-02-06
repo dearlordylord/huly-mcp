@@ -22,7 +22,7 @@ import {
 } from "../../huly/operations/documents.js"
 import { createToolHandler, type RegisteredTool } from "./registry.js"
 
-const CATEGORY = "Documents" as const
+const CATEGORY = "documents" as const
 
 export const documentTools: ReadonlyArray<RegisteredTool> = [
   {

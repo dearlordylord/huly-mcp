@@ -11,7 +11,7 @@ import {
 import { addComment, deleteComment, listComments, updateComment } from "../../huly/operations/comments.js"
 import { createToolHandler, type RegisteredTool } from "./registry.js"
 
-const CATEGORY = "Comments" as const
+const CATEGORY = "comments" as const
 
 export const commentTools: ReadonlyArray<RegisteredTool> = [
   {

@@ -128,11 +128,14 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `MCP_TRANSPORT` | No | Transport type: `stdio` (default) or `http` |
 | `MCP_HTTP_PORT` | No | HTTP server port (default: 3000) |
 | `MCP_HTTP_HOST` | No | HTTP server host (default: 127.0.0.1) |
+| `TOOLSETS` | No | Comma-separated tool categories to expose. If unset, all tools are exposed. Example: `issues,projects,search` |
 
 *Auth: Provide either `HULY_EMAIL` + `HULY_PASSWORD` or `HULY_TOKEN`.
 
 <!-- tools:start -->
 ## Available Tools
+
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `activity`, `notifications`, `workspace`
 
 ### Projects
 

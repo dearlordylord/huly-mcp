@@ -40,7 +40,7 @@ import {
 } from "../../huly/operations/channels.js"
 import { createToolHandler, type RegisteredTool } from "./registry.js"
 
-const CATEGORY = "Channels" as const
+const CATEGORY = "channels" as const
 
 export const channelTools: ReadonlyArray<RegisteredTool> = [
   {

@@ -31,7 +31,7 @@ import {
 } from "../../huly/operations/attachments.js"
 import { createCombinedToolHandler, createToolHandler, type RegisteredTool } from "./registry.js"
 
-const CATEGORY = "Attachments" as const
+const CATEGORY = "attachments" as const
 
 export const attachmentTools: ReadonlyArray<RegisteredTool> = [
   {

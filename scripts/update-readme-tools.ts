@@ -39,22 +39,25 @@ const toolFiles = readdirSync(toolsDir)
 const allTools = toolFiles.flatMap((file) => parseToolsFromFile(join(toolsDir, file)))
 
 const categoryOrder = [
-  "Projects",
-  "Issues",
-  "Comments",
-  "Milestones",
-  "Documents",
-  "Storage",
-  "Attachments",
-  "Contacts",
-  "Channels",
-  "Calendar",
-  "Time Tracking",
-  "Search",
-  "Activity",
-  "Notifications",
-  "Workspace"
+  "projects",
+  "issues",
+  "comments",
+  "milestones",
+  "documents",
+  "storage",
+  "attachments",
+  "contacts",
+  "channels",
+  "calendar",
+  "time tracking",
+  "search",
+  "activity",
+  "notifications",
+  "workspace"
 ]
+
+const capitalize = (s: string): string =>
+  s.replace(/\b\w/g, (c) => c.toUpperCase())
 
 const toolsByCategory = new Map<string, Tool[]>()
 for (const tool of allTools) {
@@ -64,13 +67,18 @@ for (const tool of allTools) {
 }
 
 const generateToolsSection = (): string => {
+  const categories = [
+    ...categoryOrder.filter((c) => toolsByCategory.has(c)),
+    ...[...toolsByCategory.keys()].filter((c) => !categoryOrder.includes(c))
+  ]
   let output = "## Available Tools\n\n"
+  output += `**\`TOOLSETS\` categories:** ${categories.map((c) => `\`${c}\``).join(", ")}\n\n`
 
   for (const categoryName of categoryOrder) {
     const tools = toolsByCategory.get(categoryName)
     if (!tools || tools.length === 0) continue
 
-    output += `### ${categoryName}\n\n`
+    output += `### ${capitalize(categoryName)}\n\n`
     output += "| Tool | Description |\n"
     output += "|------|-------------|\n"
 
@@ -86,7 +94,7 @@ const generateToolsSection = (): string => {
     if (categoryOrder.includes(categoryName)) continue
     if (tools.length === 0) continue
 
-    output += `### ${categoryName}\n\n`
+    output += `### ${capitalize(categoryName)}\n\n`
     output += "| Tool | Description |\n"
     output += "|------|-------------|\n"
 

@@ -28,7 +28,7 @@ import {
 } from "../../huly/operations/time.js"
 import { createToolHandler, type RegisteredTool } from "./registry.js"
 
-const CATEGORY = "Time Tracking" as const
+const CATEGORY = "time tracking" as const
 
 export const timeTools: ReadonlyArray<RegisteredTool> = [
   {

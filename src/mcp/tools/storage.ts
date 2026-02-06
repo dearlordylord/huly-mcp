@@ -2,7 +2,7 @@ import { parseUploadFileParams, uploadFileParamsJsonSchema } from "../../domain/
 import { uploadFile } from "../../huly/operations/storage.js"
 import { createStorageToolHandler, type RegisteredTool } from "./registry.js"
 
-const CATEGORY = "Storage" as const
+const CATEGORY = "storage" as const
 
 export const storageTools: ReadonlyArray<RegisteredTool> = [
   {

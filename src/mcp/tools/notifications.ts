@@ -40,7 +40,7 @@ import {
 } from "../../huly/operations/notifications.js"
 import { createToolHandler, type RegisteredTool } from "./registry.js"
 
-const CATEGORY = "Notifications" as const
+const CATEGORY = "notifications" as const
 
 export const notificationTools: ReadonlyArray<RegisteredTool> = [
   {
