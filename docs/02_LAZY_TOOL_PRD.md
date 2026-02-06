@@ -17,14 +17,37 @@ Claude Code already implements **client-side** lazy loading. When MCP tool descr
 
 However, this is **Claude Code-specific**. Claude Desktop, Cursor, and other MCP clients don't have this. A server-side solution benefits all clients.
 
+### Claude API Tool Search Tool
+
+The Claude API offers a dedicated `tool_search` tool type for API users with 10+ tools or >10K tokens of definitions. Supports Sonnet 4.0+ and Opus 4.0+ only.
+
 ### MCP Protocol Support
 
-The MCP spec (2025-06-18) already supports relevant primitives:
+The MCP spec (2025-06-18) supports relevant primitives:
 - **`tools/list` pagination** via cursor-based pagination (`nextCursor` in response)
 - **`listChanged` notifications** for dynamic tool registration
 - **Tool annotations** for metadata (read-only, destructive, etc.)
 
-None of these are currently used by this server (SDK version `^1.0.4`).
+None of these are currently used by this server.
+
+### SDK Support (v1.25.3)
+
+The installed `@modelcontextprotocol/sdk` v1.25.3 has **full support** for dynamic tool management:
+- `server.sendToolListChanged()` — sends notification to client
+- `McpServer.registerTool()` / `RegisteredTool.remove()` — add/remove tools at runtime
+- `RegisteredTool.enable()` / `.disable()` — show/hide tools from `tools/list`
+- All of the above automatically trigger `tools/list_changed` notifications
+- Notification debouncing available via `debouncedNotificationMethods` option
+
+### Client Support for `tools/list_changed`
+
+| Client | Status | Notes |
+|--------|--------|-------|
+| Claude Code | Disputed | Docs claim support, but [Issue #4118](https://github.com/anthropics/claude-code/issues/4118) (58 upvotes) reports it doesn't work mid-conversation |
+| Claude Desktop | **Not supported** | Confirmed by MCP maintainer ([Discussion #76](https://github.com/orgs/modelcontextprotocol/discussions/76)) |
+| GitHub Copilot (VS Code) | **Supported** | Confirmed working |
+| Cursor | Unknown | Unverified claims of support |
+| Vercel AI SDK | **Not supported** | Docs confirm no notification support |
 
 ## Existing Infrastructure
 
@@ -35,144 +58,156 @@ The codebase is well-positioned for this change:
 - **JSON schemas** are pre-generated at import time via `makeJsonSchema()` from Effect Schema.
 - **`tools/list` handler** (`src/mcp/server.ts:72-82`) maps over `toolRegistry.definitions` to produce the response.
 
-## Design
+## Approaches Evaluated
 
-### Concept: Three Meta-Tools
+### ~~Approach A: All Tools Listed, Schemas Stripped~~ (REJECTED)
 
-Replace the 114-tool listing with 3 meta-tools that let the LLM discover and use tools on demand:
+`tools/list` returns all 114 tools with `inputSchema: { type: "object" }` (no property definitions) plus 3 meta-tools for schema discovery.
 
-| Meta-Tool | Purpose | Output |
-|-----------|---------|--------|
-| `list_tool_categories` | Discovery — what's available? | Category names, descriptions, tool counts |
-| `get_category_tools` | Browse — what tools are in a category? | Tool names + one-line descriptions (no schemas) |
-| `get_tool_schema` | Prepare — how do I call this tool? | Full JSON schema for a single tool |
+**Why rejected:** Does not solve the core problem. The LLM still sees 117 tool entries in context — it saves schema payload tokens but the tool count (what causes LLMs to miscount/lose track) is unchanged. An LLM seeing `create_issue` with `inputSchema: { type: "object" }` will likely just call it directly without fetching the schema, since the server validates via Effect Schema anyway. The meta-tools become unused overhead.
 
-The actual tool invocation remains unchanged — the LLM calls the real tool name (e.g., `create_issue`) with arguments. The meta-tools are purely for discovery.
+### ~~Approach B: Only Meta-Tools Listed, Real Tools Hidden~~ (REJECTED as primary)
 
-### The Key Question: How Are Real Tools Exposed?
+`tools/list` returns only 3 meta-tools. Real tools unlisted but callable.
 
-There are two sub-approaches with different tradeoffs.
+**Why rejected as primary:** Some MCP clients reject calls to tools not in `tools/list`. Protocol compliance varies. However, elements of this approach survive in Approach D.
 
-#### Approach A: All Tools Listed, Schemas Stripped
+### ~~Approach C: Hybrid — Core Tools + Meta-Tools~~ (REJECTED)
 
-`tools/list` returns all 114 tools, but with `inputSchema: { type: "object" }` (permissive, no property definitions). Plus the 3 meta-tools. The LLM sees all tool names and descriptions upfront but calls `get_tool_schema` before using any tool.
+Curated set of ~20-30 "core" tools plus meta-tools.
 
-**Tradeoffs:**
-- (+) Tool names visible immediately — LLM knows `create_issue` exists without searching
-- (+) No proxy needed — tools are callable directly via MCP protocol
-- (+) Descriptions still aid tool selection
-- (-) 114 tool entries still in context (~2-5K tokens for names + descriptions alone)
-- (-) Client may validate args against the permissive schema, potentially allowing malformed calls without server-side schema enforcement (though the server already validates via Effect Schema)
+**Why rejected:** Maintenance burden of curating "core" list. Inconsistent UX.
 
-#### Approach B: Only Meta-Tools Listed, Real Tools Hidden
+### Approach D: Dynamic Tool Loading via `tools/list_changed` (RECOMMENDED)
 
-`tools/list` returns only the 3 meta-tools. Real tools are not listed but remain callable — the `CallToolRequestSchema` handler still dispatches to them. The LLM discovers tools through meta-tools and calls them by name.
+The MCP-native pattern for tool filtering:
+
+1. Server starts with a small set of always-available tools + 1 `search_tools` meta-tool
+2. LLM calls `search_tools` with a query describing what it needs
+3. Server enables matching tools (adds them to what `tools/list` returns)
+4. Server sends `tools/list_changed` notification
+5. Client calls `tools/list` to get updated tool list
+6. LLM can now call the newly available tools
 
 **Tradeoffs:**
-- (+) Minimal initial context — 3 tools instead of 117
-- (+) Maximum token savings
-- (-) LLM must always start with `list_tool_categories` → `get_category_tools` → `get_tool_schema` before any tool call — 3 round-trips minimum
-- (-) Some MCP clients may reject calls to tools not in the `tools/list` response (protocol compliance varies)
-- (-) Tool name validation via `ToolNameSchema` (currently derived from `TOOL_DEFINITIONS` keys) would need adjustment
+- (+) Minimal initial context — only a few tools + search
+- (+) Uses MCP-native primitives, not custom workarounds
+- (+) Tools appear as first-class MCP tools once enabled (full client compatibility)
+- (+) SDK already supports everything needed
+- (-) Client must support `tools/list_changed` (Claude Desktop doesn't, Claude Code disputed)
+- (-) Extra round-trip: search → notification → list → call (vs direct call)
 
-#### Approach C: Hybrid — Core Tools + Meta-Tools
+### Fallback: Static Meta-Tool Proxy (for incompatible clients)
 
-`tools/list` returns a curated set of ~20-30 "core" tools with full schemas, plus the 3 meta-tools. Remaining tools are discoverable via meta-tools only.
+For clients that don't support `tools/list_changed`, a static 3-tool approach (like [Stainless dynamic tools](https://www.stainless.com/changelog/mcp-dynamic-tools)):
+- `list_tool_categories` — browse categories
+- `search_tools` — find tools by query
+- `invoke_tool` — proxy: takes `toolName` + `args`, dispatches to real handler
 
-**Tradeoffs:**
-- (+) Common operations (list/create/update issues, search, list projects) work immediately
-- (+) Long-tail tools (notification settings, workspace admin, recurring events) don't waste context
-- (-) Requires maintaining a "core" list — subjective, may become stale
-- (-) Inconsistent UX: some tools are immediate, some require discovery
+This works with every client but loses native tool call UX (all calls go through `invoke_tool`).
 
-### Recommended: Configurable Mode
+## Design: Approach D
 
-An environment variable controls behavior, letting users choose based on their client:
+### Search Organization
+
+The `search_tools` tool performs keyword matching against tool names, descriptions, and categories:
 
 ```
-TOOL_LOADING=eager   # Current behavior: all 114 tools with full schemas (default)
-TOOL_LOADING=lazy    # Only meta-tools + stripped tool listings (Approach A or B)
-```
-
-This avoids breaking existing users while letting context-constrained setups opt in.
-
-### Meta-Tool Specifications
-
-#### `list_tool_categories`
-
-No parameters. Returns:
-
-```json
-[
-  { "category": "Issues", "toolCount": 18, "description": "Issue tracking: create, update, search, and manage issues, components, labels, and templates" },
-  { "category": "Documents", "toolCount": 6, "description": "Document management: teamspaces, create/read/update documents with markdown" },
+Input:  { query: "create an issue" }
+Output: [
+  { name: "create_issue", description: "...", category: "Issues" },
+  { name: "create_issue_from_template", description: "...", category: "Issues" },
   ...
 ]
+Side effect: matched tools enabled in tools/list, notification sent
 ```
 
-Category descriptions don't exist today — they'd be new metadata, one per category.
+Search strategy (simple, no vector DB needed):
+- Tokenize query into keywords
+- Score each tool: exact name match > keyword in name > keyword in description > category match
+- Enable top N matches (e.g., top 20)
+- Return matched tools with names + descriptions (no schemas — those come via `tools/list`)
 
-#### `get_category_tools`
+### Always-Available Tools
 
-Parameter: `category` (string). Returns:
+A small set of high-frequency tools always listed in `tools/list`:
+- `search_tools` (the meta-tool)
+- `list_projects` (nearly every session needs this)
+- `fulltext_search` (general-purpose discovery)
 
-```json
-[
-  { "name": "list_issues", "description": "Query Huly issues with optional filters..." },
-  { "name": "get_issue", "description": "Retrieve full details for a Huly issue..." },
-  ...
-]
+Possibly also: `list_issues`, `create_issue`, `get_issue` (the most common operations).
+
+The exact set should be determined by usage data. Configurable via env var:
+```
+ALWAYS_AVAILABLE_TOOLS=list_projects,fulltext_search,list_issues,create_issue,get_issue
 ```
 
-This is the existing `name` + `description` fields, just filtered by category.
+### Session Tool State
 
-#### `get_tool_schema`
+Tools enabled by `search_tools` accumulate during a session — once enabled, a tool stays enabled for the rest of the connection. This avoids the LLM losing access to tools it already discovered.
 
-Parameter: `toolName` (string). Returns the full `inputSchema` JSON object for that tool, exactly as currently returned in `tools/list`.
+For HTTP transport (stateless, new server per request), all tools are always available (lazy loading doesn't apply since there's no persistent session).
 
 ### LLM Interaction Flow
 
 ```
 User: "Create an issue in HULY project for the login bug"
 
-LLM thinks: I need issue creation tools.
-  1. calls get_tool_schema("create_issue")     ← if name is already known
-     OR
-  1. calls list_tool_categories()               ← if exploring
-  2. calls get_category_tools("Issues")
-  3. calls get_tool_schema("create_issue")
+tools/list returns: search_tools, list_projects, fulltext_search
+LLM sees 3 tools.
 
-LLM now has the full create_issue schema.
-  4. calls create_issue({ project: "HULY", title: "Login bug", ... })
+Option A (tool name already known):
+  1. LLM calls search_tools({ query: "create issue" })
+  2. Server enables create_issue + related tools, sends list_changed
+  3. Client re-fetches tools/list → now includes create_issue with full schema
+  4. LLM calls create_issue({ project: "HULY", title: "Login bug", ... })
+
+Option B (exploring):
+  1. LLM calls search_tools({ query: "issue management" })
+  2. Server enables all Issues category tools, sends list_changed
+  3. Client re-fetches → 18 issue tools now available with full schemas
+  4. LLM picks create_issue and calls it
 ```
 
-In practice, LLMs often know common tool names from descriptions alone, so the 3-step discovery flow is mainly for less obvious tools.
+### Token Budget Impact
 
-### Token Budget Impact (Estimates)
-
-| Mode | Initial Context | Per-Tool-Use Overhead |
-|------|----------------|----------------------|
+| Mode | Initial Context | Per-Search Overhead |
+|------|----------------|---------------------|
 | Current (eager) | ~30-60K tokens | 0 |
-| Lazy (approach A) | ~5-8K tokens | ~200-500 tokens (schema fetch) |
-| Lazy (approach B) | ~500 tokens | ~200-500 tokens (schema fetch + discovery) |
+| Approach D (lazy) | ~1-2K tokens | ~500-2K tokens (search result + newly enabled tool schemas) |
+| Static proxy fallback | ~500 tokens | ~200-500 tokens per invoke_tool call |
+
+### `tools/list_changed` Integration
+
+```typescript
+// In search_tools handler:
+const matches = searchTools(query, domainTools)
+for (const tool of matches) {
+  enabledTools.add(tool.name)
+}
+server.sendToolListChanged()
+return createSuccessResponse(matches.map(t => ({ name: t.name, description: t.description })))
+
+// In ListToolsRequestSchema handler:
+const visibleTools = allTools.filter(t =>
+  alwaysAvailableTools.has(t.name) || enabledTools.has(t.name) || t.category === META_CATEGORY
+)
+```
+
+The `Server` instance (low-level API currently used in `server.ts`) exposes `sendToolListChanged()` directly.
 
 ## Implementation Surface
 
-Files that would change:
-
 | File | Change |
 |------|--------|
-| `src/mcp/tools/registry.ts` | Add meta-tool type or integrate meta-tools as regular `RegisteredTool`s |
-| `src/mcp/tools/index.ts` | New meta-tool definitions; modified `toolRegistry` to support category queries |
-| `src/mcp/server.ts` | Modified `ListToolsRequestSchema` handler to respect `TOOL_LOADING` env var; `ToolNameSchema` adjustment if hiding tools |
-| `src/mcp/tools/meta.ts` (new) | Meta-tool definitions and handlers |
-| `src/domain/schemas/meta.ts` (new) | Schemas for meta-tool parameters |
-
-The meta-tool handlers don't need `HulyClient` — they only read from the in-memory tool registry. A new handler factory or direct implementation would work.
+| `src/mcp/server.ts` | Modified `ListToolsRequestSchema` to filter by enabled tools; `search_tools` handler; `tools/list_changed` notification; session state for enabled tools |
+| `src/mcp/tools/meta.ts` (new) | `search_tools` definition, search logic, category descriptions |
+| `src/domain/schemas/meta.ts` (new) | Schema for search_tools parameters |
+| `src/mcp/tools/index.ts` | Export meta-tools, expose tool search index |
 
 ### Category Metadata
 
-Each of the 15 tool files currently defines `const CATEGORY = "..." as const`. A new mapping from category → description is needed:
+Each of the 15 tool files defines `const CATEGORY = "..." as const`. A mapping from category → description is needed for search scoring:
 
 ```typescript
 const CATEGORY_DESCRIPTIONS: Record<string, string> = {
@@ -183,25 +218,26 @@ const CATEGORY_DESCRIPTIONS: Record<string, string> = {
 }
 ```
 
-This could live in the meta-tools file or in a shared location.
-
 ## Open Questions
 
-1. **Approach A vs B vs C?** Approach A (all tools listed, schemas stripped) is the safest and most compatible. Approach B (meta-tools only) gives maximum savings but may break clients that validate tool names against `tools/list`. Approach C adds maintenance burden.
+1. **Which tools are "always available"?** Need usage data or a reasonable starting set. Configurable via env var mitigates the decision.
 
-2. **Should `get_tool_schema` return just the inputSchema, or the full tool definition (name + description + schema)?** Returning the full definition makes it self-contained; just the schema is more minimal.
+2. **Search quality.** Simple keyword matching may miss semantic connections ("bug report" → `create_issue`). Should we embed synonyms/aliases per tool? Or is keyword matching on name + description sufficient?
 
-3. **Caching hint?** Should `get_tool_schema` responses include a note like "cache this for the session" in the response text? LLMs generally keep tool call results in context, but an explicit hint could help.
+3. **Client compatibility strategy.** Given that Claude Desktop doesn't support `tools/list_changed` and Claude Code's support is disputed, should we:
+   - Default to eager mode and only enable lazy for confirmed-compatible clients?
+   - Auto-detect client capabilities from the `initialize` handshake?
+   - Provide the static proxy fallback (`invoke_tool`) alongside?
 
-4. **Should meta-tools be available in eager mode too?** Having `list_tool_categories` available even in eager mode could help LLMs navigate the 114 tools. Low cost, potentially useful.
+4. **Tool accumulation limit.** If `search_tools` is called many times, enabled tools grow unbounded. Should there be a cap or LRU eviction?
 
-5. **MCP SDK upgrade?** The current SDK (`^1.0.4`) may not support `tools/list` pagination or `listChanged`. Worth checking if upgrading would enable protocol-native lazy loading as a complementary mechanism.
-
-6. **What about Claude Code's `server instructions`?** With MCP Tool Search, the server instructions field is critical for Claude Code to know when to search for tools. Should we add a recommended `serverInstructions` value to the README/docs? (This is orthogonal to server-side lazy loading but relevant for Claude Code users.)
+5. **HTTP transport.** Stateless HTTP transport creates a new server per request — lazy loading is meaningless. Should HTTP always use eager mode?
 
 ## References
 
 - [MCP Specification: Tools (2025-06-18)](https://modelcontextprotocol.io/specification/2025-06-18/server/tools) — protocol spec for `tools/list`, pagination, `listChanged`
-- [Claude Code Issue #11364: Lazy-load MCP tool definitions](https://github.com/anthropics/claude-code/issues/11364) — the original feature request that led to MCP Tool Search
-- [Claude Code MCP Tool Search overview](https://claudefa.st/blog/tools/mcp-extensions/mcp-tool-search) — how Claude Code's client-side lazy loading works
-- [VentureBeat: Claude Code MCP Tool Search launch](https://venturebeat.com/orchestration/claude-code-just-got-updated-with-one-of-the-most-requested-user-features) — coverage of the Jan 2026 release
+- [Claude Code Issue #4118: tools/list_changed not working](https://github.com/anthropics/claude-code/issues/4118) — 58 upvotes, reports notification not processed mid-conversation
+- [MCP Discussion #76: Dynamic tool registration](https://github.com/orgs/modelcontextprotocol/discussions/76) — Claude Desktop confirmed unsupported
+- [Stainless MCP Dynamic Tools](https://www.stainless.com/changelog/mcp-dynamic-tools) — static 3-meta-tool proxy pattern
+- [Claude Code MCP Tool Search](https://claudefa.st/blog/tools/mcp-extensions/mcp-tool-search) — client-side lazy loading
+- [Claude API Tool Search Tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool) — API-level tool search
