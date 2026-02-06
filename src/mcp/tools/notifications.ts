@@ -3,6 +3,7 @@ import { Effect } from "effect"
 import {
   archiveNotificationParamsJsonSchema,
   deleteNotificationParamsJsonSchema,
+  emptyParamsJsonSchema,
   getNotificationContextParamsJsonSchema,
   getNotificationParamsJsonSchema,
   listNotificationContextsParamsJsonSchema,
@@ -80,7 +81,7 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
     name: "mark_all_notifications_read",
     description: "Mark all unread notifications as read. Returns the count of notifications marked.",
     category: CATEGORY,
-    inputSchema: {},
+    inputSchema: emptyParamsJsonSchema,
     handler: createToolHandler(
       "mark_all_notifications_read",
       () => Effect.succeed({}),
@@ -102,7 +103,7 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
     name: "archive_all_notifications",
     description: "Archive all notifications. Returns the count of notifications archived.",
     category: CATEGORY,
-    inputSchema: {},
+    inputSchema: emptyParamsJsonSchema,
     handler: createToolHandler(
       "archive_all_notifications",
       () => Effect.succeed({}),
@@ -180,7 +181,7 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
     name: "get_unread_notification_count",
     description: "Get the count of unread notifications.",
     category: CATEGORY,
-    inputSchema: {},
+    inputSchema: emptyParamsJsonSchema,
     handler: createToolHandler(
       "get_unread_notification_count",
       () => Effect.succeed({}),

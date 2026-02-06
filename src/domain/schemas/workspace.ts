@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 
-import { LimitParam, makeJsonSchema, NonEmptyString, Timestamp } from "./shared.js"
+import { EmptyParamsSchema, LimitParam, makeJsonSchema, NonEmptyString, Timestamp } from "./shared.js"
 
 export const AccountRoleSchema = Schema.Literal(
   "READONLYGUEST",
@@ -209,10 +209,7 @@ export const UpdateGuestSettingsParamsSchema = Schema.Struct({
 
 export type UpdateGuestSettingsParams = Schema.Schema.Type<typeof UpdateGuestSettingsParamsSchema>
 
-export const GetRegionsParamsSchema = Schema.Struct({}).annotations({
-  title: "GetRegionsParams",
-  description: "Parameters for getting available regions"
-})
+export const GetRegionsParamsSchema = EmptyParamsSchema
 
 export type GetRegionsParams = Schema.Schema.Type<typeof GetRegionsParamsSchema>
 

@@ -1,5 +1,6 @@
 import {
   createWorkspaceParamsJsonSchema,
+  emptyParamsJsonSchema,
   getRegionsParamsJsonSchema,
   listWorkspaceMembersParamsJsonSchema,
   listWorkspacesParamsJsonSchema,
@@ -13,7 +14,7 @@ import {
   updateGuestSettingsParamsJsonSchema,
   updateMemberRoleParamsJsonSchema,
   updateUserProfileParamsJsonSchema
-} from "../../domain/schemas/workspace.js"
+} from "../../domain/schemas.js"
 import {
   createWorkspace,
   deleteWorkspace,
@@ -59,7 +60,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     name: "get_workspace_info",
     description: "Get information about the current workspace including name, URL, region, and settings.",
     category: CATEGORY,
-    inputSchema: { type: "object" as const, properties: {} },
+    inputSchema: emptyParamsJsonSchema,
     handler: createNoParamsWorkspaceToolHandler(
       "get_workspace_info",
       () => getWorkspaceInfo()
@@ -92,7 +93,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     name: "delete_workspace",
     description: "Permanently delete the current workspace. This action cannot be undone. Use with extreme caution.",
     category: CATEGORY,
-    inputSchema: { type: "object" as const, properties: {} },
+    inputSchema: emptyParamsJsonSchema,
     handler: createNoParamsWorkspaceToolHandler(
       "delete_workspace",
       () => deleteWorkspace()
@@ -102,7 +103,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     name: "get_user_profile",
     description: "Get the current user's profile information including bio, location, and social links.",
     category: CATEGORY,
-    inputSchema: { type: "object" as const, properties: {} },
+    inputSchema: emptyParamsJsonSchema,
     handler: createNoParamsWorkspaceToolHandler(
       "get_user_profile",
       () => getUserProfile()
