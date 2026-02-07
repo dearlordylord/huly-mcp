@@ -49,8 +49,6 @@ export const PersonRefSchema = Schema.Struct({
   description: "Reference to a person (assignee, reporter)"
 })
 
-export type PersonRef = Schema.Schema.Type<typeof PersonRefSchema>
-
 export const IssueSummarySchema = Schema.Struct({
   identifier: IssueIdentifier,
   title: Schema.String,

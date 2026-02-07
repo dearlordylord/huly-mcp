@@ -56,14 +56,14 @@ const core = require("@hcengineering/core").default as typeof import("@hcenginee
 
 // --- Error types ---
 
-export type ListEventsError = HulyClientError
-export type GetEventError = HulyClientError | EventNotFoundError
-export type CreateEventError = HulyClientError
-export type UpdateEventError = HulyClientError | EventNotFoundError
-export type DeleteEventError = HulyClientError | EventNotFoundError
-export type ListRecurringEventsError = HulyClientError
-export type CreateRecurringEventError = HulyClientError
-export type ListEventInstancesError = HulyClientError | RecurringEventNotFoundError
+type ListEventsError = HulyClientError
+type GetEventError = HulyClientError | EventNotFoundError
+type CreateEventError = HulyClientError
+type UpdateEventError = HulyClientError | EventNotFoundError
+type DeleteEventError = HulyClientError | EventNotFoundError
+type ListRecurringEventsError = HulyClientError
+type CreateRecurringEventError = HulyClientError
+type ListEventInstancesError = HulyClientError | RecurringEventNotFoundError
 
 // --- SDK Type Bridges ---
 
@@ -295,8 +295,6 @@ export const getEvent = (
 
     return result
   })
-
-export type { CreateEventResult, CreateRecurringEventResult, DeleteEventResult, UpdateEventResult }
 
 export const createEvent = (
   params: CreateEventParams

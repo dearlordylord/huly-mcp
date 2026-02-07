@@ -63,16 +63,14 @@ const time = require("@hcengineering/time").default as typeof import("@hcenginee
 const serverPopulatedCalendar = toRef<HulyCalendar>("")
 const serverPopulatedPersonId: CorePersonId = "" as CorePersonId
 
-export type LogTimeError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
-export type GetTimeReportError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
-export type ListTimeSpendReportsError = HulyClientError | ProjectNotFoundError
-export type GetDetailedTimeReportError = HulyClientError | ProjectNotFoundError
-export type ListWorkSlotsError = HulyClientError
-export type CreateWorkSlotError = HulyClientError
-export type StartTimerError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
-export type StopTimerError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
-
-export type { CreateWorkSlotResult, LogTimeResult, StartTimerResult, StopTimerResult }
+type LogTimeError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
+type GetTimeReportError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
+type ListTimeSpendReportsError = HulyClientError | ProjectNotFoundError
+type GetDetailedTimeReportError = HulyClientError | ProjectNotFoundError
+type ListWorkSlotsError = HulyClientError
+type CreateWorkSlotError = HulyClientError
+type StartTimerError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
+type StopTimerError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
 
 export const logTime = (
   params: LogTimeParams

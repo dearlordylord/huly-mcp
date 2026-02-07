@@ -38,14 +38,14 @@ import { toRef } from "./shared.js"
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
 
-export type ListPersonsError = HulyClientError
-export type GetPersonError = HulyClientError | PersonNotFoundError
-export type CreatePersonError = HulyClientError
-export type UpdatePersonError = HulyClientError | PersonNotFoundError
-export type DeletePersonError = HulyClientError | PersonNotFoundError
-export type ListEmployeesError = HulyClientError
-export type ListOrganizationsError = HulyClientError
-export type CreateOrganizationError = HulyClientError
+type ListPersonsError = HulyClientError
+type GetPersonError = HulyClientError | PersonNotFoundError
+type CreatePersonError = HulyClientError
+type UpdatePersonError = HulyClientError | PersonNotFoundError
+type DeletePersonError = HulyClientError | PersonNotFoundError
+type ListEmployeesError = HulyClientError
+type ListOrganizationsError = HulyClientError
+type CreateOrganizationError = HulyClientError
 
 const formatName = (firstName: string, lastName: string): string => `${lastName},${firstName}`
 
@@ -214,8 +214,6 @@ export const getPerson = (
       createdOn: person.createdOn
     }
   })
-
-export type { CreateOrganizationResult, CreatePersonResult, DeletePersonResult, UpdatePersonResult }
 
 export const createPerson = (
   params: CreatePersonParams

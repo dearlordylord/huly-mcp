@@ -33,9 +33,9 @@ import {
   InvalidFileDataError
 } from "./errors.js"
 
-export const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
+const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
 
-export const ALLOWED_CONTENT_TYPES = new Set([
+const ALLOWED_CONTENT_TYPES = new Set([
   // Images
   "image/jpeg",
   "image/png",
