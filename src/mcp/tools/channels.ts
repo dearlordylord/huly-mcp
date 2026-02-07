@@ -52,7 +52,7 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_channels",
       parseListChannelsParams,
-      (params) => listChannels(params)
+      listChannels
     )
   },
   {
@@ -63,7 +63,7 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "get_channel",
       parseGetChannelParams,
-      (params) => getChannel(params)
+      getChannel
     )
   },
   {
@@ -74,7 +74,7 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "create_channel",
       parseCreateChannelParams,
-      (params) => createChannel(params)
+      createChannel
     )
   },
   {
@@ -85,7 +85,7 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "update_channel",
       parseUpdateChannelParams,
-      (params) => updateChannel(params)
+      updateChannel
     )
   },
   {
@@ -96,7 +96,7 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "delete_channel",
       parseDeleteChannelParams,
-      (params) => deleteChannel(params)
+      deleteChannel
     )
   },
   {
@@ -107,7 +107,7 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_channel_messages",
       parseListChannelMessagesParams,
-      (params) => listChannelMessages(params)
+      listChannelMessages
     )
   },
   {
@@ -118,7 +118,7 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "send_channel_message",
       parseSendChannelMessageParams,
-      (params) => sendChannelMessage(params)
+      sendChannelMessage
     )
   },
   {
@@ -129,7 +129,7 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_direct_messages",
       parseListDirectMessagesParams,
-      (params) => listDirectMessages(params)
+      listDirectMessages
     )
   },
   {
@@ -140,7 +140,7 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_thread_replies",
       parseListThreadRepliesParams,
-      (params) => listThreadReplies(params)
+      listThreadReplies
     )
   },
   {
@@ -151,7 +151,7 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "add_thread_reply",
       parseAddThreadReplyParams,
-      (params) => addThreadReply(params)
+      addThreadReply
     )
   },
   {
@@ -162,7 +162,7 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "update_thread_reply",
       parseUpdateThreadReplyParams,
-      (params) => updateThreadReply(params)
+      updateThreadReply
     )
   },
   {
@@ -173,7 +173,7 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "delete_thread_reply",
       parseDeleteThreadReplyParams,
-      (params) => deleteThreadReply(params)
+      deleteThreadReply
     )
   }
 ]

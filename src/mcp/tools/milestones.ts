@@ -33,7 +33,7 @@ export const milestoneTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_milestones",
       parseListMilestonesParams,
-      (params) => listMilestones(params)
+      listMilestones
     )
   },
   {
@@ -44,7 +44,7 @@ export const milestoneTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "get_milestone",
       parseGetMilestoneParams,
-      (params) => getMilestone(params)
+      getMilestone
     )
   },
   {
@@ -55,7 +55,7 @@ export const milestoneTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "create_milestone",
       parseCreateMilestoneParams,
-      (params) => createMilestone(params)
+      createMilestone
     )
   },
   {
@@ -66,7 +66,7 @@ export const milestoneTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "update_milestone",
       parseUpdateMilestoneParams,
-      (params) => updateMilestone(params)
+      updateMilestone
     )
   },
   {
@@ -77,7 +77,7 @@ export const milestoneTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "set_issue_milestone",
       parseSetIssueMilestoneParams,
-      (params) => setIssueMilestone(params)
+      setIssueMilestone
     )
   },
   {
@@ -88,7 +88,7 @@ export const milestoneTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "delete_milestone",
       parseDeleteMilestoneParams,
-      (params) => deleteMilestone(params)
+      deleteMilestone
     )
   }
 ]

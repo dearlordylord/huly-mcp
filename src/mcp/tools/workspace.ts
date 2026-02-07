@@ -41,7 +41,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     handler: createWorkspaceToolHandler(
       "list_workspace_members",
       parseListWorkspaceMembersParams,
-      (params) => listWorkspaceMembers(params)
+      listWorkspaceMembers
     )
   },
   {
@@ -53,7 +53,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     handler: createWorkspaceToolHandler(
       "update_member_role",
       parseUpdateMemberRoleParams,
-      (params) => updateMemberRole(params)
+      updateMemberRole
     )
   },
   {
@@ -63,7 +63,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     inputSchema: emptyParamsJsonSchema,
     handler: createNoParamsWorkspaceToolHandler(
       "get_workspace_info",
-      () => getWorkspaceInfo()
+      getWorkspaceInfo
     )
   },
   {
@@ -75,7 +75,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     handler: createWorkspaceToolHandler(
       "list_workspaces",
       parseListWorkspacesParams,
-      (params) => listWorkspaces(params)
+      listWorkspaces
     )
   },
   {
@@ -86,7 +86,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     handler: createWorkspaceToolHandler(
       "create_workspace",
       parseCreateWorkspaceParams,
-      (params) => createWorkspace(params)
+      createWorkspace
     )
   },
   {

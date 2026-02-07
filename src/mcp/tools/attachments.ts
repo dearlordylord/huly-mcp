@@ -43,7 +43,7 @@ export const attachmentTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_attachments",
       parseListAttachmentsParams,
-      (params) => listAttachments(params)
+      listAttachments
     )
   },
   {
@@ -54,7 +54,7 @@ export const attachmentTools: ReadonlyArray<RegisteredTool> = [
     handler: createCombinedToolHandler(
       "get_attachment",
       parseGetAttachmentParams,
-      (params) => getAttachment(params)
+      getAttachment
     )
   },
   {
@@ -66,7 +66,7 @@ export const attachmentTools: ReadonlyArray<RegisteredTool> = [
     handler: createCombinedToolHandler(
       "add_attachment",
       parseAddAttachmentParams,
-      (params) => addAttachment(params)
+      addAttachment
     )
   },
   {
@@ -77,7 +77,7 @@ export const attachmentTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "update_attachment",
       parseUpdateAttachmentParams,
-      (params) => updateAttachment(params)
+      updateAttachment
     )
   },
   {
@@ -88,7 +88,7 @@ export const attachmentTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "delete_attachment",
       parseDeleteAttachmentParams,
-      (params) => deleteAttachment(params)
+      deleteAttachment
     )
   },
   {
@@ -99,7 +99,7 @@ export const attachmentTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "pin_attachment",
       parsePinAttachmentParams,
-      (params) => pinAttachment(params)
+      pinAttachment
     )
   },
   {
@@ -110,7 +110,7 @@ export const attachmentTools: ReadonlyArray<RegisteredTool> = [
     handler: createCombinedToolHandler(
       "download_attachment",
       parseDownloadAttachmentParams,
-      (params) => downloadAttachment(params)
+      downloadAttachment
     )
   },
   {
@@ -122,7 +122,7 @@ export const attachmentTools: ReadonlyArray<RegisteredTool> = [
     handler: createCombinedToolHandler(
       "add_issue_attachment",
       parseAddIssueAttachmentParams,
-      (params) => addIssueAttachment(params)
+      addIssueAttachment
     )
   },
   {
@@ -134,7 +134,7 @@ export const attachmentTools: ReadonlyArray<RegisteredTool> = [
     handler: createCombinedToolHandler(
       "add_document_attachment",
       parseAddDocumentAttachmentParams,
-      (params) => addDocumentAttachment(params)
+      addDocumentAttachment
     )
   }
 ]
