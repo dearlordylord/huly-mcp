@@ -62,7 +62,6 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     category: CATEGORY,
     inputSchema: emptyParamsJsonSchema,
     handler: createNoParamsWorkspaceToolHandler(
-      "get_workspace_info",
       () => getWorkspaceInfo()
     )
   },
@@ -95,7 +94,6 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     category: CATEGORY,
     inputSchema: emptyParamsJsonSchema,
     handler: createNoParamsWorkspaceToolHandler(
-      "delete_workspace",
       () => deleteWorkspace()
     )
   },
@@ -105,7 +103,6 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     category: CATEGORY,
     inputSchema: emptyParamsJsonSchema,
     handler: createNoParamsWorkspaceToolHandler(
-      "get_user_profile",
       () => getUserProfile()
     )
   },

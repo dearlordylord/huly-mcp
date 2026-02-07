@@ -3,7 +3,8 @@ import type { ProjectType } from "@hcengineering/task"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
 import { Effect } from "effect"
 
-import { NonNegativeNumber, PositiveNumber } from "../../domain/schemas/shared.js"
+import type { NonNegativeNumber } from "../../domain/schemas/shared.js"
+import { PositiveNumber } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { InvalidPersonUuidError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 
