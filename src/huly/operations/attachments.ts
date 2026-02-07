@@ -49,6 +49,7 @@ import {
   TeamspaceNotFoundError
 } from "../errors.js"
 import {
+  type FileSourceParams,
   getBufferFromParams,
   HulyStorageClient,
   type StorageClientError,
@@ -210,6 +211,18 @@ export interface AddAttachmentResult {
  *
  * Uploads file to storage and creates Attachment document linked to parent.
  */
+const toFileSourceParams = (params: {
+  readonly filePath?: string | undefined
+  readonly fileUrl?: string | undefined
+  readonly data?: string | undefined
+}): FileSourceParams => {
+  const result: FileSourceParams = {}
+  if (params.filePath !== undefined) result.filePath = params.filePath
+  if (params.fileUrl !== undefined) result.fileUrl = params.fileUrl
+  if (params.data !== undefined) result.data = params.data
+  return result
+}
+
 export const addAttachment = (
   params: AddAttachmentParams
 ): Effect.Effect<AddAttachmentResult, AddAttachmentError, HulyClient | HulyStorageClient> =>
@@ -217,7 +230,7 @@ export const addAttachment = (
     const client = yield* HulyClient
     const storageClient = yield* HulyStorageClient
 
-    const buffer = yield* getBufferFromParams(params)
+    const buffer = yield* getBufferFromParams(toFileSourceParams(params))
     yield* validateFileSize(buffer, params.filename)
     yield* validateContentType(params.contentType, params.filename)
 
@@ -455,7 +468,7 @@ export const addIssueAttachment = (
 
     const storageClient = yield* HulyStorageClient
 
-    const buffer = yield* getBufferFromParams(params)
+    const buffer = yield* getBufferFromParams(toFileSourceParams(params))
     yield* validateFileSize(buffer, params.filename)
     yield* validateContentType(params.contentType, params.filename)
 
@@ -536,7 +549,7 @@ export const addDocumentAttachment = (
 
     const storageClient = yield* HulyStorageClient
 
-    const buffer = yield* getBufferFromParams(params)
+    const buffer = yield* getBufferFromParams(toFileSourceParams(params))
     yield* validateFileSize(buffer, params.filename)
     yield* validateContentType(params.contentType, params.filename)
 

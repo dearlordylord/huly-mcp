@@ -9,7 +9,7 @@
  *
  * @module
  */
-import { absurd, Cause, Chunk, Match, ParseResult } from "effect"
+import { absurd, Cause, Chunk, ParseResult } from "effect"
 
 import type { Die, Interrupt } from "effect/Cause"
 import { type HulyDomainError, McpErrorCode } from "../huly/errors.js"
@@ -55,51 +55,56 @@ const createErrorResponse = (
 
 /**
  * Map a HulyDomainError to an MCP error response.
+ * Uses switch statement because Effect's Match.tag has a 20-branch limit.
  */
 export const mapDomainErrorToMcp = (error: HulyDomainError): McpErrorResponseWithMeta => {
-  return Match.value(error).pipe(
-    Match.tag("IssueNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("ProjectNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("InvalidStatusError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("PersonNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("InvalidFileDataError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("FileNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("FileFetchError", (e) => createErrorResponse(e.message, McpErrorCode.InternalError)),
-    Match.tag("FileUploadError", (e) =>
-      createErrorResponse(
-        `File upload error: ${e.message}`,
-        McpErrorCode.InternalError
-      )),
-    Match.tag("TeamspaceNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("DocumentNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("CommentNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("MilestoneNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("ChannelNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("MessageNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("ThreadReplyNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("EventNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("RecurringEventNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("AttachmentNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("ComponentNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("IssueTemplateNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("NotificationNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("NotificationContextNotFoundError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("InvalidPersonUuidError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("FileTooLargeError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("InvalidContentTypeError", (e) => createErrorResponse(e.message, McpErrorCode.InvalidParams)),
-    Match.tag("HulyConnectionError", (e) =>
-      createErrorResponse(
-        `Connection error: ${e.message}`,
-        McpErrorCode.InternalError
-      )),
-    Match.tag("HulyAuthError", (e) =>
-      createErrorResponse(
-        `Authentication error: ${e.message}`,
-        McpErrorCode.InternalError
-      )),
-    Match.tag("HulyError", (e) => createErrorResponse(e.message, McpErrorCode.InternalError)),
-    Match.exhaustive
-  )
+  switch (error._tag) {
+    case "IssueNotFoundError":
+    case "ProjectNotFoundError":
+    case "InvalidStatusError":
+    case "PersonNotFoundError":
+    case "InvalidFileDataError":
+    case "FileNotFoundError":
+    case "TeamspaceNotFoundError":
+    case "DocumentNotFoundError":
+    case "CommentNotFoundError":
+    case "MilestoneNotFoundError":
+    case "ChannelNotFoundError":
+    case "MessageNotFoundError":
+    case "ThreadReplyNotFoundError":
+    case "EventNotFoundError":
+    case "RecurringEventNotFoundError":
+    case "ActivityMessageNotFoundError":
+    case "ReactionNotFoundError":
+    case "SavedMessageNotFoundError":
+    case "AttachmentNotFoundError":
+    case "ComponentNotFoundError":
+    case "IssueTemplateNotFoundError":
+    case "NotificationNotFoundError":
+    case "NotificationContextNotFoundError":
+    case "InvalidPersonUuidError":
+    case "FileTooLargeError":
+    case "InvalidContentTypeError":
+      return createErrorResponse(error.message, McpErrorCode.InvalidParams)
+
+    case "FileFetchError":
+      return createErrorResponse(error.message, McpErrorCode.InternalError)
+
+    case "FileUploadError":
+      return createErrorResponse(`File upload error: ${error.message}`, McpErrorCode.InternalError)
+
+    case "HulyConnectionError":
+      return createErrorResponse(`Connection error: ${error.message}`, McpErrorCode.InternalError)
+
+    case "HulyAuthError":
+      return createErrorResponse(`Authentication error: ${error.message}`, McpErrorCode.InternalError)
+
+    case "HulyError":
+      return createErrorResponse(error.message, McpErrorCode.InternalError)
+
+    default:
+      return absurd(error as never)
+  }
 }
 
 // --- Parse Error Mapping ---

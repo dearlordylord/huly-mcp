@@ -1,4 +1,4 @@
-import type { DocumentQuery, FindOptions } from "@hcengineering/core"
+import type { Doc, DocumentQuery, FindOptions } from "@hcengineering/core"
 
 /**
  * Escape SQL LIKE wildcard characters in a string.
@@ -14,7 +14,7 @@ export const escapeLikeWildcards = (input: string): string =>
  * Add substring search to query using $like operator.
  * The $like operator performs SQL-style LIKE matching with % wildcards.
  */
-export const addSubstringSearch = <T extends object>(
+export const addSubstringSearch = <T extends Doc>(
   query: DocumentQuery<T>,
   field: keyof T & string,
   searchTerm: string | undefined
@@ -32,7 +32,7 @@ export const addSubstringSearch = <T extends object>(
  * Lookups allow fetching related documents in a single query,
  * avoiding N+1 query problems.
  */
-export const withLookup = <T extends object>(
+export const withLookup = <T extends Doc>(
   options: FindOptions<T> | undefined,
   lookups: Record<string, unknown>
 ): FindOptions<T> => {
@@ -49,7 +49,7 @@ export const withLookup = <T extends object>(
  * Add fulltext search to query using $search operator.
  * Searches across indexed text fields.
  */
-export const addFulltextSearch = <T extends object>(
+export const addFulltextSearch = <T extends Doc>(
   query: DocumentQuery<T>,
   searchTerm: string | undefined
 ): DocumentQuery<T> => {
@@ -64,7 +64,7 @@ export const addFulltextSearch = <T extends object>(
  * Add regex search to query.
  * Supports JavaScript-style regex patterns.
  */
-export const addRegexSearch = <T extends object>(
+export const addRegexSearch = <T extends Doc>(
   query: DocumentQuery<T>,
   field: keyof T & string,
   pattern: string | undefined,
