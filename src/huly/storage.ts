@@ -184,8 +184,7 @@ export class HulyStorageClient extends Context.Tag("@hulymcp/HulyStorageClient")
           Effect.tryPromise({
             try: async () => {
               const blob = await storageClient.put(filename, data, contentType, data.length)
-              // SDK: blob._id is Ref<Doc>; narrow to Ref<Blob> for type-safe downstream usage
-              const blobRef = blob._id as Ref<Blob>
+              const blobRef = blob._id
               return {
                 blobId: blobRef,
                 contentType: blob.contentType,
@@ -218,6 +217,7 @@ export class HulyStorageClient extends Context.Tag("@hulymcp/HulyStorageClient")
       StorageClientError
     > =>
       Effect.succeed({
+        // eslint-disable-next-line no-restricted-syntax -- test mock: string literal to branded Ref
         blobId: "test-blob-id" as unknown as Ref<Blob>,
         contentType: "application/octet-stream",
         size: 0,

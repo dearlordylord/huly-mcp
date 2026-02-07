@@ -73,9 +73,10 @@ const descriptionAsMarkupRef = (desc: HulyEvent["description"]): MarkupBlobRef =
 // SDK: uploadMarkup returns MarkupBlobRef but Event.description expects a different union.
 const markupRefAsDescription = (
   ref: MarkupBlobRef | null
+  // eslint-disable-next-line no-restricted-syntax -- SDK type mismatch: MarkupBlobRef vs Event.description
 ): HulyEvent["description"] => ref as unknown as HulyEvent["description"]
 
-// SDK: clearing description requires empty string but type doesn't allow it.
+// eslint-disable-next-line no-restricted-syntax -- SDK: clearing description requires empty string but type doesn't allow it
 const emptyEventDescription = "" as unknown as HulyEvent["description"]
 
 // SDK: Data<Event> requires 'user' but server populates from auth context.
