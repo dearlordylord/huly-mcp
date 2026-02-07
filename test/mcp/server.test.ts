@@ -1,12 +1,12 @@
 import { describe, it } from "@effect/vitest"
 import { expect } from "vitest"
 import { Effect, Layer } from "effect"
-import type {
-  Doc,
-  FindResult,
-  Ref,
-  Space,
-  Status,
+import {
+  toFindResult,
+  type Doc,
+  type Ref,
+  type Space,
+  type Status,
 } from "@hcengineering/core"
 import { type Issue as HulyIssue, type Project as HulyProject, IssuePriority } from "@hcengineering/tracker"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
@@ -101,12 +101,12 @@ const createMockHulyClientLayer = (config: {
 
   const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown) => {
     if (_class === tracker.class.Issue) {
-      return Effect.succeed(issues as unknown as FindResult<Doc>)
+      return Effect.succeed(toFindResult(issues as Doc[]))
     }
     if (_class === tracker.class.IssueStatus) {
-      return Effect.succeed(statuses as unknown as FindResult<Doc>)
+      return Effect.succeed(toFindResult(statuses as Doc[]))
     }
-    return Effect.succeed([] as unknown as FindResult<Doc>)
+    return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
 
   const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown, query: unknown) => {

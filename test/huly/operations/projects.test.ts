@@ -1,11 +1,11 @@
 import { describe, it } from "@effect/vitest"
 import { expect } from "vitest"
 import { Effect } from "effect"
-import type {
-  Doc,
-  FindResult,
-  Ref,
-  Space,
+import {
+  toFindResult,
+  type Doc,
+  type Ref,
+  type Space,
 } from "@hcengineering/core"
 import { type Project as HulyProject } from "@hcengineering/tracker"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
@@ -66,11 +66,11 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       const limited = filtered.slice(0, limit)
 
       // Return with total
-      const result = limited as unknown as FindResult<Doc>
+      const result = toFindResult(limited as Doc[])
       ;(result as { total?: number }).total = filtered.length
       return Effect.succeed(result)
     }
-    return Effect.succeed([] as unknown as FindResult<Doc>)
+    return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
 
   return HulyClient.testLayer({
