@@ -16,6 +16,10 @@ See `INTEGRATION_TESTING.md` for manual testing against live Huly instance.
 
 No comments that repeat the code. If the code says what it does, don't add a comment saying the same thing.
 
+## No Dead Code
+
+Every function, type, and export must have at least one call site at time of writing. Never write code "for future use" unless the user explicitly requests it.
+
 ## Type Safety
 
 Type casts (`as T`) are a sin. Avoid them. When unavoidable:

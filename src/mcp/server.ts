@@ -20,7 +20,7 @@ import { CATEGORY_NAMES, createFilteredRegistry, TOOL_DEFINITIONS, toolRegistry 
 
 export type McpTransportType = "stdio" | "http"
 
-export interface McpServerConfig {
+interface McpServerConfig {
   readonly transport: McpTransportType
   readonly httpPort?: number
   readonly httpHost?: string
@@ -53,7 +53,7 @@ const parseToolsets = (raw: string | undefined): ReadonlySet<string> | undefined
   return enabled.size > 0 ? enabled : undefined
 }
 
-export interface McpServerOperations {
+interface McpServerOperations {
   readonly run: () => Effect.Effect<void, McpServerError, HttpServerFactoryService>
   readonly stop: () => Effect.Effect<void, McpServerError>
 }
@@ -62,7 +62,7 @@ export interface McpServerOperations {
  * Create a configured MCP Server instance with tool handlers.
  * Used for both stdio and HTTP transports.
  */
-export const createMcpServer = (
+const createMcpServer = (
   hulyClient: HulyClient["Type"],
   storageClient: HulyStorageClient["Type"],
   workspaceClient?: WorkspaceClient["Type"],

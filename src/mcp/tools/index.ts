@@ -56,7 +56,7 @@ type ToolRegistryMethods = {
   ) => Promise<McpToolResponse> | null
 }
 
-export type ToolRegistry = ToolRegistryData & ToolRegistryMethods
+type ToolRegistry = ToolRegistryData & ToolRegistryMethods
 
 const buildRegistry = (tools: ReadonlyArray<RegisteredTool>): ToolRegistry => {
   const map = new Map<string, RegisteredTool>(

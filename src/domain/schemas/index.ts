@@ -125,8 +125,6 @@ export {
   parseUpdateComponentParams,
   parseUpdateIssueParams,
   parseUpdateIssueTemplateParams,
-  type PersonRef,
-  PersonRefSchema,
   type SetIssueComponentParams,
   setIssueComponentParamsJsonSchema,
   SetIssueComponentParamsSchema,
