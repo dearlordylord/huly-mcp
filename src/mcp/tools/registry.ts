@@ -2,12 +2,13 @@ import type { ParseResult } from "effect"
 import { Effect, Exit } from "effect"
 
 import { HulyClient } from "../../huly/client.js"
-import type { HulyDomainError } from "../../huly/errors.js"
+import { HulyError, type HulyDomainError } from "../../huly/errors.js"
 import { HulyStorageClient } from "../../huly/storage.js"
 import { WorkspaceClient } from "../../huly/workspace-client.js"
 import {
   createSuccessResponse,
   mapDomainCauseToMcp,
+  mapDomainErrorToMcp,
   mapParseCauseToMcp,
   type McpToolResponse
 } from "../error-mapping.js"
@@ -123,10 +124,9 @@ export const createWorkspaceToolHandler = <P, R>(
     const params = parseResult.value
 
     if (!workspaceClient) {
-      return {
-        isError: true,
-        content: [{ type: "text" as const, text: "WorkspaceClient not available" }]
-      }
+      return mapDomainErrorToMcp(
+        new HulyError({ message: "WorkspaceClient not available" })
+      )
     }
 
     const operationResult = await Effect.runPromiseExit(
@@ -147,10 +147,9 @@ export const createNoParamsWorkspaceToolHandler = <R>(
 ): RegisteredTool["handler"] => {
   return async (_args, _hulyClient, _storageClient, workspaceClient) => {
     if (!workspaceClient) {
-      return {
-        isError: true,
-        content: [{ type: "text" as const, text: "WorkspaceClient not available" }]
-      }
+      return mapDomainErrorToMcp(
+        new HulyError({ message: "WorkspaceClient not available" })
+      )
     }
 
     const operationResult = await Effect.runPromiseExit(
