@@ -1,12 +1,12 @@
 import { describe, it } from "@effect/vitest"
 import { expect } from "vitest"
 import { Effect } from "effect"
-import type {
-  Doc,
-  FindResult,
-  Ref,
-  Space,
-  Status
+import {
+  toFindResult,
+  type Doc,
+  type Ref,
+  type Space,
+  type Status
 } from "@hcengineering/core"
 import { type Issue as HulyIssue, type Project as HulyProject, type TimeSpendReport as HulyTimeSpendReport, IssuePriority } from "@hcengineering/tracker"
 import type { Person, Channel } from "@hcengineering/contact"
@@ -146,9 +146,9 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       if (q._id?.$in) {
         const ids = q._id.$in as string[]
         const filtered = issues.filter(i => ids.includes(String(i._id)))
-        return Effect.succeed(filtered as unknown as FindResult<Doc>)
+        return Effect.succeed(toFindResult(filtered as Doc[]))
       }
-      return Effect.succeed(issues as unknown as FindResult<Doc>)
+      return Effect.succeed(toFindResult(issues as Doc[]))
     }
     if (_class === tracker.class.TimeSpendReport) {
       const q = query as Record<string, unknown>
@@ -177,23 +177,23 @@ const createTestLayerWithMocks = (config: MockConfig) => {
           }
         })
       }
-      return Effect.succeed(filtered as unknown as FindResult<Doc>)
+      return Effect.succeed(toFindResult(filtered as Doc[]))
     }
     if (_class === contact.class.Channel) {
       const value = (query as Record<string, unknown>).value as string
       const filtered = channels.filter(c => c.value === value)
-      return Effect.succeed(filtered as unknown as FindResult<Doc>)
+      return Effect.succeed(toFindResult(filtered as Doc[]))
     }
     if (_class === contact.class.Person) {
       const q = query as Record<string, unknown>
       if (q._id?.$in) {
         const ids = q._id.$in as string[]
         const filtered = persons.filter(p => ids.includes(String(p._id)))
-        return Effect.succeed(filtered as unknown as FindResult<Doc>)
+        return Effect.succeed(toFindResult(filtered as Doc[]))
       }
-      return Effect.succeed(persons as unknown as FindResult<Doc>)
+      return Effect.succeed(toFindResult(persons as Doc[]))
     }
-    return Effect.succeed([] as unknown as FindResult<Doc>)
+    return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
 
   const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown, query: unknown) => {

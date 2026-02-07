@@ -1,17 +1,18 @@
 import { describe, it } from "@effect/vitest"
 import { expect } from "vitest"
 import { Effect } from "effect"
-import type {
-  Class,
-  Data,
-  Doc,
-  DocumentQuery,
-  FindOptions,
-  FindResult,
-  Ref as DocRef,
-  Space,
-  TxResult,
-  WithLookup,
+import {
+  toFindResult,
+  type Class,
+  type Data,
+  type Doc,
+  type DocumentQuery,
+  type FindOptions,
+  type FindResult,
+  type Ref as DocRef,
+  type Space,
+  type TxResult,
+  type WithLookup,
 } from "@hcengineering/core"
 import type { MarkupRef } from "@hcengineering/api-client"
 import {
@@ -45,13 +46,13 @@ describe("HulyClient Service", () => {
 
         it.effect("allows overriding specific operations", () =>
       Effect.gen(function* () {
-        const mockResults: FindResult<TestDoc> = [
-          { _id: "1", _class: "class" as DocRef<Class<TestDoc>>, space: "space" as DocRef<Space>, title: "Test", modifiedBy: "user" as DocRef<Doc>, modifiedOn: 0, createdBy: "user" as DocRef<Doc>, createdOn: 0 },
-        ] as unknown as FindResult<TestDoc>
+        const mockResults = toFindResult([
+          { _id: "1", _class: "class" as DocRef<Class<TestDoc>>, space: "space" as DocRef<Space>, title: "Test", modifiedBy: "user" as DocRef<Doc>, modifiedOn: 0, createdBy: "user" as DocRef<Doc>, createdOn: 0 } as TestDoc,
+        ])
 
         const testLayer = HulyClient.testLayer({
           findAll: <T extends Doc>() =>
-            Effect.succeed(mockResults as unknown as FindResult<T>),
+            Effect.succeed(mockResults as FindResult<T>),
         })
 
         const client = yield* HulyClient.pipe(Effect.provide(testLayer))
@@ -276,10 +277,10 @@ describe("HulyClient Service", () => {
       Effect.gen(function* () {
         // Mock a higher-level service that uses HulyClient
         const mockFindAll = <T extends Doc>() =>
-          Effect.succeed([
+          Effect.succeed(toFindResult([
             { _id: "1", title: "Issue 1" },
             { _id: "2", title: "Issue 2" },
-          ] as unknown as FindResult<T>)
+          ] as Doc[]) as FindResult<T>)
 
         const testLayer = HulyClient.testLayer({
           findAll: mockFindAll,
@@ -293,7 +294,7 @@ describe("HulyClient Service", () => {
             { space: "project-1" } as DocumentQuery<TestDoc>,
             { limit: 50 } as FindOptions<TestDoc>
           )
-          return issues.map((i) => (i as unknown as { title: string }).title)
+          return issues.map((i) => (i as Doc & { title: string }).title)
         })
 
         const result = yield* listIssues.pipe(Effect.provide(testLayer))
@@ -309,11 +310,11 @@ describe("HulyClient Service", () => {
         const testLayer = HulyClient.testLayer({
           findAll: <T extends Doc>() => {
             callCount.findAll++
-            return Effect.succeed([] as unknown as FindResult<T>)
+            return Effect.succeed(toFindResult([]) as FindResult<T>)
           },
           findOne: <T extends Doc>() => {
             callCount.findOne++
-            return Effect.succeed({ _id: "1", title: "Found" } as unknown as WithLookup<T>)
+            return Effect.succeed({ _id: "1", title: "Found" } as WithLookup<T>)
           },
         })
 
@@ -371,7 +372,7 @@ describe("HulyClient Service", () => {
         const testLayer = HulyClient.testLayer({
           findAll: <T extends Doc>() => {
             operations.push("findAll")
-            return Effect.succeed([] as unknown as FindResult<T>)
+            return Effect.succeed(toFindResult([]) as FindResult<T>)
           },
           findOne: <T extends Doc>() => {
             operations.push("findOne")
