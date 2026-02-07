@@ -48,6 +48,9 @@ export type StatusInfo = {
 /**
  * Find project with its ProjectType lookup to get status information.
  * This avoids querying IssueStatus directly which can fail on some workspaces.
+ *
+ * If Status query fails (known bug on some workspaces), falls back to using
+ * status refs without resolved names.
  */
 export const findProjectWithStatuses = (
   projectIdentifier: string
@@ -59,7 +62,6 @@ export const findProjectWithStatuses = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    // Use lookup to get ProjectType which contains status definitions
     const project = yield* client.findOne<ProjectWithType>(
       tracker.class.Project,
       { identifier: projectIdentifier },
@@ -69,31 +71,65 @@ export const findProjectWithStatuses = (
       return yield* new ProjectNotFoundError({ identifier: projectIdentifier })
     }
 
-    // Extract statuses from ProjectType
     const projectType = project.$lookup?.type
-    const statuses: StatusInfo[] = []
+    let statuses: StatusInfo[] = []
 
-    // Category refs for done/canceled detection
     const wonCategory = String(task.statusCategory.Won)
     const lostCategory = String(task.statusCategory.Lost)
 
     if (projectType?.statuses) {
-      // ProjectType.statuses contains ProjectStatus objects with _id refs
-      // We need to fetch the actual Status documents to get names
       const statusRefs = projectType.statuses.map(s => s._id)
       if (statusRefs.length > 0) {
-        const statusDocs = yield* client.findAll<Status>(
-          core.class.Status as Ref<Class<Doc>> as Ref<Class<Status>>,
-          { _id: { $in: statusRefs } }
+        // Try to query Status documents for names
+        // On some workspaces this fails with deserialization errors
+        const statusDocsResult = yield* Effect.either(
+          client.findAll<Status>(
+            // Double cast needed: core.class.Status is typed as string constant
+            // but findAll expects Ref<Class<Status>>. SDK type limitation.
+            core.class.Status as Ref<Class<Doc>> as Ref<Class<Status>>,
+            { _id: { $in: statusRefs } }
+          )
         )
-        for (const doc of statusDocs) {
-          const categoryStr = doc.category ? String(doc.category) : ""
-          statuses.push({
-            _id: doc._id,
-            name: doc.name,
-            isDone: categoryStr === wonCategory,
-            isCanceled: categoryStr === lostCategory
-          })
+
+        if (statusDocsResult._tag === "Right") {
+          for (const doc of statusDocsResult.right) {
+            const categoryStr = doc.category ? String(doc.category) : ""
+            statuses.push({
+              _id: doc._id,
+              name: doc.name,
+              isDone: categoryStr === wonCategory,
+              isCanceled: categoryStr === lostCategory
+            })
+          }
+        } else {
+          // Fallback: use refs without names if Status query fails
+          // This allows operations to work even with malformed workspace data
+          yield* Effect.logWarning(
+            `Status query failed for project ${projectIdentifier}, using fallback. ` +
+            `Category-based filtering (open/done/canceled) will use name heuristics. ` +
+            `Error: ${statusDocsResult.left.message}`
+          )
+          for (const ps of projectType.statuses) {
+            const name = String(ps._id).split(":").pop() ?? "Unknown"
+            const nameLower = name.toLowerCase()
+            // Infer done/canceled from common status name patterns
+            const isDone = nameLower.includes("done")
+              || nameLower.includes("complete")
+              || nameLower.includes("finished")
+              || nameLower.includes("resolved")
+              || nameLower.includes("closed")
+            const isCanceled = nameLower.includes("cancel")
+              || nameLower.includes("reject")
+              || nameLower.includes("abort")
+              || nameLower.includes("wontfix")
+              || nameLower.includes("invalid")
+            statuses.push({
+              _id: ps._id,
+              name,
+              isDone,
+              isCanceled
+            })
+          }
         }
       }
     }

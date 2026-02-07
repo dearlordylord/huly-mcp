@@ -40,7 +40,7 @@ import type {
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { InvalidStatusError, PersonNotFoundError } from "../errors.js"
-import { findProject, findProjectAndIssue, findProjectWithStatuses, type StatusInfo } from "./shared.js"
+import { findProject, findProjectAndIssue, findProjectWithStatuses, parseIssueIdentifier, type StatusInfo } from "./shared.js"
 
 // Import plugin objects at runtime (CommonJS modules)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
