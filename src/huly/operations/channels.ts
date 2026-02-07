@@ -128,10 +128,10 @@ export type DeleteThreadReplyError =
 // SDK: PersonId and SocialIdentityRef are the same underlying string but typed differently.
 const personIdsAsSocialIdentityRefs = (
   ids: Array<PersonId>
+  // eslint-disable-next-line no-restricted-syntax -- SDK type mismatch: PersonId vs SocialIdentityRef
 ): Array<SocialIdentityRef> => ids as unknown as Array<SocialIdentityRef>
 
-// SDK: jsonToMarkup return type doesn't match Markup; cast contained here.
-const jsonAsMarkup = (json: ReturnType<typeof markdownToMarkup>): Markup => jsonToMarkup(json) as Markup
+const jsonAsMarkup = (json: ReturnType<typeof markdownToMarkup>): Markup => jsonToMarkup(json)
 
 // --- Helpers ---
 

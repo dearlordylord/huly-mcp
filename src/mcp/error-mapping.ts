@@ -103,7 +103,7 @@ export const mapDomainErrorToMcp = (error: HulyDomainError): McpErrorResponseWit
       return createErrorResponse(error.message, McpErrorCode.InternalError)
 
     default:
-      return absurd(error as never)
+      return absurd(error)
   }
 }
 

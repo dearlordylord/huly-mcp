@@ -71,6 +71,11 @@ export default [
         varsIgnorePattern: "^_"
       }],
       "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/no-unnecessary-type-assertion": "error",
+      "no-restricted-syntax": ["error", {
+        selector: "TSAsExpression > TSAsExpression",
+        message: "Double type assertion (as A as B). Requires eslint-disable with justification."
+      }],
 
       // Code quality
       "object-shorthand": "error",
