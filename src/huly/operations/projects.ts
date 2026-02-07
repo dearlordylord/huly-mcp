@@ -13,6 +13,7 @@ import { Effect } from "effect"
 import type { ListProjectsParams, ListProjectsResult, ProjectSummary } from "../../domain/schemas.js"
 import { ProjectIdentifier } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
+import { clampLimit } from "./shared.js"
 
 // Import plugin objects at runtime (CommonJS modules)
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
@@ -31,7 +32,7 @@ export const listProjects = (
       query.archived = false
     }
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const projects = yield* client.findAll<HulyProject>(
       tracker.class.Project,

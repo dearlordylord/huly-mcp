@@ -40,7 +40,7 @@ import { DocumentId, TeamspaceId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js"
 import { escapeLikeWildcards } from "./query-helpers.js"
-import { toRef } from "./shared.js"
+import { clampLimit, toRef } from "./shared.js"
 
 // Import plugin objects at runtime (CommonJS modules)
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
@@ -167,7 +167,7 @@ export const listTeamspaces = (
       query.archived = false
     }
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const teamspaces = yield* client.findAll<HulyTeamspace>(
       documentPlugin.class.Teamspace,
@@ -207,7 +207,7 @@ export const listDocuments = (
   Effect.gen(function*() {
     const { client, teamspace } = yield* findTeamspace(params.teamspace)
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     // Build query with search filters
     const query: Record<string, unknown> = {

@@ -1,43 +1,42 @@
-# Registry Consolidation Report
+# Item 16: Extract clampLimit helper
 
-## Changes
+## What changed
 
-### Consolidated 5 tool handler factories into a single generic (`src/mcp/tools/registry.ts`)
+Extracted the repeated `Math.min(params.limit ?? 50, 200)` pattern into a `clampLimit` helper function.
 
-**Before:** 5 near-identical factory functions, each ~20 lines, differing only in which Effect service they provided:
+### Helper (in `src/huly/operations/shared.ts`)
 
-1. `createToolHandler` - HulyClient
-2. `createStorageToolHandler` - HulyStorageClient
-3. `createCombinedToolHandler` - HulyClient + HulyStorageClient
-4. `createWorkspaceToolHandler` - WorkspaceClient (with availability check)
-5. `createNoParamsWorkspaceToolHandler` - WorkspaceClient, no params parsing
+```typescript
+const DEFAULT_LIMIT = 50
+const MAX_LIMIT = 200
 
-**After:** A single generic `createHandler<P, Svc, R>` parameterized by:
-- `P` - parsed params type
-- `Svc` - Effect service requirement (HulyClient, HulyStorageClient, WorkspaceClient, or union)
-- `R` - operation return type
+export const clampLimit = (limit?: number): number => Math.min(limit ?? DEFAULT_LIMIT, MAX_LIMIT)
+```
 
-Service provision is abstracted via `ProvideServices<R>` - a function that takes handler args and returns either a fully-provided Effect (Right) or an error response (Left, for WorkspaceClient unavailability). Four pre-built providers handle each service combination.
+### Files modified (14 operation files + shared.ts)
 
-The 5 exported functions are retained as thin wrappers delegating to `createHandler` with the appropriate provider, preserving backward compatibility. No callers needed changes (except `createNoParamsWorkspaceToolHandler`).
+All 31 occurrences replaced across:
 
-### Removed unused `_toolName` parameter from `createNoParamsWorkspaceToolHandler`
-
-The `_toolName` parameter was unused (prefixed with underscore). Removed from the signature. Updated all 3 call sites in `src/mcp/tools/workspace.ts`.
-
-### Design decisions
-
-- **`Either` for service validation**: WorkspaceClient is optional in the handler signature. Rather than using a non-null assertion (`!`), `ProvideServices` returns `Either<Effect, McpToolResponse>` - Left for validation failure, Right for the provided effect. This avoids type casts.
-- **Backward-compatible exports**: All 5 original function names still exported. External callers see no API change.
-
-## Files changed
-
-- `src/mcp/tools/registry.ts` - Consolidated factories, removed `_toolName`
-- `src/mcp/tools/workspace.ts` - Updated 3 `createNoParamsWorkspaceToolHandler` call sites
+- `src/huly/operations/shared.ts` -- helper definition
+- `src/huly/operations/workspace.ts` -- 2 occurrences
+- `src/huly/operations/time.ts` -- 2 occurrences
+- `src/huly/operations/projects.ts` -- 1 occurrence
+- `src/huly/operations/issues.ts` -- 3 occurrences
+- `src/huly/operations/contacts.ts` -- 3 occurrences
+- `src/huly/operations/comments.ts` -- 1 occurrence
+- `src/huly/operations/calendar.ts` -- 3 occurrences
+- `src/huly/operations/milestones.ts` -- 1 occurrence
+- `src/huly/operations/documents.ts` -- 2 occurrences
+- `src/huly/operations/activity.ts` -- 4 occurrences
+- `src/huly/operations/notifications.ts` -- 3 occurrences
+- `src/huly/operations/search.ts` -- 1 occurrence
+- `src/huly/operations/channels.ts` -- 4 occurrences
+- `src/huly/operations/attachments.ts` -- 1 occurrence
 
 ## Verification
 
-- `pnpm build` - pass
-- `pnpm typecheck` - pass
-- `pnpm lint` - 0 errors (126 pre-existing warnings, unchanged)
-- `pnpm test` - 755/755 pass
+- `pnpm build` -- pass
+- `pnpm typecheck` -- pass
+- `pnpm lint` -- 0 errors (127 pre-existing warnings)
+- `pnpm test` -- 755 tests pass
+- `grep` confirms 0 remaining `Math.min(.*limit.*200)` in src/

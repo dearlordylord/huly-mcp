@@ -50,7 +50,7 @@ import { HulyClient, type HulyClientError } from "../client.js"
 import type { IssueNotFoundError } from "../errors.js"
 import { ProjectNotFoundError } from "../errors.js"
 import { withLookup } from "./query-helpers.js"
-import { findProject, findProjectAndIssue, toRef, zeroAsUnset } from "./shared.js"
+import { clampLimit, findProject, findProjectAndIssue, toRef, zeroAsUnset } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
@@ -195,7 +195,7 @@ export const listTimeSpendReports = (
       query.date = dateFilter
     }
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     type TimeSpendReportWithLookup = WithLookup<HulyTimeSpendReport> & {
       $lookup?: {
@@ -346,7 +346,7 @@ export const listWorkSlots = (
       query.date = dateFilter
     }
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     /* eslint-disable @typescript-eslint/consistent-type-imports -- inline type for generic */
     type HulyWorkSlot = import("@hcengineering/time").WorkSlot

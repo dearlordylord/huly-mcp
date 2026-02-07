@@ -29,7 +29,7 @@ import type {
 import { ActivityMessageId, EmojiCode, NonEmptyString, ObjectClassName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { ActivityMessageNotFoundError, ReactionNotFoundError, SavedMessageNotFoundError } from "../errors.js"
-import { toRef } from "./shared.js"
+import { clampLimit, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const activity = require("@hcengineering/activity").default as typeof import("@hcengineering/activity").default
@@ -65,7 +65,7 @@ export const listActivity = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const messages = yield* client.findAll<HulyActivityMessage>(
       activity.class.ActivityMessage,
@@ -182,7 +182,7 @@ export const listReactions = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const reactions = yield* client.findAll<HulyReaction>(
       activity.class.Reaction,
@@ -278,7 +278,7 @@ export const listSavedMessages = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const saved = yield* client.findAll<HulySavedMessage>(
       activity.class.SavedMessage,
@@ -303,7 +303,7 @@ export const listMentions = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const mentions = yield* client.findAll<UserMentionInfo>(
       activity.class.UserMentionInfo,

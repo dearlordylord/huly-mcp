@@ -271,6 +271,11 @@ export const stringToPriority = (priority: IssuePriorityStr): IssuePriority => {
   }
 }
 
+const DEFAULT_LIMIT = 50
+const MAX_LIMIT = 200
+
+export const clampLimit = (limit?: number): number => Math.min(limit ?? DEFAULT_LIMIT, MAX_LIMIT)
+
 export const findPersonByEmailOrName = (
   client: HulyClient["Type"],
   emailOrName: string

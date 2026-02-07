@@ -60,7 +60,7 @@ import {
   validateFileSize
 } from "../storage.js"
 import { findTeamspaceAndDocument } from "./documents.js"
-import { findProjectAndIssue, toRef } from "./shared.js"
+import { clampLimit, findProjectAndIssue, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const attachment = require("@hcengineering/attachment").default as typeof import("@hcengineering/attachment").default
@@ -236,7 +236,7 @@ export const listAttachments = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const attachments = yield* client.findAll<HulyAttachment>(
       attachment.class.Attachment,
