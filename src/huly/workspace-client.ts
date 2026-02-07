@@ -19,16 +19,9 @@ import { getWorkspaceToken, loadServerConfig } from "@hcengineering/api-client"
 import { Context, Effect, Layer } from "effect"
 
 import { HulyConfigService } from "../config/config.js"
-import {
-  authToOptions,
-  type ConnectionConfig,
-  type ConnectionError,
-  isAuthError,
-  withConnectionRetry
-} from "./auth-utils.js"
-import { HulyAuthError, HulyConnectionError } from "./errors.js"
+import { authToOptions, type ConnectionConfig, type ConnectionError, connectWithRetry } from "./auth-utils.js"
 
-export type WorkspaceClientError = HulyConnectionError | HulyAuthError
+export type WorkspaceClientError = ConnectionError
 
 export class WorkspaceClient extends Context.Tag("@hulymcp/WorkspaceClient")<
   WorkspaceClient,
@@ -172,19 +165,4 @@ const connectAccountClient = async (
 const connectAccountClientWithRetry = (
   config: ConnectionConfig
 ): Effect.Effect<{ client: AccountClient; token: string }, ConnectionError> =>
-  withConnectionRetry(
-    Effect.tryPromise({
-      try: () => connectAccountClient(config),
-      catch: (e) => {
-        if (isAuthError(e)) {
-          return new HulyAuthError({
-            message: `Authentication failed: ${String(e)}`
-          })
-        }
-        return new HulyConnectionError({
-          message: `Connection failed: ${String(e)}`,
-          cause: e
-        })
-      }
-    })
-  )
+  connectWithRetry(() => connectAccountClient(config), "Connection failed")

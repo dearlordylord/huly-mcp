@@ -21,14 +21,13 @@ import { Context, Effect, Layer } from "effect"
 import { HulyConfigService } from "../config/config.js"
 import { assertExists } from "../utils/assertions.js"
 import { concatLink } from "../utils/url.js"
-import { authToOptions, isAuthError, withConnectionRetry } from "./auth-utils.js"
+import { authToOptions, connectWithRetry } from "./auth-utils.js"
+import type { HulyAuthError, HulyConnectionError } from "./errors.js"
 import {
   FileFetchError,
   FileNotFoundError,
   FileTooLargeError,
   FileUploadError,
-  HulyAuthError,
-  HulyConnectionError,
   InvalidContentTypeError,
   InvalidFileDataError
 } from "./errors.js"
@@ -286,22 +285,7 @@ const connectStorageClient = async (
 const connectStorageWithRetry = (
   config: StorageConnectionConfig
 ): Effect.Effect<StorageConnection, StorageClientError> =>
-  withConnectionRetry(
-    Effect.tryPromise({
-      try: () => connectStorageClient(config),
-      catch: (e) => {
-        if (isAuthError(e)) {
-          return new HulyAuthError({
-            message: `Storage authentication failed: ${String(e)}`
-          })
-        }
-        return new HulyConnectionError({
-          message: `Storage connection failed: ${String(e)}`,
-          cause: e
-        })
-      }
-    })
-  )
+  connectWithRetry(() => connectStorageClient(config), "Storage connection failed")
 
 /**
  * Decode base64 data to Buffer with validation.
