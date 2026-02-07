@@ -266,7 +266,7 @@ const connectStorageClient = async (
 
   // Construct URLs for file operations
   const filesUrl = concatLink(url, `/files`)
-  const uploadUrl = concatLink(url, serverConfig.UPLOAD_URL ?? "/upload")
+  const uploadUrl = concatLink(url, serverConfig.UPLOAD_URL)
 
   // Create storage client with proper authentication
   const storageClient: StorageClient = createStorageClient(

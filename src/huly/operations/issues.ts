@@ -188,7 +188,7 @@ const stringToPriority = (priority: IssuePriorityStr): IssuePriority => {
 // SDK: updateDoc with retrieve=true returns TxResult which doesn't type the embedded object.
 // The runtime value includes { object: { sequence: number } } for $inc operations.
 const extractUpdatedSequence = (txResult: unknown): number | undefined =>
-  (txResult as { object?: { sequence?: number } })?.object?.sequence
+  (txResult as { object?: { sequence?: number } } | undefined)?.object?.sequence
 
 // --- Operations ---
 

@@ -196,7 +196,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                       cause: e as Error
                     })
                 })
-              } else if (config.transport === "http") {
+              } else {
                 const port = config.httpPort ?? 3000
                 const host = config.httpHost ?? "127.0.0.1"
 
