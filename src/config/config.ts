@@ -88,8 +88,6 @@ export class ConfigValidationError extends Schema.TaggedError<ConfigValidationEr
   }
 ) {}
 
-export type HulyConfigError = ConfigValidationError
-
 const TokenAuthFromEnv = Config.map(
   Schema.Config("HULY_TOKEN", Schema.Redacted(NonWhitespaceString)),
   (token): Auth => ({ _tag: "token", token })
@@ -118,7 +116,7 @@ const HulyConfigFromEnv = Config.all({
   )
 })
 
-const loadConfig: Effect.Effect<HulyConfig, HulyConfigError> = HulyConfigFromEnv.pipe(
+const loadConfig: Effect.Effect<HulyConfig, ConfigValidationError> = HulyConfigFromEnv.pipe(
   Effect.mapError((e) =>
     new ConfigValidationError({
       message: `Configuration error: ${e.message}`,
@@ -141,7 +139,7 @@ export class HulyConfigService extends Context.Tag("@hulymcp/HulyConfig")<
 >() {
   static readonly DEFAULT_TIMEOUT = DEFAULT_TIMEOUT
 
-  static readonly layer: Layer.Layer<HulyConfigService, HulyConfigError> = Layer.effect(
+  static readonly layer: Layer.Layer<HulyConfigService, ConfigValidationError> = Layer.effect(
     HulyConfigService,
     loadConfig
   )
