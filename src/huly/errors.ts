@@ -263,6 +263,23 @@ export class MilestoneNotFoundError extends Schema.TaggedError<MilestoneNotFound
 }
 
 /**
+ * Channel not found in the workspace.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class ChannelNotFoundError extends Schema.TaggedError<ChannelNotFoundError>()(
+  "ChannelNotFoundError",
+  {
+    identifier: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Channel '${this.identifier}' not found`
+  }
+}
+
+/**
  * Union of all Huly domain errors.
  */
 export type HulyDomainError =
@@ -281,6 +298,7 @@ export type HulyDomainError =
   | DocumentNotFoundError
   | CommentNotFoundError
   | MilestoneNotFoundError
+  | ChannelNotFoundError
 
 /**
  * Schema for all Huly domain errors (for serialization).
@@ -301,7 +319,8 @@ export const HulyDomainError: Schema.Union<
     typeof TeamspaceNotFoundError,
     typeof DocumentNotFoundError,
     typeof CommentNotFoundError,
-    typeof MilestoneNotFoundError
+    typeof MilestoneNotFoundError,
+    typeof ChannelNotFoundError
   ]
 > = Schema.Union(
   HulyError,
@@ -318,7 +337,8 @@ export const HulyDomainError: Schema.Union<
   TeamspaceNotFoundError,
   DocumentNotFoundError,
   CommentNotFoundError,
-  MilestoneNotFoundError
+  MilestoneNotFoundError,
+  ChannelNotFoundError
 )
 
 /**
