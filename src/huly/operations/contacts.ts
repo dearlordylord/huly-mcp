@@ -5,7 +5,15 @@ import type {
   Person as HulyPerson
 } from "@hcengineering/contact"
 import { AvatarType } from "@hcengineering/contact"
-import { type Data, type Doc, type DocumentUpdate, generateId, type Ref, SortingOrder } from "@hcengineering/core"
+import {
+  type Data,
+  type Doc,
+  type DocumentQuery,
+  type DocumentUpdate,
+  generateId,
+  type Ref,
+  SortingOrder
+} from "@hcengineering/core"
 import { Effect } from "effect"
 
 import type {
@@ -90,10 +98,8 @@ export const listPersons = (
     const client = yield* HulyClient
     const limit = Math.min(params.limit ?? 50, 200)
 
-    // Build query with search filters
-    const query: Record<string, unknown> = {}
+    const query: DocumentQuery<HulyPerson> = {}
 
-    // Apply name search using $like operator
     if (params.nameSearch !== undefined && params.nameSearch.trim() !== "") {
       query.name = { $like: `%${escapeLikeWildcards(params.nameSearch)}%` }
     }

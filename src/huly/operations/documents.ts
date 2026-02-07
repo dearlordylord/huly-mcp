@@ -8,6 +8,7 @@
  */
 import {
   type Data,
+  type DocumentQuery,
   type DocumentUpdate,
   generateId,
   type MarkupBlobRef,
@@ -162,7 +163,7 @@ export const listTeamspaces = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const query: Record<string, unknown> = {}
+    const query: DocumentQuery<HulyTeamspace> = {}
     if (!params.includeArchived) {
       query.archived = false
     }
@@ -209,17 +210,14 @@ export const listDocuments = (
 
     const limit = Math.min(params.limit ?? 50, 200)
 
-    // Build query with search filters
-    const query: Record<string, unknown> = {
+    const query: DocumentQuery<HulyDocument> = {
       space: teamspace._id
     }
 
-    // Apply title search using $like operator
     if (params.titleSearch !== undefined && params.titleSearch.trim() !== "") {
       query.title = { $like: `%${escapeLikeWildcards(params.titleSearch)}%` }
     }
 
-    // Apply content search using fulltext $search operator
     if (params.contentSearch !== undefined && params.contentSearch.trim() !== "") {
       query.$search = params.contentSearch
     }

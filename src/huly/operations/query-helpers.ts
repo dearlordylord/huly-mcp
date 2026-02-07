@@ -1,4 +1,4 @@
-import type { Doc, DocumentQuery, FindOptions } from "@hcengineering/core"
+import type { Doc, DocumentQuery, FindOptions, Lookup } from "@hcengineering/core"
 
 /**
  * Escape SQL LIKE wildcard characters in a string.
@@ -34,7 +34,7 @@ export const addSubstringSearch = <T extends Doc>(
  */
 export const withLookup = <T extends Doc>(
   options: FindOptions<T> | undefined,
-  lookups: Record<string, unknown>
+  lookups: Lookup<T>
 ): FindOptions<T> => ({
   ...options,
   lookup: {

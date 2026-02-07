@@ -6,7 +6,7 @@
  *
  * @module
  */
-import { SortingOrder } from "@hcengineering/core"
+import { type DocumentQuery, SortingOrder } from "@hcengineering/core"
 import { type Project as HulyProject } from "@hcengineering/tracker"
 import { Effect } from "effect"
 
@@ -26,7 +26,7 @@ export const listProjects = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const query: Record<string, unknown> = {}
+    const query: DocumentQuery<HulyProject> = {}
     if (!params.includeArchived) {
       query.archived = false
     }

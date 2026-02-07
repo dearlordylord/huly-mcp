@@ -1,4 +1,4 @@
-import type { Class, Doc, DocumentUpdate } from "@hcengineering/core"
+import type { Class, Doc, DocumentQuery, DocumentUpdate } from "@hcengineering/core"
 import { SortingOrder } from "@hcengineering/core"
 import type {
   DocNotifyContext as HulyDocNotifyContext,
@@ -145,7 +145,7 @@ export const listNotifications = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const query: Record<string, unknown> = {}
+    const query: DocumentQuery<HulyInboxNotification> = {}
 
     if (!params.includeArchived) {
       query.archived = false
@@ -402,7 +402,7 @@ export const listNotificationContexts = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const query: Record<string, unknown> = {
+    const query: DocumentQuery<HulyDocNotifyContext> = {
       hidden: false
     }
 

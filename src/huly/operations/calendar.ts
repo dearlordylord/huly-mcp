@@ -13,6 +13,7 @@ import {
   type AttachedData,
   type Class,
   type Doc,
+  type DocumentQuery,
   type DocumentUpdate,
   type MarkupBlobRef,
   type Ref,
@@ -215,7 +216,7 @@ export const listEvents = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const query: Record<string, unknown> = {}
+    const query: DocumentQuery<HulyEvent> = {}
 
     if (params.from !== undefined) {
       query.date = { $gte: params.from }
@@ -566,7 +567,7 @@ export const listEventInstances = (
       return yield* new RecurringEventNotFoundError({ eventId: params.recurringEventId })
     }
 
-    const query: Record<string, unknown> = {
+    const query: DocumentQuery<HulyRecurringInstance> = {
       recurringEventId: params.recurringEventId
     }
 
