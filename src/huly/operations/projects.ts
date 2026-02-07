@@ -44,7 +44,7 @@ export const listProjects = (
       }
     )
 
-    const total = projects.total ?? projects.length
+    const total = projects.total
 
     const summaries: Array<ProjectSummary> = projects.map((project) => ({
       identifier: ProjectIdentifier.make(project.identifier),

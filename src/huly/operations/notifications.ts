@@ -525,7 +525,7 @@ export const getUnreadNotificationCount = (): Effect.Effect<UnreadCountResult, H
       { limit: 1 }
     )
 
-    const count = unreadNotifications.total ?? unreadNotifications.length
+    const count = unreadNotifications.total
 
     return { count }
   })

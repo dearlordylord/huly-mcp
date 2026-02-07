@@ -291,7 +291,7 @@ export const listChannels = (
       topic: ch.topic || undefined,
       private: ch.private,
       archived: ch.archived,
-      members: ch.members?.length,
+      members: ch.members.length,
       messages: ch.messages,
       modifiedOn: ch.modifiedOn
     }))
@@ -309,7 +309,7 @@ export const getChannel = (
     const { channel, client } = yield* findChannel(params.channel)
 
     let memberNames: Array<string> | undefined
-    if (channel.members && channel.members.length > 0) {
+    if (channel.members.length > 0) {
       // Space.members is typed as AccountUuid[] in @hcengineering/core
       const accountUuidToName = yield* buildAccountUuidToNameMap(
         client,
@@ -451,13 +451,12 @@ export const listChannelMessages = (
       }
     )
 
-    const total = messages.total ?? messages.length
+    const total = messages.total
 
     const uniqueSocialIds = [
       ...new Set(
         messages
           .map((msg) => msg.modifiedBy)
-          .filter((id): id is PersonId => id !== undefined)
       )
     ]
 
@@ -537,19 +536,19 @@ export const listDirectMessages = (
       }
     )
 
-    const total = dms.total ?? dms.length
+    const total = dms.total
 
     // DirectMessage.members is typed as AccountUuid[] in @hcengineering/chunter (extends Space)
     const uniqueAccountUuids = [
       ...new Set(
-        dms.flatMap((dm) => dm.members || [])
+        dms.flatMap((dm) => dm.members)
       )
     ]
 
     const accountUuidToName = yield* buildAccountUuidToNameMap(client, uniqueAccountUuids)
 
     const summaries: Array<DirectMessageSummary> = dms.map((dm) => {
-      const members = dm.members || []
+      const members = dm.members
       const participants = members
         .map((m) => accountUuidToName.get(m))
         .filter((n): n is string => n !== undefined)
@@ -627,13 +626,12 @@ export const listThreadReplies = (
       }
     )
 
-    const total = replies.total ?? replies.length
+    const total = replies.total
 
     const uniqueSocialIds = [
       ...new Set(
         replies
           .map((msg) => msg.modifiedBy)
-          .filter((id): id is PersonId => id !== undefined)
       )
     ]
 

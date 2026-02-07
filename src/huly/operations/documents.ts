@@ -180,7 +180,7 @@ export const listTeamspaces = (
       }
     )
 
-    const total = teamspaces.total ?? teamspaces.length
+    const total = teamspaces.total
 
     const summaries: Array<TeamspaceSummary> = teamspaces.map((ts) => ({
       id: TeamspaceId.make(ts._id),
@@ -235,7 +235,7 @@ export const listDocuments = (
       }
     )
 
-    const total = documents.total ?? documents.length
+    const total = documents.total
 
     const summaries: Array<DocumentSummary> = documents.map((doc) => ({
       id: DocumentId.make(doc._id),
