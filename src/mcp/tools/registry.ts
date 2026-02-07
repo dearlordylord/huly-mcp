@@ -4,6 +4,7 @@ import { Effect, Exit } from "effect"
 import { HulyClient } from "../../huly/client.js"
 import type { HulyDomainError } from "../../huly/errors.js"
 import { HulyStorageClient } from "../../huly/storage.js"
+import { WorkspaceClient, type WorkspaceClientError } from "../../huly/workspace-client.js"
 import {
   createSuccessResponse,
   mapDomainCauseToMcp,
@@ -21,7 +22,8 @@ export interface RegisteredTool extends ToolDefinition {
   readonly handler: (
     args: unknown,
     hulyClient: HulyClient["Type"],
-    storageClient: HulyStorageClient["Type"]
+    storageClient: HulyStorageClient["Type"],
+    workspaceClient?: WorkspaceClient["Type"]
   ) => Promise<McpToolResponse>
 }
 
@@ -67,6 +69,63 @@ export const createStorageToolHandler = <P, R>(
 
     const operationResult = await Effect.runPromiseExit(
       operation(params).pipe(Effect.provideService(HulyStorageClient, storageClient))
+    )
+
+    if (Exit.isFailure(operationResult)) {
+      return mapDomainCauseToMcp(operationResult.cause)
+    }
+
+    return createSuccessResponse(operationResult.value)
+  }
+}
+
+export const createWorkspaceToolHandler = <P, R>(
+  toolName: string,
+  parse: (input: unknown) => Effect.Effect<P, ParseResult.ParseError>,
+  operation: (params: P) => Effect.Effect<R, WorkspaceClientError, WorkspaceClient>
+): RegisteredTool["handler"] => {
+  return async (args, _hulyClient, _storageClient, workspaceClient) => {
+    const parseResult = await Effect.runPromiseExit(parse(args))
+
+    if (Exit.isFailure(parseResult)) {
+      return mapParseCauseToMcp(parseResult.cause, toolName)
+    }
+
+    const params = parseResult.value
+
+    if (!workspaceClient) {
+      return {
+        isError: true,
+        content: [{ type: "text" as const, text: "WorkspaceClient not available" }]
+      }
+    }
+
+    const operationResult = await Effect.runPromiseExit(
+      operation(params).pipe(Effect.provideService(WorkspaceClient, workspaceClient))
+    )
+
+    if (Exit.isFailure(operationResult)) {
+      return mapDomainCauseToMcp(operationResult.cause)
+    }
+
+    return createSuccessResponse(operationResult.value)
+  }
+}
+
+export const createNoParamsWorkspaceToolHandler = <R>(
+  _toolName: string,
+  operation: () => Effect.Effect<R, WorkspaceClientError, WorkspaceClient>
+): RegisteredTool["handler"] => {
+  return async (_args, _hulyClient, _storageClient, workspaceClient) => {
+    if (!workspaceClient) {
+      return {
+        isError: true,
+        content: [{ type: "text" as const, text: "WorkspaceClient not available" }]
+      }
+    }
+
+    const operationResult = await Effect.runPromiseExit(
+      operation().pipe(Effect.provideService(WorkspaceClient, workspaceClient))
     )
 
     if (Exit.isFailure(operationResult)) {

@@ -14,6 +14,7 @@ import fakeIndexedDB from "fake-indexeddb"
 import { type HulyConfigError, HulyConfigService } from "./config/config.js"
 import { HulyClient, type HulyClientError } from "./huly/client.js"
 import { HulyStorageClient, type StorageClientError } from "./huly/storage.js"
+import { WorkspaceClient, type WorkspaceClientError } from "./huly/workspace-client.js"
 import { HttpServerFactoryService } from "./mcp/http-transport.js"
 import { type McpServerError, McpServerService, type McpTransportType } from "./mcp/server.js"
 ;(globalThis as any).indexedDB = fakeIndexedDB
@@ -36,7 +37,7 @@ if (!(globalThis as any).navigator) {
   })
 }
 
-export type AppError = HulyConfigError | HulyClientError | StorageClientError | McpServerError | ConfigError.ConfigError
+export type AppError = HulyConfigError | HulyClientError | StorageClientError | WorkspaceClientError | McpServerError | ConfigError.ConfigError
 
 const getTransportType = Config.string("MCP_TRANSPORT").pipe(
   Config.withDefault("stdio"),
@@ -65,7 +66,7 @@ export const buildAppLayer = (
   autoExit: boolean
 ): Layer.Layer<
   McpServerService | HttpServerFactoryService,
-  HulyConfigError | HulyClientError | StorageClientError,
+  HulyConfigError | HulyClientError | StorageClientError | WorkspaceClientError,
   never
 > => {
   const configLayer = HulyConfigService.layer
@@ -78,7 +79,14 @@ export const buildAppLayer = (
     Layer.provide(configLayer)
   )
 
-  const combinedClientLayer = Layer.merge(hulyClientLayer, storageClientLayer)
+  const workspaceClientLayer = WorkspaceClient.layer.pipe(
+    Layer.provide(configLayer)
+  )
+
+  const combinedClientLayer = Layer.merge(
+    Layer.merge(hulyClientLayer, storageClientLayer),
+    workspaceClientLayer
+  )
 
   const mcpServerLayer = McpServerService.layer({
     transport,
