@@ -22,7 +22,7 @@ import {
   type UploadFileResult
 } from "../storage.js"
 
-export type UploadFileError = StorageClientError | InvalidFileDataError | FileNotFoundError | FileFetchError
+type UploadFileError = StorageClientError | InvalidFileDataError | FileNotFoundError | FileFetchError
 
 /**
  * Upload a file to Huly storage.

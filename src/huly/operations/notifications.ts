@@ -51,41 +51,41 @@ const notification = require("@hcengineering/notification")
 
 // --- Error Types ---
 
-export type ListNotificationsError = HulyClientError
+type ListNotificationsError = HulyClientError
 
-export type GetNotificationError =
+type GetNotificationError =
   | HulyClientError
   | NotificationNotFoundError
 
-export type MarkNotificationReadError =
+type MarkNotificationReadError =
   | HulyClientError
   | NotificationNotFoundError
 
-export type ArchiveNotificationError =
+type ArchiveNotificationError =
   | HulyClientError
   | NotificationNotFoundError
 
-export type DeleteNotificationError =
+type DeleteNotificationError =
   | HulyClientError
   | NotificationNotFoundError
 
-export type GetNotificationContextError =
+type GetNotificationContextError =
   | HulyClientError
   | NotificationContextNotFoundError
 
-export type ListNotificationContextsError = HulyClientError
+type ListNotificationContextsError = HulyClientError
 
-export type PinNotificationContextError =
+type PinNotificationContextError =
   | HulyClientError
   | NotificationContextNotFoundError
 
-export type ListNotificationSettingsError = HulyClientError
+type ListNotificationSettingsError = HulyClientError
 
-export type UpdateNotificationProviderSettingError = HulyClientError
+type UpdateNotificationProviderSettingError = HulyClientError
 
-export type MarkAllNotificationsReadError = HulyClientError
+type MarkAllNotificationsReadError = HulyClientError
 
-export type ArchiveAllNotificationsError = HulyClientError
+type ArchiveAllNotificationsError = HulyClientError
 
 // --- Helpers ---
 
@@ -208,17 +208,6 @@ export const getNotification = (
 
     return result
   })
-
-export type {
-  ArchiveAllNotificationsResult,
-  ArchiveNotificationResult,
-  DeleteNotificationResult,
-  MarkAllNotificationsReadResult,
-  MarkNotificationReadResult,
-  PinNotificationContextResult,
-  UnreadCountResult,
-  UpdateNotificationProviderSettingResult
-}
 
 /**
  * Mark a notification as read.

@@ -37,7 +37,7 @@ if (!(globalThis as Record<string, unknown>).navigator) {
   })
 }
 
-export type AppError =
+type AppError =
   | HulyConfigError
   | HulyClientError
   | StorageClientError
@@ -65,7 +65,7 @@ const getAutoExit = Config.boolean("MCP_AUTO_EXIT").pipe(
   Config.withDefault(false)
 )
 
-export const buildAppLayer = (
+const buildAppLayer = (
   transport: McpTransportType,
   httpPort: number,
   httpHost: string,

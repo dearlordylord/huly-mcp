@@ -1,11 +1,11 @@
 import { describe, it } from "@effect/vitest"
 import { expect } from "vitest"
 import { Effect, Schema } from "effect"
+import { PersonRefSchema } from "../../src/domain/schemas/issues.js"
 import {
   IssuePrioritySchema,
   IssuePriorityValues,
   LabelSchema,
-  PersonRefSchema,
   ProjectSummarySchema,
   parseIssue,
   parseIssueSummary,

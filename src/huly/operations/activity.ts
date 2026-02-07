@@ -36,21 +36,21 @@ const activity = require("@hcengineering/activity").default as typeof import("@h
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
 
-export type ListActivityError = HulyClientError
+type ListActivityError = HulyClientError
 
-export type AddReactionError = HulyClientError | ActivityMessageNotFoundError
+type AddReactionError = HulyClientError | ActivityMessageNotFoundError
 
-export type RemoveReactionError = HulyClientError | ReactionNotFoundError
+type RemoveReactionError = HulyClientError | ReactionNotFoundError
 
-export type ListReactionsError = HulyClientError
+type ListReactionsError = HulyClientError
 
-export type SaveMessageError = HulyClientError | ActivityMessageNotFoundError
+type SaveMessageError = HulyClientError | ActivityMessageNotFoundError
 
-export type UnsaveMessageError = HulyClientError | SavedMessageNotFoundError
+type UnsaveMessageError = HulyClientError | SavedMessageNotFoundError
 
-export type ListSavedMessagesError = HulyClientError
+type ListSavedMessagesError = HulyClientError
 
-export type ListMentionsError = HulyClientError
+type ListMentionsError = HulyClientError
 
 // SDK: Data<Reaction> requires createBy but server populates from auth context.
 const serverPopulatedCreateBy: HulyReaction["createBy"] = "" as HulyReaction["createBy"]
@@ -95,8 +95,6 @@ export const listActivity = (
 
     return result
   })
-
-export type { AddReactionResult, RemoveReactionResult, SaveMessageResult, UnsaveMessageResult }
 
 /**
  * Add a reaction to an activity message.

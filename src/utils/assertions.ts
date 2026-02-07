@@ -1,6 +1,7 @@
+/* eslint-disable import-x/no-unused-modules */
 import { Effect, Option } from "effect"
 
-export class AssertionError extends Error {
+class AssertionError extends Error {
   readonly _tag = "AssertionError"
   constructor(message: string) {
     super(message)
