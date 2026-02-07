@@ -20,6 +20,7 @@ import { Context, Effect, Layer } from "effect"
 
 import { HulyConfigService } from "../config/config.js"
 import { assertExists } from "../utils/assertions.js"
+import { concatLink } from "../utils/url.js"
 import { authToOptions, isAuthError, withConnectionRetry } from "./auth-utils.js"
 import {
   FileFetchError,
@@ -249,15 +250,6 @@ interface StorageConnection {
 const buildFileUrl = (baseUrl: string, workspaceId: WorkspaceUuid, blobId: string): string => {
   const trimmedUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl
   return `${trimmedUrl}/files?workspace=${workspaceId}&file=${blobId}`
-}
-
-/**
- * Construct the files URL for the server.
- */
-const concatLink = (host: string, path: string): string => {
-  const trimmedHost = host.endsWith("/") ? host.slice(0, -1) : host
-  const trimmedPath = path.startsWith("/") ? path : `/${path}`
-  return `${trimmedHost}${trimmedPath}`
 }
 
 const connectStorageClient = async (

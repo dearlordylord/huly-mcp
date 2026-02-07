@@ -1,10 +1,5 @@
 import { type Data, type DocumentUpdate, generateId, type Ref, SortingOrder } from "@hcengineering/core"
-import {
-  type Issue as HulyIssue,
-  type Milestone as HulyMilestone,
-  MilestoneStatus,
-  type Project as HulyProject
-} from "@hcengineering/tracker"
+import { type Milestone as HulyMilestone, MilestoneStatus, type Project as HulyProject } from "@hcengineering/tracker"
 import { absurd, Effect } from "effect"
 
 import type {
@@ -22,7 +17,7 @@ import { MilestoneId, MilestoneLabel } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { ProjectNotFoundError } from "../errors.js"
 import { IssueNotFoundError, MilestoneNotFoundError } from "../errors.js"
-import { findProject, parseIssueIdentifier, toRef } from "./shared.js"
+import { findProject, findProjectAndIssue, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
@@ -88,6 +83,35 @@ const stringToMilestoneStatus = (status: MilestoneStatusStr): MilestoneStatus =>
   }
 }
 
+const findMilestone = (
+  client: HulyClient["Type"],
+  project: HulyProject,
+  milestoneIdentifier: string,
+  projectIdentifier: string
+): Effect.Effect<HulyMilestone, MilestoneNotFoundError | HulyClientError> =>
+  Effect.gen(function*() {
+    let milestone = yield* client.findOne<HulyMilestone>(
+      tracker.class.Milestone,
+      { space: project._id, _id: toRef<HulyMilestone>(milestoneIdentifier) }
+    )
+
+    if (milestone === undefined) {
+      milestone = yield* client.findOne<HulyMilestone>(
+        tracker.class.Milestone,
+        { space: project._id, label: milestoneIdentifier }
+      )
+    }
+
+    if (milestone === undefined) {
+      return yield* new MilestoneNotFoundError({
+        identifier: milestoneIdentifier,
+        project: projectIdentifier
+      })
+    }
+
+    return milestone
+  })
+
 const findProjectAndMilestone = (
   params: { project: string; milestone: string }
 ): Effect.Effect<
@@ -97,32 +121,7 @@ const findProjectAndMilestone = (
 > =>
   Effect.gen(function*() {
     const { client, project } = yield* findProject(params.project)
-
-    let milestone = yield* client.findOne<HulyMilestone>(
-      tracker.class.Milestone,
-      {
-        space: project._id,
-        _id: toRef<HulyMilestone>(params.milestone)
-      }
-    )
-
-    if (milestone === undefined) {
-      milestone = yield* client.findOne<HulyMilestone>(
-        tracker.class.Milestone,
-        {
-          space: project._id,
-          label: params.milestone
-        }
-      )
-    }
-
-    if (milestone === undefined) {
-      return yield* new MilestoneNotFoundError({
-        identifier: params.milestone,
-        project: params.project
-      })
-    }
-
+    const milestone = yield* findMilestone(client, project, params.milestone, params.project)
     return { client, project, milestone }
   })
 
@@ -257,64 +256,12 @@ export const setIssueMilestone = (
   params: SetIssueMilestoneParams
 ): Effect.Effect<SetIssueMilestoneResult, SetIssueMilestoneError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, project } = yield* findProject(params.project)
-
-    const { fullIdentifier, number } = parseIssueIdentifier(
-      params.identifier,
-      params.project
-    )
-
-    let issue = yield* client.findOne<HulyIssue>(
-      tracker.class.Issue,
-      {
-        space: project._id,
-        identifier: fullIdentifier
-      }
-    )
-    if (issue === undefined && number !== null) {
-      issue = yield* client.findOne<HulyIssue>(
-        tracker.class.Issue,
-        {
-          space: project._id,
-          number
-        }
-      )
-    }
-    if (issue === undefined) {
-      return yield* new IssueNotFoundError({
-        identifier: params.identifier,
-        project: params.project
-      })
-    }
+    const { client, issue, project } = yield* findProjectAndIssue(params)
 
     let milestoneRef: Ref<HulyMilestone> | null = null
 
     if (params.milestone !== null) {
-      let milestone = yield* client.findOne<HulyMilestone>(
-        tracker.class.Milestone,
-        {
-          space: project._id,
-          _id: toRef<HulyMilestone>(params.milestone)
-        }
-      )
-
-      if (milestone === undefined) {
-        milestone = yield* client.findOne<HulyMilestone>(
-          tracker.class.Milestone,
-          {
-            space: project._id,
-            label: params.milestone
-          }
-        )
-      }
-
-      if (milestone === undefined) {
-        return yield* new MilestoneNotFoundError({
-          identifier: params.milestone,
-          project: params.project
-        })
-      }
-
+      const milestone = yield* findMilestone(client, project, params.milestone, params.project)
       milestoneRef = milestone._id
     }
 

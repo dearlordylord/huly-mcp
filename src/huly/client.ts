@@ -41,6 +41,7 @@ import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown
 import { absurd, Context, Effect, Layer } from "effect"
 
 import { HulyConfigService } from "../config/config.js"
+import { concatLink } from "../utils/url.js"
 import {
   authToOptions,
   type ConnectionConfig,
@@ -341,12 +342,6 @@ interface MarkupOperations {
 interface RestConnection {
   client: TxOperations
   markupOps: MarkupOperations
-}
-
-const concatLink = (host: string, path: string): string => {
-  const trimmedHost = host.endsWith("/") ? host.slice(0, -1) : host
-  const trimmedPath = path.startsWith("/") ? path : `/${path}`
-  return `${trimmedHost}${trimmedPath}`
 }
 
 function createMarkupOps(
