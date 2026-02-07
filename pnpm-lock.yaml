@@ -14,12 +14,18 @@ importers:
       '@effect/platform-node':
         specifier: ^0.104.1
         version: 0.104.1(@effect/cluster@0.56.1(@effect/platform@0.94.2(effect@3.19.15))(@effect/rpc@0.73.0(@effect/platform@0.94.2(effect@3.19.15))(effect@3.19.15))(@effect/sql@0.49.0(@effect/experimental@0.58.0(@effect/platform@0.94.2(effect@3.19.15))(effect@3.19.15))(@effect/platform@0.94.2(effect@3.19.15))(effect@3.19.15))(@effect/workflow@0.16.0(@effect/experimental@0.58.0(@effect/platform@0.94.2(effect@3.19.15))(effect@3.19.15))(@effect/platform@0.94.2(effect@3.19.15))(@effect/rpc@0.73.0(@effect/platform@0.94.2(effect@3.19.15))(effect@3.19.15))(effect@3.19.15))(effect@3.19.15))(@effect/platform@0.94.2(effect@3.19.15))(@effect/rpc@0.73.0(@effect/platform@0.94.2(effect@3.19.15))(effect@3.19.15))(@effect/sql@0.49.0(@effect/experimental@0.58.0(@effect/platform@0.94.2(effect@3.19.15))(effect@3.19.15))(@effect/platform@0.94.2(effect@3.19.15))(effect@3.19.15))(effect@3.19.15)
+      '@hcengineering/account-client':
+        specifier: ^0.7
+        version: 0.7.20
       '@hcengineering/activity':
         specifier: ^0.7.0
         version: 0.7.0
       '@hcengineering/api-client':
         specifier: ^0.7.3
         version: 0.7.18(prosemirror-inputrules@1.5.1)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.5)
+      '@hcengineering/attachment':
+        specifier: ^0.7
+        version: 0.7.0
       '@hcengineering/calendar':
         specifier: ^0.7.0
         version: 0.7.0
@@ -37,6 +43,9 @@ importers:
         version: 0.7.23
       '@hcengineering/document':
         specifier: ^0.7.0
+        version: 0.7.0
+      '@hcengineering/notification':
+        specifier: ^0.7
         version: 0.7.0
       '@hcengineering/rank':
         specifier: ^0.7.3
