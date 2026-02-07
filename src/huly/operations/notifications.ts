@@ -49,6 +49,16 @@ const notification = require("@hcengineering/notification")
   .default as typeof import("@hcengineering/notification").default
 /* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports */
 
+const toDocNotifyContextSummary = (ctx: HulyDocNotifyContext): DocNotifyContextSummary => ({
+  id: NotificationContextId.make(ctx._id),
+  objectId: ctx.objectId,
+  objectClass: ObjectClassName.make(ctx.objectClass),
+  isPinned: ctx.isPinned,
+  hidden: ctx.hidden,
+  lastViewedTimestamp: ctx.lastViewedTimestamp,
+  lastUpdateTimestamp: ctx.lastUpdateTimestamp
+})
+
 // --- Error Types ---
 
 export type ListNotificationsError = HulyClientError
@@ -379,17 +389,7 @@ export const getNotificationContext = (
       return null
     }
 
-    const result: DocNotifyContextSummary = {
-      id: NotificationContextId.make(ctx._id),
-      objectId: ctx.objectId,
-      objectClass: ObjectClassName.make(ctx.objectClass),
-      isPinned: ctx.isPinned,
-      hidden: ctx.hidden,
-      lastViewedTimestamp: ctx.lastViewedTimestamp,
-      lastUpdateTimestamp: ctx.lastUpdateTimestamp
-    }
-
-    return result
+    return toDocNotifyContextSummary(ctx)
   })
 
 /**
@@ -423,17 +423,7 @@ export const listNotificationContexts = (
       }
     )
 
-    const summaries: Array<DocNotifyContextSummary> = contexts.map((ctx) => ({
-      id: NotificationContextId.make(ctx._id),
-      objectId: ctx.objectId,
-      objectClass: ObjectClassName.make(ctx.objectClass),
-      isPinned: ctx.isPinned,
-      hidden: ctx.hidden,
-      lastViewedTimestamp: ctx.lastViewedTimestamp,
-      lastUpdateTimestamp: ctx.lastUpdateTimestamp
-    }))
-
-    return summaries
+    return contexts.map(toDocNotifyContextSummary)
   })
 
 /**

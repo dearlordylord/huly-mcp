@@ -12,7 +12,17 @@
 import { absurd, Cause, Chunk, ParseResult } from "effect"
 
 import type { Die, Interrupt } from "effect/Cause"
-import { type HulyDomainError, McpErrorCode } from "../huly/errors.js"
+import type { HulyDomainError } from "../huly/errors.js"
+
+/**
+ * MCP standard error codes.
+ */
+export const McpErrorCode = {
+  InvalidParams: -32602,
+  InternalError: -32603
+} as const
+
+export type McpErrorCode = (typeof McpErrorCode)[keyof typeof McpErrorCode]
 
 // --- MCP Error Response Types ---
 
