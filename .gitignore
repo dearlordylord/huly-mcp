@@ -5,3 +5,4 @@ dist/
 .ralph/
 .ralph-tests/
 .mcpregistry_*
+COMPARISON.md

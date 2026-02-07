@@ -2,6 +2,7 @@ import type { HulyClient } from "../../huly/client.js"
 import type { HulyStorageClient } from "../../huly/storage.js"
 import type { McpToolResponse } from "../error-mapping.js"
 import { commentTools } from "./comments.js"
+import { contactTools } from "./contacts.js"
 import { documentTools } from "./documents.js"
 import { issueTools } from "./issues.js"
 import { milestoneTools } from "./milestones.js"
@@ -15,7 +16,8 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...commentTools,
   ...milestoneTools,
   ...documentTools,
-  ...storageTools
+  ...storageTools,
+  ...contactTools
 ]
 
 const toolMap = new Map<string, RegisteredTool>(
