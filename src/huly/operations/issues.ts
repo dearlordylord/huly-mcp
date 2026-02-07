@@ -65,6 +65,7 @@ import {
   Email,
   IssueIdentifier,
   IssueTemplateId,
+  NonNegativeNumber,
   PersonId,
   PersonName,
   StatusName
@@ -431,7 +432,7 @@ export const getIssue = (
       modifiedOn: issue.modifiedOn,
       createdOn: issue.createdOn,
       dueDate: issue.dueDate ?? undefined,
-      estimation: zeroAsUnset(issue.estimation)
+      estimation: zeroAsUnset(NonNegativeNumber.make(issue.estimation))
     }
 
     return result
@@ -1270,7 +1271,7 @@ export const getIssueTemplate = (
       priority: priorityToString(template.priority),
       assignee: assigneeName !== undefined ? PersonName.make(assigneeName) : undefined,
       component: componentLabel !== undefined ? ComponentLabel.make(componentLabel) : undefined,
-      estimation: template.estimation,
+      estimation: zeroAsUnset(NonNegativeNumber.make(template.estimation)),
       project: params.project,
       modifiedOn: template.modifiedOn,
       createdOn: template.createdOn

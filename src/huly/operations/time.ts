@@ -30,7 +30,13 @@ import type {
   TimeSpendReport,
   WorkSlot
 } from "../../domain/schemas.js"
-import { IssueIdentifier, PersonName, TimeSpendReportId, TodoId } from "../../domain/schemas/shared.js"
+import {
+  IssueIdentifier,
+  NonNegativeNumber,
+  PersonName,
+  TimeSpendReportId,
+  TodoId
+} from "../../domain/schemas/shared.js"
 import { isExistent } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { IssueNotFoundError } from "../errors.js"
@@ -154,8 +160,8 @@ export const getTimeReport = (
     return {
       identifier: IssueIdentifier.make(issue.identifier),
       totalTime: issue.reportedTime,
-      estimation: zeroAsUnset(issue.estimation),
-      remainingTime: zeroAsUnset(issue.remainingTime),
+      estimation: zeroAsUnset(NonNegativeNumber.make(issue.estimation)),
+      remainingTime: zeroAsUnset(NonNegativeNumber.make(issue.remainingTime)),
       reports: timeReports
     }
   })

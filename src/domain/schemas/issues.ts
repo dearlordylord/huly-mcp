@@ -13,6 +13,7 @@ import {
   NonEmptyString,
   PersonId,
   PersonName,
+  PositiveNumber,
   ProjectIdentifier,
   StatusName,
   TemplateIdentifier,
@@ -76,7 +77,7 @@ export const IssueSchema = Schema.Struct({
   modifiedOn: Schema.optional(Timestamp),
   createdOn: Schema.optional(Timestamp),
   dueDate: Schema.optional(Schema.NullOr(Timestamp)),
-  estimation: Schema.optional(Schema.Number)
+  estimation: Schema.optional(PositiveNumber)
 }).annotations({
   title: "Issue",
   description: "Full issue with all fields"
@@ -410,7 +411,7 @@ export const IssueTemplateSchema = Schema.Struct({
   priority: Schema.optional(IssuePrioritySchema),
   assignee: Schema.optional(PersonName),
   component: Schema.optional(ComponentLabel),
-  estimation: Schema.optional(Schema.Number),
+  estimation: Schema.optional(PositiveNumber),
   project: ProjectIdentifier,
   modifiedOn: Schema.optional(Timestamp),
   createdOn: Schema.optional(Timestamp)
@@ -470,7 +471,7 @@ export const CreateIssueTemplateParamsSchema = Schema.Struct({
   component: Schema.optional(Schema.String.annotations({
     description: "Default component ID or label"
   })),
-  estimation: Schema.optional(Schema.Number.annotations({
+  estimation: Schema.optional(PositiveNumber.annotations({
     description: "Default estimation in minutes"
   }))
 }).annotations({
@@ -535,7 +536,7 @@ export const UpdateIssueTemplateParamsSchema = Schema.Struct({
       description: "New default component ID or label (null to clear)"
     })
   ),
-  estimation: Schema.optional(Schema.Number.annotations({
+  estimation: Schema.optional(PositiveNumber.annotations({
     description: "New default estimation in minutes"
   }))
 }).annotations({

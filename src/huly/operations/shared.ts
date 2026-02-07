@@ -3,6 +3,7 @@ import type { ProjectType } from "@hcengineering/task"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
 import { Effect } from "effect"
 
+import { NonNegativeNumber, PositiveNumber } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { InvalidPersonUuidError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 
@@ -10,10 +11,11 @@ import { InvalidPersonUuidError, IssueNotFoundError, ProjectNotFoundError } from
 // Our domain uses Effect Schema brands. No type-safe bridge exists; this is the boundary cast.
 export const toRef = <T extends Doc>(id: string): Ref<T> => id as Ref<T>
 
-// Huly API uses 0 as a sentinel for "not set" on numeric fields like estimation and remainingTime
-// (confirmed: creating an issue without estimation stores 0, not null/undefined).
-// Convert to undefined so downstream consumers see absent value instead of a misleading 0.
-export const zeroAsUnset = (value: number): number | undefined => value > 0 ? value : undefined
+// Huly API uses 0 as sentinel for "not set" on numeric fields like estimation and remainingTime.
+// Confirmed: creating an issue without estimation stores 0, not null/undefined.
+// Converts sentinel 0 → undefined; positive values → branded PositiveNumber.
+export const zeroAsUnset = (value: NonNegativeNumber): PositiveNumber | undefined =>
+  value > 0 ? PositiveNumber.make(value) : undefined
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 

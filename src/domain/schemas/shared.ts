@@ -153,6 +153,12 @@ export type RegionId = Schema.Schema.Type<typeof RegionId>
 
 // === Tier 5: Numeric Brands ===
 
+export const NonNegativeNumber = Schema.Number.pipe(Schema.nonNegative(), Schema.brand("NonNegativeNumber"))
+export type NonNegativeNumber = Schema.Schema.Type<typeof NonNegativeNumber>
+
+export const PositiveNumber = NonNegativeNumber.pipe(Schema.positive(), Schema.brand("PositiveNumber"))
+export type PositiveNumber = Schema.Schema.Type<typeof PositiveNumber>
+
 export const ColorCode = Schema.Number.pipe(
   Schema.int(),
   Schema.greaterThanOrEqualTo(0),

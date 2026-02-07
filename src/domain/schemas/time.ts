@@ -6,6 +6,7 @@ import {
   makeJsonSchema,
   NonEmptyString,
   PersonName,
+  PositiveNumber,
   ProjectIdentifier,
   TimeSpendReportId,
   Timestamp,
@@ -33,8 +34,8 @@ export const TimeReportSummarySchema = Schema.Struct({
     description: "Issue identifier (e.g., 'HULY-123'). Absent if the issue was deleted."
   })),
   totalTime: Schema.Number.annotations({ description: "Total time in minutes" }),
-  estimation: Schema.optional(Schema.Number.annotations({ description: "Estimated time in minutes" })),
-  remainingTime: Schema.optional(Schema.Number.annotations({ description: "Remaining time in minutes" })),
+  estimation: Schema.optional(PositiveNumber.annotations({ description: "Estimated time in minutes" })),
+  remainingTime: Schema.optional(PositiveNumber.annotations({ description: "Remaining time in minutes" })),
   reports: Schema.Array(TimeSpendReportSchema)
 }).annotations({
   title: "TimeReportSummary",
