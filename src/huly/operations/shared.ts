@@ -1,10 +1,22 @@
-import type { Class, Doc, FindOptions, Ref, Status, WithLookup } from "@hcengineering/core"
+import type { Class, Doc, FindOptions, PersonUuid, Ref, Status, WithLookup } from "@hcengineering/core"
 import type { ProjectType } from "@hcengineering/task"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
 import { Effect } from "effect"
 
 import { HulyClient, type HulyClientError } from "../client.js"
-import { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
+import { InvalidPersonUuidError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export const validatePersonUuid = (uuid?: string): Effect.Effect<PersonUuid | undefined, InvalidPersonUuidError> => {
+  if (uuid === undefined) return Effect.succeed(undefined)
+  if (!UUID_REGEX.test(uuid)) {
+    return Effect.fail(new InvalidPersonUuidError({ uuid }))
+  }
+  // PersonUuid is a branded string type from @hcengineering/core.
+  // After regex validation confirms UUID format, cast is safe.
+  return Effect.succeed(uuid as PersonUuid)
+}
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default

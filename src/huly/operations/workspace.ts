@@ -4,7 +4,6 @@
  */
 import type {
   AccountRole as HulyAccountRole,
-  PersonUuid,
   WorkspaceInfoWithStatus
 } from "@hcengineering/core"
 import { Effect } from "effect"
@@ -22,7 +21,8 @@ import type {
   WorkspaceMember,
   WorkspaceSummary
 } from "../../domain/schemas/workspace.js"
-import { HulyConnectionError } from "../errors.js"
+import { HulyConnectionError, InvalidPersonUuidError } from "../errors.js"
+import { validatePersonUuid } from "./shared.js"
 import { WorkspaceClient, type WorkspaceClientError } from "../workspace-client.js"
 
 export type ListWorkspaceMembersError = WorkspaceClientError
@@ -62,6 +62,8 @@ export const listWorkspaceMembers = (
       let name: string | undefined
       let email: string | undefined
 
+      // Non-critical enrichment: person info is best-effort.
+      // If fails, still return basic member info (personId, role).
       const personInfoResult = yield* Effect.tryPromise({
         try: () => client.getPersonInfo(member.person),
         catch: () => undefined
@@ -215,12 +217,13 @@ export const deleteWorkspace = (): Effect.Effect<DeleteWorkspaceResult, DeleteWo
 
 export const getUserProfile = (
   personUuid?: string
-): Effect.Effect<UserProfile | null, GetUserProfileError, WorkspaceClient> =>
+): Effect.Effect<UserProfile | null, GetUserProfileError | InvalidPersonUuidError, WorkspaceClient> =>
   Effect.gen(function*() {
     const { client } = yield* WorkspaceClient
 
+    const validatedUuid = yield* validatePersonUuid(personUuid)
     const profile = yield* Effect.tryPromise({
-      try: () => client.getUserProfile(personUuid as PersonUuid | undefined),
+      try: () => client.getUserProfile(validatedUuid),
       catch: (e) =>
         new HulyConnectionError({
           message: `Failed to get user profile: ${String(e)}`,
