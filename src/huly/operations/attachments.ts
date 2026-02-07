@@ -288,11 +288,10 @@ const toFileSourceParams = (params: {
   readonly fileUrl?: string | undefined
   readonly data?: string | undefined
 }): FileSourceParams => {
-  const result: FileSourceParams = {}
-  if (params.filePath !== undefined) result.filePath = params.filePath
-  if (params.fileUrl !== undefined) result.fileUrl = params.fileUrl
-  if (params.data !== undefined) result.data = params.data
-  return result
+  if (params.filePath !== undefined) return { _tag: "filePath", filePath: params.filePath }
+  if (params.fileUrl !== undefined) return { _tag: "fileUrl", fileUrl: params.fileUrl }
+  if (params.data !== undefined) return { _tag: "base64", data: params.data }
+  throw new Error("data required when no filePath/fileUrl")
 }
 
 export const addAttachment = (

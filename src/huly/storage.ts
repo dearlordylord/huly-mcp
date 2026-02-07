@@ -19,7 +19,6 @@ import type { Blob, Ref, WorkspaceUuid } from "@hcengineering/core"
 import { Context, Effect, Layer } from "effect"
 
 import { HulyConfigService } from "../config/config.js"
-import { assertExists } from "../utils/assertions.js"
 import { concatLink } from "../utils/url.js"
 import { authToOptions, connectWithRetry } from "./auth-utils.js"
 import type { HulyAuthError, HulyConnectionError } from "./errors.js"
@@ -93,21 +92,23 @@ export const validateContentType = (
     ? Effect.void
     : Effect.fail(new InvalidContentTypeError({ filename, contentType }))
 
-// TODO better type
-export interface FileSourceParams {
-  filePath?: string
-  fileUrl?: string
-  data?: string
-}
+export type FileSourceParams =
+  | { readonly _tag: "filePath"; readonly filePath: string }
+  | { readonly _tag: "fileUrl"; readonly fileUrl: string }
+  | { readonly _tag: "base64"; readonly data: string }
 
 export const getBufferFromParams = (
   params: FileSourceParams
-): Effect.Effect<Buffer, InvalidFileDataError | FileNotFoundError | FileFetchError> =>
-  params.filePath
-    ? readFromFilePath(params.filePath)
-    : params.fileUrl
-    ? fetchFromUrl(params.fileUrl)
-    : decodeBase64(assertExists(params.data, "data required when no filePath/fileUrl"))
+): Effect.Effect<Buffer, InvalidFileDataError | FileNotFoundError | FileFetchError> => {
+  switch (params._tag) {
+    case "filePath":
+      return readFromFilePath(params.filePath)
+    case "fileUrl":
+      return fetchFromUrl(params.fileUrl)
+    case "base64":
+      return decodeBase64(params.data)
+  }
+}
 
 export type StorageClientError =
   | HulyConnectionError
@@ -183,12 +184,15 @@ export class HulyStorageClient extends Context.Tag("@hulymcp/HulyStorageClient")
           Effect.tryPromise({
             try: async () => {
               const blob = await storageClient.put(filename, data, contentType, data.length)
+<<<<<<< HEAD
               const blobRef = blob._id
+=======
+>>>>>>> wt-storage
               return {
-                blobId: blobRef,
+                blobId: blob._id,
                 contentType: blob.contentType,
                 size: blob.size,
-                url: buildFileUrl(baseUrl, workspaceId, blobRef)
+                url: buildFileUrl(baseUrl, workspaceId, blob._id)
               }
             },
             catch: (e) =>
@@ -236,6 +240,8 @@ export class HulyStorageClient extends Context.Tag("@hulymcp/HulyStorageClient")
 
 // --- Internal Helpers ---
 
+const isErrnoException = (e: unknown): e is NodeJS.ErrnoException => e instanceof Error && "code" in e
+
 type StorageConnectionConfig = {
   url: string
 } & AuthOptions
@@ -247,8 +253,8 @@ interface StorageConnection {
 }
 
 const buildFileUrl = (baseUrl: string, workspaceId: WorkspaceUuid, blobId: string): string => {
-  const trimmedUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl
-  return `${trimmedUrl}/files?workspace=${workspaceId}&file=${blobId}`
+  const params = new URLSearchParams({ workspace: workspaceId, file: blobId })
+  return `${concatLink(baseUrl, "/files")}?${params.toString()}`
 }
 
 const connectStorageClient = async (
@@ -338,8 +344,7 @@ export const readFromFilePath = (
   Effect.tryPromise({
     try: () => fs.readFile(path.resolve(filePath)),
     catch: (e) => {
-      const err = e as NodeJS.ErrnoException
-      if (err.code === "ENOENT") {
+      if (isErrnoException(e) && e.code === "ENOENT") {
         return new FileNotFoundError({ filePath })
       }
       return new InvalidFileDataError({
