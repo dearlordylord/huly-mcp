@@ -42,7 +42,7 @@ import { AccountUuid, ChannelId, ChannelName, MessageId, PersonName } from "../.
 import { HulyClient, type HulyClientError } from "../client.js"
 import { ChannelNotFoundError } from "../errors.js"
 import { escapeLikeWildcards } from "./query-helpers.js"
-import { toRef } from "./shared.js"
+import { clampLimit, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const chunter = require("@hcengineering/chunter").default as typeof import("@hcengineering/chunter").default
@@ -227,7 +227,7 @@ export const listChannels = (
       query.topic = { $like: `%${escapeLikeWildcards(params.topicSearch)}%` }
     }
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const channels = yield* client.findAll<HulyChannel>(
       chunter.class.Channel,
@@ -391,7 +391,7 @@ export const listChannelMessages = (
   Effect.gen(function*() {
     const { channel, client } = yield* findChannel(params.channel)
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const messages = yield* client.findAll<ChatMessage>(
       chunter.class.ChatMessage,
@@ -478,7 +478,7 @@ export const listDirectMessages = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const dms = yield* client.findAll<HulyDirectMessage>(
       chunter.class.DirectMessage,

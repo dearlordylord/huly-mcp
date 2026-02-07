@@ -11,6 +11,7 @@ import { Effect } from "effect"
 
 import type { FulltextSearchParams, FulltextSearchResult } from "../../domain/schemas.js"
 import { HulyClient, type HulyClientError } from "../client.js"
+import { clampLimit } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
@@ -32,7 +33,7 @@ export const fulltextSearch = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     // Use $search operator for fulltext search
     // This searches across all indexed fields

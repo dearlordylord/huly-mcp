@@ -42,7 +42,7 @@ import {
 } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { NotificationContextNotFoundError, NotificationNotFoundError } from "../errors.js"
-import { toRef } from "./shared.js"
+import { clampLimit, toRef } from "./shared.js"
 
 /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop */
 const notification = require("@hcengineering/notification")
@@ -165,7 +165,7 @@ export const listNotifications = (
       query.isViewed = false
     }
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const notifications = yield* client.findAll<HulyInboxNotification>(
       notification.class.InboxNotification,
@@ -399,7 +399,7 @@ export const listNotificationContexts = (
       query.isPinned = true
     }
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const contexts = yield* client.findAll<HulyDocNotifyContext>(
       notification.class.DocNotifyContext,
@@ -451,7 +451,7 @@ export const listNotificationSettings = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const settings = yield* client.findAll<HulyNotificationProviderSetting>(
       notification.class.NotificationProviderSetting,

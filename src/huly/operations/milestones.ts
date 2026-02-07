@@ -23,7 +23,7 @@ import { IssueIdentifier, MilestoneId, MilestoneLabel } from "../../domain/schem
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { MilestoneNotFoundError } from "../errors.js"
-import { findProject, findProjectAndIssue, toRef } from "./shared.js"
+import { clampLimit, findProject, findProjectAndIssue, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
@@ -137,7 +137,7 @@ export const listMilestones = (
   Effect.gen(function*() {
     const { client, project } = yield* findProject(params.project)
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const milestones = yield* client.findAll<HulyMilestone>(
       tracker.class.Milestone,

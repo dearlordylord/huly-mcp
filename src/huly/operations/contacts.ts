@@ -33,7 +33,7 @@ import { assertExists } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { PersonNotFoundError } from "../errors.js"
 import { escapeLikeWildcards } from "./query-helpers.js"
-import { toRef } from "./shared.js"
+import { clampLimit, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
@@ -88,7 +88,7 @@ export const listPersons = (
 ): Effect.Effect<Array<PersonSummary>, ListPersonsError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     // Build query with search filters
     const query: Record<string, unknown> = {}
@@ -316,7 +316,7 @@ export const listEmployees = (
 ): Effect.Effect<Array<EmployeeSummary>, ListEmployeesError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const employees = yield* client.findAll<HulyEmployee>(
       contact.mixin.Employee,
@@ -348,7 +348,7 @@ export const listOrganizations = (
 ): Effect.Effect<Array<OrganizationSummary>, ListOrganizationsError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const orgs = yield* client.findAll<HulyOrganization>(
       contact.class.Organization,

@@ -46,7 +46,7 @@ import type {
 import { Email, EventId, PersonId, PersonName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { EventNotFoundError, RecurringEventNotFoundError } from "../errors.js"
-import { toRef } from "./shared.js"
+import { clampLimit, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const calendar = require("@hcengineering/calendar").default as typeof import("@hcengineering/calendar").default
@@ -227,7 +227,7 @@ export const listEvents = (
       query.dueDate = { $lte: params.to }
     }
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const events = yield* client.findAll<HulyEvent>(
       calendar.class.Event,
@@ -467,7 +467,7 @@ export const listRecurringEvents = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const events = yield* client.findAll<HulyRecurringEvent>(
       calendar.class.ReccuringEvent,
@@ -578,7 +578,7 @@ export const listEventInstances = (
       query.dueDate = { $lte: params.to }
     }
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const instances = yield* client.findAll<HulyRecurringInstance>(
       calendar.class.ReccuringInstance,

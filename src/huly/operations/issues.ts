@@ -57,6 +57,7 @@ import { HulyError, InvalidStatusError, IssueNotFoundError, PersonNotFoundError 
 import { findComponentByIdOrLabel } from "./components.js"
 import { escapeLikeWildcards, withLookup } from "./query-helpers.js"
 import {
+  clampLimit,
   findPersonByEmailOrName,
   findProject,
   findProjectAndIssue,
@@ -268,7 +269,7 @@ export const listIssues = (
       }
     }
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     type IssueWithLookup = WithLookup<HulyIssue> & {
       $lookup?: { assignee?: Person }

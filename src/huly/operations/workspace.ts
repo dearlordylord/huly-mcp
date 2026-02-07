@@ -28,7 +28,7 @@ import type {
 import type { InvalidPersonUuidError } from "../errors.js"
 import { HulyConnectionError } from "../errors.js"
 import { WorkspaceClient, type WorkspaceClientError } from "../workspace-client.js"
-import { validatePersonUuid } from "./shared.js"
+import { clampLimit, validatePersonUuid } from "./shared.js"
 
 // Compile-time assertion: AccountRole string literals must match HulyAccountRole enum values
 // If AccountRole has values not in HulyAccountRole, this line will fail to compile
@@ -60,7 +60,7 @@ export const listWorkspaceMembers = (
 ): Effect.Effect<Array<WorkspaceMember>, ListWorkspaceMembersError, WorkspaceClient> =>
   Effect.gen(function*() {
     const { client } = yield* WorkspaceClient
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const members = yield* Effect.tryPromise({
       try: () => client.getWorkspaceMembers(),
@@ -157,7 +157,7 @@ export const listWorkspaces = (
 ): Effect.Effect<Array<WorkspaceSummary>, ListWorkspacesError, WorkspaceClient> =>
   Effect.gen(function*() {
     const { client } = yield* WorkspaceClient
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const workspaces = yield* Effect.tryPromise({
       try: () => client.getUserWorkspaces(),
