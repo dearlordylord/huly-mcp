@@ -272,20 +272,20 @@ export const updateUserProfile = (
 
     const profileUpdate: Parameters<typeof client.setMyProfile>[0] = {}
 
-    if (params.bio !== undefined && params.bio !== null) {
-      profileUpdate.bio = params.bio
+    if (params.bio !== undefined) {
+      profileUpdate.bio = params.bio === null ? "" : params.bio
     }
-    if (params.city !== undefined && params.city !== null) {
-      profileUpdate.city = params.city
+    if (params.city !== undefined) {
+      profileUpdate.city = params.city === null ? "" : params.city
     }
-    if (params.country !== undefined && params.country !== null) {
-      profileUpdate.country = params.country
+    if (params.country !== undefined) {
+      profileUpdate.country = params.country === null ? "" : params.country
     }
-    if (params.website !== undefined && params.website !== null) {
-      profileUpdate.website = params.website
+    if (params.website !== undefined) {
+      profileUpdate.website = params.website === null ? "" : params.website
     }
-    if (params.socialLinks !== undefined && params.socialLinks !== null) {
-      profileUpdate.socialLinks = params.socialLinks
+    if (params.socialLinks !== undefined) {
+      profileUpdate.socialLinks = params.socialLinks === null ? {} : params.socialLinks
     }
     if (params.isPublic !== undefined) {
       profileUpdate.isPublic = params.isPublic

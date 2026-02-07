@@ -53,6 +53,7 @@ import {
 } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { ChannelNotFoundError, MessageNotFoundError, ThreadReplyNotFoundError } from "../errors.js"
+import { escapeLikeWildcards } from "./query-helpers.js"
 import { toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
@@ -251,12 +252,12 @@ export const listChannels = (
 
     // Apply name search using $like operator
     if (params.nameSearch !== undefined && params.nameSearch.trim() !== "") {
-      query.name = { $like: `%${params.nameSearch}%` }
+      query.name = { $like: `%${escapeLikeWildcards(params.nameSearch)}%` }
     }
 
     // Apply topic search using $like operator
     if (params.topicSearch !== undefined && params.topicSearch.trim() !== "") {
-      query.topic = { $like: `%${params.topicSearch}%` }
+      query.topic = { $like: `%${escapeLikeWildcards(params.topicSearch)}%` }
     }
 
     const limit = Math.min(params.limit ?? 50, 200)

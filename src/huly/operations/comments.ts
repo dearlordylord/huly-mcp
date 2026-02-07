@@ -82,7 +82,7 @@ export const listComments = (
     const comments: Array<Comment> = messages.map((msg) => ({
       id: CommentId.make(msg._id),
       body: msg.message ?? "",
-      authorId: msg.modifiedBy ? msg.modifiedBy : undefined,
+      authorId: msg.modifiedBy,
       createdOn: msg.createdOn,
       modifiedOn: msg.modifiedOn,
       editedOn: msg.editedOn

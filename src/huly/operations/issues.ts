@@ -79,7 +79,7 @@ import {
   IssueTemplateNotFoundError,
   PersonNotFoundError
 } from "../errors.js"
-import { withLookup } from "./query-helpers.js"
+import { escapeLikeWildcards, withLookup } from "./query-helpers.js"
 import {
   findProject,
   findProjectAndIssue,
@@ -249,7 +249,7 @@ export const listIssues = (
 
     // Apply title search using $like operator
     if (params.titleSearch !== undefined && params.titleSearch.trim() !== "") {
-      query.title = { $like: `%${params.titleSearch}%` }
+      query.title = { $like: `%${escapeLikeWildcards(params.titleSearch)}%` }
     }
 
     if (params.descriptionSearch !== undefined && params.descriptionSearch.trim() !== "") {
@@ -338,7 +338,8 @@ const findPersonByEmailOrName = (
 
     const allPersons = yield* client.findAll<Person>(
       contact.class.Person,
-      {}
+      {},
+      { limit: 200 }
     )
 
     const lowerName = emailOrName.toLowerCase()
@@ -443,6 +444,7 @@ export const getIssue = (
  */
 export interface CreateIssueResult {
   identifier: string
+  issueId: string
 }
 
 /**
@@ -562,7 +564,7 @@ export const createIssue = (
       issueId
     )
 
-    return { identifier }
+    return { identifier: IssueIdentifier.make(identifier), issueId }
   })
 
 // --- Update Issue Operation ---
@@ -1074,35 +1076,7 @@ export const setIssueComponent = (
   params: SetIssueComponentParams
 ): Effect.Effect<SetIssueComponentResult, SetIssueComponentError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, project } = yield* findProject(params.project)
-
-    const { fullIdentifier, number } = parseIssueIdentifier(
-      params.identifier,
-      params.project
-    )
-
-    let issue = yield* client.findOne<HulyIssue>(
-      tracker.class.Issue,
-      {
-        space: project._id,
-        identifier: fullIdentifier
-      }
-    )
-    if (issue === undefined && number !== null) {
-      issue = yield* client.findOne<HulyIssue>(
-        tracker.class.Issue,
-        {
-          space: project._id,
-          number
-        }
-      )
-    }
-    if (issue === undefined) {
-      return yield* new IssueNotFoundError({
-        identifier: params.identifier,
-        project: params.project
-      })
-    }
+    const { client, issue, project } = yield* findProjectAndIssue(params)
 
     let componentRef: Ref<HulyComponent> | null = null
 
@@ -1403,31 +1377,12 @@ export const createIssueFromTemplate = (
     const result = yield* createIssue(issueParams)
 
     if (template.component !== null) {
-      const { fullIdentifier, number } = parseIssueIdentifier(
-        result.identifier,
-        params.project
-      )
-      let issue = yield* client.findOne<HulyIssue>(
+      yield* client.updateDoc(
         tracker.class.Issue,
-        {
-          space: project._id,
-          identifier: fullIdentifier
-        }
+        project._id,
+        toRef<HulyIssue>(result.issueId),
+        { component: template.component }
       )
-      if (issue === undefined && number !== null) {
-        issue = yield* client.findOne<HulyIssue>(
-          tracker.class.Issue,
-          { space: project._id, number }
-        )
-      }
-      if (issue !== undefined) {
-        yield* client.updateDoc(
-          tracker.class.Issue,
-          project._id,
-          issue._id,
-          { component: template.component }
-        )
-      }
     }
 
     return result

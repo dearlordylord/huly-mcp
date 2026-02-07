@@ -77,16 +77,10 @@ const emptyEventDescription = "" as unknown as HulyEvent["description"]
 // SDK: Data<Event> requires 'user' but server populates from auth context.
 const serverPopulatedUser: HulyEvent["user"] = "" as HulyEvent["user"]
 
-// SDK: Visibility and HulyVisibility are identical string enums; cast bridges the two.
-const visibilityToString = (v: HulyVisibility | undefined): Visibility | undefined => {
-  if (v === undefined) return undefined
-  return v as Visibility
-}
+// SDK: Visibility and HulyVisibility are identical string literal unions.
+const visibilityToString = (v: HulyVisibility | undefined): Visibility | undefined => v
 
-const stringToVisibility = (v: Visibility | undefined): HulyVisibility | undefined => {
-  if (v === undefined) return undefined
-  return v as HulyVisibility
-}
+const stringToVisibility = (v: Visibility | undefined): HulyVisibility | undefined => v
 
 // --- Helpers ---
 
@@ -192,7 +186,7 @@ const resolveEventInputs = (
     let participantRefs: Array<Ref<Contact>> = []
     if (params.participants && params.participants.length > 0) {
       const persons = yield* findPersonsByEmails(client, params.participants)
-      participantRefs = persons.map(p => toRef<Contact>(p._id))
+      participantRefs = persons.map(p => p._id)
     }
 
     let descriptionRef: MarkupBlobRef | null = null
@@ -290,7 +284,7 @@ export const getEvent = (
       visibility: visibilityToString(event.visibility),
       participants,
       externalParticipants: (event.externalParticipants || []).map(p => Email.make(p)),
-      calendarId: event.calendar ? event.calendar : undefined,
+      calendarId: event.calendar,
       modifiedOn: event.modifiedOn,
       createdOn: event.createdOn
     }
