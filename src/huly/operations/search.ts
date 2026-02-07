@@ -47,7 +47,7 @@ export const fulltextSearch = (
       }
     )
 
-    const total = results.total ?? results.length
+    const total = results.total
 
     // Map results to a consistent format
     const items = results.map((doc) => ({

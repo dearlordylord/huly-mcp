@@ -464,7 +464,7 @@ export const listChannelMessages = (
       }
     )
 
-    const total = messages.total ?? messages.length
+    const total = messages.total
 
     const uniqueSocialIds = [
       ...new Set(
@@ -550,7 +550,7 @@ export const listDirectMessages = (
       }
     )
 
-    const total = dms.total ?? dms.length
+    const total = dms.total
 
     // DirectMessage.members is typed as AccountUuid[] in @hcengineering/chunter (extends Space)
     const uniqueAccountUuids = [
@@ -640,7 +640,7 @@ export const listThreadReplies = (
       }
     )
 
-    const total = replies.total ?? replies.length
+    const total = replies.total
 
     const uniqueSocialIds = [
       ...new Set(
