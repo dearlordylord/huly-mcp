@@ -27,7 +27,7 @@ import type {
   DeleteComponentResult,
   SetIssueComponentResult,
   UpdateComponentResult
-} from "../../domain/schemas/issues.js"
+} from "../../domain/schemas/components.js"
 import { ComponentId, ComponentLabel, IssueIdentifier, PersonName } from "../../domain/schemas/shared.js"
 import { isExistent } from "../../utils/assertions.js"
 import type { HulyClient, HulyClientError } from "../client.js"

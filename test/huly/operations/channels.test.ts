@@ -23,11 +23,13 @@ import {
   listChannelMessages,
   sendChannelMessage,
   listDirectMessages,
+} from "../../../src/huly/operations/channels.js"
+import {
   listThreadReplies,
   addThreadReply,
   updateThreadReply,
   deleteThreadReply,
-} from "../../../src/huly/operations/channels.js"
+} from "../../../src/huly/operations/threads.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const chunter = require("@hcengineering/chunter").default as typeof import("@hcengineering/chunter").default

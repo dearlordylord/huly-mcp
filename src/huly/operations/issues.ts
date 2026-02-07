@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- issue CRUD + search + labels + description handling form a single domain */
 /**
  * Issue domain operations for Huly MCP server.
  *

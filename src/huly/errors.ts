@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- flat error class registry; each error is uniform boilerplate, splitting by domain adds indirection without benefit */
 /**
  * Error hierarchy for Huly MCP server.
  *

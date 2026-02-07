@@ -29,11 +29,11 @@ import type {
   UpdateIssueTemplateParams
 } from "../../domain/schemas.js"
 import type {
-  CreateIssueResult,
   CreateIssueTemplateResult,
   DeleteIssueTemplateResult,
   UpdateIssueTemplateResult
-} from "../../domain/schemas/issues.js"
+} from "../../domain/schemas/issue-templates.js"
+import type { CreateIssueResult } from "../../domain/schemas/issues.js"
 import { ComponentLabel, Email, IssueTemplateId, NonNegativeNumber, PersonName } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { InvalidStatusError, ProjectNotFoundError } from "../errors.js"
