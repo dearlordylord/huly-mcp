@@ -66,6 +66,10 @@ HULY_URL=... HULY_EMAIL=... HULY_PASSWORD=... HULY_WORKSPACE=... timeout 5 node 
 
 Use short timeouts (5s) - MCP keeps connection open.
 
+## Worktrees
+
+Worktrees symlink `node_modules` to the main tree. `.gitignore` must use `node_modules` (no trailing slash) — trailing slash only matches directories, not symlinks, so `git add .` will commit the symlink.
+
 ## Publishing
 
 ```bash
