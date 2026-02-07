@@ -1,23 +1,43 @@
-# Item 6: Isolate globalThis polyfills into polyfills.ts
+# Registry Consolidation Report
 
-## What changed
+## Changes
 
-Extracted all globalThis polyfill code from `src/index.ts` into a new `src/polyfills.ts` file.
+### Consolidated 5 tool handler factories into a single generic (`src/mcp/tools/registry.ts`)
 
-### Files modified
-- **`src/index.ts`** -- removed polyfill code (indexedDB, window, navigator globals), removed `fake-indexeddb` import, added `import "./polyfills.js"` as first import
-- **`src/polyfills.ts`** (new) -- contains all globalThis mutations with `eslint-disable functional/immutable-data` and documented `as` casts
+**Before:** 5 near-identical factory functions, each ~20 lines, differing only in which Effect service they provided:
 
-### What moved
-- `fake-indexeddb` import and `globalThis.indexedDB` assignment
-- `mockWindow` object and `globalThis.window` assignment
-- `globalThis.navigator` conditional polyfill via `Object.defineProperty`
+1. `createToolHandler` - HulyClient
+2. `createStorageToolHandler` - HulyStorageClient
+3. `createCombinedToolHandler` - HulyClient + HulyStorageClient
+4. `createWorkspaceToolHandler` - WorkspaceClient (with availability check)
+5. `createNoParamsWorkspaceToolHandler` - WorkspaceClient, no params parsing
 
-### Why
-The `as Record<string, unknown>` casts and `eslint-disable` directives are necessary for polyfills but pollute the main entry point. Quarantining them in a dedicated file keeps `src/index.ts` clean and makes the unsafe code easy to locate/audit.
+**After:** A single generic `createHandler<P, Svc, R>` parameterized by:
+- `P` - parsed params type
+- `Svc` - Effect service requirement (HulyClient, HulyStorageClient, WorkspaceClient, or union)
+- `R` - operation return type
+
+Service provision is abstracted via `ProvideServices<R>` - a function that takes handler args and returns either a fully-provided Effect (Right) or an error response (Left, for WorkspaceClient unavailability). Four pre-built providers handle each service combination.
+
+The 5 exported functions are retained as thin wrappers delegating to `createHandler` with the appropriate provider, preserving backward compatibility. No callers needed changes (except `createNoParamsWorkspaceToolHandler`).
+
+### Removed unused `_toolName` parameter from `createNoParamsWorkspaceToolHandler`
+
+The `_toolName` parameter was unused (prefixed with underscore). Removed from the signature. Updated all 3 call sites in `src/mcp/tools/workspace.ts`.
+
+### Design decisions
+
+- **`Either` for service validation**: WorkspaceClient is optional in the handler signature. Rather than using a non-null assertion (`!`), `ProvideServices` returns `Either<Effect, McpToolResponse>` - Left for validation failure, Right for the provided effect. This avoids type casts.
+- **Backward-compatible exports**: All 5 original function names still exported. External callers see no API change.
+
+## Files changed
+
+- `src/mcp/tools/registry.ts` - Consolidated factories, removed `_toolName`
+- `src/mcp/tools/workspace.ts` - Updated 3 `createNoParamsWorkspaceToolHandler` call sites
 
 ## Verification
-- `pnpm build` -- passes
-- `pnpm typecheck` -- passes
-- `pnpm lint` -- 0 errors (124 pre-existing warnings, none from new file)
-- `pnpm test` -- 755/755 pass
+
+- `pnpm build` - pass
+- `pnpm typecheck` - pass
+- `pnpm lint` - 0 errors (126 pre-existing warnings, unchanged)
+- `pnpm test` - 755/755 pass
