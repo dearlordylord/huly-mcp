@@ -81,7 +81,7 @@ export const listActivity = (
       id: ActivityMessageId.make(msg._id),
       objectId: msg.attachedTo,
       objectClass: ObjectClassName.make(msg.attachedToClass),
-      modifiedBy: msg.modifiedBy ? msg.modifiedBy : undefined,
+      modifiedBy: msg.modifiedBy,
       modifiedOn: msg.modifiedOn,
       isPinned: msg.isPinned,
       replies: msg.replies,
@@ -202,7 +202,7 @@ export const listReactions = (
       id: r._id,
       messageId: ActivityMessageId.make(r.attachedTo),
       emoji: EmojiCode.make(r.emoji),
-      createdBy: r.createBy ? r.createBy : undefined
+      createdBy: r.createBy
     }))
 
     return result

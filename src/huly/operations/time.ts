@@ -209,7 +209,9 @@ export const listTimeSpendReports = (
 
     return reports.map(r => ({
       id: TimeSpendReportId.make(r._id),
-      identifier: IssueIdentifier.make(r.$lookup?.attachedTo?.identifier ?? "Unknown"),
+      identifier: r.$lookup?.attachedTo?.identifier !== undefined
+        ? IssueIdentifier.make(r.$lookup.attachedTo.identifier)
+        : undefined,
       employee: r.$lookup?.employee?.name !== undefined ? PersonName.make(r.$lookup.employee.name) : undefined,
       date: r.date,
       value: r.value,
@@ -252,7 +254,7 @@ export const getDetailedTimeReport = (
     )
 
     const byIssueMap = new Map<string, {
-      identifier: IssueIdentifier
+      identifier: IssueIdentifier | undefined
       issueTitle: string
       totalTime: number
       reports: Array<TimeSpendReport>
@@ -268,7 +270,7 @@ export const getDetailedTimeReport = (
       const issueKey = r.attachedTo
       const issue = r.$lookup?.attachedTo
       const existing = byIssueMap.get(issueKey) ?? {
-        identifier: IssueIdentifier.make(issue?.identifier ?? "Unknown"),
+        identifier: issue?.identifier !== undefined ? IssueIdentifier.make(issue.identifier) : undefined,
         issueTitle: issue?.title ?? "Unknown",
         totalTime: 0,
         reports: []
@@ -276,7 +278,7 @@ export const getDetailedTimeReport = (
       existing.totalTime += r.value
       existing.reports.push({
         id: TimeSpendReportId.make(r._id),
-        identifier: IssueIdentifier.make(issue?.identifier ?? "Unknown"),
+        identifier: issue?.identifier !== undefined ? IssueIdentifier.make(issue.identifier) : undefined,
         employee: r.$lookup?.employee?.name !== undefined ? PersonName.make(r.$lookup.employee.name) : undefined,
         date: r.date,
         value: r.value,

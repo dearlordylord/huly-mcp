@@ -1,10 +1,5 @@
 import { type Data, type DocumentUpdate, generateId, type Ref, SortingOrder } from "@hcengineering/core"
-import {
-  type Issue as HulyIssue,
-  type Milestone as HulyMilestone,
-  MilestoneStatus,
-  type Project as HulyProject
-} from "@hcengineering/tracker"
+import { type Milestone as HulyMilestone, MilestoneStatus, type Project as HulyProject } from "@hcengineering/tracker"
 import { absurd, Effect } from "effect"
 
 import type {
@@ -20,9 +15,9 @@ import type {
 } from "../../domain/schemas.js"
 import { MilestoneId, MilestoneLabel } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
-import type { ProjectNotFoundError } from "../errors.js"
-import { IssueNotFoundError, MilestoneNotFoundError } from "../errors.js"
-import { findProject, parseIssueIdentifier, toRef } from "./shared.js"
+import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
+import { MilestoneNotFoundError } from "../errors.js"
+import { findProject, findProjectAndIssue, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
@@ -257,35 +252,7 @@ export const setIssueMilestone = (
   params: SetIssueMilestoneParams
 ): Effect.Effect<SetIssueMilestoneResult, SetIssueMilestoneError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, project } = yield* findProject(params.project)
-
-    const { fullIdentifier, number } = parseIssueIdentifier(
-      params.identifier,
-      params.project
-    )
-
-    let issue = yield* client.findOne<HulyIssue>(
-      tracker.class.Issue,
-      {
-        space: project._id,
-        identifier: fullIdentifier
-      }
-    )
-    if (issue === undefined && number !== null) {
-      issue = yield* client.findOne<HulyIssue>(
-        tracker.class.Issue,
-        {
-          space: project._id,
-          number
-        }
-      )
-    }
-    if (issue === undefined) {
-      return yield* new IssueNotFoundError({
-        identifier: params.identifier,
-        project: params.project
-      })
-    }
+    const { client, issue, project } = yield* findProjectAndIssue(params)
 
     let milestoneRef: Ref<HulyMilestone> | null = null
 

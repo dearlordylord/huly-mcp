@@ -18,7 +18,6 @@ import {
   type Space
 } from "@hcengineering/core"
 import type { Document as HulyDocument, Teamspace as HulyTeamspace } from "@hcengineering/document"
-import type { Issue as HulyIssue } from "@hcengineering/tracker"
 import { Effect } from "effect"
 
 import type {
@@ -44,7 +43,7 @@ import {
   type FileTooLargeError,
   type InvalidContentTypeError,
   type InvalidFileDataError,
-  IssueNotFoundError,
+  type IssueNotFoundError,
   type ProjectNotFoundError,
   TeamspaceNotFoundError
 } from "../errors.js"
@@ -56,7 +55,7 @@ import {
   validateContentType,
   validateFileSize
 } from "../storage.js"
-import { findProject, parseIssueIdentifier, toRef } from "./shared.js"
+import { findProjectAndIssue, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const attachment = require("@hcengineering/attachment").default as typeof import("@hcengineering/attachment").default
@@ -450,26 +449,7 @@ export const addIssueAttachment = (
   params: AddIssueAttachmentParams
 ): Effect.Effect<AddAttachmentResult, AddIssueAttachmentError, HulyClient | HulyStorageClient> =>
   Effect.gen(function*() {
-    const { client, project } = yield* findProject(params.project)
-
-    const { fullIdentifier, number } = parseIssueIdentifier(params.identifier, params.project)
-
-    let issue = yield* client.findOne<HulyIssue>(
-      tracker.class.Issue,
-      { space: project._id, identifier: fullIdentifier }
-    )
-    if (issue === undefined && number !== null) {
-      issue = yield* client.findOne<HulyIssue>(
-        tracker.class.Issue,
-        { space: project._id, number }
-      )
-    }
-    if (issue === undefined) {
-      return yield* new IssueNotFoundError({
-        identifier: params.identifier,
-        project: params.project
-      })
-    }
+    const { client, issue, project } = yield* findProjectAndIssue(params)
 
     const storageClient = yield* HulyStorageClient
 

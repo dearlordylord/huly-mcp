@@ -34,6 +34,7 @@ import type {
 import { DocumentId, TeamspaceId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js"
+import { escapeLikeWildcards } from "./query-helpers.js"
 import { toRef } from "./shared.js"
 
 // Import plugin objects at runtime (CommonJS modules)
@@ -210,7 +211,7 @@ export const listDocuments = (
 
     // Apply title search using $like operator
     if (params.titleSearch !== undefined && params.titleSearch.trim() !== "") {
-      query.title = { $like: `%${params.titleSearch}%` }
+      query.title = { $like: `%${escapeLikeWildcards(params.titleSearch)}%` }
     }
 
     // Apply content search using fulltext $search operator
