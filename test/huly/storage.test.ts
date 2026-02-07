@@ -312,13 +312,6 @@ describe("FileUploadError", () => {
       expect(error.cause).toBe(cause)
     })
   )
-
-  it.effect("has mcpErrorCode for internal error", () =>
-    Effect.gen(function* () {
-      const error = new FileUploadError({ message: "test" })
-      expect(error.mcpErrorCode).toBe(-32603) // InternalError
-    })
-  )
 })
 
 describe("InvalidFileDataError", () => {
@@ -326,13 +319,6 @@ describe("InvalidFileDataError", () => {
     Effect.gen(function* () {
       const error = new InvalidFileDataError({ message: "Bad data" })
       expect(error._tag).toBe("InvalidFileDataError")
-    })
-  )
-
-  it.effect("has mcpErrorCode for invalid params", () =>
-    Effect.gen(function* () {
-      const error = new InvalidFileDataError({ message: "test" })
-      expect(error.mcpErrorCode).toBe(-32602) // InvalidParams
     })
   )
 })

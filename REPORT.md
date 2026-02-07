@@ -1,47 +1,47 @@
-# HTTP Transport Cleanup Report
+# Error System Cleanup Report
 
-## Item 14: Transport cast at line 115
+## Changes
 
-**Decision: Keep cast, add documentation.**
+### Item 29: Remove `getMcpErrorCode` (dead export)
+- Removed `getMcpErrorCode` function from `src/huly/errors.ts` (was exported but never imported in source code)
+- Removed corresponding test block in `test/huly/errors.test.ts`
 
-`StreamableHTTPServerTransport` declares `implements Transport` in the SDK, but its property types
-(e.g., `onmessage` signature, `send` options subset) don't satisfy the `Transport` interface under
-`exactOptionalPropertyTypes: true` (our tsconfig). The SDK was compiled without this strict flag.
+### Item 33: Remove `mcpErrorCode` from all error classes
+- Removed `readonly mcpErrorCode: McpErrorCode = ...` property from all 29 error classes in `src/huly/errors.ts`
+- The switch in `error-mapping.ts` matches on `_tag`, not `mcpErrorCode`, so this was pure dead code
+- Removed all `mcpErrorCode` assertions from tests:
+  - `test/huly/errors.test.ts` (10 assertions)
+  - `test/huly/client.test.ts` (2 test cases)
+  - `test/huly/storage.test.ts` (2 test cases)
 
-This is an upstream SDK type bug. The cast is safe because the class genuinely implements the
-interface at runtime. Added a comment explaining the root cause.
+### Item 44: Move `McpErrorCode` to `error-mapping.ts`
+- Moved `McpErrorCode` const and type from `src/huly/errors.ts` to `src/mcp/error-mapping.ts`
+- Updated `test/mcp/error-mapping.test.ts` to import `McpErrorCode` from `error-mapping.ts` instead of `errors.ts`
+- Removed "Maps to MCP ..." JSDoc lines from all error classes (no longer relevant after removing the property)
 
-**Alternatives considered:**
-- Wrapping in an adapter object that satisfies `Transport` exactly -- adds unnecessary runtime
-  overhead for a compile-time-only issue.
-- Removing `exactOptionalPropertyTypes` -- weakens the entire codebase for one SDK edge case.
-- Generic type parameter on `Server.connect` -- not available, the method signature is fixed.
+### Item 2a: Umbrella verification
+- Confirmed zero references to `mcpErrorCode`, `getMcpErrorCode`, or `McpErrorCode` remain in `src/huly/errors.ts`
+- `McpErrorCode` lives only in `src/mcp/error-mapping.ts` and `test/mcp/error-mapping.test.ts`
 
-## Item 50: Signal handlers accumulate on repeated starts
-
-**Decision: Clean up handlers in both completion paths.**
-
-The original code only cleaned up signal handlers on Effect interruption (the `return Effect.sync(cleanup)`
-path). When a signal fires and `resume(Effect.void)` is called (normal completion), the cleanup
-function was never invoked, leaving stale handlers on `process`.
-
-Fix: extracted a `cleanup` function called both from `shutdown` (normal signal path) and from
-the Effect interruption finalizer. Now handlers are removed regardless of how the async effect
-completes.
-
-## Item 62: Redundant async on GET/DELETE handlers
-
-**Decision: Remove `async`, update return types to `void`.**
-
-The `get` and `del` handlers contained no `await` expressions. Removed the `async` keyword and
-changed their return type annotations from `Promise<void>` to `void` in both the function signatures
-and the `createMcpHandlers` return type.
-
-No test changes needed -- `await` on a `void` value is a no-op in the existing tests.
+### Item 28: Extract duplicate notification context mapping
+- Extracted `toDocNotifyContextSummary` helper in `src/huly/operations/notifications.ts`
+- Replaced inline mapping at two call sites: `getNotificationContext` and `listNotificationContexts`
 
 ## Verification
 
-- `pnpm build` -- pass
-- `pnpm typecheck` -- pass (0 errors)
-- `pnpm lint` -- pass (0 errors, 127 pre-existing warnings)
-- `pnpm test` -- 755/755 tests pass
+```
+pnpm build    -- OK
+pnpm typecheck -- OK (0 errors)
+pnpm lint     -- OK (0 errors, 127 pre-existing warnings)
+pnpm test     -- OK (749 tests passed, 24 test files)
+```
+
+## Files Modified
+
+- `src/huly/errors.ts` -- removed McpErrorCode, mcpErrorCode, getMcpErrorCode
+- `src/mcp/error-mapping.ts` -- added McpErrorCode definition, updated import
+- `src/huly/operations/notifications.ts` -- extracted toDocNotifyContextSummary helper
+- `test/huly/errors.test.ts` -- removed mcpErrorCode/getMcpErrorCode tests
+- `test/huly/client.test.ts` -- removed mcpErrorCode tests
+- `test/huly/storage.test.ts` -- removed mcpErrorCode tests
+- `test/mcp/error-mapping.test.ts` -- updated McpErrorCode import source

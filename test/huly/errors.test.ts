@@ -13,8 +13,6 @@ import {
   InvalidFileDataError,
   FileNotFoundError,
   FileFetchError,
-  McpErrorCode,
-  getMcpErrorCode,
   type HulyDomainError,
 } from "../../src/huly/errors.js"
 
@@ -25,7 +23,6 @@ describe("Huly Errors", () => {
         const error = new HulyError({ message: "Something went wrong" })
         expect(error._tag).toBe("HulyError")
         expect(error.message).toBe("Something went wrong")
-        expect(error.mcpErrorCode).toBe(McpErrorCode.InternalError)
       })
     )
 
@@ -44,7 +41,6 @@ describe("Huly Errors", () => {
         const error = new HulyConnectionError({ message: "Connection failed" })
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toBe("Connection failed")
-        expect(error.mcpErrorCode).toBe(McpErrorCode.InternalError)
       })
     )
 
@@ -63,7 +59,6 @@ describe("Huly Errors", () => {
         const error = new HulyAuthError({ message: "Invalid credentials" })
         expect(error._tag).toBe("HulyAuthError")
         expect(error.message).toBe("Invalid credentials")
-        expect(error.mcpErrorCode).toBe(McpErrorCode.InternalError)
       })
     )
   })
@@ -75,7 +70,6 @@ describe("Huly Errors", () => {
         expect(error._tag).toBe("IssueNotFoundError")
         expect(error.identifier).toBe("HULY-123")
         expect(error.project).toBe("HULY")
-        expect(error.mcpErrorCode).toBe(McpErrorCode.InvalidParams)
       })
     )
 
@@ -93,7 +87,6 @@ describe("Huly Errors", () => {
         const error = new ProjectNotFoundError({ identifier: "MISSING" })
         expect(error._tag).toBe("ProjectNotFoundError")
         expect(error.identifier).toBe("MISSING")
-        expect(error.mcpErrorCode).toBe(McpErrorCode.InvalidParams)
       })
     )
 
@@ -112,7 +105,6 @@ describe("Huly Errors", () => {
         expect(error._tag).toBe("InvalidStatusError")
         expect(error.status).toBe("bogus")
         expect(error.project).toBe("HULY")
-        expect(error.mcpErrorCode).toBe(McpErrorCode.InvalidParams)
       })
     )
 
@@ -130,7 +122,6 @@ describe("Huly Errors", () => {
         const error = new FileUploadError({ message: "Storage quota exceeded" })
         expect(error._tag).toBe("FileUploadError")
         expect(error.message).toBe("Storage quota exceeded")
-        expect(error.mcpErrorCode).toBe(McpErrorCode.InternalError)
       })
     )
 
@@ -149,7 +140,6 @@ describe("Huly Errors", () => {
         const error = new InvalidFileDataError({ message: "Invalid base64 encoding" })
         expect(error._tag).toBe("InvalidFileDataError")
         expect(error.message).toBe("Invalid base64 encoding")
-        expect(error.mcpErrorCode).toBe(McpErrorCode.InvalidParams)
       })
     )
   })
@@ -161,7 +151,6 @@ describe("Huly Errors", () => {
         expect(error._tag).toBe("FileNotFoundError")
         expect(error.filePath).toBe("/tmp/missing.txt")
         expect(error.message).toBe("File not found: /tmp/missing.txt")
-        expect(error.mcpErrorCode).toBe(McpErrorCode.InvalidParams)
       })
     )
   })
@@ -174,41 +163,6 @@ describe("Huly Errors", () => {
         expect(error.fileUrl).toBe("https://example.com/img.png")
         expect(error.reason).toBe("404 Not Found")
         expect(error.message).toBe("Failed to fetch file from https://example.com/img.png: 404 Not Found")
-        expect(error.mcpErrorCode).toBe(McpErrorCode.InternalError)
-      })
-    )
-  })
-
-  describe("getMcpErrorCode", () => {
-        it.effect("returns InvalidParams for domain errors", () =>
-      Effect.gen(function* () {
-        expect(getMcpErrorCode(new IssueNotFoundError({ identifier: "X", project: "Y" }))).toBe(
-          McpErrorCode.InvalidParams
-        )
-        expect(getMcpErrorCode(new ProjectNotFoundError({ identifier: "X" }))).toBe(
-          McpErrorCode.InvalidParams
-        )
-        expect(getMcpErrorCode(new InvalidStatusError({ status: "X", project: "Y" }))).toBe(
-          McpErrorCode.InvalidParams
-        )
-        expect(getMcpErrorCode(new InvalidFileDataError({ message: "bad data" }))).toBe(
-          McpErrorCode.InvalidParams
-        )
-        expect(getMcpErrorCode(new FileNotFoundError({ filePath: "/missing" }))).toBe(
-          McpErrorCode.InvalidParams
-        )
-      })
-    )
-
-        it.effect("returns InternalError for infrastructure errors", () =>
-      Effect.gen(function* () {
-        expect(getMcpErrorCode(new HulyError({ message: "X" }))).toBe(McpErrorCode.InternalError)
-        expect(getMcpErrorCode(new HulyConnectionError({ message: "X" }))).toBe(
-          McpErrorCode.InternalError
-        )
-        expect(getMcpErrorCode(new HulyAuthError({ message: "X" }))).toBe(McpErrorCode.InternalError)
-        expect(getMcpErrorCode(new FileUploadError({ message: "X" }))).toBe(McpErrorCode.InternalError)
-        expect(getMcpErrorCode(new FileFetchError({ fileUrl: "http://x", reason: "fail" }))).toBe(McpErrorCode.InternalError)
       })
     )
   })
