@@ -292,6 +292,27 @@ describe("Calendar Schemas", () => {
       expect(Either.isRight(result)).toBe(true)
     })
 
+    it("accepts includeParticipants flag", () => {
+      const result = Schema.decodeUnknownEither(ListEventInstancesParamsSchema)({
+        recurringEventId: "rec-evt-123",
+        includeParticipants: true
+      })
+      expect(Either.isRight(result)).toBe(true)
+      if (Either.isRight(result)) {
+        expect(result.right.includeParticipants).toBe(true)
+      }
+    })
+
+    it("defaults includeParticipants to undefined when not provided", () => {
+      const result = Schema.decodeUnknownEither(ListEventInstancesParamsSchema)({
+        recurringEventId: "rec-evt-123"
+      })
+      expect(Either.isRight(result)).toBe(true)
+      if (Either.isRight(result)) {
+        expect(result.right.includeParticipants).toBeUndefined()
+      }
+    })
+
     it("rejects empty recurringEventId", () => {
       const result = Schema.decodeUnknownEither(ListEventInstancesParamsSchema)({
         recurringEventId: ""

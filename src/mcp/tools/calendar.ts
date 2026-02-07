@@ -108,7 +108,7 @@ export const calendarTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "list_event_instances",
     description:
-      "List instances of a recurring event. Returns instances sorted by date. Supports filtering by date range.",
+      "List instances of a recurring event. Returns instances sorted by date. Supports filtering by date range. Use includeParticipants=true to fetch full participant info (extra lookups).",
     inputSchema: listEventInstancesParamsJsonSchema,
     handler: createToolHandler(
       "list_event_instances",
