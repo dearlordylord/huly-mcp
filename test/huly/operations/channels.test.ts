@@ -2,13 +2,15 @@ import { describe, it } from "@effect/vitest"
 import { expect } from "vitest"
 import { Effect } from "effect"
 import type {
+  AccountUuid,
   Doc,
   FindResult,
+  PersonId,
   Ref,
   Space,
 } from "@hcengineering/core"
 import type { Channel as HulyChannel, ChatMessage, DirectMessage } from "@hcengineering/chunter"
-import type { Person } from "@hcengineering/contact"
+import type { Employee as HulyEmployee, Person, SocialIdentity } from "@hcengineering/contact"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { ChannelNotFoundError } from "../../../src/huly/errors.js"
 import {
@@ -94,11 +96,43 @@ const makePerson = (overrides?: Partial<Person>): Person =>
     ...overrides,
   }) as Person
 
+const makeEmployee = (overrides?: Partial<HulyEmployee>): HulyEmployee =>
+  ({
+    _id: "employee-1" as Ref<HulyEmployee>,
+    _class: contact.mixin.Employee,
+    space: "space-1" as Ref<Space>,
+    name: "John Doe",
+    active: true,
+    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedOn: Date.now(),
+    createdBy: "user-1" as Ref<Doc>,
+    createdOn: Date.now(),
+    ...overrides,
+  }) as HulyEmployee
+
+const makeSocialIdentity = (overrides?: Partial<SocialIdentity>): SocialIdentity =>
+  ({
+    _id: "social-1" as PersonId,
+    _class: contact.class.SocialIdentity,
+    space: "space-1" as Ref<Space>,
+    attachedTo: "person-1" as Ref<Person>,
+    attachedToClass: contact.class.Person,
+    collection: "socialIds",
+    type: "huly",
+    value: "user@example.com",
+    key: "huly:user@example.com",
+    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedOn: Date.now(),
+    ...overrides,
+  }) as SocialIdentity
+
 interface MockConfig {
   channels?: HulyChannel[]
   messages?: ChatMessage[]
   directMessages?: DirectMessage[]
   persons?: Person[]
+  employees?: HulyEmployee[]
+  socialIdentities?: SocialIdentity[]
   captureChannelQuery?: { query?: Record<string, unknown>; options?: Record<string, unknown> }
   captureCreateDoc?: { attributes?: Record<string, unknown>; id?: string }
   captureUpdateDoc?: { operations?: Record<string, unknown> }
@@ -111,6 +145,8 @@ const createTestLayerWithMocks = (config: MockConfig) => {
   const messages = config.messages ?? []
   const directMessages = config.directMessages ?? []
   const persons = config.persons ?? []
+  const employees = config.employees ?? []
+  const socialIdentities = config.socialIdentities ?? []
 
   const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown, options: unknown) => {
     if (_class === chunter.class.Channel) {
@@ -147,7 +183,28 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       return Effect.succeed(Object.assign(result, { total: result.length }) as unknown as FindResult<Doc>)
     }
     if (_class === contact.class.Person) {
+      const q = query as { _id?: { $in?: Array<Ref<Person>> } }
+      if (q._id?.$in) {
+        const filtered = persons.filter(p => q._id!.$in!.includes(p._id))
+        return Effect.succeed(filtered as unknown as FindResult<Doc>)
+      }
       return Effect.succeed(persons as unknown as FindResult<Doc>)
+    }
+    if (_class === contact.mixin.Employee) {
+      const q = query as { personUuid?: { $in?: Array<AccountUuid> } }
+      if (q.personUuid?.$in) {
+        const filtered = employees.filter(e => e.personUuid !== undefined && q.personUuid!.$in!.includes(e.personUuid))
+        return Effect.succeed(filtered as unknown as FindResult<Doc>)
+      }
+      return Effect.succeed(employees as unknown as FindResult<Doc>)
+    }
+    if (_class === contact.class.SocialIdentity) {
+      const q = query as { _id?: { $in?: Array<PersonId> } }
+      if (q._id?.$in) {
+        const filtered = socialIdentities.filter(si => q._id!.$in!.includes(si._id))
+        return Effect.succeed(filtered as unknown as FindResult<Doc>)
+      }
+      return Effect.succeed(socialIdentities as unknown as FindResult<Doc>)
     }
     return Effect.succeed([] as unknown as FindResult<Doc>)
   }) as HulyClientOperations["findAll"]
@@ -380,14 +437,14 @@ describe("getChannel", () => {
       const channel = makeChannel({
         _id: "ch-1" as Ref<HulyChannel>,
         name: "team",
-        members: ["person-1" as Ref<Doc>, "person-2" as Ref<Doc>],
+        members: ["account-1" as AccountUuid, "account-2" as AccountUuid],
       })
-      const persons = [
-        makePerson({ _id: "person-1" as Ref<Person>, name: "Alice" }),
-        makePerson({ _id: "person-2" as Ref<Person>, name: "Bob" }),
+      const employees = [
+        makeEmployee({ _id: "emp-1" as Ref<HulyEmployee>, name: "Alice", personUuid: "account-1" as AccountUuid }),
+        makeEmployee({ _id: "emp-2" as Ref<HulyEmployee>, name: "Bob", personUuid: "account-2" as AccountUuid }),
       ]
 
-      const testLayer = createTestLayerWithMocks({ channels: [channel], persons })
+      const testLayer = createTestLayerWithMocks({ channels: [channel], employees })
 
       const result = yield* getChannel({ channel: "team" }).pipe(Effect.provide(testLayer))
 
@@ -620,19 +677,19 @@ describe("listDirectMessages", () => {
     Effect.gen(function* () {
       const dm = makeDirectMessage({
         _id: "dm-1" as Ref<DirectMessage>,
-        members: ["person-1" as Ref<Doc>, "person-2" as Ref<Doc>],
+        members: ["account-1" as AccountUuid, "account-2" as AccountUuid],
       })
-      const persons = [
-        makePerson({ _id: "person-1" as Ref<Person>, name: "Alice" }),
-        makePerson({ _id: "person-2" as Ref<Person>, name: "Bob" }),
+      const employees = [
+        makeEmployee({ _id: "emp-1" as Ref<HulyEmployee>, name: "Alice", personUuid: "account-1" as AccountUuid }),
+        makeEmployee({ _id: "emp-2" as Ref<HulyEmployee>, name: "Bob", personUuid: "account-2" as AccountUuid }),
       ]
 
-      const testLayer = createTestLayerWithMocks({ directMessages: [dm], persons })
+      const testLayer = createTestLayerWithMocks({ directMessages: [dm], employees })
 
       const result = yield* listDirectMessages({}).pipe(Effect.provide(testLayer))
 
       expect(result.conversations[0].participants).toEqual(["Alice", "Bob"])
-      expect(result.conversations[0].participantIds).toEqual(["person-1", "person-2"])
+      expect(result.conversations[0].participantIds).toEqual(["account-1", "account-2"])
     })
   )
 })
