@@ -605,6 +605,64 @@ describe("listChannelMessages", () => {
     })
   )
 
+  it.effect("resolves sender names via buildSocialIdToPersonNameMap", () =>
+    Effect.gen(function* () {
+      const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
+      const messages = [
+        makeChatMessage({
+          _id: "msg-1" as Ref<ChatMessage>,
+          space: "ch-1" as Ref<Space>,
+          modifiedBy: "social-alice" as PersonId,
+          createdOn: 1000,
+        }),
+        makeChatMessage({
+          _id: "msg-2" as Ref<ChatMessage>,
+          space: "ch-1" as Ref<Space>,
+          modifiedBy: "social-bob" as PersonId,
+          createdOn: 2000,
+        }),
+        makeChatMessage({
+          _id: "msg-3" as Ref<ChatMessage>,
+          space: "ch-1" as Ref<Space>,
+          modifiedBy: "social-unknown" as PersonId,
+          createdOn: 3000,
+        }),
+      ]
+      const persons = [
+        makePerson({ _id: "person-alice" as Ref<Person>, name: "Alice Smith" }),
+        makePerson({ _id: "person-bob" as Ref<Person>, name: "Bob Jones" }),
+      ]
+      const socialIdentities = [
+        makeSocialIdentity({
+          _id: "social-alice" as PersonId,
+          attachedTo: "person-alice" as Ref<Person>,
+        }),
+        makeSocialIdentity({
+          _id: "social-bob" as PersonId,
+          attachedTo: "person-bob" as Ref<Person>,
+        }),
+      ]
+
+      const testLayer = createTestLayerWithMocks({
+        channels: [channel],
+        messages,
+        persons,
+        socialIdentities,
+      })
+
+      const result = yield* listChannelMessages({ channel: "general" }).pipe(Effect.provide(testLayer))
+
+      expect(result.messages).toHaveLength(3)
+      // Messages sorted by createdOn descending: 3000, 2000, 1000
+      expect(result.messages[0].sender).toBeUndefined()
+      expect(result.messages[0].senderId).toBe("social-unknown")
+      expect(result.messages[1].sender).toBe("Bob Jones")
+      expect(result.messages[1].senderId).toBe("social-bob")
+      expect(result.messages[2].sender).toBe("Alice Smith")
+      expect(result.messages[2].senderId).toBe("social-alice")
+    })
+  )
+
   it.effect("returns ChannelNotFoundError when channel doesn't exist", () =>
     Effect.gen(function* () {
       const testLayer = createTestLayerWithMocks({ channels: [] })
