@@ -12,6 +12,7 @@ import {
   type Class,
   type Data,
   type Doc,
+  type DocumentQuery,
   type DocumentUpdate,
   generateId,
   type MarkupBlobRef,
@@ -202,7 +203,7 @@ export const listIssues = (
   Effect.gen(function*() {
     const { client, project, statuses } = yield* findProjectWithStatuses(params.project)
 
-    const query: Record<string, unknown> = {
+    const query: DocumentQuery<HulyIssue> = {
       space: project._id
     }
 
