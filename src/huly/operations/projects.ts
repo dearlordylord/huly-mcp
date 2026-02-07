@@ -11,6 +11,7 @@ import { type Project as HulyProject } from "@hcengineering/tracker"
 import { Effect } from "effect"
 
 import type { ListProjectsParams, ListProjectsResult, ProjectSummary } from "../../domain/schemas.js"
+import { ProjectIdentifier } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 
 // Import plugin objects at runtime (CommonJS modules)
@@ -46,7 +47,7 @@ export const listProjects = (
     const total = projects.total ?? projects.length
 
     const summaries: Array<ProjectSummary> = projects.map((project) => ({
-      identifier: project.identifier,
+      identifier: ProjectIdentifier.make(project.identifier),
       name: project.name,
       description: project.description || undefined,
       archived: project.archived

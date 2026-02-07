@@ -1,6 +1,16 @@
 import { Schema } from "effect"
 
-import { LimitParam, makeJsonSchema, NonEmptyString, Timestamp } from "./shared.js"
+import {
+  IssueIdentifier,
+  LimitParam,
+  makeJsonSchema,
+  MilestoneId,
+  MilestoneIdentifier,
+  MilestoneLabel,
+  NonEmptyString,
+  ProjectIdentifier,
+  Timestamp
+} from "./shared.js"
 
 export const MilestoneStatusValues = ["planned", "in-progress", "completed", "canceled"] as const
 
@@ -12,8 +22,8 @@ export const MilestoneStatusSchema = Schema.Literal(...MilestoneStatusValues).an
 export type MilestoneStatus = Schema.Schema.Type<typeof MilestoneStatusSchema>
 
 export const MilestoneSummarySchema = Schema.Struct({
-  id: NonEmptyString,
-  label: Schema.String,
+  id: MilestoneId,
+  label: MilestoneLabel,
   status: MilestoneStatusSchema,
   targetDate: Timestamp,
   modifiedOn: Schema.optional(Timestamp)
@@ -25,12 +35,12 @@ export const MilestoneSummarySchema = Schema.Struct({
 export type MilestoneSummary = Schema.Schema.Type<typeof MilestoneSummarySchema>
 
 export const MilestoneSchema = Schema.Struct({
-  id: NonEmptyString,
-  label: Schema.String,
+  id: MilestoneId,
+  label: MilestoneLabel,
   description: Schema.optional(Schema.String),
   status: MilestoneStatusSchema,
   targetDate: Timestamp,
-  project: NonEmptyString,
+  project: ProjectIdentifier,
   modifiedOn: Schema.optional(Timestamp),
   createdOn: Schema.optional(Timestamp)
 }).annotations({
@@ -41,7 +51,7 @@ export const MilestoneSchema = Schema.Struct({
 export type Milestone = Schema.Schema.Type<typeof MilestoneSchema>
 
 export const ListMilestonesParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
   limit: Schema.optional(
@@ -57,10 +67,10 @@ export const ListMilestonesParamsSchema = Schema.Struct({
 export type ListMilestonesParams = Schema.Schema.Type<typeof ListMilestonesParamsSchema>
 
 export const GetMilestoneParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  milestone: NonEmptyString.annotations({
+  milestone: MilestoneIdentifier.annotations({
     description: "Milestone ID or label"
   })
 }).annotations({
@@ -71,7 +81,7 @@ export const GetMilestoneParamsSchema = Schema.Struct({
 export type GetMilestoneParams = Schema.Schema.Type<typeof GetMilestoneParamsSchema>
 
 export const CreateMilestoneParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
   label: NonEmptyString.annotations({
@@ -91,10 +101,10 @@ export const CreateMilestoneParamsSchema = Schema.Struct({
 export type CreateMilestoneParams = Schema.Schema.Type<typeof CreateMilestoneParamsSchema>
 
 export const UpdateMilestoneParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  milestone: NonEmptyString.annotations({
+  milestone: MilestoneIdentifier.annotations({
     description: "Milestone ID or label"
   }),
   label: Schema.optional(NonEmptyString.annotations({
@@ -117,13 +127,13 @@ export const UpdateMilestoneParamsSchema = Schema.Struct({
 export type UpdateMilestoneParams = Schema.Schema.Type<typeof UpdateMilestoneParamsSchema>
 
 export const SetIssueMilestoneParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  identifier: NonEmptyString.annotations({
+  identifier: IssueIdentifier.annotations({
     description: "Issue identifier (e.g., 'HULY-123')"
   }),
-  milestone: Schema.NullOr(NonEmptyString).annotations({
+  milestone: Schema.NullOr(MilestoneIdentifier).annotations({
     description: "Milestone ID or label (null to clear)"
   })
 }).annotations({
@@ -134,10 +144,10 @@ export const SetIssueMilestoneParamsSchema = Schema.Struct({
 export type SetIssueMilestoneParams = Schema.Schema.Type<typeof SetIssueMilestoneParamsSchema>
 
 export const DeleteMilestoneParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  milestone: NonEmptyString.annotations({
+  milestone: MilestoneIdentifier.annotations({
     description: "Milestone ID or label"
   })
 }).annotations({

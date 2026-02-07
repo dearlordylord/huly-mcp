@@ -1,12 +1,12 @@
 import { Schema } from "effect"
 
-import { makeJsonSchema, NonEmptyString } from "./shared.js"
+import { BlobId, makeJsonSchema, MimeType, NonEmptyString } from "./shared.js"
 
 const UploadFileParamsBase = Schema.Struct({
   filename: NonEmptyString.annotations({
     description: "Name of the file (e.g., 'screenshot.png')"
   }),
-  contentType: NonEmptyString.annotations({
+  contentType: MimeType.annotations({
     description: "MIME type of the file (e.g., 'image/png', 'application/pdf')"
   }),
   filePath: Schema.optional(Schema.String.annotations({
@@ -34,7 +34,7 @@ export const UploadFileParamsSchema = UploadFileParamsBase.pipe(
 export type UploadFileParams = Schema.Schema.Type<typeof UploadFileParamsSchema>
 
 export const UploadFileResultSchema = Schema.Struct({
-  blobId: NonEmptyString.annotations({
+  blobId: BlobId.annotations({
     description: "The blob ID for referencing the uploaded file"
   }),
   contentType: Schema.String.annotations({

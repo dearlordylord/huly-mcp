@@ -31,8 +31,10 @@ import type {
   TeamspaceSummary,
   UpdateDocumentParams
 } from "../../domain/schemas.js"
+import { DocumentId, TeamspaceId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js"
+import { toRef } from "./shared.js"
 
 // Import plugin objects at runtime (CommonJS modules)
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
@@ -88,7 +90,7 @@ const findTeamspace = (
     if (teamspace === undefined) {
       teamspace = yield* client.findOne<HulyTeamspace>(
         documentPlugin.class.Teamspace,
-        { _id: identifier as Ref<HulyTeamspace> }
+        { _id: toRef<HulyTeamspace>(identifier) }
       )
     }
 
@@ -127,7 +129,7 @@ const findTeamspaceAndDocument = (
         documentPlugin.class.Document,
         {
           space: teamspace._id,
-          _id: params.document as Ref<HulyDocument>
+          _id: toRef<HulyDocument>(params.document)
         }
       )
     }
@@ -175,7 +177,7 @@ export const listTeamspaces = (
     const total = teamspaces.total ?? teamspaces.length
 
     const summaries: Array<TeamspaceSummary> = teamspaces.map((ts) => ({
-      id: String(ts._id),
+      id: TeamspaceId.make(ts._id),
       name: ts.name,
       description: ts.description || undefined,
       archived: ts.archived,
@@ -230,7 +232,7 @@ export const listDocuments = (
     const total = documents.total ?? documents.length
 
     const summaries: Array<DocumentSummary> = documents.map((doc) => ({
-      id: String(doc._id),
+      id: DocumentId.make(doc._id),
       title: doc.title,
       teamspace: teamspace.name,
       modifiedOn: doc.modifiedOn
@@ -271,7 +273,7 @@ export const getDocument = (
     }
 
     const result: Document = {
-      id: String(doc._id),
+      id: DocumentId.make(doc._id),
       title: doc.title,
       content,
       teamspace: teamspace.name,
@@ -344,7 +346,7 @@ export const createDocument = (
       documentId
     )
 
-    return { id: String(documentId), title: params.title }
+    return { id: documentId, title: params.title }
   })
 
 // --- Update Document Operation ---
@@ -409,7 +411,7 @@ export const updateDocument = (
     }
 
     if (Object.keys(updateOps).length === 0 && !contentUpdatedInPlace) {
-      return { id: String(doc._id), updated: false }
+      return { id: doc._id, updated: false }
     }
 
     if (Object.keys(updateOps).length > 0) {
@@ -421,7 +423,7 @@ export const updateDocument = (
       )
     }
 
-    return { id: String(doc._id), updated: true }
+    return { id: doc._id, updated: true }
   })
 
 // --- Delete Document Operation ---
@@ -456,5 +458,5 @@ export const deleteDocument = (
       doc._id
     )
 
-    return { id: String(doc._id), deleted: true }
+    return { id: doc._id, deleted: true }
   })

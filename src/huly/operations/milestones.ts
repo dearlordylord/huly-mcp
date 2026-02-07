@@ -18,10 +18,11 @@ import type {
   SetIssueMilestoneParams,
   UpdateMilestoneParams
 } from "../../domain/schemas.js"
+import { MilestoneId, MilestoneLabel } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { ProjectNotFoundError } from "../errors.js"
 import { IssueNotFoundError, MilestoneNotFoundError } from "../errors.js"
-import { findProject, parseIssueIdentifier } from "./shared.js"
+import { findProject, parseIssueIdentifier, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
@@ -101,7 +102,7 @@ const findProjectAndMilestone = (
       tracker.class.Milestone,
       {
         space: project._id,
-        _id: params.milestone as Ref<HulyMilestone>
+        _id: toRef<HulyMilestone>(params.milestone)
       }
     )
 
@@ -143,8 +144,8 @@ export const listMilestones = (
     )
 
     const summaries: Array<MilestoneSummary> = milestones.map(m => ({
-      id: String(m._id),
-      label: m.label,
+      id: MilestoneId.make(m._id),
+      label: MilestoneLabel.make(m.label),
       status: milestoneStatusToString(m.status),
       targetDate: m.targetDate,
       modifiedOn: m.modifiedOn
@@ -160,8 +161,8 @@ export const getMilestone = (
     const { milestone } = yield* findProjectAndMilestone(params)
 
     const result: Milestone = {
-      id: String(milestone._id),
-      label: milestone.label,
+      id: MilestoneId.make(milestone._id),
+      label: MilestoneLabel.make(milestone.label),
       description: milestone.description,
       status: milestoneStatusToString(milestone.status),
       targetDate: milestone.targetDate,
@@ -201,7 +202,7 @@ export const createMilestone = (
       milestoneId
     )
 
-    return { id: String(milestoneId), label: params.label }
+    return { id: milestoneId, label: params.label }
   })
 
 export interface UpdateMilestoneResult {
@@ -234,7 +235,7 @@ export const updateMilestone = (
     }
 
     if (Object.keys(updateOps).length === 0) {
-      return { id: String(milestone._id), updated: false }
+      return { id: milestone._id, updated: false }
     }
 
     yield* client.updateDoc(
@@ -244,7 +245,7 @@ export const updateMilestone = (
       updateOps
     )
 
-    return { id: String(milestone._id), updated: true }
+    return { id: milestone._id, updated: true }
   })
 
 export interface SetIssueMilestoneResult {
@@ -293,7 +294,7 @@ export const setIssueMilestone = (
         tracker.class.Milestone,
         {
           space: project._id,
-          _id: params.milestone as Ref<HulyMilestone>
+          _id: toRef<HulyMilestone>(params.milestone)
         }
       )
 
@@ -344,5 +345,5 @@ export const deleteMilestone = (
       milestone._id
     )
 
-    return { id: String(milestone._id), deleted: true }
+    return { id: milestone._id, deleted: true }
   })

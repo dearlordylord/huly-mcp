@@ -1,15 +1,25 @@
 import { Schema } from "effect"
 
-import { LimitParam, makeJsonSchema, NonEmptyString, Timestamp } from "./shared.js"
+import {
+  LimitParam,
+  makeJsonSchema,
+  NonEmptyString,
+  NotificationContextId,
+  NotificationId,
+  NotificationProviderId,
+  NotificationTypeId,
+  ObjectClassName,
+  Timestamp
+} from "./shared.js"
 
 // --- Notification Summary (for list operations) ---
 
 export const NotificationSummarySchema = Schema.Struct({
-  id: NonEmptyString,
+  id: NotificationId,
   isViewed: Schema.Boolean,
   archived: Schema.Boolean,
   objectId: Schema.optional(NonEmptyString),
-  objectClass: Schema.optional(NonEmptyString),
+  objectClass: Schema.optional(ObjectClassName),
   title: Schema.optional(Schema.String),
   body: Schema.optional(Schema.String),
   createdOn: Schema.optional(Timestamp),
@@ -24,12 +34,12 @@ export type NotificationSummary = Schema.Schema.Type<typeof NotificationSummaryS
 // --- Full Notification ---
 
 export const NotificationSchema = Schema.Struct({
-  id: NonEmptyString,
+  id: NotificationId,
   isViewed: Schema.Boolean,
   archived: Schema.Boolean,
   objectId: Schema.optional(NonEmptyString),
-  objectClass: Schema.optional(NonEmptyString),
-  docNotifyContextId: Schema.optional(NonEmptyString),
+  objectClass: Schema.optional(ObjectClassName),
+  docNotifyContextId: Schema.optional(NotificationContextId),
   title: Schema.optional(Schema.String),
   body: Schema.optional(Schema.String),
   data: Schema.optional(Schema.String),
@@ -45,9 +55,9 @@ export type Notification = Schema.Schema.Type<typeof NotificationSchema>
 // --- Doc Notify Context Summary ---
 
 export const DocNotifyContextSummarySchema = Schema.Struct({
-  id: NonEmptyString,
+  id: NotificationContextId,
   objectId: NonEmptyString,
-  objectClass: NonEmptyString,
+  objectClass: ObjectClassName,
   isPinned: Schema.Boolean,
   hidden: Schema.Boolean,
   lastViewedTimestamp: Schema.optional(Timestamp),
@@ -63,7 +73,7 @@ export type DocNotifyContextSummary = Schema.Schema.Type<typeof DocNotifyContext
 
 export const NotificationProviderSettingSchema = Schema.Struct({
   id: NonEmptyString,
-  providerId: NonEmptyString,
+  providerId: NotificationProviderId,
   enabled: Schema.Boolean
 }).annotations({
   title: "NotificationProviderSetting",
@@ -76,8 +86,8 @@ export type NotificationProviderSetting = Schema.Schema.Type<typeof Notification
 
 export const NotificationTypeSettingSchema = Schema.Struct({
   id: NonEmptyString,
-  providerId: NonEmptyString,
-  typeId: NonEmptyString,
+  providerId: NotificationProviderId,
+  typeId: NotificationTypeId,
   enabled: Schema.Boolean
 }).annotations({
   title: "NotificationTypeSetting",
@@ -114,7 +124,7 @@ export type ListNotificationsParams = Schema.Schema.Type<typeof ListNotification
 // --- Get Notification Params ---
 
 export const GetNotificationParamsSchema = Schema.Struct({
-  notificationId: NonEmptyString.annotations({
+  notificationId: NotificationId.annotations({
     description: "Notification ID"
   })
 }).annotations({
@@ -127,7 +137,7 @@ export type GetNotificationParams = Schema.Schema.Type<typeof GetNotificationPar
 // --- Mark Notification Read Params ---
 
 export const MarkNotificationReadParamsSchema = Schema.Struct({
-  notificationId: NonEmptyString.annotations({
+  notificationId: NotificationId.annotations({
     description: "Notification ID to mark as read"
   })
 }).annotations({
@@ -140,7 +150,7 @@ export type MarkNotificationReadParams = Schema.Schema.Type<typeof MarkNotificat
 // --- Archive Notification Params ---
 
 export const ArchiveNotificationParamsSchema = Schema.Struct({
-  notificationId: NonEmptyString.annotations({
+  notificationId: NotificationId.annotations({
     description: "Notification ID to archive"
   })
 }).annotations({
@@ -153,7 +163,7 @@ export type ArchiveNotificationParams = Schema.Schema.Type<typeof ArchiveNotific
 // --- Delete Notification Params ---
 
 export const DeleteNotificationParamsSchema = Schema.Struct({
-  notificationId: NonEmptyString.annotations({
+  notificationId: NotificationId.annotations({
     description: "Notification ID to delete"
   })
 }).annotations({
@@ -169,7 +179,7 @@ export const GetNotificationContextParamsSchema = Schema.Struct({
   objectId: NonEmptyString.annotations({
     description: "Object ID to get notification context for"
   }),
-  objectClass: NonEmptyString.annotations({
+  objectClass: ObjectClassName.annotations({
     description: "Object class name (e.g., 'tracker.class.Issue')"
   })
 }).annotations({
@@ -202,7 +212,7 @@ export type ListNotificationContextsParams = Schema.Schema.Type<typeof ListNotif
 // --- Pin/Unpin Context Params ---
 
 export const PinNotificationContextParamsSchema = Schema.Struct({
-  contextId: NonEmptyString.annotations({
+  contextId: NotificationContextId.annotations({
     description: "Notification context ID to pin/unpin"
   }),
   pinned: Schema.Boolean.annotations({
@@ -233,7 +243,7 @@ export type ListNotificationSettingsParams = Schema.Schema.Type<typeof ListNotif
 // --- Update Notification Provider Setting Params ---
 
 export const UpdateNotificationProviderSettingParamsSchema = Schema.Struct({
-  providerId: NonEmptyString.annotations({
+  providerId: NotificationProviderId.annotations({
     description: "Notification provider ID"
   }),
   enabled: Schema.Boolean.annotations({

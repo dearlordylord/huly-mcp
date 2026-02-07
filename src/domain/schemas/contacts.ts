@@ -1,12 +1,23 @@
 import { Schema } from "effect"
 
-import { LimitParam, makeJsonSchema, NonEmptyString, Timestamp } from "./shared.js"
+import {
+  ContactProvider,
+  Email,
+  LimitParam,
+  makeJsonSchema,
+  MemberReference,
+  NonEmptyString,
+  OrganizationId,
+  PersonId,
+  PersonName,
+  Timestamp
+} from "./shared.js"
 
 export const PersonSummarySchema = Schema.Struct({
-  id: NonEmptyString,
-  name: Schema.String,
+  id: PersonId,
+  name: PersonName,
   city: Schema.optional(Schema.String),
-  email: Schema.optional(Schema.String),
+  email: Schema.optional(Email),
   modifiedOn: Schema.optional(Timestamp)
 }).annotations({
   title: "PersonSummary",
@@ -16,14 +27,14 @@ export const PersonSummarySchema = Schema.Struct({
 export type PersonSummary = Schema.Schema.Type<typeof PersonSummarySchema>
 
 export const PersonSchema = Schema.Struct({
-  id: NonEmptyString,
-  name: Schema.String,
+  id: PersonId,
+  name: PersonName,
   firstName: Schema.optional(Schema.String),
   lastName: Schema.optional(Schema.String),
   city: Schema.optional(Schema.String),
-  email: Schema.optional(Schema.String),
+  email: Schema.optional(Email),
   channels: Schema.optional(Schema.Array(Schema.Struct({
-    provider: Schema.String,
+    provider: ContactProvider,
     value: Schema.String
   }))),
   modifiedOn: Schema.optional(Timestamp),
@@ -36,9 +47,9 @@ export const PersonSchema = Schema.Struct({
 export type Person = Schema.Schema.Type<typeof PersonSchema>
 
 export const EmployeeSummarySchema = Schema.Struct({
-  id: NonEmptyString,
-  name: Schema.String,
-  email: Schema.optional(Schema.String),
+  id: PersonId,
+  name: PersonName,
+  email: Schema.optional(Email),
   position: Schema.optional(Schema.String),
   active: Schema.Boolean,
   modifiedOn: Schema.optional(Timestamp)
@@ -50,7 +61,7 @@ export const EmployeeSummarySchema = Schema.Struct({
 export type EmployeeSummary = Schema.Schema.Type<typeof EmployeeSummarySchema>
 
 export const OrganizationSummarySchema = Schema.Struct({
-  id: NonEmptyString,
+  id: OrganizationId,
   name: Schema.String,
   city: Schema.optional(Schema.String),
   members: Schema.Number,
@@ -83,10 +94,10 @@ export type ListPersonsParams = Schema.Schema.Type<typeof ListPersonsParamsSchem
 
 // TODO better typing (and usage)
 export const GetPersonParamsSchema = Schema.Struct({
-  personId: Schema.optional(NonEmptyString.annotations({
+  personId: Schema.optional(PersonId.annotations({
     description: "Person ID"
   })),
-  email: Schema.optional(Schema.String.annotations({
+  email: Schema.optional(Email.annotations({
     description: "Person email address"
   }))
 }).pipe(
@@ -110,7 +121,7 @@ export const CreatePersonParamsSchema = Schema.Struct({
   lastName: NonEmptyString.annotations({
     description: "Last name"
   }),
-  email: Schema.optional(Schema.String.annotations({
+  email: Schema.optional(Email.annotations({
     description: "Email address"
   })),
   city: Schema.optional(Schema.String.annotations({
@@ -124,7 +135,7 @@ export const CreatePersonParamsSchema = Schema.Struct({
 export type CreatePersonParams = Schema.Schema.Type<typeof CreatePersonParamsSchema>
 
 export const UpdatePersonParamsSchema = Schema.Struct({
-  personId: NonEmptyString.annotations({
+  personId: PersonId.annotations({
     description: "Person ID"
   }),
   firstName: Schema.optional(NonEmptyString.annotations({
@@ -146,7 +157,7 @@ export const UpdatePersonParamsSchema = Schema.Struct({
 export type UpdatePersonParams = Schema.Schema.Type<typeof UpdatePersonParamsSchema>
 
 export const DeletePersonParamsSchema = Schema.Struct({
-  personId: NonEmptyString.annotations({
+  personId: PersonId.annotations({
     description: "Person ID"
   })
 }).annotations({
@@ -187,7 +198,7 @@ export const CreateOrganizationParamsSchema = Schema.Struct({
     description: "Organization name"
   }),
   members: Schema.optional(
-    Schema.Array(Schema.String).annotations({
+    Schema.Array(MemberReference).annotations({
       description: "Member person IDs or emails"
     })
   )

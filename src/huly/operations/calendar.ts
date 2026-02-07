@@ -38,8 +38,10 @@ import type {
   UpdateEventParams,
   Visibility
 } from "../../domain/schemas/calendar.js"
+import { Email, EventId, PersonId, PersonName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { EventNotFoundError, RecurringEventNotFoundError } from "../errors.js"
+import { toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const calendar = require("@hcengineering/calendar").default as typeof import("@hcengineering/calendar").default
@@ -59,10 +61,23 @@ export type ListRecurringEventsError = HulyClientError
 export type CreateRecurringEventError = HulyClientError
 export type ListEventInstancesError = HulyClientError | RecurringEventNotFoundError
 
-// --- Helpers ---
+// --- SDK Type Bridges ---
 
-const ONE_HOUR_MS = 60 * 60 * 1000
+// SDK: HulyEvent["description"] is a complex union; fetchMarkup expects MarkupBlobRef.
+const descriptionAsMarkupRef = (desc: HulyEvent["description"]): MarkupBlobRef => desc as MarkupBlobRef
 
+// SDK: uploadMarkup returns MarkupBlobRef but Event.description expects a different union.
+const markupRefAsDescription = (
+  ref: MarkupBlobRef | null
+): HulyEvent["description"] => ref as unknown as HulyEvent["description"]
+
+// SDK: clearing description requires empty string but type doesn't allow it.
+const emptyEventDescription = "" as unknown as HulyEvent["description"]
+
+// SDK: Data<Event> requires 'user' but server populates from auth context.
+const serverPopulatedUser: HulyEvent["user"] = "" as HulyEvent["user"]
+
+// SDK: Visibility and HulyVisibility are identical string enums; cast bridges the two.
 const visibilityToString = (v: HulyVisibility | undefined): Visibility | undefined => {
   if (v === undefined) return undefined
   return v as Visibility
@@ -72,6 +87,10 @@ const stringToVisibility = (v: Visibility | undefined): HulyVisibility | undefin
   if (v === undefined) return undefined
   return v as HulyVisibility
 }
+
+// --- Helpers ---
+
+const ONE_HOUR_MS = 60 * 60 * 1000
 
 const hulyRuleToRule = (rule: HulyRecurringRule): RecurringRule => ({
   freq: rule.freq,
@@ -111,10 +130,10 @@ const findPersonsByEmails = (
 
     const allChannels = yield* client.findAll<Channel>(
       contact.class.Channel,
-      { value: { $in: emails as Array<string> } }
+      { value: { $in: [...emails] } }
     )
 
-    const personIds = [...new Set(allChannels.map(c => c.attachedTo as Ref<Person>))]
+    const personIds = [...new Set(allChannels.map(c => toRef<Person>(c.attachedTo)))]
     if (personIds.length === 0) return []
 
     const persons = yield* client.findAll<Person>(
@@ -142,12 +161,12 @@ const buildParticipants = (
 
     const persons = yield* client.findAll<Person>(
       contact.class.Person,
-      { _id: { $in: participantRefs as Array<Ref<Person>> } }
+      { _id: { $in: participantRefs.map(r => toRef<Person>(r)) } }
     )
 
     return persons.map(p => ({
-      id: String(p._id),
-      name: p.name
+      id: PersonId.make(p._id),
+      name: PersonName.make(p.name)
     }))
   })
 
@@ -181,7 +200,7 @@ export const listEvents = (
     )
 
     const summaries: Array<EventSummary> = events.map(event => ({
-      eventId: event.eventId,
+      eventId: EventId.make(event.eventId),
       title: event.title,
       date: event.date,
       dueDate: event.dueDate,
@@ -216,13 +235,13 @@ export const getEvent = (
         calendar.class.Event,
         event._id,
         "description",
-        event.description as MarkupBlobRef,
+        descriptionAsMarkupRef(event.description),
         "markdown"
       )
     }
 
     const result: Event = {
-      eventId: event.eventId,
+      eventId: EventId.make(event.eventId),
       title: event.title,
       description,
       date: event.date,
@@ -231,8 +250,8 @@ export const getEvent = (
       location: event.location,
       visibility: visibilityToString(event.visibility),
       participants,
-      externalParticipants: event.externalParticipants,
-      calendarId: event.calendar ? String(event.calendar) : undefined,
+      externalParticipants: (event.externalParticipants || []).map(p => Email.make(p)),
+      calendarId: event.calendar ? event.calendar : undefined,
       modifiedOn: event.modifiedOn,
       createdOn: event.createdOn
     }
@@ -252,7 +271,7 @@ export const createEvent = (
 
     const cal = yield* getDefaultCalendar(client)
     // Huly API: empty string as calendar ref when no calendar found
-    const calendarRef = cal?._id ?? ("" as Ref<HulyCalendar>)
+    const calendarRef = cal?._id ?? toRef<HulyCalendar>("")
 
     const eventId = generateEventId()
     const dueDate = params.dueDate ?? (params.date + ONE_HOUR_MS)
@@ -260,14 +279,14 @@ export const createEvent = (
     let participantRefs: Array<Ref<Contact>> = []
     if (params.participants && params.participants.length > 0) {
       const persons = yield* findPersonsByEmails(client, params.participants)
-      participantRefs = persons.map(p => p._id as unknown as Ref<Contact>)
+      participantRefs = persons.map(p => toRef<Contact>(p._id))
     }
 
     let descriptionRef: MarkupBlobRef | null = null
     if (params.description && params.description.trim() !== "") {
       descriptionRef = yield* client.uploadMarkup(
         calendar.class.Event,
-        eventId as unknown as Ref<Doc>,
+        toRef<Doc>(eventId),
         "description",
         params.description,
         "markdown"
@@ -277,7 +296,7 @@ export const createEvent = (
     const eventData: AttachedData<HulyEvent> = {
       eventId,
       title: params.title,
-      description: descriptionRef as unknown as HulyEvent["description"],
+      description: markupRefAsDescription(descriptionRef),
       date: params.date,
       dueDate,
       allDay: params.allDay ?? false,
@@ -285,8 +304,7 @@ export const createEvent = (
       participants: participantRefs,
       externalParticipants: [],
       access: AccessLevel.Owner,
-      // Huly API: empty string for user field (server populates from auth)
-      user: "" as HulyEvent["user"],
+      user: serverPopulatedUser,
       blockTime: false
     }
 
@@ -303,9 +321,9 @@ export const createEvent = (
 
     yield* client.addCollection(
       calendar.class.Event,
-      calendar.space.Calendar as Ref<Space>,
-      calendar.space.Calendar as unknown as Ref<Doc>,
-      core.class.Space as Ref<Class<Doc>>,
+      toRef<Space>(calendar.space.Calendar),
+      toRef<Doc>(calendar.space.Calendar),
+      toRef<Class<Doc>>(core.class.Space),
       "events",
       eventData
     )
@@ -342,7 +360,7 @@ export const updateEvent = (
 
     if (params.description !== undefined) {
       if (params.description.trim() === "") {
-        updateOps.description = "" as unknown as HulyEvent["description"]
+        updateOps.description = emptyEventDescription
       } else if (event.description) {
         yield* client.updateMarkup(
           calendar.class.Event,
@@ -360,7 +378,7 @@ export const updateEvent = (
           params.description,
           "markdown"
         )
-        updateOps.description = descriptionRef as unknown as HulyEvent["description"]
+        updateOps.description = markupRefAsDescription(descriptionRef)
       }
     }
 
@@ -450,7 +468,7 @@ export const listRecurringEvents = (
     )
 
     const summaries: Array<RecurringEventSummary> = events.map(event => ({
-      eventId: event.eventId,
+      eventId: EventId.make(event.eventId),
       title: event.title,
       originalStartTime: event.originalStartTime,
       rules: event.rules.map(hulyRuleToRule),
@@ -473,7 +491,7 @@ export const createRecurringEvent = (
 
     const cal = yield* getDefaultCalendar(client)
     // Huly API: empty string as calendar ref when no calendar found
-    const calendarRef = cal?._id ?? ("" as Ref<HulyCalendar>)
+    const calendarRef = cal?._id ?? toRef<HulyCalendar>("")
 
     const eventId = generateEventId()
     const dueDate = params.dueDate ?? (params.startDate + ONE_HOUR_MS)
@@ -481,14 +499,14 @@ export const createRecurringEvent = (
     let participantRefs: Array<Ref<Contact>> = []
     if (params.participants && params.participants.length > 0) {
       const persons = yield* findPersonsByEmails(client, params.participants)
-      participantRefs = persons.map(p => p._id as unknown as Ref<Contact>)
+      participantRefs = persons.map(p => toRef<Contact>(p._id))
     }
 
     let descriptionRef: MarkupBlobRef | null = null
     if (params.description && params.description.trim() !== "") {
       descriptionRef = yield* client.uploadMarkup(
         calendar.class.ReccuringEvent,
-        eventId as unknown as Ref<Doc>,
+        toRef<Doc>(eventId),
         "description",
         params.description,
         "markdown"
@@ -500,7 +518,7 @@ export const createRecurringEvent = (
     const eventData: AttachedData<HulyRecurringEvent> = {
       eventId,
       title: params.title,
-      description: descriptionRef as unknown as HulyRecurringEvent["description"],
+      description: markupRefAsDescription(descriptionRef),
       date: params.startDate,
       dueDate,
       allDay: params.allDay ?? false,
@@ -508,8 +526,7 @@ export const createRecurringEvent = (
       participants: participantRefs,
       externalParticipants: [],
       access: AccessLevel.Owner,
-      // Huly API: empty string for user field (server populates from auth)
-      user: "" as HulyRecurringEvent["user"],
+      user: serverPopulatedUser,
       blockTime: false,
       rules: hulyRules,
       exdate: [],
@@ -531,9 +548,9 @@ export const createRecurringEvent = (
 
     yield* client.addCollection(
       calendar.class.ReccuringEvent,
-      calendar.space.Calendar as Ref<Space>,
-      calendar.space.Calendar as unknown as Ref<Doc>,
-      core.class.Space as Ref<Class<Doc>>,
+      toRef<Space>(calendar.space.Calendar),
+      toRef<Doc>(calendar.space.Calendar),
+      toRef<Class<Doc>>(core.class.Space),
       "events",
       eventData
     )
@@ -587,7 +604,7 @@ export const listEventInstances = (
         const participantById = new Map(participants.map(p => [p.id, p]))
         for (const instance of instances) {
           const instanceParticipants = instance.participants
-            .map(ref => participantById.get(String(ref)))
+            .map(ref => participantById.get(PersonId.make(ref)))
             .filter((p): p is Participant => p !== undefined)
           participantMap.set(instance.eventId, instanceParticipants)
         }
@@ -599,8 +616,8 @@ export const listEventInstances = (
     }
 
     const results: Array<EventInstance> = instances.map(instance => ({
-      eventId: instance.eventId,
-      recurringEventId: instance.recurringEventId,
+      eventId: EventId.make(instance.eventId),
+      recurringEventId: EventId.make(instance.recurringEventId),
       title: instance.title,
       date: instance.date,
       dueDate: instance.dueDate,
@@ -612,6 +629,8 @@ export const listEventInstances = (
       isVirtual: instance.virtual,
       participants: params.includeParticipants ? (participantMap.get(instance.eventId) ?? []) : undefined,
       externalParticipants: instance.externalParticipants
+        ? instance.externalParticipants.map(p => Email.make(p))
+        : undefined
     }))
 
     return results

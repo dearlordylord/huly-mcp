@@ -1,9 +1,10 @@
-import { AccessLevel } from "@hcengineering/calendar"
+import { AccessLevel, type Calendar as HulyCalendar } from "@hcengineering/calendar"
 import type { Channel, Person } from "@hcengineering/contact"
 import {
   type AttachedData,
   type DocumentUpdate,
   generateId,
+  type PersonId as CorePersonId,
   type Ref,
   SortingOrder,
   type WithLookup
@@ -29,12 +30,13 @@ import type {
   TimeSpendReport,
   WorkSlot
 } from "../../domain/schemas.js"
+import { IssueIdentifier, PersonName, TimeSpendReportId, TodoId } from "../../domain/schemas/shared.js"
 import { isExistent } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { IssueNotFoundError } from "../errors.js"
 import { ProjectNotFoundError } from "../errors.js"
 import { withLookup } from "./query-helpers.js"
-import { findProject, findProjectAndIssue } from "./shared.js"
+import { findProject, findProjectAndIssue, toRef, zeroAsUnset } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
@@ -42,6 +44,10 @@ const tracker = require("@hcengineering/tracker").default as typeof import("@hce
 const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const time = require("@hcengineering/time").default as typeof import("@hcengineering/time").default
+
+// SDK: Data<WorkSlot> requires calendar/user but server populates from auth context.
+const serverPopulatedCalendar = toRef<HulyCalendar>("")
+const serverPopulatedPersonId: CorePersonId = "" as CorePersonId
 
 export type LogTimeError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
 export type GetTimeReportError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
@@ -101,7 +107,7 @@ export const logTime = (
       updateOps
     )
 
-    return { reportId: String(reportId), identifier: issue.identifier }
+    return { reportId, identifier: IssueIdentifier.make(issue.identifier) }
   })
 
 export const getTimeReport = (
@@ -132,22 +138,24 @@ export const getTimeReport = (
       )
       : []
 
-    const personMap = new Map(persons.map(p => [String(p._id), p.name]))
+    const personMap = new Map(persons.map(p => [p._id, p.name]))
 
     const timeReports: Array<TimeSpendReport> = reports.map(r => ({
-      id: String(r._id),
-      identifier: issue.identifier,
-      employee: r.employee ? personMap.get(String(r.employee)) : undefined,
+      id: TimeSpendReportId.make(r._id),
+      identifier: IssueIdentifier.make(issue.identifier),
+      employee: r.employee && personMap.has(r.employee)
+        ? PersonName.make(personMap.get(r.employee)!)
+        : undefined,
       date: r.date,
       value: r.value,
       description: r.description
     }))
 
     return {
-      identifier: issue.identifier,
+      identifier: IssueIdentifier.make(issue.identifier),
       totalTime: issue.reportedTime,
-      estimation: issue.estimation > 0 ? issue.estimation : undefined,
-      remainingTime: issue.remainingTime > 0 ? issue.remainingTime : undefined,
+      estimation: zeroAsUnset(issue.estimation),
+      remainingTime: zeroAsUnset(issue.remainingTime),
       reports: timeReports
     }
   })
@@ -200,9 +208,9 @@ export const listTimeSpendReports = (
     )
 
     return reports.map(r => ({
-      id: String(r._id),
-      identifier: r.$lookup?.attachedTo?.identifier ?? "Unknown",
-      employee: r.$lookup?.employee?.name,
+      id: TimeSpendReportId.make(r._id),
+      identifier: IssueIdentifier.make(r.$lookup?.attachedTo?.identifier ?? "Unknown"),
+      employee: r.$lookup?.employee?.name !== undefined ? PersonName.make(r.$lookup.employee.name) : undefined,
       date: r.date,
       value: r.value,
       description: r.description
@@ -244,7 +252,7 @@ export const getDetailedTimeReport = (
     )
 
     const byIssueMap = new Map<string, {
-      identifier: string
+      identifier: IssueIdentifier
       issueTitle: string
       totalTime: number
       reports: Array<TimeSpendReport>
@@ -257,26 +265,26 @@ export const getDetailedTimeReport = (
     for (const r of reports) {
       totalTime += r.value
 
-      const issueKey = String(r.attachedTo)
+      const issueKey = r.attachedTo
       const issue = r.$lookup?.attachedTo
       const existing = byIssueMap.get(issueKey) ?? {
-        identifier: issue?.identifier ?? "Unknown",
+        identifier: IssueIdentifier.make(issue?.identifier ?? "Unknown"),
         issueTitle: issue?.title ?? "Unknown",
         totalTime: 0,
         reports: []
       }
       existing.totalTime += r.value
       existing.reports.push({
-        id: String(r._id),
-        identifier: issue?.identifier ?? "Unknown",
-        employee: r.$lookup?.employee?.name,
+        id: TimeSpendReportId.make(r._id),
+        identifier: IssueIdentifier.make(issue?.identifier ?? "Unknown"),
+        employee: r.$lookup?.employee?.name !== undefined ? PersonName.make(r.$lookup.employee.name) : undefined,
         date: r.date,
         value: r.value,
         description: r.description
       })
       byIssueMap.set(issueKey, existing)
 
-      const empKey = r.employee ? String(r.employee) : "__unassigned__"
+      const empKey = r.employee ? r.employee : "__unassigned__"
       const empExisting = byEmployeeMap.get(empKey) ?? {
         employeeName: r.$lookup?.employee?.name,
         totalTime: 0
@@ -302,10 +310,9 @@ export const listWorkSlots = (
     const query: Record<string, unknown> = {}
 
     if (params.employeeId !== undefined) {
-      // Huly API: Person._id is a branded string, cast required from user input
       const person = yield* client.findOne<Person>(
         contact.class.Person,
-        { _id: params.employeeId as Ref<Person> }
+        { _id: toRef<Person>(params.employeeId) }
       )
       if (person === undefined) {
         const channels = yield* client.findAll<Channel>(
@@ -341,8 +348,8 @@ export const listWorkSlots = (
     )
 
     return slots.map(s => ({
-      id: String(s._id),
-      todoId: String(s.attachedTo),
+      id: s._id,
+      todoId: TodoId.make(s.attachedTo),
       date: s.date,
       dueDate: s.dueDate,
       title: s.title
@@ -380,25 +387,22 @@ export const createWorkSlot = (
       reminders: [],
       visibility: "public" as const,
       eventId: "",
-      /* eslint-disable @typescript-eslint/consistent-type-imports -- inline type cast */
-      calendar: "" as Ref<import("@hcengineering/calendar").Calendar>,
-      user: "" as import("@hcengineering/core").PersonId,
-      /* eslint-enable @typescript-eslint/consistent-type-imports */
+      calendar: serverPopulatedCalendar,
+      user: serverPopulatedPersonId,
       blockTime: false
     }
 
-    // Huly API: todoId is a branded Ref string, cast required from user input
     yield* client.addCollection(
       time.class.WorkSlot,
       time.space.ToDos,
-      params.todoId as Ref<HulyToDo>,
+      toRef<HulyToDo>(params.todoId),
       time.class.ToDo,
       "workslots",
       slotData,
       slotId
     )
 
-    return { slotId: String(slotId) }
+    return { slotId }
   })
 
 export interface StartTimerResult {

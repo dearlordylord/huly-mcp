@@ -1,6 +1,23 @@
 import { Schema } from "effect"
 
-import { LimitParam, makeJsonSchema, NonEmptyString, Timestamp } from "./shared.js"
+import {
+  ColorCode,
+  ComponentId,
+  ComponentIdentifier,
+  ComponentLabel,
+  Email,
+  IssueIdentifier,
+  IssueTemplateId,
+  LimitParam,
+  makeJsonSchema,
+  NonEmptyString,
+  PersonId,
+  PersonName,
+  ProjectIdentifier,
+  StatusName,
+  TemplateIdentifier,
+  Timestamp
+} from "./shared.js"
 
 export const IssuePriorityValues = ["urgent", "high", "medium", "low", "no-priority"] as const
 
@@ -13,7 +30,7 @@ export type IssuePriority = Schema.Schema.Type<typeof IssuePrioritySchema>
 
 export const LabelSchema = Schema.Struct({
   title: NonEmptyString,
-  color: Schema.optional(Schema.Number)
+  color: Schema.optional(ColorCode)
 }).annotations({
   title: "Label",
   description: "Issue label/tag"
@@ -22,9 +39,9 @@ export const LabelSchema = Schema.Struct({
 export type Label = Schema.Schema.Type<typeof LabelSchema>
 
 export const PersonRefSchema = Schema.Struct({
-  id: NonEmptyString,
-  name: Schema.optional(Schema.String),
-  email: Schema.optional(Schema.String)
+  id: PersonId,
+  name: Schema.optional(PersonName),
+  email: Schema.optional(Email)
 }).annotations({
   title: "PersonRef",
   description: "Reference to a person (assignee, reporter)"
@@ -33,11 +50,11 @@ export const PersonRefSchema = Schema.Struct({
 export type PersonRef = Schema.Schema.Type<typeof PersonRefSchema>
 
 export const IssueSummarySchema = Schema.Struct({
-  identifier: NonEmptyString,
+  identifier: IssueIdentifier,
   title: Schema.String,
-  status: Schema.String,
+  status: StatusName,
   priority: Schema.optional(IssuePrioritySchema),
-  assignee: Schema.optional(Schema.String),
+  assignee: Schema.optional(PersonName),
   modifiedOn: Schema.optional(Timestamp)
 }).annotations({
   title: "IssueSummary",
@@ -47,15 +64,15 @@ export const IssueSummarySchema = Schema.Struct({
 export type IssueSummary = Schema.Schema.Type<typeof IssueSummarySchema>
 
 export const IssueSchema = Schema.Struct({
-  identifier: NonEmptyString,
+  identifier: IssueIdentifier,
   title: Schema.String,
   description: Schema.optional(Schema.String),
-  status: Schema.String,
+  status: StatusName,
   priority: Schema.optional(IssuePrioritySchema),
-  assignee: Schema.optional(Schema.String),
+  assignee: Schema.optional(PersonName),
   assigneeRef: Schema.optional(PersonRefSchema),
   labels: Schema.optional(Schema.Array(LabelSchema)),
-  project: NonEmptyString,
+  project: ProjectIdentifier,
   modifiedOn: Schema.optional(Timestamp),
   createdOn: Schema.optional(Timestamp),
   dueDate: Schema.optional(Schema.NullOr(Timestamp)),
@@ -68,13 +85,13 @@ export const IssueSchema = Schema.Struct({
 export type Issue = Schema.Schema.Type<typeof IssueSchema>
 
 export const ListIssuesParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  status: Schema.optional(Schema.String.annotations({
+  status: Schema.optional(StatusName.annotations({
     description: "Filter by status name"
   })),
-  assignee: Schema.optional(Schema.String.annotations({
+  assignee: Schema.optional(Email.annotations({
     description: "Filter by assignee email"
   })),
   titleSearch: Schema.optional(Schema.String.annotations({
@@ -99,10 +116,10 @@ export const ListIssuesParamsSchema = Schema.Struct({
 export type ListIssuesParams = Schema.Schema.Type<typeof ListIssuesParamsSchema>
 
 export const GetIssueParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  identifier: NonEmptyString.annotations({
+  identifier: IssueIdentifier.annotations({
     description: "Issue identifier (e.g., 'HULY-123')"
   })
 }).annotations({
@@ -113,7 +130,7 @@ export const GetIssueParamsSchema = Schema.Struct({
 export type GetIssueParams = Schema.Schema.Type<typeof GetIssueParamsSchema>
 
 export const CreateIssueParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
   title: NonEmptyString.annotations({
@@ -125,10 +142,10 @@ export const CreateIssueParamsSchema = Schema.Struct({
   priority: Schema.optional(IssuePrioritySchema.annotations({
     description: "Issue priority (urgent, high, medium, low, no-priority)"
   })),
-  assignee: Schema.optional(Schema.String.annotations({
+  assignee: Schema.optional(Email.annotations({
     description: "Assignee email address"
   })),
-  status: Schema.optional(Schema.String.annotations({
+  status: Schema.optional(StatusName.annotations({
     description: "Initial status (uses project default if not specified)"
   }))
 }).annotations({
@@ -139,10 +156,10 @@ export const CreateIssueParamsSchema = Schema.Struct({
 export type CreateIssueParams = Schema.Schema.Type<typeof CreateIssueParamsSchema>
 
 export const UpdateIssueParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  identifier: NonEmptyString.annotations({
+  identifier: IssueIdentifier.annotations({
     description: "Issue identifier (e.g., 'HULY-123')"
   }),
   title: Schema.optional(NonEmptyString.annotations({
@@ -155,11 +172,11 @@ export const UpdateIssueParamsSchema = Schema.Struct({
     description: "New issue priority"
   })),
   assignee: Schema.optional(
-    Schema.NullOr(Schema.String).annotations({
+    Schema.NullOr(Email).annotations({
       description: "New assignee email (null to unassign)"
     })
   ),
-  status: Schema.optional(Schema.String.annotations({
+  status: Schema.optional(StatusName.annotations({
     description: "New status"
   }))
 }).annotations({
@@ -170,21 +187,17 @@ export const UpdateIssueParamsSchema = Schema.Struct({
 export type UpdateIssueParams = Schema.Schema.Type<typeof UpdateIssueParamsSchema>
 
 export const AddLabelParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  identifier: NonEmptyString.annotations({
+  identifier: IssueIdentifier.annotations({
     description: "Issue identifier (e.g., 'HULY-123')"
   }),
   label: NonEmptyString.annotations({
     description: "Label name to add"
   }),
   color: Schema.optional(
-    Schema.Number.pipe(
-      Schema.int(),
-      Schema.greaterThanOrEqualTo(0),
-      Schema.lessThanOrEqualTo(9)
-    ).annotations({
+    ColorCode.annotations({
       description: "Color code (0-9, default: 0)"
     })
   )
@@ -196,10 +209,10 @@ export const AddLabelParamsSchema = Schema.Struct({
 export type AddLabelParams = Schema.Schema.Type<typeof AddLabelParamsSchema>
 
 export const DeleteIssueParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  identifier: NonEmptyString.annotations({
+  identifier: IssueIdentifier.annotations({
     description: "Issue identifier (e.g., 'HULY-123')"
   })
 }).annotations({
@@ -228,9 +241,9 @@ export const parseDeleteIssueParams = Schema.decodeUnknown(DeleteIssueParamsSche
 // --- Component Schemas ---
 
 export const ComponentSummarySchema = Schema.Struct({
-  id: NonEmptyString,
-  label: Schema.String,
-  lead: Schema.optional(Schema.String),
+  id: ComponentId,
+  label: ComponentLabel,
+  lead: Schema.optional(PersonName),
   modifiedOn: Schema.optional(Timestamp)
 }).annotations({
   title: "ComponentSummary",
@@ -240,11 +253,11 @@ export const ComponentSummarySchema = Schema.Struct({
 export type ComponentSummary = Schema.Schema.Type<typeof ComponentSummarySchema>
 
 export const ComponentSchema = Schema.Struct({
-  id: NonEmptyString,
-  label: Schema.String,
+  id: ComponentId,
+  label: ComponentLabel,
   description: Schema.optional(Schema.String),
-  lead: Schema.optional(Schema.String),
-  project: NonEmptyString,
+  lead: Schema.optional(PersonName),
+  project: ProjectIdentifier,
   modifiedOn: Schema.optional(Timestamp),
   createdOn: Schema.optional(Timestamp)
 }).annotations({
@@ -255,7 +268,7 @@ export const ComponentSchema = Schema.Struct({
 export type Component = Schema.Schema.Type<typeof ComponentSchema>
 
 export const ListComponentsParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
   limit: Schema.optional(
@@ -271,10 +284,10 @@ export const ListComponentsParamsSchema = Schema.Struct({
 export type ListComponentsParams = Schema.Schema.Type<typeof ListComponentsParamsSchema>
 
 export const GetComponentParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  component: NonEmptyString.annotations({
+  component: ComponentIdentifier.annotations({
     description: "Component ID or label"
   })
 }).annotations({
@@ -285,7 +298,7 @@ export const GetComponentParamsSchema = Schema.Struct({
 export type GetComponentParams = Schema.Schema.Type<typeof GetComponentParamsSchema>
 
 export const CreateComponentParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
   label: NonEmptyString.annotations({
@@ -294,7 +307,7 @@ export const CreateComponentParamsSchema = Schema.Struct({
   description: Schema.optional(Schema.String.annotations({
     description: "Component description (markdown supported)"
   })),
-  lead: Schema.optional(Schema.String.annotations({
+  lead: Schema.optional(Email.annotations({
     description: "Lead person email address"
   }))
 }).annotations({
@@ -305,10 +318,10 @@ export const CreateComponentParamsSchema = Schema.Struct({
 export type CreateComponentParams = Schema.Schema.Type<typeof CreateComponentParamsSchema>
 
 export const UpdateComponentParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  component: NonEmptyString.annotations({
+  component: ComponentIdentifier.annotations({
     description: "Component ID or label"
   }),
   label: Schema.optional(NonEmptyString.annotations({
@@ -318,7 +331,7 @@ export const UpdateComponentParamsSchema = Schema.Struct({
     description: "New component description (markdown supported)"
   })),
   lead: Schema.optional(
-    Schema.NullOr(Schema.String).annotations({
+    Schema.NullOr(Email).annotations({
       description: "New lead person email (null to unassign)"
     })
   )
@@ -330,13 +343,13 @@ export const UpdateComponentParamsSchema = Schema.Struct({
 export type UpdateComponentParams = Schema.Schema.Type<typeof UpdateComponentParamsSchema>
 
 export const SetIssueComponentParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  identifier: NonEmptyString.annotations({
+  identifier: IssueIdentifier.annotations({
     description: "Issue identifier (e.g., 'HULY-123')"
   }),
-  component: Schema.NullOr(NonEmptyString).annotations({
+  component: Schema.NullOr(ComponentIdentifier).annotations({
     description: "Component ID or label (null to clear)"
   })
 }).annotations({
@@ -347,10 +360,10 @@ export const SetIssueComponentParamsSchema = Schema.Struct({
 export type SetIssueComponentParams = Schema.Schema.Type<typeof SetIssueComponentParamsSchema>
 
 export const DeleteComponentParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  component: NonEmptyString.annotations({
+  component: ComponentIdentifier.annotations({
     description: "Component ID or label"
   })
 }).annotations({
@@ -379,7 +392,7 @@ export const parseDeleteComponentParams = Schema.decodeUnknown(DeleteComponentPa
 // --- Issue Template Schemas ---
 
 export const IssueTemplateSummarySchema = Schema.Struct({
-  id: NonEmptyString,
+  id: IssueTemplateId,
   title: Schema.String,
   priority: Schema.optional(IssuePrioritySchema),
   modifiedOn: Schema.optional(Timestamp)
@@ -391,14 +404,14 @@ export const IssueTemplateSummarySchema = Schema.Struct({
 export type IssueTemplateSummary = Schema.Schema.Type<typeof IssueTemplateSummarySchema>
 
 export const IssueTemplateSchema = Schema.Struct({
-  id: NonEmptyString,
+  id: IssueTemplateId,
   title: Schema.String,
   description: Schema.optional(Schema.String),
   priority: Schema.optional(IssuePrioritySchema),
-  assignee: Schema.optional(Schema.String),
-  component: Schema.optional(Schema.String),
+  assignee: Schema.optional(PersonName),
+  component: Schema.optional(ComponentLabel),
   estimation: Schema.optional(Schema.Number),
-  project: NonEmptyString,
+  project: ProjectIdentifier,
   modifiedOn: Schema.optional(Timestamp),
   createdOn: Schema.optional(Timestamp)
 }).annotations({
@@ -409,7 +422,7 @@ export const IssueTemplateSchema = Schema.Struct({
 export type IssueTemplate = Schema.Schema.Type<typeof IssueTemplateSchema>
 
 export const ListIssueTemplatesParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
   limit: Schema.optional(
@@ -425,10 +438,10 @@ export const ListIssueTemplatesParamsSchema = Schema.Struct({
 export type ListIssueTemplatesParams = Schema.Schema.Type<typeof ListIssueTemplatesParamsSchema>
 
 export const GetIssueTemplateParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  template: NonEmptyString.annotations({
+  template: TemplateIdentifier.annotations({
     description: "Template ID or title"
   })
 }).annotations({
@@ -439,7 +452,7 @@ export const GetIssueTemplateParamsSchema = Schema.Struct({
 export type GetIssueTemplateParams = Schema.Schema.Type<typeof GetIssueTemplateParamsSchema>
 
 export const CreateIssueTemplateParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
   title: NonEmptyString.annotations({
@@ -451,7 +464,7 @@ export const CreateIssueTemplateParamsSchema = Schema.Struct({
   priority: Schema.optional(IssuePrioritySchema.annotations({
     description: "Default priority for issues created from this template"
   })),
-  assignee: Schema.optional(Schema.String.annotations({
+  assignee: Schema.optional(Email.annotations({
     description: "Default assignee email address"
   })),
   component: Schema.optional(Schema.String.annotations({
@@ -468,10 +481,10 @@ export const CreateIssueTemplateParamsSchema = Schema.Struct({
 export type CreateIssueTemplateParams = Schema.Schema.Type<typeof CreateIssueTemplateParamsSchema>
 
 export const CreateIssueFromTemplateParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  template: NonEmptyString.annotations({
+  template: TemplateIdentifier.annotations({
     description: "Template ID or title"
   }),
   title: Schema.optional(NonEmptyString.annotations({
@@ -483,10 +496,10 @@ export const CreateIssueFromTemplateParamsSchema = Schema.Struct({
   priority: Schema.optional(IssuePrioritySchema.annotations({
     description: "Override priority"
   })),
-  assignee: Schema.optional(Schema.String.annotations({
+  assignee: Schema.optional(Email.annotations({
     description: "Override assignee email"
   })),
-  status: Schema.optional(Schema.String.annotations({
+  status: Schema.optional(StatusName.annotations({
     description: "Initial status (uses project default if not specified)"
   }))
 }).annotations({
@@ -497,10 +510,10 @@ export const CreateIssueFromTemplateParamsSchema = Schema.Struct({
 export type CreateIssueFromTemplateParams = Schema.Schema.Type<typeof CreateIssueFromTemplateParamsSchema>
 
 export const UpdateIssueTemplateParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  template: NonEmptyString.annotations({
+  template: TemplateIdentifier.annotations({
     description: "Template ID or title"
   }),
   title: Schema.optional(NonEmptyString.annotations({
@@ -513,7 +526,7 @@ export const UpdateIssueTemplateParamsSchema = Schema.Struct({
     description: "New default priority"
   })),
   assignee: Schema.optional(
-    Schema.NullOr(Schema.String).annotations({
+    Schema.NullOr(Email).annotations({
       description: "New default assignee email (null to unassign)"
     })
   ),
@@ -533,10 +546,10 @@ export const UpdateIssueTemplateParamsSchema = Schema.Struct({
 export type UpdateIssueTemplateParams = Schema.Schema.Type<typeof UpdateIssueTemplateParamsSchema>
 
 export const DeleteIssueTemplateParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  template: NonEmptyString.annotations({
+  template: TemplateIdentifier.annotations({
     description: "Template ID or title"
   })
 }).annotations({

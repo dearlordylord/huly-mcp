@@ -22,9 +22,11 @@ import type {
   PersonSummary,
   UpdatePersonParams
 } from "../../domain/schemas.js"
+import { ContactProvider, Email, OrganizationId, PersonId, PersonName } from "../../domain/schemas/shared.js"
 import { assertExists } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { PersonNotFoundError } from "../errors.js"
+import { toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
@@ -67,9 +69,8 @@ const batchGetEmailsForPersons = <T extends Doc>(
 
     const emailMap = new Map<string, string>()
     for (const channel of channels) {
-      const personIdStr = String(channel.attachedTo)
-      if (!emailMap.has(personIdStr)) {
-        emailMap.set(personIdStr, channel.value)
+      if (!emailMap.has(channel.attachedTo)) {
+        emailMap.set(channel.attachedTo, channel.value)
       }
     }
     return emailMap
@@ -107,18 +108,21 @@ export const listPersons = (
     if (params.emailSearch !== undefined && params.emailSearch.trim() !== "") {
       const searchLower = params.emailSearch.toLowerCase()
       filteredPersons = persons.filter(person => {
-        const email = emailMap.get(String(person._id))
+        const email = emailMap.get(person._id)
         return email !== undefined && email.toLowerCase().includes(searchLower)
       })
     }
 
-    return filteredPersons.map(person => ({
-      id: String(person._id),
-      name: person.name,
-      city: person.city,
-      email: emailMap.get(String(person._id)),
-      modifiedOn: person.modifiedOn
-    }))
+    return filteredPersons.map(person => {
+      const emailValue = emailMap.get(person._id)
+      return {
+        id: PersonId.make(person._id),
+        name: PersonName.make(person.name),
+        city: person.city,
+        email: emailValue !== undefined ? Email.make(emailValue) : undefined,
+        modifiedOn: person.modifiedOn
+      }
+    })
   })
 
 const findPersonById = (
@@ -127,7 +131,7 @@ const findPersonById = (
 ): Effect.Effect<HulyPerson | undefined, HulyClientError> =>
   client.findOne<HulyPerson>(
     contact.class.Person,
-    { _id: personId as Ref<HulyPerson> }
+    { _id: toRef<HulyPerson>(personId) }
   )
 
 const findPersonByEmail = (
@@ -150,7 +154,7 @@ const findPersonByEmail = (
     const channel = channels[0]
     return yield* client.findOne<HulyPerson>(
       contact.class.Person,
-      { _id: channel.attachedTo as Ref<HulyPerson> }
+      { _id: toRef<HulyPerson>(channel.attachedTo) }
     )
   })
 
@@ -189,14 +193,14 @@ export const getPerson = (
     const emailChannel = channels.find(c => c.provider === contact.channelProvider.Email)
 
     return {
-      id: String(person._id),
-      name: person.name,
+      id: PersonId.make(person._id),
+      name: PersonName.make(person.name),
       firstName,
       lastName,
       city: person.city,
-      email: emailChannel?.value,
+      email: emailChannel?.value !== undefined ? Email.make(emailChannel.value) : undefined,
       channels: channels.map(c => ({
-        provider: String(c.provider),
+        provider: ContactProvider.make(c.provider),
         value: c.value
       })),
       modifiedOn: person.modifiedOn,
@@ -243,7 +247,7 @@ export const createPerson = (
       )
     }
 
-    return { id: String(personId) }
+    return { id: personId }
   })
 
 export interface UpdatePersonResult {
@@ -333,14 +337,17 @@ export const listEmployees = (
     const employeeIds = employees.map(e => e._id)
     const emailMap = yield* batchGetEmailsForPersons(client, employeeIds)
 
-    return employees.map(emp => ({
-      id: String(emp._id),
-      name: emp.name,
-      email: emailMap.get(String(emp._id)),
-      position: emp.position ?? undefined,
-      active: emp.active,
-      modifiedOn: emp.modifiedOn
-    }))
+    return employees.map(emp => {
+      const emailValue = emailMap.get(emp._id)
+      return {
+        id: PersonId.make(emp._id),
+        name: PersonName.make(emp.name),
+        email: emailValue !== undefined ? Email.make(emailValue) : undefined,
+        position: emp.position ?? undefined,
+        active: emp.active,
+        modifiedOn: emp.modifiedOn
+      }
+    })
   })
 
 export const listOrganizations = (
@@ -360,7 +367,7 @@ export const listOrganizations = (
     )
 
     return orgs.map(org => ({
-      id: String(org._id),
+      id: OrganizationId.make(org._id),
       name: org.name,
       city: org.city,
       members: org.members,
@@ -421,5 +428,5 @@ export const createOrganization = (
       }
     }
 
-    return { id: String(orgId) }
+    return { id: orgId }
   })

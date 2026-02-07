@@ -1,4 +1,4 @@
-import type { Class, Doc, DocumentUpdate, Ref } from "@hcengineering/core"
+import type { Class, Doc, DocumentUpdate } from "@hcengineering/core"
 import { SortingOrder } from "@hcengineering/core"
 import type {
   DocNotifyContext as HulyDocNotifyContext,
@@ -24,8 +24,15 @@ import type {
   PinNotificationContextParams,
   UpdateNotificationProviderSettingParams
 } from "../../domain/schemas.js"
+import {
+  NotificationContextId,
+  NotificationId,
+  NotificationProviderId,
+  ObjectClassName
+} from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { NotificationContextNotFoundError, NotificationNotFoundError } from "../errors.js"
+import { toRef } from "./shared.js"
 
 /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop */
 const notification = require("@hcengineering/notification")
@@ -84,7 +91,7 @@ const findNotification = (
 
     const notif = yield* client.findOne<HulyInboxNotification>(
       notification.class.InboxNotification,
-      { _id: notificationId as Ref<HulyInboxNotification> }
+      { _id: toRef<HulyInboxNotification>(notificationId) }
     )
 
     if (notif === undefined) {
@@ -106,7 +113,7 @@ const findNotificationContext = (
 
     const ctx = yield* client.findOne<HulyDocNotifyContext>(
       notification.class.DocNotifyContext,
-      { _id: contextId as Ref<HulyDocNotifyContext> }
+      { _id: toRef<HulyDocNotifyContext>(contextId) }
     )
 
     if (ctx === undefined) {
@@ -152,13 +159,13 @@ export const listNotifications = (
     )
 
     const summaries: Array<NotificationSummary> = notifications.map((n) => ({
-      id: String(n._id),
+      id: NotificationId.make(n._id),
       isViewed: n.isViewed,
       archived: n.archived,
-      objectId: n.objectId ? String(n.objectId) : undefined,
-      objectClass: n.objectClass ? String(n.objectClass) : undefined,
-      title: n.title ? String(n.title) : undefined,
-      body: n.body ? String(n.body) : undefined,
+      objectId: n.objectId ? n.objectId : undefined,
+      objectClass: n.objectClass ? ObjectClassName.make(n.objectClass) : undefined,
+      title: n.title ? n.title : undefined,
+      body: n.body ? n.body : undefined,
       createdOn: n.createdOn,
       modifiedOn: n.modifiedOn
     }))
@@ -176,15 +183,17 @@ export const getNotification = (
     const { notification: notif } = yield* findNotification(params.notificationId)
 
     const result: Notification = {
-      id: String(notif._id),
+      id: NotificationId.make(notif._id),
       isViewed: notif.isViewed,
       archived: notif.archived,
-      objectId: notif.objectId ? String(notif.objectId) : undefined,
-      objectClass: notif.objectClass ? String(notif.objectClass) : undefined,
-      docNotifyContextId: notif.docNotifyContext ? String(notif.docNotifyContext) : undefined,
-      title: notif.title ? String(notif.title) : undefined,
-      body: notif.body ? String(notif.body) : undefined,
-      data: notif.data ? String(notif.data) : undefined,
+      objectId: notif.objectId ? notif.objectId : undefined,
+      objectClass: notif.objectClass ? ObjectClassName.make(notif.objectClass) : undefined,
+      docNotifyContextId: notif.docNotifyContext
+        ? NotificationContextId.make(notif.docNotifyContext)
+        : undefined,
+      title: notif.title ? notif.title : undefined,
+      body: notif.body ? notif.body : undefined,
+      data: notif.data ? notif.data : undefined,
       createdOn: notif.createdOn,
       modifiedOn: notif.modifiedOn
     }
@@ -207,7 +216,7 @@ export const markNotificationRead = (
     const { client, notification: notif } = yield* findNotification(params.notificationId)
 
     if (notif.isViewed) {
-      return { id: String(notif._id), marked: false }
+      return { id: notif._id, marked: false }
     }
 
     const updateOps: DocumentUpdate<HulyInboxNotification> = {
@@ -221,7 +230,7 @@ export const markNotificationRead = (
       updateOps
     )
 
-    return { id: String(notif._id), marked: true }
+    return { id: notif._id, marked: true }
   })
 
 /**
@@ -276,7 +285,7 @@ export const archiveNotification = (
     const { client, notification: notif } = yield* findNotification(params.notificationId)
 
     if (notif.archived) {
-      return { id: String(notif._id), archived: false }
+      return { id: notif._id, archived: false }
     }
 
     const updateOps: DocumentUpdate<HulyInboxNotification> = {
@@ -290,7 +299,7 @@ export const archiveNotification = (
       updateOps
     )
 
-    return { id: String(notif._id), archived: true }
+    return { id: notif._id, archived: true }
   })
 
 /**
@@ -350,7 +359,7 @@ export const deleteNotification = (
       notif._id
     )
 
-    return { id: String(notif._id), deleted: true }
+    return { id: notif._id, deleted: true }
   })
 
 /**
@@ -365,8 +374,8 @@ export const getNotificationContext = (
     const ctx = yield* client.findOne<HulyDocNotifyContext>(
       notification.class.DocNotifyContext,
       {
-        objectId: params.objectId as Ref<Doc>,
-        objectClass: params.objectClass as Ref<Class<Doc>>
+        objectId: toRef<Doc>(params.objectId),
+        objectClass: toRef<Class<Doc>>(params.objectClass)
       }
     )
 
@@ -375,9 +384,9 @@ export const getNotificationContext = (
     }
 
     const result: DocNotifyContextSummary = {
-      id: String(ctx._id),
-      objectId: String(ctx.objectId),
-      objectClass: String(ctx.objectClass),
+      id: NotificationContextId.make(ctx._id),
+      objectId: ctx.objectId,
+      objectClass: ObjectClassName.make(ctx.objectClass),
       isPinned: ctx.isPinned,
       hidden: ctx.hidden,
       lastViewedTimestamp: ctx.lastViewedTimestamp,
@@ -419,9 +428,9 @@ export const listNotificationContexts = (
     )
 
     const summaries: Array<DocNotifyContextSummary> = contexts.map((ctx) => ({
-      id: String(ctx._id),
-      objectId: String(ctx.objectId),
-      objectClass: String(ctx.objectClass),
+      id: NotificationContextId.make(ctx._id),
+      objectId: ctx.objectId,
+      objectClass: ObjectClassName.make(ctx.objectClass),
       isPinned: ctx.isPinned,
       hidden: ctx.hidden,
       lastViewedTimestamp: ctx.lastViewedTimestamp,
@@ -446,7 +455,7 @@ export const pinNotificationContext = (
     const { client, context } = yield* findNotificationContext(params.contextId)
 
     if (context.isPinned === params.pinned) {
-      return { id: String(context._id), isPinned: context.isPinned }
+      return { id: context._id, isPinned: context.isPinned }
     }
 
     const updateOps: DocumentUpdate<HulyDocNotifyContext> = {
@@ -460,7 +469,7 @@ export const pinNotificationContext = (
       updateOps
     )
 
-    return { id: String(context._id), isPinned: params.pinned }
+    return { id: context._id, isPinned: params.pinned }
   })
 
 /**
@@ -481,8 +490,8 @@ export const listNotificationSettings = (
     )
 
     const summaries: Array<NotificationProviderSetting> = settings.map((s) => ({
-      id: String(s._id),
-      providerId: String(s.attachedTo),
+      id: s._id,
+      providerId: NotificationProviderId.make(s.attachedTo),
       enabled: s.enabled
     }))
 
@@ -506,7 +515,7 @@ export const updateNotificationProviderSetting = (
 
     const existingSetting = yield* client.findOne<HulyNotificationProviderSetting>(
       notification.class.NotificationProviderSetting,
-      { attachedTo: params.providerId as Ref<NotificationProvider> }
+      { attachedTo: toRef<NotificationProvider>(params.providerId) }
     )
 
     if (existingSetting !== undefined) {

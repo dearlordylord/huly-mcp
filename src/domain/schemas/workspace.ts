@@ -1,6 +1,16 @@
 import { Schema } from "effect"
 
-import { EmptyParamsSchema, LimitParam, makeJsonSchema, NonEmptyString, Timestamp } from "./shared.js"
+import {
+  AccountId,
+  EmptyParamsSchema,
+  LimitParam,
+  makeJsonSchema,
+  NonEmptyString,
+  PersonUuid,
+  RegionId,
+  Timestamp,
+  WorkspaceUuid
+} from "./shared.js"
 
 export const AccountRoleSchema = Schema.Literal(
   "READONLYGUEST",
@@ -28,7 +38,7 @@ export const AccountRoleValues = [
 ] as const
 
 export const WorkspaceMemberSchema = Schema.Struct({
-  personId: NonEmptyString,
+  personId: PersonUuid,
   role: AccountRoleSchema,
   name: Schema.optional(Schema.String),
   email: Schema.optional(Schema.String)
@@ -40,10 +50,10 @@ export const WorkspaceMemberSchema = Schema.Struct({
 export type WorkspaceMember = Schema.Schema.Type<typeof WorkspaceMemberSchema>
 
 export const WorkspaceInfoSchema = Schema.Struct({
-  uuid: NonEmptyString,
+  uuid: WorkspaceUuid,
   name: Schema.String,
   url: Schema.String,
-  region: Schema.optional(Schema.String),
+  region: Schema.optional(RegionId),
   createdOn: Timestamp,
   allowReadOnlyGuest: Schema.optional(Schema.Boolean),
   allowGuestSignUp: Schema.optional(Schema.Boolean),
@@ -57,10 +67,10 @@ export const WorkspaceInfoSchema = Schema.Struct({
 export type WorkspaceInfo = Schema.Schema.Type<typeof WorkspaceInfoSchema>
 
 export const WorkspaceSummarySchema = Schema.Struct({
-  uuid: NonEmptyString,
+  uuid: WorkspaceUuid,
   name: Schema.String,
   url: Schema.String,
-  region: Schema.optional(Schema.String),
+  region: Schema.optional(RegionId),
   createdOn: Timestamp,
   lastVisit: Schema.optional(Timestamp)
 }).annotations({
@@ -71,7 +81,7 @@ export const WorkspaceSummarySchema = Schema.Struct({
 export type WorkspaceSummary = Schema.Schema.Type<typeof WorkspaceSummarySchema>
 
 export const RegionInfoSchema = Schema.Struct({
-  region: NonEmptyString,
+  region: RegionId,
   name: Schema.String
 }).annotations({
   title: "RegionInfo",
@@ -81,7 +91,7 @@ export const RegionInfoSchema = Schema.Struct({
 export type RegionInfo = Schema.Schema.Type<typeof RegionInfoSchema>
 
 export const UserProfileSchema = Schema.Struct({
-  personUuid: NonEmptyString,
+  personUuid: PersonUuid,
   firstName: Schema.String,
   lastName: Schema.String,
   bio: Schema.optional(Schema.String),
@@ -111,7 +121,7 @@ export const ListWorkspaceMembersParamsSchema = Schema.Struct({
 export type ListWorkspaceMembersParams = Schema.Schema.Type<typeof ListWorkspaceMembersParamsSchema>
 
 export const UpdateMemberRoleParamsSchema = Schema.Struct({
-  accountId: NonEmptyString.annotations({
+  accountId: AccountId.annotations({
     description: "Account UUID of the member"
   }),
   role: AccountRoleSchema.annotations({
@@ -142,7 +152,7 @@ export const CreateWorkspaceParamsSchema = Schema.Struct({
     description: "Name for the new workspace"
   }),
   region: Schema.optional(
-    Schema.String.annotations({
+    RegionId.annotations({
       description: "Region for the workspace (optional)"
     })
   )

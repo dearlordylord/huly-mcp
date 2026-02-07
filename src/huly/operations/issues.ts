@@ -59,6 +59,16 @@ import type {
   UpdateIssueParams,
   UpdateIssueTemplateParams
 } from "../../domain/schemas.js"
+import {
+  ComponentId,
+  ComponentLabel,
+  Email,
+  IssueIdentifier,
+  IssueTemplateId,
+  PersonId,
+  PersonName,
+  StatusName
+} from "../../domain/schemas/shared.js"
 import { isExistent } from "../../utils/assertions.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { ProjectNotFoundError } from "../errors.js"
@@ -75,7 +85,9 @@ import {
   findProjectAndIssue,
   findProjectWithStatuses,
   parseIssueIdentifier,
-  type StatusInfo
+  type StatusInfo,
+  toRef,
+  zeroAsUnset
 } from "./shared.js"
 
 // Import plugin objects at runtime (CommonJS modules)
@@ -158,6 +170,11 @@ const stringToPriority = (priority: IssuePriorityStr): IssuePriority => {
   }
 }
 
+// SDK: updateDoc with retrieve=true returns TxResult which doesn't type the embedded object.
+// The runtime value includes { object: { sequence: number } } for $inc operations.
+const extractUpdatedSequence = (txResult: unknown): number | undefined =>
+  (txResult as { object?: { sequence?: number } })?.object?.sequence
+
 // --- Operations ---
 
 /**
@@ -235,10 +252,8 @@ export const listIssues = (
       query.title = { $like: `%${params.titleSearch}%` }
     }
 
-    // Apply description search using fulltext $search operator
-    // Note: $search performs fulltext search across indexed fields
     if (params.descriptionSearch !== undefined && params.descriptionSearch.trim() !== "") {
-      ;(query as Record<string, unknown>).$search = params.descriptionSearch
+      query.$search = params.descriptionSearch
     }
 
     if (params.component !== undefined) {
@@ -271,16 +286,16 @@ export const listIssues = (
     )
 
     const summaries: Array<IssueSummary> = issues.map(issue => {
-      const statusDoc = statuses.find(s => String(s._id) === String(issue.status))
+      const statusDoc = statuses.find(s => s._id === issue.status)
       const statusName = statusDoc?.name ?? "Unknown"
       const assigneeName = issue.$lookup?.assignee?.name
 
       return {
-        identifier: issue.identifier,
+        identifier: IssueIdentifier.make(issue.identifier),
         title: issue.title,
-        status: statusName,
+        status: StatusName.make(statusName),
         priority: priorityToString(issue.priority),
-        assignee: assigneeName,
+        assignee: assigneeName !== undefined ? PersonName.make(assigneeName) : undefined,
         modifiedOn: issue.modifiedOn
       }
     })
@@ -305,7 +320,7 @@ const findPersonByEmailOrName = (
       const channel = channels[0]
       const person = yield* client.findOne<Person>(
         contact.class.Person,
-        { _id: channel.attachedTo as Ref<Person> }
+        { _id: toRef<Person>(channel.attachedTo) }
       )
       if (person) {
         return person
@@ -373,7 +388,7 @@ export const getIssue = (
       return yield* new IssueNotFoundError({ identifier: params.identifier, project: params.project })
     }
 
-    const statusDoc = statuses.find(s => String(s._id) === String(issue.status))
+    const statusDoc = statuses.find(s => s._id === issue.status)
     const statusName = statusDoc?.name ?? "Unknown"
 
     let assigneeName: string | undefined
@@ -386,8 +401,8 @@ export const getIssue = (
       if (person) {
         assigneeName = person.name
         assigneeRef = {
-          id: String(person._id),
-          name: person.name
+          id: PersonId.make(person._id),
+          name: PersonName.make(person.name)
         }
       }
     }
@@ -404,18 +419,18 @@ export const getIssue = (
     }
 
     const result: Issue = {
-      identifier: issue.identifier,
+      identifier: IssueIdentifier.make(issue.identifier),
       title: issue.title,
       description,
-      status: statusName,
+      status: StatusName.make(statusName),
       priority: priorityToString(issue.priority),
-      assignee: assigneeName,
+      assignee: assigneeName !== undefined ? PersonName.make(assigneeName) : undefined,
       assigneeRef,
       project: params.project,
       modifiedOn: issue.modifiedOn,
       createdOn: issue.createdOn,
       dueDate: issue.dueDate ?? undefined,
-      estimation: issue.estimation
+      estimation: zeroAsUnset(issue.estimation)
     }
 
     return result
@@ -465,12 +480,12 @@ export const createIssue = (
     const incOps: DocumentUpdate<HulyProject> = { $inc: { sequence: 1 } }
     const incResult = yield* client.updateDoc(
       tracker.class.Project,
-      "core:space:Space" as Ref<Space>,
+      toRef<Space>("core:space:Space"),
       project._id,
       incOps,
       true
     )
-    const sequence = (incResult as { object?: { sequence?: number } }).object?.sequence ?? project.sequence + 1
+    const sequence = extractUpdatedSequence(incResult) ?? project.sequence + 1
 
     let statusRef: Ref<Status> = project.defaultIssueStatus
     if (params.status !== undefined) {
@@ -722,7 +737,7 @@ export const addLabel = (
       tags.class.TagElement,
       {
         title: labelTitle,
-        targetClass: tracker.class.Issue as Ref<Class<Doc>>
+        targetClass: toRef<Class<Doc>>(tracker.class.Issue)
       }
     )
 
@@ -731,13 +746,13 @@ export const addLabel = (
       const tagElementData: Data<TagElement> = {
         title: labelTitle,
         description: "",
-        targetClass: tracker.class.Issue as Ref<Class<Doc>>,
+        targetClass: toRef<Class<Doc>>(tracker.class.Issue),
         color,
         category: tracker.category.Other
       }
       yield* client.createDoc(
         tags.class.TagElement,
-        core.space.Workspace as Ref<Space>,
+        toRef<Space>(core.space.Workspace),
         tagElementData,
         tagElementId
       )
@@ -846,7 +861,7 @@ const findComponentByIdOrLabel = (
       tracker.class.Component,
       {
         space: projectId,
-        _id: componentIdOrLabel as Ref<HulyComponent>
+        _id: toRef<HulyComponent>(componentIdOrLabel)
       }
     )
 
@@ -917,12 +932,15 @@ export const listComponents = (
 
     const personMap = new Map(persons.map(p => [p._id, p]))
 
-    const summaries: Array<ComponentSummary> = components.map(c => ({
-      id: String(c._id),
-      label: c.label,
-      lead: c.lead !== null ? personMap.get(c.lead)?.name : undefined,
-      modifiedOn: c.modifiedOn
-    }))
+    const summaries: Array<ComponentSummary> = components.map(c => {
+      const leadName = c.lead !== null ? personMap.get(c.lead)?.name : undefined
+      return {
+        id: ComponentId.make(c._id),
+        label: ComponentLabel.make(c.label),
+        lead: leadName !== undefined ? PersonName.make(leadName) : undefined,
+        modifiedOn: c.modifiedOn
+      }
+    })
 
     return summaries
   })
@@ -945,10 +963,10 @@ export const getComponent = (
     }
 
     const result: Component = {
-      id: String(component._id),
-      label: component.label,
+      id: ComponentId.make(component._id),
+      label: ComponentLabel.make(component.label),
       description: component.description,
-      lead: leadName,
+      lead: leadName !== undefined ? PersonName.make(leadName) : undefined,
       project: params.project,
       modifiedOn: component.modifiedOn,
       createdOn: component.createdOn
@@ -978,7 +996,7 @@ export const createComponent = (
       }
       // Huly API: Component.lead expects Ref<Employee>, but we look up Person by email.
       // Employee extends Person, so this is safe when person is actually an employee.
-      leadRef = person._id as Ref<Employee>
+      leadRef = toRef<Employee>(person._id)
     }
 
     const componentData: Data<HulyComponent> = {
@@ -995,7 +1013,7 @@ export const createComponent = (
       componentId
     )
 
-    return { id: String(componentId), label: params.label }
+    return { id: componentId, label: params.label }
   })
 
 export interface UpdateComponentResult {
@@ -1029,12 +1047,12 @@ export const updateComponent = (
         }
         // Huly API: Component.lead expects Ref<Employee>, but we look up Person by email.
         // Employee extends Person, so this is safe when person is actually an employee.
-        updateOps.lead = person._id as Ref<Employee>
+        updateOps.lead = toRef<Employee>(person._id)
       }
     }
 
     if (Object.keys(updateOps).length === 0) {
-      return { id: String(component._id), updated: false }
+      return { id: component._id, updated: false }
     }
 
     yield* client.updateDoc(
@@ -1044,7 +1062,7 @@ export const updateComponent = (
       updateOps
     )
 
-    return { id: String(component._id), updated: true }
+    return { id: component._id, updated: true }
   })
 
 export interface SetIssueComponentResult {
@@ -1128,7 +1146,7 @@ export const deleteComponent = (
       component._id
     )
 
-    return { id: String(component._id), deleted: true }
+    return { id: component._id, deleted: true }
   })
 
 // --- Issue Template Operations ---
@@ -1177,7 +1195,7 @@ const findTemplateByIdOrTitle = (
       tracker.class.IssueTemplate,
       {
         space: projectId,
-        _id: templateIdOrTitle as Ref<HulyIssueTemplate>
+        _id: toRef<HulyIssueTemplate>(templateIdOrTitle)
       }
     )
 
@@ -1234,7 +1252,7 @@ export const listIssueTemplates = (
     )
 
     const summaries: Array<IssueTemplateSummary> = templates.map(t => ({
-      id: String(t._id),
+      id: IssueTemplateId.make(t._id),
       title: t.title,
       priority: priorityToString(t.priority),
       modifiedOn: t.modifiedOn
@@ -1272,12 +1290,12 @@ export const getIssueTemplate = (
     }
 
     const result: IssueTemplate = {
-      id: String(template._id),
+      id: IssueTemplateId.make(template._id),
       title: template.title,
       description: template.description,
       priority: priorityToString(template.priority),
-      assignee: assigneeName,
-      component: componentLabel,
+      assignee: assigneeName !== undefined ? PersonName.make(assigneeName) : undefined,
+      component: componentLabel !== undefined ? ComponentLabel.make(componentLabel) : undefined,
       estimation: template.estimation,
       project: params.project,
       modifiedOn: template.modifiedOn,
@@ -1341,7 +1359,7 @@ export const createIssueTemplate = (
       templateId
     )
 
-    return { id: String(templateId), title: params.title }
+    return { id: templateId, title: params.title }
   })
 
 export const createIssueFromTemplate = (
@@ -1361,7 +1379,15 @@ export const createIssueFromTemplate = (
         { _id: template.assignee }
       )
       if (person) {
-        assignee = person.name
+        const emailCh = yield* client.findOne<Channel>(
+          contact.class.Channel,
+          {
+            attachedTo: person._id,
+            provider: contact.channelProvider.Email
+          }
+        )
+        // Fall back to name for findPersonByEmailOrName lookup
+        assignee = Email.make(emailCh?.value ?? person.name)
       }
     }
 
@@ -1464,7 +1490,7 @@ export const updateIssueTemplate = (
     }
 
     if (Object.keys(updateOps).length === 0) {
-      return { id: String(template._id), updated: false }
+      return { id: template._id, updated: false }
     }
 
     yield* client.updateDoc(
@@ -1474,7 +1500,7 @@ export const updateIssueTemplate = (
       updateOps
     )
 
-    return { id: String(template._id), updated: true }
+    return { id: template._id, updated: true }
   })
 
 export interface DeleteIssueTemplateResult {
@@ -1494,5 +1520,5 @@ export const deleteIssueTemplate = (
       template._id
     )
 
-    return { id: String(template._id), deleted: true }
+    return { id: template._id, deleted: true }
   })

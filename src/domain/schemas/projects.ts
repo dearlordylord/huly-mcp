@@ -1,9 +1,9 @@
 import { Schema } from "effect"
 
-import { LimitParam, makeJsonSchema, NonEmptyString } from "./shared.js"
+import { LimitParam, makeJsonSchema, ProjectIdentifier, StatusName } from "./shared.js"
 
 export const ProjectSummarySchema = Schema.Struct({
-  identifier: NonEmptyString,
+  identifier: ProjectIdentifier,
   name: Schema.String,
   description: Schema.optional(Schema.String),
   archived: Schema.Boolean
@@ -41,11 +41,11 @@ export const ListProjectsResultSchema = Schema.Struct({
 export type ListProjectsResult = Schema.Schema.Type<typeof ListProjectsResultSchema>
 
 export const ProjectSchema = Schema.Struct({
-  identifier: NonEmptyString,
+  identifier: ProjectIdentifier,
   name: Schema.String,
   description: Schema.optional(Schema.String),
-  defaultStatus: Schema.optional(Schema.String),
-  statuses: Schema.optional(Schema.Array(Schema.String))
+  defaultStatus: Schema.optional(StatusName),
+  statuses: Schema.optional(Schema.Array(StatusName))
 }).annotations({
   title: "Project",
   description: "Full project with status information"

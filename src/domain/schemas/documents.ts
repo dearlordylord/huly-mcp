@@ -1,9 +1,18 @@
 import { Schema } from "effect"
 
-import { LimitParam, makeJsonSchema, NonEmptyString, Timestamp } from "./shared.js"
+import {
+  DocumentId,
+  DocumentIdentifier,
+  LimitParam,
+  makeJsonSchema,
+  NonEmptyString,
+  TeamspaceId,
+  TeamspaceIdentifier,
+  Timestamp
+} from "./shared.js"
 
 export const TeamspaceSummarySchema = Schema.Struct({
-  id: NonEmptyString,
+  id: TeamspaceId,
   name: Schema.String,
   description: Schema.optional(Schema.String),
   archived: Schema.Boolean,
@@ -42,7 +51,7 @@ export const ListTeamspacesResultSchema = Schema.Struct({
 export type ListTeamspacesResult = Schema.Schema.Type<typeof ListTeamspacesResultSchema>
 
 export const DocumentSummarySchema = Schema.Struct({
-  id: NonEmptyString,
+  id: DocumentId,
   title: Schema.String,
   teamspace: NonEmptyString,
   modifiedOn: Schema.optional(Timestamp)
@@ -54,7 +63,7 @@ export const DocumentSummarySchema = Schema.Struct({
 export type DocumentSummary = Schema.Schema.Type<typeof DocumentSummarySchema>
 
 export const ListDocumentsParamsSchema = Schema.Struct({
-  teamspace: NonEmptyString.annotations({
+  teamspace: TeamspaceIdentifier.annotations({
     description: "Teamspace name or ID"
   }),
   titleSearch: Schema.optional(Schema.String.annotations({
@@ -86,7 +95,7 @@ export const ListDocumentsResultSchema = Schema.Struct({
 export type ListDocumentsResult = Schema.Schema.Type<typeof ListDocumentsResultSchema>
 
 export const DocumentSchema = Schema.Struct({
-  id: NonEmptyString,
+  id: DocumentId,
   title: Schema.String,
   content: Schema.optional(Schema.String),
   teamspace: NonEmptyString,
@@ -100,10 +109,10 @@ export const DocumentSchema = Schema.Struct({
 export type Document = Schema.Schema.Type<typeof DocumentSchema>
 
 export const GetDocumentParamsSchema = Schema.Struct({
-  teamspace: NonEmptyString.annotations({
+  teamspace: TeamspaceIdentifier.annotations({
     description: "Teamspace name or ID"
   }),
-  document: NonEmptyString.annotations({
+  document: DocumentIdentifier.annotations({
     description: "Document title or ID"
   })
 }).annotations({
@@ -114,7 +123,7 @@ export const GetDocumentParamsSchema = Schema.Struct({
 export type GetDocumentParams = Schema.Schema.Type<typeof GetDocumentParamsSchema>
 
 export const CreateDocumentParamsSchema = Schema.Struct({
-  teamspace: NonEmptyString.annotations({
+  teamspace: TeamspaceIdentifier.annotations({
     description: "Teamspace name or ID"
   }),
   title: NonEmptyString.annotations({
@@ -131,10 +140,10 @@ export const CreateDocumentParamsSchema = Schema.Struct({
 export type CreateDocumentParams = Schema.Schema.Type<typeof CreateDocumentParamsSchema>
 
 export const UpdateDocumentParamsSchema = Schema.Struct({
-  teamspace: NonEmptyString.annotations({
+  teamspace: TeamspaceIdentifier.annotations({
     description: "Teamspace name or ID"
   }),
-  document: NonEmptyString.annotations({
+  document: DocumentIdentifier.annotations({
     description: "Document title or ID"
   }),
   title: Schema.optional(NonEmptyString.annotations({
@@ -151,10 +160,10 @@ export const UpdateDocumentParamsSchema = Schema.Struct({
 export type UpdateDocumentParams = Schema.Schema.Type<typeof UpdateDocumentParamsSchema>
 
 export const DeleteDocumentParamsSchema = Schema.Struct({
-  teamspace: NonEmptyString.annotations({
+  teamspace: TeamspaceIdentifier.annotations({
     description: "Teamspace name or ID"
   }),
-  document: NonEmptyString.annotations({
+  document: DocumentIdentifier.annotations({
     description: "Document title or ID"
   })
 }).annotations({
