@@ -1,51 +1,47 @@
-# Refactor Report: server.ts version/casts/config + remove HulyConfigError alias
+# HTTP Transport Cleanup Report
 
-## Changes
+## Item 14: Transport cast at line 115
 
-### Item 5: Version hardcode (server.ts:78)
+**Decision: Keep cast, add documentation.**
 
-**Problem**: `version: "1.0.0"` was hardcoded while `package.json` says `0.1.25`.
+`StreamableHTTPServerTransport` declares `implements Transport` in the SDK, but its property types
+(e.g., `onmessage` signature, `send` options subset) don't satisfy the `Transport` interface under
+`exactOptionalPropertyTypes: true` (our tsconfig). The SDK was compiled without this strict flag.
 
-**Fix**: esbuild `--define` injects `PKG_VERSION` at build time.
+This is an upstream SDK type bug. The cast is safe because the class genuinely implements the
+interface at runtime. Added a comment explaining the root cause.
 
-- `package.json` build script now reads version via `node -p "require('./package.json').version"` and passes it as `--define:PKG_VERSION="\"$V\""`.
-- `src/globals.d.ts` declares `PKG_VERSION` for TypeScript.
-- `src/mcp/server.ts` uses `const VERSION = typeof PKG_VERSION !== "undefined" ? PKG_VERSION : "0.0.0-dev"` -- the fallback covers test/dev environments where esbuild define is absent.
-- In the built bundle, esbuild replaces `PKG_VERSION` with `"0.1.25"` and constant-folds the ternary to just `"0.1.25"`.
+**Alternatives considered:**
+- Wrapping in an adapter object that satisfies `Transport` exactly -- adds unnecessary runtime
+  overhead for a compile-time-only issue.
+- Removing `exactOptionalPropertyTypes` -- weakens the entire codebase for one SDK edge case.
+- Generic type parameter on `Server.connect` -- not available, the method signature is fixed.
 
-### Item 7: Remove `as Error` casts (server.ts:163,196,235)
+## Item 50: Signal handlers accumulate on repeated starts
 
-**Problem**: Three `catch: (e) => ... cause: e as Error` casts from `unknown` to `Error`.
+**Decision: Clean up handlers in both completion paths.**
 
-**Fix**: Removed all three. `McpServerError.cause` is typed as `Schema.optional(Schema.Defect)` which accepts `unknown` directly.
+The original code only cleaned up signal handlers on Effect interruption (the `return Effect.sync(cleanup)`
+path). When a signal fires and `resume(Effect.void)` is called (normal completion), the cleanup
+function was never invoked, leaving stale handlers on `process`.
 
-### Item 45: TOOLSETS via Effect Config (server.ts:134)
+Fix: extracted a `cleanup` function called both from `shutdown` (normal signal path) and from
+the Effect interruption finalizer. Now handlers are removed regardless of how the async effect
+completes.
 
-**Problem**: `process.env.TOOLSETS` read directly, inconsistent with rest of codebase.
+## Item 62: Redundant async on GET/DELETE handlers
 
-**Fix**: Replaced with `Effect.orElseSucceed(Config.string("TOOLSETS"), () => "")`. Uses Effect's `Config.string` for consistency. `Effect.orElseSucceed` eliminates `ConfigError` from the error channel (the layer declares error type `never`), defaulting to empty string when unset. Added `Config` to the effect import.
+**Decision: Remove `async`, update return types to `void`.**
 
-### Item 57: Remove HulyConfigError alias (config.ts:91)
+The `get` and `del` handlers contained no `await` expressions. Removed the `async` keyword and
+changed their return type annotations from `Promise<void>` to `void` in both the function signatures
+and the `createMcpHandlers` return type.
 
-**Problem**: `export type HulyConfigError = ConfigValidationError` -- redundant alias.
-
-**Fix**: Removed the alias. Updated all references:
-- `src/config/config.ts`: removed alias, updated `loadConfig` and `layer` type annotations.
-- `src/index.ts`: replaced `HulyConfigError` import and all usages with `ConfigValidationError`.
-
-## Files Changed
-
-- `src/mcp/server.ts` -- version constant, removed casts, TOOLSETS via Config
-- `src/config/config.ts` -- removed HulyConfigError alias, updated annotations
-- `src/index.ts` -- HulyConfigError -> ConfigValidationError
-- `src/globals.d.ts` -- new file, declares `PKG_VERSION` global
-- `package.json` -- build script injects PKG_VERSION via esbuild --define
+No test changes needed -- `await` on a `void` value is a no-op in the existing tests.
 
 ## Verification
 
-```
-pnpm build     -- pass (version correctly injected as "0.1.25" in bundle)
-pnpm typecheck -- pass
-pnpm lint      -- pass (0 errors, only pre-existing warnings)
-pnpm test      -- pass (755/755 tests)
-```
+- `pnpm build` -- pass
+- `pnpm typecheck` -- pass (0 errors)
+- `pnpm lint` -- pass (0 errors, 127 pre-existing warnings)
+- `pnpm test` -- 755/755 tests pass
