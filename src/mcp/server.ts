@@ -13,6 +13,7 @@ import { startHttpTransport } from "./http-transport.js"
 
 import { HulyClient } from "../huly/client.js"
 import { HulyStorageClient } from "../huly/storage.js"
+import { WorkspaceClient } from "../huly/workspace-client.js"
 import { createUnknownToolError, toMcpResponse } from "./error-mapping.js"
 import { TOOL_DEFINITIONS, toolRegistry } from "./tools/index.js"
 
@@ -52,7 +53,8 @@ export interface McpServerOperations {
  */
 export const createMcpServer = (
   hulyClient: HulyClient["Type"],
-  storageClient: HulyStorageClient["Type"]
+  storageClient: HulyStorageClient["Type"],
+  workspaceClient?: WorkspaceClient["Type"]
 ): Server => {
   const server = new Server(
     {
@@ -90,7 +92,8 @@ export const createMcpServer = (
       toolNameResult.right,
       args ?? {},
       hulyClient,
-      storageClient
+      storageClient,
+      workspaceClient
     )
 
     if (response === null) {
@@ -109,14 +112,15 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 >() {
   static layer(
     config: McpServerConfig
-  ): Layer.Layer<McpServerService, never, HulyClient | HulyStorageClient> {
+  ): Layer.Layer<McpServerService, never, HulyClient | HulyStorageClient | WorkspaceClient> {
     return Layer.effect(
       McpServerService,
       Effect.gen(function*() {
         const hulyClient = yield* HulyClient
         const storageClient = yield* HulyStorageClient
+        const workspaceClient = yield* WorkspaceClient
 
-        const server = config.transport === "stdio" ? createMcpServer(hulyClient, storageClient) : null
+        const server = config.transport === "stdio" ? createMcpServer(hulyClient, storageClient, workspaceClient) : null
 
         const isRunning = yield* Ref.make(false)
 
@@ -181,7 +185,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 
                 yield* startHttpTransport(
                   { port, host },
-                  () => createMcpServer(hulyClient, storageClient)
+                  () => createMcpServer(hulyClient, storageClient, workspaceClient)
                 ).pipe(
                   Effect.scoped,
                   Effect.mapError(
