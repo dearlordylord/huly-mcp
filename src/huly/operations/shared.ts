@@ -234,6 +234,11 @@ export interface PaginationOptions {
   offset?: number
 }
 
+const DEFAULT_LIMIT = 50
+const MAX_LIMIT = 200
+
+export const clampLimit = (limit?: number): number => Math.min(limit ?? DEFAULT_LIMIT, MAX_LIMIT)
+
 export interface SearchOptions {
   query?: string
   fulltext?: boolean

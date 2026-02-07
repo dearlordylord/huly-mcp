@@ -14,7 +14,7 @@ import { CommentId, IssueIdentifier } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { CommentNotFoundError } from "../errors.js"
-import { findProjectAndIssue as findProjectAndIssueShared, toRef } from "./shared.js"
+import { clampLimit, findProjectAndIssue as findProjectAndIssueShared, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
@@ -64,7 +64,7 @@ export const listComments = (
       issueIdentifier: params.issueIdentifier
     })
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const messages = yield* client.findAll<ChatMessage>(
       chunter.class.ChatMessage,

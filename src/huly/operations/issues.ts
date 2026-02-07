@@ -96,6 +96,7 @@ import {
 } from "../errors.js"
 import { escapeLikeWildcards, withLookup } from "./query-helpers.js"
 import {
+  clampLimit,
   findProject,
   findProjectAndIssue,
   findProjectWithStatuses,
@@ -280,7 +281,7 @@ export const listIssues = (
       }
     }
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     type IssueWithLookup = WithLookup<HulyIssue> & {
       $lookup?: { assignee?: Person }
@@ -895,7 +896,7 @@ export const listComponents = (
   Effect.gen(function*() {
     const { client, project } = yield* findProject(params.project)
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const components = yield* client.findAll<HulyComponent>(
       tracker.class.Component,
@@ -1181,7 +1182,7 @@ export const listIssueTemplates = (
   Effect.gen(function*() {
     const { client, project } = yield* findProject(params.project)
 
-    const limit = Math.min(params.limit ?? 50, 200)
+    const limit = clampLimit(params.limit)
 
     const templates = yield* client.findAll<HulyIssueTemplate>(
       tracker.class.IssueTemplate,
