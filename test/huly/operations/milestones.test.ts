@@ -1,11 +1,11 @@
 import { describe, it } from "@effect/vitest"
 import { expect } from "vitest"
 import { Effect } from "effect"
-import type {
-  Doc,
-  FindResult,
-  Ref,
-  Space,
+import {
+  toFindResult,
+  type Doc,
+  type Ref,
+  type Space,
 } from "@hcengineering/core"
 import {
   type Issue as HulyIssue,
@@ -127,9 +127,9 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       if (opts?.limit) {
         result = result.slice(0, opts.limit)
       }
-      return Effect.succeed(result as unknown as FindResult<Doc>)
+      return Effect.succeed(toFindResult(result as Doc[]))
     }
-    return Effect.succeed([] as unknown as FindResult<Doc>)
+    return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
 
   const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown, query: unknown) => {
