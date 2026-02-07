@@ -1,10 +1,9 @@
-import { Schema } from "effect"
+import { JSONSchema, Schema } from "effect"
 
 import {
   DocumentId,
   DocumentIdentifier,
   LimitParam,
-  makeJsonSchema,
   NonEmptyString,
   TeamspaceId,
   TeamspaceIdentifier,
@@ -173,12 +172,12 @@ export const DeleteDocumentParamsSchema = Schema.Struct({
 
 export type DeleteDocumentParams = Schema.Schema.Type<typeof DeleteDocumentParamsSchema>
 
-export const listTeamspacesParamsJsonSchema = makeJsonSchema(ListTeamspacesParamsSchema)
-export const listDocumentsParamsJsonSchema = makeJsonSchema(ListDocumentsParamsSchema)
-export const getDocumentParamsJsonSchema = makeJsonSchema(GetDocumentParamsSchema)
-export const createDocumentParamsJsonSchema = makeJsonSchema(CreateDocumentParamsSchema)
-export const updateDocumentParamsJsonSchema = makeJsonSchema(UpdateDocumentParamsSchema)
-export const deleteDocumentParamsJsonSchema = makeJsonSchema(DeleteDocumentParamsSchema)
+export const listTeamspacesParamsJsonSchema = JSONSchema.make(ListTeamspacesParamsSchema)
+export const listDocumentsParamsJsonSchema = JSONSchema.make(ListDocumentsParamsSchema)
+export const getDocumentParamsJsonSchema = JSONSchema.make(GetDocumentParamsSchema)
+export const createDocumentParamsJsonSchema = JSONSchema.make(CreateDocumentParamsSchema)
+export const updateDocumentParamsJsonSchema = JSONSchema.make(UpdateDocumentParamsSchema)
+export const deleteDocumentParamsJsonSchema = JSONSchema.make(DeleteDocumentParamsSchema)
 
 export const parseListTeamspacesParams = Schema.decodeUnknown(ListTeamspacesParamsSchema)
 export const parseListDocumentsParams = Schema.decodeUnknown(ListDocumentsParamsSchema)

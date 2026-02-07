@@ -1,9 +1,10 @@
-import type { Class, Doc, FindOptions, PersonUuid, Ref, Status, WithLookup } from "@hcengineering/core"
+import type { Doc, PersonUuid, Ref, Status, WithLookup } from "@hcengineering/core"
 import type { ProjectType } from "@hcengineering/task"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
 import { Effect } from "effect"
 
-import { NonNegativeNumber, PositiveNumber } from "../../domain/schemas/shared.js"
+import type { NonNegativeNumber } from "../../domain/schemas/shared.js"
+import { PositiveNumber } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { InvalidPersonUuidError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 
@@ -36,11 +37,9 @@ const task = require("@hcengineering/task").default as typeof import("@hcenginee
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
 
-// SDK: core.class.Status is a string constant but findAll expects Ref<Class<Status>>.
-// SDK class hierarchy variance requires double cast.
-const statusClassRef: Ref<Class<Status>> = core.class.Status as Ref<Class<Doc>> as Ref<Class<Status>>
+const statusClassRef = core.class.Status
 
-export type ProjectWithType = WithLookup<HulyProject> & {
+type ProjectWithType = WithLookup<HulyProject> & {
   $lookup?: { type?: ProjectType }
 }
 
@@ -228,17 +227,3 @@ export const findProjectAndIssue = (
 
     return { client, project, issue }
   })
-
-export interface PaginationOptions {
-  limit?: number
-  offset?: number
-}
-
-export interface SearchOptions {
-  query?: string
-  fulltext?: boolean
-}
-
-export interface LookupOptions<T extends Doc> {
-  lookup?: FindOptions<T>["lookup"]
-}

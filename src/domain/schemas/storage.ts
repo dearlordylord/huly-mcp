@@ -1,6 +1,6 @@
-import { Schema } from "effect"
+import { JSONSchema, Schema } from "effect"
 
-import { BlobId, makeJsonSchema, MimeType, NonEmptyString } from "./shared.js"
+import { BlobId, MimeType, NonEmptyString } from "./shared.js"
 
 const UploadFileParamsBase = Schema.Struct({
   filename: NonEmptyString.annotations({
@@ -53,6 +53,6 @@ export const UploadFileResultSchema = Schema.Struct({
 
 export type UploadFileResult = Schema.Schema.Type<typeof UploadFileResultSchema>
 
-export const uploadFileParamsJsonSchema = makeJsonSchema(UploadFileParamsSchema)
+export const uploadFileParamsJsonSchema = JSONSchema.make(UploadFileParamsSchema)
 
 export const parseUploadFileParams = Schema.decodeUnknown(UploadFileParamsSchema)

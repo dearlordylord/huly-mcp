@@ -75,49 +75,49 @@ const contact = require("@hcengineering/contact").default as typeof import("@hce
 
 // --- Error Types ---
 
-export type ListChannelsError = HulyClientError
+type ListChannelsError = HulyClientError
 
-export type GetChannelError =
+type GetChannelError =
   | HulyClientError
   | ChannelNotFoundError
 
-export type CreateChannelError = HulyClientError
+type CreateChannelError = HulyClientError
 
-export type UpdateChannelError =
+type UpdateChannelError =
   | HulyClientError
   | ChannelNotFoundError
 
-export type DeleteChannelError =
+type DeleteChannelError =
   | HulyClientError
   | ChannelNotFoundError
 
-export type ListChannelMessagesError =
+type ListChannelMessagesError =
   | HulyClientError
   | ChannelNotFoundError
 
-export type SendChannelMessageError =
+type SendChannelMessageError =
   | HulyClientError
   | ChannelNotFoundError
 
-export type ListDirectMessagesError = HulyClientError
+type ListDirectMessagesError = HulyClientError
 
-export type ListThreadRepliesError =
-  | HulyClientError
-  | ChannelNotFoundError
-  | MessageNotFoundError
-
-export type AddThreadReplyError =
+type ListThreadRepliesError =
   | HulyClientError
   | ChannelNotFoundError
   | MessageNotFoundError
 
-export type UpdateThreadReplyError =
+type AddThreadReplyError =
+  | HulyClientError
+  | ChannelNotFoundError
+  | MessageNotFoundError
+
+type UpdateThreadReplyError =
   | HulyClientError
   | ChannelNotFoundError
   | MessageNotFoundError
   | ThreadReplyNotFoundError
 
-export type DeleteThreadReplyError =
+type DeleteThreadReplyError =
   | HulyClientError
   | ChannelNotFoundError
   | MessageNotFoundError
@@ -128,10 +128,10 @@ export type DeleteThreadReplyError =
 // SDK: PersonId and SocialIdentityRef are the same underlying string but typed differently.
 const personIdsAsSocialIdentityRefs = (
   ids: Array<PersonId>
+  // eslint-disable-next-line no-restricted-syntax -- SDK type mismatch: PersonId vs SocialIdentityRef
 ): Array<SocialIdentityRef> => ids as unknown as Array<SocialIdentityRef>
 
-// SDK: jsonToMarkup return type doesn't match Markup; cast contained here.
-const jsonAsMarkup = (json: ReturnType<typeof markdownToMarkup>): Markup => jsonToMarkup(json) as Markup
+const jsonAsMarkup = (json: ReturnType<typeof markdownToMarkup>): Markup => jsonToMarkup(json)
 
 // --- Helpers ---
 
@@ -291,7 +291,7 @@ export const listChannels = (
       topic: ch.topic || undefined,
       private: ch.private,
       archived: ch.archived,
-      members: ch.members?.length,
+      members: ch.members.length,
       messages: ch.messages,
       modifiedOn: ch.modifiedOn
     }))
@@ -309,7 +309,7 @@ export const getChannel = (
     const { channel, client } = yield* findChannel(params.channel)
 
     let memberNames: Array<string> | undefined
-    if (channel.members && channel.members.length > 0) {
+    if (channel.members.length > 0) {
       // Space.members is typed as AccountUuid[] in @hcengineering/core
       const accountUuidToName = yield* buildAccountUuidToNameMap(
         client,
@@ -336,19 +336,6 @@ export const getChannel = (
 
     return result
   })
-
-export type {
-  AddThreadReplyResult,
-  CreateChannelResult,
-  DeleteChannelResult,
-  DeleteThreadReplyResult,
-  ListChannelMessagesResult,
-  ListDirectMessagesResult,
-  ListThreadRepliesResult,
-  SendChannelMessageResult,
-  UpdateChannelResult,
-  UpdateThreadReplyResult
-}
 
 // --- Create Channel ---
 
@@ -464,13 +451,12 @@ export const listChannelMessages = (
       }
     )
 
-    const total = messages.total ?? messages.length
+    const total = messages.total
 
     const uniqueSocialIds = [
       ...new Set(
         messages
           .map((msg) => msg.modifiedBy)
-          .filter((id): id is PersonId => id !== undefined)
       )
     ]
 
@@ -550,19 +536,19 @@ export const listDirectMessages = (
       }
     )
 
-    const total = dms.total ?? dms.length
+    const total = dms.total
 
     // DirectMessage.members is typed as AccountUuid[] in @hcengineering/chunter (extends Space)
     const uniqueAccountUuids = [
       ...new Set(
-        dms.flatMap((dm) => dm.members || [])
+        dms.flatMap((dm) => dm.members)
       )
     ]
 
     const accountUuidToName = yield* buildAccountUuidToNameMap(client, uniqueAccountUuids)
 
     const summaries: Array<DirectMessageSummary> = dms.map((dm) => {
-      const members = dm.members || []
+      const members = dm.members
       const participants = members
         .map((m) => accountUuidToName.get(m))
         .filter((n): n is string => n !== undefined)
@@ -640,13 +626,12 @@ export const listThreadReplies = (
       }
     )
 
-    const total = replies.total ?? replies.length
+    const total = replies.total
 
     const uniqueSocialIds = [
       ...new Set(
         replies
           .map((msg) => msg.modifiedBy)
-          .filter((id): id is PersonId => id !== undefined)
       )
     ]
 

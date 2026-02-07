@@ -21,21 +21,20 @@ import { Context, Effect, Layer } from "effect"
 import { HulyConfigService } from "../config/config.js"
 import { assertExists } from "../utils/assertions.js"
 import { concatLink } from "../utils/url.js"
-import { authToOptions, isAuthError, withConnectionRetry } from "./auth-utils.js"
+import { authToOptions, connectWithRetry } from "./auth-utils.js"
+import type { HulyAuthError, HulyConnectionError } from "./errors.js"
 import {
   FileFetchError,
   FileNotFoundError,
   FileTooLargeError,
   FileUploadError,
-  HulyAuthError,
-  HulyConnectionError,
   InvalidContentTypeError,
   InvalidFileDataError
 } from "./errors.js"
 
-export const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
+const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
 
-export const ALLOWED_CONTENT_TYPES = new Set([
+const ALLOWED_CONTENT_TYPES = new Set([
   // Images
   "image/jpeg",
   "image/png",
@@ -184,8 +183,7 @@ export class HulyStorageClient extends Context.Tag("@hulymcp/HulyStorageClient")
           Effect.tryPromise({
             try: async () => {
               const blob = await storageClient.put(filename, data, contentType, data.length)
-              // SDK: blob._id is Ref<Doc>; narrow to Ref<Blob> for type-safe downstream usage
-              const blobRef = blob._id as Ref<Blob>
+              const blobRef = blob._id
               return {
                 blobId: blobRef,
                 contentType: blob.contentType,
@@ -218,6 +216,7 @@ export class HulyStorageClient extends Context.Tag("@hulymcp/HulyStorageClient")
       StorageClientError
     > =>
       Effect.succeed({
+        // eslint-disable-next-line no-restricted-syntax -- test mock: string literal to branded Ref
         blobId: "test-blob-id" as unknown as Ref<Blob>,
         contentType: "application/octet-stream",
         size: 0,
@@ -266,7 +265,7 @@ const connectStorageClient = async (
 
   // Construct URLs for file operations
   const filesUrl = concatLink(url, `/files`)
-  const uploadUrl = concatLink(url, serverConfig.UPLOAD_URL ?? "/upload")
+  const uploadUrl = concatLink(url, serverConfig.UPLOAD_URL)
 
   // Create storage client with proper authentication
   const storageClient: StorageClient = createStorageClient(
@@ -286,22 +285,7 @@ const connectStorageClient = async (
 const connectStorageWithRetry = (
   config: StorageConnectionConfig
 ): Effect.Effect<StorageConnection, StorageClientError> =>
-  withConnectionRetry(
-    Effect.tryPromise({
-      try: () => connectStorageClient(config),
-      catch: (e) => {
-        if (isAuthError(e)) {
-          return new HulyAuthError({
-            message: `Storage authentication failed: ${String(e)}`
-          })
-        }
-        return new HulyConnectionError({
-          message: `Storage connection failed: ${String(e)}`,
-          cause: e
-        })
-      }
-    })
-  )
+  connectWithRetry(() => connectStorageClient(config), "Storage connection failed")
 
 /**
  * Decode base64 data to Buffer with validation.

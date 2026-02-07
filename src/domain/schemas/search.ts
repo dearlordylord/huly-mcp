@@ -1,6 +1,6 @@
-import { Schema } from "effect"
+import { JSONSchema, Schema } from "effect"
 
-import { LimitParam, makeJsonSchema, NonEmptyString, Timestamp } from "./shared.js"
+import { LimitParam, NonEmptyString, Timestamp } from "./shared.js"
 
 export const FulltextSearchParamsSchema = Schema.Struct({
   query: NonEmptyString.annotations({
@@ -41,6 +41,6 @@ export const FulltextSearchResultSchema = Schema.Struct({
 
 export type FulltextSearchResult = Schema.Schema.Type<typeof FulltextSearchResultSchema>
 
-export const fulltextSearchParamsJsonSchema = makeJsonSchema(FulltextSearchParamsSchema)
+export const fulltextSearchParamsJsonSchema = JSONSchema.make(FulltextSearchParamsSchema)
 
 export const parseFulltextSearchParams = Schema.decodeUnknown(FulltextSearchParamsSchema)

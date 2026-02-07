@@ -1,5 +1,5 @@
 import type { Channel, Person as HulyPerson } from "@hcengineering/contact"
-import type { Doc, FindResult, Ref, Space } from "@hcengineering/core"
+import type { Doc, FindResult, Ref } from "@hcengineering/core"
 import { Effect, Exit } from "effect"
 import { describe, expect, it } from "vitest"
 
@@ -18,7 +18,7 @@ const createMockPerson = (overrides: Partial<HulyPerson> = {}): HulyPerson =>
     _class: contact.class.Person,
     name: "Doe,John",
     city: "NYC",
-    space: contact.space.Contacts as Ref<Space>,
+    space: contact.space.Contacts,
     modifiedOn: 1700000000000,
     modifiedBy: "user" as Ref<Doc>,
     createdOn: 1699000000000,
@@ -30,7 +30,7 @@ const createMockChannel = (overrides: Partial<Channel> = {}): Channel =>
   ({
     _id: "channel-1" as Ref<Channel>,
     _class: contact.class.Channel,
-    space: contact.space.Contacts as Ref<Space>,
+    space: contact.space.Contacts,
     attachedTo: "person-123" as Ref<Doc>,
     attachedToClass: contact.class.Person,
     collection: "channels",
@@ -59,6 +59,7 @@ const createTestLayer = (config: MockConfig) => {
 
   const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown) => {
     if (_class === contact.class.Person) {
+      // eslint-disable-next-line no-restricted-syntax -- test mock: typed array to FindResult
       return Effect.succeed(persons as unknown as FindResult<Doc>)
     }
     if (_class === contact.class.Channel) {
@@ -79,8 +80,10 @@ const createTestLayer = (config: MockConfig) => {
       if (q.value !== undefined) {
         filtered = filtered.filter(c => c.value === q.value)
       }
+      // eslint-disable-next-line no-restricted-syntax -- test mock: typed array to FindResult
       return Effect.succeed(filtered as unknown as FindResult<Doc>)
     }
+    // eslint-disable-next-line no-restricted-syntax -- test mock: empty array to FindResult
     return Effect.succeed([] as unknown as FindResult<Doc>)
   }) as HulyClientOperations["findAll"]
 

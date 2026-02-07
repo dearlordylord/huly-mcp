@@ -1,10 +1,9 @@
-import { Schema } from "effect"
+import { JSONSchema, Schema } from "effect"
 
 import {
   ContactProvider,
   Email,
   LimitParam,
-  makeJsonSchema,
   MemberReference,
   NonEmptyString,
   OrganizationId,
@@ -209,14 +208,14 @@ export const CreateOrganizationParamsSchema = Schema.Struct({
 
 export type CreateOrganizationParams = Schema.Schema.Type<typeof CreateOrganizationParamsSchema>
 
-export const listPersonsParamsJsonSchema = makeJsonSchema(ListPersonsParamsSchema)
-export const getPersonParamsJsonSchema = makeJsonSchema(GetPersonParamsSchema)
-export const createPersonParamsJsonSchema = makeJsonSchema(CreatePersonParamsSchema)
-export const updatePersonParamsJsonSchema = makeJsonSchema(UpdatePersonParamsSchema)
-export const deletePersonParamsJsonSchema = makeJsonSchema(DeletePersonParamsSchema)
-export const listEmployeesParamsJsonSchema = makeJsonSchema(ListEmployeesParamsSchema)
-export const listOrganizationsParamsJsonSchema = makeJsonSchema(ListOrganizationsParamsSchema)
-export const createOrganizationParamsJsonSchema = makeJsonSchema(CreateOrganizationParamsSchema)
+export const listPersonsParamsJsonSchema = JSONSchema.make(ListPersonsParamsSchema)
+export const getPersonParamsJsonSchema = JSONSchema.make(GetPersonParamsSchema)
+export const createPersonParamsJsonSchema = JSONSchema.make(CreatePersonParamsSchema)
+export const updatePersonParamsJsonSchema = JSONSchema.make(UpdatePersonParamsSchema)
+export const deletePersonParamsJsonSchema = JSONSchema.make(DeletePersonParamsSchema)
+export const listEmployeesParamsJsonSchema = JSONSchema.make(ListEmployeesParamsSchema)
+export const listOrganizationsParamsJsonSchema = JSONSchema.make(ListOrganizationsParamsSchema)
+export const createOrganizationParamsJsonSchema = JSONSchema.make(CreateOrganizationParamsSchema)
 
 export const parseListPersonsParams = Schema.decodeUnknown(ListPersonsParamsSchema)
 export const parseGetPersonParams = Schema.decodeUnknown(GetPersonParamsSchema)

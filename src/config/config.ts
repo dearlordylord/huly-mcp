@@ -50,21 +50,19 @@ const PositiveIntFromString = Schema.NumberFromString.pipe(
   Schema.positive({ message: () => "Must be positive" })
 )
 
-export const TokenAuthSchema = Schema.Struct({
+const TokenAuthSchema = Schema.Struct({
   _tag: Schema.Literal("token"),
   token: Schema.Redacted(NonWhitespaceString)
 })
 
-export const PasswordAuthSchema = Schema.Struct({
+const PasswordAuthSchema = Schema.Struct({
   _tag: Schema.Literal("password"),
   email: NonWhitespaceString,
   password: Schema.Redacted(NonWhitespaceString)
 })
 
-export const AuthSchema = Schema.Union(TokenAuthSchema, PasswordAuthSchema)
+const AuthSchema = Schema.Union(TokenAuthSchema, PasswordAuthSchema)
 
-export type TokenAuth = Schema.Schema.Type<typeof TokenAuthSchema>
-export type PasswordAuth = Schema.Schema.Type<typeof PasswordAuthSchema>
 export type Auth = Schema.Schema.Type<typeof AuthSchema>
 
 /**
@@ -77,7 +75,7 @@ export const HulyConfigSchema = Schema.Struct({
   connectionTimeout: PositiveInt
 })
 
-export type HulyConfig = Schema.Schema.Type<typeof HulyConfigSchema>
+type HulyConfig = Schema.Schema.Type<typeof HulyConfigSchema>
 
 export class ConfigValidationError extends Schema.TaggedError<ConfigValidationError>()(
   "ConfigValidationError",
@@ -87,8 +85,6 @@ export class ConfigValidationError extends Schema.TaggedError<ConfigValidationEr
     cause: Schema.optional(Schema.Defect)
   }
 ) {}
-
-export type HulyConfigError = ConfigValidationError
 
 const TokenAuthFromEnv = Config.map(
   Schema.Config("HULY_TOKEN", Schema.Redacted(NonWhitespaceString)),
@@ -118,7 +114,7 @@ const HulyConfigFromEnv = Config.all({
   )
 })
 
-const loadConfig: Effect.Effect<HulyConfig, HulyConfigError> = HulyConfigFromEnv.pipe(
+const loadConfig: Effect.Effect<HulyConfig, ConfigValidationError> = HulyConfigFromEnv.pipe(
   Effect.mapError((e) =>
     new ConfigValidationError({
       message: `Configuration error: ${e.message}`,
@@ -141,7 +137,7 @@ export class HulyConfigService extends Context.Tag("@hulymcp/HulyConfig")<
 >() {
   static readonly DEFAULT_TIMEOUT = DEFAULT_TIMEOUT
 
-  static readonly layer: Layer.Layer<HulyConfigService, HulyConfigError> = Layer.effect(
+  static readonly layer: Layer.Layer<HulyConfigService, ConfigValidationError> = Layer.effect(
     HulyConfigService,
     loadConfig
   )

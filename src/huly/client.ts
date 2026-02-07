@@ -42,16 +42,10 @@ import { absurd, Context, Effect, Layer } from "effect"
 
 import { HulyConfigService } from "../config/config.js"
 import { concatLink } from "../utils/url.js"
-import {
-  authToOptions,
-  type ConnectionConfig,
-  type ConnectionError,
-  isAuthError,
-  withConnectionRetry
-} from "./auth-utils.js"
-import { HulyAuthError, HulyConnectionError } from "./errors.js"
+import { authToOptions, type ConnectionConfig, type ConnectionError, connectWithRetry } from "./auth-utils.js"
+import { HulyConnectionError } from "./errors.js"
 
-export type HulyClientError = HulyConnectionError | HulyAuthError
+export type HulyClientError = ConnectionError
 
 export interface HulyClientOperations {
   readonly findAll: <T extends Doc>(
@@ -430,20 +424,4 @@ const connectRest = async (
 
 const connectRestWithRetry = (
   config: ConnectionConfig
-): Effect.Effect<RestConnection, ConnectionError> =>
-  withConnectionRetry(
-    Effect.tryPromise({
-      try: () => connectRest(config),
-      catch: (e) => {
-        if (isAuthError(e)) {
-          return new HulyAuthError({
-            message: `Authentication failed: ${String(e)}`
-          })
-        }
-        return new HulyConnectionError({
-          message: `Connection failed: ${String(e)}`,
-          cause: e
-        })
-      }
-    })
-  )
+): Effect.Effect<RestConnection, ConnectionError> => connectWithRetry(() => connectRest(config), "Connection failed")

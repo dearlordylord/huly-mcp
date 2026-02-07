@@ -1,14 +1,6 @@
-import { Schema } from "effect"
+import { JSONSchema, Schema } from "effect"
 
-import {
-  CommentId,
-  IssueIdentifier,
-  LimitParam,
-  makeJsonSchema,
-  NonEmptyString,
-  ProjectIdentifier,
-  Timestamp
-} from "./shared.js"
+import { CommentId, IssueIdentifier, LimitParam, NonEmptyString, ProjectIdentifier, Timestamp } from "./shared.js"
 
 export const CommentSchema = Schema.Struct({
   id: CommentId,
@@ -98,10 +90,10 @@ export const DeleteCommentParamsSchema = Schema.Struct({
 
 export type DeleteCommentParams = Schema.Schema.Type<typeof DeleteCommentParamsSchema>
 
-export const listCommentsParamsJsonSchema = makeJsonSchema(ListCommentsParamsSchema)
-export const addCommentParamsJsonSchema = makeJsonSchema(AddCommentParamsSchema)
-export const updateCommentParamsJsonSchema = makeJsonSchema(UpdateCommentParamsSchema)
-export const deleteCommentParamsJsonSchema = makeJsonSchema(DeleteCommentParamsSchema)
+export const listCommentsParamsJsonSchema = JSONSchema.make(ListCommentsParamsSchema)
+export const addCommentParamsJsonSchema = JSONSchema.make(AddCommentParamsSchema)
+export const updateCommentParamsJsonSchema = JSONSchema.make(UpdateCommentParamsSchema)
+export const deleteCommentParamsJsonSchema = JSONSchema.make(DeleteCommentParamsSchema)
 
 export const parseComment = Schema.decodeUnknown(CommentSchema)
 export const parseListCommentsParams = Schema.decodeUnknown(ListCommentsParamsSchema)

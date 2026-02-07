@@ -46,27 +46,27 @@ import { toRef } from "./shared.js"
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const documentPlugin = require("@hcengineering/document").default as typeof import("@hcengineering/document").default
 
-export type ListTeamspacesError = HulyClientError
+type ListTeamspacesError = HulyClientError
 
-export type ListDocumentsError =
+type ListDocumentsError =
   | HulyClientError
   | TeamspaceNotFoundError
 
-export type GetDocumentError =
-  | HulyClientError
-  | TeamspaceNotFoundError
-  | DocumentNotFoundError
-
-export type CreateDocumentError =
-  | HulyClientError
-  | TeamspaceNotFoundError
-
-export type UpdateDocumentError =
+type GetDocumentError =
   | HulyClientError
   | TeamspaceNotFoundError
   | DocumentNotFoundError
 
-export type DeleteDocumentError =
+type CreateDocumentError =
+  | HulyClientError
+  | TeamspaceNotFoundError
+
+type UpdateDocumentError =
+  | HulyClientError
+  | TeamspaceNotFoundError
+  | DocumentNotFoundError
+
+type DeleteDocumentError =
   | HulyClientError
   | TeamspaceNotFoundError
   | DocumentNotFoundError
@@ -180,7 +180,7 @@ export const listTeamspaces = (
       }
     )
 
-    const total = teamspaces.total ?? teamspaces.length
+    const total = teamspaces.total
 
     const summaries: Array<TeamspaceSummary> = teamspaces.map((ts) => ({
       id: TeamspaceId.make(ts._id),
@@ -235,7 +235,7 @@ export const listDocuments = (
       }
     )
 
-    const total = documents.total ?? documents.length
+    const total = documents.total
 
     const summaries: Array<DocumentSummary> = documents.map((doc) => ({
       id: DocumentId.make(doc._id),
@@ -289,8 +289,6 @@ export const getDocument = (
 
     return result
   })
-
-export type { CreateDocumentResult, DeleteDocumentResult, UpdateDocumentResult }
 
 // --- Create Document Operation ---
 

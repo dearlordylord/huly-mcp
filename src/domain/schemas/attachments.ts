@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { JSONSchema, Schema } from "effect"
 
 import {
   AttachmentId,
@@ -6,7 +6,6 @@ import {
   DocumentIdentifier,
   IssueIdentifier,
   LimitParam,
-  makeJsonSchema,
   MimeType,
   NonEmptyString,
   ObjectClassName,
@@ -261,15 +260,15 @@ export const AddDocumentAttachmentParamsSchema = AddDocumentAttachmentParamsBase
 
 export type AddDocumentAttachmentParams = Schema.Schema.Type<typeof AddDocumentAttachmentParamsSchema>
 
-export const listAttachmentsParamsJsonSchema = makeJsonSchema(ListAttachmentsParamsSchema)
-export const getAttachmentParamsJsonSchema = makeJsonSchema(GetAttachmentParamsSchema)
-export const addAttachmentParamsJsonSchema = makeJsonSchema(AddAttachmentParamsSchema)
-export const updateAttachmentParamsJsonSchema = makeJsonSchema(UpdateAttachmentParamsSchema)
-export const deleteAttachmentParamsJsonSchema = makeJsonSchema(DeleteAttachmentParamsSchema)
-export const pinAttachmentParamsJsonSchema = makeJsonSchema(PinAttachmentParamsSchema)
-export const downloadAttachmentParamsJsonSchema = makeJsonSchema(DownloadAttachmentParamsSchema)
-export const addIssueAttachmentParamsJsonSchema = makeJsonSchema(AddIssueAttachmentParamsSchema)
-export const addDocumentAttachmentParamsJsonSchema = makeJsonSchema(AddDocumentAttachmentParamsSchema)
+export const listAttachmentsParamsJsonSchema = JSONSchema.make(ListAttachmentsParamsSchema)
+export const getAttachmentParamsJsonSchema = JSONSchema.make(GetAttachmentParamsSchema)
+export const addAttachmentParamsJsonSchema = JSONSchema.make(AddAttachmentParamsSchema)
+export const updateAttachmentParamsJsonSchema = JSONSchema.make(UpdateAttachmentParamsSchema)
+export const deleteAttachmentParamsJsonSchema = JSONSchema.make(DeleteAttachmentParamsSchema)
+export const pinAttachmentParamsJsonSchema = JSONSchema.make(PinAttachmentParamsSchema)
+export const downloadAttachmentParamsJsonSchema = JSONSchema.make(DownloadAttachmentParamsSchema)
+export const addIssueAttachmentParamsJsonSchema = JSONSchema.make(AddIssueAttachmentParamsSchema)
+export const addDocumentAttachmentParamsJsonSchema = JSONSchema.make(AddDocumentAttachmentParamsSchema)
 
 export const parseListAttachmentsParams = Schema.decodeUnknown(ListAttachmentsParamsSchema)
 export const parseGetAttachmentParams = Schema.decodeUnknown(GetAttachmentParamsSchema)

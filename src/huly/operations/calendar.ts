@@ -56,14 +56,14 @@ const core = require("@hcengineering/core").default as typeof import("@hcenginee
 
 // --- Error types ---
 
-export type ListEventsError = HulyClientError
-export type GetEventError = HulyClientError | EventNotFoundError
-export type CreateEventError = HulyClientError
-export type UpdateEventError = HulyClientError | EventNotFoundError
-export type DeleteEventError = HulyClientError | EventNotFoundError
-export type ListRecurringEventsError = HulyClientError
-export type CreateRecurringEventError = HulyClientError
-export type ListEventInstancesError = HulyClientError | RecurringEventNotFoundError
+type ListEventsError = HulyClientError
+type GetEventError = HulyClientError | EventNotFoundError
+type CreateEventError = HulyClientError
+type UpdateEventError = HulyClientError | EventNotFoundError
+type DeleteEventError = HulyClientError | EventNotFoundError
+type ListRecurringEventsError = HulyClientError
+type CreateRecurringEventError = HulyClientError
+type ListEventInstancesError = HulyClientError | RecurringEventNotFoundError
 
 // --- SDK Type Bridges ---
 
@@ -73,9 +73,10 @@ const descriptionAsMarkupRef = (desc: HulyEvent["description"]): MarkupBlobRef =
 // SDK: uploadMarkup returns MarkupBlobRef but Event.description expects a different union.
 const markupRefAsDescription = (
   ref: MarkupBlobRef | null
+  // eslint-disable-next-line no-restricted-syntax -- SDK type mismatch: MarkupBlobRef vs Event.description
 ): HulyEvent["description"] => ref as unknown as HulyEvent["description"]
 
-// SDK: clearing description requires empty string but type doesn't allow it.
+// eslint-disable-next-line no-restricted-syntax -- SDK: clearing description requires empty string but type doesn't allow it
 const emptyEventDescription = "" as unknown as HulyEvent["description"]
 
 // SDK: Data<Event> requires 'user' but server populates from auth context.
@@ -295,8 +296,6 @@ export const getEvent = (
 
     return result
   })
-
-export type { CreateEventResult, CreateRecurringEventResult, DeleteEventResult, UpdateEventResult }
 
 export const createEvent = (
   params: CreateEventParams

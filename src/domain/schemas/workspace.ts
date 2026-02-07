@@ -1,10 +1,9 @@
-import { Schema } from "effect"
+import { JSONSchema, Schema } from "effect"
 
 import {
   AccountId,
   EmptyParamsSchema,
   LimitParam,
-  makeJsonSchema,
   NonEmptyString,
   PersonUuid,
   RegionId,
@@ -223,13 +222,13 @@ export const GetRegionsParamsSchema = EmptyParamsSchema
 
 export type GetRegionsParams = Schema.Schema.Type<typeof GetRegionsParamsSchema>
 
-export const listWorkspaceMembersParamsJsonSchema = makeJsonSchema(ListWorkspaceMembersParamsSchema)
-export const updateMemberRoleParamsJsonSchema = makeJsonSchema(UpdateMemberRoleParamsSchema)
-export const listWorkspacesParamsJsonSchema = makeJsonSchema(ListWorkspacesParamsSchema)
-export const createWorkspaceParamsJsonSchema = makeJsonSchema(CreateWorkspaceParamsSchema)
-export const updateUserProfileParamsJsonSchema = makeJsonSchema(UpdateUserProfileParamsSchema)
-export const updateGuestSettingsParamsJsonSchema = makeJsonSchema(UpdateGuestSettingsParamsSchema)
-export const getRegionsParamsJsonSchema = makeJsonSchema(GetRegionsParamsSchema)
+export const listWorkspaceMembersParamsJsonSchema = JSONSchema.make(ListWorkspaceMembersParamsSchema)
+export const updateMemberRoleParamsJsonSchema = JSONSchema.make(UpdateMemberRoleParamsSchema)
+export const listWorkspacesParamsJsonSchema = JSONSchema.make(ListWorkspacesParamsSchema)
+export const createWorkspaceParamsJsonSchema = JSONSchema.make(CreateWorkspaceParamsSchema)
+export const updateUserProfileParamsJsonSchema = JSONSchema.make(UpdateUserProfileParamsSchema)
+export const updateGuestSettingsParamsJsonSchema = JSONSchema.make(UpdateGuestSettingsParamsSchema)
+export const getRegionsParamsJsonSchema = JSONSchema.make(GetRegionsParamsSchema)
 
 export const parseListWorkspaceMembersParams = Schema.decodeUnknown(ListWorkspaceMembersParamsSchema)
 export const parseUpdateMemberRoleParams = Schema.decodeUnknown(UpdateMemberRoleParamsSchema)

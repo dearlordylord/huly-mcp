@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { JSONSchema, Schema } from "effect"
 
 import {
   AccountUuid,
@@ -6,7 +6,6 @@ import {
   ChannelIdentifier,
   ChannelName,
   LimitParam,
-  makeJsonSchema,
   MessageId,
   NonEmptyString,
   PersonName,
@@ -324,18 +323,18 @@ export type DeleteThreadReplyParams = Schema.Schema.Type<typeof DeleteThreadRepl
 
 // --- JSON Schemas for MCP ---
 
-export const listChannelsParamsJsonSchema = makeJsonSchema(ListChannelsParamsSchema)
-export const getChannelParamsJsonSchema = makeJsonSchema(GetChannelParamsSchema)
-export const createChannelParamsJsonSchema = makeJsonSchema(CreateChannelParamsSchema)
-export const updateChannelParamsJsonSchema = makeJsonSchema(UpdateChannelParamsSchema)
-export const deleteChannelParamsJsonSchema = makeJsonSchema(DeleteChannelParamsSchema)
-export const listChannelMessagesParamsJsonSchema = makeJsonSchema(ListChannelMessagesParamsSchema)
-export const sendChannelMessageParamsJsonSchema = makeJsonSchema(SendChannelMessageParamsSchema)
-export const listDirectMessagesParamsJsonSchema = makeJsonSchema(ListDirectMessagesParamsSchema)
-export const listThreadRepliesParamsJsonSchema = makeJsonSchema(ListThreadRepliesParamsSchema)
-export const addThreadReplyParamsJsonSchema = makeJsonSchema(AddThreadReplyParamsSchema)
-export const updateThreadReplyParamsJsonSchema = makeJsonSchema(UpdateThreadReplyParamsSchema)
-export const deleteThreadReplyParamsJsonSchema = makeJsonSchema(DeleteThreadReplyParamsSchema)
+export const listChannelsParamsJsonSchema = JSONSchema.make(ListChannelsParamsSchema)
+export const getChannelParamsJsonSchema = JSONSchema.make(GetChannelParamsSchema)
+export const createChannelParamsJsonSchema = JSONSchema.make(CreateChannelParamsSchema)
+export const updateChannelParamsJsonSchema = JSONSchema.make(UpdateChannelParamsSchema)
+export const deleteChannelParamsJsonSchema = JSONSchema.make(DeleteChannelParamsSchema)
+export const listChannelMessagesParamsJsonSchema = JSONSchema.make(ListChannelMessagesParamsSchema)
+export const sendChannelMessageParamsJsonSchema = JSONSchema.make(SendChannelMessageParamsSchema)
+export const listDirectMessagesParamsJsonSchema = JSONSchema.make(ListDirectMessagesParamsSchema)
+export const listThreadRepliesParamsJsonSchema = JSONSchema.make(ListThreadRepliesParamsSchema)
+export const addThreadReplyParamsJsonSchema = JSONSchema.make(AddThreadReplyParamsSchema)
+export const updateThreadReplyParamsJsonSchema = JSONSchema.make(UpdateThreadReplyParamsSchema)
+export const deleteThreadReplyParamsJsonSchema = JSONSchema.make(DeleteThreadReplyParamsSchema)
 
 // --- Parsers ---
 

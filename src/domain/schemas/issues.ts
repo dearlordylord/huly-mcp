@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { JSONSchema, Schema } from "effect"
 
 import {
   ColorCode,
@@ -10,7 +10,6 @@ import {
   IssueIdentifier,
   IssueTemplateId,
   LimitParam,
-  makeJsonSchema,
   NonEmptyString,
   PersonId,
   PersonName,
@@ -48,8 +47,6 @@ export const PersonRefSchema = Schema.Struct({
   title: "PersonRef",
   description: "Reference to a person (assignee, reporter)"
 })
-
-export type PersonRef = Schema.Schema.Type<typeof PersonRefSchema>
 
 export const IssueSummarySchema = Schema.Struct({
   identifier: IssueIdentifier,
@@ -224,12 +221,12 @@ export const DeleteIssueParamsSchema = Schema.Struct({
 
 export type DeleteIssueParams = Schema.Schema.Type<typeof DeleteIssueParamsSchema>
 
-export const listIssuesParamsJsonSchema = makeJsonSchema(ListIssuesParamsSchema)
-export const getIssueParamsJsonSchema = makeJsonSchema(GetIssueParamsSchema)
-export const createIssueParamsJsonSchema = makeJsonSchema(CreateIssueParamsSchema)
-export const updateIssueParamsJsonSchema = makeJsonSchema(UpdateIssueParamsSchema)
-export const addLabelParamsJsonSchema = makeJsonSchema(AddLabelParamsSchema)
-export const deleteIssueParamsJsonSchema = makeJsonSchema(DeleteIssueParamsSchema)
+export const listIssuesParamsJsonSchema = JSONSchema.make(ListIssuesParamsSchema)
+export const getIssueParamsJsonSchema = JSONSchema.make(GetIssueParamsSchema)
+export const createIssueParamsJsonSchema = JSONSchema.make(CreateIssueParamsSchema)
+export const updateIssueParamsJsonSchema = JSONSchema.make(UpdateIssueParamsSchema)
+export const addLabelParamsJsonSchema = JSONSchema.make(AddLabelParamsSchema)
+export const deleteIssueParamsJsonSchema = JSONSchema.make(DeleteIssueParamsSchema)
 
 export const parseIssue = Schema.decodeUnknown(IssueSchema)
 export const parseIssueSummary = Schema.decodeUnknown(IssueSummarySchema)
@@ -375,12 +372,12 @@ export const DeleteComponentParamsSchema = Schema.Struct({
 
 export type DeleteComponentParams = Schema.Schema.Type<typeof DeleteComponentParamsSchema>
 
-export const listComponentsParamsJsonSchema = makeJsonSchema(ListComponentsParamsSchema)
-export const getComponentParamsJsonSchema = makeJsonSchema(GetComponentParamsSchema)
-export const createComponentParamsJsonSchema = makeJsonSchema(CreateComponentParamsSchema)
-export const updateComponentParamsJsonSchema = makeJsonSchema(UpdateComponentParamsSchema)
-export const setIssueComponentParamsJsonSchema = makeJsonSchema(SetIssueComponentParamsSchema)
-export const deleteComponentParamsJsonSchema = makeJsonSchema(DeleteComponentParamsSchema)
+export const listComponentsParamsJsonSchema = JSONSchema.make(ListComponentsParamsSchema)
+export const getComponentParamsJsonSchema = JSONSchema.make(GetComponentParamsSchema)
+export const createComponentParamsJsonSchema = JSONSchema.make(CreateComponentParamsSchema)
+export const updateComponentParamsJsonSchema = JSONSchema.make(UpdateComponentParamsSchema)
+export const setIssueComponentParamsJsonSchema = JSONSchema.make(SetIssueComponentParamsSchema)
+export const deleteComponentParamsJsonSchema = JSONSchema.make(DeleteComponentParamsSchema)
 
 export const parseComponent = Schema.decodeUnknown(ComponentSchema)
 export const parseComponentSummary = Schema.decodeUnknown(ComponentSummarySchema)
@@ -561,12 +558,12 @@ export const DeleteIssueTemplateParamsSchema = Schema.Struct({
 
 export type DeleteIssueTemplateParams = Schema.Schema.Type<typeof DeleteIssueTemplateParamsSchema>
 
-export const listIssueTemplatesParamsJsonSchema = makeJsonSchema(ListIssueTemplatesParamsSchema)
-export const getIssueTemplateParamsJsonSchema = makeJsonSchema(GetIssueTemplateParamsSchema)
-export const createIssueTemplateParamsJsonSchema = makeJsonSchema(CreateIssueTemplateParamsSchema)
-export const createIssueFromTemplateParamsJsonSchema = makeJsonSchema(CreateIssueFromTemplateParamsSchema)
-export const updateIssueTemplateParamsJsonSchema = makeJsonSchema(UpdateIssueTemplateParamsSchema)
-export const deleteIssueTemplateParamsJsonSchema = makeJsonSchema(DeleteIssueTemplateParamsSchema)
+export const listIssueTemplatesParamsJsonSchema = JSONSchema.make(ListIssueTemplatesParamsSchema)
+export const getIssueTemplateParamsJsonSchema = JSONSchema.make(GetIssueTemplateParamsSchema)
+export const createIssueTemplateParamsJsonSchema = JSONSchema.make(CreateIssueTemplateParamsSchema)
+export const createIssueFromTemplateParamsJsonSchema = JSONSchema.make(CreateIssueFromTemplateParamsSchema)
+export const updateIssueTemplateParamsJsonSchema = JSONSchema.make(UpdateIssueTemplateParamsSchema)
+export const deleteIssueTemplateParamsJsonSchema = JSONSchema.make(DeleteIssueTemplateParamsSchema)
 
 export const parseIssueTemplate = Schema.decodeUnknown(IssueTemplateSchema)
 export const parseIssueTemplateSummary = Schema.decodeUnknown(IssueTemplateSummarySchema)

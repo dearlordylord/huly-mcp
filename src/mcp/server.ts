@@ -6,7 +6,7 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js"
-import { Context, Effect, Layer, Ref, Schema } from "effect"
+import { Config, Context, Effect, Layer, Ref, Schema } from "effect"
 
 import type { HttpServerFactoryService, HttpTransportError } from "./http-transport.js"
 import { startHttpTransport } from "./http-transport.js"
@@ -18,9 +18,12 @@ import { assertExists } from "../utils/assertions.js"
 import { createUnknownToolError, toMcpResponse } from "./error-mapping.js"
 import { CATEGORY_NAMES, createFilteredRegistry, TOOL_DEFINITIONS, toolRegistry } from "./tools/index.js"
 
+// PKG_VERSION is injected by esbuild at build time via --define
+const VERSION: string = typeof PKG_VERSION !== "undefined" ? PKG_VERSION : "0.0.0-dev"
+
 export type McpTransportType = "stdio" | "http"
 
-export interface McpServerConfig {
+interface McpServerConfig {
   readonly transport: McpTransportType
   readonly httpPort?: number
   readonly httpHost?: string
@@ -53,7 +56,7 @@ const parseToolsets = (raw: string | undefined): ReadonlySet<string> | undefined
   return enabled.size > 0 ? enabled : undefined
 }
 
-export interface McpServerOperations {
+interface McpServerOperations {
   readonly run: () => Effect.Effect<void, McpServerError, HttpServerFactoryService>
   readonly stop: () => Effect.Effect<void, McpServerError>
 }
@@ -62,7 +65,7 @@ export interface McpServerOperations {
  * Create a configured MCP Server instance with tool handlers.
  * Used for both stdio and HTTP transports.
  */
-export const createMcpServer = (
+const createMcpServer = (
   hulyClient: HulyClient["Type"],
   storageClient: HulyStorageClient["Type"],
   workspaceClient?: WorkspaceClient["Type"],
@@ -75,7 +78,7 @@ export const createMcpServer = (
   const server = new Server(
     {
       name: "huly-mcp",
-      version: "1.0.0"
+      version: VERSION
     },
     {
       capabilities: {
@@ -131,7 +134,8 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
         const storageClient = yield* HulyStorageClient
         const workspaceClient = yield* WorkspaceClient
 
-        const enabledCategories = parseToolsets(process.env.TOOLSETS)
+        const toolsetsRaw = yield* Effect.orElseSucceed(Config.string("TOOLSETS"), () => "")
+        const enabledCategories = parseToolsets(toolsetsRaw || undefined)
 
         // TODO better harmony with config.transport
         const server = config.transport === "stdio"
@@ -160,7 +164,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                   catch: (e) =>
                     new McpServerError({
                       message: `Failed to connect stdio transport: ${String(e)}`,
-                      cause: e as Error
+                      cause: e
                     })
                 })
 
@@ -193,10 +197,10 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                   catch: (e) =>
                     new McpServerError({
                       message: `Failed to close server: ${String(e)}`,
-                      cause: e as Error
+                      cause: e
                     })
                 })
-              } else if (config.transport === "http") {
+              } else {
                 const port = config.httpPort ?? 3000
                 const host = config.httpHost ?? "127.0.0.1"
 
@@ -232,7 +236,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                   catch: (e) =>
                     new McpServerError({
                       message: `Failed to stop server: ${String(e)}`,
-                      cause: e as Error
+                      cause: e
                     })
                 })
               }

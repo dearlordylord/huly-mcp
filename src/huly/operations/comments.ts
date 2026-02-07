@@ -21,23 +21,23 @@ const tracker = require("@hcengineering/tracker").default as typeof import("@hce
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const chunter = require("@hcengineering/chunter").default as typeof import("@hcengineering/chunter").default
 
-export type ListCommentsError =
+type ListCommentsError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueNotFoundError
 
-export type AddCommentError =
+type AddCommentError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueNotFoundError
 
-export type UpdateCommentError =
+type UpdateCommentError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueNotFoundError
   | CommentNotFoundError
 
-export type DeleteCommentError =
+type DeleteCommentError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueNotFoundError
@@ -82,7 +82,7 @@ export const listComments = (
 
     const comments: Array<Comment> = messages.map((msg) => ({
       id: CommentId.make(msg._id),
-      body: msg.message ?? "",
+      body: msg.message,
       authorId: msg.modifiedBy,
       createdOn: msg.createdOn,
       modifiedOn: msg.modifiedOn,
@@ -91,8 +91,6 @@ export const listComments = (
 
     return comments
   })
-
-export type { AddCommentResult, DeleteCommentResult, UpdateCommentResult }
 
 /**
  * Add a comment to an issue.

@@ -19,7 +19,7 @@ import type { Express, Request, Response } from "express"
 /**
  * HTTP transport configuration.
  */
-export interface HttpTransportConfig {
+interface HttpTransportConfig {
   readonly port: number
   readonly host: string
 }
@@ -58,7 +58,7 @@ export interface HttpServerFactory {
 /**
  * Default HTTP server factory using SDK's createMcpExpressApp.
  */
-export const defaultHttpServerFactory: HttpServerFactory = {
+const defaultHttpServerFactory: HttpServerFactory = {
   createApp: (host: string) => createMcpExpressApp({ host }),
 
   listen: (app, port, host) =>
@@ -103,8 +103,8 @@ export const createMcpHandlers = (
   createServer: () => Server
 ): {
   post: (req: Request, res: Response) => Promise<void>
-  get: (req: Request, res: Response) => Promise<void>
-  delete: (req: Request, res: Response) => Promise<void>
+  get: (req: Request, res: Response) => void
+  delete: (req: Request, res: Response) => void
 } => {
   const post = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -112,6 +112,10 @@ export const createMcpHandlers = (
       // Stateless mode: no session ID generator, each request is independent
       const transport = new StreamableHTTPServerTransport({})
 
+      // SDK's StreamableHTTPServerTransport declares `implements Transport` but its
+      // property types (onmessage, send options) don't satisfy Transport under
+      // exactOptionalPropertyTypes. SDK bug — safe because the class genuinely
+      // implements the interface at runtime.
       await server.connect(transport as Transport)
       await transport.handleRequest(req, res, req.body)
 
@@ -137,7 +141,7 @@ export const createMcpHandlers = (
     }
   }
 
-  const get = async (_req: Request, res: Response): Promise<void> => {
+  const get = (_req: Request, res: Response): void => {
     res.status(405).json({
       jsonrpc: "2.0",
       error: {
@@ -148,7 +152,7 @@ export const createMcpHandlers = (
     })
   }
 
-  const del = async (_req: Request, res: Response): Promise<void> => {
+  const del = (_req: Request, res: Response): void => {
     res.status(405).json({
       jsonrpc: "2.0",
       error: {
@@ -222,19 +226,20 @@ export const startHttpTransport = (
       process.stderr.write(`MCP HTTP server listening on http://${config.host}:${config.port}/mcp\n`)
     })
 
-    // Wait for signal to shutdown - this keeps the server running
     yield* Effect.async<void, never>((resume) => {
+      const cleanup = () => {
+        process.off("SIGINT", shutdown)
+        process.off("SIGTERM", shutdown)
+      }
+
       const shutdown = () => {
+        cleanup()
         resume(Effect.void)
       }
 
       process.on("SIGINT", shutdown)
       process.on("SIGTERM", shutdown)
 
-      // Cleanup signal handlers when interrupted
-      return Effect.sync(() => {
-        process.off("SIGINT", shutdown)
-        process.off("SIGTERM", shutdown)
-      })
+      return Effect.sync(cleanup)
     })
   })
