@@ -101,7 +101,12 @@ export type IssueIdentifier = Schema.Schema.Type<typeof IssueIdentifier>
 
 // === Tier 3: Constrained String Domains ===
 
-export const Email = Schema.String.pipe(Schema.brand("Email"))
+export const Email = Schema.NonEmptyString.pipe(
+  Schema.pattern(/^[^@]+@[^@]+$/, {
+    message: () => "must contain exactly one @"
+  }),
+  Schema.brand("Email")
+)
 export type Email = Schema.Schema.Type<typeof Email>
 
 export const StatusName = Schema.String.pipe(Schema.brand("StatusName"))

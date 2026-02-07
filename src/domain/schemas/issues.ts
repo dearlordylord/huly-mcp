@@ -102,7 +102,7 @@ export const ListIssuesParamsSchema = Schema.Struct({
   descriptionSearch: Schema.optional(Schema.String.annotations({
     description: "Search issues by description content (fulltext search)"
   })),
-  component: Schema.optional(Schema.String.annotations({
+  component: Schema.optional(ComponentIdentifier.annotations({
     description: "Filter by component ID or label"
   })),
   limit: Schema.optional(
@@ -469,7 +469,7 @@ export const CreateIssueTemplateParamsSchema = Schema.Struct({
   assignee: Schema.optional(Email.annotations({
     description: "Default assignee email address"
   })),
-  component: Schema.optional(Schema.String.annotations({
+  component: Schema.optional(ComponentIdentifier.annotations({
     description: "Default component ID or label"
   })),
   estimation: Schema.optional(PositiveNumber.annotations({
@@ -533,7 +533,7 @@ export const UpdateIssueTemplateParamsSchema = Schema.Struct({
     })
   ),
   component: Schema.optional(
-    Schema.NullOr(Schema.String).annotations({
+    Schema.NullOr(ComponentIdentifier).annotations({
       description: "New default component ID or label (null to clear)"
     })
   ),
