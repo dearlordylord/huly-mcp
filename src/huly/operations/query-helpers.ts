@@ -1,4 +1,4 @@
-import type { Doc, DocumentQuery, FindOptions } from "@hcengineering/core"
+import type { Doc, FindOptions } from "@hcengineering/core"
 
 /**
  * Escape SQL LIKE wildcard characters in a string.
@@ -9,23 +9,6 @@ export const escapeLikeWildcards = (input: string): string =>
     .replace(/\\/g, "\\\\")
     .replace(/%/g, "\\%")
     .replace(/_/g, "\\_")
-
-/**
- * Add substring search to query using $like operator.
- * The $like operator performs SQL-style LIKE matching with % wildcards.
- */
-export const addSubstringSearch = <T extends Doc>(
-  query: DocumentQuery<T>,
-  field: keyof T & string,
-  searchTerm: string | undefined
-): DocumentQuery<T> => {
-  if (!searchTerm) return query
-  const escapedTerm = escapeLikeWildcards(searchTerm)
-  return {
-    ...query,
-    [field]: { $like: `%${escapedTerm}%` }
-  }
-}
 
 /**
  * Add lookup to FindOptions for relationship joins.

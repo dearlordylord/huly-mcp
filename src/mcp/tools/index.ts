@@ -56,7 +56,7 @@ type ToolRegistryMethods = {
   ) => Promise<McpToolResponse> | null
 }
 
-export type ToolRegistry = ToolRegistryData & ToolRegistryMethods
+type ToolRegistry = ToolRegistryData & ToolRegistryMethods
 
 const buildRegistry = (tools: ReadonlyArray<RegisteredTool>): ToolRegistry => {
   const map = new Map<string, RegisteredTool>(
@@ -78,6 +78,4 @@ export const createFilteredRegistry = (categories: ReadonlySet<string>): ToolReg
 
 export const toolRegistry: ToolRegistry = buildRegistry(allTools)
 
-export const TOOL_DEFINITIONS = Object.fromEntries(toolRegistry.tools) as Record<string, RegisteredTool>
-
-export type { RegisteredTool, ToolDefinition } from "./registry.js"
+export const TOOL_DEFINITIONS = Object.fromEntries(toolRegistry.tools)

@@ -8,6 +8,7 @@ import {
   mapParseCauseToMcp,
   createSuccessResponse,
   createUnknownToolError,
+  McpErrorCode,
 } from "../../src/mcp/error-mapping.js"
 import {
   HulyError,
@@ -21,7 +22,6 @@ import {
   InvalidFileDataError,
   FileNotFoundError,
   FileFetchError,
-  McpErrorCode,
 } from "../../src/huly/errors.js"
 
 describe("Error Mapping to MCP", () => {

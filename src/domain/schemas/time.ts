@@ -1,9 +1,8 @@
-import { Schema } from "effect"
+import { JSONSchema, Schema } from "effect"
 
 import {
   IssueIdentifier,
   LimitParam,
-  makeJsonSchema,
   NonEmptyString,
   PersonName,
   PositiveNumber,
@@ -221,14 +220,14 @@ export const DetailedTimeReportSchema = Schema.Struct({
 
 export type DetailedTimeReport = Schema.Schema.Type<typeof DetailedTimeReportSchema>
 
-export const logTimeParamsJsonSchema = makeJsonSchema(LogTimeParamsSchema)
-export const getTimeReportParamsJsonSchema = makeJsonSchema(GetTimeReportParamsSchema)
-export const listTimeSpendReportsParamsJsonSchema = makeJsonSchema(ListTimeSpendReportsParamsSchema)
-export const getDetailedTimeReportParamsJsonSchema = makeJsonSchema(GetDetailedTimeReportParamsSchema)
-export const listWorkSlotsParamsJsonSchema = makeJsonSchema(ListWorkSlotsParamsSchema)
-export const createWorkSlotParamsJsonSchema = makeJsonSchema(CreateWorkSlotParamsSchema)
-export const startTimerParamsJsonSchema = makeJsonSchema(StartTimerParamsSchema)
-export const stopTimerParamsJsonSchema = makeJsonSchema(StopTimerParamsSchema)
+export const logTimeParamsJsonSchema = JSONSchema.make(LogTimeParamsSchema)
+export const getTimeReportParamsJsonSchema = JSONSchema.make(GetTimeReportParamsSchema)
+export const listTimeSpendReportsParamsJsonSchema = JSONSchema.make(ListTimeSpendReportsParamsSchema)
+export const getDetailedTimeReportParamsJsonSchema = JSONSchema.make(GetDetailedTimeReportParamsSchema)
+export const listWorkSlotsParamsJsonSchema = JSONSchema.make(ListWorkSlotsParamsSchema)
+export const createWorkSlotParamsJsonSchema = JSONSchema.make(CreateWorkSlotParamsSchema)
+export const startTimerParamsJsonSchema = JSONSchema.make(StartTimerParamsSchema)
+export const stopTimerParamsJsonSchema = JSONSchema.make(StopTimerParamsSchema)
 
 export const parseLogTimeParams = Schema.decodeUnknown(LogTimeParamsSchema)
 export const parseGetTimeReportParams = Schema.decodeUnknown(GetTimeReportParamsSchema)

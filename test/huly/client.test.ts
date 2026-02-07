@@ -420,13 +420,6 @@ describe("Connection error classification", () => {
         expect(error.cause).toBe(cause)
       })
     )
-
-        it.effect("has mcpErrorCode", () =>
-      Effect.gen(function* () {
-        const error = new HulyConnectionError({ message: "timeout" })
-        expect(error.mcpErrorCode).toBe(-32603)
-      })
-    )
   })
 
   describe("HulyAuthError", () => {
@@ -434,13 +427,6 @@ describe("Connection error classification", () => {
       Effect.gen(function* () {
         const error = new HulyAuthError({ message: "invalid credentials" })
         expect(error._tag).toBe("HulyAuthError")
-      })
-    )
-
-        it.effect("has mcpErrorCode", () =>
-      Effect.gen(function* () {
-        const error = new HulyAuthError({ message: "invalid credentials" })
-        expect(error.mcpErrorCode).toBe(-32603)
       })
     )
   })

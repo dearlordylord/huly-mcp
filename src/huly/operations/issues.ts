@@ -116,38 +116,38 @@ const tags = require("@hcengineering/tags").default as typeof import("@hcenginee
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
 
-export type ListIssuesError =
+type ListIssuesError =
   | HulyClientError
   | HulyError
   | ProjectNotFoundError
   | InvalidStatusError
   | ComponentNotFoundError
 
-export type GetIssueError =
+type GetIssueError =
   | HulyClientError
   | HulyError
   | ProjectNotFoundError
   | IssueNotFoundError
 
-export type CreateIssueError =
+type CreateIssueError =
   | HulyClientError
   | ProjectNotFoundError
   | InvalidStatusError
   | PersonNotFoundError
 
-export type UpdateIssueError =
+type UpdateIssueError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueNotFoundError
   | InvalidStatusError
   | PersonNotFoundError
 
-export type AddLabelError =
+type AddLabelError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueNotFoundError
 
-export type DeleteIssueError =
+type DeleteIssueError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueNotFoundError
@@ -528,10 +528,6 @@ export const getIssue = (
     return result
   })
 
-export type { AddLabelResult, CreateIssueResult, DeleteIssueResult, UpdateIssueResult }
-export type { CreateComponentResult, DeleteComponentResult, SetIssueComponentResult, UpdateComponentResult }
-export type { CreateIssueTemplateResult, DeleteIssueTemplateResult, UpdateIssueTemplateResult }
-
 // --- Create Issue Operation ---
 
 /**
@@ -859,33 +855,33 @@ export const deleteIssue = (
 
 // --- Component Operations ---
 
-export type ListComponentsError =
+type ListComponentsError =
   | HulyClientError
   | ProjectNotFoundError
 
-export type GetComponentError =
+type GetComponentError =
   | HulyClientError
   | ProjectNotFoundError
   | ComponentNotFoundError
 
-export type CreateComponentError =
+type CreateComponentError =
   | HulyClientError
   | ProjectNotFoundError
   | PersonNotFoundError
 
-export type UpdateComponentError =
+type UpdateComponentError =
   | HulyClientError
   | ProjectNotFoundError
   | ComponentNotFoundError
   | PersonNotFoundError
 
-export type SetIssueComponentError =
+type SetIssueComponentError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueNotFoundError
   | ComponentNotFoundError
 
-export type DeleteComponentError =
+type DeleteComponentError =
   | HulyClientError
   | ProjectNotFoundError
   | ComponentNotFoundError
@@ -1132,36 +1128,36 @@ export const deleteComponent = (
 
 // --- Issue Template Operations ---
 
-export type ListIssueTemplatesError =
+type ListIssueTemplatesError =
   | HulyClientError
   | ProjectNotFoundError
 
-export type GetIssueTemplateError =
+type GetIssueTemplateError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueTemplateNotFoundError
 
-export type CreateIssueTemplateError =
+type CreateIssueTemplateError =
   | HulyClientError
   | ProjectNotFoundError
   | PersonNotFoundError
   | ComponentNotFoundError
 
-export type CreateIssueFromTemplateError =
+type CreateIssueFromTemplateError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueTemplateNotFoundError
   | InvalidStatusError
   | PersonNotFoundError
 
-export type UpdateIssueTemplateError =
+type UpdateIssueTemplateError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueTemplateNotFoundError
   | PersonNotFoundError
   | ComponentNotFoundError
 
-export type DeleteIssueTemplateError =
+type DeleteIssueTemplateError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueTemplateNotFoundError

@@ -5,6 +5,7 @@ import tseslint from "typescript-eslint"
 import functional from "eslint-plugin-functional"
 import _import from "eslint-plugin-import"
 import simpleImportSort from "eslint-plugin-simple-import-sort"
+import importX from "eslint-plugin-import-x"
 import sortDestructureKeys from "eslint-plugin-sort-destructure-keys"
 
 export default [
@@ -71,6 +72,12 @@ export default [
         varsIgnorePattern: "^_"
       }],
       "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/no-unnecessary-type-assertion": "error",
+      "@typescript-eslint/no-unnecessary-condition": "error",
+      "no-restricted-syntax": ["error", {
+        selector: "TSAsExpression > TSAsExpression",
+        message: "Double type assertion (as A as B). Requires eslint-disable with justification."
+      }],
 
       // Code quality
       "object-shorthand": "error",
@@ -103,6 +110,26 @@ export default [
           trailingCommas: "never"
         }
       }]
+    }
+  },
+
+  // Dead export detection (import-x supports flat config, unlike import/no-unused-modules)
+  {
+    plugins: {
+      "import-x": importX
+    },
+    settings: {
+      "import-x/parsers": {
+        "@typescript-eslint/parser": [".ts", ".tsx"]
+      },
+      "import-x/resolver": {
+        typescript: {
+          alwaysTryTypes: true
+        }
+      }
+    },
+    rules: {
+      "import-x/no-unused-modules": ["error", { unusedExports: true }]
     }
   }
 ]

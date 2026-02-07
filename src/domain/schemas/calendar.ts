@@ -1,15 +1,6 @@
-import { Schema } from "effect"
+import { JSONSchema, Schema } from "effect"
 
-import {
-  Email,
-  EventId,
-  LimitParam,
-  makeJsonSchema,
-  NonEmptyString,
-  PersonId,
-  PersonName,
-  Timestamp
-} from "./shared.js"
+import { Email, EventId, LimitParam, NonEmptyString, PersonId, PersonName, Timestamp } from "./shared.js"
 
 export const VisibilityValues = ["public", "freeBusy", "private"] as const
 
@@ -391,14 +382,14 @@ export type ListEventInstancesParams = Schema.Schema.Type<typeof ListEventInstan
 
 // --- JSON schemas for MCP ---
 
-export const listEventsParamsJsonSchema = makeJsonSchema(ListEventsParamsSchema)
-export const getEventParamsJsonSchema = makeJsonSchema(GetEventParamsSchema)
-export const createEventParamsJsonSchema = makeJsonSchema(CreateEventParamsSchema)
-export const updateEventParamsJsonSchema = makeJsonSchema(UpdateEventParamsSchema)
-export const deleteEventParamsJsonSchema = makeJsonSchema(DeleteEventParamsSchema)
-export const listRecurringEventsParamsJsonSchema = makeJsonSchema(ListRecurringEventsParamsSchema)
-export const createRecurringEventParamsJsonSchema = makeJsonSchema(CreateRecurringEventParamsSchema)
-export const listEventInstancesParamsJsonSchema = makeJsonSchema(ListEventInstancesParamsSchema)
+export const listEventsParamsJsonSchema = JSONSchema.make(ListEventsParamsSchema)
+export const getEventParamsJsonSchema = JSONSchema.make(GetEventParamsSchema)
+export const createEventParamsJsonSchema = JSONSchema.make(CreateEventParamsSchema)
+export const updateEventParamsJsonSchema = JSONSchema.make(UpdateEventParamsSchema)
+export const deleteEventParamsJsonSchema = JSONSchema.make(DeleteEventParamsSchema)
+export const listRecurringEventsParamsJsonSchema = JSONSchema.make(ListRecurringEventsParamsSchema)
+export const createRecurringEventParamsJsonSchema = JSONSchema.make(CreateRecurringEventParamsSchema)
+export const listEventInstancesParamsJsonSchema = JSONSchema.make(ListEventInstancesParamsSchema)
 
 // --- Parsers ---
 

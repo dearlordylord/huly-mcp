@@ -8,3 +8,4 @@ dist/
 COMPARISON.md
 .env.production
 CLAUDE.local.md
+.worktrees/

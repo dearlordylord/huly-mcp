@@ -302,32 +302,6 @@ describe("listComments", () => {
       })
     )
 
-    it.effect("handles null message as empty string body", () =>
-      Effect.gen(function* () {
-        const project = makeProject({ identifier: "TEST" })
-        const issue = makeIssue({ identifier: "TEST-1", number: 1 })
-        const messages = [
-          makeChatMessage({
-            _id: "msg-1" as Ref<ChatMessage>,
-            message: undefined as unknown as string,
-            attachedTo: "issue-1" as Ref<Doc>,
-          }),
-        ]
-
-        const testLayer = createTestLayerWithMocks({
-          projects: [project],
-          issues: [issue],
-          messages,
-        })
-
-        const result = yield* listComments({
-          project: "TEST",
-          issueIdentifier: "TEST-1",
-        }).pipe(Effect.provide(testLayer))
-
-        expect(result[0].body).toBe("")
-      })
-    )
   })
 
   describe("identifier parsing", () => {

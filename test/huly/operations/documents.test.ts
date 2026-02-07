@@ -1,11 +1,11 @@
 import { describe, it } from "@effect/vitest"
 import { expect } from "vitest"
 import { Effect } from "effect"
-import type {
-  Doc,
-  FindResult,
-  Ref,
-  Space
+import {
+  toFindResult,
+  type Doc,
+  type Ref,
+  type Space
 } from "@hcengineering/core"
 import type { Document as HulyDocument, Teamspace as HulyTeamspace } from "@hcengineering/document"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
@@ -81,7 +81,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       if (q.archived !== undefined) {
         filtered = filtered.filter(ts => ts.archived === q.archived)
       }
-      return Effect.succeed(filtered as unknown as FindResult<Doc>)
+      return Effect.succeed(toFindResult(filtered as Doc[]))
     }
     if (_class === documentPlugin.class.Document) {
       if (config.captureDocumentQuery) {
@@ -100,9 +100,9 @@ const createTestLayerWithMocks = (config: MockConfig) => {
         const direction = opts.sort.rank
         filtered = filtered.sort((a, b) => direction * a.rank.localeCompare(b.rank))
       }
-      return Effect.succeed(filtered as unknown as FindResult<Doc>)
+      return Effect.succeed(toFindResult(filtered as Doc[]))
     }
-    return Effect.succeed([] as unknown as FindResult<Doc>)
+    return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
 
   const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown, query: unknown) => {

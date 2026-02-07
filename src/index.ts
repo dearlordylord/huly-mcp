@@ -11,7 +11,7 @@ import type { ConfigError } from "effect"
 import { Config, Effect, Layer } from "effect"
 import fakeIndexedDB from "fake-indexeddb"
 
-import { type HulyConfigError, HulyConfigService } from "./config/config.js"
+import { type ConfigValidationError, HulyConfigService } from "./config/config.js"
 import { HulyClient, type HulyClientError } from "./huly/client.js"
 import { HulyStorageClient, type StorageClientError } from "./huly/storage.js"
 import { WorkspaceClient, type WorkspaceClientError } from "./huly/workspace-client.js"
@@ -37,8 +37,8 @@ if (!(globalThis as Record<string, unknown>).navigator) {
   })
 }
 
-export type AppError =
-  | HulyConfigError
+type AppError =
+  | ConfigValidationError
   | HulyClientError
   | StorageClientError
   | WorkspaceClientError
@@ -65,14 +65,14 @@ const getAutoExit = Config.boolean("MCP_AUTO_EXIT").pipe(
   Config.withDefault(false)
 )
 
-export const buildAppLayer = (
+const buildAppLayer = (
   transport: McpTransportType,
   httpPort: number,
   httpHost: string,
   autoExit: boolean
 ): Layer.Layer<
   McpServerService | HttpServerFactoryService,
-  HulyConfigError | HulyClientError | StorageClientError | WorkspaceClientError,
+  ConfigValidationError | HulyClientError | StorageClientError | WorkspaceClientError,
   never
 > => {
   const configLayer = HulyConfigService.layer

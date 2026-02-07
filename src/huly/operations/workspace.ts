@@ -41,16 +41,16 @@ const toHulyAccountRole = (role: AccountRole): HulyAccountRole => {
   return role as HulyAccountRole
 }
 
-export type ListWorkspaceMembersError = WorkspaceClientError
-export type UpdateMemberRoleError = WorkspaceClientError
-export type GetWorkspaceInfoError = WorkspaceClientError
-export type ListWorkspacesError = WorkspaceClientError
-export type CreateWorkspaceError = WorkspaceClientError
-export type DeleteWorkspaceError = WorkspaceClientError
-export type GetUserProfileError = WorkspaceClientError
-export type UpdateUserProfileError = WorkspaceClientError
-export type UpdateGuestSettingsError = WorkspaceClientError
-export type GetRegionsError = WorkspaceClientError
+type ListWorkspaceMembersError = WorkspaceClientError
+type UpdateMemberRoleError = WorkspaceClientError
+type GetWorkspaceInfoError = WorkspaceClientError
+type ListWorkspacesError = WorkspaceClientError
+type CreateWorkspaceError = WorkspaceClientError
+type DeleteWorkspaceError = WorkspaceClientError
+type GetUserProfileError = WorkspaceClientError
+type UpdateUserProfileError = WorkspaceClientError
+type UpdateGuestSettingsError = WorkspaceClientError
+type GetRegionsError = WorkspaceClientError
 
 const formatVersion = (info: WorkspaceInfoWithStatus): string =>
   `${info.versionMajor}.${info.versionMinor}.${info.versionPatch}`
@@ -88,7 +88,7 @@ export const listWorkspaceMembers = (
           if (Option.isSome(personInfoResult)) {
             const personInfo = personInfoResult.value
             name = personInfo.name
-            const emailSocialId = personInfo.socialIds?.find((s) => s.type === "email")
+            const emailSocialId = personInfo.socialIds.find((s) => s.type === "email")
             email = emailSocialId?.value
           }
 
@@ -103,14 +103,6 @@ export const listWorkspaceMembers = (
     )
     return result
   })
-
-export type {
-  CreateWorkspaceResult,
-  DeleteWorkspaceResult,
-  UpdateGuestSettingsResult,
-  UpdateMemberRoleResult,
-  UpdateUserProfileResult
-}
 
 export const updateMemberRole = (
   params: UpdateMemberRoleParams
@@ -253,7 +245,7 @@ export const getUserProfile = (
       country: profile.country,
       website: profile.website,
       socialLinks: profile.socialLinks,
-      isPublic: profile.isPublic ?? false
+      isPublic: profile.isPublic
     }
   })
 

@@ -15,7 +15,7 @@ import { HulyClient, type HulyClientError } from "../client.js"
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
 
-export type FulltextSearchError = HulyClientError
+type FulltextSearchError = HulyClientError
 
 /**
  * Perform a fulltext search across all indexed content.
@@ -47,7 +47,7 @@ export const fulltextSearch = (
       }
     )
 
-    const total = results.total ?? results.length
+    const total = results.total
 
     // Map results to a consistent format
     const items = results.map((doc) => ({
