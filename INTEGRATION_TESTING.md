@@ -50,11 +50,11 @@ Run all operations in one batch:
 ```bash
 printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}
 {"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}
-{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_issues","arguments":{"project":"YOUR_PROJECT","limit":2}},"id":3}
+{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_issues","arguments":{"project":"RFFR","limit":2}},"id":3}
 {"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_teamspaces","arguments":{}},"id":4}
 {"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_persons","arguments":{"limit":3}},"id":5}
 {"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_channels","arguments":{}},"id":6}
-{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_milestones","arguments":{"project":"YOUR_PROJECT"}},"id":7}
+{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_milestones","arguments":{"project":"RFFR"}},"id":7}
 {"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_events","arguments":{"limit":3}},"id":8}
 ' | MCP_AUTO_EXIT=true node dist/index.cjs 2>&1 | grep -E '"id":[2-8]'
 ```
@@ -67,17 +67,17 @@ printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024
 # List projects
 printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}\n' | node dist/index.cjs
 
-# List issues (replace PROJECT with actual identifier)
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_issues","arguments":{"project":"PROJECT","limit":5}},"id":2}\n' | node dist/index.cjs
+# List issues
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_issues","arguments":{"project":"RFFR","limit":5}},"id":2}\n' | node dist/index.cjs
 
 # Create issue
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_issue","arguments":{"project":"PROJECT","title":"Test Issue"}},"id":2}\n' | node dist/index.cjs
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_issue","arguments":{"project":"RFFR","title":"Test Issue"}},"id":2}\n' | node dist/index.cjs
 
 # Get issue
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_issue","arguments":{"project":"PROJECT","identifier":"1"}},"id":2}\n' | node dist/index.cjs
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_issue","arguments":{"project":"RFFR","identifier":"1"}},"id":2}\n' | node dist/index.cjs
 
 # Delete issue
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"delete_issue","arguments":{"project":"PROJECT","identifier":"123"}},"id":2}\n' | node dist/index.cjs
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"delete_issue","arguments":{"project":"RFFR","identifier":"123"}},"id":2}\n' | node dist/index.cjs
 ```
 
 ### Issue CRUD with Update (requires delay)
@@ -86,20 +86,20 @@ printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":
 # Create issue
 INIT='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
 
-printf "$INIT"'\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_issue","arguments":{"project":"PROJECT","title":"Test Issue","priority":"low"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep '"id":2'
-# Note the identifier (e.g., PROJECT-123)
+printf "$INIT"'\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_issue","arguments":{"project":"RFFR","title":"Test Issue","priority":"low"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep '"id":2'
+# Note the identifier (e.g., RFFR-123)
 
 # Update issue
-printf "$INIT"'\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"update_issue","arguments":{"project":"PROJECT","identifier":"123","title":"Updated Title","priority":"high"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep '"id":2'
+printf "$INIT"'\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"update_issue","arguments":{"project":"RFFR","identifier":"123","title":"Updated Title","priority":"high"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep '"id":2'
 
 # IMPORTANT: Wait for eventual consistency
 sleep 2
 
 # Verify update (separate connection after delay)
-printf "$INIT"'\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_issue","arguments":{"project":"PROJECT","identifier":"123"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep '"id":2'
+printf "$INIT"'\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_issue","arguments":{"project":"RFFR","identifier":"123"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep '"id":2'
 
 # Cleanup
-printf "$INIT"'\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"delete_issue","arguments":{"project":"PROJECT","identifier":"123"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep '"id":2'
+printf "$INIT"'\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"delete_issue","arguments":{"project":"RFFR","identifier":"123"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep '"id":2'
 ```
 
 ### Documents
@@ -142,10 +142,10 @@ printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":
 
 ```bash
 # List milestones
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_milestones","arguments":{"project":"PROJECT"}},"id":2}\n' | node dist/index.cjs
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_milestones","arguments":{"project":"RFFR"}},"id":2}\n' | node dist/index.cjs
 
 # Create milestone (targetDate is Unix timestamp in ms)
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_milestone","arguments":{"project":"PROJECT","label":"Test","targetDate":1772467200000}},"id":2}\n' | node dist/index.cjs
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_milestone","arguments":{"project":"RFFR","label":"Test","targetDate":1772467200000}},"id":2}\n' | node dist/index.cjs
 ```
 
 ### Calendar & Time
@@ -182,7 +182,7 @@ Each test follows: **Create → Read → Delete** to ensure clean state.
 
 ```bash
 # Search issues by title
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_issues","arguments":{"project":"PROJECT","titleSearch":"bug","limit":3}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_issues","arguments":{"project":"RFFR","titleSearch":"bug","limit":3}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
 
 # Search documents by content
 printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_documents","arguments":{"teamspace":"TEAMSPACE","contentSearch":"api","limit":3}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
@@ -202,19 +202,19 @@ printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":
 
 ```bash
 # Create component
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_component","arguments":{"project":"PROJECT","label":"Test Component","description":"Integration test component"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs | tee /tmp/component.json
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_component","arguments":{"project":"RFFR","label":"Test Component","description":"Integration test component"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs | tee /tmp/component.json
 
 # Extract component ID from response
 COMPONENT_ID=$(jq -r '.result.content[0].text | fromjson | .id' /tmp/component.json)
 
 # List components (verify created)
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_components","arguments":{"project":"PROJECT"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_components","arguments":{"project":"RFFR"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
 
 # Get component details
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_component","arguments":{"project":"PROJECT","component":"'$COMPONENT_ID'"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_component","arguments":{"project":"RFFR","component":"'$COMPONENT_ID'"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
 
 # CLEANUP: Delete component
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"delete_component","arguments":{"project":"PROJECT","component":"'$COMPONENT_ID'"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"delete_component","arguments":{"project":"RFFR","component":"'$COMPONENT_ID'"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
 ```
 
 ---
@@ -225,25 +225,25 @@ printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":
 
 ```bash
 # Create issue template
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_issue_template","arguments":{"project":"PROJECT","title":"Bug Report Template","description":"## Steps to Reproduce\n\n## Expected\n\n## Actual","priority":"high"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs | tee /tmp/template.json
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_issue_template","arguments":{"project":"RFFR","title":"Bug Report Template","description":"## Steps to Reproduce\n\n## Expected\n\n## Actual","priority":"high"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs | tee /tmp/template.json
 
 TEMPLATE_ID=$(jq -r '.result.content[0].text | fromjson | .id' /tmp/template.json)
 
 # List templates (verify created)
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_issue_templates","arguments":{"project":"PROJECT"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_issue_templates","arguments":{"project":"RFFR"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
 
 # Create issue from template
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_issue_from_template","arguments":{"project":"PROJECT","template":"'$TEMPLATE_ID'","title":"Actual Bug: Login fails"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs | tee /tmp/issue_from_template.json
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_issue_from_template","arguments":{"project":"RFFR","template":"'$TEMPLATE_ID'","title":"Actual Bug: Login fails"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs | tee /tmp/issue_from_template.json
 
 ISSUE_ID=$(jq -r '.result.content[0].text | fromjson | .identifier' /tmp/issue_from_template.json)
 
 # Verify issue has template defaults (priority=high, description from template)
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_issue","arguments":{"project":"PROJECT","identifier":"'$ISSUE_ID'"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_issue","arguments":{"project":"RFFR","identifier":"'$ISSUE_ID'"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
 
 # CLEANUP: Delete issue and template
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"delete_issue","arguments":{"project":"PROJECT","identifier":"'$ISSUE_ID'"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"delete_issue","arguments":{"project":"RFFR","identifier":"'$ISSUE_ID'"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
 
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"delete_issue_template","arguments":{"project":"PROJECT","template":"'$TEMPLATE_ID'"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"delete_issue_template","arguments":{"project":"RFFR","template":"'$TEMPLATE_ID'"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
 ```
 
 ---
@@ -278,7 +278,7 @@ printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":
 
 ```bash
 # List activity to get a message ID
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_issues","arguments":{"project":"PROJECT","limit":1}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs | tee /tmp/issue_for_activity.json
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_issues","arguments":{"project":"RFFR","limit":1}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs | tee /tmp/issue_for_activity.json
 
 ISSUE_ID=$(jq -r '.result.content[0].text | fromjson | .issues[0].id' /tmp/issue_for_activity.json)
 
@@ -325,7 +325,7 @@ printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":
 echo "Test attachment content" > /tmp/test_attachment.txt
 
 # Add attachment to issue
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"add_issue_attachment","arguments":{"project":"PROJECT","identifier":"1","filePath":"/tmp/test_attachment.txt","filename":"test.txt","contentType":"text/plain","description":"Test attachment"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs | tee /tmp/attachment.json
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"add_issue_attachment","arguments":{"project":"RFFR","identifier":"1","filePath":"/tmp/test_attachment.txt","filename":"test.txt","contentType":"text/plain","description":"Test attachment"}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs | tee /tmp/attachment.json
 
 ATTACHMENT_ID=$(jq -r '.result.content[0].text | fromjson | .id' /tmp/attachment.json)
 
@@ -350,11 +350,11 @@ rm /tmp/test_attachment.txt
 ```bash
 # List issues (now uses lookup for assignee)
 # Should make 1 query instead of 2
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_issues","arguments":{"project":"PROJECT","limit":10}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_issues","arguments":{"project":"RFFR","limit":10}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
 
 # List time reports (now uses lookups for issue + person)
 # Should make 1 query instead of 3
-printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_time_spend_reports","arguments":{"project":"PROJECT","limit":10}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
+printf '..initialize..\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_time_spend_reports","arguments":{"project":"RFFR","limit":10}},"id":2}\n' | MCP_AUTO_EXIT=true node dist/index.cjs
 ```
 
 **Verification**: Enable Huly client debug logging to count queries (implementation-specific).
@@ -369,7 +369,7 @@ Complete test cycle for new capabilities:
 #!/bin/bash
 set -e
 
-PROJECT="YOUR_PROJECT"
+PROJECT="RFFR"
 TEAMSPACE="YOUR_TEAMSPACE"
 CHANNEL="general"
 
