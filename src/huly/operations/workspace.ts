@@ -88,7 +88,7 @@ export const listWorkspaceMembers = (
           if (Option.isSome(personInfoResult)) {
             const personInfo = personInfoResult.value
             name = personInfo.name
-            const emailSocialId = personInfo.socialIds?.find((s) => s.type === "email")
+            const emailSocialId = personInfo.socialIds.find((s) => s.type === "email")
             email = emailSocialId?.value
           }
 
@@ -253,7 +253,7 @@ export const getUserProfile = (
       country: profile.country,
       website: profile.website,
       socialLinks: profile.socialLinks,
-      isPublic: profile.isPublic ?? false
+      isPublic: profile.isPublic
     }
   })
 

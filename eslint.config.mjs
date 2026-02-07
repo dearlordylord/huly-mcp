@@ -71,6 +71,7 @@ export default [
         varsIgnorePattern: "^_"
       }],
       "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/no-unnecessary-condition": "error",
 
       // Code quality
       "object-shorthand": "error",
