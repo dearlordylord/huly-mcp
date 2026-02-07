@@ -1,17 +1,9 @@
-import type { ActivityMessage } from "@hcengineering/activity"
-import type {
-  Channel as HulyChannel,
-  ChatMessage,
-  DirectMessage as HulyDirectMessage,
-  ThreadMessage as HulyThreadMessage
-} from "@hcengineering/chunter"
+import type { Channel as HulyChannel, ChatMessage, DirectMessage as HulyDirectMessage } from "@hcengineering/chunter"
 import type { Employee as HulyEmployee, Person, SocialIdentity, SocialIdentityRef } from "@hcengineering/contact"
 import {
   type AccountUuid as HulyAccountUuid,
   type AttachedData,
-  type Class,
   type Data,
-  type Doc,
   type DocumentUpdate,
   generateId,
   type Markup,
@@ -25,46 +17,30 @@ import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown
 import { Effect } from "effect"
 
 import type {
-  AddThreadReplyParams,
   Channel,
   ChannelSummary,
   CreateChannelParams,
   DeleteChannelParams,
-  DeleteThreadReplyParams,
   DirectMessageSummary,
   GetChannelParams,
   ListChannelMessagesParams,
   ListChannelsParams,
   ListDirectMessagesParams,
-  ListThreadRepliesParams,
   MessageSummary,
   SendChannelMessageParams,
-  ThreadMessage,
-  UpdateChannelParams,
-  UpdateThreadReplyParams
+  UpdateChannelParams
 } from "../../domain/schemas.js"
 import type {
-  AddThreadReplyResult,
   CreateChannelResult,
   DeleteChannelResult,
-  DeleteThreadReplyResult,
   ListChannelMessagesResult,
   ListDirectMessagesResult,
-  ListThreadRepliesResult,
   SendChannelMessageResult,
-  UpdateChannelResult,
-  UpdateThreadReplyResult
+  UpdateChannelResult
 } from "../../domain/schemas/channels.js"
-import {
-  AccountUuid,
-  ChannelId,
-  ChannelName,
-  MessageId,
-  PersonName,
-  ThreadReplyId
-} from "../../domain/schemas/shared.js"
+import { AccountUuid, ChannelId, ChannelName, MessageId, PersonName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import { ChannelNotFoundError, MessageNotFoundError, ThreadReplyNotFoundError } from "../errors.js"
+import { ChannelNotFoundError } from "../errors.js"
 import { escapeLikeWildcards } from "./query-helpers.js"
 import { toRef } from "./shared.js"
 
@@ -101,41 +77,20 @@ type SendChannelMessageError =
 
 type ListDirectMessagesError = HulyClientError
 
-type ListThreadRepliesError =
-  | HulyClientError
-  | ChannelNotFoundError
-  | MessageNotFoundError
-
-type AddThreadReplyError =
-  | HulyClientError
-  | ChannelNotFoundError
-  | MessageNotFoundError
-
-type UpdateThreadReplyError =
-  | HulyClientError
-  | ChannelNotFoundError
-  | MessageNotFoundError
-  | ThreadReplyNotFoundError
-
-type DeleteThreadReplyError =
-  | HulyClientError
-  | ChannelNotFoundError
-  | MessageNotFoundError
-  | ThreadReplyNotFoundError
-
 // --- SDK Type Bridges ---
 
 // SDK: PersonId and SocialIdentityRef are the same underlying string but typed differently.
 const personIdsAsSocialIdentityRefs = (
   ids: Array<PersonId>
-  // eslint-disable-next-line no-restricted-syntax -- SDK type mismatch: PersonId vs SocialIdentityRef
+  // eslint-disable-next-line no-restricted-syntax -- PersonId and SocialIdentityRef are identical string brands in @hcengineering/core; no single-step cast exists
 ): Array<SocialIdentityRef> => ids as unknown as Array<SocialIdentityRef>
 
+// SDK: jsonToMarkup return type doesn't match Markup; cast contained here.
 const jsonAsMarkup = (json: ReturnType<typeof markdownToMarkup>): Markup => jsonToMarkup(json)
 
 // --- Helpers ---
 
-const findChannel = (
+export const findChannel = (
   identifier: string
 ): Effect.Effect<
   { client: HulyClient["Type"]; channel: HulyChannel },
@@ -164,12 +119,12 @@ const findChannel = (
     return { client, channel }
   })
 
-const markupToMarkdownString = (markup: Markup): string => {
+export const markupToMarkdownString = (markup: Markup): string => {
   const json = markupToJSON(markup)
   return markupToMarkdown(json, { refUrl: "", imageUrl: "" })
 }
 
-const markdownToMarkupString = (markdown: string): Markup => {
+export const markdownToMarkupString = (markdown: string): Markup => {
   const json = markdownToMarkup(markdown, { refUrl: "", imageUrl: "" })
   return jsonAsMarkup(json)
 }
@@ -179,7 +134,7 @@ const markdownToMarkupString = (markdown: string): Markup => {
  * SocialIdentity._id (typed as Ref<SocialIdentity> & PersonId) has attachedTo pointing to Person.
  * The PersonId from Doc.modifiedBy is the same string value as SocialIdentity._id.
  */
-const buildSocialIdToPersonNameMap = (
+export const buildSocialIdToPersonNameMap = (
   client: HulyClient["Type"],
   socialIds: Array<PersonId>
 ): Effect.Effect<Map<string, string>, HulyClientError> =>
@@ -463,7 +418,7 @@ export const listChannelMessages = (
     const socialIdToName = yield* buildSocialIdToPersonNameMap(client, uniqueSocialIds)
 
     const summaries: Array<MessageSummary> = messages.map((msg) => {
-      const senderName = msg.modifiedBy ? socialIdToName.get(msg.modifiedBy) : undefined
+      const senderName = socialIdToName.get(msg.modifiedBy)
       return {
         id: MessageId.make(msg._id),
         body: markupToMarkdownString(msg.message),
@@ -548,13 +503,12 @@ export const listDirectMessages = (
     const accountUuidToName = yield* buildAccountUuidToNameMap(client, uniqueAccountUuids)
 
     const summaries: Array<DirectMessageSummary> = dms.map((dm) => {
-      const members = dm.members
-      const participants = members
+      const participants = dm.members
         .map((m) => accountUuidToName.get(m))
         .filter((n): n is string => n !== undefined)
         .map((n) => PersonName.make(n))
 
-      const participantIds = members.map((m) => AccountUuid.make(m))
+      const participantIds = dm.members.map((m) => AccountUuid.make(m))
 
       return {
         id: ChannelId.make(dm._id),
@@ -566,204 +520,4 @@ export const listDirectMessages = (
     })
 
     return { conversations: summaries, total }
-  })
-
-// --- Thread Message Operations ---
-
-/**
- * Find a message in a channel by ID.
- * Returns the client, channel, and message.
- */
-const findMessage = (
-  channelIdentifier: string,
-  messageId: string
-): Effect.Effect<
-  { client: HulyClient["Type"]; channel: HulyChannel; message: ChatMessage },
-  ChannelNotFoundError | MessageNotFoundError | HulyClientError,
-  HulyClient
-> =>
-  Effect.gen(function*() {
-    const { channel, client } = yield* findChannel(channelIdentifier)
-
-    const message = yield* client.findOne<ChatMessage>(
-      chunter.class.ChatMessage,
-      {
-        _id: toRef<ChatMessage>(messageId),
-        space: channel._id
-      }
-    )
-
-    if (message === undefined) {
-      return yield* new MessageNotFoundError({ messageId, channel: channelIdentifier })
-    }
-
-    return { client, channel, message }
-  })
-
-/**
- * List replies in a thread.
- * Results sorted by creation date ascending (oldest first).
- */
-export const listThreadReplies = (
-  params: ListThreadRepliesParams
-): Effect.Effect<ListThreadRepliesResult, ListThreadRepliesError, HulyClient> =>
-  Effect.gen(function*() {
-    const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
-
-    const limit = Math.min(params.limit ?? 50, 200)
-
-    const replies = yield* client.findAll<HulyThreadMessage>(
-      chunter.class.ThreadMessage,
-      {
-        attachedTo: toRef<ActivityMessage>(message._id),
-        space: channel._id
-      },
-      {
-        limit,
-        sort: {
-          createdOn: SortingOrder.Ascending
-        }
-      }
-    )
-
-    const total = replies.total
-
-    const uniqueSocialIds = [
-      ...new Set(
-        replies
-          .map((msg) => msg.modifiedBy)
-      )
-    ]
-
-    const socialIdToName = yield* buildSocialIdToPersonNameMap(client, uniqueSocialIds)
-
-    const threadMessages: Array<ThreadMessage> = replies.map((msg) => {
-      const senderName = msg.modifiedBy ? socialIdToName.get(msg.modifiedBy) : undefined
-      return {
-        id: ThreadReplyId.make(msg._id),
-        body: markupToMarkdownString(msg.message),
-        sender: senderName !== undefined ? PersonName.make(senderName) : undefined,
-        senderId: msg.modifiedBy,
-        createdOn: msg.createdOn,
-        modifiedOn: msg.modifiedOn,
-        editedOn: msg.editedOn
-      }
-    })
-
-    return { replies: threadMessages, total }
-  })
-
-/**
- * Add a reply to a message thread.
- */
-export const addThreadReply = (
-  params: AddThreadReplyParams
-): Effect.Effect<AddThreadReplyResult, AddThreadReplyError, HulyClient> =>
-  Effect.gen(function*() {
-    const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
-
-    const replyId: Ref<HulyThreadMessage> = generateId()
-    const markup = markdownToMarkupString(params.body)
-
-    // ThreadMessage requires attachedTo, attachedToClass, objectId, objectClass
-    // attachedTo points to the parent message
-    // objectId/objectClass point to the channel (the object the thread is about)
-    const replyData: AttachedData<HulyThreadMessage> = {
-      message: markup,
-      attachments: 0,
-      objectId: toRef<Doc>(channel._id),
-      objectClass: toRef<Class<Doc>>(chunter.class.Channel)
-    }
-
-    yield* client.addCollection(
-      chunter.class.ThreadMessage,
-      channel._id,
-      toRef<ActivityMessage>(message._id),
-      toRef<Class<ActivityMessage>>(chunter.class.ChatMessage),
-      "replies",
-      replyData,
-      replyId
-    )
-
-    return {
-      id: ThreadReplyId.make(replyId),
-      messageId: MessageId.make(message._id),
-      channelId: ChannelId.make(channel._id)
-    }
-  })
-
-/**
- * Update a thread reply.
- */
-export const updateThreadReply = (
-  params: UpdateThreadReplyParams
-): Effect.Effect<UpdateThreadReplyResult, UpdateThreadReplyError, HulyClient> =>
-  Effect.gen(function*() {
-    const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
-
-    const reply = yield* client.findOne<HulyThreadMessage>(
-      chunter.class.ThreadMessage,
-      {
-        _id: toRef<HulyThreadMessage>(params.replyId),
-        attachedTo: toRef<ActivityMessage>(message._id),
-        space: channel._id
-      }
-    )
-
-    if (reply === undefined) {
-      return yield* new ThreadReplyNotFoundError({
-        replyId: params.replyId,
-        messageId: params.messageId
-      })
-    }
-
-    const markup = markdownToMarkupString(params.body)
-
-    const updateOps: DocumentUpdate<HulyThreadMessage> = {
-      message: markup,
-      editedOn: Date.now()
-    }
-
-    yield* client.updateDoc(
-      chunter.class.ThreadMessage,
-      channel._id,
-      reply._id,
-      updateOps
-    )
-
-    return { id: ThreadReplyId.make(reply._id), updated: true }
-  })
-
-/**
- * Delete a thread reply.
- */
-export const deleteThreadReply = (
-  params: DeleteThreadReplyParams
-): Effect.Effect<DeleteThreadReplyResult, DeleteThreadReplyError, HulyClient> =>
-  Effect.gen(function*() {
-    const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
-
-    const reply = yield* client.findOne<HulyThreadMessage>(
-      chunter.class.ThreadMessage,
-      {
-        _id: toRef<HulyThreadMessage>(params.replyId),
-        attachedTo: toRef<ActivityMessage>(message._id),
-        space: channel._id
-      }
-    )
-
-    if (reply === undefined) {
-      return yield* new ThreadReplyNotFoundError({
-        replyId: params.replyId,
-        messageId: params.messageId
-      })
-    }
-
-    yield* client.removeDoc(
-      chunter.class.ThreadMessage,
-      channel._id,
-      reply._id
-    )
-
-    return { id: ThreadReplyId.make(reply._id), deleted: true }
   })

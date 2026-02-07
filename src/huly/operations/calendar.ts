@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- calendar operations are cohesive; event CRUD + recurrence + instances form a single domain */
 import {
   AccessLevel,
   type Calendar as HulyCalendar,

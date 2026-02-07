@@ -82,6 +82,7 @@ export default [
       // Code quality
       "object-shorthand": "error",
       "sort-destructure-keys/sort-destructure-keys": "error",
+      "max-lines": ["error", { max: 420, skipBlankLines: true, skipComments: true }],
       "no-console": "warn",
 
       // Functional programming
@@ -130,6 +131,13 @@ export default [
     },
     rules: {
       "import-x/no-unused-modules": ["error", { unusedExports: true }]
+    }
+  },
+
+  {
+    files: ["**/*.test.ts"],
+    rules: {
+      "max-lines": "off"
     }
   }
 ]

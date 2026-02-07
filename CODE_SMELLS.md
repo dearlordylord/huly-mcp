@@ -6,15 +6,15 @@ Rules: worktree work by parallel sub-agents. each writes REPORT.md. integration 
 
 | WT | Items | Scope | Status | Result |
 |----|-------|-------|--------|--------|
-| wt-nits | 55, 66 | remove makeJsonSchema wrapper; remove TOOL_DEFINITIONS cast | DONE | d185007: removed makeJsonSchema (100+ sites), removed TOOL_DEFINITIONS cast. 755/755 |
-| wt-dead-code | 30, 32 | addSubstringSearch: remove or use; PersonRefSchema: remove from barrel | DONE | 94fbe73: removed addSubstringSearch, removed PersonRefSchema from barrel. 755/755 |
-| wt-shared-ops | 11, 31 | double-cast shared.ts:41; remove dead interfaces | DONE | 5931308: eliminated double-cast (SDK types correct), removed 3 dead interfaces. 755/755 |
-| wt-results-total | 27 | results.total fallback unnecessary, remove | DONE | eb38a62: removed 8x .total??.length in 6 files, fixed test mock. 755/755 |
-| wt-http-transport | 14, 50, 62 | transport cast; signal handler cleanup; redundant async | DONE | 9b2ddb4: kept transport cast (documented SDK bug), fixed signal cleanup, removed async. 755/755 |
-| wt-server-config | 5, 7, 45, 57 | version from pkg.json; remove casts; TOOLSETS via Config; remove HulyConfigError | DONE | bf08e17: PKG_VERSION build-time inject, removed 3 casts, TOOLSETS via Config, removed HulyConfigError. 755/755 |
+| wt-nits | 55, 66 | remove makeJsonSchema wrapper; remove TOOL_DEFINITIONS cast | MERGED | d185007: removed makeJsonSchema (100+ sites), removed TOOL_DEFINITIONS cast. 755/755 |
+| wt-dead-code | 30, 32 | addSubstringSearch: remove or use; PersonRefSchema: remove from barrel | MERGED | 94fbe73: removed addSubstringSearch, removed PersonRefSchema from barrel. 755/755 |
+| wt-shared-ops | 11, 31 | double-cast shared.ts:41; remove dead interfaces | MERGED | 5931308: eliminated double-cast (SDK types correct), removed 3 dead interfaces. 755/755 |
+| wt-results-total | 27 | results.total fallback unnecessary, remove | MERGED | eb38a62: removed 8x .total??.length in 6 files, fixed test mock. 755/755 |
+| wt-http-transport | 14, 50, 62 | transport cast; signal handler cleanup; redundant async | MERGED | 9b2ddb4: kept transport cast (documented SDK bug), fixed signal cleanup, removed async. 755/755 |
+| wt-server-config | 5, 7, 45, 57 | version from pkg.json; remove casts; TOOLSETS via Config; remove HulyConfigError | MERGED | bf08e17: PKG_VERSION build-time inject, removed 3 casts, TOOLSETS via Config, removed HulyConfigError. 755/755 |
 | wt-errors-research | 2b | RESEARCH: error 4-edit architecture viability | DONE | 6c283fb: as never defeats exhaustive check, schema union dead code. Recommends Option A |
-| wt-schema-research | 23, 24 | RESEARCH: schema boilerplate factory; ParticipantSchema reuse | DONE | f253be8: 97 schemas follow pattern, factory viable. Participant=PersonRef |
-| wt-errors-cleanup | 2a, 28, 29, 33, 44 | remove mcpErrorCode+getMcpErrorCode; extract notif context dup; move McpErrorCode | DONE | cb16e74: removed mcpErrorCode from 29 classes, moved McpErrorCode to error-mapping, extracted notif helper. 749/749 |
+| wt-schema-research | 23, 24 | RESEARCH: schema boilerplate factory; ParticipantSchema reuse | REJECTED | user: not wanted |
+| wt-errors-cleanup | 2a, 28, 29, 33, 44 | remove mcpErrorCode+getMcpErrorCode; extract notif context dup; move McpErrorCode | MERGED | cb16e74: removed mcpErrorCode from 29 classes, moved McpErrorCode to error-mapping, extracted notif helper. 747/747 |
 | wt-issues-split | 1 | split issues.ts -> issues/components/issue-templates | DONE | a00f50f: split into components.ts + issue-templates.ts, added re-exports from issues.ts. 755/755 |
 | wt-issues-improve | 4, 8, 9, 10, 18, 19, 59 | findPerson $like; extractUpdatedSequence guard; toRef<Employee> verify; Email.make fix; resolveStatusByName; resolveAssignee; Unknown fallback fail | DONE | f71bfd8: resolveStatusByName, resolveAssignee, verifyEmployee helpers; Schema decoder; findOne+$like. 755/755 |
 | wt-storage | 3, 12, 13, 47 | FileSourceParams union; blob cast; ErrnoException guard; buildFileUrl encoding | DONE | 675f0f0: discriminated union, removed blob cast, ErrnoException guard, URLSearchParams. 755/755 |
@@ -22,7 +22,7 @@ Rules: worktree work by parallel sub-agents. each writes REPORT.md. integration 
 | wt-registry | 17, 56 | single generic factory; remove _toolName | DONE | 8ee75d9: consolidated 5 factories into generic createHandler, removed _toolName. 755/755 |
 | wt-dry-limit | 16 | clampLimit helper + DEFAULT_LIMIT/MAX_LIMIT constants | DONE | 97960fc: clampLimit helper replacing 31 occurrences across 14 files. 755/755 |
 | wt-dry-helpers | 25, 26 | findByNameOrId; findOneOrFail | DONE | e97d78a: extracted findByNameOrId + findOneOrFail to shared.ts, updated 8 files. 755/755 |
-| wt-dry-retry | 20 | shared connection retry HOF | DONE | 817bbf7: extracted withConnectionRetry HOF to auth-utils. 755/755 |
+| wt-dry-retry | 20 | shared connection retry HOF | MERGED | 817bbf7: extracted withConnectionRetry HOF to auth-utils. 755/755 |
 | wt-cjs-interop | 21 | centralize CJS require() -> huly-plugins.ts | DONE | ecd2183: centralized 12 plugins into huly-plugins.ts, updated 15 files. 755/755 |
 | wt-markup | 22 | extract toInternalMarkup/fromInternalMarkup | DONE | eaccef0: extracted toInternalMarkup/fromInternalMarkup in client.ts. 755/755 |
 | wt-schemas | 36, 37, 38, 39, 40, 41, 42, 43 | Email validation; NonNegativeInt counts; component field; GetPersonParams union; author type; senderId type; ProjectSchema archived; byDay validator | DONE | e32742e: Email validation, NonNegativeInt, unified ParticipantSchema, archived field. 756/756 |
