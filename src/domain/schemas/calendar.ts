@@ -354,7 +354,7 @@ export const ListEventInstancesParamsSchema = Schema.Struct({
     })
   ),
   includeParticipants: Schema.optional(Schema.Boolean.annotations({
-    description: "Include full participant info (requires extra lookups, default: false)"
+    description: "Include full participant info (requires extra lookups, default: off)"
   }))
 }).annotations({
   title: "ListEventInstancesParams",
