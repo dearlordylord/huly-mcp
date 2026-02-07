@@ -83,19 +83,41 @@ const batchGetEmailsForPersons = <T extends Doc>(
     return emailMap
   })
 
+const findPersonIdsByEmail = (
+  client: HulyClient["Type"],
+  emailSearch: string
+): Effect.Effect<Array<Ref<HulyPerson>>, HulyClientError> =>
+  Effect.gen(function*() {
+    const channels = yield* client.findAll<Channel>(
+      contact.class.Channel,
+      {
+        provider: contact.channelProvider.Email,
+        value: { $like: `%${escapeLikeWildcards(emailSearch)}%` }
+      }
+    )
+    return channels.map(c => toRef<HulyPerson>(c.attachedTo))
+  })
+
 export const listPersons = (
   params: ListPersonsParams
 ): Effect.Effect<Array<PersonSummary>, ListPersonsError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
     const limit = Math.min(params.limit ?? 50, 200)
+    const emailSearch = params.emailSearch?.trim()
 
-    // Build query with search filters
     const query: Record<string, unknown> = {}
 
-    // Apply name search using $like operator
     if (params.nameSearch !== undefined && params.nameSearch.trim() !== "") {
       query.name = { $like: `%${escapeLikeWildcards(params.nameSearch)}%` }
+    }
+
+    if (emailSearch !== undefined && emailSearch !== "") {
+      const matchingPersonIds = yield* findPersonIdsByEmail(client, emailSearch)
+      if (matchingPersonIds.length === 0) {
+        return []
+      }
+      query._id = { $in: matchingPersonIds }
     }
 
     const persons = yield* client.findAll<HulyPerson>(
@@ -110,17 +132,7 @@ export const listPersons = (
     const personIds = persons.map(p => p._id)
     const emailMap = yield* batchGetEmailsForPersons(client, personIds)
 
-    // If emailSearch is provided, filter results by email
-    let filteredPersons = [...persons]
-    if (params.emailSearch !== undefined && params.emailSearch.trim() !== "") {
-      const searchLower = params.emailSearch.toLowerCase()
-      filteredPersons = persons.filter(person => {
-        const email = emailMap.get(person._id)
-        return email !== undefined && email.toLowerCase().includes(searchLower)
-      })
-    }
-
-    return filteredPersons.map(person => {
+    return persons.map(person => {
       const emailValue = emailMap.get(person._id)
       return {
         id: PersonId.make(person._id),

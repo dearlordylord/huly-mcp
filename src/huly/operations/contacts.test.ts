@@ -57,9 +57,27 @@ const createTestLayer = (config: MockConfig) => {
   const persons = config.persons ?? []
   const channels = config.channels ?? []
 
-  const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown) => {
+  const matchesLike = (value: string, pattern: string): boolean => {
+    const escaped = pattern.replace(/%/g, ".*").replace(/_/g, ".")
+    return new RegExp(`^${escaped}$`, "i").test(value)
+  }
+
+  const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown, options?: unknown) => {
     if (_class === contact.class.Person) {
-      return Effect.succeed(persons as unknown as FindResult<Doc>)
+      const q = (query ?? {}) as Record<string, unknown>
+      let filtered = persons
+      if (q._id !== undefined) {
+        const idFilter = q._id as { $in?: Array<unknown> } | unknown
+        if (typeof idFilter === "object" && idFilter !== null && "$in" in idFilter) {
+          const ids = idFilter.$in as Array<unknown>
+          filtered = filtered.filter(p => ids.includes(p._id))
+        }
+      }
+      const opts = (options ?? {}) as { limit?: number }
+      if (opts.limit !== undefined) {
+        filtered = filtered.slice(0, opts.limit)
+      }
+      return Effect.succeed(filtered as unknown as FindResult<Doc>)
     }
     if (_class === contact.class.Channel) {
       const q = query as Record<string, unknown>
@@ -77,7 +95,13 @@ const createTestLayer = (config: MockConfig) => {
         filtered = filtered.filter(c => c.provider === q.provider)
       }
       if (q.value !== undefined) {
-        filtered = filtered.filter(c => c.value === q.value)
+        const value = q.value as { $like?: string } | string
+        if (typeof value === "object" && value !== null && "$like" in value) {
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by "$like" in value check
+          filtered = filtered.filter(c => matchesLike(c.value, value.$like!))
+        } else {
+          filtered = filtered.filter(c => c.value === value)
+        }
       }
       return Effect.succeed(filtered as unknown as FindResult<Doc>)
     }
@@ -267,6 +291,81 @@ describe("Contacts Operations", () => {
       expect(resultMap.get(PersonId.make("person-1"))?.email).toBe("john@example.com")
       expect(resultMap.get(PersonId.make("person-2"))?.email).toBe("jane@example.com")
       expect(resultMap.get(PersonId.make("person-3"))?.email).toBe("bob@example.com")
+    })
+
+    it("filters by emailSearch using server-side channel query", async () => {
+      const person1 = createMockPerson({
+        _id: "person-1" as Ref<HulyPerson>,
+        name: "Doe,John"
+      })
+      const person2 = createMockPerson({
+        _id: "person-2" as Ref<HulyPerson>,
+        name: "Smith,Jane"
+      })
+
+      const channel1 = createMockChannel({
+        _id: "channel-1" as Ref<Channel>,
+        attachedTo: "person-1" as Ref<Doc>,
+        value: "john@example.com"
+      })
+      const channel2 = createMockChannel({
+        _id: "channel-2" as Ref<Channel>,
+        attachedTo: "person-2" as Ref<Doc>,
+        value: "jane@other.com"
+      })
+
+      const testLayer = createTestLayer({
+        persons: [person1, person2],
+        channels: [channel1, channel2]
+      })
+
+      const result = await Effect.runPromise(
+        listPersons({ emailSearch: "example.com", limit: 10 }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(result).toHaveLength(1)
+      expect(result[0].id).toBe("person-1")
+      expect(result[0].email).toBe("john@example.com")
+    })
+
+    it("returns empty when emailSearch matches no channels", async () => {
+      const person1 = createMockPerson()
+      const channel1 = createMockChannel({ value: "john@example.com" })
+
+      const testLayer = createTestLayer({
+        persons: [person1],
+        channels: [channel1]
+      })
+
+      const result = await Effect.runPromise(
+        listPersons({ emailSearch: "nonexistent.com", limit: 10 }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(result).toEqual([])
+    })
+
+    it("respects limit when emailSearch is provided", async () => {
+      const persons: Array<HulyPerson> = []
+      const channels: Array<Channel> = []
+      for (let i = 0; i < 5; i++) {
+        persons.push(createMockPerson({
+          _id: `person-${i}` as Ref<HulyPerson>,
+          name: `Last${i},First${i}`
+        }))
+        channels.push(createMockChannel({
+          _id: `channel-${i}` as Ref<Channel>,
+          attachedTo: `person-${i}` as Ref<Doc>,
+          value: `user${i}@example.com`
+        }))
+      }
+
+      const testLayer = createTestLayer({ persons, channels })
+
+      const result = await Effect.runPromise(
+        listPersons({ emailSearch: "example.com", limit: 3 }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(result).toHaveLength(3)
     })
   })
 
