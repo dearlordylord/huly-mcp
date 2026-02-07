@@ -10,6 +10,7 @@ import { contactTools } from "./contacts.js"
 import { documentTools } from "./documents.js"
 import { issueTools } from "./issues.js"
 import { milestoneTools } from "./milestones.js"
+import { notificationTools } from "./notifications.js"
 import { projectTools } from "./projects.js"
 import type { RegisteredTool, ToolDefinition } from "./registry.js"
 import { searchTools } from "./search.js"
@@ -29,7 +30,8 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...calendarTools,
   ...timeTools,
   ...searchTools,
-  ...activityTools
+  ...activityTools,
+  ...notificationTools
 ]
 
 const toolMap = new Map<string, RegisteredTool>(

@@ -146,6 +146,18 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `update_issue` | Update fields on an existing Huly issue. Only provided fields are modified. Description updates support markdown. |
 | `add_issue_label` | Add a tag/label to a Huly issue. Creates the tag if it doesn't exist in the project. |
 | `delete_issue` | Permanently delete a Huly issue. This action cannot be undone. |
+| `list_components` | List components in a Huly project. Components organize issues by area/feature. Returns components sorted by modification date (newest first). |
+| `get_component` | Retrieve full details for a Huly component. Use this to view component content and metadata. |
+| `create_component` | Create a new component in a Huly project. Components help organize issues by area/feature. Returns the created component ID and label. |
+| `update_component` | Update fields on an existing Huly component. Only provided fields are modified. |
+| `set_issue_component` | Set or clear the component on a Huly issue. Pass null for component to clear it. |
+| `delete_component` | Permanently delete a Huly component. This action cannot be undone. |
+| `list_issue_templates` | List issue templates in a Huly project. Templates define reusable issue configurations. Returns templates sorted by modification date (newest first). |
+| `get_issue_template` | Retrieve full details for a Huly issue template. Use this to view template content and default values. |
+| `create_issue_template` | Create a new issue template in a Huly project. Templates define default values for new issues. Returns the created template ID and title. |
+| `create_issue_from_template` | Create a new issue from a template. Applies template defaults, allowing overrides for specific fields. Returns the created issue identifier. |
+| `update_issue_template` | Update fields on an existing Huly issue template. Only provided fields are modified. |
+| `delete_issue_template` | Permanently delete a Huly issue template. This action cannot be undone. |
 
 ### Comments
 
