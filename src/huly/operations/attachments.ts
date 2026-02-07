@@ -69,13 +69,13 @@ const tracker = require("@hcengineering/tracker").default as typeof import("@hce
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const documentPlugin = require("@hcengineering/document").default as typeof import("@hcengineering/document").default
 
-export type ListAttachmentsError = HulyClientError
+type ListAttachmentsError = HulyClientError
 
-export type GetAttachmentError =
+type GetAttachmentError =
   | HulyClientError
   | AttachmentNotFoundError
 
-export type AddAttachmentError =
+type AddAttachmentError =
   | HulyClientError
   | StorageClientError
   | InvalidFileDataError
@@ -84,23 +84,23 @@ export type AddAttachmentError =
   | FileTooLargeError
   | InvalidContentTypeError
 
-export type UpdateAttachmentError =
+type UpdateAttachmentError =
   | HulyClientError
   | AttachmentNotFoundError
 
-export type DeleteAttachmentError =
+type DeleteAttachmentError =
   | HulyClientError
   | AttachmentNotFoundError
 
-export type PinAttachmentError =
+type PinAttachmentError =
   | HulyClientError
   | AttachmentNotFoundError
 
-export type DownloadAttachmentError =
+type DownloadAttachmentError =
   | HulyClientError
   | AttachmentNotFoundError
 
-export type AddIssueAttachmentError =
+type AddIssueAttachmentError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueNotFoundError
@@ -111,7 +111,7 @@ export type AddIssueAttachmentError =
   | FileTooLargeError
   | InvalidContentTypeError
 
-export type AddDocumentAttachmentError =
+type AddDocumentAttachmentError =
   | HulyClientError
   | TeamspaceNotFoundError
   | DocumentNotFoundError
@@ -277,14 +277,6 @@ export const getAttachment = (
     const url = storageClient.getFileUrl(att.file)
     return toAttachment(att, url)
   })
-
-export type {
-  AddAttachmentResult,
-  DeleteAttachmentResult,
-  DownloadAttachmentResult,
-  PinAttachmentResult,
-  UpdateAttachmentResult
-}
 
 /**
  * Add an attachment to an object.

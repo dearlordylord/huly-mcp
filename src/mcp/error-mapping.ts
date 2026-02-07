@@ -11,7 +11,6 @@
  */
 import { absurd, Cause, Chunk, ParseResult } from "effect"
 
-import type { Die, Interrupt } from "effect/Cause"
 import { type HulyDomainError, McpErrorCode } from "../huly/errors.js"
 
 // --- MCP Error Response Types ---
@@ -30,14 +29,14 @@ export interface McpToolResponse {
 /**
  * Internal metadata for error tracking (not exposed to MCP).
  */
-export interface ErrorMetadata {
+interface ErrorMetadata {
   errorCode: McpErrorCode
 }
 
 /**
  * Internal error response with metadata for testing.
  */
-export interface McpErrorResponseWithMeta extends McpToolResponse {
+interface McpErrorResponseWithMeta extends McpToolResponse {
   isError: true
   _meta: ErrorMetadata
 }
@@ -122,17 +121,6 @@ export const mapParseErrorToMcp = (
   const message = formatParseError(error)
 
   return createErrorResponse(`${prefix}${message}`, McpErrorCode.InvalidParams)
-}
-
-export const mapDefectCause = (cause: Die | Interrupt): McpErrorResponseWithMeta => {
-  if (Cause.isDieType(cause)) {
-    return createErrorResponse("Internal server error", McpErrorCode.InternalError)
-  }
-  if (Cause.isInterruptType(cause)) {
-    return createErrorResponse("Operation was interrupted", McpErrorCode.InternalError)
-  }
-  absurd(cause)
-  throw new Error("Unexpected cause type")
 }
 
 export const mapParseCauseToMcp = (

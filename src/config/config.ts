@@ -50,21 +50,19 @@ const PositiveIntFromString = Schema.NumberFromString.pipe(
   Schema.positive({ message: () => "Must be positive" })
 )
 
-export const TokenAuthSchema = Schema.Struct({
+const TokenAuthSchema = Schema.Struct({
   _tag: Schema.Literal("token"),
   token: Schema.Redacted(NonWhitespaceString)
 })
 
-export const PasswordAuthSchema = Schema.Struct({
+const PasswordAuthSchema = Schema.Struct({
   _tag: Schema.Literal("password"),
   email: NonWhitespaceString,
   password: Schema.Redacted(NonWhitespaceString)
 })
 
-export const AuthSchema = Schema.Union(TokenAuthSchema, PasswordAuthSchema)
+const AuthSchema = Schema.Union(TokenAuthSchema, PasswordAuthSchema)
 
-export type TokenAuth = Schema.Schema.Type<typeof TokenAuthSchema>
-export type PasswordAuth = Schema.Schema.Type<typeof PasswordAuthSchema>
 export type Auth = Schema.Schema.Type<typeof AuthSchema>
 
 /**
@@ -76,8 +74,6 @@ export const HulyConfigSchema = Schema.Struct({
   workspace: NonWhitespaceString,
   connectionTimeout: PositiveInt
 })
-
-export type HulyConfig = Schema.Schema.Type<typeof HulyConfigSchema>
 
 export class ConfigValidationError extends Schema.TaggedError<ConfigValidationError>()(
   "ConfigValidationError",

@@ -64,7 +64,7 @@ export const isAuthError = (error: unknown): boolean =>
 /**
  * Retry schedule for connection attempts: exponential backoff, max 3 attempts.
  */
-export const connectionRetrySchedule = Schedule.exponential("100 millis").pipe(
+const connectionRetrySchedule = Schedule.exponential("100 millis").pipe(
   Schedule.compose(Schedule.recurs(2))
 )
 

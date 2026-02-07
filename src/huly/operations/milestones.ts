@@ -28,31 +28,31 @@ import { findProject, findProjectAndIssue, toRef } from "./shared.js"
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
 
-export type ListMilestonesError =
+type ListMilestonesError =
   | HulyClientError
   | ProjectNotFoundError
 
-export type GetMilestoneError =
-  | HulyClientError
-  | ProjectNotFoundError
-  | MilestoneNotFoundError
-
-export type CreateMilestoneError =
-  | HulyClientError
-  | ProjectNotFoundError
-
-export type UpdateMilestoneError =
+type GetMilestoneError =
   | HulyClientError
   | ProjectNotFoundError
   | MilestoneNotFoundError
 
-export type SetIssueMilestoneError =
+type CreateMilestoneError =
+  | HulyClientError
+  | ProjectNotFoundError
+
+type UpdateMilestoneError =
+  | HulyClientError
+  | ProjectNotFoundError
+  | MilestoneNotFoundError
+
+type SetIssueMilestoneError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueNotFoundError
   | MilestoneNotFoundError
 
-export type DeleteMilestoneError =
+type DeleteMilestoneError =
   | HulyClientError
   | ProjectNotFoundError
   | MilestoneNotFoundError
@@ -178,8 +178,6 @@ export const getMilestone = (
 
     return result
   })
-
-export type { CreateMilestoneResult, DeleteMilestoneResult, SetIssueMilestoneResult, UpdateMilestoneResult }
 
 export const createMilestone = (
   params: CreateMilestoneParams

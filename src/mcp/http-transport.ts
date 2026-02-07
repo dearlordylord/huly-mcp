@@ -19,7 +19,7 @@ import type { Express, Request, Response } from "express"
 /**
  * HTTP transport configuration.
  */
-export interface HttpTransportConfig {
+interface HttpTransportConfig {
   readonly port: number
   readonly host: string
 }
@@ -58,7 +58,7 @@ export interface HttpServerFactory {
 /**
  * Default HTTP server factory using SDK's createMcpExpressApp.
  */
-export const defaultHttpServerFactory: HttpServerFactory = {
+const defaultHttpServerFactory: HttpServerFactory = {
   createApp: (host: string) => createMcpExpressApp({ host }),
 
   listen: (app, port, host) =>

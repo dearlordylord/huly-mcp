@@ -18,7 +18,7 @@ import { HulyClient, type HulyClientError } from "../client.js"
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
 
-export type ListProjectsError = HulyClientError
+type ListProjectsError = HulyClientError
 
 export const listProjects = (
   params: ListProjectsParams

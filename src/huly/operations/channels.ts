@@ -75,49 +75,49 @@ const contact = require("@hcengineering/contact").default as typeof import("@hce
 
 // --- Error Types ---
 
-export type ListChannelsError = HulyClientError
+type ListChannelsError = HulyClientError
 
-export type GetChannelError =
+type GetChannelError =
   | HulyClientError
   | ChannelNotFoundError
 
-export type CreateChannelError = HulyClientError
+type CreateChannelError = HulyClientError
 
-export type UpdateChannelError =
+type UpdateChannelError =
   | HulyClientError
   | ChannelNotFoundError
 
-export type DeleteChannelError =
+type DeleteChannelError =
   | HulyClientError
   | ChannelNotFoundError
 
-export type ListChannelMessagesError =
+type ListChannelMessagesError =
   | HulyClientError
   | ChannelNotFoundError
 
-export type SendChannelMessageError =
+type SendChannelMessageError =
   | HulyClientError
   | ChannelNotFoundError
 
-export type ListDirectMessagesError = HulyClientError
+type ListDirectMessagesError = HulyClientError
 
-export type ListThreadRepliesError =
-  | HulyClientError
-  | ChannelNotFoundError
-  | MessageNotFoundError
-
-export type AddThreadReplyError =
+type ListThreadRepliesError =
   | HulyClientError
   | ChannelNotFoundError
   | MessageNotFoundError
 
-export type UpdateThreadReplyError =
+type AddThreadReplyError =
+  | HulyClientError
+  | ChannelNotFoundError
+  | MessageNotFoundError
+
+type UpdateThreadReplyError =
   | HulyClientError
   | ChannelNotFoundError
   | MessageNotFoundError
   | ThreadReplyNotFoundError
 
-export type DeleteThreadReplyError =
+type DeleteThreadReplyError =
   | HulyClientError
   | ChannelNotFoundError
   | MessageNotFoundError
@@ -336,19 +336,6 @@ export const getChannel = (
 
     return result
   })
-
-export type {
-  AddThreadReplyResult,
-  CreateChannelResult,
-  DeleteChannelResult,
-  DeleteThreadReplyResult,
-  ListChannelMessagesResult,
-  ListDirectMessagesResult,
-  ListThreadRepliesResult,
-  SendChannelMessageResult,
-  UpdateChannelResult,
-  UpdateThreadReplyResult
-}
 
 // --- Create Channel ---
 
