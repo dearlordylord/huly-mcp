@@ -323,3 +323,4 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `get_regions` | Get available regions for workspace creation. Returns region codes and display names. |
 
 <!-- tools:end -->
+
