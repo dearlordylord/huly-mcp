@@ -60,6 +60,7 @@
     "@hcengineering/core": "^0.7.4",
     "@hcengineering/document": "^0.7.0",
     "@hcengineering/notification": "^0.7",
+    "@hcengineering/platform": "0.7.19",
     "@hcengineering/rank": "^0.7.3",
     "@hcengineering/tags": "^0.7.0",
     "@hcengineering/task": "^0.7.0",

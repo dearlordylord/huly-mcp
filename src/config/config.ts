@@ -75,6 +75,8 @@ export const HulyConfigSchema = Schema.Struct({
   connectionTimeout: PositiveInt
 })
 
+export type HulyConfig = Schema.Schema.Type<typeof HulyConfigSchema>
+
 export class ConfigValidationError extends Schema.TaggedError<ConfigValidationError>()(
   "ConfigValidationError",
   {
