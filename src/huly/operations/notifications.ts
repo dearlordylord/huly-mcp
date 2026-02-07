@@ -44,10 +44,7 @@ import { HulyClient, type HulyClientError } from "../client.js"
 import { NotificationContextNotFoundError, NotificationNotFoundError } from "../errors.js"
 import { toRef } from "./shared.js"
 
-/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop */
-const notification = require("@hcengineering/notification")
-  .default as typeof import("@hcengineering/notification").default
-/* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports */
+import { notification } from "../huly-plugins.js"
 
 // --- Error Types ---
 

@@ -62,12 +62,7 @@ import {
 import { findTeamspaceAndDocument } from "./documents.js"
 import { findProjectAndIssue, toRef } from "./shared.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const attachment = require("@hcengineering/attachment").default as typeof import("@hcengineering/attachment").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const documentPlugin = require("@hcengineering/document").default as typeof import("@hcengineering/document").default
+import { attachment, documentPlugin, tracker } from "../huly-plugins.js"
 
 export type ListAttachmentsError = HulyClientError
 

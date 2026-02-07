@@ -8,8 +8,7 @@ import type { HulyClientOperations } from "../client.js"
 import { HulyClient } from "../client.js"
 import { createPerson, deletePerson, getPerson, listPersons, updatePerson } from "./contacts.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
+import { contact } from "../huly-plugins.js"
 
 /* eslint-disable @typescript-eslint/consistent-type-assertions -- test mock factories */
 const createMockPerson = (overrides: Partial<HulyPerson> = {}): HulyPerson =>

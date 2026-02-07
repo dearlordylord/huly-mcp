@@ -47,12 +47,7 @@ import { HulyClient, type HulyClientError } from "../client.js"
 import { EventNotFoundError, RecurringEventNotFoundError } from "../errors.js"
 import { toRef } from "./shared.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const calendar = require("@hcengineering/calendar").default as typeof import("@hcengineering/calendar").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
+import { calendar, contact, core } from "../huly-plugins.js"
 
 // --- Error types ---
 

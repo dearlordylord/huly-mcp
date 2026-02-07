@@ -12,8 +12,7 @@ import { Effect } from "effect"
 import type { FulltextSearchParams, FulltextSearchResult } from "../../domain/schemas.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
+import { core } from "../huly-plugins.js"
 
 export type FulltextSearchError = HulyClientError
 

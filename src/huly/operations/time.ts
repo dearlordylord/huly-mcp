@@ -52,12 +52,7 @@ import { ProjectNotFoundError } from "../errors.js"
 import { withLookup } from "./query-helpers.js"
 import { findProject, findProjectAndIssue, toRef, zeroAsUnset } from "./shared.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const time = require("@hcengineering/time").default as typeof import("@hcengineering/time").default
+import { contact, time, tracker } from "../huly-plugins.js"
 
 // SDK: Data<WorkSlot> requires calendar/user but server populates from auth context.
 const serverPopulatedCalendar = toRef<HulyCalendar>("")

@@ -6,6 +6,7 @@ import { Effect } from "effect"
 import { NonNegativeNumber, PositiveNumber } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { InvalidPersonUuidError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
+import { core, task, tracker } from "../huly-plugins.js"
 
 // Huly SDK uses `Ref<T>` (a branded string) for entity references.
 // Our domain uses Effect Schema brands. No type-safe bridge exists; this is the boundary cast.
@@ -28,13 +29,6 @@ export const validatePersonUuid = (uuid?: string): Effect.Effect<PersonUuid | un
   // After regex validation confirms UUID format, cast is safe.
   return Effect.succeed(uuid as PersonUuid)
 }
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const task = require("@hcengineering/task").default as typeof import("@hcengineering/task").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
 
 // SDK: core.class.Status is a string constant but findAll expects Ref<Class<Status>>.
 // SDK class hierarchy variance requires double cast.

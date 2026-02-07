@@ -68,10 +68,7 @@ import { ChannelNotFoundError, MessageNotFoundError, ThreadReplyNotFoundError } 
 import { escapeLikeWildcards } from "./query-helpers.js"
 import { toRef } from "./shared.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const chunter = require("@hcengineering/chunter").default as typeof import("@hcengineering/chunter").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
+import { chunter, contact } from "../huly-plugins.js"
 
 // --- Error Types ---
 
