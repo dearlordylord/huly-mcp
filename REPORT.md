@@ -1,43 +1,30 @@
-# Item 27: Remove unnecessary results.total fallback
+# Item 20: Extract shared connection retry logic
 
-## Finding
+## Problem
 
-`FindResult<T>` from `@hcengineering/core` is typed as `WithLookup<T>[] & { total: number }`. The `total` property is always `number`, never `undefined` or `null`. The `?? .length` fallback was dead code.
+Three files duplicated the same connect-with-retry pattern:
+- `src/huly/client.ts` (`connectRestWithRetry`)
+- `src/huly/workspace-client.ts` (`connectAccountClientWithRetry`)
+- `src/huly/storage.ts` (`connectStorageWithRetry`)
 
-## Type evidence
+Each wrapped an async function in `Effect.tryPromise`, checked `isAuthError` to map to `HulyAuthError` vs `HulyConnectionError`, then piped through `withConnectionRetry`. Only the error message prefix differed.
 
-From `node_modules/@hcengineering/core/types/storage.d.ts`:
+## Solution
+
+Added `connectWithRetry` to `src/huly/auth-utils.ts` -- a higher-order function that takes a `Promise`-returning function and an error prefix string, encapsulates the `Effect.tryPromise` + `isAuthError` check + error construction + `withConnectionRetry` wrapping.
+
+All three call sites now delegate to one-liners:
 ```ts
-export type FindResult<T extends Doc> = WithLookup<T>[] & {
-    total: number;
-    lookupMap?: Record<string, Doc>;
-};
+connectWithRetry(() => connectRest(config), "Connection failed")
 ```
 
 ## Changes
 
-### Production code (8 occurrences removed)
-
-| File | Variable | Before | After |
-|------|----------|--------|-------|
-| `src/huly/operations/documents.ts:183` | `teamspaces` | `teamspaces.total ?? teamspaces.length` | `teamspaces.total` |
-| `src/huly/operations/documents.ts:238` | `documents` | `documents.total ?? documents.length` | `documents.total` |
-| `src/huly/operations/projects.ts:47` | `projects` | `projects.total ?? projects.length` | `projects.total` |
-| `src/huly/operations/notifications.ts:539` | `unreadNotifications` | `unreadNotifications.total ?? unreadNotifications.length` | `unreadNotifications.total` |
-| `src/huly/operations/channels.ts:467` | `messages` | `messages.total ?? messages.length` | `messages.total` |
-| `src/huly/operations/channels.ts:553` | `dms` | `dms.total ?? dms.length` | `dms.total` |
-| `src/huly/operations/channels.ts:643` | `replies` | `replies.total ?? replies.length` | `replies.total` |
-| `src/huly/operations/search.ts:50` | `results` | `results.total ?? results.length` | `results.total` |
-
-### Test fix
-
-`test/huly/operations/documents.test.ts`: The mock `findAll` was casting plain arrays to `FindResult<Doc>` without setting `total`, which meant `total` was `undefined` at runtime despite the type saying `number`. Replaced `as unknown as FindResult<Doc>` casts with `toFindResult()` from `@hcengineering/core`, which properly sets the `total` property.
+- **`src/huly/auth-utils.ts`**: Added `connectWithRetry`. Changed `HulyConnectionError` from type-only to value import (needed for constructing instances).
+- **`src/huly/client.ts`**: Replaced 12-line `connectRestWithRetry` with one-liner. Removed `isAuthError`, `withConnectionRetry`, `HulyAuthError` imports. `HulyClientError` now aliases `ConnectionError`.
+- **`src/huly/workspace-client.ts`**: Replaced 12-line `connectAccountClientWithRetry` with one-liner. Removed `isAuthError`, `withConnectionRetry`, `HulyAuthError`, `HulyConnectionError` imports. `WorkspaceClientError` now aliases `ConnectionError`.
+- **`src/huly/storage.ts`**: Replaced 12-line `connectStorageWithRetry` with one-liner. Removed `isAuthError`, `withConnectionRetry` imports. `HulyAuthError`/`HulyConnectionError` kept as type-only imports (used in `StorageClientError` type alias).
 
 ## Verification
 
-```
-pnpm build    -- OK
-pnpm typecheck -- OK (0 errors)
-pnpm lint     -- OK (0 errors, only pre-existing warnings)
-pnpm test     -- OK (755/755 passed)
-```
+`pnpm build && pnpm typecheck && pnpm lint && pnpm test` -- all pass (755 tests, 0 lint errors).

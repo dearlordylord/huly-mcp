@@ -8,7 +8,7 @@ import { Effect, Redacted, Schedule } from "effect"
 import { absurd } from "effect/Function"
 
 import type { Auth } from "../config/config.js"
-import { HulyAuthError, type HulyConnectionError } from "./errors.js"
+import { HulyAuthError, HulyConnectionError } from "./errors.js"
 
 /**
  * Status codes that indicate authentication failures (should not be retried).
@@ -79,5 +79,30 @@ export const withConnectionRetry = <A>(
     Effect.retry({
       schedule: connectionRetrySchedule,
       while: (e) => !(e instanceof HulyAuthError)
+    })
+  )
+
+/**
+ * Connect with retry: wraps a Promise-returning function in Effect.tryPromise,
+ * maps errors to HulyAuthError/HulyConnectionError, and applies connection retry.
+ */
+export const connectWithRetry = <A>(
+  connect: () => Promise<A>,
+  errorPrefix: string
+): Effect.Effect<A, ConnectionError> =>
+  withConnectionRetry(
+    Effect.tryPromise({
+      try: connect,
+      catch: (e) => {
+        if (isAuthError(e)) {
+          return new HulyAuthError({
+            message: `${errorPrefix}: ${String(e)}`
+          })
+        }
+        return new HulyConnectionError({
+          message: `${errorPrefix}: ${String(e)}`,
+          cause: e
+        })
+      }
     })
   )
