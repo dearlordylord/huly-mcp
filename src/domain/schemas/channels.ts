@@ -22,8 +22,8 @@ export const ChannelSummarySchema = Schema.Struct({
   topic: Schema.optional(Schema.String),
   private: Schema.Boolean,
   archived: Schema.Boolean,
-  members: Schema.optional(Schema.Number),
-  messages: Schema.optional(Schema.Number),
+  members: Schema.optional(Schema.NonNegativeInt),
+  messages: Schema.optional(Schema.NonNegativeInt),
   modifiedOn: Schema.optional(Timestamp)
 }).annotations({
   title: "ChannelSummary",
@@ -42,7 +42,7 @@ export const ChannelSchema = Schema.Struct({
   private: Schema.Boolean,
   archived: Schema.Boolean,
   members: Schema.optional(Schema.Array(PersonName)),
-  messages: Schema.optional(Schema.Number),
+  messages: Schema.optional(Schema.NonNegativeInt),
   modifiedOn: Schema.optional(Timestamp),
   createdOn: Schema.optional(Timestamp)
 }).annotations({
@@ -62,7 +62,7 @@ export const MessageSummarySchema = Schema.Struct({
   createdOn: Schema.optional(Timestamp),
   modifiedOn: Schema.optional(Timestamp),
   editedOn: Schema.optional(Timestamp),
-  replies: Schema.optional(Schema.Number)
+  replies: Schema.optional(Schema.NonNegativeInt)
 }).annotations({
   title: "MessageSummary",
   description: "Message summary for list operations"
@@ -76,7 +76,7 @@ export const DirectMessageSummarySchema = Schema.Struct({
   id: ChannelId,
   participants: Schema.Array(PersonName),
   participantIds: Schema.optional(Schema.Array(AccountUuid)),
-  messages: Schema.optional(Schema.Number),
+  messages: Schema.optional(Schema.NonNegativeInt),
   modifiedOn: Schema.optional(Timestamp)
 }).annotations({
   title: "DirectMessageSummary",
