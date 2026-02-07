@@ -58,7 +58,7 @@ export const authToOptions = (auth: Auth, workspace: string): AuthOptions => {
 /**
  * Check if an error is an authentication error (should not be retried).
  */
-export const isAuthError = (error: unknown): boolean =>
+const isAuthError = (error: unknown): boolean =>
   error instanceof PlatformError && AUTH_STATUS_CODES.has(error.status.code)
 
 /**
@@ -72,7 +72,7 @@ const connectionRetrySchedule = Schedule.exponential("100 millis").pipe(
  * Wrap a connection attempt with retry logic.
  * Auth errors are not retried; connection errors retry up to 3 times.
  */
-export const withConnectionRetry = <A>(
+const withConnectionRetry = <A>(
   attempt: Effect.Effect<A, ConnectionError>
 ): Effect.Effect<A, ConnectionError> =>
   attempt.pipe(

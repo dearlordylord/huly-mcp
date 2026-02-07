@@ -37,7 +37,7 @@ if (!(globalThis as Record<string, unknown>).navigator) {
   })
 }
 
-export type AppError =
+type AppError =
   | ConfigValidationError
   | HulyClientError
   | StorageClientError

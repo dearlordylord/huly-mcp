@@ -129,15 +129,7 @@ export default [
       }
     },
     rules: {
-      "import-x/no-unused-modules": ["error", {
-        unusedExports: true,
-        ignoreExports: [
-          "src/index.ts",
-          "src/config/config.ts",
-          "src/huly/auth-utils.ts",
-          "src/mcp/tools/index.ts"
-        ]
-      }]
+      "import-x/no-unused-modules": ["error", { unusedExports: true }]
     }
   }
 ]
