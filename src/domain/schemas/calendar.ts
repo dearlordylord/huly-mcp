@@ -352,7 +352,10 @@ export const ListEventInstancesParamsSchema = Schema.Struct({
     LimitParam.annotations({
       description: "Maximum number of instances to return (default: 50)"
     })
-  )
+  ),
+  includeParticipants: Schema.optional(Schema.Boolean.annotations({
+    description: "Include full participant info (requires extra lookups, default: false)"
+  }))
 }).annotations({
   title: "ListEventInstancesParams",
   description: "Parameters for listing instances of a recurring event"

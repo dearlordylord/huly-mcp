@@ -579,6 +579,23 @@ export const listEventInstances = (
       }
     )
 
+    const participantMap = new Map<string, Participant[]>()
+    if (params.includeParticipants) {
+      const allParticipantRefs = instances.flatMap(i => i.participants)
+      if (allParticipantRefs.length > 0) {
+        const participants = yield* buildParticipants(client, allParticipantRefs)
+        const participantById = new Map(participants.map(p => [p.id, p]))
+        for (const instance of instances) {
+          const instanceParticipants = instance.participants
+            .map(ref => participantById.get(String(ref)))
+            .filter((p): p is Participant => p !== undefined)
+          if (instanceParticipants.length > 0) {
+            participantMap.set(instance.eventId, instanceParticipants)
+          }
+        }
+      }
+    }
+
     const results: Array<EventInstance> = instances.map(instance => ({
       eventId: instance.eventId,
       recurringEventId: instance.recurringEventId,
@@ -591,6 +608,7 @@ export const listEventInstances = (
       visibility: visibilityToString(instance.visibility),
       isCancelled: instance.isCancelled,
       isVirtual: instance.virtual,
+      participants: participantMap.get(instance.eventId),
       externalParticipants: instance.externalParticipants
     }))
 
