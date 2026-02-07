@@ -81,9 +81,17 @@ export const listPersons = (
     const client = yield* HulyClient
     const limit = Math.min(params.limit ?? 50, 200)
 
+    // Build query with search filters
+    const query: Record<string, unknown> = {}
+
+    // Apply name search using $like operator
+    if (params.nameSearch !== undefined && params.nameSearch.trim() !== "") {
+      query.name = { $like: `%${params.nameSearch}%` }
+    }
+
     const persons = yield* client.findAll<HulyPerson>(
       contact.class.Person,
-      {},
+      query,
       {
         limit,
         sort: { modifiedOn: SortingOrder.Descending }
@@ -93,7 +101,17 @@ export const listPersons = (
     const personIds = persons.map(p => p._id)
     const emailMap = yield* batchGetEmailsForPersons(client, personIds)
 
-    return persons.map(person => ({
+    // If emailSearch is provided, filter results by email
+    let filteredPersons = [...persons]
+    if (params.emailSearch !== undefined && params.emailSearch.trim() !== "") {
+      const searchLower = params.emailSearch.toLowerCase()
+      filteredPersons = persons.filter(person => {
+        const email = emailMap.get(String(person._id))
+        return email !== undefined && email.toLowerCase().includes(searchLower)
+      })
+    }
+
+    return filteredPersons.map(person => ({
       id: String(person._id),
       name: person.name,
       city: person.city,

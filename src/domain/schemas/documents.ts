@@ -57,6 +57,12 @@ export const ListDocumentsParamsSchema = Schema.Struct({
   teamspace: NonEmptyString.annotations({
     description: "Teamspace name or ID"
   }),
+  titleSearch: Schema.optional(Schema.String.annotations({
+    description: "Search documents by title substring (case-insensitive)"
+  })),
+  contentSearch: Schema.optional(Schema.String.annotations({
+    description: "Search documents by content (fulltext search)"
+  })),
   limit: Schema.optional(
     LimitParam.annotations({
       description: "Maximum number of documents to return (default: 50)"

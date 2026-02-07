@@ -195,6 +195,17 @@ export const listIssues = (
       }
     }
 
+    // Apply title search using $like operator
+    if (params.titleSearch !== undefined && params.titleSearch.trim() !== "") {
+      query.title = { $like: `%${params.titleSearch}%` }
+    }
+
+    // Apply description search using fulltext $search operator
+    // Note: $search performs fulltext search across indexed fields
+    if (params.descriptionSearch !== undefined && params.descriptionSearch.trim() !== "") {
+      (query as Record<string, unknown>).$search = params.descriptionSearch
+    }
+
     const limit = Math.min(params.limit ?? 50, 200)
 
     const issues = yield* client.findAll<HulyIssue>(

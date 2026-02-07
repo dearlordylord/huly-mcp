@@ -63,6 +63,12 @@ export const OrganizationSummarySchema = Schema.Struct({
 export type OrganizationSummary = Schema.Schema.Type<typeof OrganizationSummarySchema>
 
 export const ListPersonsParamsSchema = Schema.Struct({
+  nameSearch: Schema.optional(Schema.String.annotations({
+    description: "Search persons by name substring (case-insensitive)"
+  })),
+  emailSearch: Schema.optional(Schema.String.annotations({
+    description: "Search persons by email substring (case-insensitive)"
+  })),
   limit: Schema.optional(
     LimitParam.annotations({
       description: "Maximum number of persons to return (default: 50)"

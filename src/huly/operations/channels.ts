@@ -184,6 +184,7 @@ const buildAccountUuidToNameMap = (
 /**
  * List channels.
  * Results sorted by name ascending.
+ * Supports filtering by name and topic substring.
  */
 export const listChannels = (
   params: ListChannelsParams
@@ -194,6 +195,16 @@ export const listChannels = (
     const query: Record<string, unknown> = {}
     if (!params.includeArchived) {
       query.archived = false
+    }
+
+    // Apply name search using $like operator
+    if (params.nameSearch !== undefined && params.nameSearch.trim() !== "") {
+      query.name = { $like: `%${params.nameSearch}%` }
+    }
+
+    // Apply topic search using $like operator
+    if (params.topicSearch !== undefined && params.topicSearch.trim() !== "") {
+      query.topic = { $like: `%${params.topicSearch}%` }
     }
 
     const limit = Math.min(params.limit ?? 50, 200)

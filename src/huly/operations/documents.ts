@@ -190,7 +190,8 @@ export const listTeamspaces = (
 
 /**
  * List documents in a teamspace.
- * Results sorted by name ascending.
+ * Results sorted by modification date descending.
+ * Supports filtering by title substring and content fulltext search.
  */
 export const listDocuments = (
   params: ListDocumentsParams
@@ -200,11 +201,24 @@ export const listDocuments = (
 
     const limit = Math.min(params.limit ?? 50, 200)
 
+    // Build query with search filters
+    let query: Record<string, unknown> = {
+      space: teamspace._id
+    }
+
+    // Apply title search using $like operator
+    if (params.titleSearch !== undefined && params.titleSearch.trim() !== "") {
+      query.title = { $like: `%${params.titleSearch}%` }
+    }
+
+    // Apply content search using fulltext $search operator
+    if (params.contentSearch !== undefined && params.contentSearch.trim() !== "") {
+      query.$search = params.contentSearch
+    }
+
     const documents = yield* client.findAll<HulyDocument>(
       documentPlugin.class.Document,
-      {
-        space: teamspace._id
-      },
+      query,
       {
         limit,
         sort: {

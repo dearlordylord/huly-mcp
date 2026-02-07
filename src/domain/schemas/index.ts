@@ -344,3 +344,14 @@ export {
   type WorkSlot,
   WorkSlotSchema
 } from "./time.js"
+
+export {
+  type FulltextSearchParams,
+  fulltextSearchParamsJsonSchema,
+  FulltextSearchParamsSchema,
+  type FulltextSearchResult,
+  FulltextSearchResultSchema,
+  parseFulltextSearchParams,
+  type SearchResultItem,
+  SearchResultItemSchema
+} from "./search.js"

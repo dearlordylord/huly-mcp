@@ -77,6 +77,12 @@ export const ListIssuesParamsSchema = Schema.Struct({
   assignee: Schema.optional(Schema.String.annotations({
     description: "Filter by assignee email"
   })),
+  titleSearch: Schema.optional(Schema.String.annotations({
+    description: "Search issues by title substring (case-insensitive)"
+  })),
+  descriptionSearch: Schema.optional(Schema.String.annotations({
+    description: "Search issues by description content (fulltext search)"
+  })),
   limit: Schema.optional(
     LimitParam.annotations({
       description: "Maximum number of issues to return (default: 50)"

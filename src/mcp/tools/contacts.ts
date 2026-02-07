@@ -31,7 +31,7 @@ import { createToolHandler, type RegisteredTool } from "./registry.js"
 export const contactTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "list_persons",
-    description: "List all persons in the Huly workspace. Returns persons sorted by modification date (newest first).",
+    description: "List all persons in the Huly workspace. Returns persons sorted by modification date (newest first). Supports searching by name substring (nameSearch) and email substring (emailSearch).",
     inputSchema: listPersonsParamsJsonSchema,
     handler: createToolHandler(
       "list_persons",

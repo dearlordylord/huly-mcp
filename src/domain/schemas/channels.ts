@@ -76,6 +76,12 @@ export type DirectMessageSummary = Schema.Schema.Type<typeof DirectMessageSummar
 // --- List Channels Params ---
 
 export const ListChannelsParamsSchema = Schema.Struct({
+  nameSearch: Schema.optional(Schema.String.annotations({
+    description: "Search channels by name substring (case-insensitive)"
+  })),
+  topicSearch: Schema.optional(Schema.String.annotations({
+    description: "Search channels by topic substring (case-insensitive)"
+  })),
   limit: Schema.optional(
     LimitParam.annotations({
       description: "Maximum number of channels to return (default: 50)"

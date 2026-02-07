@@ -19,7 +19,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "list_issues",
     description:
-      "Query Huly issues with optional filters. Returns issues sorted by modification date (newest first). Supports filtering by project, status, assignee, and milestone.",
+      "Query Huly issues with optional filters. Returns issues sorted by modification date (newest first). Supports filtering by project, status, assignee, and milestone. Supports searching by title substring (titleSearch) and description content (descriptionSearch).",
     inputSchema: listIssuesParamsJsonSchema,
     handler: createToolHandler(
       "list_issues",

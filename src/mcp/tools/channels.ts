@@ -31,7 +31,7 @@ import { createToolHandler, type RegisteredTool } from "./registry.js"
 export const channelTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "list_channels",
-    description: "List all Huly channels. Returns channels sorted by name. Supports filtering by archived status.",
+    description: "List all Huly channels. Returns channels sorted by name. Supports filtering by archived status. Supports searching by name substring (nameSearch) and topic substring (topicSearch).",
     inputSchema: listChannelsParamsJsonSchema,
     handler: createToolHandler(
       "list_channels",
