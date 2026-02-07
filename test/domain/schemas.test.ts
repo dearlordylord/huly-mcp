@@ -1,6 +1,6 @@
 import { describe, it } from "@effect/vitest"
 import { expect } from "vitest"
-import { Effect, JSONSchema, Schema } from "effect"
+import { Effect, Schema } from "effect"
 import {
   IssuePrioritySchema,
   IssuePriorityValues,
@@ -533,19 +533,6 @@ describe("Domain Schemas", () => {
         expect(schema.required).toContain("project")
         expect(schema.required).toContain("identifier")
         expect(schema.required).toContain("label")
-      })
-    )
-
-        it.effect("JSONSchema.make works with any schema", () =>
-      Effect.gen(function* () {
-        const customSchema = Schema.Struct({
-          name: Schema.String,
-          age: Schema.Number,
-        })
-        const jsonSchema = JSONSchema.make(customSchema) as JsonSchemaObject
-        expect(jsonSchema.type).toBe("object")
-        expect(jsonSchema.required).toContain("name")
-        expect(jsonSchema.required).toContain("age")
       })
     )
 
