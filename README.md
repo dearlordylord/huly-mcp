@@ -122,3 +122,114 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `MCP_TRANSPORT` | No | Transport type: `stdio` (default) or `http` |
 | `MCP_HTTP_PORT` | No | HTTP server port (default: 3000) |
 | `MCP_HTTP_HOST` | No | HTTP server host (default: 127.0.0.1) |
+
+<!-- tools:start -->
+## Available Tools
+
+### Projects
+
+| Tool | Description |
+|------|-------------|
+| `list_projects` | List all Huly projects. Returns projects sorted by name. Supports filtering by archived status. |
+
+### Issues
+
+| Tool | Description |
+|------|-------------|
+| `list_issues` | Query Huly issues with optional filters. Returns issues sorted by modification date (newest first). Supports filtering by project, status, assignee, and milestone. |
+| `get_issue` | Retrieve full details for a Huly issue including markdown description. Use this to view issue content, comments, or full metadata. |
+| `create_issue` | Create a new issue in a Huly project. Description supports markdown formatting. Returns the created issue identifier. |
+| `update_issue` | Update fields on an existing Huly issue. Only provided fields are modified. Description updates support markdown. |
+| `add_issue_label` | Add a tag/label to a Huly issue. Creates the tag if it doesn't exist in the project. |
+| `delete_issue` | Permanently delete a Huly issue. This action cannot be undone. |
+
+### Comments
+
+| Tool | Description |
+|------|-------------|
+| `list_comments` | List comments on a Huly issue. Returns comments sorted by creation date (oldest first). |
+| `add_comment` | Add a comment to a Huly issue. Comment body supports markdown formatting. |
+| `update_comment` | Update an existing comment on a Huly issue. Comment body supports markdown formatting. |
+| `delete_comment` | Delete a comment from a Huly issue. This action cannot be undone. |
+
+### Milestones
+
+| Tool | Description |
+|------|-------------|
+| `list_milestones` | List milestones in a Huly project. Returns milestones sorted by modification date (newest first). |
+| `get_milestone` | Retrieve full details for a Huly milestone. Use this to view milestone content and metadata. |
+| `create_milestone` | Create a new milestone in a Huly project. Returns the created milestone ID and label. |
+| `update_milestone` | Update fields on an existing Huly milestone. Only provided fields are modified. |
+| `set_issue_milestone` | Set or clear the milestone on a Huly issue. Pass null for milestone to clear it. |
+| `delete_milestone` | Permanently delete a Huly milestone. This action cannot be undone. |
+
+### Documents
+
+| Tool | Description |
+|------|-------------|
+| `list_teamspaces` | List all Huly document teamspaces. Returns teamspaces sorted by name. Supports filtering by archived status. |
+| `list_documents` | List documents in a Huly teamspace. Returns documents sorted by modification date (newest first). |
+| `get_document` | Retrieve full details for a Huly document including markdown content. Use this to view document content and metadata. |
+| `create_document` | Create a new document in a Huly teamspace. Content supports markdown formatting. Returns the created document id. |
+| `update_document` | Update fields on an existing Huly document. Only provided fields are modified. Content updates support markdown. |
+| `delete_document` | Permanently delete a Huly document. This action cannot be undone. |
+
+### Storage
+
+| Tool | Description |
+|------|-------------|
+| `upload_file` | Upload a file to Huly storage. Provide ONE of: filePath (local file - preferred), fileUrl (fetch from URL), or data (base64 - for small files only). Returns blob ID and URL for referencing the file. |
+
+### Contacts
+
+| Tool | Description |
+|------|-------------|
+| `list_persons` | List all persons in the Huly workspace. Returns persons sorted by modification date (newest first). |
+| `get_person` | Retrieve full details for a person including contact channels. Use personId or email to identify the person. |
+| `create_person` | Create a new person in Huly. Returns the created person ID. |
+| `update_person` | Update fields on an existing person. Only provided fields are modified. |
+| `delete_person` | Permanently delete a person from Huly. This action cannot be undone. |
+| `list_employees` | List employees (persons who are team members). Returns employees sorted by modification date (newest first). |
+| `list_organizations` | List all organizations in the Huly workspace. Returns organizations sorted by modification date (newest first). |
+| `create_organization` | Create a new organization in Huly. Optionally add members by person ID or email. Returns the created organization ID. |
+
+### Channels
+
+| Tool | Description |
+|------|-------------|
+| `list_channels` | List all Huly channels. Returns channels sorted by name. Supports filtering by archived status. |
+| `get_channel` | Retrieve full details for a Huly channel including topic and member list. |
+| `create_channel` | Create a new channel in Huly. Returns the created channel ID and name. |
+| `update_channel` | Update fields on an existing Huly channel. Only provided fields are modified. |
+| `delete_channel` | Permanently delete a Huly channel. This action cannot be undone. |
+| `list_channel_messages` | List messages in a Huly channel. Returns messages sorted by date (newest first). |
+| `send_channel_message` | Send a message to a Huly channel. Message body supports markdown formatting. |
+| `list_direct_messages` | List direct message conversations in Huly. Returns conversations sorted by date (newest first). |
+
+### Calendar
+
+| Tool | Description |
+|------|-------------|
+| `list_events` | List calendar events. Returns events sorted by date. Supports filtering by date range. |
+| `get_event` | Retrieve full details for a calendar event including description. Use this to view event content and metadata. |
+| `create_event` | Create a new calendar event. Description supports markdown formatting. Returns the created event ID. |
+| `update_event` | Update fields on an existing calendar event. Only provided fields are modified. Description updates support markdown. |
+| `delete_event` | Permanently delete a calendar event. This action cannot be undone. |
+| `list_recurring_events` | List recurring event definitions. Returns recurring events sorted by modification date (newest first). |
+| `create_recurring_event` | Create a new recurring calendar event with RFC5545 RRULE rules. Description supports markdown. Returns the created event ID. |
+| `list_event_instances` | List instances of a recurring event. Returns instances sorted by date. Supports filtering by date range. Use includeParticipants=true to fetch full participant info (extra lookups). |
+
+### Time Tracking
+
+| Tool | Description |
+|------|-------------|
+| `log_time` | Log time spent on a Huly issue. Records a time entry with optional description. Time value is in minutes. |
+| `get_time_report` | Get time tracking report for a specific Huly issue. Shows total time, estimation, remaining time, and all time entries. |
+| `list_time_spend_reports` | List all time entries across issues. Supports filtering by project and date range. Returns entries sorted by date (newest first). |
+| `get_detailed_time_report` | Get detailed time breakdown for a project. Shows total time grouped by issue and by employee. Supports date range filtering. |
+| `list_work_slots` | List scheduled work slots. Shows planned time blocks attached to ToDos. Supports filtering by employee and date range. |
+| `create_work_slot` | Create a scheduled work slot. Attaches a time block to a ToDo for planning purposes. |
+| `start_timer` | Start a client-side timer on a Huly issue. Validates the issue exists and returns a start timestamp. Use log_time to record the elapsed time when done. |
+| `stop_timer` | Stop a client-side timer on a Huly issue. Returns the stop timestamp. Calculate elapsed time from start/stop timestamps and use log_time to record it. |
+
+<!-- tools:end -->

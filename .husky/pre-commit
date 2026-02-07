@@ -1,3 +1,6 @@
+echo "Updating README with tools documentation..."
+pnpm run update-readme
+
 echo "Running gitleaks to check for secrets..."
 
 gitleaks protect --verbose --staged
