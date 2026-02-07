@@ -5,11 +5,11 @@
  * @module
  */
 
-// Polyfill browser globals for Node.js (required by @hcengineering packages)
+import "./polyfills.js"
+
 import { NodeRuntime } from "@effect/platform-node"
 import type { ConfigError } from "effect"
 import { Config, Effect, Layer } from "effect"
-import fakeIndexedDB from "fake-indexeddb"
 
 import { type ConfigValidationError, HulyConfigService } from "./config/config.js"
 import { HulyClient, type HulyClientError } from "./huly/client.js"
@@ -17,25 +17,6 @@ import { HulyStorageClient, type StorageClientError } from "./huly/storage.js"
 import { WorkspaceClient, type WorkspaceClientError } from "./huly/workspace-client.js"
 import { HttpServerFactoryService } from "./mcp/http-transport.js"
 import { type McpServerError, McpServerService, type McpTransportType } from "./mcp/server.js"
-;(globalThis as Record<string, unknown>).indexedDB = fakeIndexedDB
-
-// Mock window with basic event handling
-// - dirtiest hack here. current api package is frontend-oriented, but we somehow run it on the server and it somehow works. hooray?
-const mockWindow: Record<string, unknown> = {
-  addEventListener: () => {},
-  removeEventListener: () => {},
-  location: { href: "" },
-  document: {}
-}
-;(globalThis as Record<string, unknown>).window = mockWindow
-
-if (!(globalThis as Record<string, unknown>).navigator) {
-  Object.defineProperty(globalThis, "navigator", {
-    value: { userAgent: "node" },
-    writable: true,
-    configurable: true
-  })
-}
 
 type AppError =
   | ConfigValidationError

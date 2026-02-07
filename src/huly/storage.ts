@@ -184,10 +184,6 @@ export class HulyStorageClient extends Context.Tag("@hulymcp/HulyStorageClient")
           Effect.tryPromise({
             try: async () => {
               const blob = await storageClient.put(filename, data, contentType, data.length)
-<<<<<<< HEAD
-              const blobRef = blob._id
-=======
->>>>>>> wt-storage
               return {
                 blobId: blob._id,
                 contentType: blob.contentType,
