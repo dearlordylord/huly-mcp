@@ -20,6 +20,9 @@ importers:
       '@hcengineering/api-client':
         specifier: ^0.7.3
         version: 0.7.18(prosemirror-inputrules@1.5.1)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.5)
+      '@hcengineering/calendar':
+        specifier: ^0.7.0
+        version: 0.7.0
       '@hcengineering/chunter':
         specifier: ^0.7.0
         version: 0.7.0

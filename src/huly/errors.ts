@@ -280,6 +280,40 @@ export class ChannelNotFoundError extends Schema.TaggedError<ChannelNotFoundErro
 }
 
 /**
+ * Calendar event not found.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class EventNotFoundError extends Schema.TaggedError<EventNotFoundError>()(
+  "EventNotFoundError",
+  {
+    eventId: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Event '${this.eventId}' not found`
+  }
+}
+
+/**
+ * Recurring calendar event not found.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class RecurringEventNotFoundError extends Schema.TaggedError<RecurringEventNotFoundError>()(
+  "RecurringEventNotFoundError",
+  {
+    eventId: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Recurring event '${this.eventId}' not found`
+  }
+}
+
+/**
  * Union of all Huly domain errors.
  */
 export type HulyDomainError =
@@ -299,6 +333,8 @@ export type HulyDomainError =
   | CommentNotFoundError
   | MilestoneNotFoundError
   | ChannelNotFoundError
+  | EventNotFoundError
+  | RecurringEventNotFoundError
 
 /**
  * Schema for all Huly domain errors (for serialization).
@@ -320,7 +356,9 @@ export const HulyDomainError: Schema.Union<
     typeof DocumentNotFoundError,
     typeof CommentNotFoundError,
     typeof MilestoneNotFoundError,
-    typeof ChannelNotFoundError
+    typeof ChannelNotFoundError,
+    typeof EventNotFoundError,
+    typeof RecurringEventNotFoundError
   ]
 > = Schema.Union(
   HulyError,
@@ -338,7 +376,9 @@ export const HulyDomainError: Schema.Union<
   DocumentNotFoundError,
   CommentNotFoundError,
   MilestoneNotFoundError,
-  ChannelNotFoundError
+  ChannelNotFoundError,
+  EventNotFoundError,
+  RecurringEventNotFoundError
 )
 
 /**
