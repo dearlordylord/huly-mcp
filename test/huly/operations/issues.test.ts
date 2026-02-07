@@ -123,7 +123,7 @@ const makeChannel = (overrides?: Partial<Channel>): Channel =>
     attachedTo: "person-1" as Ref<Doc>,
     attachedToClass: contact.class.Person,
     collection: "channels",
-    provider: "email" as Ref<Doc>,
+    provider: contact.channelProvider.Email as unknown as Ref<Doc>,
     value: "john@example.com",
     modifiedBy: "user-1" as Ref<Doc>,
     modifiedOn: Date.now(),
@@ -299,10 +299,38 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       )
       return Effect.succeed(found as Doc | undefined)
     }
+    if (_class === contact.class.Channel) {
+      const q = query as Record<string, unknown>
+      const value = q.value as string | { $like: string } | undefined
+      if (typeof value === "string") {
+        const found = channels.find(c => c.value === value && (q.provider === undefined || c.provider === q.provider))
+        return Effect.succeed(found as Doc | undefined)
+      }
+      if (value && typeof value === "object" && "$like" in value) {
+        const pattern = (value.$like as string).replace(/%/g, "")
+        const found = channels.find(c => c.value.includes(pattern) && (q.provider === undefined || c.provider === q.provider))
+        return Effect.succeed(found as Doc | undefined)
+      }
+      return Effect.succeed(undefined)
+    }
     if (_class === contact.class.Person) {
-      const id = (query as Record<string, unknown>)._id as string
-      const found = persons.find(p => p._id === id)
-      return Effect.succeed(found as Doc | undefined)
+      const q = query as Record<string, unknown>
+      if (q._id) {
+        const found = persons.find(p => p._id === q._id)
+        return Effect.succeed(found as Doc | undefined)
+      }
+      if (q.name) {
+        if (typeof q.name === "string") {
+          const found = persons.find(p => p.name === q.name)
+          return Effect.succeed(found as Doc | undefined)
+        }
+        if (typeof q.name === "object" && q.name !== null && "$like" in (q.name as Record<string, unknown>)) {
+          const pattern = ((q.name as Record<string, string>).$like).replace(/%/g, "")
+          const found = persons.find(p => p.name.includes(pattern))
+          return Effect.succeed(found as Doc | undefined)
+        }
+      }
+      return Effect.succeed(undefined)
     }
     if (_class === tags.class.TagElement) {
       const q = query as Record<string, unknown>
