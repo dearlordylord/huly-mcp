@@ -1,11 +1,13 @@
 import type { Channel as HulyChannel, ChatMessage, DirectMessage as HulyDirectMessage } from "@hcengineering/chunter"
-import type { Person } from "@hcengineering/contact"
+import type { Employee as HulyEmployee, Person, SocialIdentity } from "@hcengineering/contact"
 import {
+  type AccountUuid,
   type AttachedData,
   type Data,
   type DocumentUpdate,
   generateId,
   type Markup,
+  type PersonId,
   type Ref,
   SortingOrder,
   type Space
@@ -105,6 +107,75 @@ const markdownToMarkupString = (markdown: string): Markup => {
   return jsonToMarkup(json) as Markup
 }
 
+/**
+ * Build a map from PersonId to Person name by querying SocialIdentity.
+ * PersonId is the _id of SocialIdentity, which has attachedTo pointing to Person.
+ */
+const buildPersonIdToNameMap = (
+  client: HulyClient["Type"],
+  personIds: Array<PersonId>
+): Effect.Effect<Map<string, string>, HulyClientError> =>
+  Effect.gen(function*() {
+    if (personIds.length === 0) {
+      return new Map<string, string>()
+    }
+
+    const socialIdentities = yield* client.findAll<SocialIdentity>(
+      contact.class.SocialIdentity,
+      { _id: { $in: personIds } }
+    )
+
+    if (socialIdentities.length === 0) {
+      return new Map<string, string>()
+    }
+
+    const personRefs = [...new Set(socialIdentities.map((si) => si.attachedTo))]
+    const persons = yield* client.findAll<Person>(
+      contact.class.Person,
+      { _id: { $in: personRefs } }
+    )
+
+    const personById = new Map(persons.map((p) => [String(p._id), p]))
+    const result = new Map<string, string>()
+
+    for (const si of socialIdentities) {
+      const person = personById.get(String(si.attachedTo))
+      if (person !== undefined) {
+        result.set(String(si._id), person.name)
+      }
+    }
+
+    return result
+  })
+
+/**
+ * Build a map from AccountUuid to Person name by querying Employee.
+ * Employee has personUuid field that matches AccountUuid.
+ */
+const buildAccountUuidToNameMap = (
+  client: HulyClient["Type"],
+  accountUuids: Array<AccountUuid>
+): Effect.Effect<Map<string, string>, HulyClientError> =>
+  Effect.gen(function*() {
+    if (accountUuids.length === 0) {
+      return new Map<string, string>()
+    }
+
+    const employees = yield* client.findAll<HulyEmployee>(
+      contact.mixin.Employee,
+      { personUuid: { $in: accountUuids } }
+    )
+
+    const result = new Map<string, string>()
+    for (const emp of employees) {
+      if (emp.personUuid !== undefined) {
+        result.set(String(emp.personUuid), emp.name)
+      }
+    }
+
+    return result
+  })
+
 // --- Operations ---
 
 /**
@@ -160,18 +231,13 @@ export const getChannel = (
 
     let memberNames: Array<string> | undefined
     if (channel.members && channel.members.length > 0) {
-      const memberIds = channel.members as Array<Ref<Person>>
-      const persons = yield* client.findAll<Person>(
-        contact.class.Person,
-        { _id: { $in: memberIds } }
-      )
-
-      const personByAccount = new Map<string, Person>(
-        persons.map((p) => [String(p._id), p])
+      const accountUuidToName = yield* buildAccountUuidToNameMap(
+        client,
+        channel.members as Array<AccountUuid>
       )
 
       memberNames = channel.members
-        .map((m) => personByAccount.get(String(m))?.name)
+        .map((m) => accountUuidToName.get(String(m)))
         .filter((n): n is string => n !== undefined)
     }
 
@@ -327,20 +393,22 @@ export const listChannelMessages = (
 
     const total = messages.total ?? messages.length
 
-    // Note: modifiedBy is AccountUuid which doesn't directly map to Person._id
-    // We fetch all persons to map accounts to names. This could be optimized
-    // if Huly provides an account-to-person mapping API.
-    const persons = messages.length > 0
-      ? yield* client.findAll<Person>(contact.class.Person, {})
-      : []
-    const personMap = new Map(persons.map((p) => [String(p._id), p]))
+    const uniquePersonIds = [
+      ...new Set(
+        messages
+          .map((msg) => msg.modifiedBy)
+          .filter((id): id is PersonId => id !== undefined)
+      )
+    ]
+
+    const personIdToName = yield* buildPersonIdToNameMap(client, uniquePersonIds)
 
     const summaries: Array<MessageSummary> = messages.map((msg) => {
-      const sender = msg.modifiedBy ? personMap.get(String(msg.modifiedBy)) : undefined
+      const senderName = msg.modifiedBy ? personIdToName.get(String(msg.modifiedBy)) : undefined
       return {
         id: String(msg._id),
         body: markupToMarkdownString(msg.message),
-        sender: sender?.name,
+        sender: senderName,
         senderId: msg.modifiedBy ? String(msg.modifiedBy) : undefined,
         createdOn: msg.createdOn,
         modifiedOn: msg.modifiedOn,
@@ -421,16 +489,17 @@ export const listDirectMessages = (
 
     const total = dms.total ?? dms.length
 
-    // Note: DM members are AccountUuids which don't directly map to Person._id
-    // We fetch all persons to map accounts to names.
-    const persons = dms.length > 0
-      ? yield* client.findAll<Person>(contact.class.Person, {})
-      : []
-    const personMap = new Map(persons.map((p) => [String(p._id), p]))
+    const uniqueAccountUuids = [
+      ...new Set(
+        dms.flatMap((dm) => dm.members || [])
+      )
+    ] as Array<AccountUuid>
+
+    const accountUuidToName = yield* buildAccountUuidToNameMap(client, uniqueAccountUuids)
 
     const summaries: Array<DirectMessageSummary> = dms.map((dm) => {
       const participants = (dm.members || [])
-        .map((m) => personMap.get(String(m))?.name)
+        .map((m) => accountUuidToName.get(String(m)))
         .filter((n): n is string => n !== undefined)
 
       const participantIds = (dm.members || []).map(String)
