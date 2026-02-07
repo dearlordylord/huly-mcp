@@ -99,7 +99,7 @@ export const createMcpServer = (
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { arguments: args, name } = request.params
 
-    const response = registry.handleToolCall(
+    const response = await registry.handleToolCall(
       name,
       args ?? {},
       hulyClient,
@@ -111,7 +111,7 @@ export const createMcpServer = (
       return toMcpResponse(createUnknownToolError(name))
     }
 
-    return toMcpResponse(await response)
+    return toMcpResponse(response)
   })
 
   return server
