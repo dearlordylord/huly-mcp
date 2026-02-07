@@ -15,7 +15,7 @@
 import fakeIndexedDB from "fake-indexeddb"
 ;(globalThis as Record<string, unknown>).indexedDB = fakeIndexedDB
 
-// Current api package is frontend-oriented but we run it on the server
+// dirtiest hack here. current api package is frontend-oriented, but we somehow run it on the server and it somehow works. hooray?
 const mockWindow: Record<string, unknown> = {
   addEventListener: () => {},
   removeEventListener: () => {},
