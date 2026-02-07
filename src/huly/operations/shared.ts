@@ -1,11 +1,17 @@
+import type { Channel, Person } from "@hcengineering/contact"
 import type { Class, Doc, FindOptions, PersonUuid, Ref, Status, WithLookup } from "@hcengineering/core"
 import type { ProjectType } from "@hcengineering/task"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
-import { Effect } from "effect"
+import { IssuePriority } from "@hcengineering/tracker"
+import { absurd, Effect } from "effect"
 
+import type { IssuePriority as IssuePriorityStr } from "../../domain/schemas/issues.js"
 import { NonNegativeNumber, PositiveNumber } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { InvalidPersonUuidError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
+const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
 
 // Huly SDK uses `Ref<T>` (a branded string) for entity references.
 // Our domain uses Effect Schema brands. No type-safe bridge exists; this is the boundary cast.
@@ -242,3 +248,83 @@ export interface SearchOptions {
 export interface LookupOptions<T extends Doc> {
   lookup?: FindOptions<T>["lookup"]
 }
+
+export const priorityToString = (priority: IssuePriority): IssuePriorityStr => {
+  switch (priority) {
+    case IssuePriority.Urgent:
+      return "urgent"
+    case IssuePriority.High:
+      return "high"
+    case IssuePriority.Medium:
+      return "medium"
+    case IssuePriority.Low:
+      return "low"
+    case IssuePriority.NoPriority:
+      return "no-priority"
+    default:
+      absurd(priority)
+      throw new Error("Invalid priority")
+  }
+}
+
+export const stringToPriority = (priority: IssuePriorityStr): IssuePriority => {
+  switch (priority) {
+    case "urgent":
+      return IssuePriority.Urgent
+    case "high":
+      return IssuePriority.High
+    case "medium":
+      return IssuePriority.Medium
+    case "low":
+      return IssuePriority.Low
+    case "no-priority":
+      return IssuePriority.NoPriority
+    default:
+      absurd(priority)
+      throw new Error("Invalid priority")
+  }
+}
+
+export const findPersonByEmailOrName = (
+  client: HulyClient["Type"],
+  emailOrName: string
+): Effect.Effect<Person | undefined, HulyClientError> =>
+  Effect.gen(function*() {
+    const channels = yield* client.findAll<Channel>(
+      contact.class.Channel,
+      { value: emailOrName }
+    )
+
+    if (channels.length > 0) {
+      const channel = channels[0]
+      const person = yield* client.findOne<Person>(
+        contact.class.Person,
+        { _id: toRef<Person>(channel.attachedTo) }
+      )
+      if (person) {
+        return person
+      }
+    }
+
+    const persons = yield* client.findAll<Person>(
+      contact.class.Person,
+      { name: emailOrName }
+    )
+
+    if (persons.length > 0) {
+      return persons[0]
+    }
+
+    const allPersons = yield* client.findAll<Person>(
+      contact.class.Person,
+      {},
+      { limit: 200 }
+    )
+
+    const lowerName = emailOrName.toLowerCase()
+    const matchingPerson = allPersons.find(
+      p => p.name.toLowerCase().includes(lowerName)
+    )
+
+    return matchingPerson
+  })
