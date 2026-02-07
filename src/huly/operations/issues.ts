@@ -25,7 +25,7 @@ import {
 import { makeRank } from "@hcengineering/rank"
 import type { TagElement, TagReference } from "@hcengineering/tags"
 import { type Issue as HulyIssue, type Project as HulyProject } from "@hcengineering/tracker"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 
 import type {
   AddLabelParams,
@@ -53,7 +53,7 @@ import {
 } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { ComponentNotFoundError, ProjectNotFoundError } from "../errors.js"
-import { InvalidStatusError, IssueNotFoundError, PersonNotFoundError } from "../errors.js"
+import { HulyError, InvalidStatusError, IssueNotFoundError, PersonNotFoundError } from "../errors.js"
 import { findComponentByIdOrLabel } from "./components.js"
 import { escapeLikeWildcards, withLookup } from "./query-helpers.js"
 import {
@@ -99,12 +99,14 @@ const core = require("@hcengineering/core").default as typeof import("@hcenginee
 
 type ListIssuesError =
   | HulyClientError
+  | HulyError
   | ProjectNotFoundError
   | InvalidStatusError
   | ComponentNotFoundError
 
 type GetIssueError =
   | HulyClientError
+  | HulyError
   | ProjectNotFoundError
   | IssueNotFoundError
 
@@ -133,8 +135,59 @@ type DeleteIssueError =
 
 // SDK: updateDoc with retrieve=true returns TxResult which doesn't type the embedded object.
 // The runtime value includes { object: { sequence: number } } for $inc operations.
-const extractUpdatedSequence = (txResult: unknown): number | undefined =>
-  (txResult as { object?: { sequence?: number } } | undefined)?.object?.sequence
+const TxIncResult = Schema.Struct({
+  object: Schema.Struct({
+    sequence: Schema.Number
+  })
+})
+
+const extractUpdatedSequence = (txResult: unknown): number | undefined => {
+  const decoded = Schema.decodeUnknownOption(TxIncResult)(txResult)
+  return decoded._tag === "Some" ? decoded.value.object.sequence : undefined
+}
+
+// --- Helpers: resolveStatusByName, resolveAssignee ---
+
+const resolveStatusByName = (
+  statuses: Array<StatusInfo>,
+  statusName: string,
+  project: string
+): Effect.Effect<Ref<Status>, InvalidStatusError> => {
+  const matchingStatus = statuses.find(
+    s => s.name.toLowerCase() === statusName.toLowerCase()
+  )
+  if (matchingStatus === undefined) {
+    return Effect.fail(new InvalidStatusError({ status: statusName, project }))
+  }
+  return Effect.succeed(matchingStatus._id)
+}
+
+const resolveAssignee = (
+  client: HulyClient["Type"],
+  assigneeIdentifier: string
+): Effect.Effect<Person, PersonNotFoundError | HulyClientError> =>
+  Effect.gen(function*() {
+    const person = yield* findPersonByEmailOrName(client, assigneeIdentifier)
+    if (person === undefined) {
+      return yield* new PersonNotFoundError({ identifier: assigneeIdentifier })
+    }
+    return person
+  })
+
+const resolveStatusName = (
+  statuses: Array<StatusInfo>,
+  statusId: Ref<Status>
+): Effect.Effect<string, HulyError> => {
+  const statusDoc = statuses.find(s => s._id === statusId)
+  if (statusDoc === undefined) {
+    return Effect.fail(
+      new HulyError({
+        message: `Status '${statusId}' not found in project status list — possible data inconsistency`
+      })
+    )
+  }
+  return Effect.succeed(statusDoc.name)
+}
 
 // --- Operations ---
 
@@ -184,18 +237,7 @@ export const listIssues = (
           return []
         }
       } else {
-        const matchingStatus = statuses.find(
-          s => s.name.toLowerCase() === statusFilter
-        )
-
-        if (matchingStatus === undefined) {
-          return yield* new InvalidStatusError({
-            status: params.status,
-            project: params.project
-          })
-        }
-
-        query.status = matchingStatus._id
+        query.status = yield* resolveStatusByName(statuses, params.status, params.project)
       }
     }
 
@@ -246,20 +288,20 @@ export const listIssues = (
       )
     )
 
-    const summaries: Array<IssueSummary> = issues.map(issue => {
-      const statusDoc = statuses.find(s => s._id === issue.status)
-      const statusName = statusDoc?.name ?? "Unknown"
+    const summaries: Array<IssueSummary> = []
+    for (const issue of issues) {
+      const statusName = yield* resolveStatusName(statuses, issue.status)
       const assigneeName = issue.$lookup?.assignee?.name
 
-      return {
+      summaries.push({
         identifier: IssueIdentifier.make(issue.identifier),
         title: issue.title,
         status: StatusName.make(statusName),
         priority: priorityToString(issue.priority),
         assignee: assigneeName !== undefined ? PersonName.make(assigneeName) : undefined,
         modifiedOn: issue.modifiedOn
-      }
-    })
+      })
+    }
 
     return summaries
   })
@@ -296,8 +338,7 @@ export const getIssue = (
       return yield* new IssueNotFoundError({ identifier: params.identifier, project: params.project })
     }
 
-    const statusDoc = statuses.find(s => s._id === issue.status)
-    const statusName = statusDoc?.name ?? "Unknown"
+    const statusName = yield* resolveStatusName(statuses, issue.status)
 
     let assigneeName: string | undefined
     let assigneeRef: Issue["assigneeRef"]
@@ -384,25 +425,12 @@ export const createIssue = (
 
     let statusRef: Ref<Status> = project.defaultIssueStatus
     if (params.status !== undefined) {
-      const statusFilter = params.status.toLowerCase()
-      const matchingStatus = statuses.find(
-        s => s.name.toLowerCase() === statusFilter
-      )
-      if (matchingStatus === undefined) {
-        return yield* new InvalidStatusError({
-          status: params.status,
-          project: params.project
-        })
-      }
-      statusRef = matchingStatus._id
+      statusRef = yield* resolveStatusByName(statuses, params.status, params.project)
     }
 
     let assigneeRef: Ref<Person> | null = null
     if (params.assignee !== undefined) {
-      const person = yield* findPersonByEmailOrName(client, params.assignee)
-      if (person === undefined) {
-        return yield* new PersonNotFoundError({ identifier: params.assignee })
-      }
+      const person = yield* resolveAssignee(client, params.assignee)
       assigneeRef = person._id
     }
 
@@ -521,17 +549,7 @@ export const updateIssue = (
     }
 
     if (params.status !== undefined) {
-      const statusFilter = params.status.toLowerCase()
-      const matchingStatus = statuses.find(
-        s => s.name.toLowerCase() === statusFilter
-      )
-      if (matchingStatus === undefined) {
-        return yield* new InvalidStatusError({
-          status: params.status,
-          project: params.project
-        })
-      }
-      updateOps.status = matchingStatus._id
+      updateOps.status = yield* resolveStatusByName(statuses, params.status, params.project)
     }
 
     if (params.priority !== undefined) {
@@ -542,10 +560,7 @@ export const updateIssue = (
       if (params.assignee === null) {
         updateOps.assignee = null
       } else {
-        const person = yield* findPersonByEmailOrName(client, params.assignee)
-        if (person === undefined) {
-          return yield* new PersonNotFoundError({ identifier: params.assignee })
-        }
+        const person = yield* resolveAssignee(client, params.assignee)
         updateOps.assignee = person._id
       }
     }

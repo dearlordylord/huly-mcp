@@ -15,7 +15,7 @@ Rules: worktree work by parallel sub-agents. each writes REPORT.md. integration 
 | wt-errors-research | 2b | RESEARCH: error 4-edit architecture viability | DONE | 6c283fb: as never defeats exhaustive check, schema union dead code. Recommends Option A |
 | wt-schema-research | 23, 24 | RESEARCH: schema boilerplate factory; ParticipantSchema reuse | REJECTED | user: not wanted |
 | wt-errors-cleanup | 2a, 28, 29, 33, 44 | remove mcpErrorCode+getMcpErrorCode; extract notif context dup; move McpErrorCode | MERGED | cb16e74: removed mcpErrorCode from 29 classes, moved McpErrorCode to error-mapping, extracted notif helper. 747/747 |
-| wt-issues-split | 1 | split issues.ts -> issues/components/issue-templates | DONE | a00f50f: split into components.ts + issue-templates.ts, added re-exports from issues.ts. 755/755 |
+| wt-issues-split | 1 | split issues.ts -> issues/components/issue-templates | MERGED | a00f50f+user 10dd847: split ops+schemas, extracted threads.ts, max-lines rule. 747/747 |
 | wt-issues-improve | 4, 8, 9, 10, 18, 19, 59 | findPerson $like; extractUpdatedSequence guard; toRef<Employee> verify; Email.make fix; resolveStatusByName; resolveAssignee; Unknown fallback fail | DONE | f71bfd8: resolveStatusByName, resolveAssignee, verifyEmployee helpers; Schema decoder; findOne+$like. 755/755 |
 | wt-storage | 3, 12, 13, 47 | FileSourceParams union; blob cast; ErrnoException guard; buildFileUrl encoding | DONE | 675f0f0: discriminated union, removed blob cast, ErrnoException guard, URLSearchParams. 755/755 |
 | wt-polyfills | 6 | isolate globalThis polyfills -> polyfills.ts | DONE | 89d282f: extracted to src/polyfills.ts. 755/755 |

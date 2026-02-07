@@ -4,6 +4,7 @@ import { Effect } from "effect"
 import {
   toFindResult,
   type Doc,
+  type MarkupBlobRef,
   type Ref,
   type Space
 } from "@hcengineering/core"
@@ -338,7 +339,7 @@ describe("getDocument", () => {
           _id: "doc-1" as Ref<HulyDocument>,
           title: "Test Doc",
           space: "ts-1" as Ref<HulyTeamspace>,
-          content: "markup-id-123" as unknown as null,
+          content: "markup-id-123" as MarkupBlobRef,
         })
 
         const testLayer = createTestLayerWithMocks({
@@ -614,7 +615,7 @@ describe("updateDocument", () => {
           _id: "doc-1" as Ref<HulyDocument>,
           title: "Test Doc",
           space: "ts-1" as Ref<HulyTeamspace>,
-          content: "markup-old" as unknown as null,
+          content: "markup-old" as MarkupBlobRef,
         })
         const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 

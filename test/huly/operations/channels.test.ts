@@ -1,13 +1,13 @@
 import { describe, it } from "@effect/vitest"
 import { expect } from "vitest"
 import { Effect } from "effect"
-import type {
-  AccountUuid,
-  Doc,
-  FindResult,
-  PersonId,
-  Ref,
-  Space,
+import {
+  toFindResult,
+  type AccountUuid,
+  type Doc,
+  type PersonId,
+  type Ref,
+  type Space,
 } from "@hcengineering/core"
 import type { Channel as HulyChannel, ChatMessage, DirectMessage, ThreadMessage as HulyThreadMessage } from "@hcengineering/chunter"
 import type { ActivityMessage } from "@hcengineering/activity"
@@ -188,7 +188,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
         const direction = opts.sort.name
         result = result.sort((a, b) => direction * a.name.localeCompare(b.name))
       }
-      return Effect.succeed(result as unknown as FindResult<Doc>)
+      return Effect.succeed(toFindResult(result as Doc[]))
     }
     if (_class === chunter.class.ChatMessage) {
       const q = query as Record<string, unknown>
@@ -199,7 +199,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
         const direction = opts.sort.createdOn
         result = result.sort((a, b) => direction * ((a.createdOn ?? 0) - (b.createdOn ?? 0)))
       }
-      return Effect.succeed(Object.assign(result, { total: result.length }) as unknown as FindResult<Doc>)
+      return Effect.succeed(toFindResult(result as Doc[]))
     }
     if (_class === chunter.class.ThreadMessage) {
       const q = query as { attachedTo?: Ref<ActivityMessage>; space?: Ref<Space> }
@@ -213,7 +213,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
         const direction = opts.sort.createdOn
         result = result.sort((a, b) => direction * ((a.createdOn ?? 0) - (b.createdOn ?? 0)))
       }
-      return Effect.succeed(Object.assign(result, { total: result.length }) as unknown as FindResult<Doc>)
+      return Effect.succeed(toFindResult(result as Doc[]))
     }
     if (_class === chunter.class.DirectMessage) {
       const opts = options as { sort?: Record<string, number> } | undefined
@@ -222,33 +222,33 @@ const createTestLayerWithMocks = (config: MockConfig) => {
         const direction = opts.sort.modifiedOn
         result = result.sort((a, b) => direction * (a.modifiedOn - b.modifiedOn))
       }
-      return Effect.succeed(Object.assign(result, { total: result.length }) as unknown as FindResult<Doc>)
+      return Effect.succeed(toFindResult(result as Doc[]))
     }
     if (_class === contact.class.Person) {
       const q = query as { _id?: { $in?: Array<Ref<Person>> } }
       if (q._id?.$in) {
         const filtered = persons.filter(p => q._id!.$in!.includes(p._id))
-        return Effect.succeed(filtered as unknown as FindResult<Doc>)
+        return Effect.succeed(toFindResult(filtered as Doc[]))
       }
-      return Effect.succeed(persons as unknown as FindResult<Doc>)
+      return Effect.succeed(toFindResult(persons as Doc[]))
     }
     if (_class === contact.mixin.Employee) {
       const q = query as { personUuid?: { $in?: Array<AccountUuid> } }
       if (q.personUuid?.$in) {
         const filtered = employees.filter(e => e.personUuid !== undefined && q.personUuid!.$in!.includes(e.personUuid))
-        return Effect.succeed(filtered as unknown as FindResult<Doc>)
+        return Effect.succeed(toFindResult(filtered as Doc[]))
       }
-      return Effect.succeed(employees as unknown as FindResult<Doc>)
+      return Effect.succeed(toFindResult(employees as Doc[]))
     }
     if (_class === contact.class.SocialIdentity) {
       const q = query as { _id?: { $in?: Array<PersonId> } }
       if (q._id?.$in) {
         const filtered = socialIdentities.filter(si => q._id!.$in!.includes(si._id))
-        return Effect.succeed(filtered as unknown as FindResult<Doc>)
+        return Effect.succeed(toFindResult(filtered as Doc[]))
       }
-      return Effect.succeed(socialIdentities as unknown as FindResult<Doc>)
+      return Effect.succeed(toFindResult(socialIdentities as Doc[]))
     }
-    return Effect.succeed([] as unknown as FindResult<Doc>)
+    return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
 
   const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown, query: unknown) => {

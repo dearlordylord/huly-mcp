@@ -10,6 +10,7 @@ import type { NonNegativeNumber } from "../../domain/schemas/shared.js"
 import { PositiveNumber } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { InvalidPersonUuidError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
+import { escapeLikeWildcards } from "./query-helpers.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
@@ -275,41 +276,50 @@ export const findPersonByEmailOrName = (
   emailOrName: string
 ): Effect.Effect<Person | undefined, HulyClientError> =>
   Effect.gen(function*() {
-    const channels = yield* client.findAll<Channel>(
+    // 1. Exact email channel match (email channels only)
+    const exactChannel = yield* client.findOne<Channel>(
       contact.class.Channel,
-      { value: emailOrName }
+      {
+        value: emailOrName,
+        provider: contact.channelProvider.Email
+      }
     )
-
-    if (channels.length > 0) {
-      const channel = channels[0]
+    if (exactChannel !== undefined) {
       const person = yield* client.findOne<Person>(
         contact.class.Person,
-        { _id: toRef<Person>(channel.attachedTo) }
+        { _id: toRef<Person>(exactChannel.attachedTo) }
       )
-      if (person) {
-        return person
-      }
+      if (person !== undefined) return person
     }
 
-    const persons = yield* client.findAll<Person>(
+    // 2. Exact name match
+    const exactPerson = yield* client.findOne<Person>(
       contact.class.Person,
       { name: emailOrName }
     )
+    if (exactPerson !== undefined) return exactPerson
 
-    if (persons.length > 0) {
-      return persons[0]
+    // 3. Substring email channel match via $like (email channels only)
+    const escaped = escapeLikeWildcards(emailOrName)
+    const likeChannel = yield* client.findOne<Channel>(
+      contact.class.Channel,
+      {
+        value: { $like: `%${escaped}%` },
+        provider: contact.channelProvider.Email
+      }
+    )
+    if (likeChannel !== undefined) {
+      const person = yield* client.findOne<Person>(
+        contact.class.Person,
+        { _id: toRef<Person>(likeChannel.attachedTo) }
+      )
+      if (person !== undefined) return person
     }
 
-    const allPersons = yield* client.findAll<Person>(
+    // 4. Substring name match via $like
+    const likePerson = yield* client.findOne<Person>(
       contact.class.Person,
-      {},
-      { limit: 200 }
+      { name: { $like: `%${escaped}%` } }
     )
-
-    const lowerName = emailOrName.toLowerCase()
-    const matchingPerson = allPersons.find(
-      p => p.name.toLowerCase().includes(lowerName)
-    )
-
-    return matchingPerson
+    return likePerson
   })
