@@ -226,6 +226,40 @@ export class DocumentNotFoundError extends Schema.TaggedError<DocumentNotFoundEr
 }
 
 /**
+ * Calendar event not found.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class EventNotFoundError extends Schema.TaggedError<EventNotFoundError>()(
+  "EventNotFoundError",
+  {
+    eventId: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Event '${this.eventId}' not found`
+  }
+}
+
+/**
+ * Recurring calendar event not found.
+ * Maps to MCP -32602 (Invalid params).
+ */
+export class RecurringEventNotFoundError extends Schema.TaggedError<RecurringEventNotFoundError>()(
+  "RecurringEventNotFoundError",
+  {
+    eventId: Schema.String
+  }
+) {
+  readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
+
+  override get message(): string {
+    return `Recurring event '${this.eventId}' not found`
+  }
+}
+
+/**
  * Union of all Huly domain errors.
  */
 export type HulyDomainError =
@@ -242,6 +276,8 @@ export type HulyDomainError =
   | FileFetchError
   | TeamspaceNotFoundError
   | DocumentNotFoundError
+  | EventNotFoundError
+  | RecurringEventNotFoundError
 
 /**
  * Schema for all Huly domain errors (for serialization).
@@ -260,7 +296,9 @@ export const HulyDomainError: Schema.Union<
     typeof FileNotFoundError,
     typeof FileFetchError,
     typeof TeamspaceNotFoundError,
-    typeof DocumentNotFoundError
+    typeof DocumentNotFoundError,
+    typeof EventNotFoundError,
+    typeof RecurringEventNotFoundError
   ]
 > = Schema.Union(
   HulyError,
@@ -275,7 +313,9 @@ export const HulyDomainError: Schema.Union<
   FileNotFoundError,
   FileFetchError,
   TeamspaceNotFoundError,
-  DocumentNotFoundError
+  DocumentNotFoundError,
+  EventNotFoundError,
+  RecurringEventNotFoundError
 )
 
 /**
