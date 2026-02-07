@@ -40,6 +40,17 @@ import {
   DocumentSchema,
   type CreateIssueParams,
   type UpdateIssueParams,
+  TimeSpendReportSchema,
+  TimeReportSummarySchema,
+  parseLogTimeParams,
+  parseGetTimeReportParams,
+  parseListTimeSpendReportsParams,
+  parseStartTimerParams,
+  parseStopTimerParams,
+  logTimeParamsJsonSchema,
+  getTimeReportParamsJsonSchema,
+  startTimerParamsJsonSchema,
+  stopTimerParamsJsonSchema,
 } from "../../src/domain/schemas.js"
 
 // Helper type for JSON Schema assertions
@@ -877,6 +888,257 @@ describe("Domain Schemas", () => {
         expect(schema.type).toBe("object")
         expect(schema.required).toContain("teamspace")
         expect(schema.required).toContain("document")
+      })
+    )
+  })
+
+  // --- Time Schema Tests ---
+
+  describe("TimeSpendReportSchema", () => {
+    it.effect("parses valid time report", () =>
+      Effect.gen(function* () {
+        const result = yield* Schema.decodeUnknown(TimeSpendReportSchema)({
+          id: "report-1",
+          identifier: "TEST-1",
+          value: 30,
+          description: "Worked on feature",
+        })
+        expect(result.id).toBe("report-1")
+        expect(result.identifier).toBe("TEST-1")
+        expect(result.value).toBe(30)
+        expect(result.description).toBe("Worked on feature")
+      })
+    )
+
+    it.effect("parses with optional employee", () =>
+      Effect.gen(function* () {
+        const result = yield* Schema.decodeUnknown(TimeSpendReportSchema)({
+          id: "report-1",
+          identifier: "TEST-1",
+          employee: "John Doe",
+          value: 60,
+          description: "Bug fix",
+        })
+        expect(result.employee).toBe("John Doe")
+      })
+    )
+
+    it.effect("parses with optional date", () =>
+      Effect.gen(function* () {
+        const result = yield* Schema.decodeUnknown(TimeSpendReportSchema)({
+          id: "report-1",
+          identifier: "TEST-1",
+          date: 1706500000000,
+          value: 45,
+          description: "Review",
+        })
+        expect(result.date).toBe(1706500000000)
+      })
+    )
+  })
+
+  describe("TimeReportSummarySchema", () => {
+    it.effect("parses valid summary", () =>
+      Effect.gen(function* () {
+        const result = yield* Schema.decodeUnknown(TimeReportSummarySchema)({
+          identifier: "TEST-1",
+          totalTime: 120,
+          reports: [],
+        })
+        expect(result.identifier).toBe("TEST-1")
+        expect(result.totalTime).toBe(120)
+        expect(result.reports).toHaveLength(0)
+      })
+    )
+
+    it.effect("parses with estimation and remainingTime", () =>
+      Effect.gen(function* () {
+        const result = yield* Schema.decodeUnknown(TimeReportSummarySchema)({
+          identifier: "TEST-1",
+          totalTime: 60,
+          estimation: 120,
+          remainingTime: 60,
+          reports: [],
+        })
+        expect(result.estimation).toBe(120)
+        expect(result.remainingTime).toBe(60)
+      })
+    )
+  })
+
+  describe("LogTimeParamsSchema", () => {
+    it.effect("parses minimal params", () =>
+      Effect.gen(function* () {
+        const result = yield* parseLogTimeParams({
+          project: "TEST",
+          identifier: "TEST-1",
+          value: 30,
+        })
+        expect(result.project).toBe("TEST")
+        expect(result.identifier).toBe("TEST-1")
+        expect(result.value).toBe(30)
+      })
+    )
+
+    it.effect("parses with description", () =>
+      Effect.gen(function* () {
+        const result = yield* parseLogTimeParams({
+          project: "TEST",
+          identifier: "TEST-1",
+          value: 45,
+          description: "Worked on feature",
+        })
+        expect(result.description).toBe("Worked on feature")
+      })
+    )
+
+    it.effect("rejects non-positive value", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          parseLogTimeParams({
+            project: "TEST",
+            identifier: "TEST-1",
+            value: 0,
+          })
+        )
+        expect(error._tag).toBe("ParseError")
+      })
+    )
+
+    it.effect("rejects negative value", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          parseLogTimeParams({
+            project: "TEST",
+            identifier: "TEST-1",
+            value: -10,
+          })
+        )
+        expect(error._tag).toBe("ParseError")
+      })
+    )
+  })
+
+  describe("GetTimeReportParamsSchema", () => {
+    it.effect("parses valid params", () =>
+      Effect.gen(function* () {
+        const result = yield* parseGetTimeReportParams({
+          project: "TEST",
+          identifier: "TEST-1",
+        })
+        expect(result.project).toBe("TEST")
+        expect(result.identifier).toBe("TEST-1")
+      })
+    )
+
+    it.effect("rejects empty project", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          parseGetTimeReportParams({
+            project: "  ",
+            identifier: "TEST-1",
+          })
+        )
+        expect(error._tag).toBe("ParseError")
+      })
+    )
+  })
+
+  describe("ListTimeSpendReportsParamsSchema", () => {
+    it.effect("parses empty params", () =>
+      Effect.gen(function* () {
+        const result = yield* parseListTimeSpendReportsParams({})
+        expect(result).toEqual({})
+      })
+    )
+
+    it.effect("parses with all options", () =>
+      Effect.gen(function* () {
+        const result = yield* parseListTimeSpendReportsParams({
+          project: "TEST",
+          from: 1706400000000,
+          to: 1706500000000,
+          limit: 100,
+        })
+        expect(result.project).toBe("TEST")
+        expect(result.from).toBe(1706400000000)
+        expect(result.to).toBe(1706500000000)
+        expect(result.limit).toBe(100)
+      })
+    )
+
+    it.effect("rejects limit over 200", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          parseListTimeSpendReportsParams({ limit: 201 })
+        )
+        expect(error._tag).toBe("ParseError")
+      })
+    )
+  })
+
+  describe("StartTimerParamsSchema", () => {
+    it.effect("parses valid params", () =>
+      Effect.gen(function* () {
+        const result = yield* parseStartTimerParams({
+          project: "TEST",
+          identifier: "TEST-1",
+        })
+        expect(result.project).toBe("TEST")
+        expect(result.identifier).toBe("TEST-1")
+      })
+    )
+  })
+
+  describe("StopTimerParamsSchema", () => {
+    it.effect("parses valid params", () =>
+      Effect.gen(function* () {
+        const result = yield* parseStopTimerParams({
+          project: "TEST",
+          identifier: "TEST-1",
+        })
+        expect(result.project).toBe("TEST")
+        expect(result.identifier).toBe("TEST-1")
+      })
+    )
+  })
+
+  describe("Time JSON Schema Generation", () => {
+    it.effect("generates JSON Schema for LogTimeParams", () =>
+      Effect.gen(function* () {
+        const schema = logTimeParamsJsonSchema as JsonSchemaObject
+        expect(schema.$schema).toBe("http://json-schema.org/draft-07/schema#")
+        expect(schema.type).toBe("object")
+        expect(schema.required).toContain("project")
+        expect(schema.required).toContain("identifier")
+        expect(schema.required).toContain("value")
+      })
+    )
+
+    it.effect("generates JSON Schema for GetTimeReportParams", () =>
+      Effect.gen(function* () {
+        const schema = getTimeReportParamsJsonSchema as JsonSchemaObject
+        expect(schema.type).toBe("object")
+        expect(schema.required).toContain("project")
+        expect(schema.required).toContain("identifier")
+      })
+    )
+
+    it.effect("generates JSON Schema for StartTimerParams", () =>
+      Effect.gen(function* () {
+        const schema = startTimerParamsJsonSchema as JsonSchemaObject
+        expect(schema.type).toBe("object")
+        expect(schema.required).toContain("project")
+        expect(schema.required).toContain("identifier")
+      })
+    )
+
+    it.effect("generates JSON Schema for StopTimerParams", () =>
+      Effect.gen(function* () {
+        const schema = stopTimerParamsJsonSchema as JsonSchemaObject
+        expect(schema.type).toBe("object")
+        expect(schema.required).toContain("project")
+        expect(schema.required).toContain("identifier")
       })
     )
   })
