@@ -30,7 +30,7 @@ import {
   type IssueTemplate as HulyIssueTemplate,
   type Project as HulyProject
 } from "@hcengineering/tracker"
-import { absurd, Effect } from "effect"
+import { absurd, Effect, Schema } from "effect"
 
 import type {
   AddLabelParams,
@@ -89,6 +89,7 @@ import type { HulyClient, HulyClientError } from "../client.js"
 import type { ProjectNotFoundError } from "../errors.js"
 import {
   ComponentNotFoundError,
+  HulyError,
   InvalidStatusError,
   IssueNotFoundError,
   IssueTemplateNotFoundError,
@@ -117,12 +118,14 @@ const core = require("@hcengineering/core").default as typeof import("@hcenginee
 
 export type ListIssuesError =
   | HulyClientError
+  | HulyError
   | ProjectNotFoundError
   | InvalidStatusError
   | ComponentNotFoundError
 
 export type GetIssueError =
   | HulyClientError
+  | HulyError
   | ProjectNotFoundError
   | IssueNotFoundError
 
@@ -185,10 +188,85 @@ const stringToPriority = (priority: IssuePriorityStr): IssuePriority => {
   }
 }
 
+// Item 8: Schema-based decoder for TxResult from $inc operations.
 // SDK: updateDoc with retrieve=true returns TxResult which doesn't type the embedded object.
 // The runtime value includes { object: { sequence: number } } for $inc operations.
-const extractUpdatedSequence = (txResult: unknown): number | undefined =>
-  (txResult as { object?: { sequence?: number } })?.object?.sequence
+const TxIncResult = Schema.Struct({
+  object: Schema.Struct({
+    sequence: Schema.Number
+  })
+})
+
+const extractUpdatedSequence = (txResult: unknown): number | undefined => {
+  const decoded = Schema.decodeUnknownOption(TxIncResult)(txResult)
+  return decoded._tag === "Some" ? decoded.value.object.sequence : undefined
+}
+
+// --- Helpers: resolveStatusByName, resolveAssignee ---
+
+const resolveStatusByName = (
+  statuses: Array<StatusInfo>,
+  statusName: string,
+  project: string
+): Effect.Effect<Ref<Status>, InvalidStatusError> => {
+  const matchingStatus = statuses.find(
+    s => s.name.toLowerCase() === statusName.toLowerCase()
+  )
+  if (matchingStatus === undefined) {
+    return Effect.fail(new InvalidStatusError({ status: statusName, project }))
+  }
+  return Effect.succeed(matchingStatus._id)
+}
+
+const resolveAssignee = (
+  client: HulyClient["Type"],
+  assigneeIdentifier: string
+): Effect.Effect<Person, PersonNotFoundError | HulyClientError> =>
+  Effect.gen(function*() {
+    const person = yield* findPersonByEmailOrName(client, assigneeIdentifier)
+    if (person === undefined) {
+      return yield* new PersonNotFoundError({ identifier: assigneeIdentifier })
+    }
+    return person
+  })
+
+const resolveStatusName = (
+  statuses: Array<StatusInfo>,
+  statusId: Ref<Status>
+): Effect.Effect<string, HulyError> => {
+  const statusDoc = statuses.find(s => s._id === statusId)
+  if (statusDoc === undefined) {
+    return Effect.fail(
+      new HulyError({
+        message: `Status '${statusId}' not found in project status list — possible data inconsistency`
+      })
+    )
+  }
+  return Effect.succeed(statusDoc.name)
+}
+
+// --- Helpers: findPersonByEmailOrName, verifyEmployee ---
+
+const verifyEmployee = (
+  client: HulyClient["Type"],
+  person: Person
+): Effect.Effect<Ref<Employee>, HulyClientError> =>
+  Effect.gen(function*() {
+    const employee = yield* client.findOne<Employee>(
+      contact.mixin.Employee,
+      { _id: toRef<Employee>(person._id) }
+    )
+    if (employee !== undefined) {
+      return employee._id
+    }
+    // Huly API: Component.lead expects Ref<Employee>.
+    // Person found but not an employee — use the ref anyway since the API may accept it,
+    // but log a warning about the type mismatch.
+    yield* Effect.logWarning(
+      `Person '${person.name}' (${person._id}) is not an Employee mixin; using as component lead anyway`
+    )
+    return toRef<Employee>(person._id)
+  })
 
 // --- Operations ---
 
@@ -238,18 +316,7 @@ export const listIssues = (
           return []
         }
       } else {
-        const matchingStatus = statuses.find(
-          s => s.name.toLowerCase() === statusFilter
-        )
-
-        if (matchingStatus === undefined) {
-          return yield* new InvalidStatusError({
-            status: params.status,
-            project: params.project
-          })
-        }
-
-        query.status = matchingStatus._id
+        query.status = yield* resolveStatusByName(statuses, params.status, params.project)
       }
     }
 
@@ -300,69 +367,79 @@ export const listIssues = (
       )
     )
 
-    const summaries: Array<IssueSummary> = issues.map(issue => {
-      const statusDoc = statuses.find(s => s._id === issue.status)
-      const statusName = statusDoc?.name ?? "Unknown"
+    const summaries: Array<IssueSummary> = []
+    for (const issue of issues) {
+      const statusName = yield* resolveStatusName(statuses, issue.status)
       const assigneeName = issue.$lookup?.assignee?.name
 
-      return {
+      summaries.push({
         identifier: IssueIdentifier.make(issue.identifier),
         title: issue.title,
         status: StatusName.make(statusName),
         priority: priorityToString(issue.priority),
         assignee: assigneeName !== undefined ? PersonName.make(assigneeName) : undefined,
         modifiedOn: issue.modifiedOn
-      }
-    })
+      })
+    }
 
     return summaries
   })
 
 /**
  * Find a person by email or name.
+ * Searches email channels (exact then $like), then person names (exact then $like).
  */
 const findPersonByEmailOrName = (
   client: HulyClient["Type"],
   emailOrName: string
 ): Effect.Effect<Person | undefined, HulyClientError> =>
   Effect.gen(function*() {
-    const channels = yield* client.findAll<Channel>(
+    // 1. Exact email channel match (email channels only)
+    const exactChannel = yield* client.findOne<Channel>(
       contact.class.Channel,
-      { value: emailOrName }
+      {
+        value: emailOrName,
+        provider: contact.channelProvider.Email
+      }
     )
-
-    if (channels.length > 0) {
-      const channel = channels[0]
+    if (exactChannel !== undefined) {
       const person = yield* client.findOne<Person>(
         contact.class.Person,
-        { _id: toRef<Person>(channel.attachedTo) }
+        { _id: toRef<Person>(exactChannel.attachedTo) }
       )
-      if (person) {
-        return person
-      }
+      if (person !== undefined) return person
     }
 
-    const persons = yield* client.findAll<Person>(
+    // 2. Exact name match
+    const exactPerson = yield* client.findOne<Person>(
       contact.class.Person,
       { name: emailOrName }
     )
+    if (exactPerson !== undefined) return exactPerson
 
-    if (persons.length > 0) {
-      return persons[0]
+    // 3. Substring email channel match via $like (email channels only)
+    const escaped = escapeLikeWildcards(emailOrName)
+    const likeChannel = yield* client.findOne<Channel>(
+      contact.class.Channel,
+      {
+        value: { $like: `%${escaped}%` },
+        provider: contact.channelProvider.Email
+      }
+    )
+    if (likeChannel !== undefined) {
+      const person = yield* client.findOne<Person>(
+        contact.class.Person,
+        { _id: toRef<Person>(likeChannel.attachedTo) }
+      )
+      if (person !== undefined) return person
     }
 
-    const allPersons = yield* client.findAll<Person>(
+    // 4. Substring name match via $like
+    const likePerson = yield* client.findOne<Person>(
       contact.class.Person,
-      {},
-      { limit: 200 }
+      { name: { $like: `%${escaped}%` } }
     )
-
-    const lowerName = emailOrName.toLowerCase()
-    const matchingPerson = allPersons.find(
-      p => p.name.toLowerCase().includes(lowerName)
-    )
-
-    return matchingPerson
+    return likePerson
   })
 
 // --- Get Issue Operation ---
@@ -404,8 +481,7 @@ export const getIssue = (
       return yield* new IssueNotFoundError({ identifier: params.identifier, project: params.project })
     }
 
-    const statusDoc = statuses.find(s => s._id === issue.status)
-    const statusName = statusDoc?.name ?? "Unknown"
+    const statusName = yield* resolveStatusName(statuses, issue.status)
 
     let assigneeName: string | undefined
     let assigneeRef: Issue["assigneeRef"]
@@ -502,25 +578,12 @@ export const createIssue = (
 
     let statusRef: Ref<Status> = project.defaultIssueStatus
     if (params.status !== undefined) {
-      const statusFilter = params.status.toLowerCase()
-      const matchingStatus = statuses.find(
-        s => s.name.toLowerCase() === statusFilter
-      )
-      if (matchingStatus === undefined) {
-        return yield* new InvalidStatusError({
-          status: params.status,
-          project: params.project
-        })
-      }
-      statusRef = matchingStatus._id
+      statusRef = yield* resolveStatusByName(statuses, params.status, params.project)
     }
 
     let assigneeRef: Ref<Person> | null = null
     if (params.assignee !== undefined) {
-      const person = yield* findPersonByEmailOrName(client, params.assignee)
-      if (person === undefined) {
-        return yield* new PersonNotFoundError({ identifier: params.assignee })
-      }
+      const person = yield* resolveAssignee(client, params.assignee)
       assigneeRef = person._id
     }
 
@@ -646,17 +709,7 @@ export const updateIssue = (
     }
 
     if (params.status !== undefined) {
-      const statusFilter = params.status.toLowerCase()
-      const matchingStatus = statuses.find(
-        s => s.name.toLowerCase() === statusFilter
-      )
-      if (matchingStatus === undefined) {
-        return yield* new InvalidStatusError({
-          status: params.status,
-          project: params.project
-        })
-      }
-      updateOps.status = matchingStatus._id
+      updateOps.status = yield* resolveStatusByName(statuses, params.status, params.project)
     }
 
     if (params.priority !== undefined) {
@@ -667,10 +720,7 @@ export const updateIssue = (
       if (params.assignee === null) {
         updateOps.assignee = null
       } else {
-        const person = yield* findPersonByEmailOrName(client, params.assignee)
-        if (person === undefined) {
-          return yield* new PersonNotFoundError({ identifier: params.assignee })
-        }
+        const person = yield* resolveAssignee(client, params.assignee)
         updateOps.assignee = person._id
       }
     }
@@ -974,13 +1024,8 @@ export const createComponent = (
 
     let leadRef: Ref<Employee> | null = null
     if (params.lead !== undefined) {
-      const person = yield* findPersonByEmailOrName(client, params.lead)
-      if (person === undefined) {
-        return yield* new PersonNotFoundError({ identifier: params.lead })
-      }
-      // Huly API: Component.lead expects Ref<Employee>, but we look up Person by email.
-      // Employee extends Person, so this is safe when person is actually an employee.
-      leadRef = toRef<Employee>(person._id)
+      const person = yield* resolveAssignee(client, params.lead)
+      leadRef = yield* verifyEmployee(client, person)
     }
 
     const componentData: Data<HulyComponent> = {
@@ -1020,13 +1065,8 @@ export const updateComponent = (
       if (params.lead === null) {
         updateOps.lead = null
       } else {
-        const person = yield* findPersonByEmailOrName(client, params.lead)
-        if (person === undefined) {
-          return yield* new PersonNotFoundError({ identifier: params.lead })
-        }
-        // Huly API: Component.lead expects Ref<Employee>, but we look up Person by email.
-        // Employee extends Person, so this is safe when person is actually an employee.
-        updateOps.lead = toRef<Employee>(person._id)
+        const person = yield* resolveAssignee(client, params.lead)
+        updateOps.lead = yield* verifyEmployee(client, person)
       }
     }
 
@@ -1256,10 +1296,7 @@ export const createIssueTemplate = (
 
     let assigneeRef: Ref<Person> | null = null
     if (params.assignee !== undefined) {
-      const person = yield* findPersonByEmailOrName(client, params.assignee)
-      if (person === undefined) {
-        return yield* new PersonNotFoundError({ identifier: params.assignee })
-      }
+      const person = yield* resolveAssignee(client, params.assignee)
       assigneeRef = person._id
     }
 
@@ -1322,8 +1359,13 @@ export const createIssueFromTemplate = (
             provider: contact.channelProvider.Email
           }
         )
-        // Fall back to name for findPersonByEmailOrName lookup
-        assignee = Email.make(emailCh?.value ?? person.name)
+        if (emailCh !== undefined) {
+          assignee = Email.make(emailCh.value)
+        } else {
+          yield* Effect.logWarning(
+            `Template assignee '${person.name}' has no email channel; skipping assignee for created issue`
+          )
+        }
       }
     }
 
@@ -1374,10 +1416,7 @@ export const updateIssueTemplate = (
       if (params.assignee === null) {
         updateOps.assignee = null
       } else {
-        const person = yield* findPersonByEmailOrName(client, params.assignee)
-        if (person === undefined) {
-          return yield* new PersonNotFoundError({ identifier: params.assignee })
-        }
+        const person = yield* resolveAssignee(client, params.assignee)
         updateOps.assignee = person._id
       }
     }
