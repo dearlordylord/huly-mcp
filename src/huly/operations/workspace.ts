@@ -26,6 +26,11 @@ import { HulyConnectionError, InvalidPersonUuidError } from "../errors.js"
 import { validatePersonUuid } from "./shared.js"
 import { WorkspaceClient, type WorkspaceClientError } from "../workspace-client.js"
 
+// Compile-time assertion: AccountRole string literals must match HulyAccountRole enum values
+// If AccountRole has values not in HulyAccountRole, this line will fail to compile
+type _AssertAccountRoleCompatible = AccountRole extends `${HulyAccountRole}` ? true : never
+void (true as _AssertAccountRoleCompatible)
+
 const toHulyAccountRole = (role: AccountRole): HulyAccountRole => {
   // AccountRole validated by AccountRoleSchema at API boundary.
   // Values match HulyAccountRole enum. Cast safe after schema validation.
