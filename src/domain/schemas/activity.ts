@@ -1,14 +1,6 @@
-import { Schema } from "effect"
+import { JSONSchema, Schema } from "effect"
 
-import {
-  ActivityMessageId,
-  EmojiCode,
-  LimitParam,
-  makeJsonSchema,
-  NonEmptyString,
-  ObjectClassName,
-  Timestamp
-} from "./shared.js"
+import { ActivityMessageId, EmojiCode, LimitParam, NonEmptyString, ObjectClassName, Timestamp } from "./shared.js"
 
 export const ActivityMessageSchema = Schema.Struct({
   id: ActivityMessageId,
@@ -174,14 +166,14 @@ export const ListMentionsParamsSchema = Schema.Struct({
 
 export type ListMentionsParams = Schema.Schema.Type<typeof ListMentionsParamsSchema>
 
-export const listActivityParamsJsonSchema = makeJsonSchema(ListActivityParamsSchema)
-export const addReactionParamsJsonSchema = makeJsonSchema(AddReactionParamsSchema)
-export const removeReactionParamsJsonSchema = makeJsonSchema(RemoveReactionParamsSchema)
-export const listReactionsParamsJsonSchema = makeJsonSchema(ListReactionsParamsSchema)
-export const saveMessageParamsJsonSchema = makeJsonSchema(SaveMessageParamsSchema)
-export const unsaveMessageParamsJsonSchema = makeJsonSchema(UnsaveMessageParamsSchema)
-export const listSavedMessagesParamsJsonSchema = makeJsonSchema(ListSavedMessagesParamsSchema)
-export const listMentionsParamsJsonSchema = makeJsonSchema(ListMentionsParamsSchema)
+export const listActivityParamsJsonSchema = JSONSchema.make(ListActivityParamsSchema)
+export const addReactionParamsJsonSchema = JSONSchema.make(AddReactionParamsSchema)
+export const removeReactionParamsJsonSchema = JSONSchema.make(RemoveReactionParamsSchema)
+export const listReactionsParamsJsonSchema = JSONSchema.make(ListReactionsParamsSchema)
+export const saveMessageParamsJsonSchema = JSONSchema.make(SaveMessageParamsSchema)
+export const unsaveMessageParamsJsonSchema = JSONSchema.make(UnsaveMessageParamsSchema)
+export const listSavedMessagesParamsJsonSchema = JSONSchema.make(ListSavedMessagesParamsSchema)
+export const listMentionsParamsJsonSchema = JSONSchema.make(ListMentionsParamsSchema)
 
 export const parseListActivityParams = Schema.decodeUnknown(ListActivityParamsSchema)
 export const parseAddReactionParams = Schema.decodeUnknown(AddReactionParamsSchema)

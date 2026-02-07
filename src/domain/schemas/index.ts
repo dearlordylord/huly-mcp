@@ -3,7 +3,6 @@ export {
   EmptyParamsSchema,
   IssueId,
   LimitParam,
-  makeJsonSchema,
   NonEmptyString,
   NonNegativeNumber,
   NotificationContextId,

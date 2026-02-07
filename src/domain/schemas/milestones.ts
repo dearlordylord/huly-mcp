@@ -1,9 +1,8 @@
-import { Schema } from "effect"
+import { JSONSchema, Schema } from "effect"
 
 import {
   IssueIdentifier,
   LimitParam,
-  makeJsonSchema,
   MilestoneId,
   MilestoneIdentifier,
   MilestoneLabel,
@@ -157,12 +156,12 @@ export const DeleteMilestoneParamsSchema = Schema.Struct({
 
 export type DeleteMilestoneParams = Schema.Schema.Type<typeof DeleteMilestoneParamsSchema>
 
-export const listMilestonesParamsJsonSchema = makeJsonSchema(ListMilestonesParamsSchema)
-export const getMilestoneParamsJsonSchema = makeJsonSchema(GetMilestoneParamsSchema)
-export const createMilestoneParamsJsonSchema = makeJsonSchema(CreateMilestoneParamsSchema)
-export const updateMilestoneParamsJsonSchema = makeJsonSchema(UpdateMilestoneParamsSchema)
-export const setIssueMilestoneParamsJsonSchema = makeJsonSchema(SetIssueMilestoneParamsSchema)
-export const deleteMilestoneParamsJsonSchema = makeJsonSchema(DeleteMilestoneParamsSchema)
+export const listMilestonesParamsJsonSchema = JSONSchema.make(ListMilestonesParamsSchema)
+export const getMilestoneParamsJsonSchema = JSONSchema.make(GetMilestoneParamsSchema)
+export const createMilestoneParamsJsonSchema = JSONSchema.make(CreateMilestoneParamsSchema)
+export const updateMilestoneParamsJsonSchema = JSONSchema.make(UpdateMilestoneParamsSchema)
+export const setIssueMilestoneParamsJsonSchema = JSONSchema.make(SetIssueMilestoneParamsSchema)
+export const deleteMilestoneParamsJsonSchema = JSONSchema.make(DeleteMilestoneParamsSchema)
 
 export const parseMilestone = Schema.decodeUnknown(MilestoneSchema)
 export const parseMilestoneSummary = Schema.decodeUnknown(MilestoneSummarySchema)

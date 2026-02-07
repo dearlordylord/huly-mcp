@@ -78,6 +78,6 @@ export const createFilteredRegistry = (categories: ReadonlySet<string>): ToolReg
 
 export const toolRegistry: ToolRegistry = buildRegistry(allTools)
 
-export const TOOL_DEFINITIONS = Object.fromEntries(toolRegistry.tools) as Record<string, RegisteredTool>
+export const TOOL_DEFINITIONS = Object.fromEntries(toolRegistry.tools)
 
 export type { RegisteredTool, ToolDefinition } from "./registry.js"

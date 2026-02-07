@@ -1,8 +1,7 @@
-import { Schema } from "effect"
+import { JSONSchema, Schema } from "effect"
 
 import {
   LimitParam,
-  makeJsonSchema,
   NonEmptyString,
   NotificationContextId,
   NotificationId,
@@ -260,16 +259,16 @@ export type UpdateNotificationProviderSettingParams = Schema.Schema.Type<
 
 // --- JSON Schemas for MCP ---
 
-export const listNotificationsParamsJsonSchema = makeJsonSchema(ListNotificationsParamsSchema)
-export const getNotificationParamsJsonSchema = makeJsonSchema(GetNotificationParamsSchema)
-export const markNotificationReadParamsJsonSchema = makeJsonSchema(MarkNotificationReadParamsSchema)
-export const archiveNotificationParamsJsonSchema = makeJsonSchema(ArchiveNotificationParamsSchema)
-export const deleteNotificationParamsJsonSchema = makeJsonSchema(DeleteNotificationParamsSchema)
-export const getNotificationContextParamsJsonSchema = makeJsonSchema(GetNotificationContextParamsSchema)
-export const listNotificationContextsParamsJsonSchema = makeJsonSchema(ListNotificationContextsParamsSchema)
-export const pinNotificationContextParamsJsonSchema = makeJsonSchema(PinNotificationContextParamsSchema)
-export const listNotificationSettingsParamsJsonSchema = makeJsonSchema(ListNotificationSettingsParamsSchema)
-export const updateNotificationProviderSettingParamsJsonSchema = makeJsonSchema(
+export const listNotificationsParamsJsonSchema = JSONSchema.make(ListNotificationsParamsSchema)
+export const getNotificationParamsJsonSchema = JSONSchema.make(GetNotificationParamsSchema)
+export const markNotificationReadParamsJsonSchema = JSONSchema.make(MarkNotificationReadParamsSchema)
+export const archiveNotificationParamsJsonSchema = JSONSchema.make(ArchiveNotificationParamsSchema)
+export const deleteNotificationParamsJsonSchema = JSONSchema.make(DeleteNotificationParamsSchema)
+export const getNotificationContextParamsJsonSchema = JSONSchema.make(GetNotificationContextParamsSchema)
+export const listNotificationContextsParamsJsonSchema = JSONSchema.make(ListNotificationContextsParamsSchema)
+export const pinNotificationContextParamsJsonSchema = JSONSchema.make(PinNotificationContextParamsSchema)
+export const listNotificationSettingsParamsJsonSchema = JSONSchema.make(ListNotificationSettingsParamsSchema)
+export const updateNotificationProviderSettingParamsJsonSchema = JSONSchema.make(
   UpdateNotificationProviderSettingParamsSchema
 )
 

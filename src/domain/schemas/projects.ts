@@ -1,6 +1,6 @@
-import { Schema } from "effect"
+import { JSONSchema, Schema } from "effect"
 
-import { LimitParam, makeJsonSchema, ProjectIdentifier, StatusName } from "./shared.js"
+import { LimitParam, ProjectIdentifier, StatusName } from "./shared.js"
 
 export const ProjectSummarySchema = Schema.Struct({
   identifier: ProjectIdentifier,
@@ -53,7 +53,7 @@ export const ProjectSchema = Schema.Struct({
 
 export type Project = Schema.Schema.Type<typeof ProjectSchema>
 
-export const listProjectsParamsJsonSchema = makeJsonSchema(ListProjectsParamsSchema)
+export const listProjectsParamsJsonSchema = JSONSchema.make(ListProjectsParamsSchema)
 
 export const parseListProjectsParams = Schema.decodeUnknown(ListProjectsParamsSchema)
 export const parseProject = Schema.decodeUnknown(ProjectSchema)
