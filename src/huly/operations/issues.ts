@@ -32,7 +32,6 @@ import {
 } from "@hcengineering/tracker"
 import { absurd, Effect } from "effect"
 
-import { isExistent } from "../../utils/assertions.js"
 import type {
   AddLabelParams,
   Component,
@@ -60,6 +59,7 @@ import type {
   UpdateIssueParams,
   UpdateIssueTemplateParams
 } from "../../domain/schemas.js"
+import { isExistent } from "../../utils/assertions.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { ProjectNotFoundError } from "../errors.js"
 import {

@@ -36,16 +36,16 @@ import type {
   UpdateAttachmentParams
 } from "../../domain/schemas/attachments.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import type {
+import {
   AttachmentNotFoundError,
   DocumentNotFoundError,
-  FileFetchError,
-  FileNotFoundError,
-  FileTooLargeError,
-  InvalidContentTypeError,
-  InvalidFileDataError,
+  type FileFetchError,
+  type FileNotFoundError,
+  type FileTooLargeError,
+  type InvalidContentTypeError,
+  type InvalidFileDataError,
   IssueNotFoundError,
-  ProjectNotFoundError,
+  type ProjectNotFoundError,
   TeamspaceNotFoundError
 } from "../errors.js"
 import {

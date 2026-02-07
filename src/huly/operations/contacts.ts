@@ -8,7 +8,6 @@ import { AvatarType } from "@hcengineering/contact"
 import { type Data, type Doc, type DocumentUpdate, generateId, type Ref, SortingOrder } from "@hcengineering/core"
 import { Effect } from "effect"
 
-import { assertExists } from "../../utils/assertions.js"
 import type {
   CreateOrganizationParams,
   CreatePersonParams,
@@ -23,6 +22,7 @@ import type {
   PersonSummary,
   UpdatePersonParams
 } from "../../domain/schemas.js"
+import { assertExists } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { PersonNotFoundError } from "../errors.js"
 
