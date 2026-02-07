@@ -29,6 +29,7 @@ const createMockExpressApp = () => {
     delete: {}
   }
 
+  // eslint-disable-next-line no-restricted-syntax -- test mock: partial Express app
   const app = {
     get: vi.fn((path: string, handler: (req: Request, res: Response) => Promise<void>) => {
       routes.get[path] = handler
@@ -47,6 +48,7 @@ const createMockExpressApp = () => {
 
 // Mock MCP Server for testing
 const createMockMcpServer = (): Server => {
+  // eslint-disable-next-line no-restricted-syntax -- test mock: partial MCP Server
   return {
     connect: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
@@ -62,6 +64,7 @@ const createMockResponse = () => {
     headersSent: false,
     on: vi.fn()
   }
+  // eslint-disable-next-line no-restricted-syntax -- test mock: partial Response
   return res as unknown as Response
 }
 
@@ -225,6 +228,7 @@ describe("HTTP Transport", () => {
   describe("startHttpTransport", () => {
     it("should register POST, GET, DELETE handlers on /mcp", async () => {
       const { app } = createMockExpressApp()
+      // eslint-disable-next-line no-restricted-syntax -- test mock: partial http.Server
       const mockHttpServer = {
         close: vi.fn((cb?: (err?: Error) => void) => cb?.())
       } as unknown as http.Server
@@ -262,6 +266,7 @@ describe("HTTP Transport", () => {
     it("should close server when scope closes", async () => {
       const { app } = createMockExpressApp()
       const closeFn = vi.fn((cb?: (err?: Error) => void) => cb?.())
+      // eslint-disable-next-line no-restricted-syntax -- test mock: partial http.Server
       const mockHttpServer = {
         close: closeFn
       } as unknown as http.Server
