@@ -782,6 +782,46 @@ describe("updateComment", () => {
         expect(captureUpdateDoc.operations?.message).toBe("**Bold** and *italic*")
       })
     )
+
+    it.effect("returns updated: false when body is unchanged", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "TEST" })
+        const issue = makeIssue({
+          _id: "issue-1" as Ref<HulyIssue>,
+          identifier: "TEST-1",
+          number: 1,
+          space: "proj-1" as Ref<HulyProject>,
+        })
+        const messages = [
+          makeChatMessage({
+            _id: "comment-abc" as Ref<ChatMessage>,
+            message: "Same content",
+            attachedTo: "issue-1" as Ref<Doc>,
+          }),
+        ]
+
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          messages,
+          captureUpdateDoc,
+        })
+
+        const result = yield* updateComment({
+          project: "TEST",
+          issueIdentifier: "TEST-1",
+          commentId: "comment-abc",
+          body: "Same content",
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result.commentId).toBe("comment-abc")
+        expect(result.issueIdentifier).toBe("TEST-1")
+        expect(result.updated).toBe(false)
+        expect(captureUpdateDoc.operations).toBeUndefined()
+      })
+    )
   })
 
   describe("error handling", () => {

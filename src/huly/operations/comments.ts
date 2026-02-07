@@ -258,6 +258,14 @@ export const updateComment = (
       })
     }
 
+    if (params.body === comment.message) {
+      return {
+        commentId: params.commentId,
+        issueIdentifier: issue.identifier,
+        updated: false
+      }
+    }
+
     const updateOps: DocumentUpdate<ChatMessage> = {
       message: params.body,
       editedOn: Date.now()
