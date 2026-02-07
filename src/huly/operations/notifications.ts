@@ -42,7 +42,7 @@ import {
 } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { NotificationContextNotFoundError, NotificationNotFoundError } from "../errors.js"
-import { toRef } from "./shared.js"
+import { findOneOrFail, toRef } from "./shared.js"
 
 /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop */
 const notification = require("@hcengineering/notification")
@@ -99,14 +99,12 @@ const findNotification = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const notif = yield* client.findOne<HulyInboxNotification>(
+    const notif = yield* findOneOrFail(
+      client,
       notification.class.InboxNotification,
-      { _id: toRef<HulyInboxNotification>(notificationId) }
+      { _id: toRef<HulyInboxNotification>(notificationId) },
+      () => new NotificationNotFoundError({ notificationId })
     )
-
-    if (notif === undefined) {
-      return yield* new NotificationNotFoundError({ notificationId })
-    }
 
     return { client, notification: notif }
   })
@@ -121,14 +119,12 @@ const findNotificationContext = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const ctx = yield* client.findOne<HulyDocNotifyContext>(
+    const ctx = yield* findOneOrFail(
+      client,
       notification.class.DocNotifyContext,
-      { _id: toRef<HulyDocNotifyContext>(contextId) }
+      { _id: toRef<HulyDocNotifyContext>(contextId) },
+      () => new NotificationContextNotFoundError({ contextId })
     )
-
-    if (ctx === undefined) {
-      return yield* new NotificationContextNotFoundError({ contextId })
-    }
 
     return { client, context: ctx }
   })

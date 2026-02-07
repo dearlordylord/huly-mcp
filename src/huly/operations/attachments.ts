@@ -60,7 +60,7 @@ import {
   validateFileSize
 } from "../storage.js"
 import { findTeamspaceAndDocument } from "./documents.js"
-import { findProjectAndIssue, toRef } from "./shared.js"
+import { findOneOrFail, findProjectAndIssue, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const attachment = require("@hcengineering/attachment").default as typeof import("@hcengineering/attachment").default
@@ -265,14 +265,12 @@ export const getAttachment = (
     const client = yield* HulyClient
     const storageClient = yield* HulyStorageClient
 
-    const att = yield* client.findOne<HulyAttachment>(
+    const att = yield* findOneOrFail(
+      client,
       attachment.class.Attachment,
-      { _id: toRef<HulyAttachment>(params.attachmentId) }
+      { _id: toRef<HulyAttachment>(params.attachmentId) },
+      () => new AttachmentNotFoundError({ attachmentId: params.attachmentId })
     )
-
-    if (att === undefined) {
-      return yield* new AttachmentNotFoundError({ attachmentId: params.attachmentId })
-    }
 
     const url = storageClient.getFileUrl(att.file)
     return toAttachment(att, url)
@@ -321,14 +319,12 @@ export const updateAttachment = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const att = yield* client.findOne<HulyAttachment>(
+    const att = yield* findOneOrFail(
+      client,
       attachment.class.Attachment,
-      { _id: toRef<HulyAttachment>(params.attachmentId) }
+      { _id: toRef<HulyAttachment>(params.attachmentId) },
+      () => new AttachmentNotFoundError({ attachmentId: params.attachmentId })
     )
-
-    if (att === undefined) {
-      return yield* new AttachmentNotFoundError({ attachmentId: params.attachmentId })
-    }
 
     const updateOps: DocumentUpdate<HulyAttachment> = {}
 
@@ -367,14 +363,12 @@ export const deleteAttachment = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const att = yield* client.findOne<HulyAttachment>(
+    const att = yield* findOneOrFail(
+      client,
       attachment.class.Attachment,
-      { _id: toRef<HulyAttachment>(params.attachmentId) }
+      { _id: toRef<HulyAttachment>(params.attachmentId) },
+      () => new AttachmentNotFoundError({ attachmentId: params.attachmentId })
     )
-
-    if (att === undefined) {
-      return yield* new AttachmentNotFoundError({ attachmentId: params.attachmentId })
-    }
 
     yield* client.removeDoc(
       attachment.class.Attachment,
@@ -394,14 +388,12 @@ export const pinAttachment = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const att = yield* client.findOne<HulyAttachment>(
+    const att = yield* findOneOrFail(
+      client,
       attachment.class.Attachment,
-      { _id: toRef<HulyAttachment>(params.attachmentId) }
+      { _id: toRef<HulyAttachment>(params.attachmentId) },
+      () => new AttachmentNotFoundError({ attachmentId: params.attachmentId })
     )
-
-    if (att === undefined) {
-      return yield* new AttachmentNotFoundError({ attachmentId: params.attachmentId })
-    }
 
     yield* client.updateDoc(
       attachment.class.Attachment,
@@ -423,14 +415,12 @@ export const downloadAttachment = (
     const client = yield* HulyClient
     const storageClient = yield* HulyStorageClient
 
-    const att = yield* client.findOne<HulyAttachment>(
+    const att = yield* findOneOrFail(
+      client,
       attachment.class.Attachment,
-      { _id: toRef<HulyAttachment>(params.attachmentId) }
+      { _id: toRef<HulyAttachment>(params.attachmentId) },
+      () => new AttachmentNotFoundError({ attachmentId: params.attachmentId })
     )
-
-    if (att === undefined) {
-      return yield* new AttachmentNotFoundError({ attachmentId: params.attachmentId })
-    }
 
     const url = storageClient.getFileUrl(att.file)
 

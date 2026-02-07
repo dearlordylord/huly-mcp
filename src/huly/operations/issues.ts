@@ -96,6 +96,7 @@ import {
 } from "../errors.js"
 import { escapeLikeWildcards, withLookup } from "./query-helpers.js"
 import {
+  findByNameOrId,
   findProject,
   findProjectAndIssue,
   findProjectWithStatuses,
@@ -845,27 +846,12 @@ const findComponentByIdOrLabel = (
   projectId: Ref<HulyProject>,
   componentIdOrLabel: string
 ): Effect.Effect<HulyComponent | undefined, HulyClientError> =>
-  Effect.gen(function*() {
-    let component = yield* client.findOne<HulyComponent>(
-      tracker.class.Component,
-      {
-        space: projectId,
-        _id: toRef<HulyComponent>(componentIdOrLabel)
-      }
-    )
-
-    if (component === undefined) {
-      component = yield* client.findOne<HulyComponent>(
-        tracker.class.Component,
-        {
-          space: projectId,
-          label: componentIdOrLabel
-        }
-      )
-    }
-
-    return component
-  })
+  findByNameOrId(
+    client,
+    tracker.class.Component,
+    { space: projectId, _id: toRef<HulyComponent>(componentIdOrLabel) },
+    { space: projectId, label: componentIdOrLabel }
+  )
 
 const findProjectAndComponent = (
   params: { project: string; component: string }
@@ -1131,27 +1117,12 @@ const findTemplateByIdOrTitle = (
   projectId: Ref<HulyProject>,
   templateIdOrTitle: string
 ): Effect.Effect<HulyIssueTemplate | undefined, HulyClientError> =>
-  Effect.gen(function*() {
-    let template = yield* client.findOne<HulyIssueTemplate>(
-      tracker.class.IssueTemplate,
-      {
-        space: projectId,
-        _id: toRef<HulyIssueTemplate>(templateIdOrTitle)
-      }
-    )
-
-    if (template === undefined) {
-      template = yield* client.findOne<HulyIssueTemplate>(
-        tracker.class.IssueTemplate,
-        {
-          space: projectId,
-          title: templateIdOrTitle
-        }
-      )
-    }
-
-    return template
-  })
+  findByNameOrId(
+    client,
+    tracker.class.IssueTemplate,
+    { space: projectId, _id: toRef<HulyIssueTemplate>(templateIdOrTitle) },
+    { space: projectId, title: templateIdOrTitle }
+  )
 
 const findProjectAndTemplate = (
   params: { project: string; template: string }

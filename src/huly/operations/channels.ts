@@ -66,7 +66,7 @@ import {
 import { HulyClient, type HulyClientError } from "../client.js"
 import { ChannelNotFoundError, MessageNotFoundError, ThreadReplyNotFoundError } from "../errors.js"
 import { escapeLikeWildcards } from "./query-helpers.js"
-import { toRef } from "./shared.js"
+import { findByNameOrId, findOneOrFail, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const chunter = require("@hcengineering/chunter").default as typeof import("@hcengineering/chunter").default
@@ -145,17 +145,12 @@ const findChannel = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    let channel = yield* client.findOne<HulyChannel>(
+    const channel = yield* findByNameOrId(
+      client,
       chunter.class.Channel,
-      { name: identifier }
+      { name: identifier },
+      { _id: toRef<HulyChannel>(identifier) }
     )
-
-    if (channel === undefined) {
-      channel = yield* client.findOne<HulyChannel>(
-        chunter.class.Channel,
-        { _id: toRef<HulyChannel>(identifier) }
-      )
-    }
 
     if (channel === undefined) {
       return yield* new ChannelNotFoundError({ identifier })
@@ -599,17 +594,15 @@ const findMessage = (
   Effect.gen(function*() {
     const { channel, client } = yield* findChannel(channelIdentifier)
 
-    const message = yield* client.findOne<ChatMessage>(
+    const message = yield* findOneOrFail(
+      client,
       chunter.class.ChatMessage,
       {
         _id: toRef<ChatMessage>(messageId),
         space: channel._id
-      }
+      },
+      () => new MessageNotFoundError({ messageId, channel: channelIdentifier })
     )
-
-    if (message === undefined) {
-      return yield* new MessageNotFoundError({ messageId, channel: channelIdentifier })
-    }
 
     return { client, channel, message }
   })
@@ -716,21 +709,19 @@ export const updateThreadReply = (
   Effect.gen(function*() {
     const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
 
-    const reply = yield* client.findOne<HulyThreadMessage>(
+    const reply = yield* findOneOrFail(
+      client,
       chunter.class.ThreadMessage,
       {
         _id: toRef<HulyThreadMessage>(params.replyId),
         attachedTo: toRef<ActivityMessage>(message._id),
         space: channel._id
-      }
-    )
-
-    if (reply === undefined) {
-      return yield* new ThreadReplyNotFoundError({
+      },
+      () => new ThreadReplyNotFoundError({
         replyId: params.replyId,
         messageId: params.messageId
       })
-    }
+    )
 
     const markup = markdownToMarkupString(params.body)
 
@@ -758,21 +749,19 @@ export const deleteThreadReply = (
   Effect.gen(function*() {
     const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
 
-    const reply = yield* client.findOne<HulyThreadMessage>(
+    const reply = yield* findOneOrFail(
+      client,
       chunter.class.ThreadMessage,
       {
         _id: toRef<HulyThreadMessage>(params.replyId),
         attachedTo: toRef<ActivityMessage>(message._id),
         space: channel._id
-      }
-    )
-
-    if (reply === undefined) {
-      return yield* new ThreadReplyNotFoundError({
+      },
+      () => new ThreadReplyNotFoundError({
         replyId: params.replyId,
         messageId: params.messageId
       })
-    }
+    )
 
     yield* client.removeDoc(
       chunter.class.ThreadMessage,
