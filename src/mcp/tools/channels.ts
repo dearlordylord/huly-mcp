@@ -25,19 +25,21 @@ import {
   updateThreadReplyParamsJsonSchema
 } from "../../domain/schemas.js"
 import {
-  addThreadReply,
   createChannel,
   deleteChannel,
-  deleteThreadReply,
   getChannel,
   listChannelMessages,
   listChannels,
   listDirectMessages,
-  listThreadReplies,
   sendChannelMessage,
-  updateChannel,
-  updateThreadReply
+  updateChannel
 } from "../../huly/operations/channels.js"
+import {
+  addThreadReply,
+  deleteThreadReply,
+  listThreadReplies,
+  updateThreadReply
+} from "../../huly/operations/threads.js"
 import { createToolHandler, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "channels" as const

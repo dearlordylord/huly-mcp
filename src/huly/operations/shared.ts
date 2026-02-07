@@ -6,7 +6,8 @@ import { IssuePriority } from "@hcengineering/tracker"
 import { absurd, Effect } from "effect"
 
 import type { IssuePriority as IssuePriorityStr } from "../../domain/schemas/issues.js"
-import { NonNegativeNumber, PositiveNumber } from "../../domain/schemas/shared.js"
+import type { NonNegativeNumber } from "../../domain/schemas/shared.js"
+import { PositiveNumber } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { InvalidPersonUuidError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 
