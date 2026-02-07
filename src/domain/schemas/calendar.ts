@@ -410,3 +410,27 @@ export const parseDeleteEventParams = Schema.decodeUnknown(DeleteEventParamsSche
 export const parseListRecurringEventsParams = Schema.decodeUnknown(ListRecurringEventsParamsSchema)
 export const parseCreateRecurringEventParams = Schema.decodeUnknown(CreateRecurringEventParamsSchema)
 export const parseListEventInstancesParams = Schema.decodeUnknown(ListEventInstancesParamsSchema)
+
+// --- Result Schemas ---
+
+export const CreateEventResultSchema = Schema.Struct({
+  eventId: EventId
+}).annotations({ title: "CreateEventResult", description: "Result of create event operation" })
+export type CreateEventResult = Schema.Schema.Type<typeof CreateEventResultSchema>
+
+export const UpdateEventResultSchema = Schema.Struct({
+  eventId: EventId,
+  updated: Schema.Boolean
+}).annotations({ title: "UpdateEventResult", description: "Result of update event operation" })
+export type UpdateEventResult = Schema.Schema.Type<typeof UpdateEventResultSchema>
+
+export const DeleteEventResultSchema = Schema.Struct({
+  eventId: EventId,
+  deleted: Schema.Boolean
+}).annotations({ title: "DeleteEventResult", description: "Result of delete event operation" })
+export type DeleteEventResult = Schema.Schema.Type<typeof DeleteEventResultSchema>
+
+export const CreateRecurringEventResultSchema = Schema.Struct({
+  eventId: EventId
+}).annotations({ title: "CreateRecurringEventResult", description: "Result of create recurring event operation" })
+export type CreateRecurringEventResult = Schema.Schema.Type<typeof CreateRecurringEventResultSchema>

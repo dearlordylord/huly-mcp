@@ -11,6 +11,7 @@ import { Effect } from "effect"
 import type {
   ActivityMessage,
   AddReactionParams,
+  AddReactionResult,
   ListActivityParams,
   ListMentionsParams,
   ListReactionsParams,
@@ -18,11 +19,14 @@ import type {
   Mention,
   Reaction,
   RemoveReactionParams,
+  RemoveReactionResult,
   SavedMessage,
   SaveMessageParams,
-  UnsaveMessageParams
+  SaveMessageResult,
+  UnsaveMessageParams,
+  UnsaveMessageResult
 } from "../../domain/schemas/activity.js"
-import { ActivityMessageId, EmojiCode, ObjectClassName } from "../../domain/schemas/shared.js"
+import { ActivityMessageId, EmojiCode, NonEmptyString, ObjectClassName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { ActivityMessageNotFoundError, ReactionNotFoundError, SavedMessageNotFoundError } from "../errors.js"
 import { toRef } from "./shared.js"
@@ -92,10 +96,7 @@ export const listActivity = (
     return result
   })
 
-export interface AddReactionResult {
-  reactionId: string
-  messageId: string
-}
+export type { AddReactionResult, RemoveReactionResult, SaveMessageResult, UnsaveMessageResult }
 
 /**
  * Add a reaction to an activity message.
@@ -133,15 +134,10 @@ export const addReaction = (
     )
 
     return {
-      reactionId,
-      messageId: params.messageId
+      reactionId: NonEmptyString.make(reactionId),
+      messageId: ActivityMessageId.make(params.messageId)
     }
   })
-
-export interface RemoveReactionResult {
-  messageId: string
-  removed: boolean
-}
 
 /**
  * Remove a reaction from an activity message.
@@ -174,7 +170,7 @@ export const removeReaction = (
     )
 
     return {
-      messageId: params.messageId,
+      messageId: ActivityMessageId.make(params.messageId),
       removed: true
     }
   })
@@ -208,11 +204,6 @@ export const listReactions = (
     return result
   })
 
-export interface SaveMessageResult {
-  savedId: string
-  messageId: string
-}
-
 /**
  * Save/bookmark an activity message.
  */
@@ -243,15 +234,10 @@ export const saveMessage = (
     )
 
     return {
-      savedId,
-      messageId: params.messageId
+      savedId: NonEmptyString.make(savedId),
+      messageId: ActivityMessageId.make(params.messageId)
     }
   })
-
-export interface UnsaveMessageResult {
-  messageId: string
-  removed: boolean
-}
 
 /**
  * Remove a message from saved/bookmarks.
@@ -280,7 +266,7 @@ export const unsaveMessage = (
     )
 
     return {
-      messageId: params.messageId,
+      messageId: ActivityMessageId.make(params.messageId),
       removed: true
     }
   })

@@ -23,8 +23,11 @@ import { Effect } from "effect"
 
 import type {
   CreateEventParams,
+  CreateEventResult,
   CreateRecurringEventParams,
+  CreateRecurringEventResult,
   DeleteEventParams,
+  DeleteEventResult,
   Event,
   EventInstance,
   EventSummary,
@@ -36,6 +39,7 @@ import type {
   RecurringEventSummary,
   RecurringRule,
   UpdateEventParams,
+  UpdateEventResult,
   Visibility
 } from "../../domain/schemas/calendar.js"
 import { Email, EventId, PersonId, PersonName } from "../../domain/schemas/shared.js"
@@ -292,9 +296,7 @@ export const getEvent = (
     return result
   })
 
-export interface CreateEventResult {
-  eventId: string
-}
+export type { CreateEventResult, CreateRecurringEventResult, DeleteEventResult, UpdateEventResult }
 
 export const createEvent = (
   params: CreateEventParams
@@ -347,13 +349,8 @@ export const createEvent = (
       eventData
     )
 
-    return { eventId }
+    return { eventId: EventId.make(eventId) }
   })
-
-export interface UpdateEventResult {
-  eventId: string
-  updated: boolean
-}
 
 export const updateEvent = (
   params: UpdateEventParams
@@ -425,7 +422,7 @@ export const updateEvent = (
     }
 
     if (Object.keys(updateOps).length === 0 && !descriptionUpdatedInPlace) {
-      return { eventId: params.eventId, updated: false }
+      return { eventId: EventId.make(params.eventId), updated: false }
     }
 
     if (Object.keys(updateOps).length > 0) {
@@ -437,13 +434,8 @@ export const updateEvent = (
       )
     }
 
-    return { eventId: params.eventId, updated: true }
+    return { eventId: EventId.make(params.eventId), updated: true }
   })
-
-export interface DeleteEventResult {
-  eventId: string
-  deleted: boolean
-}
 
 export const deleteEvent = (
   params: DeleteEventParams
@@ -466,7 +458,7 @@ export const deleteEvent = (
       event._id
     )
 
-    return { eventId: params.eventId, deleted: true }
+    return { eventId: EventId.make(params.eventId), deleted: true }
   })
 
 export const listRecurringEvents = (
@@ -497,10 +489,6 @@ export const listRecurringEvents = (
 
     return summaries
   })
-
-export interface CreateRecurringEventResult {
-  eventId: string
-}
 
 export const createRecurringEvent = (
   params: CreateRecurringEventParams
@@ -560,7 +548,7 @@ export const createRecurringEvent = (
       eventData
     )
 
-    return { eventId }
+    return { eventId: EventId.make(eventId) }
   })
 
 export const listEventInstances = (

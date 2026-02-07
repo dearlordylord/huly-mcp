@@ -34,6 +34,9 @@ export type PersonId = Schema.Schema.Type<typeof PersonId>
 export const OrganizationId = HulyRef("OrganizationId")
 export type OrganizationId = Schema.Schema.Type<typeof OrganizationId>
 
+export const IssueId = HulyRef("IssueId")
+export type IssueId = Schema.Schema.Type<typeof IssueId>
+
 export const ComponentId = HulyRef("ComponentId")
 export type ComponentId = Schema.Schema.Type<typeof ComponentId>
 

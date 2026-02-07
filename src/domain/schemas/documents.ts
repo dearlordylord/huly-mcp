@@ -186,3 +186,23 @@ export const parseGetDocumentParams = Schema.decodeUnknown(GetDocumentParamsSche
 export const parseCreateDocumentParams = Schema.decodeUnknown(CreateDocumentParamsSchema)
 export const parseUpdateDocumentParams = Schema.decodeUnknown(UpdateDocumentParamsSchema)
 export const parseDeleteDocumentParams = Schema.decodeUnknown(DeleteDocumentParamsSchema)
+
+// --- Result Schemas ---
+
+export const CreateDocumentResultSchema = Schema.Struct({
+  id: DocumentId,
+  title: Schema.String
+}).annotations({ title: "CreateDocumentResult", description: "Result of create document operation" })
+export type CreateDocumentResult = Schema.Schema.Type<typeof CreateDocumentResultSchema>
+
+export const UpdateDocumentResultSchema = Schema.Struct({
+  id: DocumentId,
+  updated: Schema.Boolean
+}).annotations({ title: "UpdateDocumentResult", description: "Result of update document operation" })
+export type UpdateDocumentResult = Schema.Schema.Type<typeof UpdateDocumentResultSchema>
+
+export const DeleteDocumentResultSchema = Schema.Struct({
+  id: DocumentId,
+  deleted: Schema.Boolean
+}).annotations({ title: "DeleteDocumentResult", description: "Result of delete document operation" })
+export type DeleteDocumentResult = Schema.Schema.Type<typeof DeleteDocumentResultSchema>

@@ -13,7 +13,13 @@ import type {
   SetIssueMilestoneParams,
   UpdateMilestoneParams
 } from "../../domain/schemas.js"
-import { MilestoneId, MilestoneLabel } from "../../domain/schemas/shared.js"
+import type {
+  CreateMilestoneResult,
+  DeleteMilestoneResult,
+  SetIssueMilestoneResult,
+  UpdateMilestoneResult
+} from "../../domain/schemas/milestones.js"
+import { IssueIdentifier, MilestoneId, MilestoneLabel } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { MilestoneNotFoundError } from "../errors.js"
@@ -173,10 +179,7 @@ export const getMilestone = (
     return result
   })
 
-export interface CreateMilestoneResult {
-  id: string
-  label: string
-}
+export type { CreateMilestoneResult, DeleteMilestoneResult, SetIssueMilestoneResult, UpdateMilestoneResult }
 
 export const createMilestone = (
   params: CreateMilestoneParams
@@ -201,13 +204,8 @@ export const createMilestone = (
       milestoneId
     )
 
-    return { id: milestoneId, label: params.label }
+    return { id: MilestoneId.make(milestoneId), label: MilestoneLabel.make(params.label) }
   })
-
-export interface UpdateMilestoneResult {
-  id: string
-  updated: boolean
-}
 
 export const updateMilestone = (
   params: UpdateMilestoneParams
@@ -234,7 +232,7 @@ export const updateMilestone = (
     }
 
     if (Object.keys(updateOps).length === 0) {
-      return { id: milestone._id, updated: false }
+      return { id: MilestoneId.make(milestone._id), updated: false }
     }
 
     yield* client.updateDoc(
@@ -244,13 +242,8 @@ export const updateMilestone = (
       updateOps
     )
 
-    return { id: milestone._id, updated: true }
+    return { id: MilestoneId.make(milestone._id), updated: true }
   })
-
-export interface SetIssueMilestoneResult {
-  identifier: string
-  milestoneSet: boolean
-}
 
 export const setIssueMilestone = (
   params: SetIssueMilestoneParams
@@ -272,13 +265,8 @@ export const setIssueMilestone = (
       { milestone: milestoneRef }
     )
 
-    return { identifier: issue.identifier, milestoneSet: true }
+    return { identifier: IssueIdentifier.make(issue.identifier), milestoneSet: true }
   })
-
-export interface DeleteMilestoneResult {
-  id: string
-  deleted: boolean
-}
 
 export const deleteMilestone = (
   params: DeleteMilestoneParams
@@ -292,5 +280,5 @@ export const deleteMilestone = (
       milestone._id
     )
 
-    return { id: milestone._id, deleted: true }
+    return { id: MilestoneId.make(milestone._id), deleted: true }
   })

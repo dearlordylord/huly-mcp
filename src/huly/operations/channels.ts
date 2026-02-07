@@ -43,6 +43,18 @@ import type {
   UpdateChannelParams,
   UpdateThreadReplyParams
 } from "../../domain/schemas.js"
+import type {
+  AddThreadReplyResult,
+  CreateChannelResult,
+  DeleteChannelResult,
+  DeleteThreadReplyResult,
+  ListChannelMessagesResult,
+  ListDirectMessagesResult,
+  ListThreadRepliesResult,
+  SendChannelMessageResult,
+  UpdateChannelResult,
+  UpdateThreadReplyResult
+} from "../../domain/schemas/channels.js"
 import {
   AccountUuid,
   ChannelId,
@@ -325,12 +337,20 @@ export const getChannel = (
     return result
   })
 
-// --- Create Channel ---
-
-export interface CreateChannelResult {
-  id: string
-  name: string
+export type {
+  AddThreadReplyResult,
+  CreateChannelResult,
+  DeleteChannelResult,
+  DeleteThreadReplyResult,
+  ListChannelMessagesResult,
+  ListDirectMessagesResult,
+  ListThreadRepliesResult,
+  SendChannelMessageResult,
+  UpdateChannelResult,
+  UpdateThreadReplyResult
 }
+
+// --- Create Channel ---
 
 /**
  * Create a new channel.
@@ -359,15 +379,10 @@ export const createChannel = (
       channelId
     )
 
-    return { id: channelId, name: params.name }
+    return { id: ChannelId.make(channelId), name: ChannelName.make(params.name) }
   })
 
 // --- Update Channel ---
-
-export interface UpdateChannelResult {
-  id: string
-  updated: boolean
-}
 
 /**
  * Update an existing channel.
@@ -389,7 +404,7 @@ export const updateChannel = (
     }
 
     if (Object.keys(updateOps).length === 0) {
-      return { id: channel._id, updated: false }
+      return { id: ChannelId.make(channel._id), updated: false }
     }
 
     yield* client.updateDoc(
@@ -399,15 +414,10 @@ export const updateChannel = (
       updateOps
     )
 
-    return { id: channel._id, updated: true }
+    return { id: ChannelId.make(channel._id), updated: true }
   })
 
 // --- Delete Channel ---
-
-export interface DeleteChannelResult {
-  id: string
-  deleted: boolean
-}
 
 /**
  * Delete a channel.
@@ -424,15 +434,10 @@ export const deleteChannel = (
       channel._id
     )
 
-    return { id: channel._id, deleted: true }
+    return { id: ChannelId.make(channel._id), deleted: true }
   })
 
 // --- List Channel Messages ---
-
-export interface ListChannelMessagesResult {
-  messages: Array<MessageSummary>
-  total: number
-}
 
 /**
  * List messages in a channel.
@@ -490,11 +495,6 @@ export const listChannelMessages = (
 
 // --- Send Channel Message ---
 
-export interface SendChannelMessageResult {
-  id: string
-  channelId: string
-}
-
 /**
  * Send a message to a channel.
  */
@@ -522,15 +522,10 @@ export const sendChannelMessage = (
       messageId
     )
 
-    return { id: messageId, channelId: channel._id }
+    return { id: MessageId.make(messageId), channelId: ChannelId.make(channel._id) }
   })
 
 // --- List Direct Messages ---
-
-export interface ListDirectMessagesResult {
-  conversations: Array<DirectMessageSummary>
-  total: number
-}
 
 /**
  * List direct message conversations.
@@ -619,11 +614,6 @@ const findMessage = (
     return { client, channel, message }
   })
 
-export interface ListThreadRepliesResult {
-  replies: Array<ThreadMessage>
-  total: number
-}
-
 /**
  * List replies in a thread.
  * Results sorted by creation date ascending (oldest first).
@@ -678,12 +668,6 @@ export const listThreadReplies = (
     return { replies: threadMessages, total }
   })
 
-export interface AddThreadReplyResult {
-  id: string
-  messageId: string
-  channelId: string
-}
-
 /**
  * Add a reply to a message thread.
  */
@@ -717,16 +701,11 @@ export const addThreadReply = (
     )
 
     return {
-      id: replyId,
-      messageId: message._id,
-      channelId: channel._id
+      id: ThreadReplyId.make(replyId),
+      messageId: MessageId.make(message._id),
+      channelId: ChannelId.make(channel._id)
     }
   })
-
-export interface UpdateThreadReplyResult {
-  id: string
-  updated: boolean
-}
 
 /**
  * Update a thread reply.
@@ -767,13 +746,8 @@ export const updateThreadReply = (
       updateOps
     )
 
-    return { id: reply._id, updated: true }
+    return { id: ThreadReplyId.make(reply._id), updated: true }
   })
-
-export interface DeleteThreadReplyResult {
-  id: string
-  deleted: boolean
-}
 
 /**
  * Delete a thread reply.
@@ -806,5 +780,5 @@ export const deleteThreadReply = (
       reply._id
     )
 
-    return { id: reply._id, deleted: true }
+    return { id: ThreadReplyId.make(reply._id), deleted: true }
   })

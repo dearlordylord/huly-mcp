@@ -238,3 +238,29 @@ export const parseListWorkSlotsParams = Schema.decodeUnknown(ListWorkSlotsParams
 export const parseCreateWorkSlotParams = Schema.decodeUnknown(CreateWorkSlotParamsSchema)
 export const parseStartTimerParams = Schema.decodeUnknown(StartTimerParamsSchema)
 export const parseStopTimerParams = Schema.decodeUnknown(StopTimerParamsSchema)
+
+// --- Result Schemas ---
+
+export const LogTimeResultSchema = Schema.Struct({
+  reportId: TimeSpendReportId,
+  identifier: IssueIdentifier
+}).annotations({ title: "LogTimeResult", description: "Result of log time operation" })
+export type LogTimeResult = Schema.Schema.Type<typeof LogTimeResultSchema>
+
+export const CreateWorkSlotResultSchema = Schema.Struct({
+  slotId: NonEmptyString
+}).annotations({ title: "CreateWorkSlotResult", description: "Result of create work slot operation" })
+export type CreateWorkSlotResult = Schema.Schema.Type<typeof CreateWorkSlotResultSchema>
+
+export const StartTimerResultSchema = Schema.Struct({
+  identifier: IssueIdentifier,
+  startedAt: Timestamp
+}).annotations({ title: "StartTimerResult", description: "Result of start timer operation" })
+export type StartTimerResult = Schema.Schema.Type<typeof StartTimerResultSchema>
+
+export const StopTimerResultSchema = Schema.Struct({
+  identifier: IssueIdentifier,
+  stoppedAt: Timestamp,
+  reportId: Schema.optional(NonEmptyString)
+}).annotations({ title: "StopTimerResult", description: "Result of stop timer operation" })
+export type StopTimerResult = Schema.Schema.Type<typeof StopTimerResultSchema>

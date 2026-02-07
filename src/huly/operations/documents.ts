@@ -31,6 +31,11 @@ import type {
   TeamspaceSummary,
   UpdateDocumentParams
 } from "../../domain/schemas.js"
+import type {
+  CreateDocumentResult,
+  DeleteDocumentResult,
+  UpdateDocumentResult
+} from "../../domain/schemas/documents.js"
 import { DocumentId, TeamspaceId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js"
@@ -285,15 +290,9 @@ export const getDocument = (
     return result
   })
 
-// --- Create Document Operation ---
+export type { CreateDocumentResult, DeleteDocumentResult, UpdateDocumentResult }
 
-/**
- * Result of createDocument operation.
- */
-export interface CreateDocumentResult {
-  id: string
-  title: string
-}
+// --- Create Document Operation ---
 
 /**
  * Create a new document in a teamspace.
@@ -347,18 +346,10 @@ export const createDocument = (
       documentId
     )
 
-    return { id: documentId, title: params.title }
+    return { id: DocumentId.make(documentId), title: params.title }
   })
 
 // --- Update Document Operation ---
-
-/**
- * Result of updateDocument operation.
- */
-export interface UpdateDocumentResult {
-  id: string
-  updated: boolean
-}
 
 /**
  * Update an existing document in a teamspace.
@@ -412,7 +403,7 @@ export const updateDocument = (
     }
 
     if (Object.keys(updateOps).length === 0 && !contentUpdatedInPlace) {
-      return { id: doc._id, updated: false }
+      return { id: DocumentId.make(doc._id), updated: false }
     }
 
     if (Object.keys(updateOps).length > 0) {
@@ -424,18 +415,10 @@ export const updateDocument = (
       )
     }
 
-    return { id: doc._id, updated: true }
+    return { id: DocumentId.make(doc._id), updated: true }
   })
 
 // --- Delete Document Operation ---
-
-/**
- * Result of deleteDocument operation.
- */
-export interface DeleteDocumentResult {
-  id: string
-  deleted: boolean
-}
 
 /**
  * Delete a document from a teamspace.
@@ -459,5 +442,5 @@ export const deleteDocument = (
       doc._id
     )
 
-    return { id: doc._id, deleted: true }
+    return { id: DocumentId.make(doc._id), deleted: true }
   })
