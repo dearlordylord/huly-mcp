@@ -9,10 +9,11 @@ import type {
   Ref,
   Space,
 } from "@hcengineering/core"
-import type { Channel as HulyChannel, ChatMessage, DirectMessage } from "@hcengineering/chunter"
+import type { Channel as HulyChannel, ChatMessage, DirectMessage, ThreadMessage as HulyThreadMessage } from "@hcengineering/chunter"
+import type { ActivityMessage } from "@hcengineering/activity"
 import type { Employee as HulyEmployee, Person, SocialIdentity } from "@hcengineering/contact"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
-import { ChannelNotFoundError } from "../../../src/huly/errors.js"
+import { ChannelNotFoundError, MessageNotFoundError, ThreadReplyNotFoundError } from "../../../src/huly/errors.js"
 import {
   listChannels,
   getChannel,
@@ -22,6 +23,10 @@ import {
   listChannelMessages,
   sendChannelMessage,
   listDirectMessages,
+  listThreadReplies,
+  addThreadReply,
+  updateThreadReply,
+  deleteThreadReply,
 } from "../../../src/huly/operations/channels.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -64,6 +69,25 @@ const makeChatMessage = (overrides?: Partial<ChatMessage>): ChatMessage =>
     createdOn: Date.now(),
     ...overrides,
   }) as ChatMessage
+
+const makeThreadMessage = (overrides?: Partial<HulyThreadMessage>): HulyThreadMessage =>
+  ({
+    _id: "thread-msg-1" as Ref<HulyThreadMessage>,
+    _class: chunter.class.ThreadMessage,
+    space: "channel-1" as Ref<Space>,
+    attachedTo: "msg-1" as Ref<ActivityMessage>,
+    attachedToClass: chunter.class.ChatMessage,
+    collection: "replies",
+    message: "<p>Reply content</p>",
+    attachments: 0,
+    objectId: "channel-1" as Ref<Doc>,
+    objectClass: chunter.class.Channel,
+    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedOn: Date.now(),
+    createdBy: "user-1" as Ref<Doc>,
+    createdOn: Date.now(),
+    ...overrides,
+  }) as HulyThreadMessage
 
 const makeDirectMessage = (overrides?: Partial<DirectMessage>): DirectMessage =>
   ({
@@ -129,6 +153,7 @@ const makeSocialIdentity = (overrides?: Partial<SocialIdentity>): SocialIdentity
 interface MockConfig {
   channels?: HulyChannel[]
   messages?: ChatMessage[]
+  threadMessages?: HulyThreadMessage[]
   directMessages?: DirectMessage[]
   persons?: Person[]
   employees?: HulyEmployee[]
@@ -143,6 +168,7 @@ interface MockConfig {
 const createTestLayerWithMocks = (config: MockConfig) => {
   const channels = config.channels ?? []
   const messages = config.messages ?? []
+  const threadMessages = config.threadMessages ?? []
   const directMessages = config.directMessages ?? []
   const persons = config.persons ?? []
   const employees = config.employees ?? []
@@ -165,6 +191,20 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     if (_class === chunter.class.ChatMessage) {
       const q = query as Record<string, unknown>
       const filtered = messages.filter(m => m.space === q.space)
+      const opts = options as { sort?: Record<string, number> } | undefined
+      let result = [...filtered]
+      if (opts?.sort?.createdOn !== undefined) {
+        const direction = opts.sort.createdOn
+        result = result.sort((a, b) => direction * ((a.createdOn ?? 0) - (b.createdOn ?? 0)))
+      }
+      return Effect.succeed(Object.assign(result, { total: result.length }) as unknown as FindResult<Doc>)
+    }
+    if (_class === chunter.class.ThreadMessage) {
+      const q = query as { attachedTo?: Ref<ActivityMessage>; space?: Ref<Space> }
+      const filtered = threadMessages.filter(m =>
+        (!q.attachedTo || m.attachedTo === q.attachedTo) &&
+        (!q.space || m.space === q.space)
+      )
       const opts = options as { sort?: Record<string, number> } | undefined
       let result = [...filtered]
       if (opts?.sort?.createdOn !== undefined) {
@@ -215,6 +255,23 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       const found = channels.find(c =>
         (q.name && c.name === q.name) ||
         (q._id && c._id === q._id)
+      )
+      return Effect.succeed(found as Doc | undefined)
+    }
+    if (_class === chunter.class.ChatMessage) {
+      const q = query as { _id?: Ref<ChatMessage>; space?: Ref<Space> }
+      const found = messages.find(m =>
+        (!q._id || m._id === q._id) &&
+        (!q.space || m.space === q.space)
+      )
+      return Effect.succeed(found as Doc | undefined)
+    }
+    if (_class === chunter.class.ThreadMessage) {
+      const q = query as { _id?: Ref<HulyThreadMessage>; attachedTo?: Ref<ActivityMessage>; space?: Ref<Space> }
+      const found = threadMessages.find(m =>
+        (!q._id || m._id === q._id) &&
+        (!q.attachedTo || m.attachedTo === q.attachedTo) &&
+        (!q.space || m.space === q.space)
       )
       return Effect.succeed(found as Doc | undefined)
     }
@@ -748,6 +805,258 @@ describe("listDirectMessages", () => {
 
       expect(result.conversations[0].participants).toEqual(["Alice", "Bob"])
       expect(result.conversations[0].participantIds).toEqual(["account-1", "account-2"])
+    })
+  )
+})
+
+describe("listThreadReplies", () => {
+  it.effect("returns thread replies sorted by creation date ascending", () =>
+    Effect.gen(function* () {
+      const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
+      const parentMsg = makeChatMessage({
+        _id: "msg-1" as Ref<ChatMessage>,
+        space: "ch-1" as Ref<Space>,
+      })
+      const threadMsgs = [
+        makeThreadMessage({
+          _id: "reply-2" as Ref<HulyThreadMessage>,
+          space: "ch-1" as Ref<Space>,
+          attachedTo: "msg-1" as Ref<ActivityMessage>,
+          createdOn: 2000,
+        }),
+        makeThreadMessage({
+          _id: "reply-1" as Ref<HulyThreadMessage>,
+          space: "ch-1" as Ref<Space>,
+          attachedTo: "msg-1" as Ref<ActivityMessage>,
+          createdOn: 1000,
+        }),
+      ]
+
+      const testLayer = createTestLayerWithMocks({
+        channels: [channel],
+        messages: [parentMsg],
+        threadMessages: threadMsgs,
+      })
+
+      const result = yield* listThreadReplies({
+        channel: "general",
+        messageId: "msg-1",
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result.replies).toHaveLength(2)
+      expect(result.replies[0].id).toBe("reply-1")
+      expect(result.replies[1].id).toBe("reply-2")
+    })
+  )
+
+  it.effect("returns MessageNotFoundError when message doesn't exist", () =>
+    Effect.gen(function* () {
+      const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
+
+      const testLayer = createTestLayerWithMocks({
+        channels: [channel],
+        messages: [],
+      })
+
+      const error = yield* Effect.flip(
+        listThreadReplies({
+          channel: "general",
+          messageId: "nonexistent",
+        }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(error._tag).toBe("MessageNotFoundError")
+      expect((error as MessageNotFoundError).messageId).toBe("nonexistent")
+    })
+  )
+
+  it.effect("returns ChannelNotFoundError when channel doesn't exist", () =>
+    Effect.gen(function* () {
+      const testLayer = createTestLayerWithMocks({ channels: [] })
+
+      const error = yield* Effect.flip(
+        listThreadReplies({
+          channel: "nonexistent",
+          messageId: "msg-1",
+        }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(error._tag).toBe("ChannelNotFoundError")
+    })
+  )
+})
+
+describe("addThreadReply", () => {
+  it.effect("adds reply to message thread", () =>
+    Effect.gen(function* () {
+      const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
+      const parentMsg = makeChatMessage({
+        _id: "msg-1" as Ref<ChatMessage>,
+        space: "ch-1" as Ref<Space>,
+      })
+      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+      const testLayer = createTestLayerWithMocks({
+        channels: [channel],
+        messages: [parentMsg],
+        captureAddCollection,
+      })
+
+      const result = yield* addThreadReply({
+        channel: "general",
+        messageId: "msg-1",
+        body: "This is a reply",
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result.messageId).toBe("msg-1")
+      expect(result.channelId).toBe("ch-1")
+      expect(captureAddCollection.attributes).toBeDefined()
+    })
+  )
+
+  it.effect("returns MessageNotFoundError when message doesn't exist", () =>
+    Effect.gen(function* () {
+      const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
+
+      const testLayer = createTestLayerWithMocks({
+        channels: [channel],
+        messages: [],
+      })
+
+      const error = yield* Effect.flip(
+        addThreadReply({
+          channel: "general",
+          messageId: "nonexistent",
+          body: "Reply",
+        }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(error._tag).toBe("MessageNotFoundError")
+    })
+  )
+})
+
+describe("updateThreadReply", () => {
+  it.effect("updates thread reply", () =>
+    Effect.gen(function* () {
+      const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
+      const parentMsg = makeChatMessage({
+        _id: "msg-1" as Ref<ChatMessage>,
+        space: "ch-1" as Ref<Space>,
+      })
+      const reply = makeThreadMessage({
+        _id: "reply-1" as Ref<HulyThreadMessage>,
+        space: "ch-1" as Ref<Space>,
+        attachedTo: "msg-1" as Ref<ActivityMessage>,
+      })
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+      const testLayer = createTestLayerWithMocks({
+        channels: [channel],
+        messages: [parentMsg],
+        threadMessages: [reply],
+        captureUpdateDoc,
+      })
+
+      const result = yield* updateThreadReply({
+        channel: "general",
+        messageId: "msg-1",
+        replyId: "reply-1",
+        body: "Updated content",
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result.id).toBe("reply-1")
+      expect(result.updated).toBe(true)
+      expect(captureUpdateDoc.operations).toBeDefined()
+    })
+  )
+
+  it.effect("returns ThreadReplyNotFoundError when reply doesn't exist", () =>
+    Effect.gen(function* () {
+      const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
+      const parentMsg = makeChatMessage({
+        _id: "msg-1" as Ref<ChatMessage>,
+        space: "ch-1" as Ref<Space>,
+      })
+
+      const testLayer = createTestLayerWithMocks({
+        channels: [channel],
+        messages: [parentMsg],
+        threadMessages: [],
+      })
+
+      const error = yield* Effect.flip(
+        updateThreadReply({
+          channel: "general",
+          messageId: "msg-1",
+          replyId: "nonexistent",
+          body: "Updated",
+        }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(error._tag).toBe("ThreadReplyNotFoundError")
+      expect((error as ThreadReplyNotFoundError).replyId).toBe("nonexistent")
+    })
+  )
+})
+
+describe("deleteThreadReply", () => {
+  it.effect("deletes thread reply", () =>
+    Effect.gen(function* () {
+      const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
+      const parentMsg = makeChatMessage({
+        _id: "msg-1" as Ref<ChatMessage>,
+        space: "ch-1" as Ref<Space>,
+      })
+      const reply = makeThreadMessage({
+        _id: "reply-1" as Ref<HulyThreadMessage>,
+        space: "ch-1" as Ref<Space>,
+        attachedTo: "msg-1" as Ref<ActivityMessage>,
+      })
+      const captureRemoveDoc: MockConfig["captureRemoveDoc"] = {}
+
+      const testLayer = createTestLayerWithMocks({
+        channels: [channel],
+        messages: [parentMsg],
+        threadMessages: [reply],
+        captureRemoveDoc,
+      })
+
+      const result = yield* deleteThreadReply({
+        channel: "general",
+        messageId: "msg-1",
+        replyId: "reply-1",
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result.id).toBe("reply-1")
+      expect(result.deleted).toBe(true)
+      expect(captureRemoveDoc.called).toBe(true)
+    })
+  )
+
+  it.effect("returns ThreadReplyNotFoundError when reply doesn't exist", () =>
+    Effect.gen(function* () {
+      const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
+      const parentMsg = makeChatMessage({
+        _id: "msg-1" as Ref<ChatMessage>,
+        space: "ch-1" as Ref<Space>,
+      })
+
+      const testLayer = createTestLayerWithMocks({
+        channels: [channel],
+        messages: [parentMsg],
+        threadMessages: [],
+      })
+
+      const error = yield* Effect.flip(
+        deleteThreadReply({
+          channel: "general",
+          messageId: "msg-1",
+          replyId: "nonexistent",
+        }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(error._tag).toBe("ThreadReplyNotFoundError")
     })
   )
 })
