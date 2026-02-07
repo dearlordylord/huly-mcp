@@ -238,18 +238,19 @@ export const markAllNotificationsRead = (): Effect.Effect<MarkAllNotificationsRe
       { limit: 200 }
     )
 
-    let count = 0
-    for (const notif of unreadNotifications) {
-      yield* client.updateDoc(
+    // Concurrent updates (10x speedup). Limited to 200/call.
+    yield* Effect.forEach(
+      unreadNotifications,
+      (notif) => client.updateDoc(
         notification.class.InboxNotification,
         notif.space,
         notif._id,
         { isViewed: true }
-      )
-      count++
-    }
+      ),
+      { concurrency: 10 }
+    )
 
-    return { count }
+    return { count: unreadNotifications.length }
   })
 
 /**
@@ -301,18 +302,19 @@ export const archiveAllNotifications = (): Effect.Effect<ArchiveAllNotifications
       { limit: 200 }
     )
 
-    let count = 0
-    for (const notif of activeNotifications) {
-      yield* client.updateDoc(
+    // Concurrent updates (10x speedup). Limited to 200/call.
+    yield* Effect.forEach(
+      activeNotifications,
+      (notif) => client.updateDoc(
         notification.class.InboxNotification,
         notif.space,
         notif._id,
         { archived: true }
-      )
-      count++
-    }
+      ),
+      { concurrency: 10 }
+    )
 
-    return { count }
+    return { count: activeNotifications.length }
   })
 
 /**
