@@ -314,36 +314,21 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       HulyClientError
     > => Effect.succeed(undefined)
 
-    const noopCreateDoc = <T extends Doc>(): Effect.Effect<
-      Ref<T>,
-      HulyClientError
-    > => Effect.succeed("" as Ref<T>)
-
-    const noopUpdateDoc = (): Effect.Effect<TxResult, HulyClientError> => Effect.succeed({})
-
-    const noopAddCollection = <
-      _T extends Doc,
-      P extends AttachedDoc
-    >(): Effect.Effect<Ref<P>, HulyClientError> => Effect.succeed("" as Ref<P>)
-
-    const noopRemoveDoc = (): Effect.Effect<TxResult, HulyClientError> => Effect.succeed({})
-
-    const noopUploadMarkup = (): Effect.Effect<MarkupRef, HulyClientError> => Effect.succeed("" as MarkupRef)
+    const notImplemented = (name: string) => (): Effect.Effect<never, HulyClientError> =>
+      Effect.die(new Error(`${name} not implemented in test layer`))
 
     const noopFetchMarkup = (): Effect.Effect<string, HulyClientError> => Effect.succeed("")
-
-    const noopUpdateMarkup = (): Effect.Effect<void, HulyClientError> => Effect.succeed(undefined)
 
     const defaultOps: HulyClientOperations = {
       findAll: noopFindAll,
       findOne: noopFindOne,
-      createDoc: noopCreateDoc,
-      updateDoc: noopUpdateDoc,
-      addCollection: noopAddCollection,
-      removeDoc: noopRemoveDoc,
-      uploadMarkup: noopUploadMarkup,
+      createDoc: notImplemented("createDoc"),
+      updateDoc: notImplemented("updateDoc"),
+      addCollection: notImplemented("addCollection"),
+      removeDoc: notImplemented("removeDoc"),
+      uploadMarkup: notImplemented("uploadMarkup"),
       fetchMarkup: noopFetchMarkup,
-      updateMarkup: noopUpdateMarkup
+      updateMarkup: notImplemented("updateMarkup")
     }
 
     return Layer.succeed(HulyClient, { ...defaultOps, ...mockOperations })

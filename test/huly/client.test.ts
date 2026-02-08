@@ -13,7 +13,7 @@ import {
   type TxResult,
   type WithLookup
 } from "@hcengineering/core"
-import { Effect } from "effect"
+import { Cause, Effect, Exit } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientError } from "../../src/huly/client.js"
 import { HulyAuthError, HulyConnectionError } from "../../src/huly/errors.js"
@@ -93,20 +93,20 @@ describe("HulyClient Service", () => {
         expect(result).toBeUndefined()
       }))
 
-    it.effect("default uploadMarkup returns empty string", () =>
+    it.effect("default uploadMarkup dies (not implemented)", () =>
       Effect.gen(function*() {
         const testLayer = HulyClient.testLayer({})
 
         const client = yield* HulyClient.pipe(Effect.provide(testLayer))
-        const result = yield* client.uploadMarkup(
+        const exit = yield* Effect.exit(client.uploadMarkup(
           "class" as DocRef<Class<Doc>>,
           "id" as DocRef<Doc>,
           "attr",
           "content",
           "markdown"
-        )
+        ))
 
-        expect(result).toBe("")
+        expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
       }))
 
     it.effect("default fetchMarkup returns empty string", () =>
