@@ -46,6 +46,32 @@ const findProjectAndIssue = (
   params: { project: string; issueIdentifier: string }
 ) => findProjectAndIssueShared({ project: params.project, identifier: params.issueIdentifier })
 
+const findComment = (params: { project: string; issueIdentifier: string; commentId: string }) =>
+  Effect.gen(function*() {
+    const { client, issue, project } = yield* findProjectAndIssue({
+      project: params.project,
+      issueIdentifier: params.issueIdentifier
+    })
+
+    const comment = yield* client.findOne<ChatMessage>(
+      chunter.class.ChatMessage,
+      {
+        _id: toRef<ChatMessage>(params.commentId),
+        attachedTo: issue._id
+      }
+    )
+
+    if (comment === undefined) {
+      return yield* new CommentNotFoundError({
+        commentId: params.commentId,
+        issueIdentifier: params.issueIdentifier,
+        project: params.project
+      })
+    }
+
+    return { client, issue, project, comment }
+  })
+
 // --- Operations ---
 
 /**
@@ -130,26 +156,7 @@ export const updateComment = (
   params: UpdateCommentParams
 ): Effect.Effect<UpdateCommentResult, UpdateCommentError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, issue, project } = yield* findProjectAndIssue({
-      project: params.project,
-      issueIdentifier: params.issueIdentifier
-    })
-
-    const comment = yield* client.findOne<ChatMessage>(
-      chunter.class.ChatMessage,
-      {
-        _id: toRef<ChatMessage>(params.commentId),
-        attachedTo: issue._id
-      }
-    )
-
-    if (comment === undefined) {
-      return yield* new CommentNotFoundError({
-        commentId: params.commentId,
-        issueIdentifier: params.issueIdentifier,
-        project: params.project
-      })
-    }
+    const { client, comment, issue, project } = yield* findComment(params)
 
     if (params.body === comment.message) {
       return {
@@ -185,26 +192,7 @@ export const deleteComment = (
   params: DeleteCommentParams
 ): Effect.Effect<DeleteCommentResult, DeleteCommentError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, issue, project } = yield* findProjectAndIssue({
-      project: params.project,
-      issueIdentifier: params.issueIdentifier
-    })
-
-    const comment = yield* client.findOne<ChatMessage>(
-      chunter.class.ChatMessage,
-      {
-        _id: toRef<ChatMessage>(params.commentId),
-        attachedTo: issue._id
-      }
-    )
-
-    if (comment === undefined) {
-      return yield* new CommentNotFoundError({
-        commentId: params.commentId,
-        issueIdentifier: params.issueIdentifier,
-        project: params.project
-      })
-    }
+    const { client, comment, issue, project } = yield* findComment(params)
 
     yield* client.removeDoc(
       chunter.class.ChatMessage,

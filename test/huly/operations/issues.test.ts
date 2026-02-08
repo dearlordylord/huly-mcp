@@ -14,17 +14,7 @@ import type {
 } from "../../../src/huly/errors.js"
 import { addLabel, createIssue, getIssue, listIssues, updateIssue } from "../../../src/huly/operations/issues.js"
 
-// Import plugin objects at runtime (CommonJS modules)
- 
-const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
- 
-const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
- 
-const tags = require("@hcengineering/tags").default as typeof import("@hcengineering/tags").default
- 
-const task = require("@hcengineering/task").default as typeof import("@hcengineering/task").default
- 
-const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
+import { contact, core, tags, task, tracker } from "../../../src/huly/huly-plugins.js"
 
 // Helper to create properly typed FindResult for tests
 // FindResult<T> = T[] & { total: number; lookupMap?: Record<string, Doc> }
@@ -36,8 +26,8 @@ const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
 
 // --- Mock Data Builders ---
 
-const makeProject = (overrides?: Partial<HulyProject>): HulyProject =>
-  ({
+const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
+  const result: HulyProject = {
     _id: "project-1" as Ref<HulyProject>,
     _class: tracker.class.Project,
     space: "space-1" as Ref<Space>,
@@ -51,10 +41,12 @@ const makeProject = (overrides?: Partial<HulyProject>): HulyProject =>
     createdBy: "user-1" as Ref<Doc>,
     createdOn: Date.now(),
     ...overrides
-  }) as HulyProject
+  }
+  return result
+}
 
-const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue =>
-  ({
+const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
+  const result: HulyIssue = {
     _id: "issue-1" as Ref<HulyIssue>,
     _class: tracker.class.Issue,
     space: "project-1" as Ref<HulyProject>,
@@ -84,10 +76,12 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue =>
     createdBy: "user-1" as Ref<Doc>,
     createdOn: Date.now(),
     ...overrides
-  }) as HulyIssue
+  }
+  return result
+}
 
-const makeStatus = (overrides?: Partial<Status>): Status =>
-  ({
+const makeStatus = (overrides?: Partial<Status>): Status => {
+  const result: Status = {
     _id: "status-1" as Ref<Status>,
     _class: "core:class:Status" as Ref<Doc>,
     space: "space-1" as Ref<Space>,
@@ -98,10 +92,12 @@ const makeStatus = (overrides?: Partial<Status>): Status =>
     createdBy: "user-1" as Ref<Doc>,
     createdOn: Date.now(),
     ...overrides
-  }) as Status
+  }
+  return result
+}
 
-const makePerson = (overrides?: Partial<Person>): Person =>
-  ({
+const makePerson = (overrides?: Partial<Person>): Person => {
+  const result: Person = {
     _id: "person-1" as Ref<Person>,
     _class: contact.class.Person,
     space: "space-1" as Ref<Space>,
@@ -111,10 +107,12 @@ const makePerson = (overrides?: Partial<Person>): Person =>
     createdBy: "user-1" as Ref<Doc>,
     createdOn: Date.now(),
     ...overrides
-  }) as Person
+  }
+  return result
+}
 
-const makeChannel = (overrides?: Partial<Channel>): Channel =>
-  ({
+const makeChannel = (overrides?: Partial<Channel>): Channel => {
+  const result: Channel = {
     _id: "channel-1" as Ref<Channel>,
     _class: contact.class.Channel,
     space: "space-1" as Ref<Space>,
@@ -128,10 +126,12 @@ const makeChannel = (overrides?: Partial<Channel>): Channel =>
     createdBy: "user-1" as Ref<Doc>,
     createdOn: Date.now(),
     ...overrides
-  }) as Channel
+  }
+  return result
+}
 
-const makeTagElement = (overrides?: Partial<TagElement>): TagElement =>
-  ({
+const makeTagElement = (overrides?: Partial<TagElement>): TagElement => {
+  const result: TagElement = {
     _id: "tag-element-1" as Ref<TagElement>,
     _class: tags.class.TagElement,
     space: "space-1" as Ref<Space>,
@@ -145,10 +145,12 @@ const makeTagElement = (overrides?: Partial<TagElement>): TagElement =>
     createdBy: "user-1" as Ref<Doc>,
     createdOn: Date.now(),
     ...overrides
-  }) as TagElement
+  }
+  return result
+}
 
-const makeTagReference = (overrides?: Partial<TagReference>): TagReference =>
-  ({
+const makeTagReference = (overrides?: Partial<TagReference>): TagReference => {
+  const result: TagReference = {
     _id: "tag-ref-1" as Ref<TagReference>,
     _class: tags.class.TagReference,
     space: "project-1" as Ref<Space>,
@@ -163,7 +165,9 @@ const makeTagReference = (overrides?: Partial<TagReference>): TagReference =>
     createdBy: "user-1" as Ref<Doc>,
     createdOn: Date.now(),
     ...overrides
-  }) as TagReference
+  }
+  return result
+}
 
 // --- Test Helpers ---
 
@@ -324,7 +328,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
           const found = persons.find(p => p.name === q.name)
           return Effect.succeed(found as Doc | undefined)
         }
-        if (typeof q.name === "object" && q.name !== null && "$like" in (q.name as Record<string, unknown>)) {
+        if (typeof q.name === "object" && "$like" in (q.name as Record<string, unknown>)) {
           const pattern = (q.name as Record<string, string>).$like.replace(/%/g, "")
           const found = persons.find(p => p.name.includes(pattern))
           return Effect.succeed(found as Doc | undefined)
@@ -360,14 +364,14 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       }
       // Return project with incremented sequence
       const project = projects[0]
-      const sequence = (config.updateDocResult?.object?.sequence) ?? (project ? project.sequence + 1 : 2)
+      const sequence = (config.updateDocResult?.object?.sequence) ?? project.sequence + 1
       return Effect.succeed({ object: { sequence } } as never)
     }
   ) as HulyClientOperations["updateDoc"]
 
   // Mock addCollection - captures attributes
-   
-  const addCollectionImpl: any = (
+
+  const addCollectionImpl: HulyClientOperations["addCollection"] = ((
     _class: unknown,
     _space: unknown,
     _attachedTo: unknown,
@@ -382,11 +386,11 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       config.captureAddCollection.id = id as string
     }
     return Effect.succeed((id ?? "new-issue-id") as Ref<Doc>)
-  }
+  }) as HulyClientOperations["addCollection"]
 
   // Mock createDoc - captures attributes for tag creation
-   
-  const createDocImpl: any = (
+
+  const createDocImpl: HulyClientOperations["createDoc"] = ((
     _class: unknown,
     _space: unknown,
     attributes: unknown,
@@ -405,11 +409,11 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       tagElements.push(newTag)
     }
     return Effect.succeed((id ?? "new-doc-id") as Ref<Doc>)
-  }
+  }) as HulyClientOperations["createDoc"]
 
   // Mock uploadMarkup - captures markup content
-   
-  const uploadMarkupImpl: any = (
+
+  const uploadMarkupImpl: HulyClientOperations["uploadMarkup"] = ((
     _objectClass: unknown,
     _objectId: unknown,
     _objectAttr: unknown,
@@ -419,7 +423,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       config.captureUploadMarkup.markup = markup as string
     }
     return Effect.succeed("markup-ref-123")
-  }
+  }) as HulyClientOperations["uploadMarkup"]
 
   return HulyClient.testLayer({
     findAll: findAllImpl,
@@ -739,7 +743,7 @@ describe("listIssues", () => {
         yield* listIssues({ project: "TEST" }).pipe(Effect.provide(testLayer))
 
         // SortingOrder.Descending = -1
-        expect((captureQuery.options?.sort as Record<string, number>)?.modifiedOn).toBe(-1)
+        expect((captureQuery.options?.sort as Record<string, number>).modifiedOn).toBe(-1)
       }))
   })
 })

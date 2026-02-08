@@ -5,7 +5,6 @@
  *
  * @module
  */
-/* eslint-disable @typescript-eslint/consistent-type-assertions -- test mocks */
 import type http from "node:http"
 
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js"
@@ -74,9 +73,10 @@ describe("HTTP Transport", () => {
       const mockServer = createMockMcpServer()
       const handlers = createMcpHandlers(() => mockServer)
 
-      const req = {
+      const reqData = {
         body: { jsonrpc: "2.0", method: "tools/list", id: 1 }
-      } as Request
+      }
+      const req = reqData as Request
 
       const res = createMockResponse()
 
@@ -93,7 +93,7 @@ describe("HTTP Transport", () => {
       const mockServer = createMockMcpServer()
       const handlers = createMcpHandlers(() => mockServer)
 
-      const req = {
+      const reqData = {
         body: {
           jsonrpc: "2.0",
           method: "initialize",
@@ -104,7 +104,8 @@ describe("HTTP Transport", () => {
             clientInfo: { name: "test", version: "1.0" }
           }
         }
-      } as Request
+      }
+      const req = reqData as Request
 
       const res = createMockResponse()
 
@@ -155,7 +156,8 @@ describe("HTTP Transport", () => {
       const mockServer = createMockMcpServer()
       const handlers = createMcpHandlers(() => mockServer)
 
-      const req = {} as Request
+      const reqData = {}
+      const req = reqData as Request
       const res = createMockResponse()
 
       await handlers.get(req, res)
@@ -176,7 +178,8 @@ describe("HTTP Transport", () => {
       const mockServer = createMockMcpServer()
       const handlers = createMcpHandlers(() => mockServer)
 
-      const req = {} as Request
+      const reqData = {}
+      const req = reqData as Request
       const res = createMockResponse()
 
       await handlers.delete(req, res)
@@ -199,14 +202,15 @@ describe("HTTP Transport", () => {
       })
 
       // Any valid JSON-RPC request (tools/list in this case)
-      const req = {
+      const reqData = {
         body: {
           jsonrpc: "2.0",
           method: "tools/list",
           id: 1,
           params: {}
         }
-      } as Request
+      }
+      const req = reqData as Request
 
       const res = createMockResponse()
 

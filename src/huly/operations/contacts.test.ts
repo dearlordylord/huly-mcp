@@ -1,5 +1,5 @@
 import type { Channel, Person as HulyPerson } from "@hcengineering/contact"
-import type { Doc, FindResult, Ref } from "@hcengineering/core"
+import type { Doc, FindResult, PersonId as CorePersonId, Ref } from "@hcengineering/core"
 import { Effect, Exit } from "effect"
 import { describe, expect, it } from "vitest"
 
@@ -10,23 +10,24 @@ import { createPerson, deletePerson, getPerson, listPersons, updatePerson } from
 
 import { contact } from "../huly-plugins.js"
 
-/* eslint-disable @typescript-eslint/consistent-type-assertions -- test mock factories */
-const createMockPerson = (overrides: Partial<HulyPerson> = {}): HulyPerson =>
-  ({
+const createMockPerson = (overrides: Partial<HulyPerson> = {}): HulyPerson => {
+  const data = {
     _id: "person-123" as Ref<HulyPerson>,
     _class: contact.class.Person,
     name: "Doe,John",
     city: "NYC",
     space: contact.space.Contacts,
     modifiedOn: 1700000000000,
-    modifiedBy: "user" as Ref<Doc>,
+    modifiedBy: "user" as CorePersonId,
     createdOn: 1699000000000,
-    createdBy: "user" as Ref<Doc>,
+    createdBy: "user" as CorePersonId,
     ...overrides
-  }) as HulyPerson
+  }
+  return data as HulyPerson
+}
 
-const createMockChannel = (overrides: Partial<Channel> = {}): Channel =>
-  ({
+const createMockChannel = (overrides: Partial<Channel> = {}): Channel => {
+  const data = {
     _id: "channel-1" as Ref<Channel>,
     _class: contact.class.Channel,
     space: contact.space.Contacts,
@@ -35,13 +36,14 @@ const createMockChannel = (overrides: Partial<Channel> = {}): Channel =>
     collection: "channels",
     provider: contact.channelProvider.Email,
     value: "john@example.com",
-    modifiedBy: "user" as Ref<Doc>,
+    modifiedBy: "user" as CorePersonId,
     modifiedOn: Date.now(),
-    createdBy: "user" as Ref<Doc>,
+    createdBy: "user" as CorePersonId,
     createdOn: Date.now(),
     ...overrides
-  }) as Channel
-/* eslint-enable @typescript-eslint/consistent-type-assertions */
+  }
+  return data as Channel
+}
 
 interface MockConfig {
   persons?: Array<HulyPerson>

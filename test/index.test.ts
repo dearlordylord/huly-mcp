@@ -1,23 +1,11 @@
-import { describe, it, beforeEach, afterEach } from "@effect/vitest"
+import { afterEach, beforeEach, describe, it } from "@effect/vitest"
+import { Effect, Layer } from "effect"
 import { expect } from "vitest"
-import { Effect, Layer, Cause } from "effect"
-import { HulyConfigService } from "../src/config/config.js"
 import { HulyClient } from "../src/huly/client.js"
 import { HulyStorageClient } from "../src/huly/storage.js"
 import { WorkspaceClient } from "../src/huly/workspace-client.js"
-import { McpServerService, McpServerError } from "../src/mcp/server.js"
 import { main } from "../src/index.js"
-
-// --- Test Helpers ---
-
-const createTestConfigLayer = () =>
-  HulyConfigService.testLayer({
-    url: "https://test.huly.app",
-    email: "test@example.com",
-    password: "test-password",
-    workspace: "test-workspace",
-    connectionTimeout: 5000,
-  })
+import { McpServerError, McpServerService } from "../src/mcp/server.js"
 
 // --- Tests ---
 
@@ -31,7 +19,7 @@ describe("Main Entry Point", () => {
     "HULY_WORKSPACE",
     "HULY_CONNECTION_TIMEOUT",
     "MCP_TRANSPORT",
-    "MCP_HTTP_PORT",
+    "MCP_HTTP_PORT"
   ]
 
   beforeEach(() => {
@@ -54,19 +42,18 @@ describe("Main Entry Point", () => {
   })
 
   describe("main program", () => {
-        it.effect("fails on missing config", () =>
-      Effect.gen(function* () {
+    it.effect("fails on missing config", () =>
+      Effect.gen(function*() {
         // Don't set any env vars - config should fail
         const error = yield* Effect.flip(main)
 
         expect(error).toBeDefined()
-      })
-    )
+      }))
   })
 
   describe("layer composition", () => {
-        it.scoped("McpServerService layer composes with HulyClient, HulyStorageClient, and WorkspaceClient", () =>
-      Effect.gen(function* () {
+    it.scoped("McpServerService layer composes with HulyClient, HulyStorageClient, and WorkspaceClient", () =>
+      Effect.gen(function*() {
         const hulyClientLayer = HulyClient.testLayer({})
         const storageClientLayer = HulyStorageClient.testLayer({})
         const workspaceClientLayer = WorkspaceClient.testLayer({})
@@ -78,13 +65,12 @@ describe("Main Entry Point", () => {
         )
 
         yield* Layer.build(mcpServerLayer)
-      })
-    )
+      }))
   })
 
   describe("error handling", () => {
-        it.effect("reports config validation errors clearly", () =>
-      Effect.gen(function* () {
+    it.effect("reports config validation errors clearly", () =>
+      Effect.gen(function*() {
         // Invalid URL
         process.env["HULY_URL"] = "not-a-valid-url"
         process.env["HULY_EMAIL"] = "test@example.com"
@@ -94,11 +80,10 @@ describe("Main Entry Point", () => {
         const error = yield* Effect.flip(main)
 
         expect(error).toBeDefined()
-      })
-    )
+      }))
 
-        it.effect("reports missing required config", () =>
-      Effect.gen(function* () {
+    it.effect("reports missing required config", () =>
+      Effect.gen(function*() {
         // Missing HULY_PASSWORD
         process.env["HULY_URL"] = "https://test.huly.app"
         process.env["HULY_EMAIL"] = "test@example.com"
@@ -107,13 +92,12 @@ describe("Main Entry Point", () => {
         const error = yield* Effect.flip(main)
 
         expect(error).toBeDefined()
-      })
-    )
+      }))
   })
 
   describe("McpServerService integration", () => {
-        it.effect("server run/stop cycle works", () =>
-      Effect.gen(function* () {
+    it.effect("server run/stop cycle works", () =>
+      Effect.gen(function*() {
         let runCalled = false
         let stopCalled = false
 
@@ -125,10 +109,10 @@ describe("Main Entry Point", () => {
           stop: () =>
             Effect.sync(() => {
               stopCalled = true
-            }),
+            })
         })
 
-        yield* Effect.gen(function* () {
+        yield* Effect.gen(function*() {
           const server = yield* McpServerService
           yield* server.run()
           yield* server.stop()
@@ -136,17 +120,16 @@ describe("Main Entry Point", () => {
 
         expect(runCalled).toBe(true)
         expect(stopCalled).toBe(true)
-      })
-    )
+      }))
 
-        it.effect("server error is properly typed", () =>
-      Effect.gen(function* () {
+    it.effect("server error is properly typed", () =>
+      Effect.gen(function*() {
         const mockServerLayer = McpServerService.testLayer({
-          run: () => new McpServerError({ message: "Connection refused" }),
+          run: () => new McpServerError({ message: "Connection refused" })
         })
 
         const error = yield* Effect.flip(
-          Effect.gen(function* () {
+          Effect.gen(function*() {
             const server = yield* McpServerService
             yield* server.run()
           }).pipe(Effect.provide(mockServerLayer))
@@ -154,7 +137,6 @@ describe("Main Entry Point", () => {
 
         expect(error._tag).toBe("McpServerError")
         expect(error.message).toBe("Connection refused")
-      })
-    )
+      }))
   })
 })
