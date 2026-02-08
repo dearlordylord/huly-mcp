@@ -26,7 +26,6 @@ import type {
   WorkspaceSummary
 } from "../../domain/schemas/workspace.js"
 import type { InvalidPersonUuidError } from "../errors.js"
-import { HulyConnectionError } from "../errors.js"
 import { WorkspaceClient, type WorkspaceClientError } from "../workspace-client.js"
 import { clampLimit, validatePersonUuid } from "./shared.js"
 
@@ -59,17 +58,10 @@ export const listWorkspaceMembers = (
   params: ListWorkspaceMembersParams
 ): Effect.Effect<Array<WorkspaceMember>, ListWorkspaceMembersError, WorkspaceClient> =>
   Effect.gen(function*() {
-    const { client } = yield* WorkspaceClient
+    const ops = yield* WorkspaceClient
     const limit = clampLimit(params.limit)
 
-    const members = yield* Effect.tryPromise({
-      try: () => client.getWorkspaceMembers(),
-      catch: (e) =>
-        new HulyConnectionError({
-          message: `Failed to get workspace members: ${String(e)}`,
-          cause: e
-        })
-    })
+    const members = yield* ops.getWorkspaceMembers()
 
     const limitedMembers = members.slice(0, limit)
 
@@ -80,10 +72,7 @@ export const listWorkspaceMembers = (
           let name: string | undefined
           let email: string | undefined
 
-          const personInfoResult = yield* Effect.tryPromise({
-            try: () => client.getPersonInfo(member.person),
-            catch: () => undefined
-          }).pipe(Effect.option)
+          const personInfoResult = yield* ops.getPersonInfo(member.person).pipe(Effect.option)
 
           if (Option.isSome(personInfoResult)) {
             const personInfo = personInfoResult.value
@@ -108,16 +97,9 @@ export const updateMemberRole = (
   params: UpdateMemberRoleParams
 ): Effect.Effect<UpdateMemberRoleResult, UpdateMemberRoleError, WorkspaceClient> =>
   Effect.gen(function*() {
-    const { client } = yield* WorkspaceClient
+    const ops = yield* WorkspaceClient
 
-    yield* Effect.tryPromise({
-      try: () => client.updateWorkspaceRole(params.accountId, toHulyAccountRole(params.role)),
-      catch: (e) =>
-        new HulyConnectionError({
-          message: `Failed to update member role: ${String(e)}`,
-          cause: e
-        })
-    })
+    yield* ops.updateWorkspaceRole(params.accountId, toHulyAccountRole(params.role))
 
     return {
       accountId: AccountId.make(params.accountId),
@@ -128,16 +110,9 @@ export const updateMemberRole = (
 
 export const getWorkspaceInfo = (): Effect.Effect<WorkspaceInfo, GetWorkspaceInfoError, WorkspaceClient> =>
   Effect.gen(function*() {
-    const { client } = yield* WorkspaceClient
+    const ops = yield* WorkspaceClient
 
-    const info = yield* Effect.tryPromise({
-      try: () => client.getWorkspaceInfo(false),
-      catch: (e) =>
-        new HulyConnectionError({
-          message: `Failed to get workspace info: ${String(e)}`,
-          cause: e
-        })
-    })
+    const info = yield* ops.getWorkspaceInfo(false)
 
     return {
       uuid: WorkspaceUuid.make(info.uuid),
@@ -156,17 +131,10 @@ export const listWorkspaces = (
   params: ListWorkspacesParams
 ): Effect.Effect<Array<WorkspaceSummary>, ListWorkspacesError, WorkspaceClient> =>
   Effect.gen(function*() {
-    const { client } = yield* WorkspaceClient
+    const ops = yield* WorkspaceClient
     const limit = clampLimit(params.limit)
 
-    const workspaces = yield* Effect.tryPromise({
-      try: () => client.getUserWorkspaces(),
-      catch: (e) =>
-        new HulyConnectionError({
-          message: `Failed to list workspaces: ${String(e)}`,
-          cause: e
-        })
-    })
+    const workspaces = yield* ops.getUserWorkspaces()
 
     return workspaces.slice(0, limit).map((ws) => ({
       uuid: WorkspaceUuid.make(ws.uuid),
@@ -182,16 +150,9 @@ export const createWorkspace = (
   params: CreateWorkspaceParams
 ): Effect.Effect<CreateWorkspaceResult, CreateWorkspaceError, WorkspaceClient> =>
   Effect.gen(function*() {
-    const { client } = yield* WorkspaceClient
+    const ops = yield* WorkspaceClient
 
-    const loginInfo = yield* Effect.tryPromise({
-      try: () => client.createWorkspace(params.name, params.region),
-      catch: (e) =>
-        new HulyConnectionError({
-          message: `Failed to create workspace: ${String(e)}`,
-          cause: e
-        })
-    })
+    const loginInfo = yield* ops.createWorkspace(params.name, params.region)
 
     return {
       uuid: WorkspaceUuid.make(loginInfo.workspace),
@@ -202,16 +163,9 @@ export const createWorkspace = (
 
 export const deleteWorkspace = (): Effect.Effect<DeleteWorkspaceResult, DeleteWorkspaceError, WorkspaceClient> =>
   Effect.gen(function*() {
-    const { client } = yield* WorkspaceClient
+    const ops = yield* WorkspaceClient
 
-    yield* Effect.tryPromise({
-      try: () => client.deleteWorkspace(),
-      catch: (e) =>
-        new HulyConnectionError({
-          message: `Failed to delete workspace: ${String(e)}`,
-          cause: e
-        })
-    })
+    yield* ops.deleteWorkspace()
 
     return { deleted: true }
   })
@@ -220,17 +174,10 @@ export const getUserProfile = (
   personUuid?: string
 ): Effect.Effect<UserProfile | null, GetUserProfileError | InvalidPersonUuidError, WorkspaceClient> =>
   Effect.gen(function*() {
-    const { client } = yield* WorkspaceClient
+    const ops = yield* WorkspaceClient
 
     const validatedUuid = yield* validatePersonUuid(personUuid)
-    const profile = yield* Effect.tryPromise({
-      try: () => client.getUserProfile(validatedUuid),
-      catch: (e) =>
-        new HulyConnectionError({
-          message: `Failed to get user profile: ${String(e)}`,
-          cause: e
-        })
-    })
+    const profile = yield* ops.getUserProfile(validatedUuid)
 
     if (profile === null) {
       return null
@@ -253,9 +200,9 @@ export const updateUserProfile = (
   params: UpdateUserProfileParams
 ): Effect.Effect<UpdateUserProfileResult, UpdateUserProfileError, WorkspaceClient> =>
   Effect.gen(function*() {
-    const { client } = yield* WorkspaceClient
+    const ops = yield* WorkspaceClient
 
-    const profileUpdate: Parameters<typeof client.setMyProfile>[0] = {}
+    const profileUpdate: Parameters<typeof ops.setMyProfile>[0] = {}
 
     if (params.bio !== undefined) {
       profileUpdate.bio = params.bio === null ? "" : params.bio
@@ -280,14 +227,7 @@ export const updateUserProfile = (
       return { updated: false }
     }
 
-    yield* Effect.tryPromise({
-      try: () => client.setMyProfile(profileUpdate),
-      catch: (e) =>
-        new HulyConnectionError({
-          message: `Failed to update user profile: ${String(e)}`,
-          cause: e
-        })
-    })
+    yield* ops.setMyProfile(profileUpdate)
 
     return { updated: true }
   })
@@ -296,33 +236,17 @@ export const updateGuestSettings = (
   params: UpdateGuestSettingsParams
 ): Effect.Effect<UpdateGuestSettingsResult, UpdateGuestSettingsError, WorkspaceClient> =>
   Effect.gen(function*() {
-    const { client } = yield* WorkspaceClient
+    const ops = yield* WorkspaceClient
 
     let updated = false
 
     if (params.allowReadOnly !== undefined) {
-      const allowReadOnly = params.allowReadOnly
-      yield* Effect.tryPromise({
-        try: () => client.updateAllowReadOnlyGuests(allowReadOnly),
-        catch: (e) =>
-          new HulyConnectionError({
-            message: `Failed to update read-only guest setting: ${String(e)}`,
-            cause: e
-          })
-      })
+      yield* ops.updateAllowReadOnlyGuests(params.allowReadOnly)
       updated = true
     }
 
     if (params.allowSignUp !== undefined) {
-      const allowSignUp = params.allowSignUp
-      yield* Effect.tryPromise({
-        try: () => client.updateAllowGuestSignUp(allowSignUp),
-        catch: (e) =>
-          new HulyConnectionError({
-            message: `Failed to update guest sign-up setting: ${String(e)}`,
-            cause: e
-          })
-      })
+      yield* ops.updateAllowGuestSignUp(params.allowSignUp)
       updated = true
     }
 
@@ -335,16 +259,9 @@ export const updateGuestSettings = (
 
 export const getRegions = (): Effect.Effect<Array<RegionInfo>, GetRegionsError, WorkspaceClient> =>
   Effect.gen(function*() {
-    const { client } = yield* WorkspaceClient
+    const ops = yield* WorkspaceClient
 
-    const regions = yield* Effect.tryPromise({
-      try: () => client.getRegionInfo(),
-      catch: (e) =>
-        new HulyConnectionError({
-          message: `Failed to get regions: ${String(e)}`,
-          cause: e
-        })
-    })
+    const regions = yield* ops.getRegionInfo()
 
     return regions.map((r) => ({
       region: RegionId.make(r.region),
