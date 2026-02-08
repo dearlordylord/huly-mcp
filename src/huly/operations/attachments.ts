@@ -9,7 +9,6 @@
 import type { Attachment as HulyAttachment } from "@hcengineering/attachment"
 import {
   type AttachedData,
-  type Blob,
   type Class,
   type Doc,
   type DocumentUpdate,
@@ -35,6 +34,7 @@ import type {
   PinAttachmentParams,
   UpdateAttachmentParams
 } from "../../domain/schemas/attachments.js"
+import { AttachmentId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import {
   AttachmentNotFoundError,
@@ -56,7 +56,7 @@ import {
   validateContentType,
   validateFileSize
 } from "../storage.js"
-import { findProject, parseIssueIdentifier } from "./shared.js"
+import { findProject, parseIssueIdentifier, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const attachment = require("@hcengineering/attachment").default as typeof import("@hcengineering/attachment").default
@@ -120,8 +120,14 @@ export type AddDocumentAttachmentError =
 
 // --- Helpers ---
 
+// SDK: DocumentUpdate<Attachment> doesn't allow clearing optional fields with empty string.
+// Huly API requires empty string to clear description (not undefined/null).
+const clearAttachmentDescription = (ops: DocumentUpdate<HulyAttachment>): void => {
+  ;(ops as Record<string, unknown>).description = ""
+}
+
 const toAttachmentSummary = (att: HulyAttachment): AttachmentSummary => ({
-  id: String(att._id),
+  id: AttachmentId.make(att._id),
   name: att.name,
   type: att.type,
   size: att.size,
@@ -131,7 +137,7 @@ const toAttachmentSummary = (att: HulyAttachment): AttachmentSummary => ({
 })
 
 const toAttachment = (att: HulyAttachment, url?: string): Attachment => ({
-  id: String(att._id),
+  id: AttachmentId.make(att._id),
   name: att.name,
   type: att.type,
   size: att.size,
@@ -160,8 +166,8 @@ export const listAttachments = (
     const attachments = yield* client.findAll<HulyAttachment>(
       attachment.class.Attachment,
       {
-        attachedTo: params.objectId as Ref<Doc>,
-        attachedToClass: params.objectClass as Ref<Class<Doc>>
+        attachedTo: toRef<Doc>(params.objectId),
+        attachedToClass: toRef<Class<Doc<Space>>>(params.objectClass)
       },
       {
         limit,
@@ -186,14 +192,14 @@ export const getAttachment = (
 
     const att = yield* client.findOne<HulyAttachment>(
       attachment.class.Attachment,
-      { _id: params.attachmentId as Ref<HulyAttachment> }
+      { _id: toRef<HulyAttachment>(params.attachmentId) }
     )
 
     if (att === undefined) {
       return yield* new AttachmentNotFoundError({ attachmentId: params.attachmentId })
     }
 
-    const url = storageClient.getFileUrl(att.file as string)
+    const url = storageClient.getFileUrl(att.file)
     return toAttachment(att, url)
   })
 
@@ -244,7 +250,7 @@ export const addAttachment = (
 
     const attachmentData: AttachedData<HulyAttachment> = {
       name: params.filename,
-      file: uploadResult.blobId as Ref<Blob>,
+      file: uploadResult.blobId,
       size: uploadResult.size,
       type: params.contentType,
       lastModified: Date.now(),
@@ -254,16 +260,16 @@ export const addAttachment = (
 
     yield* client.addCollection(
       attachment.class.Attachment,
-      params.space as Ref<Space>,
-      params.objectId as Ref<Doc>,
-      params.objectClass as Ref<Class<Doc>>,
+      toRef<Space>(params.space),
+      toRef<Doc>(params.objectId),
+      toRef<Class<Doc<Space>>>(params.objectClass),
       "attachments",
       attachmentData,
       attachmentId
     )
 
     return {
-      attachmentId: String(attachmentId),
+      attachmentId,
       blobId: uploadResult.blobId,
       url: uploadResult.url
     }
@@ -288,7 +294,7 @@ export const updateAttachment = (
 
     const att = yield* client.findOne<HulyAttachment>(
       attachment.class.Attachment,
-      { _id: params.attachmentId as Ref<HulyAttachment> }
+      { _id: toRef<HulyAttachment>(params.attachmentId) }
     )
 
     if (att === undefined) {
@@ -299,8 +305,7 @@ export const updateAttachment = (
 
     if (params.description !== undefined) {
       if (params.description === null) {
-        // Clear description by setting to empty string (Huly API doesn't support undefined in updates)
-        ;(updateOps as Record<string, unknown>).description = ""
+        clearAttachmentDescription(updateOps)
       } else {
         updateOps.description = params.description
       }
@@ -343,7 +348,7 @@ export const deleteAttachment = (
 
     const att = yield* client.findOne<HulyAttachment>(
       attachment.class.Attachment,
-      { _id: params.attachmentId as Ref<HulyAttachment> }
+      { _id: toRef<HulyAttachment>(params.attachmentId) }
     )
 
     if (att === undefined) {
@@ -378,7 +383,7 @@ export const pinAttachment = (
 
     const att = yield* client.findOne<HulyAttachment>(
       attachment.class.Attachment,
-      { _id: params.attachmentId as Ref<HulyAttachment> }
+      { _id: toRef<HulyAttachment>(params.attachmentId) }
     )
 
     if (att === undefined) {
@@ -418,14 +423,14 @@ export const downloadAttachment = (
 
     const att = yield* client.findOne<HulyAttachment>(
       attachment.class.Attachment,
-      { _id: params.attachmentId as Ref<HulyAttachment> }
+      { _id: toRef<HulyAttachment>(params.attachmentId) }
     )
 
     if (att === undefined) {
       return yield* new AttachmentNotFoundError({ attachmentId: params.attachmentId })
     }
 
-    const url = storageClient.getFileUrl(att.file as string)
+    const url = storageClient.getFileUrl(att.file)
 
     return {
       attachmentId: params.attachmentId,
@@ -482,7 +487,7 @@ export const addIssueAttachment = (
 
     const attachmentData: AttachedData<HulyAttachment> = {
       name: params.filename,
-      file: uploadResult.blobId as Ref<Blob>,
+      file: uploadResult.blobId,
       size: uploadResult.size,
       type: params.contentType,
       lastModified: Date.now(),
@@ -501,7 +506,7 @@ export const addIssueAttachment = (
     )
 
     return {
-      attachmentId: String(attachmentId),
+      attachmentId,
       blobId: uploadResult.blobId,
       url: uploadResult.url
     }
@@ -523,7 +528,7 @@ export const addDocumentAttachment = (
     if (teamspace === undefined) {
       teamspace = yield* client.findOne<HulyTeamspace>(
         documentPlugin.class.Teamspace,
-        { _id: params.teamspace as Ref<HulyTeamspace> }
+        { _id: toRef<HulyTeamspace>(params.teamspace) }
       )
     }
     if (teamspace === undefined) {
@@ -537,7 +542,7 @@ export const addDocumentAttachment = (
     if (doc === undefined) {
       doc = yield* client.findOne<HulyDocument>(
         documentPlugin.class.Document,
-        { space: teamspace._id, _id: params.document as Ref<HulyDocument> }
+        { space: teamspace._id, _id: toRef<HulyDocument>(params.document) }
       )
     }
     if (doc === undefined) {
@@ -563,7 +568,7 @@ export const addDocumentAttachment = (
 
     const attachmentData: AttachedData<HulyAttachment> = {
       name: params.filename,
-      file: uploadResult.blobId as Ref<Blob>,
+      file: uploadResult.blobId,
       size: uploadResult.size,
       type: params.contentType,
       lastModified: Date.now(),
@@ -582,7 +587,7 @@ export const addDocumentAttachment = (
     )
 
     return {
-      attachmentId: String(attachmentId),
+      attachmentId,
       blobId: uploadResult.blobId,
       url: uploadResult.url
     }

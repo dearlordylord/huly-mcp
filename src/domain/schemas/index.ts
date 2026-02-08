@@ -4,6 +4,10 @@ export {
   LimitParam,
   makeJsonSchema,
   NonEmptyString,
+  NotificationContextId,
+  NotificationId,
+  NotificationProviderId,
+  ObjectClassName,
   Timestamp
 } from "./shared.js"
 

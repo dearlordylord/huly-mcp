@@ -1,12 +1,24 @@
 import { Schema } from "effect"
 
-import { LimitParam, makeJsonSchema, NonEmptyString, Timestamp } from "./shared.js"
+import {
+  AccountUuid,
+  ChannelId,
+  ChannelIdentifier,
+  ChannelName,
+  LimitParam,
+  makeJsonSchema,
+  MessageId,
+  NonEmptyString,
+  PersonName,
+  ThreadReplyId,
+  Timestamp
+} from "./shared.js"
 
 // --- Channel Summary (for list operations) ---
 
 export const ChannelSummarySchema = Schema.Struct({
-  id: NonEmptyString,
-  name: Schema.String,
+  id: ChannelId,
+  name: ChannelName,
   topic: Schema.optional(Schema.String),
   private: Schema.Boolean,
   archived: Schema.Boolean,
@@ -23,13 +35,13 @@ export type ChannelSummary = Schema.Schema.Type<typeof ChannelSummarySchema>
 // --- Full Channel ---
 
 export const ChannelSchema = Schema.Struct({
-  id: NonEmptyString,
-  name: Schema.String,
+  id: ChannelId,
+  name: ChannelName,
   topic: Schema.optional(Schema.String),
   description: Schema.optional(Schema.String),
   private: Schema.Boolean,
   archived: Schema.Boolean,
-  members: Schema.optional(Schema.Array(Schema.String)),
+  members: Schema.optional(Schema.Array(PersonName)),
   messages: Schema.optional(Schema.Number),
   modifiedOn: Schema.optional(Timestamp),
   createdOn: Schema.optional(Timestamp)
@@ -43,9 +55,9 @@ export type Channel = Schema.Schema.Type<typeof ChannelSchema>
 // --- Message Summary ---
 
 export const MessageSummarySchema = Schema.Struct({
-  id: NonEmptyString,
+  id: MessageId,
   body: Schema.String,
-  sender: Schema.optional(Schema.String),
+  sender: Schema.optional(PersonName),
   senderId: Schema.optional(Schema.String),
   createdOn: Schema.optional(Timestamp),
   modifiedOn: Schema.optional(Timestamp),
@@ -61,9 +73,9 @@ export type MessageSummary = Schema.Schema.Type<typeof MessageSummarySchema>
 // --- Direct Message Conversation Summary ---
 
 export const DirectMessageSummarySchema = Schema.Struct({
-  id: NonEmptyString,
-  participants: Schema.Array(Schema.String),
-  participantIds: Schema.optional(Schema.Array(Schema.String)),
+  id: ChannelId,
+  participants: Schema.Array(PersonName),
+  participantIds: Schema.optional(Schema.Array(AccountUuid)),
   messages: Schema.optional(Schema.Number),
   modifiedOn: Schema.optional(Timestamp)
 }).annotations({
@@ -102,7 +114,7 @@ export type ListChannelsParams = Schema.Schema.Type<typeof ListChannelsParamsSch
 // --- Get Channel Params ---
 
 export const GetChannelParamsSchema = Schema.Struct({
-  channel: NonEmptyString.annotations({
+  channel: ChannelIdentifier.annotations({
     description: "Channel name or ID"
   })
 }).annotations({
@@ -134,7 +146,7 @@ export type CreateChannelParams = Schema.Schema.Type<typeof CreateChannelParamsS
 // --- Update Channel Params ---
 
 export const UpdateChannelParamsSchema = Schema.Struct({
-  channel: NonEmptyString.annotations({
+  channel: ChannelIdentifier.annotations({
     description: "Channel name or ID"
   }),
   name: Schema.optional(NonEmptyString.annotations({
@@ -153,7 +165,7 @@ export type UpdateChannelParams = Schema.Schema.Type<typeof UpdateChannelParamsS
 // --- Delete Channel Params ---
 
 export const DeleteChannelParamsSchema = Schema.Struct({
-  channel: NonEmptyString.annotations({
+  channel: ChannelIdentifier.annotations({
     description: "Channel name or ID"
   })
 }).annotations({
@@ -166,7 +178,7 @@ export type DeleteChannelParams = Schema.Schema.Type<typeof DeleteChannelParamsS
 // --- List Channel Messages Params ---
 
 export const ListChannelMessagesParamsSchema = Schema.Struct({
-  channel: NonEmptyString.annotations({
+  channel: ChannelIdentifier.annotations({
     description: "Channel name or ID"
   }),
   limit: Schema.optional(
@@ -184,7 +196,7 @@ export type ListChannelMessagesParams = Schema.Schema.Type<typeof ListChannelMes
 // --- Send Channel Message Params ---
 
 export const SendChannelMessageParamsSchema = Schema.Struct({
-  channel: NonEmptyString.annotations({
+  channel: ChannelIdentifier.annotations({
     description: "Channel name or ID"
   }),
   body: NonEmptyString.annotations({
@@ -215,9 +227,9 @@ export type ListDirectMessagesParams = Schema.Schema.Type<typeof ListDirectMessa
 // --- Thread Message Schema ---
 
 export const ThreadMessageSchema = Schema.Struct({
-  id: NonEmptyString,
+  id: ThreadReplyId,
   body: Schema.String,
-  sender: Schema.optional(Schema.String),
+  sender: Schema.optional(PersonName),
   senderId: Schema.optional(Schema.String),
   createdOn: Schema.optional(Timestamp),
   modifiedOn: Schema.optional(Timestamp),
@@ -232,10 +244,10 @@ export type ThreadMessage = Schema.Schema.Type<typeof ThreadMessageSchema>
 // --- List Thread Replies Params ---
 
 export const ListThreadRepliesParamsSchema = Schema.Struct({
-  channel: NonEmptyString.annotations({
+  channel: ChannelIdentifier.annotations({
     description: "Channel name or ID"
   }),
-  messageId: NonEmptyString.annotations({
+  messageId: MessageId.annotations({
     description: "Parent message ID"
   }),
   limit: Schema.optional(
@@ -253,10 +265,10 @@ export type ListThreadRepliesParams = Schema.Schema.Type<typeof ListThreadReplie
 // --- Add Thread Reply Params ---
 
 export const AddThreadReplyParamsSchema = Schema.Struct({
-  channel: NonEmptyString.annotations({
+  channel: ChannelIdentifier.annotations({
     description: "Channel name or ID"
   }),
-  messageId: NonEmptyString.annotations({
+  messageId: MessageId.annotations({
     description: "Parent message ID to reply to"
   }),
   body: NonEmptyString.annotations({
@@ -272,13 +284,13 @@ export type AddThreadReplyParams = Schema.Schema.Type<typeof AddThreadReplyParam
 // --- Update Thread Reply Params ---
 
 export const UpdateThreadReplyParamsSchema = Schema.Struct({
-  channel: NonEmptyString.annotations({
+  channel: ChannelIdentifier.annotations({
     description: "Channel name or ID"
   }),
-  messageId: NonEmptyString.annotations({
+  messageId: MessageId.annotations({
     description: "Parent message ID"
   }),
-  replyId: NonEmptyString.annotations({
+  replyId: ThreadReplyId.annotations({
     description: "Thread reply ID to update"
   }),
   body: NonEmptyString.annotations({
@@ -294,13 +306,13 @@ export type UpdateThreadReplyParams = Schema.Schema.Type<typeof UpdateThreadRepl
 // --- Delete Thread Reply Params ---
 
 export const DeleteThreadReplyParamsSchema = Schema.Struct({
-  channel: NonEmptyString.annotations({
+  channel: ChannelIdentifier.annotations({
     description: "Channel name or ID"
   }),
-  messageId: NonEmptyString.annotations({
+  messageId: MessageId.annotations({
     description: "Parent message ID"
   }),
-  replyId: NonEmptyString.annotations({
+  replyId: ThreadReplyId.annotations({
     description: "Thread reply ID to delete"
   })
 }).annotations({

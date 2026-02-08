@@ -7,7 +7,7 @@ import type {
 } from "@hcengineering/chunter"
 import type { Employee as HulyEmployee, Person, SocialIdentity, SocialIdentityRef } from "@hcengineering/contact"
 import {
-  type AccountUuid,
+  type AccountUuid as HulyAccountUuid,
   type AttachedData,
   type Class,
   type Data,
@@ -43,8 +43,17 @@ import type {
   UpdateChannelParams,
   UpdateThreadReplyParams
 } from "../../domain/schemas.js"
+import {
+  AccountUuid,
+  ChannelId,
+  ChannelName,
+  MessageId,
+  PersonName,
+  ThreadReplyId
+} from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { ChannelNotFoundError, MessageNotFoundError, ThreadReplyNotFoundError } from "../errors.js"
+import { toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const chunter = require("@hcengineering/chunter").default as typeof import("@hcengineering/chunter").default
@@ -101,6 +110,16 @@ export type DeleteThreadReplyError =
   | MessageNotFoundError
   | ThreadReplyNotFoundError
 
+// --- SDK Type Bridges ---
+
+// SDK: PersonId and SocialIdentityRef are the same underlying string but typed differently.
+const personIdsAsSocialIdentityRefs = (
+  ids: Array<PersonId>
+): Array<SocialIdentityRef> => ids as unknown as Array<SocialIdentityRef>
+
+// SDK: jsonToMarkup return type doesn't match Markup; cast contained here.
+const jsonAsMarkup = (json: ReturnType<typeof markdownToMarkup>): Markup => jsonToMarkup(json) as Markup
+
 // --- Helpers ---
 
 const findChannel = (
@@ -121,7 +140,7 @@ const findChannel = (
     if (channel === undefined) {
       channel = yield* client.findOne<HulyChannel>(
         chunter.class.Channel,
-        { _id: identifier as Ref<HulyChannel> }
+        { _id: toRef<HulyChannel>(identifier) }
       )
     }
 
@@ -139,7 +158,7 @@ const markupToMarkdownString = (markup: Markup): string => {
 
 const markdownToMarkupString = (markdown: string): Markup => {
   const json = markdownToMarkup(markdown, { refUrl: "", imageUrl: "" })
-  return jsonToMarkup(json) as Markup
+  return jsonAsMarkup(json)
 }
 
 /**
@@ -156,11 +175,9 @@ const buildSocialIdToPersonNameMap = (
       return new Map<string, string>()
     }
 
-    // PersonId values from Doc.modifiedBy are the same underlying string as SocialIdentityRef
-    // (both are the _id of SocialIdentity documents), so this cast is safe
     const socialIdentities = yield* client.findAll<SocialIdentity>(
       contact.class.SocialIdentity,
-      { _id: { $in: socialIds as unknown as Array<SocialIdentityRef> } }
+      { _id: { $in: personIdsAsSocialIdentityRefs(socialIds) } }
     )
 
     if (socialIdentities.length === 0) {
@@ -192,7 +209,7 @@ const buildSocialIdToPersonNameMap = (
  */
 const buildAccountUuidToNameMap = (
   client: HulyClient["Type"],
-  accountUuids: Array<AccountUuid>
+  accountUuids: Array<HulyAccountUuid>
 ): Effect.Effect<Map<string, string>, HulyClientError> =>
   Effect.gen(function*() {
     if (accountUuids.length === 0) {
@@ -256,8 +273,8 @@ export const listChannels = (
     )
 
     const summaries: Array<ChannelSummary> = channels.map((ch) => ({
-      id: String(ch._id),
-      name: ch.name,
+      id: ChannelId.make(ch._id),
+      name: ChannelName.make(ch.name),
       topic: ch.topic || undefined,
       private: ch.private,
       archived: ch.archived,
@@ -292,13 +309,13 @@ export const getChannel = (
     }
 
     const result: Channel = {
-      id: String(channel._id),
-      name: channel.name,
+      id: ChannelId.make(channel._id),
+      name: ChannelName.make(channel.name),
       topic: channel.topic || undefined,
       description: channel.description || undefined,
       private: channel.private,
       archived: channel.archived,
-      members: memberNames,
+      members: memberNames?.map(m => PersonName.make(m)),
       messages: channel.messages,
       modifiedOn: channel.modifiedOn,
       createdOn: channel.createdOn
@@ -336,12 +353,12 @@ export const createChannel = (
 
     yield* client.createDoc(
       chunter.class.Channel,
-      channelId as unknown as Ref<Space>,
+      toRef<Space>(channelId),
       channelData,
       channelId
     )
 
-    return { id: String(channelId), name: params.name }
+    return { id: channelId, name: params.name }
   })
 
 // --- Update Channel ---
@@ -371,17 +388,17 @@ export const updateChannel = (
     }
 
     if (Object.keys(updateOps).length === 0) {
-      return { id: String(channel._id), updated: false }
+      return { id: channel._id, updated: false }
     }
 
     yield* client.updateDoc(
       chunter.class.Channel,
-      channel._id as unknown as Ref<Space>,
+      toRef<Space>(channel._id),
       channel._id,
       updateOps
     )
 
-    return { id: String(channel._id), updated: true }
+    return { id: channel._id, updated: true }
   })
 
 // --- Delete Channel ---
@@ -402,11 +419,11 @@ export const deleteChannel = (
 
     yield* client.removeDoc(
       chunter.class.Channel,
-      channel._id as unknown as Ref<Space>,
+      toRef<Space>(channel._id),
       channel._id
     )
 
-    return { id: String(channel._id), deleted: true }
+    return { id: channel._id, deleted: true }
   })
 
 // --- List Channel Messages ---
@@ -456,9 +473,9 @@ export const listChannelMessages = (
     const summaries: Array<MessageSummary> = messages.map((msg) => {
       const senderName = msg.modifiedBy ? socialIdToName.get(msg.modifiedBy) : undefined
       return {
-        id: msg._id,
+        id: MessageId.make(msg._id),
         body: markupToMarkdownString(msg.message),
-        sender: senderName,
+        sender: senderName !== undefined ? PersonName.make(senderName) : undefined,
         senderId: msg.modifiedBy,
         createdOn: msg.createdOn,
         modifiedOn: msg.modifiedOn,
@@ -504,7 +521,7 @@ export const sendChannelMessage = (
       messageId
     )
 
-    return { id: String(messageId), channelId: String(channel._id) }
+    return { id: messageId, channelId: channel._id }
   })
 
 // --- List Direct Messages ---
@@ -553,11 +570,12 @@ export const listDirectMessages = (
       const participants = members
         .map((m) => accountUuidToName.get(m))
         .filter((n): n is string => n !== undefined)
+        .map((n) => PersonName.make(n))
 
-      const participantIds = members as Array<string>
+      const participantIds = members.map((m) => AccountUuid.make(m))
 
       return {
-        id: dm._id,
+        id: ChannelId.make(dm._id),
         participants,
         participantIds,
         messages: dm.messages,
@@ -588,7 +606,7 @@ const findMessage = (
     const message = yield* client.findOne<ChatMessage>(
       chunter.class.ChatMessage,
       {
-        _id: messageId as Ref<ChatMessage>,
+        _id: toRef<ChatMessage>(messageId),
         space: channel._id
       }
     )
@@ -620,7 +638,7 @@ export const listThreadReplies = (
     const replies = yield* client.findAll<HulyThreadMessage>(
       chunter.class.ThreadMessage,
       {
-        attachedTo: message._id as Ref<ActivityMessage>,
+        attachedTo: toRef<ActivityMessage>(message._id),
         space: channel._id
       },
       {
@@ -646,9 +664,9 @@ export const listThreadReplies = (
     const threadMessages: Array<ThreadMessage> = replies.map((msg) => {
       const senderName = msg.modifiedBy ? socialIdToName.get(msg.modifiedBy) : undefined
       return {
-        id: msg._id,
+        id: ThreadReplyId.make(msg._id),
         body: markupToMarkdownString(msg.message),
-        sender: senderName,
+        sender: senderName !== undefined ? PersonName.make(senderName) : undefined,
         senderId: msg.modifiedBy,
         createdOn: msg.createdOn,
         modifiedOn: msg.modifiedOn,
@@ -683,24 +701,24 @@ export const addThreadReply = (
     const replyData: AttachedData<HulyThreadMessage> = {
       message: markup,
       attachments: 0,
-      objectId: channel._id as Ref<Doc>,
-      objectClass: chunter.class.Channel as Ref<Class<Doc>>
+      objectId: toRef<Doc>(channel._id),
+      objectClass: toRef<Class<Doc>>(chunter.class.Channel)
     }
 
     yield* client.addCollection(
       chunter.class.ThreadMessage,
       channel._id,
-      message._id as Ref<ActivityMessage>,
-      chunter.class.ChatMessage as Ref<Class<ActivityMessage>>,
+      toRef<ActivityMessage>(message._id),
+      toRef<Class<ActivityMessage>>(chunter.class.ChatMessage),
       "replies",
       replyData,
       replyId
     )
 
     return {
-      id: String(replyId),
-      messageId: String(message._id),
-      channelId: String(channel._id)
+      id: replyId,
+      messageId: message._id,
+      channelId: channel._id
     }
   })
 
@@ -721,8 +739,8 @@ export const updateThreadReply = (
     const reply = yield* client.findOne<HulyThreadMessage>(
       chunter.class.ThreadMessage,
       {
-        _id: params.replyId as Ref<HulyThreadMessage>,
-        attachedTo: message._id as Ref<ActivityMessage>,
+        _id: toRef<HulyThreadMessage>(params.replyId),
+        attachedTo: toRef<ActivityMessage>(message._id),
         space: channel._id
       }
     )
@@ -748,7 +766,7 @@ export const updateThreadReply = (
       updateOps
     )
 
-    return { id: String(reply._id), updated: true }
+    return { id: reply._id, updated: true }
   })
 
 export interface DeleteThreadReplyResult {
@@ -768,8 +786,8 @@ export const deleteThreadReply = (
     const reply = yield* client.findOne<HulyThreadMessage>(
       chunter.class.ThreadMessage,
       {
-        _id: params.replyId as Ref<HulyThreadMessage>,
-        attachedTo: message._id as Ref<ActivityMessage>,
+        _id: toRef<HulyThreadMessage>(params.replyId),
+        attachedTo: toRef<ActivityMessage>(message._id),
         space: channel._id
       }
     )
@@ -787,5 +805,5 @@ export const deleteThreadReply = (
       reply._id
     )
 
-    return { id: String(reply._id), deleted: true }
+    return { id: reply._id, deleted: true }
   })

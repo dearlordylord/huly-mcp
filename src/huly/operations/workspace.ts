@@ -5,6 +5,7 @@
 import type { AccountRole as HulyAccountRole, WorkspaceInfoWithStatus } from "@hcengineering/core"
 import { Effect, Option } from "effect"
 
+import { PersonUuid, RegionId, WorkspaceUuid } from "../../domain/schemas/shared.js"
 import type {
   AccountRole,
   CreateWorkspaceParams,
@@ -87,7 +88,7 @@ export const listWorkspaceMembers = (
           }
 
           return {
-            personId: member.person,
+            personId: PersonUuid.make(member.person),
             role: member.role,
             name,
             email
@@ -140,10 +141,10 @@ export const getWorkspaceInfo = (): Effect.Effect<WorkspaceInfo, GetWorkspaceInf
     })
 
     return {
-      uuid: info.uuid,
+      uuid: WorkspaceUuid.make(info.uuid),
       name: info.name,
       url: info.url,
-      region: info.region,
+      region: info.region !== undefined ? RegionId.make(info.region) : undefined,
       createdOn: info.createdOn,
       allowReadOnlyGuest: info.allowReadOnlyGuest,
       allowGuestSignUp: info.allowGuestSignUp,
@@ -169,10 +170,10 @@ export const listWorkspaces = (
     })
 
     return workspaces.slice(0, limit).map((ws) => ({
-      uuid: ws.uuid,
+      uuid: WorkspaceUuid.make(ws.uuid),
       name: ws.name,
       url: ws.url,
-      region: ws.region,
+      region: ws.region !== undefined ? RegionId.make(ws.region) : undefined,
       createdOn: ws.createdOn,
       lastVisit: ws.lastVisit
     }))
@@ -247,7 +248,7 @@ export const getUserProfile = (
     }
 
     return {
-      personUuid: profile.uuid,
+      personUuid: PersonUuid.make(profile.uuid),
       firstName: profile.firstName,
       lastName: profile.lastName,
       bio: profile.bio,
@@ -367,7 +368,7 @@ export const getRegions = (): Effect.Effect<Array<RegionInfo>, GetRegionsError, 
     })
 
     return regions.map((r) => ({
-      region: r.region,
+      region: RegionId.make(r.region),
       name: r.name
     }))
   })

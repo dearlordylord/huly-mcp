@@ -3,6 +3,7 @@ import type { Doc, FindResult, Ref, Space } from "@hcengineering/core"
 import { Effect, Exit } from "effect"
 import { describe, expect, it } from "vitest"
 
+import { Email, PersonId } from "../../domain/schemas/shared.js"
 import type { HulyClientOperations } from "../client.js"
 import { HulyClient } from "../client.js"
 import { createPerson, deletePerson, getPerson, listPersons, updatePerson } from "./contacts.js"
@@ -263,9 +264,9 @@ describe("Contacts Operations", () => {
 
       expect(result).toHaveLength(3)
       const resultMap = new Map(result.map(p => [p.id, p]))
-      expect(resultMap.get("person-1")?.email).toBe("john@example.com")
-      expect(resultMap.get("person-2")?.email).toBe("jane@example.com")
-      expect(resultMap.get("person-3")?.email).toBe("bob@example.com")
+      expect(resultMap.get(PersonId.make("person-1"))?.email).toBe("john@example.com")
+      expect(resultMap.get(PersonId.make("person-2"))?.email).toBe("jane@example.com")
+      expect(resultMap.get(PersonId.make("person-3"))?.email).toBe("bob@example.com")
     })
   })
 
@@ -280,7 +281,7 @@ describe("Contacts Operations", () => {
       })
 
       const result = await Effect.runPromise(
-        getPerson({ personId: "person-123" }).pipe(Effect.provide(testLayer))
+        getPerson({ personId: PersonId.make("person-123") }).pipe(Effect.provide(testLayer))
       )
 
       expect(result).toMatchObject({
@@ -296,7 +297,7 @@ describe("Contacts Operations", () => {
       const testLayer = createTestLayer({ persons: [] })
 
       const result = await Effect.runPromiseExit(
-        getPerson({ personId: "nonexistent" }).pipe(Effect.provide(testLayer))
+        getPerson({ personId: PersonId.make("nonexistent") }).pipe(Effect.provide(testLayer))
       )
 
       expect(Exit.isFailure(result)).toBe(true)
@@ -311,7 +312,7 @@ describe("Contacts Operations", () => {
       })
 
       const result = await Effect.runPromise(
-        getPerson({ personId: "person-123" }).pipe(Effect.provide(testLayer))
+        getPerson({ personId: PersonId.make("person-123") }).pipe(Effect.provide(testLayer))
       )
 
       expect(result.firstName).toBe("Jane")
@@ -327,7 +328,7 @@ describe("Contacts Operations", () => {
       })
 
       const result = await Effect.runPromise(
-        getPerson({ personId: "person-123" }).pipe(Effect.provide(testLayer))
+        getPerson({ personId: PersonId.make("person-123") }).pipe(Effect.provide(testLayer))
       )
 
       expect(result.firstName).toBe("SingleName")
@@ -343,7 +344,7 @@ describe("Contacts Operations", () => {
       })
 
       const result = await Effect.runPromise(
-        getPerson({ personId: "person-123" }).pipe(Effect.provide(testLayer))
+        getPerson({ personId: PersonId.make("person-123") }).pipe(Effect.provide(testLayer))
       )
 
       expect(result.firstName).toBe("John,Jr")
@@ -360,7 +361,7 @@ describe("Contacts Operations", () => {
       })
 
       const result = await Effect.runPromise(
-        getPerson({ email: "john@example.com" }).pipe(Effect.provide(testLayer))
+        getPerson({ email: Email.make("john@example.com") }).pipe(Effect.provide(testLayer))
       )
 
       expect(result).toMatchObject({
@@ -373,7 +374,7 @@ describe("Contacts Operations", () => {
       const testLayer = createTestLayer({ persons: [], channels: [] })
 
       const result = await Effect.runPromiseExit(
-        getPerson({ email: "nonexistent@example.com" }).pipe(Effect.provide(testLayer))
+        getPerson({ email: Email.make("nonexistent@example.com") }).pipe(Effect.provide(testLayer))
       )
 
       expect(Exit.isFailure(result)).toBe(true)
@@ -429,7 +430,7 @@ describe("Contacts Operations", () => {
         createPerson({
           firstName: "John",
           lastName: "Doe",
-          email: "john@example.com"
+          email: Email.make("john@example.com")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -447,7 +448,7 @@ describe("Contacts Operations", () => {
         createPerson({
           firstName: "John",
           lastName: "Doe",
-          email: "   "
+          email: Email.make("   ")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -464,7 +465,7 @@ describe("Contacts Operations", () => {
       })
 
       const result = await Effect.runPromise(
-        updatePerson({ personId: "person-123" }).pipe(Effect.provide(testLayer))
+        updatePerson({ personId: PersonId.make("person-123") }).pipe(Effect.provide(testLayer))
       )
 
       expect(result.updated).toBe(false)
@@ -481,7 +482,7 @@ describe("Contacts Operations", () => {
 
       const result = await Effect.runPromise(
         updatePerson({
-          personId: "person-123",
+          personId: PersonId.make("person-123"),
           firstName: "Jane"
         }).pipe(Effect.provide(testLayer))
       )
@@ -501,7 +502,7 @@ describe("Contacts Operations", () => {
 
       const result = await Effect.runPromise(
         updatePerson({
-          personId: "person-123",
+          personId: PersonId.make("person-123"),
           city: null
         }).pipe(Effect.provide(testLayer))
       )
@@ -514,7 +515,7 @@ describe("Contacts Operations", () => {
       const testLayer = createTestLayer({ persons: [] })
 
       const result = await Effect.runPromiseExit(
-        updatePerson({ personId: "nonexistent" }).pipe(Effect.provide(testLayer))
+        updatePerson({ personId: PersonId.make("nonexistent") }).pipe(Effect.provide(testLayer))
       )
 
       expect(Exit.isFailure(result)).toBe(true)
@@ -532,7 +533,7 @@ describe("Contacts Operations", () => {
       })
 
       const result = await Effect.runPromise(
-        deletePerson({ personId: "person-123" }).pipe(Effect.provide(testLayer))
+        deletePerson({ personId: PersonId.make("person-123") }).pipe(Effect.provide(testLayer))
       )
 
       expect(result.deleted).toBe(true)
@@ -543,7 +544,7 @@ describe("Contacts Operations", () => {
       const testLayer = createTestLayer({ persons: [] })
 
       const result = await Effect.runPromiseExit(
-        deletePerson({ personId: "nonexistent" }).pipe(Effect.provide(testLayer))
+        deletePerson({ personId: PersonId.make("nonexistent") }).pipe(Effect.provide(testLayer))
       )
 
       expect(Exit.isFailure(result)).toBe(true)

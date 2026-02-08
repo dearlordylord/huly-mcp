@@ -9,10 +9,11 @@ import type {
   ListCommentsParams,
   UpdateCommentParams
 } from "../../domain/schemas.js"
+import { CommentId } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { CommentNotFoundError } from "../errors.js"
-import { findProjectAndIssue as findProjectAndIssueShared } from "./shared.js"
+import { findProjectAndIssue as findProjectAndIssueShared, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
@@ -79,9 +80,9 @@ export const listComments = (
     )
 
     const comments: Array<Comment> = messages.map((msg) => ({
-      id: String(msg._id),
+      id: CommentId.make(msg._id),
       body: msg.message ?? "",
-      authorId: msg.modifiedBy ? String(msg.modifiedBy) : undefined,
+      authorId: msg.modifiedBy ? msg.modifiedBy : undefined,
       createdOn: msg.createdOn,
       modifiedOn: msg.modifiedOn,
       editedOn: msg.editedOn
@@ -127,7 +128,7 @@ export const addComment = (
     )
 
     return {
-      commentId: String(commentId),
+      commentId,
       issueIdentifier: issue.identifier
     }
   })
@@ -156,7 +157,7 @@ export const updateComment = (
     const comment = yield* client.findOne<ChatMessage>(
       chunter.class.ChatMessage,
       {
-        _id: params.commentId as Ref<ChatMessage>,
+        _id: toRef<ChatMessage>(params.commentId),
         attachedTo: issue._id
       }
     )
@@ -220,7 +221,7 @@ export const deleteComment = (
     const comment = yield* client.findOne<ChatMessage>(
       chunter.class.ChatMessage,
       {
-        _id: params.commentId as Ref<ChatMessage>,
+        _id: toRef<ChatMessage>(params.commentId),
         attachedTo: issue._id
       }
     )

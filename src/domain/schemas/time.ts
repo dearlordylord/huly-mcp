@@ -1,11 +1,21 @@
 import { Schema } from "effect"
 
-import { LimitParam, makeJsonSchema, NonEmptyString, Timestamp } from "./shared.js"
+import {
+  IssueIdentifier,
+  LimitParam,
+  makeJsonSchema,
+  NonEmptyString,
+  PersonName,
+  ProjectIdentifier,
+  TimeSpendReportId,
+  Timestamp,
+  TodoId
+} from "./shared.js"
 
 export const TimeSpendReportSchema = Schema.Struct({
-  id: NonEmptyString,
-  identifier: NonEmptyString.annotations({ description: "Issue identifier (e.g., 'HULY-123')" }),
-  employee: Schema.optional(Schema.String),
+  id: TimeSpendReportId,
+  identifier: IssueIdentifier.annotations({ description: "Issue identifier (e.g., 'HULY-123')" }),
+  employee: Schema.optional(PersonName),
   date: Schema.optional(Schema.NullOr(Timestamp)),
   value: Schema.Number.annotations({ description: "Time spent in minutes" }),
   description: Schema.String
@@ -17,7 +27,7 @@ export const TimeSpendReportSchema = Schema.Struct({
 export type TimeSpendReport = Schema.Schema.Type<typeof TimeSpendReportSchema>
 
 export const TimeReportSummarySchema = Schema.Struct({
-  identifier: NonEmptyString.annotations({ description: "Issue identifier (e.g., 'HULY-123')" }),
+  identifier: IssueIdentifier.annotations({ description: "Issue identifier (e.g., 'HULY-123')" }),
   totalTime: Schema.Number.annotations({ description: "Total time in minutes" }),
   estimation: Schema.optional(Schema.Number.annotations({ description: "Estimated time in minutes" })),
   remainingTime: Schema.optional(Schema.Number.annotations({ description: "Remaining time in minutes" })),
@@ -31,7 +41,7 @@ export type TimeReportSummary = Schema.Schema.Type<typeof TimeReportSummarySchem
 
 export const WorkSlotSchema = Schema.Struct({
   id: NonEmptyString,
-  todoId: NonEmptyString,
+  todoId: TodoId,
   date: Timestamp.annotations({ description: "Start date timestamp" }),
   dueDate: Timestamp.annotations({ description: "End date timestamp" }),
   title: Schema.optional(Schema.String)
@@ -43,10 +53,10 @@ export const WorkSlotSchema = Schema.Struct({
 export type WorkSlot = Schema.Schema.Type<typeof WorkSlotSchema>
 
 export const LogTimeParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  identifier: NonEmptyString.annotations({
+  identifier: IssueIdentifier.annotations({
     description: "Issue identifier (e.g., 'HULY-123' or just '123')"
   }),
   value: Schema.Number.pipe(
@@ -65,10 +75,10 @@ export const LogTimeParamsSchema = Schema.Struct({
 export type LogTimeParams = Schema.Schema.Type<typeof LogTimeParamsSchema>
 
 export const GetTimeReportParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  identifier: NonEmptyString.annotations({
+  identifier: IssueIdentifier.annotations({
     description: "Issue identifier (e.g., 'HULY-123' or just '123')"
   })
 }).annotations({
@@ -79,7 +89,7 @@ export const GetTimeReportParamsSchema = Schema.Struct({
 export type GetTimeReportParams = Schema.Schema.Type<typeof GetTimeReportParamsSchema>
 
 export const ListTimeSpendReportsParamsSchema = Schema.Struct({
-  project: Schema.optional(NonEmptyString.annotations({
+  project: Schema.optional(ProjectIdentifier.annotations({
     description: "Filter by project identifier"
   })),
   from: Schema.optional(Timestamp.annotations({
@@ -101,7 +111,7 @@ export const ListTimeSpendReportsParamsSchema = Schema.Struct({
 export type ListTimeSpendReportsParams = Schema.Schema.Type<typeof ListTimeSpendReportsParamsSchema>
 
 export const GetDetailedTimeReportParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
   from: Schema.optional(Timestamp.annotations({
@@ -140,7 +150,7 @@ export const ListWorkSlotsParamsSchema = Schema.Struct({
 export type ListWorkSlotsParams = Schema.Schema.Type<typeof ListWorkSlotsParamsSchema>
 
 export const CreateWorkSlotParamsSchema = Schema.Struct({
-  todoId: NonEmptyString.annotations({
+  todoId: TodoId.annotations({
     description: "ToDo ID to attach the work slot to"
   }),
   date: Timestamp.annotations({
@@ -157,10 +167,10 @@ export const CreateWorkSlotParamsSchema = Schema.Struct({
 export type CreateWorkSlotParams = Schema.Schema.Type<typeof CreateWorkSlotParamsSchema>
 
 export const StartTimerParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  identifier: NonEmptyString.annotations({
+  identifier: IssueIdentifier.annotations({
     description: "Issue identifier (e.g., 'HULY-123' or just '123')"
   })
 }).annotations({
@@ -171,10 +181,10 @@ export const StartTimerParamsSchema = Schema.Struct({
 export type StartTimerParams = Schema.Schema.Type<typeof StartTimerParamsSchema>
 
 export const StopTimerParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  identifier: NonEmptyString.annotations({
+  identifier: IssueIdentifier.annotations({
     description: "Issue identifier (e.g., 'HULY-123' or just '123')"
   })
 }).annotations({
@@ -185,10 +195,10 @@ export const StopTimerParamsSchema = Schema.Struct({
 export type StopTimerParams = Schema.Schema.Type<typeof StopTimerParamsSchema>
 
 export const DetailedTimeReportSchema = Schema.Struct({
-  project: NonEmptyString,
+  project: ProjectIdentifier,
   totalTime: Schema.Number.annotations({ description: "Total time in minutes" }),
   byIssue: Schema.Array(Schema.Struct({
-    identifier: NonEmptyString.annotations({ description: "Issue identifier (e.g., 'HULY-123')" }),
+    identifier: IssueIdentifier.annotations({ description: "Issue identifier (e.g., 'HULY-123')" }),
     issueTitle: Schema.String,
     totalTime: Schema.Number,
     reports: Schema.Array(TimeSpendReportSchema)

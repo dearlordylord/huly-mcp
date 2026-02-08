@@ -6,6 +6,15 @@ import { Effect } from "effect"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { InvalidPersonUuidError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 
+// Huly SDK uses `Ref<T>` (a branded string) for entity references.
+// Our domain uses Effect Schema brands. No type-safe bridge exists; this is the boundary cast.
+export const toRef = <T extends Doc>(id: string): Ref<T> => id as Ref<T>
+
+// Huly API uses 0 as a sentinel for "not set" on numeric fields like estimation and remainingTime
+// (confirmed: creating an issue without estimation stores 0, not null/undefined).
+// Convert to undefined so downstream consumers see absent value instead of a misleading 0.
+export const zeroAsUnset = (value: number): number | undefined => value > 0 ? value : undefined
+
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export const validatePersonUuid = (uuid?: string): Effect.Effect<PersonUuid | undefined, InvalidPersonUuidError> => {
@@ -24,6 +33,10 @@ const tracker = require("@hcengineering/tracker").default as typeof import("@hce
 const task = require("@hcengineering/task").default as typeof import("@hcengineering/task").default
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
+
+// SDK: core.class.Status is a string constant but findAll expects Ref<Class<Status>>.
+// SDK class hierarchy variance requires double cast.
+const statusClassRef: Ref<Class<Status>> = core.class.Status as Ref<Class<Doc>> as Ref<Class<Status>>
 
 export type ProjectWithType = WithLookup<HulyProject> & {
   $lookup?: { type?: ProjectType }
@@ -86,8 +99,8 @@ export const findProjectWithStatuses = (
     const projectType = project.$lookup?.type
     const statuses: Array<StatusInfo> = []
 
-    const wonCategory = String(task.statusCategory.Won)
-    const lostCategory = String(task.statusCategory.Lost)
+    const wonCategory = task.statusCategory.Won
+    const lostCategory = task.statusCategory.Lost
 
     if (projectType?.statuses) {
       const statusRefs = projectType.statuses.map(s => s._id)
@@ -96,16 +109,14 @@ export const findProjectWithStatuses = (
         // On some workspaces this fails with deserialization errors
         const statusDocsResult = yield* Effect.either(
           client.findAll<Status>(
-            // Double cast needed: core.class.Status is typed as string constant
-            // but findAll expects Ref<Class<Status>>. SDK type limitation.
-            core.class.Status as Ref<Class<Doc>> as Ref<Class<Status>>,
+            statusClassRef,
             { _id: { $in: statusRefs } }
           )
         )
 
         if (statusDocsResult._tag === "Right") {
           for (const doc of statusDocsResult.right) {
-            const categoryStr = doc.category ? String(doc.category) : ""
+            const categoryStr = doc.category ? doc.category : ""
             statuses.push({
               _id: doc._id,
               name: doc.name,
@@ -122,7 +133,7 @@ export const findProjectWithStatuses = (
               + `Error: ${statusDocsResult.left.message}`
           )
           for (const ps of projectType.statuses) {
-            const name = String(ps._id).split(":").pop() ?? "Unknown"
+            const name = ps._id.split(":").pop() ?? "Unknown"
             const nameLower = name.toLowerCase()
             // Infer done/canceled from common status name patterns
             const isDone = nameLower.includes("done")

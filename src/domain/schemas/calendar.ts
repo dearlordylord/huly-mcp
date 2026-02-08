@@ -1,6 +1,15 @@
 import { Schema } from "effect"
 
-import { LimitParam, makeJsonSchema, NonEmptyString, Timestamp } from "./shared.js"
+import {
+  Email,
+  EventId,
+  LimitParam,
+  makeJsonSchema,
+  NonEmptyString,
+  PersonId,
+  PersonName,
+  Timestamp
+} from "./shared.js"
 
 export const VisibilityValues = ["public", "freeBusy", "private"] as const
 
@@ -86,9 +95,9 @@ export const RecurringRuleSchema = Schema.Struct({
 export type RecurringRule = Schema.Schema.Type<typeof RecurringRuleSchema>
 
 export const ParticipantSchema = Schema.Struct({
-  id: NonEmptyString,
-  name: Schema.optional(Schema.String),
-  email: Schema.optional(Schema.String)
+  id: PersonId,
+  name: Schema.optional(PersonName),
+  email: Schema.optional(Email)
 }).annotations({
   title: "Participant",
   description: "Event participant"
@@ -97,7 +106,7 @@ export const ParticipantSchema = Schema.Struct({
 export type Participant = Schema.Schema.Type<typeof ParticipantSchema>
 
 export const EventSummarySchema = Schema.Struct({
-  eventId: NonEmptyString,
+  eventId: EventId,
   title: Schema.String,
   date: Timestamp,
   dueDate: Timestamp,
@@ -112,7 +121,7 @@ export const EventSummarySchema = Schema.Struct({
 export type EventSummary = Schema.Schema.Type<typeof EventSummarySchema>
 
 export const EventSchema = Schema.Struct({
-  eventId: NonEmptyString,
+  eventId: EventId,
   title: Schema.String,
   description: Schema.optional(Schema.String),
   date: Timestamp,
@@ -121,7 +130,7 @@ export const EventSchema = Schema.Struct({
   location: Schema.optional(Schema.String),
   visibility: Schema.optional(VisibilitySchema),
   participants: Schema.optional(Schema.Array(ParticipantSchema)),
-  externalParticipants: Schema.optional(Schema.Array(Schema.String)),
+  externalParticipants: Schema.optional(Schema.Array(Email)),
   calendarId: Schema.optional(NonEmptyString),
   modifiedOn: Schema.optional(Timestamp),
   createdOn: Schema.optional(Timestamp)
@@ -133,7 +142,7 @@ export const EventSchema = Schema.Struct({
 export type Event = Schema.Schema.Type<typeof EventSchema>
 
 export const RecurringEventSummarySchema = Schema.Struct({
-  eventId: NonEmptyString,
+  eventId: EventId,
   title: Schema.String,
   originalStartTime: Timestamp,
   rules: Schema.Array(RecurringRuleSchema),
@@ -147,7 +156,7 @@ export const RecurringEventSummarySchema = Schema.Struct({
 export type RecurringEventSummary = Schema.Schema.Type<typeof RecurringEventSummarySchema>
 
 export const RecurringEventSchema = Schema.Struct({
-  eventId: NonEmptyString,
+  eventId: EventId,
   title: Schema.String,
   description: Schema.optional(Schema.String),
   originalStartTime: Timestamp,
@@ -160,7 +169,7 @@ export const RecurringEventSchema = Schema.Struct({
   location: Schema.optional(Schema.String),
   visibility: Schema.optional(VisibilitySchema),
   participants: Schema.optional(Schema.Array(ParticipantSchema)),
-  externalParticipants: Schema.optional(Schema.Array(Schema.String)),
+  externalParticipants: Schema.optional(Schema.Array(Email)),
   calendarId: Schema.optional(NonEmptyString),
   modifiedOn: Schema.optional(Timestamp),
   createdOn: Schema.optional(Timestamp)
@@ -172,8 +181,8 @@ export const RecurringEventSchema = Schema.Struct({
 export type RecurringEvent = Schema.Schema.Type<typeof RecurringEventSchema>
 
 export const EventInstanceSchema = Schema.Struct({
-  eventId: NonEmptyString,
-  recurringEventId: NonEmptyString,
+  eventId: EventId,
+  recurringEventId: EventId,
   title: Schema.String,
   description: Schema.optional(Schema.String),
   date: Timestamp,
@@ -185,7 +194,7 @@ export const EventInstanceSchema = Schema.Struct({
   isCancelled: Schema.optional(Schema.Boolean),
   isVirtual: Schema.optional(Schema.Boolean),
   participants: Schema.optional(Schema.Array(ParticipantSchema)),
-  externalParticipants: Schema.optional(Schema.Array(Schema.String))
+  externalParticipants: Schema.optional(Schema.Array(Email))
 }).annotations({
   title: "EventInstance",
   description: "Instance of a recurring event"
@@ -215,7 +224,7 @@ export const ListEventsParamsSchema = Schema.Struct({
 export type ListEventsParams = Schema.Schema.Type<typeof ListEventsParamsSchema>
 
 export const GetEventParamsSchema = Schema.Struct({
-  eventId: NonEmptyString.annotations({
+  eventId: EventId.annotations({
     description: "Event ID"
   })
 }).annotations({
@@ -245,7 +254,7 @@ export const CreateEventParamsSchema = Schema.Struct({
     description: "Event location"
   })),
   participants: Schema.optional(
-    Schema.Array(Schema.String).annotations({
+    Schema.Array(Email).annotations({
       description: "Participant emails"
     })
   ),
@@ -260,7 +269,7 @@ export const CreateEventParamsSchema = Schema.Struct({
 export type CreateEventParams = Schema.Schema.Type<typeof CreateEventParamsSchema>
 
 export const UpdateEventParamsSchema = Schema.Struct({
-  eventId: NonEmptyString.annotations({
+  eventId: EventId.annotations({
     description: "Event ID"
   }),
   title: Schema.optional(NonEmptyString.annotations({
@@ -292,7 +301,7 @@ export const UpdateEventParamsSchema = Schema.Struct({
 export type UpdateEventParams = Schema.Schema.Type<typeof UpdateEventParamsSchema>
 
 export const DeleteEventParamsSchema = Schema.Struct({
-  eventId: NonEmptyString.annotations({
+  eventId: EventId.annotations({
     description: "Event ID"
   })
 }).annotations({
@@ -338,7 +347,7 @@ export const CreateRecurringEventParamsSchema = Schema.Struct({
     description: "Event location"
   })),
   participants: Schema.optional(
-    Schema.Array(Schema.String).annotations({
+    Schema.Array(Email).annotations({
       description: "Participant emails"
     })
   ),
@@ -356,7 +365,7 @@ export const CreateRecurringEventParamsSchema = Schema.Struct({
 export type CreateRecurringEventParams = Schema.Schema.Type<typeof CreateRecurringEventParamsSchema>
 
 export const ListEventInstancesParamsSchema = Schema.Struct({
-  recurringEventId: NonEmptyString.annotations({
+  recurringEventId: EventId.annotations({
     description: "Recurring event ID"
   }),
   from: Schema.optional(Timestamp.annotations({

@@ -22,8 +22,10 @@ import type {
   SaveMessageParams,
   UnsaveMessageParams
 } from "../../domain/schemas/activity.js"
+import { ActivityMessageId, EmojiCode, ObjectClassName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { ActivityMessageNotFoundError, ReactionNotFoundError, SavedMessageNotFoundError } from "../errors.js"
+import { toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const activity = require("@hcengineering/activity").default as typeof import("@hcengineering/activity").default
@@ -46,6 +48,9 @@ export type ListSavedMessagesError = HulyClientError
 
 export type ListMentionsError = HulyClientError
 
+// SDK: Data<Reaction> requires createBy but server populates from auth context.
+const serverPopulatedCreateBy: HulyReaction["createBy"] = "" as HulyReaction["createBy"]
+
 /**
  * List activity messages for an object.
  * Results sorted by modifiedOn descending (newest first).
@@ -61,8 +66,8 @@ export const listActivity = (
     const messages = yield* client.findAll<HulyActivityMessage>(
       activity.class.ActivityMessage,
       {
-        attachedTo: params.objectId as Ref<Doc>,
-        attachedToClass: params.objectClass as Ref<Class<Doc>>
+        attachedTo: toRef<Doc>(params.objectId),
+        attachedToClass: toRef<Class<Doc>>(params.objectClass)
       },
       {
         limit,
@@ -73,10 +78,10 @@ export const listActivity = (
     )
 
     const result: Array<ActivityMessage> = messages.map((msg) => ({
-      id: String(msg._id),
-      objectId: String(msg.attachedTo),
-      objectClass: String(msg.attachedToClass),
-      modifiedBy: msg.modifiedBy ? String(msg.modifiedBy) : undefined,
+      id: ActivityMessageId.make(msg._id),
+      objectId: msg.attachedTo,
+      objectClass: ObjectClassName.make(msg.attachedToClass),
+      modifiedBy: msg.modifiedBy ? msg.modifiedBy : undefined,
       modifiedOn: msg.modifiedOn,
       isPinned: msg.isPinned,
       replies: msg.replies,
@@ -103,7 +108,7 @@ export const addReaction = (
 
     const message = yield* client.findOne<HulyActivityMessage>(
       activity.class.ActivityMessage,
-      { _id: params.messageId as Ref<HulyActivityMessage> }
+      { _id: toRef<HulyActivityMessage>(params.messageId) }
     )
 
     if (message === undefined) {
@@ -114,7 +119,7 @@ export const addReaction = (
 
     const reactionData: AttachedData<HulyReaction> = {
       emoji: params.emoji,
-      createBy: "" as HulyReaction["createBy"]
+      createBy: serverPopulatedCreateBy
     }
 
     yield* client.addCollection(
@@ -128,7 +133,7 @@ export const addReaction = (
     )
 
     return {
-      reactionId: String(reactionId),
+      reactionId,
       messageId: params.messageId
     }
   })
@@ -150,7 +155,7 @@ export const removeReaction = (
     const reaction = yield* client.findOne<HulyReaction>(
       activity.class.Reaction,
       {
-        attachedTo: params.messageId as Ref<HulyActivityMessage>,
+        attachedTo: toRef<HulyActivityMessage>(params.messageId),
         emoji: params.emoji
       }
     )
@@ -188,16 +193,16 @@ export const listReactions = (
     const reactions = yield* client.findAll<HulyReaction>(
       activity.class.Reaction,
       {
-        attachedTo: params.messageId as Ref<HulyActivityMessage>
+        attachedTo: toRef<HulyActivityMessage>(params.messageId)
       },
       { limit }
     )
 
     const result: Array<Reaction> = reactions.map((r) => ({
-      id: String(r._id),
-      messageId: String(r.attachedTo),
-      emoji: r.emoji,
-      createdBy: r.createBy ? String(r.createBy) : undefined
+      id: r._id,
+      messageId: ActivityMessageId.make(r.attachedTo),
+      emoji: EmojiCode.make(r.emoji),
+      createdBy: r.createBy ? r.createBy : undefined
     }))
 
     return result
@@ -219,7 +224,7 @@ export const saveMessage = (
 
     const message = yield* client.findOne<HulyActivityMessage>(
       activity.class.ActivityMessage,
-      { _id: params.messageId as Ref<HulyActivityMessage> }
+      { _id: toRef<HulyActivityMessage>(params.messageId) }
     )
 
     if (message === undefined) {
@@ -238,7 +243,7 @@ export const saveMessage = (
     )
 
     return {
-      savedId: String(savedId),
+      savedId,
       messageId: params.messageId
     }
   })
@@ -260,7 +265,7 @@ export const unsaveMessage = (
     const saved = yield* client.findOne<HulySavedMessage>(
       activity.class.SavedMessage,
       {
-        attachedTo: params.messageId as Ref<HulyActivityMessage>
+        attachedTo: toRef<HulyActivityMessage>(params.messageId)
       }
     )
 
@@ -298,8 +303,8 @@ export const listSavedMessages = (
     )
 
     const result: Array<SavedMessage> = saved.map((s) => ({
-      id: String(s._id),
-      messageId: String(s.attachedTo)
+      id: s._id,
+      messageId: ActivityMessageId.make(s.attachedTo)
     }))
 
     return result
@@ -328,9 +333,9 @@ export const listMentions = (
     )
 
     const result: Array<Mention> = mentions.map((m) => ({
-      id: String(m._id),
-      messageId: String(m.attachedTo),
-      userId: String(m.user),
+      id: m._id,
+      messageId: ActivityMessageId.make(m.attachedTo),
+      userId: m.user,
       content: m.content
     }))
 

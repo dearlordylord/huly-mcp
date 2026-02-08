@@ -1,9 +1,22 @@
 import { Schema } from "effect"
 
-import { LimitParam, makeJsonSchema, NonEmptyString, Timestamp } from "./shared.js"
+import {
+  AttachmentId,
+  DocumentIdentifier,
+  IssueIdentifier,
+  LimitParam,
+  makeJsonSchema,
+  MimeType,
+  NonEmptyString,
+  ObjectClassName,
+  ProjectIdentifier,
+  SpaceId,
+  TeamspaceIdentifier,
+  Timestamp
+} from "./shared.js"
 
 export const AttachmentSummarySchema = Schema.Struct({
-  id: NonEmptyString.annotations({
+  id: AttachmentId.annotations({
     description: "Attachment ID"
   }),
   name: Schema.String.annotations({
@@ -32,7 +45,7 @@ export const AttachmentSummarySchema = Schema.Struct({
 export type AttachmentSummary = Schema.Schema.Type<typeof AttachmentSummarySchema>
 
 export const AttachmentSchema = Schema.Struct({
-  id: NonEmptyString.annotations({
+  id: AttachmentId.annotations({
     description: "Attachment ID"
   }),
   name: Schema.String.annotations({
@@ -73,7 +86,7 @@ export const ListAttachmentsParamsSchema = Schema.Struct({
   objectId: NonEmptyString.annotations({
     description: "ID of the parent object (issue, document, etc.)"
   }),
-  objectClass: NonEmptyString.annotations({
+  objectClass: ObjectClassName.annotations({
     description: "Class of the parent object (e.g., 'tracker:class:Issue', 'document:class:Document')"
   }),
   limit: Schema.optional(
@@ -89,7 +102,7 @@ export const ListAttachmentsParamsSchema = Schema.Struct({
 export type ListAttachmentsParams = Schema.Schema.Type<typeof ListAttachmentsParamsSchema>
 
 export const GetAttachmentParamsSchema = Schema.Struct({
-  attachmentId: NonEmptyString.annotations({
+  attachmentId: AttachmentId.annotations({
     description: "Attachment ID"
   })
 }).annotations({
@@ -103,16 +116,16 @@ const AddAttachmentParamsBase = Schema.Struct({
   objectId: NonEmptyString.annotations({
     description: "ID of the parent object (issue, document, etc.)"
   }),
-  objectClass: NonEmptyString.annotations({
+  objectClass: ObjectClassName.annotations({
     description: "Class of the parent object (e.g., 'tracker:class:Issue', 'document:class:Document')"
   }),
-  space: NonEmptyString.annotations({
+  space: SpaceId.annotations({
     description: "Space ID where the parent object resides"
   }),
   filename: NonEmptyString.annotations({
     description: "Name of the file"
   }),
-  contentType: NonEmptyString.annotations({
+  contentType: MimeType.annotations({
     description: "MIME type of the file (e.g., 'image/png', 'application/pdf')"
   }),
   filePath: Schema.optional(Schema.String.annotations({
@@ -145,7 +158,7 @@ export const AddAttachmentParamsSchema = AddAttachmentParamsBase.pipe(
 export type AddAttachmentParams = Schema.Schema.Type<typeof AddAttachmentParamsSchema>
 
 export const UpdateAttachmentParamsSchema = Schema.Struct({
-  attachmentId: NonEmptyString.annotations({
+  attachmentId: AttachmentId.annotations({
     description: "Attachment ID"
   }),
   description: Schema.optional(
@@ -164,7 +177,7 @@ export const UpdateAttachmentParamsSchema = Schema.Struct({
 export type UpdateAttachmentParams = Schema.Schema.Type<typeof UpdateAttachmentParamsSchema>
 
 export const DeleteAttachmentParamsSchema = Schema.Struct({
-  attachmentId: NonEmptyString.annotations({
+  attachmentId: AttachmentId.annotations({
     description: "Attachment ID to delete"
   })
 }).annotations({
@@ -175,7 +188,7 @@ export const DeleteAttachmentParamsSchema = Schema.Struct({
 export type DeleteAttachmentParams = Schema.Schema.Type<typeof DeleteAttachmentParamsSchema>
 
 export const PinAttachmentParamsSchema = Schema.Struct({
-  attachmentId: NonEmptyString.annotations({
+  attachmentId: AttachmentId.annotations({
     description: "Attachment ID"
   }),
   pinned: Schema.Boolean.annotations({
@@ -189,7 +202,7 @@ export const PinAttachmentParamsSchema = Schema.Struct({
 export type PinAttachmentParams = Schema.Schema.Type<typeof PinAttachmentParamsSchema>
 
 export const DownloadAttachmentParamsSchema = Schema.Struct({
-  attachmentId: NonEmptyString.annotations({
+  attachmentId: AttachmentId.annotations({
     description: "Attachment ID"
   })
 }).annotations({
@@ -200,16 +213,16 @@ export const DownloadAttachmentParamsSchema = Schema.Struct({
 export type DownloadAttachmentParams = Schema.Schema.Type<typeof DownloadAttachmentParamsSchema>
 
 const AddIssueAttachmentParamsBase = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  identifier: NonEmptyString.annotations({
+  identifier: IssueIdentifier.annotations({
     description: "Issue identifier (e.g., 'HULY-123')"
   }),
   filename: NonEmptyString.annotations({
     description: "Name of the file"
   }),
-  contentType: NonEmptyString.annotations({
+  contentType: MimeType.annotations({
     description: "MIME type of the file (e.g., 'image/png', 'application/pdf')"
   }),
   filePath: Schema.optional(Schema.String.annotations({
@@ -242,16 +255,16 @@ export const AddIssueAttachmentParamsSchema = AddIssueAttachmentParamsBase.pipe(
 export type AddIssueAttachmentParams = Schema.Schema.Type<typeof AddIssueAttachmentParamsSchema>
 
 const AddDocumentAttachmentParamsBase = Schema.Struct({
-  teamspace: NonEmptyString.annotations({
+  teamspace: TeamspaceIdentifier.annotations({
     description: "Teamspace name or ID"
   }),
-  document: NonEmptyString.annotations({
+  document: DocumentIdentifier.annotations({
     description: "Document title or ID"
   }),
   filename: NonEmptyString.annotations({
     description: "Name of the file"
   }),
-  contentType: NonEmptyString.annotations({
+  contentType: MimeType.annotations({
     description: "MIME type of the file (e.g., 'image/png', 'application/pdf')"
   }),
   filePath: Schema.optional(Schema.String.annotations({

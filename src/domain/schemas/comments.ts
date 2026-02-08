@@ -1,9 +1,17 @@
 import { Schema } from "effect"
 
-import { LimitParam, makeJsonSchema, NonEmptyString, Timestamp } from "./shared.js"
+import {
+  CommentId,
+  IssueIdentifier,
+  LimitParam,
+  makeJsonSchema,
+  NonEmptyString,
+  ProjectIdentifier,
+  Timestamp
+} from "./shared.js"
 
 export const CommentSchema = Schema.Struct({
-  id: NonEmptyString,
+  id: CommentId,
   body: Schema.String,
   author: Schema.optional(Schema.String),
   authorId: Schema.optional(NonEmptyString),
@@ -18,10 +26,10 @@ export const CommentSchema = Schema.Struct({
 export type Comment = Schema.Schema.Type<typeof CommentSchema>
 
 export const ListCommentsParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  issueIdentifier: NonEmptyString.annotations({
+  issueIdentifier: IssueIdentifier.annotations({
     description: "Issue identifier (e.g., 'HULY-123' or just '123')"
   }),
   limit: Schema.optional(
@@ -37,10 +45,10 @@ export const ListCommentsParamsSchema = Schema.Struct({
 export type ListCommentsParams = Schema.Schema.Type<typeof ListCommentsParamsSchema>
 
 export const AddCommentParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  issueIdentifier: NonEmptyString.annotations({
+  issueIdentifier: IssueIdentifier.annotations({
     description: "Issue identifier (e.g., 'HULY-123' or just '123')"
   }),
   body: NonEmptyString.annotations({
@@ -54,13 +62,13 @@ export const AddCommentParamsSchema = Schema.Struct({
 export type AddCommentParams = Schema.Schema.Type<typeof AddCommentParamsSchema>
 
 export const UpdateCommentParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  issueIdentifier: NonEmptyString.annotations({
+  issueIdentifier: IssueIdentifier.annotations({
     description: "Issue identifier (e.g., 'HULY-123' or just '123')"
   }),
-  commentId: NonEmptyString.annotations({
+  commentId: CommentId.annotations({
     description: "Comment ID to update"
   }),
   body: NonEmptyString.annotations({
@@ -74,13 +82,13 @@ export const UpdateCommentParamsSchema = Schema.Struct({
 export type UpdateCommentParams = Schema.Schema.Type<typeof UpdateCommentParamsSchema>
 
 export const DeleteCommentParamsSchema = Schema.Struct({
-  project: NonEmptyString.annotations({
+  project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  issueIdentifier: NonEmptyString.annotations({
+  issueIdentifier: IssueIdentifier.annotations({
     description: "Issue identifier (e.g., 'HULY-123' or just '123')"
   }),
-  commentId: NonEmptyString.annotations({
+  commentId: CommentId.annotations({
     description: "Comment ID to delete"
   })
 }).annotations({

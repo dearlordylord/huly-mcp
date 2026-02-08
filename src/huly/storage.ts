@@ -15,7 +15,7 @@ import {
   loadServerConfig,
   type StorageClient
 } from "@hcengineering/api-client"
-import type { WorkspaceUuid } from "@hcengineering/core"
+import type { Blob, Ref, WorkspaceUuid } from "@hcengineering/core"
 import { Context, Effect, Layer } from "effect"
 
 import { HulyConfigService } from "../config/config.js"
@@ -121,8 +121,8 @@ export type StorageClientError =
  * Result of a file upload operation.
  */
 export interface UploadFileResult {
-  /** The blob ID for referencing the file */
-  readonly blobId: string
+  /** The blob reference for attaching to documents */
+  readonly blobId: Ref<Blob>
   /** Content type of the uploaded file */
   readonly contentType: string
   /** Size in bytes */
@@ -183,11 +183,13 @@ export class HulyStorageClient extends Context.Tag("@hulymcp/HulyStorageClient")
           Effect.tryPromise({
             try: async () => {
               const blob = await storageClient.put(filename, data, contentType, data.length)
+              // SDK: blob._id is Ref<Doc>; narrow to Ref<Blob> for type-safe downstream usage
+              const blobRef = blob._id as Ref<Blob>
               return {
-                blobId: blob._id as string,
+                blobId: blobRef,
                 contentType: blob.contentType,
                 size: blob.size,
-                url: buildFileUrl(baseUrl, workspaceId, blob._id as string)
+                url: buildFileUrl(baseUrl, workspaceId, blobRef)
               }
             },
             catch: (e) =>
@@ -215,7 +217,7 @@ export class HulyStorageClient extends Context.Tag("@hulymcp/HulyStorageClient")
       StorageClientError
     > =>
       Effect.succeed({
-        blobId: "test-blob-id",
+        blobId: "test-blob-id" as unknown as Ref<Blob>,
         contentType: "application/octet-stream",
         size: 0,
         url: "https://test.huly.io/files?workspace=test&file=test-blob-id"
