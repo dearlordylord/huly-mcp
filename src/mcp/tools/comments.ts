@@ -22,7 +22,7 @@ export const commentTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_comments",
       parseListCommentsParams,
-      (params) => listComments(params)
+      listComments
     )
   },
   {
@@ -33,7 +33,7 @@ export const commentTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "add_comment",
       parseAddCommentParams,
-      (params) => addComment(params)
+      addComment
     )
   },
   {
@@ -44,7 +44,7 @@ export const commentTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "update_comment",
       parseUpdateCommentParams,
-      (params) => updateComment(params)
+      updateComment
     )
   },
   {
@@ -55,7 +55,7 @@ export const commentTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "delete_comment",
       parseDeleteCommentParams,
-      (params) => deleteComment(params)
+      deleteComment
     )
   }
 ]

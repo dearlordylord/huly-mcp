@@ -75,6 +75,7 @@ export default [
       // Code quality
       "object-shorthand": "error",
       "sort-destructure-keys/sort-destructure-keys": "error",
+      "functional/prefer-tacit": "error",
       "no-console": "warn",
 
       // Functional programming

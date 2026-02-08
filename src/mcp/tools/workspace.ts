@@ -96,7 +96,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     inputSchema: emptyParamsJsonSchema,
     handler: createNoParamsWorkspaceToolHandler(
       "delete_workspace",
-      () => deleteWorkspace()
+      deleteWorkspace
     )
   },
   {
@@ -106,7 +106,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     inputSchema: emptyParamsJsonSchema,
     handler: createNoParamsWorkspaceToolHandler(
       "get_user_profile",
-      () => getUserProfile()
+      getUserProfile
     )
   },
   {
@@ -118,7 +118,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     handler: createWorkspaceToolHandler(
       "update_user_profile",
       parseUpdateUserProfileParams,
-      (params) => updateUserProfile(params)
+      updateUserProfile
     )
   },
   {
@@ -129,7 +129,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     handler: createWorkspaceToolHandler(
       "update_guest_settings",
       parseUpdateGuestSettingsParams,
-      (params) => updateGuestSettings(params)
+      updateGuestSettings
     )
   },
   {
@@ -140,7 +140,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     handler: createWorkspaceToolHandler(
       "get_regions",
       parseGetRegionsParams,
-      () => getRegions()
+      getRegions
     )
   }
 ]

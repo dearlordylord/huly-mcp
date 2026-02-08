@@ -160,7 +160,7 @@ const AddAttachmentParamsBase = Schema.Struct({
 })
 
 export const AddAttachmentParamsSchema = AddAttachmentParamsBase.pipe(
-  Schema.filter((params) => hasFileSource(params))
+  Schema.filter(hasFileSource)
 ).annotations({
   title: "AddAttachmentParams",
   description: "Parameters for adding an attachment. Provide ONE of: filePath, fileUrl, or data"
@@ -234,7 +234,7 @@ const AddIssueAttachmentParamsBase = Schema.Struct({
 })
 
 export const AddIssueAttachmentParamsSchema = AddIssueAttachmentParamsBase.pipe(
-  Schema.filter((params) => hasFileSource(params))
+  Schema.filter(hasFileSource)
 ).annotations({
   title: "AddIssueAttachmentParams",
   description: "Parameters for adding an attachment to an issue"
@@ -253,7 +253,7 @@ const AddDocumentAttachmentParamsBase = Schema.Struct({
 })
 
 export const AddDocumentAttachmentParamsSchema = AddDocumentAttachmentParamsBase.pipe(
-  Schema.filter((params) => hasFileSource(params))
+  Schema.filter(hasFileSource)
 ).annotations({
   title: "AddDocumentAttachmentParams",
   description: "Parameters for adding an attachment to a document"
