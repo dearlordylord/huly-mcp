@@ -112,16 +112,7 @@ export const GetAttachmentParamsSchema = Schema.Struct({
 
 export type GetAttachmentParams = Schema.Schema.Type<typeof GetAttachmentParamsSchema>
 
-const AddAttachmentParamsBase = Schema.Struct({
-  objectId: NonEmptyString.annotations({
-    description: "ID of the parent object (issue, document, etc.)"
-  }),
-  objectClass: ObjectClassName.annotations({
-    description: "Class of the parent object (e.g., 'tracker:class:Issue', 'document:class:Document')"
-  }),
-  space: SpaceId.annotations({
-    description: "Space ID where the parent object resides"
-  }),
+const FileSourceFields = {
   filename: NonEmptyString.annotations({
     description: "Name of the file"
   }),
@@ -143,13 +134,32 @@ const AddAttachmentParamsBase = Schema.Struct({
   pinned: Schema.optional(Schema.Boolean.annotations({
     description: "Whether to pin the attachment (default: false)"
   }))
+}
+
+const hasFileSource = (params: {
+  readonly filePath?: string | undefined
+  readonly fileUrl?: string | undefined
+  readonly data?: string | undefined
+}) => {
+  const hasSource = params.filePath || params.fileUrl || params.data
+  return hasSource ? true : "Must provide filePath, fileUrl, or data"
+}
+
+const AddAttachmentParamsBase = Schema.Struct({
+  objectId: NonEmptyString.annotations({
+    description: "ID of the parent object (issue, document, etc.)"
+  }),
+  objectClass: ObjectClassName.annotations({
+    description: "Class of the parent object (e.g., 'tracker:class:Issue', 'document:class:Document')"
+  }),
+  space: SpaceId.annotations({
+    description: "Space ID where the parent object resides"
+  }),
+  ...FileSourceFields
 })
 
 export const AddAttachmentParamsSchema = AddAttachmentParamsBase.pipe(
-  Schema.filter((params) => {
-    const hasSource = params.filePath || params.fileUrl || params.data
-    return hasSource ? true : "Must provide filePath, fileUrl, or data"
-  })
+  Schema.filter((params) => hasFileSource(params))
 ).annotations({
   title: "AddAttachmentParams",
   description: "Parameters for adding an attachment. Provide ONE of: filePath, fileUrl, or data"
@@ -219,34 +229,11 @@ const AddIssueAttachmentParamsBase = Schema.Struct({
   identifier: IssueIdentifier.annotations({
     description: "Issue identifier (e.g., 'HULY-123')"
   }),
-  filename: NonEmptyString.annotations({
-    description: "Name of the file"
-  }),
-  contentType: MimeType.annotations({
-    description: "MIME type of the file (e.g., 'image/png', 'application/pdf')"
-  }),
-  filePath: Schema.optional(Schema.String.annotations({
-    description: "Local file path to upload (preferred)"
-  })),
-  fileUrl: Schema.optional(Schema.String.annotations({
-    description: "URL to fetch file from (for remote files)"
-  })),
-  data: Schema.optional(Schema.String.annotations({
-    description: "Base64-encoded file data (fallback for small files)"
-  })),
-  description: Schema.optional(Schema.String.annotations({
-    description: "Attachment description"
-  })),
-  pinned: Schema.optional(Schema.Boolean.annotations({
-    description: "Whether to pin the attachment"
-  }))
+  ...FileSourceFields
 })
 
 export const AddIssueAttachmentParamsSchema = AddIssueAttachmentParamsBase.pipe(
-  Schema.filter((params) => {
-    const hasSource = params.filePath || params.fileUrl || params.data
-    return hasSource ? true : "Must provide filePath, fileUrl, or data"
-  })
+  Schema.filter((params) => hasFileSource(params))
 ).annotations({
   title: "AddIssueAttachmentParams",
   description: "Parameters for adding an attachment to an issue"
@@ -261,34 +248,11 @@ const AddDocumentAttachmentParamsBase = Schema.Struct({
   document: DocumentIdentifier.annotations({
     description: "Document title or ID"
   }),
-  filename: NonEmptyString.annotations({
-    description: "Name of the file"
-  }),
-  contentType: MimeType.annotations({
-    description: "MIME type of the file (e.g., 'image/png', 'application/pdf')"
-  }),
-  filePath: Schema.optional(Schema.String.annotations({
-    description: "Local file path to upload (preferred)"
-  })),
-  fileUrl: Schema.optional(Schema.String.annotations({
-    description: "URL to fetch file from (for remote files)"
-  })),
-  data: Schema.optional(Schema.String.annotations({
-    description: "Base64-encoded file data (fallback for small files)"
-  })),
-  description: Schema.optional(Schema.String.annotations({
-    description: "Attachment description"
-  })),
-  pinned: Schema.optional(Schema.Boolean.annotations({
-    description: "Whether to pin the attachment"
-  }))
+  ...FileSourceFields
 })
 
 export const AddDocumentAttachmentParamsSchema = AddDocumentAttachmentParamsBase.pipe(
-  Schema.filter((params) => {
-    const hasSource = params.filePath || params.fileUrl || params.data
-    return hasSource ? true : "Must provide filePath, fileUrl, or data"
-  })
+  Schema.filter((params) => hasFileSource(params))
 ).annotations({
   title: "AddDocumentAttachmentParams",
   description: "Parameters for adding an attachment to a document"

@@ -164,6 +164,45 @@ const buildParticipants = (
     }))
   })
 
+interface ResolvedEventInputs {
+  calendarRef: Ref<HulyCalendar>
+  participantRefs: Array<Ref<Contact>>
+  descriptionRef: MarkupBlobRef | null
+}
+
+const resolveEventInputs = (
+  client: HulyClient["Type"],
+  params: {
+    readonly participants?: ReadonlyArray<string> | undefined
+    readonly description?: string | undefined
+  },
+  eventClass: Ref<Class<Doc>>,
+  eventId: string
+): Effect.Effect<ResolvedEventInputs, HulyClientError> =>
+  Effect.gen(function*() {
+    const cal = yield* getDefaultCalendar(client)
+    const calendarRef = cal?._id ?? toRef<HulyCalendar>("")
+
+    let participantRefs: Array<Ref<Contact>> = []
+    if (params.participants && params.participants.length > 0) {
+      const persons = yield* findPersonsByEmails(client, params.participants)
+      participantRefs = persons.map(p => p._id)
+    }
+
+    let descriptionRef: MarkupBlobRef | null = null
+    if (params.description && params.description.trim() !== "") {
+      descriptionRef = yield* client.uploadMarkup(
+        eventClass,
+        toRef<Doc>(eventId),
+        "description",
+        params.description,
+        "markdown"
+      )
+    }
+
+    return { calendarRef, participantRefs, descriptionRef }
+  })
+
 // --- Operations ---
 
 export const listEvents = (
@@ -263,29 +302,15 @@ export const createEvent = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const cal = yield* getDefaultCalendar(client)
-    // Huly API: empty string as calendar ref when no calendar found
-    const calendarRef = cal?._id ?? toRef<HulyCalendar>("")
-
     const eventId = generateEventId()
     const dueDate = params.dueDate ?? (params.date + ONE_HOUR_MS)
 
-    let participantRefs: Array<Ref<Contact>> = []
-    if (params.participants && params.participants.length > 0) {
-      const persons = yield* findPersonsByEmails(client, params.participants)
-      participantRefs = persons.map(p => p._id)
-    }
-
-    let descriptionRef: MarkupBlobRef | null = null
-    if (params.description && params.description.trim() !== "") {
-      descriptionRef = yield* client.uploadMarkup(
-        calendar.class.Event,
-        toRef<Doc>(eventId),
-        "description",
-        params.description,
-        "markdown"
-      )
-    }
+    const { calendarRef, descriptionRef, participantRefs } = yield* resolveEventInputs(
+      client,
+      params,
+      calendar.class.Event,
+      eventId
+    )
 
     const eventData: AttachedData<HulyEvent> = {
       eventId,
@@ -483,29 +508,15 @@ export const createRecurringEvent = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const cal = yield* getDefaultCalendar(client)
-    // Huly API: empty string as calendar ref when no calendar found
-    const calendarRef = cal?._id ?? toRef<HulyCalendar>("")
-
     const eventId = generateEventId()
     const dueDate = params.dueDate ?? (params.startDate + ONE_HOUR_MS)
 
-    let participantRefs: Array<Ref<Contact>> = []
-    if (params.participants && params.participants.length > 0) {
-      const persons = yield* findPersonsByEmails(client, params.participants)
-      participantRefs = persons.map(p => p._id)
-    }
-
-    let descriptionRef: MarkupBlobRef | null = null
-    if (params.description && params.description.trim() !== "") {
-      descriptionRef = yield* client.uploadMarkup(
-        calendar.class.ReccuringEvent,
-        toRef<Doc>(eventId),
-        "description",
-        params.description,
-        "markdown"
-      )
-    }
+    const { calendarRef, descriptionRef, participantRefs } = yield* resolveEventInputs(
+      client,
+      params,
+      calendar.class.ReccuringEvent,
+      eventId
+    )
 
     const hulyRules = params.rules.map(ruleToHulyRule)
 

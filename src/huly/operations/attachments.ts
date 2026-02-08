@@ -17,7 +17,6 @@ import {
   SortingOrder,
   type Space
 } from "@hcengineering/core"
-import type { Document as HulyDocument, Teamspace as HulyTeamspace } from "@hcengineering/document"
 import { Effect } from "effect"
 
 import type {
@@ -37,7 +36,7 @@ import { AttachmentId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import {
   AttachmentNotFoundError,
-  DocumentNotFoundError,
+  type DocumentNotFoundError,
   type FileFetchError,
   type FileNotFoundError,
   type FileTooLargeError,
@@ -45,7 +44,7 @@ import {
   type InvalidFileDataError,
   type IssueNotFoundError,
   type ProjectNotFoundError,
-  TeamspaceNotFoundError
+  type TeamspaceNotFoundError
 } from "../errors.js"
 import {
   type FileSourceParams,
@@ -55,6 +54,7 @@ import {
   validateContentType,
   validateFileSize
 } from "../storage.js"
+import { findTeamspaceAndDocument } from "./documents.js"
 import { findProjectAndIssue, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
@@ -148,6 +148,77 @@ const toAttachment = (att: HulyAttachment, url?: string): Attachment => ({
   createdOn: att.createdOn
 })
 
+interface AttachmentParent {
+  readonly spaceRef: Ref<Space>
+  readonly objectRef: Ref<Doc>
+  readonly objectClassRef: Ref<Class<Doc>>
+}
+
+const uploadAndAttach = (
+  params: {
+    readonly filename: string
+    readonly contentType: string
+    readonly filePath?: string | undefined
+    readonly fileUrl?: string | undefined
+    readonly data?: string | undefined
+    readonly description?: string | undefined
+    readonly pinned?: boolean | undefined
+  },
+  parent: AttachmentParent
+): Effect.Effect<
+  AddAttachmentResult,
+  | HulyClientError
+  | StorageClientError
+  | InvalidFileDataError
+  | FileNotFoundError
+  | FileFetchError
+  | FileTooLargeError
+  | InvalidContentTypeError,
+  HulyClient | HulyStorageClient
+> =>
+  Effect.gen(function*() {
+    const client = yield* HulyClient
+    const storageClient = yield* HulyStorageClient
+
+    const buffer = yield* getBufferFromParams(toFileSourceParams(params))
+    yield* validateFileSize(buffer, params.filename)
+    yield* validateContentType(params.contentType, params.filename)
+
+    const uploadResult = yield* storageClient.uploadFile(
+      params.filename,
+      buffer,
+      params.contentType
+    )
+
+    const attachmentId: Ref<HulyAttachment> = generateId()
+
+    const attachmentData: AttachedData<HulyAttachment> = {
+      name: params.filename,
+      file: uploadResult.blobId,
+      size: uploadResult.size,
+      type: params.contentType,
+      lastModified: Date.now(),
+      pinned: params.pinned ?? false,
+      ...(params.description !== undefined ? { description: params.description } : {})
+    }
+
+    yield* client.addCollection(
+      attachment.class.Attachment,
+      parent.spaceRef,
+      parent.objectRef,
+      parent.objectClassRef,
+      "attachments",
+      attachmentData,
+      attachmentId
+    )
+
+    return {
+      attachmentId,
+      blobId: uploadResult.blobId,
+      url: uploadResult.url
+    }
+  })
+
 // --- Operations ---
 
 /**
@@ -231,47 +302,10 @@ const toFileSourceParams = (params: {
 export const addAttachment = (
   params: AddAttachmentParams
 ): Effect.Effect<AddAttachmentResult, AddAttachmentError, HulyClient | HulyStorageClient> =>
-  Effect.gen(function*() {
-    const client = yield* HulyClient
-    const storageClient = yield* HulyStorageClient
-
-    const buffer = yield* getBufferFromParams(toFileSourceParams(params))
-    yield* validateFileSize(buffer, params.filename)
-    yield* validateContentType(params.contentType, params.filename)
-
-    const uploadResult = yield* storageClient.uploadFile(
-      params.filename,
-      buffer,
-      params.contentType
-    )
-
-    const attachmentId: Ref<HulyAttachment> = generateId()
-
-    const attachmentData: AttachedData<HulyAttachment> = {
-      name: params.filename,
-      file: uploadResult.blobId,
-      size: uploadResult.size,
-      type: params.contentType,
-      lastModified: Date.now(),
-      pinned: params.pinned ?? false,
-      ...(params.description !== undefined ? { description: params.description } : {})
-    }
-
-    yield* client.addCollection(
-      attachment.class.Attachment,
-      toRef<Space>(params.space),
-      toRef<Doc>(params.objectId),
-      toRef<Class<Doc<Space>>>(params.objectClass),
-      "attachments",
-      attachmentData,
-      attachmentId
-    )
-
-    return {
-      attachmentId,
-      blobId: uploadResult.blobId,
-      url: uploadResult.url
-    }
+  uploadAndAttach(params, {
+    spaceRef: toRef<Space>(params.space),
+    objectRef: toRef<Doc>(params.objectId),
+    objectClassRef: toRef<Class<Doc>>(params.objectClass)
   })
 
 /**
@@ -449,47 +483,13 @@ export const addIssueAttachment = (
   params: AddIssueAttachmentParams
 ): Effect.Effect<AddAttachmentResult, AddIssueAttachmentError, HulyClient | HulyStorageClient> =>
   Effect.gen(function*() {
-    const { client, issue, project } = yield* findProjectAndIssue(params)
+    const { issue, project } = yield* findProjectAndIssue(params)
 
-    const storageClient = yield* HulyStorageClient
-
-    const buffer = yield* getBufferFromParams(toFileSourceParams(params))
-    yield* validateFileSize(buffer, params.filename)
-    yield* validateContentType(params.contentType, params.filename)
-
-    const uploadResult = yield* storageClient.uploadFile(
-      params.filename,
-      buffer,
-      params.contentType
-    )
-
-    const attachmentId: Ref<HulyAttachment> = generateId()
-
-    const attachmentData: AttachedData<HulyAttachment> = {
-      name: params.filename,
-      file: uploadResult.blobId,
-      size: uploadResult.size,
-      type: params.contentType,
-      lastModified: Date.now(),
-      pinned: params.pinned ?? false,
-      ...(params.description !== undefined ? { description: params.description } : {})
-    }
-
-    yield* client.addCollection(
-      attachment.class.Attachment,
-      project._id,
-      issue._id,
-      tracker.class.Issue,
-      "attachments",
-      attachmentData,
-      attachmentId
-    )
-
-    return {
-      attachmentId,
-      blobId: uploadResult.blobId,
-      url: uploadResult.url
-    }
+    return yield* uploadAndAttach(params, {
+      spaceRef: project._id,
+      objectRef: issue._id,
+      objectClassRef: tracker.class.Issue
+    })
   })
 
 /**
@@ -499,76 +499,14 @@ export const addDocumentAttachment = (
   params: AddDocumentAttachmentParams
 ): Effect.Effect<AddAttachmentResult, AddDocumentAttachmentError, HulyClient | HulyStorageClient> =>
   Effect.gen(function*() {
-    const client = yield* HulyClient
+    const { doc, teamspace } = yield* findTeamspaceAndDocument({
+      teamspace: params.teamspace,
+      document: params.document
+    })
 
-    let teamspace = yield* client.findOne<HulyTeamspace>(
-      documentPlugin.class.Teamspace,
-      { name: params.teamspace, archived: false }
-    )
-    if (teamspace === undefined) {
-      teamspace = yield* client.findOne<HulyTeamspace>(
-        documentPlugin.class.Teamspace,
-        { _id: toRef<HulyTeamspace>(params.teamspace) }
-      )
-    }
-    if (teamspace === undefined) {
-      return yield* new TeamspaceNotFoundError({ identifier: params.teamspace })
-    }
-
-    let doc = yield* client.findOne<HulyDocument>(
-      documentPlugin.class.Document,
-      { space: teamspace._id, title: params.document }
-    )
-    if (doc === undefined) {
-      doc = yield* client.findOne<HulyDocument>(
-        documentPlugin.class.Document,
-        { space: teamspace._id, _id: toRef<HulyDocument>(params.document) }
-      )
-    }
-    if (doc === undefined) {
-      return yield* new DocumentNotFoundError({
-        identifier: params.document,
-        teamspace: params.teamspace
-      })
-    }
-
-    const storageClient = yield* HulyStorageClient
-
-    const buffer = yield* getBufferFromParams(toFileSourceParams(params))
-    yield* validateFileSize(buffer, params.filename)
-    yield* validateContentType(params.contentType, params.filename)
-
-    const uploadResult = yield* storageClient.uploadFile(
-      params.filename,
-      buffer,
-      params.contentType
-    )
-
-    const attachmentId: Ref<HulyAttachment> = generateId()
-
-    const attachmentData: AttachedData<HulyAttachment> = {
-      name: params.filename,
-      file: uploadResult.blobId,
-      size: uploadResult.size,
-      type: params.contentType,
-      lastModified: Date.now(),
-      pinned: params.pinned ?? false,
-      ...(params.description !== undefined ? { description: params.description } : {})
-    }
-
-    yield* client.addCollection(
-      attachment.class.Attachment,
-      teamspace._id,
-      doc._id,
-      documentPlugin.class.Document,
-      "attachments",
-      attachmentData,
-      attachmentId
-    )
-
-    return {
-      attachmentId,
-      blobId: uploadResult.blobId,
-      url: uploadResult.url
-    }
+    return yield* uploadAndAttach(params, {
+      spaceRef: teamspace._id,
+      objectRef: doc._id,
+      objectClassRef: documentPlugin.class.Document
+    })
   })

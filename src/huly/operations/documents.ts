@@ -105,7 +105,7 @@ const findTeamspace = (
 /**
  * Find a teamspace and document.
  */
-const findTeamspaceAndDocument = (
+export const findTeamspaceAndDocument = (
   params: { teamspace: string; document: string }
 ): Effect.Effect<
   { client: HulyClient["Type"]; teamspace: HulyTeamspace; doc: HulyDocument },
