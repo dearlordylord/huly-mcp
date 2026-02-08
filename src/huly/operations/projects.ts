@@ -15,9 +15,7 @@ import { ProjectIdentifier } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { clampLimit } from "./shared.js"
 
-// Import plugin objects at runtime (CommonJS modules)
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
+import { tracker } from "../huly-plugins.js"
 
 type ListProjectsError = HulyClientError
 

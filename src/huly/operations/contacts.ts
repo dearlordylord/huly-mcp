@@ -35,8 +35,7 @@ import { PersonNotFoundError } from "../errors.js"
 import { escapeLikeWildcards } from "./query-helpers.js"
 import { clampLimit, toRef } from "./shared.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
+import { contact } from "../huly-plugins.js"
 
 type ListPersonsError = HulyClientError
 type GetPersonError = HulyClientError | PersonNotFoundError

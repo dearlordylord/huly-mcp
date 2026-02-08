@@ -31,10 +31,7 @@ import { HulyClient, type HulyClientError } from "../client.js"
 import { ActivityMessageNotFoundError, ReactionNotFoundError, SavedMessageNotFoundError } from "../errors.js"
 import { clampLimit, findOneOrFail, toRef } from "./shared.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const activity = require("@hcengineering/activity").default as typeof import("@hcengineering/activity").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
+import { activity, core } from "../huly-plugins.js"
 
 type ListActivityError = HulyClientError
 

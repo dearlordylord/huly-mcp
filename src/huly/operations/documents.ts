@@ -42,9 +42,7 @@ import { DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js"
 import { escapeLikeWildcards } from "./query-helpers.js"
 import { clampLimit, findByNameOrId, toRef } from "./shared.js"
 
-// Import plugin objects at runtime (CommonJS modules)
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const documentPlugin = require("@hcengineering/document").default as typeof import("@hcengineering/document").default
+import { documentPlugin } from "../huly-plugins.js"
 
 type ListTeamspacesError = HulyClientError
 

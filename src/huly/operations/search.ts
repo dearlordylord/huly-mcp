@@ -13,8 +13,7 @@ import type { FulltextSearchParams, FulltextSearchResult } from "../../domain/sc
 import { HulyClient, type HulyClientError } from "../client.js"
 import { clampLimit } from "./shared.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
+import { core } from "../huly-plugins.js"
 
 type FulltextSearchError = HulyClientError
 

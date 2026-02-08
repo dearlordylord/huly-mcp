@@ -1,42 +1,51 @@
-# Item 16: Extract clampLimit helper
+# Item 21: Centralize CJS require() interop
 
-## What changed
+## Problem
 
-Extracted the repeated `Math.min(params.limit ?? 50, 200)` pattern into a `clampLimit` helper function.
+CJS `require()` interop with eslint-disable comments was duplicated across 14 files (13 source files + 1 test file). Each occurrence required a 2-line pattern: an eslint-disable comment and a `require().default as typeof import()` expression. Some files had up to 4 such blocks. Total: 28 require() calls scattered across the codebase.
 
-### Helper (in `src/huly/operations/shared.ts`)
+## Solution
 
-```typescript
-const DEFAULT_LIMIT = 50
-const MAX_LIMIT = 200
+Created `src/huly/huly-plugins.ts` as the single CJS interop boundary. It centralizes all 12 Huly platform plugin requires:
 
-export const clampLimit = (limit?: number): number => Math.min(limit ?? DEFAULT_LIMIT, MAX_LIMIT)
-```
+- `@hcengineering/activity`
+- `@hcengineering/attachment`
+- `@hcengineering/calendar`
+- `@hcengineering/chunter`
+- `@hcengineering/contact`
+- `@hcengineering/core`
+- `@hcengineering/document`
+- `@hcengineering/notification`
+- `@hcengineering/tags`
+- `@hcengineering/task`
+- `@hcengineering/time`
+- `@hcengineering/tracker`
 
-### Files modified (14 operation files + shared.ts)
+The eslint-disable/enable block appears exactly once in the new file. All consumer files now use standard `import { ... } from "../huly-plugins.js"` instead.
 
-All 31 occurrences replaced across:
+## Files changed
 
-- `src/huly/operations/shared.ts` -- helper definition
-- `src/huly/operations/workspace.ts` -- 2 occurrences
-- `src/huly/operations/time.ts` -- 2 occurrences
-- `src/huly/operations/projects.ts` -- 1 occurrence
-- `src/huly/operations/issues.ts` -- 3 occurrences
-- `src/huly/operations/contacts.ts` -- 3 occurrences
-- `src/huly/operations/comments.ts` -- 1 occurrence
-- `src/huly/operations/calendar.ts` -- 3 occurrences
-- `src/huly/operations/milestones.ts` -- 1 occurrence
-- `src/huly/operations/documents.ts` -- 2 occurrences
-- `src/huly/operations/activity.ts` -- 4 occurrences
-- `src/huly/operations/notifications.ts` -- 3 occurrences
-- `src/huly/operations/search.ts` -- 1 occurrence
-- `src/huly/operations/channels.ts` -- 4 occurrences
-- `src/huly/operations/attachments.ts` -- 1 occurrence
+- **Created**: `src/huly/huly-plugins.ts`
+- **Updated** (14 files, removed require + eslint-disable, added import):
+  - `src/huly/operations/activity.ts`
+  - `src/huly/operations/attachments.ts`
+  - `src/huly/operations/calendar.ts`
+  - `src/huly/operations/channels.ts`
+  - `src/huly/operations/comments.ts`
+  - `src/huly/operations/contacts.ts`
+  - `src/huly/operations/contacts.test.ts`
+  - `src/huly/operations/documents.ts`
+  - `src/huly/operations/issues.ts`
+  - `src/huly/operations/milestones.ts`
+  - `src/huly/operations/notifications.ts`
+  - `src/huly/operations/projects.ts`
+  - `src/huly/operations/search.ts`
+  - `src/huly/operations/shared.ts`
+  - `src/huly/operations/time.ts`
 
 ## Verification
 
 - `pnpm build` -- pass
 - `pnpm typecheck` -- pass
-- `pnpm lint` -- 0 errors (127 pre-existing warnings)
+- `pnpm lint` -- 0 errors (127 warnings, all pre-existing)
 - `pnpm test` -- 755 tests pass
-- `grep` confirms 0 remaining `Math.min(.*limit.*200)` in src/

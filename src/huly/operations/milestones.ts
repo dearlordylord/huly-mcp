@@ -25,8 +25,7 @@ import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { MilestoneNotFoundError } from "../errors.js"
 import { clampLimit, findByNameOrId, findProject, findProjectAndIssue, toRef } from "./shared.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
-const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
+import { tracker } from "../huly-plugins.js"
 
 type ListMilestonesError =
   | HulyClientError
