@@ -19,7 +19,7 @@ import {
 } from "../../src/mcp/server.js"
 
 // Import plugin objects at runtime (CommonJS modules)
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+ 
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
 
 // --- Mock Data Builders ---

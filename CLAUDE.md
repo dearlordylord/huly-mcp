@@ -70,6 +70,10 @@ Use short timeouts (5s) - MCP keeps connection open.
 
 Worktrees symlink `node_modules` to the main tree. `.gitignore` must use `node_modules` (no trailing slash) — trailing slash only matches directories, not symlinks, so `git add .` will commit the symlink.
 
+Before deleting a worktree or branch, always check for uncommitted changes (`git status`) and unmerged commits (`git log <branch> --not master`) first. Never force-delete without verifying all work is integrated.
+
+After merging a worktree branch, verify the merge commit actually landed (`git log --oneline -1`) and that CODE_SMELLS.md updates are staged — don't leave integration work uncommitted.
+
 ## Publishing
 
 ```bash

@@ -14,9 +14,9 @@ import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.
 import { ProjectNotFoundError, IssueNotFoundError } from "../../../src/huly/errors.js"
 import { logTime, getTimeReport, listTimeSpendReports, startTimer, stopTimer } from "../../../src/huly/operations/time.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+ 
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+ 
 const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
 
 // --- Mock Data Builders ---
@@ -219,7 +219,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     return Effect.succeed(undefined)
   }) as HulyClientOperations["findOne"]
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const addCollectionImpl: any = (
     _class: unknown, _space: unknown, _attachedTo: unknown, _attachedToClass: unknown, _collection: unknown, attributes: unknown, id?: unknown
   ) => {

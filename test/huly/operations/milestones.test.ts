@@ -28,7 +28,7 @@ import {
   deleteMilestone,
 } from "../../../src/huly/operations/milestones.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+ 
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
 
 const makeProject = (overrides?: Partial<HulyProject>): HulyProject =>

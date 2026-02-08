@@ -31,9 +31,9 @@ import {
   deleteThreadReply,
 } from "../../../src/huly/operations/threads.js"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+ 
 const chunter = require("@hcengineering/chunter").default as typeof import("@hcengineering/chunter").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+ 
 const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
 
 const makeChannel = (overrides?: Partial<HulyChannel>): HulyChannel =>
@@ -280,7 +280,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     return Effect.succeed(undefined)
   }) as HulyClientOperations["findOne"]
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const createDocImpl: any = (
     _class: unknown, _space: unknown, attributes: unknown, id?: unknown
   ) => {
@@ -300,7 +300,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     }
   ) as HulyClientOperations["updateDoc"]
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const addCollectionImpl: any = (
     _class: unknown, _space: unknown, _attachedTo: unknown, _attachedToClass: unknown, _collection: unknown, attributes: unknown, id?: unknown
   ) => {

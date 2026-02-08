@@ -12,7 +12,7 @@ import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.
 import { listProjects } from "../../../src/huly/operations/projects.js"
 
 // Import plugin objects at runtime (CommonJS modules)
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+ 
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
 
 // --- Mock Data Builders ---

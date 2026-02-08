@@ -16,14 +16,14 @@ Rules: worktree work by parallel sub-agents. each writes REPORT.md. integration 
 | wt-schema-research | 23, 24 | RESEARCH: schema boilerplate factory; ParticipantSchema reuse | REJECTED | user: not wanted |
 | wt-errors-cleanup | 2a, 28, 29, 33, 44 | remove mcpErrorCode+getMcpErrorCode; extract notif context dup; move McpErrorCode | MERGED | cb16e74: removed mcpErrorCode from 29 classes, moved McpErrorCode to error-mapping, extracted notif helper. 747/747 |
 | wt-issues-split | 1 | split issues.ts -> issues/components/issue-templates | MERGED | a00f50f+user 10dd847: split ops+schemas, extracted threads.ts, max-lines rule. 747/747 |
-| wt-issues-improve | 4, 8, 9, 10, 18, 19, 59 | findPerson $like; extractUpdatedSequence guard; toRef<Employee> verify; Email.make fix; resolveStatusByName; resolveAssignee; Unknown fallback fail | DONE | f71bfd8: resolveStatusByName, resolveAssignee, verifyEmployee helpers; Schema decoder; findOne+$like. 755/755 |
-| wt-storage | 3, 12, 13, 47 | FileSourceParams union; blob cast; ErrnoException guard; buildFileUrl encoding | DONE | 675f0f0: discriminated union, removed blob cast, ErrnoException guard, URLSearchParams. 755/755 |
-| wt-polyfills | 6 | isolate globalThis polyfills -> polyfills.ts | DONE | 89d282f: extracted to src/polyfills.ts. 755/755 |
-| wt-registry | 17, 56 | single generic factory; remove _toolName | DONE | 8ee75d9: consolidated 5 factories into generic createHandler, removed _toolName. 755/755 |
-| wt-dry-limit | 16 | clampLimit helper + DEFAULT_LIMIT/MAX_LIMIT constants | DONE | 97960fc: clampLimit helper replacing 31 occurrences across 14 files. 755/755 |
-| wt-dry-helpers | 25, 26 | findByNameOrId; findOneOrFail | DONE | e97d78a: extracted findByNameOrId + findOneOrFail to shared.ts, updated 8 files. 755/755 |
+| wt-issues-improve | 4, 8, 9, 10, 18, 19, 59 | findPerson $like; extractUpdatedSequence guard; toRef<Employee> verify; Email.make fix; resolveStatusByName; resolveAssignee; Unknown fallback fail | MERGED | a74c692: resolveStatusByName, resolveAssignee helpers; Schema decoder; findOne+$like. 747/747 |
+| wt-storage | 3, 12, 13, 47 | FileSourceParams union; blob cast; ErrnoException guard; buildFileUrl encoding | MERGED | 2a37124: discriminated union, removed blob cast, ErrnoException guard, URLSearchParams. 755/755 |
+| wt-polyfills | 6 | isolate globalThis polyfills -> polyfills.ts | MERGED | 2d16fa1: extracted to src/polyfills.ts. 747/747 |
+| wt-registry | 17, 56 | single generic factory; remove _toolName | MERGED | 2785f2e: consolidated 5 factories into generic createHandler, removed _toolName. 747/747 |
+| wt-dry-limit | 16 | clampLimit helper + DEFAULT_LIMIT/MAX_LIMIT constants; jscpd + no-magic-numbers | MERGED | 3e4f15f: clampLimit helper, named constants, jscpd lint. 747/747 |
+| wt-dry-helpers | 25, 26 | findByNameOrId; findOneOrFail | MERGED | f1bd0c4: extracted findByNameOrId + findOneOrFail to shared.ts, updated 8 files. 747/747 |
 | wt-dry-retry | 20 | shared connection retry HOF | MERGED | 817bbf7: extracted withConnectionRetry HOF to auth-utils. 755/755 |
-| wt-cjs-interop | 21 | centralize CJS require() -> huly-plugins.ts | DONE | ecd2183: centralized 12 plugins into huly-plugins.ts, updated 15 files. 755/755 |
+| wt-cjs-interop | 21 | centralize CJS require() -> huly-plugins.ts | MERGED | 67b8895: centralized 12 plugins into huly-plugins.ts, updated 18 files (incl. split modules). 747/747 |
 | wt-markup | 22 | extract toInternalMarkup/fromInternalMarkup | DONE | eaccef0: extracted toInternalMarkup/fromInternalMarkup in client.ts. 755/755 |
 | wt-schemas | 36, 37, 38, 39, 40, 41, 42, 43 | Email validation; NonNegativeInt counts; component field; GetPersonParams union; author type; senderId type; ProjectSchema archived; byDay validator | DONE | e32742e: Email validation, NonNegativeInt, unified ParticipantSchema, archived field. 756/756 |
 | wt-contacts | 46 | email filtering after limit -> filter before or adjust | DONE | 83185e7: channel-first query strategy, email filter before limit. 758/758 |
@@ -108,3 +108,25 @@ Rules: worktree work by parallel sub-agents. each writes REPORT.md. integration 
 | 62 | Redundant async on non-await handlers | yes | wt-http-transport |
 | 65 | buildFileUrl should use concatLink | agent decides | wt-style |
 | 66 | TOOL_DEFINITIONS redundant as cast | yes | wt-nits |
+| 68 | Enforce full ESLint ruleset on test files | yes | pending |
+| 69 | Lower jscpd threshold | TODO | pending |
+
+## Item 68 Research: Test File Lint Enforcement
+
+**Source**: `eslint.config.mjs` TODO — currently only double-assertion ban on test files.
+
+**Baseline**: 150 warnings (0 errors). Full enforcement: 2,492 problems (2,142 errors, 350 warnings).
+**After auto-fix**: 365 problems (80 errors, 285 warnings) — 83% resolved by `pnpm lint --fix`.
+
+**Remaining ~240 manual fixes in test files:**
+
+| Rule | Count | Effort |
+|------|-------|--------|
+| `functional/immutable-data` | ~261 | disable for tests (mutation in setup is standard) |
+| `consistent-type-assertions` | ~32 | low — remove `as T` where return type suffices |
+| `no-unnecessary-condition` | ~27 | low-medium — remove defensive `?.` on non-nullable |
+| `no-unused-vars` | ~20 | low — remove unused schema imports |
+| `consistent-type-imports` | ~15 | low-medium |
+| `no-non-null-assertion` | ~8 | low — add null checks |
+
+**Approach**: extend rules to `["src/**/*.ts", "test/**/*.ts"]`, parser → `tsconfig.lint.json`, auto-fix, then manual pass. Disable `functional/immutable-data` for test files.

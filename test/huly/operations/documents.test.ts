@@ -21,7 +21,7 @@ import {
 } from "../../../src/huly/operations/documents.js"
 
 // Import plugin objects at runtime (CommonJS modules)
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+ 
 const documentPlugin = require("@hcengineering/document").default as typeof import("@hcengineering/document").default
 
 // --- Mock Data Builders ---
@@ -137,7 +137,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     }
   ) as HulyClientOperations["fetchMarkup"]
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const createDocImpl: any = (
     _class: unknown, _space: unknown, attributes: unknown, id?: unknown
   ) => {
@@ -157,7 +157,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     }
   ) as HulyClientOperations["updateDoc"]
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const uploadMarkupImpl: any = (
     _objectClass: unknown, _objectId: unknown, _objectAttr: unknown, markup: unknown
   ) => {
@@ -167,7 +167,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     return Effect.succeed("markup-ref-123")
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const removeDocImpl: any = (
     _class: unknown, _space: unknown, objectId: unknown
   ) => {

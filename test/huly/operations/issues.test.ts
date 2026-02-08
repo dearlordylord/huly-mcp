@@ -15,15 +15,15 @@ import type {
 import { addLabel, createIssue, getIssue, listIssues, updateIssue } from "../../../src/huly/operations/issues.js"
 
 // Import plugin objects at runtime (CommonJS modules)
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+ 
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+ 
 const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+ 
 const tags = require("@hcengineering/tags").default as typeof import("@hcengineering/tags").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+ 
 const task = require("@hcengineering/task").default as typeof import("@hcengineering/task").default
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+ 
 const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
 
 // Helper to create properly typed FindResult for tests
@@ -366,7 +366,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
   ) as HulyClientOperations["updateDoc"]
 
   // Mock addCollection - captures attributes
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const addCollectionImpl: any = (
     _class: unknown,
     _space: unknown,
@@ -385,7 +385,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
   }
 
   // Mock createDoc - captures attributes for tag creation
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const createDocImpl: any = (
     _class: unknown,
     _space: unknown,
@@ -408,7 +408,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
   }
 
   // Mock uploadMarkup - captures markup content
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const uploadMarkupImpl: any = (
     _objectClass: unknown,
     _objectId: unknown,
