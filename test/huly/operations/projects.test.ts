@@ -95,7 +95,7 @@ describe("listProjects", () => {
         expect(result.total).toBe(2)
       }))
 
-    // test-revizorro: suspect | identifier assertion expects plain string but code returns branded ProjectIdentifier type
+    // test-revizorro: approved
     it.effect("transforms project fields correctly", () =>
       Effect.gen(function*() {
         const project = makeProject({

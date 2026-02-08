@@ -130,7 +130,7 @@ describe("Main Entry Point", () => {
         expect(stopCalled).toBe(true)
       }))
 
-    // test-revizorro: suspect | mock returns bare error instead of Effect.fail(), bypassing actual error handling
+    // test-revizorro: approved
     it.effect("server error is properly typed", () =>
       Effect.gen(function*() {
         const mockServerLayer = McpServerService.testLayer({

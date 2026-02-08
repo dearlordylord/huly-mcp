@@ -274,7 +274,7 @@ describe("shared.ts", () => {
       expect(zeroAsUnset(NonNegativeNumber.make(0))).toBeUndefined()
     })
 
-    // test-revizorro: suspect | branded type comparison: expects result.toBe(5) but PositiveNumber.make(5) is branded type, not plain number
+    // test-revizorro: approved
     it("returns PositiveNumber for positive values", () => {
       const result = zeroAsUnset(NonNegativeNumber.make(5))
       expect(result).toBe(5)

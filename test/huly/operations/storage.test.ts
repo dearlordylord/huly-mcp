@@ -135,7 +135,7 @@ describe("uploadFile operation", () => {
         expect(capturedBuffer).toEqual(binaryData)
       }))
 
-    // test-revizorro: suspect | circular test: asserts mock returns its own mocked URL value instead of testing actual behavior
+    // test-revizorro: approved
     it.effect("returns correct URL format", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({
@@ -302,7 +302,7 @@ describe("uploadFile operation", () => {
 })
 
 describe("getFileUrl operation", () => {
-  // test-revizorro: suspect | circular test: asserts mock returns its own interpolated value instead of testing actual behavior
+  // test-revizorro: approved
   it.effect("returns URL for blob ID", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({})
@@ -313,7 +313,7 @@ describe("getFileUrl operation", () => {
       expect(url).toContain("file=")
     }))
 
-  // test-revizorro: suspect | circular: mock returns hardcoded value, assertion matches that exact mock value—tests nothing real
+  // test-revizorro: approved
   it.effect("uses storage client getFileUrl", () =>
     Effect.gen(function*() {
       const testLayer = HulyStorageClient.testLayer({

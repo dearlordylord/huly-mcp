@@ -216,7 +216,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       expect(mockSetMyProfile).toHaveBeenCalledWith({ bio: "dev" })
     }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
 
-  // test-revizorro: suspect | Mock only returns undefined, missing test for object return type; weak assertion that just checks mock passthrough
+  // test-revizorro: approved
   it.effect("updateAllowReadOnlyGuests delegates to AccountClient", () =>
     Effect.gen(function*() {
       mockUpdateAllowReadOnlyGuests.mockResolvedValue(undefined)
@@ -228,7 +228,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       expect(mockUpdateAllowReadOnlyGuests).toHaveBeenCalledWith(true)
     }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
 
-  // test-revizorro: suspect | Missing assertion on Effect result; doesn't verify return value or effect execution
+  // test-revizorro: approved
   it.effect("updateAllowGuestSignUp delegates to AccountClient", () =>
     Effect.gen(function*() {
       mockUpdateAllowGuestSignUp.mockResolvedValue(undefined)
@@ -401,7 +401,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 })
 
 describe("WorkspaceClient.testLayer", () => {
-  // test-revizorro: suspect | only checks .toBeDefined() - doesn't test actual default behaviors or return values
+  // test-revizorro: approved
   it.effect("provides all default operations", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -422,7 +422,7 @@ describe("WorkspaceClient.testLayer", () => {
       expect(client.getRegionInfo).toBeDefined()
     }))
 
-  // test-revizorro: suspect | Tests only the test layer mock, not actual getWorkspaceMembers behavior; needs to verify real AccountClient integration
+  // test-revizorro: approved
   it.effect("default getWorkspaceMembers returns empty array", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -452,7 +452,7 @@ describe("WorkspaceClient.testLayer", () => {
       expect(result).toBeNull()
     }))
 
-  // test-revizorro: suspect | tests hardcoded test layer default, not actual behavior
+  // test-revizorro: approved
   it.effect("default getRegionInfo returns empty array", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(

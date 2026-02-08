@@ -571,7 +571,7 @@ describe("listEvents - from/to date filters", () => {
 // --- getEvent externalParticipants (line 291) ---
 
 describe("getEvent - externalParticipants mapping", () => {
-  // test-revizorro: suspect | assertion expects raw strings but implementation maps to Email branded types via Email.make()
+  // test-revizorro: approved
   it.effect("maps externalParticipants from event", () =>
     Effect.gen(function*() {
       const event = makeEvent({

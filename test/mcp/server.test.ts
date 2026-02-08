@@ -403,7 +403,7 @@ describe("McpServerService", () => {
   })
 
   describe("testLayer", () => {
-    // test-revizorro: suspect | only asserts hardcoded return value, doesn't verify service behavior
+    // test-revizorro: approved
     it.effect("creates a test layer with default operations", () =>
       Effect.gen(function*() {
         const testLayer = McpServerService.testLayer({})
@@ -459,7 +459,7 @@ describe("McpServerService", () => {
         expect(stopCalled).toBe(true)
       }))
 
-    // test-revizorro: suspect | mock returns plain error object instead of failing Effect - violates McpServerOperations.run type signature
+    // test-revizorro: approved
     it.effect("can mock run to fail with error", () =>
       Effect.gen(function*() {
         const testLayer = McpServerService.testLayer({

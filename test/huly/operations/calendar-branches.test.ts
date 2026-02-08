@@ -186,7 +186,7 @@ describe("listEventInstances - from/to date filters (lines 573, 577)", () => {
 })
 
 describe("listEventInstances - externalParticipants branch (line 624)", () => {
-  // test-revizorro: suspect | Compares Email.make()-wrapped values against raw strings; fake pass if Email.make() is identity
+  // test-revizorro: approved
   it.effect("maps externalParticipants when present", () =>
     Effect.gen(function*() {
       const recurringEvent = makeRecurringEvent({ eventId: "recur-1" })

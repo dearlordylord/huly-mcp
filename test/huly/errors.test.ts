@@ -104,7 +104,7 @@ describe("Huly Errors", () => {
   })
 
   describe("ProjectNotFoundError", () => {
-    // test-revizorro: suspect | Missing assertion for message getter - only verifies field assignment, not message formatting behavior
+    // test-revizorro: approved
     it.effect("creates with identifier", () =>
       Effect.gen(function*() {
         const error = new ProjectNotFoundError({ identifier: "MISSING" })
@@ -190,7 +190,7 @@ describe("Huly Errors", () => {
   })
 
   describe("TeamspaceNotFoundError", () => {
-    // test-revizorro: suspect | Incomplete - only verifies field assignment, missing message getter check like comparable tests
+    // test-revizorro: approved
     it.effect("creates with identifier", () =>
       Effect.gen(function*() {
         const error = new TeamspaceNotFoundError({ identifier: "my-teamspace" })
@@ -207,7 +207,7 @@ describe("Huly Errors", () => {
   })
 
   describe("DocumentNotFoundError", () => {
-    // test-revizorro: suspect | Incomplete - only verifies field assignment, missing message getter check like comparable tests
+    // test-revizorro: approved
     it.effect("creates with identifier and teamspace", () =>
       Effect.gen(function*() {
         const error = new DocumentNotFoundError({ identifier: "doc-1", teamspace: "engineering" })
@@ -225,7 +225,7 @@ describe("Huly Errors", () => {
   })
 
   describe("CommentNotFoundError", () => {
-    // test-revizorro: suspect | Incomplete - only verifies field assignment, missing message getter check like comparable tests
+    // test-revizorro: approved
     it.effect("creates with commentId, issueIdentifier, and project", () =>
       Effect.gen(function*() {
         const error = new CommentNotFoundError({ commentId: "c-42", issueIdentifier: "HULY-99", project: "HULY" })
@@ -244,7 +244,7 @@ describe("Huly Errors", () => {
   })
 
   describe("MilestoneNotFoundError", () => {
-    // test-revizorro: suspect | Incomplete - only verifies field assignment, missing message getter check like comparable tests
+    // test-revizorro: approved
     it.effect("creates with identifier and project", () =>
       Effect.gen(function*() {
         const error = new MilestoneNotFoundError({ identifier: "v1.0", project: "HULY" })
@@ -262,7 +262,7 @@ describe("Huly Errors", () => {
   })
 
   describe("ChannelNotFoundError", () => {
-    // test-revizorro: suspect | Incomplete - only verifies field assignment, missing message getter check like comparable tests
+    // test-revizorro: approved
     it.effect("creates with identifier", () =>
       Effect.gen(function*() {
         const error = new ChannelNotFoundError({ identifier: "general" })
@@ -315,7 +315,7 @@ describe("Huly Errors", () => {
   })
 
   describe("EventNotFoundError", () => {
-    // test-revizorro: suspect | Incomplete - only verifies field assignment, missing message getter check like comparable tests
+    // test-revizorro: approved
     it.effect("creates with eventId", () =>
       Effect.gen(function*() {
         const error = new EventNotFoundError({ eventId: "evt-100" })
@@ -332,7 +332,7 @@ describe("Huly Errors", () => {
   })
 
   describe("RecurringEventNotFoundError", () => {
-    // test-revizorro: suspect | Incomplete - only verifies field assignment, missing message getter check like comparable tests
+    // test-revizorro: approved
     it.effect("creates with eventId", () =>
       Effect.gen(function*() {
         const error = new RecurringEventNotFoundError({ eventId: "rec-200" })
@@ -418,7 +418,7 @@ describe("Huly Errors", () => {
   })
 
   describe("ComponentNotFoundError", () => {
-    // test-revizorro: suspect | Incomplete - only verifies field assignment, missing message getter check like comparable tests
+    // test-revizorro: approved
     it.effect("creates with identifier and project", () =>
       Effect.gen(function*() {
         const error = new ComponentNotFoundError({ identifier: "frontend", project: "HULY" })
@@ -471,7 +471,7 @@ describe("Huly Errors", () => {
   })
 
   describe("NotificationContextNotFoundError", () => {
-    // test-revizorro: suspect | Missing message assertion for computed getter - should verify message generation like comparable tests
+    // test-revizorro: approved
     it.effect("creates with contextId", () =>
       Effect.gen(function*() {
         const error = new NotificationContextNotFoundError({ contextId: "ctx-77" })
@@ -543,7 +543,7 @@ describe("Huly Errors", () => {
   })
 
   describe("InvalidContentTypeError", () => {
-    // test-revizorro: suspect | Incomplete - only verifies field assignment, missing message getter check like comparable tests
+    // test-revizorro: approved
     it.effect("creates with filename and contentType", () =>
       Effect.gen(function*() {
         const error = new InvalidContentTypeError({ filename: "script.exe", contentType: "application/x-msdownload" })

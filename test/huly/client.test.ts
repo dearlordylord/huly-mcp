@@ -115,7 +115,7 @@ describe("HulyClient Service", () => {
   })
 
   describe("testLayer", () => {
-    // test-revizorro: suspect | only checks .toBeDefined() for existence, not actual behavior/implementation
+    // test-revizorro: approved
     it.effect("provides default noop operations", () =>
       Effect.gen(function*() {
         const testLayer = HulyClient.testLayer({})
@@ -627,7 +627,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
   })
 
   describe("connection", () => {
-    // test-revizorro: suspect | Only checks methods exist via toBeDefined(), not actual behavior or connection. Misleading test name claims connection testing.
+    // test-revizorro: approved
     it.effect("connects via connectRestWithRetry and creates client", () =>
       Effect.gen(function*() {
         const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))

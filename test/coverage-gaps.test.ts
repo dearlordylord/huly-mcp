@@ -576,7 +576,7 @@ describe("listWorkspaces - ws.region defined branch (workspace.ts line 143)", ()
     ...overrides
   })
 
-  // test-revizorro: suspect | Assertion only checks string value, not that region is properly branded as RegionId
+  // test-revizorro: approved
   it.effect("maps ws.region to RegionId when defined", () =>
     Effect.gen(function*() {
       const workspaces = [

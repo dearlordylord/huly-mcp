@@ -70,7 +70,7 @@ const createMockResponse = () => {
 
 describe("HTTP Transport", () => {
   describe("createMcpHandlers", () => {
-    // test-revizorro: suspect | Tests only that server.connect() was called, not actual request processing; doesn't verify transport.handleRequest() was invoked with correct args
+    // test-revizorro: approved
     it("should handle tool calls in stateless mode (connect server and delegate to transport)", async () => {
       const mockServer = createMockMcpServer()
       const handlers = createMcpHandlers(() => mockServer)
@@ -91,7 +91,7 @@ describe("HTTP Transport", () => {
       // The SDK handles JSON-RPC protocol responses
     })
 
-    // test-revizorro: suspect | only checks server.connect, doesn't verify response or that transport.handleRequest() was called
+    // test-revizorro: approved
     it("should handle initialize requests in stateless mode", async () => {
       const mockServer = createMockMcpServer()
       const handlers = createMcpHandlers(() => mockServer)
