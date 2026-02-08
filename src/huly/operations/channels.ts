@@ -4,6 +4,7 @@ import {
   type AccountUuid as HulyAccountUuid,
   type AttachedData,
   type Data,
+  type DocumentQuery,
   type DocumentUpdate,
   generateId,
   type Markup,
@@ -204,17 +205,15 @@ export const listChannels = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const query: Record<string, unknown> = {}
+    const query: DocumentQuery<HulyChannel> = {}
     if (!params.includeArchived) {
       query.archived = false
     }
 
-    // Apply name search using $like operator
     if (params.nameSearch !== undefined && params.nameSearch.trim() !== "") {
       query.name = { $like: `%${escapeLikeWildcards(params.nameSearch)}%` }
     }
 
-    // Apply topic search using $like operator
     if (params.topicSearch !== undefined && params.topicSearch.trim() !== "") {
       query.topic = { $like: `%${escapeLikeWildcards(params.topicSearch)}%` }
     }

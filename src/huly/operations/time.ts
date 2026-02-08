@@ -2,6 +2,8 @@ import { AccessLevel, type Calendar as HulyCalendar } from "@hcengineering/calen
 import type { Channel, Person } from "@hcengineering/contact"
 import {
   type AttachedData,
+  type Doc,
+  type DocumentQuery,
   type DocumentUpdate,
   generateId,
   type PersonId as CorePersonId,
@@ -57,6 +59,12 @@ import { contact, time, tracker } from "../huly-plugins.js"
 // SDK: Data<WorkSlot> requires calendar/user but server populates from auth context.
 const serverPopulatedCalendar = toRef<HulyCalendar>("")
 const serverPopulatedPersonId: CorePersonId = "" as CorePersonId
+
+// SDK: WorkSlot.user is typed PersonId, but Huly queries accept Ref<Person> for user lookup.
+// Both are branded strings over string; the REST API treats them interchangeably in queries.
+// TODO that's all mighty weird, we may want to reinvestigate that
+// eslint-disable-next-line no-restricted-syntax -- SDK type mismatch: PersonId and Ref<Person> are both branded strings, interchangeable in REST queries
+const refAsPersonId = (ref: Ref<Doc>): CorePersonId => ref as unknown as CorePersonId
 
 type LogTimeError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
 type GetTimeReportError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
@@ -170,7 +178,14 @@ export const listTimeSpendReports = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const query: Record<string, unknown> = {}
+    type TimeSpendReportWithLookup = WithLookup<HulyTimeSpendReport> & {
+      $lookup?: {
+        attachedTo?: HulyIssue
+        employee?: Person
+      }
+    }
+
+    const query: DocumentQuery<TimeSpendReportWithLookup> = {}
 
     if (params.project !== undefined) {
       const project = yield* client.findOne<HulyProject>(
@@ -184,20 +199,13 @@ export const listTimeSpendReports = (
     }
 
     if (params.from !== undefined || params.to !== undefined) {
-      const dateFilter: Record<string, number> = {}
+      const dateFilter: DocumentQuery<HulyTimeSpendReport>["date"] = {}
       if (params.from !== undefined) dateFilter.$gte = params.from
       if (params.to !== undefined) dateFilter.$lte = params.to
       query.date = dateFilter
     }
 
     const limit = clampLimit(params.limit)
-
-    type TimeSpendReportWithLookup = WithLookup<HulyTimeSpendReport> & {
-      $lookup?: {
-        attachedTo?: HulyIssue
-        employee?: Person
-      }
-    }
 
     const reports = yield* client.findAll<TimeSpendReportWithLookup>(
       tracker.class.TimeSpendReport,
@@ -229,20 +237,20 @@ export const getDetailedTimeReport = (
   Effect.gen(function*() {
     const { client, project } = yield* findProject(params.project)
 
-    const query: Record<string, unknown> = { space: project._id }
-
-    if (params.from !== undefined || params.to !== undefined) {
-      const dateFilter: Record<string, number> = {}
-      if (params.from !== undefined) dateFilter.$gte = params.from
-      if (params.to !== undefined) dateFilter.$lte = params.to
-      query.date = dateFilter
-    }
-
     type TimeSpendReportWithLookup = WithLookup<HulyTimeSpendReport> & {
       $lookup?: {
         attachedTo?: HulyIssue
         employee?: Person
       }
+    }
+
+    const query: DocumentQuery<TimeSpendReportWithLookup> = { space: project._id }
+
+    if (params.from !== undefined || params.to !== undefined) {
+      const dateFilter: DocumentQuery<HulyTimeSpendReport>["date"] = {}
+      if (params.from !== undefined) dateFilter.$gte = params.from
+      if (params.to !== undefined) dateFilter.$lte = params.to
+      query.date = dateFilter
     }
 
     const reports = yield* client.findAll<TimeSpendReportWithLookup>(
@@ -313,7 +321,11 @@ export const listWorkSlots = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const query: Record<string, unknown> = {}
+    /* eslint-disable @typescript-eslint/consistent-type-imports -- inline type for generic */
+    type HulyWorkSlot = import("@hcengineering/time").WorkSlot
+    /* eslint-enable @typescript-eslint/consistent-type-imports */
+
+    const query: DocumentQuery<HulyWorkSlot> = {}
 
     if (params.employeeId !== undefined) {
       const person = yield* client.findOne<Person>(
@@ -327,25 +339,21 @@ export const listWorkSlots = (
         )
         if (channels.length > 0) {
           const channel = channels[0]
-          query.user = channel.attachedTo
+          query.user = refAsPersonId(channel.attachedTo)
         }
       } else {
-        query.user = person._id
+        query.user = refAsPersonId(person._id)
       }
     }
 
     if (params.from !== undefined || params.to !== undefined) {
-      const dateFilter: Record<string, number> = {}
+      const dateFilter: DocumentQuery<HulyWorkSlot>["date"] = {}
       if (params.from !== undefined) dateFilter.$gte = params.from
       if (params.to !== undefined) dateFilter.$lte = params.to
       query.date = dateFilter
     }
 
     const limit = clampLimit(params.limit)
-
-    /* eslint-disable @typescript-eslint/consistent-type-imports -- inline type for generic */
-    type HulyWorkSlot = import("@hcengineering/time").WorkSlot
-    /* eslint-enable @typescript-eslint/consistent-type-imports */
 
     const slots = yield* client.findAll<HulyWorkSlot>(
       time.class.WorkSlot,
