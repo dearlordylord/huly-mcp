@@ -26,6 +26,7 @@ import { ContactProvider, Email, OrganizationId, PersonId, PersonName } from "..
 import { assertExists } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { PersonNotFoundError } from "../errors.js"
+import { escapeLikeWildcards } from "./query-helpers.js"
 import { toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
@@ -88,7 +89,7 @@ export const listPersons = (
 
     // Apply name search using $like operator
     if (params.nameSearch !== undefined && params.nameSearch.trim() !== "") {
-      query.name = { $like: `%${params.nameSearch}%` }
+      query.name = { $like: `%${escapeLikeWildcards(params.nameSearch)}%` }
     }
 
     const persons = yield* client.findAll<HulyPerson>(

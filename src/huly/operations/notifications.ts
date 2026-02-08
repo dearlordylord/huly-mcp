@@ -162,10 +162,10 @@ export const listNotifications = (
       id: NotificationId.make(n._id),
       isViewed: n.isViewed,
       archived: n.archived,
-      objectId: n.objectId ? n.objectId : undefined,
-      objectClass: n.objectClass ? ObjectClassName.make(n.objectClass) : undefined,
-      title: n.title ? n.title : undefined,
-      body: n.body ? n.body : undefined,
+      objectId: n.objectId,
+      objectClass: ObjectClassName.make(n.objectClass),
+      title: n.title,
+      body: n.body,
       createdOn: n.createdOn,
       modifiedOn: n.modifiedOn
     }))
@@ -186,13 +186,11 @@ export const getNotification = (
       id: NotificationId.make(notif._id),
       isViewed: notif.isViewed,
       archived: notif.archived,
-      objectId: notif.objectId ? notif.objectId : undefined,
-      objectClass: notif.objectClass ? ObjectClassName.make(notif.objectClass) : undefined,
-      docNotifyContextId: notif.docNotifyContext
-        ? NotificationContextId.make(notif.docNotifyContext)
-        : undefined,
-      title: notif.title ? notif.title : undefined,
-      body: notif.body ? notif.body : undefined,
+      objectId: notif.objectId,
+      objectClass: ObjectClassName.make(notif.objectClass),
+      docNotifyContextId: NotificationContextId.make(notif.docNotifyContext),
+      title: notif.title,
+      body: notif.body,
       data: notif.data ? notif.data : undefined,
       createdOn: notif.createdOn,
       modifiedOn: notif.modifiedOn
@@ -216,7 +214,7 @@ export const markNotificationRead = (
     const { client, notification: notif } = yield* findNotification(params.notificationId)
 
     if (notif.isViewed) {
-      return { id: notif._id, marked: false }
+      return { id: notif._id, marked: true }
     }
 
     const updateOps: DocumentUpdate<HulyInboxNotification> = {
@@ -285,7 +283,7 @@ export const archiveNotification = (
     const { client, notification: notif } = yield* findNotification(params.notificationId)
 
     if (notif.archived) {
-      return { id: notif._id, archived: false }
+      return { id: notif._id, archived: true }
     }
 
     const updateOps: DocumentUpdate<HulyInboxNotification> = {

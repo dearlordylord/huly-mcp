@@ -14,7 +14,9 @@ import {
 
 export const TimeSpendReportSchema = Schema.Struct({
   id: TimeSpendReportId,
-  identifier: IssueIdentifier.annotations({ description: "Issue identifier (e.g., 'HULY-123')" }),
+  identifier: Schema.optional(IssueIdentifier.annotations({
+    description: "Issue identifier (e.g., 'HULY-123'). Absent if the issue was deleted."
+  })),
   employee: Schema.optional(PersonName),
   date: Schema.optional(Schema.NullOr(Timestamp)),
   value: Schema.Number.annotations({ description: "Time spent in minutes" }),
@@ -27,7 +29,9 @@ export const TimeSpendReportSchema = Schema.Struct({
 export type TimeSpendReport = Schema.Schema.Type<typeof TimeSpendReportSchema>
 
 export const TimeReportSummarySchema = Schema.Struct({
-  identifier: IssueIdentifier.annotations({ description: "Issue identifier (e.g., 'HULY-123')" }),
+  identifier: Schema.optional(IssueIdentifier.annotations({
+    description: "Issue identifier (e.g., 'HULY-123'). Absent if the issue was deleted."
+  })),
   totalTime: Schema.Number.annotations({ description: "Total time in minutes" }),
   estimation: Schema.optional(Schema.Number.annotations({ description: "Estimated time in minutes" })),
   remainingTime: Schema.optional(Schema.Number.annotations({ description: "Remaining time in minutes" })),
@@ -198,7 +202,9 @@ export const DetailedTimeReportSchema = Schema.Struct({
   project: ProjectIdentifier,
   totalTime: Schema.Number.annotations({ description: "Total time in minutes" }),
   byIssue: Schema.Array(Schema.Struct({
-    identifier: IssueIdentifier.annotations({ description: "Issue identifier (e.g., 'HULY-123')" }),
+    identifier: Schema.optional(IssueIdentifier.annotations({
+      description: "Issue identifier (e.g., 'HULY-123'). Absent if the issue was deleted."
+    })),
     issueTitle: Schema.String,
     totalTime: Schema.Number,
     reports: Schema.Array(TimeSpendReportSchema)

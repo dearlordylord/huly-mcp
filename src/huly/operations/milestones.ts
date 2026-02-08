@@ -15,8 +15,8 @@ import type {
 } from "../../domain/schemas.js"
 import { MilestoneId, MilestoneLabel } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
-import type { ProjectNotFoundError } from "../errors.js"
-import { IssueNotFoundError, MilestoneNotFoundError } from "../errors.js"
+import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
+import { MilestoneNotFoundError } from "../errors.js"
 import { findProject, findProjectAndIssue, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
