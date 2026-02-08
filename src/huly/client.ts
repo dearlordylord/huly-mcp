@@ -45,6 +45,47 @@ import { concatLink } from "../utils/url.js"
 import { authToOptions, type ConnectionConfig, type ConnectionError, connectWithRetry } from "./auth-utils.js"
 import { HulyConnectionError } from "./errors.js"
 
+interface MarkupConvertOptions {
+  readonly refUrl: string
+  readonly imageUrl: string
+}
+
+function toInternalMarkup(
+  value: string,
+  format: MarkupFormat,
+  opts: MarkupConvertOptions
+): string {
+  switch (format) {
+    case "markup":
+      return value
+    case "html":
+      return jsonToMarkup(htmlToJSON(value))
+    case "markdown":
+      return jsonToMarkup(markdownToMarkup(value, opts))
+    default:
+      absurd(format)
+      throw new Error(`Invalid format: ${format}`)
+  }
+}
+
+function fromInternalMarkup(
+  markup: string,
+  format: MarkupFormat,
+  opts: MarkupConvertOptions
+): string {
+  switch (format) {
+    case "markup":
+      return markup
+    case "html":
+      return jsonToHTML(markupToJSON(markup))
+    case "markdown":
+      return markupToMarkdown(markupToJSON(markup), opts)
+    default:
+      absurd(format)
+      throw new Error(`Invalid format: ${format}`)
+  }
+}
+
 export type HulyClientError = ConnectionError
 
 export interface HulyClientOperations {
@@ -352,48 +393,17 @@ function createMarkupOps(
     async fetchMarkup(objectClass, objectId, objectAttr, doc, format) {
       const collabId = makeCollabId(objectClass, objectId, objectAttr)
       const markup = await collaborator.getMarkup(collabId, doc)
-      const json = markupToJSON(markup)
-      switch (format) {
-        case "markup":
-          return markup
-        case "html":
-          return jsonToHTML(json)
-        case "markdown":
-          return markupToMarkdown(json, { refUrl, imageUrl })
-        default:
-          absurd(format)
-          throw new Error(`Invalid format: ${format}`)
-      }
+      return fromInternalMarkup(markup, format, { refUrl, imageUrl })
     },
 
     async uploadMarkup(objectClass, objectId, objectAttr, value, format) {
       const collabId = makeCollabId(objectClass, objectId, objectAttr)
-      switch (format) {
-        case "markup":
-          return await collaborator.createMarkup(collabId, value)
-        case "html":
-          return await collaborator.createMarkup(collabId, jsonToMarkup(htmlToJSON(value)))
-        case "markdown":
-          return await collaborator.createMarkup(collabId, jsonToMarkup(markdownToMarkup(value, { refUrl, imageUrl })))
-        default:
-          absurd(format)
-          throw new Error(`Invalid format: ${format}`)
-      }
+      return await collaborator.createMarkup(collabId, toInternalMarkup(value, format, { refUrl, imageUrl }))
     },
 
     async updateMarkup(objectClass, objectId, objectAttr, value, format) {
       const collabId = makeCollabId(objectClass, objectId, objectAttr)
-      switch (format) {
-        case "markup":
-          return await collaborator.updateMarkup(collabId, value)
-        case "html":
-          return await collaborator.updateMarkup(collabId, jsonToMarkup(htmlToJSON(value)))
-        case "markdown":
-          return await collaborator.updateMarkup(collabId, jsonToMarkup(markdownToMarkup(value, { refUrl, imageUrl })))
-        default:
-          absurd(format)
-          throw new Error(`Invalid format: ${format}`)
-      }
+      return await collaborator.updateMarkup(collabId, toInternalMarkup(value, format, { refUrl, imageUrl }))
     }
   }
 }
