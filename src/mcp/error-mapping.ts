@@ -26,25 +26,25 @@ export type McpErrorCode = (typeof McpErrorCode)[keyof typeof McpErrorCode]
 // --- MCP Error Response Types ---
 
 /**
- * MCP protocol tool response structure.
- * Compatible with MCP SDK CallToolResult.
- * Uses index signature to match SDK's loose typing.
- */
-export interface McpToolResponse {
-  content: Array<{ type: "text"; text: string }>
-  isError?: boolean
-  [key: string]: unknown
-}
-
-/**
- * Internal metadata for error tracking (not exposed to MCP).
+ * Internal metadata for error tracking (stripped before sending to MCP).
  */
 interface ErrorMetadata {
   errorCode: McpErrorCode
 }
 
 /**
- * Internal error response with metadata for testing.
+ * MCP protocol tool response structure.
+ * Compatible with MCP SDK CallToolResult.
+ * _meta carries internal error metadata, stripped by toMcpResponse before wire.
+ */
+export interface McpToolResponse {
+  content: Array<{ type: "text"; text: string }>
+  isError?: boolean
+  _meta?: ErrorMetadata
+}
+
+/**
+ * Error response with required metadata for error tracking/testing.
  */
 interface McpErrorResponseWithMeta extends McpToolResponse {
   isError: true
@@ -172,10 +172,7 @@ export const createSuccessResponse = <T>(result: T): McpToolResponse => ({
 export const createUnknownToolError = (toolName: string): McpErrorResponseWithMeta =>
   createErrorResponse(`Unknown tool: ${toolName}`, McpErrorCode.InvalidParams)
 
-export const toMcpResponse = (response: McpErrorResponseWithMeta | McpToolResponse): McpToolResponse => {
-  const result: McpToolResponse = { content: response.content }
-  if (response.isError !== undefined) {
-    result.isError = response.isError
-  }
-  return result
+export const toMcpResponse = (response: McpToolResponse): Omit<McpToolResponse, "_meta"> => {
+  const { _meta: _, ...wire } = response
+  return wire
 }
