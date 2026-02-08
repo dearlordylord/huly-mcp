@@ -32,7 +32,7 @@ const findTool = (name: string) => {
 }
 
 describe("notificationTools", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("exports all expected notification tools", () =>
     Effect.gen(function*() {
       const expectedTools = [
@@ -58,7 +58,7 @@ describe("notificationTools", () => {
       expect(notificationTools.length).toBe(expectedTools.length)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("all tools have category 'notifications'", () =>
     Effect.gen(function*() {
       for (const tool of notificationTools) {
@@ -66,7 +66,7 @@ describe("notificationTools", () => {
       }
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("all tools have non-empty description and inputSchema", () =>
     Effect.gen(function*() {
       for (const tool of notificationTools) {
@@ -77,7 +77,7 @@ describe("notificationTools", () => {
 })
 
 describe("notification tool handlers", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("mark_all_notifications_read handler returns success for empty list", () =>
     Effect.gen(function*() {
       const tool = findTool("mark_all_notifications_read")
@@ -88,7 +88,7 @@ describe("notification tool handlers", () => {
       expect(parsed.count).toBe(0)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("archive_all_notifications handler returns success for empty list", () =>
     Effect.gen(function*() {
       const tool = findTool("archive_all_notifications")
@@ -99,7 +99,7 @@ describe("notification tool handlers", () => {
       expect(parsed.count).toBe(0)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("get_unread_notification_count handler returns count", () =>
     Effect.gen(function*() {
       const tool = findTool("get_unread_notification_count")
@@ -110,7 +110,7 @@ describe("notification tool handlers", () => {
       expect(parsed.count).toBe(0)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("list_notifications handler returns empty list", () =>
     Effect.gen(function*() {
       const tool = findTool("list_notifications")
@@ -121,7 +121,7 @@ describe("notification tool handlers", () => {
       expect(parsed).toEqual([])
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("get_notification handler returns error for missing notification", () =>
     Effect.gen(function*() {
       const tool = findTool("get_notification")
@@ -132,7 +132,7 @@ describe("notification tool handlers", () => {
       expect(result.isError).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("mark_notification_read handler returns error for missing notification", () =>
     Effect.gen(function*() {
       const tool = findTool("mark_notification_read")
@@ -154,7 +154,7 @@ describe("notification tool handlers", () => {
       expect(result.isError).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("delete_notification handler returns error for missing notification", () =>
     Effect.gen(function*() {
       const tool = findTool("delete_notification")
@@ -165,7 +165,7 @@ describe("notification tool handlers", () => {
       expect(result.isError).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("get_notification_context handler returns null for missing context", () =>
     Effect.gen(function*() {
       const tool = findTool("get_notification_context")
@@ -182,7 +182,7 @@ describe("notification tool handlers", () => {
       expect(parsed).toBeNull()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("list_notification_contexts handler returns empty list", () =>
     Effect.gen(function*() {
       const tool = findTool("list_notification_contexts")
@@ -193,7 +193,7 @@ describe("notification tool handlers", () => {
       expect(parsed).toEqual([])
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("pin_notification_context handler returns error for missing context", () =>
     Effect.gen(function*() {
       const tool = findTool("pin_notification_context")
@@ -208,7 +208,7 @@ describe("notification tool handlers", () => {
       expect(result.isError).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("list_notification_settings handler returns empty list", () =>
     Effect.gen(function*() {
       const tool = findTool("list_notification_settings")
@@ -219,7 +219,7 @@ describe("notification tool handlers", () => {
       expect(parsed).toEqual([])
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | Test name claims "valid params" but only tests setting doesn't exist case; should mock existing setting and verify update=true
   it.effect("update_notification_provider_setting handler with valid params", () =>
     Effect.gen(function*() {
       const tool = findTool("update_notification_provider_setting")
@@ -237,7 +237,7 @@ describe("notification tool handlers", () => {
       expect(parsed.updated).toBe(false)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("handler returns parse error for invalid params", () =>
     Effect.gen(function*() {
       const tool = findTool("get_notification")

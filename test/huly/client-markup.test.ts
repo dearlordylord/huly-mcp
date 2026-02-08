@@ -23,7 +23,7 @@ interface TestDoc extends Doc {
 }
 
 describe("HulyClient.testLayer defaults", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("findAll returns empty FindResult", () =>
     Effect.gen(function*() {
       const client = yield* HulyClient.pipe(
@@ -37,7 +37,7 @@ describe("HulyClient.testLayer defaults", () => {
       expect(results.total).toBe(0)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("findOne returns undefined", () =>
     Effect.gen(function*() {
       const client = yield* HulyClient.pipe(
@@ -50,7 +50,7 @@ describe("HulyClient.testLayer defaults", () => {
       expect(result).toBeUndefined()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fetchMarkup returns empty string", () =>
     Effect.gen(function*() {
       const client = yield* HulyClient.pipe(
@@ -66,7 +66,7 @@ describe("HulyClient.testLayer defaults", () => {
       expect(result).toBe("")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("createDoc dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* HulyClient.pipe(
@@ -82,7 +82,7 @@ describe("HulyClient.testLayer defaults", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updateDoc dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* HulyClient.pipe(
@@ -99,7 +99,7 @@ describe("HulyClient.testLayer defaults", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("addCollection dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* HulyClient.pipe(
@@ -118,7 +118,7 @@ describe("HulyClient.testLayer defaults", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("removeDoc dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* HulyClient.pipe(
@@ -134,7 +134,7 @@ describe("HulyClient.testLayer defaults", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("uploadMarkup dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* HulyClient.pipe(
@@ -152,7 +152,7 @@ describe("HulyClient.testLayer defaults", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updateMarkup dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* HulyClient.pipe(
@@ -172,7 +172,7 @@ describe("HulyClient.testLayer defaults", () => {
 })
 
 describe("HulyClient.testLayer with custom operations", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("custom findAll returns provided data", () =>
     Effect.gen(function*() {
       const docs = [
@@ -192,7 +192,7 @@ describe("HulyClient.testLayer with custom operations", () => {
       expect(results).toHaveLength(2)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | Weak assertion: only checks toBeDefined(), doesn't validate returned doc matches mock
   it.effect("custom findOne returns provided value", () =>
     Effect.gen(function*() {
       const doc = { _id: "d1", title: "Found" }
@@ -208,7 +208,7 @@ describe("HulyClient.testLayer with custom operations", () => {
       expect(result).toBeDefined()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("custom operation can return error", () =>
     Effect.gen(function*() {
       const layer = HulyClient.testLayer({
@@ -227,7 +227,7 @@ describe("HulyClient.testLayer with custom operations", () => {
       expect(err._tag).toBe("HulyConnectionError")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("overriding one op does not affect others", () =>
     Effect.gen(function*() {
       const layer = HulyClient.testLayer({
@@ -254,7 +254,7 @@ describe("HulyClient.testLayer with custom operations", () => {
 })
 
 describe("WorkspaceClient.testLayer defaults", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("getWorkspaceMembers returns empty array", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -264,7 +264,7 @@ describe("WorkspaceClient.testLayer defaults", () => {
       expect(members).toEqual([])
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("getUserWorkspaces returns empty array", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -274,7 +274,7 @@ describe("WorkspaceClient.testLayer defaults", () => {
       expect(workspaces).toEqual([])
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("getUserProfile returns null", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -284,7 +284,7 @@ describe("WorkspaceClient.testLayer defaults", () => {
       expect(profile).toBeNull()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("getRegionInfo returns empty array", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -294,7 +294,7 @@ describe("WorkspaceClient.testLayer defaults", () => {
       expect(regions).toEqual([])
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("getPersonInfo dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -306,7 +306,7 @@ describe("WorkspaceClient.testLayer defaults", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updateWorkspaceRole dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -328,7 +328,7 @@ describe("WorkspaceClient.testLayer defaults", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("createWorkspace dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -338,7 +338,7 @@ describe("WorkspaceClient.testLayer defaults", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("deleteWorkspace dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -348,7 +348,7 @@ describe("WorkspaceClient.testLayer defaults", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("setMyProfile dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -358,7 +358,7 @@ describe("WorkspaceClient.testLayer defaults", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updateAllowReadOnlyGuests dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -368,7 +368,7 @@ describe("WorkspaceClient.testLayer defaults", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updateAllowGuestSignUp dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -380,7 +380,7 @@ describe("WorkspaceClient.testLayer defaults", () => {
 })
 
 describe("WorkspaceClient.testLayer with custom operations", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | Only checks length, not actual data; should verify members[0].person === "p1"
   it.effect("custom getWorkspaceMembers returns provided data", () =>
     Effect.gen(function*() {
       const mockMembers = [{ person: "p1" }]
@@ -396,7 +396,7 @@ describe("WorkspaceClient.testLayer with custom operations", () => {
       expect(members).toHaveLength(1)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("custom operation can return error", () =>
     Effect.gen(function*() {
       const layer = WorkspaceClient.testLayer({
@@ -410,7 +410,7 @@ describe("WorkspaceClient.testLayer with custom operations", () => {
       expect(err._tag).toBe("HulyConnectionError")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("overriding one op preserves other defaults", () =>
     Effect.gen(function*() {
       const layer = WorkspaceClient.testLayer({

@@ -212,7 +212,7 @@ const createTestLayer = (config: MockConfig) => {
 // --- Tests ---
 
 describe("listEvents", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns event summaries", () =>
     Effect.gen(function*() {
       const events = [
@@ -228,7 +228,7 @@ describe("listEvents", () => {
       expect(result[1].title).toBe("Lunch")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns empty array when no events", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayer({})
@@ -240,7 +240,7 @@ describe("listEvents", () => {
 })
 
 describe("getEvent", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns full event with participants", () =>
     Effect.gen(function*() {
       const person = makePerson({ _id: "person-1" as Ref<Person>, name: "Alice" })
@@ -265,7 +265,7 @@ describe("getEvent", () => {
       expect(result.participants?.[0].name).toBe("Alice")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns event without description when not set", () =>
     Effect.gen(function*() {
       const event = makeEvent({ eventId: "evt-1", description: "" as HulyEvent["description"] })
@@ -276,7 +276,7 @@ describe("getEvent", () => {
       expect(result.description).toBeUndefined()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fails with EventNotFoundError when event does not exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayer({})
@@ -291,7 +291,7 @@ describe("getEvent", () => {
 })
 
 describe("createEvent", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | Missing dueDate assertion - should verify default calculation (date + 1 hour)
   it.effect("creates event with minimal params", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -307,7 +307,7 @@ describe("createEvent", () => {
       expect(captureAddCollection.attributes?.allDay).toBe(false)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("creates event with all optional params", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -328,7 +328,7 @@ describe("createEvent", () => {
       expect(captureAddCollection.attributes?.visibility).toBe("private")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("defaults dueDate to date + 1 hour when not provided", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -343,7 +343,7 @@ describe("createEvent", () => {
 })
 
 describe("updateEvent", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates event title", () =>
     Effect.gen(function*() {
       const event = makeEvent({ eventId: "evt-1", title: "Old Title" })
@@ -360,7 +360,7 @@ describe("updateEvent", () => {
       expect(captureUpdateDoc.operations?.title).toBe("New Title")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns updated=false when no fields provided", () =>
     Effect.gen(function*() {
       const event = makeEvent({ eventId: "evt-1" })
@@ -371,7 +371,7 @@ describe("updateEvent", () => {
       expect(result.updated).toBe(false)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("clears description with empty string", () =>
     Effect.gen(function*() {
       const event = makeEvent({ eventId: "evt-1", description: "old-desc" as HulyEvent["description"] })
@@ -387,7 +387,7 @@ describe("updateEvent", () => {
       expect(captureUpdateDoc.operations?.description).toBe("")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | doesn't verify updateMarkup was called; only checks updated=true which would pass for wrong code paths
   it.effect("updates description in place when event already has one", () =>
     Effect.gen(function*() {
       const event = makeEvent({ eventId: "evt-1", description: "existing-markup-ref" as HulyEvent["description"] })
@@ -401,7 +401,7 @@ describe("updateEvent", () => {
       expect(result.updated).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | Mock uploadMarkup hardcoded; doesn't verify uploadMarkup vs updateMarkup path taken
   it.effect("uploads new description when event has none", () =>
     Effect.gen(function*() {
       const event = makeEvent({ eventId: "evt-1", description: "" as HulyEvent["description"] })
@@ -417,7 +417,7 @@ describe("updateEvent", () => {
       expect(captureUpdateDoc.operations?.description).toBe("markup-ref-123")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | Only verifies error type, not error content (eventId missing from assertion)
   it.effect("fails with EventNotFoundError when event does not exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayer({})
@@ -445,7 +445,7 @@ describe("deleteEvent", () => {
       expect(captureRemoveDoc.id).toBe("event-1")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fails with EventNotFoundError when event does not exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayer({})
@@ -460,7 +460,7 @@ describe("deleteEvent", () => {
 })
 
 describe("listRecurringEvents", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns recurring event summaries", () =>
     Effect.gen(function*() {
       const recurringEvents = [
@@ -476,7 +476,7 @@ describe("listRecurringEvents", () => {
       expect(result[0].rules[0].freq).toBe("WEEKLY")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns empty array when no recurring events", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayer({})
@@ -488,7 +488,7 @@ describe("listRecurringEvents", () => {
 })
 
 describe("createRecurringEvent", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("creates recurring event with rules", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -530,7 +530,7 @@ describe("createRecurringEvent", () => {
 })
 
 describe("listEventInstances", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns instances of recurring event", () =>
     Effect.gen(function*() {
       const recurringEvent = makeRecurringEvent({ eventId: "recur-1" })
@@ -548,7 +548,7 @@ describe("listEventInstances", () => {
       expect(result[0].recurringEventId).toBe("recur-1")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns instances with participants when requested", () =>
     Effect.gen(function*() {
       const person = makePerson({ _id: "person-1" as Ref<Person>, name: "Bob" })
@@ -576,7 +576,7 @@ describe("listEventInstances", () => {
       expect(result[0].participants?.[0].name).toBe("Bob")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns empty participants when no participants exist", () =>
     Effect.gen(function*() {
       const recurringEvent = makeRecurringEvent({ eventId: "recur-1" })
@@ -597,7 +597,7 @@ describe("listEventInstances", () => {
       expect(result[0].participants).toEqual([])
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fails with RecurringEventNotFoundError when recurring event does not exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayer({})

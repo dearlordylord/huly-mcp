@@ -33,7 +33,7 @@ type JsonSchemaObject = {
 
 describe("Channel Domain Schemas", () => {
   describe("ChannelSummarySchema", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses minimal channel summary", () =>
       Effect.gen(function*() {
         const result = yield* Schema.decodeUnknown(ChannelSummarySchema)({
@@ -50,7 +50,7 @@ describe("Channel Domain Schemas", () => {
         })
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses with all optional fields", () =>
       Effect.gen(function*() {
         const result = yield* Schema.decodeUnknown(ChannelSummarySchema)({
@@ -69,7 +69,7 @@ describe("Channel Domain Schemas", () => {
         expect(result.modifiedOn).toBe(1706500000000)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects empty id", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -85,7 +85,7 @@ describe("Channel Domain Schemas", () => {
   })
 
   describe("ChannelSchema", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses minimal channel", () =>
       Effect.gen(function*() {
         const result = yield* Schema.decodeUnknown(ChannelSchema)({
@@ -99,7 +99,7 @@ describe("Channel Domain Schemas", () => {
         expect(result.description).toBeUndefined()
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses full channel", () =>
       Effect.gen(function*() {
         const result = yield* Schema.decodeUnknown(ChannelSchema)({
@@ -133,7 +133,7 @@ describe("Channel Domain Schemas", () => {
         expect(result.body).toBe("Hello world")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | Incomplete assertions: provides 8 fields but only validates 2 (sender, replies). Missing validation of senderId, timestamps, etc.
     it.effect("parses full message", () =>
       Effect.gen(function*() {
         const result = yield* Schema.decodeUnknown(MessageSummarySchema)({
@@ -152,7 +152,7 @@ describe("Channel Domain Schemas", () => {
   })
 
   describe("DirectMessageSummarySchema", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses minimal DM", () =>
       Effect.gen(function*() {
         const result = yield* Schema.decodeUnknown(DirectMessageSummarySchema)({
@@ -163,7 +163,7 @@ describe("Channel Domain Schemas", () => {
         expect(result.participants).toEqual(["Alice", "Bob"])
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses full DM", () =>
       Effect.gen(function*() {
         const result = yield* Schema.decodeUnknown(DirectMessageSummarySchema)({
@@ -179,14 +179,14 @@ describe("Channel Domain Schemas", () => {
   })
 
   describe("ListChannelsParamsSchema", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses empty params", () =>
       Effect.gen(function*() {
         const result = yield* parseListChannelsParams({})
         expect(result).toEqual({})
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses with all options", () =>
       Effect.gen(function*() {
         const result = yield* parseListChannelsParams({
@@ -197,7 +197,7 @@ describe("Channel Domain Schemas", () => {
         expect(result.limit).toBe(25)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects limit over 200", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -206,7 +206,7 @@ describe("Channel Domain Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects negative limit", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -215,7 +215,7 @@ describe("Channel Domain Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects non-integer limit", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -235,21 +235,21 @@ describe("Channel Domain Schemas", () => {
   })
 
   describe("GetChannelParamsSchema", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses valid params", () =>
       Effect.gen(function*() {
         const result = yield* parseGetChannelParams({ channel: "general" })
         expect(result).toEqual({ channel: "general" })
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("trims whitespace", () =>
       Effect.gen(function*() {
         const result = yield* parseGetChannelParams({ channel: "  general  " })
         expect(result.channel).toBe("general")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects empty channel", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -276,7 +276,7 @@ describe("Channel Domain Schemas", () => {
         expect(result).toEqual({ name: "new-channel" })
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses with topic and private", () =>
       Effect.gen(function*() {
         const result = yield* parseCreateChannelParams({
@@ -289,7 +289,7 @@ describe("Channel Domain Schemas", () => {
         expect(result.private).toBe(true)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects empty name", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -300,14 +300,14 @@ describe("Channel Domain Schemas", () => {
   })
 
   describe("UpdateChannelParamsSchema", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses minimal params", () =>
       Effect.gen(function*() {
         const result = yield* parseUpdateChannelParams({ channel: "general" })
         expect(result).toEqual({ channel: "general" })
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | Missing assertion for 'channel' field; validates 2 of 3 required input fields
     it.effect("parses with update fields", () =>
       Effect.gen(function*() {
         const result = yield* parseUpdateChannelParams({
@@ -319,7 +319,7 @@ describe("Channel Domain Schemas", () => {
         expect(result.topic).toBe("Updated topic")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects empty channel", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -330,14 +330,14 @@ describe("Channel Domain Schemas", () => {
   })
 
   describe("DeleteChannelParamsSchema", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses valid params", () =>
       Effect.gen(function*() {
         const result = yield* parseDeleteChannelParams({ channel: "old-channel" })
         expect(result).toEqual({ channel: "old-channel" })
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects empty channel", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -348,14 +348,14 @@ describe("Channel Domain Schemas", () => {
   })
 
   describe("ListChannelMessagesParamsSchema", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses minimal params", () =>
       Effect.gen(function*() {
         const result = yield* parseListChannelMessagesParams({ channel: "general" })
         expect(result).toEqual({ channel: "general" })
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses with limit", () =>
       Effect.gen(function*() {
         const result = yield* parseListChannelMessagesParams({
@@ -365,7 +365,7 @@ describe("Channel Domain Schemas", () => {
         expect(result.limit).toBe(100)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects empty channel", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -376,7 +376,7 @@ describe("Channel Domain Schemas", () => {
   })
 
   describe("SendChannelMessageParamsSchema", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses valid params", () =>
       Effect.gen(function*() {
         const result = yield* parseSendChannelMessageParams({
@@ -387,7 +387,7 @@ describe("Channel Domain Schemas", () => {
         expect(result.body).toBe("Hello everyone!")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects empty body", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -399,7 +399,7 @@ describe("Channel Domain Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects empty channel", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -413,7 +413,7 @@ describe("Channel Domain Schemas", () => {
   })
 
   describe("ListDirectMessagesParamsSchema", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses empty params", () =>
       Effect.gen(function*() {
         const result = yield* parseListDirectMessagesParams({})
@@ -429,7 +429,7 @@ describe("Channel Domain Schemas", () => {
   })
 
   describe("Channel JSON Schema Generation", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("generates JSON Schema for ListChannelsParams", () =>
       Effect.gen(function*() {
         const schema = listChannelsParamsJsonSchema as JsonSchemaObject
@@ -439,7 +439,7 @@ describe("Channel Domain Schemas", () => {
         expect(schema.properties).toHaveProperty("limit")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("generates JSON Schema for GetChannelParams", () =>
       Effect.gen(function*() {
         const schema = getChannelParamsJsonSchema as JsonSchemaObject
@@ -447,7 +447,7 @@ describe("Channel Domain Schemas", () => {
         expect(schema.required).toContain("channel")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("generates JSON Schema for CreateChannelParams without members", () =>
       Effect.gen(function*() {
         const schema = createChannelParamsJsonSchema as JsonSchemaObject
@@ -458,7 +458,7 @@ describe("Channel Domain Schemas", () => {
         expect(schema.properties).not.toHaveProperty("members")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("generates JSON Schema for UpdateChannelParams", () =>
       Effect.gen(function*() {
         const schema = updateChannelParamsJsonSchema as JsonSchemaObject
@@ -468,7 +468,7 @@ describe("Channel Domain Schemas", () => {
         expect(schema.properties).toHaveProperty("topic")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("generates JSON Schema for DeleteChannelParams", () =>
       Effect.gen(function*() {
         const schema = deleteChannelParamsJsonSchema as JsonSchemaObject
@@ -476,7 +476,7 @@ describe("Channel Domain Schemas", () => {
         expect(schema.required).toContain("channel")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("generates JSON Schema for ListChannelMessagesParams", () =>
       Effect.gen(function*() {
         const schema = listChannelMessagesParamsJsonSchema as JsonSchemaObject
@@ -485,7 +485,7 @@ describe("Channel Domain Schemas", () => {
         expect(schema.properties).toHaveProperty("limit")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("generates JSON Schema for SendChannelMessageParams", () =>
       Effect.gen(function*() {
         const schema = sendChannelMessageParamsJsonSchema as JsonSchemaObject
@@ -494,7 +494,7 @@ describe("Channel Domain Schemas", () => {
         expect(schema.required).toContain("body")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | Only validates 3 of 5 expected assertions: missing validation that limit is optional and that no required fields exist
     it.effect("generates JSON Schema for ListDirectMessagesParams", () =>
       Effect.gen(function*() {
         const schema = listDirectMessagesParamsJsonSchema as JsonSchemaObject

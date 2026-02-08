@@ -363,7 +363,7 @@ describe("listIssueTemplates", () => {
       expect(result[1].title).toBe("Template B")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns empty array when no templates exist", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -374,7 +374,7 @@ describe("listIssueTemplates", () => {
       expect(result).toHaveLength(0)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("maps priority correctly", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -401,7 +401,7 @@ describe("listIssueTemplates", () => {
       expect(result[4].priority).toBe("no-priority")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fails with ProjectNotFoundError for unknown project", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({})
@@ -416,7 +416,7 @@ describe("listIssueTemplates", () => {
 })
 
 describe("getIssueTemplate", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns full template details by title", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -444,7 +444,7 @@ describe("getIssueTemplate", () => {
       expect(result.createdOn).toBe(1000)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns template by ID", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -463,7 +463,7 @@ describe("getIssueTemplate", () => {
       expect(result.id).toBe("template-abc")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("resolves assignee name when present", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -485,7 +485,7 @@ describe("getIssueTemplate", () => {
       expect(result.assignee).toBe("Jane Doe")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns undefined assignee when template has no assignee", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -500,7 +500,7 @@ describe("getIssueTemplate", () => {
       expect(result.assignee).toBeUndefined()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("resolves component label when present", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -522,7 +522,7 @@ describe("getIssueTemplate", () => {
       expect(result.component).toBe("Backend")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns undefined component when template has no component", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -537,7 +537,7 @@ describe("getIssueTemplate", () => {
       expect(result.component).toBeUndefined()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns undefined estimation when zero", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -552,7 +552,7 @@ describe("getIssueTemplate", () => {
       expect(result.estimation).toBeUndefined()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fails with IssueTemplateNotFoundError for unknown template", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -581,7 +581,7 @@ describe("getIssueTemplate", () => {
 })
 
 describe("createIssueTemplate", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("creates template with minimal params", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -611,7 +611,7 @@ describe("createIssueTemplate", () => {
       })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("creates template with all optional fields", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -649,7 +649,7 @@ describe("createIssueTemplate", () => {
       })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fails with PersonNotFoundError for unknown assignee", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -664,7 +664,7 @@ describe("createIssueTemplate", () => {
       expect((result as PersonNotFoundError)._tag).toBe("PersonNotFoundError")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fails with ComponentNotFoundError for unknown component", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -731,7 +731,7 @@ describe("createIssueFromTemplate", () => {
       })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | Missing description assertion - only checks title and priority
   it.effect("overrides template values with provided params", () =>
     Effect.gen(function*() {
       const capture: MockConfig["captureAddCollection"] = {}
@@ -752,7 +752,7 @@ describe("createIssueFromTemplate", () => {
       })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("resolves template assignee from person email", () =>
     Effect.gen(function*() {
       const person = makePerson({ _id: "person-1" as Ref<Person>, name: "Jane Doe" })
@@ -786,7 +786,7 @@ describe("createIssueFromTemplate", () => {
       })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | Person name is email-formatted to bypass Email.make() constraint; masks real fallback behavior
   it.effect("falls back to person name as assignee lookup when no email channel", () =>
     Effect.gen(function*() {
       // When template has assignee but person has no email channel,
@@ -819,7 +819,7 @@ describe("createIssueFromTemplate", () => {
       })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("overrides template assignee when param provided", () =>
     Effect.gen(function*() {
       const person1 = makePerson({ _id: "person-1" as Ref<Person>, name: "Jane Doe" })
@@ -856,7 +856,7 @@ describe("createIssueFromTemplate", () => {
       })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("applies template component to created issue via updateDoc", () =>
     Effect.gen(function*() {
       const component = makeComponent({ _id: "comp-1" as Ref<HulyComponent>, label: "Backend" })
@@ -884,7 +884,7 @@ describe("createIssueFromTemplate", () => {
       })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fails with IssueTemplateNotFoundError for unknown template", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({
@@ -900,7 +900,7 @@ describe("createIssueFromTemplate", () => {
       expect((result as IssueTemplateNotFoundError)._tag).toBe("IssueTemplateNotFoundError")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fails with ProjectNotFoundError for unknown project", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({})
@@ -915,7 +915,7 @@ describe("createIssueFromTemplate", () => {
 })
 
 describe("updateIssueTemplate", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates template title", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -938,7 +938,7 @@ describe("updateIssueTemplate", () => {
       expect(captureUpdate.operations).toMatchObject({ title: "New Title" })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates template description", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -961,7 +961,7 @@ describe("updateIssueTemplate", () => {
       expect(captureUpdate.operations).toMatchObject({ description: "Updated description" })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates template priority", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -984,7 +984,7 @@ describe("updateIssueTemplate", () => {
       expect(captureUpdate.operations).toMatchObject({ priority: IssuePriority.Urgent })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates template assignee", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -1034,7 +1034,7 @@ describe("updateIssueTemplate", () => {
       expect(captureUpdate.operations).toMatchObject({ assignee: null })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates template component", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -1059,7 +1059,7 @@ describe("updateIssueTemplate", () => {
       expect(captureUpdate.operations).toMatchObject({ component: "component-1" })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("clears component when set to null", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -1082,7 +1082,7 @@ describe("updateIssueTemplate", () => {
       expect(captureUpdate.operations).toMatchObject({ component: null })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates template estimation", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -1105,7 +1105,7 @@ describe("updateIssueTemplate", () => {
       expect(captureUpdate.operations).toMatchObject({ estimation: 90 })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns updated=false when no changes provided", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -1125,7 +1125,7 @@ describe("updateIssueTemplate", () => {
       expect(result.id).toBe("template-1")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fails with PersonNotFoundError for unknown assignee", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -1145,7 +1145,7 @@ describe("updateIssueTemplate", () => {
       expect((result as PersonNotFoundError)._tag).toBe("PersonNotFoundError")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fails with ComponentNotFoundError for unknown component", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -1165,7 +1165,7 @@ describe("updateIssueTemplate", () => {
       expect((result as ComponentNotFoundError)._tag).toBe("ComponentNotFoundError")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fails with IssueTemplateNotFoundError for unknown template", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -1180,7 +1180,7 @@ describe("updateIssueTemplate", () => {
       expect((result as IssueTemplateNotFoundError)._tag).toBe("IssueTemplateNotFoundError")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fails with ProjectNotFoundError for unknown project", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({})
@@ -1196,7 +1196,7 @@ describe("updateIssueTemplate", () => {
 })
 
 describe("deleteIssueTemplate", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("deletes template by title", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -1219,7 +1219,7 @@ describe("deleteIssueTemplate", () => {
       expect(captureRemove.called).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("deletes template by ID", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -1246,7 +1246,7 @@ describe("deleteIssueTemplate", () => {
       expect(captureRemove.id).toBe("template-xyz")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fails with IssueTemplateNotFoundError for unknown template", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -1260,7 +1260,7 @@ describe("deleteIssueTemplate", () => {
       expect((result as IssueTemplateNotFoundError)._tag).toBe("IssueTemplateNotFoundError")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fails with ProjectNotFoundError for unknown project", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({})

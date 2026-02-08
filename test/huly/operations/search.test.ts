@@ -32,7 +32,7 @@ const createTestLayer = (docs: Array<Doc>, captureQuery?: { query?: unknown; opt
 }
 
 describe("fulltextSearch", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns mapped results with correct fields", () =>
     Effect.gen(function*() {
       const docs = [
@@ -59,7 +59,7 @@ describe("fulltextSearch", () => {
       expect(result.items[1].modifiedOn).toBe(1000)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("passes $search query to client.findAll", () =>
     Effect.gen(function*() {
       const captured: { query?: unknown; options?: unknown } = {}
@@ -70,7 +70,7 @@ describe("fulltextSearch", () => {
       expect(captured.query).toEqual({ $search: "hello world" })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("uses default limit of 50", () =>
     Effect.gen(function*() {
       const captured: { query?: unknown; options?: unknown } = {}
@@ -82,7 +82,7 @@ describe("fulltextSearch", () => {
       expect(opts.limit).toBe(50)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("enforces max limit of 200", () =>
     Effect.gen(function*() {
       const captured: { query?: unknown; options?: unknown } = {}
@@ -94,7 +94,7 @@ describe("fulltextSearch", () => {
       expect(opts.limit).toBe(200)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | assertion only checks existence (toBeDefined), not actual sort order value
   it.effect("sorts by modifiedOn descending", () =>
     Effect.gen(function*() {
       const captured: { query?: unknown; options?: unknown } = {}
@@ -106,7 +106,7 @@ describe("fulltextSearch", () => {
       expect(opts.sort?.modifiedOn).toBeDefined()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns empty results for no matches", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayer([])
@@ -132,7 +132,7 @@ describe("fulltextSearch", () => {
       expect(result.items[0].space).toBeUndefined()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("searches against core.class.Doc", () =>
     Effect.gen(function*() {
       let calledClass: unknown

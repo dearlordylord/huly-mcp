@@ -35,7 +35,7 @@ describe("Config Module", () => {
   })
 
   describe("HulyConfigSchema", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("validates valid config with password auth", () =>
       Effect.gen(function*() {
         const config = {
@@ -60,7 +60,7 @@ describe("Config Module", () => {
         expect(result.connectionTimeout).toBe(30000)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("validates valid config with token auth", () =>
       Effect.gen(function*() {
         const config = {
@@ -83,7 +83,7 @@ describe("Config Module", () => {
         expect(result.connectionTimeout).toBe(30000)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects invalid URL", () =>
       Effect.gen(function*() {
         const config = {
@@ -96,7 +96,7 @@ describe("Config Module", () => {
         expect(() => Schema.decodeUnknownSync(HulyConfigSchema)(config)).toThrow()
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects ftp URL", () =>
       Effect.gen(function*() {
         const config = {
@@ -109,7 +109,7 @@ describe("Config Module", () => {
         expect(() => Schema.decodeUnknownSync(HulyConfigSchema)(config)).toThrow()
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects empty email in password auth", () =>
       Effect.gen(function*() {
         const config = {
@@ -122,7 +122,7 @@ describe("Config Module", () => {
         expect(() => Schema.decodeUnknownSync(HulyConfigSchema)(config)).toThrow()
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects negative timeout", () =>
       Effect.gen(function*() {
         const config = {
@@ -135,7 +135,7 @@ describe("Config Module", () => {
         expect(() => Schema.decodeUnknownSync(HulyConfigSchema)(config)).toThrow()
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects zero timeout", () =>
       Effect.gen(function*() {
         const config = {
@@ -148,7 +148,7 @@ describe("Config Module", () => {
         expect(() => Schema.decodeUnknownSync(HulyConfigSchema)(config)).toThrow()
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects non-integer timeout", () =>
       Effect.gen(function*() {
         const config = {
@@ -163,7 +163,7 @@ describe("Config Module", () => {
   })
 
   describe("ConfigValidationError", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("creates with message", () =>
       Effect.gen(function*() {
         const error = new ConfigValidationError({ message: "Invalid config" })
@@ -171,7 +171,7 @@ describe("Config Module", () => {
         expect(error.message).toBe("Invalid config")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("creates with field", () =>
       Effect.gen(function*() {
         const error = new ConfigValidationError({
@@ -181,7 +181,7 @@ describe("Config Module", () => {
         expect(error.field).toBe("HULY_URL")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("creates with cause", () =>
       Effect.gen(function*() {
         const cause = new Error("underlying error")
@@ -194,7 +194,7 @@ describe("Config Module", () => {
   })
 
   describe("HulyConfigService.testLayer", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("creates layer with password auth", () =>
       Effect.gen(function*() {
         const layer = HulyConfigService.testLayer({
@@ -217,7 +217,7 @@ describe("Config Module", () => {
         expect(config.connectionTimeout).toBe(5000)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("creates layer with token auth", () =>
       Effect.gen(function*() {
         const layer = HulyConfigService.testLayerToken({
@@ -238,7 +238,7 @@ describe("Config Module", () => {
         expect(config.connectionTimeout).toBe(5000)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("uses default timeout when not provided", () =>
       Effect.gen(function*() {
         const layer = HulyConfigService.testLayer({
@@ -255,7 +255,7 @@ describe("Config Module", () => {
   })
 
   describe("HulyConfigService.layer (env vars)", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("loads config with password auth from env vars", () =>
       Effect.gen(function*() {
         process.env["HULY_URL"] = "https://huly.app"
@@ -278,7 +278,7 @@ describe("Config Module", () => {
         expect(config.connectionTimeout).toBe(60000)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("loads config with token auth from env vars", () =>
       Effect.gen(function*() {
         process.env["HULY_URL"] = "https://huly.app"
@@ -299,7 +299,7 @@ describe("Config Module", () => {
         expect(config.connectionTimeout).toBe(60000)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("token takes priority over password", () =>
       Effect.gen(function*() {
         process.env["HULY_URL"] = "https://huly.app"
@@ -318,7 +318,7 @@ describe("Config Module", () => {
         }
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("uses default timeout when not provided", () =>
       Effect.gen(function*() {
         process.env["HULY_URL"] = "https://huly.app"
@@ -333,7 +333,7 @@ describe("Config Module", () => {
         expect(config.connectionTimeout).toBe(HulyConfigService.DEFAULT_TIMEOUT)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails on missing required HULY_URL", () =>
       Effect.gen(function*() {
         process.env["HULY_EMAIL"] = "user@example.com"
@@ -347,7 +347,7 @@ describe("Config Module", () => {
         expect(error._tag).toBe("ConfigValidationError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails on missing auth (no token or email/password)", () =>
       Effect.gen(function*() {
         process.env["HULY_URL"] = "https://huly.app"
@@ -360,7 +360,7 @@ describe("Config Module", () => {
         expect(error._tag).toBe("ConfigValidationError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails on missing HULY_PASSWORD when using password auth", () =>
       Effect.gen(function*() {
         process.env["HULY_URL"] = "https://huly.app"
@@ -374,7 +374,7 @@ describe("Config Module", () => {
         expect(error._tag).toBe("ConfigValidationError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails on missing required HULY_WORKSPACE", () =>
       Effect.gen(function*() {
         process.env["HULY_URL"] = "https://huly.app"
@@ -388,7 +388,7 @@ describe("Config Module", () => {
         expect(error._tag).toBe("ConfigValidationError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails on invalid URL", () =>
       Effect.gen(function*() {
         process.env["HULY_URL"] = "not-a-url"
@@ -403,7 +403,7 @@ describe("Config Module", () => {
         expect(error._tag).toBe("ConfigValidationError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails on invalid timeout", () =>
       Effect.gen(function*() {
         process.env["HULY_URL"] = "https://huly.app"
@@ -435,7 +435,7 @@ describe("Config Module", () => {
         expect(error._tag).toBe("ConfigValidationError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails on empty password", () =>
       Effect.gen(function*() {
         process.env["HULY_URL"] = "https://huly.app"
@@ -450,7 +450,7 @@ describe("Config Module", () => {
         expect(error._tag).toBe("ConfigValidationError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails on whitespace-only password", () =>
       Effect.gen(function*() {
         process.env["HULY_URL"] = "https://huly.app"
@@ -465,7 +465,7 @@ describe("Config Module", () => {
         expect(error._tag).toBe("ConfigValidationError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails on whitespace-only email", () =>
       Effect.gen(function*() {
         process.env["HULY_URL"] = "https://huly.app"
@@ -480,7 +480,7 @@ describe("Config Module", () => {
         expect(error._tag).toBe("ConfigValidationError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails on whitespace-only token", () =>
       Effect.gen(function*() {
         process.env["HULY_URL"] = "https://huly.app"
@@ -496,7 +496,7 @@ describe("Config Module", () => {
   })
 
   describe("Constants", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("has correct default timeout", () =>
       Effect.gen(function*() {
         expect(HulyConfigService.DEFAULT_TIMEOUT).toBe(30000)
@@ -504,7 +504,7 @@ describe("Config Module", () => {
   })
 
   describe("Effect integration", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("errors are yieldable", () =>
       Effect.gen(function*() {
         const program = Effect.gen(function*() {
@@ -515,7 +515,7 @@ describe("Config Module", () => {
         expect(error._tag).toBe("ConfigValidationError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("can pattern match with catchTag", () =>
       Effect.gen(function*() {
         const program = Effect.gen(function*() {

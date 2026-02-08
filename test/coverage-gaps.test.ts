@@ -50,7 +50,7 @@ import { WorkspaceClient } from "../src/huly/workspace-client.js"
 // ============================================================
 
 describe("config - testLayerToken connectionTimeout explicit (line 172)", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("uses provided connectionTimeout instead of default", () =>
     Effect.gen(function*() {
       const layer = HulyConfigService.testLayerToken({
@@ -69,7 +69,7 @@ describe("config - testLayerToken connectionTimeout explicit (line 172)", () => 
       }
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("falls back to DEFAULT_TIMEOUT when omitted", () =>
     Effect.gen(function*() {
       const layer = HulyConfigService.testLayerToken({
@@ -89,7 +89,7 @@ describe("config - testLayerToken connectionTimeout explicit (line 172)", () => 
 // ============================================================
 
 describe("UploadFileParamsSchema - no source validation (storage.ts lines 25-26)", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("rejects when no filePath, fileUrl, or data provided", () =>
     Effect.gen(function*() {
       const result = yield* parseUploadFileParams({
@@ -100,7 +100,7 @@ describe("UploadFileParamsSchema - no source validation (storage.ts lines 25-26)
       expect(String(result)).toContain("Must provide filePath, fileUrl, or data")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("accepts when filePath is provided", () =>
     Effect.gen(function*() {
       const result = yield* parseUploadFileParams({
@@ -118,7 +118,7 @@ describe("UploadFileParamsSchema - no source validation (storage.ts lines 25-26)
 // ============================================================
 
 describe("AddAttachmentParamsSchema - hasFileSource falsy (attachments.ts lines 144-145)", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("rejects AddAttachmentParams when no file source", () =>
     Effect.gen(function*() {
       const result = yield* parseAddAttachmentParams({
@@ -132,7 +132,7 @@ describe("AddAttachmentParamsSchema - hasFileSource falsy (attachments.ts lines 
       expect(String(result)).toContain("Must provide filePath, fileUrl, or data")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("rejects AddIssueAttachmentParams when no file source", () =>
     Effect.gen(function*() {
       const result = yield* parseAddIssueAttachmentParams({
@@ -145,7 +145,7 @@ describe("AddAttachmentParamsSchema - hasFileSource falsy (attachments.ts lines 
       expect(String(result)).toContain("Must provide filePath, fileUrl, or data")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("rejects AddDocumentAttachmentParams when no file source", () =>
     Effect.gen(function*() {
       const result = yield* parseAddDocumentAttachmentParams({
@@ -194,7 +194,7 @@ describe("buildSocialIdToPersonNameMap - person resolved (channels.ts line 159)"
     return HulyClient.testLayer({ findAll: findAllImpl })
   }
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("resolves person names from socialIdentity IDs", () =>
     Effect.gen(function*() {
       const client = yield* HulyClient
@@ -236,7 +236,7 @@ describe("buildSocialIdToPersonNameMap - person resolved (channels.ts line 159)"
 })
 
 describe("channels - buildAccountUuidToNameMap emp.personUuid truthy (line 187)", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("resolves member names in listDirectMessages via buildAccountUuidToNameMap", () =>
     Effect.gen(function*() {
       const dm: HulyDirectMessage = {
@@ -337,7 +337,7 @@ describe("listTeamspaces - description || undefined branches (documents.ts line 
     ...overrides
   })
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("maps truthy description to its value", () =>
     Effect.gen(function*() {
       const ts = makeTeamspace({ description: "Has description" })
@@ -348,7 +348,7 @@ describe("listTeamspaces - description || undefined branches (documents.ts line 
       expect(result.teamspaces[0].description).toBe("Has description")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("maps falsy description to undefined", () =>
     Effect.gen(function*() {
       const ts = makeTeamspace({ description: "" })
@@ -446,7 +446,7 @@ describe("getIssueTemplate - assignee/component lookup false branches (issue-tem
     return HulyClient.testLayer({ findAll: findAllImpl, findOne: findOneImpl })
   }
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns undefined assignee when assignee ref exists but person not found in DB", () =>
     Effect.gen(function*() {
       const project = makeProject()
@@ -467,7 +467,7 @@ describe("getIssueTemplate - assignee/component lookup false branches (issue-tem
       expect(result.assignee).toBeUndefined()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns undefined component when component ref exists but component not found in DB", () =>
     Effect.gen(function*() {
       const project = makeProject()
@@ -542,7 +542,7 @@ describe("getNotification - notif.data truthy branch (notifications.ts line 207)
       expect(result.data).toEqual({ key: "value" })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns undefined data when notif.data is falsy", () =>
     Effect.gen(function*() {
       const notif = makeNotification({ data: undefined })
@@ -576,7 +576,7 @@ describe("listWorkspaces - ws.region defined branch (workspace.ts line 143)", ()
     ...overrides
   })
 
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | Assertion only checks string value, not that region is properly branded as RegionId
   it.effect("maps ws.region to RegionId when defined", () =>
     Effect.gen(function*() {
       const workspaces = [
@@ -593,7 +593,7 @@ describe("listWorkspaces - ws.region defined branch (workspace.ts line 143)", ()
       expect(result[0].region).toBe("eu-west")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("maps ws.region to undefined when not defined", () =>
     Effect.gen(function*() {
       const workspaces = [
@@ -616,7 +616,7 @@ describe("listWorkspaces - ws.region defined branch (workspace.ts line 143)", ()
 // ============================================================
 
 describe("listChannels - includeArchived true (channels.ts line 209 true branch)", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("includes archived channels when includeArchived is true", () =>
     Effect.gen(function*() {
       const archivedChannel: HulyChannel = {

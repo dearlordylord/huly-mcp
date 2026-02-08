@@ -127,7 +127,7 @@ const createComponentTestLayer = (config: {
 }
 
 describe("getComponent - lead person not found in DB (line 177 false branch)", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns undefined lead when person lookup returns undefined", () =>
     Effect.gen(function*() {
       const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
@@ -311,7 +311,7 @@ const createThreadTestLayer = (config: {
 }
 
 describe("listThreadReplies - sender name resolved (line 133 true branch)", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("resolves sender names via socialId->person mapping", () =>
     Effect.gen(function*() {
       const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
@@ -360,7 +360,7 @@ describe("listThreadReplies - sender name resolved (line 133 true branch)", () =
 // --- Storage: filePath and fileUrl branches (lines 46-48) ---
 
 describe("uploadFile - filePath branch (line 46-47)", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("reads from file path when filePath is provided", () =>
     Effect.gen(function*() {
       // We cannot easily test actual filesystem reads in unit tests,
@@ -380,7 +380,7 @@ describe("uploadFile - filePath branch (line 46-47)", () => {
 })
 
 describe("uploadFile - fileUrl branch (line 48-49)", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | mocks uploadFile entirely, never tests fetchFromUrl; should use real layer or spy on fetch
   it.effect("attempts to fetch from URL when fileUrl is provided (no filePath)", () =>
     Effect.gen(function*() {
       const testLayer = HulyStorageClient.testLayer({})

@@ -8,21 +8,21 @@ import { McpServerError, McpServerService } from "../../src/mcp/server.js"
 import { TelemetryService } from "../../src/telemetry/telemetry.js"
 
 describe("McpServerError", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("has correct _tag", () =>
     Effect.gen(function*() {
       const error = new McpServerError({ message: "boom" })
       expect(error._tag).toBe("McpServerError")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("message is accessible", () =>
     Effect.gen(function*() {
       const error = new McpServerError({ message: "test failure" })
       expect(error.message).toBe("test failure")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("cause is optional and preserved", () =>
     Effect.gen(function*() {
       const cause = new TypeError("underlying")
@@ -30,14 +30,14 @@ describe("McpServerError", () => {
       expect(error.cause).toBe(cause)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("cause defaults to undefined when omitted", () =>
     Effect.gen(function*() {
       const error = new McpServerError({ message: "no cause" })
       expect(error.cause).toBeUndefined()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("can be used as Effect failure", () =>
     Effect.gen(function*() {
       const err = yield* Effect.flip(
@@ -49,7 +49,7 @@ describe("McpServerError", () => {
 })
 
 describe("McpServerService.testLayer", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | No assertions - only checks that operations complete without error; doesn't verify actual behavior
   it.effect("default run and stop are noop", () =>
     Effect.gen(function*() {
       const server = yield* McpServerService.pipe(
@@ -59,7 +59,7 @@ describe("McpServerService.testLayer", () => {
       yield* server.stop()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("allows overriding run to fail", () =>
     Effect.gen(function*() {
       const layer = McpServerService.testLayer({
@@ -70,7 +70,7 @@ describe("McpServerService.testLayer", () => {
       expect(err.message).toBe("cannot start")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("allows overriding stop with side effect", () => {
     let stopped = false
     return Effect.gen(function*() {

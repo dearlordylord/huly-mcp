@@ -41,7 +41,7 @@ const mkWorkspaceInfo = (overrides?: Partial<WorkspaceInfoWithStatus>): Workspac
 })
 
 describe("listWorkspaceMembers", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns members with person info", () =>
     Effect.gen(function*() {
       const testLayer = WorkspaceClient.testLayer({
@@ -78,7 +78,7 @@ describe("listWorkspaceMembers", () => {
       expect(result[1].email).toBeUndefined()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("handles person info failure gracefully via Effect.option", () =>
     Effect.gen(function*() {
       const testLayer = WorkspaceClient.testLayer({
@@ -97,7 +97,7 @@ describe("listWorkspaceMembers", () => {
       expect(result[0].email).toBeUndefined()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("respects limit", () =>
     Effect.gen(function*() {
       const members = Array.from({ length: 10 }, (_, i) => ({
@@ -117,7 +117,7 @@ describe("listWorkspaceMembers", () => {
 })
 
 describe("updateMemberRole", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates role and returns result", () =>
     Effect.gen(function*() {
       let capturedAccount: string | undefined
@@ -144,7 +144,7 @@ describe("updateMemberRole", () => {
 })
 
 describe("getWorkspaceInfo", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns mapped workspace info", () =>
     Effect.gen(function*() {
       const wsInfo = mkWorkspaceInfo()
@@ -166,7 +166,7 @@ describe("getWorkspaceInfo", () => {
       expect(result.mode).toBe("active")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("handles undefined region", () =>
     Effect.gen(function*() {
       const wsInfo = mkWorkspaceInfo({ region: undefined })
@@ -182,7 +182,7 @@ describe("getWorkspaceInfo", () => {
 })
 
 describe("listWorkspaces", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns workspace summaries", () =>
     Effect.gen(function*() {
       const workspaces = [
@@ -203,7 +203,7 @@ describe("listWorkspaces", () => {
       expect(result[1].uuid).toBe("ws-2")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("respects limit", () =>
     Effect.gen(function*() {
       const workspaces = Array.from({ length: 10 }, (_, i) =>
@@ -221,7 +221,7 @@ describe("listWorkspaces", () => {
 })
 
 describe("createWorkspace", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("creates workspace and returns result", () =>
     Effect.gen(function*() {
       let capturedName: string | undefined
@@ -252,7 +252,7 @@ describe("createWorkspace", () => {
 })
 
 describe("deleteWorkspace", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("deletes workspace and returns result", () =>
     Effect.gen(function*() {
       let deleteCalled = false
@@ -272,7 +272,7 @@ describe("deleteWorkspace", () => {
 })
 
 describe("getUserProfile", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns null when profile not found", () =>
     Effect.gen(function*() {
       const testLayer = WorkspaceClient.testLayer({
@@ -284,7 +284,7 @@ describe("getUserProfile", () => {
       expect(result).toBeNull()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | Missing assertion for personUuid field transformation, doesn't verify UUID passed to mock
   it.effect("returns mapped profile when found", () =>
     Effect.gen(function*() {
       const profile: PersonWithProfile = {
@@ -316,7 +316,7 @@ describe("getUserProfile", () => {
       expect(result!.isPublic).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fails with InvalidPersonUuidError for bad UUID format", () =>
     Effect.gen(function*() {
       const testLayer = WorkspaceClient.testLayer({})
@@ -331,7 +331,7 @@ describe("getUserProfile", () => {
 })
 
 describe("updateUserProfile", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns updated=false when no fields provided", () =>
     Effect.gen(function*() {
       const testLayer = WorkspaceClient.testLayer({})
@@ -369,7 +369,7 @@ describe("updateUserProfile", () => {
       expect(capturedProfile?.isPublic).toBe(false)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("clears fields when null values provided", () =>
     Effect.gen(function*() {
       let capturedProfile: Record<string, unknown> | undefined
@@ -397,7 +397,7 @@ describe("updateUserProfile", () => {
       expect(capturedProfile?.socialLinks).toEqual({})
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | missing assertion for result.updated === true, inconsistent with similar test
   it.effect("updates socialLinks", () =>
     Effect.gen(function*() {
       let capturedProfile: Record<string, unknown> | undefined
@@ -418,7 +418,7 @@ describe("updateUserProfile", () => {
 })
 
 describe("updateGuestSettings", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns updated=false when no settings provided", () =>
     Effect.gen(function*() {
       const testLayer = WorkspaceClient.testLayer({})
@@ -430,7 +430,7 @@ describe("updateGuestSettings", () => {
       expect(result.allowSignUp).toBeUndefined()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates allowReadOnly", () =>
     Effect.gen(function*() {
       let readOnlyCalled = false
@@ -450,7 +450,7 @@ describe("updateGuestSettings", () => {
       expect(readOnlyCalled).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates allowSignUp", () =>
     Effect.gen(function*() {
       let signUpCalled = false
@@ -470,7 +470,7 @@ describe("updateGuestSettings", () => {
       expect(signUpCalled).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates both settings", () =>
     Effect.gen(function*() {
       let readOnlyCalled = false
@@ -498,7 +498,7 @@ describe("updateGuestSettings", () => {
 })
 
 describe("getRegions", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns mapped region info", () =>
     Effect.gen(function*() {
       const regions: Array<HulyRegionInfo> = [
@@ -519,7 +519,7 @@ describe("getRegions", () => {
       expect(result[1].name).toBe("EU West")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns empty array when no regions", () =>
     Effect.gen(function*() {
       const testLayer = WorkspaceClient.testLayer({

@@ -183,7 +183,7 @@ const createTestLayer = (config: MockConfig) => {
 
 describe("Contacts Operations", () => {
   describe("listPersons", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("returns empty array when no persons exist", async () => {
       const testLayer = createTestLayer({ persons: [] })
 
@@ -217,7 +217,7 @@ describe("Contacts Operations", () => {
       })
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("handles persons without email", async () => {
       const mockPerson = createMockPerson()
 
@@ -234,7 +234,7 @@ describe("Contacts Operations", () => {
       expect(result[0].email).toBeUndefined()
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("handles persons without city", async () => {
       // Create person without city - use a spread from a valid person and delete city
       const basePerson = createMockPerson()
@@ -255,7 +255,7 @@ describe("Contacts Operations", () => {
       expect(result[0].city).toBeUndefined()
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("correctly associates emails with multiple persons", async () => {
       const person1 = createMockPerson({
         _id: "person-1" as Ref<HulyPerson>,
@@ -338,7 +338,7 @@ describe("Contacts Operations", () => {
       expect(result[0].email).toBe("john@example.com")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("returns empty when emailSearch matches no channels", async () => {
       const person1 = createMockPerson()
       const channel1 = createMockChannel({ value: "john@example.com" })
@@ -355,7 +355,7 @@ describe("Contacts Operations", () => {
       expect(result).toEqual([])
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("respects limit when emailSearch is provided", async () => {
       const persons: Array<HulyPerson> = []
       const channels: Array<Channel> = []
@@ -405,7 +405,7 @@ describe("Contacts Operations", () => {
       })
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | only checks Exit.isFailure, not error type or identifier
     it("fails with PersonNotFoundError when person doesn't exist", async () => {
       const testLayer = createTestLayer({ persons: [] })
 
@@ -416,7 +416,7 @@ describe("Contacts Operations", () => {
       expect(Exit.isFailure(result)).toBe(true)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("parses name with comma correctly", async () => {
       const mockPerson = createMockPerson({ name: "Smith,Jane" })
 
@@ -450,7 +450,7 @@ describe("Contacts Operations", () => {
       expect(result.lastName).toBe("")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("handles name with multiple commas", async () => {
       const mockPerson = createMockPerson({ name: "Doe,John,Jr" })
 
@@ -467,7 +467,7 @@ describe("Contacts Operations", () => {
       expect(result.lastName).toBe("Doe")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | uses toMatchObject for weak assertion, missing verification of firstName/lastName/channels
     it("finds person by email", async () => {
       const mockPerson = createMockPerson()
       const mockChannel = createMockChannel({ value: "john@example.com" })
@@ -500,7 +500,7 @@ describe("Contacts Operations", () => {
   })
 
   describe("createPerson", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("creates person with required fields", async () => {
       const capture: MockConfig["captureCreateDoc"] = {}
 
@@ -520,7 +520,7 @@ describe("Contacts Operations", () => {
       expect(capture.data?.city).toBe("")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("creates person with city", async () => {
       const capture: MockConfig["captureCreateDoc"] = {}
 
@@ -539,7 +539,7 @@ describe("Contacts Operations", () => {
       expect(capture.data?.city).toBe("NYC")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("creates email channel when email provided", async () => {
       const channelCapture: MockConfig["captureAddCollection"] = {}
 
@@ -565,7 +565,7 @@ describe("Contacts Operations", () => {
   })
 
   describe("updatePerson", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("returns updated=false when no changes", async () => {
       const mockPerson = createMockPerson()
 
@@ -580,7 +580,7 @@ describe("Contacts Operations", () => {
       expect(result.updated).toBe(false)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("updates firstName", async () => {
       const mockPerson = createMockPerson({ name: "Doe,John" })
       const capture: MockConfig["captureUpdateDoc"] = {}
@@ -601,7 +601,7 @@ describe("Contacts Operations", () => {
       expect(capture.operations?.name).toBe("Doe,Jane")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("clears city when set to null", async () => {
       const mockPerson = createMockPerson({ city: "NYC" })
       const capture: MockConfig["captureUpdateDoc"] = {}
@@ -622,7 +622,7 @@ describe("Contacts Operations", () => {
       expect(capture.operations?.city).toBe("")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | only checks Exit.isFailure, not error type or identifier
     it("fails when person not found", async () => {
       const testLayer = createTestLayer({ persons: [] })
 
@@ -635,7 +635,7 @@ describe("Contacts Operations", () => {
   })
 
   describe("deletePerson", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("deletes existing person", async () => {
       const mockPerson = createMockPerson()
       const capture: MockConfig["captureRemoveDoc"] = {}
@@ -653,7 +653,7 @@ describe("Contacts Operations", () => {
       expect(capture.id).toBe("person-123")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("fails when person not found", async () => {
       const testLayer = createTestLayer({ persons: [] })
 

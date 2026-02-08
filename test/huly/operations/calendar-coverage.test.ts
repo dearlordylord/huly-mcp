@@ -209,7 +209,7 @@ const createTestLayer = (config: MockConfig) => {
 // --- ruleToHulyRule coverage (lines 106-121) ---
 
 describe("createRecurringEvent - ruleToHulyRule with all optional fields", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("converts rule with endDate, count, interval", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -289,7 +289,7 @@ describe("createRecurringEvent - ruleToHulyRule with all optional fields", () =>
 // --- createEvent coverage (lines 300-352) ---
 
 describe("createEvent - description and participants", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("creates event with description via resolveEventInputs", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -345,7 +345,7 @@ describe("createEvent - description and participants", () => {
       expect(participants[0]).toBe("person-1")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | weak assertion: toBeUndefined() doesn't verify uploadMarkup wasn't called, only that property wasn't set; should check called=false or verify no markup ref in attributes
   it.effect("creates event with empty description (whitespace only) - no upload", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -365,7 +365,7 @@ describe("createEvent - description and participants", () => {
 // --- updateEvent coverage (lines 354-437) ---
 
 describe("updateEvent - field update branches", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates date field", () =>
     Effect.gen(function*() {
       const event = makeEvent({ eventId: "evt-1" })
@@ -381,7 +381,7 @@ describe("updateEvent - field update branches", () => {
       expect(captureUpdateDoc.operations?.date).toBe(1800000000000)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates dueDate field", () =>
     Effect.gen(function*() {
       const event = makeEvent({ eventId: "evt-1" })
@@ -397,7 +397,7 @@ describe("updateEvent - field update branches", () => {
       expect(captureUpdateDoc.operations?.dueDate).toBe(1800003600000)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates allDay field", () =>
     Effect.gen(function*() {
       const event = makeEvent({ eventId: "evt-1", allDay: false })
@@ -445,7 +445,7 @@ describe("updateEvent - field update branches", () => {
       expect(captureUpdateDoc.operations?.visibility).toBe("private")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates multiple fields at once", () =>
     Effect.gen(function*() {
       const event = makeEvent({ eventId: "evt-1" })
@@ -473,7 +473,7 @@ describe("updateEvent - field update branches", () => {
 })
 
 describe("updateEvent - description in-place only path (line 423, 427)", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns updated=true without calling updateDoc when only description is updated in place", () =>
     Effect.gen(function*() {
       const event = makeEvent({
@@ -499,7 +499,7 @@ describe("updateEvent - description in-place only path (line 423, 427)", () => {
       expect(captureUpdateDoc.operations).toBeUndefined()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("calls updateDoc when description is updated in place AND other fields change", () =>
     Effect.gen(function*() {
       const event = makeEvent({
@@ -531,7 +531,7 @@ describe("updateEvent - description in-place only path (line 423, 427)", () => {
 // --- listEvents from/to filter branches (lines 222, 226) ---
 
 describe("listEvents - from/to date filters", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | Mock ignores query parameter entirely; doesn't actually test filtering logic
   it.effect("applies from filter when provided", () =>
     Effect.gen(function*() {
       const events = [makeEvent({ eventId: "evt-1", date: 1700100000000 })]
@@ -542,7 +542,7 @@ describe("listEvents - from/to date filters", () => {
       expect(result).toHaveLength(1)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | Single event always matches; test doesn't verify filter excludes out-of-range events
   it.effect("applies to filter when provided", () =>
     Effect.gen(function*() {
       const events = [makeEvent({ eventId: "evt-1", dueDate: 1700200000000 })]
@@ -553,7 +553,7 @@ describe("listEvents - from/to date filters", () => {
       expect(result).toHaveLength(1)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("applies both from and to filters", () =>
     Effect.gen(function*() {
       const events = [makeEvent({ eventId: "evt-1" })]
@@ -571,7 +571,7 @@ describe("listEvents - from/to date filters", () => {
 // --- getEvent externalParticipants (line 291) ---
 
 describe("getEvent - externalParticipants mapping", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | assertion expects raw strings but implementation maps to Email branded types via Email.make()
   it.effect("maps externalParticipants from event", () =>
     Effect.gen(function*() {
       const event = makeEvent({
@@ -608,7 +608,7 @@ describe("createEvent - no default calendar fallback", () => {
 // --- findPersonsByEmails: empty emails and no matching persons (lines 128, 136) ---
 
 describe("createEvent - findPersonsByEmails edge cases", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("handles empty participants array (emails.length === 0)", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -623,7 +623,7 @@ describe("createEvent - findPersonsByEmails edge cases", () => {
       expect(captureAddCollection.attributes?.participants).toEqual([])
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("handles channels found but no matching persons (personIds.length === 0)", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -648,7 +648,7 @@ describe("createEvent - findPersonsByEmails edge cases", () => {
 // --- listEventInstances: participantMap.get fallback (line 622) ---
 
 describe("listEventInstances - participantMap fallback", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | Only checks toBeDefined() - doesn't verify actual empty array value from fallback
   it.effect("falls back to empty array when participantMap has no entry for instance eventId", () =>
     Effect.gen(function*() {
       const recurringEvent = makeRecurringEvent({ eventId: "recur-1" })

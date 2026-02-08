@@ -70,7 +70,7 @@ const createMockResponse = () => {
 
 describe("HTTP Transport", () => {
   describe("createMcpHandlers", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | Tests only that server.connect() was called, not actual request processing; doesn't verify transport.handleRequest() was invoked with correct args
     it("should handle tool calls in stateless mode (connect server and delegate to transport)", async () => {
       const mockServer = createMockMcpServer()
       const handlers = createMcpHandlers(() => mockServer)
@@ -91,7 +91,7 @@ describe("HTTP Transport", () => {
       // The SDK handles JSON-RPC protocol responses
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | only checks server.connect, doesn't verify response or that transport.handleRequest() was called
     it("should handle initialize requests in stateless mode", async () => {
       const mockServer = createMockMcpServer()
       const handlers = createMcpHandlers(() => mockServer)
@@ -118,7 +118,7 @@ describe("HTTP Transport", () => {
       expect(mockServer.connect).toHaveBeenCalled()
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("should create fresh server for each request in stateless mode", async () => {
       const serverInstances: Array<Server> = []
       const handlers = createMcpHandlers(() => {
@@ -156,7 +156,7 @@ describe("HTTP Transport", () => {
       expect(serverInstances[1].connect).toHaveBeenCalled()
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("should reject GET requests in stateless mode", async () => {
       const mockServer = createMockMcpServer()
       const handlers = createMcpHandlers(() => mockServer)
@@ -179,7 +179,7 @@ describe("HTTP Transport", () => {
       )
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("should reject DELETE requests in stateless mode", async () => {
       const mockServer = createMockMcpServer()
       const handlers = createMcpHandlers(() => mockServer)
@@ -202,7 +202,7 @@ describe("HTTP Transport", () => {
       )
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | headersSent set after handler runs; test doesn't verify intended behavior of skipping error response when headers already sent
     it("should not send 500 when server factory throws and headers already sent", async () => {
       const handlers = createMcpHandlers(() => {
         throw new Error("Factory error")
@@ -223,7 +223,7 @@ describe("HTTP Transport", () => {
       expect(res.json).not.toHaveBeenCalled()
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("should return 500 when server factory throws", async () => {
       const handlers = createMcpHandlers(() => {
         throw new Error("Factory error")
@@ -258,7 +258,7 @@ describe("HTTP Transport", () => {
   })
 
   describe("startHttpTransport", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("should register POST, GET, DELETE handlers on /mcp", async () => {
       const { app } = createMockExpressApp()
       // eslint-disable-next-line no-restricted-syntax -- test mock: partial http.Server
@@ -296,7 +296,7 @@ describe("HTTP Transport", () => {
       expect(app.delete).toHaveBeenCalledWith("/mcp", expect.any(Function))
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("should close server when scope closes", async () => {
       const { app } = createMockExpressApp()
       const closeFn = vi.fn((cb?: (err?: Error) => void) => cb?.())
@@ -331,7 +331,7 @@ describe("HTTP Transport", () => {
       expect(closeFn).toHaveBeenCalled()
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("should fail if listen fails", async () => {
       const { app } = createMockExpressApp()
 
@@ -366,7 +366,7 @@ describe("HTTP Transport", () => {
       }
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("should log to stderr and continue when server close fails during release", async () => {
       const { app } = createMockExpressApp()
       const closeFn = vi.fn((cb?: (err?: Error) => void) => cb?.(new Error("close failed")))
@@ -406,7 +406,7 @@ describe("HTTP Transport", () => {
       stderrSpy.mockRestore()
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | Only checks effect succeeded, not that SIGINT was handled; stderrSpy created but not restored; missing verification of handler cleanup
     it("should shut down when SIGINT is received", async () => {
       const { app } = createMockExpressApp()
       // eslint-disable-next-line no-restricted-syntax -- test mock: partial http.Server
@@ -446,7 +446,7 @@ describe("HTTP Transport", () => {
   })
 
   describe("createMcpHandlers - close cleanup", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | Verifies handler registration but not cleanup execution; doesn't assert that mockServer.close() or transport.close() are invoked when handler runs
     it("should register close handler and call cleanup on close", async () => {
       const mockServer = createMockMcpServer()
       const handlers = createMcpHandlers(() => mockServer)
@@ -479,7 +479,7 @@ describe("HTTP Transport", () => {
       expect(res.on).toHaveBeenCalledWith("close", expect.any(Function))
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("should log to stderr when transport.close rejects during cleanup", async () => {
       const closeSpy = vi.spyOn(StreamableHTTPServerTransport.prototype, "close")
         .mockRejectedValue(new Error("transport close boom"))
@@ -571,7 +571,7 @@ describe("HTTP Transport", () => {
   })
 
   describe("defaultHttpServerFactory via defaultLayer", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("should succeed when app.listen calls back without error", async () => {
       // eslint-disable-next-line no-restricted-syntax -- test mock: partial http.Server
       const fakeHttpServer = { close: vi.fn() } as unknown as http.Server
@@ -599,7 +599,7 @@ describe("HTTP Transport", () => {
       expect(result).toBe(fakeHttpServer)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("should fail with HttpTransportError when app.listen calls back with error", async () => {
       // eslint-disable-next-line no-restricted-syntax -- test mock: partial Express app
       const mockApp = {
@@ -625,7 +625,7 @@ describe("HTTP Transport", () => {
       expect(Exit.isFailure(result)).toBe(true)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | Only checks .toBeDefined(), doesn't verify createMcpExpressApp called or app configured correctly
     it("should call createMcpExpressApp via createApp", async () => {
       const program = Effect.gen(function*() {
         const factory = yield* HttpServerFactoryService
@@ -642,7 +642,7 @@ describe("HTTP Transport", () => {
   })
 
   describe("HttpTransportError", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("should include message and optional cause", () => {
       const cause = new Error("underlying error")
       const error = new HttpTransportError({

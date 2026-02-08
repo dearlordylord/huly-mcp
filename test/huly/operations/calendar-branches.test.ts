@@ -123,7 +123,7 @@ const createTestLayer = (config: MockConfig) => {
 // --- Branch coverage tests ---
 
 describe("listEventInstances - from/to date filters (lines 573, 577)", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("passes from filter when provided", () =>
     Effect.gen(function*() {
       const recurringEvent = makeRecurringEvent({ eventId: "recur-1" })
@@ -143,7 +143,7 @@ describe("listEventInstances - from/to date filters (lines 573, 577)", () => {
       expect(result).toHaveLength(1)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("passes to filter when provided", () =>
     Effect.gen(function*() {
       const recurringEvent = makeRecurringEvent({ eventId: "recur-1" })
@@ -163,7 +163,7 @@ describe("listEventInstances - from/to date filters (lines 573, 577)", () => {
       expect(result).toHaveLength(1)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("passes both from and to filters", () =>
     Effect.gen(function*() {
       const recurringEvent = makeRecurringEvent({ eventId: "recur-1" })
@@ -186,7 +186,7 @@ describe("listEventInstances - from/to date filters (lines 573, 577)", () => {
 })
 
 describe("listEventInstances - externalParticipants branch (line 624)", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | Compares Email.make()-wrapped values against raw strings; fake pass if Email.make() is identity
   it.effect("maps externalParticipants when present", () =>
     Effect.gen(function*() {
       const recurringEvent = makeRecurringEvent({ eventId: "recur-1" })
@@ -210,7 +210,7 @@ describe("listEventInstances - externalParticipants branch (line 624)", () => {
       expect(result[0].externalParticipants).toEqual(["external@example.com", "guest@test.org"])
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns undefined externalParticipants when not present", () =>
     Effect.gen(function*() {
       const recurringEvent = makeRecurringEvent({ eventId: "recur-1" })

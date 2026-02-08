@@ -43,7 +43,7 @@ describe("Main Entry Point", () => {
   })
 
   describe("main program", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | trivial assertion `toBeDefined()` passes with any error; test doesn't verify ConfigValidationError or missing field
     it.effect("fails on missing config", () =>
       Effect.gen(function*() {
         // Don't set any env vars - config should fail
@@ -74,7 +74,7 @@ describe("Main Entry Point", () => {
   })
 
   describe("error handling", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | only checks error exists, not error type/message - should verify ConfigValidationError with URL validation details
     it.effect("reports config validation errors clearly", () =>
       Effect.gen(function*() {
         // Invalid URL
@@ -88,7 +88,7 @@ describe("Main Entry Point", () => {
         expect(error).toBeDefined()
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("reports missing required config", () =>
       Effect.gen(function*() {
         // Missing HULY_PASSWORD
@@ -130,7 +130,7 @@ describe("Main Entry Point", () => {
         expect(stopCalled).toBe(true)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | mock returns bare error instead of Effect.fail(), bypassing actual error handling
     it.effect("server error is properly typed", () =>
       Effect.gen(function*() {
         const mockServerLayer = McpServerService.testLayer({

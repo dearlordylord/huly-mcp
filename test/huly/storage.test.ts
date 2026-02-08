@@ -330,7 +330,7 @@ describe("FileUploadError", () => {
 })
 
 describe("InvalidFileDataError", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("has correct tag", () =>
     Effect.gen(function*() {
       const error = new InvalidFileDataError({ message: "Bad data" })
@@ -538,7 +538,7 @@ describe("getBufferFromParams", () => {
       }
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("decodes base64 data", () =>
     Effect.gen(function*() {
       const original = "base64 content"
@@ -548,7 +548,7 @@ describe("getBufferFromParams", () => {
       expect(buffer.toString()).toBe(original)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns error for blocked URL", () =>
     Effect.gen(function*() {
       const error = yield* Effect.flip(
@@ -559,13 +559,13 @@ describe("getBufferFromParams", () => {
 })
 
 describe("isBlockedUrl", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it("blocks localhost", () => {
     expect(isBlockedUrl("http://localhost/file")).toBe(true)
     expect(isBlockedUrl("http://localhost:8080/file")).toBe(true)
   })
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it("blocks 127.x.x.x loopback range", () => {
     expect(isBlockedUrl("http://127.0.0.1/file")).toBe(true)
     expect(isBlockedUrl("http://127.0.0.2/file")).toBe(true)
@@ -577,7 +577,7 @@ describe("isBlockedUrl", () => {
     expect(isBlockedUrl("http://[::1]/file")).toBe(true)
   })
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it("blocks 10.x.x.x private range", () => {
     expect(isBlockedUrl("http://10.0.0.1/file")).toBe(true)
     expect(isBlockedUrl("http://10.255.255.255/file")).toBe(true)
@@ -592,7 +592,7 @@ describe("isBlockedUrl", () => {
     expect(isBlockedUrl("http://172.32.0.1/file")).toBe(false)
   })
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it("blocks 192.168.x.x private range", () => {
     expect(isBlockedUrl("http://192.168.0.1/file")).toBe(true)
     expect(isBlockedUrl("http://192.168.255.255/file")).toBe(true)
@@ -600,25 +600,25 @@ describe("isBlockedUrl", () => {
     expect(isBlockedUrl("http://192.167.0.1/file")).toBe(false)
   })
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it("blocks 169.254.x.x link-local range (includes cloud metadata)", () => {
     expect(isBlockedUrl("http://169.254.169.254/latest/meta-data")).toBe(true)
     expect(isBlockedUrl("http://169.254.0.1/file")).toBe(true)
   })
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it("blocks Google cloud metadata hostname", () => {
     expect(isBlockedUrl("http://metadata.google.internal/file")).toBe(true)
   })
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it("allows public URLs", () => {
     expect(isBlockedUrl("https://example.com/file.png")).toBe(false)
     expect(isBlockedUrl("https://8.8.8.8/file")).toBe(false)
     expect(isBlockedUrl("https://cdn.example.org/image.jpg")).toBe(false)
   })
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it("blocks invalid URLs", () => {
     expect(isBlockedUrl("not-a-url")).toBe(true)
     expect(isBlockedUrl("")).toBe(true)
@@ -655,7 +655,7 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
     })
   }
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("connects and provides uploadFile and getFileUrl operations", () =>
     Effect.gen(function*() {
       setupMocksForSuccess()
@@ -695,7 +695,7 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
       )
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("getFileUrl constructs correct URL without calling API", () =>
     Effect.gen(function*() {
       setupMocksForSuccess()
@@ -708,7 +708,7 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
       expect(url).toBe("https://huly.example.com/files?workspace=ws-uuid-123&file=some-blob-id")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("wraps upload errors in FileUploadError", () =>
     Effect.gen(function*() {
       setupMocksForSuccess()
@@ -725,7 +725,7 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
       expect(error.message).toContain("S3 bucket full")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | Effects are lazy - never accesses service so layer construction never triggered
   it("fails layer construction when loadServerConfig rejects", async () => {
     mockLoadServerConfig.mockRejectedValue(new Error("DNS resolution failed"))
 

@@ -38,7 +38,7 @@ describe("CATEGORY_NAMES", () => {
 })
 
 describe("toolRegistry", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("has tools", () =>
     Effect.gen(function*() {
       expect(toolRegistry.tools.size).toBeGreaterThan(0)
@@ -46,7 +46,7 @@ describe("toolRegistry", () => {
       expect(toolRegistry.tools.size).toBe(toolRegistry.definitions.length)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("all tool names are unique", () =>
     Effect.gen(function*() {
       const names = toolRegistry.definitions.map((t) => t.name)
@@ -56,7 +56,7 @@ describe("toolRegistry", () => {
 })
 
 describe("createFilteredRegistry", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("filters to only requested categories", () =>
     Effect.gen(function*() {
       const filtered = createFilteredRegistry(new Set(["issues"]))
@@ -77,7 +77,7 @@ describe("createFilteredRegistry", () => {
       expect(filtered.tools.size).toBe(0)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("combines multiple categories", () =>
     Effect.gen(function*() {
       const filtered = createFilteredRegistry(new Set(["issues", "projects"]))
@@ -92,7 +92,7 @@ describe("createFilteredRegistry", () => {
 })
 
 describe("handleToolCall", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns null for unknown tool", () =>
     Effect.gen(function*() {
       const result = yield* Effect.promise(() =>
@@ -109,7 +109,7 @@ describe("handleToolCall", () => {
 })
 
 describe("TOOL_DEFINITIONS", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("is populated", () =>
     Effect.gen(function*() {
       const keys = Object.keys(TOOL_DEFINITIONS)

@@ -18,7 +18,7 @@ import {
 
 describe("assertions", () => {
   describe("assertExists", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("returns the value when it is defined", () => {
       expect(assertExists(42)).toBe(42)
       expect(assertExists("hello")).toBe("hello")
@@ -27,7 +27,7 @@ describe("assertions", () => {
       expect(assertExists(false)).toBe(false)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("throws on null with default message", () => {
       expect(() => assertExists(null)).toThrow("Expected value to exist")
     })
@@ -37,13 +37,13 @@ describe("assertions", () => {
       expect(() => assertExists(undefined)).toThrow("Expected value to exist")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("throws with custom message", () => {
       expect(() => assertExists(null, "missing user")).toThrow("missing user")
       expect(() => assertExists(undefined, "missing user")).toThrow("missing user")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("thrown error has name AssertionError", () => {
       try {
         assertExists(null)
@@ -55,7 +55,7 @@ describe("assertions", () => {
   })
 
   describe("isExistent", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("returns true for defined values", () => {
       expect(isExistent(42)).toBe(true)
       expect(isExistent("")).toBe(true)
@@ -63,19 +63,19 @@ describe("assertions", () => {
       expect(isExistent(false)).toBe(true)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("returns false for null", () => {
       expect(isExistent(null)).toBe(false)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("returns false for undefined", () => {
       expect(isExistent(undefined)).toBe(false)
     })
   })
 
   describe("assertNotNull", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("returns the value when not null", () => {
       expect(assertNotNull(42)).toBe(42)
       expect(assertNotNull("hello")).toBe("hello")
@@ -83,7 +83,7 @@ describe("assertions", () => {
       expect(assertNotNull(false)).toBe(false)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("throws on null with default message", () => {
       expect(() => assertNotNull(null)).toThrow("Expected value to not be null")
     })
@@ -93,7 +93,7 @@ describe("assertions", () => {
       expect(() => assertNotNull(null, "value was null")).toThrow("value was null")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("thrown error has name AssertionError", () => {
       try {
         assertNotNull(null)
@@ -105,30 +105,30 @@ describe("assertions", () => {
   })
 
   describe("getOnlyOne", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("returns the element for single-element array", () => {
       expect(getOnlyOne([42])).toBe(42)
       expect(getOnlyOne(["only"])).toBe("only")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("throws for empty array with default message", () => {
       expect(() => getOnlyOne([])).toThrow("Expected exactly 1 element, got 0")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("throws for multi-element array with default message", () => {
       expect(() => getOnlyOne([1, 2])).toThrow("Expected exactly 1 element, got 2")
       expect(() => getOnlyOne([1, 2, 3])).toThrow("Expected exactly 1 element, got 3")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("throws with custom string message", () => {
       expect(() => getOnlyOne([], "need exactly one")).toThrow("need exactly one")
       expect(() => getOnlyOne([1, 2], "need exactly one")).toThrow("need exactly one")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("throws with custom function message receiving the array", () => {
       const msgFn = (arr: ReadonlyArray<number>) => `got ${arr.length} items: ${arr.join(",")}`
       expect(() => getOnlyOne([], msgFn)).toThrow("got 0 items: ")
@@ -137,13 +137,13 @@ describe("assertions", () => {
   })
 
   describe("getFirst", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("returns first element of non-empty array", () => {
       expect(getFirst([10, 20, 30])).toBe(10)
       expect(getFirst(["a"])).toBe("a")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("throws for empty array with default message", () => {
       expect(() => getFirst([])).toThrow("Expected non-empty array")
     })
@@ -155,7 +155,7 @@ describe("assertions", () => {
   })
 
   describe("assertNonEmpty", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("returns the array for non-empty input", () => {
       const result = assertNonEmpty([1, 2, 3])
       expect(result).toEqual([1, 2, 3])
@@ -167,12 +167,12 @@ describe("assertions", () => {
       expect(result).toEqual(["x"])
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("throws for empty array with default message", () => {
       expect(() => assertNonEmpty([])).toThrow("Expected non-empty array")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("throws with custom message", () => {
       expect(() => assertNonEmpty([], "list must not be empty")).toThrow("list must not be empty")
     })
@@ -185,47 +185,47 @@ describe("assertions", () => {
       expect(isNonEmpty([1, 2, 3])).toBe(true)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("returns false for empty array", () => {
       expect(isNonEmpty([])).toBe(false)
     })
   })
 
   describe("getOneOrNone", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("returns Option.none() for empty array", () => {
       const result = getOneOrNone([])
       expect(Option.isNone(result)).toBe(true)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("returns Option.some(element) for single-element array", () => {
       const result = getOneOrNone([42])
       expect(Option.isSome(result)).toBe(true)
       expect(Option.getOrThrow(result)).toBe(42)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("throws for array with 2+ elements with default message", () => {
       expect(() => getOneOrNone([1, 2])).toThrow("Expected 0 or 1 elements, got 2")
       expect(() => getOneOrNone([1, 2, 3])).toThrow("Expected 0 or 1 elements, got 3")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("throws with custom message for 2+ elements", () => {
       expect(() => getOneOrNone([1, 2], "too many")).toThrow("too many")
     })
   })
 
   describe("assertExistsEffect", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("succeeds with the value when defined", () =>
       Effect.gen(function*() {
         const result = yield* assertExistsEffect(42, () => "missing")
         expect(result).toBe(42)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("succeeds with falsy defined values", () =>
       Effect.gen(function*() {
         expect(yield* assertExistsEffect(0, () => "missing")).toBe(0)
@@ -233,14 +233,14 @@ describe("assertions", () => {
         expect(yield* assertExistsEffect(false, () => "missing")).toBe(false)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails for null", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(assertExistsEffect(null, () => "was null"))
         expect(error).toBe("was null")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails for undefined", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(assertExistsEffect(undefined, () => "was undefined"))
@@ -256,14 +256,14 @@ describe("assertions", () => {
         expect(result).toBe(99)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails for empty array with error receiving the array", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(getOnlyOneEffect([], (arr) => `expected 1, got ${arr.length}`))
         expect(error).toBe("expected 1, got 0")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails for multi-element array with error receiving the array", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(getOnlyOneEffect([1, 2, 3], (arr) => `expected 1, got ${arr.length}`))
@@ -279,14 +279,14 @@ describe("assertions", () => {
         expect(result).toBe(10)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("succeeds for single-element array", () =>
       Effect.gen(function*() {
         const result = yield* getFirstEffect(["only"], () => "empty")
         expect(result).toBe("only")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails for empty array", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(getFirstEffect([], () => "no elements"))
@@ -295,14 +295,14 @@ describe("assertions", () => {
   })
 
   describe("getOneOrNoneEffect", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("succeeds with Option.none() for empty array", () =>
       Effect.gen(function*() {
         const result = yield* getOneOrNoneEffect([], (arr) => `too many: ${arr.length}`)
         expect(Option.isNone(result)).toBe(true)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("succeeds with Option.some(element) for single-element array", () =>
       Effect.gen(function*() {
         const result = yield* getOneOrNoneEffect([42], (arr) => `too many: ${arr.length}`)
@@ -310,14 +310,14 @@ describe("assertions", () => {
         expect(Option.getOrThrow(result)).toBe(42)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails for array with 2+ elements with error receiving the array", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(getOneOrNoneEffect([1, 2], (arr) => `too many: ${arr.length}`))
         expect(error).toBe("too many: 2")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails for array with 3 elements", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(getOneOrNoneEffect([1, 2, 3], (arr) => `too many: ${arr.length}`))

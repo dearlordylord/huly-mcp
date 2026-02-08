@@ -162,7 +162,7 @@ const createMockHulyClientLayer = (config: {
 // --- Tests ---
 
 describe("TOOL_DEFINITIONS", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("exports tool definitions", () =>
     Effect.gen(function*() {
       const tools = Object.keys(TOOL_DEFINITIONS)
@@ -226,7 +226,7 @@ describe("TOOL_DEFINITIONS", () => {
       expect(tools).toContain("fulltext_search")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("each tool has name, description, and inputSchema", () =>
     Effect.gen(function*() {
       for (const [key, tool] of Object.entries(TOOL_DEFINITIONS)) {
@@ -239,7 +239,7 @@ describe("TOOL_DEFINITIONS", () => {
     }))
 
   describe("inputSchema format", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("list_issues schema has correct structure", () =>
       Effect.gen(function*() {
         const schema = TOOL_DEFINITIONS.list_issues.inputSchema
@@ -252,7 +252,7 @@ describe("TOOL_DEFINITIONS", () => {
         expect(props).toHaveProperty("limit")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("get_issue schema has correct structure", () =>
       Effect.gen(function*() {
         const schema = TOOL_DEFINITIONS.get_issue.inputSchema
@@ -262,7 +262,7 @@ describe("TOOL_DEFINITIONS", () => {
         expect((schema as { properties: Record<string, unknown> }).properties).toHaveProperty("identifier")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("create_issue schema has correct structure", () =>
       Effect.gen(function*() {
         const schema = TOOL_DEFINITIONS.create_issue.inputSchema
@@ -272,7 +272,7 @@ describe("TOOL_DEFINITIONS", () => {
         expect((schema as { properties: Record<string, unknown> }).properties).toHaveProperty("title")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("update_issue schema has correct structure", () =>
       Effect.gen(function*() {
         const schema = TOOL_DEFINITIONS.update_issue.inputSchema
@@ -288,7 +288,7 @@ describe("TOOL_DEFINITIONS", () => {
         expect(props).toHaveProperty("status")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("add_issue_label schema has correct structure", () =>
       Effect.gen(function*() {
         const schema = TOOL_DEFINITIONS.add_issue_label.inputSchema
@@ -301,7 +301,7 @@ describe("TOOL_DEFINITIONS", () => {
         expect(props).toHaveProperty("color")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("delete_issue schema has correct structure", () =>
       Effect.gen(function*() {
         const schema = TOOL_DEFINITIONS.delete_issue.inputSchema
@@ -312,7 +312,7 @@ describe("TOOL_DEFINITIONS", () => {
         expect(props).toHaveProperty("identifier")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("list_teamspaces schema has correct structure", () =>
       Effect.gen(function*() {
         const schema = TOOL_DEFINITIONS.list_teamspaces.inputSchema
@@ -323,7 +323,7 @@ describe("TOOL_DEFINITIONS", () => {
         expect(props).toHaveProperty("limit")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("get_document schema has correct structure", () =>
       Effect.gen(function*() {
         const schema = TOOL_DEFINITIONS.get_document.inputSchema
@@ -334,7 +334,7 @@ describe("TOOL_DEFINITIONS", () => {
         expect(props).toHaveProperty("document")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("create_document schema has correct structure", () =>
       Effect.gen(function*() {
         const schema = TOOL_DEFINITIONS.create_document.inputSchema
@@ -403,7 +403,7 @@ describe("McpServerService", () => {
   })
 
   describe("testLayer", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | only asserts hardcoded return value, doesn't verify service behavior
     it.effect("creates a test layer with default operations", () =>
       Effect.gen(function*() {
         const testLayer = McpServerService.testLayer({})
@@ -419,7 +419,7 @@ describe("McpServerService", () => {
         expect(result).toBe("success")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("allows overriding run operation", () =>
       Effect.gen(function*() {
         let runCalled = false
@@ -439,7 +439,7 @@ describe("McpServerService", () => {
         expect(runCalled).toBe(true)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("allows overriding stop operation", () =>
       Effect.gen(function*() {
         let stopCalled = false
@@ -459,7 +459,7 @@ describe("McpServerService", () => {
         expect(stopCalled).toBe(true)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | mock returns plain error object instead of failing Effect - violates McpServerOperations.run type signature
     it.effect("can mock run to fail with error", () =>
       Effect.gen(function*() {
         const testLayer = McpServerService.testLayer({
@@ -480,7 +480,7 @@ describe("McpServerService", () => {
 })
 
 describe("McpServerError", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("creates error with message", () =>
     Effect.gen(function*() {
       const error = new McpServerError({ message: "Connection failed" })
@@ -501,7 +501,7 @@ describe("McpServerError", () => {
       expect(error.cause).toBe(cause)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("can be used as Effect error", () =>
     Effect.gen(function*() {
       const effect = Effect.fail(new McpServerError({ message: "Test" }))
@@ -513,7 +513,7 @@ describe("McpServerError", () => {
 })
 
 describe("Tool definition descriptions", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("list_issues has helpful description", () =>
     Effect.gen(function*() {
       expect(TOOL_DEFINITIONS.list_issues.description).toContain("Query")
@@ -521,7 +521,7 @@ describe("Tool definition descriptions", () => {
       expect(TOOL_DEFINITIONS.list_issues.description).toContain("filter")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("get_issue has helpful description", () =>
     Effect.gen(function*() {
       expect(TOOL_DEFINITIONS.get_issue.description).toContain("Retrieve")
@@ -529,7 +529,7 @@ describe("Tool definition descriptions", () => {
       expect(TOOL_DEFINITIONS.get_issue.description).toContain("markdown")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("create_issue has helpful description", () =>
     Effect.gen(function*() {
       expect(TOOL_DEFINITIONS.create_issue.description).toContain("Create")
@@ -537,7 +537,7 @@ describe("Tool definition descriptions", () => {
       expect(TOOL_DEFINITIONS.create_issue.description).toContain("markdown")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("update_issue has helpful description", () =>
     Effect.gen(function*() {
       expect(TOOL_DEFINITIONS.update_issue.description).toContain("Update")
@@ -545,14 +545,14 @@ describe("Tool definition descriptions", () => {
       expect(TOOL_DEFINITIONS.update_issue.description.length).toBeGreaterThan(30)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("add_issue_label has helpful description", () =>
     Effect.gen(function*() {
       expect(TOOL_DEFINITIONS.add_issue_label.description).toContain("label")
       expect(TOOL_DEFINITIONS.add_issue_label.description).toContain("tag")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("delete_issue has helpful description", () =>
     Effect.gen(function*() {
       expect(TOOL_DEFINITIONS.delete_issue.description).toContain("delete")

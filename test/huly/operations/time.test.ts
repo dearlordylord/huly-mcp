@@ -286,7 +286,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 
 describe("logTime", () => {
   describe("basic functionality", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("logs time on an issue", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -341,7 +341,7 @@ describe("logTime", () => {
         })
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("reduces remainingTime when time is logged", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -364,7 +364,7 @@ describe("logTime", () => {
         expect(captureUpdateDoc.operations?.remainingTime).toBe(35)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("does not reduce remainingTime below zero", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -414,7 +414,7 @@ describe("logTime", () => {
         })
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("uses empty description when not provided", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -439,7 +439,7 @@ describe("logTime", () => {
   })
 
   describe("identifier parsing", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("accepts numeric identifier", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "PROJ" })
@@ -459,7 +459,7 @@ describe("logTime", () => {
         expect(result.identifier).toBe("PROJ-42")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("accepts full identifier", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "HULY" })
@@ -501,7 +501,7 @@ describe("logTime", () => {
         expect((error as ProjectNotFoundError).identifier).toBe("NONEXISTENT")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns IssueNotFoundError when issue doesn't exist", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -527,7 +527,7 @@ describe("logTime", () => {
 
 describe("getTimeReport", () => {
   describe("basic functionality", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns time report for an issue", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -568,7 +568,7 @@ describe("getTimeReport", () => {
         expect(result.reports).toHaveLength(2)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("excludes estimation when zero", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -593,7 +593,7 @@ describe("getTimeReport", () => {
         expect(result.remainingTime).toBeUndefined()
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("includes employee name when assigned", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -670,7 +670,7 @@ describe("getTimeReport", () => {
   })
 
   describe("error handling", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | missing identifier assertion in error; logTime test checks both _tag and identifier
     it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({
@@ -688,7 +688,7 @@ describe("getTimeReport", () => {
         expect(error._tag).toBe("ProjectNotFoundError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns IssueNotFoundError when issue doesn't exist", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -712,7 +712,7 @@ describe("getTimeReport", () => {
 
 describe("listTimeSpendReports", () => {
   describe("basic functionality", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns all reports when no filters", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -731,7 +731,7 @@ describe("listTimeSpendReports", () => {
         expect(result).toHaveLength(2)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("filters by project", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST", _id: "project-1" as Ref<HulyProject> })
@@ -759,7 +759,7 @@ describe("listTimeSpendReports", () => {
         expect(result[0].id).toBe("report-1")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns ProjectNotFoundError for invalid project filter", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({
@@ -777,7 +777,7 @@ describe("listTimeSpendReports", () => {
         expect(error._tag).toBe("ProjectNotFoundError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("includes issue identifier in response", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -847,7 +847,7 @@ describe("listTimeSpendReports", () => {
         expect(result[0].id).toBe("report-1")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("filters by both from and to", () =>
       Effect.gen(function*() {
         const report1 = makeTimeSpendReport({
@@ -878,7 +878,7 @@ describe("listTimeSpendReports", () => {
   })
 
   describe("employee lookup", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("includes employee name from lookup", () =>
       Effect.gen(function*() {
         const issue = makeIssue({ _id: "issue-1" as Ref<HulyIssue>, identifier: "TEST-1" })
@@ -899,7 +899,7 @@ describe("listTimeSpendReports", () => {
         expect(result[0].employee).toBe("Alice Smith")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns undefined employee when no lookup match", () =>
       Effect.gen(function*() {
         const report = makeTimeSpendReport({
@@ -1007,7 +1007,7 @@ describe("getDetailedTimeReport", () => {
         expect(unassignedEntry!.totalTime).toBe(15)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns empty report when no time entries", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST", _id: "project-1" as Ref<HulyProject> })
@@ -1027,7 +1027,7 @@ describe("getDetailedTimeReport", () => {
         expect(result.byEmployee).toHaveLength(0)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("handles reports with missing issue lookups", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST", _id: "project-1" as Ref<HulyProject> })
@@ -1058,7 +1058,7 @@ describe("getDetailedTimeReport", () => {
   })
 
   describe("date filtering", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("filters by from date", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST", _id: "project-1" as Ref<HulyProject> })
@@ -1088,7 +1088,7 @@ describe("getDetailedTimeReport", () => {
         expect(result.totalTime).toBe(20)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("filters by to date", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST", _id: "project-1" as Ref<HulyProject> })
@@ -1118,7 +1118,7 @@ describe("getDetailedTimeReport", () => {
         expect(result.totalTime).toBe(10)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("filters by from and to date", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST", _id: "project-1" as Ref<HulyProject> })
@@ -1157,7 +1157,7 @@ describe("getDetailedTimeReport", () => {
   })
 
   describe("error handling", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({
@@ -1177,7 +1177,7 @@ describe("getDetailedTimeReport", () => {
   })
 
   describe("aggregation", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("aggregates multiple reports for same issue", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST", _id: "project-1" as Ref<HulyProject> })
@@ -1213,7 +1213,7 @@ describe("getDetailedTimeReport", () => {
         expect(result.byIssue[0].reports).toHaveLength(2)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("aggregates multiple reports for same employee", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST", _id: "project-1" as Ref<HulyProject> })
@@ -1302,7 +1302,7 @@ describe("listWorkSlots", () => {
   }
 
   describe("basic functionality", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns work slots", () =>
       Effect.gen(function*() {
         const slots = [
@@ -1334,7 +1334,7 @@ describe("listWorkSlots", () => {
         expect(result[0].title).toBe("Morning work")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns empty when no slots", () =>
       Effect.gen(function*() {
         const testLayer = makeWorkSlotFindAll([])
@@ -1346,7 +1346,7 @@ describe("listWorkSlots", () => {
   })
 
   describe("employee filtering", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("filters by employee ID (person found directly)", () =>
       Effect.gen(function*() {
         const person = makePerson({ _id: "person-1" as Ref<Person>, name: "Alice" })
@@ -1377,7 +1377,7 @@ describe("listWorkSlots", () => {
         expect(result[0].id).toBe("slot-1")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("filters by employee email via channel lookup", () =>
       Effect.gen(function*() {
         const channel = makeChannel({
@@ -1414,7 +1414,7 @@ describe("listWorkSlots", () => {
         expect(result[0].id).toBe("slot-1")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns all slots when employee not found by ID or channel", () =>
       Effect.gen(function*() {
         const slots = [
@@ -1437,7 +1437,7 @@ describe("listWorkSlots", () => {
   })
 
   describe("date filtering", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("filters by from date", () =>
       Effect.gen(function*() {
         const slots = [
@@ -1453,7 +1453,7 @@ describe("listWorkSlots", () => {
         expect(result[0].id).toBe("slot-2")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("filters by to date", () =>
       Effect.gen(function*() {
         const slots = [
@@ -1469,7 +1469,7 @@ describe("listWorkSlots", () => {
         expect(result[0].id).toBe("slot-1")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("filters by both from and to", () =>
       Effect.gen(function*() {
         const slots = [
@@ -1489,7 +1489,7 @@ describe("listWorkSlots", () => {
 })
 
 describe("createWorkSlot", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("creates a work slot", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -1527,7 +1527,7 @@ describe("createWorkSlot", () => {
       expect(captureAddCollection.attributes?.visibility).toBe("public")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("passes correct class and space references", () =>
     Effect.gen(function*() {
       let capturedClass: unknown
@@ -1573,7 +1573,7 @@ describe("createWorkSlot", () => {
 
 describe("startTimer", () => {
   describe("basic functionality", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns start timestamp and issue identifier", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -1598,7 +1598,7 @@ describe("startTimer", () => {
   })
 
   describe("error handling", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({
@@ -1616,7 +1616,7 @@ describe("startTimer", () => {
         expect(error._tag).toBe("ProjectNotFoundError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns IssueNotFoundError when issue doesn't exist", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -1640,7 +1640,7 @@ describe("startTimer", () => {
 
 describe("stopTimer", () => {
   describe("basic functionality", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns stop timestamp and issue identifier", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -1665,7 +1665,7 @@ describe("stopTimer", () => {
   })
 
   describe("error handling", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | incomplete assertion; should verify error.identifier like logTime test does
     it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({
@@ -1683,7 +1683,7 @@ describe("stopTimer", () => {
         expect(error._tag).toBe("ProjectNotFoundError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns IssueNotFoundError when issue doesn't exist", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })

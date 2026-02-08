@@ -14,7 +14,7 @@ import { Effect } from "effect"
 import { expect } from "vitest"
 
 describe("milestones - unreachable default branches", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: suspect | Test doesn't verify mapping functions - only checks enum values are numbers, not that they map correctly to strings
   it.effect("all valid MilestoneStatus values are mapped (confirming exhaustiveness)", () =>
     Effect.gen(function*() {
       // Confirm all enum values are valid numbers (the switch covers all of them)
