@@ -14,7 +14,7 @@ export const searchTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "fulltext_search",
       parseFulltextSearchParams,
-      (params) => fulltextSearch(params)
+      fulltextSearch
     )
   }
 ]
