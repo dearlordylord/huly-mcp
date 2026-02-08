@@ -13,7 +13,7 @@ import { DEFAULT_HTTP_PORT, startHttpTransport } from "./http-transport.js"
 
 import { HulyClient } from "../huly/client.js"
 import { HulyStorageClient } from "../huly/storage.js"
-import { WorkspaceClient } from "../huly/workspace-client.js"
+import { WorkspaceClient, type WorkspaceClientOperations } from "../huly/workspace-client.js"
 import type { TelemetryOperations } from "../telemetry/telemetry.js"
 import { TelemetryService } from "../telemetry/telemetry.js"
 import { assertExists } from "../utils/assertions.js"
@@ -70,7 +70,7 @@ const createMcpServer = (
   storageClient: HulyStorageClient["Type"],
   telemetry: TelemetryOperations,
   registry: ToolRegistry,
-  workspaceClient?: WorkspaceClient["Type"]
+  workspaceClient?: WorkspaceClientOperations
 ): Server => {
   const server = new Server(
     {
