@@ -1,4 +1,12 @@
 /**
+ * HulyClient - Data operations within a workspace.
+ *
+ * Uses @hcengineering/api-client (TxOperations) for CRUD on documents:
+ * issues, projects, milestones, documents, contacts, comments, etc.
+ *
+ * For workspace/account management (members, settings, workspace lifecycle),
+ * see WorkspaceClient in workspace-client.ts.
+ *
  * @module
  */
 import {
@@ -30,10 +38,16 @@ import {
 } from "@hcengineering/core"
 import { htmlToJSON, jsonToHTML, jsonToMarkup, markupToJSON } from "@hcengineering/text"
 import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown"
-import { absurd, Context, Effect, Layer, Schedule } from "effect"
+import { absurd, Context, Effect, Layer } from "effect"
 
-import { type Auth, HulyConfigService } from "../config/config.js"
-import { authToOptions } from "./auth-utils.js"
+import { HulyConfigService } from "../config/config.js"
+import {
+  authToOptions,
+  type ConnectionConfig,
+  type ConnectionError,
+  isAuthError,
+  withConnectionRetry
+} from "./auth-utils.js"
 import { HulyAuthError, HulyConnectionError } from "./errors.js"
 
 export type HulyClientError = HulyConnectionError | HulyAuthError
@@ -300,12 +314,6 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
   }
 }
 
-interface ConnectionConfig {
-  url: string
-  auth: Auth
-  workspace: string
-}
-
 interface MarkupOperations {
   fetchMarkup: (
     objectClass: Ref<Class<Doc>>,
@@ -339,20 +347,6 @@ const concatLink = (host: string, path: string): string => {
   const trimmedHost = host.endsWith("/") ? host.slice(0, -1) : host
   const trimmedPath = path.startsWith("/") ? path : `/${path}`
   return `${trimmedHost}${trimmedPath}`
-}
-
-const isAuthError = (error: unknown): boolean => {
-  const msg = String(error).toLowerCase()
-  return (
-    msg.includes("unauthorized")
-    || msg.includes("authentication")
-    || msg.includes("auth")
-    || msg.includes("credentials")
-    || msg.includes("401")
-    || msg.includes("invalid password")
-    || msg.includes("invalid email")
-    || msg.includes("login failed")
-  )
 }
 
 function createMarkupOps(
@@ -441,30 +435,20 @@ const connectRest = async (
 
 const connectRestWithRetry = (
   config: ConnectionConfig
-): Effect.Effect<RestConnection, HulyClientError> => {
-  const attemptConnect: Effect.Effect<RestConnection, HulyClientError> = Effect.tryPromise({
-    try: () => connectRest(config),
-    catch: (e) => {
-      if (isAuthError(e)) {
-        return new HulyAuthError({
-          message: `Authentication failed: ${String(e)}`
+): Effect.Effect<RestConnection, ConnectionError> =>
+  withConnectionRetry(
+    Effect.tryPromise({
+      try: () => connectRest(config),
+      catch: (e) => {
+        if (isAuthError(e)) {
+          return new HulyAuthError({
+            message: `Authentication failed: ${String(e)}`
+          })
+        }
+        return new HulyConnectionError({
+          message: `Connection failed: ${String(e)}`,
+          cause: e
         })
       }
-      return new HulyConnectionError({
-        message: `Connection failed: ${String(e)}`,
-        cause: e
-      })
-    }
-  })
-
-  const retrySchedule = Schedule.exponential("100 millis").pipe(
-    Schedule.compose(Schedule.recurs(2))
-  )
-
-  return attemptConnect.pipe(
-    Effect.retry({
-      schedule: retrySchedule,
-      while: (e) => !(e instanceof HulyAuthError)
     })
   )
-}

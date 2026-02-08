@@ -1,15 +1,31 @@
 /**
- * WorkspaceClient service for account-level operations.
- * Uses @hcengineering/account-client for workspace and user management.
+ * WorkspaceClient - Workspace and account management operations.
+ *
+ * Uses @hcengineering/account-client (AccountClient) for:
+ * - Workspace lifecycle: create, delete, list workspaces
+ * - Member management: list members, update roles
+ * - User profiles: get/update profile settings
+ * - Guest settings: read-only access, sign-up permissions
+ * - Regions: available deployment regions
+ *
+ * For data operations within a workspace (issues, documents, etc.),
+ * see HulyClient in client.ts.
+ *
  * @module
  */
 import type { AccountClient } from "@hcengineering/account-client"
 import { getClient as getAccountClient } from "@hcengineering/account-client"
 import { getWorkspaceToken, loadServerConfig } from "@hcengineering/api-client"
-import { Context, Effect, Layer, Schedule } from "effect"
+import { Context, Effect, Layer } from "effect"
 
-import { type Auth, HulyConfigService } from "../config/config.js"
-import { authToOptions } from "./auth-utils.js"
+import { HulyConfigService } from "../config/config.js"
+import {
+  authToOptions,
+  type ConnectionConfig,
+  type ConnectionError,
+  isAuthError,
+  withConnectionRetry
+} from "./auth-utils.js"
 import { HulyAuthError, HulyConnectionError } from "./errors.js"
 
 export type WorkspaceClientError = HulyConnectionError | HulyAuthError
@@ -143,26 +159,6 @@ export class WorkspaceClient extends Context.Tag("@hulymcp/WorkspaceClient")<
   }
 }
 
-interface ConnectionConfig {
-  url: string
-  auth: Auth
-  workspace: string
-}
-
-const isAuthError = (error: unknown): boolean => {
-  const msg = String(error).toLowerCase()
-  return (
-    msg.includes("unauthorized")
-    || msg.includes("authentication")
-    || msg.includes("auth")
-    || msg.includes("credentials")
-    || msg.includes("401")
-    || msg.includes("invalid password")
-    || msg.includes("invalid email")
-    || msg.includes("login failed")
-  )
-}
-
 const connectAccountClient = async (
   config: ConnectionConfig
 ): Promise<{ client: AccountClient; token: string }> => {
@@ -175,8 +171,8 @@ const connectAccountClient = async (
 
 const connectAccountClientWithRetry = (
   config: ConnectionConfig
-): Effect.Effect<{ client: AccountClient; token: string }, WorkspaceClientError> => {
-  const attemptConnect: Effect.Effect<{ client: AccountClient; token: string }, WorkspaceClientError> =
+): Effect.Effect<{ client: AccountClient; token: string }, ConnectionError> =>
+  withConnectionRetry(
     Effect.tryPromise({
       try: () => connectAccountClient(config),
       catch: (e) => {
@@ -191,15 +187,4 @@ const connectAccountClientWithRetry = (
         })
       }
     })
-
-  const retrySchedule = Schedule.exponential("100 millis").pipe(
-    Schedule.compose(Schedule.recurs(2))
   )
-
-  return attemptConnect.pipe(
-    Effect.retry({
-      schedule: retrySchedule,
-      while: (e) => !(e instanceof HulyAuthError)
-    })
-  )
-}

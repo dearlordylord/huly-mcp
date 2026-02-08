@@ -16,10 +16,10 @@ import {
   type StorageClient
 } from "@hcengineering/api-client"
 import type { WorkspaceUuid } from "@hcengineering/core"
-import { Context, Effect, Layer, Schedule } from "effect"
+import { Context, Effect, Layer } from "effect"
 
 import { HulyConfigService } from "../config/config.js"
-import { authToOptions } from "./auth-utils.js"
+import { authToOptions, isAuthError, withConnectionRetry } from "./auth-utils.js"
 import {
   FileFetchError,
   FileNotFoundError,
@@ -222,20 +222,6 @@ const buildFileUrl = (baseUrl: string, workspaceId: WorkspaceUuid, blobId: strin
   return `${trimmedUrl}/files?workspace=${workspaceId}&file=${blobId}`
 }
 
-const isAuthError = (error: unknown): boolean => {
-  const msg = String(error).toLowerCase()
-  return (
-    msg.includes("unauthorized")
-    || msg.includes("authentication")
-    || msg.includes("auth")
-    || msg.includes("credentials")
-    || msg.includes("401")
-    || msg.includes("invalid password")
-    || msg.includes("invalid email")
-    || msg.includes("login failed")
-  )
-}
-
 /**
  * Construct the files URL for the server.
  */
@@ -278,33 +264,23 @@ const connectStorageClient = async (
 
 const connectStorageWithRetry = (
   config: StorageConnectionConfig
-): Effect.Effect<StorageConnection, StorageClientError> => {
-  const attemptConnect: Effect.Effect<StorageConnection, StorageClientError> = Effect.tryPromise({
-    try: () => connectStorageClient(config),
-    catch: (e) => {
-      if (isAuthError(e)) {
-        return new HulyAuthError({
-          message: `Storage authentication failed: ${String(e)}`
+): Effect.Effect<StorageConnection, StorageClientError> =>
+  withConnectionRetry(
+    Effect.tryPromise({
+      try: () => connectStorageClient(config),
+      catch: (e) => {
+        if (isAuthError(e)) {
+          return new HulyAuthError({
+            message: `Storage authentication failed: ${String(e)}`
+          })
+        }
+        return new HulyConnectionError({
+          message: `Storage connection failed: ${String(e)}`,
+          cause: e
         })
       }
-      return new HulyConnectionError({
-        message: `Storage connection failed: ${String(e)}`,
-        cause: e
-      })
-    }
-  })
-
-  const retrySchedule = Schedule.exponential("100 millis").pipe(
-    Schedule.compose(Schedule.recurs(2))
-  )
-
-  return attemptConnect.pipe(
-    Effect.retry({
-      schedule: retrySchedule,
-      while: (e) => !(e instanceof HulyAuthError)
     })
   )
-}
 
 /**
  * Decode base64 data to Buffer with validation.

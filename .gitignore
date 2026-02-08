@@ -6,3 +6,5 @@ dist/
 .ralph-tests/
 .mcpregistry_*
 COMPARISON.md
+.env.production
+CLAUDE.local.md
