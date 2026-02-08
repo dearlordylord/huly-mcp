@@ -2,6 +2,7 @@ import { JSONSchema, Schema } from "effect"
 
 import { IssuePrioritySchema } from "./issues.js"
 import {
+  ComponentIdentifier,
   ComponentLabel,
   Email,
   IssueTemplateId,
@@ -91,7 +92,7 @@ export const CreateIssueTemplateParamsSchema = Schema.Struct({
   assignee: Schema.optional(Email.annotations({
     description: "Default assignee email address"
   })),
-  component: Schema.optional(Schema.String.annotations({
+  component: Schema.optional(ComponentIdentifier.annotations({
     description: "Default component ID or label"
   })),
   estimation: Schema.optional(PositiveNumber.annotations({
@@ -155,7 +156,7 @@ export const UpdateIssueTemplateParamsSchema = Schema.Struct({
     })
   ),
   component: Schema.optional(
-    Schema.NullOr(Schema.String).annotations({
+    Schema.NullOr(ComponentIdentifier).annotations({
       description: "New default component ID or label (null to clear)"
     })
   ),

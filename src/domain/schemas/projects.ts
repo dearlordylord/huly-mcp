@@ -44,6 +44,7 @@ export const ProjectSchema = Schema.Struct({
   identifier: ProjectIdentifier,
   name: Schema.String,
   description: Schema.optional(Schema.String),
+  archived: Schema.Boolean,
   defaultStatus: Schema.optional(StatusName),
   statuses: Schema.optional(Schema.Array(StatusName))
 }).annotations({

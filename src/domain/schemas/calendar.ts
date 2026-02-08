@@ -54,6 +54,7 @@ export const RecurringRuleSchema = Schema.Struct({
       description: "Interval between occurrences"
     })
   ),
+  // RFC5545 allows ordinal prefixes (e.g. "2MO", "-1FR"), so plain WeekdaySchema won't work here
   byDay: Schema.optional(
     Schema.Array(Schema.String).annotations({
       description: "Days of week (e.g., ['MO', 'WE', 'FR'] or ['1MO', '-1FR'])"

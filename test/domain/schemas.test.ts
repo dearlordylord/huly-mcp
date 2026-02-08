@@ -170,6 +170,7 @@ describe("Domain Schemas", () => {
           identifier: "HULY",
           name: "Huly Project",
           description: "Main project",
+          archived: false,
           defaultStatus: "Open",
           statuses: ["Open", "In Progress", "Done"],
         })
