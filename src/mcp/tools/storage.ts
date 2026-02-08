@@ -14,7 +14,7 @@ export const storageTools: ReadonlyArray<RegisteredTool> = [
     handler: createStorageToolHandler(
       "upload_file",
       parseUploadFileParams,
-      (params) => uploadFile(params)
+      uploadFile
     )
   }
 ]

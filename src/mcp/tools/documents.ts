@@ -34,7 +34,7 @@ export const documentTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_teamspaces",
       parseListTeamspacesParams,
-      (params) => listTeamspaces(params)
+      listTeamspaces
     )
   },
   {
@@ -46,7 +46,7 @@ export const documentTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_documents",
       parseListDocumentsParams,
-      (params) => listDocuments(params)
+      listDocuments
     )
   },
   {
@@ -58,7 +58,7 @@ export const documentTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "get_document",
       parseGetDocumentParams,
-      (params) => getDocument(params)
+      getDocument
     )
   },
   {
@@ -70,7 +70,7 @@ export const documentTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "create_document",
       parseCreateDocumentParams,
-      (params) => createDocument(params)
+      createDocument
     )
   },
   {
@@ -82,7 +82,7 @@ export const documentTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "update_document",
       parseUpdateDocumentParams,
-      (params) => updateDocument(params)
+      updateDocument
     )
   },
   {
@@ -93,7 +93,7 @@ export const documentTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "delete_document",
       parseDeleteDocumentParams,
-      (params) => deleteDocument(params)
+      deleteDocument
     )
   }
 ]

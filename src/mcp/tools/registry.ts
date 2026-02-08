@@ -112,5 +112,4 @@ export const createWorkspaceToolHandler = <P, R>(
 
 export const createNoParamsWorkspaceToolHandler = <R>(
   operation: () => Effect.Effect<R, HulyDomainError, WorkspaceClient>
-): RegisteredTool["handler"] =>
-  createHandler("", provideWorkspaceClient, () => Effect.succeed(undefined), () => operation())
+): RegisteredTool["handler"] => createHandler("", provideWorkspaceClient, () => Effect.succeed(undefined), operation)

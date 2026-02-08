@@ -96,7 +96,7 @@ const createTestLayer = (config: MockConfig) => {
       }
       if (q.value !== undefined) {
         const value = q.value as { $like?: string } | string
-        if (typeof value === "object" && value !== null && "$like" in value) {
+        if (typeof value === "object" && "$like" in value) {
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by "$like" in value check
           filtered = filtered.filter(c => matchesLike(c.value, value.$like!))
         } else {

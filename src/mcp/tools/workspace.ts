@@ -41,7 +41,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     handler: createWorkspaceToolHandler(
       "list_workspace_members",
       parseListWorkspaceMembersParams,
-      (params) => listWorkspaceMembers(params)
+      listWorkspaceMembers
     )
   },
   {
@@ -53,7 +53,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     handler: createWorkspaceToolHandler(
       "update_member_role",
       parseUpdateMemberRoleParams,
-      (params) => updateMemberRole(params)
+      updateMemberRole
     )
   },
   {
@@ -62,7 +62,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     category: CATEGORY,
     inputSchema: emptyParamsJsonSchema,
     handler: createNoParamsWorkspaceToolHandler(
-      () => getWorkspaceInfo()
+      getWorkspaceInfo
     )
   },
   {
@@ -74,7 +74,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     handler: createWorkspaceToolHandler(
       "list_workspaces",
       parseListWorkspacesParams,
-      (params) => listWorkspaces(params)
+      listWorkspaces
     )
   },
   {
@@ -85,7 +85,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     handler: createWorkspaceToolHandler(
       "create_workspace",
       parseCreateWorkspaceParams,
-      (params) => createWorkspace(params)
+      createWorkspace
     )
   },
   {
@@ -94,7 +94,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     category: CATEGORY,
     inputSchema: emptyParamsJsonSchema,
     handler: createNoParamsWorkspaceToolHandler(
-      () => deleteWorkspace()
+      deleteWorkspace
     )
   },
   {
@@ -103,7 +103,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     category: CATEGORY,
     inputSchema: emptyParamsJsonSchema,
     handler: createNoParamsWorkspaceToolHandler(
-      () => getUserProfile()
+      getUserProfile
     )
   },
   {
@@ -115,7 +115,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     handler: createWorkspaceToolHandler(
       "update_user_profile",
       parseUpdateUserProfileParams,
-      (params) => updateUserProfile(params)
+      updateUserProfile
     )
   },
   {
@@ -126,7 +126,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     handler: createWorkspaceToolHandler(
       "update_guest_settings",
       parseUpdateGuestSettingsParams,
-      (params) => updateGuestSettings(params)
+      updateGuestSettings
     )
   },
   {
@@ -137,7 +137,7 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     handler: createWorkspaceToolHandler(
       "get_regions",
       parseGetRegionsParams,
-      () => getRegions()
+      getRegions
     )
   }
 ]

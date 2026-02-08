@@ -40,7 +40,7 @@ export const timeTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "log_time",
       parseLogTimeParams,
-      (params) => logTime(params)
+      logTime
     )
   },
   {
@@ -52,7 +52,7 @@ export const timeTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "get_time_report",
       parseGetTimeReportParams,
-      (params) => getTimeReport(params)
+      getTimeReport
     )
   },
   {
@@ -64,7 +64,7 @@ export const timeTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_time_spend_reports",
       parseListTimeSpendReportsParams,
-      (params) => listTimeSpendReports(params)
+      listTimeSpendReports
     )
   },
   {
@@ -76,7 +76,7 @@ export const timeTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "get_detailed_time_report",
       parseGetDetailedTimeReportParams,
-      (params) => getDetailedTimeReport(params)
+      getDetailedTimeReport
     )
   },
   {
@@ -88,7 +88,7 @@ export const timeTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_work_slots",
       parseListWorkSlotsParams,
-      (params) => listWorkSlots(params)
+      listWorkSlots
     )
   },
   {
@@ -99,7 +99,7 @@ export const timeTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "create_work_slot",
       parseCreateWorkSlotParams,
-      (params) => createWorkSlot(params)
+      createWorkSlot
     )
   },
   {
@@ -111,7 +111,7 @@ export const timeTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "start_timer",
       parseStartTimerParams,
-      (params) => startTimer(params)
+      startTimer
     )
   },
   {
@@ -123,7 +123,7 @@ export const timeTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "stop_timer",
       parseStopTimerParams,
-      (params) => stopTimer(params)
+      stopTimer
     )
   }
 ]

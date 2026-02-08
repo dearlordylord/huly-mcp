@@ -91,6 +91,7 @@ export default [
       "object-shorthand": "error",
       "sort-destructure-keys/sort-destructure-keys": "error",
       "max-lines": ["error", { max: 420, skipBlankLines: true, skipComments: true }],
+      "functional/prefer-tacit": "error",
       "no-console": "warn",
       "no-magic-numbers": ["warn", {
         ignore: [0, 1, 1024],

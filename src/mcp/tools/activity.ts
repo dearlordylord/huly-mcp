@@ -39,7 +39,7 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_activity",
       parseListActivityParams,
-      (params) => listActivity(params)
+      listActivity
     )
   },
   {
@@ -50,7 +50,7 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "add_reaction",
       parseAddReactionParams,
-      (params) => addReaction(params)
+      addReaction
     )
   },
   {
@@ -61,7 +61,7 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "remove_reaction",
       parseRemoveReactionParams,
-      (params) => removeReaction(params)
+      removeReaction
     )
   },
   {
@@ -72,7 +72,7 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_reactions",
       parseListReactionsParams,
-      (params) => listReactions(params)
+      listReactions
     )
   },
   {
@@ -83,7 +83,7 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "save_message",
       parseSaveMessageParams,
-      (params) => saveMessage(params)
+      saveMessage
     )
   },
   {
@@ -94,7 +94,7 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "unsave_message",
       parseUnsaveMessageParams,
-      (params) => unsaveMessage(params)
+      unsaveMessage
     )
   },
   {
@@ -105,7 +105,7 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_saved_messages",
       parseListSavedMessagesParams,
-      (params) => listSavedMessages(params)
+      listSavedMessages
     )
   },
   {
@@ -116,7 +116,7 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_mentions",
       parseListMentionsParams,
-      (params) => listMentions(params)
+      listMentions
     )
   }
 ]

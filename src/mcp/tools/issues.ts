@@ -70,7 +70,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_issues",
       parseListIssuesParams,
-      (params) => listIssues(params)
+      listIssues
     )
   },
   {
@@ -82,7 +82,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "get_issue",
       parseGetIssueParams,
-      (params) => getIssue(params)
+      getIssue
     )
   },
   {
@@ -94,7 +94,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "create_issue",
       parseCreateIssueParams,
-      (params) => createIssue(params)
+      createIssue
     )
   },
   {
@@ -106,7 +106,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "update_issue",
       parseUpdateIssueParams,
-      (params) => updateIssue(params)
+      updateIssue
     )
   },
   {
@@ -117,7 +117,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "add_issue_label",
       parseAddLabelParams,
-      (params) => addLabel(params)
+      addLabel
     )
   },
   {
@@ -128,7 +128,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "delete_issue",
       parseDeleteIssueParams,
-      (params) => deleteIssue(params)
+      deleteIssue
     )
   },
   {
@@ -140,7 +140,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_components",
       parseListComponentsParams,
-      (params) => listComponents(params)
+      listComponents
     )
   },
   {
@@ -151,7 +151,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "get_component",
       parseGetComponentParams,
-      (params) => getComponent(params)
+      getComponent
     )
   },
   {
@@ -163,7 +163,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "create_component",
       parseCreateComponentParams,
-      (params) => createComponent(params)
+      createComponent
     )
   },
   {
@@ -174,7 +174,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "update_component",
       parseUpdateComponentParams,
-      (params) => updateComponent(params)
+      updateComponent
     )
   },
   {
@@ -185,7 +185,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "set_issue_component",
       parseSetIssueComponentParams,
-      (params) => setIssueComponent(params)
+      setIssueComponent
     )
   },
   {
@@ -196,7 +196,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "delete_component",
       parseDeleteComponentParams,
-      (params) => deleteComponent(params)
+      deleteComponent
     )
   },
   {
@@ -208,7 +208,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_issue_templates",
       parseListIssueTemplatesParams,
-      (params) => listIssueTemplates(params)
+      listIssueTemplates
     )
   },
   {
@@ -220,7 +220,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "get_issue_template",
       parseGetIssueTemplateParams,
-      (params) => getIssueTemplate(params)
+      getIssueTemplate
     )
   },
   {
@@ -232,7 +232,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "create_issue_template",
       parseCreateIssueTemplateParams,
-      (params) => createIssueTemplate(params)
+      createIssueTemplate
     )
   },
   {
@@ -244,7 +244,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "create_issue_from_template",
       parseCreateIssueFromTemplateParams,
-      (params) => createIssueFromTemplate(params)
+      createIssueFromTemplate
     )
   },
   {
@@ -255,7 +255,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "update_issue_template",
       parseUpdateIssueTemplateParams,
-      (params) => updateIssueTemplate(params)
+      updateIssueTemplate
     )
   },
   {
@@ -266,7 +266,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "delete_issue_template",
       parseDeleteIssueTemplateParams,
-      (params) => deleteIssueTemplate(params)
+      deleteIssueTemplate
     )
   }
 ]

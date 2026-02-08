@@ -52,7 +52,7 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_notifications",
       parseListNotificationsParams,
-      (params) => listNotifications(params)
+      listNotifications
     )
   },
   {
@@ -63,7 +63,7 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "get_notification",
       parseGetNotificationParams,
-      (params) => getNotification(params)
+      getNotification
     )
   },
   {
@@ -74,7 +74,7 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "mark_notification_read",
       parseMarkNotificationReadParams,
-      (params) => markNotificationRead(params)
+      markNotificationRead
     )
   },
   {
@@ -85,7 +85,7 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "mark_all_notifications_read",
       () => Effect.succeed({}),
-      () => markAllNotificationsRead()
+      markAllNotificationsRead
     )
   },
   {
@@ -96,7 +96,7 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "archive_notification",
       parseArchiveNotificationParams,
-      (params) => archiveNotification(params)
+      archiveNotification
     )
   },
   {
@@ -107,7 +107,7 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "archive_all_notifications",
       () => Effect.succeed({}),
-      () => archiveAllNotifications()
+      archiveAllNotifications
     )
   },
   {
@@ -118,7 +118,7 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "delete_notification",
       parseDeleteNotificationParams,
-      (params) => deleteNotification(params)
+      deleteNotification
     )
   },
   {
@@ -129,7 +129,7 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "get_notification_context",
       parseGetNotificationContextParams,
-      (params) => getNotificationContext(params)
+      getNotificationContext
     )
   },
   {
@@ -141,7 +141,7 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_notification_contexts",
       parseListNotificationContextsParams,
-      (params) => listNotificationContexts(params)
+      listNotificationContexts
     )
   },
   {
@@ -152,7 +152,7 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "pin_notification_context",
       parsePinNotificationContextParams,
-      (params) => pinNotificationContext(params)
+      pinNotificationContext
     )
   },
   {
@@ -163,7 +163,7 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_notification_settings",
       parseListNotificationSettingsParams,
-      (params) => listNotificationSettings(params)
+      listNotificationSettings
     )
   },
   {
@@ -174,7 +174,7 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "update_notification_provider_setting",
       parseUpdateNotificationProviderSettingParams,
-      (params) => updateNotificationProviderSetting(params)
+      updateNotificationProviderSetting
     )
   },
   {
@@ -185,7 +185,7 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "get_unread_notification_count",
       () => Effect.succeed({}),
-      () => getUnreadNotificationCount()
+      getUnreadNotificationCount
     )
   }
 ]

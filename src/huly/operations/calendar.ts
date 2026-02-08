@@ -159,7 +159,7 @@ const buildParticipants = (
 
     const persons = yield* client.findAll<Person>(
       contact.class.Person,
-      { _id: { $in: participantRefs.map(r => toRef<Person>(r)) } }
+      { _id: { $in: participantRefs.map(toRef<Person>) } }
     )
 
     return persons.map(p => ({

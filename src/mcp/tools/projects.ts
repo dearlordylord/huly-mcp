@@ -13,7 +13,7 @@ export const projectTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_projects",
       parseListProjectsParams,
-      (params) => listProjects(params)
+      listProjects
     )
   }
 ]

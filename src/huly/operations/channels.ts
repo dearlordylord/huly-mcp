@@ -83,7 +83,7 @@ const personIdsAsSocialIdentityRefs = (
 ): Array<SocialIdentityRef> => ids as unknown as Array<SocialIdentityRef>
 
 // SDK: jsonToMarkup return type doesn't match Markup; cast contained here.
-const jsonAsMarkup = (json: ReturnType<typeof markdownToMarkup>): Markup => jsonToMarkup(json)
+const jsonAsMarkup: (json: ReturnType<typeof markdownToMarkup>) => Markup = jsonToMarkup
 
 // --- Helpers ---
 

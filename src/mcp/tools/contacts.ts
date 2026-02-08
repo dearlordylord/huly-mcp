@@ -40,7 +40,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_persons",
       parseListPersonsParams,
-      (params) => listPersons(params)
+      listPersons
     )
   },
   {
@@ -52,7 +52,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "get_person",
       parseGetPersonParams,
-      (params) => getPerson(params)
+      getPerson
     )
   },
   {
@@ -63,7 +63,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "create_person",
       parseCreatePersonParams,
-      (params) => createPerson(params)
+      createPerson
     )
   },
   {
@@ -74,7 +74,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "update_person",
       parseUpdatePersonParams,
-      (params) => updatePerson(params)
+      updatePerson
     )
   },
   {
@@ -85,7 +85,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "delete_person",
       parseDeletePersonParams,
-      (params) => deletePerson(params)
+      deletePerson
     )
   },
   {
@@ -97,7 +97,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_employees",
       parseListEmployeesParams,
-      (params) => listEmployees(params)
+      listEmployees
     )
   },
   {
@@ -109,7 +109,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "list_organizations",
       parseListOrganizationsParams,
-      (params) => listOrganizations(params)
+      listOrganizations
     )
   },
   {
@@ -121,7 +121,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "create_organization",
       parseCreateOrganizationParams,
-      (params) => createOrganization(params)
+      createOrganization
     )
   }
 ]
