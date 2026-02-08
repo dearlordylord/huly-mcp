@@ -1,51 +1,30 @@
-# Item 21: Centralize CJS require() interop
+# Item 22: Extract markup format conversion helpers
 
 ## Problem
 
-CJS `require()` interop with eslint-disable comments was duplicated across 14 files (13 source files + 1 test file). Each occurrence required a 2-line pattern: an eslint-disable comment and a `require().default as typeof import()` expression. Some files had up to 4 such blocks. Total: 28 require() calls scattered across the codebase.
+In `src/huly/client.ts`, the `createMarkupOps` function contained three `switch(format)` blocks with duplicated markup conversion logic:
+
+1. `fetchMarkup` -- converts internal markup to the requested output format (markup/html/markdown)
+2. `uploadMarkup` -- converts input format to internal markup before calling `collaborator.createMarkup`
+3. `updateMarkup` -- identical conversion to `uploadMarkup`, before calling `collaborator.updateMarkup`
+
+Cases 2 and 3 were fully identical switch blocks. Case 1 was the inverse direction.
 
 ## Solution
 
-Created `src/huly/huly-plugins.ts` as the single CJS interop boundary. It centralizes all 12 Huly platform plugin requires:
+Extracted two helper functions at module scope in `src/huly/client.ts`:
 
-- `@hcengineering/activity`
-- `@hcengineering/attachment`
-- `@hcengineering/calendar`
-- `@hcengineering/chunter`
-- `@hcengineering/contact`
-- `@hcengineering/core`
-- `@hcengineering/document`
-- `@hcengineering/notification`
-- `@hcengineering/tags`
-- `@hcengineering/task`
-- `@hcengineering/time`
-- `@hcengineering/tracker`
+- `toInternalMarkup(value, format, opts)` -- converts from external format (markup/html/markdown) to internal Huly markup string. Replaces the duplicated switch in `uploadMarkup` and `updateMarkup`.
+- `fromInternalMarkup(markup, format, opts)` -- converts from internal markup to the requested external format. Replaces the switch in `fetchMarkup`.
 
-The eslint-disable/enable block appears exactly once in the new file. All consumer files now use standard `import { ... } from "../huly-plugins.js"` instead.
+Both accept a `MarkupConvertOptions` object (`{ refUrl, imageUrl }`) needed for markdown conversion.
+
+The three method bodies in `createMarkupOps` are now one-liners delegating to these helpers.
 
 ## Files changed
 
-- **Created**: `src/huly/huly-plugins.ts`
-- **Updated** (14 files, removed require + eslint-disable, added import):
-  - `src/huly/operations/activity.ts`
-  - `src/huly/operations/attachments.ts`
-  - `src/huly/operations/calendar.ts`
-  - `src/huly/operations/channels.ts`
-  - `src/huly/operations/comments.ts`
-  - `src/huly/operations/contacts.ts`
-  - `src/huly/operations/contacts.test.ts`
-  - `src/huly/operations/documents.ts`
-  - `src/huly/operations/issues.ts`
-  - `src/huly/operations/milestones.ts`
-  - `src/huly/operations/notifications.ts`
-  - `src/huly/operations/projects.ts`
-  - `src/huly/operations/search.ts`
-  - `src/huly/operations/shared.ts`
-  - `src/huly/operations/time.ts`
+- `src/huly/client.ts`
 
 ## Verification
 
-- `pnpm build` -- pass
-- `pnpm typecheck` -- pass
-- `pnpm lint` -- 0 errors (127 warnings, all pre-existing)
-- `pnpm test` -- 755 tests pass
+`pnpm build && pnpm typecheck && pnpm lint && pnpm test` -- all pass (0 errors, 755 tests).
