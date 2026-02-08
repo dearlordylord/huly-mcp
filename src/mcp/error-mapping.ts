@@ -164,8 +164,9 @@ export const mapDomainCauseToMcp = (
   return createErrorResponse("An unexpected error occurred", McpErrorCode.InternalError)
 }
 
+const JSON_INDENT = 2
 export const createSuccessResponse = <T>(result: T): McpToolResponse => ({
-  content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
+  content: [{ type: "text" as const, text: JSON.stringify(result, null, JSON_INDENT) }]
 })
 
 export const createUnknownToolError = (toolName: string): McpErrorResponseWithMeta =>

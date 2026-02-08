@@ -15,7 +15,7 @@ import { type ConfigValidationError, HulyConfigService } from "./config/config.j
 import { HulyClient, type HulyClientError } from "./huly/client.js"
 import { HulyStorageClient, type StorageClientError } from "./huly/storage.js"
 import { WorkspaceClient, type WorkspaceClientError } from "./huly/workspace-client.js"
-import { HttpServerFactoryService } from "./mcp/http-transport.js"
+import { DEFAULT_HTTP_PORT, HttpServerFactoryService } from "./mcp/http-transport.js"
 import { type McpServerError, McpServerService, type McpTransportType } from "./mcp/server.js"
 
 type AppError =
@@ -35,7 +35,7 @@ const getTransportType = Config.string("MCP_TRANSPORT").pipe(
 )
 
 const getHttpPort = Config.integer("MCP_HTTP_PORT").pipe(
-  Config.withDefault(3000)
+  Config.withDefault(DEFAULT_HTTP_PORT)
 )
 
 const getHttpHost = Config.string("MCP_HTTP_HOST").pipe(

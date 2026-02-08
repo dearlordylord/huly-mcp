@@ -54,6 +54,7 @@ import {
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { ComponentNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { HulyError, InvalidStatusError, IssueNotFoundError, PersonNotFoundError } from "../errors.js"
+import { contact, core, tags, tracker } from "../huly-plugins.js"
 import { findComponentByIdOrLabel } from "./components.js"
 import { escapeLikeWildcards, withLookup } from "./query-helpers.js"
 import {
@@ -87,8 +88,6 @@ export {
   listIssueTemplates,
   updateIssueTemplate
 } from "./issue-templates.js"
-
-import { contact, core, tags, tracker } from "../huly-plugins.js"
 
 type ListIssuesError =
   | HulyClientError

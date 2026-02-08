@@ -9,7 +9,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 import { Config, Context, Effect, Layer, Ref, Schema } from "effect"
 
 import type { HttpServerFactoryService, HttpTransportError } from "./http-transport.js"
-import { startHttpTransport } from "./http-transport.js"
+import { DEFAULT_HTTP_PORT, startHttpTransport } from "./http-transport.js"
 
 import { HulyClient } from "../huly/client.js"
 import { HulyStorageClient } from "../huly/storage.js"
@@ -201,7 +201,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                     })
                 })
               } else {
-                const port = config.httpPort ?? 3000
+                const port = config.httpPort ?? DEFAULT_HTTP_PORT
                 const host = config.httpHost ?? "127.0.0.1"
 
                 yield* startHttpTransport(

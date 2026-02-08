@@ -23,6 +23,7 @@ import { concatLink } from "../utils/url.js"
 import { authToOptions, connectWithRetry } from "./auth-utils.js"
 import type { HulyAuthError, HulyConnectionError } from "./errors.js"
 import {
+  BYTES_PER_MB,
   FileFetchError,
   FileNotFoundError,
   FileTooLargeError,
@@ -31,7 +32,8 @@ import {
   InvalidFileDataError
 } from "./errors.js"
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
+const MAX_FILE_SIZE_MB = 100
+const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * BYTES_PER_MB
 
 const ALLOWED_CONTENT_TYPES = new Set([
   // Images
@@ -371,25 +373,25 @@ export const isBlockedUrl = (urlString: string): boolean => {
       return true
     }
 
-    // Check IPv4 addresses
+    // Check IPv4 private/reserved ranges (RFC 1918, RFC 3927)
     const ipMatch = hostname.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/)
     if (ipMatch) {
       const [a, b] = [Number(ipMatch[1]), Number(ipMatch[2])]
 
       // 127.x.x.x (loopback)
-      if (a === 127) return true
+      if (a === 127) return true // eslint-disable-line no-magic-numbers
 
       // 10.x.x.x (private)
-      if (a === 10) return true
+      if (a === 10) return true // eslint-disable-line no-magic-numbers
 
       // 172.16-31.x.x (private)
-      if (a === 172 && b >= 16 && b <= 31) return true
+      if (a === 172 && b >= 16 && b <= 31) return true // eslint-disable-line no-magic-numbers
 
       // 192.168.x.x (private)
-      if (a === 192 && b === 168) return true
+      if (a === 192 && b === 168) return true // eslint-disable-line no-magic-numbers
 
       // 169.254.x.x (link-local, includes metadata endpoint)
-      if (a === 169 && b === 254) return true
+      if (a === 169 && b === 254) return true // eslint-disable-line no-magic-numbers
     }
 
     return false

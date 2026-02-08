@@ -92,6 +92,12 @@ export default [
       "sort-destructure-keys/sort-destructure-keys": "error",
       "max-lines": ["error", { max: 420, skipBlankLines: true, skipComments: true }],
       "no-console": "warn",
+      "no-magic-numbers": ["warn", {
+        ignore: [0, 1, 1024],
+        ignoreArrayIndexes: true,
+        ignoreDefaultValues: true,
+        enforceConst: true
+      }],
 
       // Functional programming
       ...functional.configs.recommended.rules,
@@ -173,9 +179,10 @@ export default [
   },
 
   {
-    files: ["**/*.test.ts"],
+    files: ["**/*.test.ts", "**/*.spec.ts"],
     rules: {
-      "max-lines": "off"
+      "max-lines": "off",
+      "no-magic-numbers": "off"
     }
   }
 ]
