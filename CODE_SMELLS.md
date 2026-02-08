@@ -28,7 +28,7 @@ Rules: worktree work by parallel sub-agents. each writes REPORT.md. integration 
 | wt-schemas | 36, 37, 38, 39, 40, 41, 42, 43 | Email validation; NonNegativeInt counts; component field; GetPersonParams union; author type; senderId type; ProjectSchema archived; byDay validator | MERGED | 94aa9c2: Email validation, NonNegativeInt, ComponentIdentifier in templates, archived field. 748/748 |
 | wt-contacts | 46 | email filtering after limit -> filter before or adjust | MERGED | d76fce3: channel-first query strategy, email filter before limit. 751/751 |
 | wt-mcp-arch | 48, 49, 51, 52 | McpToolResponse index sig; handleToolCall return; WorkspaceClient optional; toMcpResponse _meta | MERGED | 8a67c1c: removed index sig, fixed handleToolCall return, simplified toMcpResponse. 51 kept as-is. 751/751 |
-| wt-style | 61, 65 | handler style consistency; concatLink usage | DONE | 7f1e9f5: point-free handler style across 10 tool files. 755/755 |
+| wt-style | 61, 65 | handler style consistency; concatLink usage; prefer-tacit rule | MERGED | f5be2fa: point-free style, prefer-tacit eslint rule. 751/751 |
 | wt-queries | 15 | Record<string,unknown> -> Partial<DocumentQuery<T>> | DONE | 1e41655: DocumentQuery<T> across 9 files, refAsPersonId helper for WorkSlot. 755/755 |
 
 ## Skipped Items
