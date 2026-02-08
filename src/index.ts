@@ -17,6 +17,7 @@ import { HulyStorageClient, type StorageClientError } from "./huly/storage.js"
 import { WorkspaceClient, type WorkspaceClientError } from "./huly/workspace-client.js"
 import { DEFAULT_HTTP_PORT, HttpServerFactoryService } from "./mcp/http-transport.js"
 import { type McpServerError, McpServerService, type McpTransportType } from "./mcp/server.js"
+import { TelemetryService } from "./telemetry/telemetry.js"
 
 type AppError =
   | ConfigValidationError
@@ -50,7 +51,8 @@ const buildAppLayer = (
   transport: McpTransportType,
   httpPort: number,
   httpHost: string,
-  autoExit: boolean
+  autoExit: boolean,
+  authMethod: "token" | "password"
 ): Layer.Layer<
   McpServerService | HttpServerFactoryService,
   ConfigValidationError | HulyClientError | StorageClientError | WorkspaceClientError,
@@ -79,8 +81,9 @@ const buildAppLayer = (
     transport,
     httpPort,
     httpHost,
-    autoExit
-  }).pipe(Layer.provide(combinedClientLayer))
+    autoExit,
+    authMethod
+  }).pipe(Layer.provide(Layer.merge(combinedClientLayer, TelemetryService.layer)))
 
   // Merge with HttpServerFactoryService for HTTP transport
   return Layer.merge(mcpServerLayer, HttpServerFactoryService.defaultLayer)
@@ -91,8 +94,9 @@ export const main: Effect.Effect<void, AppError> = Effect.gen(function*() {
   const httpPort = yield* getHttpPort
   const httpHost = yield* getHttpHost
   const autoExit = yield* getAutoExit
+  const authMethod: "token" | "password" = process.env["HULY_TOKEN"] ? "token" : "password"
   // stdout reserved for MCP protocol in stdio mode - no console output here
-  const appLayer = buildAppLayer(transport, httpPort, httpHost, autoExit)
+  const appLayer = buildAppLayer(transport, httpPort, httpHost, autoExit, authMethod)
 
   yield* Effect.gen(function*() {
     const server = yield* McpServerService

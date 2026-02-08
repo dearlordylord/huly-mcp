@@ -29,6 +29,8 @@ Type casts (`as T`) are a sin. Avoid them. When unavoidable:
 2. Document what evidence/API docs support the cast being safe
 3. Consider if a generic type parameter or type guard could eliminate the cast
 
+All data crossing system boundaries (APIs etc.) must be strongly typed — both inbound (decoding) and outbound (encoding), with Effect Schema.
+
 <!-- effect-solutions:start -->
 ## Effect Best Practices
 
