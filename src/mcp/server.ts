@@ -14,12 +14,13 @@ import { DEFAULT_HTTP_PORT, startHttpTransport } from "./http-transport.js"
 import { HulyClient } from "../huly/client.js"
 import { HulyStorageClient } from "../huly/storage.js"
 import { WorkspaceClient } from "../huly/workspace-client.js"
+import type { TelemetryOperations } from "../telemetry/telemetry.js"
+import { TelemetryService } from "../telemetry/telemetry.js"
 import { assertExists } from "../utils/assertions.js"
-import { createUnknownToolError, toMcpResponse } from "./error-mapping.js"
-import { CATEGORY_NAMES, createFilteredRegistry, TOOL_DEFINITIONS, toolRegistry } from "./tools/index.js"
-
-// PKG_VERSION is injected by esbuild at build time via --define
-const VERSION: string = typeof PKG_VERSION !== "undefined" ? PKG_VERSION : "0.0.0-dev"
+import { VERSION } from "../version.js"
+import { createUnknownToolError, McpErrorCode, toMcpResponse } from "./error-mapping.js"
+import type { ToolRegistry } from "./tools/index.js"
+import { CATEGORY_NAMES, createFilteredRegistry, toolRegistry } from "./tools/index.js"
 
 export type McpTransportType = "stdio" | "http"
 
@@ -28,6 +29,7 @@ interface McpServerConfig {
   readonly httpPort?: number
   readonly httpHost?: string
   readonly autoExit?: boolean
+  readonly authMethod?: "token" | "password"
 }
 
 export class McpServerError extends Schema.TaggedError<McpServerError>()(
@@ -37,8 +39,6 @@ export class McpServerError extends Schema.TaggedError<McpServerError>()(
     cause: Schema.optional(Schema.Defect)
   }
 ) {}
-
-export { TOOL_DEFINITIONS }
 
 const parseToolsets = (raw: string | undefined): ReadonlySet<string> | undefined => {
   if (raw === undefined || raw.trim() === "") return undefined
@@ -68,13 +68,10 @@ interface McpServerOperations {
 const createMcpServer = (
   hulyClient: HulyClient["Type"],
   storageClient: HulyStorageClient["Type"],
-  workspaceClient?: WorkspaceClient["Type"],
-  enabledCategories?: ReadonlySet<string>
+  telemetry: TelemetryOperations,
+  registry: ToolRegistry,
+  workspaceClient?: WorkspaceClient["Type"]
 ): Server => {
-  const registry = enabledCategories
-    ? createFilteredRegistry(enabledCategories)
-    : toolRegistry
-
   const server = new Server(
     {
       name: "huly-mcp",
@@ -87,21 +84,27 @@ const createMcpServer = (
     }
   )
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: registry.definitions.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      inputSchema: tool.inputSchema as {
-        type: "object"
-        properties?: Record<string, unknown>
-        required?: Array<string>
-      }
-    }))
-  }))
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    telemetry.firstListTools()
+    return {
+      tools: registry.definitions.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        // MCP SDK expects a narrower type than JSONSchema7; our inputSchema
+        // is always { type: "object", ... } so the cast is structurally safe.
+        inputSchema: tool.inputSchema as {
+          type: "object"
+          properties?: Record<string, unknown>
+          required?: Array<string>
+        }
+      }))
+    }
+  })
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { arguments: args, name } = request.params
 
+    const start = Date.now()
     const response = await registry.handleToolCall(
       name,
       args ?? {},
@@ -109,10 +112,26 @@ const createMcpServer = (
       storageClient,
       workspaceClient
     )
+    const durationMs = Date.now() - start
 
     if (response === null) {
-      return toMcpResponse(createUnknownToolError(name))
+      const errorResponse = createUnknownToolError(name)
+      telemetry.toolCalled({
+        toolName: name,
+        status: "error",
+        errorTag: errorResponse._meta.errorTag,
+        durationMs
+      })
+      return toMcpResponse(errorResponse)
     }
+
+    const isInternalError = response._meta?.errorCode === McpErrorCode.InternalError
+    telemetry.toolCalled({
+      toolName: name,
+      status: isInternalError ? "error" : "success",
+      errorTag: response._meta?.errorTag,
+      durationMs
+    })
 
     return toMcpResponse(response)
   })
@@ -126,21 +145,38 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 >() {
   static layer(
     config: McpServerConfig
-  ): Layer.Layer<McpServerService, never, HulyClient | HulyStorageClient | WorkspaceClient> {
+  ): Layer.Layer<McpServerService, never, HulyClient | HulyStorageClient | WorkspaceClient | TelemetryService> {
     return Layer.effect(
       McpServerService,
       Effect.gen(function*() {
         const hulyClient = yield* HulyClient
         const storageClient = yield* HulyStorageClient
         const workspaceClient = yield* WorkspaceClient
+        const telemetry = yield* TelemetryService
 
         const toolsetsRaw = yield* Effect.orElseSucceed(Config.string("TOOLSETS"), () => "")
         const enabledCategories = parseToolsets(toolsetsRaw || undefined)
 
+        const toolsets = enabledCategories ? [...enabledCategories] : null
+        const registry = enabledCategories
+          ? createFilteredRegistry(enabledCategories)
+          : toolRegistry
+
+        telemetry.sessionStart({
+          transport: config.transport,
+          authMethod: config.authMethod ?? "password",
+          toolCount: registry.definitions.length,
+          toolsets
+        })
+
         // TODO better harmony with config.transport
         const server = config.transport === "stdio"
-          ? createMcpServer(hulyClient, storageClient, workspaceClient, enabledCategories)
+          ? createMcpServer(hulyClient, storageClient, telemetry, registry, workspaceClient)
           : null
+
+        const flushTelemetry = Effect.ignore(
+          Effect.tryPromise(() => telemetry.shutdown())
+        )
 
         const isRunning = yield* Ref.make(false)
 
@@ -192,6 +228,8 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                   })
                 })
 
+                yield* flushTelemetry
+
                 yield* Effect.tryPromise({
                   try: () => stdioServer.close(),
                   catch: (e) =>
@@ -206,7 +244,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 
                 yield* startHttpTransport(
                   { port, host },
-                  () => createMcpServer(hulyClient, storageClient, workspaceClient, enabledCategories)
+                  () => createMcpServer(hulyClient, storageClient, telemetry, registry, workspaceClient)
                 ).pipe(
                   Effect.scoped,
                   Effect.mapError(
@@ -219,6 +257,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                 )
 
                 yield* Ref.set(isRunning, false)
+                yield* flushTelemetry
               }
             }),
 
@@ -229,6 +268,8 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
               }
 
               yield* Ref.set(isRunning, false)
+
+              yield* flushTelemetry
 
               if (server) {
                 yield* Effect.tryPromise({

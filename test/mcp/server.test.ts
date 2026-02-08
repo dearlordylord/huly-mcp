@@ -6,7 +6,9 @@ import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
-import { McpServerError, McpServerService, TOOL_DEFINITIONS } from "../../src/mcp/server.js"
+import { McpServerError, McpServerService } from "../../src/mcp/server.js"
+import { TOOL_DEFINITIONS } from "../../src/mcp/tools/index.js"
+import { TelemetryService } from "../../src/telemetry/telemetry.js"
 
 import { tracker } from "../../src/huly/huly-plugins.js"
 
@@ -324,7 +326,8 @@ describe("McpServerService", () => {
         const serverLayer = McpServerService.layer({ transport: "stdio" }).pipe(
           Layer.provide(hulyClientLayer),
           Layer.provide(storageClientLayer),
-          Layer.provide(workspaceClientLayer)
+          Layer.provide(workspaceClientLayer),
+          Layer.provide(TelemetryService.testLayer())
         )
 
         // Verify we can build the layer (this tests the Effect.gen runs without error)
@@ -349,7 +352,8 @@ describe("McpServerService", () => {
         }).pipe(
           Layer.provide(hulyClientLayer),
           Layer.provide(storageClientLayer),
-          Layer.provide(workspaceClientLayer)
+          Layer.provide(workspaceClientLayer),
+          Layer.provide(TelemetryService.testLayer())
         )
 
         yield* Layer.build(serverLayer)

@@ -6,6 +6,7 @@ import { HulyStorageClient } from "../src/huly/storage.js"
 import { WorkspaceClient } from "../src/huly/workspace-client.js"
 import { main } from "../src/index.js"
 import { McpServerError, McpServerService } from "../src/mcp/server.js"
+import { TelemetryService } from "../src/telemetry/telemetry.js"
 
 // --- Tests ---
 
@@ -59,8 +60,11 @@ describe("Main Entry Point", () => {
         const workspaceClientLayer = WorkspaceClient.testLayer({})
         const mcpServerLayer = McpServerService.layer({ transport: "stdio" }).pipe(
           Layer.provide(Layer.merge(
-            Layer.merge(hulyClientLayer, storageClientLayer),
-            workspaceClientLayer
+            Layer.merge(
+              Layer.merge(hulyClientLayer, storageClientLayer),
+              workspaceClientLayer
+            ),
+            TelemetryService.testLayer()
           ))
         )
 

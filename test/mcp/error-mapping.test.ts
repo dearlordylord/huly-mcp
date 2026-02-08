@@ -22,13 +22,14 @@ import {
   mapDomainErrorToMcp,
   mapParseCauseToMcp,
   mapParseErrorToMcp,
-  McpErrorCode
+  McpErrorCode,
+  toMcpResponse
 } from "../../src/mcp/error-mapping.js"
 
 describe("Error Mapping to MCP", () => {
   describe("mapDomainErrorToMcp", () => {
     describe("InvalidParams errors (-32602)", () => {
-      it.effect("maps IssueNotFoundError with descriptive message", () =>
+      it.effect("maps IssueNotFoundError with no errorTag", () =>
         Effect.gen(function*() {
           const error = new IssueNotFoundError({
             identifier: "HULY-123",
@@ -38,6 +39,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+          expect(response._meta.errorTag).toBeUndefined()
           expect(response.content[0].text).toBe(
             "Issue 'HULY-123' not found in project 'HULY'"
           )
@@ -108,37 +110,40 @@ describe("Error Mapping to MCP", () => {
     })
 
     describe("InternalError errors (-32603)", () => {
-      it.effect("maps HulyConnectionError with sanitized message", () =>
+      it.effect("maps HulyConnectionError with errorTag", () =>
         Effect.gen(function*() {
           const error = new HulyConnectionError({ message: "Network timeout" })
           const response = mapDomainErrorToMcp(error)
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
+          expect(response._meta.errorTag).toBe("HulyConnectionError")
           expect(response.content[0].text).toBe("Connection error: Network timeout")
         }))
 
-      it.effect("maps HulyAuthError with sanitized message", () =>
+      it.effect("maps HulyAuthError with errorTag", () =>
         Effect.gen(function*() {
           const error = new HulyAuthError({ message: "Login failed" })
           const response = mapDomainErrorToMcp(error)
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
+          expect(response._meta.errorTag).toBe("HulyAuthError")
           expect(response.content[0].text).toBe("Authentication error: Login failed")
         }))
 
-      it.effect("maps HulyError with sanitized message", () =>
+      it.effect("maps HulyError with errorTag", () =>
         Effect.gen(function*() {
           const error = new HulyError({ message: "Something went wrong" })
           const response = mapDomainErrorToMcp(error)
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
+          expect(response._meta.errorTag).toBe("HulyError")
           expect(response.content[0].text).toBe("Something went wrong")
         }))
 
-      it.effect("maps FileUploadError with descriptive message", () =>
+      it.effect("maps FileUploadError with errorTag", () =>
         Effect.gen(function*() {
           const error = new FileUploadError({
             message: "Storage quota exceeded"
@@ -147,12 +152,13 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
+          expect(response._meta.errorTag).toBe("FileUploadError")
           expect(response.content[0].text).toBe(
             "File upload error: Storage quota exceeded"
           )
         }))
 
-      it.effect("maps FileFetchError with descriptive message", () =>
+      it.effect("maps FileFetchError with errorTag", () =>
         Effect.gen(function*() {
           const error = new FileFetchError({
             fileUrl: "https://example.com/file.png",
@@ -162,6 +168,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
+          expect(response._meta.errorTag).toBe("FileFetchError")
           expect(response.content[0].text).toContain("https://example.com/file.png")
           expect(response.content[0].text).toContain("404 Not Found")
         }))
@@ -228,6 +235,19 @@ describe("Error Mapping to MCP", () => {
           expect(response.content[0].text).toBe(
             "Issue 'TEST-1' not found in project 'TEST'"
           )
+        }))
+    })
+
+    describe("Die cause", () => {
+      it.effect("returns UnexpectedError errorTag for defects", () =>
+        Effect.gen(function*() {
+          const cause = Cause.die(new Error("boom"))
+          const response = mapDomainCauseToMcp(cause as Cause.Cause<HulyError>)
+
+          expect(response.isError).toBe(true)
+          expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
+          expect(response._meta.errorTag).toBe("UnexpectedError")
+          expect(response.content[0].text).toBe("An unexpected error occurred")
         }))
     })
 
@@ -329,13 +349,35 @@ describe("Error Mapping to MCP", () => {
   })
 
   describe("createUnknownToolError", () => {
-    it.effect("creates error response for unknown tool", () =>
+    it.effect("creates error response for unknown tool with errorTag", () =>
       Effect.gen(function*() {
         const response = createUnknownToolError("bogus_tool")
 
         expect(response.isError).toBe(true)
         expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+        expect(response._meta.errorTag).toBe("UnknownTool")
         expect(response.content[0].text).toBe("Unknown tool: bogus_tool")
+      }))
+  })
+
+  describe("toMcpResponse", () => {
+    it.effect("strips _meta from error response", () =>
+      Effect.gen(function*() {
+        const response = createUnknownToolError("bogus_tool")
+        const wire = toMcpResponse(response)
+
+        expect(wire).not.toHaveProperty("_meta")
+        expect(wire.isError).toBe(true)
+        expect(wire.content[0].text).toBe("Unknown tool: bogus_tool")
+      }))
+
+    it.effect("strips _meta from success response", () =>
+      Effect.gen(function*() {
+        const response = createSuccessResponse({ ok: true })
+        const wire = toMcpResponse(response)
+
+        expect(wire).not.toHaveProperty("_meta")
+        expect(wire.isError).toBeUndefined()
       }))
   })
 })

@@ -30,6 +30,7 @@ export type McpErrorCode = (typeof McpErrorCode)[keyof typeof McpErrorCode]
  */
 interface ErrorMetadata {
   errorCode: McpErrorCode
+  errorTag?: string | undefined
 }
 
 /**
@@ -53,11 +54,12 @@ interface McpErrorResponseWithMeta extends McpToolResponse {
 
 const createErrorResponse = (
   text: string,
-  errorCode: McpErrorCode
+  errorCode: McpErrorCode,
+  errorTag?: string
 ): McpErrorResponseWithMeta => ({
   content: [{ type: "text" as const, text }],
   isError: true,
-  _meta: { errorCode }
+  _meta: { errorCode, errorTag }
 })
 
 // --- Domain Error Mapping ---
@@ -97,19 +99,19 @@ export const mapDomainErrorToMcp = (error: HulyDomainError): McpErrorResponseWit
       return createErrorResponse(error.message, McpErrorCode.InvalidParams)
 
     case "FileFetchError":
-      return createErrorResponse(error.message, McpErrorCode.InternalError)
+      return createErrorResponse(error.message, McpErrorCode.InternalError, error._tag)
 
     case "FileUploadError":
-      return createErrorResponse(`File upload error: ${error.message}`, McpErrorCode.InternalError)
+      return createErrorResponse(`File upload error: ${error.message}`, McpErrorCode.InternalError, error._tag)
 
     case "HulyConnectionError":
-      return createErrorResponse(`Connection error: ${error.message}`, McpErrorCode.InternalError)
+      return createErrorResponse(`Connection error: ${error.message}`, McpErrorCode.InternalError, error._tag)
 
     case "HulyAuthError":
-      return createErrorResponse(`Authentication error: ${error.message}`, McpErrorCode.InternalError)
+      return createErrorResponse(`Authentication error: ${error.message}`, McpErrorCode.InternalError, error._tag)
 
     case "HulyError":
-      return createErrorResponse(error.message, McpErrorCode.InternalError)
+      return createErrorResponse(error.message, McpErrorCode.InternalError, error._tag)
 
     default:
       return absurd(error)
@@ -156,6 +158,10 @@ export const mapDomainCauseToMcp = (
     return mapDomainErrorToMcp(cause.error)
   }
 
+  if (Cause.isDieType(cause)) {
+    return createErrorResponse("An unexpected error occurred", McpErrorCode.InternalError, "UnexpectedError")
+  }
+
   const failures = Chunk.toArray(Cause.failures(cause))
   if (failures.length > 0) {
     return mapDomainErrorToMcp(failures[0])
@@ -170,7 +176,7 @@ export const createSuccessResponse = <T>(result: T): McpToolResponse => ({
 })
 
 export const createUnknownToolError = (toolName: string): McpErrorResponseWithMeta =>
-  createErrorResponse(`Unknown tool: ${toolName}`, McpErrorCode.InvalidParams)
+  createErrorResponse(`Unknown tool: ${toolName}`, McpErrorCode.InvalidParams, "UnknownTool")
 
 export const toMcpResponse = (response: McpToolResponse): Omit<McpToolResponse, "_meta"> => {
   const { _meta: _, ...wire } = response
