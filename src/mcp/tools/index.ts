@@ -1,6 +1,6 @@
 import type { HulyClient } from "../../huly/client.js"
 import type { HulyStorageClient } from "../../huly/storage.js"
-import type { WorkspaceClient } from "../../huly/workspace-client.js"
+import type { WorkspaceClientOperations } from "../../huly/workspace-client.js"
 import type { McpToolResponse } from "../error-mapping.js"
 import { activityTools } from "./activity.js"
 import { attachmentTools } from "./attachments.js"
@@ -52,7 +52,7 @@ type ToolRegistryMethods = {
     args: unknown,
     hulyClient: HulyClient["Type"],
     storageClient: HulyStorageClient["Type"],
-    workspaceClient?: WorkspaceClient["Type"]
+    workspaceClient?: WorkspaceClientOperations
   ) => Promise<McpToolResponse | null>
 }
 

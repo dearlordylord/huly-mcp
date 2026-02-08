@@ -4,7 +4,7 @@ import { Effect, Either, Exit } from "effect"
 import { HulyClient } from "../../huly/client.js"
 import { type HulyDomainError, HulyError } from "../../huly/errors.js"
 import { HulyStorageClient } from "../../huly/storage.js"
-import { WorkspaceClient } from "../../huly/workspace-client.js"
+import { WorkspaceClient, type WorkspaceClientOperations } from "../../huly/workspace-client.js"
 import {
   createSuccessResponse,
   mapDomainCauseToMcp,
@@ -25,14 +25,14 @@ export interface RegisteredTool extends ToolDefinition {
     args: unknown,
     hulyClient: HulyClient["Type"],
     storageClient: HulyStorageClient["Type"],
-    workspaceClient?: WorkspaceClient["Type"]
+    workspaceClient?: WorkspaceClientOperations
   ) => Promise<McpToolResponse>
 }
 
 interface HandlerArgs {
   readonly hulyClient: HulyClient["Type"]
   readonly storageClient: HulyStorageClient["Type"]
-  readonly workspaceClient: WorkspaceClient["Type"] | undefined
+  readonly workspaceClient: WorkspaceClientOperations | undefined
 }
 
 type ProvideServices<R> = (

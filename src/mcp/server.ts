@@ -13,7 +13,7 @@ import { DEFAULT_HTTP_PORT, startHttpTransport } from "./http-transport.js"
 
 import { HulyClient } from "../huly/client.js"
 import { HulyStorageClient } from "../huly/storage.js"
-import { WorkspaceClient } from "../huly/workspace-client.js"
+import { WorkspaceClient, type WorkspaceClientOperations } from "../huly/workspace-client.js"
 import { assertExists } from "../utils/assertions.js"
 import { createUnknownToolError, toMcpResponse } from "./error-mapping.js"
 import { CATEGORY_NAMES, createFilteredRegistry, TOOL_DEFINITIONS, toolRegistry } from "./tools/index.js"
@@ -68,7 +68,7 @@ interface McpServerOperations {
 const createMcpServer = (
   hulyClient: HulyClient["Type"],
   storageClient: HulyStorageClient["Type"],
-  workspaceClient?: WorkspaceClient["Type"],
+  workspaceClient?: WorkspaceClientOperations,
   enabledCategories?: ReadonlySet<string>
 ): Server => {
   const registry = enabledCategories
