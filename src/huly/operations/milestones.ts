@@ -23,7 +23,7 @@ import { IssueIdentifier, MilestoneId, MilestoneLabel } from "../../domain/schem
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { MilestoneNotFoundError } from "../errors.js"
-import { clampLimit, findProject, findProjectAndIssue, toRef } from "./shared.js"
+import { clampLimit, findByNameOrId, findProject, findProjectAndIssue, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
@@ -96,17 +96,12 @@ const findMilestone = (
   projectIdentifier: string
 ): Effect.Effect<HulyMilestone, MilestoneNotFoundError | HulyClientError> =>
   Effect.gen(function*() {
-    let milestone = yield* client.findOne<HulyMilestone>(
+    const milestone = yield* findByNameOrId(
+      client,
       tracker.class.Milestone,
-      { space: project._id, _id: toRef<HulyMilestone>(milestoneIdentifier) }
+      { space: project._id, _id: toRef<HulyMilestone>(milestoneIdentifier) },
+      { space: project._id, label: milestoneIdentifier }
     )
-
-    if (milestone === undefined) {
-      milestone = yield* client.findOne<HulyMilestone>(
-        tracker.class.Milestone,
-        { space: project._id, label: milestoneIdentifier }
-      )
-    }
 
     if (milestone === undefined) {
       return yield* new MilestoneNotFoundError({

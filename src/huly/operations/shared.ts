@@ -1,5 +1,5 @@
 import type { Channel, Person } from "@hcengineering/contact"
-import type { Doc, PersonUuid, Ref, Status, WithLookup } from "@hcengineering/core"
+import type { Class, Doc, DocumentQuery, FindOptions, PersonUuid, Ref, Status, WithLookup } from "@hcengineering/core"
 import type { ProjectType } from "@hcengineering/task"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
 import { IssuePriority } from "@hcengineering/tracker"
@@ -8,7 +8,7 @@ import { absurd, Effect } from "effect"
 import type { IssuePriority as IssuePriorityStr } from "../../domain/schemas/issues.js"
 import type { NonNegativeNumber } from "../../domain/schemas/shared.js"
 import { PositiveNumber } from "../../domain/schemas/shared.js"
-import { HulyClient, type HulyClientError } from "../client.js"
+import { HulyClient, type HulyClientError, type HulyClientOperations } from "../client.js"
 import { InvalidPersonUuidError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { escapeLikeWildcards } from "./query-helpers.js"
 
@@ -24,6 +24,36 @@ export const toRef = <T extends Doc>(id: string): Ref<T> => id as Ref<T>
 // Converts sentinel 0 → undefined; positive values → branded PositiveNumber.
 export const zeroAsUnset = (value: NonNegativeNumber): PositiveNumber | undefined =>
   value > 0 ? PositiveNumber.make(value) : undefined
+
+export const findOneOrFail = <T extends Doc, E>(
+  client: HulyClientOperations,
+  _class: Ref<Class<T>>,
+  query: DocumentQuery<T>,
+  onNotFound: () => E,
+  options?: FindOptions<T>
+): Effect.Effect<WithLookup<T>, E | HulyClientError> =>
+  Effect.flatMap(
+    client.findOne<T>(_class, query, options),
+    (result) =>
+      result !== undefined
+        ? Effect.succeed(result)
+        : Effect.fail(onNotFound())
+  )
+
+export const findByNameOrId = <T extends Doc>(
+  client: HulyClientOperations,
+  _class: Ref<Class<T>>,
+  primaryQuery: DocumentQuery<T>,
+  fallbackQuery: DocumentQuery<T>,
+  options?: FindOptions<T>
+): Effect.Effect<WithLookup<T> | undefined, HulyClientError> =>
+  Effect.flatMap(
+    client.findOne<T>(_class, primaryQuery, options),
+    (result) =>
+      result !== undefined
+        ? Effect.succeed(result)
+        : client.findOne<T>(_class, fallbackQuery, options)
+  )
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -60,13 +90,12 @@ export const findProject = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const project = yield* client.findOne<HulyProject>(
+    const project = yield* findOneOrFail(
+      client,
       tracker.class.Project,
-      { identifier: projectIdentifier }
+      { identifier: projectIdentifier },
+      () => new ProjectNotFoundError({ identifier: projectIdentifier })
     )
-    if (project === undefined) {
-      return yield* new ProjectNotFoundError({ identifier: projectIdentifier })
-    }
 
     return { client, project }
   })
@@ -95,14 +124,13 @@ export const findProjectWithStatuses = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const project = yield* client.findOne<ProjectWithType>(
+    const project = yield* findOneOrFail<ProjectWithType, ProjectNotFoundError>(
+      client,
       tracker.class.Project,
       { identifier: projectIdentifier },
+      () => new ProjectNotFoundError({ identifier: projectIdentifier }),
       { lookup: { type: task.class.ProjectType } }
     )
-    if (project === undefined) {
-      return yield* new ProjectNotFoundError({ identifier: projectIdentifier })
-    }
 
     const projectType = project.$lookup?.type
     const statuses: Array<StatusInfo> = []

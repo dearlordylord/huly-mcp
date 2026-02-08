@@ -42,7 +42,7 @@ import { AccountUuid, ChannelId, ChannelName, MessageId, PersonName } from "../.
 import { HulyClient, type HulyClientError } from "../client.js"
 import { ChannelNotFoundError } from "../errors.js"
 import { escapeLikeWildcards } from "./query-helpers.js"
-import { clampLimit, toRef } from "./shared.js"
+import { clampLimit, findByNameOrId, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const chunter = require("@hcengineering/chunter").default as typeof import("@hcengineering/chunter").default
@@ -100,17 +100,12 @@ export const findChannel = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    let channel = yield* client.findOne<HulyChannel>(
+    const channel = yield* findByNameOrId(
+      client,
       chunter.class.Channel,
-      { name: identifier }
+      { name: identifier },
+      { _id: toRef<HulyChannel>(identifier) }
     )
-
-    if (channel === undefined) {
-      channel = yield* client.findOne<HulyChannel>(
-        chunter.class.Channel,
-        { _id: toRef<HulyChannel>(identifier) }
-      )
-    }
 
     if (channel === undefined) {
       return yield* new ChannelNotFoundError({ identifier })
