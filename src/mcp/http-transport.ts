@@ -16,6 +16,10 @@ import type { Scope } from "effect"
 import { Context, Effect, Layer, Schema } from "effect"
 import type { Express, Request, Response } from "express"
 
+export const DEFAULT_HTTP_PORT = 3000
+const HTTP_METHOD_NOT_ALLOWED = 405
+const HTTP_INTERNAL_SERVER_ERROR = 500
+
 /**
  * HTTP transport configuration.
  */
@@ -125,7 +129,7 @@ export const createMcpHandlers = (
       })
     } catch (error) {
       if (!res.headersSent) {
-        res.status(500).json({
+        res.status(HTTP_INTERNAL_SERVER_ERROR).json({
           jsonrpc: "2.0",
           error: {
             code: -32603,
@@ -138,7 +142,7 @@ export const createMcpHandlers = (
   }
 
   const get = async (_req: Request, res: Response): Promise<void> => {
-    res.status(405).json({
+    res.status(HTTP_METHOD_NOT_ALLOWED).json({
       jsonrpc: "2.0",
       error: {
         code: -32000,
@@ -149,7 +153,7 @@ export const createMcpHandlers = (
   }
 
   const del = async (_req: Request, res: Response): Promise<void> => {
-    res.status(405).json({
+    res.status(HTTP_METHOD_NOT_ALLOWED).json({
       jsonrpc: "2.0",
       error: {
         code: -32000,

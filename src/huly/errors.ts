@@ -10,6 +10,8 @@
  */
 import { Schema } from "effect"
 
+export const BYTES_PER_MB = 1024 * 1024
+
 /**
  * MCP standard error codes.
  */
@@ -520,8 +522,9 @@ export class FileTooLargeError extends Schema.TaggedError<FileTooLargeError>()(
   readonly mcpErrorCode: McpErrorCode = McpErrorCode.InvalidParams
 
   override get message(): string {
-    const sizeMB = (this.size / 1024 / 1024).toFixed(2)
-    const maxMB = (this.maxSize / 1024 / 1024).toFixed(0)
+    const DECIMAL_PLACES = 2
+    const sizeMB = (this.size / BYTES_PER_MB).toFixed(DECIMAL_PLACES)
+    const maxMB = (this.maxSize / BYTES_PER_MB).toFixed(0)
     return `File '${this.filename}' is too large (${sizeMB}MB). Maximum allowed: ${maxMB}MB`
   }
 }

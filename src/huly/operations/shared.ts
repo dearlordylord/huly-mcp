@@ -3,7 +3,7 @@ import type { ProjectType } from "@hcengineering/task"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
 import { Effect } from "effect"
 
-import { NonNegativeNumber, PositiveNumber } from "../../domain/schemas/shared.js"
+import { MAX_LIMIT, NonNegativeNumber, PositiveNumber } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { InvalidPersonUuidError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 
@@ -235,7 +235,6 @@ export interface PaginationOptions {
 }
 
 const DEFAULT_LIMIT = 50
-const MAX_LIMIT = 200
 
 export const clampLimit = (limit?: number): number => Math.min(limit ?? DEFAULT_LIMIT, MAX_LIMIT)
 

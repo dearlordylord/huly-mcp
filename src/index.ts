@@ -15,7 +15,7 @@ import { type HulyConfigError, HulyConfigService } from "./config/config.js"
 import { HulyClient, type HulyClientError } from "./huly/client.js"
 import { HulyStorageClient, type StorageClientError } from "./huly/storage.js"
 import { WorkspaceClient, type WorkspaceClientError } from "./huly/workspace-client.js"
-import { HttpServerFactoryService } from "./mcp/http-transport.js"
+import { DEFAULT_HTTP_PORT, HttpServerFactoryService } from "./mcp/http-transport.js"
 import { type McpServerError, McpServerService, type McpTransportType } from "./mcp/server.js"
 ;(globalThis as Record<string, unknown>).indexedDB = fakeIndexedDB
 
@@ -54,7 +54,7 @@ const getTransportType = Config.string("MCP_TRANSPORT").pipe(
 )
 
 const getHttpPort = Config.integer("MCP_HTTP_PORT").pipe(
-  Config.withDefault(3000)
+  Config.withDefault(DEFAULT_HTTP_PORT)
 )
 
 const getHttpHost = Config.string("MCP_HTTP_HOST").pipe(
