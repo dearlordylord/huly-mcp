@@ -1,7 +1,14 @@
 import { describe, it } from "@effect/vitest"
 import type { Channel, Employee, Person } from "@hcengineering/contact"
-import { type Doc, type Ref, type Space, toFindResult } from "@hcengineering/core"
-import type { Component as HulyComponent, Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
+import { type Doc, type PersonId, type Ref, type Space, toFindResult } from "@hcengineering/core"
+import type { ProjectType, TaskType } from "@hcengineering/task"
+import type {
+  Component as HulyComponent,
+  Issue as HulyIssue,
+  IssueStatus,
+  Project as HulyProject
+} from "@hcengineering/tracker"
+import { TimeReportDayType } from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
@@ -21,6 +28,7 @@ import {
   setIssueComponent,
   updateComponent
 } from "../../../src/huly/operations/components.js"
+import { componentIdentifier, email, issueIdentifier, projectIdentifier } from "../../helpers/brands.js"
 
 // --- Mock Data Builders ---
 
@@ -36,12 +44,12 @@ const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
     members: [],
     identifier: "PROJ",
     sequence: 1,
-    defaultIssueStatus: "status-1" as Ref<Doc>,
-    defaultTimeReportDay: "CurrentWorkDay" as HulyProject["defaultTimeReportDay"],
-    type: "project-type-1" as Ref<Doc>,
-    modifiedBy: "user-1" as Ref<Doc>,
+    defaultIssueStatus: "status-1" as Ref<IssueStatus>,
+    defaultTimeReportDay: TimeReportDayType.CurrentWorkDay,
+    type: "project-type-1" as Ref<ProjectType>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -57,9 +65,9 @@ const makeComponent = (overrides?: Partial<HulyComponent>): HulyComponent => {
     description: "Backend component",
     lead: "person-1" as Ref<Employee>,
     comments: 0,
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -73,9 +81,9 @@ const makePerson = (overrides?: Partial<Person>): Person => {
     space: "space-1" as Ref<Space>,
     name: "John Doe",
     avatarType: "color" as Person["avatarType"],
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -92,7 +100,7 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
     collection: "subIssues",
     title: "Test Issue",
     description: null,
-    status: "status-1" as Ref<Doc>,
+    status: "status-1" as Ref<IssueStatus>,
     priority: 0,
     component: null,
     subIssues: 0,
@@ -102,15 +110,15 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
     reportedTime: 0,
     reports: 0,
     childInfo: [],
-    kind: "task-type-1" as Ref<Doc>,
+    kind: "task-type-1" as Ref<TaskType>,
     number: 123,
     assignee: null,
     dueDate: null,
     identifier: "PROJ-123",
     rank: "0|aaa",
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -127,9 +135,9 @@ const makeChannel = (overrides?: Partial<Channel>): Channel => {
     collection: "channels",
     provider: contact.channelProvider.Email,
     value: "john@example.com",
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -287,7 +295,7 @@ describe("findComponentByIdOrLabel", () => {
       components: [makeComponent({ _id: "comp-abc" as Ref<HulyComponent>, label: "Frontend" })]
     }))))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("finds component by label when ID lookup fails", () =>
     Effect.gen(function*() {
       const client = yield* HulyClient
@@ -339,7 +347,7 @@ describe("listComponents", () => {
 
       const testLayer = createTestLayerWithMocks({ projects: [project], components, persons })
 
-      const result = yield* listComponents({ project: "PROJ" }).pipe(Effect.provide(testLayer))
+      const result = yield* listComponents({ project: projectIdentifier("PROJ") }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
       expect(result[0].label).toBe("Backend")
@@ -361,7 +369,7 @@ describe("listComponents", () => {
 
       const testLayer = createTestLayerWithMocks({ projects: [project], components: [comp] })
 
-      const result = yield* listComponents({ project: "PROJ" }).pipe(Effect.provide(testLayer))
+      const result = yield* listComponents({ project: projectIdentifier("PROJ") }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
       expect(result[0].label).toBe("Infra")
@@ -374,7 +382,7 @@ describe("listComponents", () => {
       const testLayer = createTestLayerWithMocks({ projects: [] })
 
       const error = yield* Effect.flip(
-        listComponents({ project: "NONEXIST" }).pipe(Effect.provide(testLayer))
+        listComponents({ project: projectIdentifier("NONEXIST") }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("ProjectNotFoundError")
@@ -388,7 +396,9 @@ describe("listComponents", () => {
 
       const testLayer = createTestLayerWithMocks({ projects: [project], components: [] })
 
-      const result = yield* listComponents({ project: "PROJ", limit: 500 }).pipe(Effect.provide(testLayer))
+      const result = yield* listComponents({ project: projectIdentifier("PROJ"), limit: 500 }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(result).toHaveLength(0)
     }))
@@ -400,7 +410,7 @@ describe("listComponents", () => {
 
       const testLayer = createTestLayerWithMocks({ projects: [project], components: [] })
 
-      const result = yield* listComponents({ project: "PROJ" }).pipe(Effect.provide(testLayer))
+      const result = yield* listComponents({ project: projectIdentifier("PROJ") }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(0)
     }))
@@ -428,7 +438,10 @@ describe("getComponent", () => {
         persons: [person]
       })
 
-      const result = yield* getComponent({ project: "PROJ", component: "Backend" }).pipe(Effect.provide(testLayer))
+      const result = yield* getComponent({
+        project: projectIdentifier("PROJ"),
+        component: componentIdentifier("Backend")
+      }).pipe(Effect.provide(testLayer))
 
       expect(result.id).toBe("comp-1")
       expect(result.label).toBe("Backend")
@@ -455,7 +468,10 @@ describe("getComponent", () => {
         components: [comp]
       })
 
-      const result = yield* getComponent({ project: "PROJ", component: "Infra" }).pipe(Effect.provide(testLayer))
+      const result = yield* getComponent({
+        project: projectIdentifier("PROJ"),
+        component: componentIdentifier("Infra")
+      }).pipe(Effect.provide(testLayer))
 
       expect(result.id).toBe("comp-1")
       expect(result.lead).toBeUndefined()
@@ -469,7 +485,9 @@ describe("getComponent", () => {
       const testLayer = createTestLayerWithMocks({ projects: [project], components: [] })
 
       const error = yield* Effect.flip(
-        getComponent({ project: "PROJ", component: "Ghost" }).pipe(Effect.provide(testLayer))
+        getComponent({ project: projectIdentifier("PROJ"), component: componentIdentifier("Ghost") }).pipe(
+          Effect.provide(testLayer)
+        )
       )
 
       expect(error._tag).toBe("ComponentNotFoundError")
@@ -483,7 +501,9 @@ describe("getComponent", () => {
       const testLayer = createTestLayerWithMocks({ projects: [] })
 
       const error = yield* Effect.flip(
-        getComponent({ project: "NOPE", component: "Backend" }).pipe(Effect.provide(testLayer))
+        getComponent({ project: projectIdentifier("NOPE"), component: componentIdentifier("Backend") }).pipe(
+          Effect.provide(testLayer)
+        )
       )
 
       expect(error._tag).toBe("ProjectNotFoundError")
@@ -503,7 +523,7 @@ describe("createComponent", () => {
       })
 
       const result = yield* createComponent({
-        project: "PROJ",
+        project: projectIdentifier("PROJ"),
         label: "New Component"
       }).pipe(Effect.provide(testLayer))
 
@@ -534,10 +554,10 @@ describe("createComponent", () => {
       })
 
       const result = yield* createComponent({
-        project: "PROJ",
+        project: projectIdentifier("PROJ"),
         label: "Frontend",
         description: "UI component",
-        lead: "alice@example.com"
+        lead: email("alice@example.com")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.label).toBe("Frontend")
@@ -554,9 +574,9 @@ describe("createComponent", () => {
 
       const error = yield* Effect.flip(
         createComponent({
-          project: "PROJ",
+          project: projectIdentifier("PROJ"),
           label: "Frontend",
-          lead: "nobody@example.com"
+          lead: email("nobody@example.com")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -571,7 +591,7 @@ describe("createComponent", () => {
 
       const error = yield* Effect.flip(
         createComponent({
-          project: "NOPE",
+          project: projectIdentifier("NOPE"),
           label: "Frontend"
         }).pipe(Effect.provide(testLayer))
       )
@@ -599,8 +619,8 @@ describe("updateComponent", () => {
       })
 
       const result = yield* updateComponent({
-        project: "PROJ",
-        component: "Backend",
+        project: projectIdentifier("PROJ"),
+        component: componentIdentifier("Backend"),
         label: "Backend V2"
       }).pipe(Effect.provide(testLayer))
 
@@ -627,8 +647,8 @@ describe("updateComponent", () => {
       })
 
       const result = yield* updateComponent({
-        project: "PROJ",
-        component: "Backend",
+        project: projectIdentifier("PROJ"),
+        component: componentIdentifier("Backend"),
         description: "Updated description"
       }).pipe(Effect.provide(testLayer))
 
@@ -661,9 +681,9 @@ describe("updateComponent", () => {
       })
 
       const result = yield* updateComponent({
-        project: "PROJ",
-        component: "Backend",
-        lead: "bob@example.com"
+        project: projectIdentifier("PROJ"),
+        component: componentIdentifier("Backend"),
+        lead: email("bob@example.com")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.updated).toBe(true)
@@ -689,8 +709,8 @@ describe("updateComponent", () => {
       })
 
       const result = yield* updateComponent({
-        project: "PROJ",
-        component: "Backend",
+        project: projectIdentifier("PROJ"),
+        component: componentIdentifier("Backend"),
         lead: null
       }).pipe(Effect.provide(testLayer))
 
@@ -714,8 +734,8 @@ describe("updateComponent", () => {
       })
 
       const result = yield* updateComponent({
-        project: "PROJ",
-        component: "Backend"
+        project: projectIdentifier("PROJ"),
+        component: componentIdentifier("Backend")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.id).toBe("comp-1")
@@ -731,8 +751,8 @@ describe("updateComponent", () => {
 
       const error = yield* Effect.flip(
         updateComponent({
-          project: "PROJ",
-          component: "Ghost",
+          project: projectIdentifier("PROJ"),
+          component: componentIdentifier("Ghost"),
           label: "New Label"
         }).pipe(Effect.provide(testLayer))
       )
@@ -758,9 +778,9 @@ describe("updateComponent", () => {
 
       const error = yield* Effect.flip(
         updateComponent({
-          project: "PROJ",
-          component: "Backend",
-          lead: "nobody@example.com"
+          project: projectIdentifier("PROJ"),
+          component: componentIdentifier("Backend"),
+          lead: email("nobody@example.com")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -775,8 +795,8 @@ describe("updateComponent", () => {
 
       const error = yield* Effect.flip(
         updateComponent({
-          project: "NOPE",
-          component: "Backend",
+          project: projectIdentifier("NOPE"),
+          component: componentIdentifier("Backend"),
           label: "New"
         }).pipe(Effect.provide(testLayer))
       )
@@ -811,9 +831,9 @@ describe("setIssueComponent", () => {
       })
 
       const result = yield* setIssueComponent({
-        project: "PROJ",
-        identifier: "PROJ-123",
-        component: "Backend"
+        project: projectIdentifier("PROJ"),
+        identifier: issueIdentifier("PROJ-123"),
+        component: componentIdentifier("Backend")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.identifier).toBe("PROJ-123")
@@ -841,8 +861,8 @@ describe("setIssueComponent", () => {
       })
 
       const result = yield* setIssueComponent({
-        project: "PROJ",
-        identifier: "PROJ-123",
+        project: projectIdentifier("PROJ"),
+        identifier: issueIdentifier("PROJ-123"),
         component: null
       }).pipe(Effect.provide(testLayer))
 
@@ -870,9 +890,9 @@ describe("setIssueComponent", () => {
 
       const error = yield* Effect.flip(
         setIssueComponent({
-          project: "PROJ",
-          identifier: "PROJ-123",
-          component: "Ghost"
+          project: projectIdentifier("PROJ"),
+          identifier: issueIdentifier("PROJ-123"),
+          component: componentIdentifier("Ghost")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -892,9 +912,9 @@ describe("setIssueComponent", () => {
 
       const error = yield* Effect.flip(
         setIssueComponent({
-          project: "PROJ",
-          identifier: "PROJ-999",
-          component: "Backend"
+          project: projectIdentifier("PROJ"),
+          identifier: issueIdentifier("PROJ-999"),
+          component: componentIdentifier("Backend")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -909,9 +929,9 @@ describe("setIssueComponent", () => {
 
       const error = yield* Effect.flip(
         setIssueComponent({
-          project: "NOPE",
-          identifier: "NOPE-1",
-          component: "Backend"
+          project: projectIdentifier("NOPE"),
+          identifier: issueIdentifier("NOPE-1"),
+          component: componentIdentifier("Backend")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -938,8 +958,8 @@ describe("deleteComponent", () => {
       })
 
       const result = yield* deleteComponent({
-        project: "PROJ",
-        component: "Backend"
+        project: projectIdentifier("PROJ"),
+        component: componentIdentifier("Backend")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.id).toBe("comp-1")
@@ -965,8 +985,8 @@ describe("deleteComponent", () => {
       })
 
       const result = yield* deleteComponent({
-        project: "PROJ",
-        component: "comp-abc"
+        project: projectIdentifier("PROJ"),
+        component: componentIdentifier("comp-abc")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.id).toBe("comp-abc")
@@ -982,8 +1002,8 @@ describe("deleteComponent", () => {
 
       const error = yield* Effect.flip(
         deleteComponent({
-          project: "PROJ",
-          component: "Ghost"
+          project: projectIdentifier("PROJ"),
+          component: componentIdentifier("Ghost")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -999,8 +1019,8 @@ describe("deleteComponent", () => {
 
       const error = yield* Effect.flip(
         deleteComponent({
-          project: "NOPE",
-          component: "Backend"
+          project: projectIdentifier("NOPE"),
+          component: componentIdentifier("Backend")
         }).pipe(Effect.provide(testLayer))
       )
 

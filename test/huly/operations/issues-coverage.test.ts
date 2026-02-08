@@ -1,14 +1,31 @@
 import { describe, it } from "@effect/vitest"
-import type { Channel, Person } from "@hcengineering/contact"
-import type { Doc, FindResult, MarkupBlobRef, Ref, Space, Status } from "@hcengineering/core"
-import type { Component as HulyComponent, Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
-import { IssuePriority } from "@hcengineering/tracker"
+import { AvatarType, type Channel, type Person } from "@hcengineering/contact"
+import type {
+  Attribute,
+  Class,
+  Doc,
+  FindResult,
+  MarkupBlobRef,
+  PersonId,
+  Ref,
+  Space,
+  Status
+} from "@hcengineering/core"
+import type { ProjectType, TaskType } from "@hcengineering/task"
+import type {
+  Component as HulyComponent,
+  Issue as HulyIssue,
+  IssueStatus,
+  Project as HulyProject
+} from "@hcengineering/tracker"
+import { IssuePriority, TimeReportDayType } from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type { InvalidStatusError, PersonNotFoundError } from "../../../src/huly/errors.js"
 import { contact, core, task, tracker } from "../../../src/huly/huly-plugins.js"
 import { createIssue, getIssue, listIssues, updateIssue } from "../../../src/huly/operations/issues.js"
+import { componentIdentifier, email, issueIdentifier, projectIdentifier, statusName } from "../../helpers/brands.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   const result = docs as FindResult<T>
@@ -16,21 +33,29 @@ const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   return result
 }
 
-const makeProject = (overrides?: Partial<HulyProject>): HulyProject => ({
-  _id: "project-1" as Ref<HulyProject>,
-  _class: tracker.class.Project,
-  space: "space-1" as Ref<Space>,
-  identifier: "TEST",
-  name: "Test Project",
-  sequence: 1,
-  defaultIssueStatus: "status-open" as Ref<Status>,
-  defaultTimeReportDay: 0,
-  modifiedBy: "user-1" as Ref<Doc>,
-  modifiedOn: Date.now(),
-  createdBy: "user-1" as Ref<Doc>,
-  createdOn: Date.now(),
-  ...overrides
-})
+const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
+  const base = {
+    _id: "project-1" as Ref<HulyProject>,
+    _class: tracker.class.Project,
+    space: "space-1" as Ref<Space>,
+    identifier: "TEST",
+    name: "Test Project",
+    description: "",
+    private: false,
+    members: [],
+    archived: false,
+    sequence: 1,
+    type: "project-type-1" as Ref<ProjectType>,
+    defaultIssueStatus: "status-open" as Ref<IssueStatus>,
+    defaultTimeReportDay: TimeReportDayType.CurrentWorkDay,
+    modifiedBy: "user-1" as PersonId,
+    modifiedOn: Date.now(),
+    createdBy: "user-1" as PersonId,
+    createdOn: Date.now(),
+    ...overrides
+  }
+  return base as HulyProject
+}
 
 const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => ({
   _id: "issue-1" as Ref<HulyIssue>,
@@ -39,10 +64,10 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => ({
   identifier: "TEST-1",
   title: "Test Issue",
   description: null,
-  status: "status-open" as Ref<Status>,
+  status: "status-open" as Ref<IssueStatus>,
   priority: IssuePriority.Medium,
   assignee: null,
-  kind: "task-type-1" as Ref<Doc>,
+  kind: "task-type-1" as Ref<TaskType>,
   number: 1,
   dueDate: null,
   rank: "0|aaa",
@@ -57,22 +82,22 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => ({
   reportedTime: 0,
   reports: 0,
   childInfo: [],
-  modifiedBy: "user-1" as Ref<Doc>,
+  modifiedBy: "user-1" as PersonId,
   modifiedOn: Date.now(),
-  createdBy: "user-1" as Ref<Doc>,
+  createdBy: "user-1" as PersonId,
   createdOn: Date.now(),
   ...overrides
 })
 
 const makeStatus = (overrides?: Partial<Status>): Status => ({
   _id: "status-1" as Ref<Status>,
-  _class: "core:class:Status" as Ref<Doc>,
+  _class: "core:class:Status" as Ref<Class<Status>>,
   space: "space-1" as Ref<Space>,
-  ofAttribute: "tracker:attribute:IssueStatus" as Ref<Doc>,
+  ofAttribute: "tracker:attribute:IssueStatus" as Ref<Attribute<Status>>,
   name: "Open",
-  modifiedBy: "user-1" as Ref<Doc>,
+  modifiedBy: "user-1" as PersonId,
   modifiedOn: Date.now(),
-  createdBy: "user-1" as Ref<Doc>,
+  createdBy: "user-1" as PersonId,
   createdOn: Date.now(),
   ...overrides
 })
@@ -82,9 +107,10 @@ const makePerson = (overrides?: Partial<Person>): Person => ({
   _class: contact.class.Person,
   space: "space-1" as Ref<Space>,
   name: "John Doe",
-  modifiedBy: "user-1" as Ref<Doc>,
+  avatarType: AvatarType.COLOR,
+  modifiedBy: "user-1" as PersonId,
   modifiedOn: Date.now(),
-  createdBy: "user-1" as Ref<Doc>,
+  createdBy: "user-1" as PersonId,
   createdOn: Date.now(),
   ...overrides
 })
@@ -98,9 +124,9 @@ const makeChannel = (overrides?: Partial<Channel>): Channel => ({
   collection: "channels",
   provider: contact.channelProvider.Email,
   value: "john@example.com",
-  modifiedBy: "user-1" as Ref<Doc>,
+  modifiedBy: "user-1" as PersonId,
   modifiedOn: Date.now(),
-  createdBy: "user-1" as Ref<Doc>,
+  createdBy: "user-1" as PersonId,
   createdOn: Date.now(),
   ...overrides
 })
@@ -113,9 +139,9 @@ const makeComponent = (overrides?: Partial<HulyComponent>): HulyComponent => ({
   description: "",
   lead: null,
   comments: 0,
-  modifiedBy: "user-1" as Ref<Doc>,
+  modifiedBy: "user-1" as PersonId,
   modifiedOn: Date.now(),
-  createdBy: "user-1" as Ref<Doc>,
+  createdBy: "user-1" as PersonId,
   createdOn: Date.now(),
   ...overrides
 })
@@ -294,6 +320,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     return Effect.succeed((id ?? "new-issue-id") as Ref<Doc>)
   }) as HulyClientOperations["addCollection"]
 
+  // eslint-disable-next-line no-restricted-syntax -- mock function signature doesn't overlap with typed signature
   const uploadMarkupImpl: HulyClientOperations["uploadMarkup"] = ((
     _objectClass: unknown,
     _objectId: unknown,
@@ -304,7 +331,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       config.captureUploadMarkup.markup = markup as string
     }
     return Effect.succeed("markup-ref-123")
-  }) as HulyClientOperations["uploadMarkup"]
+  }) as unknown as HulyClientOperations["uploadMarkup"]
 
   const updateMarkupImpl: HulyClientOperations["updateMarkup"] = ((
     _objectClass: unknown,
@@ -352,7 +379,7 @@ describe("Issues Coverage - resolveStatusName", () => {
       })
 
       const error = yield* Effect.flip(
-        listIssues({ project: "TEST" }).pipe(Effect.provide(testLayer))
+        listIssues({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("HulyError")
@@ -362,7 +389,7 @@ describe("Issues Coverage - resolveStatusName", () => {
 })
 
 describe("Issues Coverage - listIssues status filters", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("open filter excludes done and canceled statuses", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -395,14 +422,16 @@ describe("Issues Coverage - listIssues status filters", () => {
         captureIssueQuery: captureQuery
       })
 
-      yield* listIssues({ project: "TEST", status: "open" }).pipe(Effect.provide(testLayer))
+      yield* listIssues({ project: projectIdentifier("TEST"), status: statusName("open") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(captureQuery.query?.status).toEqual({
         $nin: ["status-done", "status-canceled"]
       })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("open filter with no done/canceled statuses does not set $nin", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -425,12 +454,14 @@ describe("Issues Coverage - listIssues status filters", () => {
         captureIssueQuery: captureQuery
       })
 
-      yield* listIssues({ project: "TEST", status: "open" }).pipe(Effect.provide(testLayer))
+      yield* listIssues({ project: projectIdentifier("TEST"), status: statusName("open") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(captureQuery.query?.status).toBeUndefined()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("done filter includes only done statuses", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -458,7 +489,9 @@ describe("Issues Coverage - listIssues status filters", () => {
         captureIssueQuery: captureQuery
       })
 
-      yield* listIssues({ project: "TEST", status: "done" }).pipe(Effect.provide(testLayer))
+      yield* listIssues({ project: projectIdentifier("TEST"), status: statusName("done") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(captureQuery.query?.status).toEqual({
         $in: ["status-done"]
@@ -483,7 +516,9 @@ describe("Issues Coverage - listIssues status filters", () => {
         statuses
       })
 
-      const result = yield* listIssues({ project: "TEST", status: "done" }).pipe(Effect.provide(testLayer))
+      const result = yield* listIssues({ project: projectIdentifier("TEST"), status: statusName("done") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(result).toEqual([])
     }))
@@ -516,7 +551,9 @@ describe("Issues Coverage - listIssues status filters", () => {
         captureIssueQuery: captureQuery
       })
 
-      yield* listIssues({ project: "TEST", status: "canceled" }).pipe(Effect.provide(testLayer))
+      yield* listIssues({ project: projectIdentifier("TEST"), status: statusName("canceled") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(captureQuery.query?.status).toEqual({
         $in: ["status-canceled"]
@@ -541,7 +578,9 @@ describe("Issues Coverage - listIssues status filters", () => {
         statuses
       })
 
-      const result = yield* listIssues({ project: "TEST", status: "canceled" }).pipe(Effect.provide(testLayer))
+      const result = yield* listIssues({ project: projectIdentifier("TEST"), status: statusName("canceled") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(result).toEqual([])
     }))
@@ -566,7 +605,9 @@ describe("Issues Coverage - listIssues status filters", () => {
         captureIssueQuery: captureQuery
       })
 
-      yield* listIssues({ project: "TEST", status: "In Review" }).pipe(Effect.provide(testLayer))
+      yield* listIssues({ project: projectIdentifier("TEST"), status: statusName("In Review") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(captureQuery.query?.status).toBe("status-review")
     }))
@@ -586,7 +627,9 @@ describe("Issues Coverage - listIssues status filters", () => {
       })
 
       const error = yield* Effect.flip(
-        listIssues({ project: "TEST", status: "Nonexistent Status" }).pipe(Effect.provide(testLayer))
+        listIssues({ project: projectIdentifier("TEST"), status: statusName("Nonexistent Status") }).pipe(
+          Effect.provide(testLayer)
+        )
       )
 
       expect(error._tag).toBe("InvalidStatusError")
@@ -595,7 +638,7 @@ describe("Issues Coverage - listIssues status filters", () => {
 })
 
 describe("Issues Coverage - listIssues assignee filter", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns empty when assignee not found", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -610,8 +653,8 @@ describe("Issues Coverage - listIssues assignee filter", () => {
       })
 
       const result = yield* listIssues({
-        project: "TEST",
-        assignee: "nobody@example.com"
+        project: projectIdentifier("TEST"),
+        assignee: email("nobody@example.com")
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toEqual([])
@@ -636,7 +679,9 @@ describe("Issues Coverage - listIssues assignee filter", () => {
         captureIssueQuery: captureQuery
       })
 
-      yield* listIssues({ project: "TEST", assignee: "john@example.com" }).pipe(Effect.provide(testLayer))
+      yield* listIssues({ project: projectIdentifier("TEST"), assignee: email("john@example.com") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(captureQuery.query?.assignee).toBe("person-1")
     }))
@@ -657,7 +702,7 @@ describe("Issues Coverage - listIssues titleSearch", () => {
         captureIssueQuery: captureQuery
       })
 
-      yield* listIssues({ project: "TEST", titleSearch: "bug fix" }).pipe(Effect.provide(testLayer))
+      yield* listIssues({ project: projectIdentifier("TEST"), titleSearch: "bug fix" }).pipe(Effect.provide(testLayer))
 
       expect(captureQuery.query?.title).toEqual({ $like: "%bug fix%" })
     }))
@@ -676,7 +721,7 @@ describe("Issues Coverage - listIssues titleSearch", () => {
         captureIssueQuery: captureQuery
       })
 
-      yield* listIssues({ project: "TEST", titleSearch: "   " }).pipe(Effect.provide(testLayer))
+      yield* listIssues({ project: projectIdentifier("TEST"), titleSearch: "   " }).pipe(Effect.provide(testLayer))
 
       expect(captureQuery.query?.title).toBeUndefined()
     }))
@@ -697,7 +742,9 @@ describe("Issues Coverage - listIssues descriptionSearch", () => {
         captureIssueQuery: captureQuery
       })
 
-      yield* listIssues({ project: "TEST", descriptionSearch: "error handling" }).pipe(Effect.provide(testLayer))
+      yield* listIssues({ project: projectIdentifier("TEST"), descriptionSearch: "error handling" }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(captureQuery.query?.$search).toBe("error handling")
     }))
@@ -716,7 +763,7 @@ describe("Issues Coverage - listIssues descriptionSearch", () => {
         captureIssueQuery: captureQuery
       })
 
-      yield* listIssues({ project: "TEST", descriptionSearch: "  " }).pipe(Effect.provide(testLayer))
+      yield* listIssues({ project: projectIdentifier("TEST"), descriptionSearch: "  " }).pipe(Effect.provide(testLayer))
 
       expect(captureQuery.query?.$search).toBeUndefined()
     }))
@@ -739,7 +786,9 @@ describe("Issues Coverage - listIssues component filter", () => {
         captureIssueQuery: captureQuery
       })
 
-      yield* listIssues({ project: "TEST", component: "Frontend" }).pipe(Effect.provide(testLayer))
+      yield* listIssues({ project: projectIdentifier("TEST"), component: componentIdentifier("Frontend") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(captureQuery.query?.component).toBe("comp-1")
     }))
@@ -758,8 +807,8 @@ describe("Issues Coverage - listIssues component filter", () => {
       })
 
       const result = yield* listIssues({
-        project: "TEST",
-        component: "NonexistentComponent"
+        project: projectIdentifier("TEST"),
+        component: componentIdentifier("NonexistentComponent")
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toEqual([])
@@ -783,7 +832,7 @@ describe("Issues Coverage - extractUpdatedSequence", () => {
       })
 
       const result = yield* createIssue({
-        project: "TEST",
+        project: projectIdentifier("TEST"),
         title: "Sequence Test"
       }).pipe(Effect.provide(testLayer))
 
@@ -841,7 +890,7 @@ describe("Issues Coverage - extractUpdatedSequence", () => {
       })
 
       const result = yield* createIssue({
-        project: "TEST",
+        project: projectIdentifier("TEST"),
         title: "Fallback Sequence"
       }).pipe(Effect.provide(testLayer))
 
@@ -866,9 +915,9 @@ describe("Issues Coverage - resolveAssignee", () => {
 
       const error = yield* Effect.flip(
         createIssue({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           title: "Assignee Test",
-          assignee: "ghost@example.com"
+          assignee: email("ghost@example.com")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -896,9 +945,9 @@ describe("Issues Coverage - resolveAssignee", () => {
       })
 
       yield* createIssue({
-        project: "TEST",
+        project: projectIdentifier("TEST"),
         title: "With Assignee",
-        assignee: "jane@example.com"
+        assignee: email("jane@example.com")
       }).pipe(Effect.provide(testLayer))
 
       expect(captureAddCollection.attributes?.assignee).toBe("person-1")
@@ -924,9 +973,9 @@ describe("Issues Coverage - resolveStatusByName", () => {
       })
 
       yield* createIssue({
-        project: "TEST",
+        project: projectIdentifier("TEST"),
         title: "Status Test",
-        status: "in progress"
+        status: statusName("in progress")
       }).pipe(Effect.provide(testLayer))
 
       expect(captureAddCollection.attributes?.status).toBe("status-progress")
@@ -949,9 +998,9 @@ describe("Issues Coverage - resolveStatusByName", () => {
 
       const error = yield* Effect.flip(
         createIssue({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           title: "Bad Status",
-          status: "Nonexistent"
+          status: statusName("Nonexistent")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -987,12 +1036,12 @@ describe("Issues Coverage - createIssue full flow", () => {
       })
 
       const result = yield* createIssue({
-        project: "TEST",
+        project: projectIdentifier("TEST"),
         title: "Full Issue",
         description: "# Details",
         priority: "urgent",
-        status: "In Progress",
-        assignee: "dev@example.com"
+        status: statusName("In Progress"),
+        assignee: email("dev@example.com")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.identifier).toBe("TEST-6")
@@ -1024,7 +1073,7 @@ describe("Issues Coverage - createIssue full flow", () => {
       })
 
       yield* createIssue({
-        project: "TEST",
+        project: projectIdentifier("TEST"),
         title: "Default Status"
       }).pipe(Effect.provide(testLayer))
 
@@ -1049,8 +1098,8 @@ describe("Issues Coverage - updateIssue branches", () => {
       })
 
       yield* updateIssue({
-        project: "TEST",
-        identifier: "TEST-1",
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1"),
         priority: "low"
       }).pipe(Effect.provide(testLayer))
 
@@ -1075,15 +1124,15 @@ describe("Issues Coverage - updateIssue branches", () => {
       })
 
       yield* updateIssue({
-        project: "TEST",
-        identifier: "TEST-1",
-        status: "Done"
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1"),
+        status: statusName("Done")
       }).pipe(Effect.provide(testLayer))
 
       expect(captureUpdateDoc.operations?.status).toBe("status-done")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates assignee by email", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -1103,15 +1152,15 @@ describe("Issues Coverage - updateIssue branches", () => {
       })
 
       yield* updateIssue({
-        project: "TEST",
-        identifier: "TEST-1",
-        assignee: "dev@example.com"
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1"),
+        assignee: email("dev@example.com")
       }).pipe(Effect.provide(testLayer))
 
       expect(captureUpdateDoc.operations?.assignee).toBe("person-1")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("unassigns with null assignee", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -1131,8 +1180,8 @@ describe("Issues Coverage - updateIssue branches", () => {
       })
 
       yield* updateIssue({
-        project: "TEST",
-        identifier: "TEST-1",
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1"),
         assignee: null
       }).pipe(Effect.provide(testLayer))
 
@@ -1159,8 +1208,8 @@ describe("Issues Coverage - updateIssue branches", () => {
       })
 
       yield* updateIssue({
-        project: "TEST",
-        identifier: "TEST-1",
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1"),
         description: ""
       }).pipe(Effect.provide(testLayer))
 
@@ -1189,8 +1238,8 @@ describe("Issues Coverage - updateIssue branches", () => {
       })
 
       const result = yield* updateIssue({
-        project: "TEST",
-        identifier: "TEST-1",
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1"),
         description: "# Updated"
       }).pipe(Effect.provide(testLayer))
 
@@ -1221,8 +1270,8 @@ describe("Issues Coverage - updateIssue branches", () => {
       })
 
       const result = yield* updateIssue({
-        project: "TEST",
-        identifier: "TEST-1",
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1"),
         description: "# New Desc"
       }).pipe(Effect.provide(testLayer))
 
@@ -1245,8 +1294,8 @@ describe("Issues Coverage - updateIssue branches", () => {
       })
 
       const result = yield* updateIssue({
-        project: "TEST",
-        identifier: "TEST-1"
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.updated).toBe(false)
@@ -1273,8 +1322,8 @@ describe("Issues Coverage - updateIssue branches", () => {
       })
 
       const result = yield* updateIssue({
-        project: "TEST",
-        identifier: "TEST-1",
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1"),
         description: "# Only desc changed"
       }).pipe(Effect.provide(testLayer))
 
@@ -1298,8 +1347,8 @@ describe("Issues Coverage - updateIssue branches", () => {
       })
 
       const result = yield* updateIssue({
-        project: "TEST",
-        identifier: "TEST-1",
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1"),
         title: "Brand New Title"
       }).pipe(Effect.provide(testLayer))
 
@@ -1324,9 +1373,9 @@ describe("Issues Coverage - updateIssue branches", () => {
 
       const error = yield* Effect.flip(
         updateIssue({
-          project: "TEST",
-          identifier: "TEST-1",
-          assignee: "unknown@example.com"
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
+          assignee: email("unknown@example.com")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -1336,7 +1385,7 @@ describe("Issues Coverage - updateIssue branches", () => {
 })
 
 describe("Issues Coverage - getIssue assignee person not found", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns undefined assignee when issue has assignee ref but person doc not found", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -1355,8 +1404,8 @@ describe("Issues Coverage - getIssue assignee person not found", () => {
       })
 
       const result = yield* getIssue({
-        project: "TEST",
-        identifier: "TEST-1"
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.assignee).toBeUndefined()

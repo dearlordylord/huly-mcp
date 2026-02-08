@@ -80,8 +80,7 @@ type ListDirectMessagesError = HulyClientError
 // SDK: PersonId and SocialIdentityRef are the same underlying string but typed differently.
 const personIdsAsSocialIdentityRefs = (
   ids: Array<PersonId>
-  // eslint-disable-next-line no-restricted-syntax -- PersonId and SocialIdentityRef are identical string brands in @hcengineering/core; no single-step cast exists
-): Array<SocialIdentityRef> => ids as unknown as Array<SocialIdentityRef>
+): Array<SocialIdentityRef> => ids as Array<SocialIdentityRef>
 
 // SDK: jsonToMarkup return type doesn't match Markup; cast contained here.
 const jsonAsMarkup: (json: ReturnType<typeof markdownToMarkup>) => Markup = jsonToMarkup

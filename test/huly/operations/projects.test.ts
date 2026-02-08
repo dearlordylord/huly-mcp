@@ -1,5 +1,5 @@
 import { describe, it } from "@effect/vitest"
-import { type Doc, type Ref, type Space, toFindResult } from "@hcengineering/core"
+import { type Doc, type PersonId, type Ref, type Space, toFindResult } from "@hcengineering/core"
 import { type Project as HulyProject } from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
@@ -10,8 +10,10 @@ import { tracker } from "../../../src/huly/huly-plugins.js"
 
 // --- Mock Data Builders ---
 
+const asProject = (v: unknown) => v as HulyProject
+
 const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
-  const result: HulyProject = {
+  const result = asProject({
     _id: "project-1" as Ref<HulyProject>,
     _class: tracker.class.Project,
     space: "space-1" as Ref<Space>,
@@ -22,12 +24,12 @@ const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
     archived: false,
     private: false,
     members: [],
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
-  }
+  })
   return result
 }
 
@@ -163,7 +165,7 @@ describe("listProjects", () => {
         expect(captureQuery.query?.archived).toBe(false)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("includes archived when includeArchived=true", () =>
       Effect.gen(function*() {
         const captureQuery: MockConfig["captureQuery"] = {}

@@ -1,9 +1,11 @@
 import { describe, it } from "@effect/vitest"
+import type { Blob, Ref } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { FileUploadError } from "../../../src/huly/errors.js"
 import { getFileUrl, uploadFile } from "../../../src/huly/operations/storage.js"
 import { HulyStorageClient, type HulyStorageOperations, type UploadFileResult } from "../../../src/huly/storage.js"
+import { mimeType } from "../../helpers/brands.js"
 
 // --- Test Helpers ---
 
@@ -32,7 +34,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 
     return Effect.succeed(
       config.uploadResult ?? {
-        blobId: `blob-${Date.now()}`,
+        blobId: `blob-${Date.now()}` as Ref<Blob>,
         contentType,
         size: data.length,
         url: `https://test.huly.io/files?workspace=test&file=blob-${Date.now()}`
@@ -58,7 +60,7 @@ describe("uploadFile operation", () => {
       Effect.gen(function*() {
         const captureUpload: MockConfig["captureUpload"] = {}
         const mockResult: UploadFileResult = {
-          blobId: "blob-123",
+          blobId: "blob-123" as Ref<Blob>,
           contentType: "image/png",
           size: 11,
           url: "https://test.huly.io/files?workspace=test&file=blob-123"
@@ -72,7 +74,7 @@ describe("uploadFile operation", () => {
         const result = yield* uploadFile({
           filename: "screenshot.png",
           data: Buffer.from("Hello World").toString("base64"),
-          contentType: "image/png"
+          contentType: mimeType("image/png")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.blobId).toBe("blob-123")
@@ -99,7 +101,7 @@ describe("uploadFile operation", () => {
         yield* uploadFile({
           filename: "photo.jpg",
           data: dataUrl,
-          contentType: "image/jpeg"
+          contentType: mimeType("image/jpeg")
         }).pipe(Effect.provide(testLayer))
 
         expect(captureUpload.dataSize).toBe(imageData.length)
@@ -111,10 +113,10 @@ describe("uploadFile operation", () => {
         let capturedBuffer: Buffer | undefined
 
         const testLayer = HulyStorageClient.testLayer({
-          uploadFile: (filename, data, contentType) => {
+          uploadFile: (_filename, data, contentType) => {
             capturedBuffer = data
             return Effect.succeed({
-              blobId: "blob-bin",
+              blobId: "blob-bin" as Ref<Blob>,
               contentType,
               size: data.length,
               url: "https://test.huly.io/files?workspace=test&file=blob-bin"
@@ -128,7 +130,7 @@ describe("uploadFile operation", () => {
         yield* uploadFile({
           filename: "image.png",
           data: base64,
-          contentType: "image/png"
+          contentType: mimeType("image/png")
         }).pipe(Effect.provide(testLayer))
 
         expect(capturedBuffer).toBeDefined()
@@ -140,7 +142,7 @@ describe("uploadFile operation", () => {
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({
           uploadResult: {
-            blobId: "my-blob-id",
+            blobId: "my-blob-id" as Ref<Blob>,
             contentType: "application/pdf",
             size: 100,
             url: "https://app.huly.io/files?workspace=my-ws&file=my-blob-id"
@@ -150,7 +152,7 @@ describe("uploadFile operation", () => {
         const result = yield* uploadFile({
           filename: "document.pdf",
           data: Buffer.from("pdf content").toString("base64"),
-          contentType: "application/pdf"
+          contentType: mimeType("application/pdf")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.url).toBe("https://app.huly.io/files?workspace=my-ws&file=my-blob-id")
@@ -167,14 +169,14 @@ describe("uploadFile operation", () => {
           uploadFile({
             filename: "bad.txt",
             data: "!!!not-valid-base64-at-all!!!",
-            contentType: "text/plain"
+            contentType: mimeType("text/plain")
           }).pipe(Effect.provide(testLayer))
         )
 
         expect(error._tag).toBe("InvalidFileDataError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns FileUploadError when storage fails", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({
@@ -185,7 +187,7 @@ describe("uploadFile operation", () => {
           uploadFile({
             filename: "file.txt",
             data: Buffer.from("content").toString("base64"),
-            contentType: "text/plain"
+            contentType: mimeType("text/plain")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -193,7 +195,7 @@ describe("uploadFile operation", () => {
         expect(error.message).toContain("Storage service unavailable")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns InvalidFileDataError for empty base64 data", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({})
@@ -203,7 +205,7 @@ describe("uploadFile operation", () => {
           uploadFile({
             filename: "empty.txt",
             data: "", // Invalid - empty base64
-            contentType: "text/plain"
+            contentType: mimeType("text/plain")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -224,22 +226,22 @@ describe("uploadFile operation", () => {
         yield* uploadFile({
           filename: "data.json",
           data: Buffer.from("{\"key\": \"value\"}").toString("base64"),
-          contentType: "application/json"
+          contentType: mimeType("application/json")
         }).pipe(Effect.provide(testLayer))
 
         expect(captureUpload.contentType).toBe("application/json")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("handles common image types", () =>
       Effect.gen(function*() {
         const captures: Array<string> = []
 
         const testLayer = HulyStorageClient.testLayer({
-          uploadFile: (filename, data, contentType) => {
+          uploadFile: (_filename, data, contentType) => {
             captures.push(contentType)
             return Effect.succeed({
-              blobId: "blob",
+              blobId: "blob" as Ref<Blob>,
               contentType,
               size: data.length,
               url: "https://test.url"
@@ -254,7 +256,7 @@ describe("uploadFile operation", () => {
           yield* uploadFile({
             filename: `file.${type.split("/")[1]}`,
             data: base64,
-            contentType: type
+            contentType: mimeType(type)
           }).pipe(Effect.provide(testLayer))
         }
 
@@ -275,7 +277,7 @@ describe("uploadFile operation", () => {
         yield* uploadFile({
           filename: "my-document.pdf",
           data: Buffer.from("pdf").toString("base64"),
-          contentType: "application/pdf"
+          contentType: mimeType("application/pdf")
         }).pipe(Effect.provide(testLayer))
 
         expect(captureUpload.filename).toBe("my-document.pdf")
@@ -293,7 +295,7 @@ describe("uploadFile operation", () => {
         yield* uploadFile({
           filename: "report (2024) final.xlsx",
           data: Buffer.from("excel").toString("base64"),
-          contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          contentType: mimeType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         }).pipe(Effect.provide(testLayer))
 
         expect(captureUpload.filename).toBe("report (2024) final.xlsx")

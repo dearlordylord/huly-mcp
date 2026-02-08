@@ -24,9 +24,20 @@ import {
   updateAttachment
 } from "../../../src/huly/operations/attachments.js"
 import { HulyStorageClient } from "../../../src/huly/storage.js"
+import {
+  attachmentBrandId,
+  documentIdentifier,
+  issueIdentifier,
+  mimeType,
+  objectClassName,
+  projectIdentifier,
+  spaceBrandId,
+  teamspaceIdentifier
+} from "../../helpers/brands.js"
 
 // --- Mock Data Builders ---
 
+// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- mock builder
 const makeAttachment = (overrides?: Partial<HulyAttachment>): HulyAttachment => ({
   _id: "att-1" as Ref<HulyAttachment>,
   _class: attachment.class.Attachment,
@@ -46,7 +57,7 @@ const makeAttachment = (overrides?: Partial<HulyAttachment>): HulyAttachment => 
   createdBy: "user-1" as Doc["createdBy"],
   createdOn: Date.now(),
   ...overrides
-})
+} as HulyAttachment)
 
 // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- mock builder
 const makeProject = (overrides?: Partial<HulyProject>): HulyProject => ({
@@ -88,6 +99,7 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => ({
   ...overrides
 } as HulyIssue)
 
+// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- mock builder
 const makeTeamspace = (overrides?: Partial<HulyTeamspace>): HulyTeamspace => ({
   _id: "ts-1" as Ref<HulyTeamspace>,
   _class: documentPlugin.class.Teamspace,
@@ -101,7 +113,7 @@ const makeTeamspace = (overrides?: Partial<HulyTeamspace>): HulyTeamspace => ({
   createdBy: "user-1" as Doc["createdBy"],
   createdOn: Date.now(),
   ...overrides
-})
+} as HulyTeamspace)
 
 // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- mock builder
 const makeDocument = (overrides?: Partial<HulyDocument>): HulyDocument => ({
@@ -258,7 +270,7 @@ describe("listAttachments", () => {
 
       const result = yield* listAttachments({
         objectId: "parent-1",
-        objectClass: "tracker:class:Issue"
+        objectClass: objectClassName("tracker:class:Issue")
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
@@ -273,7 +285,7 @@ describe("listAttachments", () => {
 
       const result = yield* listAttachments({
         objectId: "parent-1",
-        objectClass: "tracker:class:Issue"
+        objectClass: objectClassName("tracker:class:Issue")
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(0)
@@ -285,16 +297,16 @@ describe("listAttachments", () => {
       const att = makeAttachment({
         _id: "att-null" as Ref<HulyAttachment>,
         attachedTo: "parent-1" as Ref<Doc>,
-        // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
+        // eslint-disable-next-line no-restricted-syntax -- undefined doesn't overlap with boolean
         pinned: undefined as unknown as boolean,
-        // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
+        // eslint-disable-next-line no-restricted-syntax -- null doesn't overlap with string
         description: null as unknown as string
       })
       const testLayer = createTestLayer({ attachments: [att] })
 
       const result = yield* listAttachments({
         objectId: "parent-1",
-        objectClass: "tracker:class:Issue"
+        objectClass: objectClassName("tracker:class:Issue")
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
@@ -316,7 +328,7 @@ describe("getAttachment", () => {
       })
       const testLayer = createTestLayer({ attachments: [att] })
 
-      const result = yield* getAttachment({ attachmentId: "att-1" }).pipe(Effect.provide(testLayer))
+      const result = yield* getAttachment({ attachmentId: attachmentBrandId("att-1") }).pipe(Effect.provide(testLayer))
 
       expect(result.id).toBe("att-1")
       expect(result.name).toBe("report.pdf")
@@ -331,7 +343,7 @@ describe("getAttachment", () => {
       const testLayer = createTestLayer({})
 
       const error = yield* Effect.flip(
-        getAttachment({ attachmentId: "nonexistent" }).pipe(Effect.provide(testLayer))
+        getAttachment({ attachmentId: attachmentBrandId("nonexistent") }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("AttachmentNotFoundError")
@@ -344,16 +356,18 @@ describe("getAttachment", () => {
       const att = makeAttachment({
         _id: "att-null" as Ref<HulyAttachment>,
         file: "blob-null" as Ref<Blob>,
-        // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
+        // eslint-disable-next-line no-restricted-syntax -- undefined doesn't overlap with boolean
         pinned: undefined as unknown as boolean,
-        // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
+        // eslint-disable-next-line no-restricted-syntax -- null doesn't overlap with string
         description: null as unknown as string,
-        // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
+        // eslint-disable-next-line no-restricted-syntax -- undefined doesn't overlap with boolean
         readonly: undefined as unknown as boolean
       })
       const testLayer = createTestLayer({ attachments: [att] })
 
-      const result = yield* getAttachment({ attachmentId: "att-null" }).pipe(Effect.provide(testLayer))
+      const result = yield* getAttachment({ attachmentId: attachmentBrandId("att-null") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(result.id).toBe("att-null")
       expect(result.pinned).toBeUndefined()
@@ -370,10 +384,10 @@ describe("addAttachment", () => {
 
       const result = yield* addAttachment({
         objectId: "parent-1",
-        objectClass: "tracker:class:Issue",
-        space: "space-1",
+        objectClass: objectClassName("tracker:class:Issue"),
+        space: spaceBrandId("space-1"),
         filename: "test.txt",
-        contentType: "text/plain",
+        contentType: mimeType("text/plain"),
         data: Buffer.from("hello world").toString("base64")
       }).pipe(Effect.provide(testLayer))
 
@@ -384,7 +398,7 @@ describe("addAttachment", () => {
       expect(captureAddCollection.attributes?.type).toBe("text/plain")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("includes description in attachment data when provided", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -392,10 +406,10 @@ describe("addAttachment", () => {
 
       yield* addAttachment({
         objectId: "parent-1",
-        objectClass: "tracker:class:Issue",
-        space: "space-1",
+        objectClass: objectClassName("tracker:class:Issue"),
+        space: spaceBrandId("space-1"),
         filename: "test.txt",
-        contentType: "text/plain",
+        contentType: mimeType("text/plain"),
         data: Buffer.from("hello").toString("base64"),
         description: "My attachment"
       }).pipe(Effect.provide(testLayer))
@@ -415,10 +429,10 @@ describe("addAttachment", () => {
 
         const result = yield* addAttachment({
           objectId: "parent-1",
-          objectClass: "tracker:class:Issue",
-          space: "space-1",
+          objectClass: objectClassName("tracker:class:Issue"),
+          space: spaceBrandId("space-1"),
           filename: "from-disk.txt",
-          contentType: "text/plain",
+          contentType: mimeType("text/plain"),
           filePath: tmpFile
         }).pipe(Effect.provide(testLayer))
 
@@ -439,7 +453,7 @@ describe("updateAttachment", () => {
       const testLayer = createTestLayer({ attachments: [att], captureUpdateDoc })
 
       const result = yield* updateAttachment({
-        attachmentId: "att-1",
+        attachmentId: attachmentBrandId("att-1"),
         description: "Updated description"
       }).pipe(Effect.provide(testLayer))
 
@@ -456,7 +470,7 @@ describe("updateAttachment", () => {
       const testLayer = createTestLayer({ attachments: [att], captureUpdateDoc })
 
       const result = yield* updateAttachment({
-        attachmentId: "att-1",
+        attachmentId: attachmentBrandId("att-1"),
         description: null
       }).pipe(Effect.provide(testLayer))
 
@@ -472,7 +486,7 @@ describe("updateAttachment", () => {
       const testLayer = createTestLayer({ attachments: [att], captureUpdateDoc })
 
       const result = yield* updateAttachment({
-        attachmentId: "att-1",
+        attachmentId: attachmentBrandId("att-1"),
         pinned: true
       }).pipe(Effect.provide(testLayer))
 
@@ -486,7 +500,9 @@ describe("updateAttachment", () => {
       const att = makeAttachment({ _id: "att-1" as Ref<HulyAttachment> })
       const testLayer = createTestLayer({ attachments: [att] })
 
-      const result = yield* updateAttachment({ attachmentId: "att-1" }).pipe(Effect.provide(testLayer))
+      const result = yield* updateAttachment({ attachmentId: attachmentBrandId("att-1") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(result.updated).toBe(false)
     }))
@@ -497,7 +513,9 @@ describe("updateAttachment", () => {
       const testLayer = createTestLayer({})
 
       const error = yield* Effect.flip(
-        updateAttachment({ attachmentId: "nonexistent", description: "x" }).pipe(Effect.provide(testLayer))
+        updateAttachment({ attachmentId: attachmentBrandId("nonexistent"), description: "x" }).pipe(
+          Effect.provide(testLayer)
+        )
       )
 
       expect(error._tag).toBe("AttachmentNotFoundError")
@@ -512,7 +530,9 @@ describe("deleteAttachment", () => {
       const captureRemoveDoc: MockConfig["captureRemoveDoc"] = {}
       const testLayer = createTestLayer({ attachments: [att], captureRemoveDoc })
 
-      const result = yield* deleteAttachment({ attachmentId: "att-1" }).pipe(Effect.provide(testLayer))
+      const result = yield* deleteAttachment({ attachmentId: attachmentBrandId("att-1") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(result.attachmentId).toBe("att-1")
       expect(result.deleted).toBe(true)
@@ -525,7 +545,7 @@ describe("deleteAttachment", () => {
       const testLayer = createTestLayer({})
 
       const error = yield* Effect.flip(
-        deleteAttachment({ attachmentId: "nonexistent" }).pipe(Effect.provide(testLayer))
+        deleteAttachment({ attachmentId: attachmentBrandId("nonexistent") }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("AttachmentNotFoundError")
@@ -542,7 +562,7 @@ describe("pinAttachment", () => {
       const testLayer = createTestLayer({ attachments: [att], captureUpdateDoc })
 
       const result = yield* pinAttachment({
-        attachmentId: "att-1",
+        attachmentId: attachmentBrandId("att-1"),
         pinned: true
       }).pipe(Effect.provide(testLayer))
 
@@ -559,7 +579,7 @@ describe("pinAttachment", () => {
       const testLayer = createTestLayer({ attachments: [att], captureUpdateDoc })
 
       const result = yield* pinAttachment({
-        attachmentId: "att-1",
+        attachmentId: attachmentBrandId("att-1"),
         pinned: false
       }).pipe(Effect.provide(testLayer))
 
@@ -573,7 +593,7 @@ describe("pinAttachment", () => {
       const testLayer = createTestLayer({})
 
       const error = yield* Effect.flip(
-        pinAttachment({ attachmentId: "nonexistent", pinned: true }).pipe(Effect.provide(testLayer))
+        pinAttachment({ attachmentId: attachmentBrandId("nonexistent"), pinned: true }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("AttachmentNotFoundError")
@@ -593,7 +613,9 @@ describe("downloadAttachment", () => {
       })
       const testLayer = createTestLayer({ attachments: [att] })
 
-      const result = yield* downloadAttachment({ attachmentId: "att-1" }).pipe(Effect.provide(testLayer))
+      const result = yield* downloadAttachment({ attachmentId: attachmentBrandId("att-1") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(result.attachmentId).toBe("att-1")
       expect(result.url).toContain("blob-456")
@@ -608,7 +630,7 @@ describe("downloadAttachment", () => {
       const testLayer = createTestLayer({})
 
       const error = yield* Effect.flip(
-        downloadAttachment({ attachmentId: "nonexistent" }).pipe(Effect.provide(testLayer))
+        downloadAttachment({ attachmentId: attachmentBrandId("nonexistent") }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("AttachmentNotFoundError")
@@ -634,10 +656,10 @@ describe("addIssueAttachment", () => {
       })
 
       const result = yield* addIssueAttachment({
-        project: "TEST",
-        identifier: "TEST-1",
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1"),
         filename: "screenshot.png",
-        contentType: "image/png",
+        contentType: mimeType("image/png"),
         data: Buffer.from("fake-png-data").toString("base64")
       }).pipe(Effect.provide(testLayer))
 
@@ -665,10 +687,10 @@ describe("addDocumentAttachment", () => {
       })
 
       const result = yield* addDocumentAttachment({
-        teamspace: "My Docs",
-        document: "Test Doc",
+        teamspace: teamspaceIdentifier("My Docs"),
+        document: documentIdentifier("Test Doc"),
         filename: "data.csv",
-        contentType: "text/csv",
+        contentType: mimeType("text/csv"),
         data: Buffer.from("col1,col2\n1,2").toString("base64")
       }).pipe(Effect.provide(testLayer))
 

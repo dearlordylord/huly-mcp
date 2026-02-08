@@ -122,7 +122,7 @@ describe("Channel Domain Schemas", () => {
   })
 
   describe("MessageSummarySchema", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses minimal message", () =>
       Effect.gen(function*() {
         const result = yield* Schema.decodeUnknown(MessageSummarySchema)({
@@ -224,7 +224,7 @@ describe("Channel Domain Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects zero limit", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -258,7 +258,7 @@ describe("Channel Domain Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects missing channel", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -269,7 +269,7 @@ describe("Channel Domain Schemas", () => {
   })
 
   describe("CreateChannelParamsSchema", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses minimal params", () =>
       Effect.gen(function*() {
         const result = yield* parseCreateChannelParams({ name: "new-channel" })
@@ -420,7 +420,7 @@ describe("Channel Domain Schemas", () => {
         expect(result).toEqual({})
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses with limit", () =>
       Effect.gen(function*() {
         const result = yield* parseListDirectMessagesParams({ limit: 25 })

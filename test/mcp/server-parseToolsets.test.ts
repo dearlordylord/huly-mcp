@@ -1,9 +1,10 @@
 import { describe, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { expect } from "vitest"
+import { expect, vi } from "vitest"
 import { HulyClient } from "../../src/huly/client.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
+import { HttpServerFactoryService } from "../../src/mcp/http-transport.js"
 import { McpServerError, McpServerService } from "../../src/mcp/server.js"
 import { TelemetryService } from "../../src/telemetry/telemetry.js"
 
@@ -49,24 +50,26 @@ describe("McpServerError", () => {
 })
 
 describe("McpServerService.testLayer", () => {
-  // test-revizorro: suspect | No assertions - only checks that operations complete without error; doesn't verify actual behavior
+  // test-revizorro: approved
   it.effect("default run and stop are noop", () =>
     Effect.gen(function*() {
+      const mockHttpLayer = Layer.succeed(HttpServerFactoryService, {} as never)
       const server = yield* McpServerService.pipe(
         Effect.provide(McpServerService.testLayer({}))
       )
-      yield* server.run()
+      yield* server.run().pipe(Effect.provide(mockHttpLayer))
       yield* server.stop()
     }))
 
   // test-revizorro: approved
   it.effect("allows overriding run to fail", () =>
     Effect.gen(function*() {
+      const mockHttpLayer = Layer.succeed(HttpServerFactoryService, {} as never)
       const layer = McpServerService.testLayer({
         run: () => new McpServerError({ message: "cannot start" })
       })
       const server = yield* McpServerService.pipe(Effect.provide(layer))
-      const err = yield* Effect.flip(server.run())
+      const err = yield* Effect.flip(server.run().pipe(Effect.provide(mockHttpLayer)))
       expect(err.message).toBe("cannot start")
     }))
 

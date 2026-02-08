@@ -24,6 +24,12 @@ import {
   startHttpTransport
 } from "../../src/mcp/http-transport.js"
 
+// Test mock factory: accepts any object, returns it typed as T.
+// Single cast from Record<string,unknown> to T (valid for test mocks of large interfaces).
+function mock<T>(impl: Record<string, unknown>): T {
+  return impl as T
+}
+
 const createMockExpressApp = () => {
   const routes: Record<string, Record<string, (req: Request, res: Response) => Promise<void>>> = {
     get: {},
@@ -31,8 +37,7 @@ const createMockExpressApp = () => {
     delete: {}
   }
 
-  // eslint-disable-next-line no-restricted-syntax -- test mock: partial Express app
-  const app = {
+  const app = mock<Express>({
     get: vi.fn((path: string, handler: (req: Request, res: Response) => Promise<void>) => {
       routes.get[path] = handler
     }),
@@ -43,29 +48,26 @@ const createMockExpressApp = () => {
       routes.delete[path] = handler
     }),
     listen: vi.fn()
-  } as unknown as Express
+  })
 
   return { app, routes }
 }
 
 const createMockMcpServer = (): Server => {
-  // eslint-disable-next-line no-restricted-syntax -- test mock: partial MCP Server
-  return {
+  return mock<Server>({
     connect: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
     setRequestHandler: vi.fn()
-  } as unknown as Server
+  })
 }
 
 const createMockResponse = () => {
-  const res = {
+  return mock<Response>({
     status: vi.fn().mockReturnThis(),
     json: vi.fn().mockReturnThis(),
     headersSent: false,
     on: vi.fn()
-  }
-  // eslint-disable-next-line no-restricted-syntax -- test mock: partial Response
-  return res as unknown as Response
+  })
 }
 
 describe("HTTP Transport - Branch Coverage", () => {
@@ -99,14 +101,13 @@ describe("HTTP Transport - Branch Coverage", () => {
       const closeFn = vi.fn((cb?: (err?: Error) => void) => {
         cb?.(new Error("Close failed"))
       })
-      // eslint-disable-next-line no-restricted-syntax -- test mock: partial http.Server
-      const mockHttpServer = {
+      const mockHttp = mock<http.Server>({
         close: closeFn
-      } as unknown as http.Server
+      })
 
       const mockFactory: HttpServerFactory = {
         createApp: vi.fn(() => app),
-        listen: vi.fn(() => Effect.succeed(mockHttpServer))
+        listen: vi.fn(() => Effect.succeed(mockHttp))
       }
 
       const mockMcpServer = createMockMcpServer()

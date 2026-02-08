@@ -1,11 +1,12 @@
 import { describe, it } from "@effect/vitest"
 import type { Channel, Person } from "@hcengineering/contact"
-import type { Doc, FindResult, Ref, Space, Status } from "@hcengineering/core"
+import type { Attribute, Class, Doc, FindResult, PersonId, Ref, Space, Status } from "@hcengineering/core"
 import {
   type Component as HulyComponent,
   IssuePriority,
   type IssueTemplate as HulyIssueTemplate,
-  type Project as HulyProject
+  type Project as HulyProject,
+  TimeReportDayType
 } from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
@@ -25,6 +26,13 @@ import {
   listIssueTemplates,
   updateIssueTemplate
 } from "../../../src/huly/operations/issue-templates.js"
+import {
+  componentIdentifier,
+  email,
+  positiveNumber,
+  projectIdentifier,
+  templateIdentifier
+} from "../../helpers/brands.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   const result = docs as FindResult<T>
@@ -34,21 +42,23 @@ const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
 
 // --- Mock Data Builders ---
 
-const makeProject = (overrides?: Partial<HulyProject>): HulyProject => ({
-  _id: "project-1" as Ref<HulyProject>,
-  _class: tracker.class.Project,
-  space: "space-1" as Ref<Space>,
-  identifier: "TEST",
-  name: "Test Project",
-  sequence: 1,
-  defaultIssueStatus: "status-open" as Ref<Status>,
-  defaultTimeReportDay: 0,
-  modifiedBy: "user-1" as Ref<Doc>,
-  modifiedOn: Date.now(),
-  createdBy: "user-1" as Ref<Doc>,
-  createdOn: Date.now(),
-  ...overrides
-})
+const asProject = (v: unknown) => v as HulyProject
+const makeProject = (overrides?: Partial<HulyProject>): HulyProject =>
+  asProject({
+    _id: "project-1" as Ref<HulyProject>,
+    _class: tracker.class.Project,
+    space: "space-1" as Ref<Space>,
+    identifier: "TEST",
+    name: "Test Project",
+    sequence: 1,
+    defaultIssueStatus: "status-open" as Ref<Status>,
+    defaultTimeReportDay: TimeReportDayType.CurrentWorkDay,
+    modifiedBy: "user-1" as PersonId,
+    modifiedOn: Date.now(),
+    createdBy: "user-1" as PersonId,
+    createdOn: Date.now(),
+    ...overrides
+  })
 
 const makeIssueTemplate = (overrides?: Partial<HulyIssueTemplate>): HulyIssueTemplate => ({
   _id: "template-1" as Ref<HulyIssueTemplate>,
@@ -62,24 +72,26 @@ const makeIssueTemplate = (overrides?: Partial<HulyIssueTemplate>): HulyIssueTem
   estimation: 0,
   children: [],
   comments: 0,
-  modifiedBy: "user-1" as Ref<Doc>,
+  modifiedBy: "user-1" as PersonId,
   modifiedOn: 1000,
-  createdBy: "user-1" as Ref<Doc>,
+  createdBy: "user-1" as PersonId,
   createdOn: 900,
   ...overrides
 })
 
-const makePerson = (overrides?: Partial<Person>): Person => ({
-  _id: "person-1" as Ref<Person>,
-  _class: contact.class.Person,
-  space: "space-1" as Ref<Space>,
-  name: "John Doe",
-  modifiedBy: "user-1" as Ref<Doc>,
-  modifiedOn: Date.now(),
-  createdBy: "user-1" as Ref<Doc>,
-  createdOn: Date.now(),
-  ...overrides
-})
+const asPerson = (v: unknown) => v as Person
+const makePerson = (overrides?: Partial<Person>): Person =>
+  asPerson({
+    _id: "person-1" as Ref<Person>,
+    _class: contact.class.Person,
+    space: "space-1" as Ref<Space>,
+    name: "John Doe",
+    modifiedBy: "user-1" as PersonId,
+    modifiedOn: Date.now(),
+    createdBy: "user-1" as PersonId,
+    createdOn: Date.now(),
+    ...overrides
+  })
 
 const makeChannel = (overrides?: Partial<Channel>): Channel => ({
   _id: "channel-1" as Ref<Channel>,
@@ -90,9 +102,9 @@ const makeChannel = (overrides?: Partial<Channel>): Channel => ({
   collection: "channels",
   provider: contact.channelProvider.Email,
   value: "john@example.com",
-  modifiedBy: "user-1" as Ref<Doc>,
+  modifiedBy: "user-1" as PersonId,
   modifiedOn: Date.now(),
-  createdBy: "user-1" as Ref<Doc>,
+  createdBy: "user-1" as PersonId,
   createdOn: Date.now(),
   ...overrides
 })
@@ -105,22 +117,22 @@ const makeComponent = (overrides?: Partial<HulyComponent>): HulyComponent => ({
   description: "",
   lead: null,
   comments: 0,
-  modifiedBy: "user-1" as Ref<Doc>,
+  modifiedBy: "user-1" as PersonId,
   modifiedOn: Date.now(),
-  createdBy: "user-1" as Ref<Doc>,
+  createdBy: "user-1" as PersonId,
   createdOn: Date.now(),
   ...overrides
 })
 
 const makeStatus = (overrides?: Partial<Status>): Status => ({
   _id: "status-1" as Ref<Status>,
-  _class: "core:class:Status" as Ref<Doc>,
+  _class: "core:class:Status" as Ref<Class<Status>>,
   space: "space-1" as Ref<Space>,
-  ofAttribute: "tracker:attribute:IssueStatus" as Ref<Doc>,
+  ofAttribute: "tracker:attribute:IssueStatus" as Ref<Attribute<Status>>,
   name: "Open",
-  modifiedBy: "user-1" as Ref<Doc>,
+  modifiedBy: "user-1" as PersonId,
   modifiedOn: Date.now(),
-  createdBy: "user-1" as Ref<Doc>,
+  createdBy: "user-1" as PersonId,
   createdOn: Date.now(),
   ...overrides
 })
@@ -319,6 +331,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     return Effect.succeed((id ?? "new-issue-id") as Ref<Doc>)
   }) as HulyClientOperations["addCollection"]
 
+  // eslint-disable-next-line no-restricted-syntax -- mock function signature (unknown params) doesn't overlap with typed signature
   const uploadMarkupImpl: HulyClientOperations["uploadMarkup"] = ((
     _objectClass: unknown,
     _objectId: unknown,
@@ -329,7 +342,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       config.captureUploadMarkup.markup = markup as string
     }
     return Effect.succeed("markup-ref-123")
-  }) as HulyClientOperations["uploadMarkup"]
+  }) as unknown as HulyClientOperations["uploadMarkup"]
 
   return HulyClient.testLayer({
     findAll: findAllImpl,
@@ -345,7 +358,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 // --- Tests ---
 
 describe("listIssueTemplates", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns templates for a project", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -356,7 +369,7 @@ describe("listIssueTemplates", () => {
 
       const testLayer = createTestLayerWithMocks({ projects: [project], templates })
 
-      const result = yield* listIssueTemplates({ project: "TEST" }).pipe(Effect.provide(testLayer))
+      const result = yield* listIssueTemplates({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
       expect(result[0].title).toBe("Template A")
@@ -369,7 +382,7 @@ describe("listIssueTemplates", () => {
       const project = makeProject({ identifier: "TEST" })
       const testLayer = createTestLayerWithMocks({ projects: [project] })
 
-      const result = yield* listIssueTemplates({ project: "TEST" }).pipe(Effect.provide(testLayer))
+      const result = yield* listIssueTemplates({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(0)
     }))
@@ -392,7 +405,7 @@ describe("listIssueTemplates", () => {
 
       const testLayer = createTestLayerWithMocks({ projects: [project], templates })
 
-      const result = yield* listIssueTemplates({ project: "TEST" }).pipe(Effect.provide(testLayer))
+      const result = yield* listIssueTemplates({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
 
       expect(result[0].priority).toBe("urgent")
       expect(result[1].priority).toBe("high")
@@ -406,7 +419,7 @@ describe("listIssueTemplates", () => {
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({})
 
-      const result = yield* listIssueTemplates({ project: "NOPE" }).pipe(
+      const result = yield* listIssueTemplates({ project: projectIdentifier("NOPE") }).pipe(
         Effect.flip,
         Effect.provide(testLayer)
       )
@@ -431,7 +444,10 @@ describe("getIssueTemplate", () => {
 
       const testLayer = createTestLayerWithMocks({ projects: [project], templates: [template] })
 
-      const result = yield* getIssueTemplate({ project: "TEST", template: "Bug Report" }).pipe(
+      const result = yield* getIssueTemplate({
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report")
+      }).pipe(
         Effect.provide(testLayer)
       )
 
@@ -455,7 +471,10 @@ describe("getIssueTemplate", () => {
 
       const testLayer = createTestLayerWithMocks({ projects: [project], templates: [template] })
 
-      const result = yield* getIssueTemplate({ project: "TEST", template: "template-abc" }).pipe(
+      const result = yield* getIssueTemplate({
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("template-abc")
+      }).pipe(
         Effect.provide(testLayer)
       )
 
@@ -478,7 +497,10 @@ describe("getIssueTemplate", () => {
         persons: [person]
       })
 
-      const result = yield* getIssueTemplate({ project: "TEST", template: "Bug Report Template" }).pipe(
+      const result = yield* getIssueTemplate({
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report Template")
+      }).pipe(
         Effect.provide(testLayer)
       )
 
@@ -493,7 +515,10 @@ describe("getIssueTemplate", () => {
 
       const testLayer = createTestLayerWithMocks({ projects: [project], templates: [template] })
 
-      const result = yield* getIssueTemplate({ project: "TEST", template: "Bug Report Template" }).pipe(
+      const result = yield* getIssueTemplate({
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report Template")
+      }).pipe(
         Effect.provide(testLayer)
       )
 
@@ -515,7 +540,10 @@ describe("getIssueTemplate", () => {
         components: [component]
       })
 
-      const result = yield* getIssueTemplate({ project: "TEST", template: "Bug Report Template" }).pipe(
+      const result = yield* getIssueTemplate({
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report Template")
+      }).pipe(
         Effect.provide(testLayer)
       )
 
@@ -530,7 +558,10 @@ describe("getIssueTemplate", () => {
 
       const testLayer = createTestLayerWithMocks({ projects: [project], templates: [template] })
 
-      const result = yield* getIssueTemplate({ project: "TEST", template: "Bug Report Template" }).pipe(
+      const result = yield* getIssueTemplate({
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report Template")
+      }).pipe(
         Effect.provide(testLayer)
       )
 
@@ -545,7 +576,10 @@ describe("getIssueTemplate", () => {
 
       const testLayer = createTestLayerWithMocks({ projects: [project], templates: [template] })
 
-      const result = yield* getIssueTemplate({ project: "TEST", template: "Bug Report Template" }).pipe(
+      const result = yield* getIssueTemplate({
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report Template")
+      }).pipe(
         Effect.provide(testLayer)
       )
 
@@ -558,7 +592,10 @@ describe("getIssueTemplate", () => {
       const project = makeProject({ identifier: "TEST" })
       const testLayer = createTestLayerWithMocks({ projects: [project] })
 
-      const result = yield* getIssueTemplate({ project: "TEST", template: "nonexistent" }).pipe(
+      const result = yield* getIssueTemplate({
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("nonexistent")
+      }).pipe(
         Effect.flip,
         Effect.provide(testLayer)
       )
@@ -566,12 +603,15 @@ describe("getIssueTemplate", () => {
       expect((result as IssueTemplateNotFoundError)._tag).toBe("IssueTemplateNotFoundError")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fails with ProjectNotFoundError for unknown project", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({})
 
-      const result = yield* getIssueTemplate({ project: "NOPE", template: "anything" }).pipe(
+      const result = yield* getIssueTemplate({
+        project: projectIdentifier("NOPE"),
+        template: templateIdentifier("anything")
+      }).pipe(
         Effect.flip,
         Effect.provide(testLayer)
       )
@@ -593,7 +633,7 @@ describe("createIssueTemplate", () => {
       })
 
       const result = yield* createIssueTemplate({
-        project: "TEST",
+        project: projectIdentifier("TEST"),
         title: "New Template"
       }).pipe(Effect.provide(testLayer))
 
@@ -629,13 +669,13 @@ describe("createIssueTemplate", () => {
       })
 
       const result = yield* createIssueTemplate({
-        project: "TEST",
+        project: projectIdentifier("TEST"),
         title: "Full Template",
         description: "Detailed description",
         priority: "high",
-        assignee: "john@example.com",
-        component: "Frontend",
-        estimation: 120
+        assignee: email("john@example.com"),
+        component: componentIdentifier("Frontend"),
+        estimation: positiveNumber(120)
       }).pipe(Effect.provide(testLayer))
 
       expect(result.title).toBe("Full Template")
@@ -656,9 +696,9 @@ describe("createIssueTemplate", () => {
       const testLayer = createTestLayerWithMocks({ projects: [project] })
 
       const result = yield* createIssueTemplate({
-        project: "TEST",
+        project: projectIdentifier("TEST"),
         title: "Template",
-        assignee: "nobody@example.com"
+        assignee: email("nobody@example.com")
       }).pipe(Effect.flip, Effect.provide(testLayer))
 
       expect((result as PersonNotFoundError)._tag).toBe("PersonNotFoundError")
@@ -671,21 +711,21 @@ describe("createIssueTemplate", () => {
       const testLayer = createTestLayerWithMocks({ projects: [project] })
 
       const result = yield* createIssueTemplate({
-        project: "TEST",
+        project: projectIdentifier("TEST"),
         title: "Template",
-        component: "NonexistentComponent"
+        component: componentIdentifier("NonexistentComponent")
       }).pipe(Effect.flip, Effect.provide(testLayer))
 
       expect((result as ComponentNotFoundError)._tag).toBe("ComponentNotFoundError")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("fails with ProjectNotFoundError for unknown project", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({})
 
       const result = yield* createIssueTemplate({
-        project: "NOPE",
+        project: projectIdentifier("NOPE"),
         title: "Template"
       }).pipe(Effect.flip, Effect.provide(testLayer))
 
@@ -713,15 +753,15 @@ describe("createIssueFromTemplate", () => {
     })
   }
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("creates issue using template defaults", () =>
     Effect.gen(function*() {
       const capture: MockConfig["captureAddCollection"] = {}
       const testLayer = setupForCreateFromTemplate({ captureAddCollection: capture })
 
       const result = yield* createIssueFromTemplate({
-        project: "TEST",
-        template: "Bug Report"
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.identifier).toBeDefined()
@@ -738,8 +778,8 @@ describe("createIssueFromTemplate", () => {
       const testLayer = setupForCreateFromTemplate({ captureAddCollection: capture })
 
       const result = yield* createIssueFromTemplate({
-        project: "TEST",
-        template: "Bug Report",
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report"),
         title: "Custom Title",
         description: "Custom description",
         priority: "low"
@@ -776,8 +816,8 @@ describe("createIssueFromTemplate", () => {
       })
 
       const result = yield* createIssueFromTemplate({
-        project: "TEST",
-        template: "Assigned Template"
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Assigned Template")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.identifier).toBeDefined()
@@ -809,8 +849,8 @@ describe("createIssueFromTemplate", () => {
       })
 
       const result = yield* createIssueFromTemplate({
-        project: "TEST",
-        template: "Assigned Template"
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Assigned Template")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.identifier).toBeDefined()
@@ -845,9 +885,9 @@ describe("createIssueFromTemplate", () => {
       })
 
       const result = yield* createIssueFromTemplate({
-        project: "TEST",
-        template: "Assigned Template",
-        assignee: "bob@example.com"
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Assigned Template"),
+        assignee: email("bob@example.com")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.identifier).toBeDefined()
@@ -875,8 +915,8 @@ describe("createIssueFromTemplate", () => {
       })
 
       yield* createIssueFromTemplate({
-        project: "TEST",
-        template: "Component Template"
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Component Template")
       }).pipe(Effect.provide(testLayer))
 
       expect(captureUpdate.operations).toMatchObject({
@@ -893,8 +933,8 @@ describe("createIssueFromTemplate", () => {
       })
 
       const result = yield* createIssueFromTemplate({
-        project: "TEST",
-        template: "nonexistent"
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("nonexistent")
       }).pipe(Effect.flip, Effect.provide(testLayer))
 
       expect((result as IssueTemplateNotFoundError)._tag).toBe("IssueTemplateNotFoundError")
@@ -906,8 +946,8 @@ describe("createIssueFromTemplate", () => {
       const testLayer = createTestLayerWithMocks({})
 
       const result = yield* createIssueFromTemplate({
-        project: "NOPE",
-        template: "anything"
+        project: projectIdentifier("NOPE"),
+        template: templateIdentifier("anything")
       }).pipe(Effect.flip, Effect.provide(testLayer))
 
       expect((result as ProjectNotFoundError)._tag).toBe("ProjectNotFoundError")
@@ -929,8 +969,8 @@ describe("updateIssueTemplate", () => {
       })
 
       const result = yield* updateIssueTemplate({
-        project: "TEST",
-        template: "Old Title",
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Old Title"),
         title: "New Title"
       }).pipe(Effect.provide(testLayer))
 
@@ -952,8 +992,8 @@ describe("updateIssueTemplate", () => {
       })
 
       const result = yield* updateIssueTemplate({
-        project: "TEST",
-        template: "Bug Report Template",
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report Template"),
         description: "Updated description"
       }).pipe(Effect.provide(testLayer))
 
@@ -975,8 +1015,8 @@ describe("updateIssueTemplate", () => {
       })
 
       const result = yield* updateIssueTemplate({
-        project: "TEST",
-        template: "Bug Report Template",
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report Template"),
         priority: "urgent"
       }).pipe(Effect.provide(testLayer))
 
@@ -1002,16 +1042,16 @@ describe("updateIssueTemplate", () => {
       })
 
       const result = yield* updateIssueTemplate({
-        project: "TEST",
-        template: "Bug Report Template",
-        assignee: "john@example.com"
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report Template"),
+        assignee: email("john@example.com")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.updated).toBe(true)
       expect(captureUpdate.operations).toMatchObject({ assignee: "person-1" })
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("clears assignee when set to null", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -1025,8 +1065,8 @@ describe("updateIssueTemplate", () => {
       })
 
       const result = yield* updateIssueTemplate({
-        project: "TEST",
-        template: "Bug Report Template",
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report Template"),
         assignee: null
       }).pipe(Effect.provide(testLayer))
 
@@ -1050,9 +1090,9 @@ describe("updateIssueTemplate", () => {
       })
 
       const result = yield* updateIssueTemplate({
-        project: "TEST",
-        template: "Bug Report Template",
-        component: "Backend"
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report Template"),
+        component: componentIdentifier("Backend")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.updated).toBe(true)
@@ -1073,8 +1113,8 @@ describe("updateIssueTemplate", () => {
       })
 
       const result = yield* updateIssueTemplate({
-        project: "TEST",
-        template: "Bug Report Template",
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report Template"),
         component: null
       }).pipe(Effect.provide(testLayer))
 
@@ -1096,9 +1136,9 @@ describe("updateIssueTemplate", () => {
       })
 
       const result = yield* updateIssueTemplate({
-        project: "TEST",
-        template: "Bug Report Template",
-        estimation: 90
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report Template"),
+        estimation: positiveNumber(90)
       }).pipe(Effect.provide(testLayer))
 
       expect(result.updated).toBe(true)
@@ -1117,8 +1157,8 @@ describe("updateIssueTemplate", () => {
       })
 
       const result = yield* updateIssueTemplate({
-        project: "TEST",
-        template: "Bug Report Template"
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report Template")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.updated).toBe(false)
@@ -1137,9 +1177,9 @@ describe("updateIssueTemplate", () => {
       })
 
       const result = yield* updateIssueTemplate({
-        project: "TEST",
-        template: "Bug Report Template",
-        assignee: "nobody@example.com"
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report Template"),
+        assignee: email("nobody@example.com")
       }).pipe(Effect.flip, Effect.provide(testLayer))
 
       expect((result as PersonNotFoundError)._tag).toBe("PersonNotFoundError")
@@ -1157,9 +1197,9 @@ describe("updateIssueTemplate", () => {
       })
 
       const result = yield* updateIssueTemplate({
-        project: "TEST",
-        template: "Bug Report Template",
-        component: "NonexistentComponent"
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report Template"),
+        component: componentIdentifier("NonexistentComponent")
       }).pipe(Effect.flip, Effect.provide(testLayer))
 
       expect((result as ComponentNotFoundError)._tag).toBe("ComponentNotFoundError")
@@ -1172,8 +1212,8 @@ describe("updateIssueTemplate", () => {
       const testLayer = createTestLayerWithMocks({ projects: [project] })
 
       const result = yield* updateIssueTemplate({
-        project: "TEST",
-        template: "nonexistent",
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("nonexistent"),
         title: "foo"
       }).pipe(Effect.flip, Effect.provide(testLayer))
 
@@ -1186,8 +1226,8 @@ describe("updateIssueTemplate", () => {
       const testLayer = createTestLayerWithMocks({})
 
       const result = yield* updateIssueTemplate({
-        project: "NOPE",
-        template: "anything",
+        project: projectIdentifier("NOPE"),
+        template: templateIdentifier("anything"),
         title: "foo"
       }).pipe(Effect.flip, Effect.provide(testLayer))
 
@@ -1210,8 +1250,8 @@ describe("deleteIssueTemplate", () => {
       })
 
       const result = yield* deleteIssueTemplate({
-        project: "TEST",
-        template: "To Delete"
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("To Delete")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.deleted).toBe(true)
@@ -1236,8 +1276,8 @@ describe("deleteIssueTemplate", () => {
       })
 
       const result = yield* deleteIssueTemplate({
-        project: "TEST",
-        template: "template-xyz"
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("template-xyz")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.deleted).toBe(true)
@@ -1253,8 +1293,8 @@ describe("deleteIssueTemplate", () => {
       const testLayer = createTestLayerWithMocks({ projects: [project] })
 
       const result = yield* deleteIssueTemplate({
-        project: "TEST",
-        template: "nonexistent"
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("nonexistent")
       }).pipe(Effect.flip, Effect.provide(testLayer))
 
       expect((result as IssueTemplateNotFoundError)._tag).toBe("IssueTemplateNotFoundError")
@@ -1266,8 +1306,8 @@ describe("deleteIssueTemplate", () => {
       const testLayer = createTestLayerWithMocks({})
 
       const result = yield* deleteIssueTemplate({
-        project: "NOPE",
-        template: "anything"
+        project: projectIdentifier("NOPE"),
+        template: templateIdentifier("anything")
       }).pipe(Effect.flip, Effect.provide(testLayer))
 
       expect((result as ProjectNotFoundError)._tag).toBe("ProjectNotFoundError")

@@ -5,6 +5,7 @@ import { HulyClient } from "../src/huly/client.js"
 import { HulyStorageClient } from "../src/huly/storage.js"
 import { WorkspaceClient } from "../src/huly/workspace-client.js"
 import { main } from "../src/index.js"
+import { HttpServerFactoryService } from "../src/mcp/http-transport.js"
 import { McpServerError, McpServerService } from "../src/mcp/server.js"
 import { TelemetryService } from "../src/telemetry/telemetry.js"
 
@@ -103,7 +104,7 @@ describe("Main Entry Point", () => {
   })
 
   describe("McpServerService integration", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("server run/stop cycle works", () =>
       Effect.gen(function*() {
         let runCalled = false
@@ -128,7 +129,7 @@ describe("Main Entry Point", () => {
 
         expect(runCalled).toBe(true)
         expect(stopCalled).toBe(true)
-      }))
+      }).pipe(Effect.provide(HttpServerFactoryService.defaultLayer)))
 
     // test-revizorro: approved
     it.effect("server error is properly typed", () =>
@@ -146,6 +147,6 @@ describe("Main Entry Point", () => {
 
         expect(error._tag).toBe("McpServerError")
         expect(error.message).toBe("Connection refused")
-      }))
+      }).pipe(Effect.provide(HttpServerFactoryService.defaultLayer)))
   })
 })

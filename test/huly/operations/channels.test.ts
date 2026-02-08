@@ -7,7 +7,15 @@ import type {
   ThreadMessage as HulyThreadMessage
 } from "@hcengineering/chunter"
 import type { Employee as HulyEmployee, Person, SocialIdentity } from "@hcengineering/contact"
-import { type AccountUuid, type Doc, type PersonId, type Ref, type Space, toFindResult } from "@hcengineering/core"
+import {
+  type AccountUuid,
+  type Doc,
+  type PersonId,
+  type Ref,
+  SocialIdType,
+  type Space,
+  toFindResult
+} from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
@@ -28,6 +36,7 @@ import {
   listThreadReplies,
   updateThreadReply
 } from "../../../src/huly/operations/threads.js"
+import { channelIdentifier, messageBrandId, threadReplyId } from "../../helpers/brands.js"
 
 import { chunter, contact } from "../../../src/huly/huly-plugins.js"
 
@@ -43,9 +52,9 @@ const makeChannel = (overrides?: Partial<HulyChannel>): HulyChannel => {
     archived: false,
     members: [],
     messages: 0,
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -62,9 +71,9 @@ const makeChatMessage = (overrides?: Partial<ChatMessage>): ChatMessage => {
     collection: "messages",
     message: "<p>Hello world</p>",
     attachments: 0,
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -83,9 +92,9 @@ const makeThreadMessage = (overrides?: Partial<HulyThreadMessage>): HulyThreadMe
     attachments: 0,
     objectId: "channel-1" as Ref<Doc>,
     objectClass: chunter.class.Channel,
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -103,58 +112,59 @@ const makeDirectMessage = (overrides?: Partial<DirectMessage>): DirectMessage =>
     archived: false,
     members: [],
     messages: 0,
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
   return result
 }
 
-const makePerson = (overrides?: Partial<Person>): Person => {
-  const result: Person = {
+// exactOptionalPropertyTypes: Partial spread can introduce undefined into required fields — factory helper needed
+const asPerson = (v: unknown) => v as Person
+const asEmployee = (v: unknown) => v as HulyEmployee
+
+const makePerson = (overrides?: Partial<Person>): Person =>
+  asPerson({
     _id: "person-1" as Ref<Person>,
     _class: contact.class.Person,
     space: "space-1" as Ref<Space>,
     name: "John Doe",
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
-  }
-  return result
-}
+  })
 
-const makeEmployee = (overrides?: Partial<HulyEmployee>): HulyEmployee => {
-  const result: HulyEmployee = {
+const makeEmployee = (overrides?: Partial<HulyEmployee>): HulyEmployee =>
+  asEmployee({
     _id: "employee-1" as Ref<HulyEmployee>,
     _class: contact.mixin.Employee,
     space: "space-1" as Ref<Space>,
     name: "John Doe",
     active: true,
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
-  }
-  return result
-}
+  })
 
 const makeSocialIdentity = (overrides?: Partial<SocialIdentity>): SocialIdentity => {
   const result: SocialIdentity = {
-    _id: "social-1" as PersonId,
+    // SocialIdentity._id is Ref<SocialIdentity> & PersonId — double cast required for this intersection phantom type
+    _id: "social-1" as Ref<SocialIdentity> & PersonId,
     _class: contact.class.SocialIdentity,
     space: "space-1" as Ref<Space>,
     attachedTo: "person-1" as Ref<Person>,
     attachedToClass: contact.class.Person,
     collection: "socialIds",
-    type: "huly",
+    type: SocialIdType.HULY,
     value: "user@example.com",
     key: "huly:user@example.com",
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
     ...overrides
   }
@@ -394,7 +404,7 @@ describe("listChannels", () => {
       expect(captureQuery.query?.archived).toBeUndefined()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("uses default limit of 50", () =>
     Effect.gen(function*() {
       const captureQuery: MockConfig["captureChannelQuery"] = {}
@@ -433,7 +443,7 @@ describe("listChannels", () => {
         topic: "General chat",
         private: true,
         archived: false,
-        members: ["person-1" as Ref<Doc>, "person-2" as Ref<Doc>],
+        members: ["person-1" as AccountUuid, "person-2" as AccountUuid],
         messages: 42,
         modifiedOn: 1706500000000
       })
@@ -470,7 +480,7 @@ describe("getChannel", () => {
 
       const testLayer = createTestLayerWithMocks({ channels: [channel] })
 
-      const result = yield* getChannel({ channel: "development" }).pipe(Effect.provide(testLayer))
+      const result = yield* getChannel({ channel: channelIdentifier("development") }).pipe(Effect.provide(testLayer))
 
       expect(result.id).toBe("ch-1")
       expect(result.name).toBe("development")
@@ -488,19 +498,19 @@ describe("getChannel", () => {
 
       const testLayer = createTestLayerWithMocks({ channels: [channel] })
 
-      const result = yield* getChannel({ channel: "ch-special-id" }).pipe(Effect.provide(testLayer))
+      const result = yield* getChannel({ channel: channelIdentifier("ch-special-id") }).pipe(Effect.provide(testLayer))
 
       expect(result.id).toBe("ch-special-id")
       expect(result.name).toBe("random")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns ChannelNotFoundError when channel doesn't exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({ channels: [] })
 
       const error = yield* Effect.flip(
-        getChannel({ channel: "nonexistent" }).pipe(Effect.provide(testLayer))
+        getChannel({ channel: channelIdentifier("nonexistent") }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("ChannelNotFoundError")
@@ -522,7 +532,7 @@ describe("getChannel", () => {
 
       const testLayer = createTestLayerWithMocks({ channels: [channel], employees })
 
-      const result = yield* getChannel({ channel: "team" }).pipe(Effect.provide(testLayer))
+      const result = yield* getChannel({ channel: channelIdentifier("team") }).pipe(Effect.provide(testLayer))
 
       expect(result.members).toEqual(["Alice", "Bob"])
     }))
@@ -574,7 +584,7 @@ describe("updateChannel", () => {
       const testLayer = createTestLayerWithMocks({ channels: [channel], captureUpdateDoc })
 
       const result = yield* updateChannel({
-        channel: "old-name",
+        channel: channelIdentifier("old-name"),
         name: "new-name"
       }).pipe(Effect.provide(testLayer))
 
@@ -592,7 +602,7 @@ describe("updateChannel", () => {
       const testLayer = createTestLayerWithMocks({ channels: [channel], captureUpdateDoc })
 
       yield* updateChannel({
-        channel: "general",
+        channel: channelIdentifier("general"),
         topic: "New topic"
       }).pipe(Effect.provide(testLayer))
 
@@ -606,7 +616,7 @@ describe("updateChannel", () => {
 
       const testLayer = createTestLayerWithMocks({ channels: [channel] })
 
-      const result = yield* updateChannel({ channel: "general" }).pipe(Effect.provide(testLayer))
+      const result = yield* updateChannel({ channel: channelIdentifier("general") }).pipe(Effect.provide(testLayer))
 
       expect(result.updated).toBe(false)
     }))
@@ -617,7 +627,7 @@ describe("updateChannel", () => {
       const testLayer = createTestLayerWithMocks({ channels: [] })
 
       const error = yield* Effect.flip(
-        updateChannel({ channel: "nonexistent", name: "new" }).pipe(Effect.provide(testLayer))
+        updateChannel({ channel: channelIdentifier("nonexistent"), name: "new" }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("ChannelNotFoundError")
@@ -633,7 +643,7 @@ describe("deleteChannel", () => {
 
       const testLayer = createTestLayerWithMocks({ channels: [channel], captureRemoveDoc })
 
-      const result = yield* deleteChannel({ channel: "to-delete" }).pipe(Effect.provide(testLayer))
+      const result = yield* deleteChannel({ channel: channelIdentifier("to-delete") }).pipe(Effect.provide(testLayer))
 
       expect(result.id).toBe("ch-1")
       expect(result.deleted).toBe(true)
@@ -646,7 +656,7 @@ describe("deleteChannel", () => {
       const testLayer = createTestLayerWithMocks({ channels: [] })
 
       const error = yield* Effect.flip(
-        deleteChannel({ channel: "nonexistent" }).pipe(Effect.provide(testLayer))
+        deleteChannel({ channel: channelIdentifier("nonexistent") }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("ChannelNotFoundError")
@@ -673,7 +683,9 @@ describe("listChannelMessages", () => {
 
       const testLayer = createTestLayerWithMocks({ channels: [channel], messages })
 
-      const result = yield* listChannelMessages({ channel: "general" }).pipe(Effect.provide(testLayer))
+      const result = yield* listChannelMessages({ channel: channelIdentifier("general") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(result.messages).toHaveLength(2)
       expect(result.messages[0].id).toBe("msg-2")
@@ -710,11 +722,11 @@ describe("listChannelMessages", () => {
       ]
       const socialIdentities = [
         makeSocialIdentity({
-          _id: "social-alice" as PersonId,
+          _id: "social-alice" as Ref<SocialIdentity> & PersonId,
           attachedTo: "person-alice" as Ref<Person>
         }),
         makeSocialIdentity({
-          _id: "social-bob" as PersonId,
+          _id: "social-bob" as Ref<SocialIdentity> & PersonId,
           attachedTo: "person-bob" as Ref<Person>
         })
       ]
@@ -726,7 +738,9 @@ describe("listChannelMessages", () => {
         socialIdentities
       })
 
-      const result = yield* listChannelMessages({ channel: "general" }).pipe(Effect.provide(testLayer))
+      const result = yield* listChannelMessages({ channel: channelIdentifier("general") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(result.messages).toHaveLength(3)
       // Messages sorted by createdOn descending: 3000, 2000, 1000
@@ -744,7 +758,7 @@ describe("listChannelMessages", () => {
       const testLayer = createTestLayerWithMocks({ channels: [] })
 
       const error = yield* Effect.flip(
-        listChannelMessages({ channel: "nonexistent" }).pipe(Effect.provide(testLayer))
+        listChannelMessages({ channel: channelIdentifier("nonexistent") }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("ChannelNotFoundError")
@@ -761,7 +775,7 @@ describe("sendChannelMessage", () => {
       const testLayer = createTestLayerWithMocks({ channels: [channel], captureAddCollection })
 
       const result = yield* sendChannelMessage({
-        channel: "general",
+        channel: channelIdentifier("general"),
         body: "Hello world!"
       }).pipe(Effect.provide(testLayer))
 
@@ -769,13 +783,13 @@ describe("sendChannelMessage", () => {
       expect(captureAddCollection.attributes).toBeDefined()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns ChannelNotFoundError when channel doesn't exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({ channels: [] })
 
       const error = yield* Effect.flip(
-        sendChannelMessage({ channel: "nonexistent", body: "Hello" }).pipe(Effect.provide(testLayer))
+        sendChannelMessage({ channel: channelIdentifier("nonexistent"), body: "Hello" }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("ChannelNotFoundError")
@@ -858,8 +872,8 @@ describe("listThreadReplies", () => {
       })
 
       const result = yield* listThreadReplies({
-        channel: "general",
-        messageId: "msg-1"
+        channel: channelIdentifier("general"),
+        messageId: messageBrandId("msg-1")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.replies).toHaveLength(2)
@@ -879,8 +893,8 @@ describe("listThreadReplies", () => {
 
       const error = yield* Effect.flip(
         listThreadReplies({
-          channel: "general",
-          messageId: "nonexistent"
+          channel: channelIdentifier("general"),
+          messageId: messageBrandId("nonexistent")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -895,8 +909,8 @@ describe("listThreadReplies", () => {
 
       const error = yield* Effect.flip(
         listThreadReplies({
-          channel: "nonexistent",
-          messageId: "msg-1"
+          channel: channelIdentifier("nonexistent"),
+          messageId: messageBrandId("msg-1")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -905,7 +919,7 @@ describe("listThreadReplies", () => {
 })
 
 describe("addThreadReply", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("adds reply to message thread", () =>
     Effect.gen(function*() {
       const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
@@ -922,8 +936,8 @@ describe("addThreadReply", () => {
       })
 
       const result = yield* addThreadReply({
-        channel: "general",
-        messageId: "msg-1",
+        channel: channelIdentifier("general"),
+        messageId: messageBrandId("msg-1"),
         body: "This is a reply"
       }).pipe(Effect.provide(testLayer))
 
@@ -944,8 +958,8 @@ describe("addThreadReply", () => {
 
       const error = yield* Effect.flip(
         addThreadReply({
-          channel: "general",
-          messageId: "nonexistent",
+          channel: channelIdentifier("general"),
+          messageId: messageBrandId("nonexistent"),
           body: "Reply"
         }).pipe(Effect.provide(testLayer))
       )
@@ -978,9 +992,9 @@ describe("updateThreadReply", () => {
       })
 
       const result = yield* updateThreadReply({
-        channel: "general",
-        messageId: "msg-1",
-        replyId: "reply-1",
+        channel: channelIdentifier("general"),
+        messageId: messageBrandId("msg-1"),
+        replyId: threadReplyId("reply-1"),
         body: "Updated content"
       }).pipe(Effect.provide(testLayer))
 
@@ -1006,9 +1020,9 @@ describe("updateThreadReply", () => {
 
       const error = yield* Effect.flip(
         updateThreadReply({
-          channel: "general",
-          messageId: "msg-1",
-          replyId: "nonexistent",
+          channel: channelIdentifier("general"),
+          messageId: messageBrandId("msg-1"),
+          replyId: threadReplyId("nonexistent"),
           body: "Updated"
         }).pipe(Effect.provide(testLayer))
       )
@@ -1042,9 +1056,9 @@ describe("deleteThreadReply", () => {
       })
 
       const result = yield* deleteThreadReply({
-        channel: "general",
-        messageId: "msg-1",
-        replyId: "reply-1"
+        channel: channelIdentifier("general"),
+        messageId: messageBrandId("msg-1"),
+        replyId: threadReplyId("reply-1")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.id).toBe("reply-1")
@@ -1069,9 +1083,9 @@ describe("deleteThreadReply", () => {
 
       const error = yield* Effect.flip(
         deleteThreadReply({
-          channel: "general",
-          messageId: "msg-1",
-          replyId: "nonexistent"
+          channel: channelIdentifier("general"),
+          messageId: messageBrandId("msg-1"),
+          replyId: threadReplyId("nonexistent")
         }).pipe(Effect.provide(testLayer))
       )
 

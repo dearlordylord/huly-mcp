@@ -1,8 +1,24 @@
 import { describe, it } from "@effect/vitest"
 import type { Channel, Person } from "@hcengineering/contact"
-import type { Doc, FindResult, MarkupBlobRef, Ref, Space, Status } from "@hcengineering/core"
+import type {
+  Attribute,
+  Class,
+  Doc,
+  FindResult,
+  MarkupBlobRef,
+  PersonId,
+  Ref,
+  Space,
+  Status
+} from "@hcengineering/core"
 import type { TagElement, TagReference } from "@hcengineering/tags"
-import { type Issue as HulyIssue, IssuePriority, type Project as HulyProject } from "@hcengineering/tracker"
+import type { TaskType } from "@hcengineering/task"
+import {
+  type Issue as HulyIssue,
+  IssuePriority,
+  type Project as HulyProject,
+  TimeReportDayType
+} from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
@@ -15,6 +31,7 @@ import type {
 import { addLabel, createIssue, getIssue, listIssues, updateIssue } from "../../../src/huly/operations/issues.js"
 
 import { contact, core, tags, task, tracker } from "../../../src/huly/huly-plugins.js"
+import { colorCode, email, issueIdentifier, projectIdentifier, statusName } from "../../helpers/brands.js"
 
 // Helper to create properly typed FindResult for tests
 // FindResult<T> = T[] & { total: number; lookupMap?: Record<string, Doc> }
@@ -27,7 +44,7 @@ const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
 // --- Mock Data Builders ---
 
 const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
-  const result: HulyProject = {
+  const base = {
     _id: "project-1" as Ref<HulyProject>,
     _class: tracker.class.Project,
     space: "space-1" as Ref<Space>,
@@ -35,14 +52,14 @@ const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
     name: "Test Project",
     sequence: 1,
     defaultIssueStatus: "status-open" as Ref<Status>,
-    defaultTimeReportDay: 0,
-    modifiedBy: "user-1" as Ref<Doc>,
+    defaultTimeReportDay: TimeReportDayType.CurrentWorkDay,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
-    createdOn: Date.now(),
-    ...overrides
+    createdBy: "user-1" as PersonId,
+    createdOn: Date.now()
   }
-  return result
+  // Object.assign mutates base, avoids exactOptionalPropertyTypes conflict from spread of Partial<T>
+  return Object.assign(base, overrides) as HulyProject
 }
 
 const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
@@ -56,7 +73,7 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
     status: "status-open" as Ref<Status>,
     priority: IssuePriority.Medium,
     assignee: null,
-    kind: "task-type-1" as Ref<Doc>,
+    kind: "task-type-1" as Ref<TaskType>,
     number: 1,
     dueDate: null,
     rank: "0|aaa",
@@ -71,9 +88,9 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
     reportedTime: 0,
     reports: 0,
     childInfo: [],
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -83,13 +100,13 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
 const makeStatus = (overrides?: Partial<Status>): Status => {
   const result: Status = {
     _id: "status-1" as Ref<Status>,
-    _class: "core:class:Status" as Ref<Doc>,
+    _class: "core:class:Status" as Ref<Class<Status>>,
     space: "space-1" as Ref<Space>,
-    ofAttribute: "tracker:attribute:IssueStatus" as Ref<Doc>,
+    ofAttribute: "tracker:attribute:IssueStatus" as Ref<Attribute<Status>>,
     name: "Open",
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -97,18 +114,18 @@ const makeStatus = (overrides?: Partial<Status>): Status => {
 }
 
 const makePerson = (overrides?: Partial<Person>): Person => {
-  const result: Person = {
+  const base = {
     _id: "person-1" as Ref<Person>,
     _class: contact.class.Person,
     space: "space-1" as Ref<Space>,
     name: "John Doe",
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
-    createdOn: Date.now(),
-    ...overrides
+    createdBy: "user-1" as PersonId,
+    createdOn: Date.now()
   }
-  return result
+  // Object.assign mutates base, avoids exactOptionalPropertyTypes conflict from spread of Partial<T>
+  return Object.assign(base, overrides) as Person
 }
 
 const makeChannel = (overrides?: Partial<Channel>): Channel => {
@@ -121,9 +138,9 @@ const makeChannel = (overrides?: Partial<Channel>): Channel => {
     collection: "channels",
     provider: contact.channelProvider.Email,
     value: "john@example.com",
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -140,9 +157,9 @@ const makeTagElement = (overrides?: Partial<TagElement>): TagElement => {
     targetClass: tracker.class.Issue,
     color: 0,
     category: tracker.category.Other,
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -160,9 +177,9 @@ const makeTagReference = (overrides?: Partial<TagReference>): TagReference => {
     title: "Bug",
     color: 0,
     tag: "tag-element-1" as Ref<TagElement>,
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -413,6 +430,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 
   // Mock uploadMarkup - captures markup content
 
+  // eslint-disable-next-line no-restricted-syntax -- mock function signature (unknown params) doesn't overlap with typed signature
   const uploadMarkupImpl: HulyClientOperations["uploadMarkup"] = ((
     _objectClass: unknown,
     _objectId: unknown,
@@ -423,7 +441,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       config.captureUploadMarkup.markup = markup as string
     }
     return Effect.succeed("markup-ref-123")
-  }) as HulyClientOperations["uploadMarkup"]
+  }) as unknown as HulyClientOperations["uploadMarkup"]
 
   return HulyClient.testLayer({
     findAll: findAllImpl,
@@ -440,7 +458,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 
 describe("listIssues", () => {
   describe("basic functionality", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns issues for a project", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -459,7 +477,7 @@ describe("listIssues", () => {
           statuses
         })
 
-        const result = yield* listIssues({ project: "TEST" }).pipe(Effect.provide(testLayer))
+        const result = yield* listIssues({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(2)
         // Expect sorted by modifiedOn descending (newer first)
@@ -486,7 +504,7 @@ describe("listIssues", () => {
           statuses
         })
 
-        const result = yield* listIssues({ project: "TEST" }).pipe(Effect.provide(testLayer))
+        const result = yield* listIssues({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
 
         expect(result[0].priority).toBe("urgent")
         expect(result[1].priority).toBe("high")
@@ -512,7 +530,7 @@ describe("listIssues", () => {
           persons: [person]
         })
 
-        const result = yield* listIssues({ project: "TEST" }).pipe(Effect.provide(testLayer))
+        const result = yield* listIssues({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
 
         expect(result[0].assignee).toBe("Jane Doe")
       }))
@@ -529,7 +547,7 @@ describe("listIssues", () => {
         })
 
         const error = yield* Effect.flip(
-          listIssues({ project: "NONEXISTENT" }).pipe(Effect.provide(testLayer))
+          listIssues({ project: projectIdentifier("NONEXISTENT") }).pipe(Effect.provide(testLayer))
         )
 
         expect(error._tag).toBe("ProjectNotFoundError")
@@ -549,7 +567,9 @@ describe("listIssues", () => {
         })
 
         const error = yield* Effect.flip(
-          listIssues({ project: "TEST", status: "InvalidStatus" }).pipe(Effect.provide(testLayer))
+          listIssues({ project: projectIdentifier("TEST"), status: statusName("InvalidStatus") }).pipe(
+            Effect.provide(testLayer)
+          )
         )
 
         expect(error._tag).toBe("InvalidStatusError")
@@ -579,7 +599,9 @@ describe("listIssues", () => {
         })
 
         // "in progress" (lowercase) should match "In Progress" status
-        yield* listIssues({ project: "TEST", status: "in progress" }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST"), status: statusName("in progress") }).pipe(
+          Effect.provide(testLayer)
+        )
 
         expect(captureQuery.query?.status).toBe("status-progress")
       }))
@@ -617,7 +639,9 @@ describe("listIssues", () => {
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: "TEST", status: "open" }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST"), status: statusName("open") }).pipe(
+          Effect.provide(testLayer)
+        )
 
         // "open" filter should exclude done (Won) and canceled (Lost) statuses
         expect(captureQuery.query?.status).toEqual({
@@ -647,7 +671,9 @@ describe("listIssues", () => {
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: "TEST", assignee: "john@example.com" }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST"), assignee: email("john@example.com") }).pipe(
+          Effect.provide(testLayer)
+        )
 
         expect(captureQuery.query?.assignee).toBe("person-1")
       }))
@@ -666,7 +692,10 @@ describe("listIssues", () => {
           channels: []
         })
 
-        const result = yield* listIssues({ project: "TEST", assignee: "nonexistent@example.com" }).pipe(
+        const result = yield* listIssues({
+          project: projectIdentifier("TEST"),
+          assignee: email("nonexistent@example.com")
+        }).pipe(
           Effect.provide(testLayer)
         )
 
@@ -675,7 +704,7 @@ describe("listIssues", () => {
   })
 
   describe("limit handling", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("uses default limit of 50", () =>
       Effect.gen(function*() {
         const project = makeProject()
@@ -690,7 +719,7 @@ describe("listIssues", () => {
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: "TEST" }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
 
         expect(captureQuery.options?.limit).toBe(50)
       }))
@@ -710,12 +739,12 @@ describe("listIssues", () => {
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: "TEST", limit: 500 }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST"), limit: 500 }).pipe(Effect.provide(testLayer))
 
         expect(captureQuery.options?.limit).toBe(200)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("uses provided limit when under max", () =>
       Effect.gen(function*() {
         const project = makeProject()
@@ -730,7 +759,7 @@ describe("listIssues", () => {
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: "TEST", limit: 25 }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST"), limit: 25 }).pipe(Effect.provide(testLayer))
 
         expect(captureQuery.options?.limit).toBe(25)
       }))
@@ -752,7 +781,7 @@ describe("listIssues", () => {
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: "TEST" }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
 
         // SortingOrder.Descending = -1
         expect((captureQuery.options?.sort as Record<string, number>).modifiedOn).toBe(-1)
@@ -762,7 +791,7 @@ describe("listIssues", () => {
 
 describe("getIssue", () => {
   describe("basic functionality", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns issue with full identifier", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -781,7 +810,8 @@ describe("getIssue", () => {
           statuses
         })
 
-        const result = yield* getIssue({ project: "TEST", identifier: "TEST-1" }).pipe(Effect.provide(testLayer))
+        const result = yield* getIssue({ project: projectIdentifier("TEST"), identifier: issueIdentifier("TEST-1") })
+          .pipe(Effect.provide(testLayer))
 
         expect(result.identifier).toBe("TEST-1")
         expect(result.title).toBe("Test Issue")
@@ -806,7 +836,9 @@ describe("getIssue", () => {
           statuses
         })
 
-        const result = yield* getIssue({ project: "HULY", identifier: "123" }).pipe(Effect.provide(testLayer))
+        const result = yield* getIssue({ project: projectIdentifier("HULY"), identifier: issueIdentifier("123") }).pipe(
+          Effect.provide(testLayer)
+        )
 
         expect(result.identifier).toBe("HULY-123")
         expect(result.title).toBe("Numeric Lookup Issue")
@@ -825,7 +857,8 @@ describe("getIssue", () => {
           statuses
         })
 
-        const result = yield* getIssue({ project: "TEST", identifier: "test-5" }).pipe(Effect.provide(testLayer))
+        const result = yield* getIssue({ project: projectIdentifier("TEST"), identifier: issueIdentifier("test-5") })
+          .pipe(Effect.provide(testLayer))
 
         expect(result.identifier).toBe("TEST-5")
       }))
@@ -849,7 +882,8 @@ describe("getIssue", () => {
           }
         })
 
-        const result = yield* getIssue({ project: "TEST", identifier: "TEST-1" }).pipe(Effect.provide(testLayer))
+        const result = yield* getIssue({ project: projectIdentifier("TEST"), identifier: issueIdentifier("TEST-1") })
+          .pipe(Effect.provide(testLayer))
 
         expect(result.description).toBe("# Hello World\n\nThis is markdown content.")
       }))
@@ -872,14 +906,15 @@ describe("getIssue", () => {
           persons: [person]
         })
 
-        const result = yield* getIssue({ project: "TEST", identifier: "TEST-1" }).pipe(Effect.provide(testLayer))
+        const result = yield* getIssue({ project: projectIdentifier("TEST"), identifier: issueIdentifier("TEST-1") })
+          .pipe(Effect.provide(testLayer))
 
         expect(result.assignee).toBe("Jane Developer")
         expect(result.assigneeRef?.id).toBe("person-1")
         expect(result.assigneeRef?.name).toBe("Jane Developer")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("transforms priority correctly", () =>
       Effect.gen(function*() {
         const project = makeProject()
@@ -895,12 +930,13 @@ describe("getIssue", () => {
           statuses
         })
 
-        const result = yield* getIssue({ project: "TEST", identifier: "TEST-1" }).pipe(Effect.provide(testLayer))
+        const result = yield* getIssue({ project: projectIdentifier("TEST"), identifier: issueIdentifier("TEST-1") })
+          .pipe(Effect.provide(testLayer))
 
         expect(result.priority).toBe("high")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns undefined description when not set", () =>
       Effect.gen(function*() {
         const project = makeProject()
@@ -916,14 +952,15 @@ describe("getIssue", () => {
           statuses
         })
 
-        const result = yield* getIssue({ project: "TEST", identifier: "TEST-1" }).pipe(Effect.provide(testLayer))
+        const result = yield* getIssue({ project: projectIdentifier("TEST"), identifier: issueIdentifier("TEST-1") })
+          .pipe(Effect.provide(testLayer))
 
         expect(result.description).toBeUndefined()
       }))
   })
 
   describe("error handling", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({
@@ -933,7 +970,9 @@ describe("getIssue", () => {
         })
 
         const error = yield* Effect.flip(
-          getIssue({ project: "NONEXISTENT", identifier: "1" }).pipe(Effect.provide(testLayer))
+          getIssue({ project: projectIdentifier("NONEXISTENT"), identifier: issueIdentifier("1") }).pipe(
+            Effect.provide(testLayer)
+          )
         )
 
         expect(error._tag).toBe("ProjectNotFoundError")
@@ -953,7 +992,9 @@ describe("getIssue", () => {
         })
 
         const error = yield* Effect.flip(
-          getIssue({ project: "TEST", identifier: "TEST-999" }).pipe(Effect.provide(testLayer))
+          getIssue({ project: projectIdentifier("TEST"), identifier: issueIdentifier("TEST-999") }).pipe(
+            Effect.provide(testLayer)
+          )
         )
 
         expect(error._tag).toBe("IssueNotFoundError")
@@ -974,7 +1015,9 @@ describe("getIssue", () => {
         })
 
         const error = yield* Effect.flip(
-          getIssue({ project: "TEST", identifier: "42" }).pipe(Effect.provide(testLayer))
+          getIssue({ project: projectIdentifier("TEST"), identifier: issueIdentifier("42") }).pipe(
+            Effect.provide(testLayer)
+          )
         )
 
         expect(error.message).toContain("42")
@@ -996,12 +1039,13 @@ describe("getIssue", () => {
           statuses
         })
 
-        const result = yield* getIssue({ project: "HULY", identifier: "HULY-123" }).pipe(Effect.provide(testLayer))
+        const result = yield* getIssue({ project: projectIdentifier("HULY"), identifier: issueIdentifier("HULY-123") })
+          .pipe(Effect.provide(testLayer))
 
         expect(result.identifier).toBe("HULY-123")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("handles just number 123", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "PROJ" })
@@ -1014,7 +1058,9 @@ describe("getIssue", () => {
           statuses
         })
 
-        const result = yield* getIssue({ project: "PROJ", identifier: "42" }).pipe(Effect.provide(testLayer))
+        const result = yield* getIssue({ project: projectIdentifier("PROJ"), identifier: issueIdentifier("42") }).pipe(
+          Effect.provide(testLayer)
+        )
 
         expect(result.identifier).toBe("PROJ-42")
       }))
@@ -1039,7 +1085,7 @@ describe("createIssue", () => {
         })
 
         const result = yield* createIssue({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           title: "New Issue"
         }).pipe(Effect.provide(testLayer))
 
@@ -1065,7 +1111,7 @@ describe("createIssue", () => {
         })
 
         const result = yield* createIssue({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           title: "Issue with Description",
           description: "# Markdown\n\nThis is a description."
         }).pipe(Effect.provide(testLayer))
@@ -1091,7 +1137,7 @@ describe("createIssue", () => {
         })
 
         yield* createIssue({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           title: "High Priority Issue",
           priority: "high"
         }).pipe(Effect.provide(testLayer))
@@ -1120,9 +1166,9 @@ describe("createIssue", () => {
         })
 
         yield* createIssue({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           title: "Assigned Issue",
-          assignee: "john@example.com"
+          assignee: email("john@example.com")
         }).pipe(Effect.provide(testLayer))
 
         expect(captureAddCollection.attributes?.assignee).toBe("person-1")
@@ -1146,9 +1192,9 @@ describe("createIssue", () => {
         })
 
         yield* createIssue({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           title: "In Progress Issue",
-          status: "In Progress"
+          status: statusName("In Progress")
         }).pipe(Effect.provide(testLayer))
 
         expect(captureAddCollection.attributes?.status).toBe("status-progress")
@@ -1174,7 +1220,7 @@ describe("createIssue", () => {
         })
 
         yield* createIssue({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           title: "Default Status Issue"
         }).pipe(Effect.provide(testLayer))
 
@@ -1198,14 +1244,14 @@ describe("createIssue", () => {
         })
 
         yield* createIssue({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           title: "Ranked Issue"
         }).pipe(Effect.provide(testLayer))
 
         // Should have calculated a rank greater than the existing issue's rank
         expect(captureAddCollection.attributes?.rank).toBeDefined()
         expect(typeof captureAddCollection.attributes?.rank).toBe("string")
-        expect(captureAddCollection.attributes?.rank > existingIssue.rank).toBe(true)
+        expect((captureAddCollection.attributes?.rank as string) > existingIssue.rank).toBe(true)
       }))
 
     // test-revizorro: approved
@@ -1233,7 +1279,7 @@ describe("createIssue", () => {
           })
 
           yield* createIssue({
-            project: "TEST",
+            project: projectIdentifier("TEST"),
             title: `Priority ${input}`,
             priority: input
           }).pipe(Effect.provide(testLayer))
@@ -1255,7 +1301,7 @@ describe("createIssue", () => {
 
         const error = yield* Effect.flip(
           createIssue({
-            project: "NONEXISTENT",
+            project: projectIdentifier("NONEXISTENT"),
             title: "Test Issue"
           }).pipe(Effect.provide(testLayer))
         )
@@ -1278,9 +1324,9 @@ describe("createIssue", () => {
 
         const error = yield* Effect.flip(
           createIssue({
-            project: "TEST",
+            project: projectIdentifier("TEST"),
             title: "Test Issue",
-            status: "InvalidStatus"
+            status: statusName("InvalidStatus")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -1303,9 +1349,9 @@ describe("createIssue", () => {
 
         const error = yield* Effect.flip(
           createIssue({
-            project: "TEST",
+            project: projectIdentifier("TEST"),
             title: "Test Issue",
-            assignee: "nonexistent@example.com"
+            assignee: email("nonexistent@example.com")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -1328,9 +1374,9 @@ describe("createIssue", () => {
 
         const error = yield* Effect.flip(
           createIssue({
-            project: "TEST",
+            project: projectIdentifier("TEST"),
             title: "Test Issue",
-            assignee: "jane@example.com"
+            assignee: email("jane@example.com")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -1356,9 +1402,9 @@ describe("createIssue", () => {
         })
 
         yield* createIssue({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           title: "Test Issue",
-          status: "in progress" // lowercase
+          status: statusName("in progress") // lowercase
         }).pipe(Effect.provide(testLayer))
 
         expect(captureAddCollection.attributes?.status).toBe("status-progress")
@@ -1385,9 +1431,9 @@ describe("createIssue", () => {
         })
 
         yield* createIssue({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           title: "Test Issue",
-          assignee: "Jane Developer"
+          assignee: email("Jane Developer")
         }).pipe(Effect.provide(testLayer))
 
         expect(captureAddCollection.attributes?.assignee).toBe("person-2")
@@ -1413,7 +1459,7 @@ describe("createIssue", () => {
         })
 
         yield* createIssue({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           title: "Issue without description"
         }).pipe(Effect.provide(testLayer))
 
@@ -1439,7 +1485,7 @@ describe("createIssue", () => {
         })
 
         yield* createIssue({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           title: "Issue with whitespace description",
           description: "   \n\t  "
         }).pipe(Effect.provide(testLayer))
@@ -1469,8 +1515,8 @@ describe("updateIssue", () => {
         })
 
         const result = yield* updateIssue({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           title: "New Title"
         }).pipe(Effect.provide(testLayer))
 
@@ -1496,8 +1542,8 @@ describe("updateIssue", () => {
         })
 
         yield* updateIssue({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           priority: "urgent"
         }).pipe(Effect.provide(testLayer))
 
@@ -1524,9 +1570,9 @@ describe("updateIssue", () => {
         })
 
         yield* updateIssue({
-          project: "TEST",
-          identifier: "TEST-1",
-          status: "Done"
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
+          status: statusName("Done")
         }).pipe(Effect.provide(testLayer))
 
         expect(captureUpdateDoc.operations?.status).toBe("status-done")
@@ -1551,8 +1597,8 @@ describe("updateIssue", () => {
         })
 
         yield* updateIssue({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           description: "# New Description\n\nUpdated content."
         }).pipe(Effect.provide(testLayer))
 
@@ -1581,9 +1627,9 @@ describe("updateIssue", () => {
         })
 
         yield* updateIssue({
-          project: "TEST",
-          identifier: "TEST-1",
-          assignee: "jane@example.com"
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
+          assignee: email("jane@example.com")
         }).pipe(Effect.provide(testLayer))
 
         expect(captureUpdateDoc.operations?.assignee).toBe("person-1")
@@ -1606,8 +1652,8 @@ describe("updateIssue", () => {
         })
 
         yield* updateIssue({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           assignee: null
         }).pipe(Effect.provide(testLayer))
 
@@ -1628,8 +1674,8 @@ describe("updateIssue", () => {
         })
 
         const result = yield* updateIssue({
-          project: "TEST",
-          identifier: "TEST-1"
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.identifier).toBe("TEST-1")
@@ -1654,11 +1700,11 @@ describe("updateIssue", () => {
         })
 
         yield* updateIssue({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           title: "Updated Title",
           priority: "high",
-          status: "Done"
+          status: statusName("Done")
         }).pipe(Effect.provide(testLayer))
 
         expect(captureUpdateDoc.operations?.title).toBe("Updated Title")
@@ -1683,8 +1729,8 @@ describe("updateIssue", () => {
         })
 
         yield* updateIssue({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           description: ""
         }).pipe(Effect.provide(testLayer))
 
@@ -1710,8 +1756,8 @@ describe("updateIssue", () => {
         })
 
         const result = yield* updateIssue({
-          project: "HULY",
-          identifier: "HULY-42",
+          project: projectIdentifier("HULY"),
+          identifier: issueIdentifier("HULY-42"),
           title: "Updated"
         }).pipe(Effect.provide(testLayer))
 
@@ -1735,8 +1781,8 @@ describe("updateIssue", () => {
         })
 
         const result = yield* updateIssue({
-          project: "TEST",
-          identifier: "99",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("99"),
           title: "Updated"
         }).pipe(Effect.provide(testLayer))
 
@@ -1756,8 +1802,8 @@ describe("updateIssue", () => {
 
         const error = yield* Effect.flip(
           updateIssue({
-            project: "NONEXISTENT",
-            identifier: "1",
+            project: projectIdentifier("NONEXISTENT"),
+            identifier: issueIdentifier("1"),
             title: "New Title"
           }).pipe(Effect.provide(testLayer))
         )
@@ -1780,8 +1826,8 @@ describe("updateIssue", () => {
 
         const error = yield* Effect.flip(
           updateIssue({
-            project: "TEST",
-            identifier: "TEST-999",
+            project: projectIdentifier("TEST"),
+            identifier: issueIdentifier("TEST-999"),
             title: "New Title"
           }).pipe(Effect.provide(testLayer))
         )
@@ -1806,9 +1852,9 @@ describe("updateIssue", () => {
 
         const error = yield* Effect.flip(
           updateIssue({
-            project: "TEST",
-            identifier: "TEST-1",
-            status: "InvalidStatus"
+            project: projectIdentifier("TEST"),
+            identifier: issueIdentifier("TEST-1"),
+            status: statusName("InvalidStatus")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -1834,9 +1880,9 @@ describe("updateIssue", () => {
 
         const error = yield* Effect.flip(
           updateIssue({
-            project: "TEST",
-            identifier: "TEST-1",
-            assignee: "nonexistent@example.com"
+            project: projectIdentifier("TEST"),
+            identifier: issueIdentifier("TEST-1"),
+            assignee: email("nonexistent@example.com")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -1863,9 +1909,9 @@ describe("updateIssue", () => {
         })
 
         yield* updateIssue({
-          project: "TEST",
-          identifier: "TEST-1",
-          status: "in progress" // lowercase
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
+          status: statusName("in progress") // lowercase
         }).pipe(Effect.provide(testLayer))
 
         expect(captureUpdateDoc.operations?.status).toBe("status-progress")
@@ -1893,9 +1939,9 @@ describe("updateIssue", () => {
         })
 
         yield* updateIssue({
-          project: "TEST",
-          identifier: "TEST-1",
-          assignee: "Jane Developer"
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
+          assignee: email("Jane Developer")
         }).pipe(Effect.provide(testLayer))
 
         expect(captureUpdateDoc.operations?.assignee).toBe("person-2")
@@ -1905,7 +1951,7 @@ describe("updateIssue", () => {
 
 describe("addLabel", () => {
   describe("basic functionality", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("adds a new label to an issue", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -1924,8 +1970,8 @@ describe("addLabel", () => {
         })
 
         const result = yield* addLabel({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           label: "Bug"
         }).pipe(Effect.provide(testLayer))
 
@@ -1962,8 +2008,8 @@ describe("addLabel", () => {
         })
 
         const result = yield* addLabel({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           label: "Bug"
         }).pipe(Effect.provide(testLayer))
 
@@ -2003,8 +2049,8 @@ describe("addLabel", () => {
         })
 
         const result = yield* addLabel({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           label: "Bug"
         }).pipe(Effect.provide(testLayer))
 
@@ -2032,8 +2078,8 @@ describe("addLabel", () => {
         })
 
         const result = yield* addLabel({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           label: "BUG" // uppercase
         }).pipe(Effect.provide(testLayer))
 
@@ -2057,10 +2103,10 @@ describe("addLabel", () => {
         })
 
         yield* addLabel({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           label: "Feature",
-          color: 7
+          color: colorCode(7)
         }).pipe(Effect.provide(testLayer))
 
         expect(captureCreateDoc.attributes?.color).toBe(7)
@@ -2083,8 +2129,8 @@ describe("addLabel", () => {
         })
 
         yield* addLabel({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           label: "Enhancement"
         }).pipe(Effect.provide(testLayer))
 
@@ -2108,8 +2154,8 @@ describe("addLabel", () => {
         })
 
         yield* addLabel({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           label: "  Trimmed Label  "
         }).pipe(Effect.provide(testLayer))
 
@@ -2135,8 +2181,8 @@ describe("addLabel", () => {
         })
 
         const result = yield* addLabel({
-          project: "HULY",
-          identifier: "HULY-42",
+          project: projectIdentifier("HULY"),
+          identifier: issueIdentifier("HULY-42"),
           label: "Bug"
         }).pipe(Effect.provide(testLayer))
 
@@ -2164,8 +2210,8 @@ describe("addLabel", () => {
         })
 
         const result = yield* addLabel({
-          project: "TEST",
-          identifier: "99",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("99"),
           label: "Bug"
         }).pipe(Effect.provide(testLayer))
 
@@ -2185,8 +2231,8 @@ describe("addLabel", () => {
 
         const error = yield* Effect.flip(
           addLabel({
-            project: "NONEXISTENT",
-            identifier: "1",
+            project: projectIdentifier("NONEXISTENT"),
+            identifier: issueIdentifier("1"),
             label: "Bug"
           }).pipe(Effect.provide(testLayer))
         )
@@ -2207,8 +2253,8 @@ describe("addLabel", () => {
 
         const error = yield* Effect.flip(
           addLabel({
-            project: "TEST",
-            identifier: "TEST-999",
+            project: projectIdentifier("TEST"),
+            identifier: issueIdentifier("TEST-999"),
             label: "Bug"
           }).pipe(Effect.provide(testLayer))
         )

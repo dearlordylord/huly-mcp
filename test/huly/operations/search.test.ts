@@ -1,23 +1,23 @@
 import { describe, it } from "@effect/vitest"
-import { type Doc, type Ref, type Space, toFindResult } from "@hcengineering/core"
+import { type Doc, type PersonId, type Ref, type Space, toFindResult } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { core } from "../../../src/huly/huly-plugins.js"
 import { fulltextSearch } from "../../../src/huly/operations/search.js"
 
-const makeDoc = (overrides: { _id: string; _class: string; space?: string; modifiedOn: number }): Doc => ({
-  _id: overrides._id as Ref<Doc>,
-  // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast
-  _class: overrides._class as Ref<Doc> as Doc["_class"],
-  space: (overrides.space ?? "space-1") as Ref<Space>,
-  modifiedOn: overrides.modifiedOn,
-  // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast
-  modifiedBy: "user-1" as Ref<Doc> as Doc["modifiedBy"],
-  // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast
-  createdBy: "user-1" as Ref<Doc> as Doc["createdBy"],
-  createdOn: Date.now()
-})
+const asDoc = (v: unknown) => v as Doc
+const makeDoc = (overrides: { _id: string; _class: string; space?: string; modifiedOn: number }): Doc =>
+  asDoc({
+    _id: overrides._id as Ref<Doc>,
+    // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast
+    _class: overrides._class as Ref<Doc> as Doc["_class"],
+    space: (overrides.space ?? "space-1") as Ref<Space>,
+    modifiedOn: overrides.modifiedOn,
+    modifiedBy: "user-1" as PersonId,
+    createdBy: "user-1" as PersonId,
+    createdOn: Date.now()
+  })
 
 const createTestLayer = (docs: Array<Doc>, captureQuery?: { query?: unknown; options?: unknown }) => {
   const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown, options: unknown) => {
@@ -118,7 +118,7 @@ describe("fulltextSearch", () => {
       expect(result.query).toBe("nonexistent")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("handles doc without space", () =>
     Effect.gen(function*() {
       const doc = makeDoc({ _id: "doc-no-space", _class: "core:class:Doc", modifiedOn: 1000 })

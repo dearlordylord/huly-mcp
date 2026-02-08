@@ -10,6 +10,7 @@ import { Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { listEventInstances } from "../../../src/huly/operations/calendar.js"
+import { eventBrandId } from "../../helpers/brands.js"
 
 import { calendar, contact } from "../../../src/huly/huly-plugins.js"
 
@@ -136,7 +137,7 @@ describe("listEventInstances - from/to date filters (lines 573, 577)", () => {
       })
 
       const result = yield* listEventInstances({
-        recurringEventId: "recur-1",
+        recurringEventId: eventBrandId("recur-1"),
         from: 1700000000000
       }).pipe(Effect.provide(testLayer))
 
@@ -156,7 +157,7 @@ describe("listEventInstances - from/to date filters (lines 573, 577)", () => {
       })
 
       const result = yield* listEventInstances({
-        recurringEventId: "recur-1",
+        recurringEventId: eventBrandId("recur-1"),
         to: 1700300000000
       }).pipe(Effect.provide(testLayer))
 
@@ -176,7 +177,7 @@ describe("listEventInstances - from/to date filters (lines 573, 577)", () => {
       })
 
       const result = yield* listEventInstances({
-        recurringEventId: "recur-1",
+        recurringEventId: eventBrandId("recur-1"),
         from: 1699000000000,
         to: 1701000000000
       }).pipe(Effect.provide(testLayer))
@@ -203,7 +204,7 @@ describe("listEventInstances - externalParticipants branch (line 624)", () => {
       })
 
       const result = yield* listEventInstances({
-        recurringEventId: "recur-1"
+        recurringEventId: eventBrandId("recur-1")
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
@@ -217,8 +218,7 @@ describe("listEventInstances - externalParticipants branch (line 624)", () => {
       const instances = [
         makeRecurringInstance({
           eventId: "inst-1",
-          recurringEventId: "recur-1",
-          externalParticipants: undefined
+          recurringEventId: "recur-1"
         })
       ]
       const testLayer = createTestLayer({
@@ -227,7 +227,7 @@ describe("listEventInstances - externalParticipants branch (line 624)", () => {
       })
 
       const result = yield* listEventInstances({
-        recurringEventId: "recur-1"
+        recurringEventId: eventBrandId("recur-1")
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)

@@ -21,72 +21,79 @@ import {
   listRecurringEvents,
   updateEvent
 } from "../../../src/huly/operations/calendar.js"
+import { eventBrandId } from "../../helpers/brands.js"
 
 import { calendar, contact } from "../../../src/huly/huly-plugins.js"
 
 // --- Mock Data Builders ---
 
-const makeEvent = (overrides?: Partial<HulyEvent>): HulyEvent => ({
-  _id: "event-1" as Ref<HulyEvent>,
-  _class: calendar.class.Event,
-  space: calendar.space.Calendar,
-  title: "Test Event",
-  description: "" as HulyEvent["description"],
-  eventId: "evt-id-1",
-  date: 1700000000000,
-  dueDate: 1700003600000,
-  allDay: false,
-  participants: [],
-  // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-  calendar: "cal-1" as Ref<Doc> as HulyEvent["calendar"],
-  access: AccessLevel.Owner,
-  user: "" as HulyEvent["user"],
-  blockTime: false,
-  attachedTo: "attached-1" as Ref<Doc>,
-  attachedToClass: "class-1" as Ref<Class<Doc>>,
-  collection: "events",
-  modifiedBy: "user-1" as Doc["modifiedBy"],
-  modifiedOn: Date.now(),
-  createdBy: "user-1" as Doc["createdBy"],
-  createdOn: Date.now(),
-  ...overrides
-})
+const asHulyEvent = (v: unknown) => v as HulyEvent
+const asRecurringEvent = (v: unknown) => v as HulyRecurringEvent
+const asRecurringInstance = (v: unknown) => v as HulyRecurringInstance
+const asPerson = (v: unknown) => v as Person
 
-// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- mock builder
-const makeRecurringEvent = (overrides?: Partial<HulyRecurringEvent>): HulyRecurringEvent => ({
-  ...makeEvent(),
-  _class: calendar.class.ReccuringEvent,
-  rules: [{ freq: "WEEKLY" }],
-  exdate: [],
-  rdate: [],
-  originalStartTime: 1700000000000,
-  timeZone: "UTC",
-  ...overrides
-} as HulyRecurringEvent)
+const makeEvent = (overrides?: Partial<HulyEvent>): HulyEvent =>
+  asHulyEvent({
+    _id: "event-1" as Ref<HulyEvent>,
+    _class: calendar.class.Event,
+    space: calendar.space.Calendar,
+    title: "Test Event",
+    description: "" as HulyEvent["description"],
+    eventId: "evt-id-1",
+    date: 1700000000000,
+    dueDate: 1700003600000,
+    allDay: false,
+    participants: [],
+    // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
+    calendar: "cal-1" as Ref<Doc> as HulyEvent["calendar"],
+    access: AccessLevel.Owner,
+    user: "" as HulyEvent["user"],
+    blockTime: false,
+    attachedTo: "attached-1" as Ref<Doc>,
+    attachedToClass: "class-1" as Ref<Class<Doc>>,
+    collection: "events",
+    modifiedBy: "user-1" as Doc["modifiedBy"],
+    modifiedOn: Date.now(),
+    createdBy: "user-1" as Doc["createdBy"],
+    createdOn: Date.now(),
+    ...overrides
+  })
 
-// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- mock builder
-const makeRecurringInstance = (overrides?: Partial<HulyRecurringInstance>): HulyRecurringInstance => ({
-  ...makeRecurringEvent(),
-  _class: calendar.class.ReccuringInstance,
-  recurringEventId: "evt-id-1",
-  originalStartTime: 1700000000000,
-  isCancelled: false,
-  virtual: false,
-  ...overrides
-} as HulyRecurringInstance)
+const makeRecurringEvent = (overrides?: Partial<HulyRecurringEvent>): HulyRecurringEvent =>
+  asRecurringEvent({
+    ...makeEvent(),
+    _class: calendar.class.ReccuringEvent,
+    rules: [{ freq: "WEEKLY" }],
+    exdate: [],
+    rdate: [],
+    originalStartTime: 1700000000000,
+    timeZone: "UTC",
+    ...overrides
+  })
 
-// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- mock builder
-const makePerson = (overrides?: Partial<Person>): Person => ({
-  _id: "person-1" as Ref<Person>,
-  _class: contact.class.Person,
-  space: "space-1" as Ref<Space>,
-  name: "John Doe",
-  modifiedBy: "user-1" as Doc["modifiedBy"],
-  modifiedOn: Date.now(),
-  createdBy: "user-1" as Doc["createdBy"],
-  createdOn: Date.now(),
-  ...overrides
-} as Person)
+const makeRecurringInstance = (overrides?: Partial<HulyRecurringInstance>): HulyRecurringInstance =>
+  asRecurringInstance({
+    ...makeRecurringEvent(),
+    _class: calendar.class.ReccuringInstance,
+    recurringEventId: "evt-id-1",
+    originalStartTime: 1700000000000,
+    isCancelled: false,
+    virtual: false,
+    ...overrides
+  })
+
+const makePerson = (overrides?: Partial<Person>): Person =>
+  asPerson({
+    _id: "person-1" as Ref<Person>,
+    _class: contact.class.Person,
+    space: "space-1" as Ref<Space>,
+    name: "John Doe",
+    modifiedBy: "user-1" as Doc["modifiedBy"],
+    modifiedOn: Date.now(),
+    createdBy: "user-1" as Doc["createdBy"],
+    createdOn: Date.now(),
+    ...overrides
+  })
 
 // --- Test Helpers ---
 
@@ -256,7 +263,7 @@ describe("getEvent", () => {
         markupContent: { "desc-ref": "# Meeting notes" }
       })
 
-      const result = yield* getEvent({ eventId: "evt-1" }).pipe(Effect.provide(testLayer))
+      const result = yield* getEvent({ eventId: eventBrandId("evt-1") }).pipe(Effect.provide(testLayer))
 
       expect(result.eventId).toBe("evt-1")
       expect(result.title).toBe("Team Sync")
@@ -271,7 +278,7 @@ describe("getEvent", () => {
       const event = makeEvent({ eventId: "evt-1", description: "" as HulyEvent["description"] })
       const testLayer = createTestLayer({ events: [event] })
 
-      const result = yield* getEvent({ eventId: "evt-1" }).pipe(Effect.provide(testLayer))
+      const result = yield* getEvent({ eventId: eventBrandId("evt-1") }).pipe(Effect.provide(testLayer))
 
       expect(result.description).toBeUndefined()
     }))
@@ -282,7 +289,7 @@ describe("getEvent", () => {
       const testLayer = createTestLayer({})
 
       const error = yield* Effect.flip(
-        getEvent({ eventId: "nonexistent" }).pipe(Effect.provide(testLayer))
+        getEvent({ eventId: eventBrandId("nonexistent") }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("EventNotFoundError")
@@ -351,7 +358,7 @@ describe("updateEvent", () => {
       const testLayer = createTestLayer({ events: [event], captureUpdateDoc })
 
       const result = yield* updateEvent({
-        eventId: "evt-1",
+        eventId: eventBrandId("evt-1"),
         title: "New Title"
       }).pipe(Effect.provide(testLayer))
 
@@ -366,7 +373,7 @@ describe("updateEvent", () => {
       const event = makeEvent({ eventId: "evt-1" })
       const testLayer = createTestLayer({ events: [event] })
 
-      const result = yield* updateEvent({ eventId: "evt-1" }).pipe(Effect.provide(testLayer))
+      const result = yield* updateEvent({ eventId: eventBrandId("evt-1") }).pipe(Effect.provide(testLayer))
 
       expect(result.updated).toBe(false)
     }))
@@ -379,7 +386,7 @@ describe("updateEvent", () => {
       const testLayer = createTestLayer({ events: [event], captureUpdateDoc })
 
       const result = yield* updateEvent({
-        eventId: "evt-1",
+        eventId: eventBrandId("evt-1"),
         description: "   "
       }).pipe(Effect.provide(testLayer))
 
@@ -394,7 +401,7 @@ describe("updateEvent", () => {
       const testLayer = createTestLayer({ events: [event] })
 
       const result = yield* updateEvent({
-        eventId: "evt-1",
+        eventId: eventBrandId("evt-1"),
         description: "Updated description"
       }).pipe(Effect.provide(testLayer))
 
@@ -409,7 +416,7 @@ describe("updateEvent", () => {
       const testLayer = createTestLayer({ events: [event], captureUpdateDoc })
 
       const result = yield* updateEvent({
-        eventId: "evt-1",
+        eventId: eventBrandId("evt-1"),
         description: "Brand new description"
       }).pipe(Effect.provide(testLayer))
 
@@ -423,7 +430,7 @@ describe("updateEvent", () => {
       const testLayer = createTestLayer({})
 
       const error = yield* Effect.flip(
-        updateEvent({ eventId: "nonexistent", title: "X" }).pipe(Effect.provide(testLayer))
+        updateEvent({ eventId: eventBrandId("nonexistent"), title: "X" }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("EventNotFoundError")
@@ -431,14 +438,14 @@ describe("updateEvent", () => {
 })
 
 describe("deleteEvent", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("deletes event", () =>
     Effect.gen(function*() {
       const event = makeEvent({ eventId: "evt-1" })
       const captureRemoveDoc: MockConfig["captureRemoveDoc"] = {}
       const testLayer = createTestLayer({ events: [event], captureRemoveDoc })
 
-      const result = yield* deleteEvent({ eventId: "evt-1" }).pipe(Effect.provide(testLayer))
+      const result = yield* deleteEvent({ eventId: eventBrandId("evt-1") }).pipe(Effect.provide(testLayer))
 
       expect(result.eventId).toBe("evt-1")
       expect(result.deleted).toBe(true)
@@ -451,7 +458,7 @@ describe("deleteEvent", () => {
       const testLayer = createTestLayer({})
 
       const error = yield* Effect.flip(
-        deleteEvent({ eventId: "nonexistent" }).pipe(Effect.provide(testLayer))
+        deleteEvent({ eventId: eventBrandId("nonexistent") }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("EventNotFoundError")
@@ -505,7 +512,7 @@ describe("createRecurringEvent", () => {
       expect(captureAddCollection.attributes?.rules).toEqual([{ freq: "DAILY" }])
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("creates recurring event with all optional fields", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -541,7 +548,7 @@ describe("listEventInstances", () => {
       const testLayer = createTestLayer({ recurringEvents: [recurringEvent], recurringInstances: instances })
 
       const result = yield* listEventInstances({
-        recurringEventId: "recur-1"
+        recurringEventId: eventBrandId("recur-1")
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
@@ -567,7 +574,7 @@ describe("listEventInstances", () => {
       })
 
       const result = yield* listEventInstances({
-        recurringEventId: "recur-1",
+        recurringEventId: eventBrandId("recur-1"),
         includeParticipants: true
       }).pipe(Effect.provide(testLayer))
 
@@ -589,7 +596,7 @@ describe("listEventInstances", () => {
       })
 
       const result = yield* listEventInstances({
-        recurringEventId: "recur-1",
+        recurringEventId: eventBrandId("recur-1"),
         includeParticipants: true
       }).pipe(Effect.provide(testLayer))
 
@@ -603,7 +610,7 @@ describe("listEventInstances", () => {
       const testLayer = createTestLayer({})
 
       const error = yield* Effect.flip(
-        listEventInstances({ recurringEventId: "nonexistent" }).pipe(Effect.provide(testLayer))
+        listEventInstances({ recurringEventId: eventBrandId("nonexistent") }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("RecurringEventNotFoundError")

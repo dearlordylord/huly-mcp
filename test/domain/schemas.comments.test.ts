@@ -2,19 +2,14 @@ import { describe, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import {
-  type AddCommentParams,
   addCommentParamsJsonSchema,
-  type Comment,
-  type DeleteCommentParams,
   deleteCommentParamsJsonSchema,
-  type ListCommentsParams,
   listCommentsParamsJsonSchema,
   parseAddCommentParams,
   parseComment,
   parseDeleteCommentParams,
   parseListCommentsParams,
   parseUpdateCommentParams,
-  type UpdateCommentParams,
   updateCommentParamsJsonSchema
 } from "../../src/domain/schemas.js"
 
@@ -101,7 +96,7 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("trims id whitespace", () =>
       Effect.gen(function*() {
         const result = yield* parseComment({
@@ -185,7 +180,7 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects non-integer limit", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -327,7 +322,7 @@ describe("Comment Schemas", () => {
         expect(result.body).toBe("Updated comment body")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("rejects empty commentId", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -423,7 +418,7 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("trims all string fields", () =>
       Effect.gen(function*() {
         const result = yield* parseDeleteCommentParams({
@@ -483,12 +478,13 @@ describe("Comment Schemas", () => {
     // test-revizorro: approved
     it.effect("schemas have additionalProperties: false", () =>
       Effect.gen(function*() {
+        // eslint-disable-next-line no-restricted-syntax -- tuple type doesn't overlap with Array<Record<string, unknown>>
         const schemas = [
           listCommentsParamsJsonSchema,
           addCommentParamsJsonSchema,
           updateCommentParamsJsonSchema,
           deleteCommentParamsJsonSchema
-        ] as Array<Record<string, unknown>>
+        ] as unknown as Array<Record<string, unknown>>
 
         for (const schema of schemas) {
           expect(schema.additionalProperties).toBe(false)
@@ -499,66 +495,9 @@ describe("Comment Schemas", () => {
     it.effect("ListCommentsParams has property descriptions", () =>
       Effect.gen(function*() {
         const schema = listCommentsParamsJsonSchema as JsonSchemaObject
-        expect(schema.properties.project.description).toBeDefined()
-        expect(schema.properties.issueIdentifier.description).toBeDefined()
-        expect(schema.properties.limit.description).toBeDefined()
-      }))
-  })
-
-  describe("Type Extraction", () => {
-    // test-revizorro: suspect | doesn't call parseComment, just tests TypeScript assignment; should validate schema parsing with parseComment() like line 31
-    it.effect("Comment type is correctly extracted", () =>
-      Effect.gen(function*() {
-        const comment: Comment = {
-          id: "comment-1",
-          body: "Test comment"
-        }
-        expect(comment.id).toBe("comment-1")
-      }))
-
-    // test-revizorro: suspect | Doesn't call parser - just type checks and asserts trivial object property, no schema validation
-    it.effect("ListCommentsParams type is correctly extracted", () =>
-      Effect.gen(function*() {
-        const params: ListCommentsParams = {
-          project: "TEST",
-          issueIdentifier: "TEST-1",
-          limit: 50
-        }
-        expect(params.project).toBe("TEST")
-      }))
-
-    // test-revizorro: suspect | only tests TypeScript type assignment, doesn't validate schema parsing with parseAddCommentParams(); should call parseAddCommentParams() like line 31
-    it.effect("AddCommentParams type is correctly extracted", () =>
-      Effect.gen(function*() {
-        const params: AddCommentParams = {
-          project: "TEST",
-          issueIdentifier: "TEST-1",
-          body: "New comment"
-        }
-        expect(params.body).toBe("New comment")
-      }))
-
-    // test-revizorro: suspect | Only validates one field of type; should call parseUpdateCommentParams() and test all fields like line 316
-    it.effect("UpdateCommentParams type is correctly extracted", () =>
-      Effect.gen(function*() {
-        const params: UpdateCommentParams = {
-          project: "TEST",
-          issueIdentifier: "TEST-1",
-          commentId: "comment-1",
-          body: "Updated"
-        }
-        expect(params.commentId).toBe("comment-1")
-      }))
-
-    // test-revizorro: suspect | Doesn't call parser - just type checks and asserts trivial object property, no schema validation
-    it.effect("DeleteCommentParams type is correctly extracted", () =>
-      Effect.gen(function*() {
-        const params: DeleteCommentParams = {
-          project: "TEST",
-          issueIdentifier: "TEST-1",
-          commentId: "comment-1"
-        }
-        expect(params.commentId).toBe("comment-1")
+        expect(schema.properties!.project.description).toBeDefined()
+        expect(schema.properties!.issueIdentifier.description).toBeDefined()
+        expect(schema.properties!.limit.description).toBeDefined()
       }))
   })
 })

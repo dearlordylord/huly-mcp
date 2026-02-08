@@ -1,13 +1,14 @@
 import { describe, it } from "@effect/vitest"
 import type { AccountClient, PersonWithProfile, RegionInfo, WorkspaceLoginInfo } from "@hcengineering/account-client"
-import type {
+import {
   AccountRole,
-  Person,
-  PersonInfo,
-  PersonUuid,
-  SocialId,
-  WorkspaceInfoWithStatus,
-  WorkspaceMemberInfo
+  type AccountUuid,
+  type Person,
+  type PersonInfo,
+  type PersonUuid,
+  type SocialId,
+  type WorkspaceInfoWithStatus,
+  type WorkspaceMemberInfo
 } from "@hcengineering/core"
 import { Cause, Effect, Exit, Layer } from "effect"
 import { beforeEach, expect, vi } from "vitest"
@@ -15,6 +16,13 @@ import { beforeEach, expect, vi } from "vitest"
 import { HulyConfigService } from "../../src/config/config.js"
 import { HulyConnectionError } from "../../src/huly/errors.js"
 import { WorkspaceClient, type WorkspaceClientError } from "../../src/huly/workspace-client.js"
+
+// --- factory helpers for type assertions on object literals ---
+
+const asPersonInfo = (v: unknown) => v as PersonInfo
+const asWsInfo = (v: unknown) => v as WorkspaceInfoWithStatus
+const asLoginInfo = (v: unknown) => v as WorkspaceLoginInfo
+const asProfile = (v: unknown) => v as PersonWithProfile
 
 // --- mocks for external Huly SDK modules ---
 
@@ -33,7 +41,7 @@ const mockUpdateAllowReadOnlyGuests = vi.fn<
 const mockUpdateAllowGuestSignUp = vi.fn<(v: boolean) => Promise<void>>()
 const mockGetRegionInfo = vi.fn<() => Promise<Array<RegionInfo>>>()
 
-// eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
+// eslint-disable-next-line no-restricted-syntax -- partial mock: vi.fn() methods don't overlap with AccountClient signatures
 const mockAccountClient: AccountClient = {
   getWorkspaceMembers: mockGetWorkspaceMembers,
   getPersonInfo: mockGetPersonInfo,
@@ -71,12 +79,11 @@ describe("WorkspaceClient.layer (real layer)", () => {
     vi.clearAllMocks()
   })
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("constructs layer and getWorkspaceMembers delegates to AccountClient", () =>
     Effect.gen(function*() {
       const mockMembers: Array<WorkspaceMemberInfo> = [
-        // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-        { person: "p1" as unknown as WorkspaceMemberInfo["person"], role: 0 as AccountRole }
+        { person: "p1" as AccountUuid, role: AccountRole.User }
       ]
       mockGetWorkspaceMembers.mockResolvedValue(mockMembers)
 
@@ -90,8 +97,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
   // test-revizorro: approved
   it.effect("getPersonInfo delegates to AccountClient", () =>
     Effect.gen(function*() {
-      // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-      const personInfo = { name: "Alice", socialIds: [] } as unknown as PersonInfo
+      const personInfo = asPersonInfo({ name: "Alice", socialIds: [] })
       mockGetPersonInfo.mockResolvedValue(personInfo)
 
       const client = yield* WorkspaceClient
@@ -107,16 +113,15 @@ describe("WorkspaceClient.layer (real layer)", () => {
       mockUpdateWorkspaceRole.mockResolvedValue(undefined)
 
       const client = yield* WorkspaceClient
-      yield* client.updateWorkspaceRole("acc-1", 1 as AccountRole)
+      yield* client.updateWorkspaceRole("acc-1", AccountRole.Maintainer)
 
-      expect(mockUpdateWorkspaceRole).toHaveBeenCalledWith("acc-1", 1)
+      expect(mockUpdateWorkspaceRole).toHaveBeenCalledWith("acc-1", AccountRole.Maintainer)
     }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
 
   // test-revizorro: approved
   it.effect("getWorkspaceInfo delegates to AccountClient", () =>
     Effect.gen(function*() {
-      // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-      const wsInfo = { uuid: "ws-1", name: "Test" } as unknown as WorkspaceInfoWithStatus
+      const wsInfo = asWsInfo({ uuid: "ws-1", name: "Test" })
       mockGetWorkspaceInfo.mockResolvedValue(wsInfo)
 
       const client = yield* WorkspaceClient
@@ -129,8 +134,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
   // test-revizorro: approved
   it.effect("getWorkspaceInfo without arg delegates correctly", () =>
     Effect.gen(function*() {
-      // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-      const wsInfo = { uuid: "ws-2", name: "Test2" } as unknown as WorkspaceInfoWithStatus
+      const wsInfo = asWsInfo({ uuid: "ws-2", name: "Test2" })
       mockGetWorkspaceInfo.mockResolvedValue(wsInfo)
 
       const client = yield* WorkspaceClient
@@ -143,8 +147,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
   // test-revizorro: approved
   it.effect("getUserWorkspaces delegates to AccountClient", () =>
     Effect.gen(function*() {
-      // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-      const workspaces = [{ uuid: "ws-1" }] as unknown as Array<WorkspaceInfoWithStatus>
+      const workspaces = [{ uuid: "ws-1" }] as Array<WorkspaceInfoWithStatus>
       mockGetUserWorkspaces.mockResolvedValue(workspaces)
 
       const client = yield* WorkspaceClient
@@ -157,8 +160,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
   // test-revizorro: approved
   it.effect("createWorkspace delegates to AccountClient", () =>
     Effect.gen(function*() {
-      // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-      const loginInfo = { workspace: "new-ws", workspaceUrl: "new-ws-url" } as unknown as WorkspaceLoginInfo
+      const loginInfo = asLoginInfo({ workspace: "new-ws", workspaceUrl: "new-ws-url" })
       mockCreateWorkspace.mockResolvedValue(loginInfo)
 
       const client = yield* WorkspaceClient
@@ -168,7 +170,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       expect(mockCreateWorkspace).toHaveBeenCalledWith("My Workspace", "us-east")
     }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("deleteWorkspace delegates to AccountClient", () =>
     Effect.gen(function*() {
       mockDeleteWorkspace.mockResolvedValue(undefined)
@@ -182,8 +184,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
   // test-revizorro: approved
   it.effect("getUserProfile delegates to AccountClient", () =>
     Effect.gen(function*() {
-      // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-      const profile = { uuid: "p1", firstName: "John" } as unknown as PersonWithProfile
+      const profile = asProfile({ uuid: "p1", firstName: "John" })
       mockGetUserProfile.mockResolvedValue(profile)
 
       const client = yield* WorkspaceClient
@@ -284,7 +285,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
         mockUpdateWorkspaceRole.mockRejectedValue(new Error("role update error"))
 
         const client = yield* WorkspaceClient
-        const error = yield* Effect.flip(client.updateWorkspaceRole("acc", 0 as AccountRole))
+        const error = yield* Effect.flip(client.updateWorkspaceRole("acc", AccountRole.User))
 
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toContain("Failed to update workspace role")
@@ -462,7 +463,7 @@ describe("WorkspaceClient.testLayer", () => {
       expect(result).toEqual([])
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("default getPersonInfo dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -478,7 +479,7 @@ describe("WorkspaceClient.testLayer", () => {
       const client = yield* WorkspaceClient.pipe(
         Effect.provide(WorkspaceClient.testLayer({}))
       )
-      const exit = yield* Effect.exit(client.updateWorkspaceRole("acc", 0 as AccountRole))
+      const exit = yield* Effect.exit(client.updateWorkspaceRole("acc", AccountRole.User))
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
@@ -492,7 +493,7 @@ describe("WorkspaceClient.testLayer", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("default createWorkspace dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -545,8 +546,7 @@ describe("WorkspaceClient.testLayer", () => {
   // test-revizorro: approved
   it.effect("overrides merge with defaults", () =>
     Effect.gen(function*() {
-      // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-      const customMembers = [{ person: "p1" }] as unknown as Array<WorkspaceMemberInfo>
+      const customMembers = [{ person: "p1" }] as Array<WorkspaceMemberInfo>
       const client = yield* WorkspaceClient.pipe(
         Effect.provide(WorkspaceClient.testLayer({
           getWorkspaceMembers: () => Effect.succeed(customMembers)

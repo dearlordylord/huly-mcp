@@ -1,6 +1,6 @@
 import { describe, it } from "@effect/vitest"
 import type { PersonSpace } from "@hcengineering/contact"
-import type { Class, Doc, Ref, Space } from "@hcengineering/core"
+import type { Class, Doc, PersonId, Ref, Space } from "@hcengineering/core"
 import { toFindResult } from "@hcengineering/core"
 import type {
   DocNotifyContext as HulyDocNotifyContext,
@@ -28,38 +28,40 @@ import {
   pinNotificationContext,
   updateNotificationProviderSetting
 } from "../../../src/huly/operations/notifications.js"
+import {
+  notificationBrandId,
+  notificationContextId,
+  notificationProviderId,
+  objectClassName
+} from "../../helpers/brands.js"
 
-const makeNotification = (overrides?: Partial<HulyInboxNotification>): HulyInboxNotification => {
-  const result: HulyInboxNotification = {
-    _id: "notif-1" as Ref<HulyInboxNotification>,
-    _class: notification.class.InboxNotification,
-    space: "person-space-1" as Ref<PersonSpace>,
-    // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-    user: "user-1" as unknown as HulyInboxNotification["user"],
-    isViewed: false,
-    archived: false,
-    objectId: "obj-1" as Ref<Doc>,
-    objectClass: "tracker.class.Issue" as Ref<Class<Doc>>,
-    docNotifyContext: "ctx-1" as Ref<HulyDocNotifyContext>,
-    title: "New issue assigned" as HulyInboxNotification["title"],
-    body: "Issue PROJ-1 was assigned to you" as HulyInboxNotification["body"],
-    data: undefined,
-    createdOn: 1706500000000,
-    modifiedOn: 1706500000000,
-    modifiedBy: "user-1" as Ref<Doc>,
-    createdBy: "user-1" as Ref<Doc>,
-    ...overrides
-  }
-  return result
-}
+// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- mock builder
+const makeNotification = (overrides?: Partial<HulyInboxNotification>): HulyInboxNotification => ({
+  _id: "notif-1" as Ref<HulyInboxNotification>,
+  _class: notification.class.InboxNotification,
+  space: "person-space-1" as Ref<PersonSpace>,
+  user: "user-1" as HulyInboxNotification["user"],
+  isViewed: false,
+  archived: false,
+  objectId: "obj-1" as Ref<Doc>,
+  objectClass: "tracker.class.Issue" as Ref<Class<Doc>>,
+  docNotifyContext: "ctx-1" as Ref<HulyDocNotifyContext>,
+  title: "New issue assigned" as HulyInboxNotification["title"],
+  body: "Issue PROJ-1 was assigned to you" as HulyInboxNotification["body"],
+  data: undefined,
+  createdOn: 1706500000000,
+  modifiedOn: 1706500000000,
+  modifiedBy: "user-1" as PersonId,
+  createdBy: "user-1" as PersonId,
+  ...overrides
+} as HulyInboxNotification)
 
 const makeNotificationContext = (overrides?: Partial<HulyDocNotifyContext>): HulyDocNotifyContext => {
   const result: HulyDocNotifyContext = {
     _id: "ctx-1" as Ref<HulyDocNotifyContext>,
     _class: notification.class.DocNotifyContext,
     space: "person-space-1" as Ref<PersonSpace>,
-    // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-    user: "user-1" as unknown as HulyDocNotifyContext["user"],
+    user: "user-1" as HulyDocNotifyContext["user"],
     objectId: "obj-1" as Ref<Doc>,
     objectClass: "tracker.class.Issue" as Ref<Class<Doc>>,
     objectSpace: "space-1" as Ref<Space>,
@@ -67,9 +69,9 @@ const makeNotificationContext = (overrides?: Partial<HulyDocNotifyContext>): Hul
     hidden: false,
     lastViewedTimestamp: 1706400000000,
     lastUpdateTimestamp: 1706500000000,
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: 1706500000000,
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: 1706400000000,
     ...overrides
   }
@@ -85,9 +87,9 @@ const makeNotificationSetting = (
     space: "person-space-1" as Ref<PersonSpace>,
     attachedTo: "provider-1" as Ref<NotificationProvider>,
     enabled: true,
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: 1706500000000,
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: 1706400000000,
     ...overrides
   }
@@ -213,7 +215,7 @@ describe("listNotifications", () => {
         body: "Test body" as HulyInboxNotification["body"],
         createdOn: 1706500000000,
         modifiedOn: 1706500001000
-      })
+      } as Partial<HulyInboxNotification>)
 
       const testLayer = createTestLayerWithMocks({ notifications: [notif] })
 
@@ -229,7 +231,7 @@ describe("listNotifications", () => {
       expect(result[0].modifiedOn).toBe(1706500001000)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("excludes archived notifications by default", () =>
     Effect.gen(function*() {
       const active = makeNotification({
@@ -317,11 +319,13 @@ describe("getNotification", () => {
         data: "some data" as HulyInboxNotification["data"],
         createdOn: 1706500000000,
         modifiedOn: 1706500001000
-      })
+      } as Partial<HulyInboxNotification>)
 
       const testLayer = createTestLayerWithMocks({ notifications: [notif] })
 
-      const result = yield* getNotification({ notificationId: "notif-1" }).pipe(Effect.provide(testLayer))
+      const result = yield* getNotification({ notificationId: notificationBrandId("notif-1") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(result.id).toBe("notif-1")
       expect(result.isViewed).toBe(true)
@@ -340,7 +344,7 @@ describe("getNotification", () => {
       const testLayer = createTestLayerWithMocks({ notifications: [] })
 
       const error = yield* Effect.flip(
-        getNotification({ notificationId: "nonexistent" }).pipe(Effect.provide(testLayer))
+        getNotification({ notificationId: notificationBrandId("nonexistent") }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("NotificationNotFoundError")
@@ -360,7 +364,9 @@ describe("markNotificationRead", () => {
 
       const testLayer = createTestLayerWithMocks({ notifications: [notif], captureUpdateDoc })
 
-      const result = yield* markNotificationRead({ notificationId: "notif-1" }).pipe(Effect.provide(testLayer))
+      const result = yield* markNotificationRead({ notificationId: notificationBrandId("notif-1") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(result.id).toBe("notif-1")
       expect(result.marked).toBe(true)
@@ -378,7 +384,9 @@ describe("markNotificationRead", () => {
 
       const testLayer = createTestLayerWithMocks({ notifications: [notif], captureUpdateDoc })
 
-      const result = yield* markNotificationRead({ notificationId: "notif-1" }).pipe(Effect.provide(testLayer))
+      const result = yield* markNotificationRead({ notificationId: notificationBrandId("notif-1") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(result.id).toBe("notif-1")
       expect(result.marked).toBe(true)
@@ -391,7 +399,7 @@ describe("markNotificationRead", () => {
       const testLayer = createTestLayerWithMocks({ notifications: [] })
 
       const error = yield* Effect.flip(
-        markNotificationRead({ notificationId: "nonexistent" }).pipe(Effect.provide(testLayer))
+        markNotificationRead({ notificationId: notificationBrandId("nonexistent") }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("NotificationNotFoundError")
@@ -455,7 +463,9 @@ describe("archiveNotification", () => {
 
       const testLayer = createTestLayerWithMocks({ notifications: [notif], captureUpdateDoc })
 
-      const result = yield* archiveNotification({ notificationId: "notif-1" }).pipe(Effect.provide(testLayer))
+      const result = yield* archiveNotification({ notificationId: notificationBrandId("notif-1") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(result.id).toBe("notif-1")
       expect(result.archived).toBe(true)
@@ -473,7 +483,9 @@ describe("archiveNotification", () => {
 
       const testLayer = createTestLayerWithMocks({ notifications: [notif], captureUpdateDoc })
 
-      const result = yield* archiveNotification({ notificationId: "notif-1" }).pipe(Effect.provide(testLayer))
+      const result = yield* archiveNotification({ notificationId: notificationBrandId("notif-1") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(result.id).toBe("notif-1")
       expect(result.archived).toBe(true)
@@ -486,7 +498,7 @@ describe("archiveNotification", () => {
       const testLayer = createTestLayerWithMocks({ notifications: [] })
 
       const error = yield* Effect.flip(
-        archiveNotification({ notificationId: "nonexistent" }).pipe(Effect.provide(testLayer))
+        archiveNotification({ notificationId: notificationBrandId("nonexistent") }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("NotificationNotFoundError")
@@ -544,7 +556,9 @@ describe("deleteNotification", () => {
 
       const testLayer = createTestLayerWithMocks({ notifications: [notif], captureRemoveDoc })
 
-      const result = yield* deleteNotification({ notificationId: "notif-1" }).pipe(Effect.provide(testLayer))
+      const result = yield* deleteNotification({ notificationId: notificationBrandId("notif-1") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(result.id).toBe("notif-1")
       expect(result.deleted).toBe(true)
@@ -557,7 +571,7 @@ describe("deleteNotification", () => {
       const testLayer = createTestLayerWithMocks({ notifications: [] })
 
       const error = yield* Effect.flip(
-        deleteNotification({ notificationId: "nonexistent" }).pipe(Effect.provide(testLayer))
+        deleteNotification({ notificationId: notificationBrandId("nonexistent") }).pipe(Effect.provide(testLayer))
       )
 
       expect(error._tag).toBe("NotificationNotFoundError")
@@ -582,7 +596,7 @@ describe("getNotificationContext", () => {
 
       const result = yield* getNotificationContext({
         objectId: "obj-1",
-        objectClass: "tracker.class.Issue"
+        objectClass: objectClassName("tracker.class.Issue")
       }).pipe(Effect.provide(testLayer))
 
       expect(result).not.toBeNull()
@@ -602,7 +616,7 @@ describe("getNotificationContext", () => {
 
       const result = yield* getNotificationContext({
         objectId: "nonexistent",
-        objectClass: "tracker.class.Issue"
+        objectClass: objectClassName("tracker.class.Issue")
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toBeNull()
@@ -678,7 +692,7 @@ describe("pinNotificationContext", () => {
       const testLayer = createTestLayerWithMocks({ contexts: [ctx], captureUpdateDoc })
 
       const result = yield* pinNotificationContext({
-        contextId: "ctx-1",
+        contextId: notificationContextId("ctx-1"),
         pinned: true
       }).pipe(Effect.provide(testLayer))
 
@@ -699,7 +713,7 @@ describe("pinNotificationContext", () => {
       const testLayer = createTestLayerWithMocks({ contexts: [ctx], captureUpdateDoc })
 
       const result = yield* pinNotificationContext({
-        contextId: "ctx-1",
+        contextId: notificationContextId("ctx-1"),
         pinned: false
       }).pipe(Effect.provide(testLayer))
 
@@ -720,7 +734,7 @@ describe("pinNotificationContext", () => {
       const testLayer = createTestLayerWithMocks({ contexts: [ctx], captureUpdateDoc })
 
       const result = yield* pinNotificationContext({
-        contextId: "ctx-1",
+        contextId: notificationContextId("ctx-1"),
         pinned: true
       }).pipe(Effect.provide(testLayer))
 
@@ -736,7 +750,7 @@ describe("pinNotificationContext", () => {
 
       const error = yield* Effect.flip(
         pinNotificationContext({
-          contextId: "nonexistent",
+          contextId: notificationContextId("nonexistent"),
           pinned: true
         }).pipe(Effect.provide(testLayer))
       )
@@ -791,7 +805,7 @@ describe("updateNotificationProviderSetting", () => {
       const testLayer = createTestLayerWithMocks({ settings: [setting], captureUpdateDoc })
 
       const result = yield* updateNotificationProviderSetting({
-        providerId: "provider-inbox",
+        providerId: notificationProviderId("provider-inbox"),
         enabled: false
       }).pipe(Effect.provide(testLayer))
 
@@ -814,7 +828,7 @@ describe("updateNotificationProviderSetting", () => {
       const testLayer = createTestLayerWithMocks({ settings: [setting], captureUpdateDoc })
 
       const result = yield* updateNotificationProviderSetting({
-        providerId: "provider-inbox",
+        providerId: notificationProviderId("provider-inbox"),
         enabled: true
       }).pipe(Effect.provide(testLayer))
 
@@ -830,7 +844,7 @@ describe("updateNotificationProviderSetting", () => {
       const testLayer = createTestLayerWithMocks({ settings: [] })
 
       const result = yield* updateNotificationProviderSetting({
-        providerId: "nonexistent-provider",
+        providerId: notificationProviderId("nonexistent-provider"),
         enabled: true
       }).pipe(Effect.provide(testLayer))
 

@@ -21,6 +21,12 @@ import {
   startHttpTransport
 } from "../../src/mcp/http-transport.js"
 
+// Test mock factory: accepts any object, returns it typed as T.
+// Single cast from Record<string,unknown> to T (valid for test mocks of large interfaces).
+function mock<T>(impl: Record<string, unknown>): T {
+  return impl as T
+}
+
 // Mock Express app for testing
 const createMockExpressApp = () => {
   const routes: Record<string, Record<string, (req: Request, res: Response) => Promise<void>>> = {
@@ -29,8 +35,7 @@ const createMockExpressApp = () => {
     delete: {}
   }
 
-  // eslint-disable-next-line no-restricted-syntax -- test mock: partial Express app
-  const app = {
+  const app = mock<Express>({
     get: vi.fn((path: string, handler: (req: Request, res: Response) => Promise<void>) => {
       routes.get[path] = handler
     }),
@@ -41,31 +46,28 @@ const createMockExpressApp = () => {
       routes.delete[path] = handler
     }),
     listen: vi.fn()
-  } as unknown as Express
+  })
 
   return { app, routes }
 }
 
 // Mock MCP Server for testing
 const createMockMcpServer = (): Server => {
-  // eslint-disable-next-line no-restricted-syntax -- test mock: partial MCP Server
-  return {
+  return mock<Server>({
     connect: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
     setRequestHandler: vi.fn()
-  } as unknown as Server
+  })
 }
 
 // Mock HTTP response
 const createMockResponse = () => {
-  const res = {
+  return mock<Response>({
     status: vi.fn().mockReturnThis(),
     json: vi.fn().mockReturnThis(),
     headersSent: false,
     on: vi.fn()
-  }
-  // eslint-disable-next-line no-restricted-syntax -- test mock: partial Response
-  return res as unknown as Response
+  })
 }
 
 describe("HTTP Transport", () => {
@@ -261,14 +263,13 @@ describe("HTTP Transport", () => {
     // test-revizorro: approved
     it("should register POST, GET, DELETE handlers on /mcp", async () => {
       const { app } = createMockExpressApp()
-      // eslint-disable-next-line no-restricted-syntax -- test mock: partial http.Server
-      const mockHttpServer = {
+      const mockHttp = mock<http.Server>({
         close: vi.fn((cb?: (err?: Error) => void) => cb?.())
-      } as unknown as http.Server
+      })
 
       const mockFactory: HttpServerFactory = {
         createApp: vi.fn(() => app),
-        listen: vi.fn(() => Effect.succeed(mockHttpServer))
+        listen: vi.fn(() => Effect.succeed(mockHttp))
       }
 
       const mockMcpServer = createMockMcpServer()
@@ -300,14 +301,13 @@ describe("HTTP Transport", () => {
     it("should close server when scope closes", async () => {
       const { app } = createMockExpressApp()
       const closeFn = vi.fn((cb?: (err?: Error) => void) => cb?.())
-      // eslint-disable-next-line no-restricted-syntax -- test mock: partial http.Server
-      const mockHttpServer = {
+      const mockHttp = mock<http.Server>({
         close: closeFn
-      } as unknown as http.Server
+      })
 
       const mockFactory: HttpServerFactory = {
         createApp: vi.fn(() => app),
-        listen: vi.fn(() => Effect.succeed(mockHttpServer))
+        listen: vi.fn(() => Effect.succeed(mockHttp))
       }
 
       const mockMcpServer = createMockMcpServer()
@@ -370,14 +370,13 @@ describe("HTTP Transport", () => {
     it("should log to stderr and continue when server close fails during release", async () => {
       const { app } = createMockExpressApp()
       const closeFn = vi.fn((cb?: (err?: Error) => void) => cb?.(new Error("close failed")))
-      // eslint-disable-next-line no-restricted-syntax -- test mock: partial http.Server
-      const mockHttpServer = {
+      const mockHttp = mock<http.Server>({
         close: closeFn
-      } as unknown as http.Server
+      })
 
       const mockFactory: HttpServerFactory = {
         createApp: vi.fn(() => app),
-        listen: vi.fn(() => Effect.succeed(mockHttpServer))
+        listen: vi.fn(() => Effect.succeed(mockHttp))
       }
 
       const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true)
@@ -409,14 +408,13 @@ describe("HTTP Transport", () => {
     // test-revizorro: suspect | Only checks effect succeeded, not that SIGINT was handled; stderrSpy created but not restored; missing verification of handler cleanup
     it("should shut down when SIGINT is received", async () => {
       const { app } = createMockExpressApp()
-      // eslint-disable-next-line no-restricted-syntax -- test mock: partial http.Server
-      const mockHttpServer = {
+      const mockHttp = mock<http.Server>({
         close: vi.fn((cb?: (err?: Error) => void) => cb?.())
-      } as unknown as http.Server
+      })
 
       const mockFactory: HttpServerFactory = {
         createApp: vi.fn(() => app),
-        listen: vi.fn(() => Effect.succeed(mockHttpServer))
+        listen: vi.fn(() => Effect.succeed(mockHttp))
       }
 
       const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true)
@@ -452,8 +450,7 @@ describe("HTTP Transport", () => {
       const handlers = createMcpHandlers(() => mockServer)
 
       const closeHandlers: Array<() => void> = []
-      // eslint-disable-next-line no-restricted-syntax -- test mock: partial Response
-      const res = {
+      const res = mock<Response>({
         status: vi.fn().mockReturnThis(),
         json: vi.fn().mockReturnThis(),
         headersSent: false,
@@ -466,7 +463,7 @@ describe("HTTP Transport", () => {
         on: vi.fn((event: string, handler: () => void) => {
           if (event === "close") closeHandlers.push(handler)
         })
-      } as unknown as Response
+      })
 
       await handlers.post(
         { body: { jsonrpc: "2.0", method: "tools/list", id: 1 } } as Request,
@@ -488,8 +485,7 @@ describe("HTTP Transport", () => {
       const handlers = createMcpHandlers(() => mockServer)
 
       const closeHandlers: Array<() => void> = []
-      // eslint-disable-next-line no-restricted-syntax -- test mock: partial Response
-      const res = {
+      const res = mock<Response>({
         status: vi.fn().mockReturnThis(),
         json: vi.fn().mockReturnThis(),
         headersSent: false,
@@ -502,7 +498,7 @@ describe("HTTP Transport", () => {
         on: vi.fn((event: string, handler: () => void) => {
           if (event === "close") closeHandlers.push(handler)
         })
-      } as unknown as Response
+      })
 
       const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true)
 
@@ -523,20 +519,18 @@ describe("HTTP Transport", () => {
       closeSpy.mockRestore()
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("should log to stderr when server.close rejects during cleanup", async () => {
-      // eslint-disable-next-line no-restricted-syntax -- test mock: partial MCP Server
-      const mockServer = {
+      const mcpServer = mock<Server>({
         connect: vi.fn().mockResolvedValue(undefined),
         close: vi.fn().mockRejectedValue(new Error("server close failed")),
         setRequestHandler: vi.fn()
-      } as unknown as Server
+      })
 
-      const handlers = createMcpHandlers(() => mockServer)
+      const handlers = createMcpHandlers(() => mcpServer)
 
       const closeHandlers: Array<() => void> = []
-      // eslint-disable-next-line no-restricted-syntax -- test mock: partial Response
-      const res = {
+      const res = mock<Response>({
         status: vi.fn().mockReturnThis(),
         json: vi.fn().mockReturnThis(),
         headersSent: false,
@@ -549,7 +543,7 @@ describe("HTTP Transport", () => {
         on: vi.fn((event: string, handler: () => void) => {
           if (event === "close") closeHandlers.push(handler)
         })
-      } as unknown as Response
+      })
 
       const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true)
 
@@ -573,19 +567,17 @@ describe("HTTP Transport", () => {
   describe("defaultHttpServerFactory via defaultLayer", () => {
     // test-revizorro: approved
     it("should succeed when app.listen calls back without error", async () => {
-      // eslint-disable-next-line no-restricted-syntax -- test mock: partial http.Server
-      const fakeHttpServer = { close: vi.fn() } as unknown as http.Server
-      // eslint-disable-next-line no-restricted-syntax -- test mock: partial Express app
-      const mockApp = {
+      const fakeHttp = mock<http.Server>({ close: vi.fn() })
+      const mockApp = mock<Express>({
         get: vi.fn(),
         post: vi.fn(),
         delete: vi.fn(),
         listen: vi.fn((_port: number, _host: string, cb: (error?: Error) => void) => {
           // Callback must fire asynchronously so that `const server = app.listen(...)` completes first
           setTimeout(() => cb(), 0)
-          return fakeHttpServer
+          return fakeHttp
         })
-      } as unknown as Express
+      })
 
       const program = Effect.gen(function*() {
         const factory = yield* HttpServerFactoryService
@@ -596,22 +588,20 @@ describe("HTTP Transport", () => {
         program.pipe(Effect.provide(HttpServerFactoryService.defaultLayer))
       )
 
-      expect(result).toBe(fakeHttpServer)
+      expect(result).toBe(fakeHttp)
     })
 
     // test-revizorro: approved
     it("should fail with HttpTransportError when app.listen calls back with error", async () => {
-      // eslint-disable-next-line no-restricted-syntax -- test mock: partial Express app
-      const mockApp = {
+      const mockApp = mock<Express>({
         get: vi.fn(),
         post: vi.fn(),
         delete: vi.fn(),
         listen: vi.fn((_port: number, _host: string, cb: (error?: Error) => void) => {
           setTimeout(() => cb(new Error("EADDRINUSE")), 0)
-          // eslint-disable-next-line no-restricted-syntax -- test mock: partial http.Server
-          return { close: vi.fn() } as unknown as http.Server
+          return mock<http.Server>({ close: vi.fn() })
         })
-      } as unknown as Express
+      })
 
       const program = Effect.gen(function*() {
         const factory = yield* HttpServerFactoryService

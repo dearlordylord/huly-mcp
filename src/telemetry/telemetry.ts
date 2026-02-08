@@ -3,14 +3,14 @@ import { Config, Context, Effect, Layer } from "effect"
 import { createNoopTelemetry } from "./noop.js"
 import { createPostHogTelemetry } from "./posthog.js"
 
-type SessionStartProps = {
+export type SessionStartProps = {
   readonly transport: "stdio" | "http"
   readonly authMethod: "token" | "password"
   readonly toolCount: number
   readonly toolsets: ReadonlyArray<string> | null
 }
 
-type ToolCalledProps = {
+export type ToolCalledProps = {
   readonly toolName: string
   readonly status: "success" | "error"
   readonly errorTag?: string | undefined

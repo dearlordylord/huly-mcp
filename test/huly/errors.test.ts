@@ -1,5 +1,5 @@
 import { describe, it } from "@effect/vitest"
-import { Effect, Match, Schema } from "effect"
+import { Effect, Schema } from "effect"
 import { expect } from "vitest"
 import {
   ActivityMessageNotFoundError,
@@ -606,40 +606,75 @@ describe("Huly Errors", () => {
     // test-revizorro: approved
     it.effect("can pattern match with Match exhaustive over all error types", () =>
       Effect.gen(function*() {
-        const matchError = Match.type<HulyDomainError>().pipe(
-          Match.tag("IssueNotFoundError", (e) => `issue:${e.identifier}`),
-          Match.tag("ProjectNotFoundError", (e) => `project:${e.identifier}`),
-          Match.tag("InvalidStatusError", (e) => `status:${e.status}`),
-          Match.tag("PersonNotFoundError", (e) => `person:${e.identifier}`),
-          Match.tag("FileUploadError", (e) => `upload:${e.message}`),
-          Match.tag("InvalidFileDataError", (e) => `data:${e.message}`),
-          Match.tag("FileNotFoundError", (e) => `notfound:${e.filePath}`),
-          Match.tag("FileFetchError", (e) => `fetch:${e.fileUrl}`),
-          Match.tag("HulyConnectionError", () => "connection"),
-          Match.tag("HulyAuthError", () => "auth"),
-          Match.tag("HulyError", () => "generic"),
-          Match.tag("TeamspaceNotFoundError", (e) => `teamspace:${e.identifier}`),
-          Match.tag("DocumentNotFoundError", (e) => `document:${e.identifier}`),
-          Match.tag("CommentNotFoundError", (e) => `comment:${e.commentId}`),
-          Match.tag("MilestoneNotFoundError", (e) => `milestone:${e.identifier}`),
-          Match.tag("ChannelNotFoundError", (e) => `channel:${e.identifier}`),
-          Match.tag("MessageNotFoundError", (e) => `message:${e.messageId}`),
-          Match.tag("ThreadReplyNotFoundError", (e) => `reply:${e.replyId}`),
-          Match.tag("EventNotFoundError", (e) => `event:${e.eventId}`),
-          Match.tag("RecurringEventNotFoundError", (e) => `recurring:${e.eventId}`),
-          Match.tag("ActivityMessageNotFoundError", (e) => `activity:${e.messageId}`),
-          Match.tag("ReactionNotFoundError", (e) => `reaction:${e.emoji}`),
-          Match.tag("SavedMessageNotFoundError", (e) => `saved:${e.messageId}`),
-          Match.tag("AttachmentNotFoundError", (e) => `attachment:${e.attachmentId}`),
-          Match.tag("ComponentNotFoundError", (e) => `component:${e.identifier}`),
-          Match.tag("IssueTemplateNotFoundError", (e) => `template:${e.identifier}`),
-          Match.tag("NotificationNotFoundError", (e) => `notification:${e.notificationId}`),
-          Match.tag("NotificationContextNotFoundError", (e) => `notifctx:${e.contextId}`),
-          Match.tag("InvalidPersonUuidError", (e) => `uuid:${e.uuid}`),
-          Match.tag("FileTooLargeError", (e) => `toolarge:${e.filename}`),
-          Match.tag("InvalidContentTypeError", (e) => `contenttype:${e.contentType}`),
-          Match.exhaustive
-        )
+        // Using switch instead of Match.type to avoid Effect Match inference issues
+        // with Schema.TaggedError unions under exactOptionalPropertyTypes: true.
+        // The return type annotation ensures exhaustiveness: TypeScript errors if a case is missing.
+        const matchError = (error: HulyDomainError): string => {
+          switch (error._tag) {
+            case "IssueNotFoundError":
+              return `issue:${error.identifier}`
+            case "ProjectNotFoundError":
+              return `project:${error.identifier}`
+            case "InvalidStatusError":
+              return `status:${error.status}`
+            case "PersonNotFoundError":
+              return `person:${error.identifier}`
+            case "FileUploadError":
+              return `upload:${error.message}`
+            case "InvalidFileDataError":
+              return `data:${error.message}`
+            case "FileNotFoundError":
+              return `notfound:${error.filePath}`
+            case "FileFetchError":
+              return `fetch:${error.fileUrl}`
+            case "HulyConnectionError":
+              return "connection"
+            case "HulyAuthError":
+              return "auth"
+            case "HulyError":
+              return "generic"
+            case "TeamspaceNotFoundError":
+              return `teamspace:${error.identifier}`
+            case "DocumentNotFoundError":
+              return `document:${error.identifier}`
+            case "CommentNotFoundError":
+              return `comment:${error.commentId}`
+            case "MilestoneNotFoundError":
+              return `milestone:${error.identifier}`
+            case "ChannelNotFoundError":
+              return `channel:${error.identifier}`
+            case "MessageNotFoundError":
+              return `message:${error.messageId}`
+            case "ThreadReplyNotFoundError":
+              return `reply:${error.replyId}`
+            case "EventNotFoundError":
+              return `event:${error.eventId}`
+            case "RecurringEventNotFoundError":
+              return `recurring:${error.eventId}`
+            case "ActivityMessageNotFoundError":
+              return `activity:${error.messageId}`
+            case "ReactionNotFoundError":
+              return `reaction:${error.emoji}`
+            case "SavedMessageNotFoundError":
+              return `saved:${error.messageId}`
+            case "AttachmentNotFoundError":
+              return `attachment:${error.attachmentId}`
+            case "ComponentNotFoundError":
+              return `component:${error.identifier}`
+            case "IssueTemplateNotFoundError":
+              return `template:${error.identifier}`
+            case "NotificationNotFoundError":
+              return `notification:${error.notificationId}`
+            case "NotificationContextNotFoundError":
+              return `notifctx:${error.contextId}`
+            case "InvalidPersonUuidError":
+              return `uuid:${error.uuid}`
+            case "FileTooLargeError":
+              return `toolarge:${error.filename}`
+            case "InvalidContentTypeError":
+              return `contenttype:${error.contentType}`
+          }
+        }
 
         expect(matchError(new IssueNotFoundError({ identifier: "X", project: "Y" }))).toBe("issue:X")
         expect(matchError(new ProjectNotFoundError({ identifier: "Z" }))).toBe("project:Z")

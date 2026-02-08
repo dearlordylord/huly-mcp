@@ -1,5 +1,5 @@
 import { describe, it } from "@effect/vitest"
-import { type Doc, type MarkupBlobRef, type Ref, type Space, toFindResult } from "@hcengineering/core"
+import { type Doc, type MarkupBlobRef, type PersonId, type Ref, type Space, toFindResult } from "@hcengineering/core"
 import type { Document as HulyDocument, Teamspace as HulyTeamspace } from "@hcengineering/document"
 import { Effect } from "effect"
 import { expect } from "vitest"
@@ -13,28 +13,27 @@ import {
   listTeamspaces,
   updateDocument
 } from "../../../src/huly/operations/documents.js"
+import { documentIdentifier, teamspaceIdentifier } from "../../helpers/brands.js"
 
 import { documentPlugin } from "../../../src/huly/huly-plugins.js"
 
 // --- Mock Data Builders ---
 
-const makeTeamspace = (overrides?: Partial<HulyTeamspace>): HulyTeamspace => {
-  const result: HulyTeamspace = {
-    _id: "teamspace-1" as Ref<HulyTeamspace>,
-    _class: documentPlugin.class.Teamspace,
-    space: "space-1" as Ref<Space>,
-    name: "My Documents",
-    description: "Test teamspace",
-    archived: false,
-    private: false,
-    modifiedBy: "user-1" as Ref<Doc>,
-    modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
-    createdOn: Date.now(),
-    ...overrides
-  }
-  return result
-}
+// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- mock builder
+const makeTeamspace = (overrides?: Partial<HulyTeamspace>): HulyTeamspace => ({
+  _id: "teamspace-1" as Ref<HulyTeamspace>,
+  _class: documentPlugin.class.Teamspace,
+  space: "space-1" as Ref<Space>,
+  name: "My Documents",
+  description: "Test teamspace",
+  archived: false,
+  private: false,
+  modifiedBy: "user-1" as PersonId,
+  modifiedOn: Date.now(),
+  createdBy: "user-1" as PersonId,
+  createdOn: Date.now(),
+  ...overrides
+} as HulyTeamspace)
 
 const makeDocument = (overrides?: Partial<HulyDocument>): HulyDocument => {
   const result: HulyDocument = {
@@ -45,9 +44,9 @@ const makeDocument = (overrides?: Partial<HulyDocument>): HulyDocument => {
     content: null,
     parent: documentPlugin.ids.NoParent,
     rank: "0|aaa",
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -155,6 +154,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     }
   ) as HulyClientOperations["updateDoc"]
 
+  // eslint-disable-next-line no-restricted-syntax -- mock function signature (unknown params) doesn't overlap with typed signature
   const uploadMarkupImpl: HulyClientOperations["uploadMarkup"] = ((
     _objectClass: unknown,
     _objectId: unknown,
@@ -165,7 +165,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       config.captureUploadMarkup.markup = markup as string
     }
     return Effect.succeed("markup-ref-123")
-  }) as HulyClientOperations["uploadMarkup"]
+  }) as unknown as HulyClientOperations["uploadMarkup"]
 
   const removeDocImpl: HulyClientOperations["removeDoc"] = ((
     _class: unknown,
@@ -265,7 +265,9 @@ describe("listDocuments", () => {
 
         const testLayer = createTestLayerWithMocks({ teamspaces: [teamspace], documents })
 
-        const result = yield* listDocuments({ teamspace: "My Docs" }).pipe(Effect.provide(testLayer))
+        const result = yield* listDocuments({ teamspace: teamspaceIdentifier("My Docs") }).pipe(
+          Effect.provide(testLayer)
+        )
 
         expect(result.documents).toHaveLength(2)
         // Sorted by modifiedOn descending
@@ -279,7 +281,7 @@ describe("listDocuments", () => {
         const testLayer = createTestLayerWithMocks({ teamspaces: [], documents: [] })
 
         const error = yield* Effect.flip(
-          listDocuments({ teamspace: "Nonexistent" }).pipe(Effect.provide(testLayer))
+          listDocuments({ teamspace: teamspaceIdentifier("Nonexistent") }).pipe(Effect.provide(testLayer))
         )
 
         expect(error._tag).toBe("TeamspaceNotFoundError")
@@ -297,7 +299,9 @@ describe("listDocuments", () => {
         const testLayer = createTestLayerWithMocks({ teamspaces: [teamspace], documents })
 
         // Search by ID instead of name
-        const result = yield* listDocuments({ teamspace: "ts-123" }).pipe(Effect.provide(testLayer))
+        const result = yield* listDocuments({ teamspace: teamspaceIdentifier("ts-123") }).pipe(
+          Effect.provide(testLayer)
+        )
 
         expect(result.documents).toHaveLength(1)
         expect(result.documents[0].teamspace).toBe("My Docs")
@@ -317,7 +321,7 @@ describe("listDocuments", () => {
           captureDocumentQuery: captureQuery
         })
 
-        yield* listDocuments({ teamspace: "My Docs" }).pipe(Effect.provide(testLayer))
+        yield* listDocuments({ teamspace: teamspaceIdentifier("My Docs") }).pipe(Effect.provide(testLayer))
 
         expect(captureQuery.options?.limit).toBe(50)
       }))
@@ -334,7 +338,7 @@ describe("listDocuments", () => {
           captureDocumentQuery: captureQuery
         })
 
-        yield* listDocuments({ teamspace: "My Docs", limit: 500 }).pipe(Effect.provide(testLayer))
+        yield* listDocuments({ teamspace: teamspaceIdentifier("My Docs"), limit: 500 }).pipe(Effect.provide(testLayer))
 
         expect(captureQuery.options?.limit).toBe(200)
       }))
@@ -360,7 +364,10 @@ describe("getDocument", () => {
           markupContent: { "markup-id-123": "# Hello World" }
         })
 
-        const result = yield* getDocument({ teamspace: "My Docs", document: "Test Doc" }).pipe(
+        const result = yield* getDocument({
+          teamspace: teamspaceIdentifier("My Docs"),
+          document: documentIdentifier("Test Doc")
+        }).pipe(
           Effect.provide(testLayer)
         )
 
@@ -385,7 +392,10 @@ describe("getDocument", () => {
           documents: [doc]
         })
 
-        const result = yield* getDocument({ teamspace: "My Docs", document: "doc-1" }).pipe(Effect.provide(testLayer))
+        const result = yield* getDocument({
+          teamspace: teamspaceIdentifier("My Docs"),
+          document: documentIdentifier("doc-1")
+        }).pipe(Effect.provide(testLayer))
 
         expect(result.id).toBe("doc-1")
       }))
@@ -406,7 +416,10 @@ describe("getDocument", () => {
           documents: [doc]
         })
 
-        const result = yield* getDocument({ teamspace: "My Docs", document: "Empty Doc" }).pipe(
+        const result = yield* getDocument({
+          teamspace: teamspaceIdentifier("My Docs"),
+          document: documentIdentifier("Empty Doc")
+        }).pipe(
           Effect.provide(testLayer)
         )
 
@@ -421,7 +434,9 @@ describe("getDocument", () => {
         const testLayer = createTestLayerWithMocks({ teamspaces: [], documents: [] })
 
         const error = yield* Effect.flip(
-          getDocument({ teamspace: "Nonexistent", document: "Doc" }).pipe(Effect.provide(testLayer))
+          getDocument({ teamspace: teamspaceIdentifier("Nonexistent"), document: documentIdentifier("Doc") }).pipe(
+            Effect.provide(testLayer)
+          )
         )
 
         expect(error._tag).toBe("TeamspaceNotFoundError")
@@ -435,7 +450,9 @@ describe("getDocument", () => {
         const testLayer = createTestLayerWithMocks({ teamspaces: [teamspace], documents: [] })
 
         const error = yield* Effect.flip(
-          getDocument({ teamspace: "My Docs", document: "Nonexistent" }).pipe(Effect.provide(testLayer))
+          getDocument({ teamspace: teamspaceIdentifier("My Docs"), document: documentIdentifier("Nonexistent") }).pipe(
+            Effect.provide(testLayer)
+          )
         )
 
         expect(error._tag).toBe("DocumentNotFoundError")
@@ -460,7 +477,7 @@ describe("createDocument", () => {
         })
 
         const result = yield* createDocument({
-          teamspace: "My Docs",
+          teamspace: teamspaceIdentifier("My Docs"),
           title: "New Document"
         }).pipe(Effect.provide(testLayer))
 
@@ -485,7 +502,7 @@ describe("createDocument", () => {
         })
 
         const result = yield* createDocument({
-          teamspace: "My Docs",
+          teamspace: teamspaceIdentifier("My Docs"),
           title: "Doc with Content",
           content: "# Heading\n\nSome content here."
         }).pipe(Effect.provide(testLayer))
@@ -512,7 +529,7 @@ describe("createDocument", () => {
         })
 
         yield* createDocument({
-          teamspace: "My Docs",
+          teamspace: teamspaceIdentifier("My Docs"),
           title: "New Document"
         }).pipe(Effect.provide(testLayer))
 
@@ -535,7 +552,7 @@ describe("createDocument", () => {
         })
 
         yield* createDocument({
-          teamspace: "My Docs",
+          teamspace: teamspaceIdentifier("My Docs"),
           title: "Empty Content Doc",
           content: "   "
         }).pipe(Effect.provide(testLayer))
@@ -553,7 +570,7 @@ describe("createDocument", () => {
 
         const error = yield* Effect.flip(
           createDocument({
-            teamspace: "Nonexistent",
+            teamspace: teamspaceIdentifier("Nonexistent"),
             title: "Test Doc"
           }).pipe(Effect.provide(testLayer))
         )
@@ -584,8 +601,8 @@ describe("updateDocument", () => {
         })
 
         const result = yield* updateDocument({
-          teamspace: "My Docs",
-          document: "Old Title",
+          teamspace: teamspaceIdentifier("My Docs"),
+          document: documentIdentifier("Old Title"),
           title: "New Title"
         }).pipe(Effect.provide(testLayer))
 
@@ -614,8 +631,8 @@ describe("updateDocument", () => {
         })
 
         yield* updateDocument({
-          teamspace: "My Docs",
-          document: "Test Doc",
+          teamspace: teamspaceIdentifier("My Docs"),
+          document: documentIdentifier("Test Doc"),
           content: "# Updated Content"
         }).pipe(Effect.provide(testLayer))
 
@@ -642,8 +659,8 @@ describe("updateDocument", () => {
         })
 
         yield* updateDocument({
-          teamspace: "My Docs",
-          document: "Test Doc",
+          teamspace: teamspaceIdentifier("My Docs"),
+          document: documentIdentifier("Test Doc"),
           content: ""
         }).pipe(Effect.provide(testLayer))
 
@@ -666,8 +683,8 @@ describe("updateDocument", () => {
         })
 
         const result = yield* updateDocument({
-          teamspace: "My Docs",
-          document: "Test Doc"
+          teamspace: teamspaceIdentifier("My Docs"),
+          document: documentIdentifier("Test Doc")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.id).toBe("doc-1")
@@ -694,8 +711,8 @@ describe("updateDocument", () => {
         })
 
         yield* updateDocument({
-          teamspace: "My Docs",
-          document: "Old Title",
+          teamspace: teamspaceIdentifier("My Docs"),
+          document: documentIdentifier("Old Title"),
           title: "New Title",
           content: "New Content"
         }).pipe(Effect.provide(testLayer))
@@ -713,8 +730,8 @@ describe("updateDocument", () => {
 
         const error = yield* Effect.flip(
           updateDocument({
-            teamspace: "Nonexistent",
-            document: "Doc",
+            teamspace: teamspaceIdentifier("Nonexistent"),
+            document: documentIdentifier("Doc"),
             title: "New Title"
           }).pipe(Effect.provide(testLayer))
         )
@@ -731,8 +748,8 @@ describe("updateDocument", () => {
 
         const error = yield* Effect.flip(
           updateDocument({
-            teamspace: "My Docs",
-            document: "Nonexistent",
+            teamspace: teamspaceIdentifier("My Docs"),
+            document: documentIdentifier("Nonexistent"),
             title: "New Title"
           }).pipe(Effect.provide(testLayer))
         )
@@ -763,8 +780,8 @@ describe("deleteDocument", () => {
         })
 
         const result = yield* deleteDocument({
-          teamspace: "My Docs",
-          document: "To Delete"
+          teamspace: teamspaceIdentifier("My Docs"),
+          document: documentIdentifier("To Delete")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.id).toBe("doc-1")
@@ -790,8 +807,8 @@ describe("deleteDocument", () => {
         })
 
         const result = yield* deleteDocument({
-          teamspace: "My Docs",
-          document: "doc-123"
+          teamspace: teamspaceIdentifier("My Docs"),
+          document: documentIdentifier("doc-123")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.id).toBe("doc-123")
@@ -807,8 +824,8 @@ describe("deleteDocument", () => {
 
         const error = yield* Effect.flip(
           deleteDocument({
-            teamspace: "Nonexistent",
-            document: "Doc"
+            teamspace: teamspaceIdentifier("Nonexistent"),
+            document: documentIdentifier("Doc")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -824,8 +841,8 @@ describe("deleteDocument", () => {
 
         const error = yield* Effect.flip(
           deleteDocument({
-            teamspace: "My Docs",
-            document: "Nonexistent"
+            teamspace: teamspaceIdentifier("My Docs"),
+            document: documentIdentifier("Nonexistent")
           }).pipe(Effect.provide(testLayer))
         )
 

@@ -14,7 +14,7 @@ import type {
   Status,
   WorkspaceInfoWithStatus
 } from "@hcengineering/core"
-import { toFindResult } from "@hcengineering/core"
+import { SocialIdType, toFindResult } from "@hcengineering/core"
 import type { Teamspace as HulyTeamspace } from "@hcengineering/document"
 import type {
   DocNotifyContext as HulyDocNotifyContext,
@@ -25,7 +25,7 @@ import type {
   IssueTemplate as HulyIssueTemplate,
   Project as HulyProject
 } from "@hcengineering/tracker"
-import { IssuePriority } from "@hcengineering/tracker"
+import { IssuePriority, TimeReportDayType } from "@hcengineering/tracker"
 import { Effect, Redacted } from "effect"
 import { expect } from "vitest"
 
@@ -44,6 +44,17 @@ import { getIssueTemplate } from "../src/huly/operations/issue-templates.js"
 import { getNotification } from "../src/huly/operations/notifications.js"
 import { listWorkspaces } from "../src/huly/operations/workspace.js"
 import { WorkspaceClient } from "../src/huly/workspace-client.js"
+import { notificationBrandId, projectIdentifier, templateIdentifier } from "./helpers/brands.js"
+
+// Test mock cast helpers: hide the single `as` inside a function so
+// the lint rule `consistent-type-assertions` does not fire on object
+// literal assertions, and TS does not complain about insufficient overlap.
+const asPerson = (v: unknown) => v as Person
+const asEmployee = (v: unknown) => v as HulyEmployee
+const asTeamspace = (v: unknown) => v as HulyTeamspace
+const asProject = (v: unknown) => v as HulyProject
+const asNotification = (v: unknown) => v as HulyInboxNotification
+const asNotifData = (v: unknown) => v as HulyInboxNotification["data"]
 
 // ============================================================
 // 1. config.ts line 172 - testLayerToken with explicit timeout
@@ -207,29 +218,28 @@ describe("buildSocialIdToPersonNameMap - person resolved (channels.ts line 159)"
       Effect.provide(
         createChannelTestLayer({
           socialIdentities: [{
-            _id: "social-alice" as PersonId,
+            _id: "social-alice" as SocialIdentity["_id"],
             _class: contact.class.SocialIdentity,
             space: "space-1" as Ref<Space>,
             attachedTo: "person-alice" as Ref<Person>,
             attachedToClass: contact.class.Person,
             collection: "socialIds",
-            type: "huly",
+            type: SocialIdType.HULY,
             value: "alice@example.com",
             key: "huly:alice@example.com",
-            modifiedBy: "user-1" as Ref<Doc>,
+            modifiedBy: "user-1" as PersonId,
             modifiedOn: Date.now()
           }],
-          // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test mock: partial Person
-          persons: [{
+          persons: [asPerson({
             _id: "person-alice" as Ref<Person>,
             _class: contact.class.Person,
             space: "space-1" as Ref<Space>,
             name: "Alice Smith",
-            modifiedBy: "user-1" as Ref<Doc>,
+            modifiedBy: "user-1" as PersonId,
             modifiedOn: Date.now(),
-            createdBy: "user-1" as Ref<Doc>,
+            createdBy: "user-1" as PersonId,
             createdOn: Date.now()
-          } as Person]
+          })]
         })
       )
     ))
@@ -249,37 +259,35 @@ describe("channels - buildAccountUuidToNameMap emp.personUuid truthy (line 187)"
         archived: false,
         members: ["account-1" as HulyAccountUuid, "account-2" as HulyAccountUuid],
         messages: 5,
-        modifiedBy: "user-1" as Ref<Doc>,
+        modifiedBy: "user-1" as PersonId,
         modifiedOn: Date.now(),
-        createdBy: "user-1" as Ref<Doc>,
+        createdBy: "user-1" as PersonId,
         createdOn: Date.now()
       }
 
-      // eslint-disable-next-line no-restricted-syntax -- test mock: double assertion for branded Employee type
-      const emp1 = {
+      const emp1 = asEmployee({
         _id: "emp-1" as Ref<HulyEmployee>,
         _class: contact.mixin.Employee,
         space: "space-1" as Ref<Space>,
         name: "Alice",
         personUuid: "account-1",
-        modifiedBy: "user-1" as Ref<Doc>,
+        modifiedBy: "user-1" as PersonId,
         modifiedOn: Date.now(),
-        createdBy: "user-1" as Ref<Doc>,
+        createdBy: "user-1" as PersonId,
         createdOn: Date.now()
-      } as unknown as HulyEmployee
+      })
 
-      // eslint-disable-next-line no-restricted-syntax -- test mock: double assertion for branded Employee type
-      const emp2 = {
+      const emp2 = asEmployee({
         _id: "emp-2" as Ref<HulyEmployee>,
         _class: contact.mixin.Employee,
         space: "space-1" as Ref<Space>,
         name: "Bob",
         personUuid: "account-2",
-        modifiedBy: "user-1" as Ref<Doc>,
+        modifiedBy: "user-1" as PersonId,
         modifiedOn: Date.now(),
-        createdBy: "user-1" as Ref<Doc>,
+        createdBy: "user-1" as PersonId,
         createdOn: Date.now()
-      } as unknown as HulyEmployee
+      })
 
       const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, _query: unknown) => {
         if (_class === chunter.class.DirectMessage) {
@@ -322,20 +330,21 @@ describe("listTeamspaces - description || undefined branches (documents.ts line 
     return HulyClient.testLayer({ findAll: findAllImpl })
   }
 
-  const makeTeamspace = (overrides?: Partial<HulyTeamspace>): HulyTeamspace => ({
-    _id: "ts-1" as Ref<HulyTeamspace>,
-    _class: documentPlugin.class.Teamspace,
-    space: "space-1" as Ref<Space>,
-    name: "Test",
-    description: "",
-    archived: false,
-    private: false,
-    modifiedBy: "user-1" as Ref<Doc>,
-    modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
-    createdOn: Date.now(),
-    ...overrides
-  })
+  const makeTeamspace = (overrides?: Partial<HulyTeamspace>): HulyTeamspace =>
+    asTeamspace({
+      _id: "ts-1" as Ref<HulyTeamspace>,
+      _class: documentPlugin.class.Teamspace,
+      space: "space-1" as Ref<Space>,
+      name: "Test",
+      description: "",
+      archived: false,
+      private: false,
+      modifiedBy: "user-1" as PersonId,
+      modifiedOn: Date.now(),
+      createdBy: "user-1" as PersonId,
+      createdOn: Date.now(),
+      ...overrides
+    })
 
   // test-revizorro: approved
   it.effect("maps truthy description to its value", () =>
@@ -366,21 +375,22 @@ describe("listTeamspaces - description || undefined branches (documents.ts line 
 // ============================================================
 
 describe("getIssueTemplate - assignee/component lookup false branches (issue-templates.ts lines 176, 187)", () => {
-  const makeProject = (overrides?: Partial<HulyProject>): HulyProject => ({
-    _id: "project-1" as Ref<HulyProject>,
-    _class: tracker.class.Project,
-    space: "space-1" as Ref<Space>,
-    identifier: "TEST",
-    name: "Test Project",
-    sequence: 1,
-    defaultIssueStatus: "status-open" as Ref<Status>,
-    defaultTimeReportDay: 0,
-    modifiedBy: "user-1" as Ref<Doc>,
-    modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
-    createdOn: Date.now(),
-    ...overrides
-  })
+  const makeProject = (overrides?: Partial<HulyProject>): HulyProject =>
+    asProject({
+      _id: "project-1" as Ref<HulyProject>,
+      _class: tracker.class.Project,
+      space: "space-1" as Ref<Space>,
+      identifier: "TEST",
+      name: "Test Project",
+      sequence: 1,
+      defaultIssueStatus: "status-open" as Ref<Status>,
+      defaultTimeReportDay: TimeReportDayType.CurrentWorkDay,
+      modifiedBy: "user-1" as PersonId,
+      modifiedOn: Date.now(),
+      createdBy: "user-1" as PersonId,
+      createdOn: Date.now(),
+      ...overrides
+    })
 
   const makeTemplate = (overrides?: Partial<HulyIssueTemplate>): HulyIssueTemplate => ({
     _id: "template-1" as Ref<HulyIssueTemplate>,
@@ -394,9 +404,9 @@ describe("getIssueTemplate - assignee/component lookup false branches (issue-tem
     estimation: 0,
     children: [],
     comments: 0,
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: 1000,
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: 900,
     ...overrides
   })
@@ -460,8 +470,8 @@ describe("getIssueTemplate - assignee/component lookup false branches (issue-tem
       })
 
       const result = yield* getIssueTemplate({
-        project: "TEST",
-        template: "Bug Report"
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.assignee).toBeUndefined()
@@ -481,8 +491,8 @@ describe("getIssueTemplate - assignee/component lookup false branches (issue-tem
       })
 
       const result = yield* getIssueTemplate({
-        project: "TEST",
-        template: "Bug Report"
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.component).toBeUndefined()
@@ -494,26 +504,25 @@ describe("getIssueTemplate - assignee/component lookup false branches (issue-tem
 // ============================================================
 
 describe("getNotification - notif.data truthy branch (notifications.ts line 207)", () => {
-  const makeNotification = (overrides?: Partial<HulyInboxNotification>): HulyInboxNotification => ({
-    _id: "notif-1" as Ref<HulyInboxNotification>,
-    _class: notification.class.InboxNotification,
-    space: "person-space-1" as Ref<PersonSpace>,
-    // eslint-disable-next-line no-restricted-syntax -- test mock: double assertion for branded user type
-    user: "user-1" as unknown as HulyInboxNotification["user"],
-    isViewed: false,
-    archived: false,
-    objectId: "obj-1" as Ref<Doc>,
-    objectClass: "tracker.class.Issue" as Ref<Class<Doc>>,
-    docNotifyContext: "ctx-1" as Ref<HulyDocNotifyContext>,
-    title: "Test" as HulyInboxNotification["title"],
-    body: "Body" as HulyInboxNotification["body"],
-    data: undefined,
-    createdOn: 1706500000000,
-    modifiedOn: 1706500000000,
-    modifiedBy: "user-1" as Ref<Doc>,
-    createdBy: "user-1" as Ref<Doc>,
-    ...overrides
-  })
+  const makeNotification = (overrides?: Partial<HulyInboxNotification>): HulyInboxNotification =>
+    asNotification({
+      _id: "notif-1" as Ref<HulyInboxNotification>,
+      _class: notification.class.InboxNotification,
+      space: "person-space-1" as Ref<PersonSpace>,
+      user: "user-1" as HulyInboxNotification["user"],
+      isViewed: false,
+      archived: false,
+      objectId: "obj-1" as Ref<Doc>,
+      objectClass: "tracker.class.Issue" as Ref<Class<Doc>>,
+      docNotifyContext: "ctx-1" as Ref<HulyDocNotifyContext>,
+      title: "Test" as HulyInboxNotification["title"],
+      body: "Body" as HulyInboxNotification["body"],
+      createdOn: 1706500000000,
+      modifiedOn: 1706500000000,
+      modifiedBy: "user-1" as PersonId,
+      createdBy: "user-1" as PersonId,
+      ...overrides
+    })
 
   const createNotifTestLayer = (notifications: Array<HulyInboxNotification>) => {
     const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown, query: unknown) => {
@@ -528,16 +537,17 @@ describe("getNotification - notif.data truthy branch (notifications.ts line 207)
     return HulyClient.testLayer({ findOne: findOneImpl })
   }
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns data when notif.data is truthy", () =>
     Effect.gen(function*() {
       const notif = makeNotification({
-        // eslint-disable-next-line no-restricted-syntax -- test mock: double assertion for branded data type
-        data: { key: "value" } as unknown as HulyInboxNotification["data"]
-      })
+        data: asNotifData({ key: "value" })
+      } as Partial<HulyInboxNotification>)
       const testLayer = createNotifTestLayer([notif])
 
-      const result = yield* getNotification({ notificationId: "notif-1" }).pipe(Effect.provide(testLayer))
+      const result = yield* getNotification({ notificationId: notificationBrandId("notif-1") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(result.data).toEqual({ key: "value" })
     }))
@@ -545,10 +555,12 @@ describe("getNotification - notif.data truthy branch (notifications.ts line 207)
   // test-revizorro: approved
   it.effect("returns undefined data when notif.data is falsy", () =>
     Effect.gen(function*() {
-      const notif = makeNotification({ data: undefined })
+      const notif = makeNotification()
       const testLayer = createNotifTestLayer([notif])
 
-      const result = yield* getNotification({ notificationId: "notif-1" }).pipe(Effect.provide(testLayer))
+      const result = yield* getNotification({ notificationId: notificationBrandId("notif-1") }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(result.data).toBeUndefined()
     }))
@@ -560,11 +572,9 @@ describe("getNotification - notif.data truthy branch (notifications.ts line 207)
 
 describe("listWorkspaces - ws.region defined branch (workspace.ts line 143)", () => {
   const mkWorkspaceInfo = (overrides?: Partial<WorkspaceInfoWithStatus>): WorkspaceInfoWithStatus => ({
-    // eslint-disable-next-line no-restricted-syntax -- test mock: double assertion for branded WorkspaceInfoWithStatus uuid
-    uuid: "ws-1" as unknown as WorkspaceInfoWithStatus["uuid"],
+    uuid: "ws-1" as WorkspaceInfoWithStatus["uuid"],
     name: "Test Workspace",
     url: "test-workspace",
-    region: undefined,
     createdOn: 1700000000000,
     versionMajor: 1,
     versionMinor: 0,
@@ -580,8 +590,7 @@ describe("listWorkspaces - ws.region defined branch (workspace.ts line 143)", ()
   it.effect("maps ws.region to RegionId when defined", () =>
     Effect.gen(function*() {
       const workspaces = [
-        // eslint-disable-next-line no-restricted-syntax -- test mock: double assertion for branded uuid
-        mkWorkspaceInfo({ uuid: "ws-1" as unknown as WorkspaceInfoWithStatus["uuid"], region: "eu-west" })
+        mkWorkspaceInfo({ uuid: "ws-1" as WorkspaceInfoWithStatus["uuid"], region: "eu-west" })
       ]
       const testLayer = WorkspaceClient.testLayer({
         getUserWorkspaces: () => Effect.succeed(workspaces)
@@ -597,8 +606,7 @@ describe("listWorkspaces - ws.region defined branch (workspace.ts line 143)", ()
   it.effect("maps ws.region to undefined when not defined", () =>
     Effect.gen(function*() {
       const workspaces = [
-        // eslint-disable-next-line no-restricted-syntax -- test mock: double assertion for branded uuid
-        mkWorkspaceInfo({ uuid: "ws-1" as unknown as WorkspaceInfoWithStatus["uuid"], region: undefined })
+        mkWorkspaceInfo({ uuid: "ws-1" as WorkspaceInfoWithStatus["uuid"] })
       ]
       const testLayer = WorkspaceClient.testLayer({
         getUserWorkspaces: () => Effect.succeed(workspaces)
@@ -630,9 +638,9 @@ describe("listChannels - includeArchived true (channels.ts line 209 true branch)
         archived: true,
         members: [],
         messages: 0,
-        modifiedBy: "user-1" as Ref<Doc>,
+        modifiedBy: "user-1" as PersonId,
         modifiedOn: Date.now(),
-        createdBy: "user-1" as Ref<Doc>,
+        createdBy: "user-1" as PersonId,
         createdOn: Date.now()
       }
 
@@ -647,9 +655,9 @@ describe("listChannels - includeArchived true (channels.ts line 209 true branch)
         archived: false,
         members: [],
         messages: 0,
-        modifiedBy: "user-1" as Ref<Doc>,
+        modifiedBy: "user-1" as PersonId,
         modifiedOn: Date.now(),
-        createdBy: "user-1" as Ref<Doc>,
+        createdBy: "user-1" as PersonId,
         createdOn: Date.now()
       }
 

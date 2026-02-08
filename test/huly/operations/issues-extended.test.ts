@@ -1,13 +1,30 @@
 import { describe, it } from "@effect/vitest"
 import type { Channel, Person } from "@hcengineering/contact"
-import type { Doc, FindResult, MarkupBlobRef, Ref, Space, Status } from "@hcengineering/core"
+import type {
+  Attribute,
+  Class,
+  Doc,
+  FindResult,
+  MarkupBlobRef,
+  PersonId,
+  Ref,
+  Space,
+  Status
+} from "@hcengineering/core"
 import type { TagElement, TagReference } from "@hcengineering/tags"
-import { type Issue as HulyIssue, IssuePriority, type Project as HulyProject } from "@hcengineering/tracker"
+import type { TaskType } from "@hcengineering/task"
+import {
+  type Issue as HulyIssue,
+  IssuePriority,
+  type Project as HulyProject,
+  TimeReportDayType
+} from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../../../src/huly/errors.js"
 import { addLabel, createIssue, deleteIssue, updateIssue } from "../../../src/huly/operations/issues.js"
+import { issueIdentifier, projectIdentifier } from "../../helpers/brands.js"
 
 import { contact, core, tags, tracker } from "../../../src/huly/huly-plugins.js"
 
@@ -17,24 +34,22 @@ const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   return result
 }
 
-const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
-  const result: HulyProject = {
-    _id: "project-1" as Ref<HulyProject>,
-    _class: tracker.class.Project,
-    space: "space-1" as Ref<Space>,
-    identifier: "TEST",
-    name: "Test Project",
-    sequence: 1,
-    defaultIssueStatus: "status-open" as Ref<Status>,
-    defaultTimeReportDay: 0,
-    modifiedBy: "user-1" as Ref<Doc>,
-    modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
-    createdOn: Date.now(),
-    ...overrides
-  }
-  return result
-}
+// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- mock builder
+const makeProject = (overrides?: Partial<HulyProject>): HulyProject => ({
+  _id: "project-1" as Ref<HulyProject>,
+  _class: tracker.class.Project,
+  space: "space-1" as Ref<Space>,
+  identifier: "TEST",
+  name: "Test Project",
+  sequence: 1,
+  defaultIssueStatus: "status-open" as Ref<Status>,
+  defaultTimeReportDay: TimeReportDayType.CurrentWorkDay,
+  modifiedBy: "user-1" as PersonId,
+  modifiedOn: Date.now(),
+  createdBy: "user-1" as PersonId,
+  createdOn: Date.now(),
+  ...overrides
+} as HulyProject)
 
 const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
   const result: HulyIssue = {
@@ -47,7 +62,7 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
     status: "status-open" as Ref<Status>,
     priority: IssuePriority.Medium,
     assignee: null,
-    kind: "task-type-1" as Ref<Doc>,
+    kind: "task-type-1" as Ref<TaskType>,
     number: 1,
     dueDate: null,
     rank: "0|aaa",
@@ -62,9 +77,9 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
     reportedTime: 0,
     reports: 0,
     childInfo: [],
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -74,13 +89,13 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
 const makeStatus = (overrides?: Partial<Status>): Status => {
   const result: Status = {
     _id: "status-1" as Ref<Status>,
-    _class: "core:class:Status" as Ref<Doc>,
+    _class: "core:class:Status" as Ref<Class<Status>>,
     space: "space-1" as Ref<Space>,
-    ofAttribute: "tracker:attribute:IssueStatus" as Ref<Doc>,
+    ofAttribute: "tracker:attribute:IssueStatus" as Ref<Attribute<Status>>,
     name: "Open",
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -97,9 +112,9 @@ const makeTagElement = (overrides?: Partial<TagElement>): TagElement => {
     targetClass: tracker.class.Issue,
     color: 0,
     category: tracker.category.Other,
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -315,6 +330,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     return Effect.succeed((id ?? "new-doc-id") as Ref<Doc>)
   }) as HulyClientOperations["createDoc"]
 
+  // eslint-disable-next-line no-restricted-syntax -- mock function signature (unknown params) doesn't overlap with typed signature
   const uploadMarkupImpl: HulyClientOperations["uploadMarkup"] = ((
     _objectClass: unknown,
     _objectId: unknown,
@@ -325,7 +341,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       config.captureUploadMarkup.markup = markup as string
     }
     return Effect.succeed("markup-ref-123")
-  }) as HulyClientOperations["uploadMarkup"]
+  }) as unknown as HulyClientOperations["uploadMarkup"]
 
   const updateMarkupImpl: HulyClientOperations["updateMarkup"] = ((
     _objectClass: unknown,
@@ -365,7 +381,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 
 describe("Issues Extended Coverage", () => {
   describe("extractUpdatedSequence fallback (line 121 None branch)", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("falls back to project.sequence + 1 when updateDoc returns non-decodable result", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST", sequence: 10 })
@@ -431,7 +447,7 @@ describe("Issues Extended Coverage", () => {
         })
 
         const result = yield* createIssue({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           title: "Fallback Sequence"
         }).pipe(Effect.provide(testLayer))
 
@@ -457,8 +473,8 @@ describe("Issues Extended Coverage", () => {
         })
 
         const result = yield* deleteIssue({
-          project: "TEST",
-          identifier: "TEST-1"
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.identifier).toBe("TEST-1")
@@ -477,8 +493,8 @@ describe("Issues Extended Coverage", () => {
 
         const error = yield* Effect.flip(
           deleteIssue({
-            project: "NONEXISTENT",
-            identifier: "1"
+            project: projectIdentifier("NONEXISTENT"),
+            identifier: issueIdentifier("1")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -500,8 +516,8 @@ describe("Issues Extended Coverage", () => {
 
         const error = yield* Effect.flip(
           deleteIssue({
-            project: "TEST",
-            identifier: "TEST-999"
+            project: projectIdentifier("TEST"),
+            identifier: issueIdentifier("TEST-999")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -525,8 +541,8 @@ describe("Issues Extended Coverage", () => {
         })
 
         const result = yield* deleteIssue({
-          project: "TEST",
-          identifier: "42"
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("42")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.identifier).toBe("TEST-42")
@@ -553,8 +569,8 @@ describe("Issues Extended Coverage", () => {
         })
 
         const result = yield* addLabel({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           label: "NewTag"
         }).pipe(Effect.provide(testLayer))
 
@@ -588,8 +604,8 @@ describe("Issues Extended Coverage", () => {
         })
 
         const result = yield* updateIssue({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           description: "# Updated Description"
         }).pipe(Effect.provide(testLayer))
 
@@ -599,7 +615,7 @@ describe("Issues Extended Coverage", () => {
         expect(captureUpdateDoc.operations?.description).toBeUndefined()
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns updated=true when only description is updated in place (no other updateOps)", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -619,8 +635,8 @@ describe("Issues Extended Coverage", () => {
         })
 
         const result = yield* updateIssue({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           description: "# Only desc updated"
         }).pipe(Effect.provide(testLayer))
 

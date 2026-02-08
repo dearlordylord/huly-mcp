@@ -218,8 +218,7 @@ export class HulyStorageClient extends Context.Tag("@hulymcp/HulyStorageClient")
       StorageClientError
     > =>
       Effect.succeed({
-        // eslint-disable-next-line no-restricted-syntax -- test mock: string literal to branded Ref
-        blobId: "test-blob-id" as unknown as Ref<Blob>,
+        blobId: "test-blob-id" as Ref<Blob>,
         contentType: "application/octet-stream",
         size: 0,
         url: "https://test.huly.io/files?workspace=test&file=test-blob-id"

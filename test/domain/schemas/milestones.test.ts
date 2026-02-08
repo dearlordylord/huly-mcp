@@ -424,7 +424,7 @@ describe("Milestone Schemas", () => {
   })
 
   describe("UpdateMilestoneParamsSchema", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("parses minimal params (no updates)", () =>
       Effect.gen(function*() {
         const result = yield* parseUpdateMilestoneParams({
@@ -634,7 +634,7 @@ describe("Milestone Schemas", () => {
         expect(schema.properties).toHaveProperty("limit")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("generates JSON Schema for GetMilestoneParams", () =>
       Effect.gen(function*() {
         const schema = getMilestoneParamsJsonSchema as JsonSchemaObject
@@ -654,7 +654,7 @@ describe("Milestone Schemas", () => {
         expect(schema.properties).toHaveProperty("description")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("generates JSON Schema for UpdateMilestoneParams", () =>
       Effect.gen(function*() {
         const schema = updateMilestoneParamsJsonSchema as JsonSchemaObject
@@ -706,6 +706,7 @@ describe("Milestone Schemas", () => {
     // test-revizorro: suspect | Tests for additionalProperties: false but schemas don't set it (missing jsonSchema annotations like in shared.ts EmptyParamsSchema)
     it.effect("all JSON schemas have additionalProperties false", () =>
       Effect.gen(function*() {
+        // eslint-disable-next-line no-restricted-syntax -- tuple type doesn't overlap with Array<Record<string, unknown>>
         const schemas = [
           listMilestonesParamsJsonSchema,
           getMilestoneParamsJsonSchema,
@@ -713,7 +714,7 @@ describe("Milestone Schemas", () => {
           updateMilestoneParamsJsonSchema,
           setIssueMilestoneParamsJsonSchema,
           deleteMilestoneParamsJsonSchema
-        ] as Array<Record<string, unknown>>
+        ] as unknown as Array<Record<string, unknown>>
 
         for (const schema of schemas) {
           expect(schema.additionalProperties).toBe(false)

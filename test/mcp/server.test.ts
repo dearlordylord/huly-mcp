@@ -1,16 +1,31 @@
 import { describe, it } from "@effect/vitest"
-import { type Doc, type Ref, type Space, type Status, toFindResult } from "@hcengineering/core"
-import { type Issue as HulyIssue, IssuePriority, type Project as HulyProject } from "@hcengineering/tracker"
+import {
+  type Attribute,
+  type Class as HulyClass,
+  type Doc,
+  type PersonId,
+  type Ref,
+  type Space,
+  type Status,
+  toFindResult
+} from "@hcengineering/core"
+import type { TaskType } from "@hcengineering/task"
+import {
+  type Issue as HulyIssue,
+  IssuePriority,
+  type Project as HulyProject,
+  TimeReportDayType
+} from "@hcengineering/tracker"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js"
 import { Effect, Fiber, Layer } from "effect"
-import { expect } from "vitest"
+import { expect, vi } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
 import { HttpServerFactoryService, HttpTransportError } from "../../src/mcp/http-transport.js"
 import { McpServerError, McpServerService } from "../../src/mcp/server.js"
 import { TOOL_DEFINITIONS } from "../../src/mcp/tools/index.js"
-import type { TelemetryOperations } from "../../src/telemetry/telemetry.js"
+import type { SessionStartProps, TelemetryOperations, ToolCalledProps } from "../../src/telemetry/telemetry.js"
 import { TelemetryService } from "../../src/telemetry/telemetry.js"
 
 import { tracker } from "../../src/huly/huly-plugins.js"
@@ -46,7 +61,7 @@ vi.mock("@modelcontextprotocol/sdk/server/index.js", () => ({
 // --- Mock Data Builders ---
 
 const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
-  const result: HulyProject = {
+  const result = {
     _id: "project-1" as Ref<HulyProject>,
     _class: tracker.class.Project,
     space: "space-1" as Ref<Space>,
@@ -54,14 +69,15 @@ const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
     name: "Test Project",
     sequence: 1,
     defaultIssueStatus: "status-open" as Ref<Status>,
-    defaultTimeReportDay: 0,
-    modifiedBy: "user-1" as Ref<Doc>,
+    defaultTimeReportDay: TimeReportDayType.CurrentWorkDay,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
-  return result
+  // single cast: exactOptionalPropertyTypes prevents direct type annotation on mock objects
+  return result as HulyProject
 }
 
 const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
@@ -75,7 +91,7 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
     status: "status-open" as Ref<Status>,
     priority: IssuePriority.Medium,
     assignee: null,
-    kind: "task-type-1" as Ref<Doc>,
+    kind: "task-type-1" as Ref<TaskType>,
     number: 1,
     dueDate: null,
     rank: "0|aaa",
@@ -90,9 +106,9 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
     reportedTime: 0,
     reports: 0,
     childInfo: [],
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -102,13 +118,13 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
 const makeStatus = (overrides?: Partial<Status>): Status => {
   const result: Status = {
     _id: "status-1" as Ref<Status>,
-    _class: "core:class:Status" as Ref<Doc>,
+    _class: "core:class:Status" as Ref<HulyClass<Status>>,
     space: "space-1" as Ref<Space>,
-    ofAttribute: "tracker:attribute:IssueStatus" as Ref<Doc>,
+    ofAttribute: "tracker:attribute:IssueStatus" as Ref<Attribute<Status>>,
     name: "Open",
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -406,7 +422,8 @@ describe("McpServerService", () => {
     // test-revizorro: approved
     it.effect("creates a test layer with default operations", () =>
       Effect.gen(function*() {
-        const testLayer = McpServerService.testLayer({})
+        const mockHttpLayer = Layer.succeed(HttpServerFactoryService, {} as never)
+        const testLayer = Layer.merge(McpServerService.testLayer({}), mockHttpLayer)
 
         const result = yield* Effect.gen(function*() {
           const server = yield* McpServerService
@@ -424,12 +441,16 @@ describe("McpServerService", () => {
       Effect.gen(function*() {
         let runCalled = false
 
-        const testLayer = McpServerService.testLayer({
-          run: () =>
-            Effect.sync(() => {
-              runCalled = true
-            })
-        })
+        const mockHttpLayer = Layer.succeed(HttpServerFactoryService, {} as never)
+        const testLayer = Layer.merge(
+          McpServerService.testLayer({
+            run: () =>
+              Effect.sync(() => {
+                runCalled = true
+              })
+          }),
+          mockHttpLayer
+        )
 
         yield* Effect.gen(function*() {
           const server = yield* McpServerService
@@ -462,9 +483,13 @@ describe("McpServerService", () => {
     // test-revizorro: approved
     it.effect("can mock run to fail with error", () =>
       Effect.gen(function*() {
-        const testLayer = McpServerService.testLayer({
-          run: () => new McpServerError({ message: "Test error" })
-        })
+        const mockHttpLayer = Layer.succeed(HttpServerFactoryService, {} as never)
+        const testLayer = Layer.merge(
+          McpServerService.testLayer({
+            run: () => new McpServerError({ message: "Test error" })
+          }),
+          mockHttpLayer
+        )
 
         const error = yield* Effect.flip(
           Effect.gen(function*() {
@@ -488,7 +513,7 @@ describe("McpServerError", () => {
       expect(error.message).toBe("Connection failed")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("creates error with message and cause", () =>
     Effect.gen(function*() {
       const cause = new Error("Original error")
@@ -587,9 +612,6 @@ describe("McpServerService.layer operations", () => {
       Effect.gen(function*() {
         const serverLayer = buildStdioService()
         const ctx = yield* Layer.build(serverLayer)
-        const _service = ctx.pipe(
-          Effect.provideService(McpServerService, ctx.unsafeMap.get(McpServerService.key) as McpServerService["Type"])
-        )
         // Get the service from the context
         const ops = yield* McpServerService.pipe(
           Effect.provide(Layer.succeedContext(ctx))
@@ -1006,12 +1028,9 @@ describe("McpServerService.layer operations", () => {
       }), { timeout: 5000 })
 
     it.scoped("http transport run completes via SIGTERM and flushes telemetry", () => {
-      let _shutdownCalled = false
       return Effect.gen(function*() {
         const telemetryOps: Partial<TelemetryOperations> = {
-          shutdown: async () => {
-            _shutdownCalled = true
-          },
+          shutdown: async () => {},
           sessionStart: () => {},
           firstListTools: () => {},
           toolCalled: () => {}
@@ -1191,12 +1210,11 @@ describe("McpServerService.layer operations", () => {
 
   describe("telemetry integration", () => {
     it.scoped("sessionStart defaults authMethod to password when not specified", () => {
-      let capturedProps: Record<string, unknown> | null = null
+      let capturedProps: SessionStartProps | null = null
       return Effect.gen(function*() {
         const telemetryLayer = TelemetryService.testLayer({
           sessionStart: (props) => {
-            // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-            capturedProps = props as unknown as Record<string, unknown>
+            capturedProps = props
           }
         })
         const layers = Layer.mergeAll(
@@ -1215,13 +1233,12 @@ describe("McpServerService.layer operations", () => {
     })
 
     it.scoped("sessionStart includes toolsets when TOOLSETS env is set", () => {
-      let capturedProps: Record<string, unknown> | null = null
+      let capturedProps: SessionStartProps | null = null
       return Effect.gen(function*() {
         process.env.TOOLSETS = "issues,documents"
         const telemetryLayer = TelemetryService.testLayer({
           sessionStart: (props) => {
-            // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-            capturedProps = props as unknown as Record<string, unknown>
+            capturedProps = props
           }
         })
         const layers = Layer.mergeAll(
@@ -1241,13 +1258,12 @@ describe("McpServerService.layer operations", () => {
     })
 
     it.scoped("sessionStart toolsets is null when no TOOLSETS env", () => {
-      let capturedProps: Record<string, unknown> | null = null
+      let capturedProps: SessionStartProps | null = null
       return Effect.gen(function*() {
         delete process.env.TOOLSETS
         const telemetryLayer = TelemetryService.testLayer({
           sessionStart: (props) => {
-            // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-            capturedProps = props as unknown as Record<string, unknown>
+            capturedProps = props
           }
         })
         const layers = Layer.mergeAll(
@@ -1326,13 +1342,12 @@ describe("McpServerService.layer operations", () => {
     it.scoped("CallTool handler returns null for unknown tool", () =>
       Effect.gen(function*() {
         capturedHandlers.clear()
-        let toolCalledProps: Record<string, unknown> | null = null
+        let toolCalledProps: ToolCalledProps | null = null
         const telemetryOps: Partial<TelemetryOperations> = {
           firstListTools: () => {},
           sessionStart: () => {},
           toolCalled: (props) => {
-            // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-            toolCalledProps = props as unknown as Record<string, unknown>
+            toolCalledProps = props
           },
           shutdown: async () => {}
         }
@@ -1368,13 +1383,12 @@ describe("McpServerService.layer operations", () => {
     it.scoped("CallTool handler handles known tool", () =>
       Effect.gen(function*() {
         capturedHandlers.clear()
-        let toolCalledProps: Record<string, unknown> | null = null
+        let toolCalledProps: ToolCalledProps | null = null
         const telemetryOps: Partial<TelemetryOperations> = {
           firstListTools: () => {},
           sessionStart: () => {},
           toolCalled: (props) => {
-            // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-            toolCalledProps = props as unknown as Record<string, unknown>
+            toolCalledProps = props
           },
           shutdown: async () => {}
         }
@@ -1441,13 +1455,12 @@ describe("McpServerService.layer operations", () => {
     it.scoped("CallTool records error telemetry for parse errors", () =>
       Effect.gen(function*() {
         capturedHandlers.clear()
-        let toolCalledProps: Record<string, unknown> | null = null
+        let toolCalledProps: ToolCalledProps | null = null
         const telemetryOps: Partial<TelemetryOperations> = {
           firstListTools: () => {},
           sessionStart: () => {},
           toolCalled: (props) => {
-            // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-            toolCalledProps = props as unknown as Record<string, unknown>
+            toolCalledProps = props
           },
           shutdown: async () => {}
         }
@@ -1481,13 +1494,12 @@ describe("McpServerService.layer operations", () => {
     it.scoped("CallTool records internal error telemetry for connection errors", () =>
       Effect.gen(function*() {
         capturedHandlers.clear()
-        let toolCalledProps: Record<string, unknown> | null = null
+        let toolCalledProps: ToolCalledProps | null = null
         const telemetryOps: Partial<TelemetryOperations> = {
           firstListTools: () => {},
           sessionStart: () => {},
           toolCalled: (props) => {
-            // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-            toolCalledProps = props as unknown as Record<string, unknown>
+            toolCalledProps = props
           },
           shutdown: async () => {}
         }

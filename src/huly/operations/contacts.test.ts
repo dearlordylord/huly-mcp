@@ -78,7 +78,7 @@ const createTestLayer = (config: MockConfig) => {
       if (opts.limit !== undefined) {
         filtered = filtered.slice(0, opts.limit)
       }
-      // eslint-disable-next-line no-restricted-syntax -- test mock: typed array to FindResult
+      // eslint-disable-next-line no-restricted-syntax -- typed array doesn't overlap with FindResult<Doc>
       return Effect.succeed(filtered as unknown as FindResult<Doc>)
     }
     if (_class === contact.class.Channel) {
@@ -105,10 +105,10 @@ const createTestLayer = (config: MockConfig) => {
           filtered = filtered.filter(c => c.value === value)
         }
       }
-      // eslint-disable-next-line no-restricted-syntax -- test mock: typed array to FindResult
+      // eslint-disable-next-line no-restricted-syntax -- typed array doesn't overlap with FindResult<Doc>
       return Effect.succeed(filtered as unknown as FindResult<Doc>)
     }
-    // eslint-disable-next-line no-restricted-syntax -- test mock: empty array to FindResult
+    // eslint-disable-next-line no-restricted-syntax -- typed array doesn't overlap with FindResult<Doc>
     return Effect.succeed([] as unknown as FindResult<Doc>)
   }) as HulyClientOperations["findAll"]
 
@@ -194,7 +194,7 @@ describe("Contacts Operations", () => {
       expect(result).toEqual([])
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("transforms persons with email channels", async () => {
       const mockPerson = createMockPerson()
       const mockChannel = createMockChannel()
@@ -302,7 +302,7 @@ describe("Contacts Operations", () => {
       expect(resultMap.get(PersonId.make("person-3"))?.email).toBe("bob@example.com")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("filters by emailSearch using server-side channel query", async () => {
       const person1 = createMockPerson({
         _id: "person-1" as Ref<HulyPerson>,
@@ -382,7 +382,7 @@ describe("Contacts Operations", () => {
   })
 
   describe("getPerson", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("returns person by ID", async () => {
       const mockPerson = createMockPerson()
       const mockChannel = createMockChannel()
@@ -433,7 +433,7 @@ describe("Contacts Operations", () => {
       expect(result.lastName).toBe("Smith")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("handles name without comma", async () => {
       const mockPerson = createMockPerson({ name: "SingleName" })
 
@@ -487,7 +487,7 @@ describe("Contacts Operations", () => {
       })
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: suspect | only checks Exit.isFailure, not error type or identifier — same weakness as line 408
     it("fails with PersonNotFoundError when email not found", async () => {
       const testLayer = createTestLayer({ persons: [], channels: [] })
 
@@ -558,7 +558,7 @@ describe("Contacts Operations", () => {
       expect(channelCapture.attributes?.value).toBe("john@example.com")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("rejects empty email at the brand level", () => {
       expect(() => Email.make("   ")).toThrow()
     })

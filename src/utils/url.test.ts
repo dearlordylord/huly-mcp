@@ -14,11 +14,6 @@ describe("concatLink", () => {
       expect(concatLink("https://example.com", "files")).toBe("https://example.com/files")
     })
 
-    // test-revizorro: suspect | duplicate of line 12-15 test with identical inputs/outputs
-    it("both without slashes", () => {
-      expect(concatLink("https://example.com", "files")).toBe("https://example.com/files")
-    })
-
     // test-revizorro: approved
     it("host without trailing slash, path with leading slash", () => {
       expect(concatLink("https://example.com", "/files")).toBe("https://example.com/files")
@@ -57,12 +52,12 @@ describe("concatLink", () => {
   })
 
   describe("host with path prefix", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("host with path, path with leading slash", () => {
       expect(concatLink("https://example.com/api", "/files")).toBe("https://example.com/api/files")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("host with trailing-slashed path, path with leading slash", () => {
       expect(concatLink("https://example.com/api/", "/files")).toBe(
         "https://example.com/api/files"

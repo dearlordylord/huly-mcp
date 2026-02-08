@@ -19,6 +19,7 @@ import {
   listPersons,
   updatePerson
 } from "../../../src/huly/operations/contacts.js"
+import { memberReference } from "../../helpers/brands.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   const result = docs as FindResult<T>
@@ -437,7 +438,7 @@ describe("Contacts Extended Coverage", () => {
   })
 
   describe("listEmployees", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns employee summaries with emails", () =>
       Effect.gen(function*() {
         const emp = createMockEmployee({
@@ -491,7 +492,7 @@ describe("Contacts Extended Coverage", () => {
       Effect.gen(function*() {
         const emp = createMockEmployee({
           _id: "employee-3" as Ref<HulyEmployee>,
-          // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
+          // eslint-disable-next-line no-restricted-syntax -- null doesn't overlap with string
           position: null as unknown as string
         })
 
@@ -605,7 +606,7 @@ describe("Contacts Extended Coverage", () => {
 
         const result = yield* createOrganization({
           name: "Org With Members",
-          members: ["person-1"]
+          members: [memberReference("person-1")]
         }).pipe(Effect.provide(testLayer))
 
         expect(result.id).toBeDefined()
@@ -684,7 +685,7 @@ describe("Contacts Extended Coverage", () => {
 
         const result = yield* createOrganization({
           name: "Org By Email",
-          members: ["member@example.com"]
+          members: [memberReference("member@example.com")]
         }).pipe(Effect.provide(testLayer))
 
         expect(result.id).toBeDefined()
@@ -706,7 +707,7 @@ describe("Contacts Extended Coverage", () => {
 
         const result = yield* createOrganization({
           name: "Org No Members",
-          members: ["nonexistent-ref"]
+          members: [memberReference("nonexistent-ref")]
         }).pipe(Effect.provide(testLayer))
 
         expect(result.id).toBeDefined()

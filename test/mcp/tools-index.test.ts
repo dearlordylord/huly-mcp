@@ -26,7 +26,7 @@ const noopStorageClient: HulyStorageOperations = {
 }
 
 describe("CATEGORY_NAMES", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("contains expected categories", () =>
     Effect.gen(function*() {
       expect(CATEGORY_NAMES.has("projects")).toBe(true)
@@ -69,7 +69,7 @@ describe("createFilteredRegistry", () => {
       }
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("returns empty registry for unknown category", () =>
     Effect.gen(function*() {
       const filtered = createFilteredRegistry(new Set(["nonexistent_category"]))
@@ -117,7 +117,7 @@ describe("TOOL_DEFINITIONS", () => {
       expect(keys.length).toBe(toolRegistry.tools.size)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("entries match toolRegistry", () =>
     Effect.gen(function*() {
       for (const [name, tool] of Object.entries(TOOL_DEFINITIONS)) {

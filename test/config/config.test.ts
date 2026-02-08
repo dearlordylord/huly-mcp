@@ -419,7 +419,7 @@ describe("Config Module", () => {
         expect(error._tag).toBe("ConfigValidationError")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails on negative timeout", () =>
       Effect.gen(function*() {
         process.env["HULY_URL"] = "https://huly.app"

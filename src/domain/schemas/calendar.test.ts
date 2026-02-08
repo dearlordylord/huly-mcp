@@ -56,7 +56,7 @@ describe("Calendar Schemas", () => {
       expect(Either.isRight(result)).toBe(true)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("rejects invalid frequency", () => {
       const result = Schema.decodeUnknownEither(RecurringRuleSchema)({ freq: "CONSTANTLY" })
       expect(Either.isLeft(result)).toBe(true)
@@ -80,7 +80,7 @@ describe("Calendar Schemas", () => {
       expect(Either.isLeft(result)).toBe(true)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("rejects invalid month values", () => {
       const result = Schema.decodeUnknownEither(RecurringRuleSchema)({
         freq: "YEARLY",
@@ -97,7 +97,7 @@ describe("Calendar Schemas", () => {
       expect(Either.isRight(result)).toBe(true)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("accepts from/to timestamps", () => {
       const result = Schema.decodeUnknownEither(ListEventsParamsSchema)({
         from: 1704067200000,
@@ -140,7 +140,7 @@ describe("Calendar Schemas", () => {
       expect(Either.isRight(result)).toBe(true)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("rejects empty eventId", () => {
       const result = Schema.decodeUnknownEither(GetEventParamsSchema)({
         eventId: ""
@@ -169,7 +169,7 @@ describe("Calendar Schemas", () => {
   })
 
   describe("CreateEventParamsSchema", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("accepts minimal valid event", () => {
       const result = Schema.decodeUnknownEither(CreateEventParamsSchema)({
         title: "Meeting",
@@ -230,7 +230,7 @@ describe("Calendar Schemas", () => {
       expect(Either.isRight(result)).toBe(true)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("accepts partial updates", () => {
       const result = Schema.decodeUnknownEither(UpdateEventParamsSchema)({
         eventId: "evt-123",
@@ -261,7 +261,7 @@ describe("Calendar Schemas", () => {
       expect(Either.isRight(result)).toBe(true)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("accepts multiple rules", () => {
       const result = Schema.decodeUnknownEither(CreateRecurringEventParamsSchema)({
         title: "Complex Event",
@@ -295,7 +295,7 @@ describe("Calendar Schemas", () => {
       expect(Either.isRight(result)).toBe(true)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("rejects missing rules", () => {
       const result = Schema.decodeUnknownEither(CreateRecurringEventParamsSchema)({
         title: "Meeting",
@@ -348,7 +348,7 @@ describe("Calendar Schemas", () => {
       }
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("rejects empty recurringEventId", () => {
       const result = Schema.decodeUnknownEither(ListEventInstancesParamsSchema)({
         recurringEventId: ""

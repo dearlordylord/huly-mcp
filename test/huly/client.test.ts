@@ -9,6 +9,7 @@ import {
   type DocumentQuery,
   type FindOptions,
   type FindResult,
+  type PersonId,
   type Ref as DocRef,
   type Space,
   toFindResult,
@@ -139,15 +140,16 @@ describe("HulyClient Service", () => {
           _class: "class" as DocRef<Class<TestDoc>>,
           space: "space" as DocRef<Space>,
           title: "Test",
-          modifiedBy: "user" as DocRef<Doc>,
+          modifiedBy: "user" as PersonId,
           modifiedOn: 0,
-          createdBy: "user" as DocRef<Doc>,
+          createdBy: "user" as PersonId,
           createdOn: 0
         }
         const mockResults = toFindResult([testDoc])
 
         const testLayer = HulyClient.testLayer({
-          findAll: <T extends Doc>() => Effect.succeed(mockResults as FindResult<T>)
+          // eslint-disable-next-line no-restricted-syntax -- FindResult<TestDoc> doesn't overlap with FindResult<T>
+          findAll: <T extends Doc>() => Effect.succeed(mockResults as unknown as FindResult<T>)
         })
 
         const client = yield* HulyClient.pipe(Effect.provide(testLayer))
@@ -173,7 +175,7 @@ describe("HulyClient Service", () => {
         expect(results).toHaveLength(0)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("default findOne returns undefined", () =>
       Effect.gen(function*() {
         const testLayer = HulyClient.testLayer({})
@@ -204,7 +206,7 @@ describe("HulyClient Service", () => {
         expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("default fetchMarkup returns empty string", () =>
       Effect.gen(function*() {
         const testLayer = HulyClient.testLayer({})
@@ -455,11 +457,12 @@ describe("HulyClient Service", () => {
     // test-revizorro: approved
     it.effect("can be composed with other services", () =>
       Effect.gen(function*() {
+        const asDoc = (v: unknown): Doc => v as Doc
         const mockFindAllOp = <T extends Doc>() =>
-          Effect.succeed(toFindResult([
-            { _id: "1", title: "Issue 1" },
-            { _id: "2", title: "Issue 2" }
-          ] as Array<Doc>) as FindResult<T>)
+          Effect.succeed(toFindResult<T>([
+            asDoc({ _id: "1", title: "Issue 1" }),
+            asDoc({ _id: "2", title: "Issue 2" })
+          ] as Array<T>))
 
         const testLayer = HulyClient.testLayer({
           findAll: mockFindAllOp
@@ -488,11 +491,12 @@ describe("HulyClient Service", () => {
         const testLayer = HulyClient.testLayer({
           findAll: <T extends Doc>() => {
             callCount.findAll++
-            return Effect.succeed(toFindResult([]) as FindResult<T>)
+            return Effect.succeed(toFindResult<T>([]))
           },
           findOne: <T extends Doc>() => {
             callCount.findOne++
-            return Effect.succeed({ _id: "1", title: "Found" } as WithLookup<T>)
+            // eslint-disable-next-line no-restricted-syntax -- partial mock object doesn't overlap with WithLookup<T>
+            return Effect.succeed({ _id: "1", title: "Found" } as unknown as WithLookup<T>)
           }
         })
 
@@ -540,7 +544,7 @@ describe("HulyClient Service", () => {
   })
 
   describe("operation tracking", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("tracks operation calls for testing", () =>
       Effect.gen(function*() {
         const operations: Array<string> = []
@@ -548,7 +552,7 @@ describe("HulyClient Service", () => {
         const testLayer = HulyClient.testLayer({
           findAll: <T extends Doc>() => {
             operations.push("findAll")
-            return Effect.succeed(toFindResult([]) as FindResult<T>)
+            return Effect.succeed(toFindResult<T>([]))
           },
           findOne: <T extends Doc>() => {
             operations.push("findOne")
@@ -648,7 +652,8 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
     it.effect("delegates to TxOperations.findAll", () =>
       Effect.gen(function*() {
         const docs = [{ _id: "d1", title: "Doc 1" }]
-        mockFindAll.mockResolvedValue(toFindResult(docs as Array<Doc>))
+        // eslint-disable-next-line no-restricted-syntax -- partial mock objects don't overlap with Doc[]
+        mockFindAll.mockResolvedValue(toFindResult(docs as unknown as Array<Doc>))
 
         const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
         const results = yield* client.findAll(

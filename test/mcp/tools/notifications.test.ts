@@ -84,7 +84,7 @@ describe("notification tool handlers", () => {
       const result = yield* Effect.promise(() => tool.handler({}, noopHulyClient, noopStorageClient))
 
       expect(result.isError).toBeUndefined()
-      const parsed = JSON.parse(result.content[0].text)
+      const parsed = JSON.parse(result.content[0].text) as { count: number }
       expect(parsed.count).toBe(0)
     }))
 
@@ -95,7 +95,7 @@ describe("notification tool handlers", () => {
       const result = yield* Effect.promise(() => tool.handler({}, noopHulyClient, noopStorageClient))
 
       expect(result.isError).toBeUndefined()
-      const parsed = JSON.parse(result.content[0].text)
+      const parsed = JSON.parse(result.content[0].text) as { count: number }
       expect(parsed.count).toBe(0)
     }))
 
@@ -106,7 +106,7 @@ describe("notification tool handlers", () => {
       const result = yield* Effect.promise(() => tool.handler({}, noopHulyClient, noopStorageClient))
 
       expect(result.isError).toBeUndefined()
-      const parsed = JSON.parse(result.content[0].text)
+      const parsed = JSON.parse(result.content[0].text) as { count: number }
       expect(parsed.count).toBe(0)
     }))
 
@@ -143,7 +143,7 @@ describe("notification tool handlers", () => {
       expect(result.isError).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("archive_notification handler returns error for missing notification", () =>
     Effect.gen(function*() {
       const tool = findTool("archive_notification")
@@ -232,7 +232,7 @@ describe("notification tool handlers", () => {
       )
 
       expect(result.isError).toBeUndefined()
-      const parsed = JSON.parse(result.content[0].text)
+      const parsed = JSON.parse(result.content[0].text) as { providerId: string; updated: boolean }
       expect(parsed.providerId).toBe("some-provider")
       expect(parsed.updated).toBe(false)
     }))

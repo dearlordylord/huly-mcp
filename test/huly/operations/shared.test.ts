@@ -1,7 +1,13 @@
 import { describe, it } from "@effect/vitest"
 import type { Channel, Person } from "@hcengineering/contact"
-import type { Doc, FindResult, Ref, Space, Status } from "@hcengineering/core"
-import { type Issue as HulyIssue, IssuePriority, type Project as HulyProject } from "@hcengineering/tracker"
+import type { Attribute, Class as HulyClass, Doc, FindResult, PersonId, Ref, Space, Status } from "@hcengineering/core"
+import type { TaskType } from "@hcengineering/task"
+import {
+  type Issue as HulyIssue,
+  IssuePriority,
+  type Project as HulyProject,
+  TimeReportDayType
+} from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { NonNegativeNumber } from "../../../src/domain/schemas/shared.js"
@@ -30,8 +36,11 @@ const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   return result
 }
 
-const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
-  const result: HulyProject = {
+const asProject = (v: unknown) => v as HulyProject
+const asPerson = (v: unknown) => v as Person
+
+const makeProject = (overrides?: Partial<HulyProject>): HulyProject =>
+  asProject({
     _id: "project-1" as Ref<HulyProject>,
     _class: tracker.class.Project,
     space: "space-1" as Ref<Space>,
@@ -39,15 +48,13 @@ const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
     name: "Test Project",
     sequence: 1,
     defaultIssueStatus: "status-open" as Ref<Status>,
-    defaultTimeReportDay: 0,
-    modifiedBy: "user-1" as Ref<Doc>,
+    defaultTimeReportDay: TimeReportDayType.CurrentWorkDay,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
-  }
-  return result
-}
+  })
 
 const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
   const result: HulyIssue = {
@@ -60,7 +67,7 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
     status: "status-open" as Ref<Status>,
     priority: IssuePriority.Medium,
     assignee: null,
-    kind: "task-type-1" as Ref<Doc>,
+    kind: "task-type-1" as Ref<TaskType>,
     number: 1,
     dueDate: null,
     rank: "0|aaa",
@@ -75,9 +82,9 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
     reportedTime: 0,
     reports: 0,
     childInfo: [],
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -87,33 +94,31 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
 const makeStatus = (overrides?: Partial<Status>): Status => {
   const result: Status = {
     _id: "status-1" as Ref<Status>,
-    _class: "core:class:Status" as Ref<Doc>,
+    _class: "core:class:Status" as Ref<HulyClass<Status>>,
     space: "space-1" as Ref<Space>,
-    ofAttribute: "tracker:attribute:IssueStatus" as Ref<Doc>,
+    ofAttribute: "tracker:attribute:IssueStatus" as Ref<Attribute<Status>>,
     name: "Open",
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
   return result
 }
 
-const makePerson = (overrides?: Partial<Person>): Person => {
-  const result: Person = {
+const makePerson = (overrides?: Partial<Person>): Person =>
+  asPerson({
     _id: "person-1" as Ref<Person>,
     _class: contact.class.Person,
     space: "space-1" as Ref<Space>,
     name: "John Doe",
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
-  }
-  return result
-}
+  })
 
 const makeChannel = (overrides?: Partial<Channel>): Channel => {
   const result: Channel = {
@@ -125,9 +130,9 @@ const makeChannel = (overrides?: Partial<Channel>): Channel => {
     collection: "channels",
     provider: contact.channelProvider.Email,
     value: "john@example.com",
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -282,7 +287,7 @@ describe("shared.ts", () => {
   })
 
   describe("clampLimit", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("uses default 50 when undefined", () => {
       expect(clampLimit(undefined)).toBe(50)
     })
@@ -336,21 +341,21 @@ describe("shared.ts", () => {
       expect(result.number).toBe(5)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("parses pure numeric identifier", () => {
       const result = parseIssueIdentifier("42", "PROJ")
       expect(result.fullIdentifier).toBe("PROJ-42")
       expect(result.number).toBe(42)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("parses numeric identifier (number type)", () => {
       const result = parseIssueIdentifier(99, "PROJ")
       expect(result.fullIdentifier).toBe("PROJ-99")
       expect(result.number).toBe(99)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("returns raw string when it doesn't match any pattern", () => {
       const result = parseIssueIdentifier("random-text-here", "PROJ")
       expect(result.fullIdentifier).toBe("random-text-here")
@@ -369,7 +374,7 @@ describe("shared.ts", () => {
       expect(priorityToString(IssuePriority.High)).toBe("high")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("converts Medium", () => {
       expect(priorityToString(IssuePriority.Medium)).toBe("medium")
     })
@@ -528,7 +533,7 @@ describe("shared.ts", () => {
   })
 
   describe("findProjectWithStatuses", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("fails with ProjectNotFoundError when project not found", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({ projects: [], statuses: [] })
@@ -818,7 +823,7 @@ describe("shared.ts", () => {
         expect(result!._id).toBe("person-1")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("finds person by substring name match via $like", () =>
       Effect.gen(function*() {
         const person = makePerson({ _id: "person-1" as Ref<Person>, name: "John Doe" })

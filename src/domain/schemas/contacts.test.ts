@@ -13,7 +13,7 @@ import {
 
 describe("Contact Schemas", () => {
   describe("ListPersonsParamsSchema", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("accepts empty object", () => {
       const result = Schema.decodeUnknownSync(ListPersonsParamsSchema)({})
       expect(result).toEqual({})
@@ -100,7 +100,7 @@ describe("Contact Schemas", () => {
       expect(Either.isLeft(result)).toBe(true)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("rejects email without @", () => {
       const result = Effect.runSync(
         Effect.either(parseGetPersonParams({ email: "invalid" }))
@@ -195,7 +195,7 @@ describe("Contact Schemas", () => {
       expect(result).toEqual({ personId: "abc123" })
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("accepts city as null (to clear)", () => {
       const result = Schema.decodeUnknownSync(UpdatePersonParamsSchema)({
         personId: "abc123",

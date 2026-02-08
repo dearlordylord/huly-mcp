@@ -32,7 +32,7 @@ describe("assertions", () => {
       expect(() => assertExists(null)).toThrow("Expected value to exist")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("throws on undefined with default message", () => {
       expect(() => assertExists(undefined)).toThrow("Expected value to exist")
     })
@@ -88,7 +88,7 @@ describe("assertions", () => {
       expect(() => assertNotNull(null)).toThrow("Expected value to not be null")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("throws with custom message", () => {
       expect(() => assertNotNull(null, "value was null")).toThrow("value was null")
     })
@@ -148,7 +148,7 @@ describe("assertions", () => {
       expect(() => getFirst([])).toThrow("Expected non-empty array")
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("throws with custom message", () => {
       expect(() => getFirst([], "no items found")).toThrow("no items found")
     })
@@ -161,7 +161,7 @@ describe("assertions", () => {
       expect(result).toEqual([1, 2, 3])
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("returns single-element array", () => {
       const result = assertNonEmpty(["x"])
       expect(result).toEqual(["x"])
@@ -179,7 +179,7 @@ describe("assertions", () => {
   })
 
   describe("isNonEmpty", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("returns true for non-empty array", () => {
       expect(isNonEmpty([1])).toBe(true)
       expect(isNonEmpty([1, 2, 3])).toBe(true)
@@ -249,7 +249,7 @@ describe("assertions", () => {
   })
 
   describe("getOnlyOneEffect", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("succeeds for single-element array", () =>
       Effect.gen(function*() {
         const result = yield* getOnlyOneEffect([99], (arr) => `bad: ${arr.length}`)
@@ -272,7 +272,7 @@ describe("assertions", () => {
   })
 
   describe("getFirstEffect", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("succeeds with first element of non-empty array", () =>
       Effect.gen(function*() {
         const result = yield* getFirstEffect([10, 20], () => "empty")

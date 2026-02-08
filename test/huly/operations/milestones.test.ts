@@ -1,7 +1,9 @@
 import { describe, it } from "@effect/vitest"
-import { type Doc, type Ref, type Space, toFindResult } from "@hcengineering/core"
+import { type Doc, type PersonId, type Ref, type Space, toFindResult } from "@hcengineering/core"
+import type { ProjectType, TaskType } from "@hcengineering/task"
 import {
   type Issue as HulyIssue,
+  type IssueStatus,
   type Milestone as HulyMilestone,
   MilestoneStatus,
   type Project as HulyProject
@@ -20,26 +22,32 @@ import {
 } from "../../../src/huly/operations/milestones.js"
 
 import { tracker } from "../../../src/huly/huly-plugins.js"
+import { issueIdentifier, milestoneIdentifier, projectIdentifier } from "../../helpers/brands.js"
 
 const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
-  const result: HulyProject = {
+  const base = {
     _id: "project-1" as Ref<HulyProject>,
     _class: tracker.class.Project,
     space: "space-1" as Ref<Space>,
     identifier: "TEST",
     name: "Test Project",
+    description: "",
+    private: false,
+    members: [],
+    archived: false,
     sequence: 1,
-    modifiedBy: "user-1" as Ref<Doc>,
+    type: "project-type-1" as Ref<ProjectType>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
-  return result
+  return base as HulyProject
 }
 
 const makeMilestone = (overrides?: Partial<HulyMilestone>): HulyMilestone => {
-  const result: HulyMilestone = {
+  const base = {
     _id: "milestone-1" as Ref<HulyMilestone>,
     _class: tracker.class.Milestone,
     space: "project-1" as Ref<HulyProject>,
@@ -48,27 +56,27 @@ const makeMilestone = (overrides?: Partial<HulyMilestone>): HulyMilestone => {
     status: MilestoneStatus.Planned,
     targetDate: 1706500000000,
     comments: 0,
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
-  return result
+  return base as HulyMilestone
 }
 
 const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
-  const result: HulyIssue = {
+  const base = {
     _id: "issue-1" as Ref<HulyIssue>,
     _class: tracker.class.Issue,
     space: "project-1" as Ref<HulyProject>,
     identifier: "TEST-1",
     title: "Test Issue",
     description: null,
-    status: "status-open" as Ref<Doc>,
+    status: "status-open" as Ref<IssueStatus>,
     priority: 3,
     assignee: null,
-    kind: "task-type-1" as Ref<Doc>,
+    kind: "task-type-1" as Ref<TaskType>,
     number: 1,
     dueDate: null,
     rank: "0|aaa",
@@ -84,13 +92,13 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
     reportedTime: 0,
     reports: 0,
     childInfo: [],
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
-  return result
+  return base as HulyIssue
 }
 
 interface MockConfig {
@@ -209,7 +217,7 @@ describe("listMilestones", () => {
           milestones
         })
 
-        const result = yield* listMilestones({ project: "TEST" }).pipe(Effect.provide(testLayer))
+        const result = yield* listMilestones({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(2)
         expect(result[0].label).toBe("Sprint 1")
@@ -232,7 +240,7 @@ describe("listMilestones", () => {
           milestones
         })
 
-        const result = yield* listMilestones({ project: "TEST" }).pipe(Effect.provide(testLayer))
+        const result = yield* listMilestones({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
 
         expect(result[0].status).toBe("planned")
         expect(result[1].status).toBe("in-progress")
@@ -250,7 +258,7 @@ describe("listMilestones", () => {
           milestones: []
         })
 
-        const result = yield* listMilestones({ project: "TEST" }).pipe(Effect.provide(testLayer))
+        const result = yield* listMilestones({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(0)
       }))
@@ -266,7 +274,7 @@ describe("listMilestones", () => {
         })
 
         const error = yield* Effect.flip(
-          listMilestones({ project: "NONEXISTENT" }).pipe(Effect.provide(testLayer))
+          listMilestones({ project: projectIdentifier("NONEXISTENT") }).pipe(Effect.provide(testLayer))
         )
 
         expect(error._tag).toBe("ProjectNotFoundError")
@@ -287,7 +295,7 @@ describe("listMilestones", () => {
           captureMilestoneQuery: captureQuery
         })
 
-        yield* listMilestones({ project: "TEST" }).pipe(Effect.provide(testLayer))
+        yield* listMilestones({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
 
         expect(captureQuery.options?.limit).toBe(50)
       }))
@@ -304,7 +312,7 @@ describe("listMilestones", () => {
           captureMilestoneQuery: captureQuery
         })
 
-        yield* listMilestones({ project: "TEST", limit: 500 }).pipe(Effect.provide(testLayer))
+        yield* listMilestones({ project: projectIdentifier("TEST"), limit: 500 }).pipe(Effect.provide(testLayer))
 
         expect(captureQuery.options?.limit).toBe(200)
       }))
@@ -321,7 +329,7 @@ describe("listMilestones", () => {
           captureMilestoneQuery: captureQuery
         })
 
-        yield* listMilestones({ project: "TEST", limit: 25 }).pipe(Effect.provide(testLayer))
+        yield* listMilestones({ project: projectIdentifier("TEST"), limit: 25 }).pipe(Effect.provide(testLayer))
 
         expect(captureQuery.options?.limit).toBe(25)
       }))
@@ -340,7 +348,7 @@ describe("listMilestones", () => {
           captureMilestoneQuery: captureQuery
         })
 
-        yield* listMilestones({ project: "TEST" }).pipe(Effect.provide(testLayer))
+        yield* listMilestones({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
 
         expect((captureQuery.options?.sort as Record<string, number>).modifiedOn).toBe(-1)
       }))
@@ -367,7 +375,10 @@ describe("getMilestone", () => {
           milestones: [milestone]
         })
 
-        const result = yield* getMilestone({ project: "TEST", milestone: "Sprint 1" }).pipe(Effect.provide(testLayer))
+        const result = yield* getMilestone({
+          project: projectIdentifier("TEST"),
+          milestone: milestoneIdentifier("Sprint 1")
+        }).pipe(Effect.provide(testLayer))
 
         expect(result.label).toBe("Sprint 1")
         expect(result.description).toBe("First sprint")
@@ -390,7 +401,10 @@ describe("getMilestone", () => {
           milestones: [milestone]
         })
 
-        const result = yield* getMilestone({ project: "TEST", milestone: "milestone-abc" }).pipe(
+        const result = yield* getMilestone({
+          project: projectIdentifier("TEST"),
+          milestone: milestoneIdentifier("milestone-abc")
+        }).pipe(
           Effect.provide(testLayer)
         )
 
@@ -410,7 +424,10 @@ describe("getMilestone", () => {
           milestones: [milestone]
         })
 
-        const result = yield* getMilestone({ project: "TEST", milestone: "Sprint 1" }).pipe(Effect.provide(testLayer))
+        const result = yield* getMilestone({
+          project: projectIdentifier("TEST"),
+          milestone: milestoneIdentifier("Sprint 1")
+        }).pipe(Effect.provide(testLayer))
 
         expect(result.description).toBe("")
       }))
@@ -426,7 +443,9 @@ describe("getMilestone", () => {
         })
 
         const error = yield* Effect.flip(
-          getMilestone({ project: "NONEXISTENT", milestone: "Sprint 1" }).pipe(Effect.provide(testLayer))
+          getMilestone({ project: projectIdentifier("NONEXISTENT"), milestone: milestoneIdentifier("Sprint 1") }).pipe(
+            Effect.provide(testLayer)
+          )
         )
 
         expect(error._tag).toBe("ProjectNotFoundError")
@@ -444,7 +463,8 @@ describe("getMilestone", () => {
         })
 
         const error = yield* Effect.flip(
-          getMilestone({ project: "TEST", milestone: "NonexistentSprint" }).pipe(Effect.provide(testLayer))
+          getMilestone({ project: projectIdentifier("TEST"), milestone: milestoneIdentifier("NonexistentSprint") })
+            .pipe(Effect.provide(testLayer))
         )
 
         expect(error._tag).toBe("MilestoneNotFoundError")
@@ -463,7 +483,9 @@ describe("getMilestone", () => {
         })
 
         const error = yield* Effect.flip(
-          getMilestone({ project: "TEST", milestone: "Sprint 99" }).pipe(Effect.provide(testLayer))
+          getMilestone({ project: projectIdentifier("TEST"), milestone: milestoneIdentifier("Sprint 99") }).pipe(
+            Effect.provide(testLayer)
+          )
         )
 
         expect(error.message).toContain("Sprint 99")
@@ -487,7 +509,7 @@ describe("createMilestone", () => {
         })
 
         const result = yield* createMilestone({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           label: "Sprint 1",
           targetDate: 1706500000000
         }).pipe(Effect.provide(testLayer))
@@ -511,7 +533,7 @@ describe("createMilestone", () => {
         })
 
         yield* createMilestone({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           label: "Sprint 1",
           description: "First sprint of Q1",
           targetDate: 1706500000000
@@ -520,7 +542,7 @@ describe("createMilestone", () => {
         expect(captureCreateDoc.attributes?.description).toBe("First sprint of Q1")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("sets initial status to Planned", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -533,7 +555,7 @@ describe("createMilestone", () => {
         })
 
         yield* createMilestone({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           label: "Sprint 1",
           targetDate: 1706500000000
         }).pipe(Effect.provide(testLayer))
@@ -554,7 +576,7 @@ describe("createMilestone", () => {
         })
 
         yield* createMilestone({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           label: "Sprint 1",
           targetDate: 1706500000000
         }).pipe(Effect.provide(testLayer))
@@ -573,7 +595,7 @@ describe("createMilestone", () => {
         })
 
         const result = yield* createMilestone({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           label: "Sprint 1",
           targetDate: 1706500000000
         }).pipe(Effect.provide(testLayer))
@@ -594,7 +616,7 @@ describe("createMilestone", () => {
 
         const error = yield* Effect.flip(
           createMilestone({
-            project: "NONEXISTENT",
+            project: projectIdentifier("NONEXISTENT"),
             label: "Sprint 1",
             targetDate: 1706500000000
           }).pipe(Effect.provide(testLayer))
@@ -622,8 +644,8 @@ describe("updateMilestone", () => {
         })
 
         const result = yield* updateMilestone({
-          project: "TEST",
-          milestone: "Sprint 1",
+          project: projectIdentifier("TEST"),
+          milestone: milestoneIdentifier("Sprint 1"),
           label: "Sprint 1 - Updated"
         }).pipe(Effect.provide(testLayer))
 
@@ -645,8 +667,8 @@ describe("updateMilestone", () => {
         })
 
         yield* updateMilestone({
-          project: "TEST",
-          milestone: "Sprint 1",
+          project: projectIdentifier("TEST"),
+          milestone: milestoneIdentifier("Sprint 1"),
           description: "Updated description"
         }).pipe(Effect.provide(testLayer))
 
@@ -667,8 +689,8 @@ describe("updateMilestone", () => {
         })
 
         yield* updateMilestone({
-          project: "TEST",
-          milestone: "Sprint 1",
+          project: projectIdentifier("TEST"),
+          milestone: milestoneIdentifier("Sprint 1"),
           targetDate: 1706600000000
         }).pipe(Effect.provide(testLayer))
 
@@ -689,8 +711,8 @@ describe("updateMilestone", () => {
         })
 
         yield* updateMilestone({
-          project: "TEST",
-          milestone: "Sprint 1",
+          project: projectIdentifier("TEST"),
+          milestone: milestoneIdentifier("Sprint 1"),
           status: "completed"
         }).pipe(Effect.provide(testLayer))
 
@@ -711,8 +733,8 @@ describe("updateMilestone", () => {
         })
 
         yield* updateMilestone({
-          project: "TEST",
-          milestone: "Sprint 1",
+          project: projectIdentifier("TEST"),
+          milestone: milestoneIdentifier("Sprint 1"),
           label: "Sprint 1 Final",
           description: "Completed",
           status: "completed",
@@ -737,8 +759,8 @@ describe("updateMilestone", () => {
         })
 
         const result = yield* updateMilestone({
-          project: "TEST",
-          milestone: "Sprint 1"
+          project: projectIdentifier("TEST"),
+          milestone: milestoneIdentifier("Sprint 1")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.updated).toBe(false)
@@ -768,8 +790,8 @@ describe("updateMilestone", () => {
           })
 
           yield* updateMilestone({
-            project: "TEST",
-            milestone: `Sprint ${input}`,
+            project: projectIdentifier("TEST"),
+            milestone: milestoneIdentifier(`Sprint ${input}`),
             status: input
           }).pipe(Effect.provide(testLayer))
 
@@ -789,8 +811,8 @@ describe("updateMilestone", () => {
 
         const error = yield* Effect.flip(
           updateMilestone({
-            project: "NONEXISTENT",
-            milestone: "Sprint 1",
+            project: projectIdentifier("NONEXISTENT"),
+            milestone: milestoneIdentifier("Sprint 1"),
             label: "Updated"
           }).pipe(Effect.provide(testLayer))
         )
@@ -810,8 +832,8 @@ describe("updateMilestone", () => {
 
         const error = yield* Effect.flip(
           updateMilestone({
-            project: "TEST",
-            milestone: "NonexistentSprint",
+            project: projectIdentifier("TEST"),
+            milestone: milestoneIdentifier("NonexistentSprint"),
             label: "Updated"
           }).pipe(Effect.provide(testLayer))
         )
@@ -840,9 +862,9 @@ describe("setIssueMilestone", () => {
         })
 
         const result = yield* setIssueMilestone({
-          project: "TEST",
-          identifier: "TEST-1",
-          milestone: "Sprint 1"
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
+          milestone: milestoneIdentifier("Sprint 1")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.identifier).toBe("TEST-1")
@@ -850,7 +872,7 @@ describe("setIssueMilestone", () => {
         expect(captureUpdateDoc.operations?.milestone).toBe("m-1")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("sets milestone on issue by milestone ID", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -866,9 +888,9 @@ describe("setIssueMilestone", () => {
         })
 
         const result = yield* setIssueMilestone({
-          project: "TEST",
-          identifier: "TEST-1",
-          milestone: "milestone-abc"
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
+          milestone: milestoneIdentifier("milestone-abc")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.milestoneSet).toBe(true)
@@ -890,8 +912,8 @@ describe("setIssueMilestone", () => {
         })
 
         const result = yield* setIssueMilestone({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           milestone: null
         }).pipe(Effect.provide(testLayer))
 
@@ -915,9 +937,9 @@ describe("setIssueMilestone", () => {
         })
 
         const result = yield* setIssueMilestone({
-          project: "TEST",
-          identifier: "42",
-          milestone: "Sprint 1"
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("42"),
+          milestone: milestoneIdentifier("Sprint 1")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.identifier).toBe("TEST-42")
@@ -936,9 +958,9 @@ describe("setIssueMilestone", () => {
 
         const error = yield* Effect.flip(
           setIssueMilestone({
-            project: "NONEXISTENT",
-            identifier: "TEST-1",
-            milestone: "Sprint 1"
+            project: projectIdentifier("NONEXISTENT"),
+            identifier: issueIdentifier("TEST-1"),
+            milestone: milestoneIdentifier("Sprint 1")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -959,9 +981,9 @@ describe("setIssueMilestone", () => {
 
         const error = yield* Effect.flip(
           setIssueMilestone({
-            project: "TEST",
-            identifier: "TEST-999",
-            milestone: "Sprint 1"
+            project: projectIdentifier("TEST"),
+            identifier: issueIdentifier("TEST-999"),
+            milestone: milestoneIdentifier("Sprint 1")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -984,9 +1006,9 @@ describe("setIssueMilestone", () => {
 
         const error = yield* Effect.flip(
           setIssueMilestone({
-            project: "TEST",
-            identifier: "TEST-1",
-            milestone: "NonexistentSprint"
+            project: projectIdentifier("TEST"),
+            identifier: issueIdentifier("TEST-1"),
+            milestone: milestoneIdentifier("NonexistentSprint")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -1012,8 +1034,8 @@ describe("deleteMilestone", () => {
         })
 
         const result = yield* deleteMilestone({
-          project: "TEST",
-          milestone: "Sprint 1"
+          project: projectIdentifier("TEST"),
+          milestone: milestoneIdentifier("Sprint 1")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.id).toBe("m-1")
@@ -1035,8 +1057,8 @@ describe("deleteMilestone", () => {
         })
 
         const result = yield* deleteMilestone({
-          project: "TEST",
-          milestone: "milestone-abc"
+          project: projectIdentifier("TEST"),
+          milestone: milestoneIdentifier("milestone-abc")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.id).toBe("milestone-abc")
@@ -1055,8 +1077,8 @@ describe("deleteMilestone", () => {
 
         const error = yield* Effect.flip(
           deleteMilestone({
-            project: "NONEXISTENT",
-            milestone: "Sprint 1"
+            project: projectIdentifier("NONEXISTENT"),
+            milestone: milestoneIdentifier("Sprint 1")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -1076,8 +1098,8 @@ describe("deleteMilestone", () => {
 
         const error = yield* Effect.flip(
           deleteMilestone({
-            project: "TEST",
-            milestone: "NonexistentSprint"
+            project: projectIdentifier("TEST"),
+            milestone: milestoneIdentifier("NonexistentSprint")
           }).pipe(Effect.provide(testLayer))
         )
 

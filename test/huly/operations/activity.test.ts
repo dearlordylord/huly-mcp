@@ -26,6 +26,7 @@ import {
   saveMessage,
   unsaveMessage
 } from "../../../src/huly/operations/activity.js"
+import { activityMessageId, emojiCode, objectClassName } from "../../helpers/brands.js"
 
 const makeActivityMessage = (overrides?: Partial<HulyActivityMessage>): HulyActivityMessage => {
   const result: HulyActivityMessage = {
@@ -66,8 +67,7 @@ const makeSavedMessage = (overrides?: Partial<HulySavedMessage>): HulySavedMessa
   const result: HulySavedMessage = {
     _id: "saved-1" as Ref<HulySavedMessage>,
     _class: activity.class.SavedMessage,
-    // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-    space: core.space.Workspace as unknown as Ref<Space>,
+    space: core.space.Workspace,
     attachedTo: "msg-1" as Ref<HulyActivityMessage>,
     modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
@@ -224,7 +224,7 @@ describe("listActivity", () => {
 
       const result = yield* listActivity({
         objectId: "obj-1",
-        objectClass: "tracker:class:Issue"
+        objectClass: objectClassName("tracker:class:Issue")
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
@@ -239,7 +239,7 @@ describe("listActivity", () => {
 
       const result = yield* listActivity({
         objectId: "obj-1",
-        objectClass: "tracker:class:Issue"
+        objectClass: objectClassName("tracker:class:Issue")
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(0)
@@ -264,7 +264,7 @@ describe("listActivity", () => {
 
       const result = yield* listActivity({
         objectId: "obj-1",
-        objectClass: "tracker:class:Issue"
+        objectClass: objectClassName("tracker:class:Issue")
       }).pipe(Effect.provide(testLayer))
 
       expect(result[0]).toEqual({
@@ -300,7 +300,7 @@ describe("listActivity", () => {
 
       const result = yield* listActivity({
         objectId: "obj-1",
-        objectClass: "tracker:class:Issue"
+        objectClass: objectClassName("tracker:class:Issue")
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
@@ -324,8 +324,8 @@ describe("addReaction", () => {
       })
 
       const result = yield* addReaction({
-        messageId: "msg-1",
-        emoji: ":thumbsup:"
+        messageId: activityMessageId("msg-1"),
+        emoji: emojiCode(":thumbsup:")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.messageId).toBe("msg-1")
@@ -340,8 +340,8 @@ describe("addReaction", () => {
 
       const error = yield* Effect.flip(
         addReaction({
-          messageId: "nonexistent",
-          emoji: ":heart:"
+          messageId: activityMessageId("nonexistent"),
+          emoji: emojiCode(":heart:")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -367,8 +367,8 @@ describe("removeReaction", () => {
       })
 
       const result = yield* removeReaction({
-        messageId: "msg-1",
-        emoji: ":thumbsup:"
+        messageId: activityMessageId("msg-1"),
+        emoji: emojiCode(":thumbsup:")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.messageId).toBe("msg-1")
@@ -383,8 +383,8 @@ describe("removeReaction", () => {
 
       const error = yield* Effect.flip(
         removeReaction({
-          messageId: "msg-1",
-          emoji: ":nonexistent:"
+          messageId: activityMessageId("msg-1"),
+          emoji: emojiCode(":nonexistent:")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -412,8 +412,8 @@ describe("removeReaction", () => {
       const testLayer = createTestLayerWithMocks({ reactions })
 
       const result = yield* removeReaction({
-        messageId: "msg-1",
-        emoji: ":heart:"
+        messageId: activityMessageId("msg-1"),
+        emoji: emojiCode(":heart:")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.messageId).toBe("msg-1")
@@ -443,7 +443,7 @@ describe("listReactions", () => {
       const testLayer = createTestLayerWithMocks({ reactions })
 
       const result = yield* listReactions({
-        messageId: "msg-1"
+        messageId: activityMessageId("msg-1")
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
@@ -467,7 +467,7 @@ describe("listReactions", () => {
       const testLayer = createTestLayerWithMocks({ reactions: [] })
 
       const result = yield* listReactions({
-        messageId: "msg-1"
+        messageId: activityMessageId("msg-1")
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(0)
@@ -492,7 +492,7 @@ describe("listReactions", () => {
       const testLayer = createTestLayerWithMocks({ reactions })
 
       const result = yield* listReactions({
-        messageId: "msg-1"
+        messageId: activityMessageId("msg-1")
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
@@ -515,7 +515,7 @@ describe("saveMessage", () => {
       })
 
       const result = yield* saveMessage({
-        messageId: "msg-1"
+        messageId: activityMessageId("msg-1")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.messageId).toBe("msg-1")
@@ -530,7 +530,7 @@ describe("saveMessage", () => {
 
       const error = yield* Effect.flip(
         saveMessage({
-          messageId: "nonexistent"
+          messageId: activityMessageId("nonexistent")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -555,7 +555,7 @@ describe("unsaveMessage", () => {
       })
 
       const result = yield* unsaveMessage({
-        messageId: "msg-1"
+        messageId: activityMessageId("msg-1")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.messageId).toBe("msg-1")
@@ -570,7 +570,7 @@ describe("unsaveMessage", () => {
 
       const error = yield* Effect.flip(
         unsaveMessage({
-          messageId: "nonexistent"
+          messageId: activityMessageId("nonexistent")
         }).pipe(Effect.provide(testLayer))
       )
 

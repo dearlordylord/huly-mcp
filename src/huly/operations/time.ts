@@ -63,7 +63,7 @@ const serverPopulatedPersonId: CorePersonId = "" as CorePersonId
 // SDK: WorkSlot.user is typed PersonId, but Huly queries accept Ref<Person> for user lookup.
 // Both are branded strings over string; the REST API treats them interchangeably in queries.
 // TODO that's all mighty weird, we may want to reinvestigate that
-// eslint-disable-next-line no-restricted-syntax -- SDK type mismatch: PersonId and Ref<Person> are both branded strings, interchangeable in REST queries
+// eslint-disable-next-line no-restricted-syntax -- Ref<Doc> and PersonId are both branded strings, no single-step cast exists
 const refAsPersonId = (ref: Ref<Doc>): CorePersonId => ref as unknown as CorePersonId
 
 type LogTimeError = HulyClientError | ProjectNotFoundError | IssueNotFoundError

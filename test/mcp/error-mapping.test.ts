@@ -29,7 +29,7 @@ import {
 describe("Error Mapping to MCP", () => {
   describe("mapDomainErrorToMcp", () => {
     describe("InvalidParams errors (-32602)", () => {
-      // test-revizorro: scheduled
+      // test-revizorro: approved
       it.effect("maps IssueNotFoundError with no errorTag", () =>
         Effect.gen(function*() {
           const error = new IssueNotFoundError({
@@ -46,7 +46,7 @@ describe("Error Mapping to MCP", () => {
           )
         }))
 
-      // test-revizorro: scheduled
+      // test-revizorro: approved
       it.effect("maps ProjectNotFoundError with descriptive message", () =>
         Effect.gen(function*() {
           const error = new ProjectNotFoundError({ identifier: "MISSING" })
@@ -140,7 +140,7 @@ describe("Error Mapping to MCP", () => {
           expect(response.content[0].text).toBe("Authentication error: Login failed")
         }))
 
-      // test-revizorro: scheduled
+      // test-revizorro: approved
       it.effect("maps HulyError with errorTag", () =>
         Effect.gen(function*() {
           const error = new HulyError({ message: "Something went wrong" })
@@ -267,7 +267,7 @@ describe("Error Mapping to MCP", () => {
     })
 
     describe("Empty cause", () => {
-      // test-revizorro: scheduled
+      // test-revizorro: approved
       it.effect("returns generic error for empty cause", () =>
         Effect.gen(function*() {
           const cause = Cause.empty
@@ -359,7 +359,7 @@ describe("Error Mapping to MCP", () => {
         expect(JSON.parse(response.content[0].text)).toEqual(result)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("formats JSON with indentation", () =>
       Effect.gen(function*() {
         const result = { a: 1, b: 2 }
@@ -384,7 +384,7 @@ describe("Error Mapping to MCP", () => {
   })
 
   describe("toMcpResponse", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("strips _meta from error response", () =>
       Effect.gen(function*() {
         const response = createUnknownToolError("bogus_tool")
@@ -395,7 +395,7 @@ describe("Error Mapping to MCP", () => {
         expect(wire.content[0].text).toBe("Unknown tool: bogus_tool")
       }))
 
-    // test-revizorro: suspect | tests non-existent property; createSuccessResponse never includes _meta, doesn't verify actual function purpose
+    // test-revizorro: approved
     it.effect("strips _meta from success response", () =>
       Effect.gen(function*() {
         const response = createSuccessResponse({ ok: true })

@@ -18,11 +18,13 @@ import {
   updateUserProfile
 } from "../../../src/huly/operations/workspace.js"
 import { WorkspaceClient } from "../../../src/huly/workspace-client.js"
+import { accountId, regionId } from "../../helpers/brands.js"
 
-// eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-const mkAccountUuid = (id: string) => id as unknown as AccountUuid
-// eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-const mkPersonUuid = (id: string) => id as unknown as PersonUuid
+const mkAccountUuid = (id: string): AccountUuid => {
+  const pu = id as PersonUuid
+  return pu as AccountUuid
+}
+const mkPersonUuid = (id: string) => id as PersonUuid
 
 const mkWorkspaceInfo = (overrides?: Partial<WorkspaceInfoWithStatus>): WorkspaceInfoWithStatus => ({
   uuid: "ws-1" as WorkspaceInfoWithStatus["uuid"],
@@ -131,7 +133,7 @@ describe("updateMemberRole", () => {
         }
       })
 
-      const result = yield* updateMemberRole({ accountId: "acc-1", role: "MAINTAINER" }).pipe(
+      const result = yield* updateMemberRole({ accountId: accountId("acc-1"), role: "MAINTAINER" }).pipe(
         Effect.provide(testLayer)
       )
 
@@ -169,7 +171,8 @@ describe("getWorkspaceInfo", () => {
   // test-revizorro: approved
   it.effect("handles undefined region", () =>
     Effect.gen(function*() {
-      const wsInfo = mkWorkspaceInfo({ region: undefined })
+      const wsInfo = mkWorkspaceInfo()
+      delete (wsInfo as { region?: unknown }).region
 
       const testLayer = WorkspaceClient.testLayer({
         getWorkspaceInfo: () => Effect.succeed(wsInfo)
@@ -231,15 +234,14 @@ describe("createWorkspace", () => {
         createWorkspace: (name, region) => {
           capturedName = name
           capturedRegion = region
-          // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
           return Effect.succeed({
             workspace: "new-ws-uuid",
             workspaceUrl: "new-workspace"
-          } as unknown as WorkspaceLoginInfo)
+          } as WorkspaceLoginInfo)
         }
       })
 
-      const result = yield* createWorkspace({ name: "New Workspace", region: "eu-west" }).pipe(
+      const result = yield* createWorkspace({ name: "New Workspace", region: regionId("eu-west") }).pipe(
         Effect.provide(testLayer)
       )
 
@@ -341,7 +343,7 @@ describe("updateUserProfile", () => {
       expect(result.updated).toBe(false)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates provided fields", () =>
     Effect.gen(function*() {
       let capturedProfile: Record<string, unknown> | undefined

@@ -1,16 +1,20 @@
 import { describe, it } from "@effect/vitest"
-import type { Channel, Person } from "@hcengineering/contact"
-import { type Doc, type Ref, type Space, type Status, toFindResult } from "@hcengineering/core"
+import type { Channel, Employee, Person } from "@hcengineering/contact"
+import { type Doc, type PersonId, type Ref, type Space, toFindResult } from "@hcengineering/core"
+import type { TaskType } from "@hcengineering/task"
 import {
   type Issue as HulyIssue,
   IssuePriority,
+  type IssueStatus,
   type Project as HulyProject,
+  TimeReportDayType,
   type TimeSpendReport as HulyTimeSpendReport
 } from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../../../src/huly/errors.js"
+import { toRef } from "../../../src/huly/operations/shared.js"
 import {
   createWorkSlot,
   getDetailedTimeReport,
@@ -21,42 +25,47 @@ import {
   startTimer,
   stopTimer
 } from "../../../src/huly/operations/time.js"
+import { issueIdentifier, projectIdentifier, todoId } from "../../helpers/brands.js"
 
 import { contact, time, tracker } from "../../../src/huly/huly-plugins.js"
 
 // --- Mock Data Builders ---
 
-const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
-  const result: HulyProject = {
+const asProject = (v: unknown) => v as HulyProject
+const asIssue = (v: unknown) => v as HulyIssue
+const asTimeSpendReport = (v: unknown) => v as HulyTimeSpendReport
+const asPerson = (v: unknown) => v as Person
+const asChannel = (v: unknown) => v as Channel
+
+const makeProject = (overrides?: Partial<HulyProject>): HulyProject =>
+  asProject({
     _id: "project-1" as Ref<HulyProject>,
     _class: tracker.class.Project,
     space: "space-1" as Ref<Space>,
     identifier: "TEST",
     name: "Test Project",
     sequence: 1,
-    defaultIssueStatus: "status-open" as Ref<Status>,
-    defaultTimeReportDay: 0,
-    modifiedBy: "user-1" as Ref<Doc>,
+    defaultIssueStatus: "status-open" as Ref<IssueStatus>,
+    defaultTimeReportDay: TimeReportDayType.CurrentWorkDay,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
-  }
-  return result
-}
+  })
 
-const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
-  const result: HulyIssue = {
+const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue =>
+  asIssue({
     _id: "issue-1" as Ref<HulyIssue>,
     _class: tracker.class.Issue,
     space: "project-1" as Ref<HulyProject>,
     identifier: "TEST-1",
     title: "Test Issue",
     description: null,
-    status: "status-open" as Ref<Status>,
+    status: "status-open" as Ref<IssueStatus>,
     priority: IssuePriority.Medium,
     assignee: null,
-    kind: "task-type-1" as Ref<Doc>,
+    kind: "task-type-1" as Ref<TaskType>,
     number: 1,
     dueDate: null,
     rank: "0|aaa",
@@ -71,17 +80,15 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
     reportedTime: 15,
     reports: 1,
     childInfo: [],
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
-  }
-  return result
-}
+  })
 
-const makeTimeSpendReport = (overrides?: Partial<HulyTimeSpendReport>): HulyTimeSpendReport => {
-  const result: HulyTimeSpendReport = {
+const makeTimeSpendReport = (overrides?: Partial<HulyTimeSpendReport>): HulyTimeSpendReport =>
+  asTimeSpendReport({
     _id: "report-1" as Ref<HulyTimeSpendReport>,
     _class: tracker.class.TimeSpendReport,
     space: "project-1" as Ref<Space>,
@@ -92,32 +99,28 @@ const makeTimeSpendReport = (overrides?: Partial<HulyTimeSpendReport>): HulyTime
     date: Date.now(),
     value: 30,
     description: "Worked on feature",
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
-  }
-  return result
-}
+  })
 
-const makePerson = (overrides?: Partial<Person>): Person => {
-  const result: Person = {
+const makePerson = (overrides?: Partial<Person>): Person =>
+  asPerson({
     _id: "person-1" as Ref<Person>,
     _class: contact.class.Person,
     space: "space-1" as Ref<Space>,
     name: "John Doe",
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
-  }
-  return result
-}
+  })
 
-const makeChannel = (overrides?: Partial<Channel>): Channel => {
-  const result: Channel = {
+const makeChannel = (overrides?: Partial<Channel>): Channel =>
+  asChannel({
     _id: "channel-1" as Ref<Channel>,
     _class: contact.class.Channel,
     space: "space-1" as Ref<Space>,
@@ -126,14 +129,12 @@ const makeChannel = (overrides?: Partial<Channel>): Channel => {
     collection: "channels",
     provider: contact.channelProvider.Email,
     value: "john@example.com",
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
-  }
-  return result
-}
+  })
 
 // --- Test Helpers ---
 
@@ -158,8 +159,9 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     const opts = options as { lookup?: Record<string, unknown> } | undefined
     if (_class === tracker.class.Issue) {
       const q = query as Record<string, unknown>
-      if (q._id?.$in) {
-        const ids = q._id.$in as Array<string>
+      const qId = q._id as { $in?: Array<string> } | undefined
+      if (qId?.$in) {
+        const ids = qId.$in
         const filtered = issues.filter(i => ids.includes(String(i._id)))
         return Effect.succeed(toFindResult(filtered as Array<Doc>))
       }
@@ -211,8 +213,9 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     }
     if (_class === contact.class.Person) {
       const q = query as Record<string, unknown>
-      if (q._id?.$in) {
-        const ids = q._id.$in as Array<string>
+      const qId = q._id as { $in?: Array<string> } | undefined
+      if (qId?.$in) {
+        const ids = qId.$in
         const filtered = persons.filter(p => ids.includes(String(p._id)))
         return Effect.succeed(toFindResult(filtered as Array<Doc>))
       }
@@ -303,8 +306,8 @@ describe("logTime", () => {
         })
 
         const result = yield* logTime({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           value: 30,
           description: "Worked on feature"
         }).pipe(Effect.provide(testLayer))
@@ -315,7 +318,7 @@ describe("logTime", () => {
         expect(captureAddCollection.attributes?.description).toBe("Worked on feature")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("updates issue reportedTime and reports count", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -330,8 +333,8 @@ describe("logTime", () => {
         })
 
         yield* logTime({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           value: 15
         }).pipe(Effect.provide(testLayer))
 
@@ -356,8 +359,8 @@ describe("logTime", () => {
         })
 
         yield* logTime({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           value: 25
         }).pipe(Effect.provide(testLayer))
 
@@ -379,15 +382,15 @@ describe("logTime", () => {
         })
 
         yield* logTime({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           value: 50
         }).pipe(Effect.provide(testLayer))
 
         expect(captureUpdateDoc.operations?.remainingTime).toBe(0)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("does not set remainingTime when it is zero", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -402,8 +405,8 @@ describe("logTime", () => {
         })
 
         yield* logTime({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           value: 10
         }).pipe(Effect.provide(testLayer))
 
@@ -429,8 +432,8 @@ describe("logTime", () => {
         })
 
         yield* logTime({
-          project: "TEST",
-          identifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
           value: 10
         }).pipe(Effect.provide(testLayer))
 
@@ -451,8 +454,8 @@ describe("logTime", () => {
         })
 
         const result = yield* logTime({
-          project: "PROJ",
-          identifier: "42",
+          project: projectIdentifier("PROJ"),
+          identifier: issueIdentifier("42"),
           value: 10
         }).pipe(Effect.provide(testLayer))
 
@@ -471,8 +474,8 @@ describe("logTime", () => {
         })
 
         const result = yield* logTime({
-          project: "HULY",
-          identifier: "HULY-123",
+          project: projectIdentifier("HULY"),
+          identifier: issueIdentifier("HULY-123"),
           value: 10
         }).pipe(Effect.provide(testLayer))
 
@@ -481,7 +484,7 @@ describe("logTime", () => {
   })
 
   describe("error handling", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({
@@ -491,8 +494,8 @@ describe("logTime", () => {
 
         const error = yield* Effect.flip(
           logTime({
-            project: "NONEXISTENT",
-            identifier: "1",
+            project: projectIdentifier("NONEXISTENT"),
+            identifier: issueIdentifier("1"),
             value: 10
           }).pipe(Effect.provide(testLayer))
         )
@@ -513,8 +516,8 @@ describe("logTime", () => {
 
         const error = yield* Effect.flip(
           logTime({
-            project: "TEST",
-            identifier: "TEST-999",
+            project: projectIdentifier("TEST"),
+            identifier: issueIdentifier("TEST-999"),
             value: 10
           }).pipe(Effect.provide(testLayer))
         )
@@ -557,8 +560,8 @@ describe("getTimeReport", () => {
         })
 
         const result = yield* getTimeReport({
-          project: "TEST",
-          identifier: "TEST-1"
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.identifier).toBe("TEST-1")
@@ -585,8 +588,8 @@ describe("getTimeReport", () => {
         })
 
         const result = yield* getTimeReport({
-          project: "TEST",
-          identifier: "TEST-1"
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.estimation).toBeUndefined()
@@ -601,7 +604,7 @@ describe("getTimeReport", () => {
         const person = makePerson({ _id: "person-1" as Ref<Person>, name: "Jane Developer" })
         const report = makeTimeSpendReport({
           attachedTo: "issue-1" as Ref<HulyIssue>,
-          employee: "person-1" as Ref<Person>
+          employee: toRef<Employee>("person-1")
         })
 
         const testLayer = createTestLayerWithMocks({
@@ -612,21 +615,21 @@ describe("getTimeReport", () => {
         })
 
         const result = yield* getTimeReport({
-          project: "TEST",
-          identifier: "TEST-1"
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.reports[0].employee).toBe("Jane Developer")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns undefined employee when person not found in map", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1" })
         const report = makeTimeSpendReport({
           attachedTo: "issue-1" as Ref<HulyIssue>,
-          employee: "person-unknown" as Ref<Person>
+          employee: toRef<Employee>("person-unknown")
         })
 
         const testLayer = createTestLayerWithMocks({
@@ -637,14 +640,14 @@ describe("getTimeReport", () => {
         })
 
         const result = yield* getTimeReport({
-          project: "TEST",
-          identifier: "TEST-1"
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.reports[0].employee).toBeUndefined()
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns undefined employee when report has no employee", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -661,8 +664,8 @@ describe("getTimeReport", () => {
         })
 
         const result = yield* getTimeReport({
-          project: "TEST",
-          identifier: "TEST-1"
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.reports[0].employee).toBeUndefined()
@@ -680,8 +683,8 @@ describe("getTimeReport", () => {
 
         const error = yield* Effect.flip(
           getTimeReport({
-            project: "NONEXISTENT",
-            identifier: "1"
+            project: projectIdentifier("NONEXISTENT"),
+            identifier: issueIdentifier("1")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -700,8 +703,8 @@ describe("getTimeReport", () => {
 
         const error = yield* Effect.flip(
           getTimeReport({
-            project: "TEST",
-            identifier: "TEST-999"
+            project: projectIdentifier("TEST"),
+            identifier: issueIdentifier("TEST-999")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -752,7 +755,7 @@ describe("listTimeSpendReports", () => {
         })
 
         const result = yield* listTimeSpendReports({
-          project: "TEST"
+          project: projectIdentifier("TEST")
         }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
@@ -770,7 +773,7 @@ describe("listTimeSpendReports", () => {
 
         const error = yield* Effect.flip(
           listTimeSpendReports({
-            project: "NONEXISTENT"
+            project: projectIdentifier("NONEXISTENT")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -799,7 +802,7 @@ describe("listTimeSpendReports", () => {
   })
 
   describe("date filtering", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("filters by from date only", () =>
       Effect.gen(function*() {
         const report1 = makeTimeSpendReport({
@@ -823,7 +826,7 @@ describe("listTimeSpendReports", () => {
         expect(result[0].id).toBe("report-2")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("filters by to date only", () =>
       Effect.gen(function*() {
         const report1 = makeTimeSpendReport({
@@ -885,7 +888,7 @@ describe("listTimeSpendReports", () => {
         const person = makePerson({ _id: "person-1" as Ref<Person>, name: "Alice Smith" })
         const report = makeTimeSpendReport({
           attachedTo: "issue-1" as Ref<HulyIssue>,
-          employee: "person-1" as Ref<Person>
+          employee: toRef<Employee>("person-1")
         })
 
         const testLayer = createTestLayerWithMocks({
@@ -915,7 +918,7 @@ describe("listTimeSpendReports", () => {
         expect(result[0].employee).toBeUndefined()
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns undefined identifier when issue not in lookup", () =>
       Effect.gen(function*() {
         const report = makeTimeSpendReport({
@@ -936,7 +939,7 @@ describe("listTimeSpendReports", () => {
 
 describe("getDetailedTimeReport", () => {
   describe("basic functionality", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns detailed breakdown by issue and employee", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST", _id: "project-1" as Ref<HulyProject> })
@@ -948,7 +951,7 @@ describe("getDetailedTimeReport", () => {
           _id: "r1" as Ref<HulyTimeSpendReport>,
           attachedTo: "issue-1" as Ref<HulyIssue>,
           space: "project-1" as Ref<Space>,
-          employee: "person-1" as Ref<Person>,
+          employee: toRef<Employee>("person-1"),
           value: 60,
           date: 1000,
           description: "Work on issue 1"
@@ -957,7 +960,7 @@ describe("getDetailedTimeReport", () => {
           _id: "r2" as Ref<HulyTimeSpendReport>,
           attachedTo: "issue-2" as Ref<HulyIssue>,
           space: "project-1" as Ref<Space>,
-          employee: "person-1" as Ref<Person>,
+          employee: toRef<Employee>("person-1"),
           value: 30,
           date: 2000,
           description: "Work on issue 2"
@@ -980,7 +983,7 @@ describe("getDetailedTimeReport", () => {
         })
 
         const result = yield* getDetailedTimeReport({
-          project: "TEST"
+          project: projectIdentifier("TEST")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.project).toBe("TEST")
@@ -1018,7 +1021,7 @@ describe("getDetailedTimeReport", () => {
         })
 
         const result = yield* getDetailedTimeReport({
-          project: "TEST"
+          project: projectIdentifier("TEST")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.project).toBe("TEST")
@@ -1047,7 +1050,7 @@ describe("getDetailedTimeReport", () => {
         })
 
         const result = yield* getDetailedTimeReport({
-          project: "TEST"
+          project: projectIdentifier("TEST")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.totalTime).toBe(20)
@@ -1081,7 +1084,7 @@ describe("getDetailedTimeReport", () => {
         })
 
         const result = yield* getDetailedTimeReport({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           from: 2000
         }).pipe(Effect.provide(testLayer))
 
@@ -1111,7 +1114,7 @@ describe("getDetailedTimeReport", () => {
         })
 
         const result = yield* getDetailedTimeReport({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           to: 2000
         }).pipe(Effect.provide(testLayer))
 
@@ -1147,7 +1150,7 @@ describe("getDetailedTimeReport", () => {
         })
 
         const result = yield* getDetailedTimeReport({
-          project: "TEST",
+          project: projectIdentifier("TEST"),
           from: 1500,
           to: 2500
         }).pipe(Effect.provide(testLayer))
@@ -1167,7 +1170,7 @@ describe("getDetailedTimeReport", () => {
 
         const error = yield* Effect.flip(
           getDetailedTimeReport({
-            project: "NONEXISTENT"
+            project: projectIdentifier("NONEXISTENT")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -1205,7 +1208,7 @@ describe("getDetailedTimeReport", () => {
         })
 
         const result = yield* getDetailedTimeReport({
-          project: "TEST"
+          project: projectIdentifier("TEST")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.byIssue).toHaveLength(1)
@@ -1225,14 +1228,14 @@ describe("getDetailedTimeReport", () => {
           _id: "r1" as Ref<HulyTimeSpendReport>,
           attachedTo: "issue-1" as Ref<HulyIssue>,
           space: "project-1" as Ref<Space>,
-          employee: "person-1" as Ref<Person>,
+          employee: toRef<Employee>("person-1"),
           value: 40
         })
         const report2 = makeTimeSpendReport({
           _id: "r2" as Ref<HulyTimeSpendReport>,
           attachedTo: "issue-2" as Ref<HulyIssue>,
           space: "project-1" as Ref<Space>,
-          employee: "person-1" as Ref<Person>,
+          employee: toRef<Employee>("person-1"),
           value: 50
         })
 
@@ -1244,7 +1247,7 @@ describe("getDetailedTimeReport", () => {
         })
 
         const result = yield* getDetailedTimeReport({
-          project: "TEST"
+          project: projectIdentifier("TEST")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.byEmployee).toHaveLength(1)
@@ -1275,7 +1278,8 @@ describe("listWorkSlots", () => {
             filtered = filtered.filter(s => (s.date as number) <= dateFilter.$lte!)
           }
         }
-        return Effect.succeed(toFindResult(filtered as Array<Doc>))
+        // eslint-disable-next-line no-restricted-syntax -- typed array doesn't overlap with Array<Doc>
+        return Effect.succeed(toFindResult(filtered as unknown as Array<Doc>))
       }
       if (_class === contact.class.Channel) {
         const q = query as Record<string, unknown>
@@ -1513,7 +1517,7 @@ describe("createWorkSlot", () => {
       })
 
       const result = yield* createWorkSlot({
-        todoId: "todo-123",
+        todoId: todoId("todo-123"),
         date: 1000,
         dueDate: 2000
       }).pipe(Effect.provide(testLayer))
@@ -1558,7 +1562,7 @@ describe("createWorkSlot", () => {
       })
 
       yield* createWorkSlot({
-        todoId: "todo-abc",
+        todoId: todoId("todo-abc"),
         date: 5000,
         dueDate: 6000
       }).pipe(Effect.provide(testLayer))
@@ -1586,8 +1590,8 @@ describe("startTimer", () => {
 
         const before = Date.now()
         const result = yield* startTimer({
-          project: "TEST",
-          identifier: "TEST-1"
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
         const after = Date.now()
 
@@ -1608,8 +1612,8 @@ describe("startTimer", () => {
 
         const error = yield* Effect.flip(
           startTimer({
-            project: "NONEXISTENT",
-            identifier: "1"
+            project: projectIdentifier("NONEXISTENT"),
+            identifier: issueIdentifier("1")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -1628,8 +1632,8 @@ describe("startTimer", () => {
 
         const error = yield* Effect.flip(
           startTimer({
-            project: "TEST",
-            identifier: "TEST-999"
+            project: projectIdentifier("TEST"),
+            identifier: issueIdentifier("TEST-999")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -1653,8 +1657,8 @@ describe("stopTimer", () => {
 
         const before = Date.now()
         const result = yield* stopTimer({
-          project: "TEST",
-          identifier: "TEST-1"
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
         const after = Date.now()
 
@@ -1675,8 +1679,8 @@ describe("stopTimer", () => {
 
         const error = yield* Effect.flip(
           stopTimer({
-            project: "NONEXISTENT",
-            identifier: "1"
+            project: projectIdentifier("NONEXISTENT"),
+            identifier: issueIdentifier("1")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -1695,8 +1699,8 @@ describe("stopTimer", () => {
 
         const error = yield* Effect.flip(
           stopTimer({
-            project: "TEST",
-            identifier: "TEST-999"
+            project: projectIdentifier("TEST"),
+            identifier: issueIdentifier("TEST-999")
           }).pipe(Effect.provide(testLayer))
         )
 

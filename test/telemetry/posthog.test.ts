@@ -105,7 +105,7 @@ describe("createPostHogTelemetry", () => {
       })
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("omits error_tag when not provided", () => {
       const telemetry = createPostHogTelemetry(false)
       telemetry.toolCalled({
@@ -254,7 +254,7 @@ describe("createPostHogTelemetry", () => {
       stderrSpy.mockRestore()
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("does not log capture error when debug is off", () => {
       const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {})
       mockCapture.mockImplementationOnce(() => {
@@ -295,7 +295,7 @@ describe("createPostHogTelemetry", () => {
       expect(ids[0]).toMatch(/^[0-9a-f-]{36}$/)
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("different instances get different session ids", () => {
       const t1 = createPostHogTelemetry(false)
       const t2 = createPostHogTelemetry(false)

@@ -18,72 +18,80 @@ import {
   listEvents,
   updateEvent
 } from "../../../src/huly/operations/calendar.js"
+import { email, eventBrandId } from "../../helpers/brands.js"
 
 import { calendar, contact } from "../../../src/huly/huly-plugins.js"
 
 // --- Mock Data Builders ---
 
-const makeEvent = (overrides?: Partial<HulyEvent>): HulyEvent => ({
-  _id: "event-1" as Ref<HulyEvent>,
-  _class: calendar.class.Event,
-  space: calendar.space.Calendar,
-  title: "Test Event",
-  description: "" as HulyEvent["description"],
-  eventId: "evt-id-1",
-  date: 1700000000000,
-  dueDate: 1700003600000,
-  allDay: false,
-  participants: [],
-  // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-  calendar: "cal-1" as Ref<Doc> as HulyEvent["calendar"],
-  access: AccessLevel.Owner,
-  user: "" as HulyEvent["user"],
-  blockTime: false,
-  attachedTo: "attached-1" as Ref<Doc>,
-  attachedToClass: "class-1" as Ref<Class<Doc>>,
-  collection: "events",
-  modifiedBy: "user-1" as Doc["modifiedBy"],
-  modifiedOn: Date.now(),
-  createdBy: "user-1" as Doc["createdBy"],
-  createdOn: Date.now(),
-  ...overrides
-})
+const asHulyEvent = (v: unknown) => v as HulyEvent
+const asPerson = (v: unknown) => v as Person
+const asRecurringEvent = (v: unknown) => v as HulyRecurringEvent
+const asRecurringInstance = (v: unknown) => v as HulyRecurringInstance
+const asChannel = (v: unknown) => v as Channel
 
-// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- mock builder
-const makePerson = (overrides?: Partial<Person>): Person => ({
-  _id: "person-1" as Ref<Person>,
-  _class: contact.class.Person,
-  space: "space-1" as Ref<Space>,
-  name: "John Doe",
-  modifiedBy: "user-1" as Doc["modifiedBy"],
-  modifiedOn: Date.now(),
-  createdBy: "user-1" as Doc["createdBy"],
-  createdOn: Date.now(),
-  ...overrides
-} as Person)
+const makeEvent = (overrides?: Partial<HulyEvent>): HulyEvent =>
+  asHulyEvent({
+    _id: "event-1" as Ref<HulyEvent>,
+    _class: calendar.class.Event,
+    space: calendar.space.Calendar,
+    title: "Test Event",
+    description: "" as HulyEvent["description"],
+    eventId: "evt-id-1",
+    date: 1700000000000,
+    dueDate: 1700003600000,
+    allDay: false,
+    participants: [],
+    // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
+    calendar: "cal-1" as Ref<Doc> as HulyEvent["calendar"],
+    access: AccessLevel.Owner,
+    user: "" as HulyEvent["user"],
+    blockTime: false,
+    attachedTo: "attached-1" as Ref<Doc>,
+    attachedToClass: "class-1" as Ref<Class<Doc>>,
+    collection: "events",
+    modifiedBy: "user-1" as Doc["modifiedBy"],
+    modifiedOn: Date.now(),
+    createdBy: "user-1" as Doc["createdBy"],
+    createdOn: Date.now(),
+    ...overrides
+  })
 
-// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- mock builder
-const makeRecurringEvent = (overrides?: Partial<HulyRecurringEvent>): HulyRecurringEvent => ({
-  ...makeEvent(),
-  _class: calendar.class.ReccuringEvent,
-  rules: [{ freq: "WEEKLY" }],
-  exdate: [],
-  rdate: [],
-  originalStartTime: 1700000000000,
-  timeZone: "UTC",
-  ...overrides
-} as HulyRecurringEvent)
+const makePerson = (overrides?: Partial<Person>): Person =>
+  asPerson({
+    _id: "person-1" as Ref<Person>,
+    _class: contact.class.Person,
+    space: "space-1" as Ref<Space>,
+    name: "John Doe",
+    modifiedBy: "user-1" as Doc["modifiedBy"],
+    modifiedOn: Date.now(),
+    createdBy: "user-1" as Doc["createdBy"],
+    createdOn: Date.now(),
+    ...overrides
+  })
 
-// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- mock builder
-const makeRecurringInstance = (overrides?: Partial<HulyRecurringInstance>): HulyRecurringInstance => ({
-  ...makeRecurringEvent(),
-  _class: calendar.class.ReccuringInstance,
-  recurringEventId: "evt-id-1",
-  originalStartTime: 1700000000000,
-  isCancelled: false,
-  virtual: false,
-  ...overrides
-} as HulyRecurringInstance)
+const makeRecurringEvent = (overrides?: Partial<HulyRecurringEvent>): HulyRecurringEvent =>
+  asRecurringEvent({
+    ...makeEvent(),
+    _class: calendar.class.ReccuringEvent,
+    rules: [{ freq: "WEEKLY" }],
+    exdate: [],
+    rdate: [],
+    originalStartTime: 1700000000000,
+    timeZone: "UTC",
+    ...overrides
+  })
+
+const makeRecurringInstance = (overrides?: Partial<HulyRecurringInstance>): HulyRecurringInstance =>
+  asRecurringInstance({
+    ...makeRecurringEvent(),
+    _class: calendar.class.ReccuringInstance,
+    recurringEventId: "evt-id-1",
+    originalStartTime: 1700000000000,
+    isCancelled: false,
+    virtual: false,
+    ...overrides
+  })
 
 // --- Test Helpers ---
 
@@ -234,7 +242,7 @@ describe("createRecurringEvent - ruleToHulyRule with all optional fields", () =>
       expect(rules[0].interval).toBe(2)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("converts rule with byDay, byMonthDay, byMonth, bySetPos, wkst", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -263,7 +271,7 @@ describe("createRecurringEvent - ruleToHulyRule with all optional fields", () =>
       expect(rules[0].wkst).toBe("MO")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("copies arrays (byDay, byMonthDay, byMonth, bySetPos) without shared references", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -307,12 +315,11 @@ describe("createEvent - description and participants", () => {
       expect(captureAddCollection.attributes?.description).toBe("markup-ref-123")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("creates event with participants resolved from emails", () =>
     Effect.gen(function*() {
       const person = makePerson({ _id: "person-1" as Ref<Person>, name: "Alice" })
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- mock builder
-      const channel = {
+      const channel = asChannel({
         _id: "channel-1" as Ref<Channel>,
         _class: contact.class.Channel,
         space: "space-1" as Ref<Space>,
@@ -325,7 +332,7 @@ describe("createEvent - description and participants", () => {
         modifiedOn: Date.now(),
         createdBy: "user-1" as Doc["createdBy"],
         createdOn: Date.now()
-      } as Channel
+      })
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
       const testLayer = createTestLayer({
         persons: [person],
@@ -336,7 +343,7 @@ describe("createEvent - description and participants", () => {
       const result = yield* createEvent({
         title: "Event with Participants",
         date: 1700000000000,
-        participants: ["alice@example.com"]
+        participants: [email("alice@example.com")]
       }).pipe(Effect.provide(testLayer))
 
       expect(result.eventId).toBeDefined()
@@ -373,7 +380,7 @@ describe("updateEvent - field update branches", () => {
       const testLayer = createTestLayer({ events: [event], captureUpdateDoc })
 
       const result = yield* updateEvent({
-        eventId: "evt-1",
+        eventId: eventBrandId("evt-1"),
         date: 1800000000000
       }).pipe(Effect.provide(testLayer))
 
@@ -389,7 +396,7 @@ describe("updateEvent - field update branches", () => {
       const testLayer = createTestLayer({ events: [event], captureUpdateDoc })
 
       const result = yield* updateEvent({
-        eventId: "evt-1",
+        eventId: eventBrandId("evt-1"),
         dueDate: 1800003600000
       }).pipe(Effect.provide(testLayer))
 
@@ -405,7 +412,7 @@ describe("updateEvent - field update branches", () => {
       const testLayer = createTestLayer({ events: [event], captureUpdateDoc })
 
       const result = yield* updateEvent({
-        eventId: "evt-1",
+        eventId: eventBrandId("evt-1"),
         allDay: true
       }).pipe(Effect.provide(testLayer))
 
@@ -413,7 +420,7 @@ describe("updateEvent - field update branches", () => {
       expect(captureUpdateDoc.operations?.allDay).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates location field", () =>
     Effect.gen(function*() {
       const event = makeEvent({ eventId: "evt-1" })
@@ -421,7 +428,7 @@ describe("updateEvent - field update branches", () => {
       const testLayer = createTestLayer({ events: [event], captureUpdateDoc })
 
       const result = yield* updateEvent({
-        eventId: "evt-1",
+        eventId: eventBrandId("evt-1"),
         location: "Building A, Room 101"
       }).pipe(Effect.provide(testLayer))
 
@@ -429,7 +436,7 @@ describe("updateEvent - field update branches", () => {
       expect(captureUpdateDoc.operations?.location).toBe("Building A, Room 101")
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("updates visibility field", () =>
     Effect.gen(function*() {
       const event = makeEvent({ eventId: "evt-1" })
@@ -437,7 +444,7 @@ describe("updateEvent - field update branches", () => {
       const testLayer = createTestLayer({ events: [event], captureUpdateDoc })
 
       const result = yield* updateEvent({
-        eventId: "evt-1",
+        eventId: eventBrandId("evt-1"),
         visibility: "private"
       }).pipe(Effect.provide(testLayer))
 
@@ -453,7 +460,7 @@ describe("updateEvent - field update branches", () => {
       const testLayer = createTestLayer({ events: [event], captureUpdateDoc })
 
       const result = yield* updateEvent({
-        eventId: "evt-1",
+        eventId: eventBrandId("evt-1"),
         title: "Updated Title",
         date: 1800000000000,
         dueDate: 1800003600000,
@@ -489,7 +496,7 @@ describe("updateEvent - description in-place only path (line 423, 427)", () => {
       })
 
       const result = yield* updateEvent({
-        eventId: "evt-1",
+        eventId: eventBrandId("evt-1"),
         description: "Updated description content"
       }).pipe(Effect.provide(testLayer))
 
@@ -515,7 +522,7 @@ describe("updateEvent - description in-place only path (line 423, 427)", () => {
       })
 
       const result = yield* updateEvent({
-        eventId: "evt-1",
+        eventId: eventBrandId("evt-1"),
         description: "Updated description content",
         title: "Also new title"
       }).pipe(Effect.provide(testLayer))
@@ -580,7 +587,7 @@ describe("getEvent - externalParticipants mapping", () => {
       })
       const testLayer = createTestLayer({ events: [event] })
 
-      const result = yield* getEvent({ eventId: "evt-1" }).pipe(Effect.provide(testLayer))
+      const result = yield* getEvent({ eventId: eventBrandId("evt-1") }).pipe(Effect.provide(testLayer))
 
       expect(result.externalParticipants).toEqual(["ext@example.com", "guest@test.org"])
     }))
@@ -589,7 +596,7 @@ describe("getEvent - externalParticipants mapping", () => {
 // --- resolveEventInputs: no calendar fallback (line 189) ---
 
 describe("createEvent - no default calendar fallback", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("uses empty ref when no calendar exists", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -637,7 +644,7 @@ describe("createEvent - findPersonsByEmails edge cases", () => {
       yield* createEvent({
         title: "With Unknown Emails",
         date: 1700000000000,
-        participants: ["unknown@example.com"]
+        participants: [email("unknown@example.com")]
       }).pipe(Effect.provide(testLayer))
 
       // No channels match, so personIds is empty, so participants is empty
@@ -671,7 +678,7 @@ describe("listEventInstances - participantMap fallback", () => {
       })
 
       const result = yield* listEventInstances({
-        recurringEventId: "recur-1",
+        recurringEventId: eventBrandId("recur-1"),
         includeParticipants: true
       }).pipe(Effect.provide(testLayer))
 

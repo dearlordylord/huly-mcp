@@ -1,16 +1,19 @@
 import { describe, it } from "@effect/vitest"
 import type { MarkupRef } from "@hcengineering/api-client"
 import {
+  AccountRole,
   type AttachedData,
   type AttachedDoc,
   type Class,
   type Data,
   type Doc,
   type DocumentQuery,
+  type PersonUuid,
   type Ref as DocRef,
   type Space,
   toFindResult,
-  type WithLookup
+  type WithLookup,
+  type WorkspaceMemberInfo
 } from "@hcengineering/core"
 import { Cause, Effect, Exit } from "effect"
 import { expect } from "vitest"
@@ -175,14 +178,10 @@ describe("HulyClient.testLayer with custom operations", () => {
   // test-revizorro: approved
   it.effect("custom findAll returns provided data", () =>
     Effect.gen(function*() {
-      const docs = [
-        { _id: "d1", title: "A" },
-        { _id: "d2", title: "B" }
-      ]
+      const asDoc = (v: unknown): Doc => v as Doc
+      const docs = [asDoc({ _id: "d1", title: "A" }), asDoc({ _id: "d2", title: "B" })]
       const layer = HulyClient.testLayer({
-        findAll: <T extends Doc>() =>
-          // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-          Effect.succeed(toFindResult(docs as Array<Doc>) as unknown as import("@hcengineering/core").FindResult<T>)
+        findAll: <T extends Doc>() => Effect.succeed(toFindResult<T>(docs as Array<T>))
       })
       const client = yield* HulyClient.pipe(Effect.provide(layer))
       const results = yield* client.findAll(
@@ -197,7 +196,7 @@ describe("HulyClient.testLayer with custom operations", () => {
     Effect.gen(function*() {
       const doc = { _id: "d1", title: "Found" }
       const layer = HulyClient.testLayer({
-        // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
+        // eslint-disable-next-line no-restricted-syntax -- partial mock object doesn't overlap with WithLookup<T>
         findOne: <T extends Doc>() => Effect.succeed(doc as unknown as WithLookup<T>)
       })
       const client = yield* HulyClient.pipe(Effect.provide(layer))
@@ -230,12 +229,12 @@ describe("HulyClient.testLayer with custom operations", () => {
   // test-revizorro: approved
   it.effect("overriding one op does not affect others", () =>
     Effect.gen(function*() {
+      const asDoc = (v: unknown): Doc => v as Doc
       const layer = HulyClient.testLayer({
-        findAll: <T extends Doc>() =>
-          Effect.succeed(
-            // eslint-disable-next-line no-restricted-syntax, @typescript-eslint/consistent-type-assertions -- test mock requires double cast through unknown
-            toFindResult([{ _id: "x" } as Doc]) as unknown as import("@hcengineering/core").FindResult<T>
-          )
+        findAll: <T extends Doc>() => {
+          const docs = [asDoc({ _id: "x" })] as Array<T>
+          return Effect.succeed(toFindResult(docs))
+        }
       })
       const client = yield* HulyClient.pipe(Effect.provide(layer))
 
@@ -301,7 +300,7 @@ describe("WorkspaceClient.testLayer defaults", () => {
         Effect.provide(WorkspaceClient.testLayer({}))
       )
       const exit = yield* Effect.exit(
-        client.getPersonInfo("person-uuid" as import("@hcengineering/core").PersonUuid)
+        client.getPersonInfo("person-uuid" as PersonUuid)
       )
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
@@ -313,12 +312,12 @@ describe("WorkspaceClient.testLayer defaults", () => {
         Effect.provide(WorkspaceClient.testLayer({}))
       )
       const exit = yield* Effect.exit(
-        client.updateWorkspaceRole("account", 0 as import("@hcengineering/core").AccountRole)
+        client.updateWorkspaceRole("account", AccountRole.Guest)
       )
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("getWorkspaceInfo dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -387,8 +386,7 @@ describe("WorkspaceClient.testLayer with custom operations", () => {
       const layer = WorkspaceClient.testLayer({
         getWorkspaceMembers: () =>
           Effect.succeed(
-            // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-            mockMembers as unknown as Array<import("@hcengineering/core").WorkspaceMemberInfo>
+            mockMembers as Array<WorkspaceMemberInfo>
           )
       })
       const client = yield* WorkspaceClient.pipe(Effect.provide(layer))
@@ -416,8 +414,7 @@ describe("WorkspaceClient.testLayer with custom operations", () => {
       const layer = WorkspaceClient.testLayer({
         getWorkspaceMembers: () =>
           Effect.succeed(
-            // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
-            [{ person: "p1" }] as unknown as Array<import("@hcengineering/core").WorkspaceMemberInfo>
+            [{ person: "p1" }] as Array<WorkspaceMemberInfo>
           )
       })
       const client = yield* WorkspaceClient.pipe(Effect.provide(layer))

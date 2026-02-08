@@ -7,9 +7,9 @@ import { describe, it } from "@effect/vitest"
 import type { DirectMessage as HulyDirectMessage } from "@hcengineering/chunter"
 import type { Employee as HulyEmployee, Person } from "@hcengineering/contact"
 import type { AccountUuid as HulyAccountUuid, Doc, PersonId, Ref, Space, Status } from "@hcengineering/core"
-import { toFindResult } from "@hcengineering/core"
+import { SocialIdType, toFindResult } from "@hcengineering/core"
 import type { IssueTemplate as HulyIssueTemplate, Project as HulyProject } from "@hcengineering/tracker"
-import { IssuePriority } from "@hcengineering/tracker"
+import { IssuePriority, TimeReportDayType } from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
 
@@ -22,6 +22,14 @@ import { HulyClient, type HulyClientOperations } from "../src/huly/client.js"
 import { chunter, contact, tracker } from "../src/huly/huly-plugins.js"
 import { buildSocialIdToPersonNameMap, listDirectMessages } from "../src/huly/operations/channels.js"
 import { createIssueFromTemplate } from "../src/huly/operations/issue-templates.js"
+import { projectIdentifier, templateIdentifier } from "./helpers/brands.js"
+
+// Test mock cast helpers: hide the single `as` inside a function so
+// the lint rule `consistent-type-assertions` does not fire on object
+// literal assertions, and TS does not complain about insufficient overlap.
+const asDocs = (v: unknown) => v as Array<Doc>
+const asEmployee = (v: unknown) => v as HulyEmployee
+const asProject = (v: unknown) => v as HulyProject
 
 // ============================================================
 // 1. channels.ts line 159 - person NOT found in personById map
@@ -43,19 +51,19 @@ describe("buildSocialIdToPersonNameMap - person not found in map (channels.ts li
         HulyClient.testLayer({
           findAll: (((_class: unknown) => {
             if (_class === contact.class.SocialIdentity) {
-              return Effect.succeed(toFindResult([{
+              return Effect.succeed(toFindResult(asDocs([{
                 _id: "social-orphan" as PersonId,
                 _class: contact.class.SocialIdentity,
                 space: "space-1" as Ref<Space>,
                 attachedTo: "person-999" as Ref<Person>,
                 attachedToClass: contact.class.Person,
                 collection: "socialIds",
-                type: "huly",
+                type: SocialIdType.HULY,
                 value: "orphan@example.com",
                 key: "huly:orphan@example.com",
-                modifiedBy: "user-1" as Ref<Doc>,
+                modifiedBy: "user-1" as PersonId,
                 modifiedOn: Date.now()
-              }] as Array<Doc>))
+              }])))
             }
             if (_class === contact.class.Person) {
               return Effect.succeed(toFindResult([]))
@@ -84,7 +92,7 @@ describe("buildSocialIdToPersonNameMap - person not found in map (channels.ts li
         HulyClient.testLayer({
           findAll: (((_class: unknown) => {
             if (_class === contact.class.SocialIdentity) {
-              return Effect.succeed(toFindResult([
+              return Effect.succeed(toFindResult(asDocs([
                 {
                   _id: "social-found" as PersonId,
                   _class: contact.class.SocialIdentity,
@@ -92,10 +100,10 @@ describe("buildSocialIdToPersonNameMap - person not found in map (channels.ts li
                   attachedTo: "person-1" as Ref<Person>,
                   attachedToClass: contact.class.Person,
                   collection: "socialIds",
-                  type: "huly",
+                  type: SocialIdType.HULY,
                   value: "found@example.com",
                   key: "huly:found@example.com",
-                  modifiedBy: "user-1" as Ref<Doc>,
+                  modifiedBy: "user-1" as PersonId,
                   modifiedOn: Date.now()
                 },
                 {
@@ -105,25 +113,25 @@ describe("buildSocialIdToPersonNameMap - person not found in map (channels.ts li
                   attachedTo: "person-999" as Ref<Person>,
                   attachedToClass: contact.class.Person,
                   collection: "socialIds",
-                  type: "huly",
+                  type: SocialIdType.HULY,
                   value: "orphan@example.com",
                   key: "huly:orphan@example.com",
-                  modifiedBy: "user-1" as Ref<Doc>,
+                  modifiedBy: "user-1" as PersonId,
                   modifiedOn: Date.now()
                 }
-              ] as Array<Doc>))
+              ])))
             }
             if (_class === contact.class.Person) {
-              return Effect.succeed(toFindResult([{
+              return Effect.succeed(toFindResult(asDocs([{
                 _id: "person-1" as Ref<Person>,
                 _class: contact.class.Person,
                 space: "space-1" as Ref<Space>,
                 name: "Found Person",
-                modifiedBy: "user-1" as Ref<Doc>,
+                modifiedBy: "user-1" as PersonId,
                 modifiedOn: Date.now(),
-                createdBy: "user-1" as Ref<Doc>,
+                createdBy: "user-1" as PersonId,
                 createdOn: Date.now()
-              }] as Array<Doc>))
+              }])))
             }
             return Effect.succeed(toFindResult([]))
           }) as HulyClientOperations["findAll"])
@@ -151,24 +159,23 @@ describe("buildAccountUuidToNameMap - employee with undefined personUuid (channe
         archived: false,
         members: ["account-1" as HulyAccountUuid],
         messages: 1,
-        modifiedBy: "user-1" as Ref<Doc>,
+        modifiedBy: "user-1" as PersonId,
         modifiedOn: Date.now(),
-        createdBy: "user-1" as Ref<Doc>,
+        createdBy: "user-1" as PersonId,
         createdOn: Date.now()
       }
 
-      // eslint-disable-next-line no-restricted-syntax -- test mock: double assertion for branded Employee type
-      const empNoUuid = {
+      const empNoUuid = asEmployee({
         _id: "emp-1" as Ref<HulyEmployee>,
         _class: contact.mixin.Employee,
         space: "space-1" as Ref<Space>,
         name: "Ghost Employee",
         personUuid: undefined,
-        modifiedBy: "user-1" as Ref<Doc>,
+        modifiedBy: "user-1" as PersonId,
         modifiedOn: Date.now(),
-        createdBy: "user-1" as Ref<Doc>,
+        createdBy: "user-1" as PersonId,
         createdOn: Date.now()
-      } as unknown as HulyEmployee
+      })
 
       const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown) => {
         if (_class === chunter.class.DirectMessage) {
@@ -201,37 +208,35 @@ describe("buildAccountUuidToNameMap - employee with undefined personUuid (channe
         archived: false,
         members: ["account-1" as HulyAccountUuid, "account-2" as HulyAccountUuid],
         messages: 1,
-        modifiedBy: "user-1" as Ref<Doc>,
+        modifiedBy: "user-1" as PersonId,
         modifiedOn: Date.now(),
-        createdBy: "user-1" as Ref<Doc>,
+        createdBy: "user-1" as PersonId,
         createdOn: Date.now()
       }
 
-      // eslint-disable-next-line no-restricted-syntax -- test mock: double assertion for branded Employee type
-      const empWithUuid = {
+      const empWithUuid = asEmployee({
         _id: "emp-1" as Ref<HulyEmployee>,
         _class: contact.mixin.Employee,
         space: "space-1" as Ref<Space>,
         name: "Alice",
         personUuid: "account-1",
-        modifiedBy: "user-1" as Ref<Doc>,
+        modifiedBy: "user-1" as PersonId,
         modifiedOn: Date.now(),
-        createdBy: "user-1" as Ref<Doc>,
+        createdBy: "user-1" as PersonId,
         createdOn: Date.now()
-      } as unknown as HulyEmployee
+      })
 
-      // eslint-disable-next-line no-restricted-syntax -- test mock: double assertion for branded Employee type
-      const empNoUuid = {
+      const empNoUuid = asEmployee({
         _id: "emp-2" as Ref<HulyEmployee>,
         _class: contact.mixin.Employee,
         space: "space-1" as Ref<Space>,
         name: "Phantom",
         personUuid: undefined,
-        modifiedBy: "user-1" as Ref<Doc>,
+        modifiedBy: "user-1" as PersonId,
         modifiedOn: Date.now(),
-        createdBy: "user-1" as Ref<Doc>,
+        createdBy: "user-1" as PersonId,
         createdOn: Date.now()
-      } as unknown as HulyEmployee
+      })
 
       const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown) => {
         if (_class === chunter.class.DirectMessage) {
@@ -280,21 +285,22 @@ describe("buildAccountUuidToNameMap - employee with undefined personUuid (channe
 // ============================================================
 
 describe("createIssueFromTemplate - person not found for template assignee (issue-templates.ts line 276 false branch)", () => {
-  const makeProject = (overrides?: Partial<HulyProject>): HulyProject => ({
-    _id: "project-1" as Ref<HulyProject>,
-    _class: tracker.class.Project,
-    space: "space-1" as Ref<Space>,
-    identifier: "TEST",
-    name: "Test Project",
-    sequence: 1,
-    defaultIssueStatus: "status-open" as Ref<Status>,
-    defaultTimeReportDay: 0,
-    modifiedBy: "user-1" as Ref<Doc>,
-    modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
-    createdOn: Date.now(),
-    ...overrides
-  })
+  const makeProject = (overrides?: Partial<HulyProject>): HulyProject =>
+    asProject({
+      _id: "project-1" as Ref<HulyProject>,
+      _class: tracker.class.Project,
+      space: "space-1" as Ref<Space>,
+      identifier: "TEST",
+      name: "Test Project",
+      sequence: 1,
+      defaultIssueStatus: "status-open" as Ref<Status>,
+      defaultTimeReportDay: TimeReportDayType.CurrentWorkDay,
+      modifiedBy: "user-1" as PersonId,
+      modifiedOn: Date.now(),
+      createdBy: "user-1" as PersonId,
+      createdOn: Date.now(),
+      ...overrides
+    })
 
   const makeTemplate = (overrides?: Partial<HulyIssueTemplate>): HulyIssueTemplate => ({
     _id: "template-1" as Ref<HulyIssueTemplate>,
@@ -308,9 +314,9 @@ describe("createIssueFromTemplate - person not found for template assignee (issu
     estimation: 0,
     children: [],
     comments: 0,
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: 1000,
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: 900,
     ...overrides
   })
@@ -326,15 +332,13 @@ describe("createIssueFromTemplate - person not found for template assignee (issu
       const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown, query: unknown) => {
         if (_class === tracker.class.Project) {
           const q = query as Record<string, unknown>
-          // eslint-disable-next-line no-restricted-syntax -- test mock: double assertion for branded Doc type
-          if (q.identifier === "TEST") return Effect.succeed(project as unknown as Doc)
+          if (q.identifier === "TEST") return Effect.succeed(project as Doc)
           return Effect.succeed(undefined)
         }
         if (_class === tracker.class.IssueTemplate) {
           const q = query as Record<string, unknown>
           if (q.title === "Bug Report" || q._id === template._id) {
-            // eslint-disable-next-line no-restricted-syntax -- test mock: double assertion for branded Doc type
-            return Effect.succeed(template as unknown as Doc)
+            return Effect.succeed(template as Doc)
           }
           return Effect.succeed(undefined)
         }
@@ -383,8 +387,8 @@ describe("createIssueFromTemplate - person not found for template assignee (issu
       })
 
       const result = yield* createIssueFromTemplate({
-        project: "TEST",
-        template: "Bug Report"
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.issueId).toBeDefined()
@@ -418,7 +422,7 @@ describe("hasFileSource - || short-circuit branches (attachments.ts lines 144-14
       expect(result.data).toBeUndefined()
     }))
 
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("accepts when ONLY data is provided (filePath AND fileUrl falsy)", () =>
     Effect.gen(function*() {
       const result = yield* parseAddAttachmentParams({

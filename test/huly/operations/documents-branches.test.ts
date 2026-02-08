@@ -1,17 +1,19 @@
 import { describe, it } from "@effect/vitest"
-import { type Doc, type MarkupBlobRef, type Ref, type Space, toFindResult } from "@hcengineering/core"
+import { type Doc, type MarkupBlobRef, type PersonId, type Ref, type Space, toFindResult } from "@hcengineering/core"
 import type { Document as HulyDocument, Teamspace as HulyTeamspace } from "@hcengineering/document"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { listDocuments, updateDocument } from "../../../src/huly/operations/documents.js"
+import { documentIdentifier, teamspaceIdentifier } from "../../helpers/brands.js"
 
 import { documentPlugin } from "../../../src/huly/huly-plugins.js"
 
 // --- Mock Data Builders ---
 
-const makeTeamspace = (overrides?: Partial<HulyTeamspace>): HulyTeamspace => {
-  const result: HulyTeamspace = {
+const asTeamspace = (v: unknown) => v as HulyTeamspace
+const makeTeamspace = (overrides?: Partial<HulyTeamspace>): HulyTeamspace =>
+  asTeamspace({
     _id: "teamspace-1" as Ref<HulyTeamspace>,
     _class: documentPlugin.class.Teamspace,
     space: "space-1" as Ref<Space>,
@@ -19,14 +21,12 @@ const makeTeamspace = (overrides?: Partial<HulyTeamspace>): HulyTeamspace => {
     description: "Test teamspace",
     archived: false,
     private: false,
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
-  }
-  return result
-}
+  })
 
 const makeDocument = (overrides?: Partial<HulyDocument>): HulyDocument => {
   const result: HulyDocument = {
@@ -37,9 +37,9 @@ const makeDocument = (overrides?: Partial<HulyDocument>): HulyDocument => {
     content: null,
     parent: documentPlugin.ids.NoParent,
     rank: "0|aaa",
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -121,17 +121,19 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     }
   ) as HulyClientOperations["updateDoc"]
 
+  // eslint-disable-next-line no-restricted-syntax -- mock function signature (unknown params) doesn't overlap with typed signature
   const uploadMarkupImpl: HulyClientOperations["uploadMarkup"] = ((
     _objectClass: unknown,
     _objectId: unknown,
     _objectAttr: unknown,
-    markup: unknown
+    markup: unknown,
+    _format: unknown
   ) => {
     if (config.captureUploadMarkup) {
       config.captureUploadMarkup.markup = markup as string
     }
     return Effect.succeed("markup-ref-123")
-  }) as HulyClientOperations["uploadMarkup"]
+  }) as unknown as HulyClientOperations["uploadMarkup"]
 
   const updateMarkupImpl: HulyClientOperations["updateMarkup"] = ((
     _objectClass: unknown,
@@ -176,7 +178,9 @@ describe("listDocuments - titleSearch branch (line 196)", () => {
         captureDocumentQuery: captureQuery
       })
 
-      yield* listDocuments({ teamspace: "My Docs", titleSearch: "design" }).pipe(Effect.provide(testLayer))
+      yield* listDocuments({ teamspace: teamspaceIdentifier("My Docs"), titleSearch: "design" }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(captureQuery.query?.title).toEqual({ $like: "%design%" })
     }))
@@ -193,14 +197,16 @@ describe("listDocuments - titleSearch branch (line 196)", () => {
         captureDocumentQuery: captureQuery
       })
 
-      yield* listDocuments({ teamspace: "My Docs", titleSearch: "   " }).pipe(Effect.provide(testLayer))
+      yield* listDocuments({ teamspace: teamspaceIdentifier("My Docs"), titleSearch: "   " }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(captureQuery.query?.title).toBeUndefined()
     }))
 })
 
 describe("listDocuments - contentSearch branch (line 200)", () => {
-  // test-revizorro: scheduled
+  // test-revizorro: approved
   it.effect("applies contentSearch to $search query", () =>
     Effect.gen(function*() {
       const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -212,7 +218,9 @@ describe("listDocuments - contentSearch branch (line 200)", () => {
         captureDocumentQuery: captureQuery
       })
 
-      yield* listDocuments({ teamspace: "My Docs", contentSearch: "implementation" }).pipe(Effect.provide(testLayer))
+      yield* listDocuments({ teamspace: teamspaceIdentifier("My Docs"), contentSearch: "implementation" }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(captureQuery.query?.$search).toBe("implementation")
     }))
@@ -229,7 +237,9 @@ describe("listDocuments - contentSearch branch (line 200)", () => {
         captureDocumentQuery: captureQuery
       })
 
-      yield* listDocuments({ teamspace: "My Docs", contentSearch: "  " }).pipe(Effect.provide(testLayer))
+      yield* listDocuments({ teamspace: teamspaceIdentifier("My Docs"), contentSearch: "  " }).pipe(
+        Effect.provide(testLayer)
+      )
 
       expect(captureQuery.query?.$search).toBeUndefined()
     }))
@@ -257,8 +267,8 @@ describe("updateDocument - in-place content update branch (lines 358-365)", () =
       })
 
       const result = yield* updateDocument({
-        teamspace: "My Docs",
-        document: "Existing Doc",
+        teamspace: teamspaceIdentifier("My Docs"),
+        document: documentIdentifier("Existing Doc"),
         content: "# Updated in place"
       }).pipe(Effect.provide(testLayer))
 
@@ -291,8 +301,8 @@ describe("updateDocument - in-place content update branch (lines 358-365)", () =
       })
 
       const result = yield* updateDocument({
-        teamspace: "My Docs",
-        document: "Old Title",
+        teamspace: teamspaceIdentifier("My Docs"),
+        document: documentIdentifier("Old Title"),
         title: "New Title",
         content: "New content in place"
       }).pipe(Effect.provide(testLayer))

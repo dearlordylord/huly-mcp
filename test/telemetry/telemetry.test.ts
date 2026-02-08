@@ -112,7 +112,7 @@ describe("Telemetry", () => {
       })
     })
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it("sessionId is consistent across calls", () => {
       const telemetry = createPostHogTelemetry(false)
       telemetry.sessionStart({

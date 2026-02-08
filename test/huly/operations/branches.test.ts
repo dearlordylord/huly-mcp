@@ -9,8 +9,9 @@ import { describe, it } from "@effect/vitest"
 import type { ActivityMessage } from "@hcengineering/activity"
 import type { Channel as HulyChannel, ChatMessage, ThreadMessage as HulyThreadMessage } from "@hcengineering/chunter"
 import type { Employee as HulyEmployee, Person, SocialIdentity } from "@hcengineering/contact"
-import { type Doc, type PersonId, type Ref, type Space, toFindResult } from "@hcengineering/core"
-import type { Component as HulyComponent, Project as HulyProject } from "@hcengineering/tracker"
+import { type Doc, type PersonId, type Ref, SocialIdType, type Space, toFindResult } from "@hcengineering/core"
+import type { ProjectType } from "@hcengineering/task"
+import type { Component as HulyComponent, IssueStatus, Project as HulyProject } from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
@@ -19,6 +20,13 @@ import { getComponent } from "../../../src/huly/operations/components.js"
 import { uploadFile } from "../../../src/huly/operations/storage.js"
 import { listThreadReplies } from "../../../src/huly/operations/threads.js"
 import { HulyStorageClient } from "../../../src/huly/storage.js"
+import {
+  channelIdentifier,
+  componentIdentifier,
+  messageBrandId,
+  mimeType,
+  projectIdentifier
+} from "../../helpers/brands.js"
 
 // --- Mock Data Builders for components ---
 
@@ -34,12 +42,12 @@ const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
     members: [],
     identifier: "PROJ",
     sequence: 1,
-    defaultIssueStatus: "status-1" as Ref<Doc>,
+    defaultIssueStatus: "status-1" as Ref<IssueStatus>,
     defaultTimeReportDay: "CurrentWorkDay" as HulyProject["defaultTimeReportDay"],
-    type: "project-type-1" as Ref<Doc>,
-    modifiedBy: "user-1" as Ref<Doc>,
+    type: "project-type-1" as Ref<ProjectType>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -55,9 +63,9 @@ const makeComponent = (overrides?: Partial<HulyComponent>): HulyComponent => {
     description: "Backend component",
     lead: "person-1" as Ref<Employee>,
     comments: 0,
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
@@ -145,7 +153,10 @@ describe("getComponent - lead person not found in DB (line 177 false branch)", (
         persons: []
       })
 
-      const result = yield* getComponent({ project: "PROJ", component: "Backend" }).pipe(Effect.provide(testLayer))
+      const result = yield* getComponent({
+        project: projectIdentifier("PROJ"),
+        component: componentIdentifier("Backend")
+      }).pipe(Effect.provide(testLayer))
 
       expect(result.id).toBe("comp-1")
       // lead is set (non-null), but person lookup fails, so leadName stays undefined
@@ -166,9 +177,9 @@ const makeChannel = (overrides?: Partial<HulyChannel>): HulyChannel => ({
   archived: false,
   members: [],
   messages: 0,
-  modifiedBy: "user-1" as Ref<Doc>,
+  modifiedBy: "user-1" as PersonId,
   modifiedOn: Date.now(),
-  createdBy: "user-1" as Ref<Doc>,
+  createdBy: "user-1" as PersonId,
   createdOn: Date.now(),
   ...overrides
 })
@@ -182,9 +193,9 @@ const makeChatMessage = (overrides?: Partial<ChatMessage>): ChatMessage => ({
   collection: "messages",
   message: "<p>Hello</p>",
   attachments: 0,
-  modifiedBy: "user-1" as Ref<Doc>,
+  modifiedBy: "user-1" as PersonId,
   modifiedOn: Date.now(),
-  createdBy: "user-1" as Ref<Doc>,
+  createdBy: "user-1" as PersonId,
   createdOn: Date.now(),
   ...overrides
 })
@@ -200,40 +211,43 @@ const makeThreadMessage = (overrides?: Partial<HulyThreadMessage>): HulyThreadMe
   attachments: 0,
   objectId: "channel-1" as Ref<Doc>,
   objectClass: chunter.class.Channel,
-  modifiedBy: "user-1" as Ref<Doc>,
+  modifiedBy: "user-1" as PersonId,
   modifiedOn: Date.now(),
-  createdBy: "user-1" as Ref<Doc>,
+  createdBy: "user-1" as PersonId,
   createdOn: Date.now(),
   ...overrides
 })
 
-// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test mock: partial Person
-const makePerson = (overrides?: Partial<Person>): Person => ({
-  _id: "person-1" as Ref<Person>,
-  _class: contact.class.Person,
-  space: "space-1" as Ref<Space>,
-  name: "John Doe",
-  modifiedBy: "user-1" as Ref<Doc>,
-  modifiedOn: Date.now(),
-  createdBy: "user-1" as Ref<Doc>,
-  createdOn: Date.now(),
-  ...overrides
-} as Person)
+const asPerson = (v: unknown) => v as Person
+const makePerson = (overrides?: Partial<Person>): Person =>
+  asPerson({
+    _id: "person-1" as Ref<Person>,
+    _class: contact.class.Person,
+    space: "space-1" as Ref<Space>,
+    name: "John Doe",
+    modifiedBy: "user-1" as PersonId,
+    modifiedOn: Date.now(),
+    createdBy: "user-1" as PersonId,
+    createdOn: Date.now(),
+    ...overrides
+  })
 
-const makeSocialIdentity = (overrides?: Partial<SocialIdentity>): SocialIdentity => ({
-  _id: "social-1" as PersonId,
-  _class: contact.class.SocialIdentity,
-  space: "space-1" as Ref<Space>,
-  attachedTo: "person-1" as Ref<Person>,
-  attachedToClass: contact.class.Person,
-  collection: "socialIds",
-  type: "huly",
-  value: "user@example.com",
-  key: "huly:user@example.com",
-  modifiedBy: "user-1" as Ref<Doc>,
-  modifiedOn: Date.now(),
-  ...overrides
-})
+const asSocialIdentity = (v: unknown) => v as SocialIdentity
+const makeSocialIdentity = (overrides?: Partial<SocialIdentity>): SocialIdentity =>
+  asSocialIdentity({
+    _id: "social-1" as SocialIdentity["_id"],
+    _class: contact.class.SocialIdentity,
+    space: "space-1" as Ref<Space>,
+    attachedTo: "person-1" as Ref<Person>,
+    attachedToClass: contact.class.Person,
+    collection: "socialIds",
+    type: SocialIdType.HULY,
+    value: "user@example.com",
+    key: "huly:user@example.com",
+    modifiedBy: "user-1" as PersonId,
+    modifiedOn: Date.now(),
+    ...overrides
+  })
 
 const createThreadTestLayer = (config: {
   channels: Array<HulyChannel>
@@ -333,9 +347,9 @@ describe("listThreadReplies - sender name resolved (line 133 true branch)", () =
       ]
       const socialIdentities = [
         makeSocialIdentity({
-          _id: "social-alice" as PersonId,
+          _id: "social-alice" as SocialIdentity["_id"],
           attachedTo: "person-alice" as Ref<Person>
-        })
+        } as Partial<SocialIdentity>)
       ]
 
       const testLayer = createThreadTestLayer({
@@ -347,8 +361,8 @@ describe("listThreadReplies - sender name resolved (line 133 true branch)", () =
       })
 
       const result = yield* listThreadReplies({
-        channel: "general",
-        messageId: "msg-1"
+        channel: channelIdentifier("general"),
+        messageId: messageBrandId("msg-1")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.replies).toHaveLength(1)
@@ -371,7 +385,7 @@ describe("uploadFile - filePath branch (line 46-47)", () => {
         uploadFile({
           filename: "test.txt",
           filePath: "/nonexistent/path/to/file.txt",
-          contentType: "text/plain"
+          contentType: mimeType("text/plain")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -389,7 +403,7 @@ describe("uploadFile - fileUrl branch (line 48-49)", () => {
         uploadFile({
           filename: "remote.png",
           fileUrl: "http://localhost:1/nonexistent-image.png",
-          contentType: "image/png"
+          contentType: mimeType("image/png")
         }).pipe(Effect.provide(testLayer))
       )
 

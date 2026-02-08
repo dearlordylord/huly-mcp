@@ -1,35 +1,43 @@
 import { describe, it } from "@effect/vitest"
 import type { ChatMessage } from "@hcengineering/chunter"
-import { type Doc, type Ref, type Space, toFindResult } from "@hcengineering/core"
-import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
+import { type Doc, type PersonId, type Ref, type Space, toFindResult } from "@hcengineering/core"
+import type { TaskType } from "@hcengineering/task"
+import {
+  type Issue as HulyIssue,
+  type IssueStatus,
+  type Project as HulyProject,
+  TimeReportDayType
+} from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type { CommentNotFoundError, IssueNotFoundError, ProjectNotFoundError } from "../../../src/huly/errors.js"
 import { addComment, deleteComment, listComments, updateComment } from "../../../src/huly/operations/comments.js"
+import { commentBrandId, issueIdentifier, projectIdentifier } from "../../helpers/brands.js"
 
 import { chunter, tracker } from "../../../src/huly/huly-plugins.js"
 
 // --- Mock Data Builders ---
 
-const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
-  const result: HulyProject = {
+const asProject = (v: unknown) => v as HulyProject
+const asChatMessage = (v: unknown) => v as ChatMessage
+
+const makeProject = (overrides?: Partial<HulyProject>): HulyProject =>
+  asProject({
     _id: "project-1" as Ref<HulyProject>,
     _class: tracker.class.Project,
     space: "space-1" as Ref<Space>,
     identifier: "TEST",
     name: "Test Project",
     sequence: 1,
-    defaultIssueStatus: "status-open" as Ref<Doc>,
-    defaultTimeReportDay: 0,
-    modifiedBy: "user-1" as Ref<Doc>,
+    defaultIssueStatus: "status-open" as Ref<IssueStatus>,
+    defaultTimeReportDay: TimeReportDayType.CurrentWorkDay,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
-  }
-  return result
-}
+  })
 
 const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
   const result: HulyIssue = {
@@ -39,10 +47,10 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
     identifier: "TEST-1",
     title: "Test Issue",
     description: null,
-    status: "status-open" as Ref<Doc>,
+    status: "status-open" as Ref<IssueStatus>,
     priority: 3,
     assignee: null,
-    kind: "task-type-1" as Ref<Doc>,
+    kind: "task-type-1" as Ref<TaskType>,
     number: 1,
     dueDate: null,
     rank: "0|aaa",
@@ -57,17 +65,17 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
     reportedTime: 0,
     reports: 0,
     childInfo: [],
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
     ...overrides
   }
   return result
 }
 
-const makeChatMessage = (overrides?: Partial<ChatMessage>): ChatMessage => {
-  const result: ChatMessage = {
+const makeChatMessage = (overrides?: Partial<ChatMessage>): ChatMessage =>
+  asChatMessage({
     _id: "msg-1" as Ref<ChatMessage>,
     _class: chunter.class.ChatMessage,
     space: "project-1" as Ref<Space>,
@@ -75,15 +83,13 @@ const makeChatMessage = (overrides?: Partial<ChatMessage>): ChatMessage => {
     attachedTo: "issue-1" as Ref<Doc>,
     attachedToClass: tracker.class.Issue,
     collection: "comments",
-    modifiedBy: "user-1" as Ref<Doc>,
+    modifiedBy: "user-1" as PersonId,
     modifiedOn: Date.now(),
-    createdBy: "user-1" as Ref<Doc>,
+    createdBy: "user-1" as PersonId,
     createdOn: Date.now(),
-    editedOn: null,
+    editedOn: undefined,
     ...overrides
-  }
-  return result
-}
+  })
 
 // --- Test Helpers ---
 
@@ -118,7 +124,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       const opts = options as { sort?: Record<string, number> } | undefined
       if (opts?.sort?.createdOn !== undefined) {
         const direction = opts.sort.createdOn
-        filtered = filtered.sort((a, b) => direction * (a.createdOn - b.createdOn))
+        filtered = filtered.sort((a, b) => direction * ((a.createdOn ?? 0) - (b.createdOn ?? 0)))
       }
       return Effect.succeed(toFindResult(filtered as Array<Doc>))
     }
@@ -229,8 +235,8 @@ describe("listComments", () => {
         })
 
         const result = yield* listComments({
-          project: "TEST",
-          issueIdentifier: "TEST-1"
+          project: projectIdentifier("TEST"),
+          issueIdentifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(2)
@@ -252,8 +258,8 @@ describe("listComments", () => {
         })
 
         const result = yield* listComments({
-          project: "TEST",
-          issueIdentifier: "TEST-1"
+          project: projectIdentifier("TEST"),
+          issueIdentifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(0)
@@ -269,7 +275,7 @@ describe("listComments", () => {
             _id: "msg-abc" as Ref<ChatMessage>,
             message: "Comment body here",
             attachedTo: "issue-1" as Ref<Doc>,
-            modifiedBy: "person-123" as Ref<Doc>,
+            modifiedBy: "person-123" as PersonId,
             createdOn: 1706500000000,
             modifiedOn: 1706600000000,
             editedOn: 1706550000000
@@ -283,8 +289,8 @@ describe("listComments", () => {
         })
 
         const result = yield* listComments({
-          project: "TEST",
-          issueIdentifier: "TEST-1"
+          project: projectIdentifier("TEST"),
+          issueIdentifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
 
         expect(result[0].id).toBe("msg-abc")
@@ -297,7 +303,7 @@ describe("listComments", () => {
   })
 
   describe("identifier parsing", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("finds issue by full identifier HULY-123", () =>
       Effect.gen(function*() {
         const project = makeProject({ _id: "proj-huly" as Ref<HulyProject>, identifier: "HULY" })
@@ -321,8 +327,8 @@ describe("listComments", () => {
         })
 
         const result = yield* listComments({
-          project: "HULY",
-          issueIdentifier: "HULY-123"
+          project: projectIdentifier("HULY"),
+          issueIdentifier: issueIdentifier("HULY-123")
         }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
@@ -352,8 +358,8 @@ describe("listComments", () => {
         })
 
         const result = yield* listComments({
-          project: "TEST",
-          issueIdentifier: "42"
+          project: projectIdentifier("TEST"),
+          issueIdentifier: issueIdentifier("42")
         }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
@@ -383,8 +389,8 @@ describe("listComments", () => {
         })
 
         const result = yield* listComments({
-          project: "TEST",
-          issueIdentifier: "test-5"
+          project: projectIdentifier("TEST"),
+          issueIdentifier: issueIdentifier("test-5")
         }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
@@ -408,14 +414,14 @@ describe("listComments", () => {
         })
 
         yield* listComments({
-          project: "TEST",
-          issueIdentifier: "TEST-1"
+          project: projectIdentifier("TEST"),
+          issueIdentifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
 
         expect(captureQuery.options?.limit).toBe(50)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("enforces max limit of 200", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -431,15 +437,15 @@ describe("listComments", () => {
         })
 
         yield* listComments({
-          project: "TEST",
-          issueIdentifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          issueIdentifier: issueIdentifier("TEST-1"),
           limit: 500
         }).pipe(Effect.provide(testLayer))
 
         expect(captureQuery.options?.limit).toBe(200)
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("uses provided limit when under max", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -455,8 +461,8 @@ describe("listComments", () => {
         })
 
         yield* listComments({
-          project: "TEST",
-          issueIdentifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          issueIdentifier: issueIdentifier("TEST-1"),
           limit: 25
         }).pipe(Effect.provide(testLayer))
 
@@ -476,8 +482,8 @@ describe("listComments", () => {
 
         const error = yield* Effect.flip(
           listComments({
-            project: "NONEXISTENT",
-            issueIdentifier: "1"
+            project: projectIdentifier("NONEXISTENT"),
+            issueIdentifier: issueIdentifier("1")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -485,7 +491,7 @@ describe("listComments", () => {
         expect((error as ProjectNotFoundError).identifier).toBe("NONEXISTENT")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns IssueNotFoundError when issue doesn't exist", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -498,8 +504,8 @@ describe("listComments", () => {
 
         const error = yield* Effect.flip(
           listComments({
-            project: "TEST",
-            issueIdentifier: "TEST-999"
+            project: projectIdentifier("TEST"),
+            issueIdentifier: issueIdentifier("TEST-999")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -532,8 +538,8 @@ describe("addComment", () => {
         })
 
         const result = yield* addComment({
-          project: "TEST",
-          issueIdentifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          issueIdentifier: issueIdentifier("TEST-1"),
           body: "This is my new comment"
         }).pipe(Effect.provide(testLayer))
 
@@ -542,7 +548,7 @@ describe("addComment", () => {
         expect(captureAddCollection.attributes?.message).toBe("This is my new comment")
       }))
 
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("supports markdown in comment body", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -557,8 +563,8 @@ describe("addComment", () => {
         })
 
         yield* addComment({
-          project: "TEST",
-          issueIdentifier: "TEST-1",
+          project: projectIdentifier("TEST"),
+          issueIdentifier: issueIdentifier("TEST-1"),
           body: "# Heading\n\n- Item 1\n- Item 2\n\n```js\nconsole.log('test');\n```"
         }).pipe(Effect.provide(testLayer))
 
@@ -578,8 +584,8 @@ describe("addComment", () => {
         })
 
         const result = yield* addComment({
-          project: "HULY",
-          issueIdentifier: "42",
+          project: projectIdentifier("HULY"),
+          issueIdentifier: issueIdentifier("42"),
           body: "Comment added"
         }).pipe(Effect.provide(testLayer))
 
@@ -602,8 +608,8 @@ describe("addComment", () => {
 
         const error = yield* Effect.flip(
           addComment({
-            project: "NONEXISTENT",
-            issueIdentifier: "1",
+            project: projectIdentifier("NONEXISTENT"),
+            issueIdentifier: issueIdentifier("1"),
             body: "Comment"
           }).pipe(Effect.provide(testLayer))
         )
@@ -624,8 +630,8 @@ describe("addComment", () => {
 
         const error = yield* Effect.flip(
           addComment({
-            project: "TEST",
-            issueIdentifier: "TEST-999",
+            project: projectIdentifier("TEST"),
+            issueIdentifier: issueIdentifier("TEST-999"),
             body: "Comment"
           }).pipe(Effect.provide(testLayer))
         )
@@ -667,9 +673,9 @@ describe("updateComment", () => {
         })
 
         const result = yield* updateComment({
-          project: "TEST",
-          issueIdentifier: "TEST-1",
-          commentId: "comment-abc",
+          project: projectIdentifier("TEST"),
+          issueIdentifier: issueIdentifier("TEST-1"),
+          commentId: commentBrandId("comment-abc"),
           body: "Updated comment body"
         }).pipe(Effect.provide(testLayer))
 
@@ -704,9 +710,9 @@ describe("updateComment", () => {
         const before = Date.now()
 
         yield* updateComment({
-          project: "TEST",
-          issueIdentifier: "TEST-1",
-          commentId: "comment-1",
+          project: projectIdentifier("TEST"),
+          issueIdentifier: issueIdentifier("TEST-1"),
+          commentId: commentBrandId("comment-1"),
           body: "Updated"
         }).pipe(Effect.provide(testLayer))
 
@@ -740,9 +746,9 @@ describe("updateComment", () => {
         })
 
         yield* updateComment({
-          project: "TEST",
-          issueIdentifier: "TEST-1",
-          commentId: "comment-1",
+          project: projectIdentifier("TEST"),
+          issueIdentifier: issueIdentifier("TEST-1"),
+          commentId: commentBrandId("comment-1"),
           body: "**Bold** and *italic*"
         }).pipe(Effect.provide(testLayer))
 
@@ -777,9 +783,9 @@ describe("updateComment", () => {
         })
 
         const result = yield* updateComment({
-          project: "TEST",
-          issueIdentifier: "TEST-1",
-          commentId: "comment-abc",
+          project: projectIdentifier("TEST"),
+          issueIdentifier: issueIdentifier("TEST-1"),
+          commentId: commentBrandId("comment-abc"),
           body: "Same content"
         }).pipe(Effect.provide(testLayer))
 
@@ -791,7 +797,7 @@ describe("updateComment", () => {
   })
 
   describe("error handling", () => {
-    // test-revizorro: scheduled
+    // test-revizorro: approved
     it.effect("returns ProjectNotFoundError when project doesn't exist", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({
@@ -802,9 +808,9 @@ describe("updateComment", () => {
 
         const error = yield* Effect.flip(
           updateComment({
-            project: "NONEXISTENT",
-            issueIdentifier: "1",
-            commentId: "comment-1",
+            project: projectIdentifier("NONEXISTENT"),
+            issueIdentifier: issueIdentifier("1"),
+            commentId: commentBrandId("comment-1"),
             body: "Updated"
           }).pipe(Effect.provide(testLayer))
         )
@@ -826,9 +832,9 @@ describe("updateComment", () => {
 
         const error = yield* Effect.flip(
           updateComment({
-            project: "TEST",
-            issueIdentifier: "TEST-999",
-            commentId: "comment-1",
+            project: projectIdentifier("TEST"),
+            issueIdentifier: issueIdentifier("TEST-999"),
+            commentId: commentBrandId("comment-1"),
             body: "Updated"
           }).pipe(Effect.provide(testLayer))
         )
@@ -851,9 +857,9 @@ describe("updateComment", () => {
 
         const error = yield* Effect.flip(
           updateComment({
-            project: "TEST",
-            issueIdentifier: "TEST-1",
-            commentId: "nonexistent-comment",
+            project: projectIdentifier("TEST"),
+            issueIdentifier: issueIdentifier("TEST-1"),
+            commentId: commentBrandId("nonexistent-comment"),
             body: "Updated"
           }).pipe(Effect.provide(testLayer))
         )
@@ -878,9 +884,9 @@ describe("updateComment", () => {
 
         const error = yield* Effect.flip(
           updateComment({
-            project: "HULY",
-            issueIdentifier: "HULY-42",
-            commentId: "missing-comment",
+            project: projectIdentifier("HULY"),
+            issueIdentifier: issueIdentifier("HULY-42"),
+            commentId: commentBrandId("missing-comment"),
             body: "Updated"
           }).pipe(Effect.provide(testLayer))
         )
@@ -922,9 +928,9 @@ describe("deleteComment", () => {
         })
 
         const result = yield* deleteComment({
-          project: "TEST",
-          issueIdentifier: "TEST-1",
-          commentId: "comment-to-delete"
+          project: projectIdentifier("TEST"),
+          issueIdentifier: issueIdentifier("TEST-1"),
+          commentId: commentBrandId("comment-to-delete")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.commentId).toBe("comment-to-delete")
@@ -961,9 +967,9 @@ describe("deleteComment", () => {
         })
 
         const result = yield* deleteComment({
-          project: "HULY",
-          issueIdentifier: "99",
-          commentId: "comment-xyz"
+          project: projectIdentifier("HULY"),
+          issueIdentifier: issueIdentifier("99"),
+          commentId: commentBrandId("comment-xyz")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.issueIdentifier).toBe("HULY-99")
@@ -983,9 +989,9 @@ describe("deleteComment", () => {
 
         const error = yield* Effect.flip(
           deleteComment({
-            project: "NONEXISTENT",
-            issueIdentifier: "1",
-            commentId: "comment-1"
+            project: projectIdentifier("NONEXISTENT"),
+            issueIdentifier: issueIdentifier("1"),
+            commentId: commentBrandId("comment-1")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -1006,9 +1012,9 @@ describe("deleteComment", () => {
 
         const error = yield* Effect.flip(
           deleteComment({
-            project: "TEST",
-            issueIdentifier: "TEST-999",
-            commentId: "comment-1"
+            project: projectIdentifier("TEST"),
+            issueIdentifier: issueIdentifier("TEST-999"),
+            commentId: commentBrandId("comment-1")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -1030,9 +1036,9 @@ describe("deleteComment", () => {
 
         const error = yield* Effect.flip(
           deleteComment({
-            project: "TEST",
-            issueIdentifier: "TEST-1",
-            commentId: "nonexistent-comment"
+            project: projectIdentifier("TEST"),
+            issueIdentifier: issueIdentifier("TEST-1"),
+            commentId: commentBrandId("nonexistent-comment")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -1074,9 +1080,9 @@ describe("deleteComment", () => {
         // Try to delete comment from issue-1 (should fail - comment is on issue-2)
         const error = yield* Effect.flip(
           deleteComment({
-            project: "TEST",
-            issueIdentifier: "TEST-1",
-            commentId: "comment-on-issue-2"
+            project: projectIdentifier("TEST"),
+            issueIdentifier: issueIdentifier("TEST-1"),
+            commentId: commentBrandId("comment-on-issue-2")
           }).pipe(Effect.provide(testLayer))
         )
 
