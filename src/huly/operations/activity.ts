@@ -29,7 +29,7 @@ import type {
 import { ActivityMessageId, EmojiCode, NonEmptyString, ObjectClassName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { ActivityMessageNotFoundError, ReactionNotFoundError, SavedMessageNotFoundError } from "../errors.js"
-import { clampLimit, toRef } from "./shared.js"
+import { clampLimit, findOneOrFail, toRef } from "./shared.js"
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
 const activity = require("@hcengineering/activity").default as typeof import("@hcengineering/activity").default
@@ -105,14 +105,12 @@ export const addReaction = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const message = yield* client.findOne<HulyActivityMessage>(
+    const message = yield* findOneOrFail(
+      client,
       activity.class.ActivityMessage,
-      { _id: toRef<HulyActivityMessage>(params.messageId) }
+      { _id: toRef<HulyActivityMessage>(params.messageId) },
+      () => new ActivityMessageNotFoundError({ messageId: params.messageId })
     )
-
-    if (message === undefined) {
-      return yield* new ActivityMessageNotFoundError({ messageId: params.messageId })
-    }
 
     const reactionId: Ref<HulyReaction> = generateId()
 
@@ -146,20 +144,19 @@ export const removeReaction = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const reaction = yield* client.findOne<HulyReaction>(
+    const reaction = yield* findOneOrFail(
+      client,
       activity.class.Reaction,
       {
         attachedTo: toRef<HulyActivityMessage>(params.messageId),
         emoji: params.emoji
-      }
+      },
+      () =>
+        new ReactionNotFoundError({
+          messageId: params.messageId,
+          emoji: params.emoji
+        })
     )
-
-    if (reaction === undefined) {
-      return yield* new ReactionNotFoundError({
-        messageId: params.messageId,
-        emoji: params.emoji
-      })
-    }
 
     yield* client.removeDoc(
       activity.class.Reaction,
@@ -211,14 +208,12 @@ export const saveMessage = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const message = yield* client.findOne<HulyActivityMessage>(
+    const message = yield* findOneOrFail(
+      client,
       activity.class.ActivityMessage,
-      { _id: toRef<HulyActivityMessage>(params.messageId) }
+      { _id: toRef<HulyActivityMessage>(params.messageId) },
+      () => new ActivityMessageNotFoundError({ messageId: params.messageId })
     )
-
-    if (message === undefined) {
-      return yield* new ActivityMessageNotFoundError({ messageId: params.messageId })
-    }
 
     const savedId: Ref<HulySavedMessage> = generateId()
 
@@ -246,16 +241,14 @@ export const unsaveMessage = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const saved = yield* client.findOne<HulySavedMessage>(
+    const saved = yield* findOneOrFail(
+      client,
       activity.class.SavedMessage,
       {
         attachedTo: toRef<HulyActivityMessage>(params.messageId)
-      }
+      },
+      () => new SavedMessageNotFoundError({ messageId: params.messageId })
     )
-
-    if (saved === undefined) {
-      return yield* new SavedMessageNotFoundError({ messageId: params.messageId })
-    }
 
     yield* client.removeDoc(
       activity.class.SavedMessage,

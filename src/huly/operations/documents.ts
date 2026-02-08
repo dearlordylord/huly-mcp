@@ -40,7 +40,7 @@ import { DocumentId, TeamspaceId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js"
 import { escapeLikeWildcards } from "./query-helpers.js"
-import { clampLimit, toRef } from "./shared.js"
+import { clampLimit, findByNameOrId, toRef } from "./shared.js"
 
 // Import plugin objects at runtime (CommonJS modules)
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports -- CJS interop
@@ -86,19 +86,12 @@ const findTeamspace = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    // Try to find by name first
-    let teamspace = yield* client.findOne<HulyTeamspace>(
+    const teamspace = yield* findByNameOrId(
+      client,
       documentPlugin.class.Teamspace,
-      { name: identifier, archived: false }
+      { name: identifier, archived: false },
+      { _id: toRef<HulyTeamspace>(identifier) }
     )
-
-    // If not found by name, try by ID
-    if (teamspace === undefined) {
-      teamspace = yield* client.findOne<HulyTeamspace>(
-        documentPlugin.class.Teamspace,
-        { _id: toRef<HulyTeamspace>(identifier) }
-      )
-    }
 
     if (teamspace === undefined) {
       return yield* new TeamspaceNotFoundError({ identifier })
@@ -120,25 +113,12 @@ export const findTeamspaceAndDocument = (
   Effect.gen(function*() {
     const { client, teamspace } = yield* findTeamspace(params.teamspace)
 
-    // Try to find by title first
-    let doc = yield* client.findOne<HulyDocument>(
+    const doc = yield* findByNameOrId(
+      client,
       documentPlugin.class.Document,
-      {
-        space: teamspace._id,
-        title: params.document
-      }
+      { space: teamspace._id, title: params.document },
+      { space: teamspace._id, _id: toRef<HulyDocument>(params.document) }
     )
-
-    // If not found by title, try by ID
-    if (doc === undefined) {
-      doc = yield* client.findOne<HulyDocument>(
-        documentPlugin.class.Document,
-        {
-          space: teamspace._id,
-          _id: toRef<HulyDocument>(params.document)
-        }
-      )
-    }
 
     if (doc === undefined) {
       return yield* new DocumentNotFoundError({
