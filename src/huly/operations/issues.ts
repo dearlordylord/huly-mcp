@@ -59,10 +59,24 @@ import type {
   UpdateIssueParams,
   UpdateIssueTemplateParams
 } from "../../domain/schemas.js"
+import type {
+  AddLabelResult,
+  CreateComponentResult,
+  CreateIssueResult,
+  CreateIssueTemplateResult,
+  DeleteComponentResult,
+  DeleteIssueResult,
+  DeleteIssueTemplateResult,
+  SetIssueComponentResult,
+  UpdateComponentResult,
+  UpdateIssueResult,
+  UpdateIssueTemplateResult
+} from "../../domain/schemas/issues.js"
 import {
   ComponentId,
   ComponentLabel,
   Email,
+  IssueId,
   IssueIdentifier,
   IssueTemplateId,
   NonNegativeNumber,
@@ -438,15 +452,11 @@ export const getIssue = (
     return result
   })
 
-// --- Create Issue Operation ---
+export type { AddLabelResult, CreateIssueResult, DeleteIssueResult, UpdateIssueResult }
+export type { CreateComponentResult, DeleteComponentResult, SetIssueComponentResult, UpdateComponentResult }
+export type { CreateIssueTemplateResult, DeleteIssueTemplateResult, UpdateIssueTemplateResult }
 
-/**
- * Result of createIssue operation.
- */
-export interface CreateIssueResult {
-  identifier: string
-  issueId: string
-}
+// --- Create Issue Operation ---
 
 /**
  * Create a new issue in a project.
@@ -565,18 +575,10 @@ export const createIssue = (
       issueId
     )
 
-    return { identifier: IssueIdentifier.make(identifier), issueId }
+    return { identifier: IssueIdentifier.make(identifier), issueId: IssueId.make(issueId) }
   })
 
 // --- Update Issue Operation ---
-
-/**
- * Result of updateIssue operation.
- */
-export interface UpdateIssueResult {
-  identifier: string
-  updated: boolean
-}
 
 /**
  * Update an existing issue in a project.
@@ -674,7 +676,7 @@ export const updateIssue = (
     }
 
     if (Object.keys(updateOps).length === 0 && !descriptionUpdatedInPlace) {
-      return { identifier: issue.identifier, updated: false }
+      return { identifier: IssueIdentifier.make(issue.identifier), updated: false }
     }
 
     if (Object.keys(updateOps).length > 0) {
@@ -686,18 +688,10 @@ export const updateIssue = (
       )
     }
 
-    return { identifier: issue.identifier, updated: true }
+    return { identifier: IssueIdentifier.make(issue.identifier), updated: true }
   })
 
 // --- Add Label Operation ---
-
-/**
- * Result of addLabel operation.
- */
-export interface AddLabelResult {
-  identifier: string
-  labelAdded: boolean
-}
 
 /**
  * Add a label/tag to an issue.
@@ -731,7 +725,7 @@ export const addLabel = (
       (l) => l.title.toLowerCase() === labelTitle.toLowerCase()
     )
     if (labelExists) {
-      return { identifier: issue.identifier, labelAdded: false }
+      return { identifier: IssueIdentifier.make(issue.identifier), labelAdded: false }
     }
 
     const color = params.color ?? 0
@@ -766,7 +760,7 @@ export const addLabel = (
     }
 
     if (tagElement === undefined) {
-      return { identifier: issue.identifier, labelAdded: false }
+      return { identifier: IssueIdentifier.make(issue.identifier), labelAdded: false }
     }
 
     const tagRefData: AttachedData<TagReference> = {
@@ -783,18 +777,10 @@ export const addLabel = (
       tagRefData
     )
 
-    return { identifier: issue.identifier, labelAdded: true }
+    return { identifier: IssueIdentifier.make(issue.identifier), labelAdded: true }
   })
 
 // --- Delete Issue Operation ---
-
-/**
- * Result of deleteIssue operation.
- */
-export interface DeleteIssueResult {
-  identifier: string
-  deleted: boolean
-}
 
 /**
  * Delete an issue from a project.
@@ -818,7 +804,7 @@ export const deleteIssue = (
       issue._id
     )
 
-    return { identifier: issue.identifier, deleted: true }
+    return { identifier: IssueIdentifier.make(issue.identifier), deleted: true }
   })
 
 // --- Component Operations ---
@@ -978,11 +964,6 @@ export const getComponent = (
     return result
   })
 
-export interface CreateComponentResult {
-  id: string
-  label: string
-}
-
 export const createComponent = (
   params: CreateComponentParams
 ): Effect.Effect<CreateComponentResult, CreateComponentError, HulyClient> =>
@@ -1016,13 +997,8 @@ export const createComponent = (
       componentId
     )
 
-    return { id: componentId, label: params.label }
+    return { id: ComponentId.make(componentId), label: ComponentLabel.make(params.label) }
   })
-
-export interface UpdateComponentResult {
-  id: string
-  updated: boolean
-}
 
 export const updateComponent = (
   params: UpdateComponentParams
@@ -1055,7 +1031,7 @@ export const updateComponent = (
     }
 
     if (Object.keys(updateOps).length === 0) {
-      return { id: component._id, updated: false }
+      return { id: ComponentId.make(component._id), updated: false }
     }
 
     yield* client.updateDoc(
@@ -1065,13 +1041,8 @@ export const updateComponent = (
       updateOps
     )
 
-    return { id: component._id, updated: true }
+    return { id: ComponentId.make(component._id), updated: true }
   })
-
-export interface SetIssueComponentResult {
-  identifier: string
-  componentSet: boolean
-}
 
 export const setIssueComponent = (
   params: SetIssueComponentParams
@@ -1101,13 +1072,8 @@ export const setIssueComponent = (
       { component: componentRef }
     )
 
-    return { identifier: issue.identifier, componentSet: true }
+    return { identifier: IssueIdentifier.make(issue.identifier), componentSet: true }
   })
-
-export interface DeleteComponentResult {
-  id: string
-  deleted: boolean
-}
 
 export const deleteComponent = (
   params: DeleteComponentParams
@@ -1121,7 +1087,7 @@ export const deleteComponent = (
       component._id
     )
 
-    return { id: component._id, deleted: true }
+    return { id: ComponentId.make(component._id), deleted: true }
   })
 
 // --- Issue Template Operations ---
@@ -1280,11 +1246,6 @@ export const getIssueTemplate = (
     return result
   })
 
-export interface CreateIssueTemplateResult {
-  id: string
-  title: string
-}
-
 export const createIssueTemplate = (
   params: CreateIssueTemplateParams
 ): Effect.Effect<CreateIssueTemplateResult, CreateIssueTemplateError, HulyClient> =>
@@ -1334,7 +1295,7 @@ export const createIssueTemplate = (
       templateId
     )
 
-    return { id: templateId, title: params.title }
+    return { id: IssueTemplateId.make(templateId), title: params.title }
   })
 
 export const createIssueFromTemplate = (
@@ -1389,11 +1350,6 @@ export const createIssueFromTemplate = (
     return result
   })
 
-export interface UpdateIssueTemplateResult {
-  id: string
-  updated: boolean
-}
-
 export const updateIssueTemplate = (
   params: UpdateIssueTemplateParams
 ): Effect.Effect<UpdateIssueTemplateResult, UpdateIssueTemplateError, HulyClient> =>
@@ -1446,7 +1402,7 @@ export const updateIssueTemplate = (
     }
 
     if (Object.keys(updateOps).length === 0) {
-      return { id: template._id, updated: false }
+      return { id: IssueTemplateId.make(template._id), updated: false }
     }
 
     yield* client.updateDoc(
@@ -1456,13 +1412,8 @@ export const updateIssueTemplate = (
       updateOps
     )
 
-    return { id: template._id, updated: true }
+    return { id: IssueTemplateId.make(template._id), updated: true }
   })
-
-export interface DeleteIssueTemplateResult {
-  id: string
-  deleted: boolean
-}
 
 export const deleteIssueTemplate = (
   params: DeleteIssueTemplateParams
@@ -1476,5 +1427,5 @@ export const deleteIssueTemplate = (
       template._id
     )
 
-    return { id: template._id, deleted: true }
+    return { id: IssueTemplateId.make(template._id), deleted: true }
   })

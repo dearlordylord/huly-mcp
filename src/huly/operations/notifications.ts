@@ -24,6 +24,16 @@ import type {
   PinNotificationContextParams,
   UpdateNotificationProviderSettingParams
 } from "../../domain/schemas.js"
+import type {
+  ArchiveAllNotificationsResult,
+  ArchiveNotificationResult,
+  DeleteNotificationResult,
+  MarkAllNotificationsReadResult,
+  MarkNotificationReadResult,
+  PinNotificationContextResult,
+  UnreadCountResult,
+  UpdateNotificationProviderSettingResult
+} from "../../domain/schemas/notifications.js"
 import {
   NotificationContextId,
   NotificationId,
@@ -199,14 +209,20 @@ export const getNotification = (
     return result
   })
 
+export type {
+  ArchiveAllNotificationsResult,
+  ArchiveNotificationResult,
+  DeleteNotificationResult,
+  MarkAllNotificationsReadResult,
+  MarkNotificationReadResult,
+  PinNotificationContextResult,
+  UnreadCountResult,
+  UpdateNotificationProviderSettingResult
+}
+
 /**
  * Mark a notification as read.
  */
-export interface MarkNotificationReadResult {
-  id: string
-  marked: boolean
-}
-
 export const markNotificationRead = (
   params: MarkNotificationReadParams
 ): Effect.Effect<MarkNotificationReadResult, MarkNotificationReadError, HulyClient> =>
@@ -214,7 +230,7 @@ export const markNotificationRead = (
     const { client, notification: notif } = yield* findNotification(params.notificationId)
 
     if (notif.isViewed) {
-      return { id: notif._id, marked: true }
+      return { id: NotificationId.make(notif._id), marked: true }
     }
 
     const updateOps: DocumentUpdate<HulyInboxNotification> = {
@@ -228,16 +244,12 @@ export const markNotificationRead = (
       updateOps
     )
 
-    return { id: notif._id, marked: true }
+    return { id: NotificationId.make(notif._id), marked: true }
   })
 
 /**
  * Mark all notifications as read.
  */
-export interface MarkAllNotificationsReadResult {
-  count: number
-}
-
 export const markAllNotificationsRead = (): Effect.Effect<
   MarkAllNotificationsReadResult,
   MarkAllNotificationsReadError,
@@ -271,11 +283,6 @@ export const markAllNotificationsRead = (): Effect.Effect<
 /**
  * Archive a notification.
  */
-export interface ArchiveNotificationResult {
-  id: string
-  archived: boolean
-}
-
 export const archiveNotification = (
   params: ArchiveNotificationParams
 ): Effect.Effect<ArchiveNotificationResult, ArchiveNotificationError, HulyClient> =>
@@ -283,7 +290,7 @@ export const archiveNotification = (
     const { client, notification: notif } = yield* findNotification(params.notificationId)
 
     if (notif.archived) {
-      return { id: notif._id, archived: true }
+      return { id: NotificationId.make(notif._id), archived: true }
     }
 
     const updateOps: DocumentUpdate<HulyInboxNotification> = {
@@ -297,16 +304,12 @@ export const archiveNotification = (
       updateOps
     )
 
-    return { id: notif._id, archived: true }
+    return { id: NotificationId.make(notif._id), archived: true }
   })
 
 /**
  * Archive all notifications.
  */
-export interface ArchiveAllNotificationsResult {
-  count: number
-}
-
 export const archiveAllNotifications = (): Effect.Effect<
   ArchiveAllNotificationsResult,
   ArchiveAllNotificationsError,
@@ -340,11 +343,6 @@ export const archiveAllNotifications = (): Effect.Effect<
 /**
  * Delete a notification.
  */
-export interface DeleteNotificationResult {
-  id: string
-  deleted: boolean
-}
-
 export const deleteNotification = (
   params: DeleteNotificationParams
 ): Effect.Effect<DeleteNotificationResult, DeleteNotificationError, HulyClient> =>
@@ -357,7 +355,7 @@ export const deleteNotification = (
       notif._id
     )
 
-    return { id: notif._id, deleted: true }
+    return { id: NotificationId.make(notif._id), deleted: true }
   })
 
 /**
@@ -441,11 +439,6 @@ export const listNotificationContexts = (
 /**
  * Pin or unpin a notification context.
  */
-export interface PinNotificationContextResult {
-  id: string
-  isPinned: boolean
-}
-
 export const pinNotificationContext = (
   params: PinNotificationContextParams
 ): Effect.Effect<PinNotificationContextResult, PinNotificationContextError, HulyClient> =>
@@ -453,7 +446,7 @@ export const pinNotificationContext = (
     const { client, context } = yield* findNotificationContext(params.contextId)
 
     if (context.isPinned === params.pinned) {
-      return { id: context._id, isPinned: context.isPinned }
+      return { id: NotificationContextId.make(context._id), isPinned: context.isPinned }
     }
 
     const updateOps: DocumentUpdate<HulyDocNotifyContext> = {
@@ -467,7 +460,7 @@ export const pinNotificationContext = (
       updateOps
     )
 
-    return { id: context._id, isPinned: params.pinned }
+    return { id: NotificationContextId.make(context._id), isPinned: params.pinned }
   })
 
 /**
@@ -499,12 +492,6 @@ export const listNotificationSettings = (
 /**
  * Update notification provider setting.
  */
-export interface UpdateNotificationProviderSettingResult {
-  providerId: string
-  enabled: boolean
-  updated: boolean
-}
-
 export const updateNotificationProviderSetting = (
   params: UpdateNotificationProviderSettingParams
 ): Effect.Effect<UpdateNotificationProviderSettingResult, UpdateNotificationProviderSettingError, HulyClient> =>
@@ -518,7 +505,7 @@ export const updateNotificationProviderSetting = (
 
     if (existingSetting !== undefined) {
       if (existingSetting.enabled === params.enabled) {
-        return { providerId: params.providerId, enabled: params.enabled, updated: false }
+        return { providerId: NotificationProviderId.make(params.providerId), enabled: params.enabled, updated: false }
       }
 
       yield* client.updateDoc(
@@ -528,7 +515,7 @@ export const updateNotificationProviderSetting = (
         { enabled: params.enabled }
       )
 
-      return { providerId: params.providerId, enabled: params.enabled, updated: true }
+      return { providerId: NotificationProviderId.make(params.providerId), enabled: params.enabled, updated: true }
     }
 
     // Setting doesn't exist, we can't create it without a proper space
@@ -539,10 +526,6 @@ export const updateNotificationProviderSetting = (
 /**
  * Get unread notification count.
  */
-export interface UnreadCountResult {
-  count: number
-}
-
 export const getUnreadNotificationCount = (): Effect.Effect<UnreadCountResult, HulyClientError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient

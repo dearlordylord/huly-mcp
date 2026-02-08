@@ -172,3 +172,29 @@ export const parseCreateMilestoneParams = Schema.decodeUnknown(CreateMilestonePa
 export const parseUpdateMilestoneParams = Schema.decodeUnknown(UpdateMilestoneParamsSchema)
 export const parseSetIssueMilestoneParams = Schema.decodeUnknown(SetIssueMilestoneParamsSchema)
 export const parseDeleteMilestoneParams = Schema.decodeUnknown(DeleteMilestoneParamsSchema)
+
+// --- Result Schemas ---
+
+export const CreateMilestoneResultSchema = Schema.Struct({
+  id: MilestoneId,
+  label: MilestoneLabel
+}).annotations({ title: "CreateMilestoneResult", description: "Result of create milestone operation" })
+export type CreateMilestoneResult = Schema.Schema.Type<typeof CreateMilestoneResultSchema>
+
+export const UpdateMilestoneResultSchema = Schema.Struct({
+  id: MilestoneId,
+  updated: Schema.Boolean
+}).annotations({ title: "UpdateMilestoneResult", description: "Result of update milestone operation" })
+export type UpdateMilestoneResult = Schema.Schema.Type<typeof UpdateMilestoneResultSchema>
+
+export const SetIssueMilestoneResultSchema = Schema.Struct({
+  identifier: IssueIdentifier,
+  milestoneSet: Schema.Boolean
+}).annotations({ title: "SetIssueMilestoneResult", description: "Result of set issue milestone operation" })
+export type SetIssueMilestoneResult = Schema.Schema.Type<typeof SetIssueMilestoneResultSchema>
+
+export const DeleteMilestoneResultSchema = Schema.Struct({
+  id: MilestoneId,
+  deleted: Schema.Boolean
+}).annotations({ title: "DeleteMilestoneResult", description: "Result of delete milestone operation" })
+export type DeleteMilestoneResult = Schema.Schema.Type<typeof DeleteMilestoneResultSchema>

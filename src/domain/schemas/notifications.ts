@@ -287,3 +287,59 @@ export const parseListNotificationSettingsParams = Schema.decodeUnknown(ListNoti
 export const parseUpdateNotificationProviderSettingParams = Schema.decodeUnknown(
   UpdateNotificationProviderSettingParamsSchema
 )
+
+// --- Result Schemas ---
+
+export const MarkNotificationReadResultSchema = Schema.Struct({
+  id: NotificationId,
+  marked: Schema.Boolean
+}).annotations({ title: "MarkNotificationReadResult", description: "Result of mark notification read operation" })
+export type MarkNotificationReadResult = Schema.Schema.Type<typeof MarkNotificationReadResultSchema>
+
+export const MarkAllNotificationsReadResultSchema = Schema.Struct({
+  count: Schema.Number
+}).annotations({
+  title: "MarkAllNotificationsReadResult",
+  description: "Result of mark all notifications read operation"
+})
+export type MarkAllNotificationsReadResult = Schema.Schema.Type<typeof MarkAllNotificationsReadResultSchema>
+
+export const ArchiveNotificationResultSchema = Schema.Struct({
+  id: NotificationId,
+  archived: Schema.Boolean
+}).annotations({ title: "ArchiveNotificationResult", description: "Result of archive notification operation" })
+export type ArchiveNotificationResult = Schema.Schema.Type<typeof ArchiveNotificationResultSchema>
+
+export const ArchiveAllNotificationsResultSchema = Schema.Struct({
+  count: Schema.Number
+}).annotations({ title: "ArchiveAllNotificationsResult", description: "Result of archive all notifications operation" })
+export type ArchiveAllNotificationsResult = Schema.Schema.Type<typeof ArchiveAllNotificationsResultSchema>
+
+export const DeleteNotificationResultSchema = Schema.Struct({
+  id: NotificationId,
+  deleted: Schema.Boolean
+}).annotations({ title: "DeleteNotificationResult", description: "Result of delete notification operation" })
+export type DeleteNotificationResult = Schema.Schema.Type<typeof DeleteNotificationResultSchema>
+
+export const PinNotificationContextResultSchema = Schema.Struct({
+  id: NotificationContextId,
+  isPinned: Schema.Boolean
+}).annotations({ title: "PinNotificationContextResult", description: "Result of pin notification context operation" })
+export type PinNotificationContextResult = Schema.Schema.Type<typeof PinNotificationContextResultSchema>
+
+export const UpdateNotificationProviderSettingResultSchema = Schema.Struct({
+  providerId: NotificationProviderId,
+  enabled: Schema.Boolean,
+  updated: Schema.Boolean
+}).annotations({
+  title: "UpdateNotificationProviderSettingResult",
+  description: "Result of update notification provider setting operation"
+})
+export type UpdateNotificationProviderSettingResult = Schema.Schema.Type<
+  typeof UpdateNotificationProviderSettingResultSchema
+>
+
+export const UnreadCountResultSchema = Schema.Struct({
+  count: Schema.Number
+}).annotations({ title: "UnreadCountResult", description: "Result of unread notification count operation" })
+export type UnreadCountResult = Schema.Schema.Type<typeof UnreadCountResultSchema>

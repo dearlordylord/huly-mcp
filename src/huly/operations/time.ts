@@ -32,11 +32,19 @@ import type {
 } from "../../domain/schemas.js"
 import {
   IssueIdentifier,
+  NonEmptyString,
   NonNegativeNumber,
   PersonName,
   TimeSpendReportId,
+  Timestamp,
   TodoId
 } from "../../domain/schemas/shared.js"
+import type {
+  CreateWorkSlotResult,
+  LogTimeResult,
+  StartTimerResult,
+  StopTimerResult
+} from "../../domain/schemas/time.js"
 import { isExistent } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { IssueNotFoundError } from "../errors.js"
@@ -64,10 +72,7 @@ export type CreateWorkSlotError = HulyClientError
 export type StartTimerError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
 export type StopTimerError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
 
-export interface LogTimeResult {
-  reportId: string
-  identifier: string
-}
+export type { CreateWorkSlotResult, LogTimeResult, StartTimerResult, StopTimerResult }
 
 export const logTime = (
   params: LogTimeParams
@@ -113,7 +118,7 @@ export const logTime = (
       updateOps
     )
 
-    return { reportId, identifier: IssueIdentifier.make(issue.identifier) }
+    return { reportId: TimeSpendReportId.make(reportId), identifier: IssueIdentifier.make(issue.identifier) }
   })
 
 export const getTimeReport = (
@@ -364,10 +369,6 @@ export const listWorkSlots = (
     }))
   })
 
-export interface CreateWorkSlotResult {
-  slotId: string
-}
-
 export const createWorkSlot = (
   params: CreateWorkSlotParams
 ): Effect.Effect<CreateWorkSlotResult, CreateWorkSlotError, HulyClient> =>
@@ -410,13 +411,8 @@ export const createWorkSlot = (
       slotId
     )
 
-    return { slotId }
+    return { slotId: NonEmptyString.make(slotId) }
   })
-
-export interface StartTimerResult {
-  identifier: string
-  startedAt: number
-}
 
 /**
  * Start a timer on an issue.
@@ -437,16 +433,10 @@ export const startTimer = (
     const startedAt = Date.now()
 
     return {
-      identifier: issue.identifier,
-      startedAt
+      identifier: IssueIdentifier.make(issue.identifier),
+      startedAt: Timestamp.make(startedAt)
     }
   })
-
-export interface StopTimerResult {
-  identifier: string
-  stoppedAt: number
-  reportId?: string
-}
 
 /**
  * Stop a timer on an issue.
@@ -467,7 +457,7 @@ export const stopTimer = (
     const stoppedAt = Date.now()
 
     return {
-      identifier: issue.identifier,
-      stoppedAt
+      identifier: IssueIdentifier.make(issue.identifier),
+      stoppedAt: Timestamp.make(stoppedAt)
     }
   })

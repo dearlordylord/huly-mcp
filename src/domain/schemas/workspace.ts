@@ -238,3 +238,36 @@ export const parseCreateWorkspaceParams = Schema.decodeUnknown(CreateWorkspacePa
 export const parseUpdateUserProfileParams = Schema.decodeUnknown(UpdateUserProfileParamsSchema)
 export const parseUpdateGuestSettingsParams = Schema.decodeUnknown(UpdateGuestSettingsParamsSchema)
 export const parseGetRegionsParams = Schema.decodeUnknown(GetRegionsParamsSchema)
+
+// --- Result Schemas ---
+
+export const UpdateMemberRoleResultSchema = Schema.Struct({
+  accountId: AccountId,
+  role: AccountRoleSchema,
+  updated: Schema.Boolean
+}).annotations({ title: "UpdateMemberRoleResult", description: "Result of update member role operation" })
+export type UpdateMemberRoleResult = Schema.Schema.Type<typeof UpdateMemberRoleResultSchema>
+
+export const CreateWorkspaceResultSchema = Schema.Struct({
+  uuid: WorkspaceUuid,
+  url: Schema.String,
+  name: Schema.String
+}).annotations({ title: "CreateWorkspaceResult", description: "Result of create workspace operation" })
+export type CreateWorkspaceResult = Schema.Schema.Type<typeof CreateWorkspaceResultSchema>
+
+export const DeleteWorkspaceResultSchema = Schema.Struct({
+  deleted: Schema.Boolean
+}).annotations({ title: "DeleteWorkspaceResult", description: "Result of delete workspace operation" })
+export type DeleteWorkspaceResult = Schema.Schema.Type<typeof DeleteWorkspaceResultSchema>
+
+export const UpdateUserProfileResultSchema = Schema.Struct({
+  updated: Schema.Boolean
+}).annotations({ title: "UpdateUserProfileResult", description: "Result of update user profile operation" })
+export type UpdateUserProfileResult = Schema.Schema.Type<typeof UpdateUserProfileResultSchema>
+
+export const UpdateGuestSettingsResultSchema = Schema.Struct({
+  updated: Schema.Boolean,
+  allowReadOnly: Schema.optional(Schema.Boolean),
+  allowSignUp: Schema.optional(Schema.Boolean)
+}).annotations({ title: "UpdateGuestSettingsResult", description: "Result of update guest settings operation" })
+export type UpdateGuestSettingsResult = Schema.Schema.Type<typeof UpdateGuestSettingsResultSchema>

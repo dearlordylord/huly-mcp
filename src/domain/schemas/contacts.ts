@@ -226,3 +226,27 @@ export const parseDeletePersonParams = Schema.decodeUnknown(DeletePersonParamsSc
 export const parseListEmployeesParams = Schema.decodeUnknown(ListEmployeesParamsSchema)
 export const parseListOrganizationsParams = Schema.decodeUnknown(ListOrganizationsParamsSchema)
 export const parseCreateOrganizationParams = Schema.decodeUnknown(CreateOrganizationParamsSchema)
+
+// --- Result Schemas ---
+
+export const CreatePersonResultSchema = Schema.Struct({
+  id: PersonId
+}).annotations({ title: "CreatePersonResult", description: "Result of create person operation" })
+export type CreatePersonResult = Schema.Schema.Type<typeof CreatePersonResultSchema>
+
+export const UpdatePersonResultSchema = Schema.Struct({
+  id: PersonId,
+  updated: Schema.Boolean
+}).annotations({ title: "UpdatePersonResult", description: "Result of update person operation" })
+export type UpdatePersonResult = Schema.Schema.Type<typeof UpdatePersonResultSchema>
+
+export const DeletePersonResultSchema = Schema.Struct({
+  id: PersonId,
+  deleted: Schema.Boolean
+}).annotations({ title: "DeletePersonResult", description: "Result of delete person operation" })
+export type DeletePersonResult = Schema.Schema.Type<typeof DeletePersonResultSchema>
+
+export const CreateOrganizationResultSchema = Schema.Struct({
+  id: OrganizationId
+}).annotations({ title: "CreateOrganizationResult", description: "Result of create organization operation" })
+export type CreateOrganizationResult = Schema.Schema.Type<typeof CreateOrganizationResultSchema>

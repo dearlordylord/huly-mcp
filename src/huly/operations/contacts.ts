@@ -22,6 +22,12 @@ import type {
   PersonSummary,
   UpdatePersonParams
 } from "../../domain/schemas.js"
+import type {
+  CreateOrganizationResult,
+  CreatePersonResult,
+  DeletePersonResult,
+  UpdatePersonResult
+} from "../../domain/schemas/contacts.js"
 import { ContactProvider, Email, OrganizationId, PersonId, PersonName } from "../../domain/schemas/shared.js"
 import { assertExists } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
@@ -209,9 +215,7 @@ export const getPerson = (
     }
   })
 
-export interface CreatePersonResult {
-  id: string
-}
+export type { CreateOrganizationResult, CreatePersonResult, DeletePersonResult, UpdatePersonResult }
 
 export const createPerson = (
   params: CreatePersonParams
@@ -248,13 +252,8 @@ export const createPerson = (
       )
     }
 
-    return { id: personId }
+    return { id: PersonId.make(personId) }
   })
-
-export interface UpdatePersonResult {
-  id: string
-  updated: boolean
-}
 
 export const updatePerson = (
   params: UpdatePersonParams
@@ -281,7 +280,7 @@ export const updatePerson = (
     }
 
     if (Object.keys(updateOps).length === 0) {
-      return { id: params.personId, updated: false }
+      return { id: PersonId.make(params.personId), updated: false }
     }
 
     yield* client.updateDoc(
@@ -291,13 +290,8 @@ export const updatePerson = (
       updateOps
     )
 
-    return { id: params.personId, updated: true }
+    return { id: PersonId.make(params.personId), updated: true }
   })
-
-export interface DeletePersonResult {
-  id: string
-  deleted: boolean
-}
 
 export const deletePerson = (
   params: DeletePersonParams
@@ -316,7 +310,7 @@ export const deletePerson = (
       person._id
     )
 
-    return { id: params.personId, deleted: true }
+    return { id: PersonId.make(params.personId), deleted: true }
   })
 
 export const listEmployees = (
@@ -376,10 +370,6 @@ export const listOrganizations = (
     }))
   })
 
-export interface CreateOrganizationResult {
-  id: string
-}
-
 export const createOrganization = (
   params: CreateOrganizationParams
 ): Effect.Effect<CreateOrganizationResult, CreateOrganizationError, HulyClient> =>
@@ -429,5 +419,5 @@ export const createOrganization = (
       }
     }
 
-    return { id: orgId }
+    return { id: OrganizationId.make(orgId) }
   })

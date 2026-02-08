@@ -2,6 +2,7 @@ import { Schema } from "effect"
 
 import {
   AttachmentId,
+  BlobId,
   DocumentIdentifier,
   IssueIdentifier,
   LimitParam,
@@ -279,3 +280,39 @@ export const parsePinAttachmentParams = Schema.decodeUnknown(PinAttachmentParams
 export const parseDownloadAttachmentParams = Schema.decodeUnknown(DownloadAttachmentParamsSchema)
 export const parseAddIssueAttachmentParams = Schema.decodeUnknown(AddIssueAttachmentParamsSchema)
 export const parseAddDocumentAttachmentParams = Schema.decodeUnknown(AddDocumentAttachmentParamsSchema)
+
+// --- Result Schemas ---
+
+export const AddAttachmentResultSchema = Schema.Struct({
+  attachmentId: AttachmentId,
+  blobId: BlobId,
+  url: Schema.String
+}).annotations({ title: "AddAttachmentResult", description: "Result of add attachment operation" })
+export type AddAttachmentResult = Schema.Schema.Type<typeof AddAttachmentResultSchema>
+
+export const UpdateAttachmentResultSchema = Schema.Struct({
+  attachmentId: AttachmentId,
+  updated: Schema.Boolean
+}).annotations({ title: "UpdateAttachmentResult", description: "Result of update attachment operation" })
+export type UpdateAttachmentResult = Schema.Schema.Type<typeof UpdateAttachmentResultSchema>
+
+export const DeleteAttachmentResultSchema = Schema.Struct({
+  attachmentId: AttachmentId,
+  deleted: Schema.Boolean
+}).annotations({ title: "DeleteAttachmentResult", description: "Result of delete attachment operation" })
+export type DeleteAttachmentResult = Schema.Schema.Type<typeof DeleteAttachmentResultSchema>
+
+export const PinAttachmentResultSchema = Schema.Struct({
+  attachmentId: AttachmentId,
+  pinned: Schema.Boolean
+}).annotations({ title: "PinAttachmentResult", description: "Result of pin attachment operation" })
+export type PinAttachmentResult = Schema.Schema.Type<typeof PinAttachmentResultSchema>
+
+export const DownloadAttachmentResultSchema = Schema.Struct({
+  attachmentId: AttachmentId,
+  url: Schema.String,
+  name: Schema.String,
+  type: Schema.String,
+  size: Schema.Number
+}).annotations({ title: "DownloadAttachmentResult", description: "Result of download attachment operation" })
+export type DownloadAttachmentResult = Schema.Schema.Type<typeof DownloadAttachmentResultSchema>

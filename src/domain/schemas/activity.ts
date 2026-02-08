@@ -191,3 +191,29 @@ export const parseSaveMessageParams = Schema.decodeUnknown(SaveMessageParamsSche
 export const parseUnsaveMessageParams = Schema.decodeUnknown(UnsaveMessageParamsSchema)
 export const parseListSavedMessagesParams = Schema.decodeUnknown(ListSavedMessagesParamsSchema)
 export const parseListMentionsParams = Schema.decodeUnknown(ListMentionsParamsSchema)
+
+// --- Result Schemas ---
+
+export const AddReactionResultSchema = Schema.Struct({
+  reactionId: NonEmptyString,
+  messageId: ActivityMessageId
+}).annotations({ title: "AddReactionResult", description: "Result of add reaction operation" })
+export type AddReactionResult = Schema.Schema.Type<typeof AddReactionResultSchema>
+
+export const RemoveReactionResultSchema = Schema.Struct({
+  messageId: ActivityMessageId,
+  removed: Schema.Boolean
+}).annotations({ title: "RemoveReactionResult", description: "Result of remove reaction operation" })
+export type RemoveReactionResult = Schema.Schema.Type<typeof RemoveReactionResultSchema>
+
+export const SaveMessageResultSchema = Schema.Struct({
+  savedId: NonEmptyString,
+  messageId: ActivityMessageId
+}).annotations({ title: "SaveMessageResult", description: "Result of save message operation" })
+export type SaveMessageResult = Schema.Schema.Type<typeof SaveMessageResultSchema>
+
+export const UnsaveMessageResultSchema = Schema.Struct({
+  messageId: ActivityMessageId,
+  removed: Schema.Boolean
+}).annotations({ title: "UnsaveMessageResult", description: "Result of unsave message operation" })
+export type UnsaveMessageResult = Schema.Schema.Type<typeof UnsaveMessageResultSchema>

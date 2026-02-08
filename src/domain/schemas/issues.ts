@@ -6,6 +6,7 @@ import {
   ComponentIdentifier,
   ComponentLabel,
   Email,
+  IssueId,
   IssueIdentifier,
   IssueTemplateId,
   LimitParam,
@@ -575,3 +576,116 @@ export const parseCreateIssueTemplateParams = Schema.decodeUnknown(CreateIssueTe
 export const parseCreateIssueFromTemplateParams = Schema.decodeUnknown(CreateIssueFromTemplateParamsSchema)
 export const parseUpdateIssueTemplateParams = Schema.decodeUnknown(UpdateIssueTemplateParamsSchema)
 export const parseDeleteIssueTemplateParams = Schema.decodeUnknown(DeleteIssueTemplateParamsSchema)
+
+// --- Result Schemas ---
+
+// issueId: internal UUID (Ref<Issue>), identifier: human-readable key (e.g. "HULY-123")
+export const CreateIssueResultSchema = Schema.Struct({
+  identifier: IssueIdentifier,
+  issueId: IssueId
+}).annotations({
+  title: "CreateIssueResult",
+  description: "Result of creating an issue"
+})
+
+export type CreateIssueResult = Schema.Schema.Type<typeof CreateIssueResultSchema>
+
+export const UpdateIssueResultSchema = Schema.Struct({
+  identifier: IssueIdentifier,
+  updated: Schema.Boolean
+}).annotations({
+  title: "UpdateIssueResult",
+  description: "Result of updating an issue"
+})
+
+export type UpdateIssueResult = Schema.Schema.Type<typeof UpdateIssueResultSchema>
+
+export const AddLabelResultSchema = Schema.Struct({
+  identifier: IssueIdentifier,
+  labelAdded: Schema.Boolean
+}).annotations({
+  title: "AddLabelResult",
+  description: "Result of adding a label to an issue"
+})
+
+export type AddLabelResult = Schema.Schema.Type<typeof AddLabelResultSchema>
+
+export const DeleteIssueResultSchema = Schema.Struct({
+  identifier: IssueIdentifier,
+  deleted: Schema.Boolean
+}).annotations({
+  title: "DeleteIssueResult",
+  description: "Result of deleting an issue"
+})
+
+export type DeleteIssueResult = Schema.Schema.Type<typeof DeleteIssueResultSchema>
+
+export const CreateComponentResultSchema = Schema.Struct({
+  id: ComponentId,
+  label: ComponentLabel
+}).annotations({
+  title: "CreateComponentResult",
+  description: "Result of creating a component"
+})
+
+export type CreateComponentResult = Schema.Schema.Type<typeof CreateComponentResultSchema>
+
+export const UpdateComponentResultSchema = Schema.Struct({
+  id: ComponentId,
+  updated: Schema.Boolean
+}).annotations({
+  title: "UpdateComponentResult",
+  description: "Result of updating a component"
+})
+
+export type UpdateComponentResult = Schema.Schema.Type<typeof UpdateComponentResultSchema>
+
+export const SetIssueComponentResultSchema = Schema.Struct({
+  identifier: IssueIdentifier,
+  componentSet: Schema.Boolean
+}).annotations({
+  title: "SetIssueComponentResult",
+  description: "Result of setting a component on an issue"
+})
+
+export type SetIssueComponentResult = Schema.Schema.Type<typeof SetIssueComponentResultSchema>
+
+export const DeleteComponentResultSchema = Schema.Struct({
+  id: ComponentId,
+  deleted: Schema.Boolean
+}).annotations({
+  title: "DeleteComponentResult",
+  description: "Result of deleting a component"
+})
+
+export type DeleteComponentResult = Schema.Schema.Type<typeof DeleteComponentResultSchema>
+
+export const CreateIssueTemplateResultSchema = Schema.Struct({
+  id: IssueTemplateId,
+  title: Schema.String
+}).annotations({
+  title: "CreateIssueTemplateResult",
+  description: "Result of creating an issue template"
+})
+
+export type CreateIssueTemplateResult = Schema.Schema.Type<typeof CreateIssueTemplateResultSchema>
+
+export const UpdateIssueTemplateResultSchema = Schema.Struct({
+  id: IssueTemplateId,
+  updated: Schema.Boolean
+}).annotations({
+  title: "UpdateIssueTemplateResult",
+  description: "Result of updating an issue template"
+})
+
+export type UpdateIssueTemplateResult = Schema.Schema.Type<typeof UpdateIssueTemplateResultSchema>
+
+export const DeleteIssueTemplateResultSchema = Schema.Struct({
+  id: IssueTemplateId,
+  deleted: Schema.Boolean
+}).annotations({
+  title: "DeleteIssueTemplateResult",
+  description: "Result of deleting an issue template"
+})
+
+export type DeleteIssueTemplateResult = Schema.Schema.Type<typeof DeleteIssueTemplateResultSchema>

@@ -9,7 +9,8 @@ import type {
   ListCommentsParams,
   UpdateCommentParams
 } from "../../domain/schemas.js"
-import { CommentId } from "../../domain/schemas/shared.js"
+import type { AddCommentResult, DeleteCommentResult, UpdateCommentResult } from "../../domain/schemas/comments.js"
+import { CommentId, IssueIdentifier } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { CommentNotFoundError } from "../errors.js"
@@ -91,13 +92,7 @@ export const listComments = (
     return comments
   })
 
-/**
- * Result of addComment operation.
- */
-export interface AddCommentResult {
-  commentId: string
-  issueIdentifier: string
-}
+export type { AddCommentResult, DeleteCommentResult, UpdateCommentResult }
 
 /**
  * Add a comment to an issue.
@@ -128,19 +123,10 @@ export const addComment = (
     )
 
     return {
-      commentId,
-      issueIdentifier: issue.identifier
+      commentId: CommentId.make(commentId),
+      issueIdentifier: IssueIdentifier.make(issue.identifier)
     }
   })
-
-/**
- * Result of updateComment operation.
- */
-export interface UpdateCommentResult {
-  commentId: string
-  issueIdentifier: string
-  updated: boolean
-}
 
 /**
  * Update an existing comment on an issue.
@@ -172,8 +158,8 @@ export const updateComment = (
 
     if (params.body === comment.message) {
       return {
-        commentId: params.commentId,
-        issueIdentifier: issue.identifier,
+        commentId: CommentId.make(params.commentId),
+        issueIdentifier: IssueIdentifier.make(issue.identifier),
         updated: false
       }
     }
@@ -191,20 +177,11 @@ export const updateComment = (
     )
 
     return {
-      commentId: params.commentId,
-      issueIdentifier: issue.identifier,
+      commentId: CommentId.make(params.commentId),
+      issueIdentifier: IssueIdentifier.make(issue.identifier),
       updated: true
     }
   })
-
-/**
- * Result of deleteComment operation.
- */
-export interface DeleteCommentResult {
-  commentId: string
-  issueIdentifier: string
-  deleted: boolean
-}
 
 /**
  * Delete a comment from an issue.
@@ -241,8 +218,8 @@ export const deleteComment = (
     )
 
     return {
-      commentId: params.commentId,
-      issueIdentifier: issue.identifier,
+      commentId: CommentId.make(params.commentId),
+      issueIdentifier: IssueIdentifier.make(issue.identifier),
       deleted: true
     }
   })

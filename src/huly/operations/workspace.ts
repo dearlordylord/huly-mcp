@@ -5,16 +5,21 @@
 import type { AccountRole as HulyAccountRole, WorkspaceInfoWithStatus } from "@hcengineering/core"
 import { Effect, Option } from "effect"
 
-import { PersonUuid, RegionId, WorkspaceUuid } from "../../domain/schemas/shared.js"
+import { AccountId, PersonUuid, RegionId, WorkspaceUuid } from "../../domain/schemas/shared.js"
 import type {
   AccountRole,
   CreateWorkspaceParams,
+  CreateWorkspaceResult,
+  DeleteWorkspaceResult,
   ListWorkspaceMembersParams,
   ListWorkspacesParams,
   RegionInfo,
   UpdateGuestSettingsParams,
+  UpdateGuestSettingsResult,
   UpdateMemberRoleParams,
+  UpdateMemberRoleResult,
   UpdateUserProfileParams,
+  UpdateUserProfileResult,
   UserProfile,
   WorkspaceInfo,
   WorkspaceMember,
@@ -99,10 +104,12 @@ export const listWorkspaceMembers = (
     return result
   })
 
-export interface UpdateMemberRoleResult {
-  accountId: string
-  role: string
-  updated: boolean
+export type {
+  CreateWorkspaceResult,
+  DeleteWorkspaceResult,
+  UpdateGuestSettingsResult,
+  UpdateMemberRoleResult,
+  UpdateUserProfileResult
 }
 
 export const updateMemberRole = (
@@ -121,7 +128,7 @@ export const updateMemberRole = (
     })
 
     return {
-      accountId: params.accountId,
+      accountId: AccountId.make(params.accountId),
       role: params.role,
       updated: true
     }
@@ -179,12 +186,6 @@ export const listWorkspaces = (
     }))
   })
 
-export interface CreateWorkspaceResult {
-  uuid: string
-  url: string
-  name: string
-}
-
 export const createWorkspace = (
   params: CreateWorkspaceParams
 ): Effect.Effect<CreateWorkspaceResult, CreateWorkspaceError, WorkspaceClient> =>
@@ -201,15 +202,11 @@ export const createWorkspace = (
     })
 
     return {
-      uuid: loginInfo.workspace,
+      uuid: WorkspaceUuid.make(loginInfo.workspace),
       url: loginInfo.workspaceUrl,
       name: params.name
     }
   })
-
-export interface DeleteWorkspaceResult {
-  deleted: boolean
-}
 
 export const deleteWorkspace = (): Effect.Effect<DeleteWorkspaceResult, DeleteWorkspaceError, WorkspaceClient> =>
   Effect.gen(function*() {
@@ -260,10 +257,6 @@ export const getUserProfile = (
     }
   })
 
-export interface UpdateUserProfileResult {
-  updated: boolean
-}
-
 export const updateUserProfile = (
   params: UpdateUserProfileParams
 ): Effect.Effect<UpdateUserProfileResult, UpdateUserProfileError, WorkspaceClient> =>
@@ -306,12 +299,6 @@ export const updateUserProfile = (
 
     return { updated: true }
   })
-
-export interface UpdateGuestSettingsResult {
-  updated: boolean
-  allowReadOnly: boolean | undefined
-  allowSignUp: boolean | undefined
-}
 
 export const updateGuestSettings = (
   params: UpdateGuestSettingsParams

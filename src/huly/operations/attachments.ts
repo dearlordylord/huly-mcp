@@ -21,18 +21,23 @@ import { Effect } from "effect"
 
 import type {
   AddAttachmentParams,
+  AddAttachmentResult,
   AddDocumentAttachmentParams,
   AddIssueAttachmentParams,
   Attachment,
   AttachmentSummary,
   DeleteAttachmentParams,
+  DeleteAttachmentResult,
   DownloadAttachmentParams,
+  DownloadAttachmentResult,
   GetAttachmentParams,
   ListAttachmentsParams,
   PinAttachmentParams,
-  UpdateAttachmentParams
+  PinAttachmentResult,
+  UpdateAttachmentParams,
+  UpdateAttachmentResult
 } from "../../domain/schemas/attachments.js"
-import { AttachmentId } from "../../domain/schemas/shared.js"
+import { AttachmentId, BlobId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import {
   AttachmentNotFoundError,
@@ -213,8 +218,8 @@ const uploadAndAttach = (
     )
 
     return {
-      attachmentId,
-      blobId: uploadResult.blobId,
+      attachmentId: AttachmentId.make(attachmentId),
+      blobId: BlobId.make(uploadResult.blobId),
       url: uploadResult.url
     }
   })
@@ -273,13 +278,12 @@ export const getAttachment = (
     return toAttachment(att, url)
   })
 
-/**
- * Result of addAttachment operation.
- */
-export interface AddAttachmentResult {
-  attachmentId: string
-  blobId: string
-  url: string
+export type {
+  AddAttachmentResult,
+  DeleteAttachmentResult,
+  DownloadAttachmentResult,
+  PinAttachmentResult,
+  UpdateAttachmentResult
 }
 
 /**
@@ -307,14 +311,6 @@ export const addAttachment = (
     objectRef: toRef<Doc>(params.objectId),
     objectClassRef: toRef<Class<Doc>>(params.objectClass)
   })
-
-/**
- * Result of updateAttachment operation.
- */
-export interface UpdateAttachmentResult {
-  attachmentId: string
-  updated: boolean
-}
 
 /**
  * Update an attachment's metadata.
@@ -349,7 +345,7 @@ export const updateAttachment = (
     }
 
     if (Object.keys(updateOps).length === 0) {
-      return { attachmentId: params.attachmentId, updated: false }
+      return { attachmentId: AttachmentId.make(params.attachmentId), updated: false }
     }
 
     yield* client.updateDoc(
@@ -359,16 +355,8 @@ export const updateAttachment = (
       updateOps
     )
 
-    return { attachmentId: params.attachmentId, updated: true }
+    return { attachmentId: AttachmentId.make(params.attachmentId), updated: true }
   })
-
-/**
- * Result of deleteAttachment operation.
- */
-export interface DeleteAttachmentResult {
-  attachmentId: string
-  deleted: boolean
-}
 
 /**
  * Delete an attachment.
@@ -394,16 +382,8 @@ export const deleteAttachment = (
       att._id
     )
 
-    return { attachmentId: params.attachmentId, deleted: true }
+    return { attachmentId: AttachmentId.make(params.attachmentId), deleted: true }
   })
-
-/**
- * Result of pinAttachment operation.
- */
-export interface PinAttachmentResult {
-  attachmentId: string
-  pinned: boolean
-}
 
 /**
  * Pin or unpin an attachment.
@@ -430,19 +410,8 @@ export const pinAttachment = (
       { pinned: params.pinned }
     )
 
-    return { attachmentId: params.attachmentId, pinned: params.pinned }
+    return { attachmentId: AttachmentId.make(params.attachmentId), pinned: params.pinned }
   })
-
-/**
- * Result of downloadAttachment operation.
- */
-export interface DownloadAttachmentResult {
-  attachmentId: string
-  url: string
-  name: string
-  type: string
-  size: number
-}
 
 /**
  * Get download URL for an attachment.
@@ -466,7 +435,7 @@ export const downloadAttachment = (
     const url = storageClient.getFileUrl(att.file)
 
     return {
-      attachmentId: params.attachmentId,
+      attachmentId: AttachmentId.make(params.attachmentId),
       url,
       name: att.name,
       type: att.type,
