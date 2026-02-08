@@ -1,43 +1,40 @@
-# Item 46: Fix email filtering happening after limit in listPersons
+# MCP Architecture Cleanup Report
 
-## Problem
+## Item 49: handleToolCall return type (IMPLEMENTED)
 
-In `listPersons`, when `emailSearch` was provided, the flow was:
+**Change**: `Promise<McpToolResponse> | null` -> `Promise<McpToolResponse | null>`
 
-1. Query persons with `limit` applied server-side
-2. Fetch email channels for those persons
-3. Filter by email substring client-side
+The null (meaning "tool not found") is now inside the Promise, making the return type uniform. The `buildRegistry` handler became `async` so it always returns a Promise. The caller in `server.ts` now does `await` first, then checks for null -- simpler control flow, no need to distinguish "synchronous null" from "async response."
 
-This meant if you requested `limit=50` and only 30 of those 50 persons had matching emails, you'd get 30 results instead of 50. The limit was applied before the email filter, so the user never got the number of results they asked for.
+## Item 48: McpToolResponse index signature (IMPLEMENTED -- remove)
 
-## Solution: Channel-first query strategy
+**Decision**: Remove the `[key: string]: unknown` index signature. Add `_meta?: ErrorMetadata` as an explicit optional field on `McpToolResponse`.
 
-Instead of fetching persons then filtering, we now query email channels first when `emailSearch` is provided:
+**Rationale**: The index signature existed solely to allow `_meta` on the `McpErrorResponseWithMeta` subtype. That's one field. An open index signature is too permissive -- it allows any arbitrary key assignment without type errors, defeating TypeScript's structural checking. Making `_meta` explicit:
+- Self-documents the only extra field actually used
+- Prevents accidental property assignments
+- The MCP SDK uses Zod `$loose` (passthrough) at runtime, so extra properties are accepted regardless of our TypeScript types
 
-1. Query `Channel` documents where `provider=Email` and `value` matches via `$like` (server-side substring match)
-2. Collect the `attachedTo` person IDs from matching channels
-3. Query persons with `_id: { $in: matchingPersonIds }` (intersected with `nameSearch` if present)
-4. Apply `limit` to the final person query
+`McpErrorResponseWithMeta` still narrows `_meta` to required (non-optional) and `isError` to `true`.
 
-This ensures the limit applies to already-email-filtered persons, so the caller gets up to `limit` results that all match the email search.
+## Item 51: WorkspaceClient optional in handler (KEPT AS-IS)
 
-### Why this approach
+**Decision**: No change.
 
-- **Server-side filtering**: The `$like` operator on Channel `value` delegates substring matching to the server, avoiding client-side post-filtering entirely.
-- **No over-fetching**: We don't need to guess how many extra persons to fetch; the channel query tells us exactly which persons match.
-- **Correct limit semantics**: The `limit` parameter on `findAll` for persons is applied after the email filter constraint, guaranteeing up to `limit` matching results.
-- **Early return**: If no channels match the email search, we return `[]` immediately without querying persons at all.
+**Rationale**: `WorkspaceClient` is genuinely optional -- it depends on workspace-level API availability. The optionality flows from `createMcpServer(... workspaceClient?)` through the registry to individual handlers. Only 2 handler factories (`createWorkspaceToolHandler`, `createNoParamsWorkspaceToolHandler`) check for it, and they produce clear error responses when absent. Lifting resolution higher would either force `WorkspaceClient` as required everywhere (breaking non-workspace setups) or require splitting registries by client dependency (over-engineering for 2 null checks).
 
-## Files changed
+## Item 52: toMcpResponse strips _meta by rebuild (SIMPLIFIED)
 
-- `src/huly/operations/contacts.ts` -- Added `findPersonIdsByEmail` helper; rewrote `listPersons` to use channel-first strategy when `emailSearch` is provided.
-- `src/huly/operations/contacts.test.ts` -- Enhanced mock `findAllImpl` to support `$in` on person `_id` and `$like` on channel `value`. Added 3 new tests: email substring filtering, empty email match returns `[]`, and limit respected with email search.
+**Decision**: Simplify from manual object rebuild to destructuring.
+
+**Before**: Built a new object property-by-property, conditionally copying `isError`.
+**After**: `const { _meta: _, ...wire } = response; return wire`
+
+This is equivalent but idiomatic. With `_meta` now explicit on `McpToolResponse` (item 48), the destructuring is type-safe. The return type is `Omit<McpToolResponse, "_meta">`, making it clear that `_meta` is intentionally stripped before the wire. The parameter type simplified from `McpErrorResponseWithMeta | McpToolResponse` to just `McpToolResponse` since the union was unnecessary (`McpErrorResponseWithMeta extends McpToolResponse`).
 
 ## Verification
 
-- `pnpm build` -- pass
-- `pnpm typecheck` -- pass
-- `pnpm lint` -- 0 errors (pre-existing warnings only)
-- `pnpm test` -- 758 tests pass (25 contacts tests, 3 new)
-
-Cannot test against a live Huly instance. The `$like` operator on Channel `value` is assumed to work the same as on other string fields (Person `name`, Issue `title`, Document `title`), which all use `$like` successfully in this codebase. User should verify via integration testing before release.
+- `pnpm build`: pass
+- `pnpm typecheck`: pass (0 errors)
+- `pnpm lint`: pass (0 errors, pre-existing warnings only)
+- `pnpm test`: 755/755 tests pass

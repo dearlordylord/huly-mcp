@@ -53,7 +53,7 @@ type ToolRegistryMethods = {
     hulyClient: HulyClient["Type"],
     storageClient: HulyStorageClient["Type"],
     workspaceClient?: WorkspaceClient["Type"]
-  ) => Promise<McpToolResponse> | null
+  ) => Promise<McpToolResponse | null>
 }
 
 type ToolRegistry = ToolRegistryData & ToolRegistryMethods
@@ -65,7 +65,7 @@ const buildRegistry = (tools: ReadonlyArray<RegisteredTool>): ToolRegistry => {
   return {
     tools: map,
     definitions: tools,
-    handleToolCall: (toolName, args, hulyClient, storageClient, workspaceClient) => {
+    handleToolCall: async (toolName, args, hulyClient, storageClient, workspaceClient) => {
       const tool = map.get(toolName)
       if (!tool) return null
       return tool.handler(args, hulyClient, storageClient, workspaceClient)
