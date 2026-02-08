@@ -1,5 +1,7 @@
 # Project Instructions
 
+Rules are reflexive: when adding a rule, apply it immediately.
+
 ## Package Manager
 
 Use `pnpm`, not npm. Prefer package.json scripts over raw commands (e.g., `pnpm typecheck` not `pnpm tsc --noEmit`).
