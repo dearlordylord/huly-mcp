@@ -1,5 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
+export const MAX_LIMIT = 200
+
 export const NonEmptyString = Schema.Trim.pipe(Schema.nonEmptyString())
 
 export const Timestamp = Schema.NonNegativeInt.annotations({
@@ -11,7 +13,7 @@ export const Timestamp = Schema.NonNegativeInt.annotations({
 export const LimitParam = Schema.Number.pipe(
   Schema.int(),
   Schema.positive(),
-  Schema.lessThanOrEqualTo(200)
+  Schema.lessThanOrEqualTo(MAX_LIMIT)
 )
 
 export const makeJsonSchema = <A, I, R>(
@@ -165,7 +167,7 @@ export type PositiveNumber = Schema.Schema.Type<typeof PositiveNumber>
 export const ColorCode = Schema.Number.pipe(
   Schema.int(),
   Schema.greaterThanOrEqualTo(0),
-  Schema.lessThanOrEqualTo(9),
+  Schema.lessThanOrEqualTo(9), // eslint-disable-line no-magic-numbers -- Huly color palette has 10 colors (0-9)
   Schema.brand("ColorCode")
 )
 export type ColorCode = Schema.Schema.Type<typeof ColorCode>

@@ -76,6 +76,12 @@ export default [
       "object-shorthand": "error",
       "sort-destructure-keys/sort-destructure-keys": "error",
       "no-console": "warn",
+      "no-magic-numbers": ["warn", {
+        ignore: [0, 1, 1024],
+        ignoreArrayIndexes: true,
+        ignoreDefaultValues: true,
+        enforceConst: true
+      }],
 
       // Functional programming
       ...functional.configs.recommended.rules,
@@ -103,6 +109,13 @@ export default [
           trailingCommas: "never"
         }
       }]
+    }
+  },
+
+  {
+    files: ["**/*.test.ts", "**/*.spec.ts"],
+    rules: {
+      "no-magic-numbers": "off"
     }
   }
 ]
