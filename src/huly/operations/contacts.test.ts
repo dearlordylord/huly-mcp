@@ -439,22 +439,8 @@ describe("Contacts Operations", () => {
       expect(channelCapture.attributes?.value).toBe("john@example.com")
     })
 
-    it("skips email channel for empty email", async () => {
-      const channelCapture: MockConfig["captureAddCollection"] = {}
-
-      const testLayer = createTestLayer({
-        captureAddCollection: channelCapture
-      })
-
-      await Effect.runPromise(
-        createPerson({
-          firstName: "John",
-          lastName: "Doe",
-          email: Email.make("   ")
-        }).pipe(Effect.provide(testLayer))
-      )
-
-      expect(channelCapture.attributes).toBeUndefined()
+    it("rejects empty email at the brand level", () => {
+      expect(() => Email.make("   ")).toThrow()
     })
   })
 

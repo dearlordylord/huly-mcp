@@ -91,21 +91,27 @@ export const ListPersonsParamsSchema = Schema.Struct({
 
 export type ListPersonsParams = Schema.Schema.Type<typeof ListPersonsParamsSchema>
 
-// TODO better typing (and usage)
-export const GetPersonParamsSchema = Schema.Struct({
-  personId: Schema.optional(PersonId.annotations({
+const GetPersonByIdSchema = Schema.Struct({
+  personId: PersonId.annotations({
     description: "Person ID"
-  })),
-  email: Schema.optional(Email.annotations({
-    description: "Person email address"
-  }))
-}).pipe(
-  Schema.filter((params) => {
-    if (params.personId === undefined && params.email === undefined) {
-      return { path: [], message: "Either personId or email must be provided" }
-    }
-    return true
   })
+}).annotations({
+  title: "GetPersonById",
+  description: "Get person by ID"
+})
+
+const GetPersonByEmailSchema = Schema.Struct({
+  email: Email.annotations({
+    description: "Person email address"
+  })
+}).annotations({
+  title: "GetPersonByEmail",
+  description: "Get person by email"
+})
+
+export const GetPersonParamsSchema = Schema.Union(
+  GetPersonByIdSchema,
+  GetPersonByEmailSchema
 ).annotations({
   title: "GetPersonParams",
   description: "Parameters for getting a single person (provide personId or email)"

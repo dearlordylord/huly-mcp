@@ -60,12 +60,12 @@ describe("Contact Schemas", () => {
       expect(result).toEqual({ email: "test@example.com" })
     })
 
-    it("accepts both personId and email", () => {
+    it("prefers personId when both are provided", () => {
       const result = Schema.decodeUnknownSync(GetPersonParamsSchema)({
         personId: "abc123",
         email: "test@example.com"
       })
-      expect(result).toEqual({ personId: "abc123", email: "test@example.com" })
+      expect(result).toEqual({ personId: "abc123" })
     })
 
     it("rejects empty object (requires at least one identifier)", () => {
@@ -85,6 +85,13 @@ describe("Contact Schemas", () => {
     it("rejects whitespace-only personId", () => {
       const result = Effect.runSync(
         Effect.either(parseGetPersonParams({ personId: "   " }))
+      )
+      expect(Either.isLeft(result)).toBe(true)
+    })
+
+    it("rejects email without @", () => {
+      const result = Effect.runSync(
+        Effect.either(parseGetPersonParams({ email: "invalid" }))
       )
       expect(Either.isLeft(result)).toBe(true)
     })

@@ -2,6 +2,7 @@ import { JSONSchema, Schema } from "effect"
 
 import {
   ColorCode,
+  ComponentIdentifier,
   Email,
   IssueId,
   IssueIdentifier,
@@ -96,7 +97,7 @@ export const ListIssuesParamsSchema = Schema.Struct({
   descriptionSearch: Schema.optional(Schema.String.annotations({
     description: "Search issues by description content (fulltext search)"
   })),
-  component: Schema.optional(Schema.String.annotations({
+  component: Schema.optional(ComponentIdentifier.annotations({
     description: "Filter by component ID or label"
   })),
   limit: Schema.optional(

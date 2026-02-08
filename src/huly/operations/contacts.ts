@@ -29,7 +29,6 @@ import type {
   UpdatePersonResult
 } from "../../domain/schemas/contacts.js"
 import { ContactProvider, Email, OrganizationId, PersonId, PersonName } from "../../domain/schemas/shared.js"
-import { assertExists } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { PersonNotFoundError } from "../errors.js"
 import { escapeLikeWildcards } from "./query-helpers.js"
@@ -171,21 +170,13 @@ export const getPerson = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    let person: HulyPerson | undefined
-
-    if (params.personId !== undefined) {
-      person = yield* findPersonById(client, params.personId)
-    } else if (params.email !== undefined) {
-      person = yield* findPersonByEmail(client, params.email)
-    }
+    const person: HulyPerson | undefined = "personId" in params
+      ? yield* findPersonById(client, params.personId)
+      : yield* findPersonByEmail(client, params.email)
 
     if (person === undefined) {
-      return yield* new PersonNotFoundError({
-        identifier: assertExists(
-          params.personId ?? params.email,
-          "personId or email required"
-        )
-      })
+      const identifier = "personId" in params ? params.personId : params.email
+      return yield* new PersonNotFoundError({ identifier })
     }
 
     const channels = yield* client.findAll<Channel>(
