@@ -13,20 +13,20 @@ export default [
     ignores: ["**/dist", "**/build", "**/*.md", "**/.reference"]
   },
 
-  // TypeScript recommended (src only)
+  // TypeScript recommended
   ...tseslint.configs.recommended.map(config => ({
     ...config,
-    files: ["src/**/*.ts"]
+    files: ["src/**/*.ts", "test/**/*.ts"]
   })),
 
-  // Effect dprint formatting rules (src only)
+  // Effect dprint formatting rules
   ...effectEslint.configs.dprint.map(config => ({
     ...config,
-    files: ["src/**/*.ts"]
+    files: ["src/**/*.ts", "test/**/*.ts"]
   })),
 
   {
-    files: ["src/**/*.ts"],
+    files: ["src/**/*.ts", "test/**/*.ts"],
 
     plugins: {
       functional,
@@ -40,7 +40,7 @@ export default [
       ecmaVersion: 2022,
       sourceType: "module",
       parserOptions: {
-        project: true,
+        project: "./tsconfig.lint.json",
         tsconfigRootDir: import.meta.dirname
       }
     },
@@ -129,35 +129,6 @@ export default [
     }
   },
 
-  // TODO: enforce the full ruleset on test files (remove src-only file scoping above,
-  // point parser at tsconfig.lint.json globally, run lint:fix, fix remaining errors).
-  // Currently only the double-assertion ban is enforced on test files.
-  ...tseslint.configs.recommended.map(config => ({
-    ...config,
-    files: ["test/**/*.ts"],
-    rules: Object.fromEntries(
-      Object.entries(config.rules ?? {}).map(([key]) => [key, "off"])
-    )
-  })),
-  {
-    files: ["test/**/*.ts"],
-    languageOptions: {
-      parser: tsParser,
-      ecmaVersion: 2022,
-      sourceType: "module",
-      parserOptions: {
-        project: "./tsconfig.lint.json",
-        tsconfigRootDir: import.meta.dirname
-      }
-    },
-    rules: {
-      "no-restricted-syntax": ["error", {
-        selector: "TSAsExpression > TSAsExpression",
-        message: "Double type assertion (as A as B). Requires eslint-disable with justification."
-      }]
-    }
-  },
-
   // Dead export detection (import-x supports flat config, unlike import/no-unused-modules)
   {
     files: ["src/**/*.ts"],
@@ -183,7 +154,8 @@ export default [
     files: ["**/*.test.ts", "**/*.spec.ts"],
     rules: {
       "max-lines": "off",
-      "no-magic-numbers": "off"
+      "no-magic-numbers": "off",
+      "functional/immutable-data": "off"
     }
   }
 ]

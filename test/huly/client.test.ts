@@ -1,8 +1,6 @@
 import { describe, it } from "@effect/vitest"
-import { expect } from "vitest"
-import { Effect } from "effect"
+import type { MarkupRef } from "@hcengineering/api-client"
 import {
-  toFindResult,
   type Class,
   type Data,
   type Doc,
@@ -11,15 +9,14 @@ import {
   type FindResult,
   type Ref as DocRef,
   type Space,
+  toFindResult,
   type TxResult,
-  type WithLookup,
+  type WithLookup
 } from "@hcengineering/core"
-import type { MarkupRef } from "@hcengineering/api-client"
-import {
-  HulyClient,
-  type HulyClientError,
-} from "../../src/huly/client.js"
-import { HulyConnectionError, HulyAuthError } from "../../src/huly/errors.js"
+import { Effect } from "effect"
+import { expect } from "vitest"
+import { HulyClient, type HulyClientError } from "../../src/huly/client.js"
+import { HulyAuthError, HulyConnectionError } from "../../src/huly/errors.js"
 
 // Mock doc for testing
 interface TestDoc extends Doc {
@@ -28,8 +25,8 @@ interface TestDoc extends Doc {
 
 describe("HulyClient Service", () => {
   describe("testLayer", () => {
-        it.effect("provides default noop operations", () =>
-      Effect.gen(function* () {
+    it.effect("provides default noop operations", () =>
+      Effect.gen(function*() {
         const testLayer = HulyClient.testLayer({})
 
         const client = yield* HulyClient.pipe(Effect.provide(testLayer))
@@ -41,18 +38,24 @@ describe("HulyClient Service", () => {
         expect(client.addCollection).toBeDefined()
         expect(client.uploadMarkup).toBeDefined()
         expect(client.fetchMarkup).toBeDefined()
-      })
-    )
+      }))
 
-        it.effect("allows overriding specific operations", () =>
-      Effect.gen(function* () {
-        const mockResults = toFindResult([
-          { _id: "1", _class: "class" as DocRef<Class<TestDoc>>, space: "space" as DocRef<Space>, title: "Test", modifiedBy: "user" as DocRef<Doc>, modifiedOn: 0, createdBy: "user" as DocRef<Doc>, createdOn: 0 } as TestDoc,
-        ])
+    it.effect("allows overriding specific operations", () =>
+      Effect.gen(function*() {
+        const testDoc: TestDoc = {
+          _id: "1" as DocRef<TestDoc>,
+          _class: "class" as DocRef<Class<TestDoc>>,
+          space: "space" as DocRef<Space>,
+          title: "Test",
+          modifiedBy: "user" as DocRef<Doc>,
+          modifiedOn: 0,
+          createdBy: "user" as DocRef<Doc>,
+          createdOn: 0
+        }
+        const mockResults = toFindResult([testDoc])
 
         const testLayer = HulyClient.testLayer({
-          findAll: <T extends Doc>() =>
-            Effect.succeed(mockResults as FindResult<T>),
+          findAll: <T extends Doc>() => Effect.succeed(mockResults as FindResult<T>)
         })
 
         const client = yield* HulyClient.pipe(Effect.provide(testLayer))
@@ -62,11 +65,10 @@ describe("HulyClient Service", () => {
         )
 
         expect(results).toHaveLength(1)
-      })
-    )
+      }))
 
-        it.effect("default findAll returns empty array", () =>
-      Effect.gen(function* () {
+    it.effect("default findAll returns empty array", () =>
+      Effect.gen(function*() {
         const testLayer = HulyClient.testLayer({})
 
         const client = yield* HulyClient.pipe(Effect.provide(testLayer))
@@ -76,11 +78,10 @@ describe("HulyClient Service", () => {
         )
 
         expect(results).toHaveLength(0)
-      })
-    )
+      }))
 
-        it.effect("default findOne returns undefined", () =>
-      Effect.gen(function* () {
+    it.effect("default findOne returns undefined", () =>
+      Effect.gen(function*() {
         const testLayer = HulyClient.testLayer({})
 
         const client = yield* HulyClient.pipe(Effect.provide(testLayer))
@@ -90,11 +91,10 @@ describe("HulyClient Service", () => {
         )
 
         expect(result).toBeUndefined()
-      })
-    )
+      }))
 
-        it.effect("default uploadMarkup returns empty string", () =>
-      Effect.gen(function* () {
+    it.effect("default uploadMarkup returns empty string", () =>
+      Effect.gen(function*() {
         const testLayer = HulyClient.testLayer({})
 
         const client = yield* HulyClient.pipe(Effect.provide(testLayer))
@@ -107,11 +107,10 @@ describe("HulyClient Service", () => {
         )
 
         expect(result).toBe("")
-      })
-    )
+      }))
 
-        it.effect("default fetchMarkup returns empty string", () =>
-      Effect.gen(function* () {
+    it.effect("default fetchMarkup returns empty string", () =>
+      Effect.gen(function*() {
         const testLayer = HulyClient.testLayer({})
 
         const client = yield* HulyClient.pipe(Effect.provide(testLayer))
@@ -124,20 +123,19 @@ describe("HulyClient Service", () => {
         )
 
         expect(result).toBe("")
-      })
-    )
+      }))
   })
 
   describe("mock operations with errors", () => {
-        it.effect("can mock operations to return HulyConnectionError", () =>
-      Effect.gen(function* () {
+    it.effect("can mock operations to return HulyConnectionError", () =>
+      Effect.gen(function*() {
         const testLayer = HulyClient.testLayer({
           findAll: () =>
             Effect.fail(
               new HulyConnectionError({
-                message: "Network error",
+                message: "Network error"
               })
-            ),
+            )
         })
 
         const client = yield* HulyClient.pipe(Effect.provide(testLayer))
@@ -150,18 +148,17 @@ describe("HulyClient Service", () => {
 
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toBe("Network error")
-      })
-    )
+      }))
 
-        it.effect("can mock operations to return HulyAuthError", () =>
-      Effect.gen(function* () {
+    it.effect("can mock operations to return HulyAuthError", () =>
+      Effect.gen(function*() {
         const testLayer = HulyClient.testLayer({
           findOne: () =>
             Effect.fail(
               new HulyAuthError({
-                message: "Invalid credentials",
+                message: "Invalid credentials"
               })
-            ),
+            )
         })
 
         const client = yield* HulyClient.pipe(Effect.provide(testLayer))
@@ -174,51 +171,47 @@ describe("HulyClient Service", () => {
 
         expect(error._tag).toBe("HulyAuthError")
         expect(error.message).toBe("Invalid credentials")
-      })
-    )
+      }))
   })
 
   describe("error handling patterns", () => {
-        it.effect("can catch HulyConnectionError with catchTag", () =>
-      Effect.gen(function* () {
+    it.effect("can catch HulyConnectionError with catchTag", () =>
+      Effect.gen(function*() {
         const testLayer = HulyClient.testLayer({
           findAll: () =>
             Effect.fail(
               new HulyConnectionError({
-                message: "Connection timeout",
+                message: "Connection timeout"
               })
-            ),
+            )
         })
 
-        const result = yield* Effect.gen(function* () {
+        const result = yield* Effect.gen(function*() {
           const client = yield* HulyClient
           return yield* client.findAll(
             "class" as DocRef<Class<TestDoc>>,
             {} as DocumentQuery<TestDoc>
           )
         }).pipe(
-          Effect.catchTag("HulyConnectionError", (e) =>
-            Effect.succeed(`Recovered from: ${e.message}`)
-          ),
+          Effect.catchTag("HulyConnectionError", (e) => Effect.succeed(`Recovered from: ${e.message}`)),
           Effect.provide(testLayer)
         )
 
         expect(result).toBe("Recovered from: Connection timeout")
-      })
-    )
+      }))
 
-        it.effect("can catch HulyAuthError with catchTag", () =>
-      Effect.gen(function* () {
+    it.effect("can catch HulyAuthError with catchTag", () =>
+      Effect.gen(function*() {
         const testLayer = HulyClient.testLayer({
           createDoc: () =>
             Effect.fail(
               new HulyAuthError({
-                message: "Session expired",
+                message: "Session expired"
               })
-            ),
+            )
         })
 
-        const result = yield* Effect.gen(function* () {
+        const result = yield* Effect.gen(function*() {
           const client = yield* HulyClient
           return yield* client.createDoc(
             "class" as DocRef<Class<TestDoc>>,
@@ -226,23 +219,20 @@ describe("HulyClient Service", () => {
             { title: "Test" } as Data<TestDoc>
           )
         }).pipe(
-          Effect.catchTag("HulyAuthError", (e) =>
-            Effect.succeed(`Auth error: ${e.message}`)
-          ),
+          Effect.catchTag("HulyAuthError", (e) => Effect.succeed(`Auth error: ${e.message}`)),
           Effect.provide(testLayer)
         )
 
         expect(result).toBe("Auth error: Session expired")
-      })
-    )
+      }))
 
-        it.effect("can handle both error types with catchTags", () =>
-      Effect.gen(function* () {
+    it.effect("can handle both error types with catchTags", () =>
+      Effect.gen(function*() {
         const connectionErrorLayer = HulyClient.testLayer({
           findAll: () =>
             Effect.fail(
               new HulyConnectionError({ message: "Network down" })
-            ),
+            )
         })
 
         const handleErrors = <A>(
@@ -250,14 +240,12 @@ describe("HulyClient Service", () => {
         ) =>
           effect.pipe(
             Effect.catchTags({
-              HulyConnectionError: (e) =>
-                Effect.succeed(`Connection: ${e.message}`),
-              HulyAuthError: (e) =>
-                Effect.succeed(`Auth: ${e.message}`),
+              HulyConnectionError: (e) => Effect.succeed(`Connection: ${e.message}`),
+              HulyAuthError: (e) => Effect.succeed(`Auth: ${e.message}`)
             })
           )
 
-        const result = yield* Effect.gen(function* () {
+        const result = yield* Effect.gen(function*() {
           const client = yield* HulyClient
           return yield* handleErrors(
             client.findAll(
@@ -268,26 +256,25 @@ describe("HulyClient Service", () => {
         }).pipe(Effect.provide(connectionErrorLayer))
 
         expect(result).toBe("Connection: Network down")
-      })
-    )
+      }))
   })
 
   describe("service composition", () => {
-        it.effect("can be composed with other services", () =>
-      Effect.gen(function* () {
+    it.effect("can be composed with other services", () =>
+      Effect.gen(function*() {
         // Mock a higher-level service that uses HulyClient
         const mockFindAll = <T extends Doc>() =>
           Effect.succeed(toFindResult([
             { _id: "1", title: "Issue 1" },
-            { _id: "2", title: "Issue 2" },
-          ] as Doc[]) as FindResult<T>)
+            { _id: "2", title: "Issue 2" }
+          ] as Array<Doc>) as FindResult<T>)
 
         const testLayer = HulyClient.testLayer({
-          findAll: mockFindAll,
+          findAll: mockFindAll
         })
 
         // Higher-level program using the client
-        const listIssues = Effect.gen(function* () {
+        const listIssues = Effect.gen(function*() {
           const client = yield* HulyClient
           const issues = yield* client.findAll(
             "tracker.class.Issue" as DocRef<Class<TestDoc>>,
@@ -300,11 +287,10 @@ describe("HulyClient Service", () => {
         const result = yield* listIssues.pipe(Effect.provide(testLayer))
 
         expect(result).toEqual(["Issue 1", "Issue 2"])
-      })
-    )
+      }))
 
-        it.effect("multiple operations reuse same mock layer", () =>
-      Effect.gen(function* () {
+    it.effect("multiple operations reuse same mock layer", () =>
+      Effect.gen(function*() {
         const callCount = { findAll: 0, findOne: 0 }
 
         const testLayer = HulyClient.testLayer({
@@ -315,10 +301,10 @@ describe("HulyClient Service", () => {
           findOne: <T extends Doc>() => {
             callCount.findOne++
             return Effect.succeed({ _id: "1", title: "Found" } as WithLookup<T>)
-          },
+          }
         })
 
-        const result = yield* Effect.gen(function* () {
+        const result = yield* Effect.gen(function*() {
           const client = yield* HulyClient
 
           // Call both operations
@@ -338,13 +324,12 @@ describe("HulyClient Service", () => {
         expect(result.found).toBe(true)
         expect(callCount.findAll).toBe(1)
         expect(callCount.findOne).toBe(1)
-      })
-    )
+      }))
   })
 
   describe("HulyClientError type", () => {
-        it.effect("is union of HulyConnectionError and HulyAuthError", () =>
-      Effect.gen(function* () {
+    it.effect("is union of HulyConnectionError and HulyAuthError", () =>
+      Effect.gen(function*() {
         // Type test - this should compile
         const handleError = (error: HulyClientError): string => {
           switch (error._tag) {
@@ -360,14 +345,13 @@ describe("HulyClient Service", () => {
 
         expect(handleError(connErr)).toBe("Connection: timeout")
         expect(handleError(authErr)).toBe("Auth: invalid")
-      })
-    )
+      }))
   })
 
   describe("operation tracking", () => {
-        it.effect("tracks operation calls for testing", () =>
-      Effect.gen(function* () {
-        const operations: string[] = []
+    it.effect("tracks operation calls for testing", () =>
+      Effect.gen(function*() {
+        const operations: Array<string> = []
 
         const testLayer = HulyClient.testLayer({
           findAll: <T extends Doc>() => {
@@ -385,50 +369,50 @@ describe("HulyClient Service", () => {
           updateDoc: () => {
             operations.push("updateDoc")
             return Effect.succeed({} as TxResult)
-          },
+          }
         })
 
-        yield* Effect.gen(function* () {
+        yield* Effect.gen(function*() {
           const client = yield* HulyClient
           yield* client.findAll("c" as DocRef<Class<TestDoc>>, {} as DocumentQuery<TestDoc>)
           yield* client.findOne("c" as DocRef<Class<TestDoc>>, {} as DocumentQuery<TestDoc>)
-          yield* client.createDoc("c" as DocRef<Class<TestDoc>>, "s" as DocRef<Space>, { title: "test" } as Data<TestDoc>)
+          yield* client.createDoc(
+            "c" as DocRef<Class<TestDoc>>,
+            "s" as DocRef<Space>,
+            { title: "test" } as Data<TestDoc>
+          )
           yield* client.updateDoc("c" as DocRef<Class<TestDoc>>, "s" as DocRef<Space>, "id" as DocRef<TestDoc>, {})
         }).pipe(Effect.provide(testLayer))
 
         expect(operations).toEqual(["findAll", "findOne", "createDoc", "updateDoc"])
-      })
-    )
+      }))
   })
 })
 
 describe("Connection error classification", () => {
   describe("HulyConnectionError", () => {
-        it.effect("has correct tag", () =>
-      Effect.gen(function* () {
+    it.effect("has correct tag", () =>
+      Effect.gen(function*() {
         const error = new HulyConnectionError({ message: "timeout" })
         expect(error._tag).toBe("HulyConnectionError")
-      })
-    )
+      }))
 
-        it.effect("includes cause", () =>
-      Effect.gen(function* () {
+    it.effect("includes cause", () =>
+      Effect.gen(function*() {
         const cause = new Error("underlying")
         const error = new HulyConnectionError({
           message: "failed",
-          cause,
+          cause
         })
         expect(error.cause).toBe(cause)
-      })
-    )
+      }))
   })
 
   describe("HulyAuthError", () => {
-        it.effect("has correct tag", () =>
-      Effect.gen(function* () {
+    it.effect("has correct tag", () =>
+      Effect.gen(function*() {
         const error = new HulyAuthError({ message: "invalid credentials" })
         expect(error._tag).toBe("HulyAuthError")
-      })
-    )
+      }))
   })
 })

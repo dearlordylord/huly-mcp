@@ -1,24 +1,17 @@
 import { describe, it } from "@effect/vitest"
-import { expect } from "vitest"
-import { Effect } from "effect"
-import {
-  toFindResult,
-  type Doc,
-  type Ref,
-  type Space,
-} from "@hcengineering/core"
+import { type Doc, type Ref, type Space, toFindResult } from "@hcengineering/core"
 import { type Project as HulyProject } from "@hcengineering/tracker"
+import { Effect } from "effect"
+import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { listProjects } from "../../../src/huly/operations/projects.js"
 
-// Import plugin objects at runtime (CommonJS modules)
- 
-const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
+import { tracker } from "../../../src/huly/huly-plugins.js"
 
 // --- Mock Data Builders ---
 
-const makeProject = (overrides?: Partial<HulyProject>): HulyProject =>
-  ({
+const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
+  const result: HulyProject = {
     _id: "project-1" as Ref<HulyProject>,
     _class: tracker.class.Project,
     space: "space-1" as Ref<Space>,
@@ -33,13 +26,15 @@ const makeProject = (overrides?: Partial<HulyProject>): HulyProject =>
     modifiedOn: Date.now(),
     createdBy: "user-1" as Ref<Doc>,
     createdOn: Date.now(),
-    ...overrides,
-  }) as HulyProject
+    ...overrides
+  }
+  return result
+}
 
 // --- Test Helpers ---
 
 interface MockConfig {
-  projects?: HulyProject[]
+  projects?: Array<HulyProject>
   captureQuery?: { query?: Record<string, unknown>; options?: Record<string, unknown> }
 }
 
@@ -66,7 +61,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       const limited = filtered.slice(0, limit)
 
       // Return with total
-      const result = toFindResult(limited as Doc[])
+      const result = toFindResult(limited as Array<Doc>)
       ;(result as { total?: number }).total = filtered.length
       return Effect.succeed(result)
     }
@@ -74,7 +69,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
   }) as HulyClientOperations["findAll"]
 
   return HulyClient.testLayer({
-    findAll: findAllImpl,
+    findAll: findAllImpl
   })
 }
 
@@ -83,11 +78,11 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 describe("listProjects", () => {
   describe("basic functionality", () => {
     it.effect("returns all active projects by default", () =>
-      Effect.gen(function* () {
+      Effect.gen(function*() {
         const projects = [
           makeProject({ identifier: "PROJ1", name: "Project 1", archived: false }),
           makeProject({ identifier: "PROJ2", name: "Project 2", archived: false }),
-          makeProject({ identifier: "ARCHIVED", name: "Archived Project", archived: true }),
+          makeProject({ identifier: "ARCHIVED", name: "Archived Project", archived: true })
         ]
 
         const testLayer = createTestLayerWithMocks({ projects })
@@ -97,16 +92,15 @@ describe("listProjects", () => {
         expect(result.projects).toHaveLength(2)
         expect(result.projects.map(p => p.identifier)).toEqual(["PROJ1", "PROJ2"])
         expect(result.total).toBe(2)
-      })
-    )
+      }))
 
     it.effect("transforms project fields correctly", () =>
-      Effect.gen(function* () {
+      Effect.gen(function*() {
         const project = makeProject({
           identifier: "TEST",
           name: "Test Project",
           description: "A description",
-          archived: false,
+          archived: false
         })
 
         const testLayer = createTestLayerWithMocks({ projects: [project] })
@@ -118,17 +112,16 @@ describe("listProjects", () => {
           identifier: "TEST",
           name: "Test Project",
           description: "A description",
-          archived: false,
+          archived: false
         })
-      })
-    )
+      }))
 
     it.effect("handles empty description", () =>
-      Effect.gen(function* () {
+      Effect.gen(function*() {
         const project = makeProject({
           identifier: "TEST",
           name: "No Description",
-          description: "",
+          description: ""
         })
 
         const testLayer = createTestLayerWithMocks({ projects: [project] })
@@ -136,28 +129,26 @@ describe("listProjects", () => {
         const result = yield* listProjects({}).pipe(Effect.provide(testLayer))
 
         expect(result.projects[0].description).toBeUndefined()
-      })
-    )
+      }))
 
     it.effect("returns empty array when no projects", () =>
-      Effect.gen(function* () {
+      Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({ projects: [] })
 
         const result = yield* listProjects({}).pipe(Effect.provide(testLayer))
 
         expect(result.projects).toHaveLength(0)
         expect(result.total).toBe(0)
-      })
-    )
+      }))
   })
 
   describe("archived filtering", () => {
     it.effect("excludes archived projects by default", () =>
-      Effect.gen(function* () {
+      Effect.gen(function*() {
         const captureQuery: MockConfig["captureQuery"] = {}
         const projects = [
           makeProject({ identifier: "ACTIVE", archived: false }),
-          makeProject({ identifier: "ARCHIVED", archived: true }),
+          makeProject({ identifier: "ARCHIVED", archived: true })
         ]
 
         const testLayer = createTestLayerWithMocks({ projects, captureQuery })
@@ -165,15 +156,14 @@ describe("listProjects", () => {
         yield* listProjects({}).pipe(Effect.provide(testLayer))
 
         expect(captureQuery.query?.archived).toBe(false)
-      })
-    )
+      }))
 
     it.effect("includes archived when includeArchived=true", () =>
-      Effect.gen(function* () {
+      Effect.gen(function*() {
         const captureQuery: MockConfig["captureQuery"] = {}
         const projects = [
           makeProject({ identifier: "ACTIVE", archived: false }),
-          makeProject({ identifier: "ARCHIVED", archived: true }),
+          makeProject({ identifier: "ARCHIVED", archived: true })
         ]
 
         const testLayer = createTestLayerWithMocks({ projects, captureQuery })
@@ -184,14 +174,13 @@ describe("listProjects", () => {
         expect(captureQuery.query?.archived).toBeUndefined()
         expect(result.projects).toHaveLength(2)
         expect(result.total).toBe(2)
-      })
-    )
+      }))
 
     it.effect("excludes archived when includeArchived=false explicitly", () =>
-      Effect.gen(function* () {
+      Effect.gen(function*() {
         const captureQuery: MockConfig["captureQuery"] = {}
         const projects = [
-          makeProject({ identifier: "ACTIVE", archived: false }),
+          makeProject({ identifier: "ACTIVE", archived: false })
         ]
 
         const testLayer = createTestLayerWithMocks({ projects, captureQuery })
@@ -199,13 +188,12 @@ describe("listProjects", () => {
         yield* listProjects({ includeArchived: false }).pipe(Effect.provide(testLayer))
 
         expect(captureQuery.query?.archived).toBe(false)
-      })
-    )
+      }))
   })
 
   describe("limit handling", () => {
     it.effect("uses default limit of 50", () =>
-      Effect.gen(function* () {
+      Effect.gen(function*() {
         const captureQuery: MockConfig["captureQuery"] = {}
 
         const testLayer = createTestLayerWithMocks({ projects: [], captureQuery })
@@ -213,11 +201,10 @@ describe("listProjects", () => {
         yield* listProjects({}).pipe(Effect.provide(testLayer))
 
         expect(captureQuery.options?.limit).toBe(50)
-      })
-    )
+      }))
 
     it.effect("uses provided limit", () =>
-      Effect.gen(function* () {
+      Effect.gen(function*() {
         const captureQuery: MockConfig["captureQuery"] = {}
 
         const testLayer = createTestLayerWithMocks({ projects: [], captureQuery })
@@ -225,11 +212,10 @@ describe("listProjects", () => {
         yield* listProjects({ limit: 10 }).pipe(Effect.provide(testLayer))
 
         expect(captureQuery.options?.limit).toBe(10)
-      })
-    )
+      }))
 
     it.effect("enforces max limit of 200", () =>
-      Effect.gen(function* () {
+      Effect.gen(function*() {
         const captureQuery: MockConfig["captureQuery"] = {}
 
         const testLayer = createTestLayerWithMocks({ projects: [], captureQuery })
@@ -237,13 +223,12 @@ describe("listProjects", () => {
         yield* listProjects({ limit: 500 }).pipe(Effect.provide(testLayer))
 
         expect(captureQuery.options?.limit).toBe(200)
-      })
-    )
+      }))
   })
 
   describe("sorting", () => {
     it.effect("sorts by name ascending", () =>
-      Effect.gen(function* () {
+      Effect.gen(function*() {
         const captureQuery: MockConfig["captureQuery"] = {}
 
         const testLayer = createTestLayerWithMocks({ projects: [], captureQuery })
@@ -251,18 +236,17 @@ describe("listProjects", () => {
         yield* listProjects({}).pipe(Effect.provide(testLayer))
 
         // SortingOrder.Ascending = 1
-        expect((captureQuery.options?.sort as Record<string, number>)?.name).toBe(1)
-      })
-    )
+        expect((captureQuery.options?.sort as Record<string, number>).name).toBe(1)
+      }))
   })
 
   describe("pagination info", () => {
     it.effect("returns total count", () =>
-      Effect.gen(function* () {
+      Effect.gen(function*() {
         const projects = [
           makeProject({ identifier: "P1", archived: false }),
           makeProject({ identifier: "P2", archived: false }),
-          makeProject({ identifier: "P3", archived: false }),
+          makeProject({ identifier: "P3", archived: false })
         ]
 
         const testLayer = createTestLayerWithMocks({ projects })
@@ -271,7 +255,6 @@ describe("listProjects", () => {
 
         expect(result.projects).toHaveLength(2)
         expect(result.total).toBe(3)
-      })
-    )
+      }))
   })
 })
