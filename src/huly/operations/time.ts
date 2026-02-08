@@ -67,6 +67,7 @@ const serverPopulatedPersonId: CorePersonId = "" as CorePersonId
 
 // SDK: WorkSlot.user is typed PersonId, but Huly queries accept Ref<Person> for user lookup.
 // Both are branded strings over string; the REST API treats them interchangeably in queries.
+// TODO that's all mighty weird, we may want to reinvestigate that
 const refAsPersonId = (ref: Ref<Doc>): CorePersonId => ref as unknown as CorePersonId
 
 export type LogTimeError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
