@@ -65,7 +65,7 @@ export const RecurringRuleSchema = Schema.Struct({
     })
   ),
   byMonth: Schema.optional(
-    Schema.Array(Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(1), Schema.lessThanOrEqualTo(12)))
+    Schema.Array(Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(1), Schema.lessThanOrEqualTo(12))) // eslint-disable-line no-magic-numbers
       .annotations({
         description: "Months (1-12)"
       })

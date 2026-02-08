@@ -6,7 +6,7 @@ import { IssuePriority } from "@hcengineering/tracker"
 import { absurd, Effect } from "effect"
 
 import type { IssuePriority as IssuePriorityStr } from "../../domain/schemas/issues.js"
-import type { NonNegativeNumber } from "../../domain/schemas/shared.js"
+import { MAX_LIMIT, type NonNegativeNumber } from "../../domain/schemas/shared.js"
 import { PositiveNumber } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError, type HulyClientOperations } from "../client.js"
 import { InvalidPersonUuidError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
@@ -291,7 +291,6 @@ export const stringToPriority = (priority: IssuePriorityStr): IssuePriority => {
 }
 
 const DEFAULT_LIMIT = 50
-const MAX_LIMIT = 200
 
 export const clampLimit = (limit?: number): number => Math.min(limit ?? DEFAULT_LIMIT, MAX_LIMIT)
 
