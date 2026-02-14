@@ -77,6 +77,52 @@ describe("Domain Schemas", () => {
         )
         expect(error._tag).toBe("ParseError")
       }))
+
+    it.effect("normalizes no_priority to no-priority", () =>
+      Effect.gen(function*() {
+        const result = yield* Schema.decodeUnknown(IssuePrioritySchema)("no_priority")
+        expect(result).toBe("no-priority")
+      }))
+
+    it.effect("normalizes NoPriority to no-priority", () =>
+      Effect.gen(function*() {
+        const result = yield* Schema.decodeUnknown(IssuePrioritySchema)("NoPriority")
+        expect(result).toBe("no-priority")
+      }))
+
+    it.effect("normalizes No Priority to no-priority", () =>
+      Effect.gen(function*() {
+        const result = yield* Schema.decodeUnknown(IssuePrioritySchema)("No Priority")
+        expect(result).toBe("no-priority")
+      }))
+
+    it.effect("normalizes NO-PRIORITY to no-priority", () =>
+      Effect.gen(function*() {
+        const result = yield* Schema.decodeUnknown(IssuePrioritySchema)("NO-PRIORITY")
+        expect(result).toBe("no-priority")
+      }))
+
+    it.effect("normalizes URGENT to urgent", () =>
+      Effect.gen(function*() {
+        const result = yield* Schema.decodeUnknown(IssuePrioritySchema)("URGENT")
+        expect(result).toBe("urgent")
+      }))
+
+    it.effect("normalizes High to high", () =>
+      Effect.gen(function*() {
+        const result = yield* Schema.decodeUnknown(IssuePrioritySchema)("High")
+        expect(result).toBe("high")
+      }))
+
+    it.effect("JSON schema preserves enum values", () =>
+      Effect.gen(function*() {
+        const schema = createIssueParamsJsonSchema as JsonSchemaObject & {
+          properties?: Record<string, { type?: string; enum?: Array<string> }>
+        }
+        const priorityProp = schema.properties?.priority
+        expect(priorityProp).toBeDefined()
+        expect(priorityProp?.enum).toEqual(["urgent", "high", "medium", "low", "no-priority"])
+      }))
   })
 
   describe("LabelSchema", () => {
@@ -518,6 +564,7 @@ describe("Domain Schemas", () => {
         expect(schema.properties).toHaveProperty("priority")
         expect(schema.properties).toHaveProperty("assignee")
         expect(schema.properties).toHaveProperty("status")
+        expect(schema.properties).toHaveProperty("parentIssue")
       }))
 
     // test-revizorro: approved

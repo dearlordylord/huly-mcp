@@ -15,6 +15,7 @@ import type { TagElement, TagReference } from "@hcengineering/tags"
 import type { TaskType } from "@hcengineering/task"
 import {
   type Issue as HulyIssue,
+  type IssueParentInfo,
   IssuePriority,
   type Project as HulyProject,
   TimeReportDayType
@@ -200,7 +201,14 @@ interface MockConfig {
   markupContent?: Record<string, string> // Map of markup ID to markdown content
   // For create tests
   captureUpdateDoc?: { operations?: Record<string, unknown> }
-  captureAddCollection?: { attributes?: Record<string, unknown>; id?: string; class?: unknown }
+  captureAddCollection?: {
+    attributes?: Record<string, unknown>
+    id?: string
+    class?: unknown
+    attachedTo?: unknown
+    attachedToClass?: unknown
+    collection?: string
+  }
   captureCreateDoc?: { attributes?: Record<string, unknown>; id?: string }
   captureUploadMarkup?: { markup?: string }
   updateDocResult?: { object?: { sequence?: number } }
@@ -412,6 +420,9 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       config.captureAddCollection.class = _class
       config.captureAddCollection.attributes = attributes as Record<string, unknown>
       config.captureAddCollection.id = id as string
+      config.captureAddCollection.attachedTo = _attachedTo
+      config.captureAddCollection.attachedToClass = _attachedToClass
+      config.captureAddCollection.collection = _collection as string
     }
     return Effect.succeed((id ?? "new-issue-id") as Ref<Doc>)
   }) as HulyClientOperations["addCollection"]
@@ -1423,6 +1434,212 @@ describe("createIssue", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(captureAddCollection.attributes?.status).toBe("status-progress")
+      }))
+
+    it.effect("matches status with hyphens (in-progress -> In Progress)", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST", sequence: 1 })
+        const inProgressStatus = makeStatus({ _id: "status-progress" as Ref<Status>, name: "In Progress" })
+
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [inProgressStatus],
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 2 } }
+        })
+
+        yield* createIssue({
+          project: projectIdentifier("TEST"),
+          title: "Test Issue",
+          status: statusName("in-progress")
+        }).pipe(Effect.provide(testLayer))
+
+        expect(captureAddCollection.attributes?.status).toBe("status-progress")
+      }))
+
+    it.effect("matches status with underscores (IN_PROGRESS -> In Progress)", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST", sequence: 1 })
+        const inProgressStatus = makeStatus({ _id: "status-progress" as Ref<Status>, name: "In Progress" })
+
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [inProgressStatus],
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 2 } }
+        })
+
+        yield* createIssue({
+          project: projectIdentifier("TEST"),
+          title: "Test Issue",
+          status: statusName("IN_PROGRESS")
+        }).pipe(Effect.provide(testLayer))
+
+        expect(captureAddCollection.attributes?.status).toBe("status-progress")
+      }))
+
+    it.effect("matches camelCase status (InProgress -> In Progress)", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST", sequence: 1 })
+        const inProgressStatus = makeStatus({ _id: "status-progress" as Ref<Status>, name: "In Progress" })
+
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [inProgressStatus],
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 2 } }
+        })
+
+        yield* createIssue({
+          project: projectIdentifier("TEST"),
+          title: "Test Issue",
+          status: statusName("InProgress")
+        }).pipe(Effect.provide(testLayer))
+
+        expect(captureAddCollection.attributes?.status).toBe("status-progress")
+      }))
+  })
+
+  describe("sub-issue creation", () => {
+    it.effect("creates sub-issue with parent reference", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST", sequence: 5 })
+        const parentIssue = makeIssue({
+          _id: "parent-1" as Ref<HulyIssue>,
+          identifier: "TEST-1",
+          title: "Parent Issue",
+          number: 1,
+          parents: []
+        })
+
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [parentIssue],
+          statuses: [],
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 6 } }
+        })
+
+        const result = yield* createIssue({
+          project: projectIdentifier("TEST"),
+          title: "Child Issue",
+          parentIssue: issueIdentifier("TEST-1")
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result.identifier).toBe("TEST-6")
+        expect(captureAddCollection.attachedTo).toBe("parent-1")
+        expect(captureAddCollection.attachedToClass).toBe(tracker.class.Issue)
+        expect(captureAddCollection.collection).toBe("subIssues")
+        const parents = captureAddCollection.attributes?.parents as Array<
+          { parentId: string; identifier: string; parentTitle: string }
+        >
+        expect(parents).toHaveLength(1)
+        expect(parents[0].parentId).toBe("parent-1")
+        expect(parents[0].identifier).toBe("TEST-1")
+        expect(parents[0].parentTitle).toBe("Parent Issue")
+      }))
+
+    it.effect("creates top-level issue when no parentIssue specified", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST", sequence: 1 })
+
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [],
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 2 } }
+        })
+
+        yield* createIssue({
+          project: projectIdentifier("TEST"),
+          title: "Top Level Issue"
+        }).pipe(Effect.provide(testLayer))
+
+        expect(captureAddCollection.attachedTo).toBe("project-1")
+        expect(captureAddCollection.attachedToClass).toBe(tracker.class.Project)
+        expect(captureAddCollection.collection).toBe("issues")
+        expect(captureAddCollection.attributes?.parents).toEqual([])
+      }))
+
+    it.effect("builds parents chain from grandparent", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST", sequence: 10 })
+        const grandparentInfo: IssueParentInfo = {
+          parentId: "grandparent-1" as Ref<HulyIssue>,
+          identifier: "TEST-1",
+          parentTitle: "Grandparent",
+          space: "project-1" as Ref<Space>
+        }
+        const parentIssue = makeIssue({
+          _id: "parent-2" as Ref<HulyIssue>,
+          identifier: "TEST-5",
+          title: "Parent Issue",
+          number: 5,
+          parents: [grandparentInfo]
+        })
+
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [parentIssue],
+          statuses: [],
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 11 } }
+        })
+
+        yield* createIssue({
+          project: projectIdentifier("TEST"),
+          title: "Grandchild Issue",
+          parentIssue: issueIdentifier("TEST-5")
+        }).pipe(Effect.provide(testLayer))
+
+        const parents = captureAddCollection.attributes?.parents as Array<
+          { parentId: string; identifier: string; parentTitle: string }
+        >
+        expect(parents).toHaveLength(2)
+        expect(parents[0].parentId).toBe("grandparent-1")
+        expect(parents[0].identifier).toBe("TEST-1")
+        expect(parents[1].parentId).toBe("parent-2")
+        expect(parents[1].identifier).toBe("TEST-5")
+        expect(parents[1].parentTitle).toBe("Parent Issue")
+      }))
+
+    it.effect("returns IssueNotFoundError when parent doesn't exist", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST", sequence: 1 })
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [],
+          updateDocResult: { object: { sequence: 2 } }
+        })
+
+        const error = yield* Effect.flip(
+          createIssue({
+            project: projectIdentifier("TEST"),
+            title: "Orphan Issue",
+            parentIssue: issueIdentifier("TEST-999")
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("IssueNotFoundError")
+        expect((error as IssueNotFoundError).identifier).toBe("TEST-999")
       }))
   })
 

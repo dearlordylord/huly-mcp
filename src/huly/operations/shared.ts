@@ -213,19 +213,15 @@ export const parseIssueIdentifier = (
   return { fullIdentifier: idStr, number: null }
 }
 
-export const findProjectAndIssue = (
-  params: { project: string; identifier: string }
-): Effect.Effect<
-  { client: HulyClient["Type"]; project: HulyProject; issue: HulyIssue },
-  ProjectNotFoundError | IssueNotFoundError | HulyClientError,
-  HulyClient
-> =>
+export const findIssueInProject = (
+  client: HulyClient["Type"],
+  project: HulyProject,
+  identifierStr: string
+): Effect.Effect<HulyIssue, IssueNotFoundError | HulyClientError> =>
   Effect.gen(function*() {
-    const { client, project } = yield* findProject(params.project)
-
     const { fullIdentifier, number } = parseIssueIdentifier(
-      params.identifier,
-      params.project
+      identifierStr,
+      project.identifier
     )
 
     let issue = yield* client.findOne<HulyIssue>(
@@ -246,11 +242,24 @@ export const findProjectAndIssue = (
     }
     if (issue === undefined) {
       return yield* new IssueNotFoundError({
-        identifier: params.identifier,
-        project: params.project
+        identifier: identifierStr,
+        project: project.identifier
       })
     }
 
+    return issue
+  })
+
+export const findProjectAndIssue = (
+  params: { project: string; identifier: string }
+): Effect.Effect<
+  { client: HulyClient["Type"]; project: HulyProject; issue: HulyIssue },
+  ProjectNotFoundError | IssueNotFoundError | HulyClientError,
+  HulyClient
+> =>
+  Effect.gen(function*() {
+    const { client, project } = yield* findProject(params.project)
+    const issue = yield* findIssueInProject(client, project, params.identifier)
     return { client, project, issue }
   })
 

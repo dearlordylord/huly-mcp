@@ -85,7 +85,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "create_issue",
     description:
-      "Create a new issue in a Huly project. Description supports markdown formatting. Returns the created issue identifier.",
+      "Create a new issue in a Huly project. Optionally create as a sub-issue by specifying parentIssue. Description supports markdown formatting. Returns the created issue identifier.",
     category: CATEGORY,
     inputSchema: createIssueParamsJsonSchema,
     handler: createToolHandler(

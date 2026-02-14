@@ -1,5 +1,6 @@
-import { JSONSchema, Schema } from "effect"
+import { JSONSchema, ParseResult, Schema } from "effect"
 
+import { normalizeForComparison } from "../../utils/normalize.js"
 import {
   ColorCode,
   ComponentIdentifier,
@@ -18,9 +19,29 @@ import {
 
 export const IssuePriorityValues = ["urgent", "high", "medium", "low", "no-priority"] as const
 
-export const IssuePrioritySchema = Schema.Literal(...IssuePriorityValues).annotations({
+const IssuePriorityLiteral = Schema.Literal(...IssuePriorityValues)
+
+const normalizedPriorityLookup = new Map(
+  IssuePriorityValues.map(v => [normalizeForComparison(v), v] as const)
+)
+
+export const IssuePrioritySchema = Schema.transformOrFail(
+  Schema.String,
+  IssuePriorityLiteral,
+  {
+    strict: true,
+    decode: (input, _options, ast) => {
+      const match = normalizedPriorityLookup.get(normalizeForComparison(input))
+      return match !== undefined
+        ? ParseResult.succeed(match)
+        : ParseResult.fail(new ParseResult.Type(ast, input, `Expected one of: ${IssuePriorityValues.join(", ")}`))
+    },
+    encode: ParseResult.succeed
+  }
+).annotations({
   title: "IssuePriority",
-  description: "Issue priority level"
+  description: "Issue priority level",
+  jsonSchema: { type: "string", enum: [...IssuePriorityValues] }
 })
 
 export type IssuePriority = Schema.Schema.Type<typeof IssuePrioritySchema>
@@ -144,6 +165,9 @@ export const CreateIssueParamsSchema = Schema.Struct({
   })),
   status: Schema.optional(StatusName.annotations({
     description: "Initial status (uses project default if not specified)"
+  })),
+  parentIssue: Schema.optional(IssueIdentifier.annotations({
+    description: "Parent issue identifier (e.g., 'HULY-42') to create as sub-issue"
   }))
 }).annotations({
   title: "CreateIssueParams",

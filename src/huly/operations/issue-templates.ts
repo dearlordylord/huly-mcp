@@ -36,7 +36,7 @@ import type {
 import type { CreateIssueResult } from "../../domain/schemas/issues.js"
 import { ComponentLabel, Email, IssueTemplateId, NonNegativeNumber, PersonName } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
-import type { InvalidStatusError, ProjectNotFoundError } from "../errors.js"
+import type { InvalidStatusError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { ComponentNotFoundError, IssueTemplateNotFoundError, PersonNotFoundError } from "../errors.js"
 import { findComponentByIdOrLabel } from "./components.js"
 import { createIssue } from "./issues.js"
@@ -69,6 +69,7 @@ type CreateIssueTemplateError =
 type CreateIssueFromTemplateError =
   | HulyClientError
   | ProjectNotFoundError
+  | IssueNotFoundError
   | IssueTemplateNotFoundError
   | InvalidStatusError
   | PersonNotFoundError

@@ -25,7 +25,7 @@ import {
 } from "@hcengineering/core"
 import { makeRank } from "@hcengineering/rank"
 import type { TagElement, TagReference } from "@hcengineering/tags"
-import { type Issue as HulyIssue, type Project as HulyProject } from "@hcengineering/tracker"
+import { type Issue as HulyIssue, type IssueParentInfo, type Project as HulyProject } from "@hcengineering/tracker"
 import { Effect, Schema } from "effect"
 
 import type {
@@ -52,6 +52,7 @@ import {
   PersonName,
   StatusName
 } from "../../domain/schemas/shared.js"
+import { normalizeForComparison } from "../../utils/normalize.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { ComponentNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { HulyError, InvalidStatusError, IssueNotFoundError, PersonNotFoundError } from "../errors.js"
@@ -60,6 +61,7 @@ import { findComponentByIdOrLabel } from "./components.js"
 import { escapeLikeWildcards, withLookup } from "./query-helpers.js"
 import {
   clampLimit,
+  findIssueInProject,
   findPersonByEmailOrName,
   findProject,
   findProjectAndIssue,
@@ -88,6 +90,7 @@ type GetIssueError =
 type CreateIssueError =
   | HulyClientError
   | ProjectNotFoundError
+  | IssueNotFoundError
   | InvalidStatusError
   | PersonNotFoundError
 
@@ -128,8 +131,9 @@ const resolveStatusByName = (
   statusName: string,
   project: string
 ): Effect.Effect<Ref<Status>, InvalidStatusError> => {
+  const normalizedInput = normalizeForComparison(statusName)
   const matchingStatus = statuses.find(
-    s => s.name.toLowerCase() === statusName.toLowerCase()
+    s => normalizeForComparison(s.name) === normalizedInput
   )
   if (matchingStatus === undefined) {
     return Effect.fail(new InvalidStatusError({ status: statusName, project }))
@@ -181,7 +185,7 @@ export const listIssues = (
     }
 
     if (params.status !== undefined) {
-      const statusFilter = params.status.toLowerCase()
+      const statusFilter = normalizeForComparison(params.status)
 
       if (statusFilter === "open") {
         const doneAndCanceledStatuses = statuses
@@ -430,6 +434,27 @@ export const createIssue = (
     const priority = stringToPriority(params.priority || "no-priority")
     const identifier = `${project.identifier}-${sequence}`
 
+    let attachedTo: Ref<Doc> = project._id
+    let attachedToClass: Ref<Class<Doc>> = tracker.class.Project
+    let collection = "issues"
+    let parents: Array<IssueParentInfo> = []
+
+    if (params.parentIssue !== undefined) {
+      const parentIssue = yield* findIssueInProject(client, project, params.parentIssue)
+      attachedTo = parentIssue._id
+      attachedToClass = tracker.class.Issue
+      collection = "subIssues"
+      parents = [
+        ...parentIssue.parents,
+        {
+          parentId: parentIssue._id,
+          identifier: parentIssue.identifier,
+          parentTitle: parentIssue.title,
+          space: project._id
+        }
+      ]
+    }
+
     const issueData: AttachedData<HulyIssue> = {
       title: params.title,
       description: descriptionMarkupRef,
@@ -445,7 +470,7 @@ export const createIssue = (
       reportedTime: 0,
       reports: 0,
       subIssues: 0,
-      parents: [],
+      parents,
       childInfo: [],
       dueDate: null,
       rank
@@ -453,9 +478,9 @@ export const createIssue = (
     yield* client.addCollection(
       tracker.class.Issue,
       project._id,
-      project._id,
-      tracker.class.Project,
-      "issues",
+      attachedTo,
+      attachedToClass,
+      collection,
       issueData,
       issueId
     )
