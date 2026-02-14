@@ -44,6 +44,7 @@ export const createPostHogTelemetry = (debug: boolean): TelemetryOperations => {
         properties: {
           session_id: sessionId,
           version: VERSION,
+          $ip: null,
           ...properties
         }
       })
