@@ -81,7 +81,7 @@
   },
   "devDependencies": {
     "@effect/eslint-plugin": "^0.3.2",
-    "@effect/language-service": "^0.72.0",
+    "@effect/language-service": "^0.73.1",
     "@effect/vitest": "latest",
     "@eslint/compat": "^2.0.2",
     "@types/express": "^5.0.6",
