@@ -1,6 +1,6 @@
 {
   "name": "@firfi/huly-mcp",
-  "version": "0.1.35",
+  "version": "0.1.36",
   "description": "MCP server for Huly integration",
   "mcpName": "io.github.dearlordylord/huly-mcp",
   "type": "module",
