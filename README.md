@@ -136,13 +136,17 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 <!-- tools:start -->
 ## Available Tools
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `activity`, `notifications`, `workspace`, `cards`, `labels`, `tag-categories`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `activity`, `notifications`, `workspace`, `cards`, `labels`, `tag-categories`, `test-management`
 
 ### Projects
 
 | Tool | Description |
 |------|-------------|
 | `list_projects` | List all Huly projects. Returns projects sorted by name. Supports filtering by archived status. |
+| `get_project` | Get full details of a Huly project including its statuses. Returns project name, description, archived flag, default status, and all available statuses. |
+| `create_project` | Create a new Huly tracker project. Idempotent: returns existing project if one with the same identifier already exists (created=false). Identifier must be 1-5 uppercase alphanumeric chars starting with a letter. |
+| `update_project` | Update a Huly project. Only provided fields are modified. Set description to null to clear it. |
+| `delete_project` | Permanently delete a Huly project. All issues, milestones, and components in this project will be orphaned. This action cannot be undone. |
 
 ### Issues
 
@@ -360,6 +364,40 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `create_tag_category` | Create a new tag/label category. Idempotent: returns existing category if one with the same label and targetClass already exists (created=false). Defaults targetClass to tracker issues. |
 | `update_tag_category` | Update a tag/label category. Accepts category ID or label name. Only provided fields are modified. |
 | `delete_tag_category` | Permanently delete a tag/label category. Accepts category ID or label name. Labels in this category will be orphaned (not deleted). This action cannot be undone. |
+
+### Test-Management
+
+| Tool | Description |
+|------|-------------|
+| `list_test_projects` | List test management projects. Returns test projects sorted by name. These are separate from tracker projects. |
+| `list_test_suites` | List test suites in a test project. Accepts project ID or name. Optional parent filter for nested suites. |
+| `get_test_suite` | Get a single test suite by ID or name within a test project. Returns suite details and test case count. |
+| `create_test_suite` | Create a test suite in a test project. Idempotent: returns existing suite if one with the same name exists (created=false). Optional parent for nesting. |
+| `update_test_suite` | Update a test suite. Accepts suite ID or name. Only provided fields are modified. |
+| `delete_test_suite` | Permanently delete a test suite. Accepts suite ID or name. This action cannot be undone. |
+| `list_test_cases` | List test cases in a test project. Optional filters: suite (ID or name), assignee (name or email). |
+| `get_test_case` | Get a single test case by ID or name within a test project. |
+| `create_test_case` | Create a test case attached to a suite. Requires project and suite. Defaults: type=functional, priority=medium, status=draft. |
+| `update_test_case` | Update a test case. Accepts test case ID or name. Only provided fields are modified. Set assignee to null to unassign. |
+| `delete_test_case` | Permanently delete a test case. Accepts test case ID or name. This action cannot be undone. |
+| `list_test_plans` | List test plans in a test management project. Returns plan names and IDs. Requires project ID or name. |
+| `get_test_plan` | Get test plan details including its items (test cases). Accepts plan ID or name within a project. |
+| `create_test_plan` | Create a test plan in a project. Idempotent: returns existing plan if one with the same name exists (created=false). |
+| `update_test_plan` | Update a test plan's name or description. Only provided fields are modified. Pass description=null to clear. |
+| `delete_test_plan` | Permanently delete a test plan. This does not delete associated test runs. Cannot be undone. |
+| `add_test_plan_item` | Add a test case to a test plan. Resolves test case by ID or name. Optionally assign a person by email or name. |
+| `remove_test_plan_item` | Remove a test case from a test plan by item ID. Get item IDs from get_test_plan. |
+| `list_test_runs` | List test runs in a test management project. Returns run names, IDs, and due dates. |
+| `get_test_run` | Get test run details including all results. Accepts run ID or name within a project. |
+| `create_test_run` | Create a test run in a project. For bulk creation from a plan, use run_test_plan instead. |
+| `update_test_run` | Update a test run's name, description, or due date. Only provided fields are modified. Pass null to clear optional fields. |
+| `delete_test_run` | Permanently delete a test run. This does not delete associated test results. Cannot be undone. |
+| `list_test_results` | List test results in a test run. Returns result names, statuses, and assignees. |
+| `get_test_result` | Get test result details. Accepts result ID or name. |
+| `create_test_result` | Create a test result in a run. Resolves test case by ID or name. Status defaults to 'untested'. |
+| `update_test_result` | Update a test result's status, assignee, or description. Status values: untested, blocked, passed, failed. |
+| `delete_test_result` | Permanently delete a test result. Cannot be undone. |
+| `run_test_plan` | Execute a test plan: creates a test run and one test result per plan item. Returns the run ID and count of results created. Optionally name the run and set a due date. |
 
 <!-- tools:end -->
 
