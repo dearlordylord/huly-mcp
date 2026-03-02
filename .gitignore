@@ -11,3 +11,4 @@ CLAUDE.local.md
 .worktrees/
 .huly-local/
 .env.local
+.claude/settings.local.json
