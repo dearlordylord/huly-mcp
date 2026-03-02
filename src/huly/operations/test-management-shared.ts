@@ -1,4 +1,3 @@
-/* eslint-disable import-x/no-unused-modules -- shared helpers consumed by test-management-core.ts and test-management-plans.ts */
 import type { Person } from "@hcengineering/contact"
 import { Effect } from "effect"
 

@@ -13,9 +13,7 @@ import {
   Timestamp
 } from "./shared.js"
 
-export const TestRunStatusValues = ["untested", "blocked", "passed", "failed"] as const
-export type TestRunStatusStr = (typeof TestRunStatusValues)[number]
-export const TestRunStatusSchema = Schema.Literal(...TestRunStatusValues)
+import { TestRunStatusSchema, type TestRunStatusStr } from "./test-management-core.js"
 
 const projectField = TestProjectIdentifier.annotations({ description: "Test project ID or name" })
 const limitField = LimitParam.annotations({ description: "Max items to return (default: 50)" })
