@@ -53,6 +53,8 @@ import type {
   RegionId,
   SpaceId,
   StatusName,
+  TagCategoryId,
+  TagCategoryIdentifier,
   TagElementId,
   TagIdentifier,
   TeamspaceId,
@@ -88,6 +90,7 @@ export const spaceBrandId = (s: string) => s as SpaceId
 export const commentBrandId = (s: string) => s as CommentId
 export const timeSpendReportId = (s: string) => s as TimeSpendReportId
 export const tagElementId = (s: string) => s as TagElementId
+export const tagCategoryId = (s: string) => s as TagCategoryId
 
 // Tier 2: Human-Readable Identifiers
 export const projectIdentifier = (s: string) => s as ProjectIdentifier
@@ -130,6 +133,7 @@ export const channelIdentifier = (s: string) => s as ChannelIdentifier
 export const teamspaceIdentifier = (s: string) => s as TeamspaceIdentifier
 export const documentIdentifier = (s: string) => s as DocumentIdentifier
 export const tagIdentifier = (s: string) => s as TagIdentifier
+export const tagCategoryIdentifier = (s: string) => s as TagCategoryIdentifier
 export const memberReference = (s: string) => s as MemberReference
 
 // Re-export branded types for convenience
@@ -177,6 +181,8 @@ export type {
   RegionId,
   SpaceId,
   StatusName,
+  TagCategoryId,
+  TagCategoryIdentifier,
   TagElementId,
   TagIdentifier,
   TeamspaceId,

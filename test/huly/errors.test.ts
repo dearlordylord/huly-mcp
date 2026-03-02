@@ -37,6 +37,7 @@ import {
   ReactionNotFoundError,
   RecurringEventNotFoundError,
   SavedMessageNotFoundError,
+  TagCategoryNotFoundError,
   TagNotFoundError,
   TeamspaceNotFoundError,
   ThreadReplyNotFoundError
@@ -671,6 +672,8 @@ describe("Huly Errors", () => {
               return `mastertag:${error.identifier}`
             case "TagNotFoundError":
               return `tag:${error.identifier}`
+            case "TagCategoryNotFoundError":
+              return `tagcat:${error.identifier}`
             case "ComponentNotFoundError":
               return `component:${error.identifier}`
             case "IssueTemplateNotFoundError":
@@ -722,6 +725,7 @@ describe("Huly Errors", () => {
           matchError(new MasterTagNotFoundError({ identifier: "mt-1", cardSpace: "cs-1" }))
         ).toBe("mastertag:mt-1")
         expect(matchError(new TagNotFoundError({ identifier: "lbl-1" }))).toBe("tag:lbl-1")
+        expect(matchError(new TagCategoryNotFoundError({ identifier: "cat-1" }))).toBe("tagcat:cat-1")
         expect(matchError(new ComponentNotFoundError({ identifier: "cmp-1", project: "P" }))).toBe("component:cmp-1")
         expect(matchError(new IssueTemplateNotFoundError({ identifier: "tpl-1", project: "P" }))).toBe("template:tpl-1")
         expect(matchError(new NotificationNotFoundError({ notificationId: "n-1" }))).toBe("notification:n-1")

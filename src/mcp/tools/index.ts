@@ -20,6 +20,7 @@ import type { RegisteredTool, ToolDefinition } from "./registry.js"
 import { resolveAnnotations } from "./registry.js"
 import { searchTools } from "./search.js"
 import { storageTools } from "./storage.js"
+import { tagCategoryTools } from "./tag-categories.js"
 import { timeTools } from "./time.js"
 import { workspaceTools } from "./workspace.js"
 
@@ -27,6 +28,7 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...projectTools,
   ...issueTools,
   ...labelTools,
+  ...tagCategoryTools,
   ...commentTools,
   ...deletionTools,
   ...milestoneTools,

@@ -382,6 +382,17 @@ export class TagNotFoundError extends Schema.TaggedError<TagNotFoundError>()(
   }
 }
 
+export class TagCategoryNotFoundError extends Schema.TaggedError<TagCategoryNotFoundError>()(
+  "TagCategoryNotFoundError",
+  {
+    identifier: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Tag category '${this.identifier}' not found`
+  }
+}
+
 /**
  * Component not found in the specified project.
  */
@@ -520,6 +531,7 @@ export type HulyDomainError =
   | CardNotFoundError
   | MasterTagNotFoundError
   | TagNotFoundError
+  | TagCategoryNotFoundError
   | ComponentNotFoundError
   | IssueTemplateNotFoundError
   | NotificationNotFoundError
@@ -561,6 +573,7 @@ export const HulyDomainError: Schema.Union<
     typeof CardNotFoundError,
     typeof MasterTagNotFoundError,
     typeof TagNotFoundError,
+    typeof TagCategoryNotFoundError,
     typeof ComponentNotFoundError,
     typeof IssueTemplateNotFoundError,
     typeof NotificationNotFoundError,
@@ -598,6 +611,7 @@ export const HulyDomainError: Schema.Union<
   CardNotFoundError,
   MasterTagNotFoundError,
   TagNotFoundError,
+  TagCategoryNotFoundError,
   ComponentNotFoundError,
   IssueTemplateNotFoundError,
   NotificationNotFoundError,

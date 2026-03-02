@@ -154,6 +154,30 @@ export {
 } from "./components.js"
 
 export {
+  type CreateTagCategoryParams,
+  createTagCategoryParamsJsonSchema,
+  CreateTagCategoryParamsSchema,
+  type CreateTagCategoryResult,
+  type DeleteTagCategoryParams,
+  deleteTagCategoryParamsJsonSchema,
+  DeleteTagCategoryParamsSchema,
+  type DeleteTagCategoryResult,
+  type ListTagCategoriesParams,
+  listTagCategoriesParamsJsonSchema,
+  ListTagCategoriesParamsSchema,
+  parseCreateTagCategoryParams,
+  parseDeleteTagCategoryParams,
+  parseListTagCategoriesParams,
+  parseUpdateTagCategoryParams,
+  type TagCategorySummary,
+  TagCategorySummarySchema,
+  type UpdateTagCategoryParams,
+  updateTagCategoryParamsJsonSchema,
+  UpdateTagCategoryParamsSchema,
+  type UpdateTagCategoryResult
+} from "./tag-categories.js"
+
+export {
   type CreateLabelParams,
   createLabelParamsJsonSchema,
   CreateLabelParamsSchema,

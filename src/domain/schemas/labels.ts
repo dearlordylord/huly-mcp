@@ -1,11 +1,12 @@
 import { JSONSchema, Schema } from "effect"
 
-import { ColorCode, LimitParam, NonEmptyString, TagElementId, TagIdentifier } from "./shared.js"
+import { ColorCode, LimitParam, NonEmptyString, TagCategoryIdentifier, TagElementId, TagIdentifier } from "./shared.js"
 
 export const TagElementSummarySchema = Schema.Struct({
   id: TagElementId,
   title: NonEmptyString,
-  color: ColorCode
+  color: ColorCode,
+  category: NonEmptyString
 }).annotations({
   title: "TagElementSummary",
   description: "Label/tag summary for list operations"
@@ -14,6 +15,11 @@ export const TagElementSummarySchema = Schema.Struct({
 export type TagElementSummary = Schema.Schema.Type<typeof TagElementSummarySchema>
 
 export const ListLabelsParamsSchema = Schema.Struct({
+  category: Schema.optional(
+    TagCategoryIdentifier.annotations({
+      description: "Filter by category ID or label name"
+    })
+  ),
   limit: Schema.optional(
     LimitParam.annotations({
       description: "Maximum number of labels to return (default: 50)"
@@ -37,7 +43,12 @@ export const CreateLabelParamsSchema = Schema.Struct({
   ),
   description: Schema.optional(Schema.String.annotations({
     description: "Label description"
-  }))
+  })),
+  category: Schema.optional(
+    TagCategoryIdentifier.annotations({
+      description: "Category ID or label name. Falls back to tracker default category ('Other') if not specified."
+    })
+  )
 }).annotations({
   title: "CreateLabelParams",
   description: "Parameters for creating a label definition"

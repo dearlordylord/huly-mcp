@@ -1,6 +1,6 @@
-import type { Class, Data, Doc, DocumentUpdate, Ref, Space } from "@hcengineering/core"
+import type { Class, Data, Doc, DocumentQuery, DocumentUpdate, Ref, Space } from "@hcengineering/core"
 import { generateId, SortingOrder } from "@hcengineering/core"
-import type { TagElement as HulyTagElement, TagReference } from "@hcengineering/tags"
+import type { TagCategory as HulyTagCategory, TagElement as HulyTagElement, TagReference } from "@hcengineering/tags"
 import { Effect } from "effect"
 
 import type { CreateLabelParams, DeleteLabelParams, ListLabelsParams, UpdateLabelParams } from "../../domain/schemas.js"
@@ -14,12 +14,13 @@ import type {
 import { ColorCode, IssueIdentifier, TagElementId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
-import { TagNotFoundError } from "../errors.js"
+import { TagCategoryNotFoundError, TagNotFoundError } from "../errors.js"
 import { core, tags, tracker } from "../huly-plugins.js"
 import { clampLimit, findProjectAndIssue, toRef } from "./shared.js"
+import { findCategoryByIdOrLabel } from "./tag-categories.js"
 
-type ListLabelsError = HulyClientError
-type CreateLabelError = HulyClientError
+type ListLabelsError = HulyClientError | TagCategoryNotFoundError
+type CreateLabelError = HulyClientError | TagCategoryNotFoundError
 type UpdateLabelError = HulyClientError | TagNotFoundError
 type DeleteLabelError = HulyClientError | TagNotFoundError
 type RemoveIssueLabelError = HulyClientError | ProjectNotFoundError | IssueNotFoundError | TagNotFoundError
@@ -64,6 +65,19 @@ const findTagOrFail = (
     return tag
   })
 
+const resolveCategoryRef = (
+  client: HulyClient["Type"],
+  categoryIdOrLabel: string | undefined
+): Effect.Effect<Ref<HulyTagCategory> | undefined, TagCategoryNotFoundError | HulyClientError> =>
+  Effect.gen(function*() {
+    if (categoryIdOrLabel === undefined) return undefined
+    const cat = yield* findCategoryByIdOrLabel(client, categoryIdOrLabel)
+    if (cat === undefined) {
+      return yield* new TagCategoryNotFoundError({ identifier: categoryIdOrLabel })
+    }
+    return cat._id
+  })
+
 export const listLabels = (
   params: ListLabelsParams
 ): Effect.Effect<Array<TagElementSummary>, ListLabelsError, HulyClient> =>
@@ -72,9 +86,18 @@ export const listLabels = (
 
     const limit = clampLimit(params.limit)
 
+    const query: DocumentQuery<HulyTagElement> = { targetClass: issueClassRef }
+
+    if (params.category !== undefined) {
+      const catRef = yield* resolveCategoryRef(client, params.category)
+      if (catRef !== undefined) {
+        query.category = catRef
+      }
+    }
+
     const elements = yield* client.findAll<HulyTagElement>(
       tags.class.TagElement,
-      { targetClass: issueClassRef },
+      query,
       {
         limit,
         sort: { modifiedOn: SortingOrder.Descending }
@@ -85,7 +108,8 @@ export const listLabels = (
       id: TagElementId.make(e._id),
       title: e.title,
       // Clamp to valid range — Huly API may return out-of-range color values
-      color: ColorCode.make(Math.max(0, Math.min(9, Math.trunc(e.color)))) // eslint-disable-line no-magic-numbers
+      color: ColorCode.make(Math.max(0, Math.min(9, Math.trunc(e.color)))), // eslint-disable-line no-magic-numbers
+      category: e.category
     }))
   })
 
@@ -107,6 +131,8 @@ export const createLabel = (
       return { id: TagElementId.make(existing._id), title: existing.title, created: false }
     }
 
+    const categoryRef = yield* resolveCategoryRef(client, params.category)
+
     const tagId: Ref<HulyTagElement> = generateId()
     const color = params.color ?? 0
 
@@ -115,7 +141,7 @@ export const createLabel = (
       description: params.description ?? "",
       targetClass: issueClassRef,
       color,
-      category: tracker.category.Other
+      category: categoryRef ?? tracker.category.Other
     }
 
     yield* client.createDoc(
