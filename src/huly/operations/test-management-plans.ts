@@ -33,7 +33,13 @@ import { TestPlanItemNotFoundError } from "../errors.js"
 import { testManagement } from "../test-management-classes.js"
 import type { TestPlan, TestPlanItem } from "../test-management-types.js"
 import { clampLimit, toRef } from "./shared.js"
-import { findTestCase, findTestPlan, findTestProject, resolveAssignee } from "./test-management-shared.js"
+import {
+  fetchDescription,
+  findTestCase,
+  findTestPlan,
+  findTestProject,
+  resolveAssignee
+} from "./test-management-shared.js"
 
 type PlanOpError = HulyClientError | TestProjectNotFoundError
 type PlanMutateError = PlanOpError | TestPlanNotFoundError
@@ -41,8 +47,7 @@ type AddItemError = PlanMutateError | TestCaseNotFoundError | PersonNotFoundErro
 
 const toPlanSummary = (p: TestPlan): TestPlanSummary => ({
   id: TestPlanId.make(p._id),
-  name: p.name,
-  ...(p.description !== null ? { description: p.description } : {})
+  name: p.name
 })
 
 const toItemSummary = (item: TestPlanItem): TestPlanItemSummary => ({
@@ -78,10 +83,16 @@ export const getTestPlan = (
       testManagement.class.TestPlanItem,
       { attachedTo: plan._id }
     )
+    const descriptionStr = yield* fetchDescription(
+      client,
+      testManagement.class.TestPlan,
+      plan._id,
+      plan.description
+    )
     return {
       id: TestPlanId.make(plan._id),
       name: plan.name,
-      ...(plan.description !== null ? { description: plan.description } : {}),
+      ...(descriptionStr !== undefined ? { description: descriptionStr } : {}),
       items: items.map(toItemSummary)
     }
   })

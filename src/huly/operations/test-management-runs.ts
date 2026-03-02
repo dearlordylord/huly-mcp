@@ -44,6 +44,7 @@ import type { TestCase, TestPlanItem, TestResult, TestRun } from "../test-manage
 import { TestRunStatus } from "../test-management-types.js"
 import { clampLimit, toRef } from "./shared.js"
 import {
+  fetchDescription,
   findTestCase,
   findTestPlan,
   findTestProject,
@@ -65,7 +66,6 @@ const BATCH_CONCURRENCY = 10
 const toRunSummary = (r: TestRun): TestRunSummary => ({
   id: TestRunId.make(r._id),
   name: r.name,
-  ...(r.description !== null ? { description: r.description } : {}),
   ...(r.dueDate !== undefined ? { dueDate: r.dueDate } : {})
 })
 
@@ -103,10 +103,16 @@ export const getTestRun = (
       testManagement.class.TestResult,
       { attachedTo: run._id }
     )
+    const descriptionStr = yield* fetchDescription(
+      client,
+      testManagement.class.TestRun,
+      run._id,
+      run.description
+    )
     return {
       id: TestRunId.make(run._id),
       name: run.name,
-      ...(run.description !== null ? { description: run.description } : {}),
+      ...(descriptionStr !== undefined ? { description: descriptionStr } : {}),
       ...(run.dueDate !== undefined ? { dueDate: run.dueDate } : {}),
       results: results.map(toResultSummary)
     }
@@ -202,16 +208,12 @@ export const getTestResult = (
     const client = yield* HulyClient
     const project = yield* findTestProject(client, params.project)
     const result = yield* findTestResult(client, project, params.result)
-    let descriptionStr: string | undefined
-    if (result.description !== null) {
-      descriptionStr = yield* client.fetchMarkup(
-        testManagement.class.TestResult,
-        result._id,
-        "description",
-        result.description,
-        "markdown"
-      )
-    }
+    const descriptionStr = yield* fetchDescription(
+      client,
+      testManagement.class.TestResult,
+      result._id,
+      result.description
+    )
     return {
       id: TestResultId.make(result._id),
       name: result.name,

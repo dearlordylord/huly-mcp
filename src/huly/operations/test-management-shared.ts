@@ -1,4 +1,6 @@
+import type { MarkupRef } from "@hcengineering/api-client"
 import type { Person } from "@hcengineering/contact"
+import type { Class, Doc, Ref } from "@hcengineering/core"
 import { Effect } from "effect"
 
 import { HulyClient, type HulyClientError, type HulyClientOperations } from "../client.js"
@@ -100,6 +102,18 @@ const stringToRunStatus: Record<string, TestRunStatus> = Object.fromEntries(
 
 export const testRunStatusToString = (s: TestRunStatus): TestRunStatusStr => runStatusToString[s]
 export const stringToTestRunStatus = (s: string): TestRunStatus | undefined => stringToRunStatus[s.toLowerCase()]
+
+// --- Markup helpers ---
+
+export const fetchDescription = (
+  client: HulyClientOperations,
+  _class: Ref<Class<Doc>>,
+  docId: Ref<Doc>,
+  description: MarkupRef | null
+): Effect.Effect<string | undefined, HulyClientError> =>
+  description !== null
+    ? client.fetchMarkup(_class, docId, "description", description, "markdown")
+    : Effect.succeed(undefined)
 
 // --- Finder helpers ---
 

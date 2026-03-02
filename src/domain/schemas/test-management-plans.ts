@@ -28,7 +28,6 @@ const assigneeField = NonEmptyString.annotations({ description: "Assignee email 
 export interface TestPlanSummary {
   readonly id: TestPlanId
   readonly name: string
-  readonly description?: string
 }
 export interface TestPlanItemSummary {
   readonly id: TestPlanItemId
@@ -39,7 +38,6 @@ export interface TestPlanItemSummary {
 export interface TestRunSummary {
   readonly id: TestRunId
   readonly name: string
-  readonly description?: string
   readonly dueDate?: number
 }
 export interface TestResultSummary {

@@ -60,6 +60,7 @@ import {
 } from "../test-management-types.js"
 import { clampLimit, toRef } from "./shared.js"
 import {
+  fetchDescription,
   findTestCase,
   findTestProject,
   findTestSuite,
@@ -346,16 +347,12 @@ export const getTestCase = (
     const project = yield* findTestProject(client, params.project)
     const tc = yield* findTestCase(client, project, params.testCase)
 
-    let descriptionStr: string | undefined
-    if (tc.description !== null) {
-      descriptionStr = yield* client.fetchMarkup(
-        testManagement.class.TestCase,
-        tc._id,
-        "description",
-        tc.description,
-        "markdown"
-      )
-    }
+    const descriptionStr = yield* fetchDescription(
+      client,
+      testManagement.class.TestCase,
+      tc._id,
+      tc.description
+    )
 
     return {
       ...toCaseSummary(tc),
