@@ -8,8 +8,7 @@ import type {
   DocumentQuery,
   DocumentUpdate,
   MarkupBlobRef,
-  Ref,
-  Space
+  Ref
 } from "@hcengineering/core"
 import { generateId, SortingOrder } from "@hcengineering/core"
 import { Effect } from "effect"
@@ -84,10 +83,6 @@ type GetTestCaseError = HulyClientError | TestProjectNotFoundError | TestCaseNot
 type CreateTestCaseError = HulyClientError | TestProjectNotFoundError | TestSuiteNotFoundError | PersonNotFoundError
 type UpdateTestCaseError = HulyClientError | TestProjectNotFoundError | TestCaseNotFoundError | PersonNotFoundError
 type DeleteTestCaseError = HulyClientError | TestProjectNotFoundError | TestCaseNotFoundError
-
-// TestProject._id is Ref<TestProject>; Huly SDK expects Ref<Space> for space params.
-// TestProject extends Space, but Ref is invariant. toRef bridges the gap.
-const projectSpace = (p: TestProject): Ref<Space> => toRef<Space>(p._id)
 
 const toProjectSummary = (p: TestProject): TestProjectSummary => {
   const result: TestProjectSummary = {
@@ -236,7 +231,7 @@ export const createTestSuite = (
 
     yield* client.createDoc(
       testManagement.class.TestSuite,
-      projectSpace(project),
+      project._id,
       suiteData as Data<TestSuite>,
       suiteId
     )
@@ -273,7 +268,7 @@ export const updateTestSuite = (
 
     yield* client.updateDoc(
       testManagement.class.TestSuite,
-      projectSpace(project),
+      project._id,
       suite._id,
       updateOps
     )
@@ -293,7 +288,7 @@ export const deleteTestSuite = (
 
     yield* client.removeDoc(
       testManagement.class.TestSuite,
-      projectSpace(project),
+      project._id,
       suite._id
     )
 
@@ -413,7 +408,7 @@ export const createTestCase = (
 
     yield* client.addCollection(
       testManagement.class.TestCase,
-      projectSpace(project),
+      project._id,
       toRef<Doc>(suite._id),
       toRef<Class<Doc>>(testManagement.class.TestSuite),
       "testCases",
@@ -485,7 +480,7 @@ export const updateTestCase = (
 
     yield* client.updateDoc(
       testManagement.class.TestCase,
-      projectSpace(project),
+      project._id,
       tc._id,
       ops as DocumentUpdate<TestCase>
     )
@@ -505,7 +500,7 @@ export const deleteTestCase = (
 
     yield* client.removeDoc(
       testManagement.class.TestCase,
-      projectSpace(project),
+      project._id,
       tc._id
     )
 

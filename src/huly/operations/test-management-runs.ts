@@ -309,6 +309,19 @@ export const runTestPlan = (
       testManagement.class.TestPlanItem,
       { attachedTo: plan._id }
     )
+    // Pre-validate all test cases before creating server-side state
+    // to avoid orphaned runs on partial failure.
+    const validated = yield* Effect.forEach(items, (item) =>
+      Effect.gen(function*() {
+        const tc = yield* client.findOne<TestCase>(
+          testManagement.class.TestCase,
+          { _id: item.testCase }
+        )
+        if (tc === undefined) {
+          return yield* new TestCaseNotFoundError({ identifier: item.testCase })
+        }
+        return { item, tc }
+      }), { concurrency: BATCH_CONCURRENCY })
     const runId: Ref<TestRun> = generateId()
     const runName = params.runName ?? `${plan.name} - Run`
     yield* client.createDoc(testManagement.class.TestRun, project._id, {
@@ -316,10 +329,8 @@ export const runTestPlan = (
       description: null,
       ...(params.dueDate !== undefined ? { dueDate: params.dueDate } : {})
     }, runId)
-    const results = yield* Effect.forEach(items, (item) =>
+    const results = yield* Effect.forEach(validated, ({ item, tc }) =>
       Effect.gen(function*() {
-        const tc = yield* client.findOne<TestCase>(testManagement.class.TestCase, { _id: item.testCase })
-        if (tc === undefined) return yield* new TestCaseNotFoundError({ identifier: item.testCase })
         const attrs: Record<string, unknown> = {
           name: tc.name,
           testCase: item.testCase,
