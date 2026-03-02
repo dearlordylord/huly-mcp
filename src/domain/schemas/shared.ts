@@ -104,6 +104,27 @@ export type TagElementId = Schema.Schema.Type<typeof TagElementId>
 export const TagCategoryId = HulyRef("TagCategoryId")
 export type TagCategoryId = Schema.Schema.Type<typeof TagCategoryId>
 
+export const TestProjectId = HulyRef("TestProjectId")
+export type TestProjectId = Schema.Schema.Type<typeof TestProjectId>
+
+export const TestSuiteId = HulyRef("TestSuiteId")
+export type TestSuiteId = Schema.Schema.Type<typeof TestSuiteId>
+
+export const TestCaseId = HulyRef("TestCaseId")
+export type TestCaseId = Schema.Schema.Type<typeof TestCaseId>
+
+export const TestPlanId = HulyRef("TestPlanId")
+export type TestPlanId = Schema.Schema.Type<typeof TestPlanId>
+
+export const TestPlanItemId = HulyRef("TestPlanItemId")
+export type TestPlanItemId = Schema.Schema.Type<typeof TestPlanItemId>
+
+export const TestRunId = HulyRef("TestRunId")
+export type TestRunId = Schema.Schema.Type<typeof TestRunId>
+
+export const TestResultId = HulyRef("TestResultId")
+export type TestResultId = Schema.Schema.Type<typeof TestResultId>
+
 // === Tier 2: Human-Readable Identifiers ===
 
 export const ProjectIdentifier = NonEmptyString.pipe(Schema.brand("ProjectIdentifier"))
@@ -225,3 +246,21 @@ export type TagCategoryIdentifier = Schema.Schema.Type<typeof TagCategoryIdentif
 
 export const MemberReference = Schema.String.pipe(Schema.brand("MemberReference"))
 export type MemberReference = Schema.Schema.Type<typeof MemberReference>
+
+export const TestProjectIdentifier = NonEmptyString.pipe(Schema.brand("TestProjectIdentifier"))
+export type TestProjectIdentifier = Schema.Schema.Type<typeof TestProjectIdentifier>
+
+export const TestSuiteIdentifier = NonEmptyString.pipe(Schema.brand("TestSuiteIdentifier"))
+export type TestSuiteIdentifier = Schema.Schema.Type<typeof TestSuiteIdentifier>
+
+export const TestCaseIdentifier = NonEmptyString.pipe(Schema.brand("TestCaseIdentifier"))
+export type TestCaseIdentifier = Schema.Schema.Type<typeof TestCaseIdentifier>
+
+export const TestPlanIdentifier = NonEmptyString.pipe(Schema.brand("TestPlanIdentifier"))
+export type TestPlanIdentifier = Schema.Schema.Type<typeof TestPlanIdentifier>
+
+export const TestRunIdentifier = NonEmptyString.pipe(Schema.brand("TestRunIdentifier"))
+export type TestRunIdentifier = Schema.Schema.Type<typeof TestRunIdentifier>
+
+export const TestResultIdentifier = NonEmptyString.pipe(Schema.brand("TestResultIdentifier"))
+export type TestResultIdentifier = Schema.Schema.Type<typeof TestResultIdentifier>

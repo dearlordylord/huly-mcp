@@ -60,6 +60,19 @@ import type {
   TeamspaceId,
   TeamspaceIdentifier,
   TemplateIdentifier,
+  TestCaseId,
+  TestCaseIdentifier,
+  TestPlanId,
+  TestPlanIdentifier,
+  TestPlanItemId,
+  TestProjectId,
+  TestProjectIdentifier,
+  TestResultId,
+  TestResultIdentifier,
+  TestRunId,
+  TestRunIdentifier,
+  TestSuiteId,
+  TestSuiteIdentifier,
   ThreadReplyId,
   TimeSpendReportId,
   TodoId,
@@ -136,6 +149,21 @@ export const tagIdentifier = (s: string) => s as TagIdentifier
 export const tagCategoryIdentifier = (s: string) => s as TagCategoryIdentifier
 export const memberReference = (s: string) => s as MemberReference
 
+export const testProjectId = (s: string) => s as TestProjectId
+export const testSuiteId = (s: string) => s as TestSuiteId
+export const testCaseId = (s: string) => s as TestCaseId
+export const testPlanId = (s: string) => s as TestPlanId
+export const testPlanItemId = (s: string) => s as TestPlanItemId
+export const testRunId = (s: string) => s as TestRunId
+export const testResultId = (s: string) => s as TestResultId
+
+export const testProjectIdentifier = (s: string) => s as TestProjectIdentifier
+export const testSuiteIdentifier = (s: string) => s as TestSuiteIdentifier
+export const testCaseIdentifier = (s: string) => s as TestCaseIdentifier
+export const testPlanIdentifier = (s: string) => s as TestPlanIdentifier
+export const testRunIdentifier = (s: string) => s as TestRunIdentifier
+export const testResultIdentifier = (s: string) => s as TestResultIdentifier
+
 // Re-export branded types for convenience
 export type {
   AccountId,
@@ -188,6 +216,19 @@ export type {
   TeamspaceId,
   TeamspaceIdentifier,
   TemplateIdentifier,
+  TestCaseId,
+  TestCaseIdentifier,
+  TestPlanId,
+  TestPlanIdentifier,
+  TestPlanItemId,
+  TestProjectId,
+  TestProjectIdentifier,
+  TestResultId,
+  TestResultIdentifier,
+  TestRunId,
+  TestRunIdentifier,
+  TestSuiteId,
+  TestSuiteIdentifier,
   ThreadReplyId,
   TimeSpendReportId,
   TodoId,

@@ -396,6 +396,72 @@ export class TagCategoryNotFoundError extends Schema.TaggedError<TagCategoryNotF
 /**
  * Component not found in the specified project.
  */
+export class TestProjectNotFoundError extends Schema.TaggedError<TestProjectNotFoundError>()(
+  "TestProjectNotFoundError",
+  {
+    identifier: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Test project '${this.identifier}' not found`
+  }
+}
+
+export class TestSuiteNotFoundError extends Schema.TaggedError<TestSuiteNotFoundError>()(
+  "TestSuiteNotFoundError",
+  {
+    identifier: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Test suite '${this.identifier}' not found`
+  }
+}
+
+export class TestCaseNotFoundError extends Schema.TaggedError<TestCaseNotFoundError>()(
+  "TestCaseNotFoundError",
+  {
+    identifier: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Test case '${this.identifier}' not found`
+  }
+}
+
+export class TestPlanNotFoundError extends Schema.TaggedError<TestPlanNotFoundError>()(
+  "TestPlanNotFoundError",
+  {
+    identifier: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Test plan '${this.identifier}' not found`
+  }
+}
+
+export class TestRunNotFoundError extends Schema.TaggedError<TestRunNotFoundError>()(
+  "TestRunNotFoundError",
+  {
+    identifier: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Test run '${this.identifier}' not found`
+  }
+}
+
+export class TestResultNotFoundError extends Schema.TaggedError<TestResultNotFoundError>()(
+  "TestResultNotFoundError",
+  {
+    identifier: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Test result '${this.identifier}' not found`
+  }
+}
+
 export class ComponentNotFoundError extends Schema.TaggedError<ComponentNotFoundError>()(
   "ComponentNotFoundError",
   {
@@ -532,6 +598,12 @@ export type HulyDomainError =
   | MasterTagNotFoundError
   | TagNotFoundError
   | TagCategoryNotFoundError
+  | TestProjectNotFoundError
+  | TestSuiteNotFoundError
+  | TestCaseNotFoundError
+  | TestPlanNotFoundError
+  | TestRunNotFoundError
+  | TestResultNotFoundError
   | ComponentNotFoundError
   | IssueTemplateNotFoundError
   | NotificationNotFoundError
@@ -574,6 +646,12 @@ export const HulyDomainError: Schema.Union<
     typeof MasterTagNotFoundError,
     typeof TagNotFoundError,
     typeof TagCategoryNotFoundError,
+    typeof TestProjectNotFoundError,
+    typeof TestSuiteNotFoundError,
+    typeof TestCaseNotFoundError,
+    typeof TestPlanNotFoundError,
+    typeof TestRunNotFoundError,
+    typeof TestResultNotFoundError,
     typeof ComponentNotFoundError,
     typeof IssueTemplateNotFoundError,
     typeof NotificationNotFoundError,
@@ -612,6 +690,12 @@ export const HulyDomainError: Schema.Union<
   MasterTagNotFoundError,
   TagNotFoundError,
   TagCategoryNotFoundError,
+  TestProjectNotFoundError,
+  TestSuiteNotFoundError,
+  TestCaseNotFoundError,
+  TestPlanNotFoundError,
+  TestRunNotFoundError,
+  TestResultNotFoundError,
   ComponentNotFoundError,
   IssueTemplateNotFoundError,
   NotificationNotFoundError,

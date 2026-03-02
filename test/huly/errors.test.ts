@@ -674,6 +674,18 @@ describe("Huly Errors", () => {
               return `tag:${error.identifier}`
             case "TagCategoryNotFoundError":
               return `tagcat:${error.identifier}`
+            case "TestProjectNotFoundError":
+              return `testproject:${error.identifier}`
+            case "TestSuiteNotFoundError":
+              return `testsuite:${error.identifier}`
+            case "TestCaseNotFoundError":
+              return `testcase:${error.identifier}`
+            case "TestPlanNotFoundError":
+              return `testplan:${error.identifier}`
+            case "TestRunNotFoundError":
+              return `testrun:${error.identifier}`
+            case "TestResultNotFoundError":
+              return `testresult:${error.identifier}`
             case "ComponentNotFoundError":
               return `component:${error.identifier}`
             case "IssueTemplateNotFoundError":
