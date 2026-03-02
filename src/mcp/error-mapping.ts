@@ -90,6 +90,7 @@ const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDo
   "TestPlanNotFoundError",
   "TestRunNotFoundError",
   "TestResultNotFoundError",
+  "TestPlanItemNotFoundError",
   "ComponentNotFoundError",
   "IssueTemplateNotFoundError",
   "NotificationNotFoundError",

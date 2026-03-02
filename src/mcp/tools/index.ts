@@ -22,6 +22,7 @@ import { searchTools } from "./search.js"
 import { storageTools } from "./storage.js"
 import { tagCategoryTools } from "./tag-categories.js"
 import { testManagementCoreTools } from "./test-management-core.js"
+import { testManagementPlansTools } from "./test-management-plans.js"
 import { timeTools } from "./time.js"
 import { workspaceTools } from "./workspace.js"
 
@@ -45,7 +46,8 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...activityTools,
   ...notificationTools,
   ...workspaceTools,
-  ...testManagementCoreTools
+  ...testManagementCoreTools,
+  ...testManagementPlansTools
 ]
 
 export const CATEGORY_NAMES: ReadonlySet<string> = new Set(

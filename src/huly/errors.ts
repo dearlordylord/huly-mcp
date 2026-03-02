@@ -462,6 +462,18 @@ export class TestResultNotFoundError extends Schema.TaggedError<TestResultNotFou
   }
 }
 
+export class TestPlanItemNotFoundError extends Schema.TaggedError<TestPlanItemNotFoundError>()(
+  "TestPlanItemNotFoundError",
+  {
+    identifier: Schema.String,
+    plan: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Test plan item '${this.identifier}' not found in plan '${this.plan}'`
+  }
+}
+
 export class ComponentNotFoundError extends Schema.TaggedError<ComponentNotFoundError>()(
   "ComponentNotFoundError",
   {
@@ -604,6 +616,7 @@ export type HulyDomainError =
   | TestPlanNotFoundError
   | TestRunNotFoundError
   | TestResultNotFoundError
+  | TestPlanItemNotFoundError
   | ComponentNotFoundError
   | IssueTemplateNotFoundError
   | NotificationNotFoundError
@@ -652,6 +665,7 @@ export const HulyDomainError: Schema.Union<
     typeof TestPlanNotFoundError,
     typeof TestRunNotFoundError,
     typeof TestResultNotFoundError,
+    typeof TestPlanItemNotFoundError,
     typeof ComponentNotFoundError,
     typeof IssueTemplateNotFoundError,
     typeof NotificationNotFoundError,
@@ -696,6 +710,7 @@ export const HulyDomainError: Schema.Union<
   TestPlanNotFoundError,
   TestRunNotFoundError,
   TestResultNotFoundError,
+  TestPlanItemNotFoundError,
   ComponentNotFoundError,
   IssueTemplateNotFoundError,
   NotificationNotFoundError,

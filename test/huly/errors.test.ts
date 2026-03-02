@@ -40,6 +40,7 @@ import {
   TagCategoryNotFoundError,
   TagNotFoundError,
   TeamspaceNotFoundError,
+  TestPlanItemNotFoundError,
   ThreadReplyNotFoundError
 } from "../../src/huly/errors.js"
 
@@ -686,6 +687,8 @@ describe("Huly Errors", () => {
               return `testrun:${error.identifier}`
             case "TestResultNotFoundError":
               return `testresult:${error.identifier}`
+            case "TestPlanItemNotFoundError":
+              return `testplanitem:${error.identifier}`
             case "ComponentNotFoundError":
               return `component:${error.identifier}`
             case "IssueTemplateNotFoundError":
@@ -738,6 +741,9 @@ describe("Huly Errors", () => {
         ).toBe("mastertag:mt-1")
         expect(matchError(new TagNotFoundError({ identifier: "lbl-1" }))).toBe("tag:lbl-1")
         expect(matchError(new TagCategoryNotFoundError({ identifier: "cat-1" }))).toBe("tagcat:cat-1")
+        expect(
+          matchError(new TestPlanItemNotFoundError({ identifier: "item-1", plan: "plan-1" }))
+        ).toBe("testplanitem:item-1")
         expect(matchError(new ComponentNotFoundError({ identifier: "cmp-1", project: "P" }))).toBe("component:cmp-1")
         expect(matchError(new IssueTemplateNotFoundError({ identifier: "tpl-1", project: "P" }))).toBe("template:tpl-1")
         expect(matchError(new NotificationNotFoundError({ notificationId: "n-1" }))).toBe("notification:n-1")
