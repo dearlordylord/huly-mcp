@@ -361,13 +361,13 @@ describe("Error Mapping to MCP", () => {
       }))
 
     // test-revizorro: approved
-    it.effect("formats JSON with indentation", () =>
+    it.effect("formats JSON as compact single-line", () =>
       Effect.gen(function*() {
         const result = { a: 1, b: 2 }
         const response = createSuccessResponse(result)
 
-        expect(response.content[0].text).toContain("\n")
-        expect(response.content[0].text).toBe(JSON.stringify(result, null, 2))
+        expect(response.content[0].text).not.toContain("\n")
+        expect(response.content[0].text).toBe(JSON.stringify(result))
       }))
   })
 
