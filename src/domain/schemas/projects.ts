@@ -2,13 +2,17 @@ import { JSONSchema, Schema } from "effect"
 
 import { LimitParam, NonEmptyString, ProjectIdentifier, StatusName } from "./shared.js"
 
-// No codec needed — internal type, not used for runtime validation
-export interface ProjectSummary {
-  readonly identifier: ProjectIdentifier
-  readonly name: string
-  readonly description?: string | undefined
-  readonly archived: boolean
-}
+export const ProjectSummarySchema = Schema.Struct({
+  identifier: ProjectIdentifier,
+  name: NonEmptyString,
+  description: Schema.optional(Schema.String),
+  archived: Schema.Boolean
+}).annotations({
+  title: "ProjectSummary",
+  description: "Project summary for list operations"
+})
+
+export type ProjectSummary = Schema.Schema.Type<typeof ProjectSummarySchema>
 
 export const ListProjectsParamsSchema = Schema.Struct({
   includeArchived: Schema.optional(Schema.Boolean.annotations({

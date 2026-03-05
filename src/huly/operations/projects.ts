@@ -10,7 +10,7 @@ import type { Data, DocumentQuery, DocumentUpdate, Ref, Space } from "@hcenginee
 import { generateId, SortingOrder } from "@hcengineering/core"
 import type { IssueStatus, Project as HulyProject } from "@hcengineering/tracker"
 import { TimeReportDayType } from "@hcengineering/tracker"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 
 import type {
   CreateProjectParams,
@@ -21,18 +21,19 @@ import type {
   ListProjectsParams,
   ListProjectsResult,
   Project,
-  ProjectSummary,
   UpdateProjectParams,
   UpdateProjectResult
 } from "../../domain/schemas.js"
-import { ProjectIdentifier, StatusName } from "../../domain/schemas/shared.js"
+import { parseProject, ProjectSummarySchema } from "../../domain/schemas/projects.js"
+import { ProjectIdentifier } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { ProjectNotFoundError } from "../errors.js"
+import { HulyConnectionError } from "../errors.js"
 import { tracker } from "../huly-plugins.js"
 import { clampLimit, findProject, findProjectWithStatuses, toRef } from "./shared.js"
 
-type ListProjectsError = HulyClientError
-type GetProjectError = ProjectNotFoundError | HulyClientError
+type ListProjectsError = HulyClientError | HulyConnectionError
+type GetProjectError = ProjectNotFoundError | HulyClientError | HulyConnectionError
 type CreateProjectError = HulyClientError
 type UpdateProjectError = ProjectNotFoundError | HulyClientError
 type DeleteProjectError = ProjectNotFoundError | HulyClientError
@@ -63,15 +64,26 @@ export const listProjects = (
 
     const total = projects.total
 
-    const summaries: Array<ProjectSummary> = projects.map((project) => ({
-      identifier: ProjectIdentifier.make(project.identifier),
-      name: project.name,
-      description: project.description || undefined,
-      archived: project.archived
-    }))
+    const validated = yield* Schema.decodeUnknown(
+      Schema.Array(ProjectSummarySchema)
+    )(
+      projects.map((project) => ({
+        identifier: project.identifier,
+        name: project.name,
+        description: project.description || undefined,
+        archived: project.archived
+      }))
+    ).pipe(
+      Effect.mapError((parseError) =>
+        new HulyConnectionError({
+          message: `listProjects response failed schema validation: ${parseError.message}`,
+          cause: parseError
+        })
+      )
+    )
 
     return {
-      projects: summaries,
+      projects: validated,
       total
     }
   })
@@ -84,16 +96,21 @@ export const getProject = (
 
     const defaultStatus = statuses.find(s => s._id === project.defaultIssueStatus)
 
-    const result: Project = {
-      identifier: ProjectIdentifier.make(project.identifier),
+    return yield* parseProject({
+      identifier: project.identifier,
       name: project.name,
       description: project.description || undefined,
       archived: project.archived,
-      defaultStatus: defaultStatus ? StatusName.make(defaultStatus.name) : undefined,
-      statuses: statuses.map(s => StatusName.make(s.name))
-    }
-
-    return result
+      defaultStatus: defaultStatus?.name,
+      statuses: statuses.map(s => s.name)
+    }).pipe(
+      Effect.mapError((parseError) =>
+        new HulyConnectionError({
+          message: `getProject response failed schema validation: ${parseError.message}`,
+          cause: parseError
+        })
+      )
+    )
   })
 
 export const createProject = (

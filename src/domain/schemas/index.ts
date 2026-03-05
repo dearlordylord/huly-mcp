@@ -40,6 +40,7 @@ export {
   type Project,
   ProjectSchema,
   type ProjectSummary,
+  ProjectSummarySchema,
   type UpdateProjectParams,
   updateProjectParamsJsonSchema,
   UpdateProjectParamsSchema,

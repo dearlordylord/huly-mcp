@@ -1,6 +1,6 @@
 import type { ChatMessage } from "@hcengineering/chunter"
 import { type AttachedData, type DocumentUpdate, generateId, type Ref, SortingOrder } from "@hcengineering/core"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 
 import type {
   AddCommentParams,
@@ -9,17 +9,19 @@ import type {
   ListCommentsParams,
   UpdateCommentParams
 } from "../../domain/schemas.js"
+import { CommentSchema } from "../../domain/schemas/comments.js"
 import type { AddCommentResult, DeleteCommentResult, UpdateCommentResult } from "../../domain/schemas/comments.js"
 import { CommentId, IssueIdentifier } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
-import { CommentNotFoundError } from "../errors.js"
+import { CommentNotFoundError, HulyConnectionError } from "../errors.js"
 import { clampLimit, findProjectAndIssue as findProjectAndIssueShared, toRef } from "./shared.js"
 
 import { chunter, tracker } from "../huly-plugins.js"
 
 type ListCommentsError =
   | HulyClientError
+  | HulyConnectionError
   | ProjectNotFoundError
   | IssueNotFoundError
 
@@ -103,16 +105,26 @@ export const listComments = (
       }
     )
 
-    const comments: Array<Comment> = messages.map((msg) => ({
-      id: CommentId.make(msg._id),
-      body: msg.message,
-      authorId: msg.modifiedBy,
-      createdOn: msg.createdOn,
-      modifiedOn: msg.modifiedOn,
-      editedOn: msg.editedOn
-    }))
+    // Spread: Schema.decodeUnknown returns readonly array; return type requires mutable
+    const validated = yield* Schema.decodeUnknown(Schema.Array(CommentSchema))(
+      messages.map((msg) => ({
+        id: msg._id,
+        body: msg.message,
+        authorId: msg.modifiedBy,
+        createdOn: msg.createdOn,
+        modifiedOn: msg.modifiedOn,
+        editedOn: msg.editedOn
+      }))
+    ).pipe(
+      Effect.mapError((parseError) =>
+        new HulyConnectionError({
+          message: `listComments response failed schema validation: ${parseError.message}`,
+          cause: parseError
+        })
+      )
+    )
 
-    return comments
+    return [...validated]
   })
 
 /**

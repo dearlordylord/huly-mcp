@@ -6,14 +6,14 @@
 import type { Person } from "@hcengineering/contact"
 import { type DocumentQuery, type Ref, SortingOrder, type Status, type WithLookup } from "@hcengineering/core"
 import { type Issue as HulyIssue } from "@hcengineering/tracker"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 
 import type { GetIssueParams, Issue, IssueSummary, ListIssuesParams } from "../../domain/schemas.js"
-import { IssueIdentifier, NonNegativeNumber, PersonId, PersonName, StatusName } from "../../domain/schemas/shared.js"
+import { IssueSummarySchema, parseIssue } from "../../domain/schemas/issues.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { ComponentNotFoundError, InvalidStatusError, ProjectNotFoundError } from "../errors.js"
-import { IssueNotFoundError } from "../errors.js"
+import { HulyConnectionError, IssueNotFoundError } from "../errors.js"
 import { contact, tracker } from "../huly-plugins.js"
 import { findComponentByIdOrLabel } from "./components.js"
 import { escapeLikeWildcards, withLookup } from "./query-helpers.js"
@@ -25,12 +25,12 @@ import {
   parseIssueIdentifier,
   priorityToString,
   resolveStatusByName,
-  type StatusInfo,
-  zeroAsUnset
+  type StatusInfo
 } from "./shared.js"
 
 type ListIssuesError =
   | HulyClientError
+  | HulyConnectionError
   | ProjectNotFoundError
   | IssueNotFoundError
   | InvalidStatusError
@@ -38,6 +38,7 @@ type ListIssuesError =
 
 type GetIssueError =
   | HulyClientError
+  | HulyConnectionError
   | ProjectNotFoundError
   | IssueNotFoundError
 
@@ -151,27 +152,36 @@ export const listIssues = (
       )
     )
 
-    const summaries: Array<IssueSummary> = []
-    for (const issue of issues) {
+    const rawSummaries = issues.map((issue) => {
       const statusName = resolveStatusName(statuses, issue.status)
       const assigneeName = issue.$lookup?.assignee?.name
       const directParent = issue.parents.length > 0
         ? issue.parents[issue.parents.length - 1]
         : undefined
 
-      summaries.push({
-        identifier: IssueIdentifier.make(issue.identifier),
+      return {
+        identifier: issue.identifier,
         title: issue.title,
-        status: StatusName.make(statusName),
+        status: statusName,
         priority: priorityToString(issue.priority),
-        assignee: assigneeName !== undefined ? PersonName.make(assigneeName) : undefined,
-        parentIssue: directParent !== undefined ? IssueIdentifier.make(directParent.identifier) : undefined,
+        assignee: assigneeName,
+        parentIssue: directParent?.identifier,
         subIssues: issue.subIssues > 0 ? issue.subIssues : undefined,
         modifiedOn: issue.modifiedOn
-      })
-    }
+      }
+    })
 
-    return summaries
+    // Spread: Schema.decodeUnknown returns readonly array; return type requires mutable
+    const validated = yield* Schema.decodeUnknown(Schema.Array(IssueSummarySchema))(rawSummaries).pipe(
+      Effect.mapError((parseError) =>
+        new HulyConnectionError({
+          message: `listIssues response failed schema validation: ${parseError.message}`,
+          cause: parseError
+        })
+      )
+    )
+
+    return [...validated]
   })
 
 /**
@@ -210,10 +220,6 @@ export const getIssue = (
     const person = issue.assignee !== null
       ? yield* client.findOne<Person>(contact.class.Person, { _id: issue.assignee })
       : undefined
-    const assigneeName = person?.name
-    const assigneeRef: Issue["assigneeRef"] = person
-      ? { id: PersonId.make(person._id), name: PersonName.make(person.name) }
-      : undefined
 
     const description = issue.description
       ? yield* client.fetchMarkup(
@@ -229,22 +235,29 @@ export const getIssue = (
       ? issue.parents[issue.parents.length - 1]
       : undefined
 
-    const result: Issue = {
-      identifier: IssueIdentifier.make(issue.identifier),
+    return yield* parseIssue({
+      identifier: issue.identifier,
       title: issue.title,
       description,
-      status: StatusName.make(statusName),
+      status: statusName,
       priority: priorityToString(issue.priority),
-      assignee: assigneeName !== undefined ? PersonName.make(assigneeName) : undefined,
-      assigneeRef,
+      assignee: person?.name,
+      assigneeRef: person
+        ? { id: person._id, name: person.name }
+        : undefined,
       project: params.project,
-      parentIssue: directParent !== undefined ? IssueIdentifier.make(directParent.identifier) : undefined,
+      parentIssue: directParent?.identifier,
       subIssues: issue.subIssues > 0 ? issue.subIssues : undefined,
       modifiedOn: issue.modifiedOn,
       createdOn: issue.createdOn,
       dueDate: issue.dueDate ?? undefined,
-      estimation: zeroAsUnset(NonNegativeNumber.make(issue.estimation))
-    }
-
-    return result
+      estimation: issue.estimation > 0 ? issue.estimation : undefined
+    }).pipe(
+      Effect.mapError((parseError) =>
+        new HulyConnectionError({
+          message: `getIssue response failed schema validation: ${parseError.message}`,
+          cause: parseError
+        })
+      )
+    )
   })
