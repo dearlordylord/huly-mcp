@@ -16,18 +16,64 @@ import {
   TimeReportDayType
 } from "@hcengineering/tracker"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js"
-import { Effect, Fiber, Layer } from "effect"
+import { Context, Effect, Fiber, Layer } from "effect"
 import { expect, vi } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
 import { HttpServerFactoryService, HttpTransportError } from "../../src/mcp/http-transport.js"
-import { McpServerError, McpServerService } from "../../src/mcp/server.js"
+import { type ClientBundle, McpServerError, McpServerService } from "../../src/mcp/server.js"
 import { TOOL_DEFINITIONS } from "../../src/mcp/tools/index.js"
 import type { SessionStartProps, TelemetryOperations, ToolCalledProps } from "../../src/telemetry/telemetry.js"
 import { TelemetryService } from "../../src/telemetry/telemetry.js"
 
 import { tracker } from "../../src/huly/huly-plugins.js"
+
+/**
+ * Build a resolveClients callback from a layer that provides all three client services.
+ * The result is memoized — builds the layer once, caches the bundle.
+ */
+const resolveClientsFromLayer = (
+  clientLayer: Layer.Layer<HulyClient | HulyStorageClient | WorkspaceClient>
+): () => Promise<ClientBundle> => {
+  let promise: Promise<ClientBundle> | null = null
+  return () => {
+    if (promise === null) {
+      promise = Effect.runPromise(
+        Effect.gen(function*() {
+          const ctx = yield* Layer.build(clientLayer).pipe(Effect.scoped)
+          return {
+            hulyClient: Context.get(ctx, HulyClient),
+            storageClient: Context.get(ctx, HulyStorageClient),
+            workspaceClient: Context.get(ctx, WorkspaceClient)
+          }
+        })
+      )
+    }
+    return promise
+  }
+}
+
+/**
+ * Test helper: wraps McpServerService.layer, splitting client+telemetry layers
+ * so that client services are provided via resolveClients and telemetry via Layer.provide.
+ *
+ * Accepts a combined layer (clients + telemetry) for backward compat with existing tests.
+ */
+const buildTestServerLayer = (
+  config: {
+    transport: "stdio" | "http"
+    httpPort?: number
+    httpHost?: string
+    autoExit?: boolean
+    authMethod?: "token" | "password"
+  },
+  layers: Layer.Layer<HulyClient | HulyStorageClient | WorkspaceClient | TelemetryService>
+) =>
+  McpServerService.layer({
+    ...config,
+    resolveClients: resolveClientsFromLayer(layers)
+  }).pipe(Layer.provide(layers))
 
 // Captured request handlers from mocked MCP Server instances
 type HandlerMap = Map<unknown, (...args: Array<unknown>) => unknown>
@@ -380,10 +426,12 @@ describe("McpServerService", () => {
         const storageClientLayer = HulyStorageClient.testLayer({})
         const workspaceClientLayer = WorkspaceClient.testLayer({})
 
-        const serverLayer = McpServerService.layer({ transport: "stdio" }).pipe(
-          Layer.provide(hulyClientLayer),
-          Layer.provide(storageClientLayer),
-          Layer.provide(workspaceClientLayer),
+        const serverLayer = McpServerService.layer({
+          transport: "stdio",
+          resolveClients: resolveClientsFromLayer(
+            Layer.mergeAll(hulyClientLayer, storageClientLayer, workspaceClientLayer)
+          )
+        }).pipe(
           Layer.provide(TelemetryService.testLayer())
         )
 
@@ -405,11 +453,11 @@ describe("McpServerService", () => {
 
         const serverLayer = McpServerService.layer({
           transport: "http",
-          httpPort: 3000
+          httpPort: 3000,
+          resolveClients: resolveClientsFromLayer(
+            Layer.mergeAll(hulyClientLayer, storageClientLayer, workspaceClientLayer)
+          )
         }).pipe(
-          Layer.provide(hulyClientLayer),
-          Layer.provide(storageClientLayer),
-          Layer.provide(workspaceClientLayer),
           Layer.provide(TelemetryService.testLayer())
         )
 
@@ -598,11 +646,10 @@ const buildStdioService = (
     WorkspaceClient.testLayer({}),
     telemetryLayer
   )
-  const serverLayer = McpServerService.layer({
+  return buildTestServerLayer({
     transport: "stdio",
     autoExit: config?.autoExit ?? true
-  }).pipe(Layer.provide(layers))
-  return serverLayer
+  }, layers)
 }
 
 describe("McpServerService.layer operations", () => {
@@ -875,11 +922,11 @@ describe("McpServerService.layer operations", () => {
           WorkspaceClient.testLayer({}),
           TelemetryService.testLayer()
         )
-        const serverLayer = McpServerService.layer({
+        const serverLayer = buildTestServerLayer({
           transport: "http",
           httpPort: 0,
           httpHost: "127.0.0.1"
-        }).pipe(Layer.provide(layers))
+        }, layers)
 
         const ctx = yield* Layer.build(serverLayer)
         const ops = yield* McpServerService.pipe(
@@ -921,9 +968,9 @@ describe("McpServerService.layer operations", () => {
           WorkspaceClient.testLayer({}),
           TelemetryService.testLayer()
         )
-        const serverLayer = McpServerService.layer({
+        const serverLayer = buildTestServerLayer({
           transport: "http"
-        }).pipe(Layer.provide(layers))
+        }, layers)
 
         const ctx = yield* Layer.build(serverLayer)
         const ops = yield* McpServerService.pipe(
@@ -964,11 +1011,11 @@ describe("McpServerService.layer operations", () => {
           WorkspaceClient.testLayer({}),
           TelemetryService.testLayer()
         )
-        const serverLayer = McpServerService.layer({
+        const serverLayer = buildTestServerLayer({
           transport: "http",
           httpPort: 19877,
           httpHost: "127.0.0.1"
-        }).pipe(Layer.provide(layers))
+        }, layers)
 
         const ctx = yield* Layer.build(serverLayer)
         const ops = yield* McpServerService.pipe(
@@ -1040,11 +1087,11 @@ describe("McpServerService.layer operations", () => {
           WorkspaceClient.testLayer({}),
           TelemetryService.testLayer(telemetryOps)
         )
-        const serverLayer = McpServerService.layer({
+        const serverLayer = buildTestServerLayer({
           transport: "http",
           httpPort: 19876,
           httpHost: "127.0.0.1"
-        }).pipe(Layer.provide(layers))
+        }, layers)
 
         const ctx = yield* Layer.build(serverLayer)
         const ops = yield* McpServerService.pipe(
@@ -1132,11 +1179,11 @@ describe("McpServerService.layer operations", () => {
           WorkspaceClient.testLayer({}),
           TelemetryService.testLayer()
         )
-        const serverLayer = McpServerService.layer({
+        const serverLayer = buildTestServerLayer({
           transport: "http",
           httpPort: 19878,
           httpHost: "127.0.0.1"
-        }).pipe(Layer.provide(layers))
+        }, layers)
 
         const ctx = yield* Layer.build(serverLayer)
         const ops = yield* McpServerService.pipe(
@@ -1222,9 +1269,9 @@ describe("McpServerService.layer operations", () => {
           WorkspaceClient.testLayer({}),
           telemetryLayer
         )
-        const serverLayer = McpServerService.layer({
+        const serverLayer = buildTestServerLayer({
           transport: "stdio"
-        }).pipe(Layer.provide(layers))
+        }, layers)
         yield* Layer.build(serverLayer)
         expect(capturedProps).not.toBeNull()
         expect(capturedProps!.authMethod).toBe("password")
@@ -1246,9 +1293,9 @@ describe("McpServerService.layer operations", () => {
           WorkspaceClient.testLayer({}),
           telemetryLayer
         )
-        const serverLayer = McpServerService.layer({
+        const serverLayer = buildTestServerLayer({
           transport: "stdio"
-        }).pipe(Layer.provide(layers))
+        }, layers)
         yield* Layer.build(serverLayer)
         expect(capturedProps).not.toBeNull()
         expect(capturedProps!.toolsets).toEqual(expect.arrayContaining(["issues", "documents"]))
@@ -1271,9 +1318,9 @@ describe("McpServerService.layer operations", () => {
           WorkspaceClient.testLayer({}),
           telemetryLayer
         )
-        const serverLayer = McpServerService.layer({
+        const serverLayer = buildTestServerLayer({
           transport: "stdio"
-        }).pipe(Layer.provide(layers))
+        }, layers)
         yield* Layer.build(serverLayer)
         expect(capturedProps).not.toBeNull()
         expect(capturedProps!.toolsets).toBeNull()
@@ -1288,10 +1335,10 @@ describe("McpServerService.layer operations", () => {
           WorkspaceClient.testLayer({}),
           TelemetryService.testLayer()
         )
-        const serverLayer = McpServerService.layer({
+        const serverLayer = buildTestServerLayer({
           transport: "http",
           httpPort: 9999
-        }).pipe(Layer.provide(layers))
+        }, layers)
         const ctx = yield* Layer.build(serverLayer)
         const ops = yield* McpServerService.pipe(
           Effect.provide(Layer.succeedContext(ctx))
@@ -1306,10 +1353,10 @@ describe("McpServerService.layer operations", () => {
       layers: Layer.Layer<HulyClient | HulyStorageClient | WorkspaceClient | TelemetryService>
     ) =>
       Effect.gen(function*() {
-        const serverLayer = McpServerService.layer({
+        const serverLayer = buildTestServerLayer({
           transport: "stdio",
           autoExit: true
-        }).pipe(Layer.provide(layers))
+        }, layers)
         const ctx = yield* Layer.build(serverLayer)
         const ops = yield* McpServerService.pipe(
           Effect.provide(Layer.succeedContext(ctx))

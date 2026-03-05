@@ -11,13 +11,14 @@ import { Config, Context, Effect, Layer, Ref, Schema } from "effect"
 import type { HttpServerFactoryService, HttpTransportError } from "./http-transport.js"
 import { DEFAULT_HTTP_PORT, startHttpTransport } from "./http-transport.js"
 
-import { HulyClient } from "../huly/client.js"
-import { HulyStorageClient } from "../huly/storage.js"
-import { WorkspaceClient, type WorkspaceClientOperations } from "../huly/workspace-client.js"
+import type { HulyClient } from "../huly/client.js"
+import { HulyError } from "../huly/errors-base.js"
+import type { HulyStorageClient } from "../huly/storage.js"
+import type { WorkspaceClientOperations } from "../huly/workspace-client.js"
 import type { TelemetryOperations } from "../telemetry/telemetry.js"
 import { TelemetryService } from "../telemetry/telemetry.js"
 import { VERSION } from "../version.js"
-import { createUnknownToolError, McpErrorCode, toMcpResponse } from "./error-mapping.js"
+import { createUnknownToolError, mapDomainErrorToMcp, McpErrorCode, toMcpResponse } from "./error-mapping.js"
 import type { ToolRegistry } from "./tools/index.js"
 import { CATEGORY_NAMES, createFilteredRegistry, resolveAnnotations, toolRegistry } from "./tools/index.js"
 
@@ -32,13 +33,28 @@ const isObjectSchema = (schema: object): schema is McpInputSchema => "type" in s
 
 export type McpTransportType = "stdio" | "http"
 
-interface McpServerConfig {
+/**
+ * Bundle of lazily-resolved Huly client services needed by tool handlers.
+ */
+export interface ClientBundle {
+  readonly hulyClient: HulyClient["Type"]
+  readonly storageClient: HulyStorageClient["Type"]
+  readonly workspaceClient?: WorkspaceClientOperations
+}
+
+interface McpServerConfigData {
   readonly transport: McpTransportType
   readonly httpPort?: number
   readonly httpHost?: string
   readonly autoExit?: boolean
   readonly authMethod?: "token" | "password"
 }
+
+interface McpServerConfigCallbacks {
+  readonly resolveClients: () => Promise<ClientBundle>
+}
+
+type McpServerConfig = McpServerConfigData & McpServerConfigCallbacks
 
 export class McpServerError extends Schema.TaggedError<McpServerError>()(
   "McpServerError",
@@ -74,11 +90,9 @@ interface McpServerOperations {
  * Used for both stdio and HTTP transports.
  */
 const createMcpServer = (
-  hulyClient: HulyClient["Type"],
-  storageClient: HulyStorageClient["Type"],
+  resolveClients: () => Promise<ClientBundle>,
   telemetry: TelemetryOperations,
-  registry: ToolRegistry,
-  workspaceClient?: WorkspaceClientOperations
+  registry: ToolRegistry
 ): Server => {
   const server = new Server(
     {
@@ -111,12 +125,30 @@ const createMcpServer = (
     const { arguments: args, name } = request.params
 
     const start = Date.now()
+
+    let clients: ClientBundle
+    try {
+      clients = await resolveClients()
+    } catch (e) {
+      const durationMs = Date.now() - start
+      const errorResponse = mapDomainErrorToMcp(
+        new HulyError({ message: `Failed to initialize Huly clients: ${e instanceof Error ? e.message : String(e)}` })
+      )
+      telemetry.toolCalled({
+        toolName: name,
+        status: "error",
+        errorTag: errorResponse._meta.errorTag,
+        durationMs
+      })
+      return toMcpResponse(errorResponse)
+    }
+
     const response = await registry.handleToolCall(
       name,
       args ?? {},
-      hulyClient,
-      storageClient,
-      workspaceClient
+      clients.hulyClient,
+      clients.storageClient,
+      clients.workspaceClient
     )
     const durationMs = Date.now() - start
 
@@ -151,13 +183,10 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 >() {
   static layer(
     config: McpServerConfig
-  ): Layer.Layer<McpServerService, never, HulyClient | HulyStorageClient | WorkspaceClient | TelemetryService> {
+  ): Layer.Layer<McpServerService, never, TelemetryService> {
     return Layer.effect(
       McpServerService,
       Effect.gen(function*() {
-        const hulyClient = yield* HulyClient
-        const storageClient = yield* HulyStorageClient
-        const workspaceClient = yield* WorkspaceClient
         const telemetry = yield* TelemetryService
 
         const toolsetsRaw = yield* Effect.orElseSucceed(Config.string("TOOLSETS"), () => "")
@@ -194,7 +223,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
               yield* Ref.set(isRunning, true)
 
               if (config.transport === "stdio") {
-                const stdioServer = createMcpServer(hulyClient, storageClient, telemetry, registry, workspaceClient)
+                const stdioServer = createMcpServer(config.resolveClients, telemetry, registry)
                 yield* Ref.set(serverRef, stdioServer)
                 const transport = new StdioServerTransport()
 
@@ -247,7 +276,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 
                 yield* startHttpTransport(
                   { port, host },
-                  () => createMcpServer(hulyClient, storageClient, telemetry, registry, workspaceClient)
+                  () => createMcpServer(config.resolveClients, telemetry, registry)
                 ).pipe(
                   Effect.scoped,
                   Effect.mapError(

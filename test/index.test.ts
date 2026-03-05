@@ -1,13 +1,34 @@
 import { afterEach, beforeEach, describe, it } from "@effect/vitest"
-import { Effect, Layer } from "effect"
+import { Context, Effect, Layer } from "effect"
 import { expect } from "vitest"
 import { HulyClient } from "../src/huly/client.js"
 import { HulyStorageClient } from "../src/huly/storage.js"
 import { WorkspaceClient } from "../src/huly/workspace-client.js"
 import { main } from "../src/index.js"
 import { HttpServerFactoryService } from "../src/mcp/http-transport.js"
-import { McpServerError, McpServerService } from "../src/mcp/server.js"
+import { type ClientBundle, McpServerError, McpServerService } from "../src/mcp/server.js"
 import { TelemetryService } from "../src/telemetry/telemetry.js"
+
+const resolveClientsFromLayer = (
+  clientLayer: Layer.Layer<HulyClient | HulyStorageClient | WorkspaceClient>
+): () => Promise<ClientBundle> => {
+  let promise: Promise<ClientBundle> | null = null
+  return () => {
+    if (promise === null) {
+      promise = Effect.runPromise(
+        Effect.gen(function*() {
+          const ctx = yield* Layer.build(clientLayer).pipe(Effect.scoped)
+          return {
+            hulyClient: Context.get(ctx, HulyClient),
+            storageClient: Context.get(ctx, HulyStorageClient),
+            workspaceClient: Context.get(ctx, WorkspaceClient)
+          }
+        })
+      )
+    }
+    return promise
+  }
+}
 
 // --- Tests ---
 
@@ -58,17 +79,16 @@ describe("Main Entry Point", () => {
   describe("layer composition", () => {
     it.scoped("McpServerService layer composes with HulyClient, HulyStorageClient, and WorkspaceClient", () =>
       Effect.gen(function*() {
-        const hulyClientLayer = HulyClient.testLayer({})
-        const storageClientLayer = HulyStorageClient.testLayer({})
-        const workspaceClientLayer = WorkspaceClient.testLayer({})
-        const mcpServerLayer = McpServerService.layer({ transport: "stdio" }).pipe(
-          Layer.provide(Layer.merge(
-            Layer.merge(
-              Layer.merge(hulyClientLayer, storageClientLayer),
-              workspaceClientLayer
-            ),
-            TelemetryService.testLayer()
-          ))
+        const clientLayer = Layer.mergeAll(
+          HulyClient.testLayer({}),
+          HulyStorageClient.testLayer({}),
+          WorkspaceClient.testLayer({})
+        )
+        const mcpServerLayer = McpServerService.layer({
+          transport: "stdio",
+          resolveClients: resolveClientsFromLayer(clientLayer)
+        }).pipe(
+          Layer.provide(TelemetryService.testLayer())
         )
 
         yield* Layer.build(mcpServerLayer)

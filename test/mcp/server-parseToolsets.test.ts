@@ -1,12 +1,48 @@
 import { describe, it } from "@effect/vitest"
-import { Effect, Layer } from "effect"
+import { Context, Effect, Layer } from "effect"
 import { expect, vi } from "vitest"
 import { HulyClient } from "../../src/huly/client.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
 import { HttpServerFactoryService } from "../../src/mcp/http-transport.js"
-import { McpServerError, McpServerService } from "../../src/mcp/server.js"
+import { type ClientBundle, McpServerError, McpServerService } from "../../src/mcp/server.js"
 import { TelemetryService } from "../../src/telemetry/telemetry.js"
+
+const resolveClientsFromLayer = (
+  clientLayer: Layer.Layer<HulyClient | HulyStorageClient | WorkspaceClient>
+): () => Promise<ClientBundle> => {
+  let promise: Promise<ClientBundle> | null = null
+  return () => {
+    if (promise === null) {
+      promise = Effect.runPromise(
+        Effect.gen(function*() {
+          const ctx = yield* Layer.build(clientLayer).pipe(Effect.scoped)
+          return {
+            hulyClient: Context.get(ctx, HulyClient),
+            storageClient: Context.get(ctx, HulyStorageClient),
+            workspaceClient: Context.get(ctx, WorkspaceClient)
+          }
+        })
+      )
+    }
+    return promise
+  }
+}
+
+const buildTestServerLayer = (
+  config: {
+    transport: "stdio" | "http"
+    httpPort?: number
+    httpHost?: string
+    autoExit?: boolean
+    authMethod?: "token" | "password"
+  },
+  layers: Layer.Layer<HulyClient | HulyStorageClient | WorkspaceClient | TelemetryService>
+) =>
+  McpServerService.layer({
+    ...config,
+    resolveClients: resolveClientsFromLayer(layers)
+  }).pipe(Layer.provide(layers))
 
 describe("McpServerError", () => {
   // test-revizorro: approved
@@ -101,18 +137,14 @@ describe("McpServerService.layer with TOOLSETS env", () => {
   it.scoped("builds successfully with no TOOLSETS env", () =>
     Effect.gen(function*() {
       delete process.env.TOOLSETS
-      const serverLayer = McpServerService.layer({ transport: "stdio" }).pipe(
-        Layer.provide(baseLayers)
-      )
+      const serverLayer = buildTestServerLayer({ transport: "stdio" }, baseLayers)
       yield* Layer.build(serverLayer)
     }))
 
   it.scoped("builds successfully with valid TOOLSETS", () =>
     Effect.gen(function*() {
       process.env.TOOLSETS = "issues"
-      const serverLayer = McpServerService.layer({ transport: "stdio" }).pipe(
-        Layer.provide(baseLayers)
-      )
+      const serverLayer = buildTestServerLayer({ transport: "stdio" }, baseLayers)
       yield* Layer.build(serverLayer)
       delete process.env.TOOLSETS
     }))
@@ -121,9 +153,7 @@ describe("McpServerService.layer with TOOLSETS env", () => {
     const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {})
     return Effect.gen(function*() {
       process.env.TOOLSETS = "nonexistent_category"
-      const serverLayer = McpServerService.layer({ transport: "stdio" }).pipe(
-        Layer.provide(baseLayers)
-      )
+      const serverLayer = buildTestServerLayer({ transport: "stdio" }, baseLayers)
       yield* Layer.build(serverLayer)
       expect(stderrSpy).toHaveBeenCalledWith(
         expect.stringContaining("unknown toolset category")
@@ -142,19 +172,16 @@ describe("McpServerService.layer with TOOLSETS env", () => {
           capturedProps = props
         }
       })
-      const serverLayer = McpServerService.layer({
+      const layers = Layer.mergeAll(
+        HulyClient.testLayer({}),
+        HulyStorageClient.testLayer({}),
+        WorkspaceClient.testLayer({}),
+        telemetryLayer
+      )
+      const serverLayer = buildTestServerLayer({
         transport: "stdio",
         authMethod: "token"
-      }).pipe(
-        Layer.provide(
-          Layer.mergeAll(
-            HulyClient.testLayer({}),
-            HulyStorageClient.testLayer({}),
-            WorkspaceClient.testLayer({}),
-            telemetryLayer
-          )
-        )
-      )
+      }, layers)
       yield* Layer.build(serverLayer)
       expect(capturedProps).toMatchObject({
         transport: "stdio",
