@@ -168,11 +168,13 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `set_issue_component` | Set or clear the component on a Huly issue. Pass null for component to clear it. |
 | `delete_component` | Permanently delete a Huly component. This action cannot be undone. |
 | `list_issue_templates` | List issue templates in a Huly project. Templates define reusable issue configurations. Returns templates sorted by modification date (newest first). |
-| `get_issue_template` | Retrieve full details for a Huly issue template. Use this to view template content and default values. |
-| `create_issue_template` | Create a new issue template in a Huly project. Templates define default values for new issues. Returns the created template ID and title. |
-| `create_issue_from_template` | Create a new issue from a template. Applies template defaults, allowing overrides for specific fields. Returns the created issue identifier. |
+| `get_issue_template` | Retrieve full details for a Huly issue template including children (sub-task templates). Use this to view template content, default values, and child template IDs. |
+| `create_issue_template` | Create a new issue template in a Huly project. Templates define default values for new issues. Optionally include children (sub-task templates) that will become sub-issues when creating issues from this template. Returns the created template ID and title. |
+| `create_issue_from_template` | Create a new issue from a template. Applies template defaults, allowing overrides for specific fields. If the template has children (sub-task templates), sub-issues are created automatically unless includeChildren is set to false. Returns the created issue identifier and count of children created. |
 | `update_issue_template` | Update fields on an existing Huly issue template. Only provided fields are modified. |
 | `delete_issue_template` | Permanently delete a Huly issue template. This action cannot be undone. |
+| `add_template_child` | Add a child (sub-task) template to an issue template. The child defines default values for sub-issues created when using create_issue_from_template. Returns the child template ID. |
+| `remove_template_child` | Remove a child (sub-task) template from an issue template by its child ID. Get child IDs from get_issue_template response. |
 | `add_issue_relation` | Add a relation between two issues. Relation types: 'blocks' (source blocks target — pushes into target's blockedBy), 'is-blocked-by' (source is blocked by target — pushes into source's blockedBy), 'relates-to' (bidirectional link — updates both sides). targetIssue accepts cross-project identifiers like 'OTHER-42'. No-op if the relation already exists. |
 | `remove_issue_relation` | Remove a relation between two issues. Mirrors add_issue_relation: 'blocks' pulls from target's blockedBy, 'is-blocked-by' pulls from source's blockedBy, 'relates-to' pulls from both sides. No-op if the relation doesn't exist. |
 | `list_issue_relations` | List all relations of an issue. Returns blockedBy (issues blocking this one) and relations (bidirectional links) with resolved identifiers. Does NOT return issues that this issue blocks — use list_issue_relations on the target issue to see that. |
