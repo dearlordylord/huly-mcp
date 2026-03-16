@@ -104,9 +104,9 @@ const createMcpServer = (
   const drainInflight = (): Promise<void> => {
     if (inflight <= 0) return Promise.resolve()
     return new Promise((resolve) => {
-      const start = Date.now()
+      const start = Date.now() // eslint-disable-line no-restricted-syntax -- non-Effect Promise-based drain loop
       const check = () => {
-        if (inflight <= 0 || Date.now() - start > DRAIN_TIMEOUT_MS) {
+        if (inflight <= 0 || Date.now() - start > DRAIN_TIMEOUT_MS) { // eslint-disable-line no-restricted-syntax
           resolve()
         } else {
           setTimeout(check, DRAIN_POLL_MS)
@@ -148,7 +148,7 @@ const createMcpServer = (
     try {
       const { arguments: args, name } = request.params
 
-      const start = Date.now()
+      const start = Date.now() // eslint-disable-line no-restricted-syntax -- non-Effect async handler
       const inputBytes = JSON.stringify(args ?? {}).length
 
       const deriveEditMode = (): string | undefined => {
@@ -166,7 +166,7 @@ const createMcpServer = (
       try {
         clients = await resolveClients()
       } catch (e) {
-        const durationMs = Date.now() - start
+        const durationMs = Date.now() - start // eslint-disable-line no-restricted-syntax
         const errorResponse = mapDomainErrorToMcp(
           new HulyError({ message: `Failed to initialize Huly clients: ${e instanceof Error ? e.message : String(e)}` })
         )
@@ -189,7 +189,7 @@ const createMcpServer = (
         clients.storageClient,
         clients.workspaceClient
       )
-      const durationMs = Date.now() - start
+      const durationMs = Date.now() - start // eslint-disable-line no-restricted-syntax
 
       if (response === null) {
         const errorResponse = createUnknownToolError(name)

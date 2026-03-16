@@ -10,7 +10,7 @@ import {
   TimeReportDayType,
   type TimeSpendReport as HulyTimeSpendReport
 } from "@hcengineering/tracker"
-import { Effect } from "effect"
+import { Clock, Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../../../src/huly/errors.js"
@@ -48,9 +48,9 @@ const makeProject = (overrides?: Partial<HulyProject>): HulyProject =>
     defaultIssueStatus: "status-open" as Ref<IssueStatus>,
     defaultTimeReportDay: TimeReportDayType.CurrentWorkDay,
     modifiedBy: "user-1" as PersonId,
-    modifiedOn: Date.now(),
+    modifiedOn: 0,
     createdBy: "user-1" as PersonId,
-    createdOn: Date.now(),
+    createdOn: 0,
     ...overrides
   })
 
@@ -81,9 +81,9 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue =>
     reports: 1,
     childInfo: [],
     modifiedBy: "user-1" as PersonId,
-    modifiedOn: Date.now(),
+    modifiedOn: 0,
     createdBy: "user-1" as PersonId,
-    createdOn: Date.now(),
+    createdOn: 0,
     ...overrides
   })
 
@@ -96,13 +96,13 @@ const makeTimeSpendReport = (overrides?: Partial<HulyTimeSpendReport>): HulyTime
     attachedToClass: tracker.class.Issue,
     collection: "reports",
     employee: null,
-    date: Date.now(),
+    date: 0,
     value: 30,
     description: "Worked on feature",
     modifiedBy: "user-1" as PersonId,
-    modifiedOn: Date.now(),
+    modifiedOn: 0,
     createdBy: "user-1" as PersonId,
-    createdOn: Date.now(),
+    createdOn: 0,
     ...overrides
   })
 
@@ -113,9 +113,9 @@ const makePerson = (overrides?: Partial<Person>): Person =>
     space: "space-1" as Ref<Space>,
     name: "John Doe",
     modifiedBy: "user-1" as PersonId,
-    modifiedOn: Date.now(),
+    modifiedOn: 0,
     createdBy: "user-1" as PersonId,
-    createdOn: Date.now(),
+    createdOn: 0,
     ...overrides
   })
 
@@ -130,9 +130,9 @@ const makeChannel = (overrides?: Partial<Channel>): Channel =>
     provider: contact.channelProvider.Email,
     value: "john@example.com",
     modifiedBy: "user-1" as PersonId,
-    modifiedOn: Date.now(),
+    modifiedOn: 0,
     createdBy: "user-1" as PersonId,
-    createdOn: Date.now(),
+    createdOn: 0,
     ...overrides
   })
 
@@ -1589,12 +1589,12 @@ describe("startTimer", () => {
           issues: [issue]
         })
 
-        const before = Date.now()
+        const before = yield* Clock.currentTimeMillis
         const result = yield* startTimer({
           project: projectIdentifier("TEST"),
           identifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
-        const after = Date.now()
+        const after = yield* Clock.currentTimeMillis
 
         expect(result.identifier).toBe("TEST-1")
         expect(result.startedAt).toBeGreaterThanOrEqual(before)
@@ -1656,12 +1656,12 @@ describe("stopTimer", () => {
           issues: [issue]
         })
 
-        const before = Date.now()
+        const before = yield* Clock.currentTimeMillis
         const result = yield* stopTimer({
           project: projectIdentifier("TEST"),
           identifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
-        const after = Date.now()
+        const after = yield* Clock.currentTimeMillis
 
         expect(result.identifier).toBe("TEST-1")
         expect(result.stoppedAt).toBeGreaterThanOrEqual(before)

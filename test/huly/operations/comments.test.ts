@@ -8,7 +8,7 @@ import {
   type Project as HulyProject,
   TimeReportDayType
 } from "@hcengineering/tracker"
-import { Effect } from "effect"
+import { Clock, Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type { CommentNotFoundError, IssueNotFoundError, ProjectNotFoundError } from "../../../src/huly/errors.js"
@@ -33,9 +33,9 @@ const makeProject = (overrides?: Partial<HulyProject>): HulyProject =>
     defaultIssueStatus: "status-open" as Ref<IssueStatus>,
     defaultTimeReportDay: TimeReportDayType.CurrentWorkDay,
     modifiedBy: "user-1" as PersonId,
-    modifiedOn: Date.now(),
+    modifiedOn: 0,
     createdBy: "user-1" as PersonId,
-    createdOn: Date.now(),
+    createdOn: 0,
     ...overrides
   })
 
@@ -66,9 +66,9 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
     reports: 0,
     childInfo: [],
     modifiedBy: "user-1" as PersonId,
-    modifiedOn: Date.now(),
+    modifiedOn: 0,
     createdBy: "user-1" as PersonId,
-    createdOn: Date.now(),
+    createdOn: 0,
     ...overrides
   }
   return result
@@ -84,9 +84,9 @@ const makeChatMessage = (overrides?: Partial<ChatMessage>): ChatMessage =>
     attachedToClass: tracker.class.Issue,
     collection: "comments",
     modifiedBy: "user-1" as PersonId,
-    modifiedOn: Date.now(),
+    modifiedOn: 0,
     createdBy: "user-1" as PersonId,
-    createdOn: Date.now(),
+    createdOn: 0,
     editedOn: undefined,
     ...overrides
   })
@@ -677,7 +677,7 @@ describe("updateComment", () => {
           captureUpdateDoc
         })
 
-        const before = Date.now()
+        const before = yield* Clock.currentTimeMillis
 
         const result = yield* updateComment({
           project: projectIdentifier("TEST"),
@@ -686,7 +686,7 @@ describe("updateComment", () => {
           body: "Updated comment body"
         }).pipe(Effect.provide(testLayer))
 
-        const after = Date.now()
+        const after = yield* Clock.currentTimeMillis
 
         expect(result.commentId).toBe("comment-abc")
         expect(result.issueIdentifier).toBe("TEST-1")
@@ -719,7 +719,7 @@ describe("updateComment", () => {
           captureUpdateDoc
         })
 
-        const before = Date.now()
+        const before = yield* Clock.currentTimeMillis
 
         yield* updateComment({
           project: projectIdentifier("TEST"),
@@ -728,7 +728,7 @@ describe("updateComment", () => {
           body: "Updated"
         }).pipe(Effect.provide(testLayer))
 
-        const after = Date.now()
+        const after = yield* Clock.currentTimeMillis
 
         const editedOn = captureUpdateDoc.operations?.editedOn as number
         expect(editedOn).toBeGreaterThanOrEqual(before)

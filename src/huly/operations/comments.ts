@@ -1,6 +1,6 @@
 import type { ChatMessage } from "@hcengineering/chunter"
 import { type AttachedData, type DocumentUpdate, generateId, type Ref, SortingOrder } from "@hcengineering/core"
-import { Effect, Schema } from "effect"
+import { Clock, Effect, Schema } from "effect"
 
 import type {
   AddCommentParams,
@@ -178,9 +178,10 @@ export const updateComment = (
       }
     }
 
+    const now = yield* Clock.currentTimeMillis
     const updateOps: DocumentUpdate<ChatMessage> = {
       message: params.body,
-      editedOn: Date.now()
+      editedOn: now
     }
 
     yield* client.updateDoc(

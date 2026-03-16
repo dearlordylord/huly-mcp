@@ -9,7 +9,7 @@ import {
   type Ref,
   SortingOrder
 } from "@hcengineering/core"
-import { Effect } from "effect"
+import { Clock, Effect } from "effect"
 
 import type {
   AddThreadReplyParams,
@@ -209,9 +209,10 @@ export const updateThreadReply = (
 
     const markup = markdownToMarkupString(params.body)
 
+    const now = yield* Clock.currentTimeMillis
     const updateOps: DocumentUpdate<HulyThreadMessage> = {
       message: markup,
-      editedOn: Date.now()
+      editedOn: now
     }
 
     yield* client.updateDoc(

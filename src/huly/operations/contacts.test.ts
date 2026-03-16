@@ -37,9 +37,9 @@ const createMockChannel = (overrides: Partial<Channel> = {}): Channel => {
     provider: contact.channelProvider.Email,
     value: "john@example.com",
     modifiedBy: "user" as CorePersonId,
-    modifiedOn: Date.now(),
+    modifiedOn: 0,
     createdBy: "user" as CorePersonId,
-    createdOn: Date.now(),
+    createdOn: 0,
     ...overrides
   }
   return data as Channel

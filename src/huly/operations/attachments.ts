@@ -17,7 +17,7 @@ import {
   SortingOrder,
   type Space
 } from "@hcengineering/core"
-import { Effect } from "effect"
+import { Clock, Effect } from "effect"
 
 import type {
   AddAttachmentParams,
@@ -192,12 +192,13 @@ const uploadAndAttach = (
 
     const attachmentId: Ref<HulyAttachment> = generateId()
 
+    const now = yield* Clock.currentTimeMillis
     const attachmentData: AttachedData<HulyAttachment> = {
       name: params.filename,
       file: uploadResult.blobId,
       size: uploadResult.size,
       type: params.contentType,
-      lastModified: Date.now(),
+      lastModified: now,
       pinned: params.pinned ?? false,
       ...(params.description !== undefined ? { description: params.description } : {})
     }

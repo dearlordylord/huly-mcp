@@ -85,6 +85,12 @@ export default [
       "no-restricted-syntax": ["error", {
         selector: "TSAsExpression > TSAsExpression",
         message: "Double type assertion (as A as B). Requires eslint-disable with justification."
+      }, {
+        selector: "NewExpression[callee.name='Date']",
+        message: "new Date() is banned. Use Effect DateTime.now or DateTime.unsafeNow instead."
+      }, {
+        selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+        message: "Date.now() is banned. Use Effect Clock.currentTimeMillis or DateTime.now instead."
       }],
 
       // Code quality

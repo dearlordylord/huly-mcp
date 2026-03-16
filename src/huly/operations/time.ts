@@ -16,7 +16,7 @@ import {
   type Project as HulyProject,
   type TimeSpendReport as HulyTimeSpendReport
 } from "@hcengineering/tracker"
-import { Effect } from "effect"
+import { Clock, Effect } from "effect"
 
 import type {
   CreateWorkSlotParams,
@@ -88,9 +88,10 @@ export const logTime = (
     const reportId: Ref<HulyTimeSpendReport> = generateId()
 
     // Huly API expects employee as null for anonymous reports (will be set to current user by server)
+    const now = yield* Clock.currentTimeMillis
     const reportData: AttachedData<HulyTimeSpendReport> = {
       employee: null,
-      date: Date.now(),
+      date: now,
       value: params.value,
       description: params.description ?? ""
     }
@@ -432,7 +433,7 @@ export const startTimer = (
       identifier: params.identifier
     })
 
-    const startedAt = Date.now()
+    const startedAt = yield* Clock.currentTimeMillis
 
     return {
       identifier: IssueIdentifier.make(issue.identifier),
@@ -456,7 +457,7 @@ export const stopTimer = (
       identifier: params.identifier
     })
 
-    const stoppedAt = Date.now()
+    const stoppedAt = yield* Clock.currentTimeMillis
 
     return {
       identifier: IssueIdentifier.make(issue.identifier),
