@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.1.59
+
+### Patch Changes
+
+- lint: ban Date.now() and new Date(), use Effect Clock.currentTimeMillis
+
 ## 0.1.58
 
 ### Patch Changes
