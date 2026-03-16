@@ -31,6 +31,14 @@ Branded types (phantom types, opaque types) are compile-time only constructs —
 
 Correct pattern: "Brands erased at runtime; both are `string`, so the cast is safe."
 
+## State Space Minimality
+
+For every product type (interface, type alias, Schema struct), verify: can every combination of field values occur in practice? If not, restructure to eliminate impossible states (discriminated union, nested types, `Option` instead of sentinel values). Symptoms:
+- `""` / `0` / `null` meaning "not applicable" (sentinel values)
+- Boolean alongside fields only meaningful when true/false
+- Optional fields that must all be present-or-absent together
+- Discriminated union variants carrying fields that only apply to some variants at the product level
+
 ## Boundary Typing
 
 All data crossing system boundaries (APIs, etc.) must be strongly typed — both inbound (decoding) and outbound (encoding), with Effect Schema. Flag any `any`, untyped fetch results, or raw JSON access.
