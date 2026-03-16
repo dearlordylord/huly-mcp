@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.1.60
+
+### Patch Changes
+
+- chore: bump tsconfig lib to ES2023, ban type assertions, add review rules
+
 ## 0.1.59
 
 ### Patch Changes
