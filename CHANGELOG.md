@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.2.0
+
+### Minor Changes
+
+- Add link_document_to_issue and unlink_document_from_issue tools for associating documents with tracker issues. Enhance list_issue_relations to return linked documents with resolved titles and teamspace names.
+
 ## 0.1.62
 
 ### Patch Changes
