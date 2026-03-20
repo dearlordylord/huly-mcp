@@ -189,7 +189,9 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `remove_template_child` | Remove a child (sub-task) template from an issue template by its child ID. Get child IDs from get_issue_template response. |
 | `add_issue_relation` | Add a relation between two issues. Relation types: 'blocks' (source blocks target — pushes into target's blockedBy), 'is-blocked-by' (source is blocked by target — pushes into source's blockedBy), 'relates-to' (bidirectional link — updates both sides). targetIssue accepts cross-project identifiers like 'OTHER-42'. No-op if the relation already exists. |
 | `remove_issue_relation` | Remove a relation between two issues. Mirrors add_issue_relation: 'blocks' pulls from target's blockedBy, 'is-blocked-by' pulls from source's blockedBy, 'relates-to' pulls from both sides. No-op if the relation doesn't exist. |
-| `list_issue_relations` | List all relations of an issue. Returns blockedBy (issues blocking this one) and relations (bidirectional links) with resolved identifiers. Does NOT return issues that this issue blocks — use list_issue_relations on the target issue to see that. |
+| `list_issue_relations` | List all relations of an issue. Returns blockedBy (issues blocking this one), relations (bidirectional issue links), and documents (linked documents with title/teamspace). Does NOT return issues that this issue blocks — use list_issue_relations on the target issue to see that. |
+| `link_document_to_issue` | Link a Huly document to an issue. The link appears in the issue's Relations panel in the UI. Idempotent: no-op if the document is already linked. Use list_issue_relations to see linked documents. |
+| `unlink_document_from_issue` | Remove a document link from an issue. Idempotent: no-op if the document is not linked. |
 
 ### Comments
 
@@ -222,7 +224,7 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `delete_teamspace` | Permanently delete a Huly document teamspace. This action cannot be undone. |
 | `list_documents` | List documents in a Huly teamspace. Returns documents sorted by modification date (newest first). Supports searching by title substring (titleSearch) and content (contentSearch). |
 | `get_document` | Retrieve full details for a Huly document including markdown content. Use this to view document content and metadata. |
-| `create_document` | Create a new document in a Huly teamspace. Content supports full markdown including native Mermaid diagrams (```mermaid blocks render interactively in Huly UI). Returns the created document id. |
+| `create_document` | Create a new document in a Huly teamspace. Content supports full markdown including native Mermaid diagrams (```mermaid blocks render interactively in Huly UI). Returns the created document id. Use link_document_to_issue to associate the document with a tracker issue. |
 | `edit_document` | Edit an existing Huly document. Two content modes (mutually exclusive): (1) 'content' for full replace, (2) 'old_text' + 'new_text' for targeted search-and-replace. Multiple matches error unless replace_all is true. Empty new_text deletes matched text. Also supports renaming via 'title'. Content supports full markdown including native Mermaid diagrams. |
 | `list_inline_comments` | List inline comment threads from a Huly document. Extracts comments embedded in document content as ProseMirror marks. Each comment includes the highlighted text and thread ID. Set includeReplies=true to also fetch thread reply messages with sender names. |
 | `delete_document` | Permanently delete a Huly document. This action cannot be undone. |

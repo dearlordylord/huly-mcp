@@ -1,12 +1,13 @@
 import { describe, it } from "@effect/vitest"
 import type { Doc, DocumentUpdate, FindResult, PersonId, Ref, Space, TxResult } from "@hcengineering/core"
+import type { Document as HulyDocument } from "@hcengineering/document"
 import type { TaskType } from "@hcengineering/task"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
 import { IssuePriority, TimeReportDayType } from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
-import { tracker } from "../../../src/huly/huly-plugins.js"
+import { documentPlugin, tracker } from "../../../src/huly/huly-plugins.js"
 import { addIssueRelation, listIssueRelations, removeIssueRelation } from "../../../src/huly/operations/relations.js"
 import { issueIdentifier, projectIdentifier } from "../../helpers/brands.js"
 
@@ -27,9 +28,9 @@ const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
     defaultIssueStatus: "status-open" as Ref<never>,
     defaultTimeReportDay: TimeReportDayType.CurrentWorkDay,
     modifiedBy: "user-1" as PersonId,
-    modifiedOn: Date.now(),
+    modifiedOn: 0,
     createdBy: "user-1" as PersonId,
-    createdOn: Date.now()
+    createdOn: 0
   }
   return Object.assign(base, overrides) as HulyProject
 }
@@ -61,9 +62,9 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
     reports: 0,
     childInfo: [],
     modifiedBy: "user-1" as PersonId,
-    modifiedOn: Date.now(),
+    modifiedOn: 0,
     createdBy: "user-1" as PersonId,
-    createdOn: Date.now(),
+    createdOn: 0,
     ...overrides
   }
   return result
@@ -72,6 +73,7 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
 interface MockConfig {
   projects?: Array<HulyProject>
   issues?: Array<HulyIssue>
+  documents?: Array<HulyDocument>
   capturedUpdateDocs?: Array<{
     _class: unknown
     space: unknown
@@ -83,6 +85,7 @@ interface MockConfig {
 const createTestLayerWithMocks = (config: MockConfig) => {
   const projects = config.projects ?? []
   const issues = config.issues ?? []
+  const documents = config.documents ?? []
   const captured = config.capturedUpdateDocs ?? []
 
   const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown) => {
@@ -94,6 +97,15 @@ const createTestLayerWithMocks = (config: MockConfig) => {
         return Effect.succeed(toFindResult(filtered))
       }
       return Effect.succeed(toFindResult(issues))
+    }
+    if (_class === documentPlugin.class.Document) {
+      const q = query as Record<string, unknown>
+      const inQuery = q._id as { $in?: Array<string> } | undefined
+      if (inQuery?.$in) {
+        const filtered = documents.filter(d => inQuery.$in!.includes(d._id as string))
+        return Effect.succeed(toFindResult(filtered))
+      }
+      return Effect.succeed(toFindResult(documents))
     }
     return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
@@ -568,6 +580,7 @@ describe("listIssueRelations", () => {
       expect(result.relations).toHaveLength(1)
       expect(result.relations[0].identifier).toBe("TEST-3")
       expect(result.relations[0]._id).toBe("issue-3")
+      expect(result.documents).toHaveLength(0)
     }))
 
   it.effect("returns empty arrays when no relations exist", () =>
@@ -591,6 +604,7 @@ describe("listIssueRelations", () => {
 
       expect(result.blockedBy).toHaveLength(0)
       expect(result.relations).toHaveLength(0)
+      expect(result.documents).toHaveLength(0)
     }))
 
   it.effect("falls back to _id when issue is not resolvable", () =>
@@ -616,5 +630,57 @@ describe("listIssueRelations", () => {
       expect(result.blockedBy).toHaveLength(1)
       expect(result.blockedBy[0].identifier).toBe("deleted-issue")
       expect(result.blockedBy[0]._id).toBe("deleted-issue")
+      expect(result.documents).toHaveLength(0)
+    }))
+
+  it.effect("partitions document refs from issue refs in relations", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "TEST" })
+      const issue = makeIssue({
+        _id: "issue-1" as Ref<HulyIssue>,
+        space: "proj-1" as Ref<HulyProject>,
+        identifier: "TEST-1",
+        number: 1,
+        relations: [
+          { _id: "issue-2" as Ref<Doc>, _class: tracker.class.Issue },
+          { _id: "doc-1" as Ref<Doc>, _class: documentPlugin.class.Document }
+        ]
+      })
+      const relatedIssue = makeIssue({
+        _id: "issue-2" as Ref<HulyIssue>,
+        space: "proj-1" as Ref<HulyProject>,
+        identifier: "TEST-2",
+        number: 2
+      })
+      const doc = Object.assign({
+        _id: "doc-1" as Ref<HulyDocument>,
+        _class: documentPlugin.class.Document,
+        space: "teamspace-1" as Ref<Space>,
+        title: "My Spec",
+        content: null,
+        parent: "no-parent" as Ref<HulyDocument>,
+        rank: "0|aaa",
+        modifiedBy: "user-1" as PersonId,
+        modifiedOn: 0,
+        createdBy: "user-1" as PersonId,
+        createdOn: 0
+      }) as HulyDocument
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        issues: [issue, relatedIssue],
+        documents: [doc]
+      })
+
+      const result = yield* listIssueRelations({
+        project: projectIdentifier("TEST"),
+        issueIdentifier: issueIdentifier("TEST-1")
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result.relations).toHaveLength(1)
+      expect(result.relations[0].identifier).toBe("TEST-2")
+      expect(result.documents).toHaveLength(1)
+      expect(result.documents[0].title).toBe("My Spec")
+      expect(result.documents[0]._id).toBe("doc-1")
+      expect(result.documents[0]._class).toBe(String(documentPlugin.class.Document))
     }))
 })

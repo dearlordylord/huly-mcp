@@ -12,6 +12,7 @@ import {
   getComponentParamsJsonSchema,
   getIssueParamsJsonSchema,
   getIssueTemplateParamsJsonSchema,
+  linkDocumentToIssueParamsJsonSchema,
   listComponentsParamsJsonSchema,
   listIssueRelationsParamsJsonSchema,
   listIssuesParamsJsonSchema,
@@ -30,6 +31,7 @@ import {
   parseGetComponentParams,
   parseGetIssueParams,
   parseGetIssueTemplateParams,
+  parseLinkDocumentToIssueParams,
   parseListComponentsParams,
   parseListIssueRelationsParams,
   parseListIssuesParams,
@@ -39,6 +41,7 @@ import {
   parseRemoveLabelParams,
   parseRemoveTemplateChildParams,
   parseSetIssueComponentParams,
+  parseUnlinkDocumentFromIssueParams,
   parseUpdateComponentParams,
   parseUpdateIssueParams,
   parseUpdateIssueTemplateParams,
@@ -46,6 +49,7 @@ import {
   removeLabelParamsJsonSchema,
   removeTemplateChildParamsJsonSchema,
   setIssueComponentParamsJsonSchema,
+  unlinkDocumentFromIssueParamsJsonSchema,
   updateComponentParamsJsonSchema,
   updateIssueParamsJsonSchema,
   updateIssueTemplateParamsJsonSchema
@@ -58,6 +62,7 @@ import {
   setIssueComponent,
   updateComponent
 } from "../../huly/operations/components.js"
+import { linkDocumentToIssue, unlinkDocumentFromIssue } from "../../huly/operations/document-relations.js"
 import {
   addTemplateChild,
   createIssueFromTemplate,
@@ -367,13 +372,36 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "list_issue_relations",
     description:
-      "List all relations of an issue. Returns blockedBy (issues blocking this one) and relations (bidirectional links) with resolved identifiers. Does NOT return issues that this issue blocks — use list_issue_relations on the target issue to see that.",
+      "List all relations of an issue. Returns blockedBy (issues blocking this one), relations (bidirectional issue links), and documents (linked documents with title/teamspace). Does NOT return issues that this issue blocks — use list_issue_relations on the target issue to see that.",
     category: CATEGORY,
     inputSchema: listIssueRelationsParamsJsonSchema,
     handler: createToolHandler(
       "list_issue_relations",
       parseListIssueRelationsParams,
       listIssueRelations
+    )
+  },
+  {
+    name: "link_document_to_issue",
+    description:
+      "Link a Huly document to an issue. The link appears in the issue's Relations panel in the UI. Idempotent: no-op if the document is already linked. Use list_issue_relations to see linked documents.",
+    category: CATEGORY,
+    inputSchema: linkDocumentToIssueParamsJsonSchema,
+    handler: createToolHandler(
+      "link_document_to_issue",
+      parseLinkDocumentToIssueParams,
+      linkDocumentToIssue
+    )
+  },
+  {
+    name: "unlink_document_from_issue",
+    description: "Remove a document link from an issue. Idempotent: no-op if the document is not linked.",
+    category: CATEGORY,
+    inputSchema: unlinkDocumentFromIssueParamsJsonSchema,
+    handler: createToolHandler(
+      "unlink_document_from_issue",
+      parseUnlinkDocumentFromIssueParams,
+      unlinkDocumentFromIssue
     )
   }
 ]

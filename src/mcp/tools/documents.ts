@@ -126,7 +126,7 @@ export const documentTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "create_document",
     description:
-      "Create a new document in a Huly teamspace. Content supports full markdown including native Mermaid diagrams (```mermaid blocks render interactively in Huly UI). Returns the created document id.",
+      "Create a new document in a Huly teamspace. Content supports full markdown including native Mermaid diagrams (```mermaid blocks render interactively in Huly UI). Returns the created document id. Use link_document_to_issue to associate the document with a tracker issue.",
     category: CATEGORY,
     inputSchema: createDocumentParamsJsonSchema,
     handler: createToolHandler(

@@ -68,6 +68,13 @@ export interface RelationEntry {
   readonly _class: string
 }
 
+export interface DocumentRelationEntry {
+  readonly title: string
+  readonly teamspace: string
+  readonly _id: string
+  readonly _class: string
+}
+
 export interface AddIssueRelationResult {
   readonly sourceIssue: string
   readonly targetIssue: string
@@ -85,4 +92,5 @@ export interface RemoveIssueRelationResult {
 export interface ListIssueRelationsResult {
   readonly blockedBy: ReadonlyArray<RelationEntry>
   readonly relations: ReadonlyArray<RelationEntry>
+  readonly documents: ReadonlyArray<DocumentRelationEntry>
 }

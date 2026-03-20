@@ -741,6 +741,7 @@ export {
   addIssueRelationParamsJsonSchema,
   AddIssueRelationParamsSchema,
   type AddIssueRelationResult,
+  type DocumentRelationEntry,
   type ListIssueRelationsParams,
   listIssueRelationsParamsJsonSchema,
   ListIssueRelationsParamsSchema,
@@ -757,6 +758,19 @@ export {
   RemoveIssueRelationParamsSchema,
   type RemoveIssueRelationResult
 } from "./relations.js"
+
+export {
+  type LinkDocumentToIssueParams,
+  linkDocumentToIssueParamsJsonSchema,
+  LinkDocumentToIssueParamsSchema,
+  type LinkDocumentToIssueResult,
+  parseLinkDocumentToIssueParams,
+  parseUnlinkDocumentFromIssueParams,
+  type UnlinkDocumentFromIssueParams,
+  unlinkDocumentFromIssueParamsJsonSchema,
+  UnlinkDocumentFromIssueParamsSchema,
+  type UnlinkDocumentFromIssueResult
+} from "./document-relations.js"
 
 export {
   type ArchiveAllNotificationsResult,

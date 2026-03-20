@@ -1,10 +1,12 @@
 import type { Class, Doc, DocumentUpdate, Ref, RelatedDocument } from "@hcengineering/core"
+import type { Document as HulyDocument, Teamspace as HulyTeamspace } from "@hcengineering/document"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
 import { Effect } from "effect"
 
 import type {
   AddIssueRelationParams,
   AddIssueRelationResult,
+  DocumentRelationEntry,
   ListIssueRelationsParams,
   ListIssueRelationsResult,
   RelationEntry,
@@ -13,7 +15,7 @@ import type {
 } from "../../domain/schemas/relations.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
-import { tracker } from "../huly-plugins.js"
+import { documentPlugin, tracker } from "../huly-plugins.js"
 import { findIssueInProject, findProject, findProjectAndIssue, parseIssueIdentifier, toRef } from "./shared.js"
 
 type RelationError =
@@ -45,15 +47,17 @@ const resolveTargetIssue = (
     return { issue, project: sourceProject }
   })
 
-// RelatedDocument = Pick<Doc, '_id' | '_class'>. Ref<HulyIssue> → Ref<Doc> requires cast
+// RelatedDocument = Pick<Doc, '_id' | '_class'>. Ref<T> → Ref<Doc> requires cast
 // because Ref is invariant on its phantom type parameter. toRef bridges the branded string.
-const makeRelatedDoc = (issue: HulyIssue): RelatedDocument => ({
-  _id: toRef<Doc>(issue._id),
-  _class: toRef<Class<Doc>>(tracker.class.Issue)
+export const makeRelatedDocEntry = (id: string, _class: Ref<Class<Doc>>): RelatedDocument => ({
+  _id: toRef<Doc>(id),
+  _class: toRef<Class<Doc>>(_class)
 })
 
-const hasRelation = (arr: Array<RelatedDocument> | undefined, targetId: Ref<HulyIssue>): boolean =>
-  arr?.some(r => r._id === toRef<Doc>(targetId)) ?? false
+export const hasRelationById = (arr: Array<RelatedDocument> | undefined, id: string): boolean =>
+  arr?.some(r => r._id === toRef<Doc>(id)) ?? false
+
+const makeRelatedDoc = (issue: HulyIssue): RelatedDocument => makeRelatedDocEntry(issue._id, tracker.class.Issue)
 
 export const addIssueRelation = (
   params: AddIssueRelationParams
@@ -76,7 +80,7 @@ export const addIssueRelation = (
     /* eslint-disable no-restricted-syntax -- see above */
     switch (params.relationType) {
       case "blocks": {
-        if (hasRelation(target.blockedBy, source._id)) {
+        if (hasRelationById(target.blockedBy, source._id)) {
           return { ...result, added: false }
         }
         // "blocks": source blocks target. Huly stores this on the blocked issue's blockedBy array.
@@ -89,7 +93,7 @@ export const addIssueRelation = (
         return { ...result, added: true }
       }
       case "is-blocked-by": {
-        if (hasRelation(source.blockedBy, target._id)) {
+        if (hasRelationById(source.blockedBy, target._id)) {
           return { ...result, added: false }
         }
         yield* client.updateDoc(
@@ -101,7 +105,7 @@ export const addIssueRelation = (
         return { ...result, added: true }
       }
       case "relates-to": {
-        if (hasRelation(source.relations, target._id)) {
+        if (hasRelationById(source.relations, target._id)) {
           return { ...result, added: false }
         }
         // Bidirectional: push to both sides. Partial failure accepted — matches Huly UI behavior.
@@ -142,7 +146,7 @@ export const removeIssueRelation = (
     /* eslint-disable no-restricted-syntax -- see above */
     switch (params.relationType) {
       case "blocks": {
-        if (!hasRelation(target.blockedBy, source._id)) {
+        if (!hasRelationById(target.blockedBy, source._id)) {
           return { ...result, removed: false }
         }
         yield* client.updateDoc(
@@ -154,7 +158,7 @@ export const removeIssueRelation = (
         return { ...result, removed: true }
       }
       case "is-blocked-by": {
-        if (!hasRelation(source.blockedBy, target._id)) {
+        if (!hasRelationById(source.blockedBy, target._id)) {
           return { ...result, removed: false }
         }
         yield* client.updateDoc(
@@ -166,7 +170,7 @@ export const removeIssueRelation = (
         return { ...result, removed: true }
       }
       case "relates-to": {
-        if (!hasRelation(source.relations, target._id)) {
+        if (!hasRelationById(source.relations, target._id)) {
           return { ...result, removed: false }
         }
         // Bidirectional: pull from both sides. Partial failure accepted — matches Huly UI behavior.
@@ -199,22 +203,33 @@ export const listIssueRelations = (
 
     const blockedByRefs = issue.blockedBy ?? []
     const relationsRefs = issue.relations ?? []
-    const allIds = [...blockedByRefs, ...relationsRefs].map(r => r._id)
 
-    if (allIds.length === 0) {
-      return { blockedBy: [], relations: [] }
+    if (blockedByRefs.length === 0 && relationsRefs.length === 0) {
+      return { blockedBy: [], relations: [], documents: [] }
     }
 
-    // Ref<Doc> → Ref<HulyIssue> cast: RelatedDocument stores Ref<Doc>, but we know
-    // these are Issue refs because they come from Issue.blockedBy/relations fields
-    const toIssueRef = toRef<HulyIssue>
-    const issueIds = allIds.map(toIssueRef)
-    const issues = yield* client.findAll<HulyIssue>(
-      tracker.class.Issue,
-      { _id: { $in: issueIds } }
-    )
+    // Single-pass partition of relations refs by _class
+    const docClass = String(documentPlugin.class.Document)
+    const issueRelationsRefs: Array<RelatedDocument> = []
+    const docRelationsRefs: Array<RelatedDocument> = []
+    for (const r of relationsRefs) {
+      ;(String(r._class) === docClass ? docRelationsRefs : issueRelationsRefs).push(r)
+    }
 
-    const idToIdentifier = new Map(issues.map(i => [String(i._id), i.identifier]))
+    // Resolve issue refs (blockedBy are always issues; issueRelationsRefs are issue relations)
+    const allIssueIds = [...blockedByRefs, ...issueRelationsRefs].map(r => r._id)
+    const idToIdentifier = new Map<string, string>()
+
+    if (allIssueIds.length > 0) {
+      const toIssueRef = toRef<HulyIssue>
+      const issues = yield* client.findAll<HulyIssue>(
+        tracker.class.Issue,
+        { _id: { $in: allIssueIds.map(toIssueRef) } }
+      )
+      for (const i of issues) {
+        idToIdentifier.set(String(i._id), i.identifier)
+      }
+    }
 
     const toEntry = (r: RelatedDocument): RelationEntry => ({
       identifier: idToIdentifier.get(String(r._id)) ?? String(r._id),
@@ -222,8 +237,43 @@ export const listIssueRelations = (
       _class: String(r._class)
     })
 
+    // Resolve document refs
+    const documents: Array<DocumentRelationEntry> = []
+    if (docRelationsRefs.length > 0) {
+      const toDocRef = toRef<HulyDocument>
+      const docs = yield* client.findAll<HulyDocument>(
+        documentPlugin.class.Document,
+        { _id: { $in: docRelationsRefs.map(r => toDocRef(r._id)) } }
+      )
+      const docMap = new Map(docs.map(d => [String(d._id), d]))
+
+      // Resolve teamspace names for the documents
+      const spaceIds = [...new Set(docs.map(d => d.space))]
+      const tsNameMap = new Map<string, string>()
+      if (spaceIds.length > 0) {
+        const teamspaces = yield* client.findAll<HulyTeamspace>(
+          documentPlugin.class.Teamspace,
+          { _id: { $in: spaceIds.map(toRef<HulyTeamspace>) } }
+        )
+        for (const ts of teamspaces) {
+          tsNameMap.set(String(ts._id), ts.name)
+        }
+      }
+
+      for (const r of docRelationsRefs) {
+        const doc = docMap.get(String(r._id))
+        documents.push({
+          title: doc?.title ?? String(r._id),
+          teamspace: doc ? (tsNameMap.get(String(doc.space)) ?? String(doc.space)) : String(r._id),
+          _id: String(r._id),
+          _class: String(r._class)
+        })
+      }
+    }
+
     return {
       blockedBy: blockedByRefs.map(toEntry),
-      relations: relationsRefs.map(toEntry)
+      relations: issueRelationsRefs.map(toEntry),
+      documents
     }
   })
