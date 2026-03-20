@@ -52,13 +52,13 @@ The full suite tests CRUD lifecycles with cleanup for all domains:
 
 | Section | Tools Tested | Notes |
 |---------|-------------|-------|
-| 1. Projects | list, get | create/update/delete skipped (pollutes workspace) |
+| 1. Projects | list, get, list_statuses | create/update/delete skipped (pollutes workspace) |
 | 2. Issues | create, get, list, update, delete, sub-issues, move, relations (add/list/remove), labels (add/remove), comments (add/list/update/delete), activity, time tracking (log/report/detailed), preview_deletion | Full lifecycle with all issue-related operations |
 | 3. Components | create, list, get, update, delete, set_issue_component | CRUD + assignment |
 | 4. Milestones | create, list, get, update, delete, set_issue_milestone | CRUD + assignment |
 | 5. Templates | create, list, get, update, delete, add_template_child, remove_template_child, create_issue_from_template | Full lifecycle including children |
 | 6. Labels & Tags | create/list/update/delete tag_category, create/list/update/delete label | Full CRUD for both |
-| 7. Documents | list_teamspaces, create/list/get/update/delete document | Full CRUD |
+| 7. Documents | list_teamspaces, create/list/get/update/delete document, list_inline_comments | Full CRUD + inline comments |
 | 8. Teamspaces | create, get, update, delete | Full CRUD |
 | 9. Channels | list, get, messages, DMs, create channel, send_message, thread replies (add/list/update/delete), reactions (add/list/remove), save/unsave, update/delete channel | All messaging in temp channel (deleted at end) |
 | 10. Contacts | list_persons, list_employees, list_organizations, get_user_profile, create/update/delete person | CRUD (create_organization skipped — no delete tool) |

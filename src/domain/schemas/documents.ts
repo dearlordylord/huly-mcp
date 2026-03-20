@@ -290,6 +290,43 @@ export interface DeleteTeamspaceResult {
   readonly deleted: boolean
 }
 
+// --- Inline Comments ---
+
+export const ListInlineCommentsParamsSchema = Schema.Struct({
+  teamspace: TeamspaceIdentifier.annotations({
+    description: "Teamspace name or ID"
+  }),
+  document: DocumentIdentifier.annotations({
+    description: "Document title or ID"
+  }),
+  includeReplies: Schema.optional(Schema.Boolean.annotations({
+    description: "Include thread reply messages for each inline comment (default: false)"
+  }))
+}).annotations({
+  title: "ListInlineCommentsParams",
+  description: "Parameters for listing inline comment threads in a document"
+})
+
+export type ListInlineCommentsParams = Schema.Schema.Type<typeof ListInlineCommentsParamsSchema>
+
+export interface InlineCommentReply {
+  readonly id: string
+  readonly body: string
+  readonly sender?: string | undefined
+  readonly createdOn?: number | undefined
+}
+
+export interface InlineCommentThread {
+  readonly threadId: string
+  readonly text: string
+  readonly replies?: ReadonlyArray<InlineCommentReply> | undefined
+}
+
+export interface ListInlineCommentsResult {
+  readonly comments: ReadonlyArray<InlineCommentThread>
+  readonly total: number
+}
+
 // --- JSON Schemas & Parsers ---
 
 export const listTeamspacesParamsJsonSchema = JSONSchema.make(ListTeamspacesParamsSchema)
@@ -301,6 +338,7 @@ export const listDocumentsParamsJsonSchema = JSONSchema.make(ListDocumentsParams
 export const getDocumentParamsJsonSchema = JSONSchema.make(GetDocumentParamsSchema)
 export const createDocumentParamsJsonSchema = JSONSchema.make(CreateDocumentParamsSchema)
 export const editDocumentParamsJsonSchema = JSONSchema.make(EditDocumentParamsSchema)
+export const listInlineCommentsParamsJsonSchema = JSONSchema.make(ListInlineCommentsParamsSchema)
 export const deleteDocumentParamsJsonSchema = JSONSchema.make(DeleteDocumentParamsSchema)
 
 export const parseListTeamspacesParams = Schema.decodeUnknown(ListTeamspacesParamsSchema)
@@ -312,6 +350,7 @@ export const parseListDocumentsParams = Schema.decodeUnknown(ListDocumentsParams
 export const parseGetDocumentParams = Schema.decodeUnknown(GetDocumentParamsSchema)
 export const parseCreateDocumentParams = Schema.decodeUnknown(CreateDocumentParamsSchema)
 export const parseEditDocumentParams = Schema.decodeUnknown(EditDocumentParamsSchema)
+export const parseListInlineCommentsParams = Schema.decodeUnknown(ListInlineCommentsParamsSchema)
 export const parseDeleteDocumentParams = Schema.decodeUnknown(DeleteDocumentParamsSchema)
 
 // No codec needed — internal type, not used for runtime validation

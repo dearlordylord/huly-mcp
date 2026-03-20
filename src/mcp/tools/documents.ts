@@ -7,6 +7,7 @@ import {
   getDocumentParamsJsonSchema,
   getTeamspaceParamsJsonSchema,
   listDocumentsParamsJsonSchema,
+  listInlineCommentsParamsJsonSchema,
   listTeamspacesParamsJsonSchema,
   parseCreateDocumentParams,
   parseCreateTeamspaceParams,
@@ -16,6 +17,7 @@ import {
   parseGetDocumentParams,
   parseGetTeamspaceParams,
   parseListDocumentsParams,
+  parseListInlineCommentsParams,
   parseListTeamspacesParams,
   parseUpdateTeamspaceParams,
   updateTeamspaceParamsJsonSchema
@@ -29,6 +31,7 @@ import {
   getDocument,
   getTeamspace,
   listDocuments,
+  listInlineComments,
   listTeamspaces,
   updateTeamspace
 } from "../../huly/operations/documents.js"
@@ -142,6 +145,18 @@ export const documentTools: ReadonlyArray<RegisteredTool> = [
       "edit_document",
       parseEditDocumentParams,
       editDocument
+    )
+  },
+  {
+    name: "list_inline_comments",
+    description:
+      "List inline comment threads from a Huly document. Extracts comments embedded in document content as ProseMirror marks. Each comment includes the highlighted text and thread ID. Set includeReplies=true to also fetch thread reply messages with sender names.",
+    category: CATEGORY,
+    inputSchema: listInlineCommentsParamsJsonSchema,
+    handler: createToolHandler(
+      "list_inline_comments",
+      parseListInlineCommentsParams,
+      listInlineComments
     )
   },
   {

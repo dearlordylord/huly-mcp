@@ -154,6 +154,7 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 |------|-------------|
 | `list_projects` | List all Huly projects. Returns projects sorted by name. Supports filtering by archived status. |
 | `get_project` | Get full details of a Huly project including its statuses. Returns project name, description, archived flag, default status, and all available statuses. |
+| `list_statuses` | List all issue statuses for a Huly project with category info. Returns status name, isDone, isCanceled, and isDefault flags. Use this to discover valid statuses before creating or updating issues. |
 | `create_project` | Create a new Huly tracker project. Idempotent: returns existing project if one with the same identifier already exists (created=false). Identifier must be 1-5 uppercase alphanumeric chars starting with a letter. |
 | `update_project` | Update a Huly project. Only provided fields are modified. Set description to null to clear it. |
 | `delete_project` | Permanently delete a Huly project. All issues, milestones, and components in this project will be orphaned. This action cannot be undone. |
@@ -222,6 +223,7 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `get_document` | Retrieve full details for a Huly document including markdown content. Use this to view document content and metadata. |
 | `create_document` | Create a new document in a Huly teamspace. Content supports markdown formatting. Returns the created document id. |
 | `edit_document` | Edit an existing Huly document. Two content modes (mutually exclusive): (1) 'content' for full replace, (2) 'old_text' + 'new_text' for targeted search-and-replace. Multiple matches error unless replace_all is true. Empty new_text deletes matched text. Also supports renaming via 'title'. |
+| `list_inline_comments` | List inline comment threads from a Huly document. Extracts comments embedded in document content as ProseMirror marks. Each comment includes the highlighted text and thread ID. Set includeReplies=true to also fetch thread reply messages with sender names. |
 | `delete_document` | Permanently delete a Huly document. This action cannot be undone. |
 
 ### Storage

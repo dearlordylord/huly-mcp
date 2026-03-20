@@ -20,12 +20,14 @@ import type {
   GetProjectParams,
   ListProjectsParams,
   ListProjectsResult,
+  ListStatusesParams,
   Project,
   UpdateProjectParams,
   UpdateProjectResult
 } from "../../domain/schemas.js"
+import type { ListStatusesResult, StatusDetail } from "../../domain/schemas/projects.js"
 import { parseProject, ProjectSummarySchema } from "../../domain/schemas/projects.js"
-import { ProjectIdentifier } from "../../domain/schemas/shared.js"
+import { ProjectIdentifier, StatusName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { ProjectNotFoundError } from "../errors.js"
 import { HulyConnectionError } from "../errors.js"
@@ -113,6 +115,24 @@ export const getProject = (
         })
       )
     )
+  })
+
+type ListStatusesError = ProjectNotFoundError | HulyClientError | HulyConnectionError
+
+export const listStatuses = (
+  params: ListStatusesParams
+): Effect.Effect<ListStatusesResult, ListStatusesError, HulyClient> =>
+  Effect.gen(function*() {
+    const { defaultStatusId, statuses } = yield* findProjectWithStatuses(params.project)
+
+    const details: Array<StatusDetail> = statuses.map(s => ({
+      name: StatusName.make(s.name),
+      isDone: s.isDone,
+      isCanceled: s.isCanceled,
+      isDefault: s._id === defaultStatusId
+    }))
+
+    return { statuses: details, total: details.length }
   })
 
 export const createProject = (

@@ -49,6 +49,7 @@ import { clampLimit, findByNameOrId, toRef } from "./shared.js"
 import { core, documentPlugin } from "../huly-plugins.js"
 
 export { editDocument } from "./documents-edit.js"
+export { listInlineComments } from "./documents-inline-comments.js"
 
 type ListTeamspacesError = HulyClientError
 

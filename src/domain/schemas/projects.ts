@@ -80,13 +80,36 @@ export const DeleteProjectParamsSchema = Schema.Struct({
 }).annotations({ title: "DeleteProjectParams", description: "Parameters for deleting a project" })
 export type DeleteProjectParams = Schema.Schema.Type<typeof DeleteProjectParamsSchema>
 
+export const ListStatusesParamsSchema = Schema.Struct({
+  project: ProjectIdentifier.annotations({ description: "Project identifier (e.g., 'HULY')" })
+}).annotations({ title: "ListStatusesParams", description: "Parameters for listing project statuses" })
+export type ListStatusesParams = Schema.Schema.Type<typeof ListStatusesParamsSchema>
+
+export const StatusDetailSchema = Schema.Struct({
+  name: StatusName,
+  isDone: Schema.Boolean,
+  isCanceled: Schema.Boolean,
+  isDefault: Schema.Boolean
+}).annotations({
+  title: "StatusDetail",
+  description: "Issue status with category and default info"
+})
+export type StatusDetail = Schema.Schema.Type<typeof StatusDetailSchema>
+
+export interface ListStatusesResult {
+  readonly statuses: ReadonlyArray<StatusDetail>
+  readonly total: number
+}
+
 export const listProjectsParamsJsonSchema = JSONSchema.make(ListProjectsParamsSchema)
+export const listStatusesParamsJsonSchema = JSONSchema.make(ListStatusesParamsSchema)
 export const getProjectParamsJsonSchema = JSONSchema.make(GetProjectParamsSchema)
 export const createProjectParamsJsonSchema = JSONSchema.make(CreateProjectParamsSchema)
 export const updateProjectParamsJsonSchema = JSONSchema.make(UpdateProjectParamsSchema)
 export const deleteProjectParamsJsonSchema = JSONSchema.make(DeleteProjectParamsSchema)
 
 export const parseListProjectsParams = Schema.decodeUnknown(ListProjectsParamsSchema)
+export const parseListStatusesParams = Schema.decodeUnknown(ListStatusesParamsSchema)
 export const parseGetProjectParams = Schema.decodeUnknown(GetProjectParamsSchema)
 export const parseCreateProjectParams = Schema.decodeUnknown(CreateProjectParamsSchema)
 export const parseUpdateProjectParams = Schema.decodeUnknown(UpdateProjectParamsSchema)

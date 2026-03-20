@@ -3,10 +3,12 @@ import {
   deleteProjectParamsJsonSchema,
   getProjectParamsJsonSchema,
   listProjectsParamsJsonSchema,
+  listStatusesParamsJsonSchema,
   parseCreateProjectParams,
   parseDeleteProjectParams,
   parseGetProjectParams,
   parseListProjectsParams,
+  parseListStatusesParams,
   parseUpdateProjectParams,
   updateProjectParamsJsonSchema
 } from "../../domain/schemas.js"
@@ -15,6 +17,7 @@ import {
   deleteProject,
   getProject,
   listProjects,
+  listStatuses,
   updateProject
 } from "../../huly/operations/projects.js"
 import { createToolHandler, type RegisteredTool } from "./registry.js"
@@ -43,6 +46,18 @@ export const projectTools: ReadonlyArray<RegisteredTool> = [
       "get_project",
       parseGetProjectParams,
       getProject
+    )
+  },
+  {
+    name: "list_statuses",
+    description:
+      "List all issue statuses for a Huly project with category info. Returns status name, isDone, isCanceled, and isDefault flags. Use this to discover valid statuses before creating or updating issues.",
+    category: CATEGORY,
+    inputSchema: listStatusesParamsJsonSchema,
+    handler: createToolHandler(
+      "list_statuses",
+      parseListStatusesParams,
+      listStatuses
     )
   },
   {

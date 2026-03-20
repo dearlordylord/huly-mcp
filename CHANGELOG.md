@@ -1,5 +1,14 @@
 # @firfi/huly-mcp
 
+## 0.1.62
+
+### Patch Changes
+
+- feat: add `list_statuses` and `list_inline_comments` tools
+
+  - `list_statuses`: returns project statuses with isDone, isCanceled, isDefault flags — useful for LLMs to pick valid statuses when creating/updating issues
+  - `list_inline_comments`: extracts inline comment threads from document markup with optional thread reply fetching including sender names
+
 ## 0.1.61
 
 ### Patch Changes
