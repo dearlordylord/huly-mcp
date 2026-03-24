@@ -19,9 +19,54 @@ import type { TelemetryOperations } from "../telemetry/telemetry.js"
 import { TelemetryService } from "../telemetry/telemetry.js"
 import { VERSION } from "../version.js"
 import type { McpToolResponse } from "./error-mapping.js"
-import { createUnknownToolError, mapDomainErrorToMcp, McpErrorCode, toMcpResponse } from "./error-mapping.js"
+import {
+  createSuccessResponse,
+  createUnknownToolError,
+  mapDomainErrorToMcp,
+  McpErrorCode,
+  toMcpResponse
+} from "./error-mapping.js"
 import type { ToolRegistry } from "./tools/index.js"
 import { CATEGORY_NAMES, createFilteredRegistry, resolveAnnotations, toolRegistry } from "./tools/index.js"
+
+const NPM_PACKAGE_NAME = "@firfi/huly-mcp"
+const VERSION_TOOL_NAME = "get_version"
+
+const versionToolDefinition = {
+  name: VERSION_TOOL_NAME,
+  description: "Returns the current version of this Huly MCP server and the latest version available on npm.",
+  inputSchema: { type: "object" as const, properties: {} },
+  annotations: {
+    title: "Get Version",
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true
+  }
+}
+
+const NPM_FETCH_TIMEOUT_MS = 5_000
+
+const fetchLatestNpmVersion = async (): Promise<string> => {
+  try {
+    const res = await fetch(`https://registry.npmjs.org/${NPM_PACKAGE_NAME}/latest`, {
+      signal: AbortSignal.timeout(NPM_FETCH_TIMEOUT_MS)
+    })
+    if (!res.ok) return "unknown"
+    const data: unknown = await res.json()
+    if (typeof data === "object" && data !== null && "version" in data && typeof data.version === "string") {
+      return data.version
+    }
+    return "unknown"
+  } catch {
+    return "unknown"
+  }
+}
+
+const handleVersionTool = async (): Promise<McpToolResponse> => {
+  const latest = await fetchLatestNpmVersion()
+  return createSuccessResponse({ current: VERSION, latest })
+}
 
 interface McpInputSchema {
   readonly type: "object"
@@ -131,15 +176,18 @@ const createMcpServer = (
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     telemetry.firstListTools()
     return {
-      tools: registry.definitions.flatMap((tool) => {
-        if (!isObjectSchema(tool.inputSchema)) return []
-        return [{
-          name: tool.name,
-          description: tool.description,
-          inputSchema: tool.inputSchema,
-          annotations: resolveAnnotations(tool)
-        }]
-      })
+      tools: [
+        versionToolDefinition,
+        ...registry.definitions.flatMap((tool) => {
+          if (!isObjectSchema(tool.inputSchema)) return []
+          return [{
+            name: tool.name,
+            description: tool.description,
+            inputSchema: tool.inputSchema,
+            annotations: resolveAnnotations(tool)
+          }]
+        })
+      ]
     }
   })
 
@@ -151,6 +199,22 @@ const createMcpServer = (
       const start = Date.now() // eslint-disable-line no-restricted-syntax -- non-Effect async handler
       const inputBytes = JSON.stringify(args ?? {}).length
 
+      const computeOutputBytes = (response: McpToolResponse): number =>
+        response.content.reduce((sum, c) => sum + c.text.length, 0)
+
+      if (name === VERSION_TOOL_NAME) {
+        const versionResponse = await handleVersionTool()
+        const durationMs = Date.now() - start // eslint-disable-line no-restricted-syntax -- non-Effect async handler
+        telemetry.toolCalled({
+          toolName: name,
+          status: "success",
+          durationMs,
+          inputBytes,
+          outputBytes: computeOutputBytes(versionResponse)
+        })
+        return toMcpResponse(versionResponse)
+      }
+
       const deriveEditMode = (): string | undefined => {
         if (name !== "edit_document" || args === undefined) return undefined
         if ("old_text" in args) return "search_and_replace"
@@ -158,9 +222,6 @@ const createMcpServer = (
         return "title_only"
       }
       const editMode = deriveEditMode()
-
-      const computeOutputBytes = (response: McpToolResponse): number =>
-        response.content.reduce((sum, c) => sum + c.text.length, 0)
 
       let clients: ClientBundle
       try {
