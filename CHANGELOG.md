@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.3.0
+
+### Minor Changes
+
+- feat: add get_version tool returning current and latest npm version
+
 ## 0.2.0
 
 ### Minor Changes
