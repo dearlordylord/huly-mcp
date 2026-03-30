@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.3.2
+
+### Patch Changes
+
+- fix: move bundled dependencies to devDependencies to fix npx install
+
 ## 0.3.1
 
 ### Patch Changes
