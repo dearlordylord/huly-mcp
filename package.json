@@ -55,8 +55,28 @@
   "author": "dearlordylord",
   "license": "MIT",
   "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "lint-staged": {
+    "*.ts": "eslint --fix"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "core-js",
+      "esbuild",
+      "@parcel/watcher",
+      "msgpackr-extract",
+      "unrs-resolver"
+    ]
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.30.0",
+    "@effect/eslint-plugin": "^0.3.2",
+    "@effect/language-service": "^0.73.1",
     "@effect/platform": "^0.94.2",
     "@effect/platform-node": "^0.104.1",
+    "@effect/vitest": "latest",
+    "@eslint/compat": "^2.0.2",
     "@hcengineering/account-client": "0.7.25",
     "@hcengineering/activity": "0.7.0",
     "@hcengineering/api-client": "0.7.19",
@@ -79,31 +99,11 @@
     "@hcengineering/tracker": "0.7.0",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@total-typescript/ts-reset": "^0.6.1",
-    "effect": "^3.19.15",
-    "posthog-node": "^5.24.11"
-  },
-  "lint-staged": {
-    "*.ts": "eslint --fix"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "core-js",
-      "esbuild",
-      "@parcel/watcher",
-      "msgpackr-extract",
-      "unrs-resolver"
-    ]
-  },
-  "devDependencies": {
-    "@changesets/cli": "^2.30.0",
-    "@effect/eslint-plugin": "^0.3.2",
-    "@effect/language-service": "^0.73.1",
-    "@effect/vitest": "latest",
-    "@eslint/compat": "^2.0.2",
     "@types/express": "^5.0.6",
     "@types/node": "^25.1.0",
     "@types/ws": "^8.18.1",
     "@typescript-eslint/parser": "^8.54.0",
+    "effect": "^3.19.15",
     "esbuild": "^0.27.2",
     "eslint": "^9.39.2",
     "eslint-import-resolver-typescript": "^4.4.4",
@@ -116,6 +116,7 @@
     "jscpd": "^4.0.8",
     "lint-staged": "^16.2.7",
     "madge": "^8.0.0",
+    "posthog-node": "^5.24.11",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.54.0",
