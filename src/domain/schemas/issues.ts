@@ -211,6 +211,14 @@ export const CreateIssueParamsSchema = Schema.Struct({
   })),
   parentIssue: Schema.optional(IssueIdentifier.annotations({
     description: "Parent issue identifier (e.g., 'HULY-42') to create as sub-issue"
+  })),
+  dueDate: Schema.optional(
+    Schema.NullOr(Timestamp).annotations({
+      description: "Due date as Unix timestamp in milliseconds (e.g., 1719792000000 for 2024-07-01), or null to clear"
+    })
+  ),
+  estimation: Schema.optional(PositiveNumber.annotations({
+    description: "Time estimation in hours"
   }))
 }).annotations({
   title: "CreateIssueParams",
@@ -242,7 +250,17 @@ export const UpdateIssueParamsSchema = Schema.Struct({
   ),
   status: Schema.optional(StatusName.annotations({
     description: "New status"
-  }))
+  })),
+  dueDate: Schema.optional(
+    Schema.NullOr(Timestamp).annotations({
+      description: "Due date as Unix timestamp in milliseconds (e.g., 1719792000000 for 2024-07-01), or null to clear"
+    })
+  ),
+  estimation: Schema.optional(
+    Schema.NullOr(PositiveNumber).annotations({
+      description: "Time estimation in hours, or null to clear"
+    })
+  )
 }).annotations({
   title: "UpdateIssueParams",
   description: "Parameters for updating an issue"

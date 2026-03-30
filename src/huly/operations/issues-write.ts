@@ -183,14 +183,14 @@ export const createIssue = (
       priority,
       assignee: assigneeRef,
       component: null,
-      estimation: 0,
+      estimation: params.estimation ?? 0,
       remainingTime: 0,
       reportedTime: 0,
       reports: 0,
       subIssues: 0,
       parents,
       childInfo: [],
-      dueDate: null,
+      dueDate: params.dueDate ?? null,
       rank
     }
     yield* client.addCollection(
@@ -277,6 +277,14 @@ export const updateIssue = (
         const person = yield* resolveAssignee(client, params.assignee)
         updateOps.assignee = person._id
       }
+    }
+
+    if (params.dueDate !== undefined) {
+      updateOps.dueDate = params.dueDate
+    }
+
+    if (params.estimation !== undefined) {
+      updateOps.estimation = params.estimation ?? 0
     }
 
     if (Object.keys(updateOps).length === 0 && !descriptionUpdatedInPlace) {
