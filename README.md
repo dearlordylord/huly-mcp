@@ -94,6 +94,10 @@ Add the standard config to your Windsurf MCP configuration file.
 
 </details>
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/dearlordylord-huly-mcp).
+
 ## Updating
 
 The `@latest` tag in the install command always fetches the newest version. Most MCP clients cache the installed package, so you need to force a re-fetch:
