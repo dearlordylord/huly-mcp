@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.5.0
+
+### Minor Changes
+
+- 81c6ab2: Add custom fields support with auto-discovery: list_custom_fields, get_custom_field_values, set_custom_field tools. Auto-discovers field definitions from Huly's Attribute system without manual configuration. Works for Cards, Issues, and any class with custom fields.
+
 ## 0.4.0
 
 ### Minor Changes
