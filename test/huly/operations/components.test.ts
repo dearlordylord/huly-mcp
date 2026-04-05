@@ -19,6 +19,7 @@ import type {
   ProjectNotFoundError
 } from "../../../src/huly/errors.js"
 import { contact, tracker } from "../../../src/huly/huly-plugins.js"
+import { markdownToMarkupString } from "../../../src/huly/operations/channels.js"
 import {
   createComponent,
   deleteComponent,
@@ -566,7 +567,7 @@ describe("createComponent", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result.label).toBe("Frontend")
-      expect(captureCreateDoc.attributes?.description).toBe("UI component")
+      expect(captureCreateDoc.attributes?.description).toBe(markdownToMarkupString("UI component"))
       expect(captureCreateDoc.attributes?.lead).toBe("person-1")
     }))
 
@@ -658,7 +659,7 @@ describe("updateComponent", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result.updated).toBe(true)
-      expect(captureUpdateDoc.operations?.description).toBe("Updated description")
+      expect(captureUpdateDoc.operations?.description).toBe(markdownToMarkupString("Updated description"))
     }))
 
   // test-revizorro: approved

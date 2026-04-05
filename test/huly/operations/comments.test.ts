@@ -16,6 +16,7 @@ import { addComment, deleteComment, listComments, updateComment } from "../../..
 import { commentBrandId, issueIdentifier, projectIdentifier } from "../../helpers/brands.js"
 
 import { chunter, tracker } from "../../../src/huly/huly-plugins.js"
+import { markdownToMarkupString } from "../../../src/huly/operations/channels.js"
 
 // --- Mock Data Builders ---
 
@@ -548,7 +549,7 @@ describe("addComment", () => {
 
         expect(result.commentId).toBeDefined()
         expect(result.issueIdentifier).toBe("TEST-1")
-        expect(captureAddCollection.attributes?.message).toBe("This is my new comment")
+        expect(captureAddCollection.attributes?.message).toBe(markdownToMarkupString("This is my new comment"))
       }))
 
     // test-revizorro: approved
@@ -571,8 +572,9 @@ describe("addComment", () => {
           body: "# Heading\n\n- Item 1\n- Item 2\n\n```js\nconsole.log('test');\n```"
         }).pipe(Effect.provide(testLayer))
 
-        expect(captureAddCollection.attributes?.message).toContain("# Heading")
-        expect(captureAddCollection.attributes?.message).toContain("console.log")
+        const markdownBody = "# Heading\n\n- Item 1\n- Item 2\n\n```js\nconsole.log('test');\n```"
+        const stored = captureAddCollection.attributes?.message as string
+        expect(stored).toBe(markdownToMarkupString(markdownBody))
       }))
 
     // test-revizorro: approved
@@ -691,7 +693,7 @@ describe("updateComment", () => {
         expect(result.commentId).toBe("comment-abc")
         expect(result.issueIdentifier).toBe("TEST-1")
         expect(result.updated).toBe(true)
-        expect(captureUpdateDoc.operations?.message).toBe("Updated comment body")
+        expect(captureUpdateDoc.operations?.message).toBe(markdownToMarkupString("Updated comment body"))
         const editedOn = captureUpdateDoc.operations?.editedOn as number
         expect(editedOn).toBeGreaterThanOrEqual(before)
         expect(editedOn).toBeLessThanOrEqual(after)
@@ -764,7 +766,7 @@ describe("updateComment", () => {
           body: "**Bold** and *italic*"
         }).pipe(Effect.provide(testLayer))
 
-        expect(captureUpdateDoc.operations?.message).toBe("**Bold** and *italic*")
+        expect(captureUpdateDoc.operations?.message).toBe(markdownToMarkupString("**Bold** and *italic*"))
       }))
 
     // test-revizorro: approved
@@ -780,7 +782,7 @@ describe("updateComment", () => {
         const messages = [
           makeChatMessage({
             _id: "comment-abc" as Ref<ChatMessage>,
-            message: "Same content",
+            message: markdownToMarkupString("Same content"),
             attachedTo: "issue-1" as Ref<Doc>
           })
         ]

@@ -18,6 +18,7 @@ import { CommentNotFoundError, HulyConnectionError } from "../errors.js"
 import { clampLimit, findProjectAndIssue as findProjectAndIssueShared, toRef } from "./shared.js"
 
 import { chunter, tracker } from "../huly-plugins.js"
+import { markdownToMarkupString, markupToMarkdownString } from "./channels.js"
 
 type ListCommentsError =
   | HulyClientError
@@ -109,7 +110,7 @@ export const listComments = (
     const validated = yield* Schema.decodeUnknown(Schema.Array(CommentSchema))(
       messages.map((msg) => ({
         id: msg._id,
-        body: msg.message,
+        body: msg.message ? markupToMarkdownString(msg.message) : "",
         authorId: msg.modifiedBy,
         createdOn: msg.createdOn,
         modifiedOn: msg.modifiedOn,
@@ -142,7 +143,7 @@ export const addComment = (
     const commentId: Ref<ChatMessage> = generateId()
 
     const commentData: AttachedData<ChatMessage> = {
-      message: params.body
+      message: markdownToMarkupString(params.body)
     }
 
     yield* client.addCollection(
@@ -170,7 +171,9 @@ export const updateComment = (
   Effect.gen(function*() {
     const { client, comment, issue, project } = yield* findComment(params)
 
-    if (params.body === comment.message) {
+    const newMarkup = markdownToMarkupString(params.body)
+
+    if (newMarkup === comment.message) {
       return {
         commentId: CommentId.make(params.commentId),
         issueIdentifier: IssueIdentifier.make(issue.identifier),
@@ -180,7 +183,7 @@ export const updateComment = (
 
     const now = yield* Clock.currentTimeMillis
     const updateOps: DocumentUpdate<ChatMessage> = {
-      message: params.body,
+      message: newMarkup,
       editedOn: now
     }
 

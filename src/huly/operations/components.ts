@@ -36,6 +36,7 @@ import { ComponentNotFoundError, PersonNotFoundError } from "../errors.js"
 import { findPersonByEmailOrName, findProject, findProjectAndIssue, toRef } from "./shared.js"
 
 import { contact, tracker } from "../huly-plugins.js"
+import { markdownToMarkupString, markupToMarkdownString } from "./channels.js"
 
 type ListComponentsError =
   | HulyClientError
@@ -171,7 +172,7 @@ export const getComponent = (
     const result: Component = {
       id: ComponentId.make(component._id),
       label: ComponentLabel.make(component.label),
-      description: component.description,
+      description: component.description ? markupToMarkdownString(component.description) : undefined,
       lead: leadName !== undefined ? PersonName.make(leadName) : undefined,
       project: params.project,
       modifiedOn: component.modifiedOn,
@@ -204,7 +205,7 @@ export const createComponent = (
 
     const componentData: Data<HulyComponent> = {
       label: params.label,
-      description: params.description ?? "",
+      description: params.description ? markdownToMarkupString(params.description) : "",
       lead: leadRef,
       comments: 0
     }
@@ -232,7 +233,7 @@ export const updateComponent = (
     }
 
     if (params.description !== undefined) {
-      updateOps.description = params.description
+      updateOps.description = params.description.trim() === "" ? "" : markdownToMarkupString(params.description)
     }
 
     if (params.lead !== undefined) {
