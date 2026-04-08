@@ -1,6 +1,15 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { PersonUuid, WorkspaceUuid } from "./shared.js"
+import type {
+  Email,
+  PersonName,
+  PersonUuid,
+  UrlString,
+  WorkspaceMode,
+  WorkspaceName,
+  WorkspaceUuid,
+  WorkspaceVersion
+} from "./shared.js"
 import { AccountId, EmptyParamsSchema, LimitParam, NonEmptyString, RegionId } from "./shared.js"
 
 export const AccountRoleSchema = Schema.Literal(
@@ -32,26 +41,26 @@ export const AccountRoleValues = [
 export interface WorkspaceMember {
   readonly personId: PersonUuid
   readonly role: AccountRole
-  readonly name?: string | undefined
-  readonly email?: string | undefined
+  readonly name?: PersonName | undefined
+  readonly email?: Email | undefined
 }
 
 export interface WorkspaceInfo {
   readonly uuid: WorkspaceUuid
-  readonly name: string
-  readonly url: string
+  readonly name: WorkspaceName
+  readonly url: UrlString
   readonly region?: RegionId | undefined
   readonly createdOn: number
   readonly allowReadOnlyGuest?: boolean | undefined
   readonly allowGuestSignUp?: boolean | undefined
-  readonly version?: string | undefined
-  readonly mode?: string | undefined
+  readonly version?: WorkspaceVersion | undefined
+  readonly mode?: WorkspaceMode | undefined
 }
 
 export interface WorkspaceSummary {
   readonly uuid: WorkspaceUuid
-  readonly name: string
-  readonly url: string
+  readonly name: WorkspaceName
+  readonly url: UrlString
   readonly region?: RegionId | undefined
   readonly createdOn: number
   readonly lastVisit?: number | undefined
@@ -215,8 +224,8 @@ export interface UpdateMemberRoleResult {
 
 export interface CreateWorkspaceResult {
   readonly uuid: WorkspaceUuid
-  readonly url: string
-  readonly name: string
+  readonly url: UrlString
+  readonly name: WorkspaceName
 }
 
 export interface DeleteWorkspaceResult {

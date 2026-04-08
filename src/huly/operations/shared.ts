@@ -6,7 +6,7 @@ import { IssuePriority } from "@hcengineering/tracker"
 import { Effect } from "effect"
 
 import type { IssuePriority as IssuePriorityStr } from "../../domain/schemas/issues.js"
-import { MAX_LIMIT, type NonNegativeNumber } from "../../domain/schemas/shared.js"
+import { MAX_LIMIT, type NonEmptyString, type NonNegativeNumber } from "../../domain/schemas/shared.js"
 import { PositiveNumber } from "../../domain/schemas/shared.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError, type HulyClientOperations } from "../client.js"
@@ -17,7 +17,7 @@ import { escapeLikeWildcards } from "./query-helpers.js"
 // Huly SDK uses `Ref<T>` (a branded string) for entity references.
 // Our domain uses Effect Schema brands. No type-safe bridge exists; this is the boundary cast.
 // eslint-disable-next-line no-restricted-syntax -- see above
-export const toRef = <T extends Doc>(id: string): Ref<T> => id as Ref<T>
+export const toRef = <T extends Doc>(id: NonEmptyString | Ref<T>): Ref<T> => id as Ref<T>
 
 // Huly API uses 0 as sentinel for "not set" on numeric fields like estimation and remainingTime.
 // Confirmed: creating an issue without estimation stores 0, not null/undefined.
@@ -53,6 +53,22 @@ export const findByNameOrId = <T extends Doc>(
       result !== undefined
         ? Effect.succeed(result)
         : client.findOne<T>(_class, fallbackQuery, options)
+  )
+
+export const findByNameOrIdOrFail = <T extends Doc, E>(
+  client: HulyClientOperations,
+  _class: Ref<Class<T>>,
+  primaryQuery: DocumentQuery<T>,
+  fallbackQuery: DocumentQuery<T>,
+  onNotFound: () => E,
+  options?: FindOptions<T>
+): Effect.Effect<WithLookup<T>, E | HulyClientError> =>
+  Effect.flatMap(
+    findByNameOrId(client, _class, primaryQuery, fallbackQuery, options),
+    (result) =>
+      result !== undefined
+        ? Effect.succeed(result)
+        : Effect.fail(onNotFound())
   )
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

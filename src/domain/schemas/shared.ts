@@ -3,12 +3,14 @@ import { JSONSchema, Schema } from "effect"
 export const MAX_LIMIT = 200
 
 export const NonEmptyString = Schema.Trim.pipe(Schema.nonEmptyString())
+export type NonEmptyString = Schema.Schema.Type<typeof NonEmptyString>
 
 export const Timestamp = Schema.NonNegativeInt.annotations({
   identifier: "Timestamp",
   title: "Timestamp",
   description: "Unix timestamp in milliseconds (non-negative integer)"
 })
+export type Timestamp = Schema.Schema.Type<typeof Timestamp>
 
 export const LimitParam = Schema.Number.pipe(
   Schema.int(),
@@ -107,6 +109,12 @@ export type TagElementId = Schema.Schema.Type<typeof TagElementId>
 export const TagCategoryId = HulyRef("TagCategoryId")
 export type TagCategoryId = Schema.Schema.Type<typeof TagCategoryId>
 
+export const WorkSlotId = HulyRef("WorkSlotId")
+export type WorkSlotId = Schema.Schema.Type<typeof WorkSlotId>
+
+export const CustomFieldId = HulyRef("CustomFieldId")
+export type CustomFieldId = Schema.Schema.Type<typeof CustomFieldId>
+
 export const TestProjectId = HulyRef("TestProjectId")
 export type TestProjectId = Schema.Schema.Type<typeof TestProjectId>
 
@@ -178,6 +186,18 @@ export type NotificationProviderId = Schema.Schema.Type<typeof NotificationProvi
 
 export const NotificationTypeId = NonEmptyString.pipe(Schema.brand("NotificationTypeId"))
 export type NotificationTypeId = Schema.Schema.Type<typeof NotificationTypeId>
+
+export const WorkspaceName = NonEmptyString.pipe(Schema.brand("WorkspaceName"))
+export type WorkspaceName = Schema.Schema.Type<typeof WorkspaceName>
+
+export const UrlString = NonEmptyString.pipe(Schema.brand("UrlString"))
+export type UrlString = Schema.Schema.Type<typeof UrlString>
+
+export const WorkspaceVersion = NonEmptyString.pipe(Schema.brand("WorkspaceVersion"))
+export type WorkspaceVersion = Schema.Schema.Type<typeof WorkspaceVersion>
+
+export const WorkspaceMode = NonEmptyString.pipe(Schema.brand("WorkspaceMode"))
+export type WorkspaceMode = Schema.Schema.Type<typeof WorkspaceMode>
 
 // === Tier 4: Workspace/Account Identifiers ===
 

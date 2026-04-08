@@ -13,6 +13,13 @@ import type {
   RemoveIssueRelationParams,
   RemoveIssueRelationResult
 } from "../../domain/schemas/relations.js"
+import {
+  DocumentId,
+  IssueId,
+  IssueIdentifier,
+  ObjectClassName,
+  TeamspaceIdentifier
+} from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { documentPlugin, tracker } from "../huly-plugins.js"
@@ -22,6 +29,12 @@ type RelationError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueNotFoundError
+
+const toIssueIdentifier = (value: string): IssueIdentifier => IssueIdentifier.make(value)
+const toIssueId = (value: string): IssueId => IssueId.make(value)
+const toObjectClassName = (value: string): ObjectClassName => ObjectClassName.make(value)
+const toTeamspaceIdentifier = (value: string): TeamspaceIdentifier => TeamspaceIdentifier.make(value)
+const toDocumentId = (value: string): DocumentId => DocumentId.make(value)
 
 const resolveTargetIssue = (
   client: HulyClient["Type"],
@@ -73,7 +86,11 @@ export const addIssueRelation = (
       params.targetIssue
     )
 
-    const result = { sourceIssue: source.identifier, targetIssue: target.identifier, relationType: params.relationType }
+    const result = {
+      sourceIssue: toIssueIdentifier(source.identifier),
+      targetIssue: toIssueIdentifier(target.identifier),
+      relationType: params.relationType
+    }
 
     // DocumentUpdate<HulyIssue> cast needed on $push/$pull literals: TS cannot infer which arm
     // of the complex intersection type (Partial<Data<T>> & PushOptions<T> & ...) applies.
@@ -141,7 +158,11 @@ export const removeIssueRelation = (
       params.targetIssue
     )
 
-    const result = { sourceIssue: source.identifier, targetIssue: target.identifier, relationType: params.relationType }
+    const result = {
+      sourceIssue: toIssueIdentifier(source.identifier),
+      targetIssue: toIssueIdentifier(target.identifier),
+      relationType: params.relationType
+    }
 
     /* eslint-disable no-restricted-syntax -- see above */
     switch (params.relationType) {
@@ -232,9 +253,9 @@ export const listIssueRelations = (
     }
 
     const toEntry = (r: RelatedDocument): RelationEntry => ({
-      identifier: idToIdentifier.get(String(r._id)) ?? String(r._id),
-      _id: String(r._id),
-      _class: String(r._class)
+      identifier: toIssueIdentifier(idToIdentifier.get(String(r._id)) ?? String(r._id)),
+      _id: toIssueId(String(r._id)),
+      _class: toObjectClassName(String(r._class))
     })
 
     // Resolve document refs
@@ -264,9 +285,11 @@ export const listIssueRelations = (
         const doc = docMap.get(String(r._id))
         documents.push({
           title: doc?.title ?? String(r._id),
-          teamspace: doc ? (tsNameMap.get(String(doc.space)) ?? String(doc.space)) : String(r._id),
-          _id: String(r._id),
-          _class: String(r._class)
+          teamspace: toTeamspaceIdentifier(
+            doc ? (tsNameMap.get(String(doc.space)) ?? String(doc.space)) : String(r._id)
+          ),
+          _id: toDocumentId(String(r._id)),
+          _class: toObjectClassName(String(r._class))
         })
       }
     }

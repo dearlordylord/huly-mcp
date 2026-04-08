@@ -58,6 +58,7 @@ Symptoms to flag:
 - `Schema.String` in schemas where the field has a known set of valid values (use `Schema.Literals`)
 - Bare `number` for quantities that have units or domain meaning (timestamps, indices, counts) when a branded/alias type exists
 - Type-narrowing helper that accepts a primitive and returns a type guard — the input might be unavoidable (external data), but document why
+- If a suitable brand or alias already exists in `src/domain/schemas/shared.ts`, reuse it before creating a new type
 
 ## Immutability
 

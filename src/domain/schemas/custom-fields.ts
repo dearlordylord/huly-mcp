@@ -1,5 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
+import type { CustomFieldId, ObjectClassName } from "./shared.js"
 import { LimitParam, NonEmptyString } from "./shared.js"
 
 export const ListCustomFieldsParamsSchema = Schema.Struct({
@@ -58,26 +59,37 @@ export const SetCustomFieldParamsSchema = Schema.Struct({
 
 export type SetCustomFieldParams = Schema.Schema.Type<typeof SetCustomFieldParamsSchema>
 
+export type CustomFieldTypeName =
+  | "string"
+  | "number"
+  | "boolean"
+  | "enum"
+  | "array"
+  | "ref"
+  | "date"
+  | "markup"
+  | "unknown"
+
 export interface CustomFieldInfo {
-  readonly id: string
+  readonly id: CustomFieldId
   readonly name: string
   readonly label: string
-  readonly ownerClassId: string
+  readonly ownerClassId: ObjectClassName
   readonly ownerLabel: string
-  readonly type: string
+  readonly type: CustomFieldTypeName
   readonly typeDetails: Record<string, unknown>
 }
 
 export interface CustomFieldValue {
-  readonly fieldId: string
+  readonly fieldId: CustomFieldId
   readonly label: string
   readonly value: unknown
-  readonly type: string
+  readonly type: CustomFieldTypeName
 }
 
 export interface SetCustomFieldResult {
-  readonly objectId: string
-  readonly fieldId: string
+  readonly objectId: NonEmptyString
+  readonly fieldId: CustomFieldId
   readonly label: string
   readonly value: unknown
   readonly updated: boolean

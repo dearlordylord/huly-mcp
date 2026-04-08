@@ -17,6 +17,7 @@ import { contact, core, task, tracker } from "../../../src/huly/huly-plugins.js"
 import {
   clampLimit,
   findByNameOrId,
+  findByNameOrIdOrFail,
   findOneOrFail,
   findPersonByEmailOrName,
   findProject,
@@ -195,7 +196,12 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     if (_class === tracker.class.Project) {
       const q = query as Record<string, unknown>
       const identifier = q.identifier as string | undefined
-      const found = identifier ? projects.find(p => p.identifier === identifier) : undefined
+      const name = q.name as string | undefined
+      const found = identifier
+        ? projects.find(p => p.identifier === identifier)
+        : name
+        ? projects.find(p => p.name === name)
+        : undefined
       if (found === undefined) return Effect.succeed(undefined)
       const opts = options as { lookup?: Record<string, unknown> } | undefined
       if (opts?.lookup?.type) {
@@ -324,6 +330,42 @@ describe("shared.ts", () => {
         const error = yield* Effect.flip(validatePersonUuid("not-a-uuid"))
         expect(error._tag).toBe("InvalidPersonUuidError")
       }))
+  })
+
+  describe("findByNameOrIdOrFail", () => {
+    it.effect("returns the fallback match when the primary ID query misses", () => {
+      const project = makeProject({ _id: "project-2" as Ref<HulyProject>, name: "Fallback Match" })
+      return Effect.gen(function*() {
+        const client = yield* HulyClient
+
+        const result = yield* findByNameOrIdOrFail(
+          client,
+          tracker.class.Project,
+          { _id: toRef<HulyProject>("missing-project") },
+          { name: "Fallback Match" },
+          () => new Error("not found")
+        )
+
+        expect(result._id).toBe("project-2")
+      }).pipe(Effect.provide(createTestLayerWithMocks({ projects: [project] })))
+    })
+
+    it.effect("fails with the supplied error when both queries miss", () =>
+      Effect.gen(function*() {
+        const client = yield* HulyClient
+
+        const error = yield* Effect.flip(
+          findByNameOrIdOrFail(
+            client,
+            tracker.class.Project,
+            { _id: toRef<HulyProject>("missing-project") },
+            { name: "Missing" },
+            () => new Error("not found")
+          )
+        )
+
+        expect(error.message).toBe("not found")
+      }).pipe(Effect.provide(createTestLayerWithMocks({ projects: [] }))))
   })
 
   describe("parseIssueIdentifier", () => {

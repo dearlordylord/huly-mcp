@@ -1,16 +1,17 @@
-/* eslint-disable no-restricted-syntax -- SDK boundary: Huly's Doc/AnyAttribute types don't expose dynamic custom field data, class label, or kind. All casts bridge the gap between Huly's generic Doc type and the runtime shape of Attribute/Class documents. */
 import type { AnyAttribute, Class, Doc, Ref } from "@hcengineering/core"
 import { ClassifierKind, SortingOrder } from "@hcengineering/core"
 import { Effect } from "effect"
 
 import type {
   CustomFieldInfo,
+  CustomFieldTypeName,
   CustomFieldValue,
   GetCustomFieldValuesParams,
   ListCustomFieldsParams,
   SetCustomFieldParams,
   SetCustomFieldResult
 } from "../../domain/schemas/custom-fields.js"
+import { CustomFieldId, NonEmptyString, ObjectClassName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { CustomFieldNotFoundError, CustomFieldObjectNotFoundError } from "../errors-custom-fields.js"
 import { core } from "../huly-plugins.js"
@@ -22,6 +23,35 @@ type SetCustomFieldError = HulyClientError | CustomFieldNotFoundError | CustomFi
 
 const DEFAULT_LIMIT = 200
 
+type JsonMap = Record<string, unknown>
+
+interface TypeDescriptor {
+  readonly typeName: CustomFieldTypeName
+  readonly typeDetails: Record<string, unknown>
+}
+
+interface DecodedCustomFieldAttribute {
+  readonly id: CustomFieldId
+  readonly name: string
+  readonly label: string
+  readonly ownerClassId: ObjectClassName
+  readonly typeDescriptor: TypeDescriptor
+}
+
+interface DecodedClassInfo {
+  readonly label: string
+  readonly kind: number
+}
+
+interface DecodedCustomFieldDocument {
+  readonly values: JsonMap
+  readonly space: Doc["space"]
+}
+
+// Huly plugin constants are compatible with Ref<Class<Doc>> at runtime; the SDK types are narrower than usage here.
+// eslint-disable-next-line no-restricted-syntax -- SDK boundary cast for class document queries
+const classRef = core.class.Class as Ref<Class<Doc>>
+
 const extractLabel = (label: unknown): string => {
   if (typeof label === "string") {
     const parts = label.split(":")
@@ -30,46 +60,69 @@ const extractLabel = (label: unknown): string => {
   return String(label ?? "")
 }
 
-const describeType = (type: Record<string, unknown>): { typeName: string; typeDetails: Record<string, unknown> } => {
-  const _class = String(type._class ?? "")
+const decodeSdkRecord = (value: unknown): JsonMap => {
+  // Huly SDK documents expose dynamic metadata fields not represented in the generated TS types.
+  // This cast is contained here so feature logic does not operate on raw unknown values directly.
+  // eslint-disable-next-line no-restricted-syntax -- SDK boundary cast contained in one adapter
+  return value as JsonMap
+}
+
+const decodeTypeDescriptor = (value: unknown): TypeDescriptor => {
+  const record = decodeSdkRecord(value)
+  const _class = String(record._class ?? "")
+
   if (_class.includes("TypeString")) return { typeName: "string", typeDetails: {} }
   if (_class.includes("TypeNumber")) return { typeName: "number", typeDetails: {} }
   if (_class.includes("TypeBoolean")) return { typeName: "boolean", typeDetails: {} }
-  if (_class.includes("EnumOf")) return { typeName: "enum", typeDetails: { enumRef: type.of } }
-  if (_class.includes("ArrOf")) return { typeName: "array", typeDetails: { of: type.of } }
-  if (_class.includes("RefTo")) return { typeName: "ref", typeDetails: { to: type.to } }
+  if (_class.includes("EnumOf")) return { typeName: "enum", typeDetails: { enumRef: record.of } }
+  if (_class.includes("ArrOf")) return { typeName: "array", typeDetails: { of: record.of } }
+  if (_class.includes("RefTo")) return { typeName: "ref", typeDetails: { to: record.to } }
   if (_class.includes("TypeDate")) return { typeName: "date", typeDetails: {} }
   if (_class.includes("TypeMarkup")) return { typeName: "markup", typeDetails: {} }
-  return { typeName: _class, typeDetails: type }
+
+  return { typeName: "unknown", typeDetails: record }
 }
 
-interface ClassInfo {
-  readonly label: string
-  readonly kind: number
+const decodeCustomFieldAttribute = (attr: AnyAttribute): DecodedCustomFieldAttribute => ({
+  id: CustomFieldId.make(String(attr._id)),
+  name: attr.name,
+  label: extractLabel(attr.label),
+  ownerClassId: ObjectClassName.make(String(attr.attributeOf)),
+  typeDescriptor: decodeTypeDescriptor(attr.type)
+})
+
+const decodeClassInfo = (value: Doc): DecodedClassInfo => {
+  const record = decodeSdkRecord(value)
+  const kind = typeof record.kind === "number" ? record.kind : ClassifierKind.CLASS
+  return {
+    label: extractLabel(record.label),
+    kind
+  }
 }
 
-const classRef = core.class.Class as Ref<Class<Doc>>
+const decodeCustomFieldDocument = (doc: Doc): DecodedCustomFieldDocument => ({
+  values: decodeSdkRecord(doc),
+  space: doc.space
+})
 
 const resolveClassInfo = (
   client: HulyClient["Type"],
-  classId: string
-): Effect.Effect<ClassInfo, HulyClientError> =>
+  classId: ObjectClassName
+): Effect.Effect<DecodedClassInfo, HulyClientError> =>
   Effect.gen(function*() {
     const cls = yield* client.findOne<Doc>(
       classRef,
       { _id: toRef<Doc>(classId) }
     )
-    if (cls !== undefined) {
-      const record = cls as unknown as Record<string, unknown>
-      return { label: extractLabel(record.label), kind: record.kind as number }
-    }
-    return { label: classId, kind: ClassifierKind.CLASS }
+    return cls !== undefined
+      ? decodeClassInfo(cls)
+      : { label: classId, kind: ClassifierKind.CLASS }
   })
 
 const batchResolveClassLabels = (
   client: HulyClient["Type"],
-  classIds: ReadonlyArray<string>
-): Effect.Effect<Map<string, string>, HulyClientError> =>
+  classIds: ReadonlyArray<ObjectClassName>
+): Effect.Effect<Map<ObjectClassName, string>, HulyClientError> =>
   Effect.gen(function*() {
     if (classIds.length === 0) return new Map()
 
@@ -78,26 +131,37 @@ const batchResolveClassLabels = (
       { _id: { $in: classIds.map(toRef<Doc>) } }
     )
 
-    const result = new Map<string, string>()
+    const labels = new Map<ObjectClassName, string>()
     for (const cls of classes) {
-      const record = cls as unknown as Record<string, unknown>
-      result.set(cls._id, extractLabel(record.label))
+      const classId = ObjectClassName.make(String(cls._id))
+      labels.set(classId, decodeClassInfo(cls).label)
     }
-    // Fill in missing entries with the raw ID
-    for (const id of classIds) {
-      if (!result.has(id)) {
-        result.set(id, id)
+    for (const classId of classIds) {
+      if (!labels.has(classId)) {
+        labels.set(classId, classId)
       }
     }
-    return result
+    return labels
   })
+
+const parseValueForType = (value: string, typeName: CustomFieldTypeName): unknown => {
+  switch (typeName) {
+    case "number": {
+      const num = Number(value)
+      return Number.isNaN(num) ? value : num
+    }
+    case "boolean":
+      return value.toLowerCase() === "true"
+    default:
+      return value
+  }
+}
 
 export const listCustomFields = (
   params: ListCustomFieldsParams
 ): Effect.Effect<Array<CustomFieldInfo>, ListCustomFieldsError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-
     const limit = clampLimit(params.limit ?? DEFAULT_LIMIT)
 
     const query: Record<string, unknown> = { isCustom: true }
@@ -111,24 +175,21 @@ export const listCustomFields = (
       { limit, sort: { modifiedOn: SortingOrder.Descending } }
     )
 
-    const uniqueOwnerIds = [...new Set(customAttrs.map(a => a.attributeOf as string))]
-    const ownerLabels = yield* batchResolveClassLabels(client, uniqueOwnerIds)
+    const decodedAttrs = customAttrs.map(decodeCustomFieldAttribute)
+    const ownerLabels = yield* batchResolveClassLabels(
+      client,
+      [...new Set(decodedAttrs.map((attr) => attr.ownerClassId))]
+    )
 
-    return customAttrs.map(attr => {
-      const ownerId = attr.attributeOf as string
-      const typeRecord = attr.type as unknown as Record<string, unknown>
-      const { typeDetails, typeName } = describeType(typeRecord)
-
-      return {
-        id: attr._id,
-        name: attr.name,
-        label: extractLabel(attr.label),
-        ownerClassId: ownerId,
-        ownerLabel: ownerLabels.get(ownerId) ?? ownerId,
-        type: typeName,
-        typeDetails
-      }
-    })
+    return decodedAttrs.map((attr) => ({
+      id: attr.id,
+      name: attr.name,
+      label: attr.label,
+      ownerClassId: attr.ownerClassId,
+      ownerLabel: ownerLabels.get(attr.ownerClassId) ?? attr.ownerClassId,
+      type: attr.typeDescriptor.typeName,
+      typeDetails: attr.typeDescriptor.typeDetails
+    }))
   })
 
 export const getCustomFieldValues = (
@@ -136,7 +197,6 @@ export const getCustomFieldValues = (
 ): Effect.Effect<Array<CustomFieldValue>, GetCustomFieldValuesError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-
     const objectClassRef = toRef<Class<Doc>>(params.objectClass)
     const objectRef = toRef<Doc>(params.objectId)
 
@@ -152,43 +212,25 @@ export const getCustomFieldValues = (
       })
     }
 
-    const docRecord = doc as unknown as Record<string, unknown>
-    const docKeys = new Set(Object.keys(docRecord))
+    const decodedDoc = decodeCustomFieldDocument(doc)
+    const docKeys = new Set(Object.keys(decodedDoc.values))
 
     return customAttrs
-      .filter(attr => docKeys.has(attr.name))
-      .map(attr => {
-        const typeRecord = attr.type as unknown as Record<string, unknown>
-        const { typeName } = describeType(typeRecord)
-        return {
-          fieldId: attr._id,
-          label: extractLabel(attr.label),
-          value: docRecord[attr.name],
-          type: typeName
-        }
-      })
+      .map(decodeCustomFieldAttribute)
+      .filter((attr) => docKeys.has(attr.name))
+      .map((attr) => ({
+        fieldId: attr.id,
+        label: attr.label,
+        value: decodedDoc.values[attr.name],
+        type: attr.typeDescriptor.typeName
+      }))
   })
-
-const parseValueForType = (value: string, typeName: string): unknown => {
-  switch (typeName) {
-    case "number": {
-      const num = Number(value)
-      if (Number.isNaN(num)) return value
-      return num
-    }
-    case "boolean":
-      return value.toLowerCase() === "true"
-    default:
-      return value
-  }
-}
 
 export const setCustomField = (
   params: SetCustomFieldParams
 ): Effect.Effect<SetCustomFieldResult, SetCustomFieldError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-
     const objectClassRef = toRef<Class<Doc>>(params.objectClass)
     const objectRef = toRef<Doc>(params.objectId)
 
@@ -211,34 +253,37 @@ export const setCustomField = (
       })
     }
 
-    const typeRecord = attr.type as unknown as Record<string, unknown>
-    const { typeName } = describeType(typeRecord)
-    const parsedValue = parseValueForType(params.value, typeName)
-
-    const ownerClassId = attr.attributeOf as string
-    const ownerInfo = yield* resolveClassInfo(client, ownerClassId)
+    const decodedAttr = decodeCustomFieldAttribute(attr)
+    const parsedValue = parseValueForType(params.value, decodedAttr.typeDescriptor.typeName)
+    const decodedDoc = decodeCustomFieldDocument(doc)
+    const ownerInfo = yield* resolveClassInfo(client, decodedAttr.ownerClassId)
 
     if (ownerInfo.kind === ClassifierKind.MIXIN) {
+      // Huly updateMixin expects the mixin class as Ref<Class<Doc>>. Brands are erased at runtime.
+      // eslint-disable-next-line no-restricted-syntax -- SDK boundary cast for mixin class ref
+      const mixinRef = toRef<Doc>(decodedAttr.ownerClassId) as Ref<Class<Doc>>
       yield* client.updateMixin(
         objectRef,
         objectClassRef,
-        doc.space,
-        toRef<Doc>(ownerClassId) as Ref<Class<Doc>>,
-        { [attr.name]: parsedValue }
+        decodedDoc.space,
+        mixinRef,
+        {
+          [decodedAttr.name]: parsedValue
+        }
       )
     } else {
       yield* client.updateDoc(
-        toRef<Class<Doc>>(ownerClassId),
-        doc.space,
+        toRef<Class<Doc>>(decodedAttr.ownerClassId),
+        decodedDoc.space,
         objectRef,
-        { [attr.name]: parsedValue }
+        { [decodedAttr.name]: parsedValue }
       )
     }
 
     return {
-      objectId: params.objectId,
-      fieldId: attr._id,
-      label: extractLabel(attr.label),
+      objectId: NonEmptyString.make(params.objectId),
+      fieldId: decodedAttr.id,
+      label: decodedAttr.label,
       value: parsedValue,
       updated: true
     }

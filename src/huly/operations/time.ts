@@ -34,12 +34,12 @@ import type {
 } from "../../domain/schemas.js"
 import {
   IssueIdentifier,
-  NonEmptyString,
   NonNegativeNumber,
   PersonName,
   TimeSpendReportId,
   Timestamp,
-  TodoId
+  TodoId,
+  WorkSlotId
 } from "../../domain/schemas/shared.js"
 import type {
   CreateWorkSlotResult,
@@ -64,7 +64,6 @@ const serverPopulatedPersonId: CorePersonId = "" as CorePersonId
 
 // SDK: WorkSlot.user is typed PersonId, but Huly queries accept Ref<Person> for user lookup.
 // Brands erased at runtime; both are plain strings. The REST API treats them interchangeably in queries.
-// TODO that's all mighty weird, we may want to reinvestigate that
 // eslint-disable-next-line no-restricted-syntax -- Ref<Doc> and PersonId are incompatible branded types, no single-step cast exists
 const refAsPersonId = (ref: Ref<Doc>): CorePersonId => ref as unknown as CorePersonId
 
@@ -275,7 +274,7 @@ export const getDetailedTimeReport = (
       reports: Array<TimeSpendReport>
     }>()
 
-    const byEmployeeMap = new Map<string, { employeeName: string | undefined; totalTime: number }>()
+    const byEmployeeMap = new Map<string, { employeeName: PersonName | undefined; totalTime: number }>()
 
     let totalTime = 0
 
@@ -303,18 +302,21 @@ export const getDetailedTimeReport = (
 
       const empKey = r.employee ? r.employee : "__unassigned__"
       const empExisting = byEmployeeMap.get(empKey) ?? {
-        employeeName: r.$lookup?.employee?.name,
+        employeeName: r.$lookup?.employee?.name !== undefined ? PersonName.make(r.$lookup.employee.name) : undefined,
         totalTime: 0
       }
       empExisting.totalTime += r.value
       byEmployeeMap.set(empKey, empExisting)
     }
 
+    const byIssue: DetailedTimeReport["byIssue"] = Array.from(byIssueMap.values())
+    const byEmployee: DetailedTimeReport["byEmployee"] = Array.from(byEmployeeMap.values())
+
     return {
       project: params.project,
       totalTime,
-      byIssue: Array.from(byIssueMap.values()),
-      byEmployee: Array.from(byEmployeeMap.values())
+      byIssue,
+      byEmployee
     }
   })
 
@@ -365,10 +367,10 @@ export const listWorkSlots = (
     )
 
     return slots.map(s => ({
-      id: s._id,
+      id: WorkSlotId.make(s._id),
       todoId: TodoId.make(s.attachedTo),
-      date: s.date,
-      dueDate: s.dueDate,
+      date: Timestamp.make(s.date),
+      dueDate: Timestamp.make(s.dueDate),
       title: s.title
     }))
   })
@@ -415,7 +417,7 @@ export const createWorkSlot = (
       slotId
     )
 
-    return { slotId: NonEmptyString.make(slotId) }
+    return { slotId: WorkSlotId.make(slotId) }
   })
 
 /**

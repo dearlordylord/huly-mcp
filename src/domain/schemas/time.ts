@@ -1,6 +1,12 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { PersonName, PositiveNumber, TimeSpendReportId } from "./shared.js"
+import type {
+  PersonName,
+  PositiveNumber,
+  TimeSpendReportId,
+  Timestamp as TimestampBrand,
+  WorkSlotId
+} from "./shared.js"
 import { IssueIdentifier, LimitParam, NonEmptyString, ProjectIdentifier, Timestamp, TodoId } from "./shared.js"
 
 // No codec needed — internal type, not used for runtime validation
@@ -22,10 +28,10 @@ export interface TimeReportSummary {
 }
 
 export interface WorkSlot {
-  readonly id: string
+  readonly id: WorkSlotId
   readonly todoId: TodoId
-  readonly date: number
-  readonly dueDate: number
+  readonly date: TimestampBrand
+  readonly dueDate: TimestampBrand
   readonly title?: string | undefined
 }
 
@@ -176,13 +182,13 @@ export interface DetailedTimeReport {
   readonly project: ProjectIdentifier
   readonly totalTime: number
   readonly byIssue: ReadonlyArray<{
-    readonly identifier?: IssueIdentifier | undefined
+    readonly identifier: IssueIdentifier | undefined
     readonly issueTitle: string
     readonly totalTime: number
     readonly reports: ReadonlyArray<TimeSpendReport>
   }>
   readonly byEmployee: ReadonlyArray<{
-    readonly employeeName?: string | undefined
+    readonly employeeName: PersonName | undefined
     readonly totalTime: number
   }>
 }
@@ -212,16 +218,16 @@ export interface LogTimeResult {
 }
 
 export interface CreateWorkSlotResult {
-  readonly slotId: string
+  readonly slotId: WorkSlotId
 }
 
 export interface StartTimerResult {
   readonly identifier: IssueIdentifier
-  readonly startedAt: number
+  readonly startedAt: TimestampBrand
 }
 
 export interface StopTimerResult {
   readonly identifier: IssueIdentifier
-  readonly stoppedAt: number
-  readonly reportId?: string | undefined
+  readonly stoppedAt: TimestampBrand
+  readonly reportId?: TimeSpendReportId | undefined
 }

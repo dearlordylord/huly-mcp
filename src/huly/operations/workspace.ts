@@ -5,7 +5,18 @@
 import { AccountRole as HulyAccountRole, type WorkspaceInfoWithStatus } from "@hcengineering/core"
 import { Effect, Option } from "effect"
 
-import { AccountId, PersonUuid, RegionId, WorkspaceUuid } from "../../domain/schemas/shared.js"
+import {
+  AccountId,
+  Email,
+  PersonName,
+  PersonUuid,
+  RegionId,
+  UrlString,
+  WorkspaceMode,
+  WorkspaceName,
+  WorkspaceUuid,
+  WorkspaceVersion
+} from "../../domain/schemas/shared.js"
 import type {
   AccountRole,
   CreateWorkspaceParams,
@@ -84,8 +95,8 @@ export const listWorkspaceMembers = (
           return {
             personId: PersonUuid.make(member.person),
             role: member.role,
-            name,
-            email
+            name: name !== undefined ? PersonName.make(name) : undefined,
+            email: email !== undefined ? Email.make(email) : undefined
           }
         }),
       { concurrency: 10 }
@@ -116,14 +127,14 @@ export const getWorkspaceInfo = (): Effect.Effect<WorkspaceInfo, GetWorkspaceInf
 
     return {
       uuid: WorkspaceUuid.make(info.uuid),
-      name: info.name,
-      url: info.url,
+      name: WorkspaceName.make(info.name),
+      url: UrlString.make(info.url),
       region: info.region !== undefined ? RegionId.make(info.region) : undefined,
       createdOn: info.createdOn,
       allowReadOnlyGuest: info.allowReadOnlyGuest,
       allowGuestSignUp: info.allowGuestSignUp,
-      version: formatVersion(info),
-      mode: info.mode
+      version: WorkspaceVersion.make(formatVersion(info)),
+      mode: WorkspaceMode.make(info.mode)
     }
   })
 
@@ -138,8 +149,8 @@ export const listWorkspaces = (
 
     return workspaces.slice(0, limit).map((ws) => ({
       uuid: WorkspaceUuid.make(ws.uuid),
-      name: ws.name,
-      url: ws.url,
+      name: WorkspaceName.make(ws.name),
+      url: UrlString.make(ws.url),
       region: ws.region !== undefined ? RegionId.make(ws.region) : undefined,
       createdOn: ws.createdOn,
       lastVisit: ws.lastVisit
@@ -156,8 +167,8 @@ export const createWorkspace = (
 
     return {
       uuid: WorkspaceUuid.make(loginInfo.workspace),
-      url: loginInfo.workspaceUrl,
-      name: params.name
+      url: UrlString.make(loginInfo.workspaceUrl),
+      name: WorkspaceName.make(params.name)
     }
   })
 

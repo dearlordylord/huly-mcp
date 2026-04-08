@@ -1,5 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
+import type { DocumentId, IssueId, ObjectClassName, TeamspaceIdentifier } from "./shared.js"
 import { IssueIdentifier, ProjectIdentifier } from "./shared.js"
 
 export const RelationTypeValues = ["blocks", "is-blocked-by", "relates-to"] as const
@@ -63,28 +64,28 @@ export const parseRemoveIssueRelationParams = Schema.decodeUnknown(RemoveIssueRe
 export const parseListIssueRelationsParams = Schema.decodeUnknown(ListIssueRelationsParamsSchema)
 
 export interface RelationEntry {
-  readonly identifier: string
-  readonly _id: string
-  readonly _class: string
+  readonly identifier: IssueIdentifier
+  readonly _id: IssueId
+  readonly _class: ObjectClassName
 }
 
 export interface DocumentRelationEntry {
   readonly title: string
-  readonly teamspace: string
-  readonly _id: string
-  readonly _class: string
+  readonly teamspace: TeamspaceIdentifier
+  readonly _id: DocumentId
+  readonly _class: ObjectClassName
 }
 
 export interface AddIssueRelationResult {
-  readonly sourceIssue: string
-  readonly targetIssue: string
+  readonly sourceIssue: IssueIdentifier
+  readonly targetIssue: IssueIdentifier
   readonly relationType: RelationType
   readonly added: boolean
 }
 
 export interface RemoveIssueRelationResult {
-  readonly sourceIssue: string
-  readonly targetIssue: string
+  readonly sourceIssue: IssueIdentifier
+  readonly targetIssue: IssueIdentifier
   readonly relationType: RelationType
   readonly removed: boolean
 }

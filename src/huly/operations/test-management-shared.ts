@@ -33,7 +33,7 @@ import {
   TestCaseType as CaseType,
   TestRunStatus as RunStatus
 } from "../test-management-types.js"
-import { findPersonByEmailOrName, toRef } from "./shared.js"
+import { findByNameOrIdOrFail, findPersonByEmailOrName, toRef } from "./shared.js"
 
 import type {
   TestCasePriorityStr,
@@ -122,132 +122,78 @@ export const findTestProject = (
   client: HulyClientOperations,
   idOrName: string
 ): Effect.Effect<TestProject, TestProjectNotFoundError | HulyClientError> =>
-  Effect.gen(function*() {
-    let project = yield* client.findOne<TestProject>(
-      testManagement.class.TestProject,
-      { _id: toRef<TestProject>(idOrName) }
-    )
-    if (project === undefined) {
-      project = yield* client.findOne<TestProject>(
-        testManagement.class.TestProject,
-        { name: idOrName }
-      )
-    }
-    if (project === undefined) {
-      return yield* new TestProjectNotFoundError({ identifier: idOrName })
-    }
-    return project
-  })
+  findByNameOrIdOrFail(
+    client,
+    testManagement.class.TestProject,
+    { _id: toRef<TestProject>(idOrName) },
+    { name: idOrName },
+    () => new TestProjectNotFoundError({ identifier: idOrName })
+  )
 
 export const findTestSuite = (
   client: HulyClientOperations,
   project: TestProject,
   idOrName: string
 ): Effect.Effect<TestSuite, TestSuiteNotFoundError | HulyClientError> =>
-  Effect.gen(function*() {
-    let suite = yield* client.findOne<TestSuite>(
-      testManagement.class.TestSuite,
-      { _id: toRef<TestSuite>(idOrName), space: project._id }
-    )
-    if (suite === undefined) {
-      suite = yield* client.findOne<TestSuite>(
-        testManagement.class.TestSuite,
-        { name: idOrName, space: project._id }
-      )
-    }
-    if (suite === undefined) {
-      return yield* new TestSuiteNotFoundError({ identifier: idOrName })
-    }
-    return suite
-  })
+  findByNameOrIdOrFail(
+    client,
+    testManagement.class.TestSuite,
+    { _id: toRef<TestSuite>(idOrName), space: project._id },
+    { name: idOrName, space: project._id },
+    () => new TestSuiteNotFoundError({ identifier: idOrName })
+  )
 
 export const findTestCase = (
   client: HulyClientOperations,
   project: TestProject,
   idOrName: string
 ): Effect.Effect<TestCase, TestCaseNotFoundError | HulyClientError> =>
-  Effect.gen(function*() {
-    let tc = yield* client.findOne<TestCase>(
-      testManagement.class.TestCase,
-      { _id: toRef<TestCase>(idOrName), space: project._id }
-    )
-    if (tc === undefined) {
-      tc = yield* client.findOne<TestCase>(
-        testManagement.class.TestCase,
-        { name: idOrName, space: project._id }
-      )
-    }
-    if (tc === undefined) {
-      return yield* new TestCaseNotFoundError({ identifier: idOrName })
-    }
-    return tc
-  })
+  findByNameOrIdOrFail(
+    client,
+    testManagement.class.TestCase,
+    { _id: toRef<TestCase>(idOrName), space: project._id },
+    { name: idOrName, space: project._id },
+    () => new TestCaseNotFoundError({ identifier: idOrName })
+  )
 
 export const findTestPlan = (
   client: HulyClientOperations,
   project: TestProject,
   idOrName: string
 ): Effect.Effect<TestPlan, TestPlanNotFoundError | HulyClientError> =>
-  Effect.gen(function*() {
-    let plan = yield* client.findOne<TestPlan>(
-      testManagement.class.TestPlan,
-      { _id: toRef<TestPlan>(idOrName), space: project._id }
-    )
-    if (plan === undefined) {
-      plan = yield* client.findOne<TestPlan>(
-        testManagement.class.TestPlan,
-        { name: idOrName, space: project._id }
-      )
-    }
-    if (plan === undefined) {
-      return yield* new TestPlanNotFoundError({ identifier: idOrName })
-    }
-    return plan
-  })
+  findByNameOrIdOrFail(
+    client,
+    testManagement.class.TestPlan,
+    { _id: toRef<TestPlan>(idOrName), space: project._id },
+    { name: idOrName, space: project._id },
+    () => new TestPlanNotFoundError({ identifier: idOrName })
+  )
 
 export const findTestRun = (
   client: HulyClientOperations,
   project: TestProject,
   idOrName: string
 ): Effect.Effect<TestRun, TestRunNotFoundError | HulyClientError> =>
-  Effect.gen(function*() {
-    let run = yield* client.findOne<TestRun>(
-      testManagement.class.TestRun,
-      { _id: toRef<TestRun>(idOrName), space: project._id }
-    )
-    if (run === undefined) {
-      run = yield* client.findOne<TestRun>(
-        testManagement.class.TestRun,
-        { name: idOrName, space: project._id }
-      )
-    }
-    if (run === undefined) {
-      return yield* new TestRunNotFoundError({ identifier: idOrName })
-    }
-    return run
-  })
+  findByNameOrIdOrFail(
+    client,
+    testManagement.class.TestRun,
+    { _id: toRef<TestRun>(idOrName), space: project._id },
+    { name: idOrName, space: project._id },
+    () => new TestRunNotFoundError({ identifier: idOrName })
+  )
 
 export const findTestResult = (
   client: HulyClientOperations,
   project: TestProject,
   idOrName: string
 ): Effect.Effect<TestResult, TestResultNotFoundError | HulyClientError> =>
-  Effect.gen(function*() {
-    let result = yield* client.findOne<TestResult>(
-      testManagement.class.TestResult,
-      { _id: toRef<TestResult>(idOrName), space: project._id }
-    )
-    if (result === undefined) {
-      result = yield* client.findOne<TestResult>(
-        testManagement.class.TestResult,
-        { name: idOrName, space: project._id }
-      )
-    }
-    if (result === undefined) {
-      return yield* new TestResultNotFoundError({ identifier: idOrName })
-    }
-    return result
-  })
+  findByNameOrIdOrFail(
+    client,
+    testManagement.class.TestResult,
+    { _id: toRef<TestResult>(idOrName), space: project._id },
+    { name: idOrName, space: project._id },
+    () => new TestResultNotFoundError({ identifier: idOrName })
+  )
 
 export const resolveAssignee = (
   emailOrName: string
