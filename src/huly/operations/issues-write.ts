@@ -3,7 +3,7 @@
  *
  * @module
  */
-import type { Person } from "@hcengineering/contact"
+import type { Person, SocialIdentity } from "@hcengineering/contact"
 import {
   type AttachedData,
   type Class,
@@ -26,7 +26,7 @@ import { IssueId, IssueIdentifier } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { InvalidStatusError, PersonNotFoundError } from "../errors.js"
-import { tracker } from "../huly-plugins.js"
+import { contact, tracker } from "../huly-plugins.js"
 import {
   findIssueInProject,
   findPersonByEmailOrName,
@@ -70,16 +70,50 @@ const extractUpdatedSequence = (txResult: unknown): number | undefined => {
   return decoded._tag === "Some" ? decoded.value.object.sequence : undefined
 }
 
+const looksLikeEmail = (value: string): boolean => value.includes("@")
+
+const findPersonBySocialIdentityEmail = (
+  client: HulyClient["Type"],
+  email: string
+): Effect.Effect<Person | undefined, HulyClientError> =>
+  Effect.gen(function*() {
+    const socialIdentity = yield* client.findOne<SocialIdentity>(contact.class.SocialIdentity, {
+      type: "email",
+      value: email
+    })
+
+    if (socialIdentity === undefined) {
+      return undefined
+    }
+
+    const personId = socialIdentity.personUuid ?? socialIdentity.person ?? socialIdentity.attachedTo
+    if (personId === undefined) {
+      return undefined
+    }
+
+    return yield* client.findOne<Person>(contact.class.Person, {
+      _id: toRef<Person>(personId)
+    })
+  })
+
 const resolveAssignee = (
   client: HulyClient["Type"],
   assigneeIdentifier: string
 ): Effect.Effect<Person, PersonNotFoundError | HulyClientError> =>
   Effect.gen(function*() {
     const person = yield* findPersonByEmailOrName(client, assigneeIdentifier)
-    if (person === undefined) {
-      return yield* new PersonNotFoundError({ identifier: assigneeIdentifier })
+    if (person !== undefined) {
+      return person
     }
-    return person
+
+    if (looksLikeEmail(assigneeIdentifier)) {
+      const socialIdentityPerson = yield* findPersonBySocialIdentityEmail(client, assigneeIdentifier)
+      if (socialIdentityPerson !== undefined) {
+        return socialIdentityPerson
+      }
+    }
+
+    return yield* new PersonNotFoundError({ identifier: assigneeIdentifier })
   })
 
 /**
