@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.6.3
+
+### Patch Changes
+
+- dbd3aea: Fix assignee resolution for workspace members whose email exists only as a SocialIdentity by moving the lookup into the shared person resolver and prioritizing it ahead of Channel-based lookups.
+
 ## 0.6.2
 
 ### Patch Changes
