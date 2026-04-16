@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.6.2
+
+### Patch Changes
+
+- Fix assignee resolution for workspace members whose email exists only as a SocialIdentity (no Channel doc). Adds SocialIdentity email lookup as the first step in findPersonByEmailOrName, benefiting all person-resolving operations.
+
 ## 0.6.1
 
 ### Patch Changes
