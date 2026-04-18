@@ -71,7 +71,7 @@ import {
 } from "./shared.js"
 
 import { contact, tracker } from "../huly-plugins.js"
-import { optionalMarkdownToMarkup, optionalMarkupToMarkdown } from "./markup.js"
+import { type MarkupUrlConfig, optionalMarkdownToMarkup, optionalMarkupToMarkdown } from "./markup.js"
 
 type ListIssueTemplatesError =
   | HulyClientError
@@ -174,6 +174,7 @@ const findProjectAndTemplate = (
  */
 const resolveChild = (
   client: HulyClient["Type"],
+  markupUrlConfig: MarkupUrlConfig,
   child: HulyIssueTemplateChild
 ): Effect.Effect<IssueTemplateChild, HulyClientError> =>
   Effect.gen(function*() {
@@ -193,7 +194,7 @@ const resolveChild = (
 
     // exactOptionalPropertyTypes: can't assign undefined to optional fields
     const withDescription = child.description
-      ? { ...base, description: optionalMarkupToMarkdown(child.description, "", client.getMarkupUrls()) }
+      ? { ...base, description: optionalMarkupToMarkdown(child.description, markupUrlConfig, "") }
       : base
     const withAssignee = assigneeName !== undefined
       ? { ...withDescription, assignee: PersonName.make(assigneeName) }
@@ -214,6 +215,7 @@ const resolveChild = (
  */
 const buildTemplateChild = (
   client: HulyClient["Type"],
+  markupUrlConfig: MarkupUrlConfig,
   projectId: Ref<HulyProject>,
   projectIdentifier: string,
   input: ChildTemplateInput
@@ -247,7 +249,7 @@ const buildTemplateChild = (
     return {
       id: generateId<HulyIssue>(),
       title: input.title,
-      description: optionalMarkdownToMarkup(input.description, "", client.getMarkupUrls()),
+      description: optionalMarkdownToMarkup(input.description, markupUrlConfig, ""),
       priority: stringToPriority(input.priority || "no-priority"),
       assignee: assigneeRef,
       component: componentRef,
@@ -296,6 +298,7 @@ export const getIssueTemplate = (
 ): Effect.Effect<IssueTemplate, GetIssueTemplateError, HulyClient> =>
   Effect.gen(function*() {
     const { client, template } = yield* findProjectAndTemplate(params)
+    const markupUrlConfig = client.markupUrlConfig
 
     const assigneeName = template.assignee !== null
       ? (yield* client.findOne<Person>(contact.class.Person, { _id: template.assignee }))?.name
@@ -307,13 +310,13 @@ export const getIssueTemplate = (
 
     const resolvedChildren: Array<IssueTemplateChild> = []
     for (const child of template.children) {
-      resolvedChildren.push(yield* resolveChild(client, child))
+      resolvedChildren.push(yield* resolveChild(client, markupUrlConfig, child))
     }
 
     const result: IssueTemplate = {
       id: IssueTemplateId.make(template._id),
       title: template.title,
-      description: optionalMarkupToMarkdown(template.description, "", client.getMarkupUrls()),
+      description: optionalMarkupToMarkdown(template.description, markupUrlConfig, ""),
       priority: priorityToString(template.priority),
       assignee: assigneeName !== undefined ? PersonName.make(assigneeName) : undefined,
       component: componentLabel !== undefined ? ComponentLabel.make(componentLabel) : undefined,
@@ -335,6 +338,7 @@ export const createIssueTemplate = (
 ): Effect.Effect<CreateIssueTemplateResult, CreateIssueTemplateError, HulyClient> =>
   Effect.gen(function*() {
     const { client, project } = yield* findProject(params.project)
+    const markupUrlConfig = client.markupUrlConfig
 
     const templateId: Ref<HulyIssueTemplate> = generateId()
 
@@ -369,13 +373,13 @@ export const createIssueTemplate = (
     const children: Array<HulyIssueTemplateChild> = []
     if (params.children !== undefined) {
       for (const childInput of params.children) {
-        children.push(yield* buildTemplateChild(client, project._id, params.project, childInput))
+        children.push(yield* buildTemplateChild(client, markupUrlConfig, project._id, params.project, childInput))
       }
     }
 
     const templateData: Data<HulyIssueTemplate> = {
       title: params.title,
-      description: optionalMarkdownToMarkup(params.description, "", client.getMarkupUrls()),
+      description: optionalMarkdownToMarkup(params.description, markupUrlConfig, ""),
       priority,
       assignee: assigneeRef,
       component: componentRef,
@@ -410,10 +414,11 @@ export const createIssueFromTemplate = (
 ): Effect.Effect<CreateIssueFromTemplateResult, CreateIssueFromTemplateError, HulyClient> =>
   Effect.gen(function*() {
     const { client, project, template } = yield* findProjectAndTemplate(params)
+    const markupUrlConfig = client.markupUrlConfig
 
     const title = params.title ?? template.title
     const description = params.description
-      ?? optionalMarkupToMarkdown(template.description, undefined, client.getMarkupUrls())
+      ?? optionalMarkupToMarkdown(template.description, markupUrlConfig, undefined)
     const priority = params.priority ?? priorityToString(template.priority)
 
     const templateAssigneeRef = template.assignee
@@ -466,7 +471,7 @@ export const createIssueFromTemplate = (
         // Create child as top-level issue via createIssue (no parentIssue).
         // We can't pass parentIssue because createIssue uses findIssueInProject
         // which does findOne on the just-created parent — that hangs.
-        const childDescription = optionalMarkupToMarkdown(child.description, undefined, client.getMarkupUrls())
+        const childDescription = optionalMarkupToMarkdown(child.description, markupUrlConfig, undefined)
         const childResult = yield* createIssue({
           project: params.project,
           title: child.title,
@@ -516,6 +521,7 @@ export const updateIssueTemplate = (
 ): Effect.Effect<UpdateIssueTemplateResult, UpdateIssueTemplateError, HulyClient> =>
   Effect.gen(function*() {
     const { client, project, template } = yield* findProjectAndTemplate(params)
+    const markupUrlConfig = client.markupUrlConfig
 
     const updateOps: DocumentUpdate<HulyIssueTemplate> = {}
 
@@ -524,7 +530,7 @@ export const updateIssueTemplate = (
     }
 
     if (params.description !== undefined) {
-      updateOps.description = optionalMarkdownToMarkup(params.description, "", client.getMarkupUrls())
+      updateOps.description = optionalMarkdownToMarkup(params.description, markupUrlConfig, "")
     }
 
     if (params.priority !== undefined) {
@@ -596,8 +602,9 @@ export const addTemplateChild = (
 ): Effect.Effect<AddTemplateChildResult, AddTemplateChildError, HulyClient> =>
   Effect.gen(function*() {
     const { client, project, template } = yield* findProjectAndTemplate(params)
+    const markupUrlConfig = client.markupUrlConfig
 
-    const child = yield* buildTemplateChild(client, project._id, params.project, {
+    const child = yield* buildTemplateChild(client, markupUrlConfig, project._id, params.project, {
       title: params.title,
       description: params.description,
       priority: params.priority,

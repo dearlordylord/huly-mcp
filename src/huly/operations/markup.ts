@@ -10,48 +10,52 @@ import type { Markup } from "@hcengineering/core"
 import { jsonToMarkup, markupToJSON } from "@hcengineering/text"
 import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown"
 
+import { type UrlString, UrlString as UrlStringSchema } from "../../domain/schemas/shared.js"
+
 // SDK: jsonToMarkup return type doesn't match Markup; cast contained here.
 const jsonAsMarkup: (json: ReturnType<typeof markdownToMarkup>) => Markup = jsonToMarkup
 
-interface MarkupUrlConfig {
-  readonly refUrl: string
-  readonly imageUrl: string
+export interface MarkupUrlConfig {
+  readonly refUrl: UrlString
+  readonly imageUrl: UrlString
 }
 
-const emptyUrlConfig: MarkupUrlConfig = { refUrl: "", imageUrl: "" }
+// Test-only fixture for callers that need deterministic conversion without a real Huly workspace.
+export const testMarkupUrlConfig: MarkupUrlConfig = {
+  refUrl: UrlStringSchema.make("https://test.invalid/browse?workspace=test"),
+  imageUrl: UrlStringSchema.make("https://test.invalid/files?workspace=test&file=")
+}
 
-// Exported for test assertions; production code should prefer client.toMarkdown/toMarkup.
-// eslint-disable-next-line import-x/no-unused-modules
-export const markupToMarkdownString = (markup: Markup, urls?: MarkupUrlConfig): string => {
+export const markupToMarkdownString = (markup: Markup, urls: MarkupUrlConfig): string => {
   const json = markupToJSON(markup)
-  return markupToMarkdown(json, urls ?? emptyUrlConfig)
+  return markupToMarkdown(json, urls)
 }
 
-export const markdownToMarkupString = (markdown: string, urls?: MarkupUrlConfig): Markup => {
-  const json = markdownToMarkup(markdown, urls ?? emptyUrlConfig)
+export const markdownToMarkupString = (markdown: string, urls: MarkupUrlConfig): Markup => {
+  const json = markdownToMarkup(markdown, urls)
   return jsonAsMarkup(json)
 }
 
 export const optionalMarkdownToMarkup = (
   md: string | undefined | null,
-  fallback: Markup | "" = "",
-  urls?: MarkupUrlConfig
+  urls: MarkupUrlConfig,
+  fallback: Markup | "" = ""
 ): Markup | "" => md && md.trim() !== "" ? markdownToMarkupString(md, urls) : fallback
 
 export function optionalMarkupToMarkdown(
   markup: Markup | undefined | null,
-  fallback: undefined,
-  urls?: MarkupUrlConfig
+  urls: MarkupUrlConfig,
+  fallback: undefined
 ): string | undefined
 export function optionalMarkupToMarkdown(
   markup: Markup | undefined | null,
-  fallback?: string,
-  urls?: MarkupUrlConfig
+  urls: MarkupUrlConfig,
+  fallback?: string
 ): string
 export function optionalMarkupToMarkdown(
   markup: Markup | undefined | null,
-  fallback: string | undefined = "",
-  urls?: MarkupUrlConfig
+  urls: MarkupUrlConfig,
+  fallback: string | undefined = ""
 ): string | undefined {
-  return markup ? markupToMarkdownString(markup, urls) : fallback
+  return markup === null || markup === undefined ? fallback : markupToMarkdownString(markup, urls)
 }

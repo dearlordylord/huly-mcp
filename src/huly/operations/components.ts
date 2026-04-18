@@ -164,6 +164,7 @@ export const getComponent = (
 ): Effect.Effect<Component, GetComponentError, HulyClient> =>
   Effect.gen(function*() {
     const { client, component } = yield* findProjectAndComponent(params)
+    const markupUrlConfig = client.markupUrlConfig
 
     const leadName = component.lead !== null
       ? (yield* client.findOne<Person>(contact.class.Person, { _id: component.lead }))?.name
@@ -172,7 +173,7 @@ export const getComponent = (
     const result: Component = {
       id: ComponentId.make(component._id),
       label: ComponentLabel.make(component.label),
-      description: optionalMarkupToMarkdown(component.description, undefined, client.getMarkupUrls()),
+      description: optionalMarkupToMarkdown(component.description, markupUrlConfig, undefined),
       lead: leadName !== undefined ? PersonName.make(leadName) : undefined,
       project: params.project,
       modifiedOn: component.modifiedOn,
@@ -187,6 +188,7 @@ export const createComponent = (
 ): Effect.Effect<CreateComponentResult, CreateComponentError, HulyClient> =>
   Effect.gen(function*() {
     const { client, project } = yield* findProject(params.project)
+    const markupUrlConfig = client.markupUrlConfig
 
     const componentId: Ref<HulyComponent> = generateId()
 
@@ -205,7 +207,7 @@ export const createComponent = (
 
     const componentData: Data<HulyComponent> = {
       label: params.label,
-      description: optionalMarkdownToMarkup(params.description, "", client.getMarkupUrls()),
+      description: optionalMarkdownToMarkup(params.description, markupUrlConfig, ""),
       lead: leadRef,
       comments: 0
     }
@@ -225,6 +227,7 @@ export const updateComponent = (
 ): Effect.Effect<UpdateComponentResult, UpdateComponentError, HulyClient> =>
   Effect.gen(function*() {
     const { client, component, project } = yield* findProjectAndComponent(params)
+    const markupUrlConfig = client.markupUrlConfig
 
     const updateOps: DocumentUpdate<HulyComponent> = {}
 
@@ -233,7 +236,7 @@ export const updateComponent = (
     }
 
     if (params.description !== undefined) {
-      updateOps.description = optionalMarkdownToMarkup(params.description, "", client.getMarkupUrls())
+      updateOps.description = optionalMarkdownToMarkup(params.description, markupUrlConfig, "")
     }
 
     if (params.lead !== undefined) {

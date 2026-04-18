@@ -5,11 +5,13 @@ import { Effect } from "effect"
 import { expect } from "vitest"
 
 import type { HulyClientOperations } from "../../src/huly/client.js"
+import { testMarkupUrlConfig } from "../../src/huly/operations/markup.js"
 import type { HulyStorageOperations } from "../../src/huly/storage.js"
 import { CATEGORY_NAMES, createFilteredRegistry, TOOL_DEFINITIONS, toolRegistry } from "../../src/mcp/tools/index.js"
 
 const noopHulyClient: HulyClientOperations = {
   getAccountUuid: () => "test-account-uuid" as AccountUuid,
+  markupUrlConfig: testMarkupUrlConfig,
   findAll: () => Effect.succeed(toFindResult([])) as Effect.Effect<FindResult<never>>,
   findOne: () => Effect.succeed(undefined),
   createDoc: () => Effect.die(new Error("not implemented")),
@@ -29,7 +31,6 @@ const noopStorageClient: HulyStorageOperations = {
 }
 
 describe("CATEGORY_NAMES", () => {
-  // test-revizorro: approved
   it.effect("contains expected categories", () =>
     Effect.gen(function*() {
       expect(CATEGORY_NAMES.has("projects")).toBe(true)
@@ -41,7 +42,6 @@ describe("CATEGORY_NAMES", () => {
 })
 
 describe("toolRegistry", () => {
-  // test-revizorro: approved
   it.effect("has tools", () =>
     Effect.gen(function*() {
       expect(toolRegistry.tools.size).toBeGreaterThan(0)
@@ -49,7 +49,6 @@ describe("toolRegistry", () => {
       expect(toolRegistry.tools.size).toBe(toolRegistry.definitions.length)
     }))
 
-  // test-revizorro: approved
   it.effect("all tool names are unique", () =>
     Effect.gen(function*() {
       const names = toolRegistry.definitions.map((t) => t.name)
@@ -59,7 +58,6 @@ describe("toolRegistry", () => {
 })
 
 describe("createFilteredRegistry", () => {
-  // test-revizorro: approved
   it.effect("filters to only requested categories", () =>
     Effect.gen(function*() {
       const filtered = createFilteredRegistry(new Set(["issues"]))
@@ -72,7 +70,6 @@ describe("createFilteredRegistry", () => {
       }
     }))
 
-  // test-revizorro: approved
   it.effect("returns empty registry for unknown category", () =>
     Effect.gen(function*() {
       const filtered = createFilteredRegistry(new Set(["nonexistent_category"]))
@@ -80,7 +77,6 @@ describe("createFilteredRegistry", () => {
       expect(filtered.tools.size).toBe(0)
     }))
 
-  // test-revizorro: approved
   it.effect("combines multiple categories", () =>
     Effect.gen(function*() {
       const filtered = createFilteredRegistry(new Set(["issues", "projects"]))
@@ -95,7 +91,6 @@ describe("createFilteredRegistry", () => {
 })
 
 describe("handleToolCall", () => {
-  // test-revizorro: approved
   it.effect("returns null for unknown tool", () =>
     Effect.gen(function*() {
       const result = yield* Effect.promise(() =>
@@ -112,7 +107,6 @@ describe("handleToolCall", () => {
 })
 
 describe("TOOL_DEFINITIONS", () => {
-  // test-revizorro: approved
   it.effect("is populated", () =>
     Effect.gen(function*() {
       const keys = Object.keys(TOOL_DEFINITIONS)
@@ -120,7 +114,6 @@ describe("TOOL_DEFINITIONS", () => {
       expect(keys.length).toBe(toolRegistry.tools.size)
     }))
 
-  // test-revizorro: approved
   it.effect("entries match toolRegistry", () =>
     Effect.gen(function*() {
       for (const [name, tool] of Object.entries(TOOL_DEFINITIONS)) {

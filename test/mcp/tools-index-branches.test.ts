@@ -5,11 +5,13 @@ import { Effect } from "effect"
 import { expect } from "vitest"
 
 import type { HulyClientOperations } from "../../src/huly/client.js"
+import { testMarkupUrlConfig } from "../../src/huly/operations/markup.js"
 import type { HulyStorageOperations } from "../../src/huly/storage.js"
 import { toolRegistry } from "../../src/mcp/tools/index.js"
 
 const noopHulyClient: HulyClientOperations = {
   getAccountUuid: () => "test-account-uuid" as AccountUuid,
+  markupUrlConfig: testMarkupUrlConfig,
   findAll: (() => Effect.succeed(toFindResult([]))) as HulyClientOperations["findAll"],
   findOne: (() => Effect.succeed(undefined)) as HulyClientOperations["findOne"],
   createDoc: () => Effect.die(new Error("not implemented")),
@@ -29,7 +31,6 @@ const noopStorageClient: HulyStorageOperations = {
 }
 
 describe("handleToolCall - known tool execution (line 71)", () => {
-  // test-revizorro: approved
   it.effect("returns a response when tool is found in registry", () =>
     Effect.gen(function*() {
       // Pick a tool that we know exists - list_projects is simple and just needs findAll

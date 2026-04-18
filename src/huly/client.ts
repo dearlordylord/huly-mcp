@@ -9,6 +9,7 @@
  *
  * @module
  */
+/* eslint-disable max-lines -- connection setup and client operation wiring live in one module */
 import {
   createRestClient,
   createRestTxOperations,
@@ -48,9 +49,11 @@ import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown
 import { absurd, Context, Effect, Layer } from "effect"
 
 import { HulyConfigService } from "../config/config.js"
+import { UrlString } from "../domain/schemas/shared.js"
 import { concatLink } from "../utils/url.js"
 import { authToOptions, type ConnectionConfig, type ConnectionError, connectWithRetry } from "./auth-utils.js"
 import { HulyConnectionError } from "./errors.js"
+import { type MarkupUrlConfig, testMarkupUrlConfig } from "./operations/markup.js"
 
 interface MarkupConvertOptions {
   readonly refUrl: string
@@ -95,7 +98,11 @@ function fromInternalMarkup(
 
 export type HulyClientError = ConnectionError
 
-export interface HulyClientOperations {
+interface HulyClientContext {
+  readonly markupUrlConfig: MarkupUrlConfig
+}
+
+export interface HulyClientOperations extends HulyClientContext {
   readonly getAccountUuid: () => AccountUuid
 
   readonly findAll: <T extends Doc>(
@@ -177,11 +184,6 @@ export interface HulyClientOperations {
     query: SearchQuery,
     options: SearchOptions
   ) => Effect.Effect<SearchResult, HulyClientError>
-
-  readonly toMarkup: (markdown: string) => string
-  readonly toMarkdown: (markup: string) => string
-
-  readonly getMarkupUrls: () => { readonly refUrl: string; readonly imageUrl: string }
 }
 
 export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
@@ -192,7 +194,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
     HulyClient,
     HulyClientError,
     HulyConfigService
-  > = Layer.scoped(
+  > = Layer.effect(
     HulyClient,
     Effect.gen(function*() {
       const config = yield* HulyConfigService
@@ -203,7 +205,10 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
         workspace: config.workspace
       })
 
-      const urlConfig = { refUrl, imageUrl }
+      const markupUrlConfig: MarkupUrlConfig = {
+        refUrl: UrlString.make(refUrl),
+        imageUrl: UrlString.make(imageUrl)
+      }
 
       const withClient = <A>(
         op: (client: TxOperations) => Promise<A>,
@@ -220,6 +225,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
 
       const operations: HulyClientOperations = {
         getAccountUuid: () => accountUuid,
+        markupUrlConfig,
 
         findAll: <T extends Doc>(
           _class: Ref<Class<T>>,
@@ -343,11 +349,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
           withClient(
             (client) => client.searchFulltext(query, options),
             "searchFulltext failed"
-          ),
-
-        toMarkup: (md: string) => jsonToMarkup(markdownToMarkup(md, urlConfig)),
-        toMarkdown: (markup: string) => markupToMarkdown(markupToJSON(markup), urlConfig),
-        getMarkupUrls: () => urlConfig
+          )
       }
 
       return operations
@@ -376,6 +378,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       // AccountUuid is a double-branded string type with no public constructor
       // eslint-disable-next-line no-restricted-syntax -- see above
       getAccountUuid: () => "test-account-uuid" as AccountUuid,
+      markupUrlConfig: testMarkupUrlConfig,
       findAll: noopFindAll,
       findOne: noopFindOne,
       createDoc: notImplemented("createDoc"),
@@ -386,10 +389,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       fetchMarkup: noopFetchMarkup,
       updateMixin: notImplemented("updateMixin"),
       updateMarkup: notImplemented("updateMarkup"),
-      searchFulltext: notImplemented("searchFulltext"),
-      toMarkup: (md: string) => jsonToMarkup(markdownToMarkup(md, { refUrl: "", imageUrl: "" })),
-      toMarkdown: (markup: string) => markupToMarkdown(markupToJSON(markup), { refUrl: "", imageUrl: "" }),
-      getMarkupUrls: () => ({ refUrl: "", imageUrl: "" })
+      searchFulltext: notImplemented("searchFulltext")
     }
 
     return Layer.succeed(HulyClient, { ...defaultOps, ...mockOperations })
@@ -434,27 +434,35 @@ function createMarkupOps(
   token: string,
   collaboratorUrl: string
 ): { ops: MarkupOperations; refUrl: string; imageUrl: string } {
+  // @hcengineering/text-markdown expects refUrl/imageUrl option names, but the Huly SDK does not
+  // expose helpers or constants for the concrete workspace browse/files routes. We derive those
+  // Huly-specific URLs here from the connected base URL and workspace id so markdown round-trips
+  // preserve links and images across entities.
   const refUrl = concatLink(url, `/browse?workspace=${workspace}`)
   const imageUrl = concatLink(url, `/files?workspace=${workspace}&file=`)
   const collaborator = getCollaboratorClient(workspace, token, collaboratorUrl)
 
-  return { refUrl, imageUrl, ops: {
-    async fetchMarkup(objectClass, objectId, objectAttr, doc, format) {
-      const collabId = makeCollabId(objectClass, objectId, objectAttr)
-      const markup = await collaborator.getMarkup(collabId, doc)
-      return fromInternalMarkup(markup, format, { refUrl, imageUrl })
-    },
+  return {
+    refUrl,
+    imageUrl,
+    ops: {
+      async fetchMarkup(objectClass, objectId, objectAttr, doc, format) {
+        const collabId = makeCollabId(objectClass, objectId, objectAttr)
+        const markup = await collaborator.getMarkup(collabId, doc)
+        return fromInternalMarkup(markup, format, { refUrl, imageUrl })
+      },
 
-    async uploadMarkup(objectClass, objectId, objectAttr, value, format) {
-      const collabId = makeCollabId(objectClass, objectId, objectAttr)
-      return await collaborator.createMarkup(collabId, toInternalMarkup(value, format, { refUrl, imageUrl }))
-    },
+      async uploadMarkup(objectClass, objectId, objectAttr, value, format) {
+        const collabId = makeCollabId(objectClass, objectId, objectAttr)
+        return await collaborator.createMarkup(collabId, toInternalMarkup(value, format, { refUrl, imageUrl }))
+      },
 
-    async updateMarkup(objectClass, objectId, objectAttr, value, format) {
-      const collabId = makeCollabId(objectClass, objectId, objectAttr)
-      return await collaborator.updateMarkup(collabId, toInternalMarkup(value, format, { refUrl, imageUrl }))
+      async updateMarkup(objectClass, objectId, objectAttr, value, format) {
+        const collabId = makeCollabId(objectClass, objectId, objectAttr)
+        return await collaborator.updateMarkup(collabId, toInternalMarkup(value, format, { refUrl, imageUrl }))
+      }
     }
-  } }
+  }
 }
 
 const connectRest = async (

@@ -145,11 +145,12 @@ export const getMilestone = (
 ): Effect.Effect<Milestone, GetMilestoneError, HulyClient> =>
   Effect.gen(function*() {
     const { client, milestone } = yield* findProjectAndMilestone(params)
+    const markupUrlConfig = client.markupUrlConfig
 
     const result: Milestone = {
       id: MilestoneId.make(milestone._id),
       label: MilestoneLabel.make(milestone.label),
-      description: optionalMarkupToMarkdown(milestone.description, "", client.getMarkupUrls()),
+      description: optionalMarkupToMarkdown(milestone.description, markupUrlConfig, ""),
       status: milestoneStatusToString(milestone.status),
       targetDate: milestone.targetDate,
       project: params.project,
@@ -165,12 +166,13 @@ export const createMilestone = (
 ): Effect.Effect<CreateMilestoneResult, CreateMilestoneError, HulyClient> =>
   Effect.gen(function*() {
     const { client, project } = yield* findProject(params.project)
+    const markupUrlConfig = client.markupUrlConfig
 
     const milestoneId: Ref<HulyMilestone> = generateId()
 
     const milestoneData: Data<HulyMilestone> = {
       label: params.label,
-      description: optionalMarkdownToMarkup(params.description, "", client.getMarkupUrls()),
+      description: optionalMarkdownToMarkup(params.description, markupUrlConfig, ""),
       status: MilestoneStatus.Planned,
       targetDate: params.targetDate,
       comments: 0
@@ -204,6 +206,7 @@ export const updateMilestone = (
 ): Effect.Effect<UpdateMilestoneResult, UpdateMilestoneError, HulyClient> =>
   Effect.gen(function*() {
     const { client, milestone, project } = yield* findProjectAndMilestone(params)
+    const markupUrlConfig = client.markupUrlConfig
 
     const updateOps: DocumentUpdate<HulyMilestone> = {}
 
@@ -222,7 +225,7 @@ export const updateMilestone = (
           "markdown"
         )
       }
-      updateOps.description = optionalMarkdownToMarkup(params.description, "", client.getMarkupUrls())
+      updateOps.description = optionalMarkdownToMarkup(params.description, markupUrlConfig, "")
     }
 
     if (params.targetDate !== undefined) {

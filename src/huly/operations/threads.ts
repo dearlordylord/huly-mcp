@@ -29,6 +29,7 @@ import type { HulyClient, HulyClientError } from "../client.js"
 import type { ChannelNotFoundError } from "../errors.js"
 import { MessageNotFoundError, ThreadReplyNotFoundError } from "../errors.js"
 import { buildSocialIdToPersonNameMap, findChannel } from "./channels.js"
+import { markdownToMarkupString, markupToMarkdownString } from "./markup.js"
 import { toRef } from "./shared.js"
 
 import { chunter } from "../huly-plugins.js"
@@ -118,6 +119,7 @@ export const listThreadReplies = (
 ): Effect.Effect<ListThreadRepliesResult, ListThreadRepliesError, HulyClient> =>
   Effect.gen(function*() {
     const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
+    const markupUrlConfig = client.markupUrlConfig
 
     const limit = Math.min(params.limit ?? 50, 200)
 
@@ -150,7 +152,7 @@ export const listThreadReplies = (
       const senderName = socialIdToName.get(msg.modifiedBy)
       return {
         id: ThreadReplyId.make(msg._id),
-        body: client.toMarkdown(msg.message),
+        body: markupToMarkdownString(msg.message, markupUrlConfig),
         sender: senderName !== undefined ? PersonName.make(senderName) : undefined,
         senderId: msg.modifiedBy,
         createdOn: msg.createdOn,
@@ -167,9 +169,10 @@ export const addThreadReply = (
 ): Effect.Effect<AddThreadReplyResult, AddThreadReplyError, HulyClient> =>
   Effect.gen(function*() {
     const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
+    const markupUrlConfig = client.markupUrlConfig
 
     const replyId: Ref<HulyThreadMessage> = generateId()
-    const markup = client.toMarkup(params.body)
+    const markup = markdownToMarkupString(params.body, markupUrlConfig)
 
     const replyData: AttachedData<HulyThreadMessage> = {
       message: markup,
@@ -201,8 +204,9 @@ export const updateThreadReply = (
   Effect.gen(function*() {
     const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
     const reply = yield* findReply(client, channel, message, params.replyId)
+    const markupUrlConfig = client.markupUrlConfig
 
-    const markup = client.toMarkup(params.body)
+    const markup = markdownToMarkupString(params.body, markupUrlConfig)
 
     const now = yield* Clock.currentTimeMillis
     const updateOps: DocumentUpdate<HulyThreadMessage> = {
