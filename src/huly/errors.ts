@@ -4,7 +4,7 @@
  * Split into domain modules:
  * - errors-base: HulyError, HulyConnectionError, HulyAuthError
  * - errors-tracker: issue, project, status, milestone, component, template errors
- * - errors-contacts: PersonNotFoundError, InvalidPersonUuidError
+ * - errors-contacts: PersonNotFoundError, OrganizationNotFoundError, InvalidPersonUuidError
  * - errors-files: file upload/fetch/size errors, BYTES_PER_MB
  * - errors-documents: teamspace, document errors
  * - errors-messaging: channel, message, thread, reaction errors
@@ -21,7 +21,7 @@ import { Schema } from "effect"
 import { HulyAuthError, HulyConnectionError, HulyError } from "./errors-base.js"
 import { EventNotFoundError, RecurringEventNotFoundError } from "./errors-calendar.js"
 import { CardNotFoundError, CardSpaceNotFoundError, MasterTagNotFoundError } from "./errors-cards.js"
-import { InvalidPersonUuidError, PersonNotFoundError } from "./errors-contacts.js"
+import { InvalidPersonUuidError, OrganizationNotFoundError, PersonNotFoundError } from "./errors-contacts.js"
 import { CustomFieldNotFoundError, CustomFieldObjectNotFoundError } from "./errors-custom-fields.js"
 import {
   DocumentEmptyContentError,
@@ -41,6 +41,7 @@ import {
   InvalidFileDataError
 } from "./errors-files.js"
 import { TagCategoryNotFoundError, TagNotFoundError } from "./errors-labels.js"
+import { FunnelNotFoundError, LeadNotFoundError } from "./errors-leads.js"
 import {
   ActivityMessageNotFoundError,
   ChannelNotFoundError,
@@ -90,6 +91,7 @@ export {
   FileNotFoundError,
   FileTooLargeError,
   FileUploadError,
+  FunnelNotFoundError,
   HulyAuthError,
   HulyConnectionError,
   HulyError,
@@ -99,11 +101,13 @@ export {
   InvalidStatusError,
   IssueNotFoundError,
   IssueTemplateNotFoundError,
+  LeadNotFoundError,
   MasterTagNotFoundError,
   MessageNotFoundError,
   MilestoneNotFoundError,
   NotificationContextNotFoundError,
   NotificationNotFoundError,
+  OrganizationNotFoundError,
   PersonNotFoundError,
   ProjectNotFoundError,
   ReactionNotFoundError,
@@ -134,6 +138,7 @@ export type HulyDomainError =
   | ProjectNotFoundError
   | InvalidStatusError
   | PersonNotFoundError
+  | OrganizationNotFoundError
   | FileUploadError
   | InvalidFileDataError
   | FileNotFoundError
@@ -174,6 +179,8 @@ export type HulyDomainError =
   | NotificationNotFoundError
   | NotificationContextNotFoundError
   | InvalidPersonUuidError
+  | FunnelNotFoundError
+  | LeadNotFoundError
   | FileTooLargeError
   | InvalidContentTypeError
 
@@ -189,6 +196,7 @@ export const HulyDomainError: Schema.Union<
     typeof ProjectNotFoundError,
     typeof InvalidStatusError,
     typeof PersonNotFoundError,
+    typeof OrganizationNotFoundError,
     typeof FileUploadError,
     typeof InvalidFileDataError,
     typeof FileNotFoundError,
@@ -229,6 +237,8 @@ export const HulyDomainError: Schema.Union<
     typeof NotificationNotFoundError,
     typeof NotificationContextNotFoundError,
     typeof InvalidPersonUuidError,
+    typeof FunnelNotFoundError,
+    typeof LeadNotFoundError,
     typeof FileTooLargeError,
     typeof InvalidContentTypeError
   ]
@@ -240,6 +250,7 @@ export const HulyDomainError: Schema.Union<
   ProjectNotFoundError,
   InvalidStatusError,
   PersonNotFoundError,
+  OrganizationNotFoundError,
   FileUploadError,
   InvalidFileDataError,
   FileNotFoundError,
@@ -280,6 +291,8 @@ export const HulyDomainError: Schema.Union<
   NotificationNotFoundError,
   NotificationContextNotFoundError,
   InvalidPersonUuidError,
+  FunnelNotFoundError,
+  LeadNotFoundError,
   FileTooLargeError,
   InvalidContentTypeError
 )

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Client wrapper exposes all Huly platform operations in one service; splitting would fragment the Effect.Tag. */
 /**
  * HulyClient - Data operations within a workspace.
  *
@@ -31,6 +32,7 @@ import {
   type FindResult,
   makeCollabId,
   type Mixin,
+  type MixinData,
   type MixinUpdate,
   type Ref,
   type SearchOptions,
@@ -165,6 +167,14 @@ export interface HulyClientOperations {
     format: MarkupFormat
   ) => Effect.Effect<void, HulyClientError>
 
+  readonly createMixin: <D extends Doc, M extends D>(
+    objectId: Ref<D>,
+    objectClass: Ref<Class<D>>,
+    objectSpace: Ref<Space>,
+    mixin: Ref<Mixin<M>>,
+    attributes: MixinData<D, M>
+  ) => Effect.Effect<TxResult, HulyClientError>
+
   readonly updateMixin: <D extends Doc, M extends D>(
     objectId: Ref<D>,
     objectClass: Ref<Class<D>>,
@@ -297,6 +307,18 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
             "removeDoc failed"
           ),
 
+        createMixin: <D extends Doc, M extends D>(
+          objectId: Ref<D>,
+          objectClass: Ref<Class<D>>,
+          objectSpace: Ref<Space>,
+          mixin: Ref<Mixin<M>>,
+          attributes: MixinData<D, M>
+        ) =>
+          withClient(
+            (client) => client.createMixin(objectId, objectClass, objectSpace, mixin, attributes),
+            "createMixin failed"
+          ),
+
         updateMixin: <D extends Doc, M extends D>(
           objectId: Ref<D>,
           objectClass: Ref<Class<D>>,
@@ -384,6 +406,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       removeDoc: notImplemented("removeDoc"),
       uploadMarkup: notImplemented("uploadMarkup"),
       fetchMarkup: noopFetchMarkup,
+      createMixin: notImplemented("createMixin"),
       updateMixin: notImplemented("updateMixin"),
       updateMarkup: notImplemented("updateMarkup"),
       searchFulltext: notImplemented("searchFulltext"),
@@ -438,23 +461,27 @@ function createMarkupOps(
   const imageUrl = concatLink(url, `/files?workspace=${workspace}&file=`)
   const collaborator = getCollaboratorClient(workspace, token, collaboratorUrl)
 
-  return { refUrl, imageUrl, ops: {
-    async fetchMarkup(objectClass, objectId, objectAttr, doc, format) {
-      const collabId = makeCollabId(objectClass, objectId, objectAttr)
-      const markup = await collaborator.getMarkup(collabId, doc)
-      return fromInternalMarkup(markup, format, { refUrl, imageUrl })
-    },
+  return {
+    refUrl,
+    imageUrl,
+    ops: {
+      async fetchMarkup(objectClass, objectId, objectAttr, doc, format) {
+        const collabId = makeCollabId(objectClass, objectId, objectAttr)
+        const markup = await collaborator.getMarkup(collabId, doc)
+        return fromInternalMarkup(markup, format, { refUrl, imageUrl })
+      },
 
-    async uploadMarkup(objectClass, objectId, objectAttr, value, format) {
-      const collabId = makeCollabId(objectClass, objectId, objectAttr)
-      return await collaborator.createMarkup(collabId, toInternalMarkup(value, format, { refUrl, imageUrl }))
-    },
+      async uploadMarkup(objectClass, objectId, objectAttr, value, format) {
+        const collabId = makeCollabId(objectClass, objectId, objectAttr)
+        return await collaborator.createMarkup(collabId, toInternalMarkup(value, format, { refUrl, imageUrl }))
+      },
 
-    async updateMarkup(objectClass, objectId, objectAttr, value, format) {
-      const collabId = makeCollabId(objectClass, objectId, objectAttr)
-      return await collaborator.updateMarkup(collabId, toInternalMarkup(value, format, { refUrl, imageUrl }))
+      async updateMarkup(objectClass, objectId, objectAttr, value, format) {
+        const collabId = makeCollabId(objectClass, objectId, objectAttr)
+        return await collaborator.updateMarkup(collabId, toInternalMarkup(value, format, { refUrl, imageUrl }))
+      }
     }
-  } }
+  }
 }
 
 const connectRest = async (

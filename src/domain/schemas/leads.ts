@@ -1,0 +1,136 @@
+import { JSONSchema, Schema } from "effect"
+
+import { Email, LimitParam, PersonName, StatusName, Timestamp } from "./shared.js"
+
+// --- Lead IDs ---
+
+const HulyRef = <T extends string>(tag: T) => Schema.Trim.pipe(Schema.nonEmptyString(), Schema.brand(tag))
+
+export const FunnelIdentifier = HulyRef("FunnelIdentifier")
+export type FunnelIdentifier = Schema.Schema.Type<typeof FunnelIdentifier>
+
+export const LeadIdentifier = HulyRef("LeadIdentifier")
+export type LeadIdentifier = Schema.Schema.Type<typeof LeadIdentifier>
+
+// --- Output Schemas ---
+
+export const FunnelSummarySchema = Schema.Struct({
+  identifier: FunnelIdentifier,
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  archived: Schema.Boolean
+}).annotations({
+  title: "FunnelSummary",
+  description: "Sales funnel summary"
+})
+
+export type FunnelSummary = Schema.Schema.Type<typeof FunnelSummarySchema>
+
+export const LeadSummarySchema = Schema.Struct({
+  identifier: LeadIdentifier,
+  title: Schema.String,
+  status: StatusName,
+  assignee: Schema.optional(PersonName),
+  customer: Schema.optional(Schema.String),
+  modifiedOn: Schema.optional(Timestamp)
+}).annotations({
+  title: "LeadSummary",
+  description: "Lead summary for list operations"
+})
+
+export type LeadSummary = Schema.Schema.Type<typeof LeadSummarySchema>
+
+export const LeadDetailSchema = Schema.Struct({
+  identifier: LeadIdentifier,
+  title: Schema.String,
+  description: Schema.optional(Schema.String),
+  status: StatusName,
+  assignee: Schema.optional(PersonName),
+  customer: Schema.optional(Schema.String),
+  funnel: FunnelIdentifier,
+  modifiedOn: Schema.optional(Timestamp),
+  createdOn: Schema.optional(Timestamp)
+}).annotations({
+  title: "LeadDetail",
+  description: "Full lead with all fields"
+})
+
+export type LeadDetail = Schema.Schema.Type<typeof LeadDetailSchema>
+
+// --- Param Schemas ---
+
+export const ListFunnelsParamsSchema = Schema.Struct({
+  includeArchived: Schema.optional(Schema.Boolean.annotations({
+    description: "Include archived funnels in results (default: false, showing only active)"
+  })),
+  limit: Schema.optional(
+    LimitParam.annotations({
+      description: "Maximum number of funnels to return (default: 50)"
+    })
+  )
+}).annotations({
+  title: "ListFunnelsParams",
+  description: "Parameters for listing funnels"
+})
+
+export type ListFunnelsParams = Schema.Schema.Type<typeof ListFunnelsParamsSchema>
+
+const ListLeadsParamsBase = Schema.Struct({
+  funnel: FunnelIdentifier.annotations({
+    description: "Funnel name (e.g., 'Funnel'). Use list_funnels to find available names."
+  }),
+  status: Schema.optional(StatusName.annotations({
+    description: "Filter by status name"
+  })),
+  assignee: Schema.optional(Email.annotations({
+    description: "Filter by assignee email"
+  })),
+  titleSearch: Schema.optional(Schema.String.annotations({
+    description: "Search leads by title substring (case-insensitive)"
+  })),
+  limit: Schema.optional(
+    LimitParam.annotations({
+      description: "Maximum number of leads to return (default: 50)"
+    })
+  )
+})
+
+export const ListLeadsParamsSchema = ListLeadsParamsBase.annotations({
+  title: "ListLeadsParams",
+  description: "Parameters for listing leads in a funnel"
+})
+
+export type ListLeadsParams = Schema.Schema.Type<typeof ListLeadsParamsSchema>
+
+export const GetLeadParamsSchema = Schema.Struct({
+  funnel: FunnelIdentifier.annotations({
+    description: "Funnel name (e.g., 'Funnel'). Use list_funnels to find available names."
+  }),
+  identifier: LeadIdentifier.annotations({
+    description: "Lead identifier (e.g., 'FUNNEL-1')"
+  })
+}).annotations({
+  title: "GetLeadParams",
+  description: "Parameters for getting a single lead"
+})
+
+export type GetLeadParams = Schema.Schema.Type<typeof GetLeadParamsSchema>
+
+// --- JSON Schemas & Parsers ---
+
+export const listFunnelsParamsJsonSchema = JSONSchema.make(ListFunnelsParamsSchema)
+export const listLeadsParamsJsonSchema = JSONSchema.make(ListLeadsParamsSchema)
+export const getLeadParamsJsonSchema = JSONSchema.make(GetLeadParamsSchema)
+
+export const parseListFunnelsParams = Schema.decodeUnknown(ListFunnelsParamsSchema)
+export const parseListLeadsParams = Schema.decodeUnknown(ListLeadsParamsSchema)
+export const parseGetLeadParams = Schema.decodeUnknown(GetLeadParamsSchema)
+export const parseLeadDetail = Schema.decodeUnknown(LeadDetailSchema)
+export const parseLeadSummary = Schema.decodeUnknown(LeadSummarySchema)
+
+// --- Result Types ---
+
+export interface ListFunnelsResult {
+  readonly funnels: ReadonlyArray<FunnelSummary>
+  readonly total: number
+}

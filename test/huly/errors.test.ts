@@ -16,6 +16,7 @@ import {
   FileNotFoundError,
   FileTooLargeError,
   FileUploadError,
+  FunnelNotFoundError,
   HulyAuthError,
   HulyConnectionError,
   type HulyDomainError,
@@ -27,6 +28,7 @@ import {
   InvalidStatusError,
   IssueNotFoundError,
   IssueTemplateNotFoundError,
+  LeadNotFoundError,
   MasterTagNotFoundError,
   MessageNotFoundError,
   MilestoneNotFoundError,
@@ -643,6 +645,8 @@ describe("Huly Errors", () => {
               return `status:${error.status}`
             case "PersonNotFoundError":
               return `person:${error.identifier}`
+            case "OrganizationNotFoundError":
+              return `organization:${error.identifier}`
             case "FileUploadError":
               return `upload:${error.message}`
             case "InvalidFileDataError":
@@ -733,6 +737,10 @@ describe("Huly Errors", () => {
               return `toolarge:${error.filename}`
             case "InvalidContentTypeError":
               return `contenttype:${error.contentType}`
+            case "FunnelNotFoundError":
+              return `funnel:${error.identifier}`
+            case "LeadNotFoundError":
+              return `lead:${error.identifier}`
           }
         }
 
@@ -790,6 +798,8 @@ describe("Huly Errors", () => {
         expect(
           matchError(new InvalidContentTypeError({ filename: "f.exe", contentType: "application/x-msdownload" }))
         ).toBe("contenttype:application/x-msdownload")
+        expect(matchError(new FunnelNotFoundError({ identifier: "SALES" }))).toBe("funnel:SALES")
+        expect(matchError(new LeadNotFoundError({ identifier: "L-1", funnel: "SALES" }))).toBe("lead:L-1")
       }))
   })
 })
