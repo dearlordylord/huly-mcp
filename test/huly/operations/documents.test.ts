@@ -595,6 +595,105 @@ describe("createDocument", () => {
       }))
   })
 
+  describe("nested documents (parent parameter)", () => {
+    // test-revizorro: approved
+    it.effect("creates document under parent found by title", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const parentDoc = makeDocument({
+          _id: "parent-1" as Ref<HulyDocument>,
+          space: "ts-1" as Ref<HulyTeamspace>,
+          title: "Architecture"
+        })
+        const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: [parentDoc],
+          captureCreateDoc
+        })
+
+        const result = yield* createDocument({
+          teamspace: teamspaceIdentifier("My Docs"),
+          title: "API Design",
+          parent: "Architecture"
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result.title).toBe("API Design")
+        expect(captureCreateDoc.attributes?.parent).toBe("parent-1")
+      }))
+
+    // test-revizorro: approved
+    it.effect("creates document under parent found by ID", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const parentDoc = makeDocument({
+          _id: "parent-1" as Ref<HulyDocument>,
+          space: "ts-1" as Ref<HulyTeamspace>,
+          title: "Architecture"
+        })
+        const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: [parentDoc],
+          captureCreateDoc
+        })
+
+        const result = yield* createDocument({
+          teamspace: teamspaceIdentifier("My Docs"),
+          title: "API Design",
+          parent: "parent-1"
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result.title).toBe("API Design")
+        expect(captureCreateDoc.attributes?.parent).toBe("parent-1")
+      }))
+
+    // test-revizorro: approved
+    it.effect("creates top-level document when parent is omitted", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: [],
+          captureCreateDoc
+        })
+
+        const result = yield* createDocument({
+          teamspace: teamspaceIdentifier("My Docs"),
+          title: "Top Level Doc"
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result.title).toBe("Top Level Doc")
+        expect(captureCreateDoc.attributes?.parent).toBe(documentPlugin.ids.NoParent)
+      }))
+
+    // test-revizorro: approved
+    it.effect("returns DocumentNotFoundError when parent does not exist", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: []
+        })
+
+        const error = yield* Effect.flip(
+          createDocument({
+            teamspace: teamspaceIdentifier("My Docs"),
+            title: "Orphan Doc",
+            parent: "Nonexistent Parent"
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("DocumentNotFoundError")
+        expect((error as DocumentNotFoundError).identifier).toBe("Nonexistent Parent")
+      }))
+  })
+
   describe("error handling", () => {
     // test-revizorro: approved
     it.effect("returns TeamspaceNotFoundError when teamspace doesn't exist", () =>
