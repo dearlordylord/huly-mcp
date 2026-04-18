@@ -1,7 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { ContactProvider, OrganizationId, PersonName } from "./shared.js"
-import { Email, LimitParam, MemberReference, NonEmptyString, PersonId } from "./shared.js"
+import type { ContactProvider, PersonName } from "./shared.js"
+import { Email, LimitParam, MemberReference, NonEmptyString, OrganizationId, PersonId } from "./shared.js"
 
 // No codec needed — internal type, not used for runtime validation
 export interface PersonSummary {
@@ -12,6 +12,11 @@ export interface PersonSummary {
   readonly modifiedOn?: number | undefined
 }
 
+export interface OrganizationMembershipSummary {
+  readonly id: OrganizationId
+  readonly name: string
+}
+
 export interface Person {
   readonly id: PersonId
   readonly name: PersonName
@@ -20,6 +25,7 @@ export interface Person {
   readonly city?: string | undefined
   readonly email?: Email | undefined
   readonly channels?: ReadonlyArray<{ readonly provider: ContactProvider; readonly value: string }> | undefined
+  readonly organizations?: ReadonlyArray<OrganizationMembershipSummary> | undefined
   readonly modifiedOn?: number | undefined
   readonly createdOn?: number | undefined
 }
@@ -196,6 +202,144 @@ export const CreateOrganizationParamsSchema = Schema.Struct({
 
 export type CreateOrganizationParams = Schema.Schema.Type<typeof CreateOrganizationParamsSchema>
 
+export const GetOrganizationParamsSchema = Schema.Struct({
+  identifier: NonEmptyString.annotations({
+    description: "Organization ID or exact name"
+  })
+}).annotations({
+  title: "GetOrganizationParams",
+  description: "Parameters for getting a single organization"
+})
+
+export type GetOrganizationParams = Schema.Schema.Type<typeof GetOrganizationParamsSchema>
+
+export const UpdateOrganizationParamsSchema = Schema.Struct({
+  organizationId: OrganizationId.annotations({
+    description: "Organization ID to update"
+  }),
+  name: Schema.optional(NonEmptyString.annotations({
+    description: "New organization name"
+  })),
+  city: Schema.optional(
+    Schema.NullOr(Schema.String).annotations({
+      description: "New city (null to clear)"
+    })
+  ),
+  description: Schema.optional(
+    Schema.NullOr(Schema.String).annotations({
+      description: "New description/notes (null to clear). Supports multi-line plain text."
+    })
+  )
+}).annotations({
+  title: "UpdateOrganizationParams",
+  description: "Update fields on an existing organization. Only provided fields are modified."
+})
+
+export type UpdateOrganizationParams = Schema.Schema.Type<typeof UpdateOrganizationParamsSchema>
+
+export const DeleteOrganizationParamsSchema = Schema.Struct({
+  organizationId: OrganizationId.annotations({
+    description: "Organization ID to delete"
+  })
+}).annotations({
+  title: "DeleteOrganizationParams",
+  description: "Parameters for deleting an organization"
+})
+
+export type DeleteOrganizationParams = Schema.Schema.Type<typeof DeleteOrganizationParamsSchema>
+
+export const ListOrganizationMembersParamsSchema = Schema.Struct({
+  organizationId: NonEmptyString.annotations({
+    description: "Organization ID or exact name"
+  })
+}).annotations({
+  title: "ListOrganizationMembersParams",
+  description: "List persons who are members of an organization"
+})
+
+export type ListOrganizationMembersParams = Schema.Schema.Type<typeof ListOrganizationMembersParamsSchema>
+
+const ListPersonOrganizationsByIdSchema = Schema.Struct({
+  personId: PersonId.annotations({
+    description: "Person ID"
+  })
+})
+
+const ListPersonOrganizationsByEmailSchema = Schema.Struct({
+  email: Email.annotations({
+    description: "Person email address"
+  })
+})
+
+export const ListPersonOrganizationsParamsSchema = Schema.Union(
+  ListPersonOrganizationsByIdSchema,
+  ListPersonOrganizationsByEmailSchema
+).annotations({
+  title: "ListPersonOrganizationsParams",
+  description: "List organizations a person is a member of (provide personId or email)"
+})
+
+export type ListPersonOrganizationsParams = Schema.Schema.Type<typeof ListPersonOrganizationsParamsSchema>
+
+export const RemoveOrganizationMemberParamsSchema = Schema.Struct({
+  organizationId: NonEmptyString.annotations({
+    description: "Organization ID or exact name"
+  }),
+  personIdentifier: NonEmptyString.annotations({
+    description: "Person ID or email address to unlink from the organization"
+  })
+}).annotations({
+  title: "RemoveOrganizationMemberParams",
+  description: "Parameters for removing a person from an organization"
+})
+
+export type RemoveOrganizationMemberParams = Schema.Schema.Type<typeof RemoveOrganizationMemberParamsSchema>
+
+export const AddOrganizationChannelParamsSchema = Schema.Struct({
+  organizationId: NonEmptyString.annotations({
+    description: "Organization ID or exact name"
+  }),
+  provider: NonEmptyString.annotations({
+    description: "Channel type: email, phone, linkedin, twitter, github, facebook, telegram, homepage"
+  }),
+  value: NonEmptyString.annotations({
+    description: "Channel value (email address, phone number, URL, username)"
+  })
+}).annotations({
+  title: "AddOrganizationChannelParams",
+  description: "Parameters for adding a contact channel to an organization"
+})
+
+export type AddOrganizationChannelParams = Schema.Schema.Type<typeof AddOrganizationChannelParamsSchema>
+
+export const AddOrganizationMemberParamsSchema = Schema.Struct({
+  organizationId: NonEmptyString.annotations({
+    description: "Organization ID or exact name"
+  }),
+  personIdentifier: NonEmptyString.annotations({
+    description: "Person ID or email address"
+  })
+}).annotations({
+  title: "AddOrganizationMemberParams",
+  description: "Parameters for adding a person as an organization member"
+})
+
+export type AddOrganizationMemberParams = Schema.Schema.Type<typeof AddOrganizationMemberParamsSchema>
+
+export const addOrganizationChannelParamsJsonSchema = JSONSchema.make(AddOrganizationChannelParamsSchema)
+export const addOrganizationMemberParamsJsonSchema = JSONSchema.make(AddOrganizationMemberParamsSchema)
+
+export const parseAddOrganizationChannelParams = Schema.decodeUnknown(AddOrganizationChannelParamsSchema)
+export const parseAddOrganizationMemberParams = Schema.decodeUnknown(AddOrganizationMemberParamsSchema)
+
+export const listOrganizationMembersParamsJsonSchema = JSONSchema.make(ListOrganizationMembersParamsSchema)
+export const listPersonOrganizationsParamsJsonSchema = JSONSchema.make(ListPersonOrganizationsParamsSchema)
+export const removeOrganizationMemberParamsJsonSchema = JSONSchema.make(RemoveOrganizationMemberParamsSchema)
+
+export const parseListOrganizationMembersParams = Schema.decodeUnknown(ListOrganizationMembersParamsSchema)
+export const parseListPersonOrganizationsParams = Schema.decodeUnknown(ListPersonOrganizationsParamsSchema)
+export const parseRemoveOrganizationMemberParams = Schema.decodeUnknown(RemoveOrganizationMemberParamsSchema)
+
 export const listPersonsParamsJsonSchema = JSONSchema.make(ListPersonsParamsSchema)
 export const getPersonParamsJsonSchema = JSONSchema.make(GetPersonParamsSchema)
 export const createPersonParamsJsonSchema = JSONSchema.make(CreatePersonParamsSchema)
@@ -204,6 +348,9 @@ export const deletePersonParamsJsonSchema = JSONSchema.make(DeletePersonParamsSc
 export const listEmployeesParamsJsonSchema = JSONSchema.make(ListEmployeesParamsSchema)
 export const listOrganizationsParamsJsonSchema = JSONSchema.make(ListOrganizationsParamsSchema)
 export const createOrganizationParamsJsonSchema = JSONSchema.make(CreateOrganizationParamsSchema)
+export const getOrganizationParamsJsonSchema = JSONSchema.make(GetOrganizationParamsSchema)
+export const updateOrganizationParamsJsonSchema = JSONSchema.make(UpdateOrganizationParamsSchema)
+export const deleteOrganizationParamsJsonSchema = JSONSchema.make(DeleteOrganizationParamsSchema)
 
 export const parseListPersonsParams = Schema.decodeUnknown(ListPersonsParamsSchema)
 export const parseGetPersonParams = Schema.decodeUnknown(GetPersonParamsSchema)
@@ -213,6 +360,9 @@ export const parseDeletePersonParams = Schema.decodeUnknown(DeletePersonParamsSc
 export const parseListEmployeesParams = Schema.decodeUnknown(ListEmployeesParamsSchema)
 export const parseListOrganizationsParams = Schema.decodeUnknown(ListOrganizationsParamsSchema)
 export const parseCreateOrganizationParams = Schema.decodeUnknown(CreateOrganizationParamsSchema)
+export const parseGetOrganizationParams = Schema.decodeUnknown(GetOrganizationParamsSchema)
+export const parseUpdateOrganizationParams = Schema.decodeUnknown(UpdateOrganizationParamsSchema)
+export const parseDeleteOrganizationParams = Schema.decodeUnknown(DeleteOrganizationParamsSchema)
 
 // No codec needed — internal type, not used for runtime validation
 export interface CreatePersonResult {
@@ -231,4 +381,44 @@ export interface DeletePersonResult {
 
 export interface CreateOrganizationResult {
   readonly id: OrganizationId
+}
+
+export interface GetOrganizationResult {
+  readonly id: OrganizationId
+  readonly name: string
+  readonly city?: string | undefined
+  readonly description?: string | undefined
+  readonly members: number
+  readonly modifiedOn?: number | undefined
+}
+
+export interface UpdateOrganizationResult {
+  readonly id: OrganizationId
+  readonly updated: boolean
+}
+
+export interface DeleteOrganizationResult {
+  readonly id: OrganizationId
+  readonly deleted: boolean
+}
+
+export interface OrganizationMemberEntry {
+  readonly personId: PersonId
+  readonly name: PersonName
+  readonly email?: Email | undefined
+}
+
+export interface ListOrganizationMembersResult {
+  readonly organizationId: OrganizationId
+  readonly members: ReadonlyArray<OrganizationMemberEntry>
+}
+
+export interface ListPersonOrganizationsResult {
+  readonly personId: PersonId
+  readonly organizations: ReadonlyArray<OrganizationMembershipSummary>
+}
+
+export interface RemoveOrganizationMemberResult {
+  readonly id: OrganizationId
+  readonly removed: boolean
 }

@@ -20,6 +20,20 @@ export class PersonNotFoundError extends Schema.TaggedError<PersonNotFoundError>
 }
 
 /**
+ * Organization not found.
+ */
+export class OrganizationNotFoundError extends Schema.TaggedError<OrganizationNotFoundError>()(
+  "OrganizationNotFoundError",
+  {
+    identifier: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Organization '${this.identifier}' not found`
+  }
+}
+
+/**
  * Invalid PersonUuid format.
  */
 export class InvalidPersonUuidError extends Schema.TaggedError<InvalidPersonUuidError>()(

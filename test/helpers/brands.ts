@@ -10,6 +10,7 @@
 
 // --- Effect Schema brands (src/domain/schemas/shared.ts) ---
 
+import type { FunnelIdentifier, LeadIdentifier } from "../../src/domain/schemas/leads.js"
 import type {
   AccountId,
   AccountUuid,
@@ -111,6 +112,8 @@ export const tagCategoryId = (s: string) => s as TagCategoryId
 // Tier 2: Human-Readable Identifiers
 export const projectIdentifier = (s: string) => s as ProjectIdentifier
 export const issueIdentifier = (s: string) => s as IssueIdentifier
+export const funnelIdentifier = (s: string) => s as FunnelIdentifier
+export const leadIdentifier = (s: string) => s as LeadIdentifier
 
 // Tier 3: Constrained String Domains
 export const email = (s: string) => s as Email
