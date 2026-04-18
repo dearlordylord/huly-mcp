@@ -147,7 +147,7 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
 ## Available Tools
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `tag-categories`, `test-management`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `leads`, `tag-categories`, `test-management`
 
 ### Projects
 
@@ -261,6 +261,15 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `list_employees` | List employees (persons who are team members). Returns employees sorted by modification date (newest first). |
 | `list_organizations` | List all organizations in the Huly workspace. Returns organizations sorted by modification date (newest first). |
 | `create_organization` | Create a new organization in Huly. Optionally add members by person ID or email. Returns the created organization ID. |
+| `get_organization` | Retrieve full details for an organization by ID or exact name - including city, description, member count, and modification timestamp. |
+| `update_organization` | Update fields on an existing organization (name, city, description). Only provided fields are modified. Description supports multi-line plain text and is the right place to store CRM notes / revenue summaries / context. Pass null to clear city or description. |
+| `delete_organization` | Permanently delete an organization. Use with care - this cannot be undone. Useful for cleaning up duplicate organizations after merging their data elsewhere. |
+| `make_organization_customer` | Apply the Customer mixin to an organization so it appears in the Huly Leads > Customers view. Idempotent - safe to call on organizations that are already customers. Takes the organization ID or exact name. |
+| `add_organization_channel` | Add a contact channel (phone, email, website/homepage, LinkedIn, Twitter, GitHub, Facebook, Telegram) to an organization. Provider names: email, phone, linkedin, twitter, github, facebook, telegram, homepage. |
+| `add_organization_member` | Link a person as a member of an organization. The person appears under the org's Members tab in Huly. Use person ID or email to identify the person. |
+| `list_organization_members` | List all persons who are members of an organization. Returns each member's person ID, name, and primary email (if any). |
+| `list_person_organizations` | List all organizations that a person is a member of. Provide personId or email. Returns each organization's ID and name. |
+| `remove_organization_member` | Unlink a person from an organization's members. Reverses add_organization_member. Returns removed: false if the person was not a member. |
 
 ### Channels
 
@@ -385,6 +394,14 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `create_label` | Create a new label/tag definition in the workspace. Labels are global and can be attached to any issue. Returns existing label if one with the same title already exists (created=false). Use add_issue_label to attach a label to a specific issue. |
 | `update_label` | Update a label/tag definition. Accepts label ID or title. Only provided fields are modified. |
 | `delete_label` | Permanently delete a label/tag definition. Accepts label ID or title. This action cannot be undone. |
+
+### Leads
+
+| Tool | Description |
+|------|-------------|
+| `list_funnels` | List all Huly sales funnels (lead pipelines). Returns funnels sorted by name. Supports filtering by archived status. |
+| `list_leads` | Query Huly leads in a funnel with optional filters. Returns leads sorted by modification date (newest first). Supports filtering by status, assignee, and title search. |
+| `get_lead` | Retrieve full details for a Huly lead including markdown description, customer name, and status. Use this to view lead content and metadata. |
 
 ### Tag-Categories
 

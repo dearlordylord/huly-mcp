@@ -20,7 +20,6 @@ interface MarkupUrlConfig {
 
 const emptyUrlConfig: MarkupUrlConfig = { refUrl: "", imageUrl: "" }
 
-// Exported for test assertions; production code should prefer client.toMarkdown/toMarkup.
 // eslint-disable-next-line import-x/no-unused-modules
 export const markupToMarkdownString = (markup: Markup, urls?: MarkupUrlConfig): string => {
   const json = markupToJSON(markup)
