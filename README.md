@@ -147,7 +147,7 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
 ## Available Tools
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `tag-categories`, `test-management`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `leads`, `tag-categories`, `test-management`
 
 ### Projects
 
@@ -385,6 +385,14 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `create_label` | Create a new label/tag definition in the workspace. Labels are global and can be attached to any issue. Returns existing label if one with the same title already exists (created=false). Use add_issue_label to attach a label to a specific issue. |
 | `update_label` | Update a label/tag definition. Accepts label ID or title. Only provided fields are modified. |
 | `delete_label` | Permanently delete a label/tag definition. Accepts label ID or title. This action cannot be undone. |
+
+### Leads
+
+| Tool | Description |
+|------|-------------|
+| `list_funnels` | List all Huly sales funnels (lead pipelines). Returns funnels sorted by name. Supports filtering by archived status. |
+| `list_leads` | Query Huly leads in a funnel with optional filters. Returns leads sorted by modification date (newest first). Supports filtering by status, assignee, and title search. |
+| `get_lead` | Retrieve full details for a Huly lead including markdown description, customer name, and status. Use this to view lead content and metadata. |
 
 ### Tag-Categories
 
