@@ -13,7 +13,6 @@ import {
   type Space
 } from "@hcengineering/core"
 import { Effect } from "effect"
-import { markdownToMarkupString, markupToMarkdownString } from "./markup.js"
 
 import type {
   Channel,
@@ -400,7 +399,7 @@ export const listChannelMessages = (
       const senderName = socialIdToName.get(msg.modifiedBy)
       return {
         id: MessageId.make(msg._id),
-        body: markupToMarkdownString(msg.message),
+        body: client.toMarkdown(msg.message),
         sender: senderName !== undefined ? PersonName.make(senderName) : undefined,
         senderId: msg.modifiedBy,
         createdOn: msg.createdOn,
@@ -425,7 +424,7 @@ export const sendChannelMessage = (
     const { channel, client } = yield* findChannel(params.channel)
 
     const messageId: Ref<ChatMessage> = generateId()
-    const markup = markdownToMarkupString(params.body)
+    const markup = client.toMarkup(params.body)
 
     const messageData: AttachedData<ChatMessage> = {
       message: markup,

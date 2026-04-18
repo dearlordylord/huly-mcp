@@ -134,7 +134,7 @@ export const listInlineComments = (
         const threadReplies = threadRepliesMap.get(comment.threadId) ?? []
         const replies: Array<InlineCommentReply> = threadReplies.map(r => ({
           id: r._id,
-          body: optionalMarkupToMarkdown(r.message),
+          body: optionalMarkupToMarkdown(r.message, "", client.getMarkupUrls()),
           sender: r.createdBy !== undefined ? nameMap.get(r.createdBy) : undefined,
           createdOn: r.createdOn
         }))

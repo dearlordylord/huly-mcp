@@ -29,7 +29,6 @@ import type { HulyClient, HulyClientError } from "../client.js"
 import type { ChannelNotFoundError } from "../errors.js"
 import { MessageNotFoundError, ThreadReplyNotFoundError } from "../errors.js"
 import { buildSocialIdToPersonNameMap, findChannel } from "./channels.js"
-import { markdownToMarkupString, markupToMarkdownString } from "./markup.js"
 import { toRef } from "./shared.js"
 
 import { chunter } from "../huly-plugins.js"
@@ -151,7 +150,7 @@ export const listThreadReplies = (
       const senderName = socialIdToName.get(msg.modifiedBy)
       return {
         id: ThreadReplyId.make(msg._id),
-        body: markupToMarkdownString(msg.message),
+        body: client.toMarkdown(msg.message),
         sender: senderName !== undefined ? PersonName.make(senderName) : undefined,
         senderId: msg.modifiedBy,
         createdOn: msg.createdOn,
@@ -170,7 +169,7 @@ export const addThreadReply = (
     const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
 
     const replyId: Ref<HulyThreadMessage> = generateId()
-    const markup = markdownToMarkupString(params.body)
+    const markup = client.toMarkup(params.body)
 
     const replyData: AttachedData<HulyThreadMessage> = {
       message: markup,
@@ -203,7 +202,7 @@ export const updateThreadReply = (
     const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
     const reply = yield* findReply(client, channel, message, params.replyId)
 
-    const markup = markdownToMarkupString(params.body)
+    const markup = client.toMarkup(params.body)
 
     const now = yield* Clock.currentTimeMillis
     const updateOps: DocumentUpdate<HulyThreadMessage> = {

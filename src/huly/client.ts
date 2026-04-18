@@ -177,6 +177,11 @@ export interface HulyClientOperations {
     query: SearchQuery,
     options: SearchOptions
   ) => Effect.Effect<SearchResult, HulyClientError>
+
+  readonly toMarkup: (markdown: string) => string
+  readonly toMarkdown: (markup: string) => string
+
+  readonly getMarkupUrls: () => { readonly refUrl: string; readonly imageUrl: string }
 }
 
 export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
@@ -192,11 +197,13 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
     Effect.gen(function*() {
       const config = yield* HulyConfigService
 
-      const { accountUuid, client, markupOps } = yield* connectRestWithRetry({
+      const { accountUuid, client, imageUrl, markupOps, refUrl } = yield* connectRestWithRetry({
         url: config.url,
         auth: config.auth,
         workspace: config.workspace
       })
+
+      const urlConfig = { refUrl, imageUrl }
 
       const withClient = <A>(
         op: (client: TxOperations) => Promise<A>,
@@ -336,7 +343,11 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
           withClient(
             (client) => client.searchFulltext(query, options),
             "searchFulltext failed"
-          )
+          ),
+
+        toMarkup: (md: string) => jsonToMarkup(markdownToMarkup(md, urlConfig)),
+        toMarkdown: (markup: string) => markupToMarkdown(markupToJSON(markup), urlConfig),
+        getMarkupUrls: () => urlConfig
       }
 
       return operations
@@ -375,7 +386,10 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       fetchMarkup: noopFetchMarkup,
       updateMixin: notImplemented("updateMixin"),
       updateMarkup: notImplemented("updateMarkup"),
-      searchFulltext: notImplemented("searchFulltext")
+      searchFulltext: notImplemented("searchFulltext"),
+      toMarkup: (md: string) => jsonToMarkup(markdownToMarkup(md, { refUrl: "", imageUrl: "" })),
+      toMarkdown: (markup: string) => markupToMarkdown(markupToJSON(markup), { refUrl: "", imageUrl: "" }),
+      getMarkupUrls: () => ({ refUrl: "", imageUrl: "" })
     }
 
     return Layer.succeed(HulyClient, { ...defaultOps, ...mockOperations })
@@ -410,6 +424,8 @@ interface RestConnection {
   client: TxOperations
   accountUuid: AccountUuid
   markupOps: MarkupOperations
+  refUrl: string
+  imageUrl: string
 }
 
 function createMarkupOps(
@@ -417,12 +433,12 @@ function createMarkupOps(
   workspace: WorkspaceUuid,
   token: string,
   collaboratorUrl: string
-): MarkupOperations {
+): { ops: MarkupOperations; refUrl: string; imageUrl: string } {
   const refUrl = concatLink(url, `/browse?workspace=${workspace}`)
   const imageUrl = concatLink(url, `/files?workspace=${workspace}&file=`)
   const collaborator = getCollaboratorClient(workspace, token, collaboratorUrl)
 
-  return {
+  return { refUrl, imageUrl, ops: {
     async fetchMarkup(objectClass, objectId, objectAttr, doc, format) {
       const collabId = makeCollabId(objectClass, objectId, objectAttr)
       const markup = await collaborator.getMarkup(collabId, doc)
@@ -438,7 +454,7 @@ function createMarkupOps(
       const collabId = makeCollabId(objectClass, objectId, objectAttr)
       return await collaborator.updateMarkup(collabId, toInternalMarkup(value, format, { refUrl, imageUrl }))
     }
-  }
+  } }
 }
 
 const connectRest = async (
@@ -460,14 +476,14 @@ const connectRest = async (
   const account = await restClient.getAccount()
 
   const client = await createRestTxOperations(endpoint, workspaceId, token)
-  const markupOps = createMarkupOps(
+  const { imageUrl, ops: markupOps, refUrl } = createMarkupOps(
     config.url,
     workspaceId,
     token,
     serverConfig.COLLABORATOR_URL
   )
 
-  return { client, accountUuid: account.uuid, markupOps }
+  return { client, accountUuid: account.uuid, markupOps, refUrl, imageUrl }
 }
 
 const connectRestWithRetry = (

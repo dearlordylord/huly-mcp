@@ -172,7 +172,7 @@ export const getComponent = (
     const result: Component = {
       id: ComponentId.make(component._id),
       label: ComponentLabel.make(component.label),
-      description: optionalMarkupToMarkdown(component.description, undefined),
+      description: optionalMarkupToMarkdown(component.description, undefined, client.getMarkupUrls()),
       lead: leadName !== undefined ? PersonName.make(leadName) : undefined,
       project: params.project,
       modifiedOn: component.modifiedOn,
@@ -205,7 +205,7 @@ export const createComponent = (
 
     const componentData: Data<HulyComponent> = {
       label: params.label,
-      description: optionalMarkdownToMarkup(params.description),
+      description: optionalMarkdownToMarkup(params.description, "", client.getMarkupUrls()),
       lead: leadRef,
       comments: 0
     }
@@ -233,7 +233,7 @@ export const updateComponent = (
     }
 
     if (params.description !== undefined) {
-      updateOps.description = optionalMarkdownToMarkup(params.description)
+      updateOps.description = optionalMarkdownToMarkup(params.description, "", client.getMarkupUrls())
     }
 
     if (params.lead !== undefined) {

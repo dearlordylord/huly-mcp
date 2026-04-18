@@ -18,7 +18,7 @@ import { CommentNotFoundError, HulyConnectionError } from "../errors.js"
 import { clampLimit, findProjectAndIssue as findProjectAndIssueShared, toRef } from "./shared.js"
 
 import { chunter, tracker } from "../huly-plugins.js"
-import { markdownToMarkupString, optionalMarkupToMarkdown } from "./markup.js"
+import { optionalMarkupToMarkdown } from "./markup.js"
 
 type ListCommentsError =
   | HulyClientError
@@ -110,7 +110,7 @@ export const listComments = (
     const validated = yield* Schema.decodeUnknown(Schema.Array(CommentSchema))(
       messages.map((msg) => ({
         id: msg._id,
-        body: optionalMarkupToMarkdown(msg.message),
+        body: optionalMarkupToMarkdown(msg.message, "", client.getMarkupUrls()),
         authorId: msg.modifiedBy,
         createdOn: msg.createdOn,
         modifiedOn: msg.modifiedOn,
@@ -143,7 +143,7 @@ export const addComment = (
     const commentId: Ref<ChatMessage> = generateId()
 
     const commentData: AttachedData<ChatMessage> = {
-      message: markdownToMarkupString(params.body)
+      message: client.toMarkup(params.body)
     }
 
     yield* client.addCollection(
@@ -171,7 +171,7 @@ export const updateComment = (
   Effect.gen(function*() {
     const { client, comment, issue, project } = yield* findComment(params)
 
-    const newMarkup = markdownToMarkupString(params.body)
+    const newMarkup = client.toMarkup(params.body)
 
     if (newMarkup === comment.message) {
       return {
