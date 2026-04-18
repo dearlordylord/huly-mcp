@@ -113,7 +113,7 @@ export const CreateDocumentParamsSchema = Schema.Struct({
   content: Schema.optional(Schema.String.annotations({
     description: "Document content (markdown supported)"
   })),
-  parent: Schema.optional(NonEmptyString.annotations({
+  parent: Schema.optional(DocumentIdentifier.annotations({
     description: "Parent document title or ID to nest this document under. If omitted, creates a top-level document."
   }))
 }).annotations({
