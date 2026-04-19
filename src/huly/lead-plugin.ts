@@ -14,14 +14,17 @@
  */
 import type { Class, Doc, Ref } from "@hcengineering/core"
 
-/* eslint-disable no-restricted-syntax -- SDK boundary: lead plugin is not published on npm, string literal class refs required */
+// Lead plugin refs are opaque strings from upstream Huly. There is no published
+// runtime factory for these phantom refs, so the bridge lives in one place.
+// eslint-disable-next-line no-restricted-syntax -- SDK boundary: upstream lead plugin refs are opaque phantom strings without constructors
+const leadRef = (identifier: string): Ref<Class<Doc>> => identifier as Ref<Class<Doc>>
+
 export const leadClassIds = {
   class: {
-    Lead: "lead:class:Lead" as Ref<Class<Doc>>,
-    Funnel: "lead:class:Funnel" as Ref<Class<Doc>>
+    Lead: leadRef("lead:class:Lead"),
+    Funnel: leadRef("lead:class:Funnel")
   },
   mixin: {
-    Customer: "lead:mixin:Customer" as Ref<Class<Doc>>
+    Customer: leadRef("lead:mixin:Customer")
   }
 } as const
-/* eslint-enable no-restricted-syntax */

@@ -1098,6 +1098,7 @@ export {
 
 export {
   FunnelIdentifier,
+  FunnelReference,
   type FunnelSummary,
   FunnelSummarySchema,
   type GetLeadParams,

@@ -1,4 +1,4 @@
-import { JSONSchema, Schema } from "effect"
+import { JSONSchema, ParseResult, Schema } from "effect"
 
 import { Email, LimitParam, PersonName, StatusName, Timestamp } from "./shared.js"
 
@@ -9,10 +9,36 @@ import { Email, LimitParam, PersonName, StatusName, Timestamp } from "./shared.j
 
 const HulyRef = <T extends string>(tag: T) => Schema.Trim.pipe(Schema.nonEmptyString(), Schema.brand(tag))
 
+export const FunnelReference = HulyRef("FunnelReference")
+export type FunnelReference = Schema.Schema.Type<typeof FunnelReference>
+
 export const FunnelIdentifier = HulyRef("FunnelIdentifier")
 export type FunnelIdentifier = Schema.Schema.Type<typeof FunnelIdentifier>
 
-export const LeadIdentifier = HulyRef("LeadIdentifier")
+const CanonicalLeadIdentifier = Schema.Trim.pipe(
+  Schema.pattern(/^LEAD-\d+$/, {
+    message: () => "Expected lead identifier like 'LEAD-1'"
+  }),
+  Schema.brand("LeadIdentifier")
+)
+
+const leadIdentifierPattern = /^(?:LEAD-)?(\d+)$/i
+
+export const LeadIdentifier = Schema.transformOrFail(Schema.String, CanonicalLeadIdentifier, {
+  strict: true,
+  decode: (input, _options, ast) => {
+    const match = leadIdentifierPattern.exec(input.trim())
+    return match !== null
+      ? ParseResult.succeed(`LEAD-${match[1]}`)
+      : ParseResult.fail(new ParseResult.Type(ast, input, "Expected lead identifier like 'LEAD-1'"))
+  },
+  encode: ParseResult.succeed
+}).annotations({
+  jsonSchema: {
+    type: "string",
+    pattern: "^LEAD-[0-9]+$"
+  }
+})
 export type LeadIdentifier = Schema.Schema.Type<typeof LeadIdentifier>
 
 // --- Output Schemas ---
@@ -80,7 +106,7 @@ export const ListFunnelsParamsSchema = Schema.Struct({
 export type ListFunnelsParams = Schema.Schema.Type<typeof ListFunnelsParamsSchema>
 
 const ListLeadsParamsBase = Schema.Struct({
-  funnel: FunnelIdentifier.annotations({
+  funnel: FunnelReference.annotations({
     description: "Funnel ID returned by list_funnels, or funnel name for convenience lookup."
   }),
   status: Schema.optional(StatusName.annotations({
@@ -107,7 +133,7 @@ export const ListLeadsParamsSchema = ListLeadsParamsBase.annotations({
 export type ListLeadsParams = Schema.Schema.Type<typeof ListLeadsParamsSchema>
 
 export const GetLeadParamsSchema = Schema.Struct({
-  funnel: FunnelIdentifier.annotations({
+  funnel: FunnelReference.annotations({
     description: "Funnel ID returned by list_funnels, or funnel name for convenience lookup."
   }),
   identifier: LeadIdentifier.annotations({

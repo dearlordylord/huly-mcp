@@ -5,13 +5,15 @@
  */
 import { Schema } from "effect"
 
+import { FunnelIdentifier, FunnelReference, LeadIdentifier } from "../domain/schemas/leads.js"
+
 /**
  * Funnel not found in the workspace.
  */
 export class FunnelNotFoundError extends Schema.TaggedError<FunnelNotFoundError>()(
   "FunnelNotFoundError",
   {
-    identifier: Schema.String
+    identifier: FunnelReference
   }
 ) {
   override get message(): string {
@@ -25,8 +27,8 @@ export class FunnelNotFoundError extends Schema.TaggedError<FunnelNotFoundError>
 export class LeadNotFoundError extends Schema.TaggedError<LeadNotFoundError>()(
   "LeadNotFoundError",
   {
-    identifier: Schema.String,
-    funnel: Schema.String
+    identifier: LeadIdentifier,
+    funnel: FunnelIdentifier
   }
 ) {
   override get message(): string {

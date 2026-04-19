@@ -17,6 +17,7 @@ import { SortingOrder } from "@hcengineering/core"
 import { Effect, Schema } from "effect"
 
 import type {
+  FunnelReference,
   FunnelSummary,
   GetLeadParams,
   LeadDetail,
@@ -66,23 +67,21 @@ type StatusInfo = {
   name: string
 }
 
-/* eslint-disable no-restricted-syntax -- SDK boundary: upstream lead plugin refs are mirrored locally */
+const funnelAsSpace = (funnel: HulyFunnel): Ref<Space> => toRef<Space>(funnel._id)
 
-const funnelAsSpace = (funnel: HulyFunnel): Ref<Space> => funnel._id as unknown as Ref<Space>
+// Huly lead descriptions are stored as blob-backed markup refs. The client
+// fetch API accepts the wider MarkupRef shape, so this bridge is safe.
+// eslint-disable-next-line no-restricted-syntax -- SDK boundary: MarkupBlobRef and MarkupRef are both erased to strings at runtime
+const markupBlobRefAsMarkupRef = (value: MarkupBlobRef): MarkupRef => value as MarkupRef
 
-const normalizeLeadIdentifier = (identifier: string): LeadIdentifier => {
-  const trimmed = identifier.trim()
-  const normalized = trimmed.toUpperCase()
-  return LeadIdentifier.make(
-    normalized.startsWith("LEAD-")
-      ? normalized
-      : `LEAD-${normalized}`
-  )
+const normalizeLeadIdentifier = (identifier: string): string => {
+  const match = /^(?:LEAD-)?(\d+)$/i.exec(identifier.trim())
+  return match !== null ? `LEAD-${match[1]}` : identifier.trim().toUpperCase()
 }
 
 const findFunnel = (
   client: HulyClient["Type"],
-  funnelIdentifier: string
+  funnelIdentifier: FunnelReference
 ): Effect.Effect<HulyFunnel, FunnelNotFoundError | HulyClientError> =>
   Effect.gen(function*() {
     const byId = yield* client.findOne<HulyFunnel>(
@@ -284,7 +283,7 @@ export const listLeads = (
         const status = yield* resolveStatusName(statuses, lead.status)
 
         return {
-          identifier: normalizeLeadIdentifier(lead.identifier),
+          identifier: lead.identifier,
           title: lead.title,
           status,
           assignee: lead.$lookup?.assignee?.name,
@@ -318,7 +317,9 @@ export const getLead = (
     const client = yield* HulyClient
     const funnel = yield* findFunnel(client, params.funnel)
     const statuses = yield* getFunnelStatuses(client, funnel)
-    const leadIdentifier = normalizeLeadIdentifier(params.identifier)
+    const leadIdentifier = yield* Schema.decodeUnknown(LeadIdentifier)(normalizeLeadIdentifier(params.identifier)).pipe(
+      Effect.orDie
+    )
 
     const lead = yield* client.findOne<HulyLead>(
       leadClassIds.class.Lead,
@@ -326,7 +327,10 @@ export const getLead = (
     )
 
     if (lead === undefined) {
-      return yield* new LeadNotFoundError({ identifier: params.identifier, funnel: params.funnel })
+      return yield* new LeadNotFoundError({
+        identifier: params.identifier,
+        funnel: FunnelIdentifier.make(funnel._id)
+      })
     }
 
     const status = yield* resolveStatusName(statuses, lead.status)
@@ -345,13 +349,13 @@ export const getLead = (
         leadClassIds.class.Lead,
         lead._id,
         "description",
-        lead.description as unknown as MarkupRef,
+        markupBlobRefAsMarkupRef(lead.description),
         "markdown"
       )
       : undefined
 
     return yield* parseLeadDetailSchema({
-      identifier: normalizeLeadIdentifier(lead.identifier),
+      identifier: lead.identifier,
       title: lead.title,
       description,
       status,
@@ -370,5 +374,3 @@ export const getLead = (
       )
     )
   })
-
-/* eslint-enable no-restricted-syntax */

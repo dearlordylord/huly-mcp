@@ -51,7 +51,7 @@ describe("Lead Schemas", () => {
     it.effect("accepts valid lead summary", () =>
       Effect.gen(function*() {
         const result = yield* Schema.decodeUnknown(LeadSummarySchema)({
-          identifier: "LEAD-1",
+          identifier: "lead-1",
           title: "Big Deal",
           status: "Negotiation",
           assignee: "Doe,Jane",
@@ -152,10 +152,16 @@ describe("Lead Schemas", () => {
       Effect.gen(function*() {
         const result = yield* parseGetLeadParams({
           funnel: "funnel-1",
-          identifier: "LEAD-1"
+          identifier: "lead-1"
         })
         expect(result.funnel).toBe("funnel-1")
         expect(result.identifier).toBe("LEAD-1")
+      }))
+
+    it.effect("rejects malformed identifier", () =>
+      Effect.gen(function*() {
+        const error = yield* Effect.flip(parseGetLeadParams({ funnel: "funnel-1", identifier: "banana" }))
+        expect(error._tag).toBe("ParseError")
       }))
 
     it.effect("rejects missing funnel", () =>
