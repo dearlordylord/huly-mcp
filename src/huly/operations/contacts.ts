@@ -9,7 +9,6 @@ import type {
 } from "@hcengineering/contact"
 import { AvatarType } from "@hcengineering/contact"
 import {
-  type Class,
   type Data,
   type Doc,
   type DocumentQuery,
@@ -64,6 +63,7 @@ import { escapeLikeWildcards } from "./query-helpers.js"
 import { clampLimit, toRef } from "./shared.js"
 
 import { contact } from "../huly-plugins.js"
+import { leadClassIds } from "../lead-plugin.js"
 
 type ListPersonsError = HulyClientError
 type GetPersonError = HulyClientError | PersonNotFoundError
@@ -623,12 +623,9 @@ export const makeOrganizationCustomer = (
       return yield* new OrganizationNotFoundError({ identifier: params.identifier })
     }
 
-    // eslint-disable-next-line no-restricted-syntax -- SDK boundary: lead module not published on npm
-    const customerMixin = "lead:mixin:Customer" as Ref<Class<Doc>>
-
     // Check if mixin is already applied by looking for the mixin key on the doc
     // eslint-disable-next-line no-restricted-syntax -- SDK boundary: mixin check uses string key lookup
-    const alreadyCustomer = (org as unknown as Record<string, unknown>)[customerMixin] !== undefined
+    const alreadyCustomer = (org as unknown as Record<string, unknown>)[leadClassIds.mixin.Customer] !== undefined
 
     if (alreadyCustomer) {
       return { id: OrganizationId.make(org._id), applied: false }
@@ -638,8 +635,7 @@ export const makeOrganizationCustomer = (
       org._id,
       contact.class.Organization,
       contact.space.Contacts,
-      // eslint-disable-next-line no-restricted-syntax -- SDK boundary: lead:mixin:Customer is untyped (npm package not published)
-      customerMixin as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      leadClassIds.mixin.Customer,
       {}
     )
 

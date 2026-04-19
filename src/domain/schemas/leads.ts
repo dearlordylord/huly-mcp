@@ -1,15 +1,48 @@
-import { JSONSchema, Schema } from "effect"
+import { JSONSchema, ParseResult, Schema } from "effect"
 
 import { Email, LimitParam, PersonName, StatusName, Timestamp } from "./shared.js"
 
 // --- Lead IDs ---
+// Upstream Huly reference:
+// https://github.com/hcengineering/platform/blob/b9657d53d130a2ed8034c1b71ab0cf8b7a0b4994/plugins/lead/src/index.ts#L71-L82
+// Funnel is a Project-derived space; expose the stable `_id` as the machine identifier.
+// Lead identifiers use the upstream `LEAD-<number>` convention.
 
 const HulyRef = <T extends string>(tag: T) => Schema.Trim.pipe(Schema.nonEmptyString(), Schema.brand(tag))
+
+export const FunnelReference = HulyRef("FunnelReference")
+export type FunnelReference = Schema.Schema.Type<typeof FunnelReference>
 
 export const FunnelIdentifier = HulyRef("FunnelIdentifier")
 export type FunnelIdentifier = Schema.Schema.Type<typeof FunnelIdentifier>
 
-export const LeadIdentifier = HulyRef("LeadIdentifier")
+// Specific upstream proof for the LEAD prefix:
+// - https://github.com/hcengineering/platform/blob/b9657d53d130a2ed8034c1b71ab0cf8b7a0b4994/models/lead/src/types.ts#L70
+// - https://github.com/hcengineering/platform/blob/b9657d53d130a2ed8034c1b71ab0cf8b7a0b4994/models/lead/src/migration.ts#L67
+const CanonicalLeadIdentifier = Schema.Trim.pipe(
+  Schema.pattern(/^LEAD-\d+$/, {
+    message: () => "Expected lead identifier like 'LEAD-1'"
+  }),
+  Schema.brand("LeadIdentifier")
+)
+
+const leadIdentifierPattern = /^(?:LEAD-)?(\d+)$/i
+
+export const LeadIdentifier = Schema.transformOrFail(Schema.String, CanonicalLeadIdentifier, {
+  strict: true,
+  decode: (input, _options, ast) => {
+    const match = leadIdentifierPattern.exec(input.trim())
+    return match !== null
+      ? ParseResult.succeed(`LEAD-${match[1]}`)
+      : ParseResult.fail(new ParseResult.Type(ast, input, "Expected lead identifier like 'LEAD-1'"))
+  },
+  encode: ParseResult.succeed
+}).annotations({
+  jsonSchema: {
+    type: "string",
+    pattern: "^LEAD-[0-9]+$"
+  }
+})
 export type LeadIdentifier = Schema.Schema.Type<typeof LeadIdentifier>
 
 // --- Output Schemas ---
@@ -48,6 +81,7 @@ export const LeadDetailSchema = Schema.Struct({
   assignee: Schema.optional(PersonName),
   customer: Schema.optional(Schema.String),
   funnel: FunnelIdentifier,
+  funnelName: Schema.String,
   modifiedOn: Schema.optional(Timestamp),
   createdOn: Schema.optional(Timestamp)
 }).annotations({
@@ -76,8 +110,8 @@ export const ListFunnelsParamsSchema = Schema.Struct({
 export type ListFunnelsParams = Schema.Schema.Type<typeof ListFunnelsParamsSchema>
 
 const ListLeadsParamsBase = Schema.Struct({
-  funnel: FunnelIdentifier.annotations({
-    description: "Funnel name (e.g., 'Funnel'). Use list_funnels to find available names."
+  funnel: FunnelReference.annotations({
+    description: "Funnel ID returned by list_funnels, or funnel name for convenience lookup."
   }),
   status: Schema.optional(StatusName.annotations({
     description: "Filter by status name"
@@ -103,11 +137,11 @@ export const ListLeadsParamsSchema = ListLeadsParamsBase.annotations({
 export type ListLeadsParams = Schema.Schema.Type<typeof ListLeadsParamsSchema>
 
 export const GetLeadParamsSchema = Schema.Struct({
-  funnel: FunnelIdentifier.annotations({
-    description: "Funnel name (e.g., 'Funnel'). Use list_funnels to find available names."
+  funnel: FunnelReference.annotations({
+    description: "Funnel ID returned by list_funnels, or funnel name for convenience lookup."
   }),
   identifier: LeadIdentifier.annotations({
-    description: "Lead identifier (e.g., 'FUNNEL-1')"
+    description: "Lead identifier (e.g., 'LEAD-1')"
   })
 }).annotations({
   title: "GetLeadParams",

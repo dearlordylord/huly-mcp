@@ -22,6 +22,7 @@ import {
   type HulyDomainError,
   HulyDomainError as HulyDomainErrorSchema,
   HulyError,
+  InvalidContactProviderError,
   InvalidContentTypeError,
   InvalidFileDataError,
   InvalidPersonUuidError,
@@ -34,6 +35,7 @@ import {
   MilestoneNotFoundError,
   NotificationContextNotFoundError,
   NotificationNotFoundError,
+  OrganizationNotFoundError,
   PersonNotFoundError,
   ProjectNotFoundError,
   ReactionNotFoundError,
@@ -46,6 +48,7 @@ import {
   TestPlanItemNotFoundError,
   ThreadReplyNotFoundError
 } from "../../src/huly/errors.js"
+import { funnelIdentifier, funnelReference, leadIdentifier } from "../helpers/brands.js"
 
 describe("Huly Errors", () => {
   describe("HulyError", () => {
@@ -648,7 +651,7 @@ describe("Huly Errors", () => {
             case "OrganizationNotFoundError":
               return `organization:${error.identifier}`
             case "InvalidContactProviderError":
-              return `contact-provider:${error.provider}`
+              return `contactprovider:${error.provider}`
             case "FileUploadError":
               return `upload:${error.message}`
             case "InvalidFileDataError":
@@ -743,6 +746,10 @@ describe("Huly Errors", () => {
               return `funnel:${error.identifier}`
             case "LeadNotFoundError":
               return `lead:${error.identifier}`
+            default: {
+              const _exhaustive: never = error
+              return _exhaustive
+            }
           }
         }
 
@@ -750,6 +757,8 @@ describe("Huly Errors", () => {
         expect(matchError(new ProjectNotFoundError({ identifier: "Z" }))).toBe("project:Z")
         expect(matchError(new InvalidStatusError({ status: "bad", project: "P" }))).toBe("status:bad")
         expect(matchError(new PersonNotFoundError({ identifier: "john@example.com" }))).toBe("person:john@example.com")
+        expect(matchError(new OrganizationNotFoundError({ identifier: "Acme" }))).toBe("organization:Acme")
+        expect(matchError(new InvalidContactProviderError({ provider: "fax" }))).toBe("contactprovider:fax")
         expect(matchError(new FileUploadError({ message: "quota exceeded" }))).toBe("upload:quota exceeded")
         expect(matchError(new InvalidFileDataError({ message: "bad base64" }))).toBe("data:bad base64")
         expect(matchError(new FileNotFoundError({ filePath: "/path/to/file" }))).toBe("notfound:/path/to/file")
@@ -800,8 +809,12 @@ describe("Huly Errors", () => {
         expect(
           matchError(new InvalidContentTypeError({ filename: "f.exe", contentType: "application/x-msdownload" }))
         ).toBe("contenttype:application/x-msdownload")
-        expect(matchError(new FunnelNotFoundError({ identifier: "SALES" }))).toBe("funnel:SALES")
-        expect(matchError(new LeadNotFoundError({ identifier: "L-1", funnel: "SALES" }))).toBe("lead:L-1")
+        expect(matchError(new FunnelNotFoundError({ identifier: funnelReference("SALES") }))).toBe("funnel:SALES")
+        expect(
+          matchError(
+            new LeadNotFoundError({ identifier: leadIdentifier("LEAD-1"), funnel: funnelIdentifier("funnel-1") })
+          )
+        ).toBe("lead:LEAD-1")
       }))
   })
 })

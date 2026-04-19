@@ -4,7 +4,6 @@ import { expect } from "vitest"
 import { leadTools } from "../../../src/mcp/tools/leads.js"
 
 describe("Lead MCP Tools", () => {
-  // test-revizorro: approved
   it.effect("registers list_funnels tool", () =>
     Effect.gen(function*() {
       const tool = leadTools.find(t => t.name === "list_funnels")
@@ -15,7 +14,6 @@ describe("Lead MCP Tools", () => {
       expect(typeof tool?.handler).toBe("function")
     }))
 
-  // test-revizorro: approved
   it.effect("registers list_leads tool", () =>
     Effect.gen(function*() {
       const tool = leadTools.find(t => t.name === "list_leads")
@@ -26,7 +24,6 @@ describe("Lead MCP Tools", () => {
       expect(typeof tool?.handler).toBe("function")
     }))
 
-  // test-revizorro: approved
   it.effect("registers get_lead tool", () =>
     Effect.gen(function*() {
       const tool = leadTools.find(t => t.name === "get_lead")
@@ -37,13 +34,11 @@ describe("Lead MCP Tools", () => {
       expect(typeof tool?.handler).toBe("function")
     }))
 
-  // test-revizorro: approved
   it.effect("has exactly 3 tools", () =>
     Effect.gen(function*() {
       expect(leadTools).toHaveLength(3)
     }))
 
-  // test-revizorro: approved
   it.effect("all tools have unique names", () =>
     Effect.gen(function*() {
       const names = leadTools.map(t => t.name)

@@ -207,6 +207,59 @@ skip_test "delete_project" "would pollute workspace"
 echo ""
 
 ##############################
+# 1b. LEADS (read-only, uses existing workspace data)
+##############################
+echo "=== 1b. Leads ==="
+FUNNELS_TEXT=$(run_capture_only \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_funnels","arguments":{"limit":5}},"id":2}')
+if [ $? -eq 0 ]; then
+  FUNNEL_COUNT=$(echo "$FUNNELS_TEXT" | jq -r '.funnels | length' 2>/dev/null)
+  if [ -n "$FUNNEL_COUNT" ] && [ "$FUNNEL_COUNT" -gt 0 ]; then
+    FIRST_FUNNEL_ID=$(echo "$FUNNELS_TEXT" | jq -r '.funnels[0].identifier // empty' 2>/dev/null)
+    FIRST_FUNNEL_NAME=$(echo "$FUNNELS_TEXT" | jq -r '.funnels[0].name // empty' 2>/dev/null)
+
+    run_test "list_funnels" \
+      '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_funnels","arguments":{"limit":5}},"id":2}'
+
+    if [ -n "$FIRST_FUNNEL_ID" ]; then
+      LEADS_TEXT=$(run_capture_only \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_leads\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"limit\":5}},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        run_test "list_leads($FIRST_FUNNEL_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_leads\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"limit\":5}},\"id\":2}"
+
+        if [ -n "$FIRST_FUNNEL_NAME" ]; then
+          run_test "list_leads(by_name:$FIRST_FUNNEL_NAME)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_leads\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_NAME\",\"limit\":5}},\"id\":2}"
+        fi
+
+        FIRST_LEAD_ID=$(echo "$LEADS_TEXT" | jq -r '.[0].identifier // empty' 2>/dev/null)
+        if [ -n "$FIRST_LEAD_ID" ]; then
+          run_test "get_lead($FIRST_LEAD_ID)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_lead\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$FIRST_LEAD_ID\"}},\"id\":2}"
+
+          if [ -n "$FIRST_FUNNEL_NAME" ]; then
+            run_test "get_lead(by_name:$FIRST_LEAD_ID)" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_lead\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_NAME\",\"identifier\":\"$FIRST_LEAD_ID\"}},\"id\":2}"
+          fi
+        else
+          skip_test "get_lead" "selected funnel has no leads"
+        fi
+      else
+        skip_test "list_leads/get_lead" "selected funnel could not be queried"
+      fi
+    else
+      skip_test "list_leads/get_lead" "list_funnels returned no stable funnel identifier"
+    fi
+  else
+    skip_test "leads" "no funnels found in workspace"
+  fi
+else
+  skip_test "leads" "list_funnels failed"
+fi
+echo ""
+
+##############################
 # 2. ISSUES CRUD + RELATIONS + LABELS + MOVE
 ##############################
 echo "=== 2. Issues CRUD ==="

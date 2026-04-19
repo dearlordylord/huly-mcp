@@ -6,6 +6,7 @@ import {
   FileFetchError,
   FileNotFoundError,
   FileUploadError,
+  FunnelNotFoundError,
   HulyAuthError,
   HulyConnectionError,
   HulyError,
@@ -13,6 +14,7 @@ import {
   InvalidFileDataError,
   InvalidStatusError,
   IssueNotFoundError,
+  LeadNotFoundError,
   OrganizationNotFoundError,
   PersonNotFoundError,
   ProjectNotFoundError
@@ -27,6 +29,7 @@ import {
   McpErrorCode,
   toMcpResponse
 } from "../../src/mcp/error-mapping.js"
+import { funnelIdentifier, funnelReference, leadIdentifier } from "../helpers/brands.js"
 
 describe("Error Mapping to MCP", () => {
   describe("mapDomainErrorToMcp", () => {
@@ -136,6 +139,29 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
           expect(response.content[0].text).toContain("/path/to/missing.txt")
+        }))
+
+      it.effect("maps FunnelNotFoundError with descriptive message", () =>
+        Effect.gen(function*() {
+          const error = new FunnelNotFoundError({ identifier: funnelReference("sales") })
+          const response = mapDomainErrorToMcp(error)
+
+          expect(response.isError).toBe(true)
+          expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+          expect(response.content[0].text).toBe("Funnel 'sales' not found")
+        }))
+
+      it.effect("maps LeadNotFoundError with descriptive message", () =>
+        Effect.gen(function*() {
+          const error = new LeadNotFoundError({
+            identifier: leadIdentifier("LEAD-9"),
+            funnel: funnelIdentifier("funnel-1")
+          })
+          const response = mapDomainErrorToMcp(error)
+
+          expect(response.isError).toBe(true)
+          expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+          expect(response.content[0].text).toBe("Lead 'LEAD-9' not found in funnel 'funnel-1'")
         }))
     })
 
