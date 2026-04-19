@@ -15,6 +15,9 @@ export type FunnelReference = Schema.Schema.Type<typeof FunnelReference>
 export const FunnelIdentifier = HulyRef("FunnelIdentifier")
 export type FunnelIdentifier = Schema.Schema.Type<typeof FunnelIdentifier>
 
+// Specific upstream proof for the LEAD prefix:
+// - https://github.com/hcengineering/platform/blob/b9657d53d130a2ed8034c1b71ab0cf8b7a0b4994/models/lead/src/types.ts#L70
+// - https://github.com/hcengineering/platform/blob/b9657d53d130a2ed8034c1b71ab0cf8b7a0b4994/models/lead/src/migration.ts#L67
 const CanonicalLeadIdentifier = Schema.Trim.pipe(
   Schema.pattern(/^LEAD-\d+$/, {
     message: () => "Expected lead identifier like 'LEAD-1'"
