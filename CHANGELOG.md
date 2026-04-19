@@ -1,5 +1,16 @@
 # @firfi/huly-mcp
 
+## 0.7.0
+
+### Minor Changes
+
+- Prepare the next minor release from the four merged PRs since `v0.6.3`.
+
+  - Add nested document creation with `create_document(parent)` for creating children under an existing document.
+  - Fix markup conversion to use workspace-aware URL configuration so generated links and asset references resolve correctly for the active workspace.
+  - Add lead and funnel tools with stronger SDK parity, deterministic funnel name resolution, and integration coverage for real workspace lead reads.
+  - Add organization CRM and customer-management tools, including organization CRUD, customer mixin support, organization channels, member linking, ambiguity-safe lookup, idempotent membership operations, and cleanup-safe integration coverage.
+
 ## 0.6.3
 
 ### Patch Changes
