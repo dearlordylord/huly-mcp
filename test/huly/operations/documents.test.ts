@@ -219,7 +219,6 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 
 describe("listTeamspaces", () => {
   describe("basic functionality", () => {
-    // test-revizorro: approved
     it.effect("returns teamspaces", () =>
       Effect.gen(function*() {
         const teamspaces = [
@@ -234,8 +233,6 @@ describe("listTeamspaces", () => {
         expect(result.teamspaces).toHaveLength(2)
         expect(result.total).toBe(2)
       }))
-
-    // test-revizorro: approved
     it.effect("filters out archived teamspaces by default", () =>
       Effect.gen(function*() {
         const teamspaces = [
@@ -250,8 +247,6 @@ describe("listTeamspaces", () => {
         expect(result.teamspaces).toHaveLength(1)
         expect(result.teamspaces[0].name).toBe("Active")
       }))
-
-    // test-revizorro: approved
     it.effect("includes archived when includeArchived=true", () =>
       Effect.gen(function*() {
         const teamspaces = [
@@ -270,7 +265,6 @@ describe("listTeamspaces", () => {
 
 describe("listDocuments", () => {
   describe("basic functionality", () => {
-    // test-revizorro: approved
     it.effect("returns documents for a teamspace", () =>
       Effect.gen(function*() {
         const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -300,8 +294,6 @@ describe("listDocuments", () => {
         expect(result.documents[0].title).toBe("Doc 1")
         expect(result.documents[1].title).toBe("Doc 2")
       }))
-
-    // test-revizorro: approved
     it.effect("returns TeamspaceNotFoundError when teamspace doesn't exist", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({ teamspaces: [], documents: [] })
@@ -313,8 +305,6 @@ describe("listDocuments", () => {
         expect(error._tag).toBe("TeamspaceNotFoundError")
         expect((error as TeamspaceNotFoundError).identifier).toBe("Nonexistent")
       }))
-
-    // test-revizorro: approved
     it.effect("finds teamspace by ID", () =>
       Effect.gen(function*() {
         const teamspace = makeTeamspace({ _id: "ts-123" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -335,7 +325,6 @@ describe("listDocuments", () => {
   })
 
   describe("limit handling", () => {
-    // test-revizorro: approved
     it.effect("uses default limit of 50", () =>
       Effect.gen(function*() {
         const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -351,8 +340,6 @@ describe("listDocuments", () => {
 
         expect(captureQuery.options?.limit).toBe(50)
       }))
-
-    // test-revizorro: approved
     it.effect("enforces max limit of 200", () =>
       Effect.gen(function*() {
         const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -373,7 +360,6 @@ describe("listDocuments", () => {
 
 describe("getDocument", () => {
   describe("basic functionality", () => {
-    // test-revizorro: approved
     it.effect("returns document with full content", () =>
       Effect.gen(function*() {
         const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -402,8 +388,6 @@ describe("getDocument", () => {
         expect(result.content).toBe("# Hello World")
         expect(result.teamspace).toBe("My Docs")
       }))
-
-    // test-revizorro: approved
     it.effect("finds document by ID", () =>
       Effect.gen(function*() {
         const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -425,8 +409,6 @@ describe("getDocument", () => {
 
         expect(result.id).toBe("doc-1")
       }))
-
-    // test-revizorro: approved
     it.effect("returns undefined content when not set", () =>
       Effect.gen(function*() {
         const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -454,7 +436,6 @@ describe("getDocument", () => {
   })
 
   describe("error handling", () => {
-    // test-revizorro: approved
     it.effect("returns TeamspaceNotFoundError when teamspace doesn't exist", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({ teamspaces: [], documents: [] })
@@ -467,8 +448,6 @@ describe("getDocument", () => {
 
         expect(error._tag).toBe("TeamspaceNotFoundError")
       }))
-
-    // test-revizorro: approved
     it.effect("returns DocumentNotFoundError when document doesn't exist", () =>
       Effect.gen(function*() {
         const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -490,7 +469,6 @@ describe("getDocument", () => {
 
 describe("createDocument", () => {
   describe("basic functionality", () => {
-    // test-revizorro: approved
     it.effect("creates document with minimal parameters", () =>
       Effect.gen(function*() {
         const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -512,8 +490,6 @@ describe("createDocument", () => {
         expect(captureCreateDoc.attributes?.title).toBe("New Document")
         expect(captureCreateDoc.attributes?.content).toBeNull()
       }))
-
-    // test-revizorro: approved
     it.effect("creates document with content", () =>
       Effect.gen(function*() {
         const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -541,8 +517,6 @@ describe("createDocument", () => {
         expect(captureCreateDoc.attributes?.content).not.toBeNull()
         expect(typeof captureCreateDoc.attributes?.content).toBe("string")
       }))
-
-    // test-revizorro: approved
     it.effect("calculates rank for new document", () =>
       Effect.gen(function*() {
         const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -569,8 +543,6 @@ describe("createDocument", () => {
         expect(typeof newRank).toBe("string")
         expect(newRank > existingDocRank).toBe(true)
       }))
-
-    // test-revizorro: approved
     it.effect("skips upload for empty content", () =>
       Effect.gen(function*() {
         const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -595,8 +567,99 @@ describe("createDocument", () => {
       }))
   })
 
+  describe("nested documents (parent parameter)", () => {
+    it.effect("creates document under parent found by title", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const parentDoc = makeDocument({
+          _id: "parent-1" as Ref<HulyDocument>,
+          space: "ts-1" as Ref<HulyTeamspace>,
+          title: "Architecture"
+        })
+        const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: [parentDoc],
+          captureCreateDoc
+        })
+
+        const result = yield* createDocument({
+          teamspace: teamspaceIdentifier("My Docs"),
+          title: "API Design",
+          parent: documentIdentifier("Architecture")
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result.title).toBe("API Design")
+        expect(captureCreateDoc.attributes?.parent).toBe("parent-1")
+      }))
+    it.effect("creates document under parent found by ID", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const parentDoc = makeDocument({
+          _id: "parent-1" as Ref<HulyDocument>,
+          space: "ts-1" as Ref<HulyTeamspace>,
+          title: "Architecture"
+        })
+        const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: [parentDoc],
+          captureCreateDoc
+        })
+
+        const result = yield* createDocument({
+          teamspace: teamspaceIdentifier("My Docs"),
+          title: "API Design",
+          parent: documentIdentifier("parent-1")
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result.title).toBe("API Design")
+        expect(captureCreateDoc.attributes?.parent).toBe("parent-1")
+      }))
+    it.effect("creates top-level document when parent is omitted", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: [],
+          captureCreateDoc
+        })
+
+        const result = yield* createDocument({
+          teamspace: teamspaceIdentifier("My Docs"),
+          title: "Top Level Doc"
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result.title).toBe("Top Level Doc")
+        expect(captureCreateDoc.attributes?.parent).toBe(documentPlugin.ids.NoParent)
+      }))
+    it.effect("returns DocumentNotFoundError when parent does not exist", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: []
+        })
+
+        const error = yield* Effect.flip(
+          createDocument({
+            teamspace: teamspaceIdentifier("My Docs"),
+            title: "Orphan Doc",
+            parent: documentIdentifier("Nonexistent Parent")
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("DocumentNotFoundError")
+        expect((error as DocumentNotFoundError).identifier).toBe("Nonexistent Parent")
+      }))
+  })
+
   describe("error handling", () => {
-    // test-revizorro: approved
     it.effect("returns TeamspaceNotFoundError when teamspace doesn't exist", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({ teamspaces: [], documents: [] })
@@ -1004,7 +1067,6 @@ describe("editDocument", () => {
 
 describe("deleteDocument", () => {
   describe("basic functionality", () => {
-    // test-revizorro: approved
     it.effect("deletes document", () =>
       Effect.gen(function*() {
         const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -1030,8 +1092,6 @@ describe("deleteDocument", () => {
         expect(result.deleted).toBe(true)
         expect(captureRemoveDoc.id).toBe("doc-1")
       }))
-
-    // test-revizorro: approved
     it.effect("finds document by ID for deletion", () =>
       Effect.gen(function*() {
         const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -1060,7 +1120,6 @@ describe("deleteDocument", () => {
   })
 
   describe("error handling", () => {
-    // test-revizorro: approved
     it.effect("returns TeamspaceNotFoundError when teamspace doesn't exist", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({ teamspaces: [], documents: [] })
@@ -1074,8 +1133,6 @@ describe("deleteDocument", () => {
 
         expect(error._tag).toBe("TeamspaceNotFoundError")
       }))
-
-    // test-revizorro: approved
     it.effect("returns DocumentNotFoundError when document doesn't exist", () =>
       Effect.gen(function*() {
         const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })

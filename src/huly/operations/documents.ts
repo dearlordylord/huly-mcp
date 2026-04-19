@@ -79,6 +79,7 @@ type GetDocumentError =
 type CreateDocumentError =
   | HulyClientError
   | TeamspaceNotFoundError
+  | DocumentNotFoundError
 
 type DeleteDocumentError =
   | HulyClientError
@@ -435,6 +436,25 @@ export const createDocument = (
 
     const documentId: Ref<HulyDocument> = generateId()
 
+    const parent = params.parent
+    const parentRef: Ref<HulyDocument> = parent === undefined
+      ? documentPlugin.ids.NoParent
+      : yield* Effect.gen(function*() {
+        const parentDoc = yield* findByNameOrId(
+          client,
+          documentPlugin.class.Document,
+          { space: teamspace._id, title: parent },
+          { space: teamspace._id, _id: toRef<HulyDocument>(parent) }
+        )
+        if (parentDoc === undefined) {
+          return yield* new DocumentNotFoundError({
+            identifier: parent,
+            teamspace: params.teamspace
+          })
+        }
+        return parentDoc._id
+      })
+
     // Fetch rank of the last document to insert after
     const lastDoc = yield* client.findOne<HulyDocument>(
       documentPlugin.class.Document,
@@ -456,7 +476,7 @@ export const createDocument = (
     const documentData: Data<HulyDocument> = {
       title: params.title,
       content: contentMarkupRef,
-      parent: documentPlugin.ids.NoParent,
+      parent: parentRef,
       rank
     }
 

@@ -74,6 +74,7 @@ export const listInlineComments = (
       teamspace: params.teamspace,
       document: params.document
     })
+    const markupUrlConfig = client.markupUrlConfig
 
     if (!doc.content) {
       return { comments: [], total: 0 }
@@ -134,7 +135,7 @@ export const listInlineComments = (
         const threadReplies = threadRepliesMap.get(comment.threadId) ?? []
         const replies: Array<InlineCommentReply> = threadReplies.map(r => ({
           id: r._id,
-          body: optionalMarkupToMarkdown(r.message, "", client.getMarkupUrls()),
+          body: optionalMarkupToMarkdown(r.message, markupUrlConfig, ""),
           sender: r.createdBy !== undefined ? nameMap.get(r.createdBy) : undefined,
           createdOn: r.createdOn
         }))

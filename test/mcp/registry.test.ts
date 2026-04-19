@@ -8,6 +8,7 @@ import { IssueIdentifier } from "../../src/domain/schemas/shared.js"
 import type { HulyClientOperations } from "../../src/huly/client.js"
 import { HulyClient } from "../../src/huly/client.js"
 import { HulyError } from "../../src/huly/errors.js"
+import { testMarkupUrlConfig } from "../../src/huly/operations/markup.js"
 import type { HulyStorageOperations } from "../../src/huly/storage.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import type { WorkspaceClientOperations } from "../../src/huly/workspace-client.js"
@@ -29,6 +30,7 @@ const parse = (input: unknown) => Schema.decodeUnknown(Params)(input)
 
 const noopHulyClient: HulyClientOperations = {
   getAccountUuid: () => "test-account-uuid" as AccountUuid,
+  markupUrlConfig: testMarkupUrlConfig,
   findAll: () => Effect.succeed(toFindResult([])) as Effect.Effect<FindResult<never>>,
   findOne: () => Effect.succeed(undefined),
   createDoc: () => Effect.die(new Error("not implemented")),
@@ -67,7 +69,6 @@ const noopWorkspaceClient: WorkspaceClientOperations = {
 }
 
 describe("createToolHandler", () => {
-  // test-revizorro: approved
   it.effect("returns success response on valid input", () =>
     Effect.gen(function*() {
       const handler = createToolHandler(
@@ -85,7 +86,6 @@ describe("createToolHandler", () => {
       expect(result.content[0].text).toContain("hello world")
     }))
 
-  // test-revizorro: approved
   it.effect("returns parse error on invalid input", () =>
     Effect.gen(function*() {
       const handler = createToolHandler(
@@ -104,7 +104,6 @@ describe("createToolHandler", () => {
       expect(result.content[0].text).toContain("Invalid parameters")
     }))
 
-  // test-revizorro: approved
   it.effect("returns domain error on operation failure", () =>
     Effect.gen(function*() {
       const handler = createToolHandler(
@@ -168,7 +167,6 @@ describe("createEncodedToolHandler", () => {
 })
 
 describe("createStorageToolHandler", () => {
-  // test-revizorro: approved
   it.effect("returns success response via storage client", () =>
     Effect.gen(function*() {
       const handler = createStorageToolHandler(
@@ -186,7 +184,6 @@ describe("createStorageToolHandler", () => {
       expect(result.content[0].text).toContain("file://doc.pdf")
     }))
 
-  // test-revizorro: approved
   it.effect("returns parse error on invalid input", () =>
     Effect.gen(function*() {
       const handler = createStorageToolHandler(
@@ -206,7 +203,6 @@ describe("createStorageToolHandler", () => {
 })
 
 describe("createCombinedToolHandler", () => {
-  // test-revizorro: approved
   it.effect("returns success response via both clients", () =>
     Effect.gen(function*() {
       const handler = createCombinedToolHandler(
@@ -228,7 +224,6 @@ describe("createCombinedToolHandler", () => {
 })
 
 describe("createWorkspaceToolHandler", () => {
-  // test-revizorro: approved
   it.effect("returns success response when workspace client available", () =>
     Effect.gen(function*() {
       const handler = createWorkspaceToolHandler(
@@ -248,7 +243,6 @@ describe("createWorkspaceToolHandler", () => {
       expect(result.content[0].text).toContain("myws")
     }))
 
-  // test-revizorro: approved
   it.effect("returns error when workspace client is undefined", () =>
     Effect.gen(function*() {
       const handler = createWorkspaceToolHandler(
@@ -269,7 +263,6 @@ describe("createWorkspaceToolHandler", () => {
       expect(result.content[0].text).toContain("WorkspaceClient not available")
     }))
 
-  // test-revizorro: approved
   it.effect("returns parse error on invalid input", () =>
     Effect.gen(function*() {
       const handler = createWorkspaceToolHandler(
@@ -291,7 +284,6 @@ describe("createWorkspaceToolHandler", () => {
 })
 
 describe("createNoParamsWorkspaceToolHandler", () => {
-  // test-revizorro: approved
   it.effect("returns success response with no params", () =>
     Effect.gen(function*() {
       const handler = createNoParamsWorkspaceToolHandler(
@@ -307,7 +299,6 @@ describe("createNoParamsWorkspaceToolHandler", () => {
       expect(result.content[0].text).toContain("5")
     }))
 
-  // test-revizorro: approved
   it.effect("returns error when workspace client is undefined", () =>
     Effect.gen(function*() {
       const handler = createNoParamsWorkspaceToolHandler(
@@ -324,7 +315,6 @@ describe("createNoParamsWorkspaceToolHandler", () => {
       expect(result.content[0].text).toContain("WorkspaceClient not available")
     }))
 
-  // test-revizorro: approved
   it.effect("returns domain error on operation failure", () =>
     Effect.gen(function*() {
       const handler = createNoParamsWorkspaceToolHandler(

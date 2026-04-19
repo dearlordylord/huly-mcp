@@ -39,6 +39,7 @@ import type {
 import { AccountUuid, ChannelId, ChannelName, MessageId, PersonName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { ChannelNotFoundError } from "../errors.js"
+import { markdownToMarkupString, markupToMarkdownString } from "./markup.js"
 import { escapeLikeWildcards } from "./query-helpers.js"
 import { clampLimit, findByNameOrId, toRef } from "./shared.js"
 
@@ -368,6 +369,7 @@ export const listChannelMessages = (
 ): Effect.Effect<ListChannelMessagesResult, ListChannelMessagesError, HulyClient> =>
   Effect.gen(function*() {
     const { channel, client } = yield* findChannel(params.channel)
+    const markupUrlConfig = client.markupUrlConfig
 
     const limit = clampLimit(params.limit)
 
@@ -399,7 +401,7 @@ export const listChannelMessages = (
       const senderName = socialIdToName.get(msg.modifiedBy)
       return {
         id: MessageId.make(msg._id),
-        body: client.toMarkdown(msg.message),
+        body: markupToMarkdownString(msg.message, markupUrlConfig),
         sender: senderName !== undefined ? PersonName.make(senderName) : undefined,
         senderId: msg.modifiedBy,
         createdOn: msg.createdOn,
@@ -422,9 +424,10 @@ export const sendChannelMessage = (
 ): Effect.Effect<SendChannelMessageResult, SendChannelMessageError, HulyClient> =>
   Effect.gen(function*() {
     const { channel, client } = yield* findChannel(params.channel)
+    const markupUrlConfig = client.markupUrlConfig
 
     const messageId: Ref<ChatMessage> = generateId()
-    const markup = client.toMarkup(params.body)
+    const markup = markdownToMarkupString(params.body, markupUrlConfig)
 
     const messageData: AttachedData<ChatMessage> = {
       message: markup,
