@@ -390,9 +390,9 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 
 | Tool | Description |
 |------|-------------|
-| `list_funnels` | List all Huly sales funnels (lead pipelines). Returns funnels sorted by name. Supports filtering by archived status. |
-| `list_leads` | Query Huly leads in a funnel with optional filters. Returns leads sorted by modification date (newest first). Supports filtering by status, assignee, and title search. |
-| `get_lead` | Retrieve full details for a Huly lead including markdown description, customer name, and status. Use this to view lead content and metadata. |
+| `list_funnels` | List all Huly sales funnels (lead pipelines). Returns each funnel's stable ID and display name, sorted by name. Supports filtering by archived status. |
+| `list_leads` | Query Huly leads in a funnel with optional filters. Pass the funnel ID returned by list_funnels, or a funnel name for convenience lookup. Returns leads sorted by modification date (newest first). Supports filtering by status, assignee, and title search. |
+| `get_lead` | Retrieve full details for a Huly lead including markdown description, customer name, funnel ID and funnel name, and status. Lead identifiers follow the upstream Huly format like 'LEAD-1'. |
 
 ### Tag-Categories
 

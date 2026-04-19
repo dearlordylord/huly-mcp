@@ -1,11 +1,14 @@
 /**
  * Lead plugin class references.
  *
- * @hcengineering/lead is not published on npm, so we define the class IDs
- * as string literals matching the Huly platform source.
+ * Upstream Huly reference:
+ * .reference/huly-platform/plugins/lead/src/index.ts
+ *
+ * `@hcengineering/lead` exists in the Huly monorepo but is not published in the
+ * package set used by this project, so we mirror the class and mixin refs here.
  *
  * These are stable internal identifiers from:
- * https://github.com/hcengineering/platform/tree/main/models/lead
+ * https://github.com/hcengineering/platform/tree/develop/plugins/lead
  *
  * @module
  */

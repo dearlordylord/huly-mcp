@@ -3,6 +3,9 @@ import { JSONSchema, Schema } from "effect"
 import { Email, LimitParam, PersonName, StatusName, Timestamp } from "./shared.js"
 
 // --- Lead IDs ---
+// Upstream Huly reference: .reference/huly-platform/plugins/lead/src/index.ts
+// Funnel is a Project-derived space; expose the stable `_id` as the machine identifier.
+// Lead identifiers use the upstream `LEAD-<number>` convention.
 
 const HulyRef = <T extends string>(tag: T) => Schema.Trim.pipe(Schema.nonEmptyString(), Schema.brand(tag))
 
@@ -48,6 +51,7 @@ export const LeadDetailSchema = Schema.Struct({
   assignee: Schema.optional(PersonName),
   customer: Schema.optional(Schema.String),
   funnel: FunnelIdentifier,
+  funnelName: Schema.String,
   modifiedOn: Schema.optional(Timestamp),
   createdOn: Schema.optional(Timestamp)
 }).annotations({
@@ -77,7 +81,7 @@ export type ListFunnelsParams = Schema.Schema.Type<typeof ListFunnelsParamsSchem
 
 const ListLeadsParamsBase = Schema.Struct({
   funnel: FunnelIdentifier.annotations({
-    description: "Funnel name (e.g., 'Funnel'). Use list_funnels to find available names."
+    description: "Funnel ID returned by list_funnels, or funnel name for convenience lookup."
   }),
   status: Schema.optional(StatusName.annotations({
     description: "Filter by status name"
@@ -104,10 +108,10 @@ export type ListLeadsParams = Schema.Schema.Type<typeof ListLeadsParamsSchema>
 
 export const GetLeadParamsSchema = Schema.Struct({
   funnel: FunnelIdentifier.annotations({
-    description: "Funnel name (e.g., 'Funnel'). Use list_funnels to find available names."
+    description: "Funnel ID returned by list_funnels, or funnel name for convenience lookup."
   }),
   identifier: LeadIdentifier.annotations({
-    description: "Lead identifier (e.g., 'FUNNEL-1')"
+    description: "Lead identifier (e.g., 'LEAD-1')"
   })
 }).annotations({
   title: "GetLeadParams",

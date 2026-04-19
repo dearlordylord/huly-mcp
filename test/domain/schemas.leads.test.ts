@@ -25,12 +25,12 @@ describe("Lead Schemas", () => {
     it.effect("accepts valid funnel summary", () =>
       Effect.gen(function*() {
         const result = yield* Schema.decodeUnknown(FunnelSummarySchema)({
-          identifier: "SALES",
+          identifier: "funnel-1",
           name: "Sales Pipeline",
           description: "Main sales funnel",
           archived: false
         })
-        expect(result.identifier).toBe("SALES")
+        expect(result.identifier).toBe("funnel-1")
         expect(result.name).toBe("Sales Pipeline")
         expect(result.archived).toBe(false)
       }))
@@ -38,7 +38,7 @@ describe("Lead Schemas", () => {
     it.effect("accepts funnel without description", () =>
       Effect.gen(function*() {
         const result = yield* Schema.decodeUnknown(FunnelSummarySchema)({
-          identifier: "LEADS",
+          identifier: "funnel-2",
           name: "Lead Funnel",
           archived: true
         })
@@ -51,14 +51,14 @@ describe("Lead Schemas", () => {
     it.effect("accepts valid lead summary", () =>
       Effect.gen(function*() {
         const result = yield* Schema.decodeUnknown(LeadSummarySchema)({
-          identifier: "SALES-1",
+          identifier: "LEAD-1",
           title: "Big Deal",
           status: "Negotiation",
           assignee: "Doe,Jane",
           customer: "Acme Corp",
           modifiedOn: 1700000000000
         })
-        expect(result.identifier).toBe("SALES-1")
+        expect(result.identifier).toBe("LEAD-1")
         expect(result.title).toBe("Big Deal")
         expect(result.status).toBe("Negotiation")
       }))
@@ -66,7 +66,7 @@ describe("Lead Schemas", () => {
     it.effect("accepts minimal lead summary", () =>
       Effect.gen(function*() {
         const result = yield* Schema.decodeUnknown(LeadSummarySchema)({
-          identifier: "SALES-2",
+          identifier: "LEAD-2",
           title: "Quick Lead",
           status: "Incoming"
         })
@@ -79,18 +79,20 @@ describe("Lead Schemas", () => {
     it.effect("accepts full lead detail", () =>
       Effect.gen(function*() {
         const result = yield* Schema.decodeUnknown(LeadDetailSchema)({
-          identifier: "SALES-1",
+          identifier: "LEAD-1",
           title: "Enterprise Deal",
           description: "# Big opportunity\n\nLots of potential.",
           status: "OfferPreparing",
           assignee: "Doe,Jane",
           customer: "Acme Corp",
-          funnel: "SALES",
+          funnel: "funnel-1",
+          funnelName: "Sales",
           modifiedOn: 1700000000000,
           createdOn: 1699000000000
         })
         expect(result.description).toContain("Big opportunity")
-        expect(result.funnel).toBe("SALES")
+        expect(result.funnel).toBe("funnel-1")
+        expect(result.funnelName).toBe("Sales")
       }))
   })
 
@@ -129,11 +131,11 @@ describe("Lead Schemas", () => {
     it.effect("accepts funnel with filters", () =>
       Effect.gen(function*() {
         const result = yield* parseListLeadsParams({
-          funnel: "SALES",
+          funnel: "funnel-1",
           status: "Negotiation",
           titleSearch: "enterprise"
         })
-        expect(result.funnel).toBe("SALES")
+        expect(result.funnel).toBe("funnel-1")
         expect(result.status).toBe("Negotiation")
         expect(result.titleSearch).toBe("enterprise")
       }))
@@ -149,22 +151,22 @@ describe("Lead Schemas", () => {
     it.effect("requires funnel and identifier", () =>
       Effect.gen(function*() {
         const result = yield* parseGetLeadParams({
-          funnel: "SALES",
-          identifier: "SALES-1"
+          funnel: "funnel-1",
+          identifier: "LEAD-1"
         })
-        expect(result.funnel).toBe("SALES")
-        expect(result.identifier).toBe("SALES-1")
+        expect(result.funnel).toBe("funnel-1")
+        expect(result.identifier).toBe("LEAD-1")
       }))
 
     it.effect("rejects missing funnel", () =>
       Effect.gen(function*() {
-        const error = yield* Effect.flip(parseGetLeadParams({ identifier: "SALES-1" }))
+        const error = yield* Effect.flip(parseGetLeadParams({ identifier: "LEAD-1" }))
         expect(error._tag).toBe("ParseError")
       }))
 
     it.effect("rejects missing identifier", () =>
       Effect.gen(function*() {
-        const error = yield* Effect.flip(parseGetLeadParams({ funnel: "SALES" }))
+        const error = yield* Effect.flip(parseGetLeadParams({ funnel: "funnel-1" }))
         expect(error._tag).toBe("ParseError")
       }))
 

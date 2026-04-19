@@ -1,13 +1,17 @@
 /**
  * Lead operations: list funnels, list leads, get lead.
  *
- * Since @hcengineering/lead is not published on npm, we use string literal
- * class IDs and generic Doc queries. Lead extends Task; Funnel extends Project.
+ * Upstream Huly references:
+ * - .reference/huly-platform/plugins/lead/src/index.ts
+ * - .reference/huly-platform/models/lead/src/types.ts
+ *
+ * `@hcengineering/lead` is not available in this project, so these shapes are
+ * mirrored from the upstream Huly lead package and model definitions.
  *
  * @module
  */
 import type { MarkupRef } from "@hcengineering/api-client"
-import type { Person } from "@hcengineering/contact"
+import type { Contact, Person } from "@hcengineering/contact"
 import type { Doc, DocumentQuery, MarkupBlobRef, Ref, Space, Status, WithLookup } from "@hcengineering/core"
 import { SortingOrder } from "@hcengineering/core"
 import { Effect, Schema } from "effect"
@@ -23,9 +27,11 @@ import type {
 } from "../../domain/schemas/leads.js"
 import {
   FunnelIdentifier,
+  LeadIdentifier,
   LeadSummarySchema,
   parseLeadDetail as parseLeadDetailSchema
 } from "../../domain/schemas/leads.js"
+import { StatusName } from "../../domain/schemas/shared.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { FunnelNotFoundError, LeadNotFoundError } from "../errors-leads.js"
@@ -34,8 +40,6 @@ import { contact, core, task } from "../huly-plugins.js"
 import { leadClassIds } from "../lead-plugin.js"
 import { escapeLikeWildcards } from "./query-helpers.js"
 import { clampLimit, findPersonByEmailOrName, toRef } from "./shared.js"
-
-// --- Huly Lead/Funnel shapes (runtime, not type-checked against SDK) ---
 
 interface HulyFunnel extends Doc {
   name: string
@@ -51,7 +55,7 @@ interface HulyLead extends Doc {
   status: Ref<Status>
   assignee: Ref<Person> | null
   description: MarkupBlobRef | null
-  attachedTo: Ref<Doc> // Customer contact
+  attachedTo: Ref<Contact>
   parents: ReadonlyArray<{ parentId: Ref<Doc>; identifier: string; parentTitle: string }>
   modifiedOn: number
   createdOn: number
@@ -62,26 +66,38 @@ type StatusInfo = {
   name: string
 }
 
-/* eslint-disable no-restricted-syntax -- SDK boundary: lead plugin refs are untyped strings, casts are unavoidable */
-
-// --- Helpers ---
+/* eslint-disable no-restricted-syntax -- SDK boundary: upstream lead plugin refs are mirrored locally */
 
 const funnelAsSpace = (funnel: HulyFunnel): Ref<Space> => funnel._id as unknown as Ref<Space>
+
+const normalizeLeadIdentifier = (identifier: string): LeadIdentifier => {
+  const trimmed = identifier.trim()
+  const normalized = trimmed.toUpperCase()
+  return LeadIdentifier.make(
+    normalized.startsWith("LEAD-")
+      ? normalized
+      : `LEAD-${normalized}`
+  )
+}
 
 const findFunnel = (
   client: HulyClient["Type"],
   funnelIdentifier: string
 ): Effect.Effect<HulyFunnel, FunnelNotFoundError | HulyClientError> =>
   Effect.gen(function*() {
-    // Funnels don't have a short identifier like tracker projects.
-    // Look up by name (case-insensitive via normalized comparison).
-    const allFunnels = yield* client.findAll<HulyFunnel>(
+    const byId = yield* client.findOne<HulyFunnel>(
       leadClassIds.class.Funnel,
-      {}
+      { _id: toRef<HulyFunnel>(funnelIdentifier) }
     )
+    if (byId !== undefined) return byId
+
+    // Upstream Huly Funnel is a Project-derived space without a tracker-style
+    // human identifier field. We accept normalized name lookup only as a
+    // convenience, but list_funnels returns `_id` as the stable identifier.
+    // Reference: .reference/huly-platform/models/lead/src/types.ts
+    const allFunnels = yield* client.findAll<HulyFunnel>(leadClassIds.class.Funnel, {})
     const normalized = normalizeForComparison(funnelIdentifier)
-    const funnel = allFunnels.find(f => normalizeForComparison(f.name) === normalized)
-      ?? allFunnels.find(f => f._id === funnelIdentifier)
+    const funnel = allFunnels.find((candidate) => normalizeForComparison(candidate.name) === normalized)
     if (funnel === undefined) {
       return yield* new FunnelNotFoundError({ identifier: funnelIdentifier })
     }
@@ -91,30 +107,44 @@ const findFunnel = (
 const getFunnelStatuses = (
   client: HulyClient["Type"],
   funnel: HulyFunnel
-): Effect.Effect<ReadonlyArray<StatusInfo>, HulyClientError> =>
+): Effect.Effect<ReadonlyArray<StatusInfo>, HulyClientError | HulyConnectionError> =>
   Effect.gen(function*() {
-    if (!funnel.type) return []
+    if (funnel.type === undefined) {
+      return yield* Effect.fail(
+        new HulyConnectionError({
+          message: `Funnel '${funnel._id}' is missing its ProjectType reference`
+        })
+      )
+    }
 
     const projectType = yield* client.findOne<Doc & { statuses?: ReadonlyArray<{ _id: Ref<Status> }> }>(
       task.class.ProjectType,
-      { _id: toRef(funnel.type as string) }
+      { _id: toRef<Doc>(funnel.type) }
     )
 
-    if (!projectType?.statuses) return []
-
-    const statusRefs = projectType.statuses.map(s => s._id)
-    if (statusRefs.length === 0) return []
-
-    const statusDocsResult = yield* Effect.either(
-      client.findAll<Status>(
-        core.class.Status,
-        { _id: { $in: [...statusRefs] } }
+    if (projectType?.statuses === undefined) {
+      return yield* Effect.fail(
+        new HulyConnectionError({
+          message: `Funnel '${funnel._id}' references a ProjectType without statuses`
+        })
       )
+    }
+
+    const statusRefs = projectType.statuses.map((status) => status._id)
+    if (statusRefs.length === 0) {
+      return yield* Effect.fail(
+        new HulyConnectionError({
+          message: `Funnel '${funnel._id}' ProjectType has no statuses`
+        })
+      )
+    }
+
+    const statusDocs = yield* client.findAll<Status>(
+      core.class.Status,
+      { _id: { $in: [...statusRefs] } }
     )
 
-    if (statusDocsResult._tag === "Left") return []
-
-    return statusDocsResult.right.map((doc) => ({
+    return statusDocs.map((doc) => ({
       _id: doc._id,
       name: doc.name
     }))
@@ -123,9 +153,15 @@ const getFunnelStatuses = (
 const resolveStatusName = (
   statuses: ReadonlyArray<StatusInfo>,
   statusId: Ref<Status>
-): string => {
-  const statusDoc = statuses.find(s => s._id === statusId)
-  return statusDoc?.name ?? "Unknown"
+): Effect.Effect<StatusName, HulyConnectionError> => {
+  const statusDoc = statuses.find((status) => status._id === statusId)
+  return statusDoc !== undefined
+    ? Effect.succeed(StatusName.make(statusDoc.name))
+    : Effect.fail(
+      new HulyConnectionError({
+        message: `Lead references status '${statusId}', but that status is not defined on the funnel ProjectType`
+      })
+    )
 }
 
 const resolveStatusByName = (
@@ -135,15 +171,13 @@ const resolveStatusByName = (
 ): Effect.Effect<Ref<Status>, InvalidStatusError> => {
   const normalizedInput = normalizeForComparison(statusName)
   const matchingStatus = statuses.find(
-    s => normalizeForComparison(s.name) === normalizedInput
+    (status) => normalizeForComparison(status.name) === normalizedInput
   )
   if (matchingStatus === undefined) {
     return Effect.fail(new InvalidStatusError({ status: statusName, project: funnel }))
   }
   return Effect.succeed(matchingStatus._id)
 }
-
-// --- Operations ---
 
 type ListFunnelsError = HulyClientError
 
@@ -168,14 +202,14 @@ export const listFunnels = (
       }
     )
 
-    const summaries: ReadonlyArray<FunnelSummary> = funnels.map((f) => ({
-      identifier: FunnelIdentifier.make(f.name),
-      name: f.name,
-      description: f.description,
-      archived: f.archived
+    const summaries: ReadonlyArray<FunnelSummary> = funnels.map((funnel) => ({
+      identifier: FunnelIdentifier.make(funnel._id),
+      name: funnel.name,
+      description: funnel.description,
+      archived: funnel.archived
     }))
 
-    return { funnels: summaries, total: funnels.length }
+    return { funnels: summaries, total: funnels.total }
   })
 
 type ListLeadsError =
@@ -200,15 +234,18 @@ export const listLeads = (
       ? { status: yield* resolveStatusByName(statuses, params.status, params.funnel) }
       : {}
 
-    let assigneeFilter: DocumentQuery<HulyLead> = {}
-    if (params.assignee !== undefined) {
-      const assigneePerson = yield* findPersonByEmailOrName(client, params.assignee)
-      if (assigneePerson !== undefined) {
-        assigneeFilter = { assignee: assigneePerson._id }
-      } else {
-        return []
-      }
-    }
+    const assigneeParam = params.assignee
+
+    const assigneeFilter = assigneeParam !== undefined
+      ? yield* Effect.gen(function*() {
+        const assigneePerson = yield* findPersonByEmailOrName(client, assigneeParam)
+        return assigneePerson !== undefined
+          ? { assignee: assigneePerson._id }
+          : undefined
+      })
+      : {}
+
+    if (assigneeFilter === undefined) return []
 
     const titleFilter = params.titleSearch !== undefined && params.titleSearch.trim() !== ""
       ? { title: { $like: `%${escapeLikeWildcards(params.titleSearch)}%` } }
@@ -224,7 +261,7 @@ export const listLeads = (
     const limit = clampLimit(params.limit)
 
     type LeadWithLookup = WithLookup<HulyLead> & {
-      $lookup?: { assignee?: Person }
+      $lookup?: { assignee?: Person; attachedTo?: Contact }
     }
 
     const leads = yield* client.findAll<LeadWithLookup>(
@@ -233,34 +270,28 @@ export const listLeads = (
       {
         limit,
         sort: { modifiedOn: SortingOrder.Descending },
-        lookup: { assignee: contact.class.Person }
+        // Upstream lead views resolve attachedTo through the Customer mixin.
+        // Reference: .reference/huly-platform/models/lead/src/index.ts
+        lookup: {
+          assignee: contact.class.Person,
+          attachedTo: leadClassIds.mixin.Customer
+        }
       }
     )
 
-    // Resolve customer names for each lead
-    const customerIds = [...new Set(leads.map(l => l.attachedTo).filter(Boolean))]
-    const customers = customerIds.length > 0
-      ? yield* client.findAll<Person>(
-        contact.class.Person,
-        { _id: { $in: customerIds as Array<Ref<Person>> } }
-      )
-      : []
-    const customerMap = new Map(customers.map(c => [c._id, c.name]))
+    const rawSummaries = yield* Effect.forEach(leads, (lead) =>
+      Effect.gen(function*() {
+        const status = yield* resolveStatusName(statuses, lead.status)
 
-    const rawSummaries = leads.map((lead) => {
-      const statusName = resolveStatusName(statuses, lead.status)
-      const assigneeName = lead.$lookup?.assignee?.name
-      const customerName = customerMap.get(lead.attachedTo as Ref<Person>)
-
-      return {
-        identifier: lead.identifier,
-        title: lead.title,
-        status: statusName,
-        assignee: assigneeName,
-        customer: customerName,
-        modifiedOn: lead.modifiedOn
-      }
-    })
+        return {
+          identifier: normalizeLeadIdentifier(lead.identifier),
+          title: lead.title,
+          status,
+          assignee: lead.$lookup?.assignee?.name,
+          customer: lead.$lookup?.attachedTo?.name,
+          modifiedOn: lead.modifiedOn
+        }
+      }))
 
     const validated = yield* Schema.decodeUnknown(Schema.Array(LeadSummarySchema))(rawSummaries).pipe(
       Effect.mapError((parseError) =>
@@ -287,32 +318,27 @@ export const getLead = (
     const client = yield* HulyClient
     const funnel = yield* findFunnel(client, params.funnel)
     const statuses = yield* getFunnelStatuses(client, funnel)
+    const leadIdentifier = normalizeLeadIdentifier(params.identifier)
 
-    const { fullIdentifier, number } = parseLeadIdentifier(params.identifier, params.funnel)
-
-    const lead = (yield* client.findOne<HulyLead>(
+    const lead = yield* client.findOne<HulyLead>(
       leadClassIds.class.Lead,
-      { space: funnelAsSpace(funnel), identifier: fullIdentifier }
-    )) ?? (number !== null
-      ? yield* client.findOne<HulyLead>(
-        leadClassIds.class.Lead,
-        { space: funnelAsSpace(funnel), number }
-      )
-      : undefined)
+      { space: funnelAsSpace(funnel), identifier: leadIdentifier }
+    )
 
     if (lead === undefined) {
       return yield* new LeadNotFoundError({ identifier: params.identifier, funnel: params.funnel })
     }
 
-    const statusName = resolveStatusName(statuses, lead.status)
+    const status = yield* resolveStatusName(statuses, lead.status)
 
     const person = lead.assignee !== null
       ? yield* client.findOne<Person>(contact.class.Person, { _id: lead.assignee })
       : undefined
 
-    const customer = lead.attachedTo
-      ? yield* client.findOne<Person>(contact.class.Person, { _id: toRef<Person>(lead.attachedTo) })
-      : undefined
+    const customer = yield* client.findOne<Contact>(
+      contact.class.Contact,
+      { _id: toRef<Contact>(lead.attachedTo) }
+    )
 
     const description = lead.description
       ? yield* client.fetchMarkup(
@@ -325,13 +351,14 @@ export const getLead = (
       : undefined
 
     return yield* parseLeadDetailSchema({
-      identifier: lead.identifier,
+      identifier: normalizeLeadIdentifier(lead.identifier),
       title: lead.title,
       description,
-      status: statusName,
+      status,
       assignee: person?.name,
       customer: customer?.name,
-      funnel: funnel.name,
+      funnel: funnel._id,
+      funnelName: funnel.name,
       modifiedOn: lead.modifiedOn,
       createdOn: lead.createdOn
     }).pipe(
@@ -345,31 +372,3 @@ export const getLead = (
   })
 
 /* eslint-enable no-restricted-syntax */
-
-// --- Lead Identifier Helpers ---
-
-const parseLeadIdentifier = (
-  identifier: string | number,
-  funnelIdentifier: string
-): { fullIdentifier: string; number: number | null } => {
-  const idStr = String(identifier).trim()
-
-  const match = idStr.match(/^([A-Z]+)-(\d+)$/i)
-  if (match) {
-    return {
-      fullIdentifier: `${match[1].toUpperCase()}-${match[2]}`,
-      number: parseInt(match[2], 10)
-    }
-  }
-
-  const numMatch = idStr.match(/^\d+$/)
-  if (numMatch) {
-    const num = parseInt(idStr, 10)
-    return {
-      fullIdentifier: `${funnelIdentifier.toUpperCase()}-${num}`,
-      number: num
-    }
-  }
-
-  return { fullIdentifier: idStr, number: null }
-}

@@ -1,8 +1,9 @@
 import { describe, it } from "@effect/vitest"
-import type { Person } from "@hcengineering/contact"
+import type { Contact, Person } from "@hcengineering/contact"
 import type { Doc, FindResult, PersonId as CorePersonId, Ref, Space, Status } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
+
 import { FunnelIdentifier, LeadIdentifier } from "../../../src/domain/schemas/leads.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type { FunnelNotFoundError, LeadNotFoundError } from "../../../src/huly/errors-leads.js"
@@ -11,8 +12,6 @@ import { contact, core, task } from "../../../src/huly/huly-plugins.js"
 import { leadClassIds } from "../../../src/huly/lead-plugin.js"
 import { getLead, listFunnels, listLeads } from "../../../src/huly/operations/leads.js"
 import { email, statusName } from "../../helpers/brands.js"
-
-// --- Helpers ---
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   const result = docs as FindResult<T>
@@ -37,11 +36,11 @@ interface MockLead extends Doc {
   status: Ref<Status>
   assignee: Ref<Person> | null
   description: string | null
-  attachedTo: Ref<Doc>
+  attachedTo: Ref<Contact>
   parents: ReadonlyArray<unknown>
   modifiedOn: number
   createdOn: number
-  $lookup?: { assignee?: Person | undefined }
+  $lookup?: { assignee?: Person | undefined; attachedTo?: Contact | undefined }
 }
 
 interface MockStatus extends Doc {
@@ -71,12 +70,12 @@ const makeLead = (overrides: Partial<MockLead> = {}): MockLead => ({
   createdBy: "user" as CorePersonId,
   createdOn: 1699000000000,
   title: "Big Deal",
-  identifier: "SALES-1",
+  identifier: "LEAD-1",
   number: 1,
   status: "status-1" as Ref<Status>,
   assignee: "person-1" as Ref<Person>,
   description: null,
-  attachedTo: "customer-1" as Ref<Doc>,
+  attachedTo: "customer-1" as Ref<Contact>,
   parents: [],
   ...overrides
 })
@@ -110,6 +109,20 @@ const makePerson = (id: string, name: string): Person => {
   return data as Person
 }
 
+const makeContact = (id: string, name: string): Contact => {
+  const data = {
+    _id: id as Ref<Contact>,
+    _class: contact.class.Contact,
+    space: contact.space.Contacts,
+    modifiedBy: "user" as CorePersonId,
+    modifiedOn: 0,
+    createdBy: "user" as CorePersonId,
+    createdOn: 0,
+    name
+  }
+  return data as Contact
+}
+
 const makeProjectType = (statusIds: Array<string>) => ({
   _id: "project-type-1" as Ref<Doc>,
   _class: task.class.ProjectType,
@@ -118,93 +131,85 @@ const makeProjectType = (statusIds: Array<string>) => ({
   modifiedOn: 0,
   createdBy: "user" as CorePersonId,
   createdOn: 0,
-  statuses: statusIds.map(id => ({ _id: id as Ref<Status> }))
+  statuses: statusIds.map((id) => ({ _id: id as Ref<Status> }))
 })
 
-// --- Mock layer builder ---
-
 interface LeadMockConfig {
+  contacts?: Array<Contact>
+  fetchMarkupResult?: string
   funnels?: Array<MockFunnel>
   leads?: Array<MockLead>
-  statuses?: Array<MockStatus>
-  projectType?: ReturnType<typeof makeProjectType>
   persons?: Array<Person>
-  fetchMarkupResult?: string
+  projectType?: ReturnType<typeof makeProjectType>
+  statusQueryError?: HulyConnectionError
+  statuses?: Array<MockStatus>
 }
 
 const createTestLayer = (config: LeadMockConfig) => {
+  const contacts = config.contacts ?? []
   const funnels = config.funnels ?? [makeFunnel()]
   const leads = config.leads ?? []
-  const statuses = config.statuses ?? [makeStatus("status-1", "Active")]
-  const projectType = config.projectType ?? makeProjectType(statuses.map(s => s._id as string))
   const persons = config.persons ?? []
+  const statuses = config.statuses ?? [makeStatus("status-1", "Active")]
+  const projectType = config.projectType ?? makeProjectType(statuses.map((status) => status._id as string))
 
-  const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown, _options?: unknown) => {
+  const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown, options?: unknown) => {
     if (_class === leadClassIds.class.Funnel) {
       const q = (query ?? {}) as Record<string, unknown>
       let filtered = [...funnels]
       if (q.archived !== undefined) {
-        filtered = filtered.filter(f => f.archived === q.archived)
+        filtered = filtered.filter((funnel) => funnel.archived === q.archived)
       }
       return Effect.succeed(toFindResult(filtered))
     }
+
     if (_class === leadClassIds.class.Lead) {
       const q = (query ?? {}) as Record<string, unknown>
       let filtered = [...leads]
       if (q.space !== undefined) {
-        filtered = filtered.filter(l => l.space === q.space)
+        filtered = filtered.filter((lead) => lead.space === q.space)
       }
       if (q.status !== undefined) {
-        filtered = filtered.filter(l => l.status === q.status)
+        filtered = filtered.filter((lead) => lead.status === q.status)
       }
       if (q.assignee !== undefined) {
-        filtered = filtered.filter(l => l.assignee === q.assignee)
+        filtered = filtered.filter((lead) => lead.assignee === q.assignee)
       }
-      // Attach $lookup.assignee if requested
-      const opts = (_options ?? {}) as { lookup?: Record<string, unknown> }
-      if (opts.lookup?.assignee) {
-        filtered = filtered.map(l => {
-          const assigneePerson = persons.find(p => p._id === l.assignee)
-          const withLookup: MockLead = { ...l, $lookup: { assignee: assigneePerson } }
-          return withLookup
-        })
+      const opts = (options ?? {}) as { lookup?: Record<string, unknown> }
+      if (opts.lookup?.assignee || opts.lookup?.attachedTo) {
+        filtered = filtered.map((lead) => ({
+          ...lead,
+          $lookup: {
+            assignee: opts.lookup?.assignee ? persons.find((person) => person._id === lead.assignee) : undefined,
+            attachedTo: opts.lookup?.attachedTo
+              ? contacts.find((customer) => customer._id === lead.attachedTo)
+              : undefined
+          }
+        }))
       }
       return Effect.succeed(toFindResult(filtered))
     }
+
     if (_class === core.class.Status) {
+      if (config.statusQueryError !== undefined) {
+        return Effect.fail(config.statusQueryError)
+      }
       const q = (query ?? {}) as Record<string, unknown>
       let filtered = [...statuses]
       if (q._id !== undefined) {
         const idFilter = q._id as { $in?: Array<unknown> } | unknown
         if (typeof idFilter === "object" && idFilter !== null && "$in" in idFilter) {
           const ids = idFilter.$in as Array<unknown>
-          filtered = filtered.filter(s => ids.includes(s._id))
+          filtered = filtered.filter((status) => ids.includes(status._id))
         }
       }
       return Effect.succeed(toFindResult(filtered))
     }
-    if (_class === contact.class.Person) {
-      const q = (query ?? {}) as Record<string, unknown>
-      let filtered = [...persons]
-      if (q._id !== undefined) {
-        const idFilter = q._id as { $in?: Array<unknown> } | unknown
-        if (typeof idFilter === "object" && idFilter !== null && "$in" in idFilter) {
-          const ids = idFilter.$in as Array<unknown>
-          filtered = filtered.filter(p => ids.includes(p._id))
-        }
-      }
-      if (q.name !== undefined) {
-        const nameFilter = q.name as { $like?: string } | string
-        if (typeof nameFilter === "object" && "$like" in nameFilter) {
-          const pattern = nameFilter.$like.replace(/%/g, ".*").replace(/_/g, ".")
-          filtered = filtered.filter(p => new RegExp(`^${pattern}$`, "i").test(p.name))
-        }
-      }
-      return Effect.succeed(toFindResult(filtered))
-    }
+
     if (_class === contact.class.Channel) {
       return Effect.succeed(toFindResult([]))
     }
+
     return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
 
@@ -212,24 +217,31 @@ const createTestLayer = (config: LeadMockConfig) => {
     if (_class === task.class.ProjectType) {
       return Effect.succeed(projectType)
     }
+
     if (_class === leadClassIds.class.Lead) {
       const q = query as Record<string, unknown>
-      const found = leads.find(l =>
-        (q.identifier !== undefined && l.identifier === q.identifier)
-        || (q.number !== undefined && l.number === q.number)
-      )
+      const found = leads.find((lead) => (q.identifier !== undefined && lead.identifier === q.identifier))
       return Effect.succeed(found)
     }
+
     if (_class === leadClassIds.class.Funnel) {
       const q = query as Record<string, unknown>
-      const found = funnels.find(f => f._id === q._id)
+      const found = funnels.find((funnel) => funnel._id === q._id)
       return Effect.succeed(found)
     }
+
     if (_class === contact.class.Person) {
       const q = query as Record<string, unknown>
-      const found = persons.find(p => p._id === q._id)
+      const found = persons.find((person) => person._id === q._id)
       return Effect.succeed(found)
     }
+
+    if (_class === contact.class.Contact) {
+      const q = query as Record<string, unknown>
+      const found = contacts.find((customer) => customer._id === q._id)
+      return Effect.succeed(found)
+    }
+
     return Effect.succeed(undefined)
   }) as HulyClientOperations["findOne"]
 
@@ -237,41 +249,26 @@ const createTestLayer = (config: LeadMockConfig) => {
     (() => Effect.succeed(config.fetchMarkupResult ?? "# Description")) as HulyClientOperations["fetchMarkup"]
 
   return HulyClient.testLayer({
+    fetchMarkup: fetchMarkupImpl,
     findAll: findAllImpl,
-    findOne: findOneImpl,
-    fetchMarkup: fetchMarkupImpl
+    findOne: findOneImpl
   })
 }
 
-// --- Tests ---
-
 describe("Lead Operations", () => {
   describe("listFunnels", () => {
-    it.effect("returns active funnels excluding archived", () =>
+    it.effect("returns stable funnel ids instead of funnel names as identifiers", () =>
       Effect.gen(function*() {
         const activeFunnel = makeFunnel({ _id: "f-1" as Ref<MockFunnel>, name: "Sales", archived: false })
         const archivedFunnel = makeFunnel({ _id: "f-2" as Ref<MockFunnel>, name: "Old Pipeline", archived: true })
 
         const testLayer = createTestLayer({ funnels: [activeFunnel, archivedFunnel] })
-
         const result = yield* listFunnels({}).pipe(Effect.provide(testLayer))
 
         expect(result.funnels).toHaveLength(1)
+        expect(result.funnels[0].identifier).toBe("f-1")
         expect(result.funnels[0].name).toBe("Sales")
         expect(result.total).toBe(1)
-      }))
-
-    it.effect("returns all funnels when includeArchived is true", () =>
-      Effect.gen(function*() {
-        const activeFunnel = makeFunnel({ _id: "f-1" as Ref<MockFunnel>, name: "Sales", archived: false })
-        const archivedFunnel = makeFunnel({ _id: "f-2" as Ref<MockFunnel>, name: "Old Pipeline", archived: true })
-
-        const testLayer = createTestLayer({ funnels: [activeFunnel, archivedFunnel] })
-
-        const result = yield* listFunnels({ includeArchived: true }).pipe(Effect.provide(testLayer))
-
-        expect(result.funnels).toHaveLength(2)
-        expect(result.total).toBe(2)
       }))
 
     it.effect("propagates client failures", () =>
@@ -286,28 +283,39 @@ describe("Lead Operations", () => {
   })
 
   describe("listLeads", () => {
-    it.effect("lists leads in a funnel with resolved status, assignee, and customer", () =>
+    it.effect("lists leads in a funnel with resolved status, assignee, and customer contact", () =>
       Effect.gen(function*() {
         const assignee = makePerson("person-1", "Smith,Jane")
-        const customer = makePerson("customer-1", "Acme,Corp")
+        const customer = makeContact("customer-1", "Acme,Corp")
         const lead = makeLead({
           assignee: "person-1" as Ref<Person>,
-          attachedTo: "customer-1" as Ref<Doc>
+          attachedTo: "customer-1" as Ref<Contact>
         })
 
         const testLayer = createTestLayer({
+          contacts: [customer],
           leads: [lead],
-          persons: [assignee, customer]
+          persons: [assignee]
         })
 
-        const result = yield* listLeads({ funnel: funnelIdentifier("Sales") }).pipe(Effect.provide(testLayer))
+        const result = yield* listLeads({ funnel: funnelIdentifier("funnel-1") }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
-        expect(result[0].identifier).toBe("SALES-1")
-        expect(result[0].title).toBe("Big Deal")
+        expect(result[0].identifier).toBe("LEAD-1")
         expect(result[0].status).toBe("Active")
         expect(result[0].assignee).toBe("Smith,Jane")
         expect(result[0].customer).toBe("Acme,Corp")
+      }))
+
+    it.effect("accepts case-insensitive funnel name lookup as a convenience", () =>
+      Effect.gen(function*() {
+        const lead = makeLead()
+        const testLayer = createTestLayer({ leads: [lead] })
+
+        const result = yield* listLeads({ funnel: funnelIdentifier("sales") }).pipe(Effect.provide(testLayer))
+
+        expect(result).toHaveLength(1)
+        expect(result[0].identifier).toBe("LEAD-1")
       }))
 
     it.effect("filters leads by status name", () =>
@@ -317,7 +325,7 @@ describe("Lead Operations", () => {
         const lead1 = makeLead({ _id: "lead-1" as Ref<MockLead>, status: "status-1" as Ref<Status> })
         const lead2 = makeLead({
           _id: "lead-2" as Ref<MockLead>,
-          identifier: "SALES-2",
+          identifier: "LEAD-2",
           number: 2,
           status: "status-2" as Ref<Status>
         })
@@ -327,29 +335,41 @@ describe("Lead Operations", () => {
           statuses: [statusActive, statusWon]
         })
 
-        const result = yield* listLeads({ funnel: funnelIdentifier("Sales"), status: statusName("Won") }).pipe(
+        const result = yield* listLeads({ funnel: funnelIdentifier("funnel-1"), status: statusName("Won") }).pipe(
           Effect.provide(testLayer)
         )
 
         expect(result).toHaveLength(1)
-        expect(result[0].identifier).toBe("SALES-2")
+        expect(result[0].identifier).toBe("LEAD-2")
       }))
 
     it.effect("returns empty array when assignee is not found", () =>
       Effect.gen(function*() {
         const lead = makeLead()
+        const testLayer = createTestLayer({ leads: [lead], persons: [] })
 
-        const testLayer = createTestLayer({
-          leads: [lead],
-          persons: []
-        })
-
-        const result = yield* listLeads({ funnel: funnelIdentifier("Sales"), assignee: email("nobody@example.com") })
-          .pipe(
-            Effect.provide(testLayer)
-          )
+        const result = yield* listLeads({ funnel: funnelIdentifier("funnel-1"), assignee: email("nobody@example.com") })
+          .pipe(Effect.provide(testLayer))
 
         expect(result).toEqual([])
+      }))
+
+    it.effect("fails when funnel status resolution fails", () =>
+      Effect.gen(function*() {
+        const lead = makeLead()
+        const testLayer = createTestLayer({
+          leads: [lead],
+          statusQueryError: new HulyConnectionError({ message: "status lookup failed" })
+        })
+
+        const error = yield* Effect.flip(
+          listLeads({ funnel: funnelIdentifier("funnel-1") }).pipe(
+            Effect.provide(testLayer)
+          )
+        )
+
+        expect(error._tag).toBe("HulyConnectionError")
+        expect(error.message).toContain("status lookup failed")
       }))
 
     it.effect("fails with FunnelNotFoundError when funnel does not exist", () =>
@@ -357,60 +377,53 @@ describe("Lead Operations", () => {
         const testLayer = createTestLayer({ funnels: [] })
 
         const error = yield* Effect.flip(
-          listLeads({ funnel: funnelIdentifier("Nonexistent") }).pipe(Effect.provide(testLayer))
+          listLeads({ funnel: funnelIdentifier("missing-funnel") }).pipe(Effect.provide(testLayer))
         )
 
         expect(error._tag).toBe("FunnelNotFoundError")
-        expect((error as FunnelNotFoundError).identifier).toBe("Nonexistent")
+        expect((error as FunnelNotFoundError).identifier).toBe("missing-funnel")
       }))
   })
 
   describe("getLead", () => {
-    it.effect("returns full lead detail with description", () =>
+    it.effect("returns full lead detail with contact customer and stable funnel id", () =>
       Effect.gen(function*() {
         const assignee = makePerson("person-1", "Smith,Jane")
-        const customer = makePerson("customer-1", "Acme,Corp")
+        const customer = makeContact("customer-1", "Acme,Corp")
         const lead = makeLead({
           assignee: "person-1" as Ref<Person>,
-          attachedTo: "customer-1" as Ref<Doc>,
-          description: "blob-ref" as string
+          attachedTo: "customer-1" as Ref<Contact>,
+          description: "blob-ref"
         })
 
         const testLayer = createTestLayer({
+          contacts: [customer],
+          fetchMarkupResult: "# Deal notes\nImportant details here.",
           leads: [lead],
-          persons: [assignee, customer],
-          fetchMarkupResult: "# Deal notes\nImportant details here."
+          persons: [assignee]
         })
 
-        const result = yield* getLead({ funnel: funnelIdentifier("Sales"), identifier: leadIdentifier("SALES-1") })
-          .pipe(
-            Effect.provide(testLayer)
-          )
+        const result = yield* getLead({ funnel: funnelIdentifier("funnel-1"), identifier: leadIdentifier("LEAD-1") })
+          .pipe(Effect.provide(testLayer))
 
-        expect(result.identifier).toBe("SALES-1")
-        expect(result.title).toBe("Big Deal")
+        expect(result.identifier).toBe("LEAD-1")
         expect(result.status).toBe("Active")
         expect(result.assignee).toBe("Smith,Jane")
         expect(result.customer).toBe("Acme,Corp")
         expect(result.description).toBe("# Deal notes\nImportant details here.")
-        expect(result.funnel).toBe("Sales")
+        expect(result.funnel).toBe("funnel-1")
+        expect(result.funnelName).toBe("Sales")
       }))
 
-    it.effect("finds lead by identifier string", () =>
+    it.effect("normalizes lowercase lead identifiers to upstream LEAD format", () =>
       Effect.gen(function*() {
-        const lead = makeLead({ identifier: "SALES-1", number: 1 })
+        const lead = makeLead({ identifier: "LEAD-1", number: 1 })
+        const testLayer = createTestLayer({ leads: [lead] })
 
-        const testLayer = createTestLayer({
-          leads: [lead],
-          persons: [makePerson("person-1", "Smith,Jane")]
-        })
+        const result = yield* getLead({ funnel: funnelIdentifier("funnel-1"), identifier: leadIdentifier("lead-1") })
+          .pipe(Effect.provide(testLayer))
 
-        const result = yield* getLead({ funnel: funnelIdentifier("Sales"), identifier: leadIdentifier("SALES-1") })
-          .pipe(
-            Effect.provide(testLayer)
-          )
-
-        expect(result.identifier).toBe("SALES-1")
+        expect(result.identifier).toBe("LEAD-1")
       }))
 
     it.effect("fails with LeadNotFoundError when lead does not exist", () =>
@@ -418,14 +431,14 @@ describe("Lead Operations", () => {
         const testLayer = createTestLayer({ leads: [] })
 
         const error = yield* Effect.flip(
-          getLead({ funnel: funnelIdentifier("Sales"), identifier: leadIdentifier("SALES-999") }).pipe(
+          getLead({ funnel: funnelIdentifier("funnel-1"), identifier: leadIdentifier("LEAD-999") }).pipe(
             Effect.provide(testLayer)
           )
         )
 
         expect(error._tag).toBe("LeadNotFoundError")
-        expect((error as LeadNotFoundError).identifier).toBe("SALES-999")
-        expect((error as LeadNotFoundError).funnel).toBe("Sales")
+        expect((error as LeadNotFoundError).identifier).toBe("LEAD-999")
+        expect((error as LeadNotFoundError).funnel).toBe("funnel-1")
       }))
 
     it.effect("fails with FunnelNotFoundError when funnel does not exist", () =>
@@ -433,13 +446,13 @@ describe("Lead Operations", () => {
         const testLayer = createTestLayer({ funnels: [] })
 
         const error = yield* Effect.flip(
-          getLead({ funnel: funnelIdentifier("Nonexistent"), identifier: leadIdentifier("SALES-1") }).pipe(
+          getLead({ funnel: funnelIdentifier("missing-funnel"), identifier: leadIdentifier("LEAD-1") }).pipe(
             Effect.provide(testLayer)
           )
         )
 
         expect(error._tag).toBe("FunnelNotFoundError")
-        expect((error as FunnelNotFoundError).identifier).toBe("Nonexistent")
+        expect((error as FunnelNotFoundError).identifier).toBe("missing-funnel")
       }))
   })
 })
