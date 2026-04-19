@@ -326,6 +326,35 @@ describe("Lead Operations", () => {
         expect(result[0].identifier).toBe("LEAD-1")
       }))
 
+    it.effect("prefers the most recently modified non-archived funnel when names collide", () =>
+      Effect.gen(function*() {
+        const olderArchived = makeFunnel({
+          _id: docRef<MockFunnel>("funnel-archived"),
+          archived: true,
+          modifiedOn: 1700000000000,
+          name: "Sales"
+        })
+        const newestActive = makeFunnel({
+          _id: docRef<MockFunnel>("funnel-active"),
+          archived: false,
+          modifiedOn: 1700000001000,
+          name: "Sales"
+        })
+        const lead = makeLead({
+          space: spaceRef("funnel-active")
+        })
+
+        const testLayer = createTestLayer({
+          funnels: [olderArchived, newestActive],
+          leads: [lead]
+        })
+
+        const result = yield* listLeads({ funnel: funnelReference("sales") }).pipe(Effect.provide(testLayer))
+
+        expect(result).toHaveLength(1)
+        expect(result[0].identifier).toBe("LEAD-1")
+      }))
+
     it.effect("lists leads with organization customers resolved through the customer mixin lookup", () =>
       Effect.gen(function*() {
         const organization = makeOrganization("customer-1", "Acme Org")

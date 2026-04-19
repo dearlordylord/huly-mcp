@@ -24,6 +24,7 @@ import { CardNotFoundError, CardSpaceNotFoundError, MasterTagNotFoundError } fro
 import {
   InvalidContactProviderError,
   InvalidPersonUuidError,
+  OrganizationIdentifierAmbiguousError,
   OrganizationNotFoundError,
   PersonNotFoundError
 } from "./errors-contacts.js"
@@ -113,6 +114,7 @@ export {
   MilestoneNotFoundError,
   NotificationContextNotFoundError,
   NotificationNotFoundError,
+  OrganizationIdentifierAmbiguousError,
   OrganizationNotFoundError,
   PersonNotFoundError,
   ProjectNotFoundError,
@@ -145,6 +147,7 @@ export type HulyDomainError =
   | InvalidStatusError
   | PersonNotFoundError
   | OrganizationNotFoundError
+  | OrganizationIdentifierAmbiguousError
   | InvalidContactProviderError
   | FileUploadError
   | InvalidFileDataError
@@ -204,6 +207,7 @@ export const HulyDomainError: Schema.Union<
     typeof InvalidStatusError,
     typeof PersonNotFoundError,
     typeof OrganizationNotFoundError,
+    typeof OrganizationIdentifierAmbiguousError,
     typeof InvalidContactProviderError,
     typeof FileUploadError,
     typeof InvalidFileDataError,
@@ -259,6 +263,7 @@ export const HulyDomainError: Schema.Union<
   InvalidStatusError,
   PersonNotFoundError,
   OrganizationNotFoundError,
+  OrganizationIdentifierAmbiguousError,
   InvalidContactProviderError,
   FileUploadError,
   InvalidFileDataError,

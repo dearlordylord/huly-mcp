@@ -58,7 +58,12 @@ import type {
 } from "../../domain/schemas/contacts.js"
 import { ContactProvider, Email, OrganizationId, PersonId, PersonName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import { InvalidContactProviderError, OrganizationNotFoundError, PersonNotFoundError } from "../errors.js"
+import {
+  InvalidContactProviderError,
+  OrganizationIdentifierAmbiguousError,
+  OrganizationNotFoundError,
+  PersonNotFoundError
+} from "../errors.js"
 import { escapeLikeWildcards } from "./query-helpers.js"
 import { clampLimit, toRef } from "./shared.js"
 
@@ -72,13 +77,25 @@ type UpdatePersonError = HulyClientError | PersonNotFoundError
 type DeletePersonError = HulyClientError | PersonNotFoundError
 type ListEmployeesError = HulyClientError
 type ListOrganizationsError = HulyClientError
-type CreateOrganizationError = HulyClientError
-type GetOrganizationError = HulyClientError | OrganizationNotFoundError
-type UpdateOrganizationError = HulyClientError | OrganizationNotFoundError
-type DeleteOrganizationError = HulyClientError | OrganizationNotFoundError
-type AddOrganizationChannelError = HulyClientError | InvalidContactProviderError | OrganizationNotFoundError
-type AddOrganizationMemberError = HulyClientError | OrganizationNotFoundError | PersonNotFoundError
-type RemoveOrganizationMemberError = HulyClientError | OrganizationNotFoundError | PersonNotFoundError
+type CreateOrganizationError = HulyClientError | PersonNotFoundError
+type GetOrganizationError = HulyClientError | OrganizationIdentifierAmbiguousError | OrganizationNotFoundError
+type UpdateOrganizationError = HulyClientError | OrganizationIdentifierAmbiguousError | OrganizationNotFoundError
+type DeleteOrganizationError = HulyClientError | OrganizationIdentifierAmbiguousError | OrganizationNotFoundError
+type AddOrganizationChannelError =
+  | HulyClientError
+  | InvalidContactProviderError
+  | OrganizationIdentifierAmbiguousError
+  | OrganizationNotFoundError
+type AddOrganizationMemberError =
+  | HulyClientError
+  | OrganizationIdentifierAmbiguousError
+  | OrganizationNotFoundError
+  | PersonNotFoundError
+type RemoveOrganizationMemberError =
+  | HulyClientError
+  | OrganizationIdentifierAmbiguousError
+  | OrganizationNotFoundError
+  | PersonNotFoundError
 
 const formatName = (firstName: string, lastName: string): string => `${lastName},${firstName}`
 
@@ -448,6 +465,9 @@ export const createOrganization = (
   Effect.gen(function*() {
     const client = yield* HulyClient
     const orgId = generateId<HulyOrganization>()
+    const memberPersonIds = params.members !== undefined && params.members.length > 0
+      ? yield* resolvePersonIdentifiers(client, params.members)
+      : []
 
     const orgData: Data<HulyOrganization> = {
       name: params.name,
@@ -464,21 +484,16 @@ export const createOrganization = (
       orgId
     )
 
-    if (params.members !== undefined && params.members.length > 0) {
-      for (const memberRef of params.members) {
-        const personId = (yield* findPersonById(client, memberRef))?._id
-          ?? (yield* findPersonByEmail(client, memberRef))?._id
-
-        if (personId !== undefined) {
-          yield* client.addCollection(
-            contact.class.Member,
-            contact.space.Contacts,
-            orgId,
-            contact.class.Organization,
-            "members",
-            { contact: personId }
-          )
-        }
+    if (memberPersonIds.length > 0) {
+      for (const personId of memberPersonIds) {
+        yield* client.addCollection(
+          contact.class.Member,
+          contact.space.Contacts,
+          orgId,
+          contact.class.Organization,
+          "members",
+          { contact: personId }
+        )
       }
     }
 
@@ -491,7 +506,10 @@ export const createOrganization = (
 const findOrganizationByIdentifier = (
   client: HulyClient["Type"],
   identifier: string
-): Effect.Effect<HulyOrganization | undefined, HulyClientError> =>
+): Effect.Effect<
+  HulyOrganization | undefined,
+  HulyClientError | OrganizationIdentifierAmbiguousError
+> =>
   Effect.gen(function*() {
     // Try by ID first
     const byId = yield* client.findOne<HulyOrganization>(
@@ -499,12 +517,66 @@ const findOrganizationByIdentifier = (
       { _id: toRef<HulyOrganization>(identifier) }
     )
     if (byId !== undefined) return byId
-    // Fall back to exact name match
-    return yield* client.findOne<HulyOrganization>(
+
+    const byName = yield* client.findAll<HulyOrganization>(
       contact.class.Organization,
       { name: identifier }
     )
+
+    if (byName.length === 0) {
+      return undefined
+    }
+
+    if (byName.length > 1) {
+      return yield* new OrganizationIdentifierAmbiguousError({
+        identifier,
+        matches: byName.length
+      })
+    }
+
+    return byName[0]
   })
+
+const resolvePersonIdentifier = (
+  client: HulyClient["Type"],
+  identifier: string
+): Effect.Effect<HulyPerson, HulyClientError | PersonNotFoundError> =>
+  Effect.gen(function*() {
+    const person = (yield* findPersonById(client, identifier))
+      ?? (yield* findPersonByEmail(client, identifier))
+
+    if (person === undefined) {
+      return yield* new PersonNotFoundError({ identifier })
+    }
+
+    return person
+  })
+
+const uniqueValues = <T>(values: Iterable<T>): Array<T> => Array.from(new Set(values))
+
+const resolvePersonIdentifiers = (
+  client: HulyClient["Type"],
+  identifiers: ReadonlyArray<string>
+): Effect.Effect<Array<Ref<HulyPerson>>, HulyClientError | PersonNotFoundError> =>
+  Effect.gen(function*() {
+    const resolvedPeople: Array<HulyPerson> = []
+
+    for (const identifier of identifiers) {
+      resolvedPeople.push(yield* resolvePersonIdentifier(client, identifier))
+    }
+
+    return uniqueValues(resolvedPeople.map(person => person._id))
+  })
+
+const findOrganizationMemberships = (
+  client: HulyClient["Type"],
+  organizationId: Ref<HulyOrganization>,
+  personId: Ref<HulyPerson>
+): Effect.Effect<Array<HulyMember>, HulyClientError> =>
+  client.findAll<HulyMember>(
+    contact.class.Member,
+    { attachedTo: organizationId, contact: personId }
+  )
 
 export const getOrganization = (
   params: GetOrganizationParams
@@ -551,6 +623,7 @@ export const updateOrganization = (
     }
 
     const updateOps: DocumentUpdate<HulyOrganization> = {}
+    let descriptionUpdatedInPlace = false
 
     if (params.name !== undefined) {
       updateOps.name = params.name
@@ -563,6 +636,15 @@ export const updateOrganization = (
       // Upload markdown and attach the resulting ref.
       if (params.description === null || params.description === "") {
         updateOps.description = null
+      } else if (org.description !== null) {
+        yield* client.updateMarkup(
+          contact.class.Organization,
+          org._id,
+          "description",
+          params.description,
+          "markdown"
+        )
+        descriptionUpdatedInPlace = true
       } else {
         const markupRef: MarkupBlobRef = yield* client.uploadMarkup(
           contact.class.Organization,
@@ -575,7 +657,7 @@ export const updateOrganization = (
       }
     }
 
-    if (Object.keys(updateOps).length === 0) {
+    if (Object.keys(updateOps).length === 0 && !descriptionUpdatedInPlace) {
       return { id: OrganizationId.make(org._id), updated: false }
     }
 
@@ -700,11 +782,11 @@ export const addOrganizationMember = (
       return yield* new OrganizationNotFoundError({ identifier: params.organizationId })
     }
 
-    const person = (yield* findPersonById(client, params.personIdentifier))
-      ?? (yield* findPersonByEmail(client, params.personIdentifier))
+    const person = yield* resolvePersonIdentifier(client, params.personIdentifier)
+    const existingMemberships = yield* findOrganizationMemberships(client, org._id, person._id)
 
-    if (person === undefined) {
-      return yield* new PersonNotFoundError({ identifier: params.personIdentifier })
+    if (existingMemberships.length > 0) {
+      return { id: OrganizationId.make(org._id), added: false }
     }
 
     yield* client.addCollection(
@@ -803,17 +885,9 @@ export const removeOrganizationMember = (
       return yield* new OrganizationNotFoundError({ identifier: params.organizationId })
     }
 
-    const person = (yield* findPersonById(client, params.personIdentifier))
-      ?? (yield* findPersonByEmail(client, params.personIdentifier))
+    const person = yield* resolvePersonIdentifier(client, params.personIdentifier)
 
-    if (person === undefined) {
-      return yield* new PersonNotFoundError({ identifier: params.personIdentifier })
-    }
-
-    const memberDocs = yield* client.findAll<HulyMember>(
-      contact.class.Member,
-      { attachedTo: org._id, contact: person._id }
-    )
+    const memberDocs = yield* findOrganizationMemberships(client, org._id, person._id)
 
     if (memberDocs.length === 0) {
       return { id: OrganizationId.make(org._id), removed: false }

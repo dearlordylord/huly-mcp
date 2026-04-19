@@ -141,7 +141,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "create_organization",
     description:
-      "Create a new organization in Huly. Optionally add members by person ID or email. Returns the created organization ID.",
+      "Create a new organization in Huly. Optionally add members by person ID or email. Fails if any requested member cannot be resolved. Returns the created organization ID.",
     category: CATEGORY,
     inputSchema: createOrganizationParamsJsonSchema,
     handler: createToolHandler(
@@ -153,7 +153,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "get_organization",
     description:
-      "Retrieve full details for an organization by ID or exact name - including city, description, member count, and modification timestamp.",
+      "Retrieve full details for an organization by ID or exact name when that name is unique - including city, description, member count, and modification timestamp. If multiple organizations share the same name, use the organization ID.",
     category: CATEGORY,
     inputSchema: getOrganizationParamsJsonSchema,
     handler: createToolHandler(
@@ -165,7 +165,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "update_organization",
     description:
-      "Update fields on an existing organization identified by ID or exact name. Only provided fields are modified. Description supports multi-line plain text and is the right place to store CRM notes / revenue summaries / context. Pass null to clear city or description.",
+      "Update fields on an existing organization identified by ID or exact name when that name is unique. Only provided fields are modified. Description supports multi-line plain text and is the right place to store CRM notes / revenue summaries / context. Pass null to clear city or description. If multiple organizations share the same name, use the organization ID.",
     category: CATEGORY,
     inputSchema: updateOrganizationParamsJsonSchema,
     handler: createToolHandler(
@@ -177,7 +177,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "delete_organization",
     description:
-      "Permanently delete an organization identified by ID or exact name. Use with care - this cannot be undone. Useful for cleaning up duplicate organizations after merging their data elsewhere.",
+      "Permanently delete an organization identified by ID or exact name when that name is unique. Use with care - this cannot be undone. Useful for cleaning up duplicate organizations after merging their data elsewhere. If multiple organizations share the same name, use the organization ID.",
     category: CATEGORY,
     inputSchema: deleteOrganizationParamsJsonSchema,
     handler: createToolHandler(
@@ -189,7 +189,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "make_organization_customer",
     description:
-      "Apply the Customer mixin to an organization so it appears in the Huly Leads > Customers view. Idempotent - safe to call on organizations that are already customers. Takes the organization ID or exact name.",
+      "Apply the Customer mixin to an organization so it appears in the Huly Leads > Customers view. Idempotent - safe to call on organizations that are already customers. Takes the organization ID or exact name when that name is unique.",
     category: CATEGORY,
     inputSchema: getOrganizationParamsJsonSchema,
     handler: createToolHandler(
@@ -201,7 +201,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "add_organization_channel",
     description:
-      "Add a contact channel (phone, email, website/homepage, LinkedIn, Twitter, GitHub, Facebook, Telegram) to an organization. Provider names: email, phone, linkedin, twitter, github, facebook, telegram, homepage.",
+      "Add a contact channel (phone, email, website/homepage, LinkedIn, Twitter, GitHub, Facebook, Telegram) to an organization identified by ID or exact unique name. Provider names: email, phone, linkedin, twitter, github, facebook, telegram, homepage.",
     category: CATEGORY,
     inputSchema: addOrganizationChannelParamsJsonSchema,
     handler: createToolHandler(
@@ -213,7 +213,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "add_organization_member",
     description:
-      "Link a person as a member of an organization. The person appears under the org's Members tab in Huly. Use person ID or email to identify the person.",
+      "Link a person as a member of an organization. The person appears under the org's Members tab in Huly. Use person ID or email to identify the person. Idempotent: returns added=false if that person is already a member.",
     category: CATEGORY,
     inputSchema: addOrganizationMemberParamsJsonSchema,
     handler: createToolHandler(
@@ -225,7 +225,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "list_organization_members",
     description:
-      "List all persons who are members of an organization. Returns each member's person ID, name, and primary email (if any).",
+      "List all persons who are members of an organization. Returns each member's person ID, name, and primary email (if any). When using a name instead of an ID, that name must identify exactly one organization.",
     category: CATEGORY,
     inputSchema: listOrganizationMembersParamsJsonSchema,
     handler: createToolHandler(
@@ -249,7 +249,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "remove_organization_member",
     description:
-      "Unlink a person from an organization's members. Reverses add_organization_member. Returns removed: false if the person was not a member.",
+      "Unlink a person from an organization's members. Reverses add_organization_member. Returns removed: false if the person was not a member. When using an organization name instead of an ID, that name must identify exactly one organization.",
     category: CATEGORY,
     inputSchema: removeOrganizationMemberParamsJsonSchema,
     handler: createToolHandler(

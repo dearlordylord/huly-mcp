@@ -70,6 +70,12 @@ const createMockResponse = () => {
   })
 }
 
+const createMockRequest = (body: unknown = {}): Request =>
+  mock<Request>({
+    body,
+    on: vi.fn()
+  })
+
 describe("HTTP Transport - Branch Coverage", () => {
   describe("createMcpHandlers - headersSent check (line 135)", () => {
     // test-revizorro: approved
@@ -78,10 +84,7 @@ describe("HTTP Transport - Branch Coverage", () => {
         throw new Error("Factory error")
       })
 
-      const reqData = {
-        body: { jsonrpc: "2.0", method: "tools/list", id: 1 }
-      }
-      const req = reqData as Request
+      const req = createMockRequest({ jsonrpc: "2.0", method: "tools/list", id: 1 })
 
       const res = createMockResponse()
       // Simulate headers already sent
@@ -144,8 +147,7 @@ describe("HTTP Transport - Branch Coverage", () => {
     // test-revizorro: approved
     it("GET returns 405 with method not allowed error", () => {
       const handlers = createMcpHandlers(createMockMcpServer)
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test mock: empty Request
-      const req = {} as Request
+      const req = createMockRequest()
       const res = createMockResponse()
 
       handlers.get(req, res)
@@ -161,8 +163,7 @@ describe("HTTP Transport - Branch Coverage", () => {
     // test-revizorro: approved
     it("DELETE returns 405 with method not allowed error", () => {
       const handlers = createMcpHandlers(createMockMcpServer)
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test mock: empty Request
-      const req = {} as Request
+      const req = createMockRequest()
       const res = createMockResponse()
 
       handlers.delete(req, res)

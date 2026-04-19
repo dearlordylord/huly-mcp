@@ -108,6 +108,10 @@ run_capture_only() {
   return 0
 }
 
+json_string() {
+  jq -Rn --arg value "$1" '$value'
+}
+
 # Like run_test but EXPECTS isError:true. PASSes if error, FAILs if success.
 run_expect_error() {
   local name="$1"
@@ -229,8 +233,9 @@ if [ $? -eq 0 ]; then
           "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_leads\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"limit\":5}},\"id\":2}"
 
         if [ -n "$FIRST_FUNNEL_NAME" ]; then
+          FIRST_FUNNEL_NAME_JSON=$(json_string "$FIRST_FUNNEL_NAME")
           run_test "list_leads(by_name:$FIRST_FUNNEL_NAME)" \
-            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_leads\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_NAME\",\"limit\":5}},\"id\":2}"
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_leads\",\"arguments\":{\"funnel\":$FIRST_FUNNEL_NAME_JSON,\"limit\":5}},\"id\":2}"
         fi
 
         FIRST_LEAD_ID=$(echo "$LEADS_TEXT" | jq -r '.[0].identifier // empty' 2>/dev/null)
@@ -239,8 +244,9 @@ if [ $? -eq 0 ]; then
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_lead\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$FIRST_LEAD_ID\"}},\"id\":2}"
 
           if [ -n "$FIRST_FUNNEL_NAME" ]; then
+            FIRST_FUNNEL_NAME_JSON=$(json_string "$FIRST_FUNNEL_NAME")
             run_test "get_lead(by_name:$FIRST_LEAD_ID)" \
-              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_lead\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_NAME\",\"identifier\":\"$FIRST_LEAD_ID\"}},\"id\":2}"
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_lead\",\"arguments\":{\"funnel\":$FIRST_FUNNEL_NAME_JSON,\"identifier\":\"$FIRST_LEAD_ID\"}},\"id\":2}"
           fi
         else
           skip_test "get_lead" "selected funnel has no leads"
@@ -715,7 +721,61 @@ if [ $? -eq 0 ]; then
 fi
 
 skip_test "get_person" "covered by create+update cycle"
-skip_test "create_organization" "no delete tool — would leak data"
+ORG_SUFFIX="$(date +%s)-$$"
+ORG_NAME="IntTest Org $ORG_SUFFIX"
+ORG_UPDATED_NAME="IntTest Org Updated $ORG_SUFFIX"
+ORG_DESC="Integration org $ORG_SUFFIX"
+ORG_MEMBER_EMAIL="inttest-org-$ORG_SUFFIX@test.local"
+ORG_CHANNEL_EMAIL="org-$ORG_SUFFIX@test.local"
+
+ORG_PERSON_TEXT=$(run_capture "create_person(for_org)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":\"Org\",\"lastName\":\"Member\",\"email\":\"$ORG_MEMBER_EMAIL\"}},\"id\":2}")
+if [ $? -eq 0 ]; then
+  ORG_PERSON_ID=$(echo "$ORG_PERSON_TEXT" | jq -r '.id' 2>/dev/null)
+  echo "  => org person: $ORG_PERSON_ID"
+
+  ORG_NAME_JSON=$(json_string "$ORG_NAME")
+  ORG_UPDATED_NAME_JSON=$(json_string "$ORG_UPDATED_NAME")
+  ORG_DESC_JSON=$(json_string "$ORG_DESC")
+  ORG_MEMBER_EMAIL_JSON=$(json_string "$ORG_MEMBER_EMAIL")
+  ORG_CHANNEL_EMAIL_JSON=$(json_string "$ORG_CHANNEL_EMAIL")
+
+  run_expect_error "create_organization(rejects_missing_member)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_organization\",\"arguments\":{\"name\":\"IntTest Missing Member $ORG_SUFFIX\",\"members\":[\"missing-$ORG_SUFFIX@test.local\"]}},\"id\":2}"
+
+  ORG_TEXT=$(run_capture "create_organization" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_organization\",\"arguments\":{\"name\":$ORG_NAME_JSON,\"members\":[$ORG_MEMBER_EMAIL_JSON]}},\"id\":2}")
+  if [ $? -eq 0 ]; then
+    ORG_ID=$(echo "$ORG_TEXT" | jq -r '.id' 2>/dev/null)
+    echo "  => organization: $ORG_ID"
+
+    run_test "get_organization($ORG_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_organization\",\"arguments\":{\"identifier\":\"$ORG_ID\"}},\"id\":2}"
+    run_test "get_organization(by_name:$ORG_NAME)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_organization\",\"arguments\":{\"identifier\":$ORG_NAME_JSON}},\"id\":2}"
+    run_test "list_organization_members($ORG_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_organization_members\",\"arguments\":{\"organizationId\":\"$ORG_ID\"}},\"id\":2}"
+    run_test "list_person_organizations($ORG_PERSON_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_person_organizations\",\"arguments\":{\"personId\":\"$ORG_PERSON_ID\"}},\"id\":2}"
+    run_test "update_organization($ORG_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_organization\",\"arguments\":{\"identifier\":\"$ORG_ID\",\"name\":$ORG_UPDATED_NAME_JSON,\"city\":\"TestCity\",\"description\":$ORG_DESC_JSON}},\"id\":2}"
+    run_test "add_organization_channel($ORG_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_organization_channel\",\"arguments\":{\"organizationId\":\"$ORG_ID\",\"provider\":\"email\",\"value\":$ORG_CHANNEL_EMAIL_JSON}},\"id\":2}"
+    run_test "remove_organization_member($ORG_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_organization_member\",\"arguments\":{\"organizationId\":\"$ORG_ID\",\"personIdentifier\":\"$ORG_PERSON_ID\"}},\"id\":2}"
+    run_test "add_organization_member($ORG_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_organization_member\",\"arguments\":{\"organizationId\":\"$ORG_ID\",\"personIdentifier\":$ORG_MEMBER_EMAIL_JSON}},\"id\":2}"
+    run_test "make_organization_customer($ORG_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"make_organization_customer\",\"arguments\":{\"identifier\":\"$ORG_ID\"}},\"id\":2}"
+    run_test "delete_organization($ORG_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_organization\",\"arguments\":{\"identifier\":\"$ORG_ID\"}},\"id\":2}"
+  fi
+
+  run_test "delete_person(org_member:$ORG_PERSON_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":\"$ORG_PERSON_ID\"}},\"id\":2}"
+else
+  skip_test "organization_mutations" "could not create cleanup-safe member person"
+fi
 echo ""
 
 ##############################

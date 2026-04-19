@@ -81,6 +81,16 @@ const normalizeLeadIdentifier = (identifier: string): string => {
   return match !== null ? `LEAD-${match[1]}` : identifier.trim().toUpperCase()
 }
 
+const SORT_LEFT_BEFORE_RIGHT = -1
+const SORT_RIGHT_BEFORE_LEFT = 1
+
+const compareFunnelsByRecency = (left: HulyFunnel, right: HulyFunnel): number => {
+  if (left.archived !== right.archived) {
+    return left.archived ? SORT_RIGHT_BEFORE_LEFT : SORT_LEFT_BEFORE_RIGHT
+  }
+  return right.modifiedOn - left.modifiedOn
+}
+
 const findFunnel = (
   client: HulyClient["Type"],
   funnelIdentifier: FunnelReference
@@ -99,7 +109,10 @@ const findFunnel = (
     // https://github.com/hcengineering/platform/blob/b9657d53d130a2ed8034c1b71ab0cf8b7a0b4994/models/lead/src/types.ts#L55-L57
     const allFunnels = yield* client.findAll<HulyFunnel>(leadClassIds.class.Funnel, {})
     const normalized = normalizeForComparison(funnelIdentifier)
-    const funnel = allFunnels.find((candidate) => normalizeForComparison(candidate.name) === normalized)
+    const matchingFunnels = [...allFunnels]
+      .filter((candidate) => normalizeForComparison(candidate.name) === normalized)
+      .sort(compareFunnelsByRecency)
+    const funnel = matchingFunnels.at(0)
     if (funnel === undefined) {
       return yield* new FunnelNotFoundError({ identifier: funnelIdentifier })
     }

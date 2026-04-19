@@ -124,7 +124,7 @@ export const createMcpHandlers = (
       await server.connect(transport as Transport)
       await transport.handleRequest(req, res, req.body)
 
-      res.on("close", () => {
+      req.on("close", () => {
         transport.close().catch((err) => {
           process.stderr.write(`Transport cleanup error: ${String(err)}\n`)
         })
@@ -178,7 +178,7 @@ const closeHttpServer = (
   server: http.Server
 ): Effect.Effect<void, HttpTransportError> =>
   Effect.async<void, HttpTransportError>((resume) => {
-    server.close((err) => {
+    server.close((err?: Error) => {
       if (err) {
         resume(
           Effect.fail(
