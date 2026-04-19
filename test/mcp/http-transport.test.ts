@@ -70,6 +70,12 @@ const createMockResponse = () => {
   })
 }
 
+const createMockRequest = (body: unknown = {}): Request =>
+  mock<Request>({
+    body,
+    on: vi.fn()
+  })
+
 describe("HTTP Transport", () => {
   describe("createMcpHandlers", () => {
     // test-revizorro: approved
@@ -77,10 +83,7 @@ describe("HTTP Transport", () => {
       const mockServer = createMockMcpServer()
       const handlers = createMcpHandlers(() => mockServer)
 
-      const reqData = {
-        body: { jsonrpc: "2.0", method: "tools/list", id: 1 }
-      }
-      const req = reqData as Request
+      const req = createMockRequest({ jsonrpc: "2.0", method: "tools/list", id: 1 })
 
       const res = createMockResponse()
 
@@ -98,19 +101,16 @@ describe("HTTP Transport", () => {
       const mockServer = createMockMcpServer()
       const handlers = createMcpHandlers(() => mockServer)
 
-      const reqData = {
-        body: {
-          jsonrpc: "2.0",
-          method: "initialize",
-          id: 1,
-          params: {
-            protocolVersion: "2024-11-05",
-            capabilities: {},
-            clientInfo: { name: "test", version: "1.0" }
-          }
+      const req = createMockRequest({
+        jsonrpc: "2.0",
+        method: "initialize",
+        id: 1,
+        params: {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "test", version: "1.0" }
         }
-      }
-      const req = reqData as Request
+      })
 
       const res = createMockResponse()
 
@@ -133,21 +133,16 @@ describe("HTTP Transport", () => {
       const res2 = createMockResponse()
 
       // First request - tools/list
-      await handlers.post(
-        { body: { jsonrpc: "2.0", method: "tools/list", id: 1 } } as Request,
-        res1
-      )
+      await handlers.post(createMockRequest({ jsonrpc: "2.0", method: "tools/list", id: 1 }), res1)
 
       // Second request - tools/call
       await handlers.post(
-        {
-          body: {
-            jsonrpc: "2.0",
-            method: "tools/call",
-            id: 2,
-            params: { name: "test_tool", arguments: {} }
-          }
-        } as Request,
+        createMockRequest({
+          jsonrpc: "2.0",
+          method: "tools/call",
+          id: 2,
+          params: { name: "test_tool", arguments: {} }
+        }),
         res2
       )
 
@@ -163,8 +158,7 @@ describe("HTTP Transport", () => {
       const mockServer = createMockMcpServer()
       const handlers = createMcpHandlers(() => mockServer)
 
-      const reqData = {}
-      const req = reqData as Request
+      const req = createMockRequest()
       const res = createMockResponse()
 
       await handlers.get(req, res)
@@ -186,8 +180,7 @@ describe("HTTP Transport", () => {
       const mockServer = createMockMcpServer()
       const handlers = createMcpHandlers(() => mockServer)
 
-      const reqData = {}
-      const req = reqData as Request
+      const req = createMockRequest()
       const res = createMockResponse()
 
       await handlers.delete(req, res)
@@ -210,10 +203,7 @@ describe("HTTP Transport", () => {
         throw new Error("Factory error")
       })
 
-      const reqData = {
-        body: { jsonrpc: "2.0", method: "tools/list", id: 1 }
-      }
-      const req = reqData as Request
+      const req = createMockRequest({ jsonrpc: "2.0", method: "tools/list", id: 1 })
 
       const res = createMockResponse()
       // Simulate headers already sent before the handler runs
@@ -234,15 +224,12 @@ describe("HTTP Transport", () => {
       })
 
       // Any valid JSON-RPC request (tools/list in this case)
-      const reqData = {
-        body: {
-          jsonrpc: "2.0",
-          method: "tools/list",
-          id: 1,
-          params: {}
-        }
-      }
-      const req = reqData as Request
+      const req = createMockRequest({
+        jsonrpc: "2.0",
+        method: "tools/list",
+        id: 1,
+        params: {}
+      })
 
       const res = createMockResponse()
 
@@ -470,10 +457,14 @@ describe("HTTP Transport", () => {
         })
       })
 
-      await handlers.post(
-        { body: { jsonrpc: "2.0", method: "tools/list", id: 1 } } as Request,
-        res
-      )
+      const req = mock<Request>({
+        body: { jsonrpc: "2.0", method: "tools/list", id: 1 },
+        on: vi.fn((event: string, handler: () => void) => {
+          if (event === "close") closeHandlers.push(handler)
+        })
+      })
+
+      await handlers.post(req, res)
 
       expect(closeHandlers).toHaveLength(1)
       closeHandlers[0]()
@@ -481,7 +472,7 @@ describe("HTTP Transport", () => {
       // Allow microtasks (transport.close() and server.close() are async)
       await new Promise((resolve) => setTimeout(resolve, 10))
 
-      expect(res.on).toHaveBeenCalledWith("close", expect.any(Function))
+      expect(req.on).toHaveBeenCalledWith("close", expect.any(Function))
       expect(mockServer.close).toHaveBeenCalled()
     })
 
@@ -509,12 +500,15 @@ describe("HTTP Transport", () => {
         })
       })
 
+      const req = mock<Request>({
+        body: { jsonrpc: "2.0", method: "tools/list", id: 1 },
+        on: vi.fn((event: string, handler: () => void) => {
+          if (event === "close") closeHandlers.push(handler)
+        })
+      })
       const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true)
 
-      await handlers.post(
-        { body: { jsonrpc: "2.0", method: "tools/list", id: 1 } } as Request,
-        res
-      )
+      await handlers.post(req, res)
 
       closeHandlers[0]()
       await new Promise((resolve) => setTimeout(resolve, 10))
@@ -554,12 +548,15 @@ describe("HTTP Transport", () => {
         })
       })
 
+      const req = mock<Request>({
+        body: { jsonrpc: "2.0", method: "tools/list", id: 1 },
+        on: vi.fn((event: string, handler: () => void) => {
+          if (event === "close") closeHandlers.push(handler)
+        })
+      })
       const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true)
 
-      await handlers.post(
-        { body: { jsonrpc: "2.0", method: "tools/list", id: 1 } } as Request,
-        res
-      )
+      await handlers.post(req, res)
 
       closeHandlers[0]()
       await new Promise((resolve) => setTimeout(resolve, 10))

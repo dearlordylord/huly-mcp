@@ -32,6 +32,7 @@ import {
   type FindResult,
   makeCollabId,
   type Mixin,
+  type MixinData,
   type MixinUpdate,
   type Ref,
   type SearchOptions,
@@ -172,6 +173,14 @@ export interface HulyClientOperations extends HulyClientContext {
     format: MarkupFormat
   ) => Effect.Effect<void, HulyClientError>
 
+  readonly createMixin: <D extends Doc, M extends D>(
+    objectId: Ref<D>,
+    objectClass: Ref<Class<D>>,
+    objectSpace: Ref<Space>,
+    mixin: Ref<Mixin<M>>,
+    attributes: MixinData<D, M>
+  ) => Effect.Effect<TxResult, HulyClientError>
+
   readonly updateMixin: <D extends Doc, M extends D>(
     objectId: Ref<D>,
     objectClass: Ref<Class<D>>,
@@ -303,6 +312,18 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
             "removeDoc failed"
           ),
 
+        createMixin: <D extends Doc, M extends D>(
+          objectId: Ref<D>,
+          objectClass: Ref<Class<D>>,
+          objectSpace: Ref<Space>,
+          mixin: Ref<Mixin<M>>,
+          attributes: MixinData<D, M>
+        ) =>
+          withClient(
+            (client) => client.createMixin(objectId, objectClass, objectSpace, mixin, attributes),
+            "createMixin failed"
+          ),
+
         updateMixin: <D extends Doc, M extends D>(
           objectId: Ref<D>,
           objectClass: Ref<Class<D>>,
@@ -387,6 +408,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       removeDoc: notImplemented("removeDoc"),
       uploadMarkup: notImplemented("uploadMarkup"),
       fetchMarkup: noopFetchMarkup,
+      createMixin: notImplemented("createMixin"),
       updateMixin: notImplemented("updateMixin"),
       updateMarkup: notImplemented("updateMarkup"),
       searchFulltext: notImplemented("searchFulltext")

@@ -1,5 +1,5 @@
 import { describe, it } from "@effect/vitest"
-import { AvatarType, type Contact, type Person } from "@hcengineering/contact"
+import { AvatarType, type Contact, type Organization as HulyOrganization, type Person } from "@hcengineering/contact"
 import type { Doc, Ref, Status, WithLookup } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
@@ -30,7 +30,7 @@ interface MockLead extends Doc {
   parents: ReadonlyArray<unknown>
   modifiedOn: number
   createdOn: number
-  $lookup?: { assignee?: Person | undefined; attachedTo?: Contact | undefined }
+  $lookup?: { assignee?: Person | undefined; attachedTo?: Contact | HulyOrganization | undefined }
 }
 
 interface MockStatus extends Doc {
@@ -112,6 +112,24 @@ const makeContact = (id: string, name: string): Contact => {
   return customer
 }
 
+const makeOrganization = (id: string, name: string): HulyOrganization => {
+  const organization: HulyOrganization = {
+    _id: docRef<HulyOrganization>(id),
+    _class: contact.class.Organization,
+    space: contact.space.Contacts,
+    modifiedBy: corePersonId("user"),
+    modifiedOn: 0,
+    createdBy: corePersonId("user"),
+    createdOn: 0,
+    name,
+    city: "",
+    avatarType: AvatarType.COLOR,
+    members: 0,
+    description: null
+  }
+  return organization
+}
+
 const makeProjectType = (statusIds: ReadonlyArray<string>) => ({
   _id: docRef<Doc>("project-type-1"),
   _class: task.class.ProjectType,
@@ -128,6 +146,7 @@ interface LeadMockConfig {
   fetchMarkupResult?: string
   funnels?: ReadonlyArray<MockFunnel>
   leads?: ReadonlyArray<MockLead>
+  organizations?: ReadonlyArray<HulyOrganization>
   persons?: ReadonlyArray<Person>
   projectType?: ReturnType<typeof makeProjectType>
   statusQueryError?: HulyConnectionError
@@ -139,7 +158,7 @@ const readQuery = (query: unknown): Record<string, unknown> => (query ?? {}) as 
 const createLookupLead = (
   lead: MockLead,
   people: ReadonlyArray<Person>,
-  customers: ReadonlyArray<Contact>,
+  customers: ReadonlyArray<Contact | HulyOrganization>,
   lookup: Record<string, unknown> | undefined
 ): MockLead | WithLookup<MockLead> => ({
   ...lead,
@@ -157,6 +176,7 @@ const createTestLayer = (config: LeadMockConfig) => {
   const contacts = config.contacts ?? []
   const funnels = config.funnels ?? [makeFunnel()]
   const leads = config.leads ?? []
+  const organizations = config.organizations ?? []
   const persons = config.persons ?? []
   const statuses = config.statuses ?? [makeStatus("status-1", "Active")]
   const projectType = config.projectType ?? makeProjectType(statuses.map((status) => String(status._id)))
@@ -177,7 +197,7 @@ const createTestLayer = (config: LeadMockConfig) => {
         .filter((lead) => q.space === undefined || lead.space === q.space)
         .filter((lead) => q.status === undefined || lead.status === q.status)
         .filter((lead) => q.assignee === undefined || lead.assignee === q.assignee)
-        .map((lead) => createLookupLead(lead, persons, contacts, lookup))
+        .map((lead) => createLookupLead(lead, persons, [...contacts, ...organizations], lookup))
 
       return Effect.succeed(findResult(filtered))
     }
@@ -224,6 +244,10 @@ const createTestLayer = (config: LeadMockConfig) => {
 
     if (_class === contact.class.Contact) {
       return Effect.succeed(contacts.find((customer) => customer._id === q._id))
+    }
+
+    if (_class === contact.class.Organization) {
+      return Effect.succeed(organizations.find((organization) => organization._id === q._id))
     }
 
     return Effect.succeed(undefined)
@@ -300,6 +324,51 @@ describe("Lead Operations", () => {
 
         expect(result).toHaveLength(1)
         expect(result[0].identifier).toBe("LEAD-1")
+      }))
+
+    it.effect("prefers the most recently modified non-archived funnel when names collide", () =>
+      Effect.gen(function*() {
+        const olderArchived = makeFunnel({
+          _id: docRef<MockFunnel>("funnel-archived"),
+          archived: true,
+          modifiedOn: 1700000000000,
+          name: "Sales"
+        })
+        const newestActive = makeFunnel({
+          _id: docRef<MockFunnel>("funnel-active"),
+          archived: false,
+          modifiedOn: 1700000001000,
+          name: "Sales"
+        })
+        const lead = makeLead({
+          space: spaceRef("funnel-active")
+        })
+
+        const testLayer = createTestLayer({
+          funnels: [olderArchived, newestActive],
+          leads: [lead]
+        })
+
+        const result = yield* listLeads({ funnel: funnelReference("sales") }).pipe(Effect.provide(testLayer))
+
+        expect(result).toHaveLength(1)
+        expect(result[0].identifier).toBe("LEAD-1")
+      }))
+
+    it.effect("lists leads with organization customers resolved through the customer mixin lookup", () =>
+      Effect.gen(function*() {
+        const organization = makeOrganization("customer-1", "Acme Org")
+        const lead = makeLead({ attachedTo: contactRef("customer-1") })
+
+        const testLayer = createTestLayer({
+          leads: [lead],
+          organizations: [organization]
+        })
+
+        const result = yield* listLeads({ funnel: funnelReference("funnel-1") }).pipe(Effect.provide(testLayer))
+
+        expect(result).toHaveLength(1)
+        expect(result[0].customer).toBe("Acme Org")
       }))
 
     it.effect("filters leads by status name", () =>
@@ -415,6 +484,28 @@ describe("Lead Operations", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(result.identifier).toBe("LEAD-1")
+      }))
+
+    it.effect("returns full lead detail with organization customer", () =>
+      Effect.gen(function*() {
+        const organization = makeOrganization("customer-1", "Acme Org")
+        const lead = makeLead({
+          attachedTo: contactRef("customer-1"),
+          description: "blob-ref"
+        })
+
+        const testLayer = createTestLayer({
+          fetchMarkupResult: "# Deal notes\nImportant details here.",
+          leads: [lead],
+          organizations: [organization]
+        })
+
+        const result = yield* getLead({
+          funnel: funnelReference("funnel-1"),
+          identifier: leadIdentifier("LEAD-1")
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result.customer).toBe("Acme Org")
       }))
 
     it.effect("fails with LeadNotFoundError when lead does not exist", () =>

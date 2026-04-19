@@ -11,7 +11,7 @@
  * @module
  */
 import type { MarkupRef } from "@hcengineering/api-client"
-import type { Contact, Person } from "@hcengineering/contact"
+import type { Contact, Organization as HulyOrganization, Person } from "@hcengineering/contact"
 import type { Doc, DocumentQuery, MarkupBlobRef, Ref, Space, Status, WithLookup } from "@hcengineering/core"
 import { SortingOrder } from "@hcengineering/core"
 import { Effect, Schema } from "effect"
@@ -67,6 +67,8 @@ type StatusInfo = {
   name: string
 }
 
+type HulyCustomer = Contact | HulyOrganization
+
 const funnelAsSpace = (funnel: HulyFunnel): Ref<Space> => toRef<Space>(funnel._id)
 
 // Huly lead descriptions are stored as blob-backed markup refs. The client
@@ -77,6 +79,16 @@ const markupBlobRefAsMarkupRef = (value: MarkupBlobRef): MarkupRef => value as M
 const normalizeLeadIdentifier = (identifier: string): string => {
   const match = /^(?:LEAD-)?(\d+)$/i.exec(identifier.trim())
   return match !== null ? `LEAD-${match[1]}` : identifier.trim().toUpperCase()
+}
+
+const SORT_LEFT_BEFORE_RIGHT = -1
+const SORT_RIGHT_BEFORE_LEFT = 1
+
+const compareFunnelsByRecency = (left: HulyFunnel, right: HulyFunnel): number => {
+  if (left.archived !== right.archived) {
+    return left.archived ? SORT_RIGHT_BEFORE_LEFT : SORT_LEFT_BEFORE_RIGHT
+  }
+  return right.modifiedOn - left.modifiedOn
 }
 
 const findFunnel = (
@@ -97,7 +109,10 @@ const findFunnel = (
     // https://github.com/hcengineering/platform/blob/b9657d53d130a2ed8034c1b71ab0cf8b7a0b4994/models/lead/src/types.ts#L55-L57
     const allFunnels = yield* client.findAll<HulyFunnel>(leadClassIds.class.Funnel, {})
     const normalized = normalizeForComparison(funnelIdentifier)
-    const funnel = allFunnels.find((candidate) => normalizeForComparison(candidate.name) === normalized)
+    const matchingFunnels = [...allFunnels]
+      .filter((candidate) => normalizeForComparison(candidate.name) === normalized)
+      .sort(compareFunnelsByRecency)
+    const funnel = matchingFunnels.at(0)
     if (funnel === undefined) {
       return yield* new FunnelNotFoundError({ identifier: funnelIdentifier })
     }
@@ -178,6 +193,21 @@ const resolveStatusByName = (
   }
   return Effect.succeed(matchingStatus._id)
 }
+
+const findCustomer = (
+  client: HulyClient["Type"],
+  customerId: Ref<Contact>
+): Effect.Effect<HulyCustomer | undefined, HulyClientError> =>
+  Effect.gen(function*() {
+    const contactCustomer = yield* client.findOne<Contact>(contact.class.Contact, { _id: customerId })
+    if (contactCustomer !== undefined) {
+      return contactCustomer
+    }
+
+    return yield* client.findOne<HulyOrganization>(contact.class.Organization, {
+      _id: toRef<HulyOrganization>(customerId)
+    })
+  })
 
 type ListFunnelsError = HulyClientError
 
@@ -261,7 +291,7 @@ export const listLeads = (
     const limit = clampLimit(params.limit)
 
     type LeadWithLookup = WithLookup<HulyLead> & {
-      $lookup?: { assignee?: Person; attachedTo?: Contact }
+      $lookup?: { assignee?: Person; attachedTo?: HulyCustomer }
     }
 
     const leads = yield* client.findAll<LeadWithLookup>(
@@ -341,10 +371,7 @@ export const getLead = (
       ? yield* client.findOne<Person>(contact.class.Person, { _id: lead.assignee })
       : undefined
 
-    const customer = yield* client.findOne<Contact>(
-      contact.class.Contact,
-      { _id: toRef<Contact>(lead.attachedTo) }
-    )
+    const customer = yield* findCustomer(client, toRef<Contact>(lead.attachedTo))
 
     const description = lead.description
       ? yield* client.fetchMarkup(

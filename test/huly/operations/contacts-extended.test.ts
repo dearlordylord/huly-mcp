@@ -695,7 +695,7 @@ describe("Contacts Extended Coverage", () => {
       }))
 
     // test-revizorro: approved
-    it.effect("skips member when neither ID nor email matches", () =>
+    it.effect("fails when neither ID nor email matches", () =>
       Effect.gen(function*() {
         const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
         const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -707,13 +707,14 @@ describe("Contacts Extended Coverage", () => {
           captureAddCollection
         })
 
-        const result = yield* createOrganization({
-          name: "Org No Members",
-          members: [memberReference("nonexistent-ref")]
-        }).pipe(Effect.provide(testLayer))
+        const error = yield* Effect.flip(
+          createOrganization({
+            name: "Org No Members",
+            members: [memberReference("nonexistent-ref")]
+          }).pipe(Effect.provide(testLayer))
+        )
 
-        expect(result.id).toBeDefined()
-        // addCollection for member should not have been called
+        expect(error._tag).toBe("PersonNotFoundError")
         expect(captureAddCollection.attributes).toBeUndefined()
       }))
 

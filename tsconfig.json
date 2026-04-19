@@ -20,6 +20,7 @@
     "exactOptionalPropertyTypes": true,
     "noUnusedLocals": true,
     "noImplicitOverride": true,
+    "types": ["node"],
 
     // Development
     "outDir": "dist",

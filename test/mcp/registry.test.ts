@@ -41,6 +41,7 @@ const noopHulyClient: HulyClientOperations = {
   fetchMarkup: () => Effect.succeed(""),
   updateMarkup: () => Effect.die(new Error("not implemented")),
   updateMixin: () => Effect.die(new Error("not implemented")),
+  createMixin: () => Effect.die(new Error("not implemented")),
   searchFulltext: () => Effect.die(new Error("not implemented"))
 }
 

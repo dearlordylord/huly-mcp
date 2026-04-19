@@ -22,6 +22,7 @@ import {
   type HulyDomainError,
   HulyDomainError as HulyDomainErrorSchema,
   HulyError,
+  InvalidContactProviderError,
   InvalidContentTypeError,
   InvalidFileDataError,
   InvalidPersonUuidError,
@@ -34,6 +35,8 @@ import {
   MilestoneNotFoundError,
   NotificationContextNotFoundError,
   NotificationNotFoundError,
+  OrganizationIdentifierAmbiguousError,
+  OrganizationNotFoundError,
   PersonNotFoundError,
   ProjectNotFoundError,
   ReactionNotFoundError,
@@ -50,7 +53,6 @@ import { funnelIdentifier, funnelReference, leadIdentifier } from "../helpers/br
 
 describe("Huly Errors", () => {
   describe("HulyError", () => {
-    // test-revizorro: approved
     it.effect("creates with message", () =>
       Effect.gen(function*() {
         const error = new HulyError({ message: "Something went wrong" })
@@ -58,7 +60,6 @@ describe("Huly Errors", () => {
         expect(error.message).toBe("Something went wrong")
       }))
 
-    // test-revizorro: approved
     it.effect("creates with cause", () =>
       Effect.gen(function*() {
         const cause = new Error("underlying error")
@@ -68,7 +69,6 @@ describe("Huly Errors", () => {
   })
 
   describe("HulyConnectionError", () => {
-    // test-revizorro: approved
     it.effect("creates with message", () =>
       Effect.gen(function*() {
         const error = new HulyConnectionError({ message: "Connection failed" })
@@ -76,7 +76,6 @@ describe("Huly Errors", () => {
         expect(error.message).toBe("Connection failed")
       }))
 
-    // test-revizorro: approved
     it.effect("creates with cause", () =>
       Effect.gen(function*() {
         const cause = new Error("network timeout")
@@ -86,7 +85,6 @@ describe("Huly Errors", () => {
   })
 
   describe("HulyAuthError", () => {
-    // test-revizorro: approved
     it.effect("creates with message", () =>
       Effect.gen(function*() {
         const error = new HulyAuthError({ message: "Invalid credentials" })
@@ -96,7 +94,6 @@ describe("Huly Errors", () => {
   })
 
   describe("IssueNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with identifier and project", () =>
       Effect.gen(function*() {
         const error = new IssueNotFoundError({ identifier: "HULY-123", project: "HULY" })
@@ -105,7 +102,6 @@ describe("Huly Errors", () => {
         expect(error.project).toBe("HULY")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new IssueNotFoundError({ identifier: "HULY-123", project: "HULY" })
@@ -114,7 +110,6 @@ describe("Huly Errors", () => {
   })
 
   describe("ProjectNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with identifier", () =>
       Effect.gen(function*() {
         const error = new ProjectNotFoundError({ identifier: "MISSING" })
@@ -122,7 +117,6 @@ describe("Huly Errors", () => {
         expect(error.identifier).toBe("MISSING")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new ProjectNotFoundError({ identifier: "MISSING" })
@@ -131,7 +125,6 @@ describe("Huly Errors", () => {
   })
 
   describe("InvalidStatusError", () => {
-    // test-revizorro: approved
     it.effect("creates with status and project", () =>
       Effect.gen(function*() {
         const error = new InvalidStatusError({ status: "bogus", project: "HULY" })
@@ -140,7 +133,6 @@ describe("Huly Errors", () => {
         expect(error.project).toBe("HULY")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new InvalidStatusError({ status: "bogus", project: "HULY" })
@@ -149,7 +141,6 @@ describe("Huly Errors", () => {
   })
 
   describe("FileUploadError", () => {
-    // test-revizorro: approved
     it.effect("creates with message", () =>
       Effect.gen(function*() {
         const error = new FileUploadError({ message: "Storage quota exceeded" })
@@ -157,7 +148,6 @@ describe("Huly Errors", () => {
         expect(error.message).toBe("Storage quota exceeded")
       }))
 
-    // test-revizorro: approved
     it.effect("creates with cause", () =>
       Effect.gen(function*() {
         const cause = new Error("network error")
@@ -167,7 +157,6 @@ describe("Huly Errors", () => {
   })
 
   describe("InvalidFileDataError", () => {
-    // test-revizorro: approved
     it.effect("creates with message", () =>
       Effect.gen(function*() {
         const error = new InvalidFileDataError({ message: "Invalid base64 encoding" })
@@ -177,7 +166,6 @@ describe("Huly Errors", () => {
   })
 
   describe("FileNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with filePath", () =>
       Effect.gen(function*() {
         const error = new FileNotFoundError({ filePath: "/tmp/missing.txt" })
@@ -188,7 +176,6 @@ describe("Huly Errors", () => {
   })
 
   describe("FileFetchError", () => {
-    // test-revizorro: approved
     it.effect("creates with fileUrl and reason", () =>
       Effect.gen(function*() {
         const error = new FileFetchError({ fileUrl: "https://example.com/img.png", reason: "404 Not Found" })
@@ -200,7 +187,6 @@ describe("Huly Errors", () => {
   })
 
   describe("TeamspaceNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with identifier", () =>
       Effect.gen(function*() {
         const error = new TeamspaceNotFoundError({ identifier: "my-teamspace" })
@@ -208,7 +194,6 @@ describe("Huly Errors", () => {
         expect(error.identifier).toBe("my-teamspace")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new TeamspaceNotFoundError({ identifier: "my-teamspace" })
@@ -217,7 +202,6 @@ describe("Huly Errors", () => {
   })
 
   describe("DocumentNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with identifier and teamspace", () =>
       Effect.gen(function*() {
         const error = new DocumentNotFoundError({ identifier: "doc-1", teamspace: "engineering" })
@@ -226,7 +210,6 @@ describe("Huly Errors", () => {
         expect(error.teamspace).toBe("engineering")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new DocumentNotFoundError({ identifier: "doc-1", teamspace: "engineering" })
@@ -235,7 +218,6 @@ describe("Huly Errors", () => {
   })
 
   describe("CommentNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with commentId, issueIdentifier, and project", () =>
       Effect.gen(function*() {
         const error = new CommentNotFoundError({ commentId: "c-42", issueIdentifier: "HULY-99", project: "HULY" })
@@ -245,7 +227,6 @@ describe("Huly Errors", () => {
         expect(error.project).toBe("HULY")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new CommentNotFoundError({ commentId: "c-42", issueIdentifier: "HULY-99", project: "HULY" })
@@ -254,7 +235,6 @@ describe("Huly Errors", () => {
   })
 
   describe("MilestoneNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with identifier and project", () =>
       Effect.gen(function*() {
         const error = new MilestoneNotFoundError({ identifier: "v1.0", project: "HULY" })
@@ -263,7 +243,6 @@ describe("Huly Errors", () => {
         expect(error.project).toBe("HULY")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new MilestoneNotFoundError({ identifier: "v1.0", project: "HULY" })
@@ -272,7 +251,6 @@ describe("Huly Errors", () => {
   })
 
   describe("ChannelNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with identifier", () =>
       Effect.gen(function*() {
         const error = new ChannelNotFoundError({ identifier: "general" })
@@ -280,7 +258,6 @@ describe("Huly Errors", () => {
         expect(error.identifier).toBe("general")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new ChannelNotFoundError({ identifier: "general" })
@@ -289,7 +266,6 @@ describe("Huly Errors", () => {
   })
 
   describe("MessageNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with messageId and channel", () =>
       Effect.gen(function*() {
         const error = new MessageNotFoundError({ messageId: "msg-1", channel: "general" })
@@ -298,7 +274,6 @@ describe("Huly Errors", () => {
         expect(error.channel).toBe("general")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new MessageNotFoundError({ messageId: "msg-1", channel: "general" })
@@ -307,7 +282,6 @@ describe("Huly Errors", () => {
   })
 
   describe("ThreadReplyNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with replyId and messageId", () =>
       Effect.gen(function*() {
         const error = new ThreadReplyNotFoundError({ replyId: "reply-5", messageId: "msg-1" })
@@ -316,7 +290,6 @@ describe("Huly Errors", () => {
         expect(error.messageId).toBe("msg-1")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new ThreadReplyNotFoundError({ replyId: "reply-5", messageId: "msg-1" })
@@ -325,7 +298,6 @@ describe("Huly Errors", () => {
   })
 
   describe("EventNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with eventId", () =>
       Effect.gen(function*() {
         const error = new EventNotFoundError({ eventId: "evt-100" })
@@ -333,7 +305,6 @@ describe("Huly Errors", () => {
         expect(error.eventId).toBe("evt-100")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new EventNotFoundError({ eventId: "evt-100" })
@@ -342,7 +313,6 @@ describe("Huly Errors", () => {
   })
 
   describe("RecurringEventNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with eventId", () =>
       Effect.gen(function*() {
         const error = new RecurringEventNotFoundError({ eventId: "rec-200" })
@@ -350,7 +320,6 @@ describe("Huly Errors", () => {
         expect(error.eventId).toBe("rec-200")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new RecurringEventNotFoundError({ eventId: "rec-200" })
@@ -359,7 +328,6 @@ describe("Huly Errors", () => {
   })
 
   describe("ActivityMessageNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with messageId", () =>
       Effect.gen(function*() {
         const error = new ActivityMessageNotFoundError({ messageId: "act-10" })
@@ -367,7 +335,6 @@ describe("Huly Errors", () => {
         expect(error.messageId).toBe("act-10")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new ActivityMessageNotFoundError({ messageId: "act-10" })
@@ -376,7 +343,6 @@ describe("Huly Errors", () => {
   })
 
   describe("ReactionNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with messageId and emoji", () =>
       Effect.gen(function*() {
         const error = new ReactionNotFoundError({ messageId: "msg-7", emoji: "thumbsup" })
@@ -385,7 +351,6 @@ describe("Huly Errors", () => {
         expect(error.emoji).toBe("thumbsup")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new ReactionNotFoundError({ messageId: "msg-7", emoji: "thumbsup" })
@@ -394,7 +359,6 @@ describe("Huly Errors", () => {
   })
 
   describe("SavedMessageNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with messageId", () =>
       Effect.gen(function*() {
         const error = new SavedMessageNotFoundError({ messageId: "msg-saved-1" })
@@ -402,7 +366,6 @@ describe("Huly Errors", () => {
         expect(error.messageId).toBe("msg-saved-1")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new SavedMessageNotFoundError({ messageId: "msg-saved-1" })
@@ -411,7 +374,6 @@ describe("Huly Errors", () => {
   })
 
   describe("AttachmentNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with attachmentId", () =>
       Effect.gen(function*() {
         const error = new AttachmentNotFoundError({ attachmentId: "att-3" })
@@ -419,7 +381,6 @@ describe("Huly Errors", () => {
         expect(error.attachmentId).toBe("att-3")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new AttachmentNotFoundError({ attachmentId: "att-3" })
@@ -428,7 +389,6 @@ describe("Huly Errors", () => {
   })
 
   describe("ComponentNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with identifier and project", () =>
       Effect.gen(function*() {
         const error = new ComponentNotFoundError({ identifier: "frontend", project: "HULY" })
@@ -437,7 +397,6 @@ describe("Huly Errors", () => {
         expect(error.project).toBe("HULY")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new ComponentNotFoundError({ identifier: "frontend", project: "HULY" })
@@ -446,7 +405,6 @@ describe("Huly Errors", () => {
   })
 
   describe("IssueTemplateNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with identifier and project", () =>
       Effect.gen(function*() {
         const error = new IssueTemplateNotFoundError({ identifier: "bug-report", project: "HULY" })
@@ -455,7 +413,6 @@ describe("Huly Errors", () => {
         expect(error.project).toBe("HULY")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new IssueTemplateNotFoundError({ identifier: "bug-report", project: "HULY" })
@@ -481,7 +438,6 @@ describe("Huly Errors", () => {
   })
 
   describe("NotificationNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with notificationId", () =>
       Effect.gen(function*() {
         const error = new NotificationNotFoundError({ notificationId: "notif-55" })
@@ -489,7 +445,6 @@ describe("Huly Errors", () => {
         expect(error.notificationId).toBe("notif-55")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new NotificationNotFoundError({ notificationId: "notif-55" })
@@ -498,7 +453,6 @@ describe("Huly Errors", () => {
   })
 
   describe("NotificationContextNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with contextId", () =>
       Effect.gen(function*() {
         const error = new NotificationContextNotFoundError({ contextId: "ctx-77" })
@@ -506,7 +460,6 @@ describe("Huly Errors", () => {
         expect(error.contextId).toBe("ctx-77")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new NotificationContextNotFoundError({ contextId: "ctx-77" })
@@ -515,7 +468,6 @@ describe("Huly Errors", () => {
   })
 
   describe("InvalidPersonUuidError", () => {
-    // test-revizorro: approved
     it.effect("creates with uuid", () =>
       Effect.gen(function*() {
         const error = new InvalidPersonUuidError({ uuid: "not-a-uuid" })
@@ -523,7 +475,6 @@ describe("Huly Errors", () => {
         expect(error.uuid).toBe("not-a-uuid")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new InvalidPersonUuidError({ uuid: "not-a-uuid" })
@@ -532,7 +483,6 @@ describe("Huly Errors", () => {
   })
 
   describe("FileTooLargeError", () => {
-    // test-revizorro: approved
     it.effect("creates with filename, size, and maxSize", () =>
       Effect.gen(function*() {
         const error = new FileTooLargeError({
@@ -546,7 +496,6 @@ describe("Huly Errors", () => {
         expect(error.maxSize).toBe(10 * BYTES_PER_MB)
       }))
 
-    // test-revizorro: approved
     it.effect("generates message with MB conversion", () =>
       Effect.gen(function*() {
         const error = new FileTooLargeError({
@@ -557,7 +506,6 @@ describe("Huly Errors", () => {
         expect(error.message).toBe("File 'big.zip' is too large (15.00MB). Maximum allowed: 10MB")
       }))
 
-    // test-revizorro: approved
     it.effect("formats fractional MB with two decimal places", () =>
       Effect.gen(function*() {
         const error = new FileTooLargeError({
@@ -570,7 +518,6 @@ describe("Huly Errors", () => {
   })
 
   describe("InvalidContentTypeError", () => {
-    // test-revizorro: approved
     it.effect("creates with filename and contentType", () =>
       Effect.gen(function*() {
         const error = new InvalidContentTypeError({ filename: "script.exe", contentType: "application/x-msdownload" })
@@ -579,7 +526,6 @@ describe("Huly Errors", () => {
         expect(error.contentType).toBe("application/x-msdownload")
       }))
 
-    // test-revizorro: approved
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
         const error = new InvalidContentTypeError({ filename: "script.exe", contentType: "application/x-msdownload" })
@@ -588,7 +534,6 @@ describe("Huly Errors", () => {
   })
 
   describe("BYTES_PER_MB", () => {
-    // test-revizorro: approved
     it.effect("equals 1024 * 1024", () =>
       Effect.gen(function*() {
         expect(BYTES_PER_MB).toBe(1048576)
@@ -596,7 +541,6 @@ describe("Huly Errors", () => {
   })
 
   describe("HulyDomainError Schema", () => {
-    // test-revizorro: approved
     it.effect("decodes a valid error via Schema.Union", () =>
       Effect.gen(function*() {
         const error = new ProjectNotFoundError({ identifier: "X" })
@@ -606,7 +550,6 @@ describe("Huly Errors", () => {
   })
 
   describe("Effect integration", () => {
-    // test-revizorro: approved
     it.effect("errors are yieldable", () =>
       Effect.gen(function*() {
         const program = Effect.gen(function*() {
@@ -617,7 +560,6 @@ describe("Huly Errors", () => {
         expect(error._tag).toBe("IssueNotFoundError")
       }))
 
-    // test-revizorro: approved
     it.effect("can pattern match with catchTag", () =>
       Effect.gen(function*() {
         const program = Effect.gen(function*() {
@@ -630,7 +572,6 @@ describe("Huly Errors", () => {
         expect(result).toBe("Recovered: HULY-1")
       }))
 
-    // test-revizorro: approved
     it.effect("can pattern match with Match exhaustive over all error types", () =>
       Effect.gen(function*() {
         // Using switch instead of Match.type to avoid Effect Match inference issues
@@ -646,6 +587,12 @@ describe("Huly Errors", () => {
               return `status:${error.status}`
             case "PersonNotFoundError":
               return `person:${error.identifier}`
+            case "OrganizationNotFoundError":
+              return `organization:${error.identifier}`
+            case "OrganizationIdentifierAmbiguousError":
+              return `organization-ambiguous:${error.identifier}:${error.matches}`
+            case "InvalidContactProviderError":
+              return `contactprovider:${error.provider}`
             case "FileUploadError":
               return `upload:${error.message}`
             case "InvalidFileDataError":
@@ -740,6 +687,10 @@ describe("Huly Errors", () => {
               return `funnel:${error.identifier}`
             case "LeadNotFoundError":
               return `lead:${error.identifier}`
+            default: {
+              const _exhaustive: never = error
+              return _exhaustive
+            }
           }
         }
 
@@ -747,6 +698,11 @@ describe("Huly Errors", () => {
         expect(matchError(new ProjectNotFoundError({ identifier: "Z" }))).toBe("project:Z")
         expect(matchError(new InvalidStatusError({ status: "bad", project: "P" }))).toBe("status:bad")
         expect(matchError(new PersonNotFoundError({ identifier: "john@example.com" }))).toBe("person:john@example.com")
+        expect(matchError(new OrganizationNotFoundError({ identifier: "Acme" }))).toBe("organization:Acme")
+        expect(
+          matchError(new OrganizationIdentifierAmbiguousError({ identifier: "Acme", matches: 2 }))
+        ).toBe("organization-ambiguous:Acme:2")
+        expect(matchError(new InvalidContactProviderError({ provider: "fax" }))).toBe("contactprovider:fax")
         expect(matchError(new FileUploadError({ message: "quota exceeded" }))).toBe("upload:quota exceeded")
         expect(matchError(new InvalidFileDataError({ message: "bad base64" }))).toBe("data:bad base64")
         expect(matchError(new FileNotFoundError({ filePath: "/path/to/file" }))).toBe("notfound:/path/to/file")
