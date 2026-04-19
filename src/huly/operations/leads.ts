@@ -2,8 +2,8 @@
  * Lead operations: list funnels, list leads, get lead.
  *
  * Upstream Huly references:
- * - .reference/huly-platform/plugins/lead/src/index.ts
- * - .reference/huly-platform/models/lead/src/types.ts
+ * - https://github.com/hcengineering/platform/blob/b9657d53d130a2ed8034c1b71ab0cf8b7a0b4994/plugins/lead/src/index.ts#L71-L82
+ * - https://github.com/hcengineering/platform/blob/b9657d53d130a2ed8034c1b71ab0cf8b7a0b4994/models/lead/src/types.ts#L55-L57
  *
  * `@hcengineering/lead` is not available in this project, so these shapes are
  * mirrored from the upstream Huly lead package and model definitions.
@@ -93,7 +93,8 @@ const findFunnel = (
     // Upstream Huly Funnel is a Project-derived space without a tracker-style
     // human identifier field. We accept normalized name lookup only as a
     // convenience, but list_funnels returns `_id` as the stable identifier.
-    // Reference: .reference/huly-platform/models/lead/src/types.ts
+    // Reference:
+    // https://github.com/hcengineering/platform/blob/b9657d53d130a2ed8034c1b71ab0cf8b7a0b4994/models/lead/src/types.ts#L55-L57
     const allFunnels = yield* client.findAll<HulyFunnel>(leadClassIds.class.Funnel, {})
     const normalized = normalizeForComparison(funnelIdentifier)
     const funnel = allFunnels.find((candidate) => normalizeForComparison(candidate.name) === normalized)
@@ -270,7 +271,8 @@ export const listLeads = (
         limit,
         sort: { modifiedOn: SortingOrder.Descending },
         // Upstream lead views resolve attachedTo through the Customer mixin.
-        // Reference: .reference/huly-platform/models/lead/src/index.ts
+        // Reference:
+        // https://github.com/hcengineering/platform/blob/b9657d53d130a2ed8034c1b71ab0cf8b7a0b4994/models/lead/src/index.ts#L357-L360
         lookup: {
           assignee: contact.class.Person,
           attachedTo: leadClassIds.mixin.Customer

@@ -2,13 +2,12 @@
  * Lead plugin class references.
  *
  * Upstream Huly reference:
- * .reference/huly-platform/plugins/lead/src/index.ts
+ * https://github.com/hcengineering/platform/blob/b9657d53d130a2ed8034c1b71ab0cf8b7a0b4994/plugins/lead/src/index.ts#L71-L82
  *
  * `@hcengineering/lead` exists in the Huly monorepo but is not published in the
  * package set used by this project, so we mirror the class and mixin refs here.
  *
- * These are stable internal identifiers from:
- * https://github.com/hcengineering/platform/tree/develop/plugins/lead
+ * These are stable internal identifiers from the upstream plugin definition.
  *
  * @module
  */

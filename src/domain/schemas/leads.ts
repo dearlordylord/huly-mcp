@@ -3,7 +3,8 @@ import { JSONSchema, ParseResult, Schema } from "effect"
 import { Email, LimitParam, PersonName, StatusName, Timestamp } from "./shared.js"
 
 // --- Lead IDs ---
-// Upstream Huly reference: .reference/huly-platform/plugins/lead/src/index.ts
+// Upstream Huly reference:
+// https://github.com/hcengineering/platform/blob/b9657d53d130a2ed8034c1b71ab0cf8b7a0b4994/plugins/lead/src/index.ts#L71-L82
 // Funnel is a Project-derived space; expose the stable `_id` as the machine identifier.
 // Lead identifiers use the upstream `LEAD-<number>` convention.
 
