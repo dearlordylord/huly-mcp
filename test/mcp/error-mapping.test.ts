@@ -9,9 +9,11 @@ import {
   HulyAuthError,
   HulyConnectionError,
   HulyError,
+  InvalidContactProviderError,
   InvalidFileDataError,
   InvalidStatusError,
   IssueNotFoundError,
+  OrganizationNotFoundError,
   PersonNotFoundError,
   ProjectNotFoundError
 } from "../../src/huly/errors.js"
@@ -86,6 +88,28 @@ describe("Error Mapping to MCP", () => {
           expect(response.content[0].text).toBe(
             "Person 'john@example.com' not found"
           )
+        }))
+
+      // test-revizorro: approved
+      it.effect("maps OrganizationNotFoundError with descriptive message", () =>
+        Effect.gen(function*() {
+          const error = new OrganizationNotFoundError({ identifier: "Acme" })
+          const response = mapDomainErrorToMcp(error)
+
+          expect(response.isError).toBe(true)
+          expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+          expect(response.content[0].text).toBe("Organization 'Acme' not found")
+        }))
+
+      // test-revizorro: approved
+      it.effect("maps InvalidContactProviderError with descriptive message", () =>
+        Effect.gen(function*() {
+          const error = new InvalidContactProviderError({ provider: "fax" })
+          const response = mapDomainErrorToMcp(error)
+
+          expect(response.isError).toBe(true)
+          expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+          expect(response.content[0].text).toBe("Invalid contact provider: 'fax'")
         }))
 
       // test-revizorro: approved

@@ -34,6 +34,20 @@ export class OrganizationNotFoundError extends Schema.TaggedError<OrganizationNo
 }
 
 /**
+ * Contact provider is not supported.
+ */
+export class InvalidContactProviderError extends Schema.TaggedError<InvalidContactProviderError>()(
+  "InvalidContactProviderError",
+  {
+    provider: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Invalid contact provider: '${this.provider}'`
+  }
+}
+
+/**
  * Invalid PersonUuid format.
  */
 export class InvalidPersonUuidError extends Schema.TaggedError<InvalidPersonUuidError>()(

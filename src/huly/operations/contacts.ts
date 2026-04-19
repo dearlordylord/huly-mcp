@@ -22,6 +22,8 @@ import {
 import { Effect } from "effect"
 
 import type {
+  AddOrganizationChannelParams,
+  AddOrganizationMemberParams,
   CreateOrganizationParams,
   CreatePersonParams,
   DeleteOrganizationParams,
@@ -57,7 +59,7 @@ import type {
 } from "../../domain/schemas/contacts.js"
 import { ContactProvider, Email, OrganizationId, PersonId, PersonName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import { OrganizationNotFoundError, PersonNotFoundError } from "../errors.js"
+import { InvalidContactProviderError, OrganizationNotFoundError, PersonNotFoundError } from "../errors.js"
 import { escapeLikeWildcards } from "./query-helpers.js"
 import { clampLimit, toRef } from "./shared.js"
 
@@ -74,6 +76,9 @@ type CreateOrganizationError = HulyClientError
 type GetOrganizationError = HulyClientError | OrganizationNotFoundError
 type UpdateOrganizationError = HulyClientError | OrganizationNotFoundError
 type DeleteOrganizationError = HulyClientError | OrganizationNotFoundError
+type AddOrganizationChannelError = HulyClientError | InvalidContactProviderError | OrganizationNotFoundError
+type AddOrganizationMemberError = HulyClientError | OrganizationNotFoundError | PersonNotFoundError
+type RemoveOrganizationMemberError = HulyClientError | OrganizationNotFoundError | PersonNotFoundError
 
 const formatName = (firstName: string, lastName: string): string => `${lastName},${firstName}`
 
@@ -540,9 +545,9 @@ export const updateOrganization = (
 ): Effect.Effect<UpdateOrganizationResult, UpdateOrganizationError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-    const org = yield* findOrganizationByIdentifier(client, params.organizationId)
+    const org = yield* findOrganizationByIdentifier(client, params.identifier)
     if (org === undefined) {
-      return yield* new OrganizationNotFoundError({ identifier: params.organizationId })
+      return yield* new OrganizationNotFoundError({ identifier: params.identifier })
     }
 
     const updateOps: DocumentUpdate<HulyOrganization> = {}
@@ -589,9 +594,9 @@ export const deleteOrganization = (
 ): Effect.Effect<DeleteOrganizationResult, DeleteOrganizationError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-    const org = yield* findOrganizationByIdentifier(client, params.organizationId)
+    const org = yield* findOrganizationByIdentifier(client, params.identifier)
     if (org === undefined) {
-      return yield* new OrganizationNotFoundError({ identifier: params.organizationId })
+      return yield* new OrganizationNotFoundError({ identifier: params.identifier })
     }
 
     yield* client.removeDoc(
@@ -609,13 +614,13 @@ export const deleteOrganization = (
  * orgs that already have the mixin.
  */
 export const makeOrganizationCustomer = (
-  params: { organizationId: string }
+  params: GetOrganizationParams
 ): Effect.Effect<{ id: OrganizationId; applied: boolean }, GetOrganizationError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-    const org = yield* findOrganizationByIdentifier(client, params.organizationId)
+    const org = yield* findOrganizationByIdentifier(client, params.identifier)
     if (org === undefined) {
-      return yield* new OrganizationNotFoundError({ identifier: params.organizationId })
+      return yield* new OrganizationNotFoundError({ identifier: params.identifier })
     }
 
     // eslint-disable-next-line no-restricted-syntax -- SDK boundary: lead module not published on npm
@@ -643,7 +648,7 @@ export const makeOrganizationCustomer = (
 
 // --- Channel Providers ---
 // Maps user-friendly names to Huly contact.channelProvider refs
-const CHANNEL_PROVIDERS: Record<string, typeof contact.channelProvider.Email> = {
+const CHANNEL_PROVIDERS: Partial<Record<string, typeof contact.channelProvider.Email>> = {
   email: contact.channelProvider.Email,
   phone: contact.channelProvider.Phone,
   linkedin: contact.channelProvider.LinkedIn,
@@ -659,8 +664,8 @@ const CHANNEL_PROVIDERS: Record<string, typeof contact.channelProvider.Email> = 
  * Does NOT check for duplicates - caller should verify beforehand if needed.
  */
 export const addOrganizationChannel = (
-  params: { organizationId: string; provider: string; value: string }
-): Effect.Effect<{ id: OrganizationId; added: boolean }, GetOrganizationError, HulyClient> =>
+  params: AddOrganizationChannelParams
+): Effect.Effect<{ id: OrganizationId; added: boolean }, AddOrganizationChannelError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
     const org = yield* findOrganizationByIdentifier(client, params.organizationId)
@@ -670,11 +675,8 @@ export const addOrganizationChannel = (
 
     const providerKey = params.provider.toLowerCase()
     const providerRef = CHANNEL_PROVIDERS[providerKey] ?? undefined
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime guard: provider comes from unvalidated user input string
     if (providerRef === undefined) {
-      return yield* new OrganizationNotFoundError({
-        identifier: `Unknown provider '${params.provider}'. Use: ${Object.keys(CHANNEL_PROVIDERS).join(", ")}`
-      })
+      return yield* new InvalidContactProviderError({ provider: params.provider })
     }
 
     yield* client.addCollection(
@@ -693,8 +695,8 @@ export const addOrganizationChannel = (
  * Link a person as a member of an organization.
  */
 export const addOrganizationMember = (
-  params: { organizationId: string; personIdentifier: string }
-): Effect.Effect<{ id: OrganizationId; added: boolean }, GetOrganizationError, HulyClient> =>
+  params: AddOrganizationMemberParams
+): Effect.Effect<{ id: OrganizationId; added: boolean }, AddOrganizationMemberError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
     const org = yield* findOrganizationByIdentifier(client, params.organizationId)
@@ -706,7 +708,7 @@ export const addOrganizationMember = (
       ?? (yield* findPersonByEmail(client, params.personIdentifier))
 
     if (person === undefined) {
-      return yield* new OrganizationNotFoundError({ identifier: `Person '${params.personIdentifier}' not found` })
+      return yield* new PersonNotFoundError({ identifier: params.personIdentifier })
     }
 
     yield* client.addCollection(
@@ -797,7 +799,7 @@ export const listPersonOrganizations = (
  */
 export const removeOrganizationMember = (
   params: RemoveOrganizationMemberParams
-): Effect.Effect<RemoveOrganizationMemberResult, GetOrganizationError, HulyClient> =>
+): Effect.Effect<RemoveOrganizationMemberResult, RemoveOrganizationMemberError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
     const org = yield* findOrganizationByIdentifier(client, params.organizationId)
@@ -809,7 +811,7 @@ export const removeOrganizationMember = (
       ?? (yield* findPersonByEmail(client, params.personIdentifier))
 
     if (person === undefined) {
-      return yield* new OrganizationNotFoundError({ identifier: `Person '${params.personIdentifier}' not found` })
+      return yield* new PersonNotFoundError({ identifier: params.personIdentifier })
     }
 
     const memberDocs = yield* client.findAll<HulyMember>(

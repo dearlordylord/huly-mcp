@@ -165,7 +165,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "update_organization",
     description:
-      "Update fields on an existing organization (name, city, description). Only provided fields are modified. Description supports multi-line plain text and is the right place to store CRM notes / revenue summaries / context. Pass null to clear city or description.",
+      "Update fields on an existing organization identified by ID or exact name. Only provided fields are modified. Description supports multi-line plain text and is the right place to store CRM notes / revenue summaries / context. Pass null to clear city or description.",
     category: CATEGORY,
     inputSchema: updateOrganizationParamsJsonSchema,
     handler: createToolHandler(
@@ -177,7 +177,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "delete_organization",
     description:
-      "Permanently delete an organization. Use with care - this cannot be undone. Useful for cleaning up duplicate organizations after merging their data elsewhere.",
+      "Permanently delete an organization identified by ID or exact name. Use with care - this cannot be undone. Useful for cleaning up duplicate organizations after merging their data elsewhere.",
     category: CATEGORY,
     inputSchema: deleteOrganizationParamsJsonSchema,
     handler: createToolHandler(
@@ -195,7 +195,7 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
     handler: createToolHandler(
       "make_organization_customer",
       parseGetOrganizationParams,
-      (params) => makeOrganizationCustomer({ organizationId: params.identifier })
+      makeOrganizationCustomer
     )
   },
   {

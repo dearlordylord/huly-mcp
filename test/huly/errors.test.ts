@@ -647,6 +647,8 @@ describe("Huly Errors", () => {
               return `person:${error.identifier}`
             case "OrganizationNotFoundError":
               return `organization:${error.identifier}`
+            case "InvalidContactProviderError":
+              return `contact-provider:${error.provider}`
             case "FileUploadError":
               return `upload:${error.message}`
             case "InvalidFileDataError":

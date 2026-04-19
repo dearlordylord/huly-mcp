@@ -23,10 +23,7 @@ const noopHulyClient: HulyClientOperations = {
   updateMarkup: () => Effect.die(new Error("not implemented")),
   updateMixin: () => Effect.die(new Error("not implemented")),
   createMixin: () => Effect.die(new Error("not implemented")),
-  searchFulltext: () => Effect.die(new Error("not implemented")),
-  toMarkup: (md: string) => md,
-  toMarkdown: (markup: string) => markup,
-  getMarkupUrls: () => ({ refUrl: "", imageUrl: "" })
+  searchFulltext: () => Effect.die(new Error("not implemented"))
 }
 
 const noopStorageClient: HulyStorageOperations = {

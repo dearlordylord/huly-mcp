@@ -4,7 +4,7 @@
  * Split into domain modules:
  * - errors-base: HulyError, HulyConnectionError, HulyAuthError
  * - errors-tracker: issue, project, status, milestone, component, template errors
- * - errors-contacts: PersonNotFoundError, OrganizationNotFoundError, InvalidPersonUuidError
+ * - errors-contacts: PersonNotFoundError, OrganizationNotFoundError, InvalidContactProviderError, InvalidPersonUuidError
  * - errors-files: file upload/fetch/size errors, BYTES_PER_MB
  * - errors-documents: teamspace, document errors
  * - errors-messaging: channel, message, thread, reaction errors
@@ -21,7 +21,12 @@ import { Schema } from "effect"
 import { HulyAuthError, HulyConnectionError, HulyError } from "./errors-base.js"
 import { EventNotFoundError, RecurringEventNotFoundError } from "./errors-calendar.js"
 import { CardNotFoundError, CardSpaceNotFoundError, MasterTagNotFoundError } from "./errors-cards.js"
-import { InvalidPersonUuidError, OrganizationNotFoundError, PersonNotFoundError } from "./errors-contacts.js"
+import {
+  InvalidContactProviderError,
+  InvalidPersonUuidError,
+  OrganizationNotFoundError,
+  PersonNotFoundError
+} from "./errors-contacts.js"
 import { CustomFieldNotFoundError, CustomFieldObjectNotFoundError } from "./errors-custom-fields.js"
 import {
   DocumentEmptyContentError,
@@ -95,6 +100,7 @@ export {
   HulyAuthError,
   HulyConnectionError,
   HulyError,
+  InvalidContactProviderError,
   InvalidContentTypeError,
   InvalidFileDataError,
   InvalidPersonUuidError,
@@ -139,6 +145,7 @@ export type HulyDomainError =
   | InvalidStatusError
   | PersonNotFoundError
   | OrganizationNotFoundError
+  | InvalidContactProviderError
   | FileUploadError
   | InvalidFileDataError
   | FileNotFoundError
@@ -197,6 +204,7 @@ export const HulyDomainError: Schema.Union<
     typeof InvalidStatusError,
     typeof PersonNotFoundError,
     typeof OrganizationNotFoundError,
+    typeof InvalidContactProviderError,
     typeof FileUploadError,
     typeof InvalidFileDataError,
     typeof FileNotFoundError,
@@ -251,6 +259,7 @@ export const HulyDomainError: Schema.Union<
   InvalidStatusError,
   PersonNotFoundError,
   OrganizationNotFoundError,
+  InvalidContactProviderError,
   FileUploadError,
   InvalidFileDataError,
   FileNotFoundError,

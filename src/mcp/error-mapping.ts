@@ -69,6 +69,8 @@ const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDo
   "ProjectNotFoundError",
   "InvalidStatusError",
   "PersonNotFoundError",
+  "OrganizationNotFoundError",
+  "InvalidContactProviderError",
   "InvalidFileDataError",
   "FileNotFoundError",
   "TeamspaceNotFoundError",

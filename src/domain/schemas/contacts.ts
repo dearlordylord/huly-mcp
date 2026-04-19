@@ -1,7 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { ContactProvider, PersonName } from "./shared.js"
-import { Email, LimitParam, MemberReference, NonEmptyString, OrganizationId, PersonId } from "./shared.js"
+import type { ContactProvider, OrganizationId, PersonName } from "./shared.js"
+import { Email, LimitParam, MemberReference, NonEmptyString, PersonId } from "./shared.js"
 
 // No codec needed — internal type, not used for runtime validation
 export interface PersonSummary {
@@ -214,8 +214,8 @@ export const GetOrganizationParamsSchema = Schema.Struct({
 export type GetOrganizationParams = Schema.Schema.Type<typeof GetOrganizationParamsSchema>
 
 export const UpdateOrganizationParamsSchema = Schema.Struct({
-  organizationId: OrganizationId.annotations({
-    description: "Organization ID to update"
+  identifier: NonEmptyString.annotations({
+    description: "Organization ID or exact name"
   }),
   name: Schema.optional(NonEmptyString.annotations({
     description: "New organization name"
@@ -238,8 +238,8 @@ export const UpdateOrganizationParamsSchema = Schema.Struct({
 export type UpdateOrganizationParams = Schema.Schema.Type<typeof UpdateOrganizationParamsSchema>
 
 export const DeleteOrganizationParamsSchema = Schema.Struct({
-  organizationId: OrganizationId.annotations({
-    description: "Organization ID to delete"
+  identifier: NonEmptyString.annotations({
+    description: "Organization ID or exact name"
   })
 }).annotations({
   title: "DeleteOrganizationParams",
