@@ -5,7 +5,6 @@ import { FunnelNotFoundError, LeadNotFoundError } from "../../src/huly/errors-le
 
 describe("Lead Errors", () => {
   describe("FunnelNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with correct tag and message", () =>
       Effect.gen(function*() {
         const error = new FunnelNotFoundError({ identifier: "SALES" })
@@ -16,7 +15,6 @@ describe("Lead Errors", () => {
   })
 
   describe("LeadNotFoundError", () => {
-    // test-revizorro: approved
     it.effect("creates with correct tag, identifier, and funnel in message", () =>
       Effect.gen(function*() {
         const error = new LeadNotFoundError({ identifier: "LEAD-1", funnel: "SALES" })

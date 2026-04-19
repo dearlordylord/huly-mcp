@@ -144,12 +144,12 @@ export const getMilestone = (
   params: GetMilestoneParams
 ): Effect.Effect<Milestone, GetMilestoneError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, milestone } = yield* findProjectAndMilestone(params)
+    const { milestone } = yield* findProjectAndMilestone(params)
 
     const result: Milestone = {
       id: MilestoneId.make(milestone._id),
       label: MilestoneLabel.make(milestone.label),
-      description: optionalMarkupToMarkdown(milestone.description, "", client.getMarkupUrls()),
+      description: optionalMarkupToMarkdown(milestone.description),
       status: milestoneStatusToString(milestone.status),
       targetDate: milestone.targetDate,
       project: params.project,
@@ -170,7 +170,7 @@ export const createMilestone = (
 
     const milestoneData: Data<HulyMilestone> = {
       label: params.label,
-      description: optionalMarkdownToMarkup(params.description, "", client.getMarkupUrls()),
+      description: optionalMarkdownToMarkup(params.description),
       status: MilestoneStatus.Planned,
       targetDate: params.targetDate,
       comments: 0
@@ -222,7 +222,7 @@ export const updateMilestone = (
           "markdown"
         )
       }
-      updateOps.description = optionalMarkdownToMarkup(params.description, "", client.getMarkupUrls())
+      updateOps.description = optionalMarkdownToMarkup(params.description)
     }
 
     if (params.targetDate !== undefined) {

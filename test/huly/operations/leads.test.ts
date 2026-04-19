@@ -3,12 +3,14 @@ import type { Person } from "@hcengineering/contact"
 import type { Doc, FindResult, PersonId as CorePersonId, Ref, Space, Status } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { FunnelIdentifier, LeadIdentifier } from "../../../src/domain/schemas/leads.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type { FunnelNotFoundError, LeadNotFoundError } from "../../../src/huly/errors-leads.js"
+import { HulyConnectionError } from "../../../src/huly/errors.js"
 import { contact, core, task } from "../../../src/huly/huly-plugins.js"
 import { leadClassIds } from "../../../src/huly/lead-plugin.js"
 import { getLead, listFunnels, listLeads } from "../../../src/huly/operations/leads.js"
-import { email, funnelIdentifier, leadIdentifier, statusName } from "../../helpers/brands.js"
+import { email, statusName } from "../../helpers/brands.js"
 
 // --- Helpers ---
 
@@ -17,6 +19,9 @@ const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   result.total = docs.length
   return result
 }
+
+const funnelIdentifier = (value: string) => FunnelIdentifier.make(value)
+const leadIdentifier = (value: string) => LeadIdentifier.make(value)
 
 interface MockFunnel extends Doc {
   name: string
@@ -242,7 +247,6 @@ const createTestLayer = (config: LeadMockConfig) => {
 
 describe("Lead Operations", () => {
   describe("listFunnels", () => {
-    // test-revizorro: approved
     it.effect("returns active funnels excluding archived", () =>
       Effect.gen(function*() {
         const activeFunnel = makeFunnel({ _id: "f-1" as Ref<MockFunnel>, name: "Sales", archived: false })
@@ -257,7 +261,6 @@ describe("Lead Operations", () => {
         expect(result.total).toBe(1)
       }))
 
-    // test-revizorro: approved
     it.effect("returns all funnels when includeArchived is true", () =>
       Effect.gen(function*() {
         const activeFunnel = makeFunnel({ _id: "f-1" as Ref<MockFunnel>, name: "Sales", archived: false })
@@ -271,23 +274,18 @@ describe("Lead Operations", () => {
         expect(result.total).toBe(2)
       }))
 
-    // test-revizorro: approved
-    it.effect("returns empty result on defect via catchAllDefect", () =>
+    it.effect("propagates client failures", () =>
       Effect.gen(function*() {
         const findAllImpl: HulyClientOperations["findAll"] = (() =>
-          Effect.die(new Error("unexpected boom"))) as HulyClientOperations["findAll"]
+          Effect.fail(new HulyConnectionError({ message: "findAll failed" }))) as HulyClientOperations["findAll"]
 
         const testLayer = HulyClient.testLayer({ findAll: findAllImpl })
-
-        const result = yield* listFunnels({}).pipe(Effect.provide(testLayer))
-
-        expect(result.funnels).toEqual([])
-        expect(result.total).toBe(0)
+        const error = yield* Effect.flip(listFunnels({}).pipe(Effect.provide(testLayer)))
+        expect(error.message).toContain("findAll failed")
       }))
   })
 
   describe("listLeads", () => {
-    // test-revizorro: approved
     it.effect("lists leads in a funnel with resolved status, assignee, and customer", () =>
       Effect.gen(function*() {
         const assignee = makePerson("person-1", "Smith,Jane")
@@ -312,7 +310,6 @@ describe("Lead Operations", () => {
         expect(result[0].customer).toBe("Acme,Corp")
       }))
 
-    // test-revizorro: approved
     it.effect("filters leads by status name", () =>
       Effect.gen(function*() {
         const statusActive = makeStatus("status-1", "Active")
@@ -338,7 +335,6 @@ describe("Lead Operations", () => {
         expect(result[0].identifier).toBe("SALES-2")
       }))
 
-    // test-revizorro: approved
     it.effect("returns empty array when assignee is not found", () =>
       Effect.gen(function*() {
         const lead = makeLead()
@@ -356,7 +352,6 @@ describe("Lead Operations", () => {
         expect(result).toEqual([])
       }))
 
-    // test-revizorro: approved
     it.effect("fails with FunnelNotFoundError when funnel does not exist", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayer({ funnels: [] })
@@ -371,7 +366,6 @@ describe("Lead Operations", () => {
   })
 
   describe("getLead", () => {
-    // test-revizorro: approved
     it.effect("returns full lead detail with description", () =>
       Effect.gen(function*() {
         const assignee = makePerson("person-1", "Smith,Jane")
@@ -402,7 +396,6 @@ describe("Lead Operations", () => {
         expect(result.funnel).toBe("Sales")
       }))
 
-    // test-revizorro: approved
     it.effect("finds lead by identifier string", () =>
       Effect.gen(function*() {
         const lead = makeLead({ identifier: "SALES-1", number: 1 })
@@ -420,7 +413,6 @@ describe("Lead Operations", () => {
         expect(result.identifier).toBe("SALES-1")
       }))
 
-    // test-revizorro: approved
     it.effect("fails with LeadNotFoundError when lead does not exist", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayer({ leads: [] })
@@ -436,7 +428,6 @@ describe("Lead Operations", () => {
         expect((error as LeadNotFoundError).funnel).toBe("Sales")
       }))
 
-    // test-revizorro: approved
     it.effect("fails with FunnelNotFoundError when funnel does not exist", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayer({ funnels: [] })

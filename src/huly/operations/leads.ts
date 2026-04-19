@@ -147,7 +147,7 @@ const resolveStatusByName = (
 
 type ListFunnelsError = HulyClientError
 
-const listFunnelsUnsafe = (
+export const listFunnels = (
   params: ListFunnelsParams
 ): Effect.Effect<ListFunnelsResult, ListFunnelsError, HulyClient> =>
   Effect.gen(function*() {
@@ -177,13 +177,6 @@ const listFunnelsUnsafe = (
 
     return { funnels: summaries, total: funnels.length }
   })
-
-export const listFunnels = (
-  params: ListFunnelsParams
-): Effect.Effect<ListFunnelsResult, ListFunnelsError, HulyClient> =>
-  listFunnelsUnsafe(params).pipe(
-    Effect.catchAllDefect(() => Effect.succeed({ funnels: [], total: 0 } satisfies ListFunnelsResult))
-  )
 
 type ListLeadsError =
   | HulyClientError

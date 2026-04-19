@@ -13,44 +13,24 @@ import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown
 // SDK: jsonToMarkup return type doesn't match Markup; cast contained here.
 const jsonAsMarkup: (json: ReturnType<typeof markdownToMarkup>) => Markup = jsonToMarkup
 
-interface MarkupUrlConfig {
-  readonly refUrl: string
-  readonly imageUrl: string
-}
-
-const emptyUrlConfig: MarkupUrlConfig = { refUrl: "", imageUrl: "" }
-
-// eslint-disable-next-line import-x/no-unused-modules
-export const markupToMarkdownString = (markup: Markup, urls?: MarkupUrlConfig): string => {
+export const markupToMarkdownString = (markup: Markup): string => {
   const json = markupToJSON(markup)
-  return markupToMarkdown(json, urls ?? emptyUrlConfig)
+  return markupToMarkdown(json, { refUrl: "", imageUrl: "" })
 }
 
-export const markdownToMarkupString = (markdown: string, urls?: MarkupUrlConfig): Markup => {
-  const json = markdownToMarkup(markdown, urls ?? emptyUrlConfig)
+export const markdownToMarkupString = (markdown: string): Markup => {
+  const json = markdownToMarkup(markdown, { refUrl: "", imageUrl: "" })
   return jsonAsMarkup(json)
 }
 
-export const optionalMarkdownToMarkup = (
-  md: string | undefined | null,
-  fallback: Markup | "" = "",
-  urls?: MarkupUrlConfig
-): Markup | "" => md && md.trim() !== "" ? markdownToMarkupString(md, urls) : fallback
+export const optionalMarkdownToMarkup = (md: string | undefined | null, fallback: Markup | "" = ""): Markup | "" =>
+  md && md.trim() !== "" ? markdownToMarkupString(md) : fallback
 
+export function optionalMarkupToMarkdown(markup: Markup | undefined | null, fallback: undefined): string | undefined
+export function optionalMarkupToMarkdown(markup: Markup | undefined | null, fallback?: string): string
 export function optionalMarkupToMarkdown(
   markup: Markup | undefined | null,
-  fallback: undefined,
-  urls?: MarkupUrlConfig
-): string | undefined
-export function optionalMarkupToMarkdown(
-  markup: Markup | undefined | null,
-  fallback?: string,
-  urls?: MarkupUrlConfig
-): string
-export function optionalMarkupToMarkdown(
-  markup: Markup | undefined | null,
-  fallback: string | undefined = "",
-  urls?: MarkupUrlConfig
+  fallback: string | undefined = ""
 ): string | undefined {
-  return markup ? markupToMarkdownString(markup, urls) : fallback
+  return markup ? markupToMarkdownString(markup) : fallback
 }

@@ -645,8 +645,6 @@ describe("Huly Errors", () => {
               return `status:${error.status}`
             case "PersonNotFoundError":
               return `person:${error.identifier}`
-            case "OrganizationNotFoundError":
-              return `organization:${error.identifier}`
             case "FileUploadError":
               return `upload:${error.message}`
             case "InvalidFileDataError":
