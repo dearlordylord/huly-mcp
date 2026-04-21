@@ -43,6 +43,7 @@ import type {
 import { DocumentId, TeamspaceId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js"
+import { buildDocumentUrlFromConfig } from "../url-builders.js"
 import { escapeLikeWildcards } from "./query-helpers.js"
 import { clampLimit, findByNameOrId, toRef } from "./shared.js"
 
@@ -367,7 +368,7 @@ export const listDocuments = (
       id: DocumentId.make(doc._id),
       title: doc.title,
       teamspace: teamspace.name,
-      url: client.documentUrl(doc.title, doc._id),
+      url: buildDocumentUrlFromConfig(client.documentUrlConfig, doc.title, DocumentId.make(doc._id)),
       modifiedOn: doc.modifiedOn
     }))
 
@@ -409,7 +410,7 @@ export const getDocument = (
       title: doc.title,
       content,
       teamspace: teamspace.name,
-      url: client.documentUrl(doc.title, doc._id),
+      url: buildDocumentUrlFromConfig(client.documentUrlConfig, doc.title, DocumentId.make(doc._id)),
       modifiedOn: doc.modifiedOn,
       createdOn: doc.createdOn
     }
@@ -492,7 +493,7 @@ export const createDocument = (
     return {
       id: DocumentId.make(documentId),
       title: params.title,
-      url: client.documentUrl(params.title, documentId)
+      url: buildDocumentUrlFromConfig(client.documentUrlConfig, params.title, DocumentId.make(documentId))
     }
   })
 

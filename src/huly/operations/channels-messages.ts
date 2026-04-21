@@ -3,7 +3,7 @@
  *
  * @module
  */
-import type { Channel as HulyChannel, ChatMessage } from "@hcengineering/chunter"
+import type { ChatMessage } from "@hcengineering/chunter"
 import type { DocumentUpdate } from "@hcengineering/core"
 import { Clock, Effect } from "effect"
 
@@ -11,11 +11,9 @@ import type { DeleteChannelMessageParams, UpdateChannelMessageParams } from "../
 import type { DeleteChannelMessageResult, UpdateChannelMessageResult } from "../../domain/schemas/channels.js"
 import { MessageId } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
-import type { ChannelNotFoundError } from "../errors.js"
-import { MessageNotFoundError } from "../errors.js"
-import { findChannel } from "./channels.js"
+import type { ChannelNotFoundError, MessageNotFoundError } from "../errors.js"
+import { findChannelMessage } from "./channel-messages-shared.js"
 import { markdownToMarkupString } from "./markup.js"
-import { toRef } from "./shared.js"
 
 import { chunter } from "../huly-plugins.js"
 
@@ -29,32 +27,6 @@ type DeleteChannelMessageError =
   | ChannelNotFoundError
   | MessageNotFoundError
 
-const findChannelMessage = (
-  channelIdentifier: string,
-  messageId: string
-): Effect.Effect<
-  { client: HulyClient["Type"]; channel: HulyChannel; message: ChatMessage },
-  ChannelNotFoundError | MessageNotFoundError | HulyClientError,
-  HulyClient
-> =>
-  Effect.gen(function*() {
-    const { channel, client } = yield* findChannel(channelIdentifier)
-
-    const message = yield* client.findOne<ChatMessage>(
-      chunter.class.ChatMessage,
-      {
-        _id: toRef<ChatMessage>(messageId),
-        space: channel._id
-      }
-    )
-
-    if (message === undefined) {
-      return yield* new MessageNotFoundError({ messageId, channel: channelIdentifier })
-    }
-
-    return { client, channel, message }
-  })
-
 /**
  * Update an existing channel message. Only the body can be modified.
  */
@@ -62,7 +34,7 @@ export const updateChannelMessage = (
   params: UpdateChannelMessageParams
 ): Effect.Effect<UpdateChannelMessageResult, UpdateChannelMessageError, HulyClient> =>
   Effect.gen(function*() {
-    const { channel, client, message } = yield* findChannelMessage(params.channel, params.messageId)
+    const { channel, client, message } = yield* findChannelMessage(params)
     const markupUrlConfig = client.markupUrlConfig
 
     const markup = markdownToMarkupString(params.body, markupUrlConfig)
@@ -90,7 +62,7 @@ export const deleteChannelMessage = (
   params: DeleteChannelMessageParams
 ): Effect.Effect<DeleteChannelMessageResult, DeleteChannelMessageError, HulyClient> =>
   Effect.gen(function*() {
-    const { channel, client, message } = yield* findChannelMessage(params.channel, params.messageId)
+    const { channel, client, message } = yield* findChannelMessage(params)
 
     yield* client.removeDoc(
       chunter.class.ChatMessage,

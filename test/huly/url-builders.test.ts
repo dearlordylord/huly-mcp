@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 
+import { DocumentId, UrlString, WorkspaceUrlSlug } from "../../src/domain/schemas/shared.js"
 import { buildDocumentUrl, slugifyTitle } from "../../src/huly/url-builders.js"
 
 describe("slugifyTitle", () => {
@@ -43,14 +44,14 @@ describe("slugifyTitle", () => {
 })
 
 describe("buildDocumentUrl", () => {
-  const baseUrl = "https://huly.axzez.org"
-  const workspaceUuid = "axzez-6925fc59-8ee2eba17e-eb022e"
-  const id = "69e6a5dab299f79d42314f12"
+  const baseUrl = UrlString.make("https://huly.axzez.org")
+  const workspaceUrlSlug = WorkspaceUrlSlug.make("axzez-6925fc59-8ee2eba17e-eb022e")
+  const id = DocumentId.make("69e6a5dab299f79d42314f12")
 
   it("reproduces the canonical working URL", () => {
     expect(buildDocumentUrl(
       baseUrl,
-      workspaceUuid,
+      workspaceUrlSlug,
       "v1.0a Short-Circuit Analysis - Lite/Keel Variants",
       id
     )).toBe(
@@ -59,12 +60,12 @@ describe("buildDocumentUrl", () => {
   })
 
   it("tolerates trailing slash on baseUrl", () => {
-    expect(buildDocumentUrl(`${baseUrl}/`, workspaceUuid, "Test", id))
-      .toBe(`${baseUrl}/workbench/${workspaceUuid}/document/test-${id}`)
+    expect(buildDocumentUrl(UrlString.make(`${baseUrl}/`), workspaceUrlSlug, "Test", id))
+      .toBe(`${baseUrl}/workbench/${workspaceUrlSlug}/document/test-${id}`)
   })
 
   it("falls back to bare id when slug is empty", () => {
-    expect(buildDocumentUrl(baseUrl, workspaceUuid, "!!!", id))
-      .toBe(`${baseUrl}/workbench/${workspaceUuid}/document/${id}`)
+    expect(buildDocumentUrl(baseUrl, workspaceUrlSlug, "!!!", id))
+      .toBe(`${baseUrl}/workbench/${workspaceUrlSlug}/document/${id}`)
   })
 })

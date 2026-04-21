@@ -4,14 +4,13 @@ import { toFindResult } from "@hcengineering/core"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
 
-import { IssueIdentifier } from "../../src/domain/schemas/shared.js"
+import { IssueIdentifier, UrlString, WorkspaceUrlSlug } from "../../src/domain/schemas/shared.js"
 import type { HulyClientOperations } from "../../src/huly/client.js"
 import { HulyClient } from "../../src/huly/client.js"
 import { HulyError } from "../../src/huly/errors.js"
 import { testMarkupUrlConfig } from "../../src/huly/operations/markup.js"
 import type { HulyStorageOperations } from "../../src/huly/storage.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
-import { buildDocumentUrl } from "../../src/huly/url-builders.js"
 import type { WorkspaceClientOperations } from "../../src/huly/workspace-client.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
 import { McpErrorCode } from "../../src/mcp/error-mapping.js"
@@ -31,7 +30,10 @@ const parse = (input: unknown) => Schema.decodeUnknown(Params)(input)
 
 const noopHulyClient: HulyClientOperations = {
   getAccountUuid: () => "test-account-uuid" as AccountUuid,
-  documentUrl: (title, id) => buildDocumentUrl("https://test.huly.local", "test-workspace", title, id),
+  documentUrlConfig: {
+    baseUrl: UrlString.make("https://test.huly.local"),
+    workspaceUrlSlug: WorkspaceUrlSlug.make("test-workspace")
+  },
   markupUrlConfig: testMarkupUrlConfig,
   findAll: () => Effect.succeed(toFindResult([])) as Effect.Effect<FindResult<never>>,
   findOne: () => Effect.succeed(undefined),
