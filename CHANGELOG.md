@@ -1,5 +1,12 @@
 # @firfi/huly-mcp
 
+## 0.8.0
+
+### Minor Changes
+
+- fa2133b: Add `update_channel_message` and `delete_channel_message` tools so edits to channel posts (e.g. fixing a bad link after send) no longer require a second message stacked on top. Mirrors the existing thread-reply edit/delete surface, reuses the existing `MessageNotFoundError` and `ChannelNotFoundError` error classes, and places the operations in `channels-messages.ts` alongside the pattern used by `documents-edit.ts`.
+- 91ec770: Include a `url` field (typed as `UrlString`) on every document result (`list_documents`, `get_document`, `create_document`, `edit_document`) pointing directly at the document in the Huly web app. The URL is built from the connected workspace's `WorkspaceLoginInfo.workspaceUrl` slug and a title-derived path segment (`<baseUrl>/workbench/<workspaceUrl>/document/<title-slug>-<id>`), matching the links Huly itself produces. This removes a common failure mode where callers constructed URLs from the raw `WorkspaceUuid` and hit the login-loop page instead of the document.
+
 ## 0.7.0
 
 ### Minor Changes
