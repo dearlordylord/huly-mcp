@@ -115,8 +115,11 @@ export const editDocument = (
       contentUpdatedInPlace = true
     }
 
+    const finalTitle = updateOps.title ?? doc.title
+    const url = client.documentUrl(finalTitle, doc._id)
+
     if (Object.keys(updateOps).length === 0 && !contentUpdatedInPlace) {
-      return { id: DocumentId.make(doc._id), updated: false }
+      return { id: DocumentId.make(doc._id), updated: false, url }
     }
 
     if (Object.keys(updateOps).length > 0) {
@@ -128,7 +131,7 @@ export const editDocument = (
       )
     }
 
-    return { id: DocumentId.make(doc._id), updated: true }
+    return { id: DocumentId.make(doc._id), updated: true, url }
   })
 
 const countOccurrences = (text: string, search: string): number => {

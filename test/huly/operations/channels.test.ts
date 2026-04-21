@@ -23,12 +23,14 @@ import type { ChannelNotFoundError, MessageNotFoundError, ThreadReplyNotFoundErr
 import {
   createChannel,
   deleteChannel,
+  deleteChannelMessage,
   getChannel,
   listChannelMessages,
   listChannels,
   listDirectMessages,
   sendChannelMessage,
-  updateChannel
+  updateChannel,
+  updateChannelMessage
 } from "../../../src/huly/operations/channels.js"
 import {
   addThreadReply,
@@ -806,6 +808,116 @@ describe("sendChannelMessage", () => {
       )
 
       expect(error._tag).toBe("ChannelNotFoundError")
+    }))
+})
+
+describe("updateChannelMessage", () => {
+  it.effect("updates channel message", () =>
+    Effect.gen(function*() {
+      const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
+      const message = makeChatMessage({
+        _id: "msg-1" as Ref<ChatMessage>,
+        space: "ch-1" as Ref<Space>
+      })
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+      const testLayer = createTestLayerWithMocks({
+        channels: [channel],
+        messages: [message],
+        captureUpdateDoc
+      })
+
+      const result = yield* updateChannelMessage({
+        channel: channelIdentifier("general"),
+        messageId: messageBrandId("msg-1"),
+        body: "Updated content"
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result.id).toBe("msg-1")
+      expect(result.updated).toBe(true)
+      expect(captureUpdateDoc.operations).toBeDefined()
+    }))
+
+  it.effect("returns MessageNotFoundError when message doesn't exist", () =>
+    Effect.gen(function*() {
+      const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
+
+      const testLayer = createTestLayerWithMocks({
+        channels: [channel],
+        messages: []
+      })
+
+      const error = yield* Effect.flip(
+        updateChannelMessage({
+          channel: channelIdentifier("general"),
+          messageId: messageBrandId("nonexistent"),
+          body: "Updated"
+        }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(error._tag).toBe("MessageNotFoundError")
+      expect((error as MessageNotFoundError).messageId).toBe("nonexistent")
+    }))
+
+  it.effect("returns ChannelNotFoundError when channel doesn't exist", () =>
+    Effect.gen(function*() {
+      const testLayer = createTestLayerWithMocks({ channels: [] })
+
+      const error = yield* Effect.flip(
+        updateChannelMessage({
+          channel: channelIdentifier("nonexistent"),
+          messageId: messageBrandId("msg-1"),
+          body: "Updated"
+        }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(error._tag).toBe("ChannelNotFoundError")
+    }))
+})
+
+describe("deleteChannelMessage", () => {
+  it.effect("deletes channel message", () =>
+    Effect.gen(function*() {
+      const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
+      const message = makeChatMessage({
+        _id: "msg-1" as Ref<ChatMessage>,
+        space: "ch-1" as Ref<Space>
+      })
+      const captureRemoveDoc: MockConfig["captureRemoveDoc"] = {}
+
+      const testLayer = createTestLayerWithMocks({
+        channels: [channel],
+        messages: [message],
+        captureRemoveDoc
+      })
+
+      const result = yield* deleteChannelMessage({
+        channel: channelIdentifier("general"),
+        messageId: messageBrandId("msg-1")
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result.id).toBe("msg-1")
+      expect(result.deleted).toBe(true)
+      expect(captureRemoveDoc.called).toBe(true)
+    }))
+
+  it.effect("returns MessageNotFoundError when message doesn't exist", () =>
+    Effect.gen(function*() {
+      const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
+
+      const testLayer = createTestLayerWithMocks({
+        channels: [channel],
+        messages: []
+      })
+
+      const error = yield* Effect.flip(
+        deleteChannelMessage({
+          channel: channelIdentifier("general"),
+          messageId: messageBrandId("nonexistent")
+        }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(error._tag).toBe("MessageNotFoundError")
     }))
 })
 

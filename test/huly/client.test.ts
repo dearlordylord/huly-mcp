@@ -61,7 +61,8 @@ vi.mock("@hcengineering/api-client", () => ({
     Promise.resolve({
       endpoint: "http://localhost:9090",
       token: "test-token",
-      workspaceId: "ws-123"
+      workspaceId: "ws-123",
+      info: { workspaceUrl: "ws-slug" }
     })
   ),
   loadServerConfig: vi.fn().mockImplementation(() =>

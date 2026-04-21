@@ -222,10 +222,10 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `create_teamspace` | Create a new Huly document teamspace. Idempotent: returns existing teamspace if one with the same name exists. |
 | `update_teamspace` | Update fields on an existing Huly document teamspace. Only provided fields are modified. Set description to null to clear it. |
 | `delete_teamspace` | Permanently delete a Huly document teamspace. This action cannot be undone. |
-| `list_documents` | List documents in a Huly teamspace. Returns documents sorted by modification date (newest first). Supports searching by title substring (titleSearch) and content (contentSearch). |
-| `get_document` | Retrieve full details for a Huly document including markdown content. Use this to view document content and metadata. |
-| `create_document` | Create a new document in a Huly teamspace. Content supports full markdown including native Mermaid diagrams (```mermaid blocks render interactively in Huly UI). Returns the created document id. Use link_document_to_issue to associate the document with a tracker issue. |
-| `edit_document` | Edit an existing Huly document. Two content modes (mutually exclusive): (1) 'content' for full replace, (2) 'old_text' + 'new_text' for targeted search-and-replace. Multiple matches error unless replace_all is true. Empty new_text deletes matched text. Also supports renaming via 'title'. Content supports full markdown including native Mermaid diagrams. |
+| `list_documents` | List documents in a Huly teamspace. Returns documents sorted by modification date (newest first). Each result includes a 'url' field pointing to the document in the Huly web app. Supports searching by title substring (titleSearch) and content (contentSearch). |
+| `get_document` | Retrieve full details for a Huly document including markdown content and a 'url' field pointing to the document in the Huly web app. Use this to view document content and metadata. |
+| `create_document` | Create a new document in a Huly teamspace. Content supports full markdown including native Mermaid diagrams (```mermaid blocks render interactively in Huly UI). Returns the created document id and a 'url' field pointing to the document in the Huly web app. Use link_document_to_issue to associate the document with a tracker issue. |
+| `edit_document` | Edit an existing Huly document. Two content modes (mutually exclusive): (1) 'content' for full replace, (2) 'old_text' + 'new_text' for targeted search-and-replace. Multiple matches error unless replace_all is true. Empty new_text deletes matched text. Also supports renaming via 'title'. Content supports full markdown including native Mermaid diagrams. Returns a 'url' field pointing to the document in the Huly web app. |
 | `list_inline_comments` | List inline comment threads from a Huly document. Extracts comments embedded in document content as ProseMirror marks. Each comment includes the highlighted text and thread ID. Set includeReplies=true to also fetch thread reply messages with sender names. |
 | `delete_document` | Permanently delete a Huly document. This action cannot be undone. |
 
@@ -282,6 +282,8 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `delete_channel` | Permanently delete a Huly channel. This action cannot be undone. |
 | `list_channel_messages` | List messages in a Huly channel. Returns messages sorted by date (newest first). |
 | `send_channel_message` | Send a message to a Huly channel. Message body supports markdown formatting. |
+| `update_channel_message` | Update a channel message. Only the body can be modified. |
+| `delete_channel_message` | Permanently delete a channel message. This action cannot be undone. |
 | `list_direct_messages` | List direct message conversations in Huly. Returns conversations sorted by date (newest first). |
 | `list_thread_replies` | List replies in a message thread. Returns replies sorted by date (oldest first). |
 | `add_thread_reply` | Add a reply to a message thread. Reply body supports markdown formatting. |

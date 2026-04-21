@@ -11,6 +11,7 @@ import { HulyError } from "../../src/huly/errors.js"
 import { testMarkupUrlConfig } from "../../src/huly/operations/markup.js"
 import type { HulyStorageOperations } from "../../src/huly/storage.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
+import { buildDocumentUrl } from "../../src/huly/url-builders.js"
 import type { WorkspaceClientOperations } from "../../src/huly/workspace-client.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
 import { McpErrorCode } from "../../src/mcp/error-mapping.js"
@@ -30,6 +31,7 @@ const parse = (input: unknown) => Schema.decodeUnknown(Params)(input)
 
 const noopHulyClient: HulyClientOperations = {
   getAccountUuid: () => "test-account-uuid" as AccountUuid,
+  documentUrl: (title, id) => buildDocumentUrl("https://test.huly.local", "test-workspace", title, id),
   markupUrlConfig: testMarkupUrlConfig,
   findAll: () => Effect.succeed(toFindResult([])) as Effect.Effect<FindResult<never>>,
   findOne: () => Effect.succeed(undefined),

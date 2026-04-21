@@ -55,6 +55,7 @@ import { concatLink } from "../utils/url.js"
 import { authToOptions, type ConnectionConfig, type ConnectionError, connectWithRetry } from "./auth-utils.js"
 import { HulyConnectionError } from "./errors.js"
 import { type MarkupUrlConfig, testMarkupUrlConfig } from "./operations/markup.js"
+import { buildDocumentUrl } from "./url-builders.js"
 
 interface MarkupConvertOptions {
   readonly refUrl: string
@@ -105,6 +106,8 @@ interface HulyClientContext {
 
 export interface HulyClientOperations extends HulyClientContext {
   readonly getAccountUuid: () => AccountUuid
+
+  readonly documentUrl: (title: string, id: string) => UrlString
 
   readonly findAll: <T extends Doc>(
     _class: Ref<Class<T>>,
@@ -208,7 +211,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
     Effect.gen(function*() {
       const config = yield* HulyConfigService
 
-      const { accountUuid, client, imageUrl, markupOps, refUrl } = yield* connectRestWithRetry({
+      const { accountUuid, client, imageUrl, markupOps, refUrl, workspaceUrlSlug } = yield* connectRestWithRetry({
         url: config.url,
         auth: config.auth,
         workspace: config.workspace
@@ -218,6 +221,9 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
         refUrl: UrlString.make(refUrl),
         imageUrl: UrlString.make(imageUrl)
       }
+
+      const documentUrl = (title: string, id: string): UrlString =>
+        buildDocumentUrl(config.url, workspaceUrlSlug, title, id)
 
       const withClient = <A>(
         op: (client: TxOperations) => Promise<A>,
@@ -234,6 +240,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
 
       const operations: HulyClientOperations = {
         getAccountUuid: () => accountUuid,
+        documentUrl,
         markupUrlConfig,
 
         findAll: <T extends Doc>(
@@ -399,6 +406,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       // AccountUuid is a double-branded string type with no public constructor
       // eslint-disable-next-line no-restricted-syntax -- see above
       getAccountUuid: () => "test-account-uuid" as AccountUuid,
+      documentUrl: (title, id) => buildDocumentUrl("https://test.huly.local", "test-workspace", title, id),
       markupUrlConfig: testMarkupUrlConfig,
       findAll: noopFindAll,
       findOne: noopFindOne,
@@ -445,6 +453,7 @@ interface MarkupOperations {
 interface RestConnection {
   client: TxOperations
   accountUuid: AccountUuid
+  workspaceUrlSlug: string
   markupOps: MarkupOperations
   refUrl: string
   imageUrl: string
@@ -494,7 +503,7 @@ const connectRest = async (
 
   const authOptions = authToOptions(config.auth, config.workspace)
 
-  const { endpoint, token, workspaceId } = await getWorkspaceToken(
+  const { endpoint, info, token, workspaceId } = await getWorkspaceToken(
     config.url,
     authOptions,
     serverConfig
@@ -513,7 +522,14 @@ const connectRest = async (
     serverConfig.COLLABORATOR_URL
   )
 
-  return { client, accountUuid: account.uuid, markupOps, refUrl, imageUrl }
+  return {
+    client,
+    accountUuid: account.uuid,
+    workspaceUrlSlug: info.workspaceUrl,
+    markupOps,
+    refUrl,
+    imageUrl
+  }
 }
 
 const connectRestWithRetry = (

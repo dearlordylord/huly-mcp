@@ -102,7 +102,7 @@ export const documentTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "list_documents",
     description:
-      "List documents in a Huly teamspace. Returns documents sorted by modification date (newest first). Supports searching by title substring (titleSearch) and content (contentSearch).",
+      "List documents in a Huly teamspace. Returns documents sorted by modification date (newest first). Each result includes a 'url' field pointing to the document in the Huly web app. Supports searching by title substring (titleSearch) and content (contentSearch).",
     category: CATEGORY,
     inputSchema: listDocumentsParamsJsonSchema,
     handler: createToolHandler(
@@ -114,7 +114,7 @@ export const documentTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "get_document",
     description:
-      "Retrieve full details for a Huly document including markdown content. Use this to view document content and metadata.",
+      "Retrieve full details for a Huly document including markdown content and a 'url' field pointing to the document in the Huly web app. Use this to view document content and metadata.",
     category: CATEGORY,
     inputSchema: getDocumentParamsJsonSchema,
     handler: createToolHandler(
@@ -126,7 +126,7 @@ export const documentTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "create_document",
     description:
-      "Create a new document in a Huly teamspace. Content supports full markdown including native Mermaid diagrams (```mermaid blocks render interactively in Huly UI). Returns the created document id. Use link_document_to_issue to associate the document with a tracker issue.",
+      "Create a new document in a Huly teamspace. Content supports full markdown including native Mermaid diagrams (```mermaid blocks render interactively in Huly UI). Returns the created document id and a 'url' field pointing to the document in the Huly web app. Use link_document_to_issue to associate the document with a tracker issue.",
     category: CATEGORY,
     inputSchema: createDocumentParamsJsonSchema,
     handler: createToolHandler(
@@ -138,7 +138,7 @@ export const documentTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "edit_document",
     description:
-      "Edit an existing Huly document. Two content modes (mutually exclusive): (1) 'content' for full replace, (2) 'old_text' + 'new_text' for targeted search-and-replace. Multiple matches error unless replace_all is true. Empty new_text deletes matched text. Also supports renaming via 'title'. Content supports full markdown including native Mermaid diagrams.",
+      "Edit an existing Huly document. Two content modes (mutually exclusive): (1) 'content' for full replace, (2) 'old_text' + 'new_text' for targeted search-and-replace. Multiple matches error unless replace_all is true. Empty new_text deletes matched text. Also supports renaming via 'title'. Content supports full markdown including native Mermaid diagrams. Returns a 'url' field pointing to the document in the Huly web app.",
     category: CATEGORY,
     inputSchema: editDocumentParamsJsonSchema,
     handler: createToolHandler(

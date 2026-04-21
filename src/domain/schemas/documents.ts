@@ -1,6 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { DocumentId, TeamspaceId } from "./shared.js"
+import type { DocumentId, TeamspaceId, UrlString } from "./shared.js"
 import { DocumentIdentifier, LimitParam, NonEmptyString, TeamspaceIdentifier } from "./shared.js"
 
 // No codec needed — internal type, not used for runtime validation
@@ -37,6 +37,7 @@ export interface DocumentSummary {
   readonly id: DocumentId
   readonly title: string
   readonly teamspace: string
+  readonly url: UrlString
   readonly modifiedOn?: number | undefined
 }
 
@@ -85,6 +86,7 @@ export interface Document {
   readonly title: string
   readonly content?: string | undefined
   readonly teamspace: string
+  readonly url: UrlString
   readonly modifiedOn?: number | undefined
   readonly createdOn?: number | undefined
 }
@@ -360,11 +362,13 @@ export const parseDeleteDocumentParams = Schema.decodeUnknown(DeleteDocumentPara
 export interface CreateDocumentResult {
   readonly id: DocumentId
   readonly title: string
+  readonly url: UrlString
 }
 
 export interface EditDocumentResult {
   readonly id: DocumentId
   readonly updated: boolean
+  readonly url: UrlString
 }
 
 export interface DeleteDocumentResult {

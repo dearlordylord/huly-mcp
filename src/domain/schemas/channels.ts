@@ -184,6 +184,41 @@ export const SendChannelMessageParamsSchema = Schema.Struct({
 
 export type SendChannelMessageParams = Schema.Schema.Type<typeof SendChannelMessageParamsSchema>
 
+// --- Update Channel Message Params ---
+
+export const UpdateChannelMessageParamsSchema = Schema.Struct({
+  channel: ChannelIdentifier.annotations({
+    description: "Channel name or ID"
+  }),
+  messageId: MessageId.annotations({
+    description: "Message ID to update"
+  }),
+  body: NonEmptyString.annotations({
+    description: "New message body (markdown supported)"
+  })
+}).annotations({
+  title: "UpdateChannelMessageParams",
+  description: "Parameters for updating a channel message"
+})
+
+export type UpdateChannelMessageParams = Schema.Schema.Type<typeof UpdateChannelMessageParamsSchema>
+
+// --- Delete Channel Message Params ---
+
+export const DeleteChannelMessageParamsSchema = Schema.Struct({
+  channel: ChannelIdentifier.annotations({
+    description: "Channel name or ID"
+  }),
+  messageId: MessageId.annotations({
+    description: "Message ID to delete"
+  })
+}).annotations({
+  title: "DeleteChannelMessageParams",
+  description: "Parameters for deleting a channel message"
+})
+
+export type DeleteChannelMessageParams = Schema.Schema.Type<typeof DeleteChannelMessageParamsSchema>
+
 // --- List Direct Messages Params ---
 
 export const ListDirectMessagesParamsSchema = Schema.Struct({
@@ -300,6 +335,8 @@ export const updateChannelParamsJsonSchema = JSONSchema.make(UpdateChannelParams
 export const deleteChannelParamsJsonSchema = JSONSchema.make(DeleteChannelParamsSchema)
 export const listChannelMessagesParamsJsonSchema = JSONSchema.make(ListChannelMessagesParamsSchema)
 export const sendChannelMessageParamsJsonSchema = JSONSchema.make(SendChannelMessageParamsSchema)
+export const updateChannelMessageParamsJsonSchema = JSONSchema.make(UpdateChannelMessageParamsSchema)
+export const deleteChannelMessageParamsJsonSchema = JSONSchema.make(DeleteChannelMessageParamsSchema)
 export const listDirectMessagesParamsJsonSchema = JSONSchema.make(ListDirectMessagesParamsSchema)
 export const listThreadRepliesParamsJsonSchema = JSONSchema.make(ListThreadRepliesParamsSchema)
 export const addThreadReplyParamsJsonSchema = JSONSchema.make(AddThreadReplyParamsSchema)
@@ -315,6 +352,8 @@ export const parseUpdateChannelParams = Schema.decodeUnknown(UpdateChannelParams
 export const parseDeleteChannelParams = Schema.decodeUnknown(DeleteChannelParamsSchema)
 export const parseListChannelMessagesParams = Schema.decodeUnknown(ListChannelMessagesParamsSchema)
 export const parseSendChannelMessageParams = Schema.decodeUnknown(SendChannelMessageParamsSchema)
+export const parseUpdateChannelMessageParams = Schema.decodeUnknown(UpdateChannelMessageParamsSchema)
+export const parseDeleteChannelMessageParams = Schema.decodeUnknown(DeleteChannelMessageParamsSchema)
 export const parseListDirectMessagesParams = Schema.decodeUnknown(ListDirectMessagesParamsSchema)
 export const parseListThreadRepliesParams = Schema.decodeUnknown(ListThreadRepliesParamsSchema)
 export const parseAddThreadReplyParams = Schema.decodeUnknown(AddThreadReplyParamsSchema)
@@ -345,6 +384,16 @@ export interface ListChannelMessagesResult {
 export interface SendChannelMessageResult {
   readonly id: MessageId
   readonly channelId: ChannelId
+}
+
+export interface UpdateChannelMessageResult {
+  readonly id: MessageId
+  readonly updated: boolean
+}
+
+export interface DeleteChannelMessageResult {
+  readonly id: MessageId
+  readonly deleted: boolean
 }
 
 export interface ListDirectMessagesResult {

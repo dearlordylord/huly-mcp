@@ -45,6 +45,8 @@ import { clampLimit, findByNameOrId, toRef } from "./shared.js"
 
 import { chunter, contact } from "../huly-plugins.js"
 
+export { deleteChannelMessage, updateChannelMessage } from "./channels-messages.js"
+
 // --- Error Types ---
 
 type ListChannelsError = HulyClientError

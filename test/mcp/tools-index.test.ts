@@ -7,10 +7,12 @@ import { expect } from "vitest"
 import type { HulyClientOperations } from "../../src/huly/client.js"
 import { testMarkupUrlConfig } from "../../src/huly/operations/markup.js"
 import type { HulyStorageOperations } from "../../src/huly/storage.js"
+import { buildDocumentUrl } from "../../src/huly/url-builders.js"
 import { CATEGORY_NAMES, createFilteredRegistry, TOOL_DEFINITIONS, toolRegistry } from "../../src/mcp/tools/index.js"
 
 const noopHulyClient: HulyClientOperations = {
   getAccountUuid: () => "test-account-uuid" as AccountUuid,
+  documentUrl: (title, id) => buildDocumentUrl("https://test.huly.local", "test-workspace", title, id),
   markupUrlConfig: testMarkupUrlConfig,
   findAll: () => Effect.succeed(toFindResult([])) as Effect.Effect<FindResult<never>>,
   findOne: () => Effect.succeed(undefined),

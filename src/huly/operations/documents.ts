@@ -367,6 +367,7 @@ export const listDocuments = (
       id: DocumentId.make(doc._id),
       title: doc.title,
       teamspace: teamspace.name,
+      url: client.documentUrl(doc.title, doc._id),
       modifiedOn: doc.modifiedOn
     }))
 
@@ -408,6 +409,7 @@ export const getDocument = (
       title: doc.title,
       content,
       teamspace: teamspace.name,
+      url: client.documentUrl(doc.title, doc._id),
       modifiedOn: doc.modifiedOn,
       createdOn: doc.createdOn
     }
@@ -487,7 +489,11 @@ export const createDocument = (
       documentId
     )
 
-    return { id: DocumentId.make(documentId), title: params.title }
+    return {
+      id: DocumentId.make(documentId),
+      title: params.title,
+      url: client.documentUrl(params.title, documentId)
+    }
   })
 
 // --- Delete Document Operation ---

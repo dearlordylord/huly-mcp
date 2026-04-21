@@ -1,6 +1,7 @@
 import {
   addThreadReplyParamsJsonSchema,
   createChannelParamsJsonSchema,
+  deleteChannelMessageParamsJsonSchema,
   deleteChannelParamsJsonSchema,
   deleteThreadReplyParamsJsonSchema,
   getChannelParamsJsonSchema,
@@ -10,6 +11,7 @@ import {
   listThreadRepliesParamsJsonSchema,
   parseAddThreadReplyParams,
   parseCreateChannelParams,
+  parseDeleteChannelMessageParams,
   parseDeleteChannelParams,
   parseDeleteThreadReplyParams,
   parseGetChannelParams,
@@ -18,21 +20,25 @@ import {
   parseListDirectMessagesParams,
   parseListThreadRepliesParams,
   parseSendChannelMessageParams,
+  parseUpdateChannelMessageParams,
   parseUpdateChannelParams,
   parseUpdateThreadReplyParams,
   sendChannelMessageParamsJsonSchema,
+  updateChannelMessageParamsJsonSchema,
   updateChannelParamsJsonSchema,
   updateThreadReplyParamsJsonSchema
 } from "../../domain/schemas.js"
 import {
   createChannel,
   deleteChannel,
+  deleteChannelMessage,
   getChannel,
   listChannelMessages,
   listChannels,
   listDirectMessages,
   sendChannelMessage,
-  updateChannel
+  updateChannel,
+  updateChannelMessage
 } from "../../huly/operations/channels.js"
 import {
   addThreadReply,
@@ -121,6 +127,28 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
       "send_channel_message",
       parseSendChannelMessageParams,
       sendChannelMessage
+    )
+  },
+  {
+    name: "update_channel_message",
+    description: "Update a channel message. Only the body can be modified.",
+    category: CATEGORY,
+    inputSchema: updateChannelMessageParamsJsonSchema,
+    handler: createToolHandler(
+      "update_channel_message",
+      parseUpdateChannelMessageParams,
+      updateChannelMessage
+    )
+  },
+  {
+    name: "delete_channel_message",
+    description: "Permanently delete a channel message. This action cannot be undone.",
+    category: CATEGORY,
+    inputSchema: deleteChannelMessageParamsJsonSchema,
+    handler: createToolHandler(
+      "delete_channel_message",
+      parseDeleteChannelMessageParams,
+      deleteChannelMessage
     )
   },
   {
