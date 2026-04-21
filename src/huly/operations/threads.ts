@@ -26,9 +26,10 @@ import type {
 } from "../../domain/schemas/channels.js"
 import { ChannelId, MessageId, PersonName, ThreadReplyId } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
-import type { ChannelNotFoundError } from "../errors.js"
-import { MessageNotFoundError, ThreadReplyNotFoundError } from "../errors.js"
-import { buildSocialIdToPersonNameMap, findChannel } from "./channels.js"
+import type { ChannelNotFoundError, MessageNotFoundError } from "../errors.js"
+import { ThreadReplyNotFoundError } from "../errors.js"
+import { findChannelMessage } from "./channel-messages-shared.js"
+import { buildSocialIdToPersonNameMap } from "./channels.js"
 import { markdownToMarkupString, markupToMarkdownString } from "./markup.js"
 import { toRef } from "./shared.js"
 
@@ -59,32 +60,6 @@ type DeleteThreadReplyError =
   | ThreadReplyNotFoundError
 
 // --- Helpers ---
-
-const findMessage = (
-  channelIdentifier: string,
-  messageId: string
-): Effect.Effect<
-  { client: HulyClient["Type"]; channel: HulyChannel; message: ChatMessage },
-  ChannelNotFoundError | MessageNotFoundError | HulyClientError,
-  HulyClient
-> =>
-  Effect.gen(function*() {
-    const { channel, client } = yield* findChannel(channelIdentifier)
-
-    const message = yield* client.findOne<ChatMessage>(
-      chunter.class.ChatMessage,
-      {
-        _id: toRef<ChatMessage>(messageId),
-        space: channel._id
-      }
-    )
-
-    if (message === undefined) {
-      return yield* new MessageNotFoundError({ messageId, channel: channelIdentifier })
-    }
-
-    return { client, channel, message }
-  })
 
 const findReply = (
   client: HulyClient["Type"],
@@ -118,7 +93,7 @@ export const listThreadReplies = (
   params: ListThreadRepliesParams
 ): Effect.Effect<ListThreadRepliesResult, ListThreadRepliesError, HulyClient> =>
   Effect.gen(function*() {
-    const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
+    const { channel, client, message } = yield* findChannelMessage(params)
     const markupUrlConfig = client.markupUrlConfig
 
     const limit = Math.min(params.limit ?? 50, 200)
@@ -168,7 +143,7 @@ export const addThreadReply = (
   params: AddThreadReplyParams
 ): Effect.Effect<AddThreadReplyResult, AddThreadReplyError, HulyClient> =>
   Effect.gen(function*() {
-    const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
+    const { channel, client, message } = yield* findChannelMessage(params)
     const markupUrlConfig = client.markupUrlConfig
 
     const replyId: Ref<HulyThreadMessage> = generateId()
@@ -202,7 +177,7 @@ export const updateThreadReply = (
   params: UpdateThreadReplyParams
 ): Effect.Effect<UpdateThreadReplyResult, UpdateThreadReplyError, HulyClient> =>
   Effect.gen(function*() {
-    const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
+    const { channel, client, message } = yield* findChannelMessage(params)
     const reply = yield* findReply(client, channel, message, params.replyId)
     const markupUrlConfig = client.markupUrlConfig
 
@@ -228,7 +203,7 @@ export const deleteThreadReply = (
   params: DeleteThreadReplyParams
 ): Effect.Effect<DeleteThreadReplyResult, DeleteThreadReplyError, HulyClient> =>
   Effect.gen(function*() {
-    const { channel, client, message } = yield* findMessage(params.channel, params.messageId)
+    const { channel, client, message } = yield* findChannelMessage(params)
     const reply = yield* findReply(client, channel, message, params.replyId)
 
     yield* client.removeDoc(

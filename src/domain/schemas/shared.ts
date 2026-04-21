@@ -193,6 +193,9 @@ export type WorkspaceName = Schema.Schema.Type<typeof WorkspaceName>
 export const UrlString = NonEmptyString.pipe(Schema.brand("UrlString"))
 export type UrlString = Schema.Schema.Type<typeof UrlString>
 
+export const WorkspaceUrlSlug = NonEmptyString.pipe(Schema.brand("WorkspaceUrlSlug"))
+export type WorkspaceUrlSlug = Schema.Schema.Type<typeof WorkspaceUrlSlug>
+
 export const WorkspaceVersion = NonEmptyString.pipe(Schema.brand("WorkspaceVersion"))
 export type WorkspaceVersion = Schema.Schema.Type<typeof WorkspaceVersion>
 

@@ -10,7 +10,13 @@
  *
  * @module
  */
+import type { DocumentId, WorkspaceUrlSlug } from "../domain/schemas/shared.js"
 import { UrlString } from "../domain/schemas/shared.js"
+
+export interface DocumentUrlConfig {
+  readonly baseUrl: UrlString
+  readonly workspaceUrlSlug: WorkspaceUrlSlug
+}
 
 /**
  * Slugify a document title to match Huly's URL path segment.
@@ -39,13 +45,16 @@ export const slugifyTitle = (title: string): string => {
  * tolerated. See {@link slugifyTitle} for the path-segment algorithm.
  */
 export const buildDocumentUrl = (
-  baseUrl: string,
-  workspaceUrlSlug: string,
+  baseUrl: UrlString,
+  workspaceUrlSlug: WorkspaceUrlSlug,
   title: string,
-  id: string
+  id: DocumentId
 ): UrlString => {
   const trimmedBase = baseUrl.replace(/\/+$/, "")
   const slug = slugifyTitle(title)
   const pathSegment = slug === "" ? id : `${slug}-${id}`
   return UrlString.make(`${trimmedBase}/workbench/${workspaceUrlSlug}/document/${pathSegment}`)
 }
+
+export const buildDocumentUrlFromConfig = (config: DocumentUrlConfig, title: string, id: DocumentId): UrlString =>
+  buildDocumentUrl(config.baseUrl, config.workspaceUrlSlug, title, id)

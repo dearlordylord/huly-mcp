@@ -21,6 +21,7 @@ import {
   DocumentTextNotFoundError,
   type TeamspaceNotFoundError
 } from "../errors.js"
+import { buildDocumentUrlFromConfig } from "../url-builders.js"
 import { findTeamspaceAndDocument } from "./documents.js"
 
 import { documentPlugin } from "../huly-plugins.js"
@@ -116,7 +117,7 @@ export const editDocument = (
     }
 
     const finalTitle = updateOps.title ?? doc.title
-    const url = client.documentUrl(finalTitle, doc._id)
+    const url = buildDocumentUrlFromConfig(client.documentUrlConfig, finalTitle, DocumentId.make(doc._id))
 
     if (Object.keys(updateOps).length === 0 && !contentUpdatedInPlace) {
       return { id: DocumentId.make(doc._id), updated: false, url }
