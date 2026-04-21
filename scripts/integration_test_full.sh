@@ -108,6 +108,21 @@ run_capture_only() {
   return 0
 }
 
+assert_json_field_nonempty() {
+  local name="$1" json="$2" jq_expr="$3"
+  local value
+  value=$(printf '%s\n' "$json" | jq -r "$jq_expr // empty" 2>/dev/null)
+  if [ -n "$value" ]; then
+    echo "PASS: $name"
+    PASSED=$((PASSED + 1))
+    return 0
+  fi
+  echo "FAIL: $name (field missing: $jq_expr)"
+  FAILED=$((FAILED + 1))
+  ERRORS="${ERRORS}\n  - ${name}: field missing (${jq_expr})"
+  return 1
+}
+
 json_string() {
   jq -Rn --arg value "$1" '$value'
 }
@@ -520,10 +535,34 @@ if [ -n "$TS_NAME" ]; then
   if [ $? -eq 0 ]; then
     DOC_ID=$(echo "$DOC_TEXT" | jq -r '.id' 2>/dev/null)
     echo "  => doc: $DOC_ID"
-    run_test "get_document($DOC_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\"}},\"id\":2}"
-    run_test "edit_document($DOC_ID) title rename" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"edit_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\",\"title\":\"Updated Doc\"}},\"id\":2}"
+    assert_json_field_nonempty "create_document($DOC_ID) returns url" "$DOC_TEXT" '.url'
+
+    GET_DOC_TEXT=$(run_capture "get_document($DOC_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\"}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_field_nonempty "get_document($DOC_ID) returns url" "$GET_DOC_TEXT" '.url'
+    fi
+
+    EDIT_DOC_TEXT=$(run_capture "edit_document($DOC_ID) title rename" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"edit_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\",\"title\":\"Updated Doc\"}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_field_nonempty "edit_document($DOC_ID) returns url" "$EDIT_DOC_TEXT" '.url'
+    fi
+
+    LIST_DOCS_TEXT=$(run_capture_only \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_documents\",\"arguments\":{\"teamspace\":\"$TS_NAME\"}},\"id\":2}")
+    if [ -n "$LIST_DOCS_TEXT" ]; then
+      LIST_DOC_URL=$(printf '%s\n' "$LIST_DOCS_TEXT" | jq -r --arg doc_id "$DOC_ID" '.documents[] | select(.id == $doc_id) | .url // empty' 2>/dev/null | head -n 1)
+      if [ -n "$LIST_DOC_URL" ]; then
+        echo "PASS: list_documents($TS_NAME) returns url for $DOC_ID"
+        PASSED=$((PASSED + 1))
+      else
+        echo "FAIL: list_documents($TS_NAME) returns url for $DOC_ID"
+        FAILED=$((FAILED + 1))
+        ERRORS="${ERRORS}\n  - list_documents(${TS_NAME}) missing url for ${DOC_ID}"
+      fi
+    fi
+
     run_test "list_inline_comments($DOC_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_inline_comments\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\"}},\"id\":2}"
     run_test "delete_document($DOC_ID)" \
