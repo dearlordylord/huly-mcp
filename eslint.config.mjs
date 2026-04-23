@@ -14,8 +14,8 @@ const doubleAssertionSelector = {
 }
 
 const dateBanSelectors = [{
-  selector: "NewExpression[callee.name='Date']",
-  message: "new Date() is banned. Use Effect DateTime.now or DateTime.unsafeNow instead."
+  selector: "NewExpression[callee.name='Date'][arguments.length=0]",
+  message: "new Date() (zero-arg clock read) is banned. Use Effect DateTime.now or inject a now() port. `new Date(value)` for parsing domain-value strings is allowed."
 }, {
   selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
   message: "Date.now() is banned. Use Effect Clock.currentTimeMillis or DateTime.now instead."
