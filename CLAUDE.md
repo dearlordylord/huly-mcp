@@ -35,6 +35,14 @@ Run before considering work complete:
 
 Type casts (`as T`) are a sin. Avoid them. All data crossing system boundaries (APIs etc.) must be strongly typed with Effect Schema.
 
+## No Test Mocks
+
+Test mocks are banned. Do not use `vi.mock`, `vi.doMock`, `vi.hoisted`, `vi.spyOn`, `vi.stubGlobal`, Jest-style `jest.mock`, or any module-level monkey-patching. If a test needs to substitute behavior, the subject must expose a dependency-injection seam — an Effect `Context.Tag` / `Effect.Service` provided via `Layer`, or a plain ports argument. Tests then provide a real stub implementation through that seam.
+
+This applies to every side effect, including time. Code that reads the clock must depend on `Effect.Clock` (or a `Clock`-like service) rather than calling `Date.now()`, `performance.now()`, or `new Date()` directly. Tests supply a deterministic `TestClock` or equivalent stub via `Layer.provide`.
+
+The intent: if a test cannot be written without reaching into another module's internals, that is a design signal — refactor the subject to accept its dependencies explicitly.
+
 ## Code Review
 
 Code review agents must consult `.claude/review-rules.md` for project-specific quality gates.

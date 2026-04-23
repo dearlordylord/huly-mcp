@@ -21,6 +21,24 @@ const dateBanSelectors = [{
   message: "Date.now() is banned. Use Effect Clock.currentTimeMillis or DateTime.now instead."
 }]
 
+const mockBanSelectors = [
+  "mock",
+  "doMock",
+  "unmock",
+  "hoisted",
+  "spyOn",
+  "stubGlobal",
+  "unstubAllGlobals",
+  "mocked"
+].map((member) => ({
+  selector: `CallExpression[callee.object.name='vi'][callee.property.name='${member}']`,
+  message:
+    `vi.${member} is banned — tests must substitute behavior through Effect Layer / ports, not module monkey-patching. See CLAUDE.md \"No Test Mocks\".`
+})).concat([{
+  selector: "CallExpression[callee.object.name='jest'][callee.property.name='mock']",
+  message: "jest.mock is banned — use dependency injection. See CLAUDE.md \"No Test Mocks\"."
+}])
+
 export default [
   {
     ignores: ["**/dist", "**/build", "**/*.md", "**/.reference"]
@@ -95,7 +113,7 @@ export default [
       "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/no-unnecessary-type-assertion": "error",
       "@typescript-eslint/no-unnecessary-condition": "error",
-      "no-restricted-syntax": ["error", doubleAssertionSelector, ...dateBanSelectors, {
+      "no-restricted-syntax": ["error", doubleAssertionSelector, ...dateBanSelectors, ...mockBanSelectors, {
         selector: "TSAsExpression:not([typeAnnotation.typeName.name='const'])",
         message: "Type assertion (as T) is banned. Use Effect Schema decode, satisfies, or restructure code to avoid the cast. If truly unavoidable at an SDK boundary, add eslint-disable with justification."
       }],
@@ -169,8 +187,8 @@ export default [
       "max-lines": "off",
       "no-magic-numbers": "off",
       "functional/immutable-data": "off",
-      // Override: keep Date bans and double-assertion ban but exclude as T ban — test mocks need branded type casts.
-      "no-restricted-syntax": ["error", doubleAssertionSelector, ...dateBanSelectors]
+      // Override: keep Date, mock and double-assertion bans; drop the general `as T` ban since test drivers need branded casts.
+      "no-restricted-syntax": ["error", doubleAssertionSelector, ...dateBanSelectors, ...mockBanSelectors]
     }
   }
 ]
