@@ -1,13 +1,16 @@
 import { JSONSchema, Schema } from "effect"
 
-import type {
-  PersonName,
-  PositiveNumber,
+import type { PersonName, PositiveNumber, Timestamp as TimestampBrand } from "./shared.js"
+import {
+  IssueIdentifier,
+  LimitParam,
+  NonEmptyString,
+  ProjectIdentifier,
   TimeSpendReportId,
-  Timestamp as TimestampBrand,
+  Timestamp,
+  TodoId,
   WorkSlotId
 } from "./shared.js"
-import { IssueIdentifier, LimitParam, NonEmptyString, ProjectIdentifier, Timestamp, TodoId } from "./shared.js"
 
 // No codec needed — internal type, not used for runtime validation
 export interface TimeSpendReport {
@@ -231,7 +234,7 @@ export interface StopTimerResult {
 }
 
 export const TimeSpendReportWireSchema = Schema.Struct({
-  id: Schema.String,
+  id: TimeSpendReportId,
   identifier: Schema.optional(IssueIdentifier),
   employee: Schema.optional(NonEmptyString),
   date: Schema.optional(Schema.NullOr(Timestamp)),
@@ -248,7 +251,7 @@ export const TimeReportSummarySchema = Schema.Struct({
 })
 
 export const WorkSlotWireSchema = Schema.Struct({
-  id: Schema.String,
+  id: WorkSlotId,
   todoId: TodoId,
   date: Timestamp,
   dueDate: Timestamp,
@@ -275,12 +278,12 @@ export const DetailedTimeReportSchema = Schema.Struct({
 })
 
 export const LogTimeResultSchema = Schema.Struct({
-  reportId: Schema.String,
+  reportId: TimeSpendReportId,
   identifier: IssueIdentifier
 })
 
 export const CreateWorkSlotResultSchema = Schema.Struct({
-  slotId: Schema.String
+  slotId: WorkSlotId
 })
 
 export const StartTimerResultSchema = Schema.Struct({
@@ -291,7 +294,7 @@ export const StartTimerResultSchema = Schema.Struct({
 export const StopTimerResultSchema = Schema.Struct({
   identifier: IssueIdentifier,
   stoppedAt: Timestamp,
-  reportId: Schema.optional(Schema.String)
+  reportId: Schema.optional(TimeSpendReportId)
 })
 
 export const ListTimeSpendReportsResultSchema = Schema.Array(TimeSpendReportWireSchema)

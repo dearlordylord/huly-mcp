@@ -16,10 +16,10 @@ Completed or mostly completed:
 
 Still open:
 
-- `custom-fields` remains the clearest typed-boundary hotspot.
-- `workspace` and `time` still have some widened string/result fields.
-- Some shared helper and fallback lookup patterns still deserve a focused pass.
-- `REPORT.md` has not been reconciled with the later fixes, so it should be treated as historical input plus unresolved findings, not as a current-state report.
+- `custom-fields` still exposes open-ended `typeDetails`, but its SDK reads and type-name domain are now mostly contained.
+- `workspace` and `time` should be monitored for future parse-precise / return-loose regressions after the latest wire-schema precision pass.
+- Some shared `toRef` usage still deserves periodic audit at SDK boundaries.
+- `REPORT.md` has been annotated with later fixes, so it should be treated as historical input plus unresolved findings, not as a current-state report.
 
 ## Architectural Decisions
 
@@ -34,36 +34,41 @@ Durable decisions that still apply:
 
 ## Phase 1: Typed Output Baseline
 
-Status: mostly complete, but not re-audited after all later features.
+Status: complete as of 2026-04-25 for the originally identified relation, time, and workspace output hotspots.
 
 What landed:
 
 - Relation, custom-field, time, and workspace output contracts were hardened in later work.
 - Encoded output validation was added for hardened tools.
 
-Remaining work:
+Completed follow-up:
 
-- [ ] Re-audit relation outputs against current `src/domain/schemas/relations.ts`.
-- [ ] Re-audit small time-tracking return values in `src/domain/schemas/time.ts`.
-- [ ] Confirm no newer tool reintroduced parse-precise / return-loose output contracts.
-- [ ] Update `REPORT.md` or close the relevant findings in a tracked issue.
+- [x] Re-audited relation outputs against current `src/domain/schemas/relations.ts`; relation result schemas now use branded/domain identifiers.
+- [x] Re-audited small time-tracking return values in `src/domain/schemas/time.ts`; wire schemas now use `TimeSpendReportId` and `WorkSlotId`.
+- [x] Confirmed the obvious newer custom-field, time, workspace, and relation tool outputs do not retain the original parse-precise / return-loose issues.
+- [x] Annotated `REPORT.md` with the later fixes.
 
 Acceptance criteria before closing:
 
-- [ ] Relation result types avoid bare strings wherever an existing identifier or class-name domain type is available.
-- [ ] Small time-tracking result types use existing branded IDs where appropriate.
-- [ ] JSON payloads remain backward-compatible.
-- [ ] Tests prove result typing and serialized output still match expectations.
+- [x] Relation result types avoid bare strings wherever an existing identifier or class-name domain type is available.
+- [x] Small time-tracking result types use existing branded IDs where appropriate.
+- [x] JSON payloads remain backward-compatible.
+- [x] Tests prove result typing and serialized output still match expectations.
 
 ## Phase 2: Custom Fields Boundary Containment
 
-Status: open.
+Status: partially complete; remaining scope is narrower than the original finding.
+
+What has already landed:
+
+- `src/huly/operations/custom-fields.ts` now isolates dynamic SDK record inspection behind decoded adapter helpers.
+- Custom-field type names are a closed domain with an explicit `unknown` case.
+- Existing tests cover list, read, and set flows through that decoded boundary.
 
 Why it remains open:
 
-- `src/huly/operations/custom-fields.ts` still contains dynamic `Record<string, unknown>` handling.
 - `src/domain/schemas/custom-fields.ts` still exposes `typeDetails: Record<string, unknown>`.
-- Custom-field metadata is still the highest-value place to isolate SDK dynamic shapes behind typed adapters.
+- Unknown custom-field type metadata is intentionally preserved for backward-compatible MCP output, but known `typeDetails` variants could still be modeled more precisely.
 
 What to build:
 
@@ -71,20 +76,21 @@ Refactor the custom-fields vertical slice so dynamic Huly metadata is decoded on
 
 Acceptance criteria:
 
-- [ ] Dynamic SDK reads for custom-field metadata are isolated behind dedicated typed adapters.
-- [ ] Custom-field type names become a closed domain where practical, including an explicit `unknown` case if needed.
+- [x] Dynamic SDK reads for custom-field metadata are isolated behind dedicated typed adapters.
+- [x] Custom-field type names become a closed domain where practical, including an explicit `unknown` case if needed.
 - [ ] Custom-field result contracts become more precise without breaking MCP callers.
-- [ ] Tests cover list, read, and set flows through the new typed boundary.
+- [x] Tests cover list, read, and set flows through the new typed boundary.
 - [ ] `pnpm check-all` passes.
 
 ## Phase 3: Workspace And Time Precision Pass
 
-Status: partially complete.
+Status: complete for the time/workspace wire-schema precision issues identified in this plan.
 
-Why it remains open:
+What landed:
 
-- `workspace` is operationally clean but still has some widened strings and anonymous maps.
-- `time` has improved coverage and typed outputs, but should be re-audited for IDs that still widen back to `string`.
+- Time result schemas now preserve `TimeSpendReportId` and `WorkSlotId`.
+- Workspace result schemas now preserve `WorkspaceUuid`, `WorkspaceName`, `UrlString`, `RegionId`, `WorkspaceVersion`, `WorkspaceMode`, `PersonUuid`, and `AccountId` where applicable.
+- Runtime JSON payloads remain string-compatible.
 
 What to build:
 
@@ -92,11 +98,11 @@ Apply the output-hardening pattern to the remaining workspace and time result su
 
 Acceptance criteria:
 
-- [ ] Workspace result types use domain-specific identifiers and constrained-string aliases where stable and justified.
-- [ ] Time-tracking outputs stop widening known IDs back to `string`.
-- [ ] No new sentinel-string states are introduced.
-- [ ] Tool tests verify that refined types do not change successful runtime output.
-- [ ] `pnpm check-all` passes.
+- [x] Workspace result types use domain-specific identifiers and constrained-string aliases where stable and justified.
+- [x] Time-tracking outputs stop widening known IDs back to `string`.
+- [x] No new sentinel-string states are introduced.
+- [x] Tool tests verify that refined types do not change successful runtime output.
+- [x] `pnpm check-all` passes.
 
 ## Phase 4: Shared Helper Discipline
 
@@ -107,17 +113,20 @@ What landed:
 - Shared operation helpers have been refactored since this plan was written.
 - Cast justifications and SDK-boundary comments are more explicit than when `REPORT.md` was written.
 
+Completed follow-up:
+
+- [x] Re-audited `src/huly/operations/test-management-shared.ts` fallback lookup helpers; they now use the shared `findByNameOrIdOrFail` helper instead of local `let`-based fallback reassignment.
+- [x] Confirmed the test-management shared finders already use the reusable ID-or-name lookup helper without weakening not-found errors.
+
 Remaining work:
 
 - [ ] Re-audit `toRef` usage and confirm each call is either fed by a validated domain value or clearly at an SDK boundary.
-- [ ] Re-audit `src/huly/operations/test-management-shared.ts` fallback lookup helpers for avoidable reassignment and duplication.
-- [ ] Prefer reusable ID-or-name lookup helpers where they reduce repeated control flow without weakening error messages.
 
 Acceptance criteria:
 
 - [ ] Shared reference-conversion helpers accept narrower inputs where practical.
-- [ ] Fallback lookup helpers avoid `let`-based conditional reassignment where practical.
-- [ ] Test-management shared finders match the style expected by `.claude/review-rules.md`.
+- [x] Fallback lookup helpers avoid `let`-based conditional reassignment where practical.
+- [x] Test-management shared finders match the style expected by `.claude/review-rules.md`.
 - [ ] Cast justifications remain explicit and limited to true SDK boundaries.
 - [ ] `pnpm check-all` passes.
 

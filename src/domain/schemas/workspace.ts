@@ -1,16 +1,20 @@
 import { JSONSchema, Schema } from "effect"
 
-import type {
+import type { PersonName, UrlString } from "./shared.js"
+import {
+  AccountId,
   Email,
-  PersonName,
+  EmptyParamsSchema,
+  LimitParam,
+  NonEmptyString,
   PersonUuid,
-  UrlString,
+  RegionId,
+  UrlString as UrlStringSchema,
   WorkspaceMode,
   WorkspaceName,
   WorkspaceUuid,
   WorkspaceVersion
 } from "./shared.js"
-import { AccountId, EmptyParamsSchema, LimitParam, NonEmptyString, RegionId } from "./shared.js"
 
 export const AccountRoleSchema = Schema.Literal(
   "READONLYGUEST",
@@ -243,40 +247,40 @@ export interface UpdateGuestSettingsResult {
 }
 
 export const WorkspaceMemberSchema = Schema.Struct({
-  personId: Schema.String,
+  personId: PersonUuid,
   role: AccountRoleSchema,
   name: Schema.optional(NonEmptyString),
-  email: Schema.optional(NonEmptyString)
+  email: Schema.optional(Email)
 })
 
 export const WorkspaceInfoSchema = Schema.Struct({
-  uuid: Schema.String,
-  name: NonEmptyString,
-  url: NonEmptyString,
-  region: Schema.optional(Schema.String),
+  uuid: WorkspaceUuid,
+  name: WorkspaceName,
+  url: UrlStringSchema,
+  region: Schema.optional(RegionId),
   createdOn: Schema.Number,
   allowReadOnlyGuest: Schema.optional(Schema.Boolean),
   allowGuestSignUp: Schema.optional(Schema.Boolean),
-  version: Schema.optional(NonEmptyString),
-  mode: Schema.optional(NonEmptyString)
+  version: Schema.optional(WorkspaceVersion),
+  mode: Schema.optional(WorkspaceMode)
 })
 
 export const WorkspaceSummarySchema = Schema.Struct({
-  uuid: Schema.String,
-  name: NonEmptyString,
-  url: NonEmptyString,
-  region: Schema.optional(Schema.String),
+  uuid: WorkspaceUuid,
+  name: WorkspaceName,
+  url: UrlStringSchema,
+  region: Schema.optional(RegionId),
   createdOn: Schema.Number,
   lastVisit: Schema.optional(Schema.Number)
 })
 
 export const RegionInfoSchema = Schema.Struct({
-  region: Schema.String,
+  region: RegionId,
   name: Schema.String
 })
 
 export const UserProfileSchema = Schema.Struct({
-  personUuid: Schema.String,
+  personUuid: PersonUuid,
   firstName: Schema.String,
   lastName: Schema.String,
   bio: Schema.optional(Schema.String),
@@ -288,15 +292,15 @@ export const UserProfileSchema = Schema.Struct({
 })
 
 export const UpdateMemberRoleResultSchema = Schema.Struct({
-  accountId: Schema.String,
+  accountId: AccountId,
   role: AccountRoleSchema,
   updated: Schema.Boolean
 })
 
 export const CreateWorkspaceResultSchema = Schema.Struct({
-  uuid: Schema.String,
-  url: NonEmptyString,
-  name: NonEmptyString
+  uuid: WorkspaceUuid,
+  url: UrlStringSchema,
+  name: WorkspaceName
 })
 
 export const DeleteWorkspaceResultSchema = Schema.Struct({

@@ -3,6 +3,8 @@
 Date: 2026-04-08
 Repository: `/workspace/typescript/hulymcp`
 
+Update 2026-04-25: this report is historical. Later hardening work addressed several findings called out below, including relation result brands, time/workspace wire-schema brands, custom-field decoded metadata adapters, closed custom-field type names, and test-management shared fallback helper consolidation. Treat remaining unchecked items in `plans/architecture-hardening-plan.md` as the current source of truth.
+
 ## Scope
 
 This report is a repo-wide audit of:
