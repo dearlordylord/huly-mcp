@@ -1,145 +1,169 @@
 # Plan: Architecture Hardening And Type Precision Pass
 
 > Source report: [REPORT.md](/workspace/typescript/hulymcp/REPORT.md)
-> Planning method: adapted from Matt Pocock's `prd-to-plan` skill at https://raw.githubusercontent.com/mattpocock/skills/refs/heads/main/prd-to-plan/SKILL.md
+> Updated: 2026-04-25
+> Status: partially completed; keep this file until remaining open items are either implemented or moved to tracked issues.
 
-## Architectural decisions
+## Current Status
 
-Durable decisions that apply across all phases:
+This plan is no longer a fresh implementation plan. Several items were addressed by later work, but the original report findings are not fully closed.
 
-- **Execution path**: keep the existing end-to-end flow intact: Effect config and service layers -> MCP server and registry -> domain schemas -> Huly operations -> Huly SDK clients. The report found this split healthy and worth preserving, not replacing.
-- **Validation boundary**: all MCP tool inputs continue to decode through Effect Schema before reaching operations. The registry already centralizes this in a good shape, and refactors should strengthen outputs without bypassing this parse path.
-- **Type strategy**: prefer extending the existing branded vocabulary in `src/domain/schemas/shared.ts` and propagating those types into result interfaces and helper signatures instead of inventing parallel ad hoc aliases.
-- **SDK boundary policy**: unsafe casts stay only at explicit Huly SDK edges. Dynamic document inspection should be isolated in adapter/decoder helpers, not spread through feature logic.
-- **Slice design**: each phase must cut through schema/result types, operation logic, MCP behavior, and tests so it is verifiable on its own. No “types-only” or “tests-only” horizontal phases.
-- **Verification**: every phase ends with `pnpm check-all`, plus relevant integration coverage if the slice changes behavior against live Huly. Current workspace also needs an `esbuild` platform fix before the standard gate can pass.
+Completed or mostly completed:
 
----
+- Typed output and boundary work landed in later commits, including `cd60559 Harden typed outputs and SDK boundaries` and `3bab07d Validate encoded outputs for hardened tools`.
+- Shared helper cleanup progressed in `24032db refactor huly operations helpers`.
+- Guardrails improved through the no-mocks rule, stricter review guidance, and a working `pnpm check-all` path in a correctly provisioned environment.
+
+Still open:
+
+- `custom-fields` remains the clearest typed-boundary hotspot.
+- `workspace` and `time` still have some widened string/result fields.
+- Some shared helper and fallback lookup patterns still deserve a focused pass.
+- `REPORT.md` has not been reconciled with the later fixes, so it should be treated as historical input plus unresolved findings, not as a current-state report.
+
+## Architectural Decisions
+
+Durable decisions that still apply:
+
+- Keep the existing end-to-end flow intact: Effect config and service layers -> MCP server and registry -> domain schemas -> Huly operations -> Huly SDK clients.
+- Continue decoding all MCP tool inputs through Effect Schema before reaching operations.
+- Prefer extending and reusing `src/domain/schemas/shared.ts` branded types instead of inventing parallel aliases.
+- Keep unsafe casts at explicit Huly SDK edges. Dynamic document inspection should be isolated in adapter/decoder helpers.
+- Each implementation slice must cut through schema/result types, operation logic, MCP behavior, and tests.
+- Each completed slice must pass `pnpm check-all`; behavior-changing Huly workflow slices also need live integration coverage.
 
 ## Phase 1: Typed Output Baseline
 
-**User stories**:
-- As a maintainer, I can rely on returned MCP result shapes carrying stable domain types instead of widening back to bare strings.
-- As an LLM caller, I receive outputs that mirror the same identifier semantics used on tool inputs.
+Status: mostly complete, but not re-audited after all later features.
 
-### What to build
+What landed:
 
-Harden one narrow, high-signal output slice end to end by converting the most obvious result-shape primitive leaks into branded or named domain types, starting with relation-style outputs and the smallest time-tracking return values. Keep the external JSON wire format unchanged while improving the internal TypeScript contracts and tests.
+- Relation, custom-field, time, and workspace output contracts were hardened in later work.
+- Encoded output validation was added for hardened tools.
 
-### Research notes
+Remaining work:
 
-- The report identifies output primitive leakage as the highest-priority issue and cites `relations`, `custom-fields`, `time`, and `workspace` as the first targets.
-- The strongest evidence for starting here is that input schemas are already precise while outputs widen back to `string`, creating an avoidable parse-precise / return-loose mismatch.
-- `src/domain/schemas/shared.ts` already contains a large branded vocabulary, so this slice should mostly reuse existing domain types rather than invent new infrastructure.
-- `src/mcp/tools/registry.ts` already guarantees parse -> execute -> serialize in one place, which means tightening return contracts here is low-risk and easy to verify.
+- [ ] Re-audit relation outputs against current `src/domain/schemas/relations.ts`.
+- [ ] Re-audit small time-tracking return values in `src/domain/schemas/time.ts`.
+- [ ] Confirm no newer tool reintroduced parse-precise / return-loose output contracts.
+- [ ] Update `REPORT.md` or close the relevant findings in a tracked issue.
 
-### Acceptance criteria
+Acceptance criteria before closing:
 
-- [ ] Relation result types stop using bare strings where an existing identifier or class-name domain type is available.
+- [ ] Relation result types avoid bare strings wherever an existing identifier or class-name domain type is available.
 - [ ] Small time-tracking result types use existing branded IDs where appropriate.
-- [ ] Tool behavior and JSON payloads stay backward-compatible at runtime.
-- [ ] Tests are updated to prove result typing and serialized output still match expectations.
-
----
+- [ ] JSON payloads remain backward-compatible.
+- [ ] Tests prove result typing and serialized output still match expectations.
 
 ## Phase 2: Custom Fields Boundary Containment
 
-**User stories**:
-- As a maintainer, I can change custom-field behavior without touching untyped `Record<string, unknown>` access across the whole feature.
-- As an LLM caller, custom-field metadata and values are described by a narrower, more predictable contract.
+Status: open.
 
-### What to build
+Why it remains open:
 
-Refactor the custom-fields vertical slice so dynamic Huly metadata is decoded once into narrow internal shapes, then used through typed helpers for listing fields, reading values, and setting values. Keep the feature behavior intact while shrinking the untyped surface area.
+- `src/huly/operations/custom-fields.ts` still contains dynamic `Record<string, unknown>` handling.
+- `src/domain/schemas/custom-fields.ts` still exposes `typeDetails: Record<string, unknown>`.
+- Custom-field metadata is still the highest-value place to isolate SDK dynamic shapes behind typed adapters.
 
-### Research notes
+What to build:
 
-- The report calls `custom-fields` the single most type-eroded production hotspot.
-- Evidence includes repeated `as unknown as Record<string, unknown>`, repeated `as string`, weak `typeName: string`, and reparsing string inputs later in the flow.
-- This is the right second phase because it is both high-value and locally contained: it affects one category of tools but touches schema, operations, and tests end to end.
-- This phase should define a closed custom-field-type domain instead of continuing to return open-ended `string` type names.
+Refactor the custom-fields vertical slice so dynamic Huly metadata is decoded once into narrow internal shapes, then used through typed helpers for listing fields, reading values, and setting values. Keep runtime behavior backward-compatible.
 
-### Acceptance criteria
+Acceptance criteria:
 
 - [ ] Dynamic SDK reads for custom-field metadata are isolated behind dedicated typed adapters.
-- [ ] Custom-field type names become a closed domain rather than open-ended strings wherever practical.
-- [ ] The custom-field result contracts become more precise without breaking MCP callers.
+- [ ] Custom-field type names become a closed domain where practical, including an explicit `unknown` case if needed.
+- [ ] Custom-field result contracts become more precise without breaking MCP callers.
 - [ ] Tests cover list, read, and set flows through the new typed boundary.
-
----
+- [ ] `pnpm check-all` passes.
 
 ## Phase 3: Workspace And Time Precision Pass
 
-**User stories**:
-- As a maintainer, I can trust workspace and time-tracking outputs to preserve meaningful types for IDs, timestamps, names, and constrained string domains.
-- As an LLM caller, I get clearer semantics for workspace/profile/time fields that already have stable meanings in the codebase.
+Status: partially complete.
 
-### What to build
+Why it remains open:
 
-Apply the same output-hardening pattern to the workspace and time vertical slices. Tighten result interfaces, reduce anonymous string maps where possible, and preserve the existing operational behavior of workspace/profile/time tools.
+- `workspace` is operationally clean but still has some widened strings and anonymous maps.
+- `time` has improved coverage and typed outputs, but should be re-audited for IDs that still widen back to `string`.
 
-### Research notes
+What to build:
 
-- The report highlights `workspace` as clean operationally but under-modeled in its result contracts.
-- It also highlights `time` as having several low-effort wins, including branded IDs already available in shared schema definitions.
-- These two slices fit together because both are output-heavy and less dependent on custom metadata decoding than `custom-fields`.
-- The existing branded/shared schema layer already contains `Timestamp`, `WorkspaceUuid`, `PersonUuid`, and time-related IDs, so the missing work is propagation, not invention.
+Apply the output-hardening pattern to the remaining workspace and time result surfaces. Tighten result interfaces, reduce anonymous string maps where possible, and preserve existing tool behavior.
 
-### Acceptance criteria
+Acceptance criteria:
 
 - [ ] Workspace result types use domain-specific identifiers and constrained-string aliases where stable and justified.
 - [ ] Time-tracking outputs stop widening known IDs back to `string`.
-- [ ] No new sentinel-string states are introduced while tightening these contracts.
-- [ ] Tool tests verify that the refined types do not change successful runtime output.
-
----
+- [ ] No new sentinel-string states are introduced.
+- [ ] Tool tests verify that refined types do not change successful runtime output.
+- [ ] `pnpm check-all` passes.
 
 ## Phase 4: Shared Helper Discipline
 
-**User stories**:
-- As a maintainer, I can follow one consistent style for SDK reference conversion, fallback lookups, and shared helper control flow.
-- As a reviewer, I can enforce the repo’s immutability and cast rules without treating common helper modules as exceptions.
+Status: partially complete.
 
-### What to build
+What landed:
 
-Refine the shared helper layer so common lookup utilities and SDK reference bridges preserve more domain information and comply with the project’s own review rules. This includes removing low-signal `let`-based fallback patterns and tightening the signatures around reference conversion.
+- Shared operation helpers have been refactored since this plan was written.
+- Cast justifications and SDK-boundary comments are more explicit than when `REPORT.md` was written.
 
-### Research notes
+Remaining work:
 
-- The report identifies `toRef` as the central cast escape hatch. It is justified, but currently accepts any `string`, which erases domain distinctions before values hit the SDK.
-- The report also identifies `test-management-shared` as violating the repo’s immutability rule via repeated “query then reassign on fallback” patterns.
-- This phase comes after the feature slices so shared helpers can be tightened based on real refactor pressure instead of theoretical cleanup.
-- A reusable “find by ID or name” helper is likely to reduce both mutation and duplication across several domains, especially test-management.
+- [ ] Re-audit `toRef` usage and confirm each call is either fed by a validated domain value or clearly at an SDK boundary.
+- [ ] Re-audit `src/huly/operations/test-management-shared.ts` fallback lookup helpers for avoidable reassignment and duplication.
+- [ ] Prefer reusable ID-or-name lookup helpers where they reduce repeated control flow without weakening error messages.
 
-### Acceptance criteria
+Acceptance criteria:
 
 - [ ] Shared reference-conversion helpers accept narrower inputs where practical.
-- [ ] Fallback lookup helpers avoid `let`-based conditional reassignment.
-- [ ] Test-management shared finders are rewritten into a style consistent with `.claude/review-rules.md`.
-- [ ] Cast justifications remain explicit and are limited to true SDK boundaries.
-
----
+- [ ] Fallback lookup helpers avoid `let`-based conditional reassignment where practical.
+- [ ] Test-management shared finders match the style expected by `.claude/review-rules.md`.
+- [ ] Cast justifications remain explicit and limited to true SDK boundaries.
+- [ ] `pnpm check-all` passes.
 
 ## Phase 5: Guardrails And Regression Proof
 
-**User stories**:
-- As a maintainer, I can keep string-type discipline from regressing after this pass lands.
-- As a reviewer, I can quickly spot when a feature starts widening branded values back to primitives or leaking dynamic records outside adapter boundaries.
+Status: partially complete.
 
-### What to build
+What landed:
 
-Close the loop by adding reviewable guardrails, targeted tests, and lightweight documentation updates so the type-precision work becomes the new default rather than a one-time cleanup.
+- The project bans test mocks and module monkey-patching.
+- Review guidance and lint rules now make several architecture regressions harder.
+- `pnpm check-all` runs cleanly in this workspace/container.
 
-### Research notes
+Remaining work:
 
-- The report found the architectural foundation strong but adoption inconsistent. That means the final phase should lock in the good patterns already present rather than add more architecture.
-- The project already uses a strict quality harness and review rules, so the best follow-up is to align code examples, tests, and review checklists with the stronger type discipline.
-- `src/domain/schemas/shared.ts` is already the durable type vocabulary. This phase should make “reuse existing brands first” an explicit working rule during future feature work.
-- Verification remains blocked today by the workspace’s `esbuild` platform mismatch; fixing the environment is prerequisite to reliable enforcement of `pnpm check-all`.
+- [ ] Reconcile `REPORT.md` with completed work, or convert remaining findings into tracked issues.
+- [ ] Add focused regression tests for any new adapter/helper boundaries introduced by Phases 2-4.
+- [ ] Document the current branded-type expectation in contributor/reviewer guidance if it is not already clear enough.
 
-### Acceptance criteria
+Acceptance criteria:
 
 - [ ] Targeted tests cover the new typed result contracts and boundary helpers.
-- [ ] Documentation or reviewer guidance explicitly points contributors toward existing shared branded types.
+- [ ] Documentation or reviewer guidance points contributors toward existing shared branded types.
 - [ ] The standard quality gate runs cleanly in a correctly provisioned environment.
-- [ ] The report’s high- and medium-severity findings are either resolved or explicitly converted into tracked follow-up items.
+- [ ] The report’s high- and medium-severity findings are resolved or explicitly tracked elsewhere.
+
+## Potential SDK Coverage Backlog
+
+Status: not validated yet.
+
+These are candidate gaps from a quick comparison against installed Huly SDK/plugin surfaces and local examples. They are not yet validated against live Huly behavior, user demand, or SDK write semantics. Do not treat them as committed scope until each item has a small PRD or issue with integration-test strategy.
+
+- [ ] Not validated: direct-message creation and direct-message send/update/delete tools. Current tools list direct message conversations but message write coverage is channel-focused.
+- [ ] Not validated: saved document tools, such as save document, unsave document, and list saved documents.
+- [ ] Not validated: document snapshot/history tools using `DocumentSnapshot`.
+- [ ] Not validated: calendar management tools for `Calendar`, `ExternalCalendar`, `Schedule`, and `PrimaryCalendar` objects.
+- [ ] Not validated: richer attachment/media tools for SDK classes such as `Embedding`, `Drawing`, and `Photo`.
+- [ ] Not validated: social identity and contact channel inspection tools for lower-level contact/account debugging.
+- [ ] Not validated: card favorites, card roles, card sections, and card view defaults/extensions.
+- [ ] Not validated: project/task descriptor management beyond the safe project type, task type, and issue status tools already implemented.
+- [ ] Not validated: a carefully constrained raw read-only SDK inspection tool. This should remain read-only unless a separate safety design is approved.
+
+Validation checklist for each backlog item:
+
+- [ ] Confirm the SDK class shape and required fields from local examples, SDK types, or live workspace inspection.
+- [ ] Decide whether the tool is LLM-first and safer as a single high-level operation rather than raw SDK access.
+- [ ] Define cleanup-safe integration coverage, or explicitly document why only read-only integration is safe.
+- [ ] Add schema-backed inputs and encoded output validation.
+- [ ] Run `pnpm check-all`.
