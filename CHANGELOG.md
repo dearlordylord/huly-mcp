@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.9.1
+
+### Patch Changes
+
+- Document the `create_document` `parent` option in the MCP tool description and generated README so agents can discover nested document creation from the tool list.
+
 ## 0.9.0
 
 ### Minor Changes
