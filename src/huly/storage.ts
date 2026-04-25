@@ -8,13 +8,7 @@
 import * as fs from "node:fs/promises"
 import * as path from "node:path"
 
-import {
-  type AuthOptions,
-  createStorageClient,
-  getWorkspaceToken,
-  loadServerConfig,
-  type StorageClient
-} from "@hcengineering/api-client"
+import { type AuthOptions, type StorageClient } from "@hcengineering/api-client"
 import type { Blob, Ref, WorkspaceUuid } from "@hcengineering/core"
 import { Context, Effect, Layer } from "effect"
 
@@ -32,6 +26,7 @@ import {
   InvalidFileDataError
 } from "./errors.js"
 import { toRef } from "./operations/sdk-boundary.js"
+import { HulySdk, type HulySdkDependencies } from "./sdk-deps.js"
 
 const MAX_FILE_SIZE_MB = 100
 const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * BYTES_PER_MB
@@ -166,21 +161,22 @@ export class HulyStorageClient extends Context.Tag("@hulymcp/HulyStorageClient")
   HulyStorageClient,
   HulyStorageOperations
 >() {
-  static readonly layer: Layer.Layer<
+  static readonly layerWithDependencies: Layer.Layer<
     HulyStorageClient,
     StorageClientError,
-    HulyConfigService
+    HulyConfigService | HulySdk
   > = Layer.scoped(
     HulyStorageClient,
     Effect.gen(function*() {
       const config = yield* HulyConfigService
+      const sdk = yield* HulySdk
 
       const authOptions = authToOptions(config.auth, config.workspace)
 
       const { baseUrl, storageClient, workspaceId } = yield* connectStorageWithRetry({
         url: config.url,
         ...authOptions
-      })
+      }, sdk)
 
       const operations: HulyStorageOperations = {
         uploadFile: (filename, data, contentType) =>
@@ -207,6 +203,12 @@ export class HulyStorageClient extends Context.Tag("@hulymcp/HulyStorageClient")
       return operations
     })
   )
+
+  static readonly layer: Layer.Layer<
+    HulyStorageClient,
+    StorageClientError,
+    HulyConfigService
+  > = HulyStorageClient.layerWithDependencies.pipe(Layer.provide(HulySdk.defaultLayer))
 
   /**
    * Create a test layer for unit testing.
@@ -256,12 +258,13 @@ const buildFileUrl = (baseUrl: string, workspaceId: WorkspaceUuid, blobId: strin
 }
 
 const connectStorageClient = async (
-  config: StorageConnectionConfig
+  config: StorageConnectionConfig,
+  sdk: HulySdkDependencies
 ): Promise<StorageConnection> => {
   // Use the same authentication flow as HulyClient to get workspace token
   const { url, ...authOptions } = config
-  const serverConfig = await loadServerConfig(url)
-  const { token, workspaceId } = await getWorkspaceToken(
+  const serverConfig = await sdk.loadServerConfig(url)
+  const { token, workspaceId } = await sdk.getWorkspaceToken(
     url,
     authOptions,
     serverConfig
@@ -272,7 +275,7 @@ const connectStorageClient = async (
   const uploadUrl = concatLink(url, serverConfig.UPLOAD_URL)
 
   // Create storage client with proper authentication
-  const storageClient: StorageClient = createStorageClient(
+  const storageClient: StorageClient = sdk.createStorageClient(
     filesUrl,
     uploadUrl,
     token,
@@ -287,9 +290,10 @@ const connectStorageClient = async (
 }
 
 const connectStorageWithRetry = (
-  config: StorageConnectionConfig
+  config: StorageConnectionConfig,
+  sdk: HulySdkDependencies
 ): Effect.Effect<StorageConnection, StorageClientError> =>
-  connectWithRetry(() => connectStorageClient(config), "Storage connection failed")
+  connectWithRetry(() => connectStorageClient(config, sdk), "Storage connection failed")
 
 /**
  * Decode base64 data to Buffer with validation.

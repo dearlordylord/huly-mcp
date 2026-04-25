@@ -98,6 +98,9 @@ interface McpServerConfigData {
 
 interface McpServerConfigCallbacks {
   readonly resolveClients: () => Promise<ClientBundle>
+  readonly createServer?: () => Server
+  readonly createStdioTransport?: () => StdioServerTransport
+  readonly writeError?: (message: string) => void
 }
 
 type McpServerConfig = McpServerConfigData & McpServerConfigCallbacks
@@ -110,7 +113,14 @@ export class McpServerError extends Schema.TaggedError<McpServerError>()(
   }
 ) {}
 
-const parseToolsets = (raw: string | undefined): ReadonlySet<string> | undefined => {
+const defaultWriteError = (message: string): void => {
+  console.error(message)
+}
+
+const parseToolsets = (
+  raw: string | undefined,
+  writeError: (message: string) => void = defaultWriteError
+): ReadonlySet<string> | undefined => {
   if (raw === undefined || raw.trim() === "") return undefined
   const requested = raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
   const enabled = new Set<string>()
@@ -118,7 +128,7 @@ const parseToolsets = (raw: string | undefined): ReadonlySet<string> | undefined
     if (CATEGORY_NAMES.has(r)) {
       enabled.add(r)
     } else {
-      console.error(
+      writeError(
         `Warning: unknown toolset category "${r}", ignoring. Valid categories: ${[...CATEGORY_NAMES].join(", ")}`
       )
     }
@@ -143,7 +153,19 @@ const DRAIN_TIMEOUT_MS = 30_000
 const createMcpServer = (
   resolveClients: () => Promise<ClientBundle>,
   telemetry: TelemetryOperations,
-  registry: ToolRegistry
+  registry: ToolRegistry,
+  createServer: () => Server = () =>
+    new Server(
+      {
+        name: "huly-mcp",
+        version: VERSION
+      },
+      {
+        capabilities: {
+          tools: {}
+        }
+      }
+    )
 ): McpServerHandle => {
   let inflight = 0
   const drainInflight = (): Promise<void> => {
@@ -161,17 +183,7 @@ const createMcpServer = (
     })
   }
 
-  const server = new Server(
-    {
-      name: "huly-mcp",
-      version: VERSION
-    },
-    {
-      capabilities: {
-        tools: {}
-      }
-    }
-  )
+  const server = createServer()
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     telemetry.firstListTools()
@@ -297,9 +309,10 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
       McpServerService,
       Effect.gen(function*() {
         const telemetry = yield* TelemetryService
+        const writeError = config.writeError ?? defaultWriteError
 
         const toolsetsRaw = yield* Effect.orElseSucceed(Config.string("TOOLSETS"), () => "")
-        const enabledCategories = parseToolsets(toolsetsRaw || undefined)
+        const enabledCategories = parseToolsets(toolsetsRaw || undefined, writeError)
 
         const toolsets = enabledCategories ? [...enabledCategories] : null
         const registry = enabledCategories
@@ -335,10 +348,11 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                 const [stdioServer, drainInflight] = createMcpServer(
                   config.resolveClients,
                   telemetry,
-                  registry
+                  registry,
+                  config.createServer
                 )
                 yield* Ref.set(serverRef, stdioServer)
-                const transport = new StdioServerTransport()
+                const transport = config.createStdioTransport?.() ?? new StdioServerTransport()
 
                 yield* Effect.tryPromise({
                   try: () => stdioServer.connect(transport),
@@ -391,7 +405,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 
                 yield* startHttpTransport(
                   { port, host },
-                  () => createMcpServer(config.resolveClients, telemetry, registry)[0]
+                  () => createMcpServer(config.resolveClients, telemetry, registry, config.createServer)[0]
                 ).pipe(
                   Effect.scoped,
                   Effect.mapError(

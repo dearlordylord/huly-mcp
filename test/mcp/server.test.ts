@@ -17,7 +17,7 @@ import {
 } from "@hcengineering/tracker"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js"
 import { Context, Effect, Fiber, Layer } from "effect"
-import { expect, vi } from "vitest"
+import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
@@ -72,6 +72,9 @@ const buildTestServerLayer = (
 ) =>
   McpServerService.layer({
     ...config,
+    createServer: createMockServer,
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test transport is never inspected by the mocked server
+    createStdioTransport: () => ({}) as never,
     resolveClients: resolveClientsFromLayer(layers)
   }).pipe(Layer.provide(layers))
 
@@ -83,25 +86,19 @@ const capturedHandlers: HandlerMap = new Map()
 let mockConnectBehavior: (() => Promise<void>) | null = null
 let mockCloseBehavior: (() => Promise<void>) | null = null
 
-// Mock MCP SDK so run() doesn't connect to real stdin/stdout
-vi.mock("@modelcontextprotocol/sdk/server/stdio.js", () => ({
-  StdioServerTransport: class StdioServerTransport {}
-}))
-
-vi.mock("@modelcontextprotocol/sdk/server/index.js", () => ({
-  Server: class MockServer {
-    constructor() {}
+const createMockServer = () =>
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test fake implements only methods used by McpServerService
+  ({
     setRequestHandler(schema: unknown, handler: (...args: Array<unknown>) => unknown) {
       capturedHandlers.set(schema, handler)
-    }
+    },
     async connect() {
       if (mockConnectBehavior) return mockConnectBehavior()
-    }
+    },
     async close() {
       if (mockCloseBehavior) return mockCloseBehavior()
     }
-  }
-}))
+  }) as never
 
 // --- Mock Data Builders ---
 

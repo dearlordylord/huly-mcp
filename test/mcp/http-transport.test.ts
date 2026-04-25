@@ -8,7 +8,6 @@
 import type http from "node:http"
 
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js"
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js"
 import { Effect, Exit, Layer } from "effect"
 import type { Express, Request, Response } from "express"
 import { describe, expect, it, vi } from "vitest"
@@ -362,13 +361,13 @@ describe("HTTP Transport", () => {
       const mockHttp = mock<http.Server>({
         close: closeFn
       })
+      const writeError = vi.fn()
 
       const mockFactory: HttpServerFactory = {
         createApp: vi.fn(() => app),
-        listen: vi.fn(() => Effect.succeed(mockHttp))
+        listen: vi.fn(() => Effect.succeed(mockHttp)),
+        writeError
       }
-
-      const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true)
 
       const program = startHttpTransport(
         { port: 3000, host: "127.0.0.1" },
@@ -386,12 +385,10 @@ describe("HTTP Transport", () => {
       )
 
       expect(closeFn).toHaveBeenCalled()
-      const closeErrorCall = stderrSpy.mock.calls.find(
-        (call) => typeof call[0] === "string" && call[0].includes("Server close error")
+      const closeErrorCall = writeError.mock.calls.find(
+        (call) => call[0].includes("Server close error")
       )
       expect(closeErrorCall).toBeDefined()
-
-      stderrSpy.mockRestore()
     })
 
     // test-revizorro: approved
@@ -404,10 +401,9 @@ describe("HTTP Transport", () => {
 
       const mockFactory: HttpServerFactory = {
         createApp: vi.fn(() => app),
-        listen: vi.fn(() => Effect.succeed(mockHttp))
+        listen: vi.fn(() => Effect.succeed(mockHttp)),
+        writeError: vi.fn()
       }
-
-      const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true)
 
       const program = startHttpTransport(
         { port: 3000, host: "127.0.0.1" },
@@ -430,8 +426,6 @@ describe("HTTP Transport", () => {
       expect(Exit.isSuccess(result)).toBe(true)
       // Server should be closed during scope release after SIGINT
       expect(closeFn).toHaveBeenCalled()
-
-      stderrSpy.mockRestore()
     })
   })
 
@@ -478,11 +472,18 @@ describe("HTTP Transport", () => {
 
     // test-revizorro: approved
     it("should log to stderr when transport.close rejects during cleanup", async () => {
-      const closeSpy = vi.spyOn(StreamableHTTPServerTransport.prototype, "close")
-        .mockRejectedValue(new Error("transport close boom"))
-
+      const writeError = vi.fn()
+      const transport = {
+        close: vi.fn().mockRejectedValue(new Error("transport close boom")),
+        handleRequest: vi.fn().mockResolvedValue(undefined)
+      }
       const mockServer = createMockMcpServer()
-      const handlers = createMcpHandlers(() => mockServer)
+      const handlers = createMcpHandlers(() => mockServer, {
+        createTransport: () => {
+          return transport as never
+        },
+        writeError
+      })
 
       const closeHandlers: Array<() => void> = []
       const res = mock<Response>({
@@ -506,20 +507,15 @@ describe("HTTP Transport", () => {
           if (event === "close") closeHandlers.push(handler)
         })
       })
-      const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true)
-
       await handlers.post(req, res)
 
       closeHandlers[0]()
       await new Promise((resolve) => setTimeout(resolve, 10))
 
-      const transportCleanupCall = stderrSpy.mock.calls.find(
-        (call) => typeof call[0] === "string" && call[0].includes("Transport cleanup error")
+      const transportCleanupCall = writeError.mock.calls.find(
+        (call) => call[0].includes("Transport cleanup error")
       )
       expect(transportCleanupCall).toBeDefined()
-
-      stderrSpy.mockRestore()
-      closeSpy.mockRestore()
     })
 
     // test-revizorro: approved
@@ -530,7 +526,17 @@ describe("HTTP Transport", () => {
         setRequestHandler: vi.fn()
       })
 
-      const handlers = createMcpHandlers(() => mcpServer)
+      const writeError = vi.fn()
+      const handlers = createMcpHandlers(() => mcpServer, {
+        createTransport: () => {
+          // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test fake implements only methods used by handler
+          return {
+            close: vi.fn().mockResolvedValue(undefined),
+            handleRequest: vi.fn().mockResolvedValue(undefined)
+          } as never
+        },
+        writeError
+      })
 
       const closeHandlers: Array<() => void> = []
       const res = mock<Response>({
@@ -554,19 +560,15 @@ describe("HTTP Transport", () => {
           if (event === "close") closeHandlers.push(handler)
         })
       })
-      const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true)
-
       await handlers.post(req, res)
 
       closeHandlers[0]()
       await new Promise((resolve) => setTimeout(resolve, 10))
 
-      const serverCleanupCall = stderrSpy.mock.calls.find(
-        (call) => typeof call[0] === "string" && call[0].includes("Server cleanup error")
+      const serverCleanupCall = writeError.mock.calls.find(
+        (call) => call[0].includes("Server cleanup error")
       )
       expect(serverCleanupCall).toBeDefined()
-
-      stderrSpy.mockRestore()
     })
   })
 

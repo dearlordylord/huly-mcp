@@ -9,6 +9,7 @@ import { expect, vi } from "vitest"
 import { HulyConfigService } from "../../src/config/config.js"
 import { FileUploadError, HulyConnectionError, InvalidFileDataError } from "../../src/huly/errors.js"
 import type { FileNotFoundError } from "../../src/huly/errors.js"
+import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
 import {
   decodeBase64,
   fetchFromUrl,
@@ -26,11 +27,23 @@ const mockLoadServerConfig = vi.fn()
 const mockGetWorkspaceToken = vi.fn()
 const mockCreateStorageClient = vi.fn()
 
-vi.mock("@hcengineering/api-client", () => ({
-  loadServerConfig: (...args: Array<unknown>) => mockLoadServerConfig(...args),
-  getWorkspaceToken: (...args: Array<unknown>) => mockGetWorkspaceToken(...args),
-  createStorageClient: (...args: Array<unknown>) => mockCreateStorageClient(...args)
-}))
+const testSdk: HulySdkDependencies = {
+  createRestClient: vi.fn(),
+  createRestTxOperations: vi.fn(),
+  createStorageClient: mockCreateStorageClient,
+  getAccountClient: vi.fn(),
+  getCollaboratorClient: vi.fn(),
+  getWorkspaceToken: mockGetWorkspaceToken,
+  htmlToJSON: vi.fn(),
+  jsonToHTML: vi.fn(),
+  jsonToMarkup: vi.fn(),
+  loadServerConfig: mockLoadServerConfig,
+  markdownToMarkup: vi.fn(),
+  markupToJSON: vi.fn(),
+  markupToMarkdown: vi.fn()
+}
+
+const testSdkLayer = Layer.succeed(HulySdk, testSdk)
 
 describe("HulyStorageClient Service", () => {
   describe("testLayer", () => {
@@ -661,7 +674,9 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
         size: 42
       })
 
-      const layer = Layer.fresh(HulyStorageClient.layer).pipe(Layer.provide(configLayer))
+      const layer = Layer.fresh(HulyStorageClient.layerWithDependencies).pipe(
+        Layer.provide(Layer.merge(configLayer, testSdkLayer))
+      )
       const client = yield* HulyStorageClient.pipe(Effect.provide(layer))
 
       const result = yield* client.uploadFile(
@@ -696,7 +711,9 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
     Effect.gen(function*() {
       setupMocksForSuccess()
 
-      const layer = Layer.fresh(HulyStorageClient.layer).pipe(Layer.provide(configLayer))
+      const layer = Layer.fresh(HulyStorageClient.layerWithDependencies).pipe(
+        Layer.provide(Layer.merge(configLayer, testSdkLayer))
+      )
       const client = yield* HulyStorageClient.pipe(Effect.provide(layer))
 
       const url = client.getFileUrl("some-blob-id")
@@ -710,7 +727,9 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
       setupMocksForSuccess()
       mockPut.mockRejectedValue(new Error("S3 bucket full"))
 
-      const layer = Layer.fresh(HulyStorageClient.layer).pipe(Layer.provide(configLayer))
+      const layer = Layer.fresh(HulyStorageClient.layerWithDependencies).pipe(
+        Layer.provide(Layer.merge(configLayer, testSdkLayer))
+      )
       const client = yield* HulyStorageClient.pipe(Effect.provide(layer))
 
       const error = yield* Effect.flip(
@@ -725,7 +744,9 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
   it("fails layer construction when loadServerConfig rejects", async () => {
     mockLoadServerConfig.mockRejectedValue(new Error("DNS resolution failed"))
 
-    const layer = Layer.fresh(HulyStorageClient.layer).pipe(Layer.provide(configLayer))
+    const layer = Layer.fresh(HulyStorageClient.layerWithDependencies).pipe(
+      Layer.provide(Layer.merge(configLayer, testSdkLayer))
+    )
     const exit = await Effect.runPromiseExit(
       HulyStorageClient.pipe(Effect.provide(layer))
     )

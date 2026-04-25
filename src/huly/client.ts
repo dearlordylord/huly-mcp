@@ -10,16 +10,7 @@
  * @module
  */
 /* eslint-disable max-lines -- connection setup and client operation wiring live in one module */
-import {
-  type AuthOptions,
-  createRestClient,
-  createRestTxOperations,
-  getWorkspaceToken,
-  loadServerConfig,
-  type MarkupFormat,
-  type MarkupRef
-} from "@hcengineering/api-client"
-import { getClient as getCollaboratorClient } from "@hcengineering/collaborator-client"
+import { type AuthOptions, type MarkupFormat, type MarkupRef } from "@hcengineering/api-client"
 import {
   type AccountUuid,
   type AttachedData,
@@ -47,8 +38,6 @@ import {
   type WorkspaceUuid
 } from "@hcengineering/core"
 import { PlatformError } from "@hcengineering/platform"
-import { htmlToJSON, jsonToHTML, jsonToMarkup, markupToJSON } from "@hcengineering/text"
-import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown"
 import { absurd, Context, Effect, Layer, Redacted, Schedule } from "effect"
 
 import { type Auth, HulyConfigService } from "../config/config.js"
@@ -56,6 +45,7 @@ import { UrlString, WorkspaceUrlSlug } from "../domain/schemas/shared.js"
 import { concatLink } from "../utils/url.js"
 import { HulyAuthError, HulyConnectionError } from "./errors.js"
 import { type MarkupUrlConfig, testMarkupUrlConfig } from "./operations/markup.js"
+import { HulySdk, type HulySdkDependencies } from "./sdk-deps.js"
 import type { DocumentUrlConfig } from "./url-builders.js"
 
 // --- Connection helpers ---
@@ -150,15 +140,16 @@ interface MarkupConvertOptions {
 function toInternalMarkup(
   value: string,
   format: MarkupFormat,
-  opts: MarkupConvertOptions
+  opts: MarkupConvertOptions,
+  sdk: HulySdkDependencies
 ): string {
   switch (format) {
     case "markup":
       return value
     case "html":
-      return jsonToMarkup(htmlToJSON(value))
+      return sdk.jsonToMarkup(sdk.htmlToJSON(value))
     case "markdown":
-      return jsonToMarkup(markdownToMarkup(value, opts))
+      return sdk.jsonToMarkup(sdk.markdownToMarkup(value, opts))
     default:
       absurd(format)
       throw new Error(`Invalid format: ${format}`)
@@ -168,15 +159,16 @@ function toInternalMarkup(
 function fromInternalMarkup(
   markup: string,
   format: MarkupFormat,
-  opts: MarkupConvertOptions
+  opts: MarkupConvertOptions,
+  sdk: HulySdkDependencies
 ): string {
   switch (format) {
     case "markup":
       return markup
     case "html":
-      return jsonToHTML(markupToJSON(markup))
+      return sdk.jsonToHTML(sdk.markupToJSON(markup))
     case "markdown":
-      return markupToMarkdown(markupToJSON(markup), opts)
+      return sdk.markupToMarkdown(sdk.markupToJSON(markup), opts)
     default:
       absurd(format)
       throw new Error(`Invalid format: ${format}`)
@@ -286,20 +278,21 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
   HulyClient,
   HulyClientOperations
 >() {
-  static readonly layer: Layer.Layer<
+  static readonly layerWithDependencies: Layer.Layer<
     HulyClient,
     HulyClientError,
-    HulyConfigService
+    HulyConfigService | HulySdk
   > = Layer.effect(
     HulyClient,
     Effect.gen(function*() {
       const config = yield* HulyConfigService
+      const sdk = yield* HulySdk
 
       const { accountUuid, client, imageUrl, markupOps, refUrl, workspaceUrlSlug } = yield* connectRestWithRetry({
         url: config.url,
         auth: config.auth,
         workspace: config.workspace
-      })
+      }, sdk)
 
       const markupUrlConfig: MarkupUrlConfig = {
         refUrl: UrlString.make(refUrl),
@@ -469,6 +462,12 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
     })
   )
 
+  static readonly layer: Layer.Layer<
+    HulyClient,
+    HulyClientError,
+    HulyConfigService
+  > = HulyClient.layerWithDependencies.pipe(Layer.provide(HulySdk.defaultLayer))
+
   static testLayer(
     mockOperations: Partial<HulyClientOperations>
   ): Layer.Layer<HulyClient> {
@@ -551,7 +550,8 @@ function createMarkupOps(
   url: string,
   workspace: WorkspaceUuid,
   token: string,
-  collaboratorUrl: string
+  collaboratorUrl: string,
+  sdk: HulySdkDependencies
 ): { ops: MarkupOperations; refUrl: string; imageUrl: string } {
   // @hcengineering/text-markdown expects refUrl/imageUrl option names, but the Huly SDK does not
   // expose helpers or constants for the concrete workspace browse/files routes. We derive those
@@ -559,7 +559,7 @@ function createMarkupOps(
   // preserve links and images across entities.
   const refUrl = concatLink(url, `/browse?workspace=${workspace}`)
   const imageUrl = concatLink(url, `/files?workspace=${workspace}&file=`)
-  const collaborator = getCollaboratorClient(workspace, token, collaboratorUrl)
+  const collaborator = sdk.getCollaboratorClient(workspace, token, collaboratorUrl)
 
   return {
     refUrl,
@@ -568,30 +568,31 @@ function createMarkupOps(
       async fetchMarkup(objectClass, objectId, objectAttr, doc, format) {
         const collabId = makeCollabId(objectClass, objectId, objectAttr)
         const markup = await collaborator.getMarkup(collabId, doc)
-        return fromInternalMarkup(markup, format, { refUrl, imageUrl })
+        return fromInternalMarkup(markup, format, { refUrl, imageUrl }, sdk)
       },
 
       async uploadMarkup(objectClass, objectId, objectAttr, value, format) {
         const collabId = makeCollabId(objectClass, objectId, objectAttr)
-        return await collaborator.createMarkup(collabId, toInternalMarkup(value, format, { refUrl, imageUrl }))
+        return await collaborator.createMarkup(collabId, toInternalMarkup(value, format, { refUrl, imageUrl }, sdk))
       },
 
       async updateMarkup(objectClass, objectId, objectAttr, value, format) {
         const collabId = makeCollabId(objectClass, objectId, objectAttr)
-        return await collaborator.updateMarkup(collabId, toInternalMarkup(value, format, { refUrl, imageUrl }))
+        return await collaborator.updateMarkup(collabId, toInternalMarkup(value, format, { refUrl, imageUrl }, sdk))
       }
     }
   }
 }
 
 const connectRest = async (
-  config: ConnectionConfig
+  config: ConnectionConfig,
+  sdk: HulySdkDependencies
 ): Promise<RestConnection> => {
-  const serverConfig = await loadServerConfig(config.url)
+  const serverConfig = await sdk.loadServerConfig(config.url)
 
   const authOptions = authToOptions(config.auth, config.workspace)
 
-  const { endpoint, info, token, workspaceId } = await getWorkspaceToken(
+  const { endpoint, info, token, workspaceId } = await sdk.getWorkspaceToken(
     config.url,
     authOptions,
     serverConfig
@@ -599,15 +600,16 @@ const connectRest = async (
 
   // createRestTxOperations also calls getAccount() internally but doesn't expose it.
   // Extra call here is one-time at connection startup; acceptable to avoid reimplementing SDK internals.
-  const restClient = createRestClient(endpoint, workspaceId, token)
+  const restClient = sdk.createRestClient(endpoint, workspaceId, token)
   const account = await restClient.getAccount()
 
-  const client = await createRestTxOperations(endpoint, workspaceId, token)
+  const client = await sdk.createRestTxOperations(endpoint, workspaceId, token)
   const { imageUrl, ops: markupOps, refUrl } = createMarkupOps(
     config.url,
     workspaceId,
     token,
-    serverConfig.COLLABORATOR_URL
+    serverConfig.COLLABORATOR_URL,
+    sdk
   )
 
   return {
@@ -621,5 +623,7 @@ const connectRest = async (
 }
 
 const connectRestWithRetry = (
-  config: ConnectionConfig
-): Effect.Effect<RestConnection, ConnectionError> => connectWithRetry(() => connectRest(config), "Connection failed")
+  config: ConnectionConfig,
+  sdk: HulySdkDependencies
+): Effect.Effect<RestConnection, ConnectionError> =>
+  connectWithRetry(() => connectRest(config, sdk), "Connection failed")

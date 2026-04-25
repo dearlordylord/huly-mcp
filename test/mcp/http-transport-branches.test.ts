@@ -110,12 +110,11 @@ describe("HTTP Transport - Branch Coverage", () => {
 
       const mockFactory: HttpServerFactory = {
         createApp: vi.fn(() => app),
-        listen: vi.fn(() => Effect.succeed(mockHttp))
+        listen: vi.fn(() => Effect.succeed(mockHttp)),
+        writeError: vi.fn()
       }
 
       const mockMcpServer = createMockMcpServer()
-
-      const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true)
 
       const program = startHttpTransport(
         { port: 3000, host: "127.0.0.1" },
@@ -134,12 +133,11 @@ describe("HTTP Transport - Branch Coverage", () => {
 
       expect(closeFn).toHaveBeenCalled()
       // Verify the error was caught and logged to stderr rather than crashing
-      const closeErrorCall = stderrSpy.mock.calls.find(
-        (call) => typeof call[0] === "string" && call[0].includes("Server close error")
+      const writeError = mockFactory.writeError as ReturnType<typeof vi.fn>
+      const closeErrorCall = writeError.mock.calls.find(
+        (call) => call[0].includes("Server close error")
       )
       expect(closeErrorCall).toBeDefined()
-
-      stderrSpy.mockRestore()
     })
   })
 

@@ -29,15 +29,47 @@ type TelemetryEvent =
   | { readonly event: "tool_called"; readonly properties: ToolCalledProperties }
   | { readonly event: "session_end"; readonly properties?: undefined }
 
-export const createPostHogTelemetry = (debug: boolean): TelemetryOperations => {
-  const client = new PostHog(POSTHOG_API_KEY, {
-    host: "https://us.i.posthog.com",
-    flushAt: 10,
-    flushInterval: 60000
-  })
+interface PostHogClientPort {
+  readonly capture: (event: {
+    readonly distinctId: string
+    readonly event: string
+    readonly properties: Record<string, unknown>
+  }) => void
+  readonly shutdown: (timeoutMs?: number) => Promise<void>
+}
 
-  const sessionId = crypto.randomUUID()
+export interface PostHogTelemetryDependencies {
+  readonly createClient: () => PostHogClientPort
+  readonly createSessionId: () => string
+  readonly writeDebug: (message: string) => void
+}
+
+const defaultDependencies: PostHogTelemetryDependencies = {
+  createClient: () =>
+    new PostHog(POSTHOG_API_KEY, {
+      host: "https://us.i.posthog.com",
+      flushAt: 10,
+      flushInterval: 60000
+    }),
+  createSessionId: () => crypto.randomUUID(),
+  writeDebug: (message) => {
+    console.error(message)
+  }
+}
+
+export const createPostHogTelemetry = (
+  debug: boolean,
+  dependencies: PostHogTelemetryDependencies = defaultDependencies
+): TelemetryOperations => {
+  const client = dependencies.createClient()
+  const sessionId = dependencies.createSessionId()
   let listToolsSent = false
+
+  const debugLog = (message: string): void => {
+    if (debug) {
+      dependencies.writeDebug(message)
+    }
+  }
 
   const capture = ({ event, properties }: TelemetryEvent): void => {
     try {
@@ -52,17 +84,13 @@ export const createPostHogTelemetry = (debug: boolean): TelemetryOperations => {
         }
       })
     } catch (e) {
-      if (debug) {
-        console.error(`[telemetry] capture error: ${String(e)}`)
-      }
+      debugLog(`[telemetry] capture error: ${String(e)}`)
     }
   }
 
   return {
     sessionStart: (props) => {
-      if (debug) {
-        console.error(`[telemetry] session_start: ${JSON.stringify(props)}`)
-      }
+      debugLog(`[telemetry] session_start: ${JSON.stringify(props)}`)
       capture({
         event: "session_start",
         properties: {
@@ -77,16 +105,12 @@ export const createPostHogTelemetry = (debug: boolean): TelemetryOperations => {
     firstListTools: () => {
       if (listToolsSent) return
       listToolsSent = true
-      if (debug) {
-        console.error("[telemetry] first_list_tools")
-      }
+      debugLog("[telemetry] first_list_tools")
       capture({ event: "first_list_tools" })
     },
 
     toolCalled: (props) => {
-      if (debug) {
-        console.error(`[telemetry] tool_called: ${JSON.stringify(props)}`)
-      }
+      debugLog(`[telemetry] tool_called: ${JSON.stringify(props)}`)
       capture({
         event: "tool_called",
         properties: {
@@ -103,15 +127,11 @@ export const createPostHogTelemetry = (debug: boolean): TelemetryOperations => {
 
     shutdown: async () => {
       capture({ event: "session_end" })
-      if (debug) {
-        console.error("[telemetry] shutting down")
-      }
+      debugLog("[telemetry] shutting down")
       try {
         await client.shutdown(SHUTDOWN_TIMEOUT_MS)
       } catch (e) {
-        if (debug) {
-          console.error(`[telemetry] shutdown error: ${String(e)}`)
-        }
+        debugLog(`[telemetry] shutdown error: ${String(e)}`)
       }
     }
   }

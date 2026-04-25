@@ -20,8 +20,6 @@ import type {
   UserProfile,
   WorkspaceLoginInfo
 } from "@hcengineering/account-client"
-import { getClient as getAccountClient } from "@hcengineering/account-client"
-import { getWorkspaceToken, loadServerConfig } from "@hcengineering/api-client"
 import type {
   AccountRole,
   Person,
@@ -36,6 +34,7 @@ import { Context, Effect, Layer } from "effect"
 import { HulyConfigService } from "../config/config.js"
 import { authToOptions, type ConnectionConfig, type ConnectionError, connectWithRetry } from "./client.js"
 import { HulyConnectionError } from "./errors.js"
+import { HulySdk, type HulySdkDependencies } from "./sdk-deps.js"
 
 export type WorkspaceClientError = ConnectionError
 
@@ -76,20 +75,21 @@ export class WorkspaceClient extends Context.Tag("@hulymcp/WorkspaceClient")<
   WorkspaceClient,
   WorkspaceClientOperations
 >() {
-  static readonly layer: Layer.Layer<
+  static readonly layerWithDependencies: Layer.Layer<
     WorkspaceClient,
     WorkspaceClientError,
-    HulyConfigService
+    HulyConfigService | HulySdk
   > = Layer.scoped(
     WorkspaceClient,
     Effect.gen(function*() {
       const config = yield* HulyConfigService
+      const sdk = yield* HulySdk
 
       const { client } = yield* connectAccountClientWithRetry({
         url: config.url,
         auth: config.auth,
         workspace: config.workspace
-      })
+      }, sdk)
 
       const withClient = <A>(
         op: (client: AccountClient) => Promise<A>,
@@ -131,6 +131,12 @@ export class WorkspaceClient extends Context.Tag("@hulymcp/WorkspaceClient")<
     })
   )
 
+  static readonly layer: Layer.Layer<
+    WorkspaceClient,
+    WorkspaceClientError,
+    HulyConfigService
+  > = WorkspaceClient.layerWithDependencies.pipe(Layer.provide(HulySdk.defaultLayer))
+
   static testLayer(
     mockOps: Partial<WorkspaceClientOperations>
   ): Layer.Layer<WorkspaceClient> {
@@ -157,16 +163,18 @@ export class WorkspaceClient extends Context.Tag("@hulymcp/WorkspaceClient")<
 }
 
 const connectAccountClient = async (
-  config: ConnectionConfig
+  config: ConnectionConfig,
+  sdk: HulySdkDependencies
 ): Promise<{ client: AccountClient; token: string }> => {
-  const serverConfig = await loadServerConfig(config.url)
+  const serverConfig = await sdk.loadServerConfig(config.url)
   const authOptions = authToOptions(config.auth, config.workspace)
-  const { token } = await getWorkspaceToken(config.url, authOptions, serverConfig)
-  const client = getAccountClient(serverConfig.ACCOUNTS_URL, token)
+  const { token } = await sdk.getWorkspaceToken(config.url, authOptions, serverConfig)
+  const client = sdk.getAccountClient(serverConfig.ACCOUNTS_URL, token)
   return { client, token }
 }
 
 const connectAccountClientWithRetry = (
-  config: ConnectionConfig
+  config: ConnectionConfig,
+  sdk: HulySdkDependencies
 ): Effect.Effect<{ client: AccountClient; token: string }, ConnectionError> =>
-  connectWithRetry(() => connectAccountClient(config), "Connection failed")
+  connectWithRetry(() => connectAccountClient(config, sdk), "Connection failed")

@@ -21,6 +21,7 @@ import { beforeEach, expect, vi } from "vitest"
 import { HulyConfigService } from "../../src/config/config.js"
 import { HulyClient, type HulyClientError } from "../../src/huly/client.js"
 import { HulyAuthError, HulyConnectionError } from "../../src/huly/errors.js"
+import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
 
 // --- Mock setup ---
 
@@ -31,6 +32,7 @@ const mockUpdateDoc = vi.fn()
 const mockAddCollection = vi.fn()
 const mockRemoveDoc = vi.fn()
 const mockClose = vi.fn()
+const mockLoadServerConfig = vi.fn()
 
 const mockTxOperations = {
   findAll: mockFindAll,
@@ -52,7 +54,7 @@ const mockCollaboratorClient = {
   updateMarkup: mockUpdateMarkup
 }
 
-vi.mock("@hcengineering/api-client", () => ({
+const testSdk: HulySdkDependencies = {
   createRestClient: vi.fn().mockImplementation(() => ({
     getAccount: vi.fn().mockResolvedValue({ uuid: "test-account-uuid" })
   })),
@@ -65,29 +67,33 @@ vi.mock("@hcengineering/api-client", () => ({
       info: { workspaceUrl: "ws-slug" }
     })
   ),
-  loadServerConfig: vi.fn().mockImplementation(() =>
-    Promise.resolve({
-      COLLABORATOR_URL: "http://localhost:3078",
-      ACCOUNTS_URL: "http://localhost:8083"
-    })
-  )
-}))
-
-vi.mock("@hcengineering/collaborator-client", () => ({
-  getClient: vi.fn().mockImplementation(() => mockCollaboratorClient)
-}))
-
-vi.mock("@hcengineering/text", () => ({
+  loadServerConfig: mockLoadServerConfig,
+  createStorageClient: vi.fn(),
+  getAccountClient: vi.fn(),
+  getCollaboratorClient: vi.fn().mockImplementation(() => mockCollaboratorClient),
   htmlToJSON: vi.fn().mockImplementation((html: string) => ({ type: "html-parsed", content: html })),
   jsonToHTML: vi.fn().mockImplementation((json: unknown) => `<html>${JSON.stringify(json)}</html>`),
   jsonToMarkup: vi.fn().mockImplementation((json: unknown) => `markup:${JSON.stringify(json)}`),
-  markupToJSON: vi.fn().mockImplementation((markup: string) => ({ type: "markup-parsed", content: markup }))
-}))
-
-vi.mock("@hcengineering/text-markdown", () => ({
   markdownToMarkup: vi.fn().mockImplementation((md: string) => ({ type: "md-parsed", content: md })),
+  markupToJSON: vi.fn().mockImplementation((markup: string) => ({ type: "markup-parsed", content: markup })),
   markupToMarkdown: vi.fn().mockImplementation((_json: unknown, _opts: unknown) => "# Markdown output")
-}))
+}
+
+const testSdkLayer = Layer.succeed(HulySdk, testSdk)
+
+const resetSdkDefaults = () => {
+  mockLoadServerConfig.mockResolvedValue({
+    COLLABORATOR_URL: "http://localhost:3078",
+    ACCOUNTS_URL: "http://localhost:8083"
+  })
+}
+
+mockLoadServerConfig.mockImplementation(() =>
+  Promise.resolve({
+    COLLABORATOR_URL: "http://localhost:3078",
+    ACCOUNTS_URL: "http://localhost:8083"
+  })
+)
 
 // Test config layer
 const testConfigLayer = HulyConfigService.testLayer({
@@ -98,7 +104,7 @@ const testConfigLayer = HulyConfigService.testLayer({
 })
 
 // Combined layer: HulyClient.layer provided with test config
-const liveClientLayer = HulyClient.layer.pipe(Layer.provide(testConfigLayer))
+const liveClientLayer = HulyClient.layerWithDependencies.pipe(Layer.provide(Layer.merge(testConfigLayer, testSdkLayer)))
 
 // Mock doc for testing
 interface TestDoc extends Doc {
@@ -117,6 +123,7 @@ describe("HulyClient Service", () => {
     mockGetMarkup.mockResolvedValue("raw-markup")
     mockCreateMarkup.mockResolvedValue("markup-ref-id")
     mockUpdateMarkup.mockResolvedValue(undefined)
+    resetSdkDefaults()
   })
 
   describe("testLayer", () => {
@@ -1204,10 +1211,11 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
     // test-revizorro: approved
     it.effect("connectRestWithRetry wraps connection errors", () =>
       Effect.gen(function*() {
-        const apiClient = yield* Effect.promise(() => import("@hcengineering/api-client"))
-        vi.mocked(apiClient.loadServerConfig).mockRejectedValue(new Error("server unreachable"))
+        mockLoadServerConfig.mockRejectedValue(new Error("server unreachable"))
 
-        const freshLayer = HulyClient.layer.pipe(Layer.provide(testConfigLayer))
+        const freshLayer = HulyClient.layerWithDependencies.pipe(
+          Layer.provide(Layer.merge(testConfigLayer, testSdkLayer))
+        )
 
         const fiber = yield* Effect.fork(
           HulyClient.pipe(Effect.provide(freshLayer))

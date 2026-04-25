@@ -19,6 +19,9 @@ import type { Express, Request, Response } from "express"
 export const DEFAULT_HTTP_PORT = 3000
 const HTTP_METHOD_NOT_ALLOWED = 405
 const HTTP_INTERNAL_SERVER_ERROR = 500
+const writeStderr = (message: string): void => {
+  process.stderr.write(message)
+}
 
 /**
  * HTTP transport configuration.
@@ -57,6 +60,8 @@ export interface HttpServerFactory {
     port: number,
     host: string
   ) => Effect.Effect<http.Server, HttpTransportError>
+
+  readonly writeError?: (message: string) => void
 }
 
 /**
@@ -81,7 +86,19 @@ const defaultHttpServerFactory: HttpServerFactory = {
           resume(Effect.succeed(server))
         }
       })
-    })
+    }),
+
+  writeError: writeStderr
+}
+
+interface HttpTransportDependencies {
+  readonly createTransport: () => StreamableHTTPServerTransport
+  readonly writeError: (message: string) => void
+}
+
+const defaultTransportDependencies: HttpTransportDependencies = {
+  createTransport: () => new StreamableHTTPServerTransport({}),
+  writeError: writeStderr
 }
 
 /**
@@ -104,7 +121,8 @@ export class HttpServerFactoryService extends Context.Tag("@hulymcp/HttpServerFa
  * @param createServer - Factory function to create MCP Server instance per request
  */
 export const createMcpHandlers = (
-  createServer: () => Server
+  createServer: () => Server,
+  dependencies: HttpTransportDependencies = defaultTransportDependencies
 ): {
   post: (req: Request, res: Response) => Promise<void>
   get: (req: Request, res: Response) => void
@@ -114,7 +132,7 @@ export const createMcpHandlers = (
     try {
       const server = createServer()
       // Stateless mode: no session ID generator, each request is independent
-      const transport = new StreamableHTTPServerTransport({})
+      const transport = dependencies.createTransport()
 
       // SDK's StreamableHTTPServerTransport declares `implements Transport` but its
       // property types (onmessage, send options) don't satisfy Transport under
@@ -126,10 +144,10 @@ export const createMcpHandlers = (
 
       req.on("close", () => {
         transport.close().catch((err) => {
-          process.stderr.write(`Transport cleanup error: ${String(err)}\n`)
+          dependencies.writeError(`Transport cleanup error: ${String(err)}\n`)
         })
         server.close().catch((err) => {
-          process.stderr.write(`Server cleanup error: ${String(err)}\n`)
+          dependencies.writeError(`Server cleanup error: ${String(err)}\n`)
         })
       })
     } catch (error) {
@@ -207,9 +225,13 @@ export const startHttpTransport = (
 ): Effect.Effect<void, HttpTransportError, HttpServerFactoryService | Scope.Scope> =>
   Effect.gen(function*() {
     const factory = yield* HttpServerFactoryService
+    const writeError: (message: string) => void = factory.writeError ?? writeStderr
 
     const app = factory.createApp(config.host)
-    const handlers = createMcpHandlers(createServer)
+    const handlers = createMcpHandlers(createServer, {
+      createTransport: defaultTransportDependencies.createTransport,
+      writeError
+    })
     app.post("/mcp", handlers.post)
     app.get("/mcp", handlers.get)
     app.delete("/mcp", handlers.delete)
@@ -220,7 +242,7 @@ export const startHttpTransport = (
         closeHttpServer(srv).pipe(
           Effect.catchAll((err) =>
             Effect.sync(() => {
-              process.stderr.write(`Server close error: ${err.message}\n`)
+              writeError(`Server close error: ${err.message}\n`)
             })
           )
         )
@@ -228,7 +250,7 @@ export const startHttpTransport = (
 
     // Log startup (to stderr, not stdout which is reserved)
     yield* Effect.sync(() => {
-      process.stderr.write(`MCP HTTP server listening on http://${config.host}:${config.port}/mcp\n`)
+      writeError(`MCP HTTP server listening on http://${config.host}:${config.port}/mcp\n`)
     })
 
     yield* Effect.async<void, never>((resume) => {

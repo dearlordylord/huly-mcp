@@ -37,10 +37,12 @@ const buildTestServerLayer = (
     autoExit?: boolean
     authMethod?: "token" | "password"
   },
-  layers: Layer.Layer<HulyClient | HulyStorageClient | WorkspaceClient | TelemetryService>
+  layers: Layer.Layer<HulyClient | HulyStorageClient | WorkspaceClient | TelemetryService>,
+  writeError?: (message: string) => void
 ) =>
   McpServerService.layer({
     ...config,
+    ...(writeError !== undefined && { writeError }),
     resolveClients: resolveClientsFromLayer(layers)
   }).pipe(Layer.provide(layers))
 
@@ -150,16 +152,15 @@ describe("McpServerService.layer with TOOLSETS env", () => {
     }))
 
   it.scoped("ignores unknown toolset categories and still builds", () => {
-    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    const writeError = vi.fn()
     return Effect.gen(function*() {
       process.env.TOOLSETS = "nonexistent_category"
-      const serverLayer = buildTestServerLayer({ transport: "stdio" }, baseLayers)
+      const serverLayer = buildTestServerLayer({ transport: "stdio" }, baseLayers, writeError)
       yield* Layer.build(serverLayer)
-      expect(stderrSpy).toHaveBeenCalledWith(
+      expect(writeError).toHaveBeenCalledWith(
         expect.stringContaining("unknown toolset category")
       )
       delete process.env.TOOLSETS
-      stderrSpy.mockRestore()
     })
   })
 

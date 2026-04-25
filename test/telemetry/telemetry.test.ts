@@ -2,23 +2,36 @@ import { describe, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { afterEach, beforeEach, expect, vi } from "vitest"
 import { createNoopTelemetry } from "../../src/telemetry/noop.js"
-import { createPostHogTelemetry } from "../../src/telemetry/posthog.js"
+import { createPostHogTelemetry, type PostHogTelemetryDependencies } from "../../src/telemetry/posthog.js"
 import { TelemetryService } from "../../src/telemetry/telemetry.js"
 
 const mockCapture = vi.fn()
 const mockShutdown = vi.fn().mockResolvedValue(undefined)
+const debugMessages: Array<string> = []
+let sessionCounter = 0
 
-vi.mock("posthog-node", () => ({
-  PostHog: class {
-    capture = mockCapture
-    shutdown = mockShutdown
+const makeDependencies = (): PostHogTelemetryDependencies => ({
+  createClient: () => ({
+    capture: mockCapture,
+    shutdown: mockShutdown
+  }),
+  createSessionId: () => {
+    sessionCounter++
+    return `00000000-0000-4000-8000-${sessionCounter.toString().padStart(12, "0")}`
+  },
+  writeDebug: (message) => {
+    debugMessages.push(message)
   }
-}))
+})
+
+const createTelemetry = (debug: boolean) => createPostHogTelemetry(debug, makeDependencies())
 
 describe("Telemetry", () => {
   beforeEach(() => {
     mockCapture.mockClear()
     mockShutdown.mockClear()
+    debugMessages.length = 0
+    sessionCounter = 0
   })
 
   describe("createNoopTelemetry", () => {
@@ -53,7 +66,7 @@ describe("Telemetry", () => {
   describe("createPostHogTelemetry", () => {
     // test-revizorro: approved
     it("sessionStart captures with correct event and properties", () => {
-      const telemetry = createPostHogTelemetry(false)
+      const telemetry = createTelemetry(false)
       telemetry.sessionStart({
         transport: "stdio",
         authMethod: "token",
@@ -76,7 +89,7 @@ describe("Telemetry", () => {
 
     // test-revizorro: approved
     it("toolCalled captures with correct event and properties", () => {
-      const telemetry = createPostHogTelemetry(false)
+      const telemetry = createTelemetry(false)
       telemetry.toolCalled({
         toolName: "list_issues",
         status: "success",
@@ -96,7 +109,7 @@ describe("Telemetry", () => {
 
     // test-revizorro: approved
     it("toolCalled with error captures errorTag", () => {
-      const telemetry = createPostHogTelemetry(false)
+      const telemetry = createTelemetry(false)
       telemetry.toolCalled({
         toolName: "get_issue",
         status: "error",
@@ -114,7 +127,7 @@ describe("Telemetry", () => {
 
     // test-revizorro: approved
     it("sessionId is consistent across calls", () => {
-      const telemetry = createPostHogTelemetry(false)
+      const telemetry = createTelemetry(false)
       telemetry.sessionStart({
         transport: "stdio",
         authMethod: "password",
@@ -136,7 +149,7 @@ describe("Telemetry", () => {
 
     // test-revizorro: approved
     it("firstListTools deduplicates — only first call captures", () => {
-      const telemetry = createPostHogTelemetry(false)
+      const telemetry = createTelemetry(false)
 
       telemetry.firstListTools()
       telemetry.firstListTools()
@@ -150,8 +163,7 @@ describe("Telemetry", () => {
 
     // test-revizorro: approved
     it("debug mode logs to stderr", () => {
-      const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {})
-      const telemetry = createPostHogTelemetry(true)
+      const telemetry = createTelemetry(true)
 
       telemetry.sessionStart({
         transport: "http",
@@ -160,16 +172,12 @@ describe("Telemetry", () => {
         toolsets: null
       })
 
-      expect(stderrSpy).toHaveBeenCalledWith(
-        expect.stringContaining("[telemetry] session_start")
-      )
-
-      stderrSpy.mockRestore()
+      expect(debugMessages).toContainEqual(expect.stringContaining("[telemetry] session_start"))
     })
 
     // test-revizorro: approved
     it("shutdown captures session_end then flushes", async () => {
-      const telemetry = createPostHogTelemetry(false)
+      const telemetry = createTelemetry(false)
       await telemetry.shutdown()
 
       const endCalls = mockCapture.mock.calls.filter(
@@ -185,7 +193,7 @@ describe("Telemetry", () => {
       mockCapture.mockImplementationOnce(() => {
         throw new Error("network down")
       })
-      const telemetry = createPostHogTelemetry(false)
+      const telemetry = createTelemetry(false)
       expect(() => telemetry.firstListTools()).not.toThrow()
     })
   })

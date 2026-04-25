@@ -8,13 +8,15 @@ import {
   type PersonUuid,
   type SocialId,
   type WorkspaceInfoWithStatus,
-  type WorkspaceMemberInfo
+  type WorkspaceMemberInfo,
+  type WorkspaceUuid
 } from "@hcengineering/core"
 import { Cause, Effect, Exit, Layer } from "effect"
 import { beforeEach, expect, vi } from "vitest"
 
 import { HulyConfigService } from "../../src/config/config.js"
 import { HulyAuthError, HulyConnectionError } from "../../src/huly/errors.js"
+import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
 import { WorkspaceClient, type WorkspaceClientError } from "../../src/huly/workspace-client.js"
 
 // --- factory helpers for type assertions on object literals ---
@@ -23,6 +25,7 @@ const asPersonInfo = (v: unknown) => v as PersonInfo
 const asWsInfo = (v: unknown) => v as WorkspaceInfoWithStatus
 const asLoginInfo = (v: unknown) => v as WorkspaceLoginInfo
 const asProfile = (v: unknown) => v as PersonWithProfile
+const serverConfig = { ACCOUNTS_URL: "http://accounts.test" }
 
 // --- mocks for external Huly SDK modules ---
 
@@ -57,15 +60,28 @@ const mockAccountClient: AccountClient = {
   getRegionInfo: mockGetRegionInfo
 } as unknown as AccountClient
 
-vi.mock("@hcengineering/account-client", () => ({
-  getClient: () => mockAccountClient
-}))
+const testSdk: HulySdkDependencies = {
+  createRestClient: vi.fn(),
+  createRestTxOperations: vi.fn(),
+  createStorageClient: vi.fn(),
+  getAccountClient: vi.fn(() => mockAccountClient),
+  getCollaboratorClient: vi.fn(),
+  getWorkspaceToken: async () => ({
+    token: "test-token",
+    endpoint: "http://endpoint.test",
+    workspaceId: "ws-id" as WorkspaceUuid,
+    info: asLoginInfo({})
+  }),
+  htmlToJSON: vi.fn(),
+  jsonToHTML: vi.fn(),
+  jsonToMarkup: vi.fn(),
+  loadServerConfig: async () => serverConfig as never,
+  markdownToMarkup: vi.fn(),
+  markupToJSON: vi.fn(),
+  markupToMarkdown: vi.fn()
+}
 
-vi.mock("@hcengineering/api-client", () => ({
-  loadServerConfig: () => Promise.resolve({ ACCOUNTS_URL: "http://accounts.test" }),
-  getWorkspaceToken: () =>
-    Promise.resolve({ token: "test-token", endpoint: "http://endpoint.test", workspaceId: "ws-id" })
-}))
+const testSdkLayer = Layer.succeed(HulySdk, testSdk)
 
 const testConfig = HulyConfigService.testLayer({
   url: "http://huly.test",
@@ -73,6 +89,7 @@ const testConfig = HulyConfigService.testLayer({
   password: "pass",
   workspace: "test-ws"
 })
+const liveLayer = Layer.provide(WorkspaceClient.layerWithDependencies, Layer.merge(testConfig, testSdkLayer))
 
 describe("WorkspaceClient.layer (real layer)", () => {
   beforeEach(() => {
@@ -92,7 +109,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
       expect(result).toEqual(mockMembers)
       expect(mockGetWorkspaceMembers).toHaveBeenCalledOnce()
-    }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+    }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
   it.effect("getPersonInfo delegates to AccountClient", () =>
@@ -105,7 +122,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
       expect(result).toEqual(personInfo)
       expect(mockGetPersonInfo).toHaveBeenCalledWith("person-1")
-    }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+    }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
   it.effect("updateWorkspaceRole delegates to AccountClient", () =>
@@ -116,7 +133,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       yield* client.updateWorkspaceRole("acc-1", AccountRole.Maintainer)
 
       expect(mockUpdateWorkspaceRole).toHaveBeenCalledWith("acc-1", AccountRole.Maintainer)
-    }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+    }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
   it.effect("getWorkspaceInfo delegates to AccountClient", () =>
@@ -129,7 +146,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
       expect(result).toEqual(wsInfo)
       expect(mockGetWorkspaceInfo).toHaveBeenCalledWith(true)
-    }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+    }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
   it.effect("getWorkspaceInfo without arg delegates correctly", () =>
@@ -142,7 +159,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
       expect(result).toEqual(wsInfo)
       expect(mockGetWorkspaceInfo).toHaveBeenCalledWith(undefined)
-    }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+    }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
   it.effect("getUserWorkspaces delegates to AccountClient", () =>
@@ -155,7 +172,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
       expect(result).toEqual(workspaces)
       expect(mockGetUserWorkspaces).toHaveBeenCalledOnce()
-    }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+    }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
   it.effect("createWorkspace delegates to AccountClient", () =>
@@ -168,7 +185,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
       expect(result).toEqual(loginInfo)
       expect(mockCreateWorkspace).toHaveBeenCalledWith("My Workspace", "us-east")
-    }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+    }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
   it.effect("deleteWorkspace delegates to AccountClient", () =>
@@ -179,7 +196,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       yield* client.deleteWorkspace()
 
       expect(mockDeleteWorkspace).toHaveBeenCalledOnce()
-    }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+    }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
   it.effect("getUserProfile delegates to AccountClient", () =>
@@ -192,7 +209,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
       expect(result).toEqual(profile)
       expect(mockGetUserProfile).toHaveBeenCalledWith("person-uuid")
-    }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+    }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
   it.effect("getUserProfile without arg delegates correctly", () =>
@@ -204,7 +221,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
       expect(result).toBeNull()
       expect(mockGetUserProfile).toHaveBeenCalledWith(undefined)
-    }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+    }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
   it.effect("setMyProfile delegates to AccountClient", () =>
@@ -215,7 +232,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       yield* client.setMyProfile({ bio: "dev" })
 
       expect(mockSetMyProfile).toHaveBeenCalledWith({ bio: "dev" })
-    }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+    }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
   it.effect("updateAllowReadOnlyGuests delegates to AccountClient", () =>
@@ -227,7 +244,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
       expect(result).toBeUndefined()
       expect(mockUpdateAllowReadOnlyGuests).toHaveBeenCalledWith(true)
-    }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+    }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
   it.effect("updateAllowGuestSignUp delegates to AccountClient", () =>
@@ -238,7 +255,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       yield* client.updateAllowGuestSignUp(false)
 
       expect(mockUpdateAllowGuestSignUp).toHaveBeenCalledWith(false)
-    }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+    }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
   it.effect("getRegionInfo delegates to AccountClient", () =>
@@ -251,7 +268,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
       expect(result).toEqual(regions)
       expect(mockGetRegionInfo).toHaveBeenCalledOnce()
-    }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+    }).pipe(Effect.provide(liveLayer)))
 
   describe("error handling (withClient)", () => {
     // test-revizorro: approved
@@ -265,7 +282,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toContain("Failed to get workspace members")
         expect(error.message).toContain("network failure")
-      }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+      }).pipe(Effect.provide(liveLayer)))
 
     // test-revizorro: approved
     it.effect("wraps getPersonInfo rejection as HulyConnectionError", () =>
@@ -277,7 +294,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toContain("Failed to get person info")
-      }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+      }).pipe(Effect.provide(liveLayer)))
 
     // test-revizorro: approved
     it.effect("wraps updateWorkspaceRole rejection", () =>
@@ -289,7 +306,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toContain("Failed to update workspace role")
-      }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+      }).pipe(Effect.provide(liveLayer)))
 
     // test-revizorro: approved
     it.effect("wraps getWorkspaceInfo rejection", () =>
@@ -301,7 +318,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toContain("Failed to get workspace info")
-      }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+      }).pipe(Effect.provide(liveLayer)))
 
     // test-revizorro: approved
     it.effect("wraps getUserWorkspaces rejection", () =>
@@ -313,7 +330,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toContain("Failed to get user workspaces")
-      }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+      }).pipe(Effect.provide(liveLayer)))
 
     // test-revizorro: approved
     it.effect("wraps createWorkspace rejection", () =>
@@ -325,7 +342,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toContain("Failed to create workspace")
-      }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+      }).pipe(Effect.provide(liveLayer)))
 
     // test-revizorro: approved
     it.effect("wraps deleteWorkspace rejection", () =>
@@ -337,7 +354,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toContain("Failed to delete workspace")
-      }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+      }).pipe(Effect.provide(liveLayer)))
 
     // test-revizorro: approved
     it.effect("wraps getUserProfile rejection", () =>
@@ -349,7 +366,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toContain("Failed to get user profile")
-      }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+      }).pipe(Effect.provide(liveLayer)))
 
     // test-revizorro: approved
     it.effect("wraps setMyProfile rejection", () =>
@@ -361,7 +378,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toContain("Failed to set my profile")
-      }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+      }).pipe(Effect.provide(liveLayer)))
 
     // test-revizorro: approved
     it.effect("wraps updateAllowReadOnlyGuests rejection", () =>
@@ -373,7 +390,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toContain("Failed to update read-only guest setting")
-      }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+      }).pipe(Effect.provide(liveLayer)))
 
     // test-revizorro: approved
     it.effect("wraps updateAllowGuestSignUp rejection", () =>
@@ -385,7 +402,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toContain("Failed to update guest sign-up setting")
-      }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+      }).pipe(Effect.provide(liveLayer)))
 
     // test-revizorro: approved
     it.effect("wraps getRegionInfo rejection", () =>
@@ -397,7 +414,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toContain("Failed to get region info")
-      }).pipe(Effect.provide(Layer.provide(WorkspaceClient.layer, testConfig))))
+      }).pipe(Effect.provide(liveLayer)))
   })
 })
 
