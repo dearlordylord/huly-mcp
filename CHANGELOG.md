@@ -1,5 +1,21 @@
 # @firfi/huly-mcp
 
+## 0.9.0
+
+### Minor Changes
+
+- Add task-management workflow tools for discovering project/task types and safely extending tracker configuration.
+
+  New MCP tools:
+
+  - `list_project_types`
+  - `get_project_type`
+  - `list_task_types`
+  - `create_task_type`
+  - `create_issue_status`
+
+  The create tools are idempotent, recover partially linked workspace configuration, validate status category mismatches, and include integration coverage against a live Huly workspace.
+
 ## 0.8.0
 
 ### Minor Changes

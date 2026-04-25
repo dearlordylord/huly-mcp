@@ -43,6 +43,7 @@ describe("CATEGORY_NAMES", () => {
       expect(CATEGORY_NAMES.has("issues")).toBe(true)
       expect(CATEGORY_NAMES.has("documents")).toBe(true)
       expect(CATEGORY_NAMES.has("comments")).toBe(true)
+      expect(CATEGORY_NAMES.has("task-management")).toBe(true)
       expect(CATEGORY_NAMES.size).toBeGreaterThan(5)
     }))
 })
@@ -94,6 +95,23 @@ describe("createFilteredRegistry", () => {
       }
       expect(filtered.definitions.length).toBeGreaterThan(0)
     }))
+
+  it.effect("filters to task-management tools", () =>
+    Effect.gen(function*() {
+      const filtered = createFilteredRegistry(new Set(["task-management"]))
+      const toolNames = filtered.definitions.map((tool) => tool.name)
+
+      expect(toolNames).toEqual([
+        "list_project_types",
+        "get_project_type",
+        "list_task_types",
+        "create_task_type",
+        "create_issue_status"
+      ])
+      for (const tool of filtered.definitions) {
+        expect(tool.category).toBe("task-management")
+      }
+    }))
 })
 
 describe("handleToolCall", () => {
@@ -118,6 +136,7 @@ describe("TOOL_DEFINITIONS", () => {
       const keys = Object.keys(TOOL_DEFINITIONS)
       expect(keys.length).toBeGreaterThan(0)
       expect(keys.length).toBe(toolRegistry.tools.size)
+      expect(keys).toContain("create_issue_status")
     }))
 
   it.effect("entries match toolRegistry", () =>

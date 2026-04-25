@@ -147,7 +147,7 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
 ## Available Tools
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `leads`, `tag-categories`, `test-management`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `leads`, `tag-categories`, `task-management`, `test-management`
 
 ### Projects
 
@@ -413,6 +413,16 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `create_tag_category` | Create a new tag/label category. Idempotent: returns existing category if one with the same label and targetClass already exists (created=false). Defaults targetClass to tracker issues. |
 | `update_tag_category` | Update a tag/label category. Accepts category ID or label name. Only provided fields are modified. |
 | `delete_tag_category` | Permanently delete a tag/label category. Accepts category ID or label name. Labels in this category will be orphaned (not deleted). This action cannot be undone. |
+
+### Task-Management
+
+| Tool | Description |
+|------|-------------|
+| `list_project_types` | List Huly tracker project types/workflow templates. Returns ID, display name, descriptor, task type count, status count, and whether the type appears to be the default Classic tracker type. |
+| `get_project_type` | Inspect one Huly tracker project type in a single call. Accepts projectType as ID or display name; when omitted, uses the unambiguous Classic tracker type. Returns task types, statuses, categories, and task-type-to-status mappings. |
+| `list_task_types` | List Huly issue/task types. Optionally filter by projectType ID or display name. Returns task type identity, parent project type, kind, issue class, and available status count. |
+| `create_task_type` | Add a Huly issue/task type to a project type idempotently by normalized name. Copies required workflow configuration from an existing template task type unless templateTaskType is supplied. Returns created, IDs, affected task type IDs, and a workspace-level workflow warning. |
+| `create_issue_status` | Add a Huly issue workflow status idempotently by normalized name within a project type and task type scope. Accepts category as backlog, todo, active, done, or canceled; taskType may be ID or display name, and omission applies the status to every task type in the project type. |
 
 ### Test-Management
 

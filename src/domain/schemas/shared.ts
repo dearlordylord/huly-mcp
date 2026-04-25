@@ -49,6 +49,15 @@ export type IssueTemplateId = Schema.Schema.Type<typeof IssueTemplateId>
 export const IssueTemplateChildId = HulyRef("IssueTemplateChildId")
 export type IssueTemplateChildId = Schema.Schema.Type<typeof IssueTemplateChildId>
 
+export const ProjectTypeId = HulyRef("ProjectTypeId")
+export type ProjectTypeId = Schema.Schema.Type<typeof ProjectTypeId>
+
+export const TaskTypeId = HulyRef("TaskTypeId")
+export type TaskTypeId = Schema.Schema.Type<typeof TaskTypeId>
+
+export const IssueStatusId = HulyRef("IssueStatusId")
+export type IssueStatusId = Schema.Schema.Type<typeof IssueStatusId>
+
 export const ChannelId = HulyRef("ChannelId")
 export type ChannelId = Schema.Schema.Type<typeof ChannelId>
 

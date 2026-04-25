@@ -19,6 +19,7 @@ fi
 
 INIT='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
 PROJECT="HULY"
+RUN_ID="$(date +%s)-$$"
 PASSED=0
 FAILED=0
 SKIPPED=0
@@ -223,6 +224,77 @@ run_test "list_statuses($PROJECT)" \
 skip_test "create_project" "would pollute workspace"
 skip_test "update_project" "would pollute workspace"
 skip_test "delete_project" "would pollute workspace"
+echo ""
+
+##############################
+# 1a. TASK MANAGEMENT (controlled workspace pollution)
+##############################
+echo "=== 1a. Task Management ==="
+run_test "list_project_types" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_project_types","arguments":{}},"id":2}'
+run_test "get_project_type(default Classic)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_project_type","arguments":{}},"id":2}'
+run_test "list_task_types(default Classic)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_task_types","arguments":{}},"id":2}'
+
+TM_TASK_TYPE_NAME="IntTest Task Type $RUN_ID"
+TM_STATUS_NAME="IntTest QA $RUN_ID"
+TM_TASK_TYPE_NAME_JSON=$(json_string "$TM_TASK_TYPE_NAME")
+TM_STATUS_NAME_JSON=$(json_string "$TM_STATUS_NAME")
+
+TASK_TYPE_TEXT=$(run_capture "create_task_type($TM_TASK_TYPE_NAME)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_task_type\",\"arguments\":{\"name\":$TM_TASK_TYPE_NAME_JSON}},\"id\":2}")
+if [ $? -eq 0 ]; then
+  assert_json_field_nonempty "create_task_type returns task type id" "$TASK_TYPE_TEXT" '.taskType.id'
+  TASK_TYPE_TEXT_2=$(run_capture "create_task_type idempotent($TM_TASK_TYPE_NAME)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_task_type\",\"arguments\":{\"name\":$TM_TASK_TYPE_NAME_JSON}},\"id\":2}")
+  if [ $? -eq 0 ]; then
+    CREATED_AGAIN=$(echo "$TASK_TYPE_TEXT_2" | jq -r '.created' 2>/dev/null)
+    if [ "$CREATED_AGAIN" = "false" ]; then
+      echo "PASS: create_task_type idempotent returns created=false"
+      PASSED=$((PASSED + 1))
+    else
+      echo "FAIL: create_task_type idempotent expected created=false"
+      FAILED=$((FAILED + 1))
+      ERRORS="${ERRORS}\n  - create_task_type idempotent expected created=false"
+    fi
+  fi
+fi
+
+STATUS_TEXT=$(run_capture "create_issue_status($TM_STATUS_NAME)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue_status\",\"arguments\":{\"name\":$TM_STATUS_NAME_JSON,\"category\":\"active\"}},\"id\":2}")
+if [ $? -eq 0 ]; then
+  assert_json_field_nonempty "create_issue_status returns status id" "$STATUS_TEXT" '.status.id'
+  STATUS_TEXT_2=$(run_capture "create_issue_status idempotent($TM_STATUS_NAME)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue_status\",\"arguments\":{\"name\":$TM_STATUS_NAME_JSON,\"category\":\"active\"}},\"id\":2}")
+  if [ $? -eq 0 ]; then
+    CREATED_AGAIN=$(echo "$STATUS_TEXT_2" | jq -r '.created' 2>/dev/null)
+    if [ "$CREATED_AGAIN" = "false" ]; then
+      echo "PASS: create_issue_status idempotent returns created=false"
+      PASSED=$((PASSED + 1))
+    else
+      echo "FAIL: create_issue_status idempotent expected created=false"
+      FAILED=$((FAILED + 1))
+      ERRORS="${ERRORS}\n  - create_issue_status idempotent expected created=false"
+    fi
+  fi
+fi
+
+sleep 2
+PROJECT_TYPE_TEXT=$(run_capture "get_project_type verifies task/status" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_project_type","arguments":{}},"id":2}')
+if [ $? -eq 0 ]; then
+  TASK_TYPE_PRESENT=$(echo "$PROJECT_TYPE_TEXT" | jq -r --arg name "$TM_TASK_TYPE_NAME" 'any(.taskTypes[]?; .name == $name)' 2>/dev/null)
+  STATUS_PRESENT=$(echo "$PROJECT_TYPE_TEXT" | jq -r --arg name "$TM_STATUS_NAME" 'any(.statuses[]?; .name == $name and .category == "active")' 2>/dev/null)
+  if [ "$TASK_TYPE_PRESENT" = "true" ] && [ "$STATUS_PRESENT" = "true" ]; then
+    echo "PASS: get_project_type includes created task type and status"
+    PASSED=$((PASSED + 1))
+  else
+    echo "FAIL: get_project_type missing created task type or status"
+    FAILED=$((FAILED + 1))
+    ERRORS="${ERRORS}\n  - get_project_type missing created task type or status"
+  fi
+fi
 echo ""
 
 ##############################
