@@ -27,16 +27,16 @@ import type { HulyClient, HulyClientError } from "../client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { InvalidStatusError, PersonNotFoundError } from "../errors.js"
 import { tracker } from "../huly-plugins.js"
+import { findPersonByEmailOrName } from "./contacts-shared.js"
 import {
   findIssueInProject,
-  findPersonByEmailOrName,
   findProjectAndIssue,
   findProjectWithStatuses,
   resolveStatusByName,
   type StatusInfo,
-  stringToPriority,
-  toRef
-} from "./shared.js"
+  stringToPriority
+} from "./issues-shared.js"
+import { toRef } from "./sdk-boundary.js"
 
 type CreateIssueError =
   | HulyClientError

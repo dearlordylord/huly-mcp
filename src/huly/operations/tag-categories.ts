@@ -18,7 +18,8 @@ import type {
 import { HulyClient, type HulyClientError } from "../client.js"
 import { TagCategoryNotFoundError } from "../errors.js"
 import { core, tags, tracker } from "../huly-plugins.js"
-import { clampLimit, toRef } from "./shared.js"
+import { clampLimit } from "./query-helpers.js"
+import { toRef } from "./sdk-boundary.js"
 
 type ListTagCategoriesError = HulyClientError
 type CreateTagCategoryError = HulyClientError

@@ -33,7 +33,9 @@ import {
   TestCaseType as CaseType,
   TestRunStatus as RunStatus
 } from "../test-management-types.js"
-import { findByNameOrIdOrFail, findPersonByEmailOrName, toRef } from "./shared.js"
+import { findPersonByEmailOrName } from "./contacts-shared.js"
+import { findByNameOrIdOrFail } from "./query-helpers.js"
+import { toRef } from "./sdk-boundary.js"
 
 import type {
   TestCasePriorityStr,

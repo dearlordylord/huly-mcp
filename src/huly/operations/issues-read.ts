@@ -16,17 +16,16 @@ import type { ComponentNotFoundError, InvalidStatusError, ProjectNotFoundError }
 import { HulyConnectionError, IssueNotFoundError } from "../errors.js"
 import { contact, tracker } from "../huly-plugins.js"
 import { findComponentByIdOrLabel } from "./components.js"
-import { escapeLikeWildcards, withLookup } from "./query-helpers.js"
+import { findPersonByEmailOrName } from "./contacts-shared.js"
 import {
-  clampLimit,
   findIssueInProject,
-  findPersonByEmailOrName,
   findProjectWithStatuses,
   parseIssueIdentifier,
   priorityToString,
   resolveStatusByName,
   type StatusInfo
-} from "./shared.js"
+} from "./issues-shared.js"
+import { clampLimit, escapeLikeWildcards, withLookup } from "./query-helpers.js"
 
 type ListIssuesError =
   | HulyClientError

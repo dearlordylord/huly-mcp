@@ -34,7 +34,7 @@ import type {
 import { Context, Effect, Layer } from "effect"
 
 import { HulyConfigService } from "../config/config.js"
-import { authToOptions, type ConnectionConfig, type ConnectionError, connectWithRetry } from "./auth-utils.js"
+import { authToOptions, type ConnectionConfig, type ConnectionError, connectWithRetry } from "./client.js"
 import { HulyConnectionError } from "./errors.js"
 
 export type WorkspaceClientError = ConnectionError

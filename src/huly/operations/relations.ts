@@ -23,7 +23,8 @@ import {
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { documentPlugin, tracker } from "../huly-plugins.js"
-import { findIssueInProject, findProject, findProjectAndIssue, parseIssueIdentifier, toRef } from "./shared.js"
+import { findIssueInProject, findProject, findProjectAndIssue, parseIssueIdentifier } from "./issues-shared.js"
+import { toRef } from "./sdk-boundary.js"
 
 type RelationError =
   | HulyClientError

@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest"
 import { Email, PersonId } from "../../domain/schemas/shared.js"
 import type { HulyClientOperations } from "../client.js"
 import { HulyClient } from "../client.js"
-import { createPerson, deletePerson, getPerson, listPersons, updatePerson } from "./contacts.js"
+import { createPerson, deletePerson, getPerson, listPersons, updatePerson } from "./persons.js"
 
 import { contact } from "../huly-plugins.js"
 

@@ -60,15 +60,10 @@ import {
   TemplateChildNotFoundError
 } from "../errors.js"
 import { findComponentByIdOrLabel } from "./components.js"
+import { findPersonByEmailOrName } from "./contacts-shared.js"
+import { findProject, priorityToString, stringToPriority, zeroAsUnset } from "./issues-shared.js"
 import { createIssue } from "./issues.js"
-import {
-  findPersonByEmailOrName,
-  findProject,
-  priorityToString,
-  stringToPriority,
-  toRef,
-  zeroAsUnset
-} from "./shared.js"
+import { toRef } from "./sdk-boundary.js"
 
 import { contact, tracker } from "../huly-plugins.js"
 import { type MarkupUrlConfig, optionalMarkdownToMarkup, optionalMarkupToMarkdown } from "./markup.js"

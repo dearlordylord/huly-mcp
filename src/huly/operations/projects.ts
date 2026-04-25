@@ -32,7 +32,9 @@ import { HulyClient, type HulyClientError } from "../client.js"
 import type { ProjectNotFoundError } from "../errors.js"
 import { HulyConnectionError } from "../errors.js"
 import { tracker } from "../huly-plugins.js"
-import { clampLimit, findProject, findProjectWithStatuses, toRef } from "./shared.js"
+import { findProject, findProjectWithStatuses } from "./issues-shared.js"
+import { clampLimit } from "./query-helpers.js"
+import { toRef } from "./sdk-boundary.js"
 
 type ListProjectsError = HulyClientError | HulyConnectionError
 type GetProjectError = ProjectNotFoundError | HulyClientError | HulyConnectionError

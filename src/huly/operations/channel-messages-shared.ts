@@ -6,7 +6,7 @@ import type { HulyClient, HulyClientError } from "../client.js"
 import type { ChannelNotFoundError } from "../errors.js"
 import { MessageNotFoundError } from "../errors.js"
 import { findChannel } from "./channels.js"
-import { toRef } from "./shared.js"
+import { toRef } from "./sdk-boundary.js"
 
 import { chunter } from "../huly-plugins.js"
 

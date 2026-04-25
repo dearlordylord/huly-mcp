@@ -18,7 +18,7 @@ import type { Participant, Visibility } from "../../domain/schemas/calendar.js"
 import { PersonId, PersonName } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import { calendar, contact } from "../huly-plugins.js"
-import { toRef } from "./shared.js"
+import { toRef } from "./sdk-boundary.js"
 
 // --- SDK Type Bridges ---
 

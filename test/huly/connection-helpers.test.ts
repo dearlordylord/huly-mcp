@@ -3,13 +3,13 @@ import { PlatformError, Severity, Status } from "@hcengineering/platform"
 import { Effect, Fiber, Redacted, TestClock } from "effect"
 import { expect } from "vitest"
 import type { Auth } from "../../src/config/config.js"
-import { authToOptions, connectWithRetry } from "../../src/huly/auth-utils.js"
+import { authToOptions, connectWithRetry } from "../../src/huly/client.js"
 import { HulyAuthError, HulyConnectionError } from "../../src/huly/errors.js"
 
 const makePlatformError = (code: string): PlatformError<Record<string, never>> =>
   new PlatformError(new Status(Severity.ERROR, code as never, {}))
 
-describe("auth-utils", () => {
+describe("connection-helpers", () => {
   describe("authToOptions", () => {
     // test-revizorro: approved
     it.effect("returns token and workspace for token auth", () =>

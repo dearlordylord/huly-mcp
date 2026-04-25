@@ -53,9 +53,9 @@ export const getOnlyOne = <T>(
 }
 
 /**
- * Gets first element of array. Throws if empty.
+ * Asserts array is non-empty and returns its first element. Throws if empty.
  */
-export const getFirst = <T>(arr: ReadonlyArray<T>, message?: string): T => {
+export const assertFirst = <T>(arr: ReadonlyArray<T>, message?: string): T => {
   if (arr.length === 0) {
     throw new AssertionError(message ?? "Expected non-empty array")
   }

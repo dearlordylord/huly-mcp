@@ -4,9 +4,9 @@ import { expect } from "vitest"
 import {
   assertExists,
   assertExistsEffect,
+  assertFirst,
   assertNonEmpty,
   assertNotNull,
-  getFirst,
   getFirstEffect,
   getOneOrNone,
   getOneOrNoneEffect,
@@ -136,21 +136,21 @@ describe("assertions", () => {
     })
   })
 
-  describe("getFirst", () => {
+  describe("assertFirst", () => {
     // test-revizorro: approved
     it("returns first element of non-empty array", () => {
-      expect(getFirst([10, 20, 30])).toBe(10)
-      expect(getFirst(["a"])).toBe("a")
+      expect(assertFirst([10, 20, 30])).toBe(10)
+      expect(assertFirst(["a"])).toBe("a")
     })
 
     // test-revizorro: approved
     it("throws for empty array with default message", () => {
-      expect(() => getFirst([])).toThrow("Expected non-empty array")
+      expect(() => assertFirst([])).toThrow("Expected non-empty array")
     })
 
     // test-revizorro: approved
     it("throws with custom message", () => {
-      expect(() => getFirst([], "no items found")).toThrow("no items found")
+      expect(() => assertFirst([], "no items found")).toThrow("no items found")
     })
   })
 

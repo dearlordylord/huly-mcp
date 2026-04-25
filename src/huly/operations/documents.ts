@@ -44,8 +44,8 @@ import { DocumentId, TeamspaceId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js"
 import { buildDocumentUrlFromConfig } from "../url-builders.js"
-import { escapeLikeWildcards } from "./query-helpers.js"
-import { clampLimit, findByNameOrId, toRef } from "./shared.js"
+import { clampLimit, escapeLikeWildcards, findByNameOrId } from "./query-helpers.js"
+import { toRef } from "./sdk-boundary.js"
 
 import { core, documentPlugin } from "../huly-plugins.js"
 

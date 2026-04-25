@@ -33,8 +33,8 @@ import { CardId, CardSpaceId, MasterTagId } from "../../domain/schemas/shared.js
 import { HulyClient, type HulyClientError } from "../client.js"
 import { CardNotFoundError, CardSpaceNotFoundError, MasterTagNotFoundError } from "../errors.js"
 import { cardPlugin } from "../huly-plugins.js"
-import { escapeLikeWildcards } from "./query-helpers.js"
-import { clampLimit, findByNameOrId, toRef } from "./shared.js"
+import { clampLimit, escapeLikeWildcards, findByNameOrId } from "./query-helpers.js"
+import { toRef } from "./sdk-boundary.js"
 
 type ListCardSpacesError = HulyClientError
 

@@ -39,8 +39,9 @@ import { FunnelNotFoundError, LeadNotFoundError } from "../errors-leads.js"
 import { HulyConnectionError, InvalidStatusError } from "../errors.js"
 import { contact, core, task } from "../huly-plugins.js"
 import { leadClassIds } from "../lead-plugin.js"
-import { escapeLikeWildcards } from "./query-helpers.js"
-import { clampLimit, findPersonByEmailOrName, toRef } from "./shared.js"
+import { findPersonByEmailOrName } from "./contacts-shared.js"
+import { clampLimit, escapeLikeWildcards } from "./query-helpers.js"
+import { toRef } from "./sdk-boundary.js"
 
 interface HulyFunnel extends Doc {
   name: string

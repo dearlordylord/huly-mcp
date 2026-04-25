@@ -23,7 +23,9 @@ import { IssueIdentifier, MilestoneId, MilestoneLabel } from "../../domain/schem
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { MilestoneNotFoundError } from "../errors.js"
-import { clampLimit, findByNameOrId, findProject, findProjectAndIssue, toRef } from "./shared.js"
+import { findProject, findProjectAndIssue } from "./issues-shared.js"
+import { clampLimit, findByNameOrId } from "./query-helpers.js"
+import { toRef } from "./sdk-boundary.js"
 
 import { tracker } from "../huly-plugins.js"
 import { optionalMarkdownToMarkup, optionalMarkupToMarkdown } from "./markup.js"

@@ -16,7 +16,9 @@ import { HulyClient, type HulyClientError } from "../client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { TagCategoryNotFoundError, TagNotFoundError } from "../errors.js"
 import { core, tags, tracker } from "../huly-plugins.js"
-import { clampLimit, findProjectAndIssue, toRef } from "./shared.js"
+import { findProjectAndIssue } from "./issues-shared.js"
+import { clampLimit } from "./query-helpers.js"
+import { toRef } from "./sdk-boundary.js"
 import { findCategoryByIdOrLabel } from "./tag-categories.js"
 
 type ListLabelsError = HulyClientError | TagCategoryNotFoundError

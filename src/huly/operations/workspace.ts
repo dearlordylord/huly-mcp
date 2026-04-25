@@ -38,7 +38,8 @@ import type {
 } from "../../domain/schemas/workspace.js"
 import type { InvalidPersonUuidError } from "../errors.js"
 import { WorkspaceClient, type WorkspaceClientError } from "../workspace-client.js"
-import { clampLimit, validatePersonUuid } from "./shared.js"
+import { clampLimit } from "./query-helpers.js"
+import { validatePersonUuid } from "./sdk-boundary.js"
 
 // Exhaustive map guarantees compile-time alignment between AccountRole literals and HulyAccountRole enum.
 // If either side adds a value, TS will error here.

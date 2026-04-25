@@ -60,7 +60,9 @@ import {
   validateFileSize
 } from "../storage.js"
 import { findTeamspaceAndDocument } from "./documents.js"
-import { clampLimit, findOneOrFail, findProjectAndIssue, toRef } from "./shared.js"
+import { findProjectAndIssue } from "./issues-shared.js"
+import { clampLimit, findOneOrFail } from "./query-helpers.js"
+import { toRef } from "./sdk-boundary.js"
 
 import { attachment, documentPlugin, tracker } from "../huly-plugins.js"
 

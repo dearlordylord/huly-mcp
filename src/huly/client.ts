@@ -11,6 +11,7 @@
  */
 /* eslint-disable max-lines -- connection setup and client operation wiring live in one module */
 import {
+  type AuthOptions,
   createRestClient,
   createRestTxOperations,
   getWorkspaceToken,
@@ -45,17 +46,101 @@ import {
   type WithLookup,
   type WorkspaceUuid
 } from "@hcengineering/core"
+import { PlatformError } from "@hcengineering/platform"
 import { htmlToJSON, jsonToHTML, jsonToMarkup, markupToJSON } from "@hcengineering/text"
 import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown"
-import { absurd, Context, Effect, Layer } from "effect"
+import { absurd, Context, Effect, Layer, Redacted, Schedule } from "effect"
 
-import { HulyConfigService } from "../config/config.js"
+import { type Auth, HulyConfigService } from "../config/config.js"
 import { UrlString, WorkspaceUrlSlug } from "../domain/schemas/shared.js"
 import { concatLink } from "../utils/url.js"
-import { authToOptions, type ConnectionConfig, type ConnectionError, connectWithRetry } from "./auth-utils.js"
-import { HulyConnectionError } from "./errors.js"
+import { HulyAuthError, HulyConnectionError } from "./errors.js"
 import { type MarkupUrlConfig, testMarkupUrlConfig } from "./operations/markup.js"
 import type { DocumentUrlConfig } from "./url-builders.js"
+
+// --- Connection helpers ---
+
+/**
+ * Status codes that indicate authentication failures (should not be retried).
+ *
+ * These are StatusCode values from @hcengineering/platform (see platform.ts).
+ * The default export `platform.status.*` can't be imported due to TypeScript's
+ * verbatimModuleSyntax + NodeNext moduleResolution not resolving the re-exported
+ * default correctly. The format is `${pluginId}:status:${statusName}` where
+ * pluginId is "platform".
+ */
+const AUTH_STATUS_CODES = new Set([
+  "platform:status:Unauthorized",
+  "platform:status:TokenExpired",
+  "platform:status:TokenNotActive",
+  "platform:status:PasswordExpired",
+  "platform:status:Forbidden",
+  "platform:status:InvalidPassword",
+  "platform:status:AccountNotFound",
+  "platform:status:AccountNotConfirmed"
+])
+
+/**
+ * Connection configuration shared by HulyClient, WorkspaceClient, and HulyStorageClient.
+ */
+export interface ConnectionConfig {
+  url: string
+  auth: Auth
+  workspace: string
+}
+
+export type ConnectionError = HulyConnectionError | HulyAuthError
+
+/**
+ * Convert Auth union type to AuthOptions for API client.
+ */
+export const authToOptions = (auth: Auth, workspace: string): AuthOptions =>
+  auth._tag === "token"
+    ? { token: Redacted.value(auth.token), workspace }
+    : { email: auth.email, password: Redacted.value(auth.password), workspace }
+
+const isAuthError = (error: unknown): boolean =>
+  error instanceof PlatformError && AUTH_STATUS_CODES.has(error.status.code)
+
+const MAX_RETRIES = 2
+const connectionRetrySchedule = Schedule.exponential("100 millis").pipe(
+  Schedule.compose(Schedule.recurs(MAX_RETRIES))
+)
+
+const withConnectionRetry = <A>(
+  attempt: Effect.Effect<A, ConnectionError>
+): Effect.Effect<A, ConnectionError> =>
+  attempt.pipe(
+    Effect.retry({
+      schedule: connectionRetrySchedule,
+      while: (e) => !(e instanceof HulyAuthError)
+    })
+  )
+
+/**
+ * Connect with retry: wraps a Promise-returning function in Effect.tryPromise,
+ * maps errors to HulyAuthError/HulyConnectionError, and applies connection retry.
+ */
+export const connectWithRetry = <A>(
+  connect: () => Promise<A>,
+  errorPrefix: string
+): Effect.Effect<A, ConnectionError> =>
+  withConnectionRetry(
+    Effect.tryPromise({
+      try: connect,
+      catch: (e) => {
+        if (isAuthError(e)) {
+          return new HulyAuthError({
+            message: `${errorPrefix}: ${String(e)}`
+          })
+        }
+        return new HulyConnectionError({
+          message: `${errorPrefix}: ${String(e)}`,
+          cause: e
+        })
+      }
+    })
+  )
 
 interface MarkupConvertOptions {
   readonly refUrl: string

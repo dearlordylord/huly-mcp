@@ -39,6 +39,32 @@ For every product type (interface, type alias, Schema struct), verify: can every
 - Optional fields that must all be present-or-absent together
 - Discriminated union variants carrying fields that only apply to some variants at the product level
 
+## Connascence
+
+Review every changed literal, branch condition, helper boundary, narrowed type, protocol step, and duplicated rule for connascence: code facts that must change together for correctness.
+
+Flag distant or high-degree connascence, especially:
+- magic strings/numbers whose validity depends on a separate parser, support gate, schema, protocol, SDK convention, or test fixture
+- tuple/array index assumptions instead of named fields
+- duplicated validation, projection, encoding, decoding, or execution algorithms
+- downstream code manually remembering what an upstream narrowing helper or schema already proved
+- caller protocols requiring operations in a specific order when a single API or state-typed API could encode the sequence
+- duplicated default values, initial state, status meanings, or sentinel semantics
+
+Required reviewer questions:
+1. What must change together if this line changes?
+2. Is that coupling local and obvious, or distant and implicit?
+3. Is the coupling weak enough for its distance? If not, require a refactor.
+
+Preferred fixes:
+- replace magic values with named constants, literal unions, branded/domain types, or derived values
+- replace positional conventions with records or named fields
+- centralize duplicated algorithms behind one implementation
+- pass narrowed/domain-specific values forward instead of rechecking or reinterpreting primitives
+- colocate unavoidable strong connascence in one helper/module named after the domain invariant
+
+Do not accept comments as the only fix when the relationship can be encoded in types, schemas, constants, or helper structure.
+
 ## Boundary Typing
 
 All data crossing system boundaries (APIs, etc.) must be strongly typed — both inbound (decoding) and outbound (encoding), with Effect Schema. Flag any `any`, untyped fetch results, or raw JSON access.

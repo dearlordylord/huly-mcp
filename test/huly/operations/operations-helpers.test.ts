@@ -15,22 +15,23 @@ import { NonNegativeNumber } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../../../src/huly/errors.js"
 import { contact, core, task, tracker } from "../../../src/huly/huly-plugins.js"
+import { findPersonByEmailOrName } from "../../../src/huly/operations/contacts-shared.js"
 import {
-  clampLimit,
-  findByNameOrId,
-  findByNameOrIdOrFail,
-  findOneOrFail,
-  findPersonByEmailOrName,
   findProject,
   findProjectAndIssue,
   findProjectWithStatuses,
   parseIssueIdentifier,
   priorityToString,
   stringToPriority,
-  toRef,
-  validatePersonUuid,
   zeroAsUnset
-} from "../../../src/huly/operations/shared.js"
+} from "../../../src/huly/operations/issues-shared.js"
+import {
+  clampLimit,
+  findByNameOrId,
+  findByNameOrIdOrFail,
+  findOneOrFail
+} from "../../../src/huly/operations/query-helpers.js"
+import { toRef, validatePersonUuid } from "../../../src/huly/operations/sdk-boundary.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   const result = docs as FindResult<T>
@@ -301,7 +302,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
   })
 }
 
-describe("shared.ts", () => {
+describe("operations helpers", () => {
   describe("toRef", () => {
     // test-revizorro: approved
     it("converts string to Ref", () => {

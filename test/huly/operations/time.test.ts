@@ -14,7 +14,7 @@ import { Clock, Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../../../src/huly/errors.js"
-import { toRef } from "../../../src/huly/operations/shared.js"
+import { toRef } from "../../../src/huly/operations/sdk-boundary.js"
 import {
   createWorkSlot,
   getDetailedTimeReport,

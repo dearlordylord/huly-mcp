@@ -18,11 +18,11 @@ import {
   deleteOrganization,
   getOrganization,
   listOrganizationMembers,
-  listPersonOrganizations,
   makeOrganizationCustomer,
   removeOrganizationMember,
   updateOrganization
-} from "../../../src/huly/operations/contacts.js"
+} from "../../../src/huly/operations/organizations.js"
+import { listPersonOrganizations } from "../../../src/huly/operations/persons.js"
 import { memberReference, organizationId, personId } from "../../helpers/brands.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {

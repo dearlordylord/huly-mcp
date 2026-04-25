@@ -31,7 +31,7 @@ import { ThreadReplyNotFoundError } from "../errors.js"
 import { findChannelMessage } from "./channel-messages-shared.js"
 import { buildSocialIdToPersonNameMap } from "./channels.js"
 import { markdownToMarkupString, markupToMarkdownString } from "./markup.js"
-import { toRef } from "./shared.js"
+import { toRef } from "./sdk-boundary.js"
 
 import { chunter } from "../huly-plugins.js"
 

@@ -16,7 +16,9 @@ import {
 } from "../errors.js"
 import { tracker } from "../huly-plugins.js"
 import { findComponentByIdOrLabel } from "./components.js"
-import { findByNameOrId, findProject, findProjectAndIssue, toRef } from "./shared.js"
+import { findProject, findProjectAndIssue } from "./issues-shared.js"
+import { findByNameOrId } from "./query-helpers.js"
+import { toRef } from "./sdk-boundary.js"
 
 type PreviewDeletionError =
   | HulyClientError

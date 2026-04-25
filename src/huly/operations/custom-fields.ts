@@ -15,7 +15,8 @@ import { CustomFieldId, NonEmptyString, ObjectClassName } from "../../domain/sch
 import { HulyClient, type HulyClientError } from "../client.js"
 import { CustomFieldNotFoundError, CustomFieldObjectNotFoundError } from "../errors-custom-fields.js"
 import { core } from "../huly-plugins.js"
-import { clampLimit, toRef } from "./shared.js"
+import { clampLimit } from "./query-helpers.js"
+import { toRef } from "./sdk-boundary.js"
 
 type ListCustomFieldsError = HulyClientError
 type GetCustomFieldValuesError = HulyClientError | CustomFieldObjectNotFoundError

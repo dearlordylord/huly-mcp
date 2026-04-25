@@ -42,7 +42,8 @@ import {
 } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { NotificationContextNotFoundError, NotificationNotFoundError } from "../errors.js"
-import { clampLimit, findOneOrFail, toRef } from "./shared.js"
+import { clampLimit, findOneOrFail } from "./query-helpers.js"
+import { toRef } from "./sdk-boundary.js"
 
 import { notification } from "../huly-plugins.js"
 

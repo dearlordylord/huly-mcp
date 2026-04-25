@@ -26,7 +26,7 @@ import { chunter } from "../huly-plugins.js"
 import { buildSocialIdToPersonNameMap } from "./channels.js"
 import { findTeamspaceAndDocument } from "./documents.js"
 import { optionalMarkupToMarkdown } from "./markup.js"
-import { toRef } from "./shared.js"
+import { toRef } from "./sdk-boundary.js"
 
 const INLINE_COMMENT_MARK_TYPE = "inline-comment"
 

@@ -23,7 +23,8 @@ import { IssueIdentifier } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { core, tags, tracker } from "../huly-plugins.js"
-import { findIssueInProject, findProjectAndIssue, toRef } from "./shared.js"
+import { findIssueInProject, findProjectAndIssue } from "./issues-shared.js"
+import { toRef } from "./sdk-boundary.js"
 
 type AddLabelError =
   | HulyClientError

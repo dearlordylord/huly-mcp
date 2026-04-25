@@ -17,8 +17,9 @@ import type {
 } from "../errors.js"
 import { documentPlugin } from "../huly-plugins.js"
 import { findTeamspaceAndDocument } from "./documents.js"
+import { findProjectAndIssue } from "./issues-shared.js"
 import { hasRelationById, makeRelatedDocEntry } from "./relations.js"
-import { findProjectAndIssue, toRef } from "./shared.js"
+import { toRef } from "./sdk-boundary.js"
 
 type DocRelationError =
   | HulyClientError

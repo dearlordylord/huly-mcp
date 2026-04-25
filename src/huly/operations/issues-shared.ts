@@ -1,91 +1,23 @@
-import type { Channel, Person, SocialIdentity } from "@hcengineering/contact"
-import type { Class, Doc, DocumentQuery, FindOptions, PersonUuid, Ref, Status, WithLookup } from "@hcengineering/core"
-import { SocialIdType } from "@hcengineering/core"
+import type { DocumentQuery, Ref, Status, WithLookup } from "@hcengineering/core"
 import type { ProjectType } from "@hcengineering/task"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
 import { IssuePriority } from "@hcengineering/tracker"
 import { Effect } from "effect"
 
 import type { IssuePriority as IssuePriorityStr } from "../../domain/schemas/issues.js"
-import { MAX_LIMIT, type NonEmptyString, type NonNegativeNumber } from "../../domain/schemas/shared.js"
+import type { NonNegativeNumber } from "../../domain/schemas/shared.js"
 import { PositiveNumber } from "../../domain/schemas/shared.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
-import { HulyClient, type HulyClientError, type HulyClientOperations } from "../client.js"
-import { InvalidPersonUuidError, InvalidStatusError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
-import { contact, core, task, tracker } from "../huly-plugins.js"
-import { escapeLikeWildcards } from "./query-helpers.js"
-
-// Huly SDK uses `Ref<T>` (a branded string) for entity references.
-// Our domain uses Effect Schema brands. No type-safe bridge exists; this is the boundary cast.
-// eslint-disable-next-line no-restricted-syntax -- see above
-export const toRef = <T extends Doc>(id: NonEmptyString | Ref<T>): Ref<T> => id as Ref<T>
+import { HulyClient, type HulyClientError } from "../client.js"
+import { InvalidStatusError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
+import { core, task, tracker } from "../huly-plugins.js"
+import { findOneOrFail } from "./query-helpers.js"
 
 // Huly API uses 0 as sentinel for "not set" on numeric fields like estimation and remainingTime.
 // Confirmed: creating an issue without estimation stores 0, not null/undefined.
 // Converts sentinel 0 → undefined; positive values → branded PositiveNumber.
 export const zeroAsUnset = (value: NonNegativeNumber): PositiveNumber | undefined =>
   value > 0 ? PositiveNumber.make(value) : undefined
-
-export const findOneOrFail = <T extends Doc, E>(
-  client: HulyClientOperations,
-  _class: Ref<Class<T>>,
-  query: DocumentQuery<T>,
-  onNotFound: () => E,
-  options?: FindOptions<T>
-): Effect.Effect<WithLookup<T>, E | HulyClientError> =>
-  Effect.flatMap(
-    client.findOne<T>(_class, query, options),
-    (result) =>
-      result !== undefined
-        ? Effect.succeed(result)
-        : Effect.fail(onNotFound())
-  )
-
-export const findByNameOrId = <T extends Doc>(
-  client: HulyClientOperations,
-  _class: Ref<Class<T>>,
-  primaryQuery: DocumentQuery<T>,
-  fallbackQuery: DocumentQuery<T>,
-  options?: FindOptions<T>
-): Effect.Effect<WithLookup<T> | undefined, HulyClientError> =>
-  Effect.flatMap(
-    client.findOne<T>(_class, primaryQuery, options),
-    (result) =>
-      result !== undefined
-        ? Effect.succeed(result)
-        : client.findOne<T>(_class, fallbackQuery, options)
-  )
-
-export const findByNameOrIdOrFail = <T extends Doc, E>(
-  client: HulyClientOperations,
-  _class: Ref<Class<T>>,
-  primaryQuery: DocumentQuery<T>,
-  fallbackQuery: DocumentQuery<T>,
-  onNotFound: () => E,
-  options?: FindOptions<T>
-): Effect.Effect<WithLookup<T>, E | HulyClientError> =>
-  Effect.flatMap(
-    findByNameOrId(client, _class, primaryQuery, fallbackQuery, options),
-    (result) =>
-      result !== undefined
-        ? Effect.succeed(result)
-        : Effect.fail(onNotFound())
-  )
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-export const validatePersonUuid = (uuid?: string): Effect.Effect<PersonUuid | undefined, InvalidPersonUuidError> => {
-  if (uuid === undefined) return Effect.succeed(undefined)
-  if (!UUID_REGEX.test(uuid)) {
-    return Effect.fail(new InvalidPersonUuidError({ uuid }))
-  }
-  // PersonUuid is a branded string type from @hcengineering/core.
-  // After regex validation confirms UUID format, cast is safe.
-  // eslint-disable-next-line no-restricted-syntax -- see above
-  return Effect.succeed(uuid as PersonUuid)
-}
-
-const statusClassRef = core.class.Status
 
 type ProjectWithType = WithLookup<HulyProject> & {
   $lookup?: { type?: ProjectType }
@@ -104,7 +36,7 @@ export const findProject = (
     const project = yield* findOneOrFail(
       client,
       tracker.class.Project,
-      { identifier: projectIdentifier },
+      { identifier: projectIdentifier } satisfies DocumentQuery<HulyProject>,
       () => new ProjectNotFoundError({ identifier: projectIdentifier })
     )
 
@@ -143,16 +75,13 @@ export const findProjectWithStatuses = (
     const project = yield* findOneOrFail<ProjectWithType, ProjectNotFoundError>(
       client,
       tracker.class.Project,
-      { identifier: projectIdentifier },
+      { identifier: projectIdentifier } satisfies DocumentQuery<ProjectWithType>,
       () => new ProjectNotFoundError({ identifier: projectIdentifier }),
       { lookup: { type: task.class.ProjectType } }
     )
 
     const projectType = project.$lookup?.type
     const statuses: Array<StatusInfo> = []
-
-    const wonCategory = task.statusCategory.Won
-    const lostCategory = task.statusCategory.Lost
 
     if (projectType?.statuses) {
       const statusRefs = projectType.statuses.map(s => s._id)
@@ -161,7 +90,7 @@ export const findProjectWithStatuses = (
         // On some workspaces this fails with deserialization errors
         const statusDocsResult = yield* Effect.either(
           client.findAll<Status>(
-            statusClassRef,
+            core.class.Status,
             { _id: { $in: statusRefs } }
           )
         )
@@ -172,8 +101,8 @@ export const findProjectWithStatuses = (
             statuses.push({
               _id: doc._id,
               name: doc.name,
-              isDone: categoryStr === wonCategory,
-              isCanceled: categoryStr === lostCategory
+              isDone: categoryStr === task.statusCategory.Won,
+              isCanceled: categoryStr === task.statusCategory.Lost
             })
           }
         } else {
@@ -187,7 +116,6 @@ export const findProjectWithStatuses = (
           for (const ps of projectType.statuses) {
             const name = ps._id.split(":").pop() ?? "Unknown"
             const nameLower = name.toLowerCase()
-            // Infer done/canceled from common status name patterns
             const isDone = nameLower.includes("done")
               || nameLower.includes("complete")
               || nameLower.includes("finished")
@@ -211,7 +139,6 @@ export const findProjectWithStatuses = (
 
     // project.defaultIssueStatus is typed as required Ref<IssueStatus> in the SDK,
     // but is undefined or "" at runtime when no explicit default was chosen at project creation.
-    // Use || (not ??) to catch both undefined and empty string.
     const defaultStatusId: Ref<Status> | undefined = project.defaultIssueStatus || statuses[0]?._id
 
     return { client, project, statuses, defaultStatusId }
@@ -311,86 +238,6 @@ const stringToPriorityMap = {
 } as const satisfies Record<IssuePriorityStr, IssuePriority>
 
 export const stringToPriority = (priority: IssuePriorityStr): IssuePriority => stringToPriorityMap[priority]
-
-const DEFAULT_LIMIT = 50
-
-export const clampLimit = (limit?: number): number => Math.min(limit ?? DEFAULT_LIMIT, MAX_LIMIT)
-
-const findPersonBySocialIdentityEmail = (
-  client: HulyClientOperations,
-  email: string
-): Effect.Effect<Person | undefined, HulyClientError> =>
-  Effect.gen(function*() {
-    const identity = yield* client.findOne<SocialIdentity>(
-      contact.class.SocialIdentity,
-      {
-        type: SocialIdType.EMAIL,
-        value: email
-      }
-    )
-    if (identity === undefined) return undefined
-    return yield* client.findOne<Person>(
-      contact.class.Person,
-      { _id: identity.attachedTo }
-    )
-  })
-
-export const findPersonByEmailOrName = (
-  client: HulyClient["Type"],
-  emailOrName: string
-): Effect.Effect<Person | undefined, HulyClientError> =>
-  Effect.gen(function*() {
-    // 1. SocialIdentity email match (workspace members — primary source)
-    const socialIdentityPerson = yield* findPersonBySocialIdentityEmail(client, emailOrName)
-    if (socialIdentityPerson !== undefined) return socialIdentityPerson
-
-    // 2. Exact email channel match (email channels only)
-    const exactChannel = yield* client.findOne<Channel>(
-      contact.class.Channel,
-      {
-        value: emailOrName,
-        provider: contact.channelProvider.Email
-      }
-    )
-    if (exactChannel !== undefined) {
-      const person = yield* client.findOne<Person>(
-        contact.class.Person,
-        { _id: toRef<Person>(exactChannel.attachedTo) }
-      )
-      if (person !== undefined) return person
-    }
-
-    // 3. Exact name match
-    const exactPerson = yield* client.findOne<Person>(
-      contact.class.Person,
-      { name: emailOrName }
-    )
-    if (exactPerson !== undefined) return exactPerson
-
-    // 4. Substring email channel match via $like (email channels only)
-    const escaped = escapeLikeWildcards(emailOrName)
-    const likeChannel = yield* client.findOne<Channel>(
-      contact.class.Channel,
-      {
-        value: { $like: `%${escaped}%` },
-        provider: contact.channelProvider.Email
-      }
-    )
-    if (likeChannel !== undefined) {
-      const person = yield* client.findOne<Person>(
-        contact.class.Person,
-        { _id: toRef<Person>(likeChannel.attachedTo) }
-      )
-      if (person !== undefined) return person
-    }
-
-    // 5. Substring name match via $like
-    const likePerson = yield* client.findOne<Person>(
-      contact.class.Person,
-      { name: { $like: `%${escaped}%` } }
-    )
-    return likePerson
-  })
 
 export const resolveStatusByName = (
   statuses: Array<StatusInfo>,

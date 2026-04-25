@@ -32,7 +32,8 @@ import type {
 import { TestPlanItemNotFoundError } from "../errors.js"
 import { testManagement } from "../test-management-classes.js"
 import type { TestPlan, TestPlanItem } from "../test-management-types.js"
-import { clampLimit, toRef } from "./shared.js"
+import { clampLimit } from "./query-helpers.js"
+import { toRef } from "./sdk-boundary.js"
 import {
   fetchDescription,
   findTestCase,

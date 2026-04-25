@@ -36,21 +36,23 @@ import {
   addOrganizationChannel,
   addOrganizationMember,
   createOrganization,
-  createPerson,
   deleteOrganization,
-  deletePerson,
   getOrganization,
-  getPerson,
-  listEmployees,
   listOrganizationMembers,
   listOrganizations,
-  listPersonOrganizations,
-  listPersons,
   makeOrganizationCustomer,
   removeOrganizationMember,
-  updateOrganization,
+  updateOrganization
+} from "../../huly/operations/organizations.js"
+import {
+  createPerson,
+  deletePerson,
+  getPerson,
+  listEmployees,
+  listPersonOrganizations,
+  listPersons,
   updatePerson
-} from "../../huly/operations/contacts.js"
+} from "../../huly/operations/persons.js"
 
 import { createToolHandler, type RegisteredTool } from "./registry.js"
 

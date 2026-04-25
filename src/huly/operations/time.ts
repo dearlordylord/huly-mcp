@@ -51,8 +51,9 @@ import { isExistent } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { IssueNotFoundError } from "../errors.js"
 import { ProjectNotFoundError } from "../errors.js"
-import { withLookup } from "./query-helpers.js"
-import { clampLimit, findProject, findProjectAndIssue, toRef, zeroAsUnset } from "./shared.js"
+import { findProject, findProjectAndIssue, zeroAsUnset } from "./issues-shared.js"
+import { clampLimit, withLookup } from "./query-helpers.js"
+import { toRef } from "./sdk-boundary.js"
 
 import { contact, time, tracker } from "../huly-plugins.js"
 

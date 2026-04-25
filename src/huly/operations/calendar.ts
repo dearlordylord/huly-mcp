@@ -40,7 +40,8 @@ import {
   stringToVisibility,
   visibilityToString
 } from "./calendar-shared.js"
-import { clampLimit, toRef } from "./shared.js"
+import { clampLimit } from "./query-helpers.js"
+import { toRef } from "./sdk-boundary.js"
 
 // Re-export recurring operations for barrel consumers
 export { createRecurringEvent, listEventInstances, listRecurringEvents } from "./calendar-recurring.js"

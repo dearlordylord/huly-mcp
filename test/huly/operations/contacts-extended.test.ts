@@ -11,14 +11,8 @@ import { expect } from "vitest"
 import { Email, PersonId } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { contact } from "../../../src/huly/huly-plugins.js"
-import {
-  createOrganization,
-  getPerson,
-  listEmployees,
-  listOrganizations,
-  listPersons,
-  updatePerson
-} from "../../../src/huly/operations/contacts.js"
+import { createOrganization, listOrganizations } from "../../../src/huly/operations/organizations.js"
+import { getPerson, listEmployees, listPersons, updatePerson } from "../../../src/huly/operations/persons.js"
 import { memberReference } from "../../helpers/brands.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {

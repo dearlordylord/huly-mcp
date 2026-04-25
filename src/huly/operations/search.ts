@@ -10,7 +10,7 @@ import { Effect } from "effect"
 import { type FulltextSearchParams, type FulltextSearchResult, parseSearchResult } from "../../domain/schemas.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { HulyConnectionError } from "../errors.js"
-import { clampLimit } from "./shared.js"
+import { clampLimit } from "./query-helpers.js"
 
 export const fulltextSearch = (
   params: FulltextSearchParams

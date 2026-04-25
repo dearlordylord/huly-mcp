@@ -20,7 +20,7 @@ import { Context, Effect, Layer } from "effect"
 
 import { HulyConfigService } from "../config/config.js"
 import { concatLink } from "../utils/url.js"
-import { authToOptions, connectWithRetry } from "./auth-utils.js"
+import { authToOptions, connectWithRetry } from "./client.js"
 import type { HulyAuthError, HulyConnectionError } from "./errors.js"
 import {
   BYTES_PER_MB,
@@ -31,7 +31,7 @@ import {
   InvalidContentTypeError,
   InvalidFileDataError
 } from "./errors.js"
-import { toRef } from "./operations/shared.js"
+import { toRef } from "./operations/sdk-boundary.js"
 
 const MAX_FILE_SIZE_MB = 100
 const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * BYTES_PER_MB
