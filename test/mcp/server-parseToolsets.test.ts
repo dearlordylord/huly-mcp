@@ -1,12 +1,13 @@
 import { describe, it } from "@effect/vitest"
 import { Context, Effect, Layer } from "effect"
-import { expect, vi } from "vitest"
+import { expect } from "vitest"
 import { HulyClient } from "../../src/huly/client.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
 import { HttpServerFactoryService } from "../../src/mcp/http-transport.js"
 import { type ClientBundle, McpServerError, McpServerService } from "../../src/mcp/server.js"
 import { TelemetryService } from "../../src/telemetry/telemetry.js"
+import { mockFn } from "../helpers/mock-fn.js"
 
 const resolveClientsFromLayer = (
   clientLayer: Layer.Layer<HulyClient | HulyStorageClient | WorkspaceClient>
@@ -152,14 +153,14 @@ describe("McpServerService.layer with TOOLSETS env", () => {
     }))
 
   it.scoped("ignores unknown toolset categories and still builds", () => {
-    const writeError = vi.fn()
+    const writeError = mockFn()
     return Effect.gen(function*() {
       process.env.TOOLSETS = "nonexistent_category"
       const serverLayer = buildTestServerLayer({ transport: "stdio" }, baseLayers, writeError)
       yield* Layer.build(serverLayer)
-      expect(writeError).toHaveBeenCalledWith(
+      expect(writeError.mock.calls).toContainEqual([
         expect.stringContaining("unknown toolset category")
-      )
+      ])
       delete process.env.TOOLSETS
     })
   })

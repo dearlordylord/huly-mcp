@@ -22,6 +22,8 @@ const dateBanSelectors = [{
 }]
 
 const mockBanSelectors = [
+  "fn",
+  "clearAllMocks",
   "mock",
   "doMock",
   "unmock",

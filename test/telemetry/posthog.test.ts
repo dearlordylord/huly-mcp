@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it } from "vitest"
 import { createPostHogTelemetry, type PostHogTelemetryDependencies } from "../../src/telemetry/posthog.js"
+import { mockFn } from "../helpers/mock-fn.js"
 
-const mockCapture = vi.fn()
-const mockShutdown = vi.fn().mockResolvedValue(undefined)
+const mockCapture = mockFn()
+const mockShutdown = mockFn().mockResolvedValue(undefined)
 const debugMessages: Array<string> = []
 let sessionCounter = 0
 
@@ -41,7 +42,7 @@ describe("createPostHogTelemetry", () => {
         toolsets: ["issues", "documents"]
       })
 
-      expect(mockCapture).toHaveBeenCalledOnce()
+      expect(mockCapture.mock.calls).toHaveLength(1)
       const call = mockCapture.mock.calls[0][0]
       expect(call.event).toBe("session_start")
       expect(call.properties).toMatchObject({
@@ -109,7 +110,7 @@ describe("createPostHogTelemetry", () => {
         durationMs: 42
       })
 
-      expect(mockCapture).toHaveBeenCalledOnce()
+      expect(mockCapture.mock.calls).toHaveLength(1)
       const call = mockCapture.mock.calls[0][0]
       expect(call.event).toBe("tool_called")
       expect(call.properties).toMatchObject({
@@ -211,8 +212,8 @@ describe("createPostHogTelemetry", () => {
         (c) => c[0].event === "session_end"
       )
       expect(endCalls).toHaveLength(1)
-      expect(mockShutdown).toHaveBeenCalledOnce()
-      expect(mockShutdown).toHaveBeenCalledWith(2000)
+      expect(mockShutdown.mock.calls).toHaveLength(1)
+      expect(mockShutdown.mock.calls).toContainEqual([2000])
     })
 
     // test-revizorro: approved
@@ -226,7 +227,7 @@ describe("createPostHogTelemetry", () => {
         (c) => c[0].event === "session_end"
       )
       expect(endCalls).toHaveLength(1)
-      expect(mockShutdown).toHaveBeenCalledOnce()
+      expect(mockShutdown.mock.calls).toHaveLength(1)
     })
 
     // test-revizorro: approved
@@ -337,7 +338,7 @@ describe("createPostHogTelemetry", () => {
         durationMs: 0
       })
 
-      expect(mockCapture).toHaveBeenCalledTimes(3)
+      expect(mockCapture.mock.calls).toHaveLength(3)
       const ids = mockCapture.mock.calls.map((c) => c[0].distinctId)
       expect(ids[0]).toBe(ids[1])
       expect(ids[1]).toBe(ids[2])
@@ -352,7 +353,7 @@ describe("createPostHogTelemetry", () => {
       t2.firstListTools()
 
       // Both capture but with different distinctIds
-      expect(mockCapture).toHaveBeenCalledTimes(2)
+      expect(mockCapture.mock.calls).toHaveLength(2)
       const id1 = mockCapture.mock.calls[0][0].distinctId
       const id2 = mockCapture.mock.calls[1][0].distinctId
       expect(id1).not.toBe(id2)

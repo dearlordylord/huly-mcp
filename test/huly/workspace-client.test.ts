@@ -12,12 +12,13 @@ import {
   type WorkspaceUuid
 } from "@hcengineering/core"
 import { Cause, Effect, Exit, Layer } from "effect"
-import { beforeEach, expect, vi } from "vitest"
+import { beforeEach, expect } from "vitest"
 
 import { HulyConfigService } from "../../src/config/config.js"
 import { HulyAuthError, HulyConnectionError } from "../../src/huly/errors.js"
 import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
 import { WorkspaceClient, type WorkspaceClientError } from "../../src/huly/workspace-client.js"
+import { mockFn } from "../helpers/mock-fn.js"
 
 // --- factory helpers for type assertions on object literals ---
 
@@ -29,22 +30,37 @@ const serverConfig = { ACCOUNTS_URL: "http://accounts.test" }
 
 // --- mocks for external Huly SDK modules ---
 
-const mockGetWorkspaceMembers = vi.fn<() => Promise<Array<WorkspaceMemberInfo>>>()
-const mockGetPersonInfo = vi.fn<(account: PersonUuid) => Promise<PersonInfo>>()
-const mockUpdateWorkspaceRole = vi.fn<(account: string, role: AccountRole) => Promise<void>>()
-const mockGetWorkspaceInfo = vi.fn<(updateLastVisit?: boolean) => Promise<WorkspaceInfoWithStatus>>()
-const mockGetUserWorkspaces = vi.fn<() => Promise<Array<WorkspaceInfoWithStatus>>>()
-const mockCreateWorkspace = vi.fn<(name: string, region?: string) => Promise<WorkspaceLoginInfo>>()
-const mockDeleteWorkspace = vi.fn<() => Promise<void>>()
-const mockGetUserProfile = vi.fn<(personUuid?: PersonUuid) => Promise<PersonWithProfile | null>>()
-const mockSetMyProfile = vi.fn<(profile: Record<string, unknown>) => Promise<void>>()
-const mockUpdateAllowReadOnlyGuests = vi.fn<
+const mockGetWorkspaceMembers = mockFn<() => Promise<Array<WorkspaceMemberInfo>>>()
+const mockGetPersonInfo = mockFn<(account: PersonUuid) => Promise<PersonInfo>>()
+const mockUpdateWorkspaceRole = mockFn<(account: string, role: AccountRole) => Promise<void>>()
+const mockGetWorkspaceInfo = mockFn<(updateLastVisit?: boolean) => Promise<WorkspaceInfoWithStatus>>()
+const mockGetUserWorkspaces = mockFn<() => Promise<Array<WorkspaceInfoWithStatus>>>()
+const mockCreateWorkspace = mockFn<(name: string, region?: string) => Promise<WorkspaceLoginInfo>>()
+const mockDeleteWorkspace = mockFn<() => Promise<void>>()
+const mockGetUserProfile = mockFn<(personUuid?: PersonUuid) => Promise<PersonWithProfile | null>>()
+const mockSetMyProfile = mockFn<(profile: Record<string, unknown>) => Promise<void>>()
+const mockUpdateAllowReadOnlyGuests = mockFn<
   (v: boolean) => Promise<{ guestPerson: Person; guestSocialIds: Array<SocialId> } | undefined>
 >()
-const mockUpdateAllowGuestSignUp = vi.fn<(v: boolean) => Promise<void>>()
-const mockGetRegionInfo = vi.fn<() => Promise<Array<RegionInfo>>>()
+const mockUpdateAllowGuestSignUp = mockFn<(v: boolean) => Promise<void>>()
+const mockGetRegionInfo = mockFn<() => Promise<Array<RegionInfo>>>()
 
-// eslint-disable-next-line no-restricted-syntax -- partial mock: vi.fn() methods don't overlap with AccountClient signatures
+const clearAllMockFns = () => {
+  mockGetWorkspaceMembers.mockClear()
+  mockGetPersonInfo.mockClear()
+  mockUpdateWorkspaceRole.mockClear()
+  mockGetWorkspaceInfo.mockClear()
+  mockGetUserWorkspaces.mockClear()
+  mockCreateWorkspace.mockClear()
+  mockDeleteWorkspace.mockClear()
+  mockGetUserProfile.mockClear()
+  mockSetMyProfile.mockClear()
+  mockUpdateAllowReadOnlyGuests.mockClear()
+  mockUpdateAllowGuestSignUp.mockClear()
+  mockGetRegionInfo.mockClear()
+}
+
+// eslint-disable-next-line no-restricted-syntax -- partial mock: mockFn() methods don't overlap with AccountClient signatures
 const mockAccountClient: AccountClient = {
   getWorkspaceMembers: mockGetWorkspaceMembers,
   getPersonInfo: mockGetPersonInfo,
@@ -61,24 +77,24 @@ const mockAccountClient: AccountClient = {
 } as unknown as AccountClient
 
 const testSdk: HulySdkDependencies = {
-  createRestClient: vi.fn(),
-  createRestTxOperations: vi.fn(),
-  createStorageClient: vi.fn(),
-  getAccountClient: vi.fn(() => mockAccountClient),
-  getCollaboratorClient: vi.fn(),
+  createRestClient: mockFn(),
+  createRestTxOperations: mockFn(),
+  createStorageClient: mockFn(),
+  getAccountClient: mockFn(() => mockAccountClient),
+  getCollaboratorClient: mockFn(),
   getWorkspaceToken: async () => ({
     token: "test-token",
     endpoint: "http://endpoint.test",
     workspaceId: "ws-id" as WorkspaceUuid,
     info: asLoginInfo({})
   }),
-  htmlToJSON: vi.fn(),
-  jsonToHTML: vi.fn(),
-  jsonToMarkup: vi.fn(),
+  htmlToJSON: mockFn(),
+  jsonToHTML: mockFn(),
+  jsonToMarkup: mockFn(),
   loadServerConfig: async () => serverConfig as never,
-  markdownToMarkup: vi.fn(),
-  markupToJSON: vi.fn(),
-  markupToMarkdown: vi.fn()
+  markdownToMarkup: mockFn(),
+  markupToJSON: mockFn(),
+  markupToMarkdown: mockFn()
 }
 
 const testSdkLayer = Layer.succeed(HulySdk, testSdk)
@@ -93,7 +109,7 @@ const liveLayer = Layer.provide(WorkspaceClient.layerWithDependencies, Layer.mer
 
 describe("WorkspaceClient.layer (real layer)", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    clearAllMockFns()
   })
 
   // test-revizorro: approved
@@ -108,7 +124,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       const result = yield* client.getWorkspaceMembers()
 
       expect(result).toEqual(mockMembers)
-      expect(mockGetWorkspaceMembers).toHaveBeenCalledOnce()
+      expect(mockGetWorkspaceMembers.mock.calls).toHaveLength(1)
     }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
@@ -121,7 +137,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       const result = yield* client.getPersonInfo("person-1" as PersonUuid)
 
       expect(result).toEqual(personInfo)
-      expect(mockGetPersonInfo).toHaveBeenCalledWith("person-1")
+      expect(mockGetPersonInfo.mock.calls).toContainEqual(["person-1"])
     }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
@@ -132,7 +148,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       const client = yield* WorkspaceClient
       yield* client.updateWorkspaceRole("acc-1", AccountRole.Maintainer)
 
-      expect(mockUpdateWorkspaceRole).toHaveBeenCalledWith("acc-1", AccountRole.Maintainer)
+      expect(mockUpdateWorkspaceRole.mock.calls).toContainEqual(["acc-1", AccountRole.Maintainer])
     }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
@@ -145,7 +161,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       const result = yield* client.getWorkspaceInfo(true)
 
       expect(result).toEqual(wsInfo)
-      expect(mockGetWorkspaceInfo).toHaveBeenCalledWith(true)
+      expect(mockGetWorkspaceInfo.mock.calls).toContainEqual([true])
     }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
@@ -158,7 +174,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       const result = yield* client.getWorkspaceInfo()
 
       expect(result).toEqual(wsInfo)
-      expect(mockGetWorkspaceInfo).toHaveBeenCalledWith(undefined)
+      expect(mockGetWorkspaceInfo.mock.calls).toContainEqual([undefined])
     }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
@@ -171,7 +187,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       const result = yield* client.getUserWorkspaces()
 
       expect(result).toEqual(workspaces)
-      expect(mockGetUserWorkspaces).toHaveBeenCalledOnce()
+      expect(mockGetUserWorkspaces.mock.calls).toHaveLength(1)
     }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
@@ -184,7 +200,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       const result = yield* client.createWorkspace("My Workspace", "us-east")
 
       expect(result).toEqual(loginInfo)
-      expect(mockCreateWorkspace).toHaveBeenCalledWith("My Workspace", "us-east")
+      expect(mockCreateWorkspace.mock.calls).toContainEqual(["My Workspace", "us-east"])
     }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
@@ -195,7 +211,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       const client = yield* WorkspaceClient
       yield* client.deleteWorkspace()
 
-      expect(mockDeleteWorkspace).toHaveBeenCalledOnce()
+      expect(mockDeleteWorkspace.mock.calls).toHaveLength(1)
     }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
@@ -208,7 +224,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       const result = yield* client.getUserProfile("person-uuid" as PersonUuid)
 
       expect(result).toEqual(profile)
-      expect(mockGetUserProfile).toHaveBeenCalledWith("person-uuid")
+      expect(mockGetUserProfile.mock.calls).toContainEqual(["person-uuid"])
     }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
@@ -220,7 +236,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       const result = yield* client.getUserProfile()
 
       expect(result).toBeNull()
-      expect(mockGetUserProfile).toHaveBeenCalledWith(undefined)
+      expect(mockGetUserProfile.mock.calls).toContainEqual([undefined])
     }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
@@ -231,7 +247,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       const client = yield* WorkspaceClient
       yield* client.setMyProfile({ bio: "dev" })
 
-      expect(mockSetMyProfile).toHaveBeenCalledWith({ bio: "dev" })
+      expect(mockSetMyProfile.mock.calls).toContainEqual([{ bio: "dev" }])
     }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
@@ -243,7 +259,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       const result = yield* client.updateAllowReadOnlyGuests(true)
 
       expect(result).toBeUndefined()
-      expect(mockUpdateAllowReadOnlyGuests).toHaveBeenCalledWith(true)
+      expect(mockUpdateAllowReadOnlyGuests.mock.calls).toContainEqual([true])
     }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
@@ -254,7 +270,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       const client = yield* WorkspaceClient
       yield* client.updateAllowGuestSignUp(false)
 
-      expect(mockUpdateAllowGuestSignUp).toHaveBeenCalledWith(false)
+      expect(mockUpdateAllowGuestSignUp.mock.calls).toContainEqual([false])
     }).pipe(Effect.provide(liveLayer)))
 
   // test-revizorro: approved
@@ -267,7 +283,7 @@ describe("WorkspaceClient.layer (real layer)", () => {
       const result = yield* client.getRegionInfo()
 
       expect(result).toEqual(regions)
-      expect(mockGetRegionInfo).toHaveBeenCalledOnce()
+      expect(mockGetRegionInfo.mock.calls).toHaveLength(1)
     }).pipe(Effect.provide(liveLayer)))
 
   describe("error handling (withClient)", () => {

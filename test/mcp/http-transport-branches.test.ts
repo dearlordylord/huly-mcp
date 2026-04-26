@@ -10,12 +10,13 @@
  * - res.headersSent check (line 135)
  * - closeHttpServer error path (line 181-188)
  */
+/* eslint-disable functional/no-mixed-types -- local test probes intentionally combine call data with callable functions */
 import type http from "node:http"
 
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { Effect, Layer } from "effect"
 import type { Express, Request, Response } from "express"
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 
 import {
   createMcpHandlers,
@@ -30,6 +31,26 @@ function mock<T>(impl: Record<string, unknown>): T {
   return impl as T
 }
 
+interface Probe<Args extends Array<unknown>, Result> {
+  readonly calls: Array<Args>
+  readonly fn: (...args: Args) => Result
+}
+
+const createProbe = <Args extends Array<unknown>, Result>(
+  impl: (...args: Args) => Result
+): Probe<Args, Result> => {
+  const calls: Array<Args> = []
+  return {
+    calls,
+    fn: (...args) => {
+      calls.push(args)
+      return impl(...args)
+    }
+  }
+}
+
+const createVoidProbe = <Args extends Array<unknown>>(): Probe<Args, void> => createProbe<Args, void>(() => undefined)
+
 const createMockExpressApp = () => {
   const routes: Record<string, Record<string, (req: Request, res: Response) => Promise<void>>> = {
     get: {},
@@ -38,16 +59,16 @@ const createMockExpressApp = () => {
   }
 
   const app = mock<Express>({
-    get: vi.fn((path: string, handler: (req: Request, res: Response) => Promise<void>) => {
+    get: createProbe<[string, (req: Request, res: Response) => Promise<void>], void>((path, handler) => {
       routes.get[path] = handler
-    }),
-    post: vi.fn((path: string, handler: (req: Request, res: Response) => Promise<void>) => {
+    }).fn,
+    post: createProbe<[string, (req: Request, res: Response) => Promise<void>], void>((path, handler) => {
       routes.post[path] = handler
-    }),
-    delete: vi.fn((path: string, handler: (req: Request, res: Response) => Promise<void>) => {
+    }).fn,
+    delete: createProbe<[string, (req: Request, res: Response) => Promise<void>], void>((path, handler) => {
       routes.delete[path] = handler
-    }),
-    listen: vi.fn()
+    }).fn,
+    listen: createVoidProbe<[number, string, (error?: Error) => void]>().fn
   })
 
   return { app, routes }
@@ -55,25 +76,42 @@ const createMockExpressApp = () => {
 
 const createMockMcpServer = (): Server => {
   return mock<Server>({
-    connect: vi.fn().mockResolvedValue(undefined),
-    close: vi.fn().mockResolvedValue(undefined),
-    setRequestHandler: vi.fn()
+    connect: createProbe<[], Promise<void>>(() => Promise.resolve()).fn,
+    close: createProbe<[], Promise<void>>(() => Promise.resolve()).fn,
+    setRequestHandler: createVoidProbe<[unknown, (...args: Array<unknown>) => unknown]>().fn
   })
 }
 
 const createMockResponse = () => {
-  return mock<Response>({
-    status: vi.fn().mockReturnThis(),
-    json: vi.fn().mockReturnThis(),
+  const statusCalls: Array<[number]> = []
+  const jsonCalls: Array<[unknown]> = []
+  const response = mock<Response>({
+    status(code: number) {
+      statusCalls.push([code])
+      return this
+    },
+    json(body: unknown) {
+      jsonCalls.push([body])
+      return this
+    },
     headersSent: false,
-    on: vi.fn()
+    on: createVoidProbe<[string, (...args: Array<unknown>) => void]>().fn,
+    __calls: { status: statusCalls, json: jsonCalls }
   })
+  return response
 }
+
+const getResponseCalls = (response: Response): {
+  status: Array<[number]>
+  json: Array<[unknown]>
+} =>
+  // eslint-disable-next-line no-restricted-syntax -- test probe metadata is attached to a structural fake
+  (response as unknown as { __calls: { status: Array<[number]>; json: Array<[unknown]> } }).__calls
 
 const createMockRequest = (body: unknown = {}): Request =>
   mock<Request>({
     body,
-    on: vi.fn()
+    on: createVoidProbe<[string, (...args: Array<unknown>) => void]>().fn
   })
 
 describe("HTTP Transport - Branch Coverage", () => {
@@ -93,7 +131,7 @@ describe("HTTP Transport - Branch Coverage", () => {
       await handlers.post(req, res)
 
       // When headersSent is true, status() should NOT be called
-      expect(res.status).not.toHaveBeenCalled()
+      expect(getResponseCalls(res).status).toHaveLength(0)
     })
   })
 
@@ -101,17 +139,20 @@ describe("HTTP Transport - Branch Coverage", () => {
     // test-revizorro: approved
     it("should handle server close error gracefully", async () => {
       const { app } = createMockExpressApp()
-      const closeFn = vi.fn((cb?: (err?: Error) => void) => {
+      const closeProbe = createProbe<[((err?: Error) => void)?], void>((cb) => {
         cb?.(new Error("Close failed"))
       })
       const mockHttp = mock<http.Server>({
-        close: closeFn
+        close: closeProbe.fn
       })
+      const writeError = createProbe<[string], void>(() => undefined)
 
       const mockFactory: HttpServerFactory = {
-        createApp: vi.fn(() => app),
-        listen: vi.fn(() => Effect.succeed(mockHttp)),
-        writeError: vi.fn()
+        createApp: createProbe<[string], Express>(() => app).fn,
+        listen: createProbe<[Express, number, string], Effect.Effect<http.Server, never>>(
+          () => Effect.succeed(mockHttp)
+        ).fn,
+        writeError: writeError.fn
       }
 
       const mockMcpServer = createMockMcpServer()
@@ -131,10 +172,9 @@ describe("HTTP Transport - Branch Coverage", () => {
         )
       )
 
-      expect(closeFn).toHaveBeenCalled()
+      expect(closeProbe.calls).toHaveLength(1)
       // Verify the error was caught and logged to stderr rather than crashing
-      const writeError = mockFactory.writeError as ReturnType<typeof vi.fn>
-      const closeErrorCall = writeError.mock.calls.find(
+      const closeErrorCall = writeError.calls.find(
         (call) => call[0].includes("Server close error")
       )
       expect(closeErrorCall).toBeDefined()
@@ -150,12 +190,13 @@ describe("HTTP Transport - Branch Coverage", () => {
 
       handlers.get(req, res)
 
-      expect(res.status).toHaveBeenCalledWith(405)
-      expect(res.json).toHaveBeenCalledWith(
+      const calls = getResponseCalls(res)
+      expect(calls.status).toContainEqual([405])
+      expect(calls.json).toContainEqual([
         expect.objectContaining({
           error: expect.objectContaining({ message: expect.stringContaining("Method not allowed") })
         })
-      )
+      ])
     })
 
     // test-revizorro: approved
@@ -166,12 +207,13 @@ describe("HTTP Transport - Branch Coverage", () => {
 
       handlers.delete(req, res)
 
-      expect(res.status).toHaveBeenCalledWith(405)
-      expect(res.json).toHaveBeenCalledWith(
+      const calls = getResponseCalls(res)
+      expect(calls.status).toContainEqual([405])
+      expect(calls.json).toContainEqual([
         expect.objectContaining({
           error: expect.objectContaining({ message: expect.stringContaining("Method not allowed") })
         })
-      )
+      ])
     })
   })
 })

@@ -4,7 +4,7 @@ import { Effect, Layer } from "effect"
 import * as fs from "node:fs/promises"
 import * as os from "node:os"
 import * as path from "node:path"
-import { expect, vi } from "vitest"
+import { expect } from "vitest"
 
 import { HulyConfigService } from "../../src/config/config.js"
 import { FileUploadError, HulyConnectionError, InvalidFileDataError } from "../../src/huly/errors.js"
@@ -21,26 +21,41 @@ import {
   validateContentType,
   validateFileSize
 } from "../../src/huly/storage.js"
+import { mockFn } from "../helpers/mock-fn.js"
 
-const mockPut = vi.fn()
-const mockLoadServerConfig = vi.fn()
-const mockGetWorkspaceToken = vi.fn()
-const mockCreateStorageClient = vi.fn()
+const mockPut = mockFn<
+  (filename: string, data: Buffer, contentType: string, size: number) => Promise<
+    { _id: Ref<Blob>; contentType: string; size: number }
+  >
+>(
+  () => Promise.reject(new Error("mockPut not configured"))
+)
+const mockLoadServerConfig = mockFn<HulySdkDependencies["loadServerConfig"]>(
+  () => Promise.reject(new Error("mockLoadServerConfig not configured"))
+)
+const mockGetWorkspaceToken = mockFn<HulySdkDependencies["getWorkspaceToken"]>(() =>
+  Promise.reject(new Error("mockGetWorkspaceToken not configured"))
+)
+const mockCreateStorageClient = mockFn<HulySdkDependencies["createStorageClient"]>(
+  () => {
+    throw new Error("mockCreateStorageClient not configured")
+  }
+)
 
 const testSdk: HulySdkDependencies = {
-  createRestClient: vi.fn(),
-  createRestTxOperations: vi.fn(),
+  createRestClient: mockFn(),
+  createRestTxOperations: mockFn(),
   createStorageClient: mockCreateStorageClient,
-  getAccountClient: vi.fn(),
-  getCollaboratorClient: vi.fn(),
+  getAccountClient: mockFn(),
+  getCollaboratorClient: mockFn(),
   getWorkspaceToken: mockGetWorkspaceToken,
-  htmlToJSON: vi.fn(),
-  jsonToHTML: vi.fn(),
-  jsonToMarkup: vi.fn(),
+  htmlToJSON: mockFn(),
+  jsonToHTML: mockFn(),
+  jsonToMarkup: mockFn(),
   loadServerConfig: mockLoadServerConfig,
-  markdownToMarkup: vi.fn(),
-  markupToJSON: vi.fn(),
-  markupToMarkdown: vi.fn()
+  markdownToMarkup: mockFn(),
+  markupToJSON: mockFn(),
+  markupToMarkdown: mockFn()
 }
 
 const testSdkLayer = Layer.succeed(HulySdk, testSdk)
@@ -445,11 +460,13 @@ describe("fetchFromUrl", () => {
   it.effect("returns FileFetchError for non-ok HTTP responses", () =>
     Effect.gen(function*() {
       const originalFetch = globalThis.fetch
-      globalThis.fetch = vi.fn().mockResolvedValue({
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- partial Fetch Response for the file-fetch branch
+      const response: Response = {
         ok: false,
         status: 403,
         statusText: "Forbidden"
-      })
+      } as Response
+      globalThis.fetch = async () => response
 
       try {
         const error = yield* Effect.flip(
@@ -468,7 +485,8 @@ describe("fetchFromUrl", () => {
     Effect.gen(function*() {
       const originalFetch = globalThis.fetch
       const fileContent = Buffer.from("fetched file data")
-      globalThis.fetch = vi.fn().mockResolvedValue({
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- partial Fetch Response for the file-fetch branch
+      const response: Response = {
         ok: true,
         status: 200,
         statusText: "OK",
@@ -477,7 +495,8 @@ describe("fetchFromUrl", () => {
             fileContent.byteOffset,
             fileContent.byteOffset + fileContent.byteLength
           ))
-      })
+      } as Response
+      globalThis.fetch = async () => response
 
       try {
         const buffer = yield* fetchFromUrl("https://example.com/file.png")
@@ -642,37 +661,51 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
   })
 
   const setupMocksForSuccess = () => {
-    mockLoadServerConfig.mockResolvedValue({
-      ACCOUNTS_URL: "https://accounts.huly.example.com",
-      COLLABORATOR_URL: "https://collab.huly.example.com",
-      FILES_URL: "/files",
-      UPLOAD_URL: "/upload"
-    })
-    mockGetWorkspaceToken.mockResolvedValue({
-      endpoint: "wss://huly.example.com",
-      token: "ws-token-abc",
+    mockPut.mockClear()
+    mockLoadServerConfig.mockClear()
+    mockGetWorkspaceToken.mockClear()
+    mockCreateStorageClient.mockClear()
+    mockLoadServerConfig.mockImplementation(() =>
+      Promise.resolve({
+        ACCOUNTS_URL: "https://accounts.huly.example.com",
+        COLLABORATOR_URL: "https://collab.huly.example.com",
+        FILES_URL: "/files",
+        UPLOAD_URL: "/upload"
+      })
+    )
+    mockGetWorkspaceToken.mockImplementation(() =>
+      Promise.resolve({
+        endpoint: "wss://huly.example.com",
+        token: "ws-token-abc",
 
-      workspaceId: "ws-uuid-123" as WorkspaceUuid,
-      info: {}
-    })
-    mockCreateStorageClient.mockReturnValue({
-      put: mockPut,
-      get: vi.fn(),
-      stat: vi.fn(),
-      partial: vi.fn(),
-      remove: vi.fn()
-    })
+        workspaceId: "ws-uuid-123" as WorkspaceUuid,
+        info: {}
+      } as never)
+    )
+    mockCreateStorageClient.mockImplementation(() => ({
+      put: (objectName, stream, contentType, size) => {
+        const data = Buffer.isBuffer(stream) ? stream : Buffer.from(String(stream))
+
+        return mockPut(objectName, data, contentType, size ?? 0) as never
+      },
+      get: mockFn(),
+      stat: mockFn(),
+      partial: mockFn(),
+      remove: mockFn()
+    }))
   }
 
   // test-revizorro: approved
   it.effect("connects and provides uploadFile and getFileUrl operations", () =>
     Effect.gen(function*() {
       setupMocksForSuccess()
-      mockPut.mockResolvedValue({
-        _id: "uploaded-blob-id" as Ref<Blob>,
-        contentType: "image/png",
-        size: 42
-      })
+      mockPut.mockImplementation(() =>
+        Promise.resolve({
+          _id: "uploaded-blob-id" as Ref<Blob>,
+          contentType: "image/png",
+          size: 42
+        })
+      )
 
       const layer = Layer.fresh(HulyStorageClient.layerWithDependencies).pipe(
         Layer.provide(Layer.merge(configLayer, testSdkLayer))
@@ -692,18 +725,18 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
       expect(result.url).toContain("file=uploaded-blob-id")
       expect(result.url).toContain("https://huly.example.com/files")
 
-      expect(mockLoadServerConfig).toHaveBeenCalledWith("https://huly.example.com")
-      expect(mockGetWorkspaceToken).toHaveBeenCalledWith(
+      expect(mockLoadServerConfig.mock.calls).toContainEqual(["https://huly.example.com"])
+      expect(mockGetWorkspaceToken.mock.calls).toContainEqual([
         "https://huly.example.com",
         expect.objectContaining({ token: "test-token-123", workspace: "test-ws" }),
         expect.any(Object)
-      )
-      expect(mockCreateStorageClient).toHaveBeenCalledWith(
+      ])
+      expect(mockCreateStorageClient.mock.calls).toContainEqual([
         "https://huly.example.com/files",
         "https://huly.example.com/upload",
         "ws-token-abc",
         "ws-uuid-123"
-      )
+      ])
     }))
 
   // test-revizorro: approved
@@ -725,7 +758,7 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
   it.effect("wraps upload errors in FileUploadError", () =>
     Effect.gen(function*() {
       setupMocksForSuccess()
-      mockPut.mockRejectedValue(new Error("S3 bucket full"))
+      mockPut.mockImplementation(() => Promise.reject(new Error("S3 bucket full")))
 
       const layer = Layer.fresh(HulyStorageClient.layerWithDependencies).pipe(
         Layer.provide(Layer.merge(configLayer, testSdkLayer))
@@ -742,7 +775,10 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
 
   // test-revizorro: approved
   it("fails layer construction when loadServerConfig rejects", async () => {
-    mockLoadServerConfig.mockRejectedValue(new Error("DNS resolution failed"))
+    mockLoadServerConfig.mockClear()
+    mockGetWorkspaceToken.mockClear()
+    mockCreateStorageClient.mockClear()
+    mockLoadServerConfig.mockImplementation(() => Promise.reject(new Error("DNS resolution failed")))
 
     const layer = Layer.fresh(HulyStorageClient.layerWithDependencies).pipe(
       Layer.provide(Layer.merge(configLayer, testSdkLayer))

@@ -1,12 +1,13 @@
 import { describe, it } from "@effect/vitest"
 import { Effect } from "effect"
-import { afterEach, beforeEach, expect, vi } from "vitest"
+import { afterEach, beforeEach, expect } from "vitest"
 import { createNoopTelemetry } from "../../src/telemetry/noop.js"
 import { createPostHogTelemetry, type PostHogTelemetryDependencies } from "../../src/telemetry/posthog.js"
 import { TelemetryService } from "../../src/telemetry/telemetry.js"
+import { mockFn } from "../helpers/mock-fn.js"
 
-const mockCapture = vi.fn()
-const mockShutdown = vi.fn().mockResolvedValue(undefined)
+const mockCapture = mockFn()
+const mockShutdown = mockFn().mockResolvedValue(undefined)
 const debugMessages: Array<string> = []
 let sessionCounter = 0
 
@@ -74,7 +75,7 @@ describe("Telemetry", () => {
         toolsets: ["issues"]
       })
 
-      expect(mockCapture).toHaveBeenCalledOnce()
+      expect(mockCapture.mock.calls).toHaveLength(1)
       const call = mockCapture.mock.calls[0][0]
       expect(call.event).toBe("session_start")
       expect(call.properties).toMatchObject({
@@ -96,7 +97,7 @@ describe("Telemetry", () => {
         durationMs: 42
       })
 
-      expect(mockCapture).toHaveBeenCalledOnce()
+      expect(mockCapture.mock.calls).toHaveLength(1)
       const call = mockCapture.mock.calls[0][0]
       expect(call.event).toBe("tool_called")
       expect(call.properties).toMatchObject({
@@ -117,7 +118,7 @@ describe("Telemetry", () => {
         durationMs: 150
       })
 
-      expect(mockCapture).toHaveBeenCalledOnce()
+      expect(mockCapture.mock.calls).toHaveLength(1)
       const call = mockCapture.mock.calls[0][0]
       expect(call.properties).toMatchObject({
         status: "error",
@@ -140,7 +141,7 @@ describe("Telemetry", () => {
         durationMs: 0
       })
 
-      expect(mockCapture).toHaveBeenCalledTimes(2)
+      expect(mockCapture.mock.calls).toHaveLength(2)
       const id1 = mockCapture.mock.calls[0][0].distinctId
       const id2 = mockCapture.mock.calls[1][0].distinctId
       expect(id1).toBe(id2)
@@ -184,8 +185,8 @@ describe("Telemetry", () => {
         (c) => c[0].event === "session_end"
       )
       expect(endCalls).toHaveLength(1)
-      expect(mockShutdown).toHaveBeenCalledOnce()
-      expect(mockShutdown).toHaveBeenCalledWith(2000)
+      expect(mockShutdown.mock.calls).toHaveLength(1)
+      expect(mockShutdown.mock.calls).toContainEqual([2000])
     })
 
     // test-revizorro: approved
@@ -223,7 +224,7 @@ describe("Telemetry", () => {
           durationMs: 0
         })
         // noop should not have called the mock
-        expect(mockCapture).not.toHaveBeenCalled()
+        expect(mockCapture.mock.calls).toHaveLength(0)
       }).pipe(Effect.provide(TelemetryService.testLayer())))
 
     it.scoped("testLayer allows overriding operations", () => {
@@ -272,7 +273,7 @@ describe("Telemetry", () => {
           durationMs: 10
         })
         // noop implementation: PostHog capture should not be called
-        expect(mockCapture).not.toHaveBeenCalled()
+        expect(mockCapture.mock.calls).toHaveLength(0)
       }).pipe(Effect.provide(TelemetryService.layer))
     })
   })

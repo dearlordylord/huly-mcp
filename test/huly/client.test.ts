@@ -17,22 +17,23 @@ import {
   type WithLookup
 } from "@hcengineering/core"
 import { Cause, Effect, Exit, Fiber, Layer, TestClock } from "effect"
-import { beforeEach, expect, vi } from "vitest"
+import { beforeEach, expect } from "vitest"
 import { HulyConfigService } from "../../src/config/config.js"
 import { HulyClient, type HulyClientError } from "../../src/huly/client.js"
 import { HulyAuthError, HulyConnectionError } from "../../src/huly/errors.js"
 import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
+import { mockFn } from "../helpers/mock-fn.js"
 
 // --- Mock setup ---
 
-const mockFindAll = vi.fn()
-const mockFindOne = vi.fn()
-const mockCreateDoc = vi.fn()
-const mockUpdateDoc = vi.fn()
-const mockAddCollection = vi.fn()
-const mockRemoveDoc = vi.fn()
-const mockClose = vi.fn()
-const mockLoadServerConfig = vi.fn()
+const mockFindAll = mockFn()
+const mockFindOne = mockFn()
+const mockCreateDoc = mockFn()
+const mockUpdateDoc = mockFn()
+const mockAddCollection = mockFn()
+const mockRemoveDoc = mockFn()
+const mockClose = mockFn()
+const mockLoadServerConfig = mockFn()
 
 const mockTxOperations = {
   findAll: mockFindAll,
@@ -44,9 +45,23 @@ const mockTxOperations = {
   close: mockClose
 }
 
-const mockGetMarkup = vi.fn()
-const mockCreateMarkup = vi.fn()
-const mockUpdateMarkup = vi.fn()
+const mockGetMarkup = mockFn()
+const mockCreateMarkup = mockFn()
+const mockUpdateMarkup = mockFn()
+
+const clearAllMockFns = () => {
+  mockFindAll.mockClear()
+  mockFindOne.mockClear()
+  mockCreateDoc.mockClear()
+  mockUpdateDoc.mockClear()
+  mockAddCollection.mockClear()
+  mockRemoveDoc.mockClear()
+  mockClose.mockClear()
+  mockLoadServerConfig.mockClear()
+  mockGetMarkup.mockClear()
+  mockCreateMarkup.mockClear()
+  mockUpdateMarkup.mockClear()
+}
 
 const mockCollaboratorClient = {
   getMarkup: mockGetMarkup,
@@ -55,11 +70,11 @@ const mockCollaboratorClient = {
 }
 
 const testSdk: HulySdkDependencies = {
-  createRestClient: vi.fn().mockImplementation(() => ({
-    getAccount: vi.fn().mockResolvedValue({ uuid: "test-account-uuid" })
+  createRestClient: mockFn().mockImplementation(() => ({
+    getAccount: mockFn().mockResolvedValue({ uuid: "test-account-uuid" })
   })),
-  createRestTxOperations: vi.fn().mockImplementation(() => Promise.resolve(mockTxOperations)),
-  getWorkspaceToken: vi.fn().mockImplementation(() =>
+  createRestTxOperations: mockFn().mockImplementation(() => Promise.resolve(mockTxOperations)),
+  getWorkspaceToken: mockFn().mockImplementation(() =>
     Promise.resolve({
       endpoint: "http://localhost:9090",
       token: "test-token",
@@ -68,15 +83,15 @@ const testSdk: HulySdkDependencies = {
     })
   ),
   loadServerConfig: mockLoadServerConfig,
-  createStorageClient: vi.fn(),
-  getAccountClient: vi.fn(),
-  getCollaboratorClient: vi.fn().mockImplementation(() => mockCollaboratorClient),
-  htmlToJSON: vi.fn().mockImplementation((html: string) => ({ type: "html-parsed", content: html })),
-  jsonToHTML: vi.fn().mockImplementation((json: unknown) => `<html>${JSON.stringify(json)}</html>`),
-  jsonToMarkup: vi.fn().mockImplementation((json: unknown) => `markup:${JSON.stringify(json)}`),
-  markdownToMarkup: vi.fn().mockImplementation((md: string) => ({ type: "md-parsed", content: md })),
-  markupToJSON: vi.fn().mockImplementation((markup: string) => ({ type: "markup-parsed", content: markup })),
-  markupToMarkdown: vi.fn().mockImplementation((_json: unknown, _opts: unknown) => "# Markdown output")
+  createStorageClient: mockFn(),
+  getAccountClient: mockFn(),
+  getCollaboratorClient: mockFn().mockImplementation(() => mockCollaboratorClient),
+  htmlToJSON: mockFn().mockImplementation((html: string) => ({ type: "html-parsed", content: html })),
+  jsonToHTML: mockFn().mockImplementation((json: unknown) => `<html>${JSON.stringify(json)}</html>`),
+  jsonToMarkup: mockFn().mockImplementation((json: unknown) => `markup:${JSON.stringify(json)}`),
+  markdownToMarkup: mockFn().mockImplementation((md: string) => ({ type: "md-parsed", content: md })),
+  markupToJSON: mockFn().mockImplementation((markup: string) => ({ type: "markup-parsed", content: markup })),
+  markupToMarkdown: mockFn().mockImplementation((_json: unknown, _opts: unknown) => "# Markdown output")
 }
 
 const testSdkLayer = Layer.succeed(HulySdk, testSdk)
@@ -113,7 +128,7 @@ interface TestDoc extends Doc {
 
 describe("HulyClient Service", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    clearAllMockFns()
     mockFindAll.mockResolvedValue(toFindResult([]))
     mockFindOne.mockResolvedValue(undefined)
     mockCreateDoc.mockResolvedValue("new-id")
@@ -629,7 +644,7 @@ describe("Connection error classification", () => {
 
 describe("HulyClient.layer (live layer with mocked externals)", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    clearAllMockFns()
     mockFindAll.mockResolvedValue(toFindResult([]))
     mockFindOne.mockResolvedValue(undefined)
     mockCreateDoc.mockResolvedValue("new-id")
@@ -674,11 +689,11 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         )
 
         expect(results).toHaveLength(1)
-        expect(mockFindAll).toHaveBeenCalledWith(
+        expect(mockFindAll.mock.calls).toContainEqual([
           "class",
           { title: "Doc 1" },
           { limit: 10 }
-        )
+        ])
       }))
 
     // test-revizorro: approved
@@ -714,7 +729,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         )
 
         expect(result).toEqual(doc)
-        expect(mockFindOne).toHaveBeenCalledWith("class", { _id: "d1" }, undefined)
+        expect(mockFindOne.mock.calls).toContainEqual(["class", { _id: "d1" }, undefined])
       }))
 
     // test-revizorro: approved
@@ -750,12 +765,12 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         )
 
         expect(result).toBe("created-id")
-        expect(mockCreateDoc).toHaveBeenCalledWith(
+        expect(mockCreateDoc.mock.calls).toContainEqual([
           "class",
           "space",
           { title: "New" },
           "preset-id"
-        )
+        ])
       }))
 
     // test-revizorro: approved
@@ -794,13 +809,13 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         )
 
         expect(result).toEqual(txResult)
-        expect(mockUpdateDoc).toHaveBeenCalledWith(
+        expect(mockUpdateDoc.mock.calls).toContainEqual([
           "class",
           "space",
           "id",
           { title: "Updated" },
           true
-        )
+        ])
       }))
 
     // test-revizorro: approved
@@ -841,7 +856,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         )
 
         expect(result).toBe("attached-id")
-        expect(mockAddCollection).toHaveBeenCalledWith(
+        expect(mockAddCollection.mock.calls).toContainEqual([
           "childClass",
           "space",
           "parentId",
@@ -849,7 +864,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
           "comments",
           { text: "hello" },
           "preset-id"
-        )
+        ])
       }))
 
     // test-revizorro: approved
@@ -889,7 +904,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         )
 
         expect(result).toEqual(txResult)
-        expect(mockRemoveDoc).toHaveBeenCalledWith("class", "space", "id")
+        expect(mockRemoveDoc.mock.calls).toContainEqual(["class", "space", "id"])
       }))
 
     // test-revizorro: approved
@@ -927,7 +942,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         )
 
         expect(result).toBe("ref-123")
-        expect(mockCreateMarkup).toHaveBeenCalledOnce()
+        expect(mockCreateMarkup.mock.calls).toHaveLength(1)
         // In markup mode, toInternalMarkup returns the value as-is
         expect(mockCreateMarkup.mock.calls[0][1]).toBe("raw markup value")
       }))
@@ -947,7 +962,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         )
 
         expect(result).toBe("ref-html")
-        expect(mockCreateMarkup).toHaveBeenCalledOnce()
+        expect(mockCreateMarkup.mock.calls).toHaveLength(1)
         // htmlToJSON returns json object, jsonToMarkup converts to string
         const uploadedValue = mockCreateMarkup.mock.calls[0][1] as string
         expect(uploadedValue).toContain("html-parsed")
@@ -968,7 +983,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         )
 
         expect(result).toBe("ref-md")
-        expect(mockCreateMarkup).toHaveBeenCalledOnce()
+        expect(mockCreateMarkup.mock.calls).toHaveLength(1)
         const uploadedValue = mockCreateMarkup.mock.calls[0][1] as string
         expect(uploadedValue).toContain("md-parsed")
       }))
@@ -1046,7 +1061,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         )
 
         // Verifies the wiring: getMarkup -> markupToJSON -> markupToMarkdown
-        expect(mockGetMarkup).toHaveBeenCalledOnce()
+        expect(mockGetMarkup.mock.calls).toHaveLength(1)
         // markupToJSON mock receives the stored markup and returns a parsed object
         // markupToMarkdown mock receives that object and returns "# Markdown output"
         expect(result).toBe("# Markdown output")
@@ -1086,7 +1101,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
           "markup"
         )
 
-        expect(mockUpdateMarkup).toHaveBeenCalledOnce()
+        expect(mockUpdateMarkup.mock.calls).toHaveLength(1)
         expect(mockUpdateMarkup.mock.calls[0][1]).toBe("updated markup")
       }))
 
@@ -1102,7 +1117,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
           "html"
         )
 
-        expect(mockUpdateMarkup).toHaveBeenCalledOnce()
+        expect(mockUpdateMarkup.mock.calls).toHaveLength(1)
         const uploadedValue = mockUpdateMarkup.mock.calls[0][1] as string
         expect(uploadedValue).toContain("html-parsed")
       }))
@@ -1119,7 +1134,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
           "markdown"
         )
 
-        expect(mockUpdateMarkup).toHaveBeenCalledOnce()
+        expect(mockUpdateMarkup.mock.calls).toHaveLength(1)
         const uploadedValue = mockUpdateMarkup.mock.calls[0][1] as string
         expect(uploadedValue).toContain("md-parsed")
       }))
