@@ -1,9 +1,10 @@
 import { describe, it } from "@effect/vitest"
 import type { AnyAttribute, Doc, FindResult, PersonId, Ref, Space } from "@hcengineering/core"
 import { ClassifierKind } from "@hcengineering/core"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import { expect } from "vitest"
 
+import { ListCustomFieldsResultSchema } from "../../../src/domain/schemas/custom-fields.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { core } from "../../../src/huly/huly-plugins.js"
 import { getCustomFieldValues, listCustomFields, setCustomField } from "../../../src/huly/operations/custom-fields.js"
@@ -118,7 +119,7 @@ describe("custom-fields operations", () => {
         _id: "attr-enum",
         name: "priorityBand",
         label: "tracker:field:Priority Band",
-        type: { _class: "core:class:EnumOf", of: "enum:priority" }
+        type: { _class: "core:class:EnumOf", of: "enum:priority", label: "Priority" }
       })
       const ownerClass = makeDoc({
         _id: "tracker:mixin:IssueTypeData",
@@ -129,8 +130,9 @@ describe("custom-fields operations", () => {
       const result = yield* listCustomFields({}).pipe(
         Effect.provide(createTestLayer({ attributes: [attr], classDocs: [ownerClass] }))
       )
+      const encoded = yield* Schema.encodeUnknown(ListCustomFieldsResultSchema)(result)
 
-      expect(result).toEqual([
+      expect(encoded).toEqual([
         {
           id: "attr-enum",
           name: "priorityBand",
@@ -138,7 +140,75 @@ describe("custom-fields operations", () => {
           ownerClassId: "tracker:mixin:IssueTypeData",
           ownerLabel: "Issue Type Data",
           type: "enum",
-          typeDetails: { enumRef: "enum:priority" }
+          typeDetails: {
+            _class: "core:class:EnumOf",
+            enumRef: "enum:priority",
+            label: "Priority",
+            of: "enum:priority"
+          }
+        }
+      ])
+    }))
+
+  it.effect("preserves typed custom field typeDetails for array, ref, and unknown metadata", () =>
+    Effect.gen(function*() {
+      const attrs = [
+        makeAttribute({
+          _id: "attr-array",
+          name: "reviewers",
+          label: "tracker:field:Reviewers",
+          type: { _class: "core:class:ArrOf", itemLabel: "Reviewer", of: { _class: "core:class:TypeString" } }
+        }),
+        makeAttribute({
+          _id: "attr-ref",
+          name: "owner",
+          label: "tracker:field:Owner",
+          type: { _class: "core:class:RefTo", to: "contact:class:Person", title: "Owner" }
+        }),
+        makeAttribute({
+          _id: "attr-weird",
+          name: "weird",
+          label: "tracker:field:Weird",
+          type: { _class: "custom:class:Weird", foo: "bar" }
+        })
+      ]
+
+      const result = yield* listCustomFields({}).pipe(
+        Effect.provide(createTestLayer({ attributes: attrs }))
+      )
+      const encoded = yield* Schema.encodeUnknown(ListCustomFieldsResultSchema)(result)
+
+      expect(encoded).toEqual([
+        {
+          id: "attr-array",
+          name: "reviewers",
+          label: "Reviewers",
+          ownerClassId: "tracker:mixin:IssueTypeData",
+          ownerLabel: "tracker:mixin:IssueTypeData",
+          type: "array",
+          typeDetails: {
+            _class: "core:class:ArrOf",
+            itemLabel: "Reviewer",
+            of: { _class: "core:class:TypeString" }
+          }
+        },
+        {
+          id: "attr-ref",
+          name: "owner",
+          label: "Owner",
+          ownerClassId: "tracker:mixin:IssueTypeData",
+          ownerLabel: "tracker:mixin:IssueTypeData",
+          type: "ref",
+          typeDetails: { _class: "core:class:RefTo", title: "Owner", to: "contact:class:Person" }
+        },
+        {
+          id: "attr-weird",
+          name: "weird",
+          label: "Weird",
+          ownerClassId: "tracker:mixin:IssueTypeData",
+          ownerLabel: "tracker:mixin:IssueTypeData",
+          type: "unknown",
+          typeDetails: { _class: "custom:class:Weird", foo: "bar" }
         }
       ])
     }))

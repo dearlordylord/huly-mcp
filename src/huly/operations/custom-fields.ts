@@ -3,13 +3,19 @@ import { ClassifierKind, SortingOrder } from "@hcengineering/core"
 import { Effect } from "effect"
 
 import type {
+  ArrayCustomFieldTypeDetails,
   CustomFieldInfo,
   CustomFieldTypeName,
   CustomFieldValue,
+  EmptyCustomFieldTypeDetails,
+  EnumCustomFieldTypeDetails,
   GetCustomFieldValuesParams,
   ListCustomFieldsParams,
+  PrimitiveCustomFieldTypeName,
+  RefCustomFieldTypeDetails,
   SetCustomFieldParams,
-  SetCustomFieldResult
+  SetCustomFieldResult,
+  UnknownCustomFieldTypeDetails
 } from "../../domain/schemas/custom-fields.js"
 import { CustomFieldId, NonEmptyString, ObjectClassName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
@@ -26,10 +32,12 @@ const DEFAULT_LIMIT = 200
 
 type JsonMap = Record<string, unknown>
 
-interface TypeDescriptor {
-  readonly typeName: CustomFieldTypeName
-  readonly typeDetails: Record<string, unknown>
-}
+type TypeDescriptor =
+  | { readonly typeName: PrimitiveCustomFieldTypeName; readonly typeDetails: EmptyCustomFieldTypeDetails }
+  | { readonly typeName: "enum"; readonly typeDetails: EnumCustomFieldTypeDetails }
+  | { readonly typeName: "array"; readonly typeDetails: ArrayCustomFieldTypeDetails }
+  | { readonly typeName: "ref"; readonly typeDetails: RefCustomFieldTypeDetails }
+  | { readonly typeName: "unknown"; readonly typeDetails: UnknownCustomFieldTypeDetails }
 
 interface DecodedCustomFieldAttribute {
   readonly id: CustomFieldId
@@ -75,9 +83,9 @@ const decodeTypeDescriptor = (value: unknown): TypeDescriptor => {
   if (_class.includes("TypeString")) return { typeName: "string", typeDetails: {} }
   if (_class.includes("TypeNumber")) return { typeName: "number", typeDetails: {} }
   if (_class.includes("TypeBoolean")) return { typeName: "boolean", typeDetails: {} }
-  if (_class.includes("EnumOf")) return { typeName: "enum", typeDetails: { enumRef: record.of } }
-  if (_class.includes("ArrOf")) return { typeName: "array", typeDetails: { of: record.of } }
-  if (_class.includes("RefTo")) return { typeName: "ref", typeDetails: { to: record.to } }
+  if (_class.includes("EnumOf")) return { typeName: "enum", typeDetails: { ...record, enumRef: record.of } }
+  if (_class.includes("ArrOf")) return { typeName: "array", typeDetails: { ...record, of: record.of } }
+  if (_class.includes("RefTo")) return { typeName: "ref", typeDetails: { ...record, to: record.to } }
   if (_class.includes("TypeDate")) return { typeName: "date", typeDetails: {} }
   if (_class.includes("TypeMarkup")) return { typeName: "markup", typeDetails: {} }
 
@@ -158,6 +166,52 @@ const parseValueForType = (value: string, typeName: CustomFieldTypeName): unknow
   }
 }
 
+const toCustomFieldInfo = (
+  attr: DecodedCustomFieldAttribute,
+  ownerLabel: string
+): CustomFieldInfo => {
+  const base = {
+    id: attr.id,
+    name: attr.name,
+    label: attr.label,
+    ownerClassId: attr.ownerClassId,
+    ownerLabel
+  }
+
+  switch (attr.typeDescriptor.typeName) {
+    case "enum":
+      return {
+        ...base,
+        type: "enum",
+        typeDetails: attr.typeDescriptor.typeDetails
+      }
+    case "array":
+      return {
+        ...base,
+        type: "array",
+        typeDetails: attr.typeDescriptor.typeDetails
+      }
+    case "ref":
+      return {
+        ...base,
+        type: "ref",
+        typeDetails: attr.typeDescriptor.typeDetails
+      }
+    case "unknown":
+      return {
+        ...base,
+        type: "unknown",
+        typeDetails: attr.typeDescriptor.typeDetails
+      }
+    default:
+      return {
+        ...base,
+        type: attr.typeDescriptor.typeName,
+        typeDetails: {}
+      }
+  }
+}
+
 export const listCustomFields = (
   params: ListCustomFieldsParams
 ): Effect.Effect<Array<CustomFieldInfo>, ListCustomFieldsError, HulyClient> =>
@@ -182,15 +236,7 @@ export const listCustomFields = (
       [...new Set(decodedAttrs.map((attr) => attr.ownerClassId))]
     )
 
-    return decodedAttrs.map((attr) => ({
-      id: attr.id,
-      name: attr.name,
-      label: attr.label,
-      ownerClassId: attr.ownerClassId,
-      ownerLabel: ownerLabels.get(attr.ownerClassId) ?? attr.ownerClassId,
-      type: attr.typeDescriptor.typeName,
-      typeDetails: attr.typeDescriptor.typeDetails
-    }))
+    return decodedAttrs.map((attr) => toCustomFieldInfo(attr, ownerLabels.get(attr.ownerClassId) ?? attr.ownerClassId))
   })
 
 export const getCustomFieldValues = (

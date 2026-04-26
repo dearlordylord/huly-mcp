@@ -58,38 +58,69 @@ export const SetCustomFieldParamsSchema = Schema.Struct({
 
 export type SetCustomFieldParams = Schema.Schema.Type<typeof SetCustomFieldParamsSchema>
 
-export const CustomFieldTypeNameSchema = Schema.Literal(
-  "string",
-  "number",
-  "boolean",
+const CUSTOM_FIELD_PRIMITIVE_TYPE_NAMES = ["string", "number", "boolean", "date", "markup"] as const
+export type PrimitiveCustomFieldTypeName = typeof CUSTOM_FIELD_PRIMITIVE_TYPE_NAMES[number]
+
+const CUSTOM_FIELD_TYPE_NAMES = [
+  ...CUSTOM_FIELD_PRIMITIVE_TYPE_NAMES,
   "enum",
   "array",
   "ref",
-  "date",
-  "markup",
   "unknown"
-)
+] as const
 
-export type CustomFieldTypeName =
-  | "string"
-  | "number"
-  | "boolean"
-  | "enum"
-  | "array"
-  | "ref"
-  | "date"
-  | "markup"
-  | "unknown"
+export const CustomFieldTypeNameSchema = Schema.Literal(...CUSTOM_FIELD_TYPE_NAMES)
 
-export interface CustomFieldInfo {
+export type CustomFieldTypeName = typeof CUSTOM_FIELD_TYPE_NAMES[number]
+
+export type EmptyCustomFieldTypeDetails = Readonly<Record<string, never>>
+
+export interface EnumCustomFieldTypeDetails {
+  readonly [key: string]: unknown
+  readonly enumRef: unknown
+}
+
+export interface ArrayCustomFieldTypeDetails {
+  readonly [key: string]: unknown
+  readonly of: unknown
+}
+
+export interface RefCustomFieldTypeDetails {
+  readonly [key: string]: unknown
+  readonly to: unknown
+}
+
+export type UnknownCustomFieldTypeDetails = Readonly<Record<string, unknown>>
+
+interface CustomFieldInfoBase {
   readonly id: CustomFieldId
   readonly name: string
   readonly label: string
   readonly ownerClassId: ObjectClassName
   readonly ownerLabel: string
-  readonly type: CustomFieldTypeName
-  readonly typeDetails: Record<string, unknown>
 }
+
+export type CustomFieldInfo =
+  | (CustomFieldInfoBase & {
+    readonly type: PrimitiveCustomFieldTypeName
+    readonly typeDetails: EmptyCustomFieldTypeDetails
+  })
+  | (CustomFieldInfoBase & {
+    readonly type: "enum"
+    readonly typeDetails: EnumCustomFieldTypeDetails
+  })
+  | (CustomFieldInfoBase & {
+    readonly type: "array"
+    readonly typeDetails: ArrayCustomFieldTypeDetails
+  })
+  | (CustomFieldInfoBase & {
+    readonly type: "ref"
+    readonly typeDetails: RefCustomFieldTypeDetails
+  })
+  | (CustomFieldInfoBase & {
+    readonly type: "unknown"
+    readonly typeDetails: UnknownCustomFieldTypeDetails
+  })
 
 export interface CustomFieldValue {
   readonly fieldId: CustomFieldId
@@ -106,15 +137,60 @@ export interface SetCustomFieldResult {
   readonly updated: boolean
 }
 
-export const CustomFieldInfoWireSchema = Schema.Struct({
+const EmptyCustomFieldTypeDetailsSchema = Schema.Record({ key: Schema.String, value: Schema.Never })
+const CustomFieldTypeDetailsRecordSchema = Schema.Record({ key: Schema.String, value: Schema.Unknown })
+const EnumCustomFieldTypeDetailsSchema = CustomFieldTypeDetailsRecordSchema.pipe(
+  Schema.filter((details): details is EnumCustomFieldTypeDetails => "enumRef" in details, {
+    message: () => "enum custom field typeDetails must include enumRef"
+  })
+)
+const ArrayCustomFieldTypeDetailsSchema = CustomFieldTypeDetailsRecordSchema.pipe(
+  Schema.filter((details): details is ArrayCustomFieldTypeDetails => "of" in details, {
+    message: () => "array custom field typeDetails must include of"
+  })
+)
+const RefCustomFieldTypeDetailsSchema = CustomFieldTypeDetailsRecordSchema.pipe(
+  Schema.filter((details): details is RefCustomFieldTypeDetails => "to" in details, {
+    message: () => "ref custom field typeDetails must include to"
+  })
+)
+const UnknownCustomFieldTypeDetailsSchema = CustomFieldTypeDetailsRecordSchema
+
+const CustomFieldInfoBaseWireFields = {
   id: CustomFieldId,
   name: Schema.String,
   label: Schema.String,
   ownerClassId: ObjectClassName,
-  ownerLabel: Schema.String,
-  type: CustomFieldTypeNameSchema,
-  typeDetails: Schema.Record({ key: Schema.String, value: Schema.Unknown })
-})
+  ownerLabel: Schema.String
+} as const
+
+export const CustomFieldInfoWireSchema = Schema.Union(
+  Schema.Struct({
+    ...CustomFieldInfoBaseWireFields,
+    type: Schema.Literal(...CUSTOM_FIELD_PRIMITIVE_TYPE_NAMES),
+    typeDetails: EmptyCustomFieldTypeDetailsSchema
+  }),
+  Schema.Struct({
+    ...CustomFieldInfoBaseWireFields,
+    type: Schema.Literal("enum"),
+    typeDetails: EnumCustomFieldTypeDetailsSchema
+  }),
+  Schema.Struct({
+    ...CustomFieldInfoBaseWireFields,
+    type: Schema.Literal("array"),
+    typeDetails: ArrayCustomFieldTypeDetailsSchema
+  }),
+  Schema.Struct({
+    ...CustomFieldInfoBaseWireFields,
+    type: Schema.Literal("ref"),
+    typeDetails: RefCustomFieldTypeDetailsSchema
+  }),
+  Schema.Struct({
+    ...CustomFieldInfoBaseWireFields,
+    type: Schema.Literal("unknown"),
+    typeDetails: UnknownCustomFieldTypeDetailsSchema
+  })
+)
 
 export const CustomFieldValueWireSchema = Schema.Struct({
   fieldId: CustomFieldId,

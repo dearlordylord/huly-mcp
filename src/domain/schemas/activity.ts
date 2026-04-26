@@ -1,38 +1,58 @@
 import { JSONSchema, Schema } from "effect"
 
-import { ActivityMessageId, EmojiCode, LimitParam, NonEmptyString, ObjectClassName } from "./shared.js"
+import {
+  ActivityMessageId,
+  EmojiCode,
+  LimitParam,
+  MentionId,
+  NonEmptyString,
+  ObjectClassName,
+  PersonId,
+  ReactionId,
+  SavedMessageId,
+  Timestamp
+} from "./shared.js"
 
-// No codec needed — internal type, not used for runtime validation
+export const ActivityCount = Schema.NonNegativeInt.annotations({
+  identifier: "ActivityCount",
+  title: "ActivityCount",
+  description: "Non-negative integer count for activity replies or reactions"
+})
+export type ActivityCount = Schema.Schema.Type<typeof ActivityCount>
+
+const ActivityAction = Schema.Literal("create", "update", "remove")
+type ActivityAction = Schema.Schema.Type<typeof ActivityAction>
+
 export interface ActivityMessage {
   readonly id: ActivityMessageId
-  readonly objectId: string
+  readonly objectId: NonEmptyString
   readonly objectClass: ObjectClassName
-  readonly modifiedBy?: string | undefined
-  readonly modifiedOn?: number | undefined
+  readonly modifiedBy?: PersonId | undefined
+  readonly modifiedOn?: Timestamp | undefined
   readonly isPinned?: boolean | undefined
-  readonly replies?: number | undefined
-  readonly reactions?: number | undefined
-  readonly editedOn?: number | null | undefined
-  readonly action?: string | undefined
+  readonly replies?: ActivityCount | undefined
+  readonly reactions?: ActivityCount | undefined
+  readonly editedOn?: Timestamp | null | undefined
+  readonly action?: ActivityAction | undefined
   readonly message?: string | undefined
 }
 
 export interface Reaction {
-  readonly id: string
+  readonly id: ReactionId
   readonly messageId: ActivityMessageId
   readonly emoji: EmojiCode
-  readonly createdBy?: string | undefined
+  readonly createdBy?: PersonId | undefined
 }
 
 export interface SavedMessage {
-  readonly id: string
+  readonly id: SavedMessageId
   readonly messageId: ActivityMessageId
 }
 
 export interface Mention {
-  readonly id: string
+  readonly id: MentionId
   readonly messageId: ActivityMessageId
-  readonly userId: string
+  readonly userId: PersonId
   readonly content?: string | undefined
 }
 
@@ -165,9 +185,8 @@ export const parseUnsaveMessageParams = Schema.decodeUnknown(UnsaveMessageParams
 export const parseListSavedMessagesParams = Schema.decodeUnknown(ListSavedMessagesParamsSchema)
 export const parseListMentionsParams = Schema.decodeUnknown(ListMentionsParamsSchema)
 
-// No codec needed — internal type, not used for runtime validation
 export interface AddReactionResult {
-  readonly reactionId: string
+  readonly reactionId: ReactionId
   readonly messageId: ActivityMessageId
 }
 
@@ -177,7 +196,7 @@ export interface RemoveReactionResult {
 }
 
 export interface SaveMessageResult {
-  readonly savedId: string
+  readonly savedId: SavedMessageId
   readonly messageId: ActivityMessageId
 }
 
@@ -185,3 +204,61 @@ export interface UnsaveMessageResult {
   readonly messageId: ActivityMessageId
   readonly removed: boolean
 }
+
+export const ActivityMessageWireSchema = Schema.Struct({
+  id: ActivityMessageId,
+  objectId: NonEmptyString,
+  objectClass: ObjectClassName,
+  modifiedBy: Schema.optional(PersonId),
+  modifiedOn: Schema.optional(Timestamp),
+  isPinned: Schema.optional(Schema.Boolean),
+  replies: Schema.optional(ActivityCount),
+  reactions: Schema.optional(ActivityCount),
+  editedOn: Schema.optional(Schema.NullOr(Timestamp)),
+  action: Schema.optional(ActivityAction),
+  message: Schema.optional(Schema.String)
+})
+
+export const ReactionWireSchema = Schema.Struct({
+  id: ReactionId,
+  messageId: ActivityMessageId,
+  emoji: EmojiCode,
+  createdBy: Schema.optional(PersonId)
+})
+
+export const SavedMessageWireSchema = Schema.Struct({
+  id: SavedMessageId,
+  messageId: ActivityMessageId
+})
+
+export const MentionWireSchema = Schema.Struct({
+  id: MentionId,
+  messageId: ActivityMessageId,
+  userId: PersonId,
+  content: Schema.optional(Schema.String)
+})
+
+export const AddReactionResultSchema = Schema.Struct({
+  reactionId: ReactionId,
+  messageId: ActivityMessageId
+})
+
+export const RemoveReactionResultSchema = Schema.Struct({
+  messageId: ActivityMessageId,
+  removed: Schema.Boolean
+})
+
+export const SaveMessageResultSchema = Schema.Struct({
+  savedId: SavedMessageId,
+  messageId: ActivityMessageId
+})
+
+export const UnsaveMessageResultSchema = Schema.Struct({
+  messageId: ActivityMessageId,
+  removed: Schema.Boolean
+})
+
+export const ListActivityResultSchema = Schema.Array(ActivityMessageWireSchema)
+export const ListReactionsResultSchema = Schema.Array(ReactionWireSchema)
+export const ListSavedMessagesResultSchema = Schema.Array(SavedMessageWireSchema)
+export const ListMentionsResultSchema = Schema.Array(MentionWireSchema)

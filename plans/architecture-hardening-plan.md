@@ -2,7 +2,7 @@
 
 > Source report: [REPORT.md](/workspace/typescript/hulymcp/REPORT.md)
 > Updated: 2026-04-25
-> Status: partially completed; keep this file until remaining open items are either implemented or moved to tracked issues.
+> Status: architecture hardening items completed as of 2026-04-25; remaining unchecked items below are unvalidated SDK coverage backlog candidates, not accepted hardening scope.
 
 ## Current Status
 
@@ -14,12 +14,13 @@ Completed or mostly completed:
 - Shared helper cleanup progressed in `24032db refactor huly operations helpers`.
 - Guardrails improved through the no-mocks rule, stricter review guidance, and a working `pnpm check-all` path in a correctly provisioned environment.
 
-Still open:
+Closed in the latest hardening pass:
 
-- `custom-fields` still exposes open-ended `typeDetails`, but its SDK reads and type-name domain are now mostly contained.
-- `workspace` and `time` should be monitored for future parse-precise / return-loose regressions after the latest wire-schema precision pass.
-- Some shared `toRef` usage still deserves periodic audit at SDK boundaries.
-- `REPORT.md` has been annotated with later fixes, so it should be treated as historical input plus unresolved findings, not as a current-state report.
+- `custom-fields` now uses typed `typeDetails` branches correlated with the custom-field type while preserving the same JSON shape.
+- `activity` now has branded secondary IDs and encoded output validation.
+- `workspace` and `time` wire schemas preserve branded output IDs and constrained strings.
+- `toRef` expectations are documented in reviewer guidance and covered by focused boundary tests.
+- `REPORT.md` has been annotated with later fixes, so it should be treated as historical input, not as a current-state report.
 
 ## Architectural Decisions
 
@@ -57,18 +58,15 @@ Acceptance criteria before closing:
 
 ## Phase 2: Custom Fields Boundary Containment
 
-Status: partially complete; remaining scope is narrower than the original finding.
+Status: complete for the originally identified boundary-containment issue.
 
 What has already landed:
 
 - `src/huly/operations/custom-fields.ts` now isolates dynamic SDK record inspection behind decoded adapter helpers.
 - Custom-field type names are a closed domain with an explicit `unknown` case.
 - Existing tests cover list, read, and set flows through that decoded boundary.
-
-Why it remains open:
-
-- `src/domain/schemas/custom-fields.ts` still exposes `typeDetails: Record<string, unknown>`.
-- Unknown custom-field type metadata is intentionally preserved for backward-compatible MCP output, but known `typeDetails` variants could still be modeled more precisely.
+- Custom-field `typeDetails` is typed as a branch correlated with `type` for primitive, enum, array, ref, and unknown cases.
+- Unknown custom-field type metadata is intentionally preserved for backward-compatible MCP output.
 
 What to build:
 
@@ -78,9 +76,9 @@ Acceptance criteria:
 
 - [x] Dynamic SDK reads for custom-field metadata are isolated behind dedicated typed adapters.
 - [x] Custom-field type names become a closed domain where practical, including an explicit `unknown` case if needed.
-- [ ] Custom-field result contracts become more precise without breaking MCP callers.
+- [x] Custom-field result contracts become more precise without breaking MCP callers.
 - [x] Tests cover list, read, and set flows through the new typed boundary.
-- [ ] `pnpm check-all` passes.
+- [x] `pnpm check-all` passes.
 
 ## Phase 3: Workspace And Time Precision Pass
 
@@ -106,33 +104,30 @@ Acceptance criteria:
 
 ## Phase 4: Shared Helper Discipline
 
-Status: partially complete.
+Status: complete.
 
 What landed:
 
 - Shared operation helpers have been refactored since this plan was written.
 - Cast justifications and SDK-boundary comments are more explicit than when `REPORT.md` was written.
+- `toRef` is documented as an SDK boundary conversion; focused tests pass decoded domain values or existing SDK refs rather than raw user text.
 
 Completed follow-up:
 
 - [x] Re-audited `src/huly/operations/test-management-shared.ts` fallback lookup helpers; they now use the shared `findByNameOrIdOrFail` helper instead of local `let`-based fallback reassignment.
 - [x] Confirmed the test-management shared finders already use the reusable ID-or-name lookup helper without weakening not-found errors.
 
-Remaining work:
-
-- [ ] Re-audit `toRef` usage and confirm each call is either fed by a validated domain value or clearly at an SDK boundary.
-
 Acceptance criteria:
 
-- [ ] Shared reference-conversion helpers accept narrower inputs where practical.
+- [x] Shared reference-conversion helpers accept narrower inputs where practical.
 - [x] Fallback lookup helpers avoid `let`-based conditional reassignment where practical.
 - [x] Test-management shared finders match the style expected by `.claude/review-rules.md`.
-- [ ] Cast justifications remain explicit and limited to true SDK boundaries.
-- [ ] `pnpm check-all` passes.
+- [x] Cast justifications remain explicit and limited to true SDK boundaries.
+- [x] `pnpm check-all` passes.
 
 ## Phase 5: Guardrails And Regression Proof
 
-Status: partially complete.
+Status: complete for architecture hardening guardrails.
 
 What landed:
 
@@ -142,16 +137,14 @@ What landed:
 
 Remaining work:
 
-- [ ] Reconcile `REPORT.md` with completed work, or convert remaining findings into tracked issues.
-- [ ] Add focused regression tests for any new adapter/helper boundaries introduced by Phases 2-4.
-- [ ] Document the current branded-type expectation in contributor/reviewer guidance if it is not already clear enough.
+- No open architecture-hardening work remains in this plan. Treat the SDK coverage backlog below as separate product discovery scope.
 
 Acceptance criteria:
 
-- [ ] Targeted tests cover the new typed result contracts and boundary helpers.
-- [ ] Documentation or reviewer guidance points contributors toward existing shared branded types.
-- [ ] The standard quality gate runs cleanly in a correctly provisioned environment.
-- [ ] The report’s high- and medium-severity findings are resolved or explicitly tracked elsewhere.
+- [x] Targeted tests cover the new typed result contracts and boundary helpers.
+- [x] Documentation or reviewer guidance points contributors toward existing shared branded types.
+- [x] The standard quality gate runs cleanly in a correctly provisioned environment.
+- [x] The report’s high- and medium-severity findings are resolved or explicitly tracked elsewhere.
 
 ## Potential SDK Coverage Backlog
 

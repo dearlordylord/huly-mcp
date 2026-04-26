@@ -8,25 +8,36 @@ import type { AttachedData, Class, Doc, Ref } from "@hcengineering/core"
 import { generateId, SortingOrder } from "@hcengineering/core"
 import { Effect } from "effect"
 
-import type {
-  ActivityMessage,
-  AddReactionParams,
-  AddReactionResult,
-  ListActivityParams,
-  ListMentionsParams,
-  ListReactionsParams,
-  ListSavedMessagesParams,
-  Mention,
-  Reaction,
-  RemoveReactionParams,
-  RemoveReactionResult,
-  SavedMessage,
-  SaveMessageParams,
-  SaveMessageResult,
-  UnsaveMessageParams,
-  UnsaveMessageResult
+import {
+  ActivityCount,
+  type ActivityMessage,
+  type AddReactionParams,
+  type AddReactionResult,
+  type ListActivityParams,
+  type ListMentionsParams,
+  type ListReactionsParams,
+  type ListSavedMessagesParams,
+  type Mention,
+  type Reaction,
+  type RemoveReactionParams,
+  type RemoveReactionResult,
+  type SavedMessage,
+  type SaveMessageParams,
+  type SaveMessageResult,
+  type UnsaveMessageParams,
+  type UnsaveMessageResult
 } from "../../domain/schemas/activity.js"
-import { ActivityMessageId, EmojiCode, NonEmptyString, ObjectClassName } from "../../domain/schemas/shared.js"
+import {
+  ActivityMessageId,
+  EmojiCode,
+  MentionId,
+  NonEmptyString,
+  ObjectClassName,
+  PersonId,
+  ReactionId,
+  SavedMessageId,
+  Timestamp
+} from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { ActivityMessageNotFoundError, ReactionNotFoundError, SavedMessageNotFoundError } from "../errors.js"
 import { clampLimit, findOneOrFail } from "./query-helpers.js"
@@ -49,6 +60,15 @@ type UnsaveMessageError = HulyClientError | SavedMessageNotFoundError
 type ListSavedMessagesError = HulyClientError
 
 type ListMentionsError = HulyClientError
+
+const optionalTimestamp = (value: number | undefined): Timestamp | undefined =>
+  value === undefined ? undefined : Timestamp.make(value)
+
+const optionalNullableTimestamp = (value: number | null | undefined): Timestamp | null | undefined =>
+  value === undefined || value === null ? value : Timestamp.make(value)
+
+const optionalActivityCount = (value: number | undefined): ActivityCount | undefined =>
+  value === undefined ? undefined : ActivityCount.make(value)
 
 // SDK: Data<Reaction> requires createBy (PersonId, branded string) but server populates from auth context.
 // PersonId = string & { __personId: true }; no SDK factory exists. Empty string is overwritten server-side.
@@ -83,14 +103,14 @@ export const listActivity = (
 
     const result: Array<ActivityMessage> = messages.map((msg) => ({
       id: ActivityMessageId.make(msg._id),
-      objectId: msg.attachedTo,
+      objectId: NonEmptyString.make(msg.attachedTo),
       objectClass: ObjectClassName.make(msg.attachedToClass),
-      modifiedBy: msg.modifiedBy,
-      modifiedOn: msg.modifiedOn,
+      modifiedBy: PersonId.make(msg.modifiedBy),
+      modifiedOn: optionalTimestamp(msg.modifiedOn),
       isPinned: msg.isPinned,
-      replies: msg.replies,
-      reactions: msg.reactions,
-      editedOn: msg.editedOn
+      replies: optionalActivityCount(msg.replies),
+      reactions: optionalActivityCount(msg.reactions),
+      editedOn: optionalNullableTimestamp(msg.editedOn)
     }))
 
     return result
@@ -130,7 +150,7 @@ export const addReaction = (
     )
 
     return {
-      reactionId: NonEmptyString.make(reactionId),
+      reactionId: ReactionId.make(reactionId),
       messageId: ActivityMessageId.make(params.messageId)
     }
   })
@@ -190,10 +210,10 @@ export const listReactions = (
     )
 
     const result: Array<Reaction> = reactions.map((r) => ({
-      id: r._id,
+      id: ReactionId.make(r._id),
       messageId: ActivityMessageId.make(r.attachedTo),
       emoji: EmojiCode.make(r.emoji),
-      createdBy: r.createBy
+      createdBy: PersonId.make(r.createBy)
     }))
 
     return result
@@ -227,7 +247,7 @@ export const saveMessage = (
     )
 
     return {
-      savedId: NonEmptyString.make(savedId),
+      savedId: SavedMessageId.make(savedId),
       messageId: ActivityMessageId.make(params.messageId)
     }
   })
@@ -280,7 +300,7 @@ export const listSavedMessages = (
     )
 
     const result: Array<SavedMessage> = saved.map((s) => ({
-      id: s._id,
+      id: SavedMessageId.make(s._id),
       messageId: ActivityMessageId.make(s.attachedTo)
     }))
 
@@ -310,9 +330,9 @@ export const listMentions = (
     )
 
     const result: Array<Mention> = mentions.map((m) => ({
-      id: m._id,
+      id: MentionId.make(m._id),
       messageId: ActivityMessageId.make(m.attachedTo),
-      userId: m.user,
+      userId: PersonId.make(m.user),
       content: m.content
     }))
 

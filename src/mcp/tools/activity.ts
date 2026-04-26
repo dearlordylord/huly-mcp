@@ -1,9 +1,14 @@
 import {
   addReactionParamsJsonSchema,
+  AddReactionResultSchema,
   listActivityParamsJsonSchema,
+  ListActivityResultSchema,
   listMentionsParamsJsonSchema,
+  ListMentionsResultSchema,
   listReactionsParamsJsonSchema,
+  ListReactionsResultSchema,
   listSavedMessagesParamsJsonSchema,
+  ListSavedMessagesResultSchema,
   parseAddReactionParams,
   parseListActivityParams,
   parseListMentionsParams,
@@ -13,8 +18,11 @@ import {
   parseSaveMessageParams,
   parseUnsaveMessageParams,
   removeReactionParamsJsonSchema,
+  RemoveReactionResultSchema,
   saveMessageParamsJsonSchema,
-  unsaveMessageParamsJsonSchema
+  SaveMessageResultSchema,
+  unsaveMessageParamsJsonSchema,
+  UnsaveMessageResultSchema
 } from "../../domain/schemas/activity.js"
 import {
   addReaction,
@@ -26,7 +34,7 @@ import {
   saveMessage,
   unsaveMessage
 } from "../../huly/operations/activity.js"
-import { createToolHandler, type RegisteredTool } from "./registry.js"
+import { createEncodedToolHandler, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "activity" as const
 
@@ -36,10 +44,11 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
     description: "List activity messages for a Huly object. Returns activity sorted by date (newest first).",
     category: CATEGORY,
     inputSchema: listActivityParamsJsonSchema,
-    handler: createToolHandler(
+    handler: createEncodedToolHandler(
       "list_activity",
       parseListActivityParams,
-      listActivity
+      listActivity,
+      ListActivityResultSchema
     )
   },
   {
@@ -47,10 +56,11 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
     description: "Add an emoji reaction to an activity message.",
     category: CATEGORY,
     inputSchema: addReactionParamsJsonSchema,
-    handler: createToolHandler(
+    handler: createEncodedToolHandler(
       "add_reaction",
       parseAddReactionParams,
-      addReaction
+      addReaction,
+      AddReactionResultSchema
     )
   },
   {
@@ -58,10 +68,11 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
     description: "Remove an emoji reaction from an activity message.",
     category: CATEGORY,
     inputSchema: removeReactionParamsJsonSchema,
-    handler: createToolHandler(
+    handler: createEncodedToolHandler(
       "remove_reaction",
       parseRemoveReactionParams,
-      removeReaction
+      removeReaction,
+      RemoveReactionResultSchema
     )
   },
   {
@@ -69,10 +80,11 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
     description: "List reactions on an activity message.",
     category: CATEGORY,
     inputSchema: listReactionsParamsJsonSchema,
-    handler: createToolHandler(
+    handler: createEncodedToolHandler(
       "list_reactions",
       parseListReactionsParams,
-      listReactions
+      listReactions,
+      ListReactionsResultSchema
     )
   },
   {
@@ -80,10 +92,11 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
     description: "Save/bookmark an activity message for later reference.",
     category: CATEGORY,
     inputSchema: saveMessageParamsJsonSchema,
-    handler: createToolHandler(
+    handler: createEncodedToolHandler(
       "save_message",
       parseSaveMessageParams,
-      saveMessage
+      saveMessage,
+      SaveMessageResultSchema
     )
   },
   {
@@ -91,10 +104,11 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
     description: "Remove an activity message from saved/bookmarks.",
     category: CATEGORY,
     inputSchema: unsaveMessageParamsJsonSchema,
-    handler: createToolHandler(
+    handler: createEncodedToolHandler(
       "unsave_message",
       parseUnsaveMessageParams,
-      unsaveMessage
+      unsaveMessage,
+      UnsaveMessageResultSchema
     )
   },
   {
@@ -102,10 +116,11 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
     description: "List saved/bookmarked activity messages.",
     category: CATEGORY,
     inputSchema: listSavedMessagesParamsJsonSchema,
-    handler: createToolHandler(
+    handler: createEncodedToolHandler(
       "list_saved_messages",
       parseListSavedMessagesParams,
-      listSavedMessages
+      listSavedMessages,
+      ListSavedMessagesResultSchema
     )
   },
   {
@@ -113,10 +128,11 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
     description: "List @mentions of the current user in activity messages.",
     category: CATEGORY,
     inputSchema: listMentionsParamsJsonSchema,
-    handler: createToolHandler(
+    handler: createEncodedToolHandler(
       "list_mentions",
       parseListMentionsParams,
-      listMentions
+      listMentions,
+      ListMentionsResultSchema
     )
   }
 ]

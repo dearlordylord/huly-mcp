@@ -3,9 +3,15 @@ import { Effect, Schema } from "effect"
 import { expect } from "vitest"
 
 import {
+  ActivityMessageWireSchema,
+  AddReactionResultSchema,
   CreateWorkSlotResultSchema,
   CreateWorkspaceResultSchema,
+  ListMentionsResultSchema,
+  ListReactionsResultSchema,
+  ListSavedMessagesResultSchema,
   LogTimeResultSchema,
+  SaveMessageResultSchema,
   StopTimerResultSchema,
   TimeSpendReportWireSchema,
   WorkSlotWireSchema,
@@ -81,5 +87,78 @@ describe("branded output schemas", () => {
       expect(workspace.region).toBe("us-east")
       expect(created.uuid).toBe("workspace-uuid-2")
       expect(created.url).toBe("new-product")
+    }))
+
+  it.effect("keeps activity output payloads JSON-compatible while validating branded IDs", () =>
+    Effect.gen(function*() {
+      const messagePayload = {
+        id: "activity-1",
+        objectId: "issue-1",
+        objectClass: "tracker:class:Issue",
+        modifiedBy: "person-1",
+        modifiedOn: 1700000000000,
+        isPinned: false,
+        replies: 1,
+        reactions: 2,
+        editedOn: null,
+        action: "update",
+        message: "Changed priority"
+      }
+      const message = yield* Schema.decodeUnknown(ActivityMessageWireSchema)(messagePayload)
+      const encodedMessage = yield* Schema.encodeUnknown(ActivityMessageWireSchema)(message)
+      const reactionPayloads = [
+        {
+          id: "reaction-1",
+          messageId: "activity-1",
+          emoji: ":thumbsup:",
+          createdBy: "person-1"
+        }
+      ]
+      const reactions = yield* Schema.decodeUnknown(ListReactionsResultSchema)(reactionPayloads)
+      const encodedReactions = yield* Schema.encodeUnknown(ListReactionsResultSchema)(reactions)
+      const savedPayloads = [
+        {
+          id: "saved-1",
+          messageId: "activity-1"
+        }
+      ]
+      const saved = yield* Schema.decodeUnknown(ListSavedMessagesResultSchema)(savedPayloads)
+      const encodedSaved = yield* Schema.encodeUnknown(ListSavedMessagesResultSchema)(saved)
+      const mentionPayloads = [
+        {
+          id: "mention-1",
+          messageId: "activity-1",
+          userId: "person-2",
+          content: "Please review"
+        }
+      ]
+      const mentions = yield* Schema.decodeUnknown(ListMentionsResultSchema)(mentionPayloads)
+      const encodedMentions = yield* Schema.encodeUnknown(ListMentionsResultSchema)(mentions)
+      const addReactionPayload = {
+        reactionId: "reaction-2",
+        messageId: "activity-1"
+      }
+      const added = yield* Schema.decodeUnknown(AddReactionResultSchema)(addReactionPayload)
+      const encodedAdded = yield* Schema.encodeUnknown(AddReactionResultSchema)(added)
+      const saveMessagePayload = {
+        savedId: "saved-2",
+        messageId: "activity-1"
+      }
+      const savedResult = yield* Schema.decodeUnknown(SaveMessageResultSchema)(saveMessagePayload)
+      const encodedSavedResult = yield* Schema.encodeUnknown(SaveMessageResultSchema)(savedResult)
+
+      expect(message.id).toBe("activity-1")
+      expect(message.objectId).toBe("issue-1")
+      expect(encodedMessage).toEqual(messagePayload)
+      expect(reactions[0]?.id).toBe("reaction-1")
+      expect(encodedReactions).toEqual(reactionPayloads)
+      expect(saved[0]?.id).toBe("saved-1")
+      expect(encodedSaved).toEqual(savedPayloads)
+      expect(mentions[0]?.userId).toBe("person-2")
+      expect(encodedMentions).toEqual(mentionPayloads)
+      expect(added.reactionId).toBe("reaction-2")
+      expect(encodedAdded).toEqual(addReactionPayload)
+      expect(savedResult.savedId).toBe("saved-2")
+      expect(encodedSavedResult).toEqual(saveMessagePayload)
     }))
 })

@@ -11,7 +11,7 @@ import {
 } from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
-import { NonNegativeNumber } from "../../../src/domain/schemas/shared.js"
+import { NonEmptyString, NonNegativeNumber } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../../../src/huly/errors.js"
 import { contact, core, task, tracker } from "../../../src/huly/huly-plugins.js"
@@ -305,9 +305,17 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 describe("operations helpers", () => {
   describe("toRef", () => {
     // test-revizorro: approved
-    it("converts string to Ref", () => {
-      const ref = toRef<Doc>("some-id")
-      expect(ref).toBe("some-id")
+    it("converts a domain identifier to Ref without changing the runtime value", () => {
+      const id = NonEmptyString.make("some-id")
+      const ref = toRef<Doc>(id)
+      expect(ref).toBe(id)
+    })
+
+    // test-revizorro: approved
+    it("preserves an existing SDK Ref without changing the runtime value", () => {
+      const existingRef = "doc-1" as Ref<Doc>
+      const ref = toRef<Doc>(existingRef)
+      expect(ref).toBe(existingRef)
     })
   })
 

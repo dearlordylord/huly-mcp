@@ -70,6 +70,15 @@ export type ThreadReplyId = Schema.Schema.Type<typeof ThreadReplyId>
 export const ActivityMessageId = HulyRef("ActivityMessageId")
 export type ActivityMessageId = Schema.Schema.Type<typeof ActivityMessageId>
 
+export const ReactionId = HulyRef("ReactionId")
+export type ReactionId = Schema.Schema.Type<typeof ReactionId>
+
+export const SavedMessageId = HulyRef("SavedMessageId")
+export type SavedMessageId = Schema.Schema.Type<typeof SavedMessageId>
+
+export const MentionId = HulyRef("MentionId")
+export type MentionId = Schema.Schema.Type<typeof MentionId>
+
 export const AttachmentId = HulyRef("AttachmentId")
 export type AttachmentId = Schema.Schema.Type<typeof AttachmentId>
 
