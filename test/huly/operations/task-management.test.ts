@@ -7,6 +7,7 @@ import { expect } from "vitest"
 
 import { ProjectTypeRefSchema, TaskTypeRefSchema } from "../../../src/domain/schemas.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import { HulyConnectionError } from "../../../src/huly/errors.js"
 import { core, task, tracker } from "../../../src/huly/huly-plugins.js"
 import {
   createIssueStatus,
@@ -97,6 +98,7 @@ const createLayer = (config?: {
   readonly taskTypes?: ReadonlyArray<TaskType>
   readonly statuses?: ReadonlyArray<Status>
   readonly captures?: Captures
+  readonly failRecoverableStatusLookup?: boolean
 }) => {
   const projectTypes = config?.projectTypes ?? [makeProjectType()]
   const taskTypes = config?.taskTypes ?? [
@@ -109,7 +111,7 @@ const createLayer = (config?: {
   ]
 
   const findAllImpl = (<T extends Doc>(_class: Ref<Doc>, query: unknown) => {
-    const q = query as { _id?: { $in?: ReadonlyArray<unknown> } }
+    const q = query as { _id?: { $in?: ReadonlyArray<unknown> }; ofAttribute?: unknown }
     const filterByIds = <D extends { readonly _id: unknown }>(items: ReadonlyArray<D>): ReadonlyArray<D> =>
       q._id?.$in === undefined ? items : items.filter((item) => q._id?.$in?.includes(item._id) ?? false)
     const findResult = <D extends Doc>(items: ReadonlyArray<D>) => {
@@ -121,6 +123,9 @@ const createLayer = (config?: {
 
     if (_class === task.class.ProjectType) return findResult(projectTypes)
     if (_class === task.class.TaskType) return findResult(filterByIds(taskTypes))
+    if (_class === core.class.Status && q.ofAttribute !== undefined && config?.failRecoverableStatusLookup === true) {
+      return Effect.fail(new HulyConnectionError({ message: "findAll failed: null status index" }))
+    }
     if (_class === core.class.Status || _class === tracker.class.IssueStatus) return findResult(filterByIds(statuses))
     return findResult([])
   }) satisfies HulyClientOperations["findAll"]
@@ -252,6 +257,24 @@ describe("task management operations", () => {
       expect(result.status.name).toBe("QA")
       expect(result.status.category).toBe("active")
       expect(result.affectedTaskTypeIds).toEqual([taskTypeId, subTaskTypeId])
+      expect(captures.createDocs[0].classId).toBe(String(tracker.class.IssueStatus))
+      expect(captures.updates.map((call) => call.classId)).toEqual([
+        String(task.class.TaskType),
+        String(task.class.TaskType),
+        String(task.class.ProjectType)
+      ])
+    }))
+
+  it.effect("creates an issue status when the broad recovery lookup fails", () =>
+    Effect.gen(function*() {
+      const captures: Captures = { createDocs: [], updates: [], mixins: [] }
+      const result = yield* createIssueStatus({ name: "QA", category: "active" }).pipe(
+        Effect.provide(createLayer({ captures, failRecoverableStatusLookup: true }))
+      )
+
+      expect(result.created).toBe(true)
+      expect(result.status.name).toBe("QA")
+      expect(result.status.category).toBe("active")
       expect(captures.createDocs[0].classId).toBe(String(tracker.class.IssueStatus))
       expect(captures.updates.map((call) => call.classId)).toEqual([
         String(task.class.TaskType),

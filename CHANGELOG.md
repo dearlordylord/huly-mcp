@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.9.2
+
+### Patch Changes
+
+- Make `create_issue_status` tolerate failures from the broad existing-status recovery lookup reported on older self-hosted Huly instances, while preserving idempotency for statuses already linked to the selected project type.
+
 ## 0.9.1
 
 ### Patch Changes

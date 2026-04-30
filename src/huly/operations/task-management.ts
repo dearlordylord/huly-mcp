@@ -126,14 +126,19 @@ const getTaskTypesByProjectType = (
     Effect.map((result) => [...result])
   )
 
-const getStatusesByName = (
+const getRecoverableStatusesByName = (
   client: HulyClientOperations,
   name: string
-): Effect.Effect<ReadonlyArray<Status>, HulyClientError> =>
+): Effect.Effect<ReadonlyArray<Status>, never> =>
   client.findAll<Status>(core.class.Status, { ofAttribute: tracker.attribute.IssueStatus }).pipe(
     Effect.map((result) =>
       [...result].filter((status) => normalizeForComparison(status.name) === normalizeForComparison(name))
-    )
+    ),
+    // Compatibility fallback for https://github.com/dearlordylord/huly-mcp/issues/34:
+    // this broad recovery query was reported to null-deref on an older self-hosted
+    // Huly. The primary project-type status data is already loaded, so losing only
+    // cross-project duplicate recovery is preferable to failing status creation.
+    Effect.catchAll(() => Effect.succeed([]))
   )
 
 const loadWorkflowData = (
@@ -475,7 +480,7 @@ export const createIssueStatus = (
       ? workflowData.taskTypes
       : [yield* resolveTaskType(workflowData.taskTypes, params.taskType)]
     const statusClass = yield* resolveStatusClass(targetTaskTypes)
-    const statusesByName = yield* getStatusesByName(client, params.name)
+    const statusesByName = yield* getRecoverableStatusesByName(client, params.name)
     const existingStatus = existingStatusByName(
       [...workflowData.statuses, ...statusesByName],
       params.name
