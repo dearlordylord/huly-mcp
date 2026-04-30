@@ -70,6 +70,9 @@ const optionalNullableTimestamp = (value: number | null | undefined): Timestamp 
 const optionalActivityCount = (value: number | undefined): ActivityCount | undefined =>
   value === undefined ? undefined : ActivityCount.make(value)
 
+const optionalPersonId = (value: string | undefined): PersonId | undefined =>
+  value === undefined || value === "" ? undefined : PersonId.make(value)
+
 // SDK: Data<Reaction> requires createBy (PersonId, branded string) but server populates from auth context.
 // PersonId = string & { __personId: true }; no SDK factory exists. Empty string is overwritten server-side.
 // eslint-disable-next-line no-restricted-syntax -- see above
@@ -213,7 +216,7 @@ export const listReactions = (
       id: ReactionId.make(r._id),
       messageId: ActivityMessageId.make(r.attachedTo),
       emoji: EmojiCode.make(r.emoji),
-      createdBy: PersonId.make(r.createBy)
+      createdBy: optionalPersonId(r.createBy)
     }))
 
     return result

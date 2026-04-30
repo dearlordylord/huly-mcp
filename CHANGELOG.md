@@ -1,5 +1,12 @@
 # @firfi/huly-mcp
 
+## 0.9.3
+
+### Patch Changes
+
+- Allow `list_leads` assignee filters to accept person display names as well as email addresses.
+- Omit empty reaction creator IDs from `list_reactions` output so freshly added reactions encode cleanly.
+
 ## 0.9.2
 
 ### Patch Changes

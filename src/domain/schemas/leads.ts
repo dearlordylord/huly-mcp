@@ -1,6 +1,6 @@
 import { JSONSchema, ParseResult, Schema } from "effect"
 
-import { Email, LimitParam, PersonName, StatusName, Timestamp } from "./shared.js"
+import { LimitParam, PersonName, PersonRefInput, StatusName, Timestamp } from "./shared.js"
 
 // --- Lead IDs ---
 // Upstream Huly reference:
@@ -116,8 +116,8 @@ const ListLeadsParamsBase = Schema.Struct({
   status: Schema.optional(StatusName.annotations({
     description: "Filter by status name"
   })),
-  assignee: Schema.optional(Email.annotations({
-    description: "Filter by assignee email"
+  assignee: Schema.optional(PersonRefInput.annotations({
+    description: "Filter by assignee email or display name"
   })),
   titleSearch: Schema.optional(Schema.String.annotations({
     description: "Search leads by title substring (case-insensitive)"

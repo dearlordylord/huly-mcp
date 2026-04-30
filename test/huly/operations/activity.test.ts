@@ -482,6 +482,28 @@ describe("listReactions", () => {
       expect(result).toHaveLength(0)
     }))
 
+  it.effect("omits createdBy when Huly returns an empty reaction creator", () =>
+    Effect.gen(function*() {
+      const reactions = [
+        makeReaction({
+          createBy: "" as PersonId
+        })
+      ]
+
+      const testLayer = createTestLayerWithMocks({ reactions })
+
+      const result = yield* listReactions({
+        messageId: activityMessageId("msg-1")
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result).toEqual([{
+        id: "reaction-1",
+        messageId: "msg-1",
+        emoji: ":thumbsup:",
+        createdBy: undefined
+      }])
+    }))
+
   // test-revizorro: approved
   it.effect("filters reactions by messageId", () =>
     Effect.gen(function*() {

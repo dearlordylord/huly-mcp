@@ -140,6 +140,15 @@ describe("Lead Schemas", () => {
         expect(result.titleSearch).toBe("enterprise")
       }))
 
+    it.effect("accepts assignee as a display name", () =>
+      Effect.gen(function*() {
+        const result = yield* parseListLeadsParams({
+          funnel: "funnel-1",
+          assignee: "Braeden Bihag"
+        })
+        expect(result.assignee).toBe("Braeden Bihag")
+      }))
+
     it("generates valid JSON schema", () => {
       const schema = listLeadsParamsJsonSchema as JsonSchemaObject
       expect(schema.type).toBe("object")
