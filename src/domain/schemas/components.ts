@@ -4,11 +4,11 @@ import {
   ComponentId,
   ComponentIdentifier,
   ComponentLabel,
-  Email,
   IssueIdentifier,
   LimitParam,
   NonEmptyString,
   PersonName,
+  PersonRefInput,
   ProjectIdentifier,
   Timestamp
 } from "./shared.js"
@@ -80,8 +80,8 @@ export const CreateComponentParamsSchema = Schema.Struct({
   description: Schema.optional(Schema.String.annotations({
     description: "Component description (markdown supported)"
   })),
-  lead: Schema.optional(Email.annotations({
-    description: "Lead person email address"
+  lead: Schema.optional(PersonRefInput.annotations({
+    description: "Lead person email address or display name"
   }))
 }).annotations({
   title: "CreateComponentParams",
@@ -104,8 +104,8 @@ export const UpdateComponentParamsSchema = Schema.Struct({
     description: "New component description (markdown supported)"
   })),
   lead: Schema.optional(
-    Schema.NullOr(Email).annotations({
-      description: "New lead person email (null to unassign)"
+    Schema.NullOr(PersonRefInput).annotations({
+      description: "New lead person email or display name (null to unassign)"
     })
   )
 }).annotations({

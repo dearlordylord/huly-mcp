@@ -178,6 +178,17 @@ export type StatusName = Schema.Schema.Type<typeof StatusName>
 export const PersonName = NonEmptyString.pipe(Schema.brand("PersonName"))
 export type PersonName = Schema.Schema.Type<typeof PersonName>
 
+/**
+ * Input schema for any field that resolves through findPersonByEmailOrName —
+ * accepts either an email address or a display name. Use this for assignee,
+ * lead, and similar person-reference inputs. Email validation stays strict
+ * for fields where only an email makes sense (account creation, social-id
+ * lookups). Named `*Input` to distinguish from the existing PersonRef
+ * output struct in domain/schemas/issues.ts.
+ */
+export const PersonRefInput = Schema.Union(Email, PersonName)
+export type PersonRefInput = Schema.Schema.Type<typeof PersonRefInput>
+
 export const ComponentLabel = NonEmptyString.pipe(Schema.brand("ComponentLabel"))
 export type ComponentLabel = Schema.Schema.Type<typeof ComponentLabel>
 
