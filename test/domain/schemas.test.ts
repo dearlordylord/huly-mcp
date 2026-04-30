@@ -325,6 +325,15 @@ describe("Domain Schemas", () => {
         )
         expect(error._tag).toBe("ParseError")
       }))
+
+    it.effect("accepts assignee as a display name (not just an email)", () =>
+      Effect.gen(function*() {
+        const result = yield* parseListIssuesParams({
+          project: "HULY",
+          assignee: "Braeden Bihag"
+        })
+        expect(result.assignee).toBe("Braeden Bihag")
+      }))
   })
 
   describe("GetIssueParamsSchema", () => {

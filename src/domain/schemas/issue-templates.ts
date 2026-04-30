@@ -5,12 +5,12 @@ import type { IssueId, IssueIdentifier } from "./shared.js"
 import {
   ComponentIdentifier,
   ComponentLabel,
-  Email,
   IssueTemplateChildId,
   IssueTemplateId,
   LimitParam,
   NonEmptyString,
   PersonName,
+  PersonRefInput,
   PositiveNumber,
   ProjectIdentifier,
   StatusName,
@@ -46,8 +46,8 @@ const ChildTemplateFieldsSchema = Schema.Struct({
   priority: Schema.optional(IssuePrioritySchema.annotations({
     description: "Child default priority"
   })),
-  assignee: Schema.optional(Email.annotations({
-    description: "Child default assignee email"
+  assignee: Schema.optional(PersonRefInput.annotations({
+    description: "Child default assignee email or display name"
   })),
   component: Schema.optional(ComponentIdentifier.annotations({
     description: "Child default component ID or label"
@@ -143,8 +143,8 @@ export const CreateIssueTemplateParamsSchema = Schema.Struct({
   priority: Schema.optional(IssuePrioritySchema.annotations({
     description: "Default priority for issues created from this template"
   })),
-  assignee: Schema.optional(Email.annotations({
-    description: "Default assignee email address"
+  assignee: Schema.optional(PersonRefInput.annotations({
+    description: "Default assignee email address or display name"
   })),
   component: Schema.optional(ComponentIdentifier.annotations({
     description: "Default component ID or label"
@@ -180,8 +180,8 @@ export const CreateIssueFromTemplateParamsSchema = Schema.Struct({
   priority: Schema.optional(IssuePrioritySchema.annotations({
     description: "Override priority"
   })),
-  assignee: Schema.optional(Email.annotations({
-    description: "Override assignee email"
+  assignee: Schema.optional(PersonRefInput.annotations({
+    description: "Override assignee email or display name"
   })),
   status: Schema.optional(StatusName.annotations({
     description: "Initial status (uses project default if not specified)"
@@ -213,8 +213,8 @@ export const UpdateIssueTemplateParamsSchema = Schema.Struct({
     description: "New default priority"
   })),
   assignee: Schema.optional(
-    Schema.NullOr(Email).annotations({
-      description: "New default assignee email (null to unassign)"
+    Schema.NullOr(PersonRefInput).annotations({
+      description: "New default assignee email or display name (null to unassign)"
     })
   ),
   component: Schema.optional(

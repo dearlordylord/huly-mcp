@@ -11,6 +11,7 @@ import {
   NonEmptyString,
   PersonId,
   PersonName,
+  PersonRefInput,
   PositiveNumber,
   ProjectIdentifier,
   StatusName,
@@ -115,8 +116,8 @@ const ListIssuesParamsBase = Schema.Struct({
   status: Schema.optional(StatusName.annotations({
     description: "Filter by status name"
   })),
-  assignee: Schema.optional(Email.annotations({
-    description: "Filter by assignee email"
+  assignee: Schema.optional(PersonRefInput.annotations({
+    description: "Filter by assignee email or display name"
   })),
   parentIssue: Schema.optional(IssueIdentifier.annotations({
     description: "Filter to children of this parent issue (e.g., 'HULY-42')"
@@ -203,8 +204,8 @@ export const CreateIssueParamsSchema = Schema.Struct({
   priority: Schema.optional(IssuePrioritySchema.annotations({
     description: "Issue priority (urgent, high, medium, low, no-priority)"
   })),
-  assignee: Schema.optional(Email.annotations({
-    description: "Assignee email address"
+  assignee: Schema.optional(PersonRefInput.annotations({
+    description: "Assignee email address or display name"
   })),
   status: Schema.optional(StatusName.annotations({
     description: "Initial status (uses project default if not specified)"
@@ -244,8 +245,8 @@ export const UpdateIssueParamsSchema = Schema.Struct({
     description: "New issue priority"
   })),
   assignee: Schema.optional(
-    Schema.NullOr(Email).annotations({
-      description: "New assignee email (null to unassign)"
+    Schema.NullOr(PersonRefInput).annotations({
+      description: "New assignee email or display name (null to unassign)"
     })
   ),
   status: Schema.optional(StatusName.annotations({
