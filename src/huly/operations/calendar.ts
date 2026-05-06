@@ -35,8 +35,8 @@ import type {
 } from "../../domain/schemas/calendar.js"
 import { CalendarId, Email, EventId, PersonId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
+import type { CalendarNotAccessibleError } from "../errors.js"
 import { EventNotFoundError } from "../errors.js"
-import type { HulyError } from "../errors.js"
 import { calendar, core } from "../huly-plugins.js"
 import {
   buildParticipants,
@@ -62,7 +62,7 @@ export { createRecurringEvent, listEventInstances, listRecurringEvents } from ".
 type ListEventsError = HulyClientError
 type ListCalendarsError = HulyClientError
 type GetEventError = HulyClientError | EventNotFoundError
-type CreateEventError = HulyClientError | HulyError
+type CreateEventError = HulyClientError | CalendarNotAccessibleError
 type UpdateEventError = HulyClientError | EventNotFoundError
 type DeleteEventError = HulyClientError | EventNotFoundError
 

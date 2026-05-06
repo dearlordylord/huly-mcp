@@ -3,6 +3,7 @@ import type { ParseResult } from "effect"
 import { Cause, Effect, Schema } from "effect"
 import { expect } from "vitest"
 import {
+  CalendarNotAccessibleError,
   FileFetchError,
   FileNotFoundError,
   FileUploadError,
@@ -170,6 +171,16 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
           expect(response.content[0].text).toBe("Lead 'LEAD-9' not found in funnel 'funnel-1'")
+        }))
+
+      it.effect("maps CalendarNotAccessibleError with descriptive message", () =>
+        Effect.gen(function*() {
+          const error = new CalendarNotAccessibleError({ calendarId: "cal-9" })
+          const response = mapDomainErrorToMcp(error)
+
+          expect(response.isError).toBe(true)
+          expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+          expect(response.content[0].text).toBe("Calendar 'cal-9' not found or not accessible")
         }))
     })
 

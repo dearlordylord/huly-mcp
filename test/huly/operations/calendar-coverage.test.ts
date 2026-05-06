@@ -540,7 +540,7 @@ describe("createEvent - description and participants", () => {
         }).pipe(Effect.provide(testLayer))
       )
 
-      expect(error._tag).toBe("HulyError")
+      expect(error._tag).toBe("CalendarNotAccessibleError")
       expect(error.message).toContain("readonly-calendar")
     }))
 
@@ -557,7 +557,7 @@ describe("createEvent - description and participants", () => {
         }).pipe(Effect.provide(testLayer))
       )
 
-      expect(error._tag).toBe("HulyError")
+      expect(error._tag).toBe("CalendarNotAccessibleError")
       expect(error.message).toContain("missing-calendar")
     }))
 })

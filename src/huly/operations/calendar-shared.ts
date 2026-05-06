@@ -20,7 +20,7 @@ import type { Participant, Visibility } from "../../domain/schemas/calendar.js"
 import type { CalendarId } from "../../domain/schemas/shared.js"
 import { PersonId, PersonName } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
-import { HulyError } from "../errors.js"
+import { CalendarNotAccessibleError } from "../errors.js"
 import { calendar, contact } from "../huly-plugins.js"
 import { toRef } from "./sdk-boundary.js"
 
@@ -119,7 +119,7 @@ export const getDefaultCalendarRef = (
 const resolveCalendarRef = (
   client: HulyClient["Type"],
   calendarId?: CalendarId
-): Effect.Effect<Ref<HulyCalendar>, HulyClientError | HulyError> =>
+): Effect.Effect<Ref<HulyCalendar>, HulyClientError | CalendarNotAccessibleError> =>
   Effect.gen(function*() {
     if (calendarId === undefined) {
       return yield* getDefaultCalendarRef(client)
@@ -135,7 +135,7 @@ const resolveCalendarRef = (
     )
 
     if (cal === undefined) {
-      return yield* new HulyError({ message: `Calendar '${calendarId}' not found or not accessible` })
+      return yield* new CalendarNotAccessibleError({ calendarId })
     }
 
     return cal._id
@@ -174,7 +174,7 @@ export const resolveEventInputs = (
   },
   eventClass: Ref<Class<Doc>>,
   eventId: string
-): Effect.Effect<ResolvedEventInputs, HulyClientError | HulyError> =>
+): Effect.Effect<ResolvedEventInputs, HulyClientError | CalendarNotAccessibleError> =>
   Effect.gen(function*() {
     const calendarRef = yield* resolveCalendarRef(client, params.calendarId)
 

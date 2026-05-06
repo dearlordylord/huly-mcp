@@ -32,3 +32,17 @@ export class RecurringEventNotFoundError extends Schema.TaggedError<RecurringEve
     return `Recurring event '${this.eventId}' not found`
   }
 }
+
+/**
+ * Calendar cannot be used as an event creation target.
+ */
+export class CalendarNotAccessibleError extends Schema.TaggedError<CalendarNotAccessibleError>()(
+  "CalendarNotAccessibleError",
+  {
+    calendarId: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Calendar '${this.calendarId}' not found or not accessible`
+  }
+}

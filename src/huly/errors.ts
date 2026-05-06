@@ -8,7 +8,7 @@
  * - errors-files: file upload/fetch/size errors, BYTES_PER_MB
  * - errors-documents: teamspace, document errors
  * - errors-messaging: channel, message, thread, reaction errors
- * - errors-calendar: event errors
+ * - errors-calendar: event and calendar errors
  * - errors-cards: card space, card, master tag errors
  * - errors-labels: tag, tag category errors
  * - errors-test-management: test project/suite/case/plan/run/result errors
@@ -19,7 +19,7 @@
 import { Schema } from "effect"
 
 import { HulyAuthError, HulyConnectionError, HulyError } from "./errors-base.js"
-import { EventNotFoundError, RecurringEventNotFoundError } from "./errors-calendar.js"
+import { CalendarNotAccessibleError, EventNotFoundError, RecurringEventNotFoundError } from "./errors-calendar.js"
 import { CardNotFoundError, CardSpaceNotFoundError, MasterTagNotFoundError } from "./errors-cards.js"
 import {
   InvalidContactProviderError,
@@ -81,6 +81,7 @@ export {
   ActivityMessageNotFoundError,
   AttachmentNotFoundError,
   BYTES_PER_MB,
+  CalendarNotAccessibleError,
   CardNotFoundError,
   CardSpaceNotFoundError,
   ChannelNotFoundError,
@@ -163,6 +164,7 @@ export type HulyDomainError =
   | ChannelNotFoundError
   | MessageNotFoundError
   | ThreadReplyNotFoundError
+  | CalendarNotAccessibleError
   | EventNotFoundError
   | RecurringEventNotFoundError
   | ActivityMessageNotFoundError
@@ -223,6 +225,7 @@ export const HulyDomainError: Schema.Union<
     typeof ChannelNotFoundError,
     typeof MessageNotFoundError,
     typeof ThreadReplyNotFoundError,
+    typeof CalendarNotAccessibleError,
     typeof EventNotFoundError,
     typeof RecurringEventNotFoundError,
     typeof ActivityMessageNotFoundError,
@@ -279,6 +282,7 @@ export const HulyDomainError: Schema.Union<
   ChannelNotFoundError,
   MessageNotFoundError,
   ThreadReplyNotFoundError,
+  CalendarNotAccessibleError,
   EventNotFoundError,
   RecurringEventNotFoundError,
   ActivityMessageNotFoundError,

@@ -5,6 +5,7 @@ import {
   ActivityMessageNotFoundError,
   AttachmentNotFoundError,
   BYTES_PER_MB,
+  CalendarNotAccessibleError,
   CardNotFoundError,
   CardSpaceNotFoundError,
   ChannelNotFoundError,
@@ -327,6 +328,21 @@ describe("Huly Errors", () => {
       }))
   })
 
+  describe("CalendarNotAccessibleError", () => {
+    it.effect("creates with calendarId", () =>
+      Effect.gen(function*() {
+        const error = new CalendarNotAccessibleError({ calendarId: "cal-100" })
+        expect(error._tag).toBe("CalendarNotAccessibleError")
+        expect(error.calendarId).toBe("cal-100")
+      }))
+
+    it.effect("generates message from fields", () =>
+      Effect.gen(function*() {
+        const error = new CalendarNotAccessibleError({ calendarId: "cal-100" })
+        expect(error.message).toBe("Calendar 'cal-100' not found or not accessible")
+      }))
+  })
+
   describe("ActivityMessageNotFoundError", () => {
     it.effect("creates with messageId", () =>
       Effect.gen(function*() {
@@ -627,6 +643,8 @@ describe("Huly Errors", () => {
               return `message:${error.messageId}`
             case "ThreadReplyNotFoundError":
               return `reply:${error.replyId}`
+            case "CalendarNotAccessibleError":
+              return `calendar:${error.calendarId}`
             case "EventNotFoundError":
               return `event:${error.eventId}`
             case "RecurringEventNotFoundError":
@@ -721,6 +739,7 @@ describe("Huly Errors", () => {
         expect(matchError(new ChannelNotFoundError({ identifier: "ch-1" }))).toBe("channel:ch-1")
         expect(matchError(new MessageNotFoundError({ messageId: "msg-1", channel: "ch-1" }))).toBe("message:msg-1")
         expect(matchError(new ThreadReplyNotFoundError({ replyId: "r-1", messageId: "msg-1" }))).toBe("reply:r-1")
+        expect(matchError(new CalendarNotAccessibleError({ calendarId: "cal-1" }))).toBe("calendar:cal-1")
         expect(matchError(new EventNotFoundError({ eventId: "e-1" }))).toBe("event:e-1")
         expect(matchError(new RecurringEventNotFoundError({ eventId: "re-1" }))).toBe("recurring:re-1")
         expect(matchError(new ActivityMessageNotFoundError({ messageId: "am-1" }))).toBe("activity:am-1")
