@@ -1,5 +1,13 @@
 # @firfi/huly-mcp
 
+## 0.10.0
+
+### Minor Changes
+
+- Add writable calendar discovery and explicit calendar targeting for event creation.
+
+  Event creation now resolves the authenticated user's primary personal calendar by default instead of selecting an arbitrary calendar. `create_event` and `create_recurring_event` accept an optional `calendarId`, and `list_calendars` returns writable calendar targets for agents that need to choose one explicitly.
+
 ## 0.9.3
 
 ### Patch Changes

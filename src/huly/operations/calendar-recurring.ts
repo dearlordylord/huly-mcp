@@ -27,6 +27,7 @@ import type {
 import { Email, EventId, PersonId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { RecurringEventNotFoundError } from "../errors.js"
+import type { HulyError } from "../errors.js"
 import { calendar, core } from "../huly-plugins.js"
 import {
   buildParticipants,
@@ -41,7 +42,7 @@ import { clampLimit } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
 type ListRecurringEventsError = HulyClientError
-type CreateRecurringEventError = HulyClientError
+type CreateRecurringEventError = HulyClientError | HulyError
 type ListEventInstancesError = HulyClientError | RecurringEventNotFoundError
 
 const hulyRuleToRule = (rule: HulyRecurringRule): RecurringRule => ({

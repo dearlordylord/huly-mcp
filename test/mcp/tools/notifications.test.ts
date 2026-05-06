@@ -1,5 +1,5 @@
 import { describe, it } from "@effect/vitest"
-import type { AccountUuid, FindResult } from "@hcengineering/core"
+import type { AccountUuid, FindResult, PersonId } from "@hcengineering/core"
 import { toFindResult } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
@@ -12,6 +12,7 @@ import { notificationTools } from "../../../src/mcp/tools/notifications.js"
 
 const noopHulyClient: HulyClientOperations = {
   getAccountUuid: () => "test-account-uuid" as AccountUuid,
+  getPrimarySocialId: () => "test-primary-social-id" as PersonId,
   documentUrlConfig: {
     baseUrl: UrlString.make("https://test.huly.local"),
     workspaceUrlSlug: WorkspaceUrlSlug.make("test-workspace")

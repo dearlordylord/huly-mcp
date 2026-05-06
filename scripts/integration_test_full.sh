@@ -124,6 +124,21 @@ assert_json_field_nonempty() {
   return 1
 }
 
+assert_json_field_equals() {
+  local name="$1" json="$2" jq_expr="$3" expected="$4"
+  local value
+  value=$(printf '%s\n' "$json" | jq -r "$jq_expr // empty" 2>/dev/null)
+  if [ "$value" = "$expected" ]; then
+    echo "PASS: $name"
+    PASSED=$((PASSED + 1))
+    return 0
+  fi
+  echo "FAIL: $name (expected $expected, got ${value:-<empty>})"
+  FAILED=$((FAILED + 1))
+  ERRORS="${ERRORS}\n  - ${name}: expected ${expected}, got ${value:-<empty>}"
+  return 1
+}
+
 json_string() {
   jq -Rn --arg value "$1" '$value'
 }
@@ -901,6 +916,17 @@ run_test "list_time_spend_reports" \
   "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_time_spend_reports\",\"arguments\":{\"project\":\"$PROJECT\",\"limit\":3}},\"id\":2}"
 run_test "list_recurring_events" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_recurring_events","arguments":{"limit":3}},"id":2}'
+CALENDARS_TEXT=$(run_capture "list_calendars" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_calendars","arguments":{}},"id":2}')
+CALENDAR_ID=""
+if [ $? -eq 0 ]; then
+  CALENDAR_ID=$(echo "$CALENDARS_TEXT" | jq -r '((map(select(.isPrimary == true)) | .[0]) // .[0]).calendarId // empty' 2>/dev/null)
+  if [ -n "$CALENDAR_ID" ]; then
+    echo "  => calendar: $CALENDAR_ID"
+  else
+    skip_test "create_event(explicit_calendar)" "list_calendars returned no writable calendar"
+  fi
+fi
 
 # Event CRUD
 EVT_TEXT=$(run_capture "create_event" \
@@ -919,6 +945,29 @@ if [ $? -eq 0 ]; then
     skip_test "get_event" "no eventId in response"
     skip_test "update_event" "no eventId in response"
     skip_test "delete_event" "no eventId in response"
+  fi
+fi
+
+if [ -n "$CALENDAR_ID" ]; then
+  EXPLICIT_EVT_PAYLOAD=$(jq -cn \
+    --arg calendarId "$CALENDAR_ID" \
+    '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_event","arguments":{"title":"IntTest Explicit Calendar Event","date":1777007200000,"dueDate":1777010800000,"calendarId":$calendarId}},"id":2}')
+  EXPLICIT_EVT_TEXT=$(run_capture "create_event(explicit_calendar)" "$EXPLICIT_EVT_PAYLOAD")
+  if [ $? -eq 0 ]; then
+    EXPLICIT_EVT_ID=$(echo "$EXPLICIT_EVT_TEXT" | jq -r '.eventId' 2>/dev/null)
+    echo "  => explicit calendar event: $EXPLICIT_EVT_ID"
+    if [ -n "$EXPLICIT_EVT_ID" ] && [ "$EXPLICIT_EVT_ID" != "null" ]; then
+      GET_EXPLICIT_EVT_TEXT=$(run_capture "get_event(explicit_calendar:$EXPLICIT_EVT_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_event\",\"arguments\":{\"eventId\":\"$EXPLICIT_EVT_ID\"}},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "get_event explicit calendarId matches" "$GET_EXPLICIT_EVT_TEXT" ".calendarId" "$CALENDAR_ID"
+      fi
+      run_test "delete_event(explicit_calendar:$EXPLICIT_EVT_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_event\",\"arguments\":{\"eventId\":\"$EXPLICIT_EVT_ID\"}},\"id\":2}"
+    else
+      skip_test "get_event(explicit_calendar)" "no eventId in response"
+      skip_test "delete_event(explicit_calendar)" "no eventId in response"
+    fi
   fi
 fi
 

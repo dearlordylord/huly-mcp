@@ -8,12 +8,18 @@
  *
  * @module
  */
-import { AccessLevel, type Event as HulyEvent, generateEventId } from "@hcengineering/calendar"
+import {
+  AccessLevel,
+  type Calendar as HulyCalendar,
+  type Event as HulyEvent,
+  generateEventId
+} from "@hcengineering/calendar"
 import type { AttachedData, Class, Doc, DocumentQuery, DocumentUpdate, Space } from "@hcengineering/core"
 import { SortingOrder } from "@hcengineering/core"
 import { Effect } from "effect"
 
 import type {
+  CalendarSummary,
   CreateEventParams,
   CreateEventResult,
   DeleteEventParams,
@@ -21,18 +27,23 @@ import type {
   Event,
   EventSummary,
   GetEventParams,
+  ListCalendarsParams,
   ListEventsParams,
   UpdateEventParams,
-  UpdateEventResult
+  UpdateEventResult,
+  WritableCalendarAccess
 } from "../../domain/schemas/calendar.js"
-import { Email, EventId } from "../../domain/schemas/shared.js"
+import { CalendarId, Email, EventId, PersonId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { EventNotFoundError } from "../errors.js"
+import type { HulyError } from "../errors.js"
 import { calendar, core } from "../huly-plugins.js"
 import {
   buildParticipants,
   descriptionAsMarkupRef,
   emptyEventDescription,
+  findWritableCalendars,
+  getDefaultCalendarRef,
   markupRefAsDescription,
   ONE_HOUR_MS,
   resolveEventInputs,
@@ -49,12 +60,25 @@ export { createRecurringEvent, listEventInstances, listRecurringEvents } from ".
 // --- Error types ---
 
 type ListEventsError = HulyClientError
+type ListCalendarsError = HulyClientError
 type GetEventError = HulyClientError | EventNotFoundError
-type CreateEventError = HulyClientError
+type CreateEventError = HulyClientError | HulyError
 type UpdateEventError = HulyClientError | EventNotFoundError
 type DeleteEventError = HulyClientError | EventNotFoundError
 
 // --- Operations ---
+
+const toWritableCalendarAccess = (access: HulyCalendar["access"]): WritableCalendarAccess | undefined => {
+  switch (access) {
+    case AccessLevel.Writer:
+      return "writer"
+    case AccessLevel.Owner:
+      return "owner"
+    case AccessLevel.FreeBusyReader:
+    case AccessLevel.Reader:
+      return undefined
+  }
+}
 
 export const listEvents = (
   params: ListEventsParams
@@ -96,6 +120,30 @@ export const listEvents = (
     return summaries
   })
 
+export const listCalendars = (
+  _params: ListCalendarsParams
+): Effect.Effect<Array<CalendarSummary>, ListCalendarsError, HulyClient> =>
+  Effect.gen(function*() {
+    const client = yield* HulyClient
+
+    const calendars = yield* findWritableCalendars(client)
+    const primaryCalendarRef = yield* getDefaultCalendarRef(client)
+
+    return calendars.flatMap(cal => {
+      const access = toWritableCalendarAccess(cal.access)
+      if (access === undefined) return []
+      return [{
+        calendarId: CalendarId.make(cal._id),
+        name: cal.name,
+        hidden: cal.hidden,
+        visibility: visibilityToString(cal.visibility) ?? "private",
+        user: PersonId.make(cal.user),
+        access,
+        isPrimary: cal._id === primaryCalendarRef
+      }]
+    })
+  })
+
 export const getEvent = (
   params: GetEventParams
 ): Effect.Effect<Event, GetEventError, HulyClient> =>
@@ -134,7 +182,7 @@ export const getEvent = (
       visibility: visibilityToString(event.visibility),
       participants,
       externalParticipants: (event.externalParticipants || []).map(p => Email.make(p)),
-      calendarId: event.calendar,
+      calendarId: CalendarId.make(event.calendar),
       modifiedOn: event.modifiedOn,
       createdOn: event.createdOn
     }

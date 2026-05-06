@@ -1,19 +1,31 @@
 import { describe, it } from "@effect/vitest"
 import {
   AccessLevel,
+  type Calendar as HulyCalendar,
   type Event as HulyEvent,
+  type PrimaryCalendar as HulyPrimaryCalendar,
   type ReccuringEvent as HulyRecurringEvent,
   type ReccuringInstance as HulyRecurringInstance
 } from "@hcengineering/calendar"
 import type { Channel, Contact, Person } from "@hcengineering/contact"
-import { type Class, type Doc, type MarkupBlobRef, type Ref, type Space, toFindResult } from "@hcengineering/core"
+import {
+  type Class,
+  type Doc,
+  type MarkupBlobRef,
+  type PersonId as HulyPersonId,
+  type Ref,
+  type Space,
+  toFindResult
+} from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { CalendarId } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import {
   createEvent,
   createRecurringEvent,
   getEvent,
+  listCalendars,
   listEventInstances,
   listEvents,
   updateEvent
@@ -25,6 +37,7 @@ import { calendar, contact } from "../../../src/huly/huly-plugins.js"
 // --- Mock Data Builders ---
 
 const asHulyEvent = (v: unknown) => v as HulyEvent
+const asCalendar = (v: unknown) => v as HulyCalendar
 const asPerson = (v: unknown) => v as Person
 const asRecurringEvent = (v: unknown) => v as HulyRecurringEvent
 const asRecurringInstance = (v: unknown) => v as HulyRecurringInstance
@@ -70,6 +83,37 @@ const makePerson = (overrides?: Partial<Person>): Person =>
     ...overrides
   })
 
+const makeCalendar = (overrides?: Partial<HulyCalendar>): HulyCalendar =>
+  asCalendar({
+    _id: "cal-1" as Ref<HulyCalendar>,
+    _class: calendar.class.Calendar,
+    space: calendar.space.Calendar,
+    name: "Primary",
+    hidden: false,
+    visibility: "private",
+    user: "test-primary-social-id" as HulyCalendar["user"],
+    access: AccessLevel.Owner,
+    modifiedBy: "user-1" as Doc["modifiedBy"],
+    modifiedOn: 0,
+    createdBy: "user-1" as Doc["createdBy"],
+    createdOn: 0,
+    ...overrides
+  })
+
+const makePrimaryCalendar = (attachedTo: Ref<HulyCalendar>): HulyPrimaryCalendar => {
+  const primary: HulyPrimaryCalendar = {
+    _id: "primary-calendar-preference" as Ref<HulyPrimaryCalendar>,
+    _class: calendar.class.PrimaryCalendar,
+    space: "core:space:Workspace" as Ref<Space>,
+    attachedTo,
+    modifiedBy: "user-1" as HulyPrimaryCalendar["modifiedBy"],
+    modifiedOn: 0,
+    createdBy: "user-1" as HulyPersonId,
+    createdOn: 0
+  }
+  return primary
+}
+
 const makeRecurringEvent = (overrides?: Partial<HulyRecurringEvent>): HulyRecurringEvent =>
   asRecurringEvent({
     ...makeEvent(),
@@ -99,9 +143,11 @@ interface MockConfig {
   events?: Array<HulyEvent>
   recurringEvents?: Array<HulyRecurringEvent>
   recurringInstances?: Array<HulyRecurringInstance>
+  calendars?: Array<HulyCalendar>
   persons?: Array<Person>
   channels?: Array<Channel>
   hasCalendar?: boolean
+  primaryCalendarId?: Ref<HulyCalendar>
   captureUpdateDoc?: { operations?: Record<string, unknown> }
   captureAddCollection?: { attributes?: Record<string, unknown> }
   captureUpdateMarkup?: { called?: boolean }
@@ -113,9 +159,21 @@ const createTestLayer = (config: MockConfig) => {
   const events = config.events ?? []
   const recurringEvents = config.recurringEvents ?? []
   const recurringInstances = config.recurringInstances ?? []
+  const calendars = config.calendars ?? [makeCalendar()]
   const persons = config.persons ?? []
   const channels = config.channels ?? []
   const hasCalendar = config.hasCalendar ?? true
+
+  const matchesCalendarQuery = (cal: HulyCalendar, query: Record<string, unknown>): boolean => {
+    if (query._id !== undefined && cal._id !== query._id) return false
+    if (query.user !== undefined && cal.user !== query.user) return false
+    if (query.hidden !== undefined && cal.hidden !== query.hidden) return false
+    if (query.access && typeof query.access === "object" && "$in" in (query.access as Record<string, unknown>)) {
+      const allowed = (query.access as Record<string, Array<string>>).$in
+      if (!allowed.includes(cal.access)) return false
+    }
+    return true
+  }
 
   const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown, _options: unknown) => {
     if (_class === calendar.class.Event) {
@@ -126,6 +184,11 @@ const createTestLayer = (config: MockConfig) => {
     }
     if (_class === calendar.class.ReccuringInstance) {
       return Effect.succeed(toFindResult(recurringInstances))
+    }
+    if (_class === calendar.class.Calendar) {
+      if (!hasCalendar) return Effect.succeed(toFindResult([]))
+      const q = query as Record<string, unknown>
+      return Effect.succeed(toFindResult(calendars.filter(cal => matchesCalendarQuery(cal, q))))
     }
     if (_class === contact.class.Person) {
       const q = query as Record<string, unknown>
@@ -161,7 +224,14 @@ const createTestLayer = (config: MockConfig) => {
     }
     if (_class === calendar.class.Calendar) {
       if (!hasCalendar) return Effect.succeed(undefined)
-      return Effect.succeed({ _id: "cal-1" })
+      const q = query as Record<string, unknown>
+      return Effect.succeed(calendars.find(cal => matchesCalendarQuery(cal, q)))
+    }
+    if (_class === calendar.class.PrimaryCalendar) {
+      const primary = config.primaryCalendarId === undefined
+        ? undefined
+        : makePrimaryCalendar(config.primaryCalendarId)
+      return Effect.succeed(primary)
     }
     return Effect.succeed(undefined)
   }) as HulyClientOperations["findOne"]
@@ -296,6 +366,47 @@ describe("createRecurringEvent - ruleToHulyRule with all optional fields", () =>
       expect(resultByDay).toEqual(["TU", "TH"])
       expect(resultByDay).not.toBe(originalByDay)
     }))
+
+  // test-revizorro: approved
+  it.effect("uses explicit calendarId when provided", () =>
+    Effect.gen(function*() {
+      const explicitCalendar = makeCalendar({ _id: "recurring-calendar" as Ref<HulyCalendar>, name: "Recurring" })
+      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+      const testLayer = createTestLayer({
+        calendars: [makeCalendar(), explicitCalendar],
+        captureAddCollection
+      })
+
+      yield* createRecurringEvent({
+        title: "Recurring With Calendar",
+        startDate: 1700000000000,
+        rules: [{ freq: "WEEKLY" }],
+        calendarId: CalendarId.make("recurring-calendar")
+      }).pipe(Effect.provide(testLayer))
+
+      expect(captureAddCollection.attributes?.calendar).toBe("recurring-calendar")
+    }))
+
+  // test-revizorro: approved
+  it.effect("uses primary calendar preference when calendarId is omitted", () =>
+    Effect.gen(function*() {
+      const defaultCalendar = makeCalendar({ _id: "test-account-uuid_calendar" as Ref<HulyCalendar>, name: "Default" })
+      const preferredCalendar = makeCalendar({ _id: "preferred-calendar" as Ref<HulyCalendar>, name: "Preferred" })
+      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+      const testLayer = createTestLayer({
+        calendars: [defaultCalendar, preferredCalendar],
+        primaryCalendarId: preferredCalendar._id,
+        captureAddCollection
+      })
+
+      yield* createRecurringEvent({
+        title: "Recurring With Preferred Calendar",
+        startDate: 1700000000000,
+        rules: [{ freq: "WEEKLY" }]
+      }).pipe(Effect.provide(testLayer))
+
+      expect(captureAddCollection.attributes?.calendar).toBe("preferred-calendar")
+    }))
 })
 
 // --- createEvent coverage (lines 300-352) ---
@@ -371,6 +482,109 @@ describe("createEvent - description and participants", () => {
 
       expect(captureUploadMarkup.called).not.toBe(true)
       expect(captureAddCollection.attributes?.description).not.toBe("markup-ref-123")
+    }))
+
+  // test-revizorro: approved
+  it.effect("uses explicit calendarId when provided", () =>
+    Effect.gen(function*() {
+      const explicitCalendar = makeCalendar({ _id: "explicit-calendar" as Ref<HulyCalendar>, name: "Explicit" })
+      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+      const testLayer = createTestLayer({
+        calendars: [makeCalendar(), explicitCalendar],
+        captureAddCollection
+      })
+
+      yield* createEvent({
+        title: "Event With Calendar",
+        date: 1700000000000,
+        calendarId: CalendarId.make("explicit-calendar")
+      }).pipe(Effect.provide(testLayer))
+
+      expect(captureAddCollection.attributes?.calendar).toBe("explicit-calendar")
+    }))
+
+  // test-revizorro: approved
+  it.effect("uses primary calendar preference when calendarId is omitted", () =>
+    Effect.gen(function*() {
+      const defaultCalendar = makeCalendar({ _id: "test-account-uuid_calendar" as Ref<HulyCalendar>, name: "Default" })
+      const preferredCalendar = makeCalendar({ _id: "preferred-calendar" as Ref<HulyCalendar>, name: "Preferred" })
+      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+      const testLayer = createTestLayer({
+        calendars: [defaultCalendar, preferredCalendar],
+        primaryCalendarId: preferredCalendar._id,
+        captureAddCollection
+      })
+
+      yield* createEvent({
+        title: "Event With Preferred Calendar",
+        date: 1700000000000
+      }).pipe(Effect.provide(testLayer))
+
+      expect(captureAddCollection.attributes?.calendar).toBe("preferred-calendar")
+    }))
+
+  // test-revizorro: approved
+  it.effect("rejects explicit calendarId for non-writable calendars", () =>
+    Effect.gen(function*() {
+      const readonlyCalendar = makeCalendar({
+        _id: "readonly-calendar" as Ref<HulyCalendar>,
+        access: AccessLevel.Reader
+      })
+      const testLayer = createTestLayer({ calendars: [makeCalendar(), readonlyCalendar] })
+
+      const error = yield* Effect.flip(
+        createEvent({
+          title: "Event With Readonly Calendar",
+          date: 1700000000000,
+          calendarId: CalendarId.make("readonly-calendar")
+        }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(error._tag).toBe("HulyError")
+      expect(error.message).toContain("readonly-calendar")
+    }))
+
+  // test-revizorro: approved
+  it.effect("fails when explicit calendarId is not found", () =>
+    Effect.gen(function*() {
+      const testLayer = createTestLayer({ calendars: [makeCalendar()] })
+
+      const error = yield* Effect.flip(
+        createEvent({
+          title: "Event With Missing Calendar",
+          date: 1700000000000,
+          calendarId: CalendarId.make("missing-calendar")
+        }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(error._tag).toBe("HulyError")
+      expect(error.message).toContain("missing-calendar")
+    }))
+})
+
+describe("listCalendars", () => {
+  // test-revizorro: approved
+  it.effect("lists calendars and marks the primary calendar", () =>
+    Effect.gen(function*() {
+      const primary = makeCalendar({ _id: "test-account-uuid_calendar" as Ref<HulyCalendar>, name: "Personal" })
+      const secondary = makeCalendar({ _id: "team-calendar" as Ref<HulyCalendar>, name: "Team" })
+      const hidden = makeCalendar({ _id: "hidden-calendar" as Ref<HulyCalendar>, hidden: true })
+      const readonly = makeCalendar({ _id: "readonly-calendar" as Ref<HulyCalendar>, access: AccessLevel.Reader })
+      const testLayer = createTestLayer({ calendars: [primary, secondary, hidden, readonly] })
+
+      const result = yield* listCalendars({}).pipe(Effect.provide(testLayer))
+
+      expect(result).toHaveLength(2)
+      expect(result[0]).toMatchObject({
+        calendarId: "test-account-uuid_calendar",
+        name: "Personal",
+        isPrimary: true
+      })
+      expect(result[1]).toMatchObject({
+        calendarId: "team-calendar",
+        name: "Team",
+        isPrimary: false
+      })
     }))
 })
 
@@ -606,9 +820,9 @@ describe("getEvent - externalParticipants mapping", () => {
 
 // --- resolveEventInputs: no calendar fallback (line 189) ---
 
-describe("createEvent - no default calendar fallback", () => {
+describe("createEvent - no listed calendar fallback", () => {
   // test-revizorro: approved
-  it.effect("uses empty ref when no calendar exists", () =>
+  it.effect("uses account-derived personal calendar ref when no writable calendar is listed", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
       const testLayer = createTestLayer({ captureAddCollection, hasCalendar: false })
@@ -619,7 +833,7 @@ describe("createEvent - no default calendar fallback", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result.eventId).toBeDefined()
-      expect(captureAddCollection.attributes?.calendar).toBe("")
+      expect(captureAddCollection.attributes?.calendar).toBe("test-account-uuid_calendar")
     }))
 })
 

@@ -3,6 +3,7 @@ import {
   createRecurringEventParamsJsonSchema,
   deleteEventParamsJsonSchema,
   getEventParamsJsonSchema,
+  listCalendarsParamsJsonSchema,
   listEventInstancesParamsJsonSchema,
   listEventsParamsJsonSchema,
   listRecurringEventsParamsJsonSchema,
@@ -10,6 +11,7 @@ import {
   parseCreateRecurringEventParams,
   parseDeleteEventParams,
   parseGetEventParams,
+  parseListCalendarsParams,
   parseListEventInstancesParams,
   parseListEventsParams,
   parseListRecurringEventsParams,
@@ -21,6 +23,7 @@ import {
   createRecurringEvent,
   deleteEvent,
   getEvent,
+  listCalendars,
   listEventInstances,
   listEvents,
   listRecurringEvents,
@@ -43,6 +46,18 @@ export const calendarTools: ReadonlyArray<RegisteredTool> = [
     )
   },
   {
+    name: "list_calendars",
+    description:
+      "List writable, non-hidden calendars that can be used as create_event or create_recurring_event targets. Use this before creating events when you need to choose a target calendarId explicitly.",
+    category: CATEGORY,
+    inputSchema: listCalendarsParamsJsonSchema,
+    handler: createToolHandler(
+      "list_calendars",
+      parseListCalendarsParams,
+      listCalendars
+    )
+  },
+  {
     name: "get_event",
     description:
       "Retrieve full details for a calendar event including description. Use this to view event content and metadata.",
@@ -56,7 +71,8 @@ export const calendarTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "create_event",
-    description: "Create a new calendar event. Description supports markdown formatting. Returns the created event ID.",
+    description:
+      "Create a new calendar event. Description supports markdown formatting. Optional calendarId targets a specific calendar; when omitted, the event uses the authenticated user's primary personal calendar. Returns the created event ID.",
     category: CATEGORY,
     inputSchema: createEventParamsJsonSchema,
     handler: createToolHandler(
@@ -103,7 +119,7 @@ export const calendarTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "create_recurring_event",
     description:
-      "Create a new recurring calendar event with RFC5545 RRULE rules. Description supports markdown. Returns the created event ID.",
+      "Create a new recurring calendar event with RFC5545 RRULE rules. Description supports markdown. Optional calendarId targets a specific calendar; when omitted, the event uses the authenticated user's primary personal calendar. Returns the created event ID.",
     category: CATEGORY,
     inputSchema: createRecurringEventParamsJsonSchema,
     handler: createToolHandler(

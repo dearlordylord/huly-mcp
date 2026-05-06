@@ -26,6 +26,7 @@ import {
   type Mixin,
   type MixinData,
   type MixinUpdate,
+  type PersonId,
   type Ref,
   type SearchOptions,
   type SearchQuery,
@@ -184,6 +185,7 @@ interface HulyClientContext {
 
 export interface HulyClientOperations extends HulyClientContext {
   readonly getAccountUuid: () => AccountUuid
+  readonly getPrimarySocialId: () => PersonId
 
   readonly findAll: <T extends Doc>(
     _class: Ref<Class<T>>,
@@ -288,7 +290,15 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       const config = yield* HulyConfigService
       const sdk = yield* HulySdk
 
-      const { accountUuid, client, imageUrl, markupOps, refUrl, workspaceUrlSlug } = yield* connectRestWithRetry({
+      const {
+        accountUuid,
+        client,
+        imageUrl,
+        markupOps,
+        primarySocialId,
+        refUrl,
+        workspaceUrlSlug
+      } = yield* connectRestWithRetry({
         url: config.url,
         auth: config.auth,
         workspace: config.workspace
@@ -318,6 +328,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
 
       const operations: HulyClientOperations = {
         getAccountUuid: () => accountUuid,
+        getPrimarySocialId: () => primarySocialId,
         documentUrlConfig,
         markupUrlConfig,
 
@@ -490,6 +501,9 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       // AccountUuid is a double-branded string type with no public constructor
       // eslint-disable-next-line no-restricted-syntax -- see above
       getAccountUuid: () => "test-account-uuid" as AccountUuid,
+      // PersonId is a branded string type with no public constructor
+      // eslint-disable-next-line no-restricted-syntax -- see above
+      getPrimarySocialId: () => "test-primary-social-id" as PersonId,
       documentUrlConfig: {
         baseUrl: UrlString.make("https://test.huly.local"),
         workspaceUrlSlug: WorkspaceUrlSlug.make("test-workspace")
@@ -540,6 +554,7 @@ interface MarkupOperations {
 interface RestConnection {
   client: TxOperations
   accountUuid: AccountUuid
+  primarySocialId: PersonId
   workspaceUrlSlug: WorkspaceUrlSlug
   markupOps: MarkupOperations
   refUrl: string
@@ -615,6 +630,7 @@ const connectRest = async (
   return {
     client,
     accountUuid: account.uuid,
+    primarySocialId: account.primarySocialId,
     workspaceUrlSlug: WorkspaceUrlSlug.make(info.workspaceUrl),
     markupOps,
     refUrl,

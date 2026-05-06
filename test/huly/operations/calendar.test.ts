@@ -1,6 +1,7 @@
 import { describe, it } from "@effect/vitest"
 import {
   AccessLevel,
+  type Calendar as HulyCalendar,
   type Event as HulyEvent,
   type ReccuringEvent as HulyRecurringEvent,
   type ReccuringInstance as HulyRecurringInstance
@@ -28,6 +29,7 @@ import { calendar, contact } from "../../../src/huly/huly-plugins.js"
 // --- Mock Data Builders ---
 
 const asHulyEvent = (v: unknown) => v as HulyEvent
+const asCalendar = (v: unknown) => v as HulyCalendar
 const asRecurringEvent = (v: unknown) => v as HulyRecurringEvent
 const asRecurringInstance = (v: unknown) => v as HulyRecurringInstance
 const asPerson = (v: unknown) => v as Person
@@ -95,12 +97,30 @@ const makePerson = (overrides?: Partial<Person>): Person =>
     ...overrides
   })
 
+const makeCalendar = (overrides?: Partial<HulyCalendar>): HulyCalendar =>
+  asCalendar({
+    _id: "cal-1" as Ref<HulyCalendar>,
+    _class: calendar.class.Calendar,
+    space: calendar.space.Calendar,
+    name: "Primary",
+    hidden: false,
+    visibility: "private",
+    user: "test-primary-social-id" as HulyCalendar["user"],
+    access: AccessLevel.Owner,
+    modifiedBy: "user-1" as Doc["modifiedBy"],
+    modifiedOn: 0,
+    createdBy: "user-1" as Doc["createdBy"],
+    createdOn: 0,
+    ...overrides
+  })
+
 // --- Test Helpers ---
 
 interface MockConfig {
   events?: Array<HulyEvent>
   recurringEvents?: Array<HulyRecurringEvent>
   recurringInstances?: Array<HulyRecurringInstance>
+  calendars?: Array<HulyCalendar>
   persons?: Array<Person>
   markupContent?: Record<string, string>
   captureUpdateDoc?: { operations?: Record<string, unknown> }
@@ -114,6 +134,7 @@ const createTestLayer = (config: MockConfig) => {
   const events = config.events ?? []
   const recurringEvents = config.recurringEvents ?? []
   const recurringInstances = config.recurringInstances ?? []
+  const calendars = config.calendars ?? [makeCalendar()]
   const persons = config.persons ?? []
 
   const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown, _options: unknown) => {
@@ -125,6 +146,9 @@ const createTestLayer = (config: MockConfig) => {
     }
     if (_class === calendar.class.ReccuringInstance) {
       return Effect.succeed(toFindResult(recurringInstances))
+    }
+    if (_class === calendar.class.Calendar) {
+      return Effect.succeed(toFindResult(calendars))
     }
     if (_class === contact.class.Person) {
       const q = query as Record<string, unknown>
@@ -153,7 +177,14 @@ const createTestLayer = (config: MockConfig) => {
       return Effect.succeed(found)
     }
     if (_class === calendar.class.Calendar) {
-      return Effect.succeed({ _id: "cal-1" })
+      const q = query as Record<string, unknown>
+      if (q._id !== undefined) {
+        return Effect.succeed(calendars.find(c => c._id === q._id))
+      }
+      return Effect.succeed(calendars[0])
+    }
+    if (_class === calendar.class.PrimaryCalendar) {
+      return Effect.succeed(undefined)
     }
     return Effect.succeed(undefined)
   }) as HulyClientOperations["findOne"]

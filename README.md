@@ -295,12 +295,13 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | Tool | Description |
 |------|-------------|
 | `list_events` | List calendar events. Returns events sorted by date. Supports filtering by date range. |
+| `list_calendars` | List writable, non-hidden calendars that can be used as create_event or create_recurring_event targets. Use this before creating events when you need to choose a target calendarId explicitly. |
 | `get_event` | Retrieve full details for a calendar event including description. Use this to view event content and metadata. |
-| `create_event` | Create a new calendar event. Description supports markdown formatting. Returns the created event ID. |
+| `create_event` | Create a new calendar event. Description supports markdown formatting. Optional calendarId targets a specific calendar; when omitted, the event uses the authenticated user's primary personal calendar. Returns the created event ID. |
 | `update_event` | Update fields on an existing calendar event. Only provided fields are modified. Description updates support markdown. |
 | `delete_event` | Permanently delete a calendar event. This action cannot be undone. |
 | `list_recurring_events` | List recurring event definitions. Returns recurring events sorted by modification date (newest first). |
-| `create_recurring_event` | Create a new recurring calendar event with RFC5545 RRULE rules. Description supports markdown. Returns the created event ID. |
+| `create_recurring_event` | Create a new recurring calendar event with RFC5545 RRULE rules. Description supports markdown. Optional calendarId targets a specific calendar; when omitted, the event uses the authenticated user's primary personal calendar. Returns the created event ID. |
 | `list_event_instances` | List instances of a recurring event. Returns instances sorted by date. Supports filtering by date range. Use includeParticipants=true to fetch full participant info (extra lookups). |
 
 ### Time Tracking
@@ -523,4 +524,3 @@ The CockroachDB credentials can be found in your Huly `compose.yml` or via `dock
 
 - **Bash wrapper scripts** (sourcing `.env` files) may not work reliably when launched by MCP clients on Windows. Prefer setting env vars directly in the MCP config JSON.
 - **Docker pulls over SSH** may fail on Windows due to credential manager issues. Pull images from the server desktop if needed.
-

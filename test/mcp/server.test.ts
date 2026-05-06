@@ -266,6 +266,7 @@ describe("TOOL_DEFINITIONS", () => {
       expect(tools).toContain("send_channel_message")
       expect(tools).toContain("list_direct_messages")
       expect(tools).toContain("list_events")
+      expect(tools).toContain("list_calendars")
       expect(tools).toContain("get_event")
       expect(tools).toContain("create_event")
       expect(tools).toContain("update_event")

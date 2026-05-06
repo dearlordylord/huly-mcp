@@ -5,6 +5,7 @@ import {
   CreateEventParamsSchema,
   CreateRecurringEventParamsSchema,
   GetEventParamsSchema,
+  ListCalendarsParamsSchema,
   ListEventInstancesParamsSchema,
   ListEventsParamsSchema,
   RecurringRuleSchema,
@@ -186,7 +187,8 @@ describe("Calendar Schemas", () => {
         allDay: false,
         location: "Conference Room A",
         participants: ["alice@example.com", "bob@example.com"],
-        visibility: "private"
+        visibility: "private",
+        calendarId: "personal-calendar"
       })
       expect(Either.isRight(result)).toBe(true)
     })
@@ -216,6 +218,14 @@ describe("Calendar Schemas", () => {
         visibility: "secret"
       })
       expect(Either.isLeft(result)).toBe(true)
+    })
+  })
+
+  describe("ListCalendarsParamsSchema", () => {
+    // test-revizorro: approved
+    it("accepts empty params", () => {
+      const result = Schema.decodeUnknownEither(ListCalendarsParamsSchema)({})
+      expect(Either.isRight(result)).toBe(true)
     })
   })
 
@@ -278,7 +288,8 @@ describe("Calendar Schemas", () => {
         title: "Meeting",
         startDate: 1704067200000,
         rules: [{ freq: "DAILY" }],
-        timeZone: "America/New_York"
+        timeZone: "America/New_York",
+        calendarId: "personal-calendar"
       })
       expect(Either.isRight(result)).toBe(true)
     })

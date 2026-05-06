@@ -1,5 +1,5 @@
 import { describe, it } from "@effect/vitest"
-import type { AccountUuid, FindResult } from "@hcengineering/core"
+import type { AccountUuid, FindResult, PersonId } from "@hcengineering/core"
 import { toFindResult } from "@hcengineering/core"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
@@ -30,6 +30,7 @@ const parse = (input: unknown) => Schema.decodeUnknown(Params)(input)
 
 const noopHulyClient: HulyClientOperations = {
   getAccountUuid: () => "test-account-uuid" as AccountUuid,
+  getPrimarySocialId: () => "test-primary-social-id" as PersonId,
   documentUrlConfig: {
     baseUrl: UrlString.make("https://test.huly.local"),
     workspaceUrlSlug: WorkspaceUrlSlug.make("test-workspace")

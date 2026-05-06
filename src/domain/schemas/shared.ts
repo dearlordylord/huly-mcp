@@ -109,6 +109,9 @@ export type NotificationContextId = Schema.Schema.Type<typeof NotificationContex
 export const EventId = HulyRef("EventId")
 export type EventId = Schema.Schema.Type<typeof EventId>
 
+export const CalendarId = HulyRef("CalendarId")
+export type CalendarId = Schema.Schema.Type<typeof CalendarId>
+
 export const TodoId = HulyRef("TodoId")
 export type TodoId = Schema.Schema.Type<typeof TodoId>
 

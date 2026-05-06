@@ -1,6 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
-import { Email, EventId, LimitParam, NonEmptyString, Timestamp } from "./shared.js"
+import { CalendarId, Email, EmptyParamsSchema, EventId, LimitParam, NonEmptyString, Timestamp } from "./shared.js"
 import type { PersonId, PersonName } from "./shared.js"
 
 export const VisibilityValues = ["public", "freeBusy", "private"] as const
@@ -11,6 +11,8 @@ export const VisibilitySchema = Schema.Literal(...VisibilityValues).annotations(
 })
 
 export type Visibility = Schema.Schema.Type<typeof VisibilitySchema>
+
+export type WritableCalendarAccess = "writer" | "owner"
 
 export const RecurringFrequencyValues = [
   "SECONDLY",
@@ -104,6 +106,16 @@ export interface EventSummary {
   readonly modifiedOn?: number | undefined
 }
 
+export interface CalendarSummary {
+  readonly calendarId: CalendarId
+  readonly name: string
+  readonly hidden: boolean
+  readonly visibility: Visibility
+  readonly user: PersonId
+  readonly access: WritableCalendarAccess
+  readonly isPrimary: boolean
+}
+
 export interface Event {
   readonly eventId: EventId
   readonly title: string
@@ -115,7 +127,7 @@ export interface Event {
   readonly visibility?: Visibility | undefined
   readonly participants?: ReadonlyArray<Participant> | undefined
   readonly externalParticipants?: ReadonlyArray<Email> | undefined
-  readonly calendarId?: string | undefined
+  readonly calendarId?: CalendarId | undefined
   readonly modifiedOn?: number | undefined
   readonly createdOn?: number | undefined
 }
@@ -144,7 +156,7 @@ export interface RecurringEvent {
   readonly visibility?: Visibility | undefined
   readonly participants?: ReadonlyArray<Participant> | undefined
   readonly externalParticipants?: ReadonlyArray<Email> | undefined
-  readonly calendarId?: string | undefined
+  readonly calendarId?: CalendarId | undefined
   readonly modifiedOn?: number | undefined
   readonly createdOn?: number | undefined
 }
@@ -198,6 +210,13 @@ export const GetEventParamsSchema = Schema.Struct({
 
 export type GetEventParams = Schema.Schema.Type<typeof GetEventParamsSchema>
 
+export const ListCalendarsParamsSchema = EmptyParamsSchema.annotations({
+  title: "ListCalendarsParams",
+  description: "Parameters for listing writable calendar targets"
+})
+
+export type ListCalendarsParams = Schema.Schema.Type<typeof ListCalendarsParamsSchema>
+
 export const CreateEventParamsSchema = Schema.Struct({
   title: NonEmptyString.annotations({
     description: "Event title"
@@ -224,6 +243,10 @@ export const CreateEventParamsSchema = Schema.Struct({
   ),
   visibility: Schema.optional(VisibilitySchema.annotations({
     description: "Event visibility (public, freeBusy, private)"
+  })),
+  calendarId: Schema.optional(CalendarId.annotations({
+    description:
+      "Target writable calendar ID. If omitted, uses the authenticated user's primary personal calendar. Use list_calendars to discover valid calendar IDs."
   }))
 }).annotations({
   title: "CreateEventParams",
@@ -320,6 +343,10 @@ export const CreateRecurringEventParamsSchema = Schema.Struct({
   })),
   visibility: Schema.optional(VisibilitySchema.annotations({
     description: "Event visibility (public, freeBusy, private)"
+  })),
+  calendarId: Schema.optional(CalendarId.annotations({
+    description:
+      "Target writable calendar ID. If omitted, uses the authenticated user's primary personal calendar. Use list_calendars to discover valid calendar IDs."
   }))
 }).annotations({
   title: "CreateRecurringEventParams",
@@ -357,6 +384,7 @@ export type ListEventInstancesParams = Schema.Schema.Type<typeof ListEventInstan
 
 export const listEventsParamsJsonSchema = JSONSchema.make(ListEventsParamsSchema)
 export const getEventParamsJsonSchema = JSONSchema.make(GetEventParamsSchema)
+export const listCalendarsParamsJsonSchema = JSONSchema.make(ListCalendarsParamsSchema)
 export const createEventParamsJsonSchema = JSONSchema.make(CreateEventParamsSchema)
 export const updateEventParamsJsonSchema = JSONSchema.make(UpdateEventParamsSchema)
 export const deleteEventParamsJsonSchema = JSONSchema.make(DeleteEventParamsSchema)
@@ -368,6 +396,7 @@ export const listEventInstancesParamsJsonSchema = JSONSchema.make(ListEventInsta
 
 export const parseListEventsParams = Schema.decodeUnknown(ListEventsParamsSchema)
 export const parseGetEventParams = Schema.decodeUnknown(GetEventParamsSchema)
+export const parseListCalendarsParams = Schema.decodeUnknown(ListCalendarsParamsSchema)
 export const parseCreateEventParams = Schema.decodeUnknown(CreateEventParamsSchema)
 export const parseUpdateEventParams = Schema.decodeUnknown(UpdateEventParamsSchema)
 export const parseDeleteEventParams = Schema.decodeUnknown(DeleteEventParamsSchema)

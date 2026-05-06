@@ -8,15 +8,19 @@
 import type {
   Calendar as HulyCalendar,
   Event as HulyEvent,
+  PrimaryCalendar as HulyPrimaryCalendar,
   Visibility as HulyVisibility
 } from "@hcengineering/calendar"
+import { AccessLevel, getPrimaryCalendar } from "@hcengineering/calendar"
 import type { Channel, Contact, Person } from "@hcengineering/contact"
 import type { Class, Doc, MarkupBlobRef, Ref } from "@hcengineering/core"
 import { Effect } from "effect"
 
 import type { Participant, Visibility } from "../../domain/schemas/calendar.js"
+import type { CalendarId } from "../../domain/schemas/shared.js"
 import { PersonId, PersonName } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
+import { HulyError } from "../errors.js"
 import { calendar, contact } from "../huly-plugins.js"
 import { toRef } from "./sdk-boundary.js"
 
@@ -76,13 +80,66 @@ const findPersonsByEmails = (
     return persons
   })
 
-const getDefaultCalendar = (
+const findWritablePersonalCalendars = (
   client: HulyClient["Type"]
-): Effect.Effect<HulyCalendar | undefined, HulyClientError> =>
-  client.findOne<HulyCalendar>(
+): Effect.Effect<Array<HulyCalendar>, HulyClientError> =>
+  client.findAll<HulyCalendar>(
     calendar.class.Calendar,
-    {}
+    {
+      user: client.getPrimarySocialId(),
+      hidden: false,
+      access: { $in: [AccessLevel.Owner, AccessLevel.Writer] }
+    }
   )
+
+export const findWritableCalendars = (
+  client: HulyClient["Type"]
+): Effect.Effect<Array<HulyCalendar>, HulyClientError> =>
+  client.findAll<HulyCalendar>(
+    calendar.class.Calendar,
+    {
+      hidden: false,
+      access: { $in: [AccessLevel.Owner, AccessLevel.Writer] }
+    }
+  )
+
+export const getDefaultCalendarRef = (
+  client: HulyClient["Type"]
+): Effect.Effect<Ref<HulyCalendar>, HulyClientError> =>
+  Effect.gen(function*() {
+    const calendars = yield* findWritablePersonalCalendars(client)
+    const preference = yield* client.findOne<HulyPrimaryCalendar>(
+      calendar.class.PrimaryCalendar,
+      {}
+    )
+
+    return getPrimaryCalendar(calendars, preference, client.getAccountUuid())
+  })
+
+const resolveCalendarRef = (
+  client: HulyClient["Type"],
+  calendarId?: CalendarId
+): Effect.Effect<Ref<HulyCalendar>, HulyClientError | HulyError> =>
+  Effect.gen(function*() {
+    if (calendarId === undefined) {
+      return yield* getDefaultCalendarRef(client)
+    }
+
+    const cal = yield* client.findOne<HulyCalendar>(
+      calendar.class.Calendar,
+      {
+        _id: toRef<HulyCalendar>(calendarId),
+        hidden: false,
+        access: { $in: [AccessLevel.Owner, AccessLevel.Writer] }
+      }
+    )
+
+    if (cal === undefined) {
+      return yield* new HulyError({ message: `Calendar '${calendarId}' not found or not accessible` })
+    }
+
+    return cal._id
+  })
 
 export const buildParticipants = (
   client: HulyClient["Type"],
@@ -113,13 +170,13 @@ export const resolveEventInputs = (
   params: {
     readonly participants?: ReadonlyArray<string> | undefined
     readonly description?: string | undefined
+    readonly calendarId?: CalendarId | undefined
   },
   eventClass: Ref<Class<Doc>>,
   eventId: string
-): Effect.Effect<ResolvedEventInputs, HulyClientError> =>
+): Effect.Effect<ResolvedEventInputs, HulyClientError | HulyError> =>
   Effect.gen(function*() {
-    const cal = yield* getDefaultCalendar(client)
-    const calendarRef = cal?._id ?? toRef<HulyCalendar>("")
+    const calendarRef = yield* resolveCalendarRef(client, params.calendarId)
 
     const participantRefs: Array<Ref<Contact>> = params.participants && params.participants.length > 0
       ? (yield* findPersonsByEmails(client, params.participants)).map(p => p._id)
