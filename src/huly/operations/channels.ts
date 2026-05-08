@@ -78,8 +78,8 @@ type ListDirectMessagesError = HulyClientError
 // --- SDK Type Bridges ---
 
 // SDK: SocialIdentityRef = Ref<SocialIdentity> & PersonId. PersonId lacks the Ref<> phantom brand (__ref).
-// Both are branded strings over the same runtime value; cast is safe but no single-step path exists.
-/* eslint-disable no-restricted-syntax -- PersonId → SocialIdentityRef: same branded string at runtime */
+// Brands are erased at runtime; both are plain strings, so the cast is safe but no single-step path exists.
+/* eslint-disable no-restricted-syntax -- PersonId → SocialIdentityRef: brands erased at runtime; both are plain strings */
 const personIdsAsSocialIdentityRefs = (
   ids: Array<PersonId>
 ): Array<SocialIdentityRef> => ids as Array<SocialIdentityRef>
@@ -157,7 +157,7 @@ export const buildSocialIdToPersonNameMap = (
  * Build a map from AccountUuid to Person name by querying Employee.
  * Employee has personUuid field that matches AccountUuid.
  */
-export const buildAccountUuidToNameMap = (
+const buildAccountUuidToNameMap = (
   client: HulyClient["Type"],
   accountUuids: Array<HulyAccountUuid>
 ): Effect.Effect<Map<string, string>, HulyClientError> =>
@@ -465,7 +465,7 @@ export const listDirectMessages = (
 
     const dms = yield* client.findAll<HulyDirectMessage>(
       chunter.class.DirectMessage,
-      {},
+      { members: client.getAccountUuid() },
       {
         limit,
         sort: {

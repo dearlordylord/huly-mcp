@@ -51,6 +51,7 @@ import { FunnelNotFoundError, LeadNotFoundError } from "./errors-leads.js"
 import {
   ActivityMessageNotFoundError,
   ChannelNotFoundError,
+  DirectMessageIdentifierAmbiguousError,
   DirectMessageNotFoundError,
   MessageNotFoundError,
   ReactionNotFoundError,
@@ -90,6 +91,7 @@ export {
   ComponentNotFoundError,
   CustomFieldNotFoundError,
   CustomFieldObjectNotFoundError,
+  DirectMessageIdentifierAmbiguousError,
   DirectMessageNotFoundError,
   DocumentEmptyContentError,
   DocumentNotFoundError,
@@ -164,6 +166,7 @@ export type HulyDomainError =
   | CommentNotFoundError
   | MilestoneNotFoundError
   | ChannelNotFoundError
+  | DirectMessageIdentifierAmbiguousError
   | DirectMessageNotFoundError
   | MessageNotFoundError
   | ThreadReplyNotFoundError
@@ -226,6 +229,7 @@ export const HulyDomainError: Schema.Union<
     typeof CommentNotFoundError,
     typeof MilestoneNotFoundError,
     typeof ChannelNotFoundError,
+    typeof DirectMessageIdentifierAmbiguousError,
     typeof DirectMessageNotFoundError,
     typeof MessageNotFoundError,
     typeof ThreadReplyNotFoundError,
@@ -284,6 +288,7 @@ export const HulyDomainError: Schema.Union<
   CommentNotFoundError,
   MilestoneNotFoundError,
   ChannelNotFoundError,
+  DirectMessageIdentifierAmbiguousError,
   DirectMessageNotFoundError,
   MessageNotFoundError,
   ThreadReplyNotFoundError,

@@ -5,6 +5,8 @@
  */
 import { Schema } from "effect"
 
+const MIN_AMBIGUOUS_DM_MATCHES = 2
+
 /**
  * Channel not found in the workspace.
  */
@@ -33,6 +35,21 @@ export class DirectMessageNotFoundError extends Schema.TaggedError<DirectMessage
 ) {
   override get message(): string {
     return `Direct message '${this.identifier}' not found`
+  }
+}
+
+/**
+ * Direct-message participant name resolves to more than one conversation.
+ */
+export class DirectMessageIdentifierAmbiguousError extends Schema.TaggedError<DirectMessageIdentifierAmbiguousError>()(
+  "DirectMessageIdentifierAmbiguousError",
+  {
+    identifier: Schema.String,
+    matches: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(MIN_AMBIGUOUS_DM_MATCHES))
+  }
+) {
+  override get message(): string {
+    return `Direct message '${this.identifier}' is ambiguous (${this.matches} matches); use the DM _id`
   }
 }
 

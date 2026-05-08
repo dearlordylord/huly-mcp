@@ -179,7 +179,7 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "list_dm_messages",
     description:
-      "List messages in a direct-message conversation, newest first. The `dm` argument accepts either the DM `_id` or a participant display name (e.g. `Kerr,Shannon`); a name resolves to the DM whose members include that person's account.",
+      "List messages in a direct-message conversation, newest first. The `dm` argument accepts either the DM `_id` or a participant display name (e.g. `Kerr,Shannon`); a name resolves only to a one-to-one DM with the authenticated account.",
     category: CATEGORY,
     inputSchema: listDmMessagesParamsJsonSchema,
     handler: createToolHandler(
@@ -191,7 +191,7 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "send_dm_message",
     description:
-      "Send a message to a direct-message conversation. The `dm` argument accepts either the DM `_id` or a participant display name. Message body supports markdown formatting.",
+      "Send a message to a direct-message conversation. The `dm` argument accepts either the DM `_id` or a participant display name; a name resolves only to a one-to-one DM with the authenticated account. Message body supports markdown formatting.",
     category: CATEGORY,
     inputSchema: sendDmMessageParamsJsonSchema,
     handler: createToolHandler(
@@ -202,7 +202,8 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "update_dm_message",
-    description: "Update a direct-message message. Only the body can be modified.",
+    description:
+      "Update a direct-message message. The `dm` argument accepts either the DM `_id` or a participant display name; a name resolves only to a one-to-one DM with the authenticated account. Only the body can be modified.",
     category: CATEGORY,
     inputSchema: updateDmMessageParamsJsonSchema,
     handler: createToolHandler(
@@ -213,7 +214,8 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "delete_dm_message",
-    description: "Permanently delete a direct-message message. This action cannot be undone.",
+    description:
+      "Permanently delete a direct-message message. The `dm` argument accepts either the DM `_id` or a participant display name; a name resolves only to a one-to-one DM with the authenticated account. This action cannot be undone.",
     category: CATEGORY,
     inputSchema: deleteDmMessageParamsJsonSchema,
     handler: createToolHandler(

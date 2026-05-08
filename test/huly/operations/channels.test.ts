@@ -237,8 +237,13 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       return Effect.succeed(toFindResult(result))
     }
     if (_class === chunter.class.DirectMessage) {
+      const q = query as { members?: AccountUuid }
       const opts = options as { sort?: Record<string, number> } | undefined
       let result = [...directMessages]
+      const member = q.members
+      if (member !== undefined) {
+        result = result.filter((dm) => dm.members.includes(member))
+      }
       if (opts?.sort?.modifiedOn !== undefined) {
         const direction = opts.sort.modifiedOn
         result = result.sort((a, b) => direction * (a.modifiedOn - b.modifiedOn))
@@ -928,10 +933,12 @@ describe("listDirectMessages", () => {
       const dms = [
         makeDirectMessage({
           _id: "dm-1" as Ref<DirectMessage>,
+          members: ["test-account-uuid" as AccountUuid, "account-1" as AccountUuid],
           modifiedOn: 1000
         }),
         makeDirectMessage({
           _id: "dm-2" as Ref<DirectMessage>,
+          members: ["test-account-uuid" as AccountUuid, "account-2" as AccountUuid],
           modifiedOn: 2000
         })
       ]
@@ -950,10 +957,14 @@ describe("listDirectMessages", () => {
     Effect.gen(function*() {
       const dm = makeDirectMessage({
         _id: "dm-1" as Ref<DirectMessage>,
-        members: ["account-1" as AccountUuid, "account-2" as AccountUuid]
+        members: ["test-account-uuid" as AccountUuid, "account-2" as AccountUuid]
       })
       const employees = [
-        makeEmployee({ _id: "emp-1" as Ref<HulyEmployee>, name: "Alice", personUuid: "account-1" as AccountUuid }),
+        makeEmployee({
+          _id: "emp-1" as Ref<HulyEmployee>,
+          name: "Alice",
+          personUuid: "test-account-uuid" as AccountUuid
+        }),
         makeEmployee({ _id: "emp-2" as Ref<HulyEmployee>, name: "Bob", personUuid: "account-2" as AccountUuid })
       ]
 
@@ -962,7 +973,25 @@ describe("listDirectMessages", () => {
       const result = yield* listDirectMessages({}).pipe(Effect.provide(testLayer))
 
       expect(result.conversations[0].participants).toEqual(["Alice", "Bob"])
-      expect(result.conversations[0].participantIds).toEqual(["account-1", "account-2"])
+      expect(result.conversations[0].participantIds).toEqual(["test-account-uuid", "account-2"])
+    }))
+
+  it.effect("only returns DM conversations containing the authenticated account", () =>
+    Effect.gen(function*() {
+      const ownDm = makeDirectMessage({
+        _id: "dm-own" as Ref<DirectMessage>,
+        members: ["test-account-uuid" as AccountUuid, "account-2" as AccountUuid]
+      })
+      const unrelatedDm = makeDirectMessage({
+        _id: "dm-unrelated" as Ref<DirectMessage>,
+        members: ["account-3" as AccountUuid, "account-4" as AccountUuid]
+      })
+      const testLayer = createTestLayerWithMocks({ directMessages: [ownDm, unrelatedDm] })
+
+      const result = yield* listDirectMessages({}).pipe(Effect.provide(testLayer))
+
+      expect(result.conversations).toHaveLength(1)
+      expect(result.conversations[0].id).toBe("dm-own")
     }))
 })
 

@@ -82,6 +82,8 @@ const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDo
   "CommentNotFoundError",
   "MilestoneNotFoundError",
   "ChannelNotFoundError",
+  "DirectMessageIdentifierAmbiguousError",
+  "DirectMessageNotFoundError",
   "MessageNotFoundError",
   "ThreadReplyNotFoundError",
   "CalendarNotAccessibleError",

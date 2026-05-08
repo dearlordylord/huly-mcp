@@ -4,6 +4,8 @@ import { Cause, Effect, Schema } from "effect"
 import { expect } from "vitest"
 import {
   CalendarNotAccessibleError,
+  DirectMessageIdentifierAmbiguousError,
+  DirectMessageNotFoundError,
   FileFetchError,
   FileNotFoundError,
   FileUploadError,
@@ -181,6 +183,30 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
           expect(response.content[0].text).toBe("Calendar 'cal-9' not found or not accessible")
+        }))
+
+      it.effect("maps DirectMessageNotFoundError with descriptive message", () =>
+        Effect.gen(function*() {
+          const error = new DirectMessageNotFoundError({ identifier: "Kerr,Shannon" })
+          const response = mapDomainErrorToMcp(error)
+
+          expect(response.isError).toBe(true)
+          expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+          expect(response._meta.errorTag).toBeUndefined()
+          expect(response.content[0].text).toBe("Direct message 'Kerr,Shannon' not found")
+        }))
+
+      it.effect("maps DirectMessageIdentifierAmbiguousError with descriptive message", () =>
+        Effect.gen(function*() {
+          const error = new DirectMessageIdentifierAmbiguousError({ identifier: "Kerr,Shannon", matches: 2 })
+          const response = mapDomainErrorToMcp(error)
+
+          expect(response.isError).toBe(true)
+          expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+          expect(response._meta.errorTag).toBeUndefined()
+          expect(response.content[0].text).toBe(
+            "Direct message 'Kerr,Shannon' is ambiguous (2 matches); use the DM _id"
+          )
         }))
     })
 

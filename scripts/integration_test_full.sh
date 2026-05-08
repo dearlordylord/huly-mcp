@@ -769,8 +769,35 @@ run_test "get_channel(general)" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_channel","arguments":{"channel":"general"}},"id":2}'
 run_test "list_channel_messages(general)" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_channel_messages","arguments":{"channel":"general","limit":3}},"id":2}'
-run_test "list_direct_messages" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_direct_messages","arguments":{"limit":3}},"id":2}'
+DM_LIST_TEXT=$(run_capture "list_direct_messages" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_direct_messages","arguments":{"limit":3}},"id":2}')
+DM_ID="${HULY_TEST_DM_ID:-}"
+if [ -z "$DM_ID" ]; then
+  DM_ID=$(echo "$DM_LIST_TEXT" | jq -r '.conversations[0].id // empty' 2>/dev/null)
+fi
+if [ -n "$DM_ID" ]; then
+  run_test "list_dm_messages($DM_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_dm_messages\",\"arguments\":{\"dm\":\"$DM_ID\",\"limit\":3}},\"id\":2}"
+  DM_MSG_TEXT=$(run_capture "send_dm_message($DM_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"send_dm_message\",\"arguments\":{\"dm\":\"$DM_ID\",\"body\":\"IntTest DM msg $RUN_ID\"}},\"id\":2}")
+  if [ $? -eq 0 ]; then
+    DM_MSG_ID=$(echo "$DM_MSG_TEXT" | jq -r '.id // empty' 2>/dev/null)
+    if [ -n "$DM_MSG_ID" ]; then
+      run_test "update_dm_message($DM_MSG_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_dm_message\",\"arguments\":{\"dm\":\"$DM_ID\",\"messageId\":\"$DM_MSG_ID\",\"body\":\"Updated IntTest DM msg $RUN_ID\"}},\"id\":2}"
+      run_test "delete_dm_message($DM_MSG_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_dm_message\",\"arguments\":{\"dm\":\"$DM_ID\",\"messageId\":\"$DM_MSG_ID\"}},\"id\":2}"
+    else
+      echo "FAIL: DM message update/delete (send_dm_message returned no id)"
+      FAILED=$((FAILED + 1))
+      ERRORS="${ERRORS}\n  - DM message update/delete: send_dm_message returned no id"
+    fi
+  fi
+else
+  echo "FAIL: DM message tools (set HULY_TEST_DM_ID or create a direct-message conversation in the test workspace)"
+  FAILED=$((FAILED + 1))
+  ERRORS="${ERRORS}\n  - DM message tools: no fixture DM; set HULY_TEST_DM_ID or create a direct-message conversation"
+fi
 
 # Create a temp channel for message/thread/reaction tests — deleting it cleans up all messages
 CH_TEXT=$(run_capture "create_channel" \

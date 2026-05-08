@@ -4,8 +4,9 @@
  *
  * A DM `dm` identifier accepts either:
  * - the DM `_id` (an opaque chunter Space ref), or
- * - a participant display name (e.g. `Kerr,Shannon`) — resolved to a DM whose
- *   `members` includes the AccountUuid of the named person.
+ * - a participant display name (e.g. `Kerr,Shannon`) — resolved to the
+ *   one-to-one DM whose `members` are the authenticated account and the named
+ *   person's AccountUuid.
  *
  * @module
  */
@@ -32,10 +33,10 @@ import type {
   UpdateDmMessageParams,
   UpdateDmMessageResult
 } from "../../domain/schemas/direct-messages.js"
-import { ChannelId, MessageId, PersonName } from "../../domain/schemas/shared.js"
+import { ChannelId, type DirectMessageIdentifier, MessageId, PersonName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import { DirectMessageNotFoundError, MessageNotFoundError } from "../errors.js"
-import { buildAccountUuidToNameMap } from "./channels.js"
+import { DirectMessageIdentifierAmbiguousError, DirectMessageNotFoundError, MessageNotFoundError } from "../errors.js"
+import { buildSocialIdToPersonNameMap } from "./channels.js"
 import { markdownToMarkupString, markupToMarkdownString } from "./markup.js"
 import { clampLimit } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
@@ -46,6 +47,7 @@ import { chunter, contact } from "../huly-plugins.js"
 
 type FindDirectMessageError =
   | HulyClientError
+  | DirectMessageIdentifierAmbiguousError
   | DirectMessageNotFoundError
 
 type ListDmMessagesError = FindDirectMessageError
@@ -60,19 +62,21 @@ type DeleteDmMessageError = UpdateDmMessageError
 
 // --- Helpers ---
 
+const ONE_TO_ONE_DM_MEMBER_COUNT = 2
+
 /**
  * Resolve a `dm` identifier to a Huly DirectMessage document.
  *
  * Resolution order:
  * 1. Treat the identifier as a DM `_id`. If a DM with that ref exists, return it.
  * 2. Treat the identifier as a participant display name. Look up Employees with
- *    that exact name to obtain candidate AccountUuids, then find a DM whose
- *    `members` array contains any of those AccountUuids.
+ *    that exact name to obtain candidate AccountUuids, then find the one-to-one
+ *    DM whose members are exactly the authenticated account and one candidate.
  *
  * If neither lookup yields a hit, fail with `DirectMessageNotFoundError`.
  */
 export const findDirectMessage = (
-  identifier: string
+  identifier: DirectMessageIdentifier
 ): Effect.Effect<
   { client: HulyClient["Type"]; dm: HulyDirectMessage },
   FindDirectMessageError,
@@ -87,6 +91,9 @@ export const findDirectMessage = (
     )
 
     if (byId !== undefined) {
+      if (!byId.members.includes(client.getAccountUuid())) {
+        return yield* new DirectMessageNotFoundError({ identifier })
+      }
       return { client, dm: byId }
     }
 
@@ -95,28 +102,43 @@ export const findDirectMessage = (
       { name: identifier }
     )
 
-    const accountUuids = employees
-      .map((e) => e.personUuid)
-      .filter((u): u is HulyAccountUuid => u !== undefined)
+    const accountUuid = client.getAccountUuid()
+    const accountUuids = [
+      ...new Set(
+        employees
+          .map((e) => e.personUuid)
+          .filter((u): u is HulyAccountUuid => u !== undefined && u !== accountUuid)
+      )
+    ]
 
     if (accountUuids.length === 0) {
       return yield* new DirectMessageNotFoundError({ identifier })
     }
 
-    const byMember = yield* client.findOne<HulyDirectMessage>(
+    const directMessages = yield* client.findAll<HulyDirectMessage>(
       chunter.class.DirectMessage,
-      { members: { $in: accountUuids } }
+      { members: accountUuid }
     )
 
-    if (byMember === undefined) {
+    const matches = directMessages.filter((dm) =>
+      dm.members.length === ONE_TO_ONE_DM_MEMBER_COUNT
+      && dm.members.includes(accountUuid)
+      && accountUuids.some((candidate) => dm.members.includes(candidate))
+    )
+
+    if (matches.length === 0) {
       return yield* new DirectMessageNotFoundError({ identifier })
     }
 
-    return { client, dm: byMember }
+    if (matches.length > 1) {
+      return yield* new DirectMessageIdentifierAmbiguousError({ identifier, matches: matches.length })
+    }
+
+    return { client, dm: matches[0] }
   })
 
 const findDirectMessageMessage = (
-  params: { dm: string; messageId: string }
+  params: { dm: DirectMessageIdentifier; messageId: MessageId }
 ): Effect.Effect<
   { client: HulyClient["Type"]; dm: HulyDirectMessage; message: ChatMessage },
   FindDirectMessageError | MessageNotFoundError,
@@ -168,10 +190,14 @@ export const listDirectMessageMessages = (
 
     const total = messages.total
 
-    const accountUuidToName = yield* buildAccountUuidToNameMap(client, dm.members)
+    const uniqueSocialIds = [
+      ...new Set(messages.map((msg) => msg.modifiedBy))
+    ]
+
+    const socialIdToName = yield* buildSocialIdToPersonNameMap(client, uniqueSocialIds)
 
     const summaries: Array<MessageSummary> = messages.map((msg) => {
-      const senderName = accountUuidToName.get(msg.modifiedBy)
+      const senderName = socialIdToName.get(msg.modifiedBy)
       return {
         id: MessageId.make(msg._id),
         body: markupToMarkdownString(msg.message, markupUrlConfig),

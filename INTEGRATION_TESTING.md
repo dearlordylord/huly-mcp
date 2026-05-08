@@ -26,6 +26,10 @@ set -a && source .env.local && set +a
 # set -a && source .env.production && set +a
 
 # Required: HULY_URL, HULY_WORKSPACE, and either HULY_TOKEN or (HULY_EMAIL + HULY_PASSWORD)
+
+# Optional for DM message integration:
+# HULY_TEST_DM_ID=<existing direct-message conversation id>
+# If unset, the suite uses the first conversation returned by list_direct_messages.
 ```
 
 ## Running from a Container (e.g., Claude Code devcontainer)
@@ -94,7 +98,7 @@ The full suite tests CRUD lifecycles with cleanup for all domains:
 | 6. Labels & Tags | create/list/update/delete tag_category, create/list/update/delete label | Full CRUD for both |
 | 7. Documents | list_teamspaces, create/list/get/update/delete document, list_inline_comments | Full CRUD + inline comments |
 | 8. Teamspaces | create, get, update, delete | Full CRUD |
-| 9. Channels | list, get, messages, DMs, create channel, send_message, thread replies (add/list/update/delete), reactions (add/list/remove), save/unsave, update/delete channel | All messaging in temp channel (deleted at end) |
+| 9. Channels | list, get, messages, DMs, DM messages (list/send/update/delete), create channel, send_message, thread replies (add/list/update/delete), reactions (add/list/remove), save/unsave, update/delete channel | Channel messaging in temp channel (deleted at end); DM message test cleans up its own message and requires `HULY_TEST_DM_ID` or at least one existing DM |
 | 10. Contacts | list_persons, list_employees, list_organizations, get_user_profile, create/update/delete person | CRUD (create_organization skipped — no delete tool) |
 | 11. Calendar | list events/work_slots/time_reports/recurring, create/get/update/delete event, start/stop timer | Lifecycle (create_recurring_event skipped — no delete tool) |
 | 12. Notifications | list, count, contexts, settings, get, mark_read | Read operations (+ mutation if notifications exist) |

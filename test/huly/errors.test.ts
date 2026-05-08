@@ -11,6 +11,7 @@ import {
   ChannelNotFoundError,
   CommentNotFoundError,
   ComponentNotFoundError,
+  DirectMessageIdentifierAmbiguousError,
   DirectMessageNotFoundError,
   DocumentNotFoundError,
   EventNotFoundError,
@@ -279,6 +280,22 @@ describe("Huly Errors", () => {
       Effect.gen(function*() {
         const error = new DirectMessageNotFoundError({ identifier: "Kerr,Shannon" })
         expect(error.message).toBe("Direct message 'Kerr,Shannon' not found")
+      }))
+  })
+
+  describe("DirectMessageIdentifierAmbiguousError", () => {
+    it.effect("creates with identifier and match count", () =>
+      Effect.gen(function*() {
+        const error = new DirectMessageIdentifierAmbiguousError({ identifier: "Kerr,Shannon", matches: 2 })
+        expect(error._tag).toBe("DirectMessageIdentifierAmbiguousError")
+        expect(error.identifier).toBe("Kerr,Shannon")
+        expect(error.matches).toBe(2)
+      }))
+
+    it.effect("generates message from fields", () =>
+      Effect.gen(function*() {
+        const error = new DirectMessageIdentifierAmbiguousError({ identifier: "Kerr,Shannon", matches: 2 })
+        expect(error.message).toBe("Direct message 'Kerr,Shannon' is ambiguous (2 matches); use the DM _id")
       }))
   })
 
@@ -655,6 +672,8 @@ describe("Huly Errors", () => {
               return `milestone:${error.identifier}`
             case "ChannelNotFoundError":
               return `channel:${error.identifier}`
+            case "DirectMessageIdentifierAmbiguousError":
+              return `dm-ambiguous:${error.identifier}:${error.matches}`
             case "DirectMessageNotFoundError":
               return `dm:${error.identifier}`
             case "MessageNotFoundError":
@@ -755,6 +774,9 @@ describe("Huly Errors", () => {
         ).toBe("comment:c-1")
         expect(matchError(new MilestoneNotFoundError({ identifier: "m-1", project: "P" }))).toBe("milestone:m-1")
         expect(matchError(new ChannelNotFoundError({ identifier: "ch-1" }))).toBe("channel:ch-1")
+        expect(matchError(new DirectMessageIdentifierAmbiguousError({ identifier: "dm-1", matches: 2 }))).toBe(
+          "dm-ambiguous:dm-1:2"
+        )
         expect(matchError(new DirectMessageNotFoundError({ identifier: "dm-1" }))).toBe("dm:dm-1")
         expect(matchError(new MessageNotFoundError({ messageId: "msg-1", channel: "ch-1" }))).toBe("message:msg-1")
         expect(matchError(new ThreadReplyNotFoundError({ replyId: "r-1", messageId: "msg-1" }))).toBe("reply:r-1")

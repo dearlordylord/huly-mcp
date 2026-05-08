@@ -13,7 +13,8 @@ import { DirectMessageIdentifier, LimitParam, MessageId, NonEmptyString } from "
 
 export const ListDmMessagesParamsSchema = Schema.Struct({
   dm: DirectMessageIdentifier.annotations({
-    description: "Direct-message conversation: either the DM `_id` or a participant display name (e.g. `Kerr,Shannon`)"
+    description:
+      "Direct-message conversation: either the DM `_id` or a participant display name (e.g. `Kerr,Shannon`). A participant name resolves only to a one-to-one DM with the authenticated account."
   }),
   limit: Schema.optional(
     LimitParam.annotations({
@@ -31,7 +32,8 @@ export type ListDmMessagesParams = Schema.Schema.Type<typeof ListDmMessagesParam
 
 export const SendDmMessageParamsSchema = Schema.Struct({
   dm: DirectMessageIdentifier.annotations({
-    description: "Direct-message conversation: either the DM `_id` or a participant display name (e.g. `Kerr,Shannon`)"
+    description:
+      "Direct-message conversation: either the DM `_id` or a participant display name (e.g. `Kerr,Shannon`). A participant name resolves only to a one-to-one DM with the authenticated account."
   }),
   body: NonEmptyString.annotations({
     description: "Message body (markdown supported)"
@@ -47,7 +49,8 @@ export type SendDmMessageParams = Schema.Schema.Type<typeof SendDmMessageParamsS
 
 export const UpdateDmMessageParamsSchema = Schema.Struct({
   dm: DirectMessageIdentifier.annotations({
-    description: "Direct-message conversation: either the DM `_id` or a participant display name"
+    description:
+      "Direct-message conversation: either the DM `_id` or a participant display name. A participant name resolves only to a one-to-one DM with the authenticated account."
   }),
   messageId: MessageId.annotations({
     description: "Message ID to update"
@@ -66,7 +69,8 @@ export type UpdateDmMessageParams = Schema.Schema.Type<typeof UpdateDmMessagePar
 
 export const DeleteDmMessageParamsSchema = Schema.Struct({
   dm: DirectMessageIdentifier.annotations({
-    description: "Direct-message conversation: either the DM `_id` or a participant display name"
+    description:
+      "Direct-message conversation: either the DM `_id` or a participant display name. A participant name resolves only to a one-to-one DM with the authenticated account."
   }),
   messageId: MessageId.annotations({
     description: "Message ID to delete"

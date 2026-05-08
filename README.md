@@ -285,10 +285,10 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `update_channel_message` | Update a channel message. Only the body can be modified. |
 | `delete_channel_message` | Permanently delete a channel message. This action cannot be undone. |
 | `list_direct_messages` | List direct message conversations in Huly. Returns conversations sorted by date (newest first). |
-| `list_dm_messages` | List messages in a direct-message conversation, newest first. The `dm` argument accepts either the DM `_id` or a participant display name (e.g. `Kerr,Shannon`); a name resolves to the DM whose members include that person's account. |
-| `send_dm_message` | Send a message to a direct-message conversation. The `dm` argument accepts either the DM `_id` or a participant display name. Message body supports markdown formatting. |
-| `update_dm_message` | Update a direct-message message. Only the body can be modified. |
-| `delete_dm_message` | Permanently delete a direct-message message. This action cannot be undone. |
+| `list_dm_messages` | List messages in a direct-message conversation, newest first. The `dm` argument accepts either the DM `_id` or a participant display name (e.g. `Kerr,Shannon`); a name resolves only to a one-to-one DM with the authenticated account. |
+| `send_dm_message` | Send a message to a direct-message conversation. The `dm` argument accepts either the DM `_id` or a participant display name; a name resolves only to a one-to-one DM with the authenticated account. Message body supports markdown formatting. |
+| `update_dm_message` | Update a direct-message message. The `dm` argument accepts either the DM `_id` or a participant display name; a name resolves only to a one-to-one DM with the authenticated account. Only the body can be modified. |
+| `delete_dm_message` | Permanently delete a direct-message message. The `dm` argument accepts either the DM `_id` or a participant display name; a name resolves only to a one-to-one DM with the authenticated account. This action cannot be undone. |
 | `list_thread_replies` | List replies in a message thread. Returns replies sorted by date (oldest first). |
 | `add_thread_reply` | Add a reply to a message thread. Reply body supports markdown formatting. |
 | `update_thread_reply` | Update a thread reply. Only the body can be modified. |
