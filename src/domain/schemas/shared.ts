@@ -281,6 +281,15 @@ export type TemplateIdentifier = Schema.Schema.Type<typeof TemplateIdentifier>
 export const ChannelIdentifier = NonEmptyString.pipe(Schema.brand("ChannelIdentifier"))
 export type ChannelIdentifier = Schema.Schema.Type<typeof ChannelIdentifier>
 
+/**
+ * Identifier for a direct-message conversation. Accepts either:
+ * - the DM `_id` (e.g. `69fe02a3671a9bf783dc94fb`), or
+ * - a participant display name (e.g. `Kerr,Shannon`) — resolves to the DM
+ *   that has both the authenticated account and the named participant.
+ */
+export const DirectMessageIdentifier = NonEmptyString.pipe(Schema.brand("DirectMessageIdentifier"))
+export type DirectMessageIdentifier = Schema.Schema.Type<typeof DirectMessageIdentifier>
+
 export const TeamspaceIdentifier = NonEmptyString.pipe(Schema.brand("TeamspaceIdentifier"))
 export type TeamspaceIdentifier = Schema.Schema.Type<typeof TeamspaceIdentifier>
 

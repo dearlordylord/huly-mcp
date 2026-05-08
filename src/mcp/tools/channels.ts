@@ -3,29 +3,37 @@ import {
   createChannelParamsJsonSchema,
   deleteChannelMessageParamsJsonSchema,
   deleteChannelParamsJsonSchema,
+  deleteDmMessageParamsJsonSchema,
   deleteThreadReplyParamsJsonSchema,
   getChannelParamsJsonSchema,
   listChannelMessagesParamsJsonSchema,
   listChannelsParamsJsonSchema,
   listDirectMessagesParamsJsonSchema,
+  listDmMessagesParamsJsonSchema,
   listThreadRepliesParamsJsonSchema,
   parseAddThreadReplyParams,
   parseCreateChannelParams,
   parseDeleteChannelMessageParams,
   parseDeleteChannelParams,
+  parseDeleteDmMessageParams,
   parseDeleteThreadReplyParams,
   parseGetChannelParams,
   parseListChannelMessagesParams,
   parseListChannelsParams,
   parseListDirectMessagesParams,
+  parseListDmMessagesParams,
   parseListThreadRepliesParams,
   parseSendChannelMessageParams,
+  parseSendDmMessageParams,
   parseUpdateChannelMessageParams,
   parseUpdateChannelParams,
+  parseUpdateDmMessageParams,
   parseUpdateThreadReplyParams,
   sendChannelMessageParamsJsonSchema,
+  sendDmMessageParamsJsonSchema,
   updateChannelMessageParamsJsonSchema,
   updateChannelParamsJsonSchema,
+  updateDmMessageParamsJsonSchema,
   updateThreadReplyParamsJsonSchema
 } from "../../domain/schemas.js"
 import {
@@ -40,6 +48,12 @@ import {
   updateChannel,
   updateChannelMessage
 } from "../../huly/operations/channels.js"
+import {
+  deleteDirectMessage,
+  listDirectMessageMessages,
+  sendDirectMessage,
+  updateDirectMessage
+} from "../../huly/operations/direct-messages.js"
 import {
   addThreadReply,
   deleteThreadReply,
@@ -160,6 +174,52 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
       "list_direct_messages",
       parseListDirectMessagesParams,
       listDirectMessages
+    )
+  },
+  {
+    name: "list_dm_messages",
+    description:
+      "List messages in a direct-message conversation, newest first. The `dm` argument accepts either the DM `_id` or a participant display name (e.g. `Kerr,Shannon`); a name resolves to the DM whose members include that person's account.",
+    category: CATEGORY,
+    inputSchema: listDmMessagesParamsJsonSchema,
+    handler: createToolHandler(
+      "list_dm_messages",
+      parseListDmMessagesParams,
+      listDirectMessageMessages
+    )
+  },
+  {
+    name: "send_dm_message",
+    description:
+      "Send a message to a direct-message conversation. The `dm` argument accepts either the DM `_id` or a participant display name. Message body supports markdown formatting.",
+    category: CATEGORY,
+    inputSchema: sendDmMessageParamsJsonSchema,
+    handler: createToolHandler(
+      "send_dm_message",
+      parseSendDmMessageParams,
+      sendDirectMessage
+    )
+  },
+  {
+    name: "update_dm_message",
+    description: "Update a direct-message message. Only the body can be modified.",
+    category: CATEGORY,
+    inputSchema: updateDmMessageParamsJsonSchema,
+    handler: createToolHandler(
+      "update_dm_message",
+      parseUpdateDmMessageParams,
+      updateDirectMessage
+    )
+  },
+  {
+    name: "delete_dm_message",
+    description: "Permanently delete a direct-message message. This action cannot be undone.",
+    category: CATEGORY,
+    inputSchema: deleteDmMessageParamsJsonSchema,
+    handler: createToolHandler(
+      "delete_dm_message",
+      parseDeleteDmMessageParams,
+      deleteDirectMessage
     )
   },
   {

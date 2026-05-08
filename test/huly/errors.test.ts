@@ -11,6 +11,7 @@ import {
   ChannelNotFoundError,
   CommentNotFoundError,
   ComponentNotFoundError,
+  DirectMessageNotFoundError,
   DocumentNotFoundError,
   EventNotFoundError,
   FileFetchError,
@@ -263,6 +264,21 @@ describe("Huly Errors", () => {
       Effect.gen(function*() {
         const error = new ChannelNotFoundError({ identifier: "general" })
         expect(error.message).toBe("Channel 'general' not found")
+      }))
+  })
+
+  describe("DirectMessageNotFoundError", () => {
+    it.effect("creates with identifier", () =>
+      Effect.gen(function*() {
+        const error = new DirectMessageNotFoundError({ identifier: "Kerr,Shannon" })
+        expect(error._tag).toBe("DirectMessageNotFoundError")
+        expect(error.identifier).toBe("Kerr,Shannon")
+      }))
+
+    it.effect("generates message from fields", () =>
+      Effect.gen(function*() {
+        const error = new DirectMessageNotFoundError({ identifier: "Kerr,Shannon" })
+        expect(error.message).toBe("Direct message 'Kerr,Shannon' not found")
       }))
   })
 
@@ -639,6 +655,8 @@ describe("Huly Errors", () => {
               return `milestone:${error.identifier}`
             case "ChannelNotFoundError":
               return `channel:${error.identifier}`
+            case "DirectMessageNotFoundError":
+              return `dm:${error.identifier}`
             case "MessageNotFoundError":
               return `message:${error.messageId}`
             case "ThreadReplyNotFoundError":
@@ -737,6 +755,7 @@ describe("Huly Errors", () => {
         ).toBe("comment:c-1")
         expect(matchError(new MilestoneNotFoundError({ identifier: "m-1", project: "P" }))).toBe("milestone:m-1")
         expect(matchError(new ChannelNotFoundError({ identifier: "ch-1" }))).toBe("channel:ch-1")
+        expect(matchError(new DirectMessageNotFoundError({ identifier: "dm-1" }))).toBe("dm:dm-1")
         expect(matchError(new MessageNotFoundError({ messageId: "msg-1", channel: "ch-1" }))).toBe("message:msg-1")
         expect(matchError(new ThreadReplyNotFoundError({ replyId: "r-1", messageId: "msg-1" }))).toBe("reply:r-1")
         expect(matchError(new CalendarNotAccessibleError({ calendarId: "cal-1" }))).toBe("calendar:cal-1")

@@ -20,6 +20,23 @@ export class ChannelNotFoundError extends Schema.TaggedError<ChannelNotFoundErro
 }
 
 /**
+ * Direct-message conversation not found in the workspace.
+ *
+ * Raised when a `dm` identifier (DM `_id` or participant display name) does
+ * not resolve to an existing DM the authenticated account is a member of.
+ */
+export class DirectMessageNotFoundError extends Schema.TaggedError<DirectMessageNotFoundError>()(
+  "DirectMessageNotFoundError",
+  {
+    identifier: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Direct message '${this.identifier}' not found`
+  }
+}
+
+/**
  * Message not found in the channel.
  */
 export class MessageNotFoundError extends Schema.TaggedError<MessageNotFoundError>()(

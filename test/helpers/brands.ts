@@ -26,6 +26,7 @@ import type {
   ComponentIdentifier,
   ComponentLabel,
   ContactProvider,
+  DirectMessageIdentifier,
   DocumentId,
   DocumentIdentifier,
   Email,
@@ -150,6 +151,7 @@ export const componentIdentifier = (s: string) => s as ComponentIdentifier
 export const milestoneIdentifier = (s: string) => s as MilestoneIdentifier
 export const templateIdentifier = (s: string) => s as TemplateIdentifier
 export const channelIdentifier = (s: string) => s as ChannelIdentifier
+export const directMessageIdentifier = (s: string) => s as DirectMessageIdentifier
 export const teamspaceIdentifier = (s: string) => s as TeamspaceIdentifier
 export const documentIdentifier = (s: string) => s as DocumentIdentifier
 export const tagIdentifier = (s: string) => s as TagIdentifier
@@ -188,6 +190,7 @@ export type {
   ComponentIdentifier,
   ComponentLabel,
   ContactProvider,
+  DirectMessageIdentifier,
   DocumentId,
   DocumentIdentifier,
   Email,

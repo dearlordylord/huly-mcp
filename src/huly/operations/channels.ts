@@ -157,7 +157,7 @@ export const buildSocialIdToPersonNameMap = (
  * Build a map from AccountUuid to Person name by querying Employee.
  * Employee has personUuid field that matches AccountUuid.
  */
-const buildAccountUuidToNameMap = (
+export const buildAccountUuidToNameMap = (
   client: HulyClient["Type"],
   accountUuids: Array<HulyAccountUuid>
 ): Effect.Effect<Map<string, string>, HulyClientError> =>

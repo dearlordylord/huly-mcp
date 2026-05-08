@@ -671,6 +671,29 @@ export {
 } from "./channels.js"
 
 export {
+  type DeleteDmMessageParams,
+  deleteDmMessageParamsJsonSchema,
+  DeleteDmMessageParamsSchema,
+  type DeleteDmMessageResult,
+  type ListDmMessagesParams,
+  listDmMessagesParamsJsonSchema,
+  ListDmMessagesParamsSchema,
+  type ListDmMessagesResult,
+  parseDeleteDmMessageParams,
+  parseListDmMessagesParams,
+  parseSendDmMessageParams,
+  parseUpdateDmMessageParams,
+  type SendDmMessageParams,
+  sendDmMessageParamsJsonSchema,
+  SendDmMessageParamsSchema,
+  type SendDmMessageResult,
+  type UpdateDmMessageParams,
+  updateDmMessageParamsJsonSchema,
+  UpdateDmMessageParamsSchema,
+  type UpdateDmMessageResult
+} from "./direct-messages.js"
+
+export {
   type CreateEventParams,
   createEventParamsJsonSchema,
   CreateEventParamsSchema,
