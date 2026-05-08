@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.10.2
+
+### Patch Changes
+
+- Expose Huly workbench URLs on contact person, employee, and organization responses.
+
 ## 0.10.1
 
 ### Patch Changes
