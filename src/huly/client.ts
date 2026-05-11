@@ -47,7 +47,7 @@ import { concatLink } from "../utils/url.js"
 import { HulyAuthError, HulyConnectionError } from "./errors.js"
 import { type MarkupUrlConfig, testMarkupUrlConfig } from "./operations/markup.js"
 import { HulySdk, type HulySdkDependencies } from "./sdk-deps.js"
-import type { DocumentUrlConfig } from "./url-builders.js"
+import { testWorkbenchUrlConfig, type WorkbenchUrlConfig } from "./url-builders.js"
 
 // --- Connection helpers ---
 
@@ -180,7 +180,7 @@ export type HulyClientError = ConnectionError
 
 interface HulyClientContext {
   readonly markupUrlConfig: MarkupUrlConfig
-  readonly documentUrlConfig: DocumentUrlConfig
+  readonly workbenchUrlConfig: WorkbenchUrlConfig
 }
 
 export interface HulyClientOperations extends HulyClientContext {
@@ -308,7 +308,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
         refUrl: UrlString.make(refUrl),
         imageUrl: UrlString.make(imageUrl)
       }
-      const documentUrlConfig: DocumentUrlConfig = {
+      const workbenchUrlConfig: WorkbenchUrlConfig = {
         baseUrl: UrlString.make(config.url),
         workspaceUrlSlug
       }
@@ -329,7 +329,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       const operations: HulyClientOperations = {
         getAccountUuid: () => accountUuid,
         getPrimarySocialId: () => primarySocialId,
-        documentUrlConfig,
+        workbenchUrlConfig,
         markupUrlConfig,
 
         findAll: <T extends Doc>(
@@ -504,11 +504,8 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       // PersonId is a branded string type with no public constructor
       // eslint-disable-next-line no-restricted-syntax -- see above
       getPrimarySocialId: () => "test-primary-social-id" as PersonId,
-      documentUrlConfig: {
-        baseUrl: UrlString.make("https://test.huly.local"),
-        workspaceUrlSlug: WorkspaceUrlSlug.make("test-workspace")
-      },
       markupUrlConfig: testMarkupUrlConfig,
+      workbenchUrlConfig: testWorkbenchUrlConfig,
       findAll: noopFindAll,
       findOne: noopFindOne,
       createDoc: notImplemented("createDoc"),

@@ -4,20 +4,17 @@ import { toFindResult } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
 
-import { UrlString, WorkspaceUrlSlug } from "../../../src/domain/schemas/shared.js"
 import type { HulyClientOperations } from "../../../src/huly/client.js"
 import { testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
 import type { HulyStorageOperations } from "../../../src/huly/storage.js"
+import { testWorkbenchUrlConfig } from "../../../src/huly/url-builders.js"
 import { notificationTools } from "../../../src/mcp/tools/notifications.js"
 
 const noopHulyClient: HulyClientOperations = {
   getAccountUuid: () => "test-account-uuid" as AccountUuid,
   getPrimarySocialId: () => "test-primary-social-id" as PersonId,
-  documentUrlConfig: {
-    baseUrl: UrlString.make("https://test.huly.local"),
-    workspaceUrlSlug: WorkspaceUrlSlug.make("test-workspace")
-  },
   markupUrlConfig: testMarkupUrlConfig,
+  workbenchUrlConfig: testWorkbenchUrlConfig,
   findAll: () => Effect.succeed(toFindResult([])) as Effect.Effect<FindResult<never>>,
   findOne: () => Effect.succeed(undefined),
   createDoc: () => Effect.die(new Error("not implemented")),

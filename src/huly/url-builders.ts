@@ -16,12 +16,18 @@
  *
  * @module
  */
-import type { DocumentId, OrganizationId, PersonId, WorkspaceUrlSlug } from "../domain/schemas/shared.js"
-import { UrlString } from "../domain/schemas/shared.js"
+import type { DocumentId, OrganizationId, PersonId } from "../domain/schemas/shared.js"
+import { UrlString, WorkspaceUrlSlug } from "../domain/schemas/shared.js"
 
-export interface DocumentUrlConfig {
+export interface WorkbenchUrlConfig {
   readonly baseUrl: UrlString
   readonly workspaceUrlSlug: WorkspaceUrlSlug
+}
+
+// Test-only fixture for callers that need a deterministic workbench config without a real Huly workspace.
+export const testWorkbenchUrlConfig: WorkbenchUrlConfig = {
+  baseUrl: UrlString.make("https://test.huly.local"),
+  workspaceUrlSlug: WorkspaceUrlSlug.make("test-workspace")
 }
 
 /**
@@ -62,7 +68,7 @@ export const buildDocumentUrl = (
   return UrlString.make(`${trimmedBase}/workbench/${workspaceUrlSlug}/document/${pathSegment}`)
 }
 
-export const buildDocumentUrlFromConfig = (config: DocumentUrlConfig, title: string, id: DocumentId): UrlString =>
+export const buildDocumentUrlFromConfig = (config: WorkbenchUrlConfig, title: string, id: DocumentId): UrlString =>
   buildDocumentUrl(config.baseUrl, config.workspaceUrlSlug, title, id)
 
 /**
@@ -79,6 +85,6 @@ export const buildContactUrl = (
 }
 
 export const buildContactUrlFromConfig = (
-  config: DocumentUrlConfig,
+  config: WorkbenchUrlConfig,
   id: OrganizationId | PersonId
 ): UrlString => buildContactUrl(config.baseUrl, config.workspaceUrlSlug, id)

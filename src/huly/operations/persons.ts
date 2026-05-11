@@ -149,7 +149,7 @@ export const listPersons = (
         name: PersonName.make(person.name),
         city: person.city,
         email: emailValue !== undefined ? Email.make(emailValue) : undefined,
-        url: buildContactUrlFromConfig(client.documentUrlConfig, id),
+        url: buildContactUrlFromConfig(client.workbenchUrlConfig, id),
         modifiedOn: person.modifiedOn
       }
     })
@@ -196,7 +196,7 @@ export const getPerson = (
         value: c.value
       })),
       organizations: organizations.length > 0 ? organizations : undefined,
-      url: buildContactUrlFromConfig(client.documentUrlConfig, id),
+      url: buildContactUrlFromConfig(client.workbenchUrlConfig, id),
       modifiedOn: person.modifiedOn,
       createdOn: person.createdOn
     }
@@ -326,7 +326,7 @@ export const listEmployees = (
         email: emailValue !== undefined ? Email.make(emailValue) : undefined,
         position: emp.position ?? undefined,
         active: emp.active,
-        url: buildContactUrlFromConfig(client.documentUrlConfig, id),
+        url: buildContactUrlFromConfig(client.workbenchUrlConfig, id),
         modifiedOn: emp.modifiedOn
       }
     })

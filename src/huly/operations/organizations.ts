@@ -160,7 +160,7 @@ export const listOrganizations = (
         name: org.name,
         city: org.city,
         members: org.members,
-        url: buildContactUrlFromConfig(client.documentUrlConfig, id),
+        url: buildContactUrlFromConfig(client.workbenchUrlConfig, id),
         modifiedOn: org.modifiedOn
       }
     })
@@ -237,7 +237,7 @@ export const getOrganization = (
       city: org.city || undefined,
       description: descriptionText,
       members: org.members,
-      url: buildContactUrlFromConfig(client.documentUrlConfig, id),
+      url: buildContactUrlFromConfig(client.workbenchUrlConfig, id),
       modifiedOn: org.modifiedOn
     }
   })

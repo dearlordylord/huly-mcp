@@ -117,7 +117,7 @@ export const editDocument = (
     }
 
     const finalTitle = updateOps.title ?? doc.title
-    const url = buildDocumentUrlFromConfig(client.documentUrlConfig, finalTitle, DocumentId.make(doc._id))
+    const url = buildDocumentUrlFromConfig(client.workbenchUrlConfig, finalTitle, DocumentId.make(doc._id))
 
     if (Object.keys(updateOps).length === 0 && !contentUpdatedInPlace) {
       return { id: DocumentId.make(doc._id), updated: false, url }

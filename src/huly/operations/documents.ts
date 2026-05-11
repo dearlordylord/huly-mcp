@@ -368,7 +368,7 @@ export const listDocuments = (
       id: DocumentId.make(doc._id),
       title: doc.title,
       teamspace: teamspace.name,
-      url: buildDocumentUrlFromConfig(client.documentUrlConfig, doc.title, DocumentId.make(doc._id)),
+      url: buildDocumentUrlFromConfig(client.workbenchUrlConfig, doc.title, DocumentId.make(doc._id)),
       modifiedOn: doc.modifiedOn
     }))
 
@@ -410,7 +410,7 @@ export const getDocument = (
       title: doc.title,
       content,
       teamspace: teamspace.name,
-      url: buildDocumentUrlFromConfig(client.documentUrlConfig, doc.title, DocumentId.make(doc._id)),
+      url: buildDocumentUrlFromConfig(client.workbenchUrlConfig, doc.title, DocumentId.make(doc._id)),
       modifiedOn: doc.modifiedOn,
       createdOn: doc.createdOn
     }
@@ -493,7 +493,7 @@ export const createDocument = (
     return {
       id: DocumentId.make(documentId),
       title: params.title,
-      url: buildDocumentUrlFromConfig(client.documentUrlConfig, params.title, DocumentId.make(documentId))
+      url: buildDocumentUrlFromConfig(client.workbenchUrlConfig, params.title, DocumentId.make(documentId))
     }
   })
 
