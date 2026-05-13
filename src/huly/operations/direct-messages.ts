@@ -94,7 +94,6 @@ type CreateDirectMessageError =
 
 // --- Helpers ---
 
-const ONE_TO_ONE_DM_MEMBER_COUNT = 2
 const isEmailIdentifier = Schema.is(Email)
 
 const sortedMemberPair = (first: HulyAccountUuid, second: HulyAccountUuid): Array<HulyAccountUuid> =>
@@ -162,11 +161,8 @@ export const findDirectMessage = (
       { members: accountUuid }
     )
 
-    const matches = directMessages.filter((dm) =>
-      dm.members.length === ONE_TO_ONE_DM_MEMBER_COUNT
-      && dm.members.includes(accountUuid)
-      && accountUuids.some((candidate) => dm.members.includes(candidate))
-    )
+    const memberPairs = accountUuids.map((candidate) => sortedMemberPair(accountUuid, candidate))
+    const matches = directMessages.filter((dm) => memberPairs.some((members) => hasExactMembers(dm, members)))
 
     if (matches.length === 0) {
       return yield* new DirectMessageNotFoundError({ identifier })
