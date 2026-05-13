@@ -1,12 +1,16 @@
 import type { Channel, Person as HulyPerson, SocialIdentity } from "@hcengineering/contact"
 import type { Doc, Ref } from "@hcengineering/core"
 import { SocialIdType } from "@hcengineering/core"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 
+import { Email, type PersonName, type PersonRefInput } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
+import { PersonIdentifierAmbiguousError } from "../errors.js"
 import { contact } from "../huly-plugins.js"
 import { escapeLikeWildcards } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
+
+const isEmailIdentifier = Schema.is(Email)
 
 export const findPersonById = (
   client: HulyClient["Type"],
@@ -85,6 +89,82 @@ const findPersonBySocialIdentityEmail = (
       { _id: identity.attachedTo }
     )
   })
+
+const findPersonByExactEmail = (
+  client: HulyClient["Type"],
+  email: Email
+): Effect.Effect<HulyPerson | undefined, HulyClientError | PersonIdentifierAmbiguousError> =>
+  Effect.gen(function*() {
+    const socialIdentities = yield* client.findAll<SocialIdentity>(
+      contact.class.SocialIdentity,
+      {
+        type: SocialIdType.EMAIL,
+        value: email
+      }
+    )
+
+    const channels = yield* client.findAll<Channel>(
+      contact.class.Channel,
+      {
+        value: email,
+        provider: contact.channelProvider.Email
+      }
+    )
+
+    const personIds = [
+      ...new Set([
+        ...socialIdentities.map((identity) => identity.attachedTo),
+        ...channels.map((channel) => channel.attachedTo)
+      ])
+    ]
+    if (personIds.length === 0) {
+      return undefined
+    }
+
+    const persons = yield* client.findAll<HulyPerson>(
+      contact.class.Person,
+      { _id: { $in: personIds.map(toRef<HulyPerson>) } }
+    )
+
+    if (persons.length === 0) {
+      return undefined
+    }
+
+    if (persons.length > 1) {
+      return yield* new PersonIdentifierAmbiguousError({ identifier: email, matches: persons.length })
+    }
+
+    return persons[0]
+  })
+
+const findPersonByExactName = (
+  client: HulyClient["Type"],
+  name: PersonName
+): Effect.Effect<HulyPerson | undefined, HulyClientError | PersonIdentifierAmbiguousError> =>
+  Effect.gen(function*() {
+    const persons = yield* client.findAll<HulyPerson>(
+      contact.class.Person,
+      { name }
+    )
+
+    if (persons.length === 0) {
+      return undefined
+    }
+
+    if (persons.length > 1) {
+      return yield* new PersonIdentifierAmbiguousError({ identifier: name, matches: persons.length })
+    }
+
+    return persons[0]
+  })
+
+export const findPersonByExactEmailOrName = (
+  client: HulyClient["Type"],
+  identifier: PersonRefInput
+): Effect.Effect<HulyPerson | undefined, HulyClientError | PersonIdentifierAmbiguousError> =>
+  isEmailIdentifier(identifier)
+    ? findPersonByExactEmail(client, identifier)
+    : findPersonByExactName(client, identifier)
 
 export const findPersonByEmailOrName = (
   client: HulyClient["Type"],

@@ -11,12 +11,7 @@
  * @module
  */
 import type { ChatMessage, DirectMessage as HulyDirectMessage } from "@hcengineering/chunter"
-import type {
-  Channel as HulyContactChannel,
-  Employee as HulyEmployee,
-  Person,
-  SocialIdentity
-} from "@hcengineering/contact"
+import type { Employee as HulyEmployee } from "@hcengineering/contact"
 import {
   type AccountUuid as HulyAccountUuid,
   type AttachedData,
@@ -24,11 +19,10 @@ import {
   type DocumentUpdate,
   generateId,
   type Ref,
-  SocialIdType,
   SortingOrder,
   type Space
 } from "@hcengineering/core"
-import { Clock, Effect, Schema } from "effect"
+import { Clock, Effect } from "effect"
 
 import type { MessageSummary } from "../../domain/schemas/channels.js"
 import type {
@@ -46,22 +40,22 @@ import type {
 import {
   ChannelId,
   type DirectMessageIdentifier,
-  Email,
   MessageId,
   PersonName,
   type PersonRefInput
 } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
+import type { PersonIdentifierAmbiguousError } from "../errors.js"
 import {
   CannotDirectMessageSelfError,
   DirectMessageIdentifierAmbiguousError,
   DirectMessageNotFoundError,
   MessageNotFoundError,
-  PersonIdentifierAmbiguousError,
   PersonNotAnEmployeeError,
   PersonNotFoundError
 } from "../errors.js"
 import { buildSocialIdToPersonNameMap } from "./channels.js"
+import { findPersonByExactEmailOrName } from "./contacts-shared.js"
 import { markdownToMarkupString, markupToMarkdownString } from "./markup.js"
 import { clampLimit } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
@@ -93,8 +87,6 @@ type CreateDirectMessageError =
   | CannotDirectMessageSelfError
 
 // --- Helpers ---
-
-const isEmailIdentifier = Schema.is(Email)
 
 const sortedMemberPair = (first: HulyAccountUuid, second: HulyAccountUuid): Array<HulyAccountUuid> =>
   [first, second].sort()
@@ -328,74 +320,6 @@ export const deleteDirectMessage = (
     return { id: MessageId.make(message._id), deleted: true }
   })
 
-const findPersonByExactEmail = (
-  client: HulyClient["Type"],
-  email: Email
-): Effect.Effect<Person | undefined, HulyClientError | PersonIdentifierAmbiguousError> =>
-  Effect.gen(function*() {
-    const socialIdentities = yield* client.findAll<SocialIdentity>(
-      contact.class.SocialIdentity,
-      {
-        type: SocialIdType.EMAIL,
-        value: email
-      }
-    )
-
-    const channels = yield* client.findAll<HulyContactChannel>(
-      contact.class.Channel,
-      {
-        value: email,
-        provider: contact.channelProvider.Email
-      }
-    )
-
-    const personIds = [
-      ...new Set([
-        ...socialIdentities.map((identity) => identity.attachedTo),
-        ...channels.map((channel) => channel.attachedTo)
-      ])
-    ]
-    if (personIds.length === 0) {
-      return undefined
-    }
-
-    const persons = yield* client.findAll<Person>(
-      contact.class.Person,
-      { _id: { $in: personIds.map(toRef<Person>) } }
-    )
-
-    if (persons.length === 0) {
-      return undefined
-    }
-
-    if (persons.length > 1) {
-      return yield* new PersonIdentifierAmbiguousError({ identifier: email, matches: persons.length })
-    }
-
-    return persons[0]
-  })
-
-const findPersonByExactName = (
-  client: HulyClient["Type"],
-  name: PersonName
-): Effect.Effect<Person | undefined, HulyClientError | PersonIdentifierAmbiguousError> =>
-  Effect.gen(function*() {
-    const persons = yield* client.findAll<Person>(
-      contact.class.Person,
-      { name }
-    )
-
-    if (persons.length === 0) {
-      return undefined
-    }
-
-    if (persons.length > 1) {
-      return yield* new PersonIdentifierAmbiguousError({ identifier: name, matches: persons.length })
-    }
-
-    return persons[0]
-  })
-
 /**
  * Resolve a person identifier (email or display name) to the `AccountUuid`
  * carried on the `contact.mixin.Employee` mixin. DMs are addressed by account
@@ -412,9 +336,7 @@ const resolveEmployeeAccount = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const person = isEmailIdentifier(identifier)
-      ? yield* findPersonByExactEmail(client, identifier)
-      : yield* findPersonByExactName(client, identifier)
+    const person = yield* findPersonByExactEmailOrName(client, identifier)
     if (person === undefined) {
       return yield* new PersonNotFoundError({ identifier })
     }
