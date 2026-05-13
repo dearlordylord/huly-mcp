@@ -790,7 +790,7 @@ if [ -n "$HULY_EMAIL" ]; then
   fi
 fi
 if [ -n "$SELF_NAME" ]; then
-  EXISTING_DM_PERSON_NAME=$(echo "$DM_LIST_TEXT" | jq -r --arg self "$SELF_NAME" '.conversations[]?.participants[]? | select(. != $self)' 2>/dev/null | head -1)
+  EXISTING_DM_PERSON_NAME=$(echo "$DM_LIST_TEXT" | jq -r --arg self "$SELF_NAME" '.conversations[]? | select((.participantIds // [] | length) == 2 and (.participants // [] | length) == 2 and ((.participants // []) | index($self) != null)) | .participants[]? | select(. != $self)' 2>/dev/null | head -1)
   if [ -n "$EXISTING_DM_PERSON_NAME" ]; then
     EXISTING_DM_PERSON_EMAIL=$(echo "$EMPLOYEES_FOR_DM_TEXT" | jq -r --arg name "$EXISTING_DM_PERSON_NAME" '[.[]? | select(.name == $name and (.email // "") != "") | .email] | unique | if length == 1 then .[0] else empty end' 2>/dev/null)
     if [ -n "$EXISTING_DM_PERSON_EMAIL" ]; then

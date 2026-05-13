@@ -234,6 +234,8 @@ const createTestLayer = (config: MockConfig) => {
       return Effect.succeed(toFindResult(result))
     }
     if (_class === contact.class.SocialIdentity) {
+      // Test double boundary: findAll receives opaque SDK query objects; this branch only handles
+      // SocialIdentity query shapes issued by direct-message operations. Brands are erased at runtime.
       const q = query as { _id?: { $in?: Array<PersonId> }; type?: SocialIdType; value?: string }
       if (q._id?.$in !== undefined) {
         const wanted = q._id.$in
