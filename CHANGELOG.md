@@ -1,5 +1,12 @@
 # @firfi/huly-mcp
 
+## 0.12.0
+
+### Minor Changes
+
+- Add the `create_direct_message` tool for idempotently opening one-to-one Huly direct-message conversations by exact workspace-member email or display name.
+- Harden direct-message creation by rejecting self-DMs, ignoring group DMs during one-to-one reuse checks, surfacing ambiguous person matches, and resolving email identities through both SocialIdentity and email Channel records.
+
 ## 0.11.0
 
 ### Minor Changes

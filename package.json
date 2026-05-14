@@ -1,12 +1,12 @@
 {
   "name": "@firfi/huly-mcp",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "MCP server for Huly integration",
   "mcpName": "io.github.dearlordylord/huly-mcp",
   "type": "module",
   "main": "./dist/index.cjs",
   "files": [
-    "dist"
+    "dist/index.cjs"
   ],
   "publishConfig": {
     "access": "public"
