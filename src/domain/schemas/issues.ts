@@ -17,6 +17,7 @@ import {
   StatusName,
   Timestamp
 } from "./shared.js"
+import { TaskTypeRefSchema } from "./task-management.js"
 
 export const IssuePriorityValues = ["urgent", "high", "medium", "low", "no-priority"] as const
 
@@ -210,6 +211,10 @@ export const CreateIssueParamsSchema = Schema.Struct({
   status: Schema.optional(StatusName.annotations({
     description: "Initial status (uses project default if not specified)"
   })),
+  taskType: Schema.optional(TaskTypeRefSchema.annotations({
+    description:
+      "Issue/task type ID or display name. Resolved within the target project's project type; use list_task_types or get_project_type to discover valid values. If omitted, creates the default Issue type."
+  })),
   parentIssue: Schema.optional(IssueIdentifier.annotations({
     description: "Parent issue identifier (e.g., 'HULY-42') to create as sub-issue"
   })),
@@ -251,6 +256,10 @@ export const UpdateIssueParamsSchema = Schema.Struct({
   ),
   status: Schema.optional(StatusName.annotations({
     description: "New status"
+  })),
+  taskType: Schema.optional(TaskTypeRefSchema.annotations({
+    description:
+      "New issue/task type ID or display name. Resolved within the target project's project type; status is preserved only if valid for that task type. Use list_task_types or get_project_type to discover valid values."
   })),
   dueDate: Schema.optional(
     Schema.NullOr(Timestamp).annotations({

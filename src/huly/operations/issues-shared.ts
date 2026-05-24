@@ -63,6 +63,7 @@ export const findProjectWithStatuses = (
   {
     client: HulyClient["Type"]
     project: HulyProject
+    projectType: ProjectType | undefined
     statuses: Array<StatusInfo>
     defaultStatusId: Ref<Status> | undefined
   },
@@ -141,7 +142,7 @@ export const findProjectWithStatuses = (
     // but is undefined or "" at runtime when no explicit default was chosen at project creation.
     const defaultStatusId: Ref<Status> | undefined = project.defaultIssueStatus || statuses[0]?._id
 
-    return { client, project, statuses, defaultStatusId }
+    return { client, defaultStatusId, project, projectType, statuses }
   })
 
 export const parseIssueIdentifier = (

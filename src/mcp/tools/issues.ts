@@ -121,7 +121,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "create_issue",
     description:
-      "Create a new issue in a Huly project. Optionally create as a sub-issue by specifying parentIssue. Description supports markdown formatting. Returns the created issue identifier.",
+      "Create a new issue in a Huly project. Optionally set taskType by ID or display name; it is resolved within the target project's project type, and status is validated against that task type's workflow. Use list_task_types or get_project_type to discover valid task types and statuses. Optionally create as a sub-issue by specifying parentIssue. Description supports markdown formatting. Returns the created issue identifier.",
     category: CATEGORY,
     inputSchema: createIssueParamsJsonSchema,
     handler: createToolHandler(
@@ -133,7 +133,7 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "update_issue",
     description:
-      "Update fields on an existing Huly issue. Only provided fields are modified. Description updates support markdown.",
+      "Update fields on an existing Huly issue. Optionally set taskType by ID or display name; it is resolved within the target project's project type, and the status is preserved only when valid for the new task type. Use list_task_types or get_project_type to discover valid task types and statuses. Only provided fields are modified. Description updates support markdown.",
     category: CATEGORY,
     inputSchema: updateIssueParamsJsonSchema,
     handler: createToolHandler(

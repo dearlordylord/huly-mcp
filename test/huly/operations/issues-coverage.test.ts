@@ -837,9 +837,10 @@ describe("Issues Coverage - extractUpdatedSequence", () => {
     }))
 
   // test-revizorro: approved
-  it.effect("falls back to project.sequence + 1 when updateDoc returns non-decodable result", () =>
+  it.effect("fails before creating an issue when updateDoc does not return the incremented sequence", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST", sequence: 10 })
+      let addCollectionCalled = false
 
       const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown) => {
         if (String(_class) === String(core.class.Status)) {
@@ -873,7 +874,10 @@ describe("Issues Coverage - extractUpdatedSequence", () => {
         _collection: unknown,
         _attributes: unknown,
         id?: unknown
-      ) => Effect.succeed((id ?? "new-issue-id") as Ref<Doc>)) as HulyClientOperations["addCollection"]
+      ) => {
+        addCollectionCalled = true
+        return Effect.succeed((id ?? "new-issue-id") as Ref<Doc>)
+      }) as HulyClientOperations["addCollection"]
 
       const uploadMarkupImpl: HulyClientOperations["uploadMarkup"] = (() =>
         Effect.succeed("markup-ref" as never)) as HulyClientOperations["uploadMarkup"]
@@ -886,12 +890,15 @@ describe("Issues Coverage - extractUpdatedSequence", () => {
         uploadMarkup: uploadMarkupImpl
       })
 
-      const result = yield* createIssue({
-        project: projectIdentifier("TEST"),
-        title: "Fallback Sequence"
-      }).pipe(Effect.provide(testLayer))
+      const error = yield* Effect.flip(
+        createIssue({
+          project: projectIdentifier("TEST"),
+          title: "Missing Sequence"
+        }).pipe(Effect.provide(testLayer))
+      )
 
-      expect(result.identifier).toBe("TEST-11")
+      expect(error.message).toContain("did not return the updated sequence")
+      expect(addCollectionCalled).toBe(false)
     }))
 })
 

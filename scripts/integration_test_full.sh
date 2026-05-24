@@ -282,6 +282,8 @@ TM_TASK_TYPE_NAME="IntTest Task Type $RUN_ID"
 TM_STATUS_NAME="IntTest QA $RUN_ID"
 TM_TASK_TYPE_NAME_JSON=$(json_string "$TM_TASK_TYPE_NAME")
 TM_STATUS_NAME_JSON=$(json_string "$TM_STATUS_NAME")
+TM_TASK_TYPE_READY=false
+TM_TASK_TYPE_STATUS_NAME_JSON=""
 
 TASK_TYPE_TEXT=$(run_capture "create_task_type($TM_TASK_TYPE_NAME)" \
   "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_task_type\",\"arguments\":{\"name\":$TM_TASK_TYPE_NAME_JSON}},\"id\":2}")
@@ -327,9 +329,13 @@ PROJECT_TYPE_TEXT=$(run_capture "get_project_type verifies task/status" \
 if [ $? -eq 0 ]; then
   TASK_TYPE_PRESENT=$(echo "$PROJECT_TYPE_TEXT" | jq -r --arg name "$TM_TASK_TYPE_NAME" 'any(.taskTypes[]?; .name == $name)' 2>/dev/null)
   STATUS_PRESENT=$(echo "$PROJECT_TYPE_TEXT" | jq -r --arg name "$TM_STATUS_NAME" 'any(.statuses[]?; .name == $name and .category == "active")' 2>/dev/null)
-  if [ "$TASK_TYPE_PRESENT" = "true" ] && [ "$STATUS_PRESENT" = "true" ]; then
+  TM_TASK_TYPE_STATUS_ID=$(echo "$PROJECT_TYPE_TEXT" | jq -r --arg name "$TM_TASK_TYPE_NAME" '.taskTypeStatuses[]? | select(.taskTypeName == $name) | .statusIds[0] // empty' 2>/dev/null | head -n 1)
+  TM_TASK_TYPE_STATUS_NAME=$(echo "$PROJECT_TYPE_TEXT" | jq -r --arg id "$TM_TASK_TYPE_STATUS_ID" '.statuses[]? | select(.id == $id) | .name // empty' 2>/dev/null | head -n 1)
+  if [ "$TASK_TYPE_PRESENT" = "true" ] && [ "$STATUS_PRESENT" = "true" ] && [ -n "$TM_TASK_TYPE_STATUS_NAME" ]; then
     echo "PASS: get_project_type includes created task type and status"
     PASSED=$((PASSED + 1))
+    TM_TASK_TYPE_READY=true
+    TM_TASK_TYPE_STATUS_NAME_JSON=$(json_string "$TM_TASK_TYPE_STATUS_NAME")
   else
     echo "FAIL: get_project_type missing created task type or status"
     FAILED=$((FAILED + 1))
@@ -414,6 +420,21 @@ if [ $? -eq 0 ]; then
 
   run_test "update_issue($ISSUE_ID)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$ISSUE_ID\",\"title\":\"Updated IntTest\",\"priority\":\"high\"}},\"id\":2}"
+
+  if [ "$TM_TASK_TYPE_READY" = "true" ]; then
+    TASK_TYPED_ISSUE_TEXT=$(run_capture "create_issue(taskType=$TM_TASK_TYPE_NAME)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Typed IntTest Issue\",\"taskType\":$TM_TASK_TYPE_NAME_JSON,\"status\":$TM_TASK_TYPE_STATUS_NAME_JSON}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      TASK_TYPED_ISSUE_ID=$(echo "$TASK_TYPED_ISSUE_TEXT" | jq -r '.identifier' 2>/dev/null)
+      echo "  => typed: $TASK_TYPED_ISSUE_ID"
+    fi
+
+    run_test "update_issue($ISSUE_ID taskType=$TM_TASK_TYPE_NAME)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$ISSUE_ID\",\"taskType\":$TM_TASK_TYPE_NAME_JSON,\"status\":$TM_TASK_TYPE_STATUS_NAME_JSON}},\"id\":2}"
+  else
+    skip_test "create_issue(taskType)" "task-management setup did not verify disposable task type/status"
+    skip_test "update_issue(taskType)" "task-management setup did not verify disposable task type/status"
+  fi
 
   # Sub-issue + move
   SUB_ID=""

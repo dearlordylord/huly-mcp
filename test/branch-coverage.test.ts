@@ -361,7 +361,7 @@ describe("createIssueFromTemplate - person not found for template assignee (issu
       }) as HulyClientOperations["findAll"]
 
       const updateDocImpl: HulyClientOperations["updateDoc"] = (() => {
-        return Effect.succeed({} as never)
+        return Effect.succeed({ object: { sequence: 2 } } as never)
       }) as HulyClientOperations["updateDoc"]
 
       const addCollectionImpl: HulyClientOperations["addCollection"] = ((

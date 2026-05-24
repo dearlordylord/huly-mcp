@@ -382,7 +382,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 describe("Issues Extended Coverage", () => {
   describe("extractUpdatedSequence fallback (line 121 None branch)", () => {
     // test-revizorro: approved
-    it.effect("falls back to project.sequence + 1 when updateDoc returns non-decodable result", () =>
+    it.effect("fails before addCollection when updateDoc returns a non-decodable sequence result", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST", sequence: 10 })
 
@@ -446,13 +446,15 @@ describe("Issues Extended Coverage", () => {
           uploadMarkup: uploadMarkupImpl
         })
 
-        const result = yield* createIssue({
-          project: projectIdentifier("TEST"),
-          title: "Fallback Sequence"
-        }).pipe(Effect.provide(testLayer))
+        const error = yield* Effect.flip(
+          createIssue({
+            project: projectIdentifier("TEST"),
+            title: "Missing Sequence"
+          }).pipe(Effect.provide(testLayer))
+        )
 
-        // project.sequence is 10, so fallback should be 10 + 1 = 11
-        expect(result.identifier).toBe("TEST-11")
+        expect(error.message).toContain("did not return the updated sequence")
+        expect(captureAddCollection.attributes).toBeUndefined()
       }))
   })
 
