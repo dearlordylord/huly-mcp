@@ -31,6 +31,36 @@ The standard configuration works with most MCP clients:
 ```
 
 <details>
+<summary>Codex</summary>
+
+Use Codex's MCP manager:
+
+```bash
+codex mcp add huly \
+  --env HULY_URL=https://huly.app \
+  --env HULY_EMAIL=your@email.com \
+  --env HULY_PASSWORD=yourpassword \
+  --env HULY_WORKSPACE=yourworkspace \
+  -- npx -y @firfi/huly-mcp@latest
+```
+
+Or add it directly to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.huly]
+command = "npx"
+args = ["-y", "@firfi/huly-mcp@latest"]
+
+[mcp_servers.huly.env]
+HULY_URL = "https://huly.app"
+HULY_EMAIL = "your@email.com"
+HULY_PASSWORD = "yourpassword"
+HULY_WORKSPACE = "yourworkspace"
+```
+
+</details>
+
+<details>
 <summary>Claude Code</summary>
 
 ```bash
@@ -59,7 +89,7 @@ Add the standard config to your `claude_desktop_config.json`:
 <details>
 <summary>VS Code</summary>
 
-Add to your user settings (`.vscode/mcp.json`) or use Command Palette → "MCP: Add Server":
+Add with Command Palette → "MCP: Add Server", or put this in a VS Code MCP config such as `.vscode/mcp.json`. Do not commit workspace config files that contain real credentials.
 
 ```json
 {
@@ -97,10 +127,12 @@ Add the standard config to your Windsurf MCP configuration file.
 <details>
 <summary>OpenCode</summary>
 
-Open the global configuration file (`~/.config/opencode/opencode.json`) and add this config to the `mcp` section.
+Open the global configuration file (`~/.config/opencode/opencode.json`) and merge this entry into your config:
 
 ```json
-"huly": {
+{
+  "mcp": {
+    "huly": {
       "type": "local",
       "command": ["npx", "-y", "@firfi/huly-mcp@latest"],
       "environment": {
@@ -110,20 +142,24 @@ Open the global configuration file (`~/.config/opencode/opencode.json`) and add 
         "HULY_WORKSPACE": "yourworkspace"
       }
     }
+  }
+}
 ```
 
 </details>
 
 ## Updating
 
-The `@latest` tag in the install command always fetches the newest version. Most MCP clients cache the installed package, so you need to force a re-fetch:
+The `@latest` tag asks the package runner for the newest version. Some MCP clients keep server processes or resolved installs alive, so restart or re-add the server when updating:
 
 | Client | How to update |
 |--------|--------------|
+| **Codex** | `codex mcp remove huly` then re-add with the install command above. If your password has shell-sensitive characters, edit `~/.codex/config.toml` directly instead |
 | **Claude Code** | `claude mcp remove huly` then re-add with the install command above |
 | **Claude Desktop** | Restart the app (it runs `npx` on startup) |
-| **VS Code / Cursor** | Restart the MCP server from the command palette or reload the window |
-| **npx (manual)** | `npx -y @firfi/huly-mcp@latest` — the `-y` flag skips the cache when `@latest` resolves to a new version |
+| **VS Code / Cursor** | Restart the MCP server from the command palette/configured client or reload the window |
+| **OpenCode** | Restart OpenCode or start a new session after config changes |
+| **npx (manual)** | `npx -y @firfi/huly-mcp@latest` — the `-y` flag auto-confirms install prompts |
 
 ## HTTP Transport
 
@@ -491,17 +527,26 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 
 ### Passwords with special characters
 
-If your Huly password contains characters like `*`, `%`, `!`, or `#`, passing it via the CLI `-e` flag may fail because the shell interprets these characters before they reach the process.
+If your Huly password contains characters like `*`, `%`, `!`, or `#`, passing it via CLI environment flags such as `-e` or `--env` may fail because the shell interprets these characters before they reach the process.
 
-**Solution**: Edit your MCP config file directly instead of using `claude mcp add -e`. In `~/.claude.json` (user scope) or `.mcp.json` (project scope), JSON handles all special characters natively:
+**Solution**: Edit your MCP config file directly instead of passing the password through the shell:
+
+- Codex: `~/.codex/config.toml`
+- Claude Code: `~/.claude.json` (user scope) or `.mcp.json` (project scope)
+- Claude Desktop: `claude_desktop_config.json` in the location listed in the installation section
+- VS Code and Cursor: use the client config location from the installation section; avoid committing workspace files that contain real credentials
+- Windsurf: edit your Windsurf MCP configuration file directly
+- OpenCode: `~/.config/opencode/opencode.json`
+
+For Claude JSON config, the shell-sensitive characters above can be written directly. JSON-reserved characters such as `"` and `\` still need normal JSON escaping:
 
 ```json
 {
   "mcpServers": {
     "huly": {
       "type": "stdio",
-      "command": "node",
-      "args": ["path/to/dist/index.cjs"],
+      "command": "npx",
+      "args": ["-y", "@firfi/huly-mcp@latest"],
       "env": {
         "HULY_URL": "https://your-huly-instance.com",
         "HULY_EMAIL": "you@example.com",
