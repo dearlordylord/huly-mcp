@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.13.0
+
+### Minor Changes
+
+- 19dc313: Improve LLM-first discovery for activity and issue relations: `list_activity` now accepts issue, document, and channel identifiers, and `list_issue_relations` now returns both `blockedBy` and `blocks`.
+
 ## 0.12.0
 
 ### Minor Changes
