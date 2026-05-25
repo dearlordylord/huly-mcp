@@ -568,6 +568,21 @@ describe("Config Module", () => {
       }))
 
     // test-revizorro: approved
+    it.effect("rejects non-HTTP header values before config mapping", () =>
+      Effect.gen(function*() {
+        const error = yield* Effect.flip(
+          hulyConfigProviderFromHeaders({
+            "x-huly-url": 123,
+            "x-huly-workspace": "my-workspace",
+            "x-huly-token": "my-api-token"
+          })
+        )
+
+        expect(error._tag).toBe("ConfigValidationError")
+        expect(error.field).toBe("headers")
+      }))
+
+    // test-revizorro: approved
     it.effect("rejects unsupported x-huly headers", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(

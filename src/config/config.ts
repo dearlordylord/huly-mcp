@@ -18,8 +18,11 @@ const HULY_CONFIG_HEADERS = [
 
 type HulyConfigHeader = typeof HULY_CONFIG_HEADERS[number]
 type HulyEnvNamePattern = `HULY_${string}`
-type HeaderValue = string | ReadonlyArray<string> | undefined
-type UrlHeaderEntries = ReadonlyMap<HulyConfigHeader, HeaderValue>
+const HeaderValueSchema = Schema.Union(Schema.String, Schema.Array(Schema.String), Schema.Undefined)
+const HeaderRecordSchema = Schema.Record({ key: Schema.String, value: HeaderValueSchema })
+type HeaderRecord = Schema.Schema.Type<typeof HeaderRecordSchema>
+type HeaderValue = Schema.Schema.Type<typeof HeaderValueSchema>
+type UrlHeaderEntries = ReadonlyMap<HulyConfigEnvName, string>
 
 type UrlHeaderConfig =
   | { readonly _tag: "NoUrlHeaders" }
@@ -124,8 +127,21 @@ const configValidationError = (
   field: string
 ): ConfigValidationError => new ConfigValidationError({ message, field })
 
+const decodeHeaderRecord = (
+  headers: unknown
+): Effect.Effect<HeaderRecord, ConfigValidationError> =>
+  Schema.decodeUnknown(HeaderRecordSchema)(headers).pipe(
+    Effect.mapError((cause) =>
+      new ConfigValidationError({
+        message: `Invalid HTTP request headers: ${cause.message}`,
+        field: "headers",
+        cause
+      })
+    )
+  )
+
 const parseUrlHeaderConfig = (
-  headers: Record<string, HeaderValue>
+  headers: HeaderRecord
 ): Effect.Effect<UrlHeaderConfig, ConfigValidationError> =>
   Effect.gen(function*() {
     const hulyHeaders = Object.entries(headers).filter(([name]) => name.toLowerCase().startsWith("x-huly-"))
@@ -157,18 +173,12 @@ const parseUrlHeaderConfig = (
       )
     }
 
-    return { _tag: "UrlHeaders", entries: new Map(normalized) }
-  })
-
-const configProviderFromUrlHeaders = (
-  config: Extract<UrlHeaderConfig, { readonly _tag: "UrlHeaders" }>
-): Effect.Effect<ConfigProvider.ConfigProvider, ConfigValidationError> =>
-  Effect.gen(function*() {
+    const normalizedHeaders = new Map(normalized)
     const configEntries = yield* Effect.forEach(HULY_CONFIG_HEADERS, (headerName): Effect.Effect<
       ConfigMapEntry | undefined,
       ConfigValidationError
     > => {
-      const value = config.entries.get(headerName)
+      const value = normalizedHeaders.get(headerName)
       if (value === undefined) {
         if (REQUIRED_HULY_CONFIG_HEADERS.includes(headerName)) {
           return Effect.fail(
@@ -194,8 +204,12 @@ const configProviderFromUrlHeaders = (
       return Effect.succeed([headerToEnvName[headerName], value])
     })
 
-    return ConfigProvider.fromMap(new Map(configEntries.filter(isConfigMapEntry)))
+    return { _tag: "UrlHeaders", entries: new Map(configEntries.filter(isConfigMapEntry)) }
   })
+
+const configProviderFromUrlHeaders = (
+  config: Extract<UrlHeaderConfig, { readonly _tag: "UrlHeaders" }>
+): ConfigProvider.ConfigProvider => ConfigProvider.fromMap(new Map(config.entries))
 
 /**
  * Build an Effect ConfigProvider from URL mode headers.
@@ -206,13 +220,14 @@ const configProviderFromUrlHeaders = (
  * headers; missing values are never filled from process env.
  */
 export const hulyConfigProviderFromHeaders = (
-  headers: Record<string, HeaderValue>
+  headers: unknown
 ): Effect.Effect<ConfigProvider.ConfigProvider | undefined, ConfigValidationError> =>
-  parseUrlHeaderConfig(headers).pipe(
+  decodeHeaderRecord(headers).pipe(
+    Effect.flatMap(parseUrlHeaderConfig),
     Effect.flatMap((config) =>
       config._tag === "NoUrlHeaders"
         ? Effect.succeed(undefined)
-        : configProviderFromUrlHeaders(config)
+        : Effect.succeed(configProviderFromUrlHeaders(config))
     )
   )
 
