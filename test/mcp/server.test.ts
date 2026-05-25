@@ -1560,6 +1560,8 @@ describe("McpServerService.layer operations", () => {
         expect(result.tools[0]).toHaveProperty("name")
         expect(result.tools[0]).toHaveProperty("description")
         expect(result.tools[0]).toHaveProperty("inputSchema")
+        expect(result.tools[0]).toHaveProperty("outputSchema")
+        expect(result.tools.every((tool) => "outputSchema" in tool)).toBe(true)
         expect(firstListToolsCalled).toBe(true)
 
         yield* cleanup(fiber)

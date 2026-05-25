@@ -40,6 +40,9 @@ interface ErrorMetadata {
  */
 export interface McpToolResponse {
   content: Array<{ type: "text"; text: string }>
+  structuredContent?: {
+    readonly result: unknown
+  }
   isError?: boolean
   _meta?: ErrorMetadata
 }
@@ -199,8 +202,16 @@ export const mapDomainCauseToMcp = (
   return createErrorResponse("An unexpected error occurred", McpErrorCode.InternalError)
 }
 
+const encodeJsonText = (value: unknown): string => {
+  const text = JSON.stringify(value)
+  return typeof text === "string" ? text : "null"
+}
+
 export const createSuccessResponse = <T>(result: T): McpToolResponse => ({
-  content: [{ type: "text" as const, text: JSON.stringify(result) }]
+  content: [{ type: "text" as const, text: encodeJsonText(result) }],
+  structuredContent: {
+    result
+  }
 })
 
 export const createUnknownToolError = (toolName: string): McpErrorResponseWithMeta =>

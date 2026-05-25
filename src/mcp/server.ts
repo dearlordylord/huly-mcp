@@ -27,6 +27,7 @@ import {
   McpErrorCode,
   toMcpResponse
 } from "./error-mapping.js"
+import { defaultToolOutputSchema, versionToolOutputSchema } from "./tool-output-schema.js"
 import type { ToolRegistry } from "./tools/index.js"
 import { CATEGORY_NAMES, createFilteredRegistry, resolveAnnotations, toolRegistry } from "./tools/index.js"
 
@@ -37,6 +38,7 @@ const versionToolDefinition = {
   name: VERSION_TOOL_NAME,
   description: "Returns the current version of this Huly MCP server and the latest version available on npm.",
   inputSchema: { type: "object" as const, properties: {} },
+  outputSchema: versionToolOutputSchema,
   annotations: {
     title: "Get Version",
     readOnlyHint: true,
@@ -199,6 +201,7 @@ const createMcpServer = (
             name: tool.name,
             description: tool.description,
             inputSchema: tool.inputSchema,
+            outputSchema: defaultToolOutputSchema,
             annotations: resolveAnnotations(tool)
           }]
         })

@@ -84,6 +84,7 @@ describe("createToolHandler", () => {
       const result = yield* Effect.promise(() => handler({ name: "world" }, noopHulyClient, noopStorageClient))
 
       expect(result.isError).toBeUndefined()
+      expect(result.structuredContent).toEqual({ result: { greeting: "hello world" } })
       expect(result.content[0].text).toContain("hello world")
     }))
 
@@ -101,6 +102,7 @@ describe("createToolHandler", () => {
       const result = yield* Effect.promise(() => handler({ wrong: 123 }, noopHulyClient, noopStorageClient))
 
       expect(result.isError).toBe(true)
+      expect(result.structuredContent).toBeUndefined()
       expect(result._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
       expect(result.content[0].text).toContain("Invalid parameters")
     }))
