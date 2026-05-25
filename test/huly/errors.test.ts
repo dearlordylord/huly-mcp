@@ -765,6 +765,18 @@ describe("Huly Errors", () => {
               return `funnel:${error.identifier}`
             case "LeadNotFoundError":
               return `lead:${error.identifier}`
+            case "ProcessNotFoundError":
+              return `process:${error.identifier}:${error.candidates.length}`
+            case "ProcessIdentifierAmbiguousError":
+              return `process-ambiguous:${error.identifier}:${error.candidates.length}`
+            case "ProcessMasterTagNotFoundError":
+              return `process-master-tag:${error.identifier}`
+            case "ProcessMasterTagAmbiguousError":
+              return `process-master-tag-ambiguous:${error.identifier}:${error.candidates.length}`
+            case "ProcessCardIdentifierAmbiguousError":
+              return `process-card-ambiguous:${error.identifier}:${error.candidates.length}`
+            case "ProcessCardNotFoundError":
+              return `process-card:${error.identifier}`
             case "CannotDirectMessageSelfError":
               return `dm-self:${error.identifier}`
             case "PersonNotAnEmployeeError":

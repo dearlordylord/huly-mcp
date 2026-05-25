@@ -114,7 +114,13 @@ const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDo
   "FunnelNotFoundError",
   "LeadNotFoundError",
   "FileTooLargeError",
-  "InvalidContentTypeError"
+  "InvalidContentTypeError",
+  "ProcessNotFoundError",
+  "ProcessIdentifierAmbiguousError",
+  "ProcessMasterTagAmbiguousError",
+  "ProcessMasterTagNotFoundError",
+  "ProcessCardIdentifierAmbiguousError",
+  "ProcessCardNotFoundError"
 ])
 
 const INTERNAL_ERROR_PREFIX: Partial<Record<HulyDomainError["_tag"], string>> = {

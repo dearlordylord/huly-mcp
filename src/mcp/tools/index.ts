@@ -17,6 +17,7 @@ import { labelTools } from "./labels.js"
 import { leadTools } from "./leads.js"
 import { milestoneTools } from "./milestones.js"
 import { notificationTools } from "./notifications.js"
+import { processTools } from "./processes.js"
 import { projectTools } from "./projects.js"
 import type { RegisteredTool, ToolDefinition } from "./registry.js"
 import { resolveAnnotations } from "./registry.js"
@@ -50,6 +51,7 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...searchTools,
   ...activityTools,
   ...notificationTools,
+  ...processTools,
   ...workspaceTools,
   ...taskManagementTools,
   ...testManagementCoreTools,
