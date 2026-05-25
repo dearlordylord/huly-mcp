@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, it } from "@effect/vitest"
 import { Effect, Redacted, Schema } from "effect"
 import { expect } from "vitest"
-import { ConfigValidationError, HulyConfigSchema, HulyConfigService } from "../../src/config/config.js"
+import {
+  ConfigValidationError,
+  hulyConfigProviderFromHeaders,
+  HulyConfigSchema,
+  HulyConfigService
+} from "../../src/config/config.js"
 
 describe("Config Module", () => {
   // Store original env vars
@@ -492,6 +497,90 @@ describe("Config Module", () => {
         )
 
         expect(error._tag).toBe("ConfigValidationError")
+      }))
+  })
+
+  describe("hulyConfigProviderFromHeaders", () => {
+    // test-revizorro: approved
+    it.effect("loads token config from complete Smithery headers", () =>
+      Effect.gen(function*() {
+        const provider = yield* hulyConfigProviderFromHeaders({
+          "x-huly-url": "https://huly.app",
+          "x-huly-workspace": "my-workspace",
+          "x-huly-token": "my-api-token",
+          "x-huly-connection-timeout": "60000"
+        })
+
+        expect(provider).toBeDefined()
+        if (provider === undefined) return
+
+        const config = yield* HulyConfigService.pipe(
+          Effect.provide(HulyConfigService.layer),
+          Effect.withConfigProvider(provider)
+        )
+
+        expect(config.url).toBe("https://huly.app")
+        expect(config.workspace).toBe("my-workspace")
+        expect(config.auth._tag).toBe("token")
+        if (config.auth._tag === "token") {
+          expect(Redacted.value(config.auth.token)).toBe("my-api-token")
+        }
+        expect(config.connectionTimeout).toBe(60000)
+      }))
+
+    // test-revizorro: approved
+    it.effect("fails when one Smithery header is present and a required header is missing", () =>
+      Effect.gen(function*() {
+        const error = yield* Effect.flip(
+          hulyConfigProviderFromHeaders({
+            "x-huly-url": "https://huly.app",
+            "x-huly-token": "my-api-token"
+          })
+        )
+
+        expect(error._tag).toBe("ConfigValidationError")
+        expect(error.field).toBe("x-huly-workspace")
+      }))
+
+    // test-revizorro: approved
+    it.effect("returns undefined when no Huly headers are present", () =>
+      Effect.gen(function*() {
+        const provider = yield* hulyConfigProviderFromHeaders({
+          authorization: "Bearer unrelated"
+        })
+
+        expect(provider).toBeUndefined()
+      }))
+
+    // test-revizorro: approved
+    it.effect("rejects multi-value Huly headers", () =>
+      Effect.gen(function*() {
+        const error = yield* Effect.flip(
+          hulyConfigProviderFromHeaders({
+            "x-huly-url": ["https://a.example", "https://b.example"],
+            "x-huly-workspace": "my-workspace",
+            "x-huly-token": "my-api-token"
+          })
+        )
+
+        expect(error._tag).toBe("ConfigValidationError")
+        expect(error.field).toBe("x-huly-url")
+      }))
+
+    // test-revizorro: approved
+    it.effect("rejects unsupported x-huly headers", () =>
+      Effect.gen(function*() {
+        const error = yield* Effect.flip(
+          hulyConfigProviderFromHeaders({
+            "x-huly-url": "https://huly.app",
+            "x-huly-workspace": "my-workspace",
+            "x-huly-token": "my-api-token",
+            "x-huly-email": "user@example.com"
+          })
+        )
+
+        expect(error._tag).toBe("ConfigValidationError")
+        expect(error.field).toBe("x-huly-email")
       }))
   })
 

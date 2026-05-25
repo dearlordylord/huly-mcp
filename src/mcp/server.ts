@@ -7,8 +7,9 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js"
 import { Config, Context, Effect, Layer, Ref, Schema } from "effect"
+import type { Request } from "express"
 
-import type { HttpServerFactoryService, HttpTransportError } from "./http-transport.js"
+import type { HttpServerFactoryService, HttpTransportDependencies, HttpTransportError } from "./http-transport.js"
 import { DEFAULT_HTTP_PORT, startHttpTransport } from "./http-transport.js"
 
 import type { HulyClient } from "../huly/client.js"
@@ -94,10 +95,12 @@ interface McpServerConfigData {
   readonly httpHost?: string
   readonly autoExit?: boolean
   readonly authMethod?: "token" | "password"
+  readonly httpTransportDependencies?: Partial<HttpTransportDependencies>
 }
 
 interface McpServerConfigCallbacks {
   readonly resolveClients: () => Promise<ClientBundle>
+  readonly resolveClientsForHttpRequest?: (req: Request) => Promise<ClientBundle>
   readonly createServer?: () => Server
   readonly createStdioTransport?: () => StdioServerTransport
   readonly writeError?: (message: string) => void
@@ -405,7 +408,19 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 
                 yield* startHttpTransport(
                   { port, host },
-                  () => createMcpServer(config.resolveClients, telemetry, registry, config.createServer)[0]
+                  (req) => {
+                    const resolveClientsForRequest = config.resolveClientsForHttpRequest
+                    const requestResolveClients = resolveClientsForRequest === undefined
+                      ? config.resolveClients
+                      : () => resolveClientsForRequest(req)
+                    return createMcpServer(
+                      requestResolveClients,
+                      telemetry,
+                      registry,
+                      config.createServer
+                    )[0]
+                  },
+                  config.httpTransportDependencies
                 ).pipe(
                   Effect.scoped,
                   Effect.mapError(

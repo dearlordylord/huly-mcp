@@ -91,7 +91,7 @@ const defaultHttpServerFactory: HttpServerFactory = {
   writeError: writeStderr
 }
 
-interface HttpTransportDependencies {
+export interface HttpTransportDependencies {
   readonly createTransport: () => StreamableHTTPServerTransport
   readonly writeError: (message: string) => void
 }
@@ -121,7 +121,7 @@ export class HttpServerFactoryService extends Context.Tag("@hulymcp/HttpServerFa
  * @param createServer - Factory function to create MCP Server instance per request
  */
 export const createMcpHandlers = (
-  createServer: () => Server,
+  createServer: (req: Request) => Server,
   dependencies: HttpTransportDependencies = defaultTransportDependencies
 ): {
   post: (req: Request, res: Response) => Promise<void>
@@ -130,7 +130,7 @@ export const createMcpHandlers = (
 } => {
   const post = async (req: Request, res: Response): Promise<void> => {
     try {
-      const server = createServer()
+      const server = createServer(req)
       // Stateless mode: no session ID generator, each request is independent
       const transport = dependencies.createTransport()
 
@@ -221,15 +221,16 @@ const closeHttpServer = (
  */
 export const startHttpTransport = (
   config: HttpTransportConfig,
-  createServer: () => Server
+  createServer: (req: Request) => Server,
+  dependencies?: Partial<HttpTransportDependencies>
 ): Effect.Effect<void, HttpTransportError, HttpServerFactoryService | Scope.Scope> =>
   Effect.gen(function*() {
     const factory = yield* HttpServerFactoryService
-    const writeError: (message: string) => void = factory.writeError ?? writeStderr
+    const writeError: (message: string) => void = dependencies?.writeError ?? factory.writeError ?? writeStderr
 
     const app = factory.createApp(config.host)
     const handlers = createMcpHandlers(createServer, {
-      createTransport: defaultTransportDependencies.createTransport,
+      createTransport: dependencies?.createTransport ?? defaultTransportDependencies.createTransport,
       writeError
     })
     app.post("/mcp", handlers.post)

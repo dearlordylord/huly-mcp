@@ -1104,6 +1104,105 @@ describe("McpServerService.layer operations", () => {
         yield* Fiber.interrupt(fiber)
       }), { timeout: 5000 })
 
+    it.scoped("http transport resolves clients from each request headers independently", () =>
+      Effect.gen(function*() {
+        capturedHandlers.clear()
+
+        const baseClientLayer = Layer.mergeAll(
+          HulyClient.testLayer({}),
+          HulyStorageClient.testLayer({}),
+          WorkspaceClient.testLayer({})
+        )
+        const resolveBaseClients = resolveClientsFromLayer(baseClientLayer)
+        const seenWorkspaces: Array<string | ReadonlyArray<string> | undefined> = []
+
+        const serverLayer = McpServerService.layer({
+          transport: "http",
+          httpPort: 19879,
+          httpHost: "127.0.0.1",
+          createServer: createMockServer,
+          resolveClients: resolveBaseClients,
+          resolveClientsForHttpRequest: (req) => {
+            seenWorkspaces.push(req.headers["x-huly-workspace"])
+            return resolveBaseClients()
+          },
+          httpTransportDependencies: {
+            createTransport: () =>
+              // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test fake implements the transport methods used by createMcpHandlers
+              ({
+                async close() {},
+                async handleRequest(_req: unknown, _res: unknown, body: unknown) {
+                  const handler = capturedHandlers.get(CallToolRequestSchema)
+                  if (handler === undefined) throw new Error("CallTool handler was not registered")
+                  const params = body && typeof body === "object" && "params" in body
+                    ? body.params
+                    : { name: "list_projects", arguments: {} }
+                  await handler({ params })
+                }
+              }) as never
+          }
+        }).pipe(Layer.provide(TelemetryService.testLayer()))
+
+        const ctx = yield* Layer.build(serverLayer)
+        const ops = yield* McpServerService.pipe(
+          Effect.provide(Layer.succeedContext(ctx))
+        )
+
+        const postHandlers: Array<(req: unknown, res: unknown) => Promise<void>> = []
+        const mockHttpFactory: HttpServerFactoryService["Type"] = {
+          createApp: () =>
+            // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test fake implements the Express methods used by startHttpTransport
+            ({
+              post: (_path: string, handler: (req: unknown, res: unknown) => Promise<void>) => {
+                postHandlers.push(handler)
+              },
+              get: () => {},
+              delete: () => {}
+            }) as never,
+          listen: () =>
+            Effect.succeed({
+              close: (cb: (err?: Error) => void) => cb()
+            } as never)
+        }
+
+        const fiber = yield* Effect.fork(
+          ops.run().pipe(
+            Effect.provideService(HttpServerFactoryService, mockHttpFactory)
+          )
+        )
+
+        yield* Effect.promise(() => new Promise((r) => setTimeout(r, 100)))
+        expect(postHandlers).toHaveLength(1)
+
+        const handler = postHandlers[0]
+        const response = {
+          headersSent: false,
+          status: () => ({ json: () => {} }),
+          on: () => {}
+        }
+        const makeRequest = (workspace: string) => ({
+          body: {
+            jsonrpc: "2.0",
+            method: "tools/call",
+            id: 1,
+            params: { name: "list_projects", arguments: {} }
+          },
+          headers: {
+            "x-huly-url": "https://huly.app",
+            "x-huly-workspace": workspace,
+            "x-huly-token": `token-${workspace}`
+          },
+          on: () => {}
+        })
+
+        yield* Effect.promise(() => handler(makeRequest("workspace-one"), response))
+        yield* Effect.promise(() => handler(makeRequest("workspace-two"), response))
+
+        expect(seenWorkspaces).toEqual(["workspace-one", "workspace-two"])
+
+        yield* Fiber.interrupt(fiber)
+      }), { timeout: 5000 })
+
     it.scoped("http transport run completes via SIGTERM and flushes telemetry", () => {
       return Effect.gen(function*() {
         const telemetryOps: Partial<TelemetryOperations> = {

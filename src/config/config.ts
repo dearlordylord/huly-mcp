@@ -6,9 +6,31 @@
  * @module
  */
 import type { ConfigError } from "effect"
-import { Config, Context, Effect, Layer, Redacted, Schema } from "effect"
+import { Config, ConfigProvider, Context, Effect, Layer, Redacted, Schema } from "effect"
 
 const DEFAULT_TIMEOUT = 30000
+const REQUIRED_HULY_CONFIG_HEADERS = ["x-huly-url", "x-huly-workspace", "x-huly-token"] as const
+const HULY_CONFIG_HEADERS = [
+  ...REQUIRED_HULY_CONFIG_HEADERS,
+  "x-huly-connection-timeout"
+] as const
+
+type HulyConfigHeader = typeof HULY_CONFIG_HEADERS[number]
+type HeaderValue = string | ReadonlyArray<string> | undefined
+type ConfigMapEntry = readonly [string, string]
+type NormalizedHeaderEntry = readonly [HulyConfigHeader, HeaderValue]
+
+const headerToEnvName: Record<HulyConfigHeader, string> = {
+  "x-huly-url": "HULY_URL",
+  "x-huly-workspace": "HULY_WORKSPACE",
+  "x-huly-token": "HULY_TOKEN",
+  "x-huly-connection-timeout": "HULY_CONNECTION_TIMEOUT"
+}
+
+const hulyConfigHeaderSet = new Set<string>(HULY_CONFIG_HEADERS)
+
+const isHulyConfigHeader = (name: string): name is HulyConfigHeader => hulyConfigHeaderSet.has(name)
+const isConfigMapEntry = (entry: ConfigMapEntry | undefined): entry is ConfigMapEntry => entry !== undefined
 
 /**
  * Schema for URL validation - must be valid http/https URL.
@@ -85,6 +107,82 @@ export class ConfigValidationError extends Schema.TaggedError<ConfigValidationEr
     cause: Schema.optional(Schema.Defect)
   }
 ) {}
+
+/**
+ * Build an Effect ConfigProvider from Smithery hosted URL mode headers.
+ *
+ * If no x-huly-* headers are present, returns undefined so callers can use the
+ * existing process environment resolver. If any x-huly-* header is present,
+ * only token auth headers are accepted and all required fields must come from
+ * headers; missing values are never filled from process env.
+ */
+export const hulyConfigProviderFromHeaders = (
+  headers: Record<string, HeaderValue>
+): Effect.Effect<ConfigProvider.ConfigProvider | undefined, ConfigValidationError> =>
+  Effect.gen(function*() {
+    const hulyHeaders = Object.entries(headers).filter(([name]) => name.toLowerCase().startsWith("x-huly-"))
+    if (hulyHeaders.length === 0) return undefined
+
+    const normalized = yield* Effect.forEach(hulyHeaders, ([rawName, value]): Effect.Effect<
+      NormalizedHeaderEntry,
+      ConfigValidationError
+    > => {
+      const name = rawName.toLowerCase()
+      if (!isHulyConfigHeader(name)) {
+        return Effect.fail(
+          new ConfigValidationError({
+            message: `Unsupported Huly config header "${rawName}". Supported headers: ${
+              HULY_CONFIG_HEADERS.join(", ")
+            }.`,
+            field: rawName
+          })
+        )
+      }
+
+      return Effect.succeed([name, value])
+    })
+
+    const normalizedNames = normalized.map(([name]) => name)
+    const duplicateName = normalizedNames.find((name, index) => normalizedNames.indexOf(name) !== index)
+    if (duplicateName !== undefined) {
+      return yield* new ConfigValidationError({
+        message: `Duplicate Huly config header "${duplicateName}" received with different casing.`,
+        field: duplicateName
+      })
+    }
+
+    const configEntries = yield* Effect.forEach(HULY_CONFIG_HEADERS, (headerName): Effect.Effect<
+      ConfigMapEntry | undefined,
+      ConfigValidationError
+    > => {
+      const value = normalized.find(([name]) => name === headerName)?.[1]
+      if (value === undefined) {
+        if (REQUIRED_HULY_CONFIG_HEADERS.includes(headerName)) {
+          return Effect.fail(
+            new ConfigValidationError({
+              message: `Missing required Huly config header "${headerName}". When any x-huly-* header is present, `
+                + `${REQUIRED_HULY_CONFIG_HEADERS.join(", ")} must all be provided.`,
+              field: headerName
+            })
+          )
+        }
+        return Effect.succeed(undefined)
+      }
+
+      if (typeof value !== "string") {
+        return Effect.fail(
+          new ConfigValidationError({
+            message: `Huly config header "${headerName}" must have exactly one value.`,
+            field: headerName
+          })
+        )
+      }
+
+      return Effect.succeed([headerToEnvName[headerName], value])
+    })
+
+    return ConfigProvider.fromMap(new Map(configEntries.filter(isConfigMapEntry)))
+  })
 
 const TokenAuthFromEnv = Config.map(
   Schema.Config("HULY_TOKEN", Schema.Redacted(NonWhitespaceString)),

@@ -126,10 +126,14 @@ const getResponseCalls = (response: Response): {
     }
   }).__calls
 
-const createMockRequest = (body: unknown = {}): Request => {
+const createMockRequest = (
+  body: unknown = {},
+  headers: Request["headers"] = {}
+): Request => {
   const on = createVoidProbe<[string, (...args: Array<unknown>) => void]>()
   return mock<Request>({
     body,
+    headers,
     on: on.fn,
     __calls: { on: on.calls }
   })
@@ -210,6 +214,27 @@ describe("HTTP Transport", () => {
       expect(serverInstances[0]).not.toBe(serverInstances[1])
       expect(getServerCalls(serverInstances[0]).connect).toHaveLength(1)
       expect(getServerCalls(serverInstances[1]).connect).toHaveLength(1)
+    })
+
+    // test-revizorro: approved
+    it("passes request headers to the per-request server factory", async () => {
+      const headers = {
+        "x-huly-url": "https://huly.one",
+        "x-huly-workspace": "workspace-one",
+        "x-huly-token": "token-one"
+      }
+      const capturedHeaders: Array<Request["headers"]> = []
+      const handlers = createMcpHandlers((req) => {
+        capturedHeaders.push(req.headers)
+        return createMockMcpServer()
+      })
+
+      await handlers.post(
+        createMockRequest({ jsonrpc: "2.0", method: "tools/list", id: 1 }, headers),
+        createMockResponse()
+      )
+
+      expect(capturedHeaders).toEqual([headers])
     })
 
     // test-revizorro: approved

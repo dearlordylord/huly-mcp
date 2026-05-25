@@ -182,6 +182,59 @@ Configure with `MCP_HTTP_PORT` and `MCP_HTTP_HOST`:
 MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-mcp@latest
 ```
 
+### Smithery URL Mode
+
+For hosted URL deployments, keep the server process configured with `MCP_TRANSPORT=http`. Smithery can forward per-session Huly credentials as request headers, so one hosted server can serve different Huly workspaces without process-wide `HULY_*` env vars.
+
+Supported v1 headers:
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `x-huly-url` | Yes | Huly instance URL |
+| `x-huly-workspace` | Yes | Workspace identifier |
+| `x-huly-token` | Yes | Huly API token |
+| `x-huly-connection-timeout` | No | Connection timeout in ms |
+
+If any `x-huly-*` header is present, all required headers must be present. Missing values are not filled from environment variables. Email/password auth is not supported in hosted URL mode v1.
+
+Example Smithery CLI publish schema:
+
+```bash
+smithery mcp publish "https://your-server.example/mcp" \
+  -n "@your-org/huly-mcp" \
+  --config-schema '{
+    "type": "object",
+    "required": ["hulyUrl", "hulyWorkspace", "hulyToken"],
+    "properties": {
+      "hulyUrl": {
+        "type": "string",
+        "title": "Huly URL",
+        "description": "Base URL for the Huly instance, such as https://huly.app.",
+        "x-from": { "header": "x-huly-url" }
+      },
+      "hulyWorkspace": {
+        "type": "string",
+        "title": "Workspace",
+        "description": "Huly workspace identifier.",
+        "x-from": { "header": "x-huly-workspace" }
+      },
+      "hulyToken": {
+        "type": "string",
+        "title": "API token",
+        "description": "Huly API token.",
+        "x-from": { "header": "x-huly-token" }
+      },
+      "hulyConnectionTimeout": {
+        "type": "number",
+        "title": "Connection timeout",
+        "description": "Maximum Huly connection wait time in milliseconds.",
+        "default": 30000,
+        "x-from": { "header": "x-huly-connection-timeout" }
+      }
+    }
+  }'
+```
+
 ## Environment Variables
 
 | Variable | Required | Description |
