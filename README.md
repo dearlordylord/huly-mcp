@@ -197,43 +197,7 @@ Supported v1 headers:
 
 If any `x-huly-*` header is present, all required headers must be present. Missing values are not filled from environment variables. Email/password auth is not supported in hosted header configuration v1.
 
-Smithery CLI publish schema example:
-
-```bash
-smithery mcp publish "https://your-server.example/mcp" \
-  -n "@your-org/huly-mcp" \
-  --config-schema '{
-    "type": "object",
-    "required": ["hulyUrl", "hulyWorkspace", "hulyToken"],
-    "properties": {
-      "hulyUrl": {
-        "type": "string",
-        "title": "Huly URL",
-        "description": "Base URL for the Huly instance, such as https://huly.app.",
-        "x-from": { "header": "x-huly-url" }
-      },
-      "hulyWorkspace": {
-        "type": "string",
-        "title": "Workspace",
-        "description": "Huly workspace identifier.",
-        "x-from": { "header": "x-huly-workspace" }
-      },
-      "hulyToken": {
-        "type": "string",
-        "title": "API token",
-        "description": "Huly API token.",
-        "x-from": { "header": "x-huly-token" }
-      },
-      "hulyConnectionTimeout": {
-        "type": "number",
-        "title": "Connection timeout",
-        "description": "Maximum Huly connection wait time in milliseconds.",
-        "default": 30000,
-        "x-from": { "header": "x-huly-connection-timeout" }
-      }
-    }
-  }'
-```
+For a Smithery publish schema example, see [docs/SMITHERY_URL_PUBLISH.md](docs/SMITHERY_URL_PUBLISH.md).
 
 ## Environment Variables
 
