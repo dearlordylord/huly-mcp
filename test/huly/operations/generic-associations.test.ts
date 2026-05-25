@@ -780,6 +780,24 @@ describe("listRelations", () => {
       expect(error).toBeInstanceOf(RelationEndpointClassMismatchError)
     }))
 
+  it.effect("fails when direction either resolves an endpoint outside the association class pair", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        listRelations({
+          association: assocId,
+          direction: "either",
+          source: { kind: "raw", id: "doc-1", class: documentClass }
+        }).pipe(
+          Effect.provide(testLayer({
+            associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })],
+            documents: [documentDoc("doc-1", "Spec")]
+          }))
+        )
+      )
+
+      expect(error).toBeInstanceOf(RelationEndpointClassMismatchError)
+    }))
+
   it.effect("fails with typed invalid locator error for raw locators without a known class", () =>
     Effect.gen(function*() {
       const error = yield* Effect.flip(

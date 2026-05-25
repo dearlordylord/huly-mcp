@@ -461,6 +461,54 @@ const validateExpectedClass = (
   return Effect.void
 }
 
+const endpointMatchesAssociationClass = (summary: ResolvedObjectSummary | undefined, className: string): boolean =>
+  summary === undefined || summary.class === className
+
+const validateEitherEndpointClasses = (
+  association: HulyAssociation,
+  source: ResolvedObjectSummary | undefined,
+  target: ResolvedObjectSummary | undefined
+): Effect.Effect<void, RelationEndpointClassMismatchError> => {
+  const sourceClass = String(association.classA)
+  const targetClass = String(association.classB)
+  const matchesForward = endpointMatchesAssociationClass(source, sourceClass)
+    && endpointMatchesAssociationClass(target, targetClass)
+  const matchesReverse = endpointMatchesAssociationClass(source, targetClass)
+    && endpointMatchesAssociationClass(target, sourceClass)
+
+  if (matchesForward || matchesReverse) {
+    return Effect.void
+  }
+
+  if (source !== undefined && source.class !== sourceClass && source.class !== targetClass) {
+    return Effect.fail(
+      new RelationEndpointClassMismatchError({
+        field: "source",
+        expectedClass: `${sourceClass} or ${targetClass}`,
+        actualClass: source.class
+      })
+    )
+  }
+
+  if (target !== undefined && target.class !== sourceClass && target.class !== targetClass) {
+    return Effect.fail(
+      new RelationEndpointClassMismatchError({
+        field: "target",
+        expectedClass: `${sourceClass} or ${targetClass}`,
+        actualClass: target.class
+      })
+    )
+  }
+
+  return Effect.fail(
+    new RelationEndpointClassMismatchError({
+      field: "target",
+      expectedClass: source?.class === sourceClass ? targetClass : sourceClass,
+      actualClass: target?.class ?? "missing"
+    })
+  )
+}
+
 const resolveIssueLocator = (
   locator: Extract<GenericObjectLocator, { kind: "issue" }>,
   field: string
@@ -955,6 +1003,9 @@ export const listRelations = (
     const target = params.target === undefined
       ? undefined
       : yield* resolveGenericObject(client, params.target, targetClass, "target")
+    if (direction === "either") {
+      yield* validateEitherEndpointClasses(association, source, target)
+    }
     const summaries = yield* listRelationsForResolvedEndpoints(client, [association], source, target, direction, limit)
 
     return {
