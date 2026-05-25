@@ -9,9 +9,16 @@ const PackageJsonSchema = Schema.Struct({
   name: Schema.String,
   version: Schema.String,
   mcpName: Schema.String,
+  homepage: Schema.String,
   repository: Schema.Struct({
     url: Schema.String
   })
+})
+
+const ServerIconSchema = Schema.Struct({
+  src: Schema.String,
+  mimeType: Schema.optional(Schema.String),
+  sizes: Schema.optional(Schema.Array(Schema.String))
 })
 
 const ServerPackageSchema = Schema.Struct({
@@ -25,7 +32,10 @@ const ServerPackageSchema = Schema.Struct({
 const ServerJsonSchema = Schema.Struct({
   $schema: Schema.String,
   name: Schema.String,
+  title: Schema.optional(Schema.String),
   description: Schema.String,
+  websiteUrl: Schema.optional(Schema.String),
+  icons: Schema.optional(Schema.Array(ServerIconSchema)),
   repository: Schema.Struct({
     url: Schema.String,
     source: Schema.String
@@ -54,6 +64,7 @@ const updatedServerJson = {
     ...serverJson.repository,
     url: normalizeRepositoryUrl(packageJson.repository.url)
   },
+  websiteUrl: packageJson.homepage,
   version: packageJson.version,
   packages: serverJson.packages.map((entry) =>
     entry.registryType === "npm"

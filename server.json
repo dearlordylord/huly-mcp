@@ -1,7 +1,18 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.dearlordylord/huly-mcp",
+  "title": "Huly MCP",
   "description": "MCP server for Huly integration",
+  "websiteUrl": "https://huly-mcp.dearlordylord.com",
+  "icons": [
+    {
+      "src": "https://huly-mcp.dearlordylord.com/icon.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+        "any"
+      ]
+    }
+  ],
   "repository": {
     "url": "https://github.com/dearlordylord/huly-mcp",
     "source": "github"

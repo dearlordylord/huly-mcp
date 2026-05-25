@@ -18,7 +18,7 @@
   "bugs": {
     "url": "https://github.com/dearlordylord/huly-mcp/issues"
   },
-  "homepage": "https://github.com/dearlordylord/huly-mcp#readme",
+  "homepage": "https://huly-mcp.dearlordylord.com",
   "scripts": {
     "prepare": "husky",
     "start": "node dist/index.cjs",
