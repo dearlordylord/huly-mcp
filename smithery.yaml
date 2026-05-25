@@ -1,0 +1,60 @@
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    required:
+      - hulyUrl
+      - hulyWorkspace
+    properties:
+      hulyUrl:
+        type: string
+        title: Huly URL
+        description: Base URL for the Huly instance, such as https://huly.app.
+      hulyWorkspace:
+        type: string
+        title: Workspace
+        description: Huly workspace identifier to connect to.
+      hulyToken:
+        type: string
+        title: API token
+        description: Huly API token. Provide this instead of email and password when available.
+      hulyEmail:
+        type: string
+        title: Email
+        description: Huly account email. Use with hulyPassword when hulyToken is not provided.
+      hulyPassword:
+        type: string
+        title: Password
+        description: Huly account password. Use with hulyEmail when hulyToken is not provided.
+      hulyConnectionTimeout:
+        type: integer
+        title: Connection timeout
+        description: Maximum Huly connection wait time in milliseconds.
+        default: 30000
+      toolsets:
+        type: string
+        title: Toolsets
+        description: Optional comma-separated tool categories to expose, for example issues,projects,search. Leave unset to expose all tools.
+  commandFunction: |-
+    (config) => {
+      const env = {
+        HULY_URL: config.hulyUrl,
+        HULY_WORKSPACE: config.hulyWorkspace
+      }
+
+      if (config.hulyToken) env.HULY_TOKEN = config.hulyToken
+      if (config.hulyEmail) env.HULY_EMAIL = config.hulyEmail
+      if (config.hulyPassword) env.HULY_PASSWORD = config.hulyPassword
+      if (config.hulyConnectionTimeout) env.HULY_CONNECTION_TIMEOUT = String(config.hulyConnectionTimeout)
+      if (config.toolsets) env.TOOLSETS = config.toolsets
+
+      return {
+        command: 'npx',
+        args: ['-y', '@firfi/huly-mcp@latest'],
+        env
+      }
+    }
+  exampleConfig:
+    hulyUrl: https://huly.app
+    hulyWorkspace: workspace-slug
+    hulyToken: huly-token
