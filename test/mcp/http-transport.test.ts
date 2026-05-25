@@ -242,7 +242,6 @@ describe("HTTP Transport", () => {
       expect(transport.calls.handleRequest).toHaveLength(2)
     })
 
-    // test-revizorro: approved
     it("passes request headers to the per-request server factory", async () => {
       const headers = {
         "x-huly-url": "https://huly.one",

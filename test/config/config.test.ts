@@ -501,7 +501,6 @@ describe("Config Module", () => {
   })
 
   describe("hulyConfigProviderFromHeaders", () => {
-    // test-revizorro: approved
     it.effect("loads token config from complete URL headers", () =>
       Effect.gen(function*() {
         const provider = yield* hulyConfigProviderFromHeaders({
@@ -528,7 +527,6 @@ describe("Config Module", () => {
         expect(config.connectionTimeout).toBe(60000)
       }))
 
-    // test-revizorro: approved
     it.effect("fails when one URL header is present and a required header is missing", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -542,7 +540,6 @@ describe("Config Module", () => {
         expect(error.field).toBe("x-huly-workspace")
       }))
 
-    // test-revizorro: approved
     it.effect("returns undefined when no Huly headers are present", () =>
       Effect.gen(function*() {
         const provider = yield* hulyConfigProviderFromHeaders({
@@ -552,7 +549,6 @@ describe("Config Module", () => {
         expect(provider).toBeUndefined()
       }))
 
-    // test-revizorro: approved
     it.effect("rejects multi-value Huly headers", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -567,7 +563,6 @@ describe("Config Module", () => {
         expect(error.field).toBe("x-huly-url")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects non-HTTP header values before config mapping", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -582,7 +577,6 @@ describe("Config Module", () => {
         expect(error.field).toBe("headers")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects unsupported x-huly headers", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
