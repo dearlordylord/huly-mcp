@@ -1,5 +1,41 @@
 # @firfi/huly-mcp
 
+## 0.15.0
+
+### Minor Changes
+
+- #54 Add generic association tools for Huly's relation model.
+
+  New MCP tools expose read-side association discovery and relation listing through `list_associations` and `list_relations`, including typed filters, class labels, raw document IDs, pagination totals, cap warnings, endpoint hydration, and explicit typed errors. Relation mutation entrypoints remain guarded until writable association allowlists are validated.
+
+- #62 Add process write tools.
+
+  New `start_process` and `cancel_execution` tools allow agents to start Huly process executions and cancel cancellable executions, with schemas, typed errors, docs, operation tests, and integration coverage.
+
+- #63 Add `list_user_statuses`.
+
+  The new read-only user-status tool exposes Huly presence records with optional account UUID and online-state filters.
+
+- #61 Add hosted URL/header configuration for HTTP deployments.
+
+  Hosted HTTP mode can now receive Huly URL configuration through request headers while preserving local stdio environment behavior. This includes Smithery URL-mode documentation and integration coverage.
+
+- #57 Reject identifier-only update calls instead of treating them as successful no-ops.
+
+  Update tools now require at least one actual update field in both their advertised JSON schemas and runtime guards. The MCP server reports omitted required argument objects before initializing Huly clients, and document editing rejects invalid mode combinations such as mixing full-content replacement with search-and-replace fields.
+
+- #57 Tighten generic relation endpoint validation.
+
+  `list_relations` with `direction: "either"` now validates endpoint classes for association filters so invalid source/target combinations fail explicitly.
+
+- 3393b74 Expose MCP tool output schemas.
+
+  Tool listings now advertise a default output schema, and `get_version` advertises its version response schema.
+
+- Add deployment and registry metadata support.
+
+  This release adds Cloud Run/Docker packaging files, Smithery configuration/docs, homepage assets, and automated registry metadata synchronization.
+
 ## 0.14.0
 
 ### Minor Changes
