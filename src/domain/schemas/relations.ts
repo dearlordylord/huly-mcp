@@ -2,6 +2,7 @@ import { JSONSchema, Schema } from "effect"
 
 import {
   DocumentId,
+  enumValuesDescription,
   IssueId,
   IssueIdentifier,
   ObjectClassName,
@@ -18,8 +19,9 @@ const RelationTypeDescriptions = {
   "relates-to": "bidirectional link"
 } satisfies Record<RelationTypeValue, string>
 
-const relationTypeDescription = RelationTypeValues.map((value) => `'${value}' (${RelationTypeDescriptions[value]})`)
-  .join(", ")
+const relationTypeDescription = enumValuesDescription(
+  RelationTypeValues.map((value) => `'${value}' (${RelationTypeDescriptions[value]})`)
+)
 
 export const RelationTypeSchema = Schema.Literal(...RelationTypeValues).annotations({
   title: "RelationType",

@@ -1,6 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
-import { IssueStatusId, NonEmptyString, ProjectTypeId, TaskTypeId } from "./shared.js"
+import { enumValuesDescription, IssueStatusId, NonEmptyString, ProjectTypeId, TaskTypeId } from "./shared.js"
 
 const StatusCategoryValues = ["backlog", "todo", "active", "done", "canceled"] as const
 const UnknownStatusCategoryValue = "unknown"
@@ -109,7 +109,7 @@ export const CreateIssueStatusParamsSchema = Schema.Struct({
   })),
   name: NonEmptyString.annotations({ description: "Display name for the workflow status to add." }),
   category: CreateStatusCategoryValueSchema.annotations({
-    description: `Business category for the status: ${StatusCategoryValues.join(", ")}.`
+    description: `Business category for the status: ${enumValuesDescription(StatusCategoryValues)}.`
   }),
   taskType: Schema.optional(TaskTypeRefSchema.annotations({
     description:

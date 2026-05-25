@@ -24,6 +24,8 @@ export const EmptyParamsSchema = Schema.Struct({}).annotations({
 
 export const emptyParamsJsonSchema = JSONSchema.make(EmptyParamsSchema)
 
+export const enumValuesDescription = (values: ReadonlyArray<string>): string => values.join(", ")
+
 // === Tier 1: Huly Internal Refs (opaque IDs from _id) ===
 
 export const DocId = NonEmptyString.pipe(Schema.brand("DocId"))

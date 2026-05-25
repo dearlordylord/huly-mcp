@@ -1,6 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
 import {
+  enumValuesDescription,
   IssueIdentifier,
   LimitParam,
   MilestoneId,
@@ -15,7 +16,7 @@ export const MilestoneStatusValues = ["planned", "in-progress", "completed", "ca
 
 export const MilestoneStatusSchema = Schema.Literal(...MilestoneStatusValues).annotations({
   title: "MilestoneStatus",
-  description: "Milestone status"
+  description: `Milestone status: ${enumValuesDescription(MilestoneStatusValues)}`
 })
 
 export type MilestoneStatus = Schema.Schema.Type<typeof MilestoneStatusSchema>

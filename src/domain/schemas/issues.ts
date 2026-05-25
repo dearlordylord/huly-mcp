@@ -6,6 +6,7 @@ import {
   ColorCode,
   ComponentIdentifier,
   Email,
+  enumValuesDescription,
   IssueIdentifier,
   LimitParam,
   NonEmptyString,
@@ -36,13 +37,15 @@ export const IssuePrioritySchema = Schema.transformOrFail(
       const match = normalizedPriorityLookup.get(normalizeForComparison(input))
       return match !== undefined
         ? ParseResult.succeed(match)
-        : ParseResult.fail(new ParseResult.Type(ast, input, `Expected one of: ${IssuePriorityValues.join(", ")}`))
+        : ParseResult.fail(
+          new ParseResult.Type(ast, input, `Expected one of: ${enumValuesDescription(IssuePriorityValues)}`)
+        )
     },
     encode: ParseResult.succeed
   }
 ).annotations({
   title: "IssuePriority",
-  description: "Issue priority level",
+  description: `Issue priority level: ${enumValuesDescription(IssuePriorityValues)}`,
   jsonSchema: { type: "string", enum: [...IssuePriorityValues] }
 })
 

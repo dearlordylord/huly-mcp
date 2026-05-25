@@ -1,6 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
-import { CustomFieldId, DocId, LimitParam, NonEmptyString, ObjectClassName } from "./shared.js"
+import { CustomFieldId, DocId, enumValuesDescription, LimitParam, NonEmptyString, ObjectClassName } from "./shared.js"
 
 export const ListCustomFieldsParamsSchema = Schema.Struct({
   targetClass: Schema.optional(
@@ -69,7 +69,9 @@ const CUSTOM_FIELD_TYPE_NAMES = [
   "unknown"
 ] as const
 
-export const CustomFieldTypeNameSchema = Schema.Literal(...CUSTOM_FIELD_TYPE_NAMES)
+export const CustomFieldTypeNameSchema = Schema.Literal(...CUSTOM_FIELD_TYPE_NAMES).annotations({
+  description: `Custom field type: ${enumValuesDescription(CUSTOM_FIELD_TYPE_NAMES)}`
+})
 
 export type CustomFieldTypeName = typeof CUSTOM_FIELD_TYPE_NAMES[number]
 

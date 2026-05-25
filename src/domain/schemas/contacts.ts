@@ -1,7 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
 import type { ContactProvider, OrganizationId, PersonName, UrlString } from "./shared.js"
-import { Email, LimitParam, MemberReference, NonEmptyString, PersonId } from "./shared.js"
+import { Email, enumValuesDescription, LimitParam, MemberReference, NonEmptyString, PersonId } from "./shared.js"
 
 // No codec needed — internal type, not used for runtime validation
 export interface PersonSummary {
@@ -321,7 +321,7 @@ export const AddOrganizationChannelParamsSchema = Schema.Struct({
     description: "Organization ID or exact name"
   }),
   provider: OrganizationChannelProviderSchema.annotations({
-    description: `Channel type: ${OrganizationChannelProviderValues.join(", ")}`
+    description: `Channel type: ${enumValuesDescription(OrganizationChannelProviderValues)}`
   }),
   value: NonEmptyString.annotations({
     description: "Channel value (email address, phone number, URL, username)"

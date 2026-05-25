@@ -1,19 +1,19 @@
 import { JSONSchema, Schema } from "effect"
 
-import { ProjectIdentifier } from "./shared.js"
+import { enumValuesDescription, ProjectIdentifier } from "./shared.js"
 
 const EntityTypeValues = ["issue", "project", "component", "milestone"] as const
 
 const EntityTypeSchema = Schema.Literal(...EntityTypeValues).annotations({
   title: "EntityType",
-  description: `Type of entity to preview deletion for: ${EntityTypeValues.join(", ")}`
+  description: `Type of entity to preview deletion for: ${enumValuesDescription(EntityTypeValues)}`
 })
 
 export type EntityType = Schema.Schema.Type<typeof EntityTypeSchema>
 
 export const PreviewDeletionParamsSchema = Schema.Struct({
   entityType: EntityTypeSchema.annotations({
-    description: `Type of entity: ${EntityTypeValues.join(", ")}`
+    description: `Type of entity: ${enumValuesDescription(EntityTypeValues)}`
   }),
   project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY'). For entityType='project', this IS the target project."

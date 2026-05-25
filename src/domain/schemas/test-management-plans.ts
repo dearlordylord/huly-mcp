@@ -2,6 +2,7 @@ import { JSONSchema, Schema } from "effect"
 
 import type { TestPlanId, TestPlanItemId, TestResultId, TestRunId } from "./shared.js"
 import {
+  enumValuesDescription,
   LimitParam,
   NonEmptyString,
   TestCaseIdentifier,
@@ -218,7 +219,9 @@ export interface GetTestResultDetail {
   readonly description?: string
 }
 
-const statusField = TestRunStatusSchema.annotations({ description: `Status: ${TestRunStatusValues.join(", ")}` })
+const statusField = TestRunStatusSchema.annotations({
+  description: `Status: ${enumValuesDescription(TestRunStatusValues)}`
+})
 
 export const CreateTestResultParamsSchema = Schema.Struct({
   project: projectField,

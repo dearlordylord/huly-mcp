@@ -5,6 +5,7 @@ import {
   AccountId,
   Email,
   EmptyParamsSchema,
+  enumValuesDescription,
   LimitParam,
   NonEmptyString,
   PersonUuid,
@@ -29,7 +30,7 @@ export const AccountRoleValues = [
 
 export const AccountRoleSchema = Schema.Literal(...AccountRoleValues).annotations({
   title: "AccountRole",
-  description: "Workspace member role"
+  description: `Workspace member role: ${enumValuesDescription(AccountRoleValues)}`
 })
 
 export type AccountRole = Schema.Schema.Type<typeof AccountRoleSchema>

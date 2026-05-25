@@ -4,6 +4,7 @@ import {
   AssociationId,
   DocId,
   DocumentIdentifier,
+  enumValuesDescription,
   IssueIdentifier,
   LimitParam,
   NonEmptyString,
@@ -26,7 +27,9 @@ const CardinalityValues = [
   "many-to-many"
 ] as const
 // MCP-facing vocabulary derived from Huly SDK Association["type"]; operations maintain the exact SDK mapping.
-export const CardinalitySchema = Schema.Literal(...CardinalityValues)
+export const CardinalitySchema = Schema.Literal(...CardinalityValues).annotations({
+  description: `Association cardinality: ${enumValuesDescription(CardinalityValues)}`
+})
 export type Cardinality = Schema.Schema.Type<typeof CardinalitySchema>
 
 const RelationDirectionValues = ["source-to-target", "target-to-source", "either"] as const
@@ -35,7 +38,7 @@ export const RelationDirectionSchema = Schema.Literal(...RelationDirectionValues
 export type RelationDirection = Schema.Schema.Type<typeof RelationDirectionSchema>
 export const DefaultRelationDirection = "source-to-target" satisfies RelationDirection
 const relationDirectionDescription = `Relation traversal direction: ${
-  RelationDirectionValues.join(", ")
+  enumValuesDescription(RelationDirectionValues)
 }. Defaults to ${DefaultRelationDirection}.`
 
 export const RelationIfExistsSchema = Schema.Literal("return_existing", "fail")

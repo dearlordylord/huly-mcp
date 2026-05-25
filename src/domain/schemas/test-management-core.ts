@@ -1,11 +1,16 @@
 import { JSONSchema, Schema } from "effect"
 
 import type { TestCaseId, TestProjectId, TestSuiteId } from "./shared.js"
-import { LimitParam, NonEmptyString, TestCaseIdentifier, TestProjectIdentifier, TestSuiteIdentifier } from "./shared.js"
+import {
+  enumValuesDescription,
+  LimitParam,
+  NonEmptyString,
+  TestCaseIdentifier,
+  TestProjectIdentifier,
+  TestSuiteIdentifier
+} from "./shared.js"
 
 // --- Enum value arrays and schemas ---
-
-const enumValuesDescription = (values: ReadonlyArray<string>): string => values.join(", ")
 
 export const TestCaseTypeValues = ["functional", "performance", "regression", "security", "smoke", "usability"] as const
 export type TestCaseTypeStr = (typeof TestCaseTypeValues)[number]

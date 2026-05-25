@@ -1,13 +1,22 @@
 import { JSONSchema, Schema } from "effect"
 
-import { CalendarId, Email, EmptyParamsSchema, EventId, LimitParam, NonEmptyString, Timestamp } from "./shared.js"
+import {
+  CalendarId,
+  Email,
+  EmptyParamsSchema,
+  enumValuesDescription,
+  EventId,
+  LimitParam,
+  NonEmptyString,
+  Timestamp
+} from "./shared.js"
 import type { PersonId, PersonName } from "./shared.js"
 
 export const VisibilityValues = ["public", "freeBusy", "private"] as const
 
 export const VisibilitySchema = Schema.Literal(...VisibilityValues).annotations({
   title: "Visibility",
-  description: "Event visibility level"
+  description: `Event visibility level: ${enumValuesDescription(VisibilityValues)}`
 })
 
 export type Visibility = Schema.Schema.Type<typeof VisibilitySchema>
@@ -26,7 +35,7 @@ export const RecurringFrequencyValues = [
 
 export const RecurringFrequencySchema = Schema.Literal(...RecurringFrequencyValues).annotations({
   title: "RecurringFrequency",
-  description: "Recurring event frequency (RFC5545)"
+  description: `Recurring event frequency (RFC5545): ${enumValuesDescription(RecurringFrequencyValues)}`
 })
 
 export type RecurringFrequency = Schema.Schema.Type<typeof RecurringFrequencySchema>
@@ -35,7 +44,7 @@ export const WeekdayValues = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"] as const
 
 export const WeekdaySchema = Schema.Literal(...WeekdayValues).annotations({
   title: "Weekday",
-  description: "Day of week abbreviation"
+  description: `Day of week abbreviation: ${enumValuesDescription(WeekdayValues)}`
 })
 
 export type Weekday = Schema.Schema.Type<typeof WeekdaySchema>
