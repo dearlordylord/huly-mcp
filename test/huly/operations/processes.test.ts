@@ -48,6 +48,20 @@ const asCard = (value: unknown): Card => value as Card
 const asMasterTag = (value: unknown): MasterTag => value as MasterTag
 const asIntlString = (value: string): IntlString => value as IntlString
 
+interface CreateDocCall {
+  readonly class: unknown
+  readonly space: Ref<Space>
+  readonly attributes: unknown
+  readonly id?: string
+}
+
+interface UpdateDocCall {
+  readonly class: unknown
+  readonly space: Ref<Space>
+  readonly objectId: string
+  readonly operations: unknown
+}
+
 const makeProcess = (overrides?: Partial<HulyProcessDefinition>): HulyProcessDefinition =>
   asProcess({
     _id: processId,
@@ -160,18 +174,8 @@ const createLayer = (config?: {
   readonly cards?: ReadonlyArray<Card>
   readonly masterTags?: ReadonlyArray<MasterTag>
   readonly total?: number
-  readonly captureCreateDoc?: {
-    class?: unknown
-    space?: unknown
-    attributes?: unknown
-    id?: string
-  }
-  readonly captureUpdateDoc?: {
-    class?: unknown
-    space?: unknown
-    objectId?: string
-    operations?: unknown
-  }
+  readonly createDocCalls?: Array<CreateDocCall>
+  readonly updateDocCalls?: Array<UpdateDocCall>
 }) => {
   const processes = config?.processes ?? [makeProcess()]
   const states = config?.states ?? [
@@ -229,12 +233,20 @@ const createLayer = (config?: {
     attributes: unknown,
     id?: unknown
   ) => {
-    if (config?.captureCreateDoc !== undefined) {
-      config.captureCreateDoc.class = _class
-      config.captureCreateDoc.space = space
-      config.captureCreateDoc.attributes = attributes
-      config.captureCreateDoc.id = String(id)
-    }
+    config?.createDocCalls?.push(
+      id === undefined
+        ? {
+          class: _class,
+          space,
+          attributes
+        }
+        : {
+          class: _class,
+          space,
+          attributes,
+          id: String(id)
+        }
+    )
     return Effect.succeed((id ?? "execution-new") as Ref<Doc>)
   }) as HulyClientOperations["createDoc"]
 
@@ -244,12 +256,12 @@ const createLayer = (config?: {
     objectId: unknown,
     operations: unknown
   ) => {
-    if (config?.captureUpdateDoc !== undefined) {
-      config.captureUpdateDoc.class = _class
-      config.captureUpdateDoc.space = space
-      config.captureUpdateDoc.objectId = String(objectId)
-      config.captureUpdateDoc.operations = operations
-    }
+    config?.updateDocCalls?.push({
+      class: _class,
+      space,
+      objectId: String(objectId),
+      operations
+    })
     return Effect.succeed({})
   }) as HulyClientOperations["updateDoc"]
 
@@ -485,16 +497,11 @@ describe("process operations", () => {
 
   it.effect("starts a process by process ID and card ID", () =>
     Effect.gen(function*() {
-      const capture: {
-        class?: unknown
-        space?: unknown
-        attributes?: unknown
-        id?: string
-      } = {}
+      const createDocCalls: Array<CreateDocCall> = []
       const result = yield* startProcess({
         process: ProcessIdentifier.make(processId),
         card: ProcessCardIdentifier.make(cardId)
-      }).pipe(Effect.provide(createLayer({ executions: [], captureCreateDoc: capture })))
+      }).pipe(Effect.provide(createLayer({ executions: [], createDocCalls })))
 
       expect(result).toMatchObject({
         processId,
@@ -505,10 +512,11 @@ describe("process operations", () => {
         currentStateTitle: "Draft",
         status: "active"
       })
-      expect(result.executionId).toBe(capture.id)
-      expect(capture.class).toBe(processPlugin.class.Execution)
-      expect(capture.space).toBe(core.space.Workspace)
-      expect(capture.attributes).toEqual({
+      const [createdExecution] = createDocCalls
+      expect(result.executionId).toBe(createdExecution.id)
+      expect(createdExecution.class).toBe(processPlugin.class.Execution)
+      expect(createdExecution.space).toBe(core.space.Workspace)
+      expect(createdExecution.attributes).toEqual({
         process: processId,
         card: cardId,
         currentState: initStateId,
@@ -533,9 +541,7 @@ describe("process operations", () => {
   it.effect("uses the lowest-rank null transition as the initial process state", () =>
     Effect.gen(function*() {
       const earliestStateId = "state-earliest" as Ref<HulyProcessState>
-      const capture: {
-        attributes?: unknown
-      } = {}
+      const createDocCalls: Array<CreateDocCall> = []
       const result = yield* startProcess({
         process: ProcessIdentifier.make(processId),
         card: ProcessCardIdentifier.make(cardId)
@@ -553,12 +559,12 @@ describe("process operations", () => {
             rank: "a"
           })
         ],
-        captureCreateDoc: capture
+        createDocCalls
       })))
 
       expect(result.currentStateId).toBe(earliestStateId)
       expect(result.currentStateTitle).toBe("Earliest")
-      expect(capture.attributes).toMatchObject({ currentState: earliestStateId })
+      expect(createDocCalls[0].attributes).toMatchObject({ currentState: earliestStateId })
     }))
 
   it.effect("fails start_process when the process has no initial transition", () =>
@@ -636,36 +642,30 @@ describe("process operations", () => {
 
   it.effect("cancels an active execution", () =>
     Effect.gen(function*() {
-      const capture: {
-        class?: unknown
-        space?: unknown
-        objectId?: string
-        operations?: unknown
-      } = {}
+      const updateDocCalls: Array<UpdateDocCall> = []
       const result = yield* cancelExecution({
         execution: ProcessExecutionId.make("execution-1")
-      }).pipe(Effect.provide(createLayer({ captureUpdateDoc: capture })))
+      }).pipe(Effect.provide(createLayer({ updateDocCalls })))
 
       expect(result).toEqual({
         executionId: "execution-1",
         status: "cancelled",
         cancelled: true
       })
-      expect(capture.class).toBe(processPlugin.class.Execution)
-      expect(capture.objectId).toBe("execution-1")
-      expect(capture.operations).toEqual({ status: "cancelled" })
+      const [updatedExecution] = updateDocCalls
+      expect(updatedExecution.class).toBe(processPlugin.class.Execution)
+      expect(updatedExecution.objectId).toBe("execution-1")
+      expect(updatedExecution.operations).toEqual({ status: "cancelled" })
     }))
 
   it.effect("returns cancelled=false for already-cancelled executions without updating", () =>
     Effect.gen(function*() {
-      const capture: {
-        operations?: unknown
-      } = {}
+      const updateDocCalls: Array<UpdateDocCall> = []
       const result = yield* cancelExecution({
         execution: ProcessExecutionId.make("execution-1")
       }).pipe(Effect.provide(createLayer({
         executions: [makeExecution({ status: "cancelled" })],
-        captureUpdateDoc: capture
+        updateDocCalls
       })))
 
       expect(result).toEqual({
@@ -673,7 +673,7 @@ describe("process operations", () => {
         status: "cancelled",
         cancelled: false
       })
-      expect(capture.operations).toBeUndefined()
+      expect(updateDocCalls).toEqual([])
     }))
 
   it.effect("fails cancel_execution for missing executions", () =>
