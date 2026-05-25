@@ -197,6 +197,8 @@ describe("listAssociations", () => {
       )
 
       expect(result.associations.map((item) => item.associationId)).toEqual(["assoc-visible"])
+      expect(result.associations[0].sourceClassLabel).toBe("Issue")
+      expect(result.associations[0].targetClassLabel).toBe("Issue")
       expect(result.associations[0].canListRelations).toBe(true)
       expect(result.associations[0].canCreateRelation).toBe(false)
     }))
@@ -327,6 +329,8 @@ describe("listAssociations", () => {
       )
 
       expect(result.associations.map((item) => item.associationId)).toEqual(["assoc-target"])
+      expect(result.associations[0].sourceClassLabel).toBe("Document")
+      expect(result.associations[0].targetClassLabel).toBe("Document")
     }))
 
   it.effect("fails on ambiguous association names", () =>

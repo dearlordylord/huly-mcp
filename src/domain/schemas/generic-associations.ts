@@ -104,7 +104,13 @@ export const AssociationSummarySchema = Schema.Struct({
   label: Schema.optional(NonEmptyString),
   description: Schema.optional(Schema.String),
   sourceClass: ObjectClassName,
+  sourceClassLabel: Schema.optional(NonEmptyString.annotations({
+    description: "Best-effort human display label for sourceClass when the class is known to this server"
+  })),
   targetClass: ObjectClassName,
+  targetClassLabel: Schema.optional(NonEmptyString.annotations({
+    description: "Best-effort human display label for targetClass when the class is known to this server"
+  })),
   sourceRole: Schema.optional(NonEmptyString),
   targetRole: Schema.optional(NonEmptyString),
   relationClass: Schema.optional(ObjectClassName),

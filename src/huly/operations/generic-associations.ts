@@ -46,7 +46,7 @@ import {
   RelationEndpointClassMismatchError,
   RelationMutationUnsupportedError
 } from "../errors.js"
-import { core, documentPlugin } from "../huly-plugins.js"
+import { core, documentPlugin, tracker } from "../huly-plugins.js"
 import { findTeamspaceAndDocument } from "./documents.js"
 import { findIssueInProject, findProject, findProjectAndIssue } from "./issues-shared.js"
 import { clampLimit, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
@@ -123,6 +123,26 @@ const associationName = (association: HulyAssociation): string | undefined =>
 const optionalNonEmpty = (value: string | undefined): NonEmptyString | undefined =>
   value === undefined ? undefined : NonEmptyString.make(value)
 
+const classLabelEntry = (classRef: string, label: string): readonly [string, NonEmptyString] => [
+  classRef,
+  NonEmptyString.make(label)
+]
+
+const KNOWN_CLASS_LABELS = new Map<string, NonEmptyString>([
+  classLabelEntry(core.class.Doc, "Huly document"),
+  classLabelEntry(core.class.AttachedDoc, "Huly attached document"),
+  classLabelEntry(core.class.Relation, "Relation"),
+  classLabelEntry(documentPlugin.class.Document, "Document"),
+  classLabelEntry(documentPlugin.class.Teamspace, "Teamspace"),
+  classLabelEntry(tracker.class.Project, "Project"),
+  classLabelEntry(tracker.class.Issue, "Issue"),
+  classLabelEntry(tracker.class.IssueTemplate, "Issue template"),
+  classLabelEntry(tracker.class.Component, "Component"),
+  classLabelEntry(tracker.class.Milestone, "Milestone")
+])
+
+const classLabel = (classRef: string): NonEmptyString | undefined => KNOWN_CLASS_LABELS.get(classRef)
+
 const isSystemAssociation = (association: HulyAssociation): boolean =>
   String(association.classA).startsWith("core:class:") || String(association.classB).startsWith("core:class:")
 
@@ -149,7 +169,9 @@ const toAssociationSummary = (association: HulyAssociation): AssociationSummary 
   associationId: AssociationId.make(association._id),
   name: optionalNonEmpty(associationName(association)),
   sourceClass: ObjectClassName.make(association.classA),
+  sourceClassLabel: classLabel(association.classA),
   targetClass: ObjectClassName.make(association.classB),
+  targetClassLabel: classLabel(association.classB),
   sourceRole: NonEmptyString.make(association.nameA),
   targetRole: NonEmptyString.make(association.nameB),
   relationClass: ObjectClassName.make(core.class.Relation),
