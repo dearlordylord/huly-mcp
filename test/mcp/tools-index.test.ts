@@ -43,6 +43,7 @@ describe("CATEGORY_NAMES", () => {
       expect(CATEGORY_NAMES.has("comments")).toBe(true)
       expect(CATEGORY_NAMES.has("task-management")).toBe(true)
       expect(CATEGORY_NAMES.has("associations")).toBe(true)
+      expect(CATEGORY_NAMES.has("user-statuses")).toBe(true)
       expect(CATEGORY_NAMES.size).toBeGreaterThan(5)
     }))
 })
@@ -127,6 +128,17 @@ describe("createFilteredRegistry", () => {
         expect(tool.category).toBe("associations")
       }
     }))
+
+  it.effect("filters to user status tools", () =>
+    Effect.gen(function*() {
+      const filtered = createFilteredRegistry(new Set(["user-statuses"]))
+      const toolNames = filtered.definitions.map((tool) => tool.name)
+
+      expect(toolNames).toEqual(["list_user_statuses"])
+      for (const tool of filtered.definitions) {
+        expect(tool.category).toBe("user-statuses")
+      }
+    }))
 })
 
 describe("handleToolCall", () => {
@@ -153,6 +165,7 @@ describe("TOOL_DEFINITIONS", () => {
       expect(keys.length).toBe(toolRegistry.tools.size)
       expect(keys).toContain("create_issue_status")
       expect(keys).toContain("list_associations")
+      expect(keys).toContain("list_user_statuses")
     }))
 
   it.effect("entries match toolRegistry", () =>

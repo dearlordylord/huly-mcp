@@ -1610,6 +1610,27 @@ fi
 echo ""
 
 ##############################
+# 20. USER STATUSES
+##############################
+echo "=== 20. User Statuses ==="
+run_capture_to_var USER_STATUSES_TEXT "list_user_statuses" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_user_statuses","arguments":{"limit":5}},"id":2}'
+
+USER_STATUS_USER=$(echo "$USER_STATUSES_TEXT" | jq -r '.statuses[0].user // empty' 2>/dev/null)
+USER_STATUS_ONLINE=$(echo "$USER_STATUSES_TEXT" | jq -r 'if (.statuses[0] | has("online")) then (.statuses[0].online | tostring) else "" end' 2>/dev/null)
+
+if [ -n "$USER_STATUS_USER" ]; then
+  run_test "list_user_statuses(user:$USER_STATUS_USER)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_user_statuses\",\"arguments\":{\"user\":\"$USER_STATUS_USER\",\"limit\":5}},\"id\":2}"
+elif [ -n "$USER_STATUS_ONLINE" ]; then
+  run_test "list_user_statuses(online:$USER_STATUS_ONLINE)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_user_statuses\",\"arguments\":{\"online\":$USER_STATUS_ONLINE,\"limit\":5}},\"id\":2}"
+else
+  skip_test "list_user_statuses(filtered)" "no user status rows found in workspace"
+fi
+echo ""
+
+##############################
 # SUMMARY
 ##############################
 TOTAL=$((PASSED + FAILED + SKIPPED))

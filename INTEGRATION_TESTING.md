@@ -70,7 +70,7 @@ Expected: JSON with `"projects": [...]`
 
 ## Full Integration Test Suite
 
-**Coverage**: 110+ tool calls across 19 domains. Self-cleaning: all created entities are deleted at the end of each section. Tools that would leak data (no delete counterpart) are skipped. Run time: ~3 minutes.
+**Coverage**: 110+ tool calls across 20 domains. Self-cleaning: all created entities are deleted at the end of each section. Tools that would leak data (no delete counterpart) are skipped. Run time: ~3 minutes.
 
 **Last verified**: 2026-05-25 — 168 passed, 0 failed, 35 skipped (of 203 total).
 
@@ -109,6 +109,7 @@ The full suite tests CRUD lifecycles with cleanup for all domains:
 | 17. Attachments | add_issue_attachment, list/get/pin/update/download/delete attachment | Full CRUD (upload_file standalone skipped — no blob delete) |
 | 18. Test Management | Full suite/case/plan/run/result lifecycle | Requires TM project in Huly UI |
 | 19. Processes | list_processes, get_process, list_process_executions, start_process, cancel_execution | Read/write; write checks run only when the workspace has a process with an initial state and a matching safe card fixture, then cancel the created execution |
+| 20. User Statuses | list_user_statuses | Read-only presence records; filtered call runs when at least one row exists |
 
 ### Intentionally Skipped (22 fixed + up to 14 conditional)
 
@@ -124,11 +125,12 @@ The full suite tests CRUD lifecycles with cleanup for all domains:
 - **Cards CRUD** (4): create/get/update/delete_card — requires master tag setup
 - **add_attachment, add_document_attachment** (2): Covered by add_issue_attachment
 
-**Conditionally skipped (up to 14):**
+**Conditionally skipped (up to 15):**
 - **Notification mutations** (7-9): Skipped based on whether notifications exist at test time
 - **Event get/update/delete** (3): Skipped if create_event returns no eventId
 - **Documents** (1): Skipped if no teamspace found
 - **test_management** (1): Skipped if no TM project exists in workspace
+- **list_user_statuses(filtered)** (1): Skipped if no user status rows exist in workspace
 
 ### Response Field Reference
 

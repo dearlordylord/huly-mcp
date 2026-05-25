@@ -1,4 +1,4 @@
-import type { Class, Doc, PersonUuid, Ref } from "@hcengineering/core"
+import type { AccountUuid, Class, Doc, PersonUuid, Ref } from "@hcengineering/core"
 import { Effect } from "effect"
 
 import type { NonEmptyString } from "../../domain/schemas/shared.js"
@@ -14,6 +14,11 @@ export const toRef = <T extends Doc>(id: NonEmptyString | Ref<T>): Ref<T> => id 
 // centralized SDK boundary for converting validated class strings back to refs.
 // eslint-disable-next-line no-restricted-syntax -- see above
 export const toClassRef = <T extends Doc>(id: string | Ref<Class<T>>): Ref<Class<T>> => id as Ref<Class<T>>
+
+// Brands are erased at runtime; the domain value and SDK AccountUuid are both
+// non-empty strings, so this is the final boundary conversion into the SDK type.
+// eslint-disable-next-line no-restricted-syntax -- see above
+export const toAccountUuid = (uuid: NonEmptyString | AccountUuid): AccountUuid => uuid as AccountUuid
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 

@@ -29,6 +29,7 @@ import { taskManagementTools } from "./task-management.js"
 import { testManagementCoreTools } from "./test-management-core.js"
 import { testManagementPlansTools } from "./test-management-plans.js"
 import { timeTools } from "./time.js"
+import { userStatusTools } from "./user-statuses.js"
 import { workspaceTools } from "./workspace.js"
 
 const allTools: ReadonlyArray<RegisteredTool> = [
@@ -53,6 +54,7 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...searchTools,
   ...activityTools,
   ...notificationTools,
+  ...userStatusTools,
   ...processTools,
   ...workspaceTools,
   ...taskManagementTools,

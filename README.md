@@ -203,7 +203,7 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
 ## Available Tools
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `leads`, `processes`, `tag-categories`, `task-management`, `test-management`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `leads`, `processes`, `tag-categories`, `task-management`, `test-management`, `user-statuses`
 
 ### Projects
 
@@ -539,6 +539,12 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `update_test_result` | Update a test result's status, assignee, or description. Status values: untested, blocked, passed, failed. |
 | `delete_test_result` | Permanently delete a test result. Cannot be undone. |
 | `run_test_plan` | Execute a test plan: creates a test run and one test result per plan item. Returns the run ID and count of results created. Optionally name the run and set a due date. |
+
+### User-Statuses
+
+| Tool | Description |
+|------|-------------|
+| `list_user_statuses` | List Huly user presence records. Returns account UUIDs, online status, and last modified timestamp. Use this to check who is currently connected; presence is maintained by Huly server sessions. Filter by online or account UUID. |
 
 <!-- tools:end -->
 
