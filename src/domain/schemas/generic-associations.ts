@@ -215,37 +215,37 @@ export const CreateRelationResultSchema = Schema.Struct({
 })
 export type CreateRelationResult = Schema.Schema.Type<typeof CreateRelationResultSchema>
 
-export const DeleteRelationParamsSchema = Schema.Struct({
-  relation: Schema.optional(RelationIdentifier.annotations({
+const DeleteRelationByIdParamsSchema = Schema.Struct({
+  relation: RelationIdentifier.annotations({
     description: "Concrete relation _id to delete"
-  })),
-  association: Schema.optional(AssociationIdentifier.annotations({
-    description: "Association _id or unambiguous name. Required when deleting by source/target triple."
-  })),
-  source: Schema.optional(GenericObjectLocatorSchema.annotations({
-    description: "Source endpoint. Required when deleting by source/target triple."
-  })),
-  target: Schema.optional(GenericObjectLocatorSchema.annotations({
-    description: "Target endpoint. Required when deleting by source/target triple."
-  }))
-}).pipe(
-  Schema.filter((params) => {
-    const hasRelation = params.relation !== undefined
-    const hasTriple = params.association !== undefined && params.source !== undefined && params.target !== undefined
-    const hasPartialTriple = params.association !== undefined || params.source !== undefined
-      || params.target !== undefined
-
-    if (hasRelation && hasPartialTriple) {
-      return "Provide either relation, or association + source + target, not both."
-    }
-    if (!hasRelation && !hasTriple) {
-      return "Provide relation, or the full association + source + target triple. Partial triples are not allowed."
-    }
-    return undefined
   })
+}).annotations({
+  title: "DeleteRelationByIdParams",
+  description: "Delete one concrete relation by its relation ID."
+})
+
+const DeleteRelationByTripleParamsSchema = Schema.Struct({
+  association: AssociationIdentifier.annotations({
+    description: "Association _id or unambiguous name"
+  }),
+  source: GenericObjectLocatorSchema.annotations({
+    description: "Source endpoint"
+  }),
+  target: GenericObjectLocatorSchema.annotations({
+    description: "Target endpoint"
+  })
+}).annotations({
+  title: "DeleteRelationByTripleParams",
+  description: "Delete one concrete relation by exact association + source + target triple."
+})
+
+export const DeleteRelationParamsSchema = Schema.Union(
+  DeleteRelationByIdParamsSchema,
+  DeleteRelationByTripleParamsSchema
 ).annotations({
   title: "DeleteRelationParams",
-  description: "Parameters for idempotently deleting one concrete generic relation"
+  description:
+    "Parameters for idempotently deleting one concrete generic relation. Provide either relation, or the full association + source + target triple."
 })
 export type DeleteRelationParams = Schema.Schema.Type<typeof DeleteRelationParamsSchema>
 
@@ -260,7 +260,10 @@ export type DeleteRelationResult = Schema.Schema.Type<typeof DeleteRelationResul
 export const listAssociationsParamsJsonSchema = JSONSchema.make(ListAssociationsParamsSchema)
 export const listRelationsParamsJsonSchema = JSONSchema.make(ListRelationsParamsSchema)
 export const createRelationParamsJsonSchema = JSONSchema.make(CreateRelationParamsSchema)
-export const deleteRelationParamsJsonSchema = JSONSchema.make(DeleteRelationParamsSchema)
+export const deleteRelationParamsJsonSchema = {
+  ...JSONSchema.make(DeleteRelationParamsSchema),
+  type: "object"
+}
 
 const strictParseOptions = { onExcessProperty: "error" } as const
 

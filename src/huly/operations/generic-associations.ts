@@ -716,9 +716,9 @@ export const deleteRelation = (
 ): Effect.Effect<DeleteRelationResult, GenericAssociationsError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-    const association = params.association === undefined
-      ? undefined
-      : yield* resolveAssociation(client, params.association, MUTATION_ASSOCIATION_FILTERS)
+    const association = "association" in params
+      ? yield* resolveAssociation(client, params.association, MUTATION_ASSOCIATION_FILTERS)
+      : undefined
 
     return yield* new RelationMutationUnsupportedError({
       associationId: association === undefined ? undefined : AssociationId.make(association._id),

@@ -70,16 +70,54 @@ describe("generic association schemas", () => {
       expect(error._tag).toBe("ParseError")
     }))
 
+  it.effect("rejects mixed delete modes", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(parseDeleteRelationParams({
+        relation: "rel-1",
+        association: "links",
+        source: { kind: "raw", id: "doc-1", class: "document:class:Document" },
+        target: { kind: "raw", id: "doc-2", class: "document:class:Document" }
+      }))
+      expect(error._tag).toBe("ParseError")
+    }))
+
   it.effect("accepts delete by relation ID", () =>
     Effect.gen(function*() {
       const parsed = yield* parseDeleteRelationParams({ relation: "rel-1" })
+      if (!("relation" in parsed)) {
+        throw new Error("expected relation-id delete params")
+      }
       expect(parsed.relation).toBe("rel-1")
+    }))
+
+  it.effect("accepts delete by association/source/target triple", () =>
+    Effect.gen(function*() {
+      const parsed = yield* parseDeleteRelationParams({
+        association: "links",
+        source: { kind: "raw", id: "doc-1", class: "document:class:Document" },
+        target: { kind: "raw", id: "doc-2", class: "document:class:Document" }
+      })
+
+      if (!("association" in parsed)) {
+        throw new Error("expected triple delete params")
+      }
+      expect(parsed.association).toBe("links")
+      expect(parsed.source.kind).toBe("raw")
+      expect(parsed.target.kind).toBe("raw")
     }))
 
   it.effect("emits JSON schema for delete_relation", () =>
     Effect.gen(function*() {
       expect(deleteRelationParamsJsonSchema).toMatchObject({
-        type: "object"
+        type: "object",
+        anyOf: [
+          {
+            required: ["relation"]
+          },
+          {
+            required: ["association", "source", "target"]
+          }
+        ]
       })
     }))
 })

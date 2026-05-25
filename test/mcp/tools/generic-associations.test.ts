@@ -106,4 +106,21 @@ describe("genericAssociationTools", () => {
         openWorldHint: false
       })
     }))
+
+  it.effect("delete_relation input schema stays list_tools compatible while describing both delete modes", () =>
+    Effect.gen(function*() {
+      const tool = findTool("delete_relation")
+
+      expect(tool.inputSchema).toMatchObject({
+        type: "object",
+        anyOf: [
+          {
+            required: ["relation"]
+          },
+          {
+            required: ["association", "source", "target"]
+          }
+        ]
+      })
+    }))
 })
