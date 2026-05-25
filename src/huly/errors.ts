@@ -47,6 +47,17 @@ import {
   InvalidContentTypeError,
   InvalidFileDataError
 } from "./errors-files.js"
+import {
+  AssociationIdentifierAmbiguousError,
+  AssociationNotFoundError,
+  GenericObjectIdentifierAmbiguousError,
+  GenericObjectLocatorInvalidError,
+  GenericObjectNotFoundError,
+  RelationEndpointClassMismatchError,
+  RelationIdentifierAmbiguousError,
+  RelationMutationUnsupportedError,
+  RelationNotFoundError
+} from "./errors-generic-associations.js"
 import { TagCategoryNotFoundError, TagNotFoundError } from "./errors-labels.js"
 import { FunnelNotFoundError, LeadNotFoundError } from "./errors-leads.js"
 import {
@@ -92,6 +103,8 @@ import {
 
 export {
   ActivityMessageNotFoundError,
+  AssociationIdentifierAmbiguousError,
+  AssociationNotFoundError,
   AttachmentNotFoundError,
   BYTES_PER_MB,
   CalendarNotAccessibleError,
@@ -115,6 +128,9 @@ export {
   FileTooLargeError,
   FileUploadError,
   FunnelNotFoundError,
+  GenericObjectIdentifierAmbiguousError,
+  GenericObjectLocatorInvalidError,
+  GenericObjectNotFoundError,
   HulyAuthError,
   HulyConnectionError,
   HulyError,
@@ -145,6 +161,10 @@ export {
   ProjectNotFoundError,
   ReactionNotFoundError,
   RecurringEventNotFoundError,
+  RelationEndpointClassMismatchError,
+  RelationIdentifierAmbiguousError,
+  RelationMutationUnsupportedError,
+  RelationNotFoundError,
   SavedMessageNotFoundError,
   TagCategoryNotFoundError,
   TagNotFoundError,
@@ -230,6 +250,15 @@ export type HulyDomainError =
   | ProcessMasterTagNotFoundError
   | ProcessCardIdentifierAmbiguousError
   | ProcessCardNotFoundError
+  | AssociationNotFoundError
+  | AssociationIdentifierAmbiguousError
+  | RelationNotFoundError
+  | RelationIdentifierAmbiguousError
+  | RelationMutationUnsupportedError
+  | RelationEndpointClassMismatchError
+  | GenericObjectIdentifierAmbiguousError
+  | GenericObjectLocatorInvalidError
+  | GenericObjectNotFoundError
 
 /**
  * Schema for all Huly domain errors (for serialization).
@@ -301,7 +330,16 @@ export const HulyDomainError: Schema.Union<
     typeof ProcessMasterTagAmbiguousError,
     typeof ProcessMasterTagNotFoundError,
     typeof ProcessCardIdentifierAmbiguousError,
-    typeof ProcessCardNotFoundError
+    typeof ProcessCardNotFoundError,
+    typeof AssociationNotFoundError,
+    typeof AssociationIdentifierAmbiguousError,
+    typeof RelationNotFoundError,
+    typeof RelationIdentifierAmbiguousError,
+    typeof RelationMutationUnsupportedError,
+    typeof RelationEndpointClassMismatchError,
+    typeof GenericObjectIdentifierAmbiguousError,
+    typeof GenericObjectLocatorInvalidError,
+    typeof GenericObjectNotFoundError
   ]
 > = Schema.Union(
   HulyError,
@@ -369,5 +407,14 @@ export const HulyDomainError: Schema.Union<
   ProcessMasterTagAmbiguousError,
   ProcessMasterTagNotFoundError,
   ProcessCardIdentifierAmbiguousError,
-  ProcessCardNotFoundError
+  ProcessCardNotFoundError,
+  AssociationNotFoundError,
+  AssociationIdentifierAmbiguousError,
+  RelationNotFoundError,
+  RelationIdentifierAmbiguousError,
+  RelationMutationUnsupportedError,
+  RelationEndpointClassMismatchError,
+  GenericObjectIdentifierAmbiguousError,
+  GenericObjectLocatorInvalidError,
+  GenericObjectNotFoundError
 )

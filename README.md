@@ -203,7 +203,7 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
 ## Available Tools
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `leads`, `processes`, `tag-categories`, `task-management`, `test-management`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `leads`, `processes`, `tag-categories`, `task-management`, `test-management`
 
 ### Projects
 
@@ -383,6 +383,15 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | Tool | Description |
 |------|-------------|
 | `fulltext_search` | Perform a global fulltext search across all Huly content. Searches issues, documents, messages, and other indexed content. Returns matching items sorted by relevance (newest first). |
+
+### Associations
+
+| Tool | Description |
+|------|-------------|
+| `list_associations` | List Huly association definitions: class-level typed links that define which document classes may be related. Use this before create_relation to discover association IDs, source/target classes, and whether relation writes are supported. |
+| `list_relations` | List concrete Huly relation instances under an association, optionally filtered by source and target documents. Requires at least one filter to avoid broad workspace scans. |
+| `create_relation` | Idempotently create one concrete relation between two resolved documents. Only succeeds for associations where list_associations reports canCreateRelation=true; otherwise it fails clearly. This build currently reports no generic associations as writable until a write allowlist is live-validated. |
+| `delete_relation` | Idempotently delete one concrete relation by relation ID or by exact association/source/target triple. Only succeeds for associations where list_associations reports canDeleteRelation=true; otherwise it fails clearly. This build currently reports no generic associations as writable until a write allowlist is live-validated. |
 
 ### Activity
 

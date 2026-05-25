@@ -1,8 +1,11 @@
 import { describe, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
+import { RelationId } from "../../src/domain/schemas/shared.js"
 import {
   ActivityMessageNotFoundError,
+  AssociationIdentifierAmbiguousError,
+  AssociationNotFoundError,
   AttachmentNotFoundError,
   BYTES_PER_MB,
   CalendarNotAccessibleError,
@@ -21,6 +24,9 @@ import {
   FileTooLargeError,
   FileUploadError,
   FunnelNotFoundError,
+  GenericObjectIdentifierAmbiguousError,
+  GenericObjectLocatorInvalidError,
+  GenericObjectNotFoundError,
   HulyAuthError,
   HulyConnectionError,
   type HulyDomainError,
@@ -47,6 +53,10 @@ import {
   ProjectNotFoundError,
   ReactionNotFoundError,
   RecurringEventNotFoundError,
+  RelationEndpointClassMismatchError,
+  RelationIdentifierAmbiguousError,
+  RelationMutationUnsupportedError,
+  RelationNotFoundError,
   SavedMessageNotFoundError,
   TagCategoryNotFoundError,
   TagNotFoundError,
@@ -777,6 +787,24 @@ describe("Huly Errors", () => {
               return `process-card-ambiguous:${error.identifier}:${error.candidates.length}`
             case "ProcessCardNotFoundError":
               return `process-card:${error.identifier}`
+            case "AssociationNotFoundError":
+              return `association:${error.identifier}`
+            case "AssociationIdentifierAmbiguousError":
+              return `association-ambiguous:${error.identifier}:${error.candidates.length}`
+            case "RelationNotFoundError":
+              return `relation:${error.identifier}`
+            case "RelationIdentifierAmbiguousError":
+              return `relation-ambiguous:${error.identifier}:${error.relationIds.length}`
+            case "RelationMutationUnsupportedError":
+              return `relation-unsupported:${error.reason}`
+            case "RelationEndpointClassMismatchError":
+              return `relation-mismatch:${error.field}:${error.expectedClass}:${error.actualClass}`
+            case "GenericObjectIdentifierAmbiguousError":
+              return `generic-object-ambiguous:${error.field}:${error.candidates.length}`
+            case "GenericObjectLocatorInvalidError":
+              return `generic-object-invalid:${error.field}:${error.reason}`
+            case "GenericObjectNotFoundError":
+              return `generic-object-not-found:${error.field}:${error.identifier}:${error.class ?? ""}`
             case "CannotDirectMessageSelfError":
               return `dm-self:${error.identifier}`
             case "PersonNotAnEmployeeError":
@@ -861,6 +889,59 @@ describe("Huly Errors", () => {
             new LeadNotFoundError({ identifier: leadIdentifier("LEAD-1"), funnel: funnelIdentifier("funnel-1") })
           )
         ).toBe("lead:LEAD-1")
+        expect(matchError(new AssociationNotFoundError({ identifier: "blocks" }))).toBe("association:blocks")
+        expect(
+          matchError(
+            new AssociationIdentifierAmbiguousError({
+              identifier: "links",
+              candidates: [{ id: "assoc-1" }, { id: "assoc-2" }]
+            })
+          )
+        ).toBe("association-ambiguous:links:2")
+        expect(matchError(new RelationNotFoundError({ identifier: "rel-1" }))).toBe("relation:rel-1")
+        expect(
+          matchError(
+            new RelationIdentifierAmbiguousError({
+              identifier: "triple",
+              relationIds: [RelationId.make("rel-1"), RelationId.make("rel-2")]
+            })
+          )
+        ).toBe("relation-ambiguous:triple:2")
+        expect(
+          matchError(new RelationMutationUnsupportedError({ reason: "not validated" }))
+        ).toBe("relation-unsupported:not validated")
+        expect(
+          matchError(
+            new RelationEndpointClassMismatchError({
+              field: "source",
+              expectedClass: "tracker:class:Issue",
+              actualClass: "document:class:Document"
+            })
+          )
+        ).toBe("relation-mismatch:source:tracker:class:Issue:document:class:Document")
+        expect(
+          matchError(
+            new GenericObjectIdentifierAmbiguousError({
+              field: "source",
+              identifier: "Spec",
+              candidates: [{ id: "doc-1", class: "document:class:Document", display: "Spec" }]
+            })
+          )
+        ).toBe("generic-object-ambiguous:source:1")
+        expect(
+          matchError(
+            new GenericObjectLocatorInvalidError({ field: "source", reason: "raw object locator requires class" })
+          )
+        ).toBe("generic-object-invalid:source:raw object locator requires class")
+        expect(
+          matchError(
+            new GenericObjectNotFoundError({
+              field: "target",
+              identifier: "missing-doc",
+              class: "document:class:Document"
+            })
+          )
+        ).toBe("generic-object-not-found:target:missing-doc:document:class:Document")
         expect(matchError(new CannotDirectMessageSelfError({ identifier: "Self,User" }))).toBe("dm-self:Self,User")
         expect(matchError(new PersonNotAnEmployeeError({ identifier: "Ext,Contact" }))).toBe("not-employee:Ext,Contact")
       }))

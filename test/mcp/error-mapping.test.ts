@@ -3,8 +3,10 @@ import type { ParseResult } from "effect"
 import { Cause, Effect, Schema } from "effect"
 import { expect } from "vitest"
 import { ProcessId } from "../../src/domain/schemas/processes.js"
-import { CardId, MasterTagId, NonEmptyString } from "../../src/domain/schemas/shared.js"
+import { AssociationId, CardId, MasterTagId, NonEmptyString, RelationId } from "../../src/domain/schemas/shared.js"
 import {
+  AssociationIdentifierAmbiguousError,
+  AssociationNotFoundError,
   CalendarNotAccessibleError,
   DirectMessageIdentifierAmbiguousError,
   DirectMessageNotFoundError,
@@ -12,6 +14,9 @@ import {
   FileNotFoundError,
   FileUploadError,
   FunnelNotFoundError,
+  GenericObjectIdentifierAmbiguousError,
+  GenericObjectLocatorInvalidError,
+  GenericObjectNotFoundError,
   HulyAuthError,
   HulyConnectionError,
   HulyError,
@@ -30,7 +35,11 @@ import {
   ProcessMasterTagAmbiguousError,
   ProcessMasterTagNotFoundError,
   ProcessNotFoundError,
-  ProjectNotFoundError
+  ProjectNotFoundError,
+  RelationEndpointClassMismatchError,
+  RelationIdentifierAmbiguousError,
+  RelationMutationUnsupportedError,
+  RelationNotFoundError
 } from "../../src/huly/errors.js"
 import {
   createSuccessResponse,
@@ -268,6 +277,54 @@ describe("Error Mapping to MCP", () => {
               candidates: [cardCandidate]
             }),
             new ProcessCardNotFoundError({ identifier: "Missing Card" })
+          ]
+
+          for (const error of errors) {
+            const response = mapDomainErrorToMcp(error)
+
+            expect(response.isError).toBe(true)
+            expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+            expect(response._meta.errorTag).toBeUndefined()
+            expect(response.content[0].text).toBe(error.message)
+          }
+        }))
+
+      it.effect("maps generic association and relation lookup errors with descriptive messages", () =>
+        Effect.gen(function*() {
+          const errors = [
+            new AssociationNotFoundError({ identifier: "relates" }),
+            new AssociationIdentifierAmbiguousError({
+              identifier: "relates",
+              candidates: [{ id: "assoc-1", name: "relates" }]
+            }),
+            new RelationNotFoundError({ identifier: "rel-1" }),
+            new RelationIdentifierAmbiguousError({
+              identifier: "assoc-1/source/target",
+              relationIds: [RelationId.make("rel-1")]
+            }),
+            new RelationMutationUnsupportedError({
+              associationId: AssociationId.make("assoc-1"),
+              reason: "not validated"
+            }),
+            new RelationEndpointClassMismatchError({
+              field: "source",
+              expectedClass: "tracker:class:Issue",
+              actualClass: "document:class:Document"
+            }),
+            new GenericObjectIdentifierAmbiguousError({
+              field: "target",
+              identifier: "Spec",
+              candidates: [{ id: "doc-1", class: "document:class:Document", display: "Spec" }]
+            }),
+            new GenericObjectLocatorInvalidError({
+              field: "source",
+              reason: "raw object locator requires class"
+            }),
+            new GenericObjectNotFoundError({
+              field: "target",
+              identifier: "missing-doc",
+              class: "document:class:Document"
+            })
           ]
 
           for (const error of errors) {

@@ -1164,6 +1164,42 @@ run_test "fulltext_search" \
 echo ""
 
 ##############################
+# 13b. GENERIC ASSOCIATIONS
+##############################
+echo "=== 13b. Generic Associations ==="
+ASSOCIATIONS_TEXT=$(run_capture "list_associations" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_associations","arguments":{"limit":5}},"id":2}')
+ASSOC_ID=$(echo "$ASSOCIATIONS_TEXT" | jq -r '.associations[0].associationId // empty' 2>/dev/null)
+ASSOC_SOURCE_CLASS=$(echo "$ASSOCIATIONS_TEXT" | jq -r '.associations[0].sourceClass // empty' 2>/dev/null)
+ASSOC_TARGET_CLASS=$(echo "$ASSOCIATIONS_TEXT" | jq -r '.associations[0].targetClass // empty' 2>/dev/null)
+
+if [ -n "$ASSOC_ID" ]; then
+  assert_json_field_nonempty "list_associations has id" "$ASSOCIATIONS_TEXT" ".associations[0].associationId"
+  run_test "list_associations(filter:$ASSOC_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_associations\",\"arguments\":{\"association\":\"$ASSOC_ID\"}},\"id\":2}"
+  if [ -n "$ASSOC_SOURCE_CLASS" ] && [ -n "$ASSOC_TARGET_CLASS" ]; then
+    run_test "list_associations(class filters)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_associations\",\"arguments\":{\"sourceClass\":\"$ASSOC_SOURCE_CLASS\",\"targetClass\":\"$ASSOC_TARGET_CLASS\",\"limit\":5}},\"id\":2}"
+  fi
+  run_test "list_relations($ASSOC_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_relations\",\"arguments\":{\"association\":\"$ASSOC_ID\",\"limit\":3}},\"id\":2}"
+else
+  skip_test "list_associations has id" "no visible associations found in workspace"
+  skip_test "list_associations(filter)" "no visible associations found in workspace"
+  skip_test "list_relations" "no visible associations found in workspace"
+fi
+
+WRITABLE_ASSOCIATIONS_TEXT=$(run_capture "list_associations(writableOnly)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_associations","arguments":{"writableOnly":true,"limit":1}},"id":2}')
+WRITABLE_ASSOC_ID=$(echo "$WRITABLE_ASSOCIATIONS_TEXT" | jq -r '.associations[0].associationId // empty' 2>/dev/null)
+if [ -n "$WRITABLE_ASSOC_ID" ]; then
+  skip_test "create_relation/delete_relation" "writable association discovered but disposable endpoint fixture is not defined yet"
+else
+  skip_test "create_relation/delete_relation" "read-only slice: no validated writable generic association allowlist"
+fi
+echo ""
+
+##############################
 # 14. CARDS
 ##############################
 echo "=== 14. Cards ==="
