@@ -36,6 +36,8 @@ const hasBlockedByRelatedDocQuery = (query: unknown, id: string): boolean => {
     && recordValue(blockedBy, "_class") === tracker.class.Issue
 }
 
+const hasBlockedByDotQuery = (query: unknown, id: string): boolean => recordValue(query, "blockedBy._id") === id
+
 const hasBlockingIssueProjection = (options: unknown): boolean => {
   const projection = recordValue(options, "projection")
   return recordValue(projection, "_id") === 1
@@ -112,7 +114,6 @@ interface MockConfig {
     objectId: unknown
     operations: unknown
   }>
-  supportsBlockedByDotQuery?: boolean
 }
 
 const createTestLayerWithMocks = (config: MockConfig) => {
@@ -128,14 +129,6 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       const inValues = inQueryValues(recordValue(query, "_id"))
       if (inValues !== undefined) {
         const filtered = issues.filter(i => inValues.includes(i._id))
-        return Effect.succeed(toFindResult(filtered))
-      }
-      const blockedById = stringRecordValue(query, "blockedBy._id")
-      if (blockedById !== undefined) {
-        if (config.supportsBlockedByDotQuery === false) {
-          return Effect.succeed(toFindResult([]))
-        }
-        const filtered = issues.filter(i => i.blockedBy?.some(ref => ref._id === blockedById))
         return Effect.succeed(toFindResult(filtered))
       }
       const blockedByRelatedId = stringRecordValue(recordValue(query, "blockedBy"), "_id")
@@ -664,51 +657,8 @@ describe("listIssueRelations", () => {
       expect(result.blocks[0]._id).toBe("issue-4")
       expect(result.relations).toHaveLength(0)
       expect(result.documents).toHaveLength(0)
-      expect(
-        capturedFindAllQueries.some(({ query }) => stringRecordValue(query, "blockedBy._id") === "issue-1")
-      ).toBe(true)
-    }))
-
-  it.effect("falls back when the nested blockedBy query returns no matches", () =>
-    Effect.gen(function*() {
-      const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "TEST" })
-      const issue = makeIssue({
-        _id: "issue-1" as Ref<HulyIssue>,
-        space: "proj-1" as Ref<HulyProject>,
-        identifier: "TEST-1",
-        number: 1
-      })
-      const blocked = makeIssue({
-        _id: "issue-4" as Ref<HulyIssue>,
-        space: "proj-1" as Ref<HulyProject>,
-        identifier: "TEST-4",
-        number: 4,
-        blockedBy: [{ _id: "issue-1" as Ref<Doc>, _class: tracker.class.Issue }]
-      })
-      const otherBlocked = makeIssue({
-        _id: "issue-5" as Ref<HulyIssue>,
-        space: "proj-1" as Ref<HulyProject>,
-        identifier: "TEST-5",
-        number: 5,
-        blockedBy: [{ _id: "issue-2" as Ref<Doc>, _class: tracker.class.Issue }]
-      })
-      const capturedFindAllQueries: Array<{ _class: unknown; query: unknown; options: unknown }> = []
-      const testLayer = createTestLayerWithMocks({
-        projects: [project],
-        issues: [issue, blocked, otherBlocked],
-        capturedFindAllQueries,
-        supportsBlockedByDotQuery: false
-      })
-
-      const result = yield* listIssueRelations({
-        project: projectIdentifier("TEST"),
-        issueIdentifier: issueIdentifier("TEST-1")
-      }).pipe(Effect.provide(testLayer))
-
-      expect(result.blocks).toHaveLength(1)
-      expect(result.blocks[0].identifier).toBe("TEST-4")
-      expect(result.blocks[0]._id).toBe("issue-4")
       expect(capturedFindAllQueries.some(({ query }) => hasBlockedByRelatedDocQuery(query, "issue-1"))).toBe(true)
+      expect(capturedFindAllQueries.some(({ query }) => hasBlockedByDotQuery(query, "issue-1"))).toBe(false)
       expect(
         capturedFindAllQueries.some(({ options, query }) =>
           hasBlockedByRelatedDocQuery(query, "issue-1") && hasBlockingIssueProjection(options)

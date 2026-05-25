@@ -270,18 +270,15 @@ export const listIssueRelations = (
       _class: toObjectClassName(String(i._class))
     })
 
-    const directBlockingIssueCandidates = yield* client.findAll<HulyIssue>(
+    // Huly stores "source blocks target" on the target issue as a RelatedDocument
+    // in `blockedBy`. Live local-Huly verification for PR #48 showed that querying
+    // `{ "blockedBy._id": issue._id }` returns no rows, so the implementation uses
+    // the stored shape directly and keeps the exact-id filter below as a guard.
+    const blockingIssueCandidates = yield* client.findAll<HulyIssue>(
       tracker.class.Issue,
-      { "blockedBy._id": toRef<Doc>(issue._id) },
+      { blockedBy: makeRelatedDoc(issue) },
       blockingIssueFindOptions
     )
-    const blockingIssueCandidates = directBlockingIssueCandidates.length > 0
-      ? directBlockingIssueCandidates
-      : yield* client.findAll<HulyIssue>(
-        tracker.class.Issue,
-        { blockedBy: makeRelatedDoc(issue) },
-        blockingIssueFindOptions
-      )
     const blocks = blockingIssueCandidates
       .filter(candidate => candidate._id !== issue._id && hasRelationById(candidate.blockedBy, issue._id))
       .map(toIssueEntry)
