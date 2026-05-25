@@ -194,11 +194,13 @@ describe("Domain Schemas", () => {
     it.effect("parses minimal issue summary", () =>
       Effect.gen(function*() {
         const result = yield* parseIssueSummary({
+          issueId: "issue-123",
           identifier: "HULY-123",
           title: "Fix bug",
           status: "Open"
         })
         expect(result).toEqual({
+          issueId: "issue-123",
           identifier: "HULY-123",
           title: "Fix bug",
           status: "Open"
@@ -209,6 +211,7 @@ describe("Domain Schemas", () => {
     it.effect("parses with all optional fields", () =>
       Effect.gen(function*() {
         const result = yield* parseIssueSummary({
+          issueId: "issue-123",
           identifier: "HULY-123",
           title: "Fix bug",
           status: "Open",
@@ -227,6 +230,7 @@ describe("Domain Schemas", () => {
     it.effect("parses minimal issue", () =>
       Effect.gen(function*() {
         const result = yield* parseIssue({
+          issueId: "issue-123",
           identifier: "HULY-123",
           title: "Fix bug",
           status: "Open",
@@ -242,6 +246,7 @@ describe("Domain Schemas", () => {
     it.effect("parses full issue", () =>
       Effect.gen(function*() {
         const result = yield* parseIssue({
+          issueId: "issue-123",
           identifier: "HULY-123",
           title: "Fix bug",
           description: "# Description\n\nFix the bug",
@@ -275,6 +280,7 @@ describe("Domain Schemas", () => {
     it.effect("handles null dueDate", () =>
       Effect.gen(function*() {
         const result = yield* parseIssue({
+          issueId: "issue-123",
           identifier: "HULY-123",
           title: "Fix bug",
           status: "Open",

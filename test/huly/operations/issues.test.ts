@@ -486,8 +486,8 @@ describe("listIssues", () => {
         const project = makeProject({ identifier: "TEST" })
         // Input: older issue first (opposite of expected output order)
         const issues = [
-          makeIssue({ identifier: "TEST-2", title: "Issue 2", modifiedOn: 1000 }),
-          makeIssue({ identifier: "TEST-1", title: "Issue 1", modifiedOn: 2000 })
+          makeIssue({ _id: "issue-2" as Ref<HulyIssue>, identifier: "TEST-2", title: "Issue 2", modifiedOn: 1000 }),
+          makeIssue({ _id: "issue-1" as Ref<HulyIssue>, identifier: "TEST-1", title: "Issue 1", modifiedOn: 2000 })
         ]
         const statuses = [
           makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })
@@ -503,7 +503,9 @@ describe("listIssues", () => {
 
         expect(result).toHaveLength(2)
         // Expect sorted by modifiedOn descending (newer first)
+        expect(result[0].issueId).toBe("issue-1")
         expect(result[0].identifier).toBe("TEST-1")
+        expect(result[1].issueId).toBe("issue-2")
         expect(result[1].identifier).toBe("TEST-2")
       }))
 
@@ -837,6 +839,7 @@ describe("getIssue", () => {
           .pipe(Effect.provide(testLayer))
 
         expect(result.identifier).toBe("TEST-1")
+        expect(result.issueId).toBe("issue-1")
         expect(result.title).toBe("Test Issue")
         expect(result.status).toBe("Open")
         expect(result.project).toBe("TEST")

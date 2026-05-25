@@ -1,12 +1,12 @@
 import { JSONSchema, ParseResult, Schema } from "effect"
 
 import { normalizeForComparison } from "../../utils/normalize.js"
-import type { IssueId } from "./shared.js"
 import {
   ColorCode,
   ComponentIdentifier,
   Email,
   enumValuesDescription,
+  IssueId,
   IssueIdentifier,
   LimitParam,
   NonEmptyString,
@@ -72,7 +72,12 @@ export const PersonRefSchema = Schema.Struct({
 
 export type PersonRef = Schema.Schema.Type<typeof PersonRefSchema>
 
+const IssueIdOutputSchema = IssueId.annotations({
+  description: "Raw Huly issue _id. Use this as a raw object locator id for relation and activity tools."
+})
+
 export const IssueSummarySchema = Schema.Struct({
+  issueId: IssueIdOutputSchema,
   identifier: IssueIdentifier,
   // String, not NonEmptyString: Huly allows storing issues with empty titles
   title: Schema.String,
@@ -90,6 +95,7 @@ export const IssueSummarySchema = Schema.Struct({
 export type IssueSummary = Schema.Schema.Type<typeof IssueSummarySchema>
 
 export const IssueSchema = Schema.Struct({
+  issueId: IssueIdOutputSchema,
   identifier: IssueIdentifier,
   // String, not NonEmptyString: Huly allows storing issues with empty titles
   title: Schema.String,

@@ -10,6 +10,7 @@ import { Effect, Schema } from "effect"
 
 import type { GetIssueParams, Issue, IssueSummary, ListIssuesParams } from "../../domain/schemas.js"
 import { IssueSummarySchema, parseIssue } from "../../domain/schemas/issues.js"
+import { IssueId } from "../../domain/schemas/shared.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { ComponentNotFoundError, InvalidStatusError, ProjectNotFoundError } from "../errors.js"
@@ -185,6 +186,7 @@ export const listIssues = (
         : undefined
 
       return {
+        issueId: IssueId.make(issue._id),
         identifier: issue.identifier,
         title: issue.title,
         status: statusName,
@@ -261,6 +263,7 @@ export const getIssue = (
       : undefined
 
     return yield* parseIssue({
+      issueId: IssueId.make(issue._id),
       identifier: issue.identifier,
       title: issue.title,
       description,
