@@ -24,6 +24,7 @@ import type { HulyClient, HulyClientError } from "../client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { documentPlugin, tracker } from "../huly-plugins.js"
 import { findIssueInProject, findProject, findProjectAndIssue, parseIssueIdentifier } from "./issues-shared.js"
+import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
 type RelationError =
@@ -251,7 +252,7 @@ export const listIssueRelations = (
       const toIssueRef = toRef<HulyIssue>
       const issues = yield* client.findAll<HulyIssue>(
         tracker.class.Issue,
-        { _id: { $in: allIssueIds.map(toIssueRef) } }
+        hulyQuery<HulyIssue>({ _id: { $in: allIssueIds.map(toIssueRef) } })
       )
       for (const i of issues) {
         idToIdentifier.set(String(i._id), i.identifier)
@@ -276,7 +277,7 @@ export const listIssueRelations = (
     // the stored shape directly and keeps the exact-id filter below as a guard.
     const blockingIssueCandidates = yield* client.findAll<HulyIssue>(
       tracker.class.Issue,
-      { blockedBy: makeRelatedDoc(issue) },
+      hulyQuery<HulyIssue>({ blockedBy: makeRelatedDoc(issue) }),
       blockingIssueFindOptions
     )
     const blocks = blockingIssueCandidates
@@ -289,7 +290,7 @@ export const listIssueRelations = (
       const toDocRef = toRef<HulyDocument>
       const docs = yield* client.findAll<HulyDocument>(
         documentPlugin.class.Document,
-        { _id: { $in: docRelationsRefs.map(r => toDocRef(r._id)) } }
+        hulyQuery<HulyDocument>({ _id: { $in: docRelationsRefs.map(r => toDocRef(r._id)) } })
       )
       const docMap = new Map(docs.map(d => [String(d._id), d]))
 
@@ -299,7 +300,7 @@ export const listIssueRelations = (
       if (spaceIds.length > 0) {
         const teamspaces = yield* client.findAll<HulyTeamspace>(
           documentPlugin.class.Teamspace,
-          { _id: { $in: spaceIds.map(toRef<HulyTeamspace>) } }
+          hulyQuery<HulyTeamspace>({ _id: { $in: spaceIds.map(toRef<HulyTeamspace>) } })
         )
         for (const ts of teamspaces) {
           tsNameMap.set(String(ts._id), ts.name)

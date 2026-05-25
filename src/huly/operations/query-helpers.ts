@@ -4,6 +4,16 @@ import { Effect } from "effect"
 import { MAX_LIMIT } from "../../domain/schemas/shared.js"
 import type { HulyClientError, HulyClientOperations } from "../client.js"
 
+type StrictDocumentQuery<T extends Doc> =
+  & {
+    [P in keyof T]?: DocumentQuery<T>[P]
+  }
+  & {
+    $search?: string
+  }
+
+export const hulyQuery = <T extends Doc>(query: StrictDocumentQuery<T>): DocumentQuery<T> => query
+
 /**
  * Escape SQL LIKE wildcard characters in a string.
  * Prevents user input from being interpreted as wildcards.
