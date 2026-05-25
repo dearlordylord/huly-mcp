@@ -1,5 +1,23 @@
 # @firfi/huly-mcp
 
+## 0.14.0
+
+### Minor Changes
+
+- 6f80f93: Add read-only Huly Process workflow definition and execution tools.
+
+  The Process plugin classes are available on current Huly servers but are not published
+  in this repository's pinned SDK type set yet, so the MCP tools use a small local type
+  shim and the existing generic client read APIs until upstream types are available.
+
+- cdcb544: Add `taskType` support to `create_issue` and `update_issue`.
+
+### Patch Changes
+
+- ea3498c: Fix `list_issue_relations` so the `blocks` result queries Huly by the stored `blockedBy` related-document shape.
+- c5ee2b6: Add a strict Huly query helper for relation lookups so accidental dot-key query fields fail typechecking.
+- 39b2910: Apply the strict Huly query helper convention across high-risk issue, document, label, relation, and task-management lookups.
+
 ## 0.13.0
 
 ### Minor Changes
