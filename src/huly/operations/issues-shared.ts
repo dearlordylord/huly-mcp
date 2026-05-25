@@ -1,4 +1,4 @@
-import type { DocumentQuery, Ref, Status, WithLookup } from "@hcengineering/core"
+import type { Ref, Status, WithLookup } from "@hcengineering/core"
 import type { ProjectType } from "@hcengineering/task"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
 import { IssuePriority } from "@hcengineering/tracker"
@@ -11,7 +11,7 @@ import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { InvalidStatusError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { core, task, tracker } from "../huly-plugins.js"
-import { findOneOrFail } from "./query-helpers.js"
+import { findOneOrFail, hulyQuery } from "./query-helpers.js"
 
 // Huly API uses 0 as sentinel for "not set" on numeric fields like estimation and remainingTime.
 // Confirmed: creating an issue without estimation stores 0, not null/undefined.
@@ -36,7 +36,7 @@ export const findProject = (
     const project = yield* findOneOrFail(
       client,
       tracker.class.Project,
-      { identifier: projectIdentifier } satisfies DocumentQuery<HulyProject>,
+      { identifier: projectIdentifier },
       () => new ProjectNotFoundError({ identifier: projectIdentifier })
     )
 
@@ -76,7 +76,7 @@ export const findProjectWithStatuses = (
     const project = yield* findOneOrFail<ProjectWithType, ProjectNotFoundError>(
       client,
       tracker.class.Project,
-      { identifier: projectIdentifier } satisfies DocumentQuery<ProjectWithType>,
+      { identifier: projectIdentifier },
       () => new ProjectNotFoundError({ identifier: projectIdentifier }),
       { lookup: { type: task.class.ProjectType } }
     )
@@ -96,7 +96,7 @@ export const findProjectWithStatuses = (
         const statusDocsResult = yield* Effect.either(
           client.findAll<Status>(
             core.class.Status,
-            { _id: { $in: statusRefs } }
+            hulyQuery<Status>({ _id: { $in: statusRefs } })
           )
         )
 
@@ -188,17 +188,17 @@ export const findIssueInProject = (
 
     const issue = (yield* client.findOne<HulyIssue>(
       tracker.class.Issue,
-      {
+      hulyQuery<HulyIssue>({
         space: project._id,
         identifier: fullIdentifier
-      }
+      })
     )) ?? (number !== null
       ? yield* client.findOne<HulyIssue>(
         tracker.class.Issue,
-        {
+        hulyQuery<HulyIssue>({
           space: project._id,
           number
-        }
+        })
       )
       : undefined)
     if (issue === undefined) {

@@ -4,7 +4,7 @@
  * @module
  */
 import type { Person } from "@hcengineering/contact"
-import { type DocumentQuery, type Ref, SortingOrder, type Status, type WithLookup } from "@hcengineering/core"
+import { type Ref, SortingOrder, type Status, type WithLookup } from "@hcengineering/core"
 import { type Issue as HulyIssue } from "@hcengineering/tracker"
 import { Effect, Schema } from "effect"
 
@@ -25,7 +25,7 @@ import {
   resolveStatusByName,
   type StatusInfo
 } from "./issues-shared.js"
-import { clampLimit, escapeLikeWildcards, withLookup } from "./query-helpers.js"
+import { clampLimit, escapeLikeWildcards, hulyQuery, type StrictDocumentQuery, withLookup } from "./query-helpers.js"
 
 type ListIssuesError =
   | HulyClientError
@@ -40,6 +40,10 @@ type GetIssueError =
   | HulyConnectionError
   | ProjectNotFoundError
   | IssueNotFoundError
+
+type IssueWithLookup = WithLookup<HulyIssue> & {
+  $lookup?: { assignee?: Person }
+}
 
 const resolveStatusName = (
   statuses: Array<StatusInfo>,
@@ -59,7 +63,7 @@ export const listIssues = (
   Effect.gen(function*() {
     const { client, project, statuses } = yield* findProjectWithStatuses(params.project)
 
-    const query: DocumentQuery<HulyIssue> = {
+    const query: StrictDocumentQuery<IssueWithLookup> = {
       space: project._id
     }
 
@@ -159,13 +163,9 @@ export const listIssues = (
 
     const limit = clampLimit(params.limit)
 
-    type IssueWithLookup = WithLookup<HulyIssue> & {
-      $lookup?: { assignee?: Person }
-    }
-
     const issues = yield* client.findAll<IssueWithLookup>(
       tracker.class.Issue,
-      query,
+      hulyQuery(query),
       withLookup<IssueWithLookup>(
         {
           limit,
@@ -229,11 +229,11 @@ export const getIssue = (
 
     const issue = (yield* client.findOne<HulyIssue>(
       tracker.class.Issue,
-      { space: project._id, identifier: fullIdentifier }
+      hulyQuery<HulyIssue>({ space: project._id, identifier: fullIdentifier })
     )) ?? (number !== null
       ? yield* client.findOne<HulyIssue>(
         tracker.class.Issue,
-        { space: project._id, number }
+        hulyQuery<HulyIssue>({ space: project._id, number })
       )
       : undefined)
     if (issue === undefined) {
@@ -243,7 +243,7 @@ export const getIssue = (
     const statusName = resolveStatusName(statuses, issue.status)
 
     const person = issue.assignee !== null
-      ? yield* client.findOne<Person>(contact.class.Person, { _id: issue.assignee })
+      ? yield* client.findOne<Person>(contact.class.Person, hulyQuery<Person>({ _id: issue.assignee }))
       : undefined
 
     const description = issue.description

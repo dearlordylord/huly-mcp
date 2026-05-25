@@ -39,6 +39,7 @@ import {
   type StatusInfo,
   stringToPriority
 } from "./issues-shared.js"
+import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
 type CreateIssueError =
@@ -140,7 +141,7 @@ const resolveTaskTypeWorkflow = (
 ): Effect.Effect<TaskTypeWorkflow, HulyClientError | HulyError> =>
   Effect.gen(function*() {
     const workflowProjectType = projectType
-      ?? (yield* client.findOne<ProjectType>(task.class.ProjectType, { _id: project.type }))
+      ?? (yield* client.findOne<ProjectType>(task.class.ProjectType, hulyQuery<ProjectType>({ _id: project.type })))
     if (workflowProjectType === undefined) {
       return yield* Effect.fail(
         new HulyError({
@@ -152,11 +153,11 @@ const resolveTaskTypeWorkflow = (
 
     const taskTypesByProjectTypeList = yield* client.findAll<TaskType>(
       task.class.TaskType,
-      { _id: { $in: [...workflowProjectType.tasks] } }
+      hulyQuery<TaskType>({ _id: { $in: [...workflowProjectType.tasks] } })
     )
     const taskTypesByParent = yield* client.findAll<TaskType>(
       task.class.TaskType,
-      { parent: workflowProjectType._id }
+      hulyQuery<TaskType>({ parent: workflowProjectType._id })
     )
     const taskTypes = mergeTaskTypes([...taskTypesByProjectTypeList], [...taskTypesByParent])
     const matches = [...taskTypes].filter((candidate) => taskTypeMatches(candidate, taskTypeRef))
@@ -309,7 +310,7 @@ export const createIssue = (
 
     const lastIssue = yield* client.findOne<HulyIssue>(
       tracker.class.Issue,
-      { space: project._id },
+      hulyQuery<HulyIssue>({ space: project._id }),
       { sort: { rank: SortingOrder.Descending } }
     )
     const rank = makeRank(lastIssue?.rank, undefined)

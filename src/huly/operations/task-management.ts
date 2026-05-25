@@ -37,6 +37,7 @@ import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError, type HulyClientOperations } from "../client.js"
 import { HulyConnectionError, HulyError } from "../errors.js"
 import { core, task, tracker } from "../huly-plugins.js"
+import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
 type TaskManagementError = HulyClientError | HulyConnectionError | HulyError
@@ -104,7 +105,7 @@ const getStatusDocs = (
 ): Effect.Effect<ReadonlyArray<Status>, HulyClientError> =>
   statusIds.length === 0
     ? Effect.succeed([])
-    : client.findAll<Status>(core.class.Status, { _id: { $in: [...statusIds] } }).pipe(
+    : client.findAll<Status>(core.class.Status, hulyQuery<Status>({ _id: { $in: [...statusIds] } })).pipe(
       Effect.map((result) => [...result])
     )
 
@@ -114,7 +115,7 @@ const getTaskTypes = (
 ): Effect.Effect<ReadonlyArray<TaskType>, HulyClientError> =>
   taskTypeIds.length === 0
     ? Effect.succeed([])
-    : client.findAll<TaskType>(task.class.TaskType, { _id: { $in: [...taskTypeIds] } }).pipe(
+    : client.findAll<TaskType>(task.class.TaskType, hulyQuery<TaskType>({ _id: { $in: [...taskTypeIds] } })).pipe(
       Effect.map((result) => [...result])
     )
 
@@ -122,7 +123,7 @@ const getTaskTypesByProjectType = (
   client: HulyClientOperations,
   projectTypeId: Ref<ProjectType>
 ): Effect.Effect<ReadonlyArray<TaskType>, HulyClientError> =>
-  client.findAll<TaskType>(task.class.TaskType, { parent: projectTypeId }).pipe(
+  client.findAll<TaskType>(task.class.TaskType, hulyQuery<TaskType>({ parent: projectTypeId })).pipe(
     Effect.map((result) => [...result])
   )
 
@@ -130,7 +131,7 @@ const getRecoverableStatusesByName = (
   client: HulyClientOperations,
   name: string
 ): Effect.Effect<ReadonlyArray<Status>, never> =>
-  client.findAll<Status>(core.class.Status, { ofAttribute: tracker.attribute.IssueStatus }).pipe(
+  client.findAll<Status>(core.class.Status, hulyQuery<Status>({ ofAttribute: tracker.attribute.IssueStatus })).pipe(
     Effect.map((result) =>
       [...result].filter((status) => normalizeForComparison(status.name) === normalizeForComparison(name))
     ),
@@ -204,7 +205,7 @@ const listAllProjectTypes = (
 ): Effect.Effect<ReadonlyArray<ProjectType>, HulyClientError> =>
   client.findAll<ProjectType>(
     task.class.ProjectType,
-    {},
+    hulyQuery<ProjectType>({}),
     { sort: { name: SortingOrder.Ascending } }
   ).pipe(Effect.map((result) => [...result]))
 
