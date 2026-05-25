@@ -51,6 +51,7 @@ const categoryOrder = [
   "calendar",
   "time tracking",
   "search",
+  "associations",
   "activity",
   "notifications",
   "workspace"

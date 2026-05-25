@@ -12,6 +12,7 @@ import { contactTools } from "./contacts.js"
 import { customFieldTools } from "./custom-fields.js"
 import { deletionTools } from "./deletion.js"
 import { documentTools } from "./documents.js"
+import { genericAssociationTools } from "./generic-associations.js"
 import { issueTools } from "./issues.js"
 import { labelTools } from "./labels.js"
 import { leadTools } from "./leads.js"
@@ -39,6 +40,7 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...deletionTools,
   ...milestoneTools,
   ...documentTools,
+  ...genericAssociationTools,
   ...storageTools,
   ...attachmentTools,
   ...contactTools,

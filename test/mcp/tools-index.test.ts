@@ -42,6 +42,7 @@ describe("CATEGORY_NAMES", () => {
       expect(CATEGORY_NAMES.has("documents")).toBe(true)
       expect(CATEGORY_NAMES.has("comments")).toBe(true)
       expect(CATEGORY_NAMES.has("task-management")).toBe(true)
+      expect(CATEGORY_NAMES.has("associations")).toBe(true)
       expect(CATEGORY_NAMES.size).toBeGreaterThan(5)
     }))
 })
@@ -110,6 +111,22 @@ describe("createFilteredRegistry", () => {
         expect(tool.category).toBe("task-management")
       }
     }))
+
+  it.effect("filters to association tools", () =>
+    Effect.gen(function*() {
+      const filtered = createFilteredRegistry(new Set(["associations"]))
+      const toolNames = filtered.definitions.map((tool) => tool.name)
+
+      expect(toolNames).toEqual([
+        "list_associations",
+        "list_relations",
+        "create_relation",
+        "delete_relation"
+      ])
+      for (const tool of filtered.definitions) {
+        expect(tool.category).toBe("associations")
+      }
+    }))
 })
 
 describe("handleToolCall", () => {
@@ -135,6 +152,7 @@ describe("TOOL_DEFINITIONS", () => {
       expect(keys.length).toBeGreaterThan(0)
       expect(keys.length).toBe(toolRegistry.tools.size)
       expect(keys).toContain("create_issue_status")
+      expect(keys).toContain("list_associations")
     }))
 
   it.effect("entries match toolRegistry", () =>

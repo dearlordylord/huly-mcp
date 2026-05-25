@@ -120,7 +120,16 @@ const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDo
   "ProcessMasterTagAmbiguousError",
   "ProcessMasterTagNotFoundError",
   "ProcessCardIdentifierAmbiguousError",
-  "ProcessCardNotFoundError"
+  "ProcessCardNotFoundError",
+  "AssociationNotFoundError",
+  "AssociationIdentifierAmbiguousError",
+  "RelationNotFoundError",
+  "RelationIdentifierAmbiguousError",
+  "RelationMutationUnsupportedError",
+  "RelationEndpointClassMismatchError",
+  "GenericObjectIdentifierAmbiguousError",
+  "GenericObjectLocatorInvalidError",
+  "GenericObjectNotFoundError"
 ])
 
 const INTERNAL_ERROR_PREFIX: Partial<Record<HulyDomainError["_tag"], string>> = {

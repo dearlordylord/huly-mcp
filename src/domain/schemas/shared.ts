@@ -37,6 +37,12 @@ export type OrganizationId = Schema.Schema.Type<typeof OrganizationId>
 export const IssueId = HulyRef("IssueId")
 export type IssueId = Schema.Schema.Type<typeof IssueId>
 
+export const AssociationId = HulyRef("AssociationId")
+export type AssociationId = Schema.Schema.Type<typeof AssociationId>
+
+export const RelationId = HulyRef("RelationId")
+export type RelationId = Schema.Schema.Type<typeof RelationId>
+
 export const ComponentId = HulyRef("ComponentId")
 export type ComponentId = Schema.Schema.Type<typeof ComponentId>
 

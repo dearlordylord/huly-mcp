@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- barrel re-export index; no logic, only re-exports from domain modules */
 export {
+  AssociationId,
   emptyParamsJsonSchema,
   EmptyParamsSchema,
   IssueId,
@@ -15,10 +16,53 @@ export {
   PositiveNumber,
   ProjectTypeId,
   ReactionId,
+  RelationId,
   SavedMessageId,
   TaskTypeId,
   Timestamp
 } from "./shared.js"
+
+export {
+  AssociationIdentifier,
+  type AssociationSummary,
+  AssociationSummarySchema,
+  CardinalitySchema,
+  type CreateRelationParams,
+  createRelationParamsJsonSchema,
+  CreateRelationParamsSchema,
+  type CreateRelationResult,
+  CreateRelationResultSchema,
+  type DeleteRelationParams,
+  deleteRelationParamsJsonSchema,
+  DeleteRelationParamsSchema,
+  type DeleteRelationResult,
+  DeleteRelationResultSchema,
+  type GenericObjectLocator,
+  GenericObjectLocatorSchema,
+  type ListAssociationsParams,
+  listAssociationsParamsJsonSchema,
+  ListAssociationsParamsSchema,
+  type ListAssociationsResult,
+  ListAssociationsResultSchema,
+  type ListRelationsParams,
+  listRelationsParamsJsonSchema,
+  ListRelationsParamsSchema,
+  type ListRelationsResult,
+  ListRelationsResultSchema,
+  parseCreateRelationParams,
+  parseDeleteRelationParams,
+  parseListAssociationsParams,
+  parseListRelationsParams,
+  type RelationDirection,
+  RelationDirectionSchema,
+  RelationIdentifier,
+  type RelationIfExists,
+  RelationIfExistsSchema,
+  type RelationSummary,
+  RelationSummarySchema,
+  type ResolvedObjectSummary,
+  ResolvedObjectSummarySchema
+} from "./generic-associations.js"
 
 export {
   type CreateProjectParams,
