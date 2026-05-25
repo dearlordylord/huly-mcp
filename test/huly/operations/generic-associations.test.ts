@@ -673,6 +673,54 @@ describe("listRelations", () => {
       expect(result.relations[0].associationId).toBe("assoc-1")
     }))
 
+  it.effect("warns when omitted-association discovery reaches the association cap", () =>
+    Effect.gen(function*() {
+      const cappedAssociations = Array.from({ length: MAX_LIMIT }, (_, index) =>
+        association({
+          _id: `assoc-${index}` as Ref<HulyAssociation>,
+          modifiedOn: MAX_LIMIT - index
+        }))
+      const rel = relation({ association: "assoc-0" as Ref<HulyAssociation> })
+
+      const result = yield* listRelations({
+        source: { kind: "raw", id: docId("issue-1"), class: issueClass }
+      }).pipe(
+        Effect.provide(testLayer({
+          associations: cappedAssociations,
+          relations: [rel],
+          issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+        }))
+      )
+
+      expect(result.total).toBe(1)
+      expect(result.warnings).toHaveLength(1)
+      expect(result.warnings?.[0]).toContain(`${MAX_LIMIT}-association cap`)
+    }))
+
+  it.effect("does not warn when an explicit association is provided", () =>
+    Effect.gen(function*() {
+      const cappedAssociations = Array.from({ length: MAX_LIMIT }, (_, index) =>
+        association({
+          _id: `assoc-${index}` as Ref<HulyAssociation>,
+          modifiedOn: MAX_LIMIT - index
+        }))
+      const rel = relation({})
+
+      const result = yield* listRelations({
+        association: assocId,
+        source: { kind: "raw", id: docId("issue-1"), class: issueClass }
+      }).pipe(
+        Effect.provide(testLayer({
+          associations: cappedAssociations,
+          relations: [rel],
+          issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+        }))
+      )
+
+      expect(result.total).toBe(1)
+      expect(result.warnings).toBeUndefined()
+    }))
+
   it.effect("chunks endpoint hydration by class instead of hydrating per relation", () =>
     Effect.gen(function*() {
       const findAllRequests: Array<Parameters<FindAllObserver>[0]> = []

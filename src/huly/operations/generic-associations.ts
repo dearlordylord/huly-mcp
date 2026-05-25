@@ -16,11 +16,12 @@ import type {
   ListAssociationsResult,
   ListRelationsParams,
   ListRelationsResult,
+  ListRelationsWarning as ListRelationsWarningType,
   RelationDirection,
   RelationSummary,
   ResolvedObjectSummary
 } from "../../domain/schemas/generic-associations.js"
-import { DefaultRelationDirection } from "../../domain/schemas/generic-associations.js"
+import { DefaultRelationDirection, ListRelationsWarning } from "../../domain/schemas/generic-associations.js"
 import {
   AssociationId,
   DocId,
@@ -87,9 +88,19 @@ type RelationAssociationPair = {
   readonly association: HulyAssociation
 }
 
+type AssociationDiscoveryResult = {
+  readonly associations: Array<HulyAssociation>
+  readonly limitReached: boolean
+}
+
+type ListRelationsWarnings = readonly [ListRelationsWarningType, ...Array<ListRelationsWarningType>]
+
 const WRITE_UNSUPPORTED_REASON = "no generic association relation write path has been live-validated for this workspace"
 // Broad association scans use this local guardrail, not an SDK page size. Keep it at the public max result cap.
 const ASSOCIATION_DISCOVERY_LIMIT = 200
+const ASSOCIATION_DISCOVERY_LIMIT_WARNING: ListRelationsWarningType = ListRelationsWarning.make(
+  `Association discovery reached the local ${ASSOCIATION_DISCOVERY_LIMIT}-association cap for at least one endpoint orientation. Huly did not indicate whether more matching associations exist, so list_relations may omit older matching associations; pass a specific association from list_associations to avoid this discovery cap.`
+)
 const ASSOCIATION_LOOKUP_AMBIGUITY_LIMIT = 2
 
 const MUTATION_ASSOCIATION_FILTERS: AssociationFilters = {
@@ -697,18 +708,28 @@ const findVisibleAssociationsForEndpoints = (
   source: ResolvedObjectSummary | undefined,
   target: ResolvedObjectSummary | undefined,
   direction: RelationDirection
-): Effect.Effect<Array<HulyAssociation>, HulyClientError> =>
+): Effect.Effect<AssociationDiscoveryResult, HulyClientError> =>
   Effect.gen(function*() {
+    const discoveryResults = yield* Effect.forEach(
+      associationEndpointQueries(source, target, direction),
+      (query): Effect.Effect<AssociationDiscoveryResult, HulyClientError> =>
+        Effect.gen(function*() {
+          const associations = yield* client.findAll<HulyAssociation>(
+            core.class.Association,
+            hulyQuery(query),
+            {
+              limit: ASSOCIATION_DISCOVERY_LIMIT,
+              sort: { modifiedOn: SortingOrder.Descending }
+            }
+          )
+          return {
+            associations,
+            limitReached: associations.length >= ASSOCIATION_DISCOVERY_LIMIT
+          }
+        })
+    )
     const byId = new Map<Ref<HulyAssociation>, HulyAssociation>()
-    for (const query of associationEndpointQueries(source, target, direction)) {
-      const associations = yield* client.findAll<HulyAssociation>(
-        core.class.Association,
-        hulyQuery(query),
-        {
-          limit: ASSOCIATION_DISCOVERY_LIMIT,
-          sort: { modifiedOn: SortingOrder.Descending }
-        }
-      )
+    for (const { associations } of discoveryResults) {
       for (const association of associations) {
         if (
           associationMatchesFilters(association, VISIBLE_ASSOCIATION_FILTERS)
@@ -718,7 +739,10 @@ const findVisibleAssociationsForEndpoints = (
         }
       }
     }
-    return [...byId.values()]
+    return {
+      associations: [...byId.values()],
+      limitReached: discoveryResults.some((result) => result.limitReached)
+    }
   })
 
 const findRelationsForAssociation = (
@@ -836,9 +860,12 @@ const listRelationsWithoutAssociation = (
   target: ResolvedObjectSummary | undefined,
   direction: RelationDirection,
   limit: number
-): Effect.Effect<Array<RelationSummary>, HulyClientError> =>
+): Effect.Effect<
+  { readonly summaries: Array<RelationSummary>; readonly warnings?: ListRelationsWarnings },
+  HulyClientError
+> =>
   Effect.gen(function*() {
-    const associations = yield* findVisibleAssociationsForEndpoints(client, source, target, direction)
+    const { associations, limitReached } = yield* findVisibleAssociationsForEndpoints(client, source, target, direction)
     const associationsById = new Map(associations.map((association) => [association._id, association]))
     const relations = yield* findRelationsForAssociationIdsAndEndpoints(
       client,
@@ -856,7 +883,8 @@ const listRelationsWithoutAssociation = (
       return [{ relation, association }]
     })
 
-    return yield* relationsToSummaries(client, pairs.slice(0, limit))
+    const summaries = yield* relationsToSummaries(client, pairs.slice(0, limit))
+    return limitReached ? { summaries, warnings: [ASSOCIATION_DISCOVERY_LIMIT_WARNING] } : { summaries }
   })
 
 export const listRelations = (
@@ -874,11 +902,12 @@ export const listRelations = (
       const target = params.target === undefined
         ? undefined
         : yield* resolveGenericObject(client, params.target, undefined, "target")
-      const summaries = yield* listRelationsWithoutAssociation(client, source, target, direction, limit)
+      const { summaries, warnings } = yield* listRelationsWithoutAssociation(client, source, target, direction, limit)
 
       return {
         relations: summaries,
-        total: summaries.length
+        total: summaries.length,
+        ...(warnings !== undefined ? { warnings } : {})
       }
     }
 

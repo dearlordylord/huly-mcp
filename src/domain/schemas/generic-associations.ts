@@ -21,6 +21,9 @@ export type AssociationIdentifier = Schema.Schema.Type<typeof AssociationIdentif
 export const RelationIdentifier = NonEmptyString.pipe(Schema.brand("RelationIdentifier"))
 export type RelationIdentifier = Schema.Schema.Type<typeof RelationIdentifier>
 
+export const ListRelationsWarning = NonEmptyString.pipe(Schema.brand("ListRelationsWarning"))
+export type ListRelationsWarning = Schema.Schema.Type<typeof ListRelationsWarning>
+
 const CardinalityValues = [
   "one-to-one",
   "one-to-many",
@@ -187,7 +190,13 @@ export type ListRelationsParams = Schema.Schema.Type<typeof ListRelationsParamsS
 
 export const ListRelationsResultSchema = Schema.Struct({
   relations: Schema.Array(RelationSummarySchema),
-  total: Schema.Number
+  total: Schema.Number,
+  warnings: Schema.optional(
+    Schema.NonEmptyArray(ListRelationsWarning).annotations({
+      description:
+        "Non-fatal warnings about result completeness or resolution. Treat these as guidance for narrowing a follow-up call."
+    })
+  )
 })
 export type ListRelationsResult = Schema.Schema.Type<typeof ListRelationsResultSchema>
 
