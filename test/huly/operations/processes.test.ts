@@ -1,15 +1,26 @@
 import { describe, it } from "@effect/vitest"
 import type { Card, MasterTag } from "@hcengineering/card"
-import type { Class, Doc, DocumentQuery, PersonId, Ref } from "@hcengineering/core"
+import type { Class, Doc, DocumentQuery, PersonId, Ref, Space } from "@hcengineering/core"
 import { toFindResult } from "@hcengineering/core"
 import type { IntlString } from "@hcengineering/platform"
 import { Effect } from "effect"
 import { expect } from "vitest"
 
-import { ProcessCardIdentifier, ProcessIdentifier, ProcessMasterTagIdentifier } from "../../../src/domain/schemas.js"
+import {
+  ProcessCardIdentifier,
+  ProcessExecutionId,
+  ProcessIdentifier,
+  ProcessMasterTagIdentifier
+} from "../../../src/domain/schemas.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { cardPlugin, core } from "../../../src/huly/huly-plugins.js"
-import { getProcess, listExecutions, listProcesses } from "../../../src/huly/operations/processes.js"
+import {
+  cancelExecution,
+  getProcess,
+  listExecutions,
+  listProcesses,
+  startProcess
+} from "../../../src/huly/operations/processes.js"
 import {
   type HulyProcessDefinition,
   type HulyProcessExecution,
@@ -36,6 +47,20 @@ const asExecution = (value: unknown): HulyProcessExecution => value as HulyProce
 const asCard = (value: unknown): Card => value as Card
 const asMasterTag = (value: unknown): MasterTag => value as MasterTag
 const asIntlString = (value: string): IntlString => value as IntlString
+
+interface CreateDocCall {
+  readonly class: unknown
+  readonly space: Ref<Space>
+  readonly attributes: unknown
+  readonly id?: string
+}
+
+interface UpdateDocCall {
+  readonly class: unknown
+  readonly space: Ref<Space>
+  readonly objectId: string
+  readonly operations: unknown
+}
 
 const makeProcess = (overrides?: Partial<HulyProcessDefinition>): HulyProcessDefinition =>
   asProcess({
@@ -149,6 +174,8 @@ const createLayer = (config?: {
   readonly cards?: ReadonlyArray<Card>
   readonly masterTags?: ReadonlyArray<MasterTag>
   readonly total?: number
+  readonly createDocCalls?: Array<CreateDocCall>
+  readonly updateDocCalls?: Array<UpdateDocCall>
 }) => {
   const processes = config?.processes ?? [makeProcess()]
   const states = config?.states ?? [
@@ -200,9 +227,49 @@ const createLayer = (config?: {
     query: DocumentQuery<T>
   ) => findAllImpl<T>(_class, query).pipe(Effect.map((items) => items[0]))) as HulyClientOperations["findOne"]
 
+  const createDocImpl: HulyClientOperations["createDoc"] = ((
+    _class: unknown,
+    space: Ref<Space>,
+    attributes: unknown,
+    id?: unknown
+  ) => {
+    config?.createDocCalls?.push(
+      id === undefined
+        ? {
+          class: _class,
+          space,
+          attributes
+        }
+        : {
+          class: _class,
+          space,
+          attributes,
+          id: String(id)
+        }
+    )
+    return Effect.succeed((id ?? "execution-new") as Ref<Doc>)
+  }) as HulyClientOperations["createDoc"]
+
+  const updateDocImpl: HulyClientOperations["updateDoc"] = ((
+    _class: unknown,
+    space: Ref<Space>,
+    objectId: unknown,
+    operations: unknown
+  ) => {
+    config?.updateDocCalls?.push({
+      class: _class,
+      space,
+      objectId: String(objectId),
+      operations
+    })
+    return Effect.succeed({})
+  }) as HulyClientOperations["updateDoc"]
+
   return HulyClient.testLayer({
     findAll: findAllImpl,
-    findOne: findOneImpl
+    findOne: findOneImpl,
+    createDoc: createDocImpl,
+    updateDoc: updateDocImpl
   })
 }
 
@@ -425,6 +492,217 @@ describe("process operations", () => {
       expect(result._tag).toBe("Left")
       if (result._tag === "Left") {
         expect(result.left._tag).toBe("ProcessCardNotFoundError")
+      }
+    }))
+
+  it.effect("starts a process by process ID and card ID", () =>
+    Effect.gen(function*() {
+      const createDocCalls: Array<CreateDocCall> = []
+      const result = yield* startProcess({
+        process: ProcessIdentifier.make(processId),
+        card: ProcessCardIdentifier.make(cardId)
+      }).pipe(Effect.provide(createLayer({ executions: [], createDocCalls })))
+
+      expect(result).toMatchObject({
+        processId,
+        processName: "Approval",
+        cardId,
+        cardTitle: "Contract",
+        currentStateId: initStateId,
+        currentStateTitle: "Draft",
+        status: "active"
+      })
+      const [createdExecution] = createDocCalls
+      expect(result.executionId).toBe(createdExecution.id)
+      expect(createdExecution.class).toBe(processPlugin.class.Execution)
+      expect(createdExecution.space).toBe(core.space.Workspace)
+      expect(createdExecution.attributes).toEqual({
+        process: processId,
+        card: cardId,
+        currentState: initStateId,
+        rollback: [],
+        context: {},
+        status: "active"
+      })
+    }))
+
+  it.effect("starts a process by process name and card title", () =>
+    Effect.gen(function*() {
+      const result = yield* startProcess({
+        process: ProcessIdentifier.make("approval"),
+        card: ProcessCardIdentifier.make("Contract")
+      }).pipe(Effect.provide(createLayer({ executions: [] })))
+
+      expect(result.processId).toBe(processId)
+      expect(result.cardId).toBe(cardId)
+      expect(result.currentStateId).toBe(initStateId)
+    }))
+
+  it.effect("uses the lowest-rank null transition as the initial process state", () =>
+    Effect.gen(function*() {
+      const earliestStateId = "state-earliest" as Ref<HulyProcessState>
+      const createDocCalls: Array<CreateDocCall> = []
+      const result = yield* startProcess({
+        process: ProcessIdentifier.make(processId),
+        card: ProcessCardIdentifier.make(cardId)
+      }).pipe(Effect.provide(createLayer({
+        executions: [],
+        states: [
+          makeState({ _id: earliestStateId, title: "Earliest", rank: "0" }),
+          makeState()
+        ],
+        transitions: [
+          makeInitialTransition({ _id: "transition-late" as Ref<HulyProcessTransition>, to: initStateId, rank: "z" }),
+          makeInitialTransition({
+            _id: "transition-early" as Ref<HulyProcessTransition>,
+            to: earliestStateId,
+            rank: "a"
+          })
+        ],
+        createDocCalls
+      })))
+
+      expect(result.currentStateId).toBe(earliestStateId)
+      expect(result.currentStateTitle).toBe("Earliest")
+      expect(createDocCalls[0].attributes).toMatchObject({ currentState: earliestStateId })
+    }))
+
+  it.effect("fails start_process when the process has no initial transition", () =>
+    Effect.gen(function*() {
+      const result = yield* Effect.either(
+        startProcess({
+          process: ProcessIdentifier.make(processId),
+          card: ProcessCardIdentifier.make(cardId)
+        }).pipe(Effect.provide(createLayer({
+          transitions: [makeTransition()],
+          executions: []
+        })))
+      )
+
+      expect(result._tag).toBe("Left")
+      if (result._tag === "Left") {
+        expect(result.left._tag).toBe("ProcessInitialStateNotFoundError")
+      }
+    }))
+
+  it.effect("fails start_process when parallel execution is forbidden and an active execution exists", () =>
+    Effect.gen(function*() {
+      const result = yield* Effect.either(
+        startProcess({
+          process: ProcessIdentifier.make(processId),
+          card: ProcessCardIdentifier.make(cardId)
+        }).pipe(Effect.provide(createLayer({
+          processes: [makeProcess({ parallelExecutionForbidden: true })],
+          executions: [makeExecution({ currentState: initStateId, status: "active" })]
+        })))
+      )
+
+      expect(result._tag).toBe("Left")
+      if (result._tag === "Left") {
+        expect(result.left._tag).toBe("ProcessParallelExecutionForbiddenError")
+        expect(result.left.message).toContain("execution-1")
+      }
+    }))
+
+  it.effect("fails start_process for ambiguous card titles", () =>
+    Effect.gen(function*() {
+      const result = yield* Effect.either(
+        startProcess({
+          process: ProcessIdentifier.make(processId),
+          card: ProcessCardIdentifier.make("Contract")
+        }).pipe(Effect.provide(createLayer({
+          executions: [],
+          cards: [
+            makeCard(),
+            makeCard({ _id: "card-2" as Ref<Card> })
+          ]
+        })))
+      )
+
+      expect(result._tag).toBe("Left")
+      if (result._tag === "Left") {
+        expect(result.left._tag).toBe("ProcessCardIdentifierAmbiguousError")
+      }
+    }))
+
+  it.effect("fails start_process for missing card titles", () =>
+    Effect.gen(function*() {
+      const result = yield* Effect.either(
+        startProcess({
+          process: ProcessIdentifier.make(processId),
+          card: ProcessCardIdentifier.make("Missing Contract")
+        }).pipe(Effect.provide(createLayer({ executions: [] })))
+      )
+
+      expect(result._tag).toBe("Left")
+      if (result._tag === "Left") {
+        expect(result.left._tag).toBe("ProcessCardNotFoundError")
+      }
+    }))
+
+  it.effect("cancels an active execution", () =>
+    Effect.gen(function*() {
+      const updateDocCalls: Array<UpdateDocCall> = []
+      const result = yield* cancelExecution({
+        execution: ProcessExecutionId.make("execution-1")
+      }).pipe(Effect.provide(createLayer({ updateDocCalls })))
+
+      expect(result).toEqual({
+        executionId: "execution-1",
+        status: "cancelled",
+        cancelled: true
+      })
+      const [updatedExecution] = updateDocCalls
+      expect(updatedExecution.class).toBe(processPlugin.class.Execution)
+      expect(updatedExecution.objectId).toBe("execution-1")
+      expect(updatedExecution.operations).toEqual({ status: "cancelled" })
+    }))
+
+  it.effect("returns cancelled=false for already-cancelled executions without updating", () =>
+    Effect.gen(function*() {
+      const updateDocCalls: Array<UpdateDocCall> = []
+      const result = yield* cancelExecution({
+        execution: ProcessExecutionId.make("execution-1")
+      }).pipe(Effect.provide(createLayer({
+        executions: [makeExecution({ status: "cancelled" })],
+        updateDocCalls
+      })))
+
+      expect(result).toEqual({
+        executionId: "execution-1",
+        status: "cancelled",
+        cancelled: false
+      })
+      expect(updateDocCalls).toEqual([])
+    }))
+
+  it.effect("fails cancel_execution for missing executions", () =>
+    Effect.gen(function*() {
+      const result = yield* Effect.either(
+        cancelExecution({
+          execution: ProcessExecutionId.make("execution-missing")
+        }).pipe(Effect.provide(createLayer({ executions: [] })))
+      )
+
+      expect(result._tag).toBe("Left")
+      if (result._tag === "Left") {
+        expect(result.left._tag).toBe("ProcessExecutionNotFoundError")
+      }
+    }))
+
+  it.effect("fails cancel_execution for completed executions", () =>
+    Effect.gen(function*() {
+      const result = yield* Effect.either(
+        cancelExecution({
+          execution: ProcessExecutionId.make("execution-1")
+        }).pipe(Effect.provide(createLayer({
+          executions: [makeExecution({ status: "done" })]
+        })))
+      )
+
+      expect(result._tag).toBe("Left")
+      if (result._tag === "Left") {
+        expect(result.left._tag).toBe("ProcessExecutionNotCancellableError")
       }
     }))
 })

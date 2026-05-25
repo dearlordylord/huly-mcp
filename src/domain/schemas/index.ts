@@ -198,6 +198,11 @@ export {
 } from "./cards.js"
 
 export {
+  type CancelExecutionParams,
+  cancelExecutionParamsJsonSchema,
+  CancelExecutionParamsSchema,
+  type CancelExecutionResult,
+  CancelExecutionResultSchema,
   type GetProcessParams,
   getProcessParamsJsonSchema,
   GetProcessParamsSchema,
@@ -211,9 +216,11 @@ export {
   ListProcessesParamsSchema,
   type ListProcessesResult,
   ListProcessesResultSchema,
+  parseCancelExecutionParams,
   parseGetProcessParams,
   parseListExecutionsParams,
   parseListProcessesParams,
+  parseStartProcessParams,
   type ProcessCandidate,
   ProcessCandidateSchema,
   ProcessCardIdentifier,
@@ -234,7 +241,12 @@ export {
   ProcessSummarySchema,
   ProcessTransitionId,
   type ProcessTransitionSummary,
-  ProcessTransitionSummarySchema
+  ProcessTransitionSummarySchema,
+  type StartProcessParams,
+  startProcessParamsJsonSchema,
+  StartProcessParamsSchema,
+  type StartProcessResult,
+  StartProcessResultSchema
 } from "./processes.js"
 
 export {

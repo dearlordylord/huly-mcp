@@ -3,6 +3,7 @@ import { Effect, Schema } from "effect"
 import { expect } from "vitest"
 import {
   addLabelParamsJsonSchema,
+  cancelExecutionParamsJsonSchema,
   createDocumentParamsJsonSchema,
   createIssueParamsJsonSchema,
   deleteDocumentParamsJsonSchema,
@@ -19,6 +20,7 @@ import {
   listTeamspacesParamsJsonSchema,
   logTimeParamsJsonSchema,
   parseAddLabelParams,
+  parseCancelExecutionParams,
   parseCreateDocumentParams,
   parseCreateIssueParams,
   parseDeleteDocumentParams,
@@ -35,9 +37,11 @@ import {
   parseListTimeSpendReportsParams,
   parseLogTimeParams,
   parseProject,
+  parseStartProcessParams,
   parseStartTimerParams,
   parseStopTimerParams,
   parseUpdateIssueParams,
+  startProcessParamsJsonSchema,
   startTimerParamsJsonSchema,
   stopTimerParamsJsonSchema,
   updateIssueParamsJsonSchema
@@ -165,6 +169,39 @@ describe("Domain Schemas", () => {
           name: "John Doe",
           email: "john@example.com"
         })
+      }))
+  })
+
+  describe("Process write schemas", () => {
+    it.effect("parses start_process params and exposes required JSON schema fields", () =>
+      Effect.gen(function*() {
+        const parsed = yield* parseStartProcessParams({
+          process: "Approval",
+          card: "Contract"
+        })
+        expect(parsed).toEqual({
+          process: "Approval",
+          card: "Contract"
+        })
+
+        const schema = startProcessParamsJsonSchema as JsonSchemaObject
+        expect(schema.required).toEqual(["process", "card"])
+        expect(schema.properties?.process).toBeDefined()
+        expect(schema.properties?.card).toBeDefined()
+      }))
+
+    it.effect("parses cancel_execution params and exposes required JSON schema fields", () =>
+      Effect.gen(function*() {
+        const parsed = yield* parseCancelExecutionParams({
+          execution: "execution-1"
+        })
+        expect(parsed).toEqual({
+          execution: "execution-1"
+        })
+
+        const schema = cancelExecutionParamsJsonSchema as JsonSchemaObject
+        expect(schema.required).toEqual(["execution"])
+        expect(schema.properties?.execution).toBeDefined()
       }))
   })
 

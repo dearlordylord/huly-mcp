@@ -787,6 +787,14 @@ describe("Huly Errors", () => {
               return `process-card-ambiguous:${error.identifier}:${error.candidates.length}`
             case "ProcessCardNotFoundError":
               return `process-card:${error.identifier}`
+            case "ProcessInitialStateNotFoundError":
+              return `process-initial-state:${error.processId}`
+            case "ProcessParallelExecutionForbiddenError":
+              return `process-parallel-forbidden:${error.processId}:${error.cardId}:${error.activeExecutionId}`
+            case "ProcessExecutionNotFoundError":
+              return `process-execution:${error.executionId}`
+            case "ProcessExecutionNotCancellableError":
+              return `process-execution-not-cancellable:${error.executionId}:${error.status}`
             case "AssociationNotFoundError":
               return `association:${error.identifier}`
             case "AssociationIdentifierAmbiguousError":

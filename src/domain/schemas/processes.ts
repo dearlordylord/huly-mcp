@@ -137,6 +137,32 @@ export const ListExecutionsParamsSchema = Schema.Struct({
 })
 export type ListExecutionsParams = Schema.Schema.Type<typeof ListExecutionsParamsSchema>
 
+export const StartProcessParamsSchema = Schema.Struct({
+  process: ProcessIdentifier.annotations({
+    description:
+      "Process/workflow ID or exact display name. Ambiguous names fail with candidate IDs instead of guessing."
+  }),
+  card: ProcessCardIdentifier.annotations({
+    description:
+      "Card/document ID or exact title to attach the new execution to. If a title matches multiple cards, the call fails with candidates."
+  })
+}).annotations({
+  title: "StartProcessParams",
+  description: "Parameters for starting a Huly Process workflow execution on a card/document."
+})
+export type StartProcessParams = Schema.Schema.Type<typeof StartProcessParamsSchema>
+
+export const CancelExecutionParamsSchema = Schema.Struct({
+  execution: ProcessExecutionId.annotations({
+    description:
+      "Process execution ID to cancel. Already-cancelled executions return cancelled=false; completed executions fail without mutation."
+  })
+}).annotations({
+  title: "CancelExecutionParams",
+  description: "Parameters for cancelling an active Huly Process workflow execution."
+})
+export type CancelExecutionParams = Schema.Schema.Type<typeof CancelExecutionParamsSchema>
+
 export const ListProcessesResultSchema = Schema.Struct({
   processes: Schema.Array(ProcessSummarySchema),
   total: Schema.NonNegativeInt
@@ -149,10 +175,33 @@ export const ListExecutionsResultSchema = Schema.Struct({
 })
 export type ListExecutionsResult = Schema.Schema.Type<typeof ListExecutionsResultSchema>
 
+export const StartProcessResultSchema = Schema.Struct({
+  executionId: ProcessExecutionId,
+  processId: ProcessId,
+  processName: Schema.optional(NonEmptyString),
+  cardId: CardId,
+  cardTitle: Schema.optional(NonEmptyString),
+  currentStateId: ProcessStateId,
+  currentStateTitle: Schema.optional(NonEmptyString),
+  status: Schema.Literal("active")
+})
+export type StartProcessResult = Schema.Schema.Type<typeof StartProcessResultSchema>
+
+export const CancelExecutionResultSchema = Schema.Struct({
+  executionId: ProcessExecutionId,
+  status: Schema.Literal("cancelled"),
+  cancelled: Schema.Boolean
+})
+export type CancelExecutionResult = Schema.Schema.Type<typeof CancelExecutionResultSchema>
+
 export const listProcessesParamsJsonSchema = JSONSchema.make(ListProcessesParamsSchema)
 export const getProcessParamsJsonSchema = JSONSchema.make(GetProcessParamsSchema)
 export const listExecutionsParamsJsonSchema = JSONSchema.make(ListExecutionsParamsSchema)
+export const startProcessParamsJsonSchema = JSONSchema.make(StartProcessParamsSchema)
+export const cancelExecutionParamsJsonSchema = JSONSchema.make(CancelExecutionParamsSchema)
 
 export const parseListProcessesParams = Schema.decodeUnknown(ListProcessesParamsSchema)
 export const parseGetProcessParams = Schema.decodeUnknown(GetProcessParamsSchema)
 export const parseListExecutionsParams = Schema.decodeUnknown(ListExecutionsParamsSchema)
+export const parseStartProcessParams = Schema.decodeUnknown(StartProcessParamsSchema)
+export const parseCancelExecutionParams = Schema.decodeUnknown(CancelExecutionParamsSchema)

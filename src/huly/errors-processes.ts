@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 
-import { ProcessCandidateSchema } from "../domain/schemas/processes.js"
+import { ProcessCandidateSchema, ProcessExecutionId, ProcessId } from "../domain/schemas/processes.js"
 import { CardId, MasterTagId, NonEmptyString } from "../domain/schemas/shared.js"
 
 const candidateList = (
@@ -90,5 +90,55 @@ export class ProcessCardNotFoundError extends Schema.TaggedError<ProcessCardNotF
 ) {
   override get message(): string {
     return `Card/document '${this.identifier}' not found`
+  }
+}
+
+export class ProcessInitialStateNotFoundError extends Schema.TaggedError<ProcessInitialStateNotFoundError>()(
+  "ProcessInitialStateNotFoundError",
+  {
+    processId: ProcessId,
+    processName: NonEmptyString
+  }
+) {
+  override get message(): string {
+    return `Process '${this.processName}' (${this.processId}) has no initial transition from null`
+  }
+}
+
+export class ProcessParallelExecutionForbiddenError
+  extends Schema.TaggedError<ProcessParallelExecutionForbiddenError>()(
+    "ProcessParallelExecutionForbiddenError",
+    {
+      processId: ProcessId,
+      cardId: CardId,
+      activeExecutionId: ProcessExecutionId
+    }
+  )
+{
+  override get message(): string {
+    return `Process '${this.processId}' already has active execution '${this.activeExecutionId}' for card '${this.cardId}'`
+  }
+}
+
+export class ProcessExecutionNotFoundError extends Schema.TaggedError<ProcessExecutionNotFoundError>()(
+  "ProcessExecutionNotFoundError",
+  {
+    executionId: ProcessExecutionId
+  }
+) {
+  override get message(): string {
+    return `Process execution '${this.executionId}' not found`
+  }
+}
+
+export class ProcessExecutionNotCancellableError extends Schema.TaggedError<ProcessExecutionNotCancellableError>()(
+  "ProcessExecutionNotCancellableError",
+  {
+    executionId: ProcessExecutionId,
+    status: Schema.Literal("done")
+  }
+) {
+  override get message(): string {
+    return `Process execution '${this.executionId}' is completed and cannot be cancelled`
   }
 }

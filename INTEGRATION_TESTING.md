@@ -108,7 +108,7 @@ The full suite tests CRUD lifecycles with cleanup for all domains:
 | 16. Workspace | get_workspace_info, list_workspace_members | Read-only (management tools skipped) |
 | 17. Attachments | add_issue_attachment, list/get/pin/update/download/delete attachment | Full CRUD (upload_file standalone skipped — no blob delete) |
 | 18. Test Management | Full suite/case/plan/run/result lifecycle | Requires TM project in Huly UI |
-| 19. Processes | list_processes, get_process, list_process_executions | Read-only; get/filter cases run when the workspace has process definitions |
+| 19. Processes | list_processes, get_process, list_process_executions, start_process, cancel_execution | Read/write; write checks run only when the workspace has a process with an initial state and a matching safe card fixture, then cancel the created execution |
 
 ### Intentionally Skipped (22 fixed + up to 14 conditional)
 

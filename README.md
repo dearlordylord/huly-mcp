@@ -484,6 +484,8 @@ MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-m
 | `list_processes` | List read-only Huly Process workflow definitions. Optionally filter by the master tag/card type that workflows attach to. Returns process IDs, names, attached card type, automation flags, and state/transition counts. |
 | `get_process` | Get one Huly Process workflow definition by process ID or exact display name. If a name is ambiguous, the tool returns a typed error with candidate IDs instead of guessing. |
 | `list_process_executions` | List read-only Huly Process workflow executions. Supports filters by process ID/name, card/document ID/title, and status. Rows are enriched with process name, card title, and current state title when available. |
+| `start_process` | Start a new active Huly Process workflow execution on a card/document. Accepts process ID or exact process name, and card/document ID or exact title; ambiguous names or titles fail with candidate IDs. This is not idempotent: each successful call creates a new execution unless the process forbids parallel active executions for the same card, in which case the existing active execution ID is returned in a typed error. |
+| `cancel_execution` | Idempotently cancel one Huly Process execution by execution ID. Active executions are marked cancelled; already-cancelled executions succeed with cancelled=false; completed executions fail without changing history. |
 
 ### Tag-Categories
 

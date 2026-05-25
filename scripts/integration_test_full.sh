@@ -1545,16 +1545,67 @@ run_test "list_process_executions" \
 PROCESSES_TEXT=$(run_capture_only \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_processes","arguments":{}},"id":2}')
 PROCESS_ID=$(echo "$PROCESSES_TEXT" | jq -r '.processes[0].id // empty' 2>/dev/null)
+PROCESS_DETAIL_TEXT=""
 
 if [ -n "$PROCESS_ID" ]; then
   echo "  Using process: $PROCESS_ID"
   run_test "get_process($PROCESS_ID)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_process\",\"arguments\":{\"process\":\"$PROCESS_ID\"}},\"id\":2}"
+  PROCESS_DETAIL_TEXT=$(run_capture_only \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_process\",\"arguments\":{\"process\":\"$PROCESS_ID\"}},\"id\":2}")
   run_test "list_process_executions(process:$PROCESS_ID)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_process_executions\",\"arguments\":{\"process\":\"$PROCESS_ID\",\"limit\":5}},\"id\":2}"
 else
   skip_test "get_process" "no process definitions found in workspace"
   skip_test "list_process_executions(process)" "no process definitions found in workspace"
+fi
+
+PROCESS_INITIAL_STATE=$(echo "$PROCESS_DETAIL_TEXT" | jq -r '.initialStateId // empty' 2>/dev/null)
+PROCESS_TYPE=$(echo "$PROCESS_DETAIL_TEXT" | jq -r '.masterTagName // .masterTagId // empty' 2>/dev/null)
+PROCESS_PARALLEL_FORBIDDEN=$(echo "$PROCESS_DETAIL_TEXT" | jq -r '.parallelExecutionForbidden // false' 2>/dev/null)
+SAFE_CARD_ID=""
+
+if [ -n "$PROCESS_ID" ] && [ -n "$PROCESS_INITIAL_STATE" ] && [ -n "$PROCESS_TYPE" ]; then
+  CARD_SPACES_TEXT=$(run_capture_only \
+    '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_card_spaces","arguments":{"limit":20}},"id":2}')
+  CARD_SPACE_COUNT=$(echo "$CARD_SPACES_TEXT" | jq -r '.cardSpaces | length' 2>/dev/null)
+  i=0
+  while [ "$i" -lt "${CARD_SPACE_COUNT:-0}" ] && [ -z "$SAFE_CARD_ID" ]; do
+    CARD_SPACE_NAME=$(echo "$CARD_SPACES_TEXT" | jq -r ".cardSpaces[$i].name // empty" 2>/dev/null)
+    if [ -n "$CARD_SPACE_NAME" ]; then
+      CARD_SPACE_JSON=$(json_string "$CARD_SPACE_NAME")
+      PROCESS_TYPE_JSON=$(json_string "$PROCESS_TYPE")
+      CARDS_TEXT=$(run_capture_only \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":$CARD_SPACE_JSON,\"type\":$PROCESS_TYPE_JSON,\"limit\":1}},\"id\":2}")
+      SAFE_CARD_ID=$(echo "$CARDS_TEXT" | jq -r '.cards[0].id // empty' 2>/dev/null)
+    fi
+    i=$((i + 1))
+  done
+fi
+
+if [ -n "$PROCESS_ID" ] && [ -n "$PROCESS_INITIAL_STATE" ] && [ -n "$SAFE_CARD_ID" ]; then
+  if [ "$PROCESS_PARALLEL_FORBIDDEN" = "true" ]; then
+    EXISTING_ACTIVE=$(run_capture_only \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_process_executions\",\"arguments\":{\"process\":\"$PROCESS_ID\",\"card\":\"$SAFE_CARD_ID\",\"status\":\"active\",\"limit\":1}},\"id\":2}" | jq -r '.executions[0].id // empty' 2>/dev/null)
+  else
+    EXISTING_ACTIVE=""
+  fi
+
+  if [ -n "$EXISTING_ACTIVE" ]; then
+    skip_test "start_process/cancel_execution" "safe card already has an active execution and process forbids parallel executions"
+  else
+    START_TEXT=$(run_capture "start_process($PROCESS_ID,$SAFE_CARD_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"start_process\",\"arguments\":{\"process\":\"$PROCESS_ID\",\"card\":\"$SAFE_CARD_ID\"}},\"id\":2}")
+    STARTED_EXECUTION_ID=$(echo "$START_TEXT" | jq -r '.executionId // empty' 2>/dev/null)
+    if [ -n "$STARTED_EXECUTION_ID" ]; then
+      run_test "cancel_execution($STARTED_EXECUTION_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"cancel_execution\",\"arguments\":{\"execution\":\"$STARTED_EXECUTION_ID\"}},\"id\":2}"
+    else
+      skip_test "cancel_execution(started)" "start_process did not return an execution ID"
+    fi
+  fi
+else
+  skip_test "start_process/cancel_execution" "requires a process with an initial state and a matching safe card fixture"
 fi
 echo ""
 

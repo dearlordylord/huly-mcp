@@ -1,9 +1,12 @@
+/* eslint-disable max-lines -- Process read/write operations share resolver and enrichment helpers in one module */
 import type { Card, MasterTag, Tag } from "@hcengineering/card"
-import type { DocumentQuery, Ref } from "@hcengineering/core"
-import { SortingOrder } from "@hcengineering/core"
+import type { Data, DocumentQuery, DocumentUpdate, Ref, Space } from "@hcengineering/core"
+import { generateId, SortingOrder } from "@hcengineering/core"
 import { Effect, Schema } from "effect"
 
 import type {
+  CancelExecutionParams,
+  CancelExecutionResult,
   GetProcessParams,
   ListExecutionsParams,
   ListExecutionsResult,
@@ -13,16 +16,20 @@ import type {
   ProcessDetail,
   ProcessExecutionSummary,
   ProcessSummary,
-  ProcessTransitionSummary
+  ProcessTransitionSummary,
+  StartProcessParams,
+  StartProcessResult
 } from "../../domain/schemas.js"
 import {
+  CancelExecutionResultSchema,
   ListExecutionsResultSchema,
   ListProcessesResultSchema,
   ProcessDetailSchema,
   ProcessExecutionId,
   ProcessId,
   ProcessStateId,
-  ProcessTransitionId
+  ProcessTransitionId,
+  StartProcessResultSchema
 } from "../../domain/schemas.js"
 import { CardId, MasterTagId } from "../../domain/schemas/shared.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
@@ -31,12 +38,16 @@ import {
   HulyConnectionError,
   ProcessCardIdentifierAmbiguousError,
   ProcessCardNotFoundError,
+  ProcessExecutionNotCancellableError,
+  ProcessExecutionNotFoundError,
   ProcessIdentifierAmbiguousError,
+  ProcessInitialStateNotFoundError,
   ProcessMasterTagAmbiguousError,
   ProcessMasterTagNotFoundError,
-  ProcessNotFoundError
+  ProcessNotFoundError,
+  ProcessParallelExecutionForbiddenError
 } from "../errors.js"
-import { cardPlugin } from "../huly-plugins.js"
+import { cardPlugin, core } from "../huly-plugins.js"
 import {
   type HulyProcessDefinition,
   type HulyProcessExecution,
@@ -56,6 +67,10 @@ type ProcessOperationError =
   | ProcessMasterTagAmbiguousError
   | ProcessCardIdentifierAmbiguousError
   | ProcessCardNotFoundError
+  | ProcessInitialStateNotFoundError
+  | ProcessParallelExecutionForbiddenError
+  | ProcessExecutionNotFoundError
+  | ProcessExecutionNotCancellableError
 
 interface MasterTagDisplay {
   readonly id: Ref<MasterTag | Tag>
@@ -179,11 +194,18 @@ const transitionSummary = (
   actionCount: transition.actions.length
 })
 
+const initialTransition = (
+  transitions: ReadonlyArray<HulyProcessTransition>
+): HulyProcessTransition | undefined =>
+  [...transitions].filter((transition) => transition.from === null).sort((a, b) =>
+    String(a.rank).localeCompare(String(b.rank))
+  )[0]
+
 const initialStateId = (
   transitions: ReadonlyArray<HulyProcessTransition>
 ): ProcessStateId | undefined => {
-  const initialTransition = transitions.find((transition) => transition.from === null)
-  return initialTransition === undefined ? undefined : ProcessStateId.make(initialTransition.to)
+  const transition = initialTransition(transitions)
+  return transition === undefined ? undefined : ProcessStateId.make(transition.to)
 }
 
 const processDetail = (data: ProcessDetailData): ProcessDetail => {
@@ -331,6 +353,41 @@ const executionSummary = (
   modifiedOn: execution.modifiedOn
 })
 
+const startProcessResult = (
+  executionId: Ref<HulyProcessExecution>,
+  process: HulyProcessDefinition,
+  card: Card,
+  currentState: HulyProcessState
+): StartProcessResult => ({
+  executionId: ProcessExecutionId.make(executionId),
+  processId: ProcessId.make(process._id),
+  processName: process.name,
+  cardId: CardId.make(card._id),
+  cardTitle: card.title,
+  currentStateId: ProcessStateId.make(currentState._id),
+  currentStateTitle: currentState.title,
+  status: "active"
+})
+
+const findExecutionOrFail = (
+  client: HulyClientOperations,
+  executionId: ProcessExecutionId
+): Effect.Effect<HulyProcessExecution, HulyClientError | ProcessExecutionNotFoundError> =>
+  client.findOne<HulyProcessExecution>(
+    processPlugin.class.Execution,
+    { _id: toRef<HulyProcessExecution>(executionId) }
+  ).pipe(
+    Effect.flatMap((execution) =>
+      execution === undefined
+        ? Effect.fail(
+          new ProcessExecutionNotFoundError({
+            executionId: ProcessExecutionId.make(executionId)
+          })
+        )
+        : Effect.succeed(execution)
+    )
+  )
+
 export const listProcesses = (
   params: ListProcessesParams
 ): Effect.Effect<ListProcessesResult, ProcessOperationError, HulyClient> =>
@@ -411,4 +468,127 @@ export const listExecutions = (
       total: executions.length
     }
     return yield* encodeOrConnectionError(ListExecutionsResultSchema, result, "listExecutions")
+  })
+
+export const startProcess = (
+  params: StartProcessParams
+): Effect.Effect<StartProcessResult, ProcessOperationError, HulyClient> =>
+  Effect.gen(function*() {
+    const client = yield* HulyClient
+    const process = yield* resolveProcess(client, params.process)
+    const cardId = yield* resolveCardFilter(client, params.card)
+    const card = yield* client.findOne<Card>(cardPlugin.class.Card, { _id: cardId })
+
+    if (card === undefined) {
+      return yield* Effect.fail(new ProcessCardNotFoundError({ identifier: params.card }))
+    }
+
+    const transitions = yield* client.findAll<HulyProcessTransition>(
+      processPlugin.class.Transition,
+      { process: process._id },
+      { sort: { rank: SortingOrder.Ascending } }
+    )
+    const transition = initialTransition(transitions)
+    if (transition === undefined) {
+      return yield* Effect.fail(
+        new ProcessInitialStateNotFoundError({
+          processId: ProcessId.make(process._id),
+          processName: process.name
+        })
+      )
+    }
+
+    const currentState = yield* client.findOne<HulyProcessState>(
+      processPlugin.class.State,
+      { _id: transition.to }
+    )
+    if (currentState === undefined) {
+      return yield* Effect.fail(
+        new ProcessInitialStateNotFoundError({
+          processId: ProcessId.make(process._id),
+          processName: process.name
+        })
+      )
+    }
+
+    if (process.parallelExecutionForbidden === true) {
+      const activeExecution = yield* client.findOne<HulyProcessExecution>(
+        processPlugin.class.Execution,
+        {
+          process: process._id,
+          card: card._id,
+          status: "active"
+        }
+      )
+      if (activeExecution !== undefined) {
+        return yield* Effect.fail(
+          new ProcessParallelExecutionForbiddenError({
+            processId: ProcessId.make(process._id),
+            cardId: CardId.make(card._id),
+            activeExecutionId: ProcessExecutionId.make(activeExecution._id)
+          })
+        )
+      }
+    }
+
+    const executionId: Ref<HulyProcessExecution> = generateId()
+    const executionData: Data<HulyProcessExecution> = {
+      process: process._id,
+      card: card._id,
+      currentState: currentState._id,
+      rollback: [],
+      context: {},
+      status: "active"
+    }
+
+    yield* client.createDoc(
+      processPlugin.class.Execution,
+      toRef<Space>(core.space.Workspace),
+      executionData,
+      executionId
+    )
+
+    const result = startProcessResult(executionId, process, card, currentState)
+    return yield* encodeOrConnectionError(StartProcessResultSchema, result, "startProcess")
+  })
+
+export const cancelExecution = (
+  params: CancelExecutionParams
+): Effect.Effect<CancelExecutionResult, ProcessOperationError, HulyClient> =>
+  Effect.gen(function*() {
+    const client = yield* HulyClient
+    const execution = yield* findExecutionOrFail(client, params.execution)
+
+    if (execution.status === "cancelled") {
+      const result: CancelExecutionResult = {
+        executionId: ProcessExecutionId.make(execution._id),
+        status: "cancelled",
+        cancelled: false
+      }
+      return yield* encodeOrConnectionError(CancelExecutionResultSchema, result, "cancelExecution")
+    }
+
+    if (execution.status === "done") {
+      return yield* Effect.fail(
+        new ProcessExecutionNotCancellableError({
+          executionId: ProcessExecutionId.make(execution._id),
+          status: "done"
+        })
+      )
+    }
+
+    const update: DocumentUpdate<HulyProcessExecution> = { status: "cancelled" }
+    yield* client.updateDoc(
+      processPlugin.class.Execution,
+      execution.space,
+      execution._id,
+      update
+    )
+
+    const result: CancelExecutionResult = {
+      executionId: ProcessExecutionId.make(execution._id),
+      status: "cancelled",
+      cancelled: true
+    }
+    return yield* encodeOrConnectionError(CancelExecutionResultSchema, result, "cancelExecution")
   })

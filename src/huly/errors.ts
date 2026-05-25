@@ -76,10 +76,14 @@ import { NotificationContextNotFoundError, NotificationNotFoundError } from "./e
 import {
   ProcessCardIdentifierAmbiguousError,
   ProcessCardNotFoundError,
+  ProcessExecutionNotCancellableError,
+  ProcessExecutionNotFoundError,
   ProcessIdentifierAmbiguousError,
+  ProcessInitialStateNotFoundError,
   ProcessMasterTagAmbiguousError,
   ProcessMasterTagNotFoundError,
-  ProcessNotFoundError
+  ProcessNotFoundError,
+  ProcessParallelExecutionForbiddenError
 } from "./errors-processes.js"
 import {
   TestCaseNotFoundError,
@@ -154,10 +158,14 @@ export {
   PersonNotFoundError,
   ProcessCardIdentifierAmbiguousError,
   ProcessCardNotFoundError,
+  ProcessExecutionNotCancellableError,
+  ProcessExecutionNotFoundError,
   ProcessIdentifierAmbiguousError,
+  ProcessInitialStateNotFoundError,
   ProcessMasterTagAmbiguousError,
   ProcessMasterTagNotFoundError,
   ProcessNotFoundError,
+  ProcessParallelExecutionForbiddenError,
   ProjectNotFoundError,
   ReactionNotFoundError,
   RecurringEventNotFoundError,
@@ -250,6 +258,10 @@ export type HulyDomainError =
   | ProcessMasterTagNotFoundError
   | ProcessCardIdentifierAmbiguousError
   | ProcessCardNotFoundError
+  | ProcessInitialStateNotFoundError
+  | ProcessParallelExecutionForbiddenError
+  | ProcessExecutionNotFoundError
+  | ProcessExecutionNotCancellableError
   | AssociationNotFoundError
   | AssociationIdentifierAmbiguousError
   | RelationNotFoundError
@@ -331,6 +343,10 @@ export const HulyDomainError: Schema.Union<
     typeof ProcessMasterTagNotFoundError,
     typeof ProcessCardIdentifierAmbiguousError,
     typeof ProcessCardNotFoundError,
+    typeof ProcessInitialStateNotFoundError,
+    typeof ProcessParallelExecutionForbiddenError,
+    typeof ProcessExecutionNotFoundError,
+    typeof ProcessExecutionNotCancellableError,
     typeof AssociationNotFoundError,
     typeof AssociationIdentifierAmbiguousError,
     typeof RelationNotFoundError,
@@ -408,6 +424,10 @@ export const HulyDomainError: Schema.Union<
   ProcessMasterTagNotFoundError,
   ProcessCardIdentifierAmbiguousError,
   ProcessCardNotFoundError,
+  ProcessInitialStateNotFoundError,
+  ProcessParallelExecutionForbiddenError,
+  ProcessExecutionNotFoundError,
+  ProcessExecutionNotCancellableError,
   AssociationNotFoundError,
   AssociationIdentifierAmbiguousError,
   RelationNotFoundError,

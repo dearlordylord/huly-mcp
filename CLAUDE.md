@@ -55,7 +55,7 @@ Code review agents must consult `.claude/review-rules.md` for project-specific q
 2. Run `effect-solutions show <topic>...` for relevant patterns (supports multiple topics)
 3. Search `.reference/effect/` for real implementations (run `effect-solutions setup` first)
 
-In secondary worktrees, `.reference/effect/` may exist only in the master checkout at `/workspace/typescript/hulymcp/.reference/effect/`. When working from another worktree, consult the master checkout's Effect reference rather than assuming the local worktree has its own copy.
+In secondary worktrees, `.reference/effect/` may exist only in the master checkout at `/workspace/typescript/hulymcp/.reference/effect/`. After creating a worktree, run `bash scripts/bootstrap-worktree.sh` to link ignored local resources (`node_modules`, `.reference`, `.env.local`, `CLAUDE.local.md`) from the master checkout when available. If `effect-solutions` is not on PATH, do not report that the Effect reference is missing until you have checked `/workspace/typescript/hulymcp/.reference/effect/`; search it directly with `rg` and read relevant files from there.
 
 Topics: quick-start, project-setup, tsconfig, basics, services-and-layers, data-modeling, error-handling, config, testing, cli.
 
@@ -95,7 +95,8 @@ Use short timeouts (5s) - MCP keeps connection open.
 
 ## Worktrees
 
-Worktrees symlink `node_modules` to the main tree. `.gitignore` must use `node_modules` (no trailing slash) — trailing slash only matches directories, not symlinks, so `git add .` will commit the symlink.
+Worktrees symlink `node_modules` and `.reference` to the main tree. `.gitignore` must use `node_modules` and `.reference` (no trailing slash) — trailing slash only matches directories, not symlinks, so `git add .` will commit the symlink.
+After creating a secondary worktree, run `bash scripts/bootstrap-worktree.sh` from that worktree. This links ignored local resources from `/workspace/typescript/hulymcp`, including `node_modules`, `.reference`, `.env.local`, and `CLAUDE.local.md`, so Effect and Huly reference material remains available outside the master checkout.
 
 Before deleting a worktree or branch, always check for uncommitted changes (`git status`) and unmerged commits (`git log <branch> --not master`) first. Never force-delete without verifying all work is integrated.
 
