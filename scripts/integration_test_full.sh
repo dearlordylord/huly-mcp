@@ -12,8 +12,43 @@ if ! command -v jq &>/dev/null; then
   exit 1
 fi
 
+INTEGRATION_TRANSPORT="${INTEGRATION_TRANSPORT:-stdio}"
+INTEGRATION_HTTP_CONFIG="${INTEGRATION_HTTP_CONFIG:-env}"
+INTEGRATION_HTTP_HOST="${INTEGRATION_HTTP_HOST:-127.0.0.1}"
+INTEGRATION_HTTP_PORT="${INTEGRATION_HTTP_PORT:-19888}"
+HTTP_ENDPOINT="http://${INTEGRATION_HTTP_HOST}:${INTEGRATION_HTTP_PORT}/mcp"
+HTTP_SERVER_PID=""
+HTTP_SERVER_STDOUT=""
+HTTP_SERVER_STDERR=""
+HTTP_CURL_CONFIG=""
+
 if [ -z "$HULY_URL" ]; then
   echo "ERROR: HULY_URL not set. Run: set -a && source .env.local && set +a"
+  exit 1
+fi
+
+if [ "$INTEGRATION_TRANSPORT" != "stdio" ] && [ "$INTEGRATION_TRANSPORT" != "http" ]; then
+  echo "ERROR: INTEGRATION_TRANSPORT must be 'stdio' or 'http'"
+  exit 1
+fi
+
+if [ "$INTEGRATION_HTTP_CONFIG" != "env" ] && [ "$INTEGRATION_HTTP_CONFIG" != "headers" ]; then
+  echo "ERROR: INTEGRATION_HTTP_CONFIG must be 'env' or 'headers'"
+  exit 1
+fi
+
+if [ "$INTEGRATION_TRANSPORT" = "http" ] && ! command -v curl &>/dev/null; then
+  echo "ERROR: curl is required for INTEGRATION_TRANSPORT=http"
+  exit 1
+fi
+
+if [ "$INTEGRATION_TRANSPORT" = "http" ] && [ "$INTEGRATION_HTTP_CONFIG" = "headers" ] && [ -z "${HULY_WORKSPACE:-}" ]; then
+  echo "ERROR: INTEGRATION_HTTP_CONFIG=headers requires HULY_WORKSPACE."
+  exit 1
+fi
+
+if [ "$INTEGRATION_TRANSPORT" = "http" ] && [ "$INTEGRATION_HTTP_CONFIG" = "headers" ] && [ -z "${HULY_TOKEN:-}" ]; then
+  echo "ERROR: INTEGRATION_HTTP_CONFIG=headers requires HULY_TOKEN. URL header config v1 does not support email/password headers."
   exit 1
 fi
 
@@ -27,10 +62,108 @@ ERRORS=""
 
 TOOL_TIMEOUT=30
 
-call_tool() {
+cleanup_http_transport() {
+  if [ -n "$HTTP_SERVER_PID" ]; then
+    kill "$HTTP_SERVER_PID" 2>/dev/null || true
+    wait "$HTTP_SERVER_PID" 2>/dev/null || true
+  fi
+  if [ -n "$HTTP_SERVER_STDOUT" ]; then
+    rm -f "$HTTP_SERVER_STDOUT"
+  fi
+  if [ -n "$HTTP_SERVER_STDERR" ]; then
+    rm -f "$HTTP_SERVER_STDERR"
+  fi
+  if [ -n "$HTTP_CURL_CONFIG" ]; then
+    rm -f "$HTTP_CURL_CONFIG"
+  fi
+}
+trap cleanup_http_transport EXIT
+
+write_http_header_config() {
+  HTTP_CURL_CONFIG="$(mktemp)"
+  chmod 600 "$HTTP_CURL_CONFIG"
+  {
+    printf '%s\n' 'header = "content-type: application/json"'
+    printf '%s\n' 'header = "accept: application/json, text/event-stream"'
+    if [ "$INTEGRATION_HTTP_CONFIG" = "headers" ]; then
+      printf 'header = "x-huly-url: %s"\n' "$HULY_URL"
+      printf 'header = "x-huly-workspace: %s"\n' "$HULY_WORKSPACE"
+      printf 'header = "x-huly-token: %s"\n' "$HULY_TOKEN"
+      if [ -n "${HULY_CONNECTION_TIMEOUT:-}" ]; then
+        printf 'header = "x-huly-connection-timeout: %s"\n' "$HULY_CONNECTION_TIMEOUT"
+      fi
+    fi
+  } >"$HTTP_CURL_CONFIG"
+}
+
+start_http_transport() {
+  HTTP_SERVER_STDOUT="$(mktemp)"
+  HTTP_SERVER_STDERR="$(mktemp)"
+  write_http_header_config
+
+  if [ "$INTEGRATION_HTTP_CONFIG" = "headers" ]; then
+    env -u HULY_URL -u HULY_WORKSPACE -u HULY_EMAIL -u HULY_PASSWORD -u HULY_TOKEN -u HULY_CONNECTION_TIMEOUT \
+      MCP_TRANSPORT=http MCP_HTTP_PORT="$INTEGRATION_HTTP_PORT" MCP_HTTP_HOST="$INTEGRATION_HTTP_HOST" \
+      node dist/index.cjs >"$HTTP_SERVER_STDOUT" 2>"$HTTP_SERVER_STDERR" &
+  else
+    env MCP_TRANSPORT=http MCP_HTTP_PORT="$INTEGRATION_HTTP_PORT" MCP_HTTP_HOST="$INTEGRATION_HTTP_HOST" \
+      node dist/index.cjs >"$HTTP_SERVER_STDOUT" 2>"$HTTP_SERVER_STDERR" &
+  fi
+  HTTP_SERVER_PID=$!
+
+  for _ in $(seq 1 100); do
+    if grep -q "MCP HTTP server listening" "$HTTP_SERVER_STDERR"; then
+      echo "HTTP integration transport listening at $HTTP_ENDPOINT (config: $INTEGRATION_HTTP_CONFIG)"
+      return 0
+    fi
+    if ! kill -0 "$HTTP_SERVER_PID" 2>/dev/null; then
+      echo "ERROR: HTTP integration transport exited during startup"
+      cat "$HTTP_SERVER_STDERR"
+      return 1
+    fi
+    sleep 0.1
+  done
+
+  echo "ERROR: HTTP integration transport did not start"
+  cat "$HTTP_SERVER_STDERR"
+  return 1
+}
+
+extract_http_json_response() {
+  local response="$1"
+  local data
+  data=$(printf '%s\n' "$response" | awk '/^data: / { sub(/^data: /, ""); print }' | tail -n 1)
+  if [ -n "$data" ]; then
+    printf '%s\n' "$data"
+  else
+    printf '%s\n' "$response"
+  fi
+}
+
+call_tool_stdio() {
   local payload="$1"
   printf '%s\n%s\n' "$INIT" "$payload" | timeout "$TOOL_TIMEOUT" env MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep '"id":2'
 }
+
+call_tool_http() {
+  local payload="$1"
+  local response
+  response=$(curl -sS --max-time "$TOOL_TIMEOUT" --config "$HTTP_CURL_CONFIG" --request POST --data "$payload" "$HTTP_ENDPOINT" 2>/dev/null)
+  extract_http_json_response "$response" | grep '"id":2'
+}
+
+call_tool() {
+  local payload="$1"
+  if [ "$INTEGRATION_TRANSPORT" = "http" ]; then
+    call_tool_http "$payload"
+  else
+    call_tool_stdio "$payload"
+  fi
+}
+
+if [ "$INTEGRATION_TRANSPORT" = "http" ]; then
+  start_http_transport || exit 1
+fi
 
 run_test() {
   local name="$1"

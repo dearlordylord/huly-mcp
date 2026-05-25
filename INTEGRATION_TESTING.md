@@ -56,6 +56,34 @@ NODE_OPTIONS="-r ./scripts/container-patch.cjs" bash scripts/integration_test_fu
 
 The patch (`scripts/container-patch.cjs`) rewrites `localhost:8087` → `nginx` in all `fetch` and `ws` calls at runtime. `.env.local` stays unchanged — same `HULY_URL=http://localhost:8087` as on the host.
 
+### Running the full suite over HTTP
+
+The same full integration suite can exercise the HTTP MCP transport instead of stdio:
+
+```bash
+pnpm build
+set -a && source .env.local && set +a
+HULY_URL="${HULY_URL/localhost/host.docker.internal}" \
+  INTEGRATION_TRANSPORT=http \
+  bash scripts/integration_test_full.sh
+```
+
+By default, this starts `node dist/index.cjs` with `MCP_TRANSPORT=http` and lets the server resolve Huly credentials from process environment variables. This tests HTTP transport parity with local stdio configuration.
+
+To test hosted URL header configuration, provide a Huly API token and run the same suite with credentials sent as request headers:
+
+```bash
+pnpm build
+set -a && source .env.local && set +a
+export HULY_URL="${HULY_URL/localhost/host.docker.internal}"
+export HULY_TOKEN=...
+INTEGRATION_TRANSPORT=http \
+  INTEGRATION_HTTP_CONFIG=headers \
+  bash scripts/integration_test_full.sh
+```
+
+`INTEGRATION_HTTP_CONFIG=headers` starts the MCP server without `HULY_*` process env vars and sends `x-huly-url`, `x-huly-workspace`, `x-huly-token`, and optional `x-huly-connection-timeout` on each HTTP tool call. Header mode requires `HULY_TOKEN`; email/password headers are intentionally not supported.
+
 ## Quick Smoke Test
 
 ```bash
