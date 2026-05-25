@@ -87,8 +87,12 @@ export const findProjectWithStatuses = (
     if (projectType?.statuses) {
       const statusRefs = projectType.statuses.map(s => s._id)
       if (statusRefs.length > 0) {
-        // Try to query Status documents for names
-        // On some workspaces this fails with deserialization errors
+        // Try to query Status documents for names. Historical manual-test proof
+        // is in `git show 31ccf83e^:PROBLEMS.md`: on workspace
+        // `internalai @ huly.app.monadical.io`, querying Status docs failed with
+        // `Cannot read properties of null (reading '#<Object>')`, breaking issue
+        // read/list/update flows. The branch below preserves operation behavior
+        // by using the status refs already present on ProjectType.
         const statusDocsResult = yield* Effect.either(
           client.findAll<Status>(
             core.class.Status,
