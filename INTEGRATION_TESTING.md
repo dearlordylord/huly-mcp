@@ -70,9 +70,9 @@ Expected: JSON with `"projects": [...]`
 
 ## Full Integration Test Suite
 
-**Coverage**: 106 tool calls across 18 domains. Self-cleaning: all created entities are deleted at the end of each section. Tools that would leak data (no delete counterpart) are skipped. Run time: ~3 minutes.
+**Coverage**: 110+ tool calls across 19 domains. Self-cleaning: all created entities are deleted at the end of each section. Tools that would leak data (no delete counterpart) are skipped. Run time: ~3 minutes.
 
-**Last verified**: 2026-04-05 — 133 passed, 0 failed, 32 skipped (of 165 total).
+**Last verified**: 2026-05-25 — 168 passed, 0 failed, 35 skipped (of 203 total).
 
 ### How to Run
 
@@ -108,6 +108,7 @@ The full suite tests CRUD lifecycles with cleanup for all domains:
 | 16. Workspace | get_workspace_info, list_workspace_members | Read-only (management tools skipped) |
 | 17. Attachments | add_issue_attachment, list/get/pin/update/download/delete attachment | Full CRUD (upload_file standalone skipped — no blob delete) |
 | 18. Test Management | Full suite/case/plan/run/result lifecycle | Requires TM project in Huly UI |
+| 19. Processes | list_processes, get_process, list_process_executions | Read-only; get/filter cases run when the workspace has process definitions |
 
 ### Intentionally Skipped (22 fixed + up to 14 conditional)
 

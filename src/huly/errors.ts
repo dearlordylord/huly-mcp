@@ -63,6 +63,14 @@ import {
 } from "./errors-messaging.js"
 import { NotificationContextNotFoundError, NotificationNotFoundError } from "./errors-notifications.js"
 import {
+  ProcessCardIdentifierAmbiguousError,
+  ProcessCardNotFoundError,
+  ProcessIdentifierAmbiguousError,
+  ProcessMasterTagAmbiguousError,
+  ProcessMasterTagNotFoundError,
+  ProcessNotFoundError
+} from "./errors-processes.js"
+import {
   TestCaseNotFoundError,
   TestPlanItemNotFoundError,
   TestPlanNotFoundError,
@@ -128,6 +136,12 @@ export {
   PersonIdentifierAmbiguousError,
   PersonNotAnEmployeeError,
   PersonNotFoundError,
+  ProcessCardIdentifierAmbiguousError,
+  ProcessCardNotFoundError,
+  ProcessIdentifierAmbiguousError,
+  ProcessMasterTagAmbiguousError,
+  ProcessMasterTagNotFoundError,
+  ProcessNotFoundError,
   ProjectNotFoundError,
   ReactionNotFoundError,
   RecurringEventNotFoundError,
@@ -210,6 +224,12 @@ export type HulyDomainError =
   | LeadNotFoundError
   | FileTooLargeError
   | InvalidContentTypeError
+  | ProcessNotFoundError
+  | ProcessIdentifierAmbiguousError
+  | ProcessMasterTagAmbiguousError
+  | ProcessMasterTagNotFoundError
+  | ProcessCardIdentifierAmbiguousError
+  | ProcessCardNotFoundError
 
 /**
  * Schema for all Huly domain errors (for serialization).
@@ -275,7 +295,13 @@ export const HulyDomainError: Schema.Union<
     typeof FunnelNotFoundError,
     typeof LeadNotFoundError,
     typeof FileTooLargeError,
-    typeof InvalidContentTypeError
+    typeof InvalidContentTypeError,
+    typeof ProcessNotFoundError,
+    typeof ProcessIdentifierAmbiguousError,
+    typeof ProcessMasterTagAmbiguousError,
+    typeof ProcessMasterTagNotFoundError,
+    typeof ProcessCardIdentifierAmbiguousError,
+    typeof ProcessCardNotFoundError
   ]
 > = Schema.Union(
   HulyError,
@@ -337,5 +363,11 @@ export const HulyDomainError: Schema.Union<
   FunnelNotFoundError,
   LeadNotFoundError,
   FileTooLargeError,
-  InvalidContentTypeError
+  InvalidContentTypeError,
+  ProcessNotFoundError,
+  ProcessIdentifierAmbiguousError,
+  ProcessMasterTagAmbiguousError,
+  ProcessMasterTagNotFoundError,
+  ProcessCardIdentifierAmbiguousError,
+  ProcessCardNotFoundError
 )

@@ -1379,6 +1379,32 @@ fi
 echo ""
 
 ##############################
+# 19. PROCESSES
+##############################
+echo "=== 19. Processes ==="
+run_test "list_processes" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_processes","arguments":{}},"id":2}'
+
+run_test "list_process_executions" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_process_executions","arguments":{"limit":5}},"id":2}'
+
+PROCESSES_TEXT=$(run_capture_only \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_processes","arguments":{}},"id":2}')
+PROCESS_ID=$(echo "$PROCESSES_TEXT" | jq -r '.processes[0].id // empty' 2>/dev/null)
+
+if [ -n "$PROCESS_ID" ]; then
+  echo "  Using process: $PROCESS_ID"
+  run_test "get_process($PROCESS_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_process\",\"arguments\":{\"process\":\"$PROCESS_ID\"}},\"id\":2}"
+  run_test "list_process_executions(process:$PROCESS_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_process_executions\",\"arguments\":{\"process\":\"$PROCESS_ID\",\"limit\":5}},\"id\":2}"
+else
+  skip_test "get_process" "no process definitions found in workspace"
+  skip_test "list_process_executions(process)" "no process definitions found in workspace"
+fi
+echo ""
+
+##############################
 # SUMMARY
 ##############################
 TOTAL=$((PASSED + FAILED + SKIPPED))

@@ -2,6 +2,8 @@ import { describe, it } from "@effect/vitest"
 import type { ParseResult } from "effect"
 import { Cause, Effect, Schema } from "effect"
 import { expect } from "vitest"
+import { ProcessId } from "../../src/domain/schemas/processes.js"
+import { CardId, MasterTagId, NonEmptyString } from "../../src/domain/schemas/shared.js"
 import {
   CalendarNotAccessibleError,
   DirectMessageIdentifierAmbiguousError,
@@ -22,6 +24,12 @@ import {
   OrganizationNotFoundError,
   PersonIdentifierAmbiguousError,
   PersonNotFoundError,
+  ProcessCardIdentifierAmbiguousError,
+  ProcessCardNotFoundError,
+  ProcessIdentifierAmbiguousError,
+  ProcessMasterTagAmbiguousError,
+  ProcessMasterTagNotFoundError,
+  ProcessNotFoundError,
   ProjectNotFoundError
 } from "../../src/huly/errors.js"
 import {
@@ -223,6 +231,53 @@ describe("Error Mapping to MCP", () => {
           expect(response.content[0].text).toBe(
             "Direct message 'Kerr,Shannon' is ambiguous (2 matches); use the DM _id"
           )
+        }))
+
+      it.effect("maps process lookup errors with descriptive messages", () =>
+        Effect.gen(function*() {
+          const processCandidate = {
+            id: ProcessId.make("process-approval"),
+            name: NonEmptyString.make("Approval"),
+            masterTagId: MasterTagId.make("card:class:Document"),
+            masterTagName: NonEmptyString.make("Document")
+          }
+          const masterTagCandidate = {
+            id: MasterTagId.make("card:class:Document"),
+            name: NonEmptyString.make("Document")
+          }
+          const cardCandidate = {
+            id: CardId.make("card-1"),
+            title: NonEmptyString.make("Contract")
+          }
+          const errors = [
+            new ProcessNotFoundError({
+              identifier: "Missing",
+              candidates: [processCandidate]
+            }),
+            new ProcessIdentifierAmbiguousError({
+              identifier: "Approval",
+              candidates: [processCandidate]
+            }),
+            new ProcessMasterTagNotFoundError({ identifier: "Contract" }),
+            new ProcessMasterTagAmbiguousError({
+              identifier: "Document",
+              candidates: [masterTagCandidate]
+            }),
+            new ProcessCardIdentifierAmbiguousError({
+              identifier: "Contract",
+              candidates: [cardCandidate]
+            }),
+            new ProcessCardNotFoundError({ identifier: "Missing Card" })
+          ]
+
+          for (const error of errors) {
+            const response = mapDomainErrorToMcp(error)
+
+            expect(response.isError).toBe(true)
+            expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+            expect(response._meta.errorTag).toBeUndefined()
+            expect(response.content[0].text).toBe(error.message)
+          }
         }))
     })
 
