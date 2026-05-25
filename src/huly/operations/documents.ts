@@ -5,7 +5,6 @@
  */
 import {
   type Data,
-  type DocumentQuery,
   type DocumentUpdate,
   generateId,
   type MarkupBlobRef,
@@ -44,7 +43,13 @@ import { DocumentId, TeamspaceId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js"
 import { buildDocumentUrlFromConfig } from "../url-builders.js"
-import { clampLimit, escapeLikeWildcards, findByNameOrId } from "./query-helpers.js"
+import {
+  clampLimit,
+  escapeLikeWildcards,
+  findByNameOrId,
+  hulyQuery,
+  type StrictDocumentQuery
+} from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
 import { core, documentPlugin } from "../huly-plugins.js"
@@ -104,8 +109,8 @@ const findTeamspace = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const nameQuery: DocumentQuery<HulyTeamspace> = { name: identifier }
-    const idQuery: DocumentQuery<HulyTeamspace> = { _id: toRef<HulyTeamspace>(identifier) }
+    const nameQuery: StrictDocumentQuery<HulyTeamspace> = { name: identifier }
+    const idQuery: StrictDocumentQuery<HulyTeamspace> = { _id: toRef<HulyTeamspace>(identifier) }
     if (!opts?.includeArchived) {
       nameQuery.archived = false
       idQuery.archived = false
@@ -167,7 +172,7 @@ export const listTeamspaces = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const query: DocumentQuery<HulyTeamspace> = {}
+    const query: StrictDocumentQuery<HulyTeamspace> = {}
     if (!params.includeArchived) {
       query.archived = false
     }
@@ -176,7 +181,7 @@ export const listTeamspaces = (
 
     const teamspaces = yield* client.findAll<HulyTeamspace>(
       documentPlugin.class.Teamspace,
-      query,
+      hulyQuery(query),
       {
         limit,
         sort: {
@@ -211,7 +216,7 @@ export const getTeamspace = (
 
     const docs = yield* client.findAll<HulyDocument>(
       documentPlugin.class.Document,
-      { space: teamspace._id },
+      hulyQuery<HulyDocument>({ space: teamspace._id }),
       { limit: 1, total: true }
     )
 
@@ -233,7 +238,7 @@ export const createTeamspace = (
 
     const existing = yield* client.findOne<HulyTeamspace>(
       documentPlugin.class.Teamspace,
-      { name: params.name, archived: false }
+      hulyQuery<HulyTeamspace>({ name: params.name, archived: false })
     )
 
     if (existing !== undefined) {
@@ -335,7 +340,7 @@ export const listDocuments = (
 
     const limit = clampLimit(params.limit)
 
-    const query: DocumentQuery<HulyDocument> = {
+    const query: StrictDocumentQuery<HulyDocument> = {
       space: teamspace._id
     }
 
@@ -353,7 +358,7 @@ export const listDocuments = (
 
     const documents = yield* client.findAll<HulyDocument>(
       documentPlugin.class.Document,
-      query,
+      hulyQuery(query),
       {
         limit,
         sort: {
@@ -461,7 +466,7 @@ export const createDocument = (
     // Fetch rank of the last document to insert after
     const lastDoc = yield* client.findOne<HulyDocument>(
       documentPlugin.class.Document,
-      { space: teamspace._id },
+      hulyQuery<HulyDocument>({ space: teamspace._id }),
       { sort: { rank: SortingOrder.Descending } }
     )
     const rank = makeRank(lastDoc?.rank, undefined)

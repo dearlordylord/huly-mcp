@@ -4,7 +4,7 @@ import { Effect } from "effect"
 import { MAX_LIMIT } from "../../domain/schemas/shared.js"
 import type { HulyClientError, HulyClientOperations } from "../client.js"
 
-type StrictDocumentQuery<T extends Doc> =
+export type StrictDocumentQuery<T extends Doc> =
   & {
     [P in keyof T]?: DocumentQuery<T>[P]
   }
@@ -43,12 +43,12 @@ export const withLookup = <T extends Doc>(
 export const findOneOrFail = <T extends Doc, E>(
   client: HulyClientOperations,
   _class: Ref<Class<T>>,
-  query: DocumentQuery<T>,
+  query: StrictDocumentQuery<T>,
   onNotFound: () => E,
   options?: FindOptions<T>
 ): Effect.Effect<WithLookup<T>, E | HulyClientError> =>
   Effect.flatMap(
-    client.findOne<T>(_class, query, options),
+    client.findOne<T>(_class, hulyQuery(query), options),
     (result) =>
       result !== undefined
         ? Effect.succeed(result)
@@ -58,23 +58,23 @@ export const findOneOrFail = <T extends Doc, E>(
 export const findByNameOrId = <T extends Doc>(
   client: HulyClientOperations,
   _class: Ref<Class<T>>,
-  primaryQuery: DocumentQuery<T>,
-  fallbackQuery: DocumentQuery<T>,
+  primaryQuery: StrictDocumentQuery<T>,
+  fallbackQuery: StrictDocumentQuery<T>,
   options?: FindOptions<T>
 ): Effect.Effect<WithLookup<T> | undefined, HulyClientError> =>
   Effect.flatMap(
-    client.findOne<T>(_class, primaryQuery, options),
+    client.findOne<T>(_class, hulyQuery(primaryQuery), options),
     (result) =>
       result !== undefined
         ? Effect.succeed(result)
-        : client.findOne<T>(_class, fallbackQuery, options)
+        : client.findOne<T>(_class, hulyQuery(fallbackQuery), options)
   )
 
 export const findByNameOrIdOrFail = <T extends Doc, E>(
   client: HulyClientOperations,
   _class: Ref<Class<T>>,
-  primaryQuery: DocumentQuery<T>,
-  fallbackQuery: DocumentQuery<T>,
+  primaryQuery: StrictDocumentQuery<T>,
+  fallbackQuery: StrictDocumentQuery<T>,
   onNotFound: () => E,
   options?: FindOptions<T>
 ): Effect.Effect<WithLookup<T>, E | HulyClientError> =>

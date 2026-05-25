@@ -1,4 +1,4 @@
-import type { Class, Data, Doc, DocumentQuery, DocumentUpdate, Ref, Space } from "@hcengineering/core"
+import type { Class, Data, Doc, DocumentUpdate, Ref, Space } from "@hcengineering/core"
 import { generateId, SortingOrder } from "@hcengineering/core"
 import type { TagCategory as HulyTagCategory, TagElement as HulyTagElement, TagReference } from "@hcengineering/tags"
 import { Effect } from "effect"
@@ -17,7 +17,7 @@ import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { TagCategoryNotFoundError, TagNotFoundError } from "../errors.js"
 import { core, tags, tracker } from "../huly-plugins.js"
 import { findProjectAndIssue } from "./issues-shared.js"
-import { clampLimit } from "./query-helpers.js"
+import { clampLimit, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import { findCategoryByIdOrLabel } from "./tag-categories.js"
 
@@ -36,16 +36,16 @@ const findTagByIdOrTitle = (
   Effect.gen(function*() {
     const tag = (yield* client.findOne<HulyTagElement>(
       tags.class.TagElement,
-      {
+      hulyQuery<HulyTagElement>({
         _id: toRef<HulyTagElement>(idOrTitle),
         targetClass: issueClassRef
-      }
+      })
     )) ?? (yield* client.findOne<HulyTagElement>(
       tags.class.TagElement,
-      {
+      hulyQuery<HulyTagElement>({
         title: idOrTitle,
         targetClass: issueClassRef
-      }
+      })
     ))
 
     return tag
@@ -84,7 +84,7 @@ export const listLabels = (
 
     const limit = clampLimit(params.limit)
 
-    const query: DocumentQuery<HulyTagElement> = { targetClass: issueClassRef }
+    const query: StrictDocumentQuery<HulyTagElement> = { targetClass: issueClassRef }
 
     if (params.category !== undefined) {
       const catRef = yield* resolveCategoryRef(client, params.category)
@@ -95,7 +95,7 @@ export const listLabels = (
 
     const elements = yield* client.findAll<HulyTagElement>(
       tags.class.TagElement,
-      query,
+      hulyQuery(query),
       {
         limit,
         sort: { modifiedOn: SortingOrder.Descending }
@@ -119,10 +119,10 @@ export const createLabel = (
 
     const existing = yield* client.findOne<HulyTagElement>(
       tags.class.TagElement,
-      {
+      hulyQuery<HulyTagElement>({
         title: params.title,
         targetClass: issueClassRef
-      }
+      })
     )
 
     if (existing !== undefined) {
@@ -213,10 +213,10 @@ export const removeIssueLabel = (
 
     const tagRefs = yield* client.findAll<TagReference>(
       tags.class.TagReference,
-      {
+      hulyQuery<TagReference>({
         attachedTo: issue._id,
         attachedToClass: tracker.class.Issue
-      }
+      })
     )
 
     const matchingRef = tagRefs.find(
