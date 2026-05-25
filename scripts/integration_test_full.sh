@@ -85,6 +85,34 @@ run_capture() {
   return 0
 }
 
+run_capture_to_var() {
+  local output_var="$1" name="$2" payload="$3"
+  local result
+  result=$(call_tool "$payload")
+  if [ -z "$result" ]; then
+    echo "FAIL: $name (no response)" >&2
+    FAILED=$((FAILED + 1))
+    ERRORS="${ERRORS}\n  - ${name}: no response"
+    printf -v "$output_var" '%s' ""
+    return 1
+  fi
+  local is_error
+  is_error=$(echo "$result" | jq -r '.result.isError // false' 2>/dev/null)
+  if [ "$is_error" = "true" ]; then
+    local err_text
+    err_text=$(echo "$result" | jq -r '.result.content[0].text' 2>/dev/null | head -c 200)
+    echo "FAIL: $name => $err_text" >&2
+    FAILED=$((FAILED + 1))
+    ERRORS="${ERRORS}\n  - ${name}: ${err_text}"
+    printf -v "$output_var" '%s' ""
+    return 1
+  fi
+  echo "PASS: $name" >&2
+  PASSED=$((PASSED + 1))
+  printf -v "$output_var" '%s' "$(echo "$result" | jq -r '.result.content[0].text' 2>/dev/null)"
+  return 0
+}
+
 skip_test() {
   local name="$1"
   local reason="$2"
@@ -139,16 +167,31 @@ assert_json_field_equals() {
   return 1
 }
 
-assert_json_any_equals() {
-  local name="$1" json="$2" jq_expr="$3"
-  if printf '%s\n' "$json" | jq -e "$jq_expr" >/dev/null 2>&1; then
+assert_json_issue_summary_contains_issue_id() {
+  local name="$1" json="$2" identifier="$3" issue_id="$4"
+  if printf '%s\n' "$json" | jq -e --arg identifier "$identifier" --arg issue_id "$issue_id" \
+    'any(.[]?; .identifier == $identifier and .issueId == $issue_id)' >/dev/null 2>&1; then
     echo "PASS: $name"
     PASSED=$((PASSED + 1))
     return 0
   fi
-  echo "FAIL: $name (no matching JSON item)"
+  echo "FAIL: $name (issue summary missing issueId)"
   FAILED=$((FAILED + 1))
-  ERRORS="${ERRORS}\n  - ${name}: no matching JSON item"
+  ERRORS="${ERRORS}\n  - ${name}: issue summary missing issueId"
+  return 1
+}
+
+assert_json_association_has_expected_class_label() {
+  local name="$1" json="$2" class_id="$3" expected_label="$4"
+  if printf '%s\n' "$json" | jq -e --arg class_id "$class_id" --arg expected_label "$expected_label" \
+    'any(.associations[]?; (.sourceClass == $class_id and .sourceClassLabel == $expected_label) or (.targetClass == $class_id and .targetClassLabel == $expected_label))' >/dev/null 2>&1; then
+    echo "PASS: $name"
+    PASSED=$((PASSED + 1))
+    return 0
+  fi
+  echo "FAIL: $name (expected label $expected_label for $class_id)"
+  FAILED=$((FAILED + 1))
+  ERRORS="${ERRORS}\n  - ${name}: expected label ${expected_label} for ${class_id}"
   return 1
 }
 
@@ -425,19 +468,16 @@ if [ $? -eq 0 ]; then
   ISSUE_OBJ_ID=$(echo "$ISSUE_TEXT" | jq -r '.issueId' 2>/dev/null)
   echo "  => $ISSUE_ID ($ISSUE_OBJ_ID)"
 
-  GET_ISSUE_TEXT=$(run_capture "get_issue($ISSUE_ID)" \
+  run_capture_to_var GET_ISSUE_TEXT "get_issue($ISSUE_ID)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$ISSUE_ID\"}},\"id\":2}"
-  )
   if [ $? -eq 0 ] && [ -n "$ISSUE_OBJ_ID" ]; then
     assert_json_field_equals "get_issue returns issueId" "$GET_ISSUE_TEXT" ".issueId" "$ISSUE_OBJ_ID"
   fi
 
-  LIST_ISSUES_TEXT=$(run_capture "list_issues" \
+  run_capture_to_var LIST_ISSUES_TEXT "list_issues" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_issues\",\"arguments\":{\"project\":\"$PROJECT\",\"titleSearch\":\"IntTest Issue\",\"limit\":10}},\"id\":2}"
-  )
   if [ $? -eq 0 ] && [ -n "$ISSUE_OBJ_ID" ]; then
-    assert_json_any_equals "list_issues includes issueId" "$LIST_ISSUES_TEXT" \
-      "any(.[]?; .identifier == \"$ISSUE_ID\" and .issueId == \"$ISSUE_OBJ_ID\")"
+    assert_json_issue_summary_contains_issue_id "list_issues includes issueId" "$LIST_ISSUES_TEXT" "$ISSUE_ID" "$ISSUE_OBJ_ID"
   fi
 
   run_test "update_issue($ISSUE_ID)" \
@@ -1194,13 +1234,31 @@ ASSOCIATIONS_TEXT=$(run_capture "list_associations" \
 ASSOC_ID=$(echo "$ASSOCIATIONS_TEXT" | jq -r '.associations[0].associationId // empty' 2>/dev/null)
 ASSOC_SOURCE_CLASS=$(echo "$ASSOCIATIONS_TEXT" | jq -r '.associations[0].sourceClass // empty' 2>/dev/null)
 ASSOC_TARGET_CLASS=$(echo "$ASSOCIATIONS_TEXT" | jq -r '.associations[0].targetClass // empty' 2>/dev/null)
-ASSOC_WITH_LABEL=$(echo "$ASSOCIATIONS_TEXT" | jq -r '.associations[]? | select((.sourceClassLabel // "") != "" or (.targetClassLabel // "") != "") | .associationId' 2>/dev/null | head -n 1)
+ASSOC_KNOWN_CLASS=$(echo "$ASSOCIATIONS_TEXT" | jq -r '
+  first(.associations[]? | [.sourceClass, .targetClass][] | select(
+    . == "tracker:class:Issue"
+    or . == "tracker:class:Project"
+    or . == "document:class:Document"
+    or . == "document:class:Teamspace"
+    or . == "core:class:Relation"
+    or . == "core:class:Doc"
+  )) // empty
+' 2>/dev/null)
+case "$ASSOC_KNOWN_CLASS" in
+  "tracker:class:Issue") ASSOC_EXPECTED_LABEL="Issue" ;;
+  "tracker:class:Project") ASSOC_EXPECTED_LABEL="Project" ;;
+  "document:class:Document") ASSOC_EXPECTED_LABEL="Document" ;;
+  "document:class:Teamspace") ASSOC_EXPECTED_LABEL="Teamspace" ;;
+  "core:class:Relation") ASSOC_EXPECTED_LABEL="Relation" ;;
+  "core:class:Doc") ASSOC_EXPECTED_LABEL="Huly document" ;;
+  *) ASSOC_EXPECTED_LABEL="" ;;
+esac
 
 if [ -n "$ASSOC_ID" ]; then
   assert_json_field_nonempty "list_associations has id" "$ASSOCIATIONS_TEXT" ".associations[0].associationId"
-  if [ -n "$ASSOC_WITH_LABEL" ]; then
-    assert_json_any_equals "list_associations returns class labels when known" "$ASSOCIATIONS_TEXT" \
-      "any(.associations[]?; .associationId == \"$ASSOC_WITH_LABEL\" and ((.sourceClassLabel // \"\") != \"\" or (.targetClassLabel // \"\") != \"\"))"
+  if [ -n "$ASSOC_KNOWN_CLASS" ] && [ -n "$ASSOC_EXPECTED_LABEL" ]; then
+    assert_json_association_has_expected_class_label "list_associations labels $ASSOC_KNOWN_CLASS" \
+      "$ASSOCIATIONS_TEXT" "$ASSOC_KNOWN_CLASS" "$ASSOC_EXPECTED_LABEL"
   else
     skip_test "list_associations class labels" "workspace returned no associations for known SDK classes"
   fi
