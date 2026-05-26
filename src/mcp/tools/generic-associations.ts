@@ -1,19 +1,27 @@
 import {
+  createAssociationParamsJsonSchema,
+  CreateAssociationResultSchema,
   createRelationParamsJsonSchema,
   CreateRelationResultSchema,
+  deleteAssociationParamsJsonSchema,
+  DeleteAssociationResultSchema,
   deleteRelationParamsJsonSchema,
   DeleteRelationResultSchema,
   listAssociationsParamsJsonSchema,
   ListAssociationsResultSchema,
   listRelationsParamsJsonSchema,
   ListRelationsResultSchema,
+  parseCreateAssociationParams,
   parseCreateRelationParams,
+  parseDeleteAssociationParams,
   parseDeleteRelationParams,
   parseListAssociationsParams,
   parseListRelationsParams
 } from "../../domain/schemas/generic-associations.js"
 import {
+  createAssociation,
   createRelation,
+  deleteAssociation,
   deleteRelation,
   listAssociations,
   listRelations
@@ -37,6 +45,44 @@ export const genericAssociationTools: ReadonlyArray<RegisteredTool> = [
     )
   },
   {
+    name: "create_association",
+    description:
+      "Idempotently create one Huly association definition between two non-system classes. Use sourceClass/targetClass with sourceRole/targetRole and cardinality; returns an existing identical association by default.",
+    category: CATEGORY,
+    inputSchema: createAssociationParamsJsonSchema,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false
+    },
+    handler: createEncodedToolHandler(
+      "create_association",
+      parseCreateAssociationParams,
+      createAssociation,
+      CreateAssociationResultSchema
+    )
+  },
+  {
+    name: "delete_association",
+    description:
+      "Idempotently delete one Huly association definition only when no concrete relations reference it. If relations exist, delete_relation must clean them up first; deleting an already-missing association is a successful no-op.",
+    category: CATEGORY,
+    inputSchema: deleteAssociationParamsJsonSchema,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false
+    },
+    handler: createEncodedToolHandler(
+      "delete_association",
+      parseDeleteAssociationParams,
+      deleteAssociation,
+      DeleteAssociationResultSchema
+    )
+  },
+  {
     name: "list_relations",
     description:
       "List concrete Huly relation instances under an association, optionally filtered by source and target documents. Requires at least one filter to avoid broad workspace scans.",
@@ -52,7 +98,7 @@ export const genericAssociationTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "create_relation",
     description:
-      "Idempotently create one concrete relation between two resolved documents. Only succeeds for associations where list_associations reports canCreateRelation=true; otherwise it fails clearly. This build currently reports no generic associations as writable until a write allowlist is live-validated.",
+      "Idempotently create one concrete relation between two resolved documents for a writable association. Enforces association endpoint classes, direction, duplicate handling, automation-only restrictions, and cardinality.",
     category: CATEGORY,
     inputSchema: createRelationParamsJsonSchema,
     annotations: {
@@ -71,9 +117,15 @@ export const genericAssociationTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "delete_relation",
     description:
-      "Idempotently delete one concrete relation by relation ID or by exact association/source/target triple. Only succeeds for associations where list_associations reports canDeleteRelation=true; otherwise it fails clearly. This build currently reports no generic associations as writable until a write allowlist is live-validated.",
+      "Idempotently delete one concrete relation by relation ID or by exact association/source/target triple. Triple deletes use the same direction semantics as create_relation and fail if the selector is ambiguous.",
     category: CATEGORY,
     inputSchema: deleteRelationParamsJsonSchema,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false
+    },
     handler: createEncodedToolHandler(
       "delete_relation",
       parseDeleteRelationParams,

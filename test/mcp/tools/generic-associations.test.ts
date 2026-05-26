@@ -68,6 +68,8 @@ describe("genericAssociationTools", () => {
     Effect.gen(function*() {
       expect(genericAssociationTools.map((tool) => tool.name)).toEqual([
         "list_associations",
+        "create_association",
+        "delete_association",
         "list_relations",
         "create_relation",
         "delete_relation"
@@ -107,6 +109,30 @@ describe("genericAssociationTools", () => {
       })
     }))
 
+  it.effect("create_association annotations mark the operation idempotent and non-destructive", () =>
+    Effect.gen(function*() {
+      const tool = findTool("create_association")
+
+      expect(tool.annotations).toMatchObject({
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      })
+    }))
+
+  it.effect("delete_association annotations mark the operation idempotent and destructive", () =>
+    Effect.gen(function*() {
+      const tool = findTool("delete_association")
+
+      expect(tool.annotations).toMatchObject({
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false
+      })
+    }))
+
   it.effect("delete_relation input schema stays list_tools compatible while describing both delete modes", () =>
     Effect.gen(function*() {
       const tool = findTool("delete_relation")
@@ -121,6 +147,18 @@ describe("genericAssociationTools", () => {
             required: ["association", "source", "target"]
           }
         ]
+      })
+    }))
+
+  it.effect("delete_relation annotations mark the operation idempotent and destructive", () =>
+    Effect.gen(function*() {
+      const tool = findTool("delete_relation")
+
+      expect(tool.annotations).toMatchObject({
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false
       })
     }))
 })

@@ -1,12 +1,13 @@
 import { Schema } from "effect"
 
+import { AssociationName, CardinalitySchema } from "../domain/schemas/generic-associations.js"
 import { AssociationId, DocId, ObjectClassName, RelationId } from "../domain/schemas/shared.js"
 
 const CandidateSchema = Schema.Struct({
   id: AssociationId,
-  name: Schema.optional(Schema.String),
-  sourceClass: Schema.optional(Schema.String),
-  targetClass: Schema.optional(Schema.String)
+  name: Schema.optional(AssociationName),
+  sourceClass: Schema.optional(ObjectClassName),
+  targetClass: Schema.optional(ObjectClassName)
 })
 
 type Candidate = Schema.Schema.Type<typeof CandidateSchema>
@@ -80,6 +81,73 @@ export class RelationMutationUnsupportedError extends Schema.TaggedError<Relatio
   override get message(): string {
     const id = this.associationId === undefined ? "" : ` for association '${this.associationId}'`
     return `Generic relation mutation${id} is not supported: ${this.reason}. Call list_associations with writableOnly=true to discover writable associations.`
+  }
+}
+
+export class AssociationSystemClassUnsupportedError
+  extends Schema.TaggedError<AssociationSystemClassUnsupportedError>()(
+    "AssociationSystemClassUnsupportedError",
+    {
+      className: ObjectClassName,
+      operation: Schema.Literal("create_association", "delete_association", "create_relation", "delete_relation")
+    }
+  )
+{
+  override get message(): string {
+    return `${this.operation} does not support core system class '${this.className}' in generic association writes.`
+  }
+}
+
+export class AssociationConflictError extends Schema.TaggedError<AssociationConflictError>()(
+  "AssociationConflictError",
+  {
+    associationId: AssociationId,
+    reason: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Association '${this.associationId}' already exists but conflicts with the requested definition: ${this.reason}.`
+  }
+}
+
+export class AssociationInUseError extends Schema.TaggedError<AssociationInUseError>()(
+  "AssociationInUseError",
+  {
+    associationId: AssociationId,
+    relationCount: Schema.Number,
+    sampleRelationIds: Schema.Array(RelationId)
+  }
+) {
+  override get message(): string {
+    const sample = this.sampleRelationIds.length === 0
+      ? ""
+      : ` Sample relation IDs: ${this.sampleRelationIds.join(", ")}.`
+    return `Association '${this.associationId}' cannot be deleted because ${this.relationCount} relation(s) still reference it. Delete those relations first.${sample}`
+  }
+}
+
+export class RelationCardinalityViolationError extends Schema.TaggedError<RelationCardinalityViolationError>()(
+  "RelationCardinalityViolationError",
+  {
+    associationId: AssociationId,
+    cardinality: CardinalitySchema,
+    reason: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Relation violates ${this.cardinality} cardinality for association '${this.associationId}': ${this.reason}.`
+  }
+}
+
+export class RelationDirectionAmbiguousError extends Schema.TaggedError<RelationDirectionAmbiguousError>()(
+  "RelationDirectionAmbiguousError",
+  {
+    associationId: AssociationId,
+    reason: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Relation direction is ambiguous for association '${this.associationId}': ${this.reason}. Use source-to-target or target-to-source.`
   }
 }
 
