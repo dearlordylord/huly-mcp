@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.16.0
+
+### Minor Changes
+
+- Add generic association write tools for creating and deleting Huly association definitions and concrete relations.
+
 ## 0.15.1
 
 ### Patch Changes
