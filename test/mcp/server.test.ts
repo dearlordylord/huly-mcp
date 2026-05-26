@@ -18,6 +18,7 @@ import {
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js"
 import { Context, Effect, Fiber, Layer } from "effect"
 import { expect } from "vitest"
+import { sanitizeHulyRuntimeConfigFromEnv, sanitizeHulyRuntimeConfigFromHeaders } from "../../src/config/config.js"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
@@ -1222,6 +1223,154 @@ describe("McpServerService.layer operations", () => {
         yield* Fiber.interrupt(fiber)
       }), { timeout: 5000 })
 
+    it.scoped(
+      "http transport reports request-specific get_huly_context header config without leakage",
+      () =>
+        Effect.gen(function*() {
+          capturedHandlers.clear()
+          const originalEnv = { ...process.env }
+          process.env["HULY_URL"] = "https://env.huly.app"
+          process.env["HULY_TOKEN"] = "env-token"
+          process.env["HULY_EMAIL"] = "env-user@example.com"
+          process.env["HULY_PASSWORD"] = "env-password"
+          process.env["HULY_WORKSPACE"] = "env-workspace"
+
+          const responses: Array<unknown> = []
+          const serverLayer = McpServerService.layer({
+            transport: "http",
+            httpPort: 19878,
+            httpHost: "127.0.0.1",
+            createServer: createMockServer,
+            resolveClients: async () => {
+              throw new Error("client resolution should be skipped")
+            },
+            getRuntimeConfigContext: () => sanitizeHulyRuntimeConfigFromEnv(process.env),
+            getRuntimeConfigContextForHttpRequest: (req) =>
+              sanitizeHulyRuntimeConfigFromHeaders(req.headers, process.env),
+            httpTransportDependencies: {
+              createTransport: () =>
+                // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test fake implements the transport methods used by createMcpHandlers
+                ({
+                  async close() {},
+                  async handleRequest(_req: unknown, _res: unknown, body: unknown) {
+                    const handler = capturedHandlers.get(CallToolRequestSchema)
+                    if (handler === undefined) throw new Error("CallTool handler was not registered")
+                    const params = body && typeof body === "object" && "params" in body
+                      ? body.params
+                      : { name: "get_huly_context", arguments: {} }
+                    responses.push(await handler({ params }))
+                  }
+                }) as never
+            }
+          }).pipe(Layer.provide(TelemetryService.testLayer()))
+
+          const ctx = yield* Layer.build(serverLayer)
+          const ops = yield* McpServerService.pipe(
+            Effect.provide(Layer.succeedContext(ctx))
+          )
+
+          const postHandlers: Array<(req: unknown, res: unknown) => Promise<void>> = []
+          const mockHttpFactory: HttpServerFactoryService["Type"] = {
+            createApp: () =>
+              // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test fake implements the Express methods used by startHttpTransport
+              ({
+                post: (_path: string, handler: (req: unknown, res: unknown) => Promise<void>) => {
+                  postHandlers.push(handler)
+                },
+                get: () => {},
+                delete: () => {}
+              }) as never,
+            listen: () =>
+              Effect.succeed({
+                close: (cb: (err?: Error) => void) => cb()
+              } as never)
+          }
+
+          const fiber = yield* Effect.fork(
+            ops.run().pipe(
+              Effect.provideService(HttpServerFactoryService, mockHttpFactory)
+            )
+          )
+
+          yield* Effect.promise(() => new Promise((r) => setTimeout(r, 100)))
+          expect(postHandlers).toHaveLength(1)
+
+          const response = {
+            headersSent: false,
+            status: () => ({ json: () => {} }),
+            on: () => {}
+          }
+          const body = {
+            jsonrpc: "2.0",
+            method: "tools/call",
+            id: 1,
+            params: { name: "get_huly_context", arguments: {} }
+          }
+          const firstRequest = {
+            body,
+            headers: {
+              "x-huly-url": "https://header-user:header-pass@header.huly.app/path?token=header-query-secret",
+              "x-huly-workspace": "header-workspace",
+              "x-huly-token": "header-token"
+            },
+            on: () => {}
+          }
+          const secondRequest = {
+            body,
+            headers: {},
+            on: () => {}
+          }
+
+          const handler = postHandlers[0]
+          yield* Effect.promise(() => handler(firstRequest, response))
+          yield* Effect.promise(() => handler(secondRequest, response))
+
+          const first = responses[0] as {
+            structuredContent?: {
+              result?: {
+                huly?: { url?: { origin?: string }; workspace?: { value?: string } }
+                auth?: { source?: string }
+                configSources?: { headers?: { present?: boolean; requiredComplete?: boolean } }
+              }
+            }
+          }
+          const second = responses[1] as {
+            structuredContent?: {
+              result?: {
+                huly?: { url?: { origin?: string }; workspace?: { value?: string } }
+                auth?: { source?: string }
+                configSources?: { headers?: { present?: boolean } }
+              }
+            }
+          }
+
+          expect(first.structuredContent?.result?.auth?.source).toBe("header")
+          expect(first.structuredContent?.result?.huly?.url?.origin).toBe("https://header.huly.app")
+          expect(first.structuredContent?.result?.huly?.workspace?.value).toBe("header-workspace")
+          expect(first.structuredContent?.result?.configSources?.headers).toMatchObject({
+            present: true,
+            requiredComplete: true
+          })
+          expect(second.structuredContent?.result?.auth?.source).toBe("env")
+          expect(second.structuredContent?.result?.huly?.url?.origin).toBe("https://env.huly.app")
+          expect(second.structuredContent?.result?.huly?.workspace?.value).toBe("env-workspace")
+          expect(second.structuredContent?.result?.configSources?.headers?.present).toBe(false)
+
+          const serialized = JSON.stringify(responses)
+          expect(serialized).not.toContain("header-token")
+          expect(serialized).not.toContain("env-token")
+          expect(serialized).not.toContain("env-password")
+          expect(serialized).not.toContain("env-user@example.com")
+          expect(serialized).not.toContain("header-user")
+          expect(serialized).not.toContain("header-pass")
+          expect(serialized).not.toContain("header-query-secret")
+
+          process.env = originalEnv
+          yield* Fiber.interrupt(fiber)
+        }),
+      { timeout: 5000 }
+    )
+
     it.scoped("http transport run completes via SIGTERM and flushes telemetry", () => {
       return Effect.gen(function*() {
         const telemetryOps: Partial<TelemetryOperations> = {
@@ -1592,8 +1741,261 @@ describe("McpServerService.layer operations", () => {
         expect(result.tools[0]).toHaveProperty("inputSchema")
         expect(result.tools[0]).toHaveProperty("outputSchema")
         expect(result.tools.every((tool) => "outputSchema" in tool)).toBe(true)
+        expect(result.tools[0]?.name).toBe("get_version")
+        expect(result.tools[1]?.name).toBe("get_huly_context")
+        expect(result.tools[1]).toMatchObject({
+          inputSchema: { type: "object", properties: {}, additionalProperties: false },
+          annotations: {
+            readOnlyHint: true,
+            destructiveHint: false,
+            idempotentHint: true,
+            openWorldHint: false
+          }
+        })
         expect(firstListToolsCalled).toBe(true)
 
+        yield* cleanup(fiber)
+      }), { timeout: 5000 })
+
+    it.scoped("CallTool handles get_huly_context without resolving Huly clients", () =>
+      Effect.gen(function*() {
+        capturedHandlers.clear()
+        const originalEnv = { ...process.env }
+        process.env["HULY_URL"] = "https://user:pass@example.huly.app/path?token=query-secret"
+        process.env["HULY_TOKEN"] = "secret-token"
+        process.env["HULY_EMAIL"] = "user@example.com"
+        process.env["HULY_PASSWORD"] = "secret-password"
+        process.env["HULY_WORKSPACE"] = "workspace-one"
+        process.env["HULY_CONNECTION_TIMEOUT"] = "45000"
+        process.env["LAZY_ENVS"] = "true"
+
+        let resolveCalled = false
+        let toolCalledProps: ToolCalledProps | null = null
+        const fiber = yield* buildAndRunWithResolveClients(
+          async () => {
+            resolveCalled = true
+            throw new Error("client resolution should be skipped")
+          },
+          {
+            firstListTools: () => {},
+            sessionStart: () => {},
+            toolCalled: (props) => {
+              toolCalledProps = props
+            },
+            shutdown: async () => {}
+          }
+        )
+
+        const callToolHandler = capturedHandlers.get(CallToolRequestSchema) as
+          | ((req: { params: { name: string; arguments?: Record<string, unknown> } }) => Promise<unknown>)
+          | undefined
+        expect(callToolHandler).toBeDefined()
+
+        const result = (yield* Effect.promise(() =>
+          callToolHandler!({
+            params: { name: "get_huly_context", arguments: {} }
+          })
+        )) as {
+          content: Array<{ text: string }>
+          structuredContent?: { result?: { huly?: { url?: { origin?: string } }; auth?: { method?: string } } }
+          isError?: boolean
+        }
+
+        expect(result.isError).toBeUndefined()
+        expect(result.structuredContent?.result?.huly?.url?.origin).toBe("https://example.huly.app")
+        expect(result.structuredContent?.result?.auth?.method).toBe("token")
+        expect(resolveCalled).toBe(false)
+        expect(toolCalledProps).not.toBeNull()
+        expect(toolCalledProps!.toolName).toBe("get_huly_context")
+        expect(toolCalledProps!.status).toBe("success")
+        const serialized = JSON.stringify(result)
+        expect(serialized).not.toContain("secret-token")
+        expect(serialized).not.toContain("secret-password")
+        expect(serialized).not.toContain("user@example.com")
+        expect(serialized).not.toContain("query-secret")
+
+        process.env = originalEnv
+        yield* cleanup(fiber)
+      }), { timeout: 5000 })
+
+    it.scoped("get_huly_context remains visible and reports active TOOLSETS filtering", () =>
+      Effect.gen(function*() {
+        capturedHandlers.clear()
+        const originalToolsets = process.env.TOOLSETS
+        process.env.TOOLSETS = "issues"
+        const fiber = yield* buildAndRunWithResolveClients(
+          async () => {
+            throw new Error("client resolution should be skipped")
+          },
+          {
+            firstListTools: () => {},
+            sessionStart: () => {},
+            toolCalled: () => {},
+            shutdown: async () => {}
+          }
+        )
+
+        const listToolsHandler = capturedHandlers.get(ListToolsRequestSchema) as
+          | (() => Promise<{ tools: Array<{ name: string }> }>)
+          | undefined
+        const listed = yield* Effect.promise(() => listToolsHandler!())
+        expect(listed.tools[0]?.name).toBe("get_version")
+        expect(listed.tools[1]?.name).toBe("get_huly_context")
+
+        const callToolHandler = capturedHandlers.get(CallToolRequestSchema) as
+          | ((req: { params: { name: string; arguments?: Record<string, unknown> } }) => Promise<unknown>)
+          | undefined
+        const result = (yield* Effect.promise(() =>
+          callToolHandler!({
+            params: { name: "get_huly_context", arguments: {} }
+          })
+        )) as {
+          structuredContent?: {
+            result?: {
+              toolsets?: {
+                filteringActive?: boolean
+                requestedCategories?: ReadonlyArray<string>
+                enabledCategories?: ReadonlyArray<string>
+                visibleRegisteredToolCount?: number
+                totalRegisteredToolCount?: number
+              }
+            }
+          }
+        }
+
+        expect(result.structuredContent?.result?.toolsets).toMatchObject({
+          filteringActive: true,
+          requestedCategories: ["issues"],
+          enabledCategories: ["issues"]
+        })
+        expect(result.structuredContent?.result?.toolsets?.visibleRegisteredToolCount).toBeLessThan(
+          result.structuredContent?.result?.toolsets?.totalRegisteredToolCount ?? 0
+        )
+
+        if (originalToolsets === undefined) {
+          delete process.env.TOOLSETS
+        } else {
+          process.env.TOOLSETS = originalToolsets
+        }
+        yield* cleanup(fiber)
+      }), { timeout: 5000 })
+
+    it.scoped("CallTool accepts omitted arguments for get_huly_context", () =>
+      Effect.gen(function*() {
+        capturedHandlers.clear()
+        const fiber = yield* buildAndRunWithResolveClients(
+          async () => {
+            throw new Error("client resolution should be skipped")
+          },
+          {
+            firstListTools: () => {},
+            sessionStart: () => {},
+            toolCalled: () => {},
+            shutdown: async () => {}
+          }
+        )
+
+        const callToolHandler = capturedHandlers.get(CallToolRequestSchema) as
+          | ((req: { params: { name: string; arguments?: Record<string, unknown> } }) => Promise<unknown>)
+          | undefined
+
+        const result = (yield* Effect.promise(() =>
+          callToolHandler!({
+            params: { name: "get_huly_context" }
+          })
+        )) as { structuredContent?: { result?: unknown }; isError?: boolean }
+
+        expect(result.isError).toBeUndefined()
+        expect(result.structuredContent?.result).toBeDefined()
+
+        yield* cleanup(fiber)
+      }), { timeout: 5000 })
+
+    it.scoped("CallTool rejects unexpected arguments for get_huly_context", () =>
+      Effect.gen(function*() {
+        capturedHandlers.clear()
+        let toolCalledProps: ToolCalledProps | null = null
+        const fiber = yield* buildAndRunWithResolveClients(
+          async () => {
+            throw new Error("client resolution should be skipped")
+          },
+          {
+            firstListTools: () => {},
+            sessionStart: () => {},
+            toolCalled: (props) => {
+              toolCalledProps = props
+            },
+            shutdown: async () => {}
+          }
+        )
+
+        const callToolHandler = capturedHandlers.get(CallToolRequestSchema) as
+          | ((req: { params: { name: string; arguments?: Record<string, unknown> } }) => Promise<unknown>)
+          | undefined
+
+        const result = (yield* Effect.promise(() =>
+          callToolHandler!({
+            params: { name: "get_huly_context", arguments: { raw: true } }
+          })
+        )) as { content: Array<{ text: string }>; isError?: boolean }
+
+        expect(result.isError).toBe(true)
+        expect(result.content[0]?.text).toContain("does not accept arguments")
+        expect(toolCalledProps).not.toBeNull()
+        expect(toolCalledProps!.errorTag).toBe("UnexpectedArguments")
+
+        yield* cleanup(fiber)
+      }), { timeout: 5000 })
+
+    it.scoped("CallTool get_huly_context succeeds with missing Huly env in lazy mode", () =>
+      Effect.gen(function*() {
+        capturedHandlers.clear()
+        const originalEnv = { ...process.env }
+        delete process.env["HULY_URL"]
+        delete process.env["HULY_TOKEN"]
+        delete process.env["HULY_EMAIL"]
+        delete process.env["HULY_PASSWORD"]
+        delete process.env["HULY_WORKSPACE"]
+        process.env["LAZY_ENVS"] = "true"
+
+        const fiber = yield* buildAndRunWithResolveClients(
+          async () => {
+            throw new Error("client resolution should be skipped")
+          },
+          {
+            firstListTools: () => {},
+            sessionStart: () => {},
+            toolCalled: () => {},
+            shutdown: async () => {}
+          }
+        )
+
+        const callToolHandler = capturedHandlers.get(CallToolRequestSchema) as
+          | ((req: { params: { name: string; arguments?: Record<string, unknown> } }) => Promise<unknown>)
+          | undefined
+
+        const result = (yield* Effect.promise(() =>
+          callToolHandler!({
+            params: { name: "get_huly_context", arguments: {} }
+          })
+        )) as {
+          structuredContent?: {
+            result?: {
+              huly?: { url?: { configured?: boolean }; workspace?: { configured?: boolean } }
+              auth?: { method?: string; source?: string }
+              configSources?: { env?: { lazyEnvs?: boolean } }
+            }
+          }
+          isError?: boolean
+        }
+
+        expect(result.isError).toBeUndefined()
+        expect(result.structuredContent?.result?.huly?.url?.configured).toBe(false)
+        expect(result.structuredContent?.result?.huly?.workspace?.configured).toBe(false)
+        expect(result.structuredContent?.result?.auth).toMatchObject({ method: "unknown", source: "none" })
+        expect(result.structuredContent?.result?.configSources?.env?.lazyEnvs).toBe(true)
+
+        process.env = originalEnv
         yield* cleanup(fiber)
       }), { timeout: 5000 })
 

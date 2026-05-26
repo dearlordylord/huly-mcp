@@ -3,94 +3,24 @@
 
  * @module
  */
-import { Server } from "@modelcontextprotocol/sdk/server/index.js"
+import type { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js"
 import { Config, Context, Effect, Layer, Ref, Schema } from "effect"
 import type { Request } from "express"
 
+import { type ClientBundle, createMcpServer } from "./create-mcp-server.js"
 import type { HttpServerFactoryService, HttpTransportDependencies, HttpTransportError } from "./http-transport.js"
 import { DEFAULT_HTTP_PORT, startHttpTransport } from "./http-transport.js"
+import { buildHulyContext, parseToolsets } from "./huly-context-tool.js"
 
-import type { HulyClient } from "../huly/client.js"
-import { HulyError } from "../huly/errors-base.js"
-import type { HulyStorageClient } from "../huly/storage.js"
-import type { WorkspaceClientOperations } from "../huly/workspace-client.js"
-import type { TelemetryOperations } from "../telemetry/telemetry.js"
+import { type SanitizedHulyRuntimeConfigContext, sanitizeHulyRuntimeConfigFromEnv } from "../config/config.js"
+import type { GetHulyContextResult } from "../domain/schemas/index.js"
 import { TelemetryService } from "../telemetry/telemetry.js"
-import { VERSION } from "../version.js"
-import type { McpToolResponse } from "./error-mapping.js"
-import { createSuccessResponse, createUnknownToolError, mapDomainErrorToMcp, toMcpResponse } from "./error-mapping.js"
-import { defaultToolOutputSchema, versionToolOutputSchema } from "./tool-output-schema.js"
-import type { ToolRegistry } from "./tools/index.js"
-import { CATEGORY_NAMES, createFilteredRegistry, resolveAnnotations, toolRegistry } from "./tools/index.js"
-import {
-  createMissingArgumentsError,
-  createUnexpectedArgumentsError,
-  isEmptyArgumentsObject,
-  isNoArgumentTool,
-  requiresArgumentsObject
-} from "./tools/registry.js"
+import { createFilteredRegistry, toolRegistry } from "./tools/index.js"
 
-const NPM_PACKAGE_NAME = "@firfi/huly-mcp"
-const VERSION_TOOL_NAME = "get_version"
-
-const versionToolDefinition = {
-  name: VERSION_TOOL_NAME,
-  description: "Returns the current version of this Huly MCP server and the latest version available on npm.",
-  inputSchema: { type: "object" as const, properties: {}, additionalProperties: false },
-  outputSchema: versionToolOutputSchema,
-  annotations: {
-    title: "Get Version",
-    readOnlyHint: true,
-    destructiveHint: false,
-    idempotentHint: true,
-    openWorldHint: true
-  }
-}
-
-const NPM_FETCH_TIMEOUT_MS = 5_000
-
-const fetchLatestNpmVersion = async (): Promise<string> => {
-  try {
-    const res = await fetch(`https://registry.npmjs.org/${NPM_PACKAGE_NAME}/latest`, {
-      signal: AbortSignal.timeout(NPM_FETCH_TIMEOUT_MS)
-    })
-    if (!res.ok) return "unknown"
-    const data: unknown = await res.json()
-    if (typeof data === "object" && data !== null && "version" in data && typeof data.version === "string") {
-      return data.version
-    }
-    return "unknown"
-  } catch {
-    return "unknown"
-  }
-}
-
-const handleVersionTool = async (): Promise<McpToolResponse> => {
-  const latest = await fetchLatestNpmVersion()
-  return createSuccessResponse({ current: VERSION, latest })
-}
-
-interface McpInputSchema {
-  readonly type: "object"
-  readonly properties?: Record<string, unknown>
-  readonly required?: Array<string>
-  readonly [key: string]: unknown
-}
-
-const isObjectSchema = (schema: object): schema is McpInputSchema => "type" in schema && schema.type === "object"
+export type { ClientBundle } from "./create-mcp-server.js"
 
 export type McpTransportType = "stdio" | "http"
-
-/**
- * Bundle of lazily-resolved Huly client services needed by tool handlers.
- */
-export interface ClientBundle {
-  readonly hulyClient: HulyClient["Type"]
-  readonly storageClient: HulyStorageClient["Type"]
-  readonly workspaceClient?: WorkspaceClientOperations
-}
 
 interface McpServerConfigData {
   readonly transport: McpTransportType
@@ -104,6 +34,8 @@ interface McpServerConfigData {
 interface McpServerConfigCallbacks {
   readonly resolveClients: () => Promise<ClientBundle>
   readonly resolveClientsForHttpRequest?: (req: Request) => Promise<ClientBundle>
+  readonly getRuntimeConfigContext?: () => SanitizedHulyRuntimeConfigContext
+  readonly getRuntimeConfigContextForHttpRequest?: (req: Request) => SanitizedHulyRuntimeConfigContext
   readonly createServer?: () => Server
   readonly createStdioTransport?: () => StdioServerTransport
   readonly writeError?: (message: string) => void
@@ -123,195 +55,9 @@ const defaultWriteError = (message: string): void => {
   console.error(message)
 }
 
-const parseToolsets = (
-  raw: string | undefined,
-  writeError: (message: string) => void = defaultWriteError
-): ReadonlySet<string> | undefined => {
-  if (raw === undefined || raw.trim() === "") return undefined
-  const requested = raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
-  const enabled = new Set<string>()
-  for (const r of requested) {
-    if (CATEGORY_NAMES.has(r)) {
-      enabled.add(r)
-    } else {
-      writeError(
-        `Warning: unknown toolset category "${r}", ignoring. Valid categories: ${[...CATEGORY_NAMES].join(", ")}`
-      )
-    }
-  }
-  return enabled.size > 0 ? enabled : undefined
-}
-
 interface McpServerOperations {
   readonly run: () => Effect.Effect<void, McpServerError, HttpServerFactoryService>
   readonly stop: () => Effect.Effect<void, McpServerError>
-}
-
-/**
- * Create a configured MCP Server instance with tool handlers.
- * Used for both stdio and HTTP transports.
- */
-type McpServerHandle = readonly [server: Server, drainInflight: () => Promise<void>]
-
-const DRAIN_POLL_MS = 50
-const DRAIN_TIMEOUT_MS = 30_000
-
-const createMcpServer = (
-  resolveClients: () => Promise<ClientBundle>,
-  telemetry: TelemetryOperations,
-  registry: ToolRegistry,
-  createServer: () => Server = () =>
-    new Server(
-      {
-        name: "huly-mcp",
-        version: VERSION
-      },
-      {
-        capabilities: {
-          tools: {}
-        }
-      }
-    )
-): McpServerHandle => {
-  let inflight = 0
-  const drainInflight = (): Promise<void> => {
-    if (inflight <= 0) return Promise.resolve()
-    return new Promise((resolve) => {
-      const start = Date.now() // eslint-disable-line no-restricted-syntax -- non-Effect Promise-based drain loop
-      const check = () => {
-        if (inflight <= 0 || Date.now() - start > DRAIN_TIMEOUT_MS) { // eslint-disable-line no-restricted-syntax
-          resolve()
-        } else {
-          setTimeout(check, DRAIN_POLL_MS)
-        }
-      }
-      check()
-    })
-  }
-
-  const server = createServer()
-
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
-    telemetry.firstListTools()
-    return {
-      tools: [
-        versionToolDefinition,
-        ...registry.definitions.flatMap((tool) => {
-          if (!isObjectSchema(tool.inputSchema)) return []
-          return [{
-            name: tool.name,
-            description: tool.description,
-            inputSchema: tool.inputSchema,
-            outputSchema: defaultToolOutputSchema,
-            annotations: resolveAnnotations(tool)
-          }]
-        })
-      ]
-    }
-  })
-
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    inflight++
-    try {
-      const { arguments: args, name } = request.params
-
-      const start = Date.now() // eslint-disable-line no-restricted-syntax -- non-Effect async handler
-      const inputBytes = JSON.stringify(args ?? {}).length
-
-      const computeOutputBytes = (response: McpToolResponse): number =>
-        response.content.reduce((sum, c) => sum + c.text.length, 0)
-
-      const returnError = (errorResponse: McpToolResponse, editMode?: string) => {
-        const durationMs = Date.now() - start // eslint-disable-line no-restricted-syntax -- non-Effect async handler
-        telemetry.toolCalled({
-          toolName: name,
-          status: "error",
-          errorTag: errorResponse._meta?.errorTag,
-          durationMs,
-          inputBytes,
-          outputBytes: computeOutputBytes(errorResponse),
-          editMode
-        })
-        return toMcpResponse(errorResponse)
-      }
-
-      if (name === VERSION_TOOL_NAME) {
-        if (!isEmptyArgumentsObject(args)) {
-          return returnError(createUnexpectedArgumentsError(name))
-        }
-
-        const versionResponse = await handleVersionTool()
-        const durationMs = Date.now() - start // eslint-disable-line no-restricted-syntax -- non-Effect async handler
-        telemetry.toolCalled({
-          toolName: name,
-          status: "success",
-          durationMs,
-          inputBytes,
-          outputBytes: computeOutputBytes(versionResponse)
-        })
-        return toMcpResponse(versionResponse)
-      }
-
-      const tool = registry.tools.get(name)
-      if (tool === undefined) {
-        return returnError(createUnknownToolError(name))
-      }
-
-      if (isNoArgumentTool(tool) && !isEmptyArgumentsObject(args)) {
-        return returnError(createUnexpectedArgumentsError(name))
-      }
-
-      if (args === undefined && requiresArgumentsObject(tool)) {
-        return returnError(createMissingArgumentsError(name))
-      }
-
-      const deriveEditMode = (): string | undefined => {
-        if (name !== "edit_document" || args === undefined) return undefined
-        const rawArgs: unknown = args
-        if (typeof rawArgs !== "object" || rawArgs === null || Array.isArray(rawArgs)) return undefined
-        if ("old_text" in rawArgs) return "search_and_replace"
-        if ("content" in rawArgs) return "full_replace"
-        return "title_only"
-      }
-      const editMode = deriveEditMode()
-
-      let clients: ClientBundle
-      try {
-        clients = await resolveClients()
-      } catch (e) {
-        const errorResponse = mapDomainErrorToMcp(
-          new HulyError({ message: `Failed to initialize Huly clients: ${e instanceof Error ? e.message : String(e)}` })
-        )
-        return returnError(errorResponse, editMode)
-      }
-
-      const response = await registry.handleToolCall(
-        name,
-        args,
-        clients.hulyClient,
-        clients.storageClient,
-        clients.workspaceClient
-      )
-      const durationMs = Date.now() - start // eslint-disable-line no-restricted-syntax
-      if (response === null) return returnError(createUnknownToolError(name), editMode)
-
-      telemetry.toolCalled({
-        toolName: name,
-        status: response.isError === true ? "error" : "success",
-        errorTag: response._meta?.errorTag,
-        durationMs,
-        inputBytes,
-        outputBytes: computeOutputBytes(response),
-        editMode
-      })
-
-      return toMcpResponse(response)
-    } finally {
-      inflight--
-    }
-  })
-
-  return [server, drainInflight] as const
 }
 
 export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
@@ -328,12 +74,17 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
         const writeError = config.writeError ?? defaultWriteError
 
         const toolsetsRaw = yield* Effect.orElseSucceed(Config.string("TOOLSETS"), () => "")
-        const enabledCategories = parseToolsets(toolsetsRaw || undefined, writeError)
+        const toolsetSummary = parseToolsets(toolsetsRaw || undefined, writeError)
+        const enabledCategories = toolsetSummary.enabledCategories
 
         const toolsets = enabledCategories ? [...enabledCategories] : null
         const registry = enabledCategories
           ? createFilteredRegistry(enabledCategories)
           : toolRegistry
+        const getRuntimeConfigContext = config.getRuntimeConfigContext
+          ?? (() => sanitizeHulyRuntimeConfigFromEnv(process.env))
+        const getHulyContext = (runtimeConfig: SanitizedHulyRuntimeConfigContext): GetHulyContextResult =>
+          buildHulyContext(config, registry, toolsetSummary, runtimeConfig)
 
         telemetry.sessionStart({
           transport: config.transport,
@@ -365,6 +116,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                   config.resolveClients,
                   telemetry,
                   registry,
+                  () => getHulyContext(getRuntimeConfigContext()),
                   config.createServer
                 )
                 yield* Ref.set(serverRef, stdioServer)
@@ -426,10 +178,15 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                     const requestResolveClients = resolveClientsForRequest === undefined
                       ? config.resolveClients
                       : () => resolveClientsForRequest(req)
+                    const getRuntimeConfigContextForRequest = config.getRuntimeConfigContextForHttpRequest
+                    const requestRuntimeConfig = getRuntimeConfigContextForRequest === undefined
+                      ? getRuntimeConfigContext()
+                      : getRuntimeConfigContextForRequest(req)
                     return createMcpServer(
                       requestResolveClients,
                       telemetry,
                       registry,
+                      () => getHulyContext(requestRuntimeConfig),
                       config.createServer
                     )[0]
                   },

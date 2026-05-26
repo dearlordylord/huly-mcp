@@ -8,13 +8,17 @@
 import type { ConfigError } from "effect"
 import { Config, ConfigProvider, Context, Effect, Layer, Redacted, Schema } from "effect"
 
-const DEFAULT_TIMEOUT = 30000
-// Required only when a request provides any x-huly-* header; otherwise HTTP falls back to process env config.
-const REQUIRED_HULY_CONFIG_HEADERS = ["x-huly-url", "x-huly-workspace", "x-huly-token"] as const
-const HULY_CONFIG_HEADERS = [
-  ...REQUIRED_HULY_CONFIG_HEADERS,
-  "x-huly-connection-timeout"
-] as const
+import {
+  DEFAULT_HULY_CONNECTION_TIMEOUT,
+  HULY_CONFIG_HEADERS,
+  REQUIRED_HULY_CONFIG_HEADERS
+} from "./huly-config-constants.js"
+
+export {
+  type SanitizedHulyRuntimeConfigContext,
+  sanitizeHulyRuntimeConfigFromEnv,
+  sanitizeHulyRuntimeConfigFromHeaders
+} from "./huly-runtime-context.js"
 
 type HulyConfigHeader = typeof HULY_CONFIG_HEADERS[number]
 type HulyEnvNamePattern = `HULY_${string}`
@@ -255,7 +259,7 @@ const HulyConfigFromEnv = Config.all({
   auth: AuthFromEnv,
   workspace: Schema.Config("HULY_WORKSPACE", NonWhitespaceString),
   connectionTimeout: Schema.Config("HULY_CONNECTION_TIMEOUT", PositiveIntFromString).pipe(
-    Config.withDefault(DEFAULT_TIMEOUT)
+    Config.withDefault(DEFAULT_HULY_CONNECTION_TIMEOUT)
   )
 })
 
@@ -280,7 +284,7 @@ export class HulyConfigService extends Context.Tag("@hulymcp/HulyConfig")<
   HulyConfigService,
   HulyConfig
 >() {
-  static readonly DEFAULT_TIMEOUT = DEFAULT_TIMEOUT
+  static readonly DEFAULT_TIMEOUT = DEFAULT_HULY_CONNECTION_TIMEOUT
 
   static readonly layer: Layer.Layer<HulyConfigService, ConfigValidationError> = Layer.effect(
     HulyConfigService,
@@ -299,7 +303,7 @@ export class HulyConfigService extends Context.Tag("@hulymcp/HulyConfig")<
       url: config.url,
       auth: { _tag: "password", email: config.email, password: Redacted.make(config.password) },
       workspace: config.workspace,
-      connectionTimeout: config.connectionTimeout ?? DEFAULT_TIMEOUT
+      connectionTimeout: config.connectionTimeout ?? DEFAULT_HULY_CONNECTION_TIMEOUT
     })
   }
 
@@ -314,7 +318,7 @@ export class HulyConfigService extends Context.Tag("@hulymcp/HulyConfig")<
       url: config.url,
       auth: { _tag: "token", token: Redacted.make(config.token) },
       workspace: config.workspace,
-      connectionTimeout: config.connectionTimeout ?? DEFAULT_TIMEOUT
+      connectionTimeout: config.connectionTimeout ?? DEFAULT_HULY_CONNECTION_TIMEOUT
     })
   }
 }
