@@ -12,7 +12,13 @@ import type { ConfigError } from "effect"
 import { Config, Context, Effect, Exit, Layer, Option, Scope } from "effect"
 import type { Request } from "express"
 
-import { type ConfigValidationError, hulyConfigProviderFromHeaders, HulyConfigService } from "./config/config.js"
+import {
+  type ConfigValidationError,
+  hulyConfigProviderFromHeaders,
+  HulyConfigService,
+  sanitizeHulyRuntimeConfigFromEnv,
+  sanitizeHulyRuntimeConfigFromHeaders
+} from "./config/config.js"
 import { HulyClient, type HulyClientError } from "./huly/client.js"
 import { HulyStorageClient, type StorageClientError } from "./huly/storage.js"
 import { WorkspaceClient, type WorkspaceClientError } from "./huly/workspace-client.js"
@@ -215,7 +221,9 @@ const buildAppLayer = (
     autoExit,
     authMethod,
     resolveClients,
-    resolveClientsForHttpRequest
+    resolveClientsForHttpRequest,
+    getRuntimeConfigContext: () => sanitizeHulyRuntimeConfigFromEnv(process.env),
+    getRuntimeConfigContextForHttpRequest: (req) => sanitizeHulyRuntimeConfigFromHeaders(req.headers, process.env)
   }).pipe(Layer.provide(TelemetryService.layer))
 
   return Layer.merge(mcpServerLayer, HttpServerFactoryService.defaultLayer)
