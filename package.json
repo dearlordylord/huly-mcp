@@ -1,6 +1,6 @@
 {
   "name": "@firfi/huly-mcp",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "description": "MCP server for Huly integration",
   "mcpName": "io.github.dearlordylord/huly-mcp",
   "type": "module",
@@ -33,13 +33,13 @@
     "check-format": "find src test -name '*.ts' -print0 | xargs -0 eslint --rule '@effect/dprint: error'",
     "check-all": "pnpm build && pnpm typecheck && pnpm verify-registry-metadata && pnpm lint && pnpm test",
     "circular": "madge --extensions ts --circular src",
-    "local-release": "changeset version && pnpm sync-registry-metadata && pnpm build && pnpm verify-version && changeset publish",
+    "local-release": "changeset version && pnpm sync-registry-metadata && git add package.json CHANGELOG.md server.json .changeset && (git diff --cached --quiet || HUSKY=0 git commit -m \"RELEASING: Releasing 1 package(s)\") && PKG_VERSION=$(node -p \"require('./package.json').version\") && pnpm dlx esbuild@0.27.2 src/index.ts --bundle --platform=node --format=cjs --outfile=dist/index.cjs --external:ws \"--define:PKG_VERSION=\\\"$PKG_VERSION\\\"\" && pnpm verify-version && npm_config_ignore_scripts=true changeset publish",
     "verify-version": "node -e \"const v=require('./package.json').version; const d=require('fs').readFileSync('dist/index.cjs','utf8'); if(!d.includes('\\\"'+v+'\\\"'))throw new Error('dist version mismatch: expected '+v)\"",
-    "verify-registry-metadata": "tsx scripts/sync-registry-metadata.ts --check",
-    "sync-registry-metadata": "tsx scripts/sync-registry-metadata.ts",
+    "verify-registry-metadata": "node scripts/sync-registry-metadata.mjs --check",
+    "sync-registry-metadata": "node scripts/sync-registry-metadata.mjs",
     "prepack": "pnpm build && pnpm verify-version",
     "prepublishOnly": "pnpm check-all && pnpm verify-version",
-    "update-readme": "tsx scripts/update-readme-tools.ts"
+    "update-readme": "node scripts/update-readme-tools.mjs"
   },
   "bin": {
     "huly-mcp": "./dist/index.cjs",

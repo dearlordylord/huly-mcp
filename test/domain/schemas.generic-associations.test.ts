@@ -3,9 +3,13 @@ import { Effect } from "effect"
 import { expect } from "vitest"
 
 import {
+  createAssociationParamsJsonSchema,
+  deleteAssociationParamsJsonSchema,
   deleteRelationParamsJsonSchema,
   listRelationsParamsJsonSchema,
+  parseCreateAssociationParams,
   parseCreateRelationParams,
+  parseDeleteAssociationParams,
   parseDeleteRelationParams,
   parseListAssociationsParams,
   parseListRelationsParams
@@ -65,9 +69,51 @@ describe("generic association schemas", () => {
       const documentParsed = yield* parseCreateRelationParams({
         association: "links",
         source: { kind: "document", document: "Spec", teamspace: "Engineering" },
-        target: { kind: "raw", id: "doc-2", class: "document:class:Document" }
+        target: { kind: "raw", id: "doc-2", class: "document:class:Document" },
+        direction: "target-to-source"
       })
       expect(documentParsed.source.kind).toBe("document")
+      expect(documentParsed.direction).toBe("target-to-source")
+    }))
+
+  it.effect("parses create_association fields", () =>
+    Effect.gen(function*() {
+      const parsed = yield* parseCreateAssociationParams({
+        sourceClass: "tracker:class:Issue",
+        targetClass: "document:class:Document",
+        sourceRole: "references",
+        targetRole: "referenced by",
+        cardinality: "one-to-many",
+        automationOnly: false
+      })
+
+      expect(parsed.sourceClass).toBe("tracker:class:Issue")
+      expect(parsed.cardinality).toBe("one-to-many")
+    }))
+
+  it.effect("emits JSON schema for create_association", () =>
+    Effect.gen(function*() {
+      expect(createAssociationParamsJsonSchema).toMatchObject({
+        type: "object",
+        required: ["sourceClass", "targetClass", "sourceRole", "targetRole", "cardinality"]
+      })
+    }))
+
+  it.effect("parses delete_association fields", () =>
+    Effect.gen(function*() {
+      const parsed = yield* parseDeleteAssociationParams({
+        association: "assoc-1"
+      })
+
+      expect(parsed.association).toBe("assoc-1")
+    }))
+
+  it.effect("emits JSON schema for delete_association", () =>
+    Effect.gen(function*() {
+      expect(deleteAssociationParamsJsonSchema).toMatchObject({
+        type: "object",
+        required: ["association"]
+      })
     }))
 
   it.effect("rejects mixed locator shapes", () =>
@@ -113,7 +159,8 @@ describe("generic association schemas", () => {
       const parsed = yield* parseDeleteRelationParams({
         association: "links",
         source: { kind: "raw", id: "doc-1", class: "document:class:Document" },
-        target: { kind: "raw", id: "doc-2", class: "document:class:Document" }
+        target: { kind: "raw", id: "doc-2", class: "document:class:Document" },
+        direction: "either"
       })
 
       if (!("association" in parsed)) {
@@ -122,6 +169,7 @@ describe("generic association schemas", () => {
       expect(parsed.association).toBe("links")
       expect(parsed.source.kind).toBe("raw")
       expect(parsed.target.kind).toBe("raw")
+      expect(parsed.direction).toBe("either")
     }))
 
   it.effect("emits JSON schema for delete_relation", () =>

@@ -200,6 +200,9 @@ describe("MCP resources", () => {
       const uri of [
         "huly://issues/123",
         "huly://projects/",
+        "huly://projects/%20HULY",
+        "huly://projects/HULY%20",
+        "huly://projects/HULY%2FCORE",
         "huly://projects/HULY/extra",
         "huly://documents/DOC-1",
         "https://huly.app/projects/HULY",

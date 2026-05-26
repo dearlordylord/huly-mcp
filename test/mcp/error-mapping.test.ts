@@ -2,6 +2,7 @@ import { describe, it } from "@effect/vitest"
 import type { ParseResult } from "effect"
 import { Cause, Effect, Schema } from "effect"
 import { expect } from "vitest"
+import { AssociationName } from "../../src/domain/schemas/generic-associations.js"
 import { ProcessId } from "../../src/domain/schemas/processes.js"
 import {
   AssociationId,
@@ -303,7 +304,7 @@ describe("Error Mapping to MCP", () => {
             new AssociationNotFoundError({ identifier: "relates" }),
             new AssociationIdentifierAmbiguousError({
               identifier: "relates",
-              candidates: [{ id: AssociationId.make("assoc-1"), name: "relates" }]
+              candidates: [{ id: AssociationId.make("assoc-1"), name: AssociationName.make("relates") }]
             }),
             new RelationNotFoundError({ identifier: "rel-1" }),
             new RelationIdentifierAmbiguousError({

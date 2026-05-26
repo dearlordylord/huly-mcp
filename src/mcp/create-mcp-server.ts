@@ -1,4 +1,4 @@
-import { Server } from "@modelcontextprotocol/sdk/server/index.js"
+import type { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js"
 import { Schema } from "effect"
 
@@ -17,6 +17,7 @@ import {
   VERSION_TOOL_NAME,
   versionToolDefinition
 } from "./huly-context-tool.js"
+import { isObjectSchema, toClientCompatibleInputSchema } from "./input-schema-compat.js"
 import { registerResourceHandlers } from "./resources.js"
 import { createDefaultMcpSdkServer } from "./sdk-server.js"
 import { defaultToolOutputSchema } from "./tool-output-schema.js"
@@ -36,19 +37,10 @@ export interface ClientBundle {
   readonly workspaceClient?: WorkspaceClientOperations
 }
 
-interface McpInputSchema {
-  readonly type: "object"
-  readonly properties?: Record<string, unknown>
-  readonly required?: Array<string>
-  readonly [key: string]: unknown
-}
-
 type McpServerHandle = readonly [server: Server, drainInflight: () => Promise<void>]
 
 const DRAIN_POLL_MS = 50
 const DRAIN_TIMEOUT_MS = 30_000
-
-const isObjectSchema = (schema: object): schema is McpInputSchema => "type" in schema && schema.type === "object"
 
 const computeOutputBytes = (response: McpToolResponse): number =>
   response.content.reduce((sum, c) => sum + c.text.length, 0)
@@ -101,7 +93,7 @@ export const createMcpServer = (
           return [{
             name: tool.name,
             description: tool.description,
-            inputSchema: tool.inputSchema,
+            inputSchema: toClientCompatibleInputSchema(tool.inputSchema),
             outputSchema: defaultToolOutputSchema,
             annotations: resolveAnnotations(tool)
           }]

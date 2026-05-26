@@ -80,6 +80,8 @@ type HulyResource =
     readonly identifier: string
   }
 
+type HulyResourceHost = "projects" | "issues"
+
 const expectedFormats =
   "Expected huly://projects/{project}, huly://issues/{PROJECT-NUMBER}, or huly://projects/{project}/issues/{issue}."
 
@@ -91,8 +93,11 @@ const invalidResourceUri = (uri: string, message: string): McpError =>
 const decodePathSegment = (uri: string, value: string): string => {
   try {
     const decoded = decodeURIComponent(value)
-    if (decoded.trim() === "" || decoded.includes("/")) {
-      throw invalidResourceUri(uri, "Resource URI path segments must be non-empty identifiers without slashes.")
+    if (decoded.trim() === "" || decoded.trim() !== decoded || decoded.includes("/")) {
+      throw invalidResourceUri(
+        uri,
+        "Resource URI path segments must be non-empty trimmed identifiers without slashes."
+      )
     }
     return decoded
   } catch (e) {
@@ -111,6 +116,23 @@ const splitPath = (uri: string, url: URL): ReadonlyArray<string> => {
   }
   return rawSegments.map(segment => decodePathSegment(uri, segment))
 }
+
+const parseResourceHost = (uri: string, hostname: string): HulyResourceHost => {
+  switch (hostname) {
+    case "projects":
+    case "issues":
+      return hostname
+    default:
+      throw invalidResourceUri(uri, "Unsupported Huly resource host.")
+  }
+}
+
+const isSingleSegment = (segments: ReadonlyArray<string>): segments is readonly [string] => segments.length === 1
+
+const isProjectIssueSegments = (
+  segments: ReadonlyArray<string>
+): segments is readonly [string, "issues", string] =>
+  segments.length === EXPLICIT_ISSUE_URI_SEGMENTS && segments[1] === "issues"
 
 const splitFullIssueIdentifier = (
   uri: string,
@@ -138,36 +160,41 @@ export const parseHulyResourceUri = (uri: string): HulyResource => {
     throw invalidResourceUri(uri, "Resource URI must use the huly:// scheme.")
   }
 
+  const host = parseResourceHost(uri, url.hostname)
   const segments = splitPath(uri, url)
 
-  if (url.hostname === "projects" && segments.length === 1) {
-    return {
-      _tag: "project",
-      uri,
-      project: segments[0]
+  switch (host) {
+    case "projects":
+      if (isSingleSegment(segments)) {
+        return {
+          _tag: "project",
+          uri,
+          project: segments[0]
+        }
+      }
+      if (isProjectIssueSegments(segments)) {
+        return {
+          _tag: "issue",
+          uri,
+          project: segments[0],
+          identifier: segments[2]
+        }
+      }
+      throw invalidResourceUri(uri, "Unsupported Huly project resource path.")
+
+    case "issues": {
+      if (!isSingleSegment(segments)) {
+        throw invalidResourceUri(uri, "Unsupported Huly issue resource path.")
+      }
+      const issue = splitFullIssueIdentifier(uri, segments[0])
+      return {
+        _tag: "issue",
+        uri,
+        project: issue.project,
+        identifier: issue.identifier
+      }
     }
   }
-
-  if (url.hostname === "issues" && segments.length === 1) {
-    const issue = splitFullIssueIdentifier(uri, segments[0])
-    return {
-      _tag: "issue",
-      uri,
-      project: issue.project,
-      identifier: issue.identifier
-    }
-  }
-
-  if (url.hostname === "projects" && segments.length === EXPLICIT_ISSUE_URI_SEGMENTS && segments[1] === "issues") {
-    return {
-      _tag: "issue",
-      uri,
-      project: segments[0],
-      identifier: segments[2]
-    }
-  }
-
-  throw invalidResourceUri(uri, "Unsupported Huly resource path.")
 }
 
 export const listResources = (): ListResourcesResult => ({ resources: [] })
@@ -236,6 +263,33 @@ const issueReadResult = (uri: string, issue: Issue): ReadResourceResult => ({
   }]
 })
 
+const absurdResource = (_resource: never): never => {
+  throw new McpError(ErrorCode.InternalError, "Unsupported Huly resource type.")
+}
+
+const readParsedHulyResource = (
+  resource: HulyResource
+): Effect.Effect<ReadResourceResult, McpError, HulyClient> => {
+  switch (resource._tag) {
+    case "project":
+      return parseGetProjectParams({ project: resource.project }).pipe(
+        Effect.flatMap(getProject),
+        Effect.map(project => projectReadResult(resource.uri, project)),
+        Effect.mapError(error => mapReadErrorToMcp(resource.uri, error))
+      )
+
+    case "issue":
+      return parseGetIssueParams({ project: resource.project, identifier: resource.identifier }).pipe(
+        Effect.flatMap(getIssue),
+        Effect.map(issue => issueReadResult(resource.uri, issue)),
+        Effect.mapError(error => mapReadErrorToMcp(resource.uri, error))
+      )
+
+    default:
+      return absurdResource(resource)
+  }
+}
+
 export const readHulyResource = (
   uri: string
 ): Effect.Effect<ReadResourceResult, McpError, HulyClient> =>
@@ -246,21 +300,7 @@ export const readHulyResource = (
         ? e
         : new McpError(ErrorCode.InvalidParams, `Invalid Huly resource URI "${uri}". ${expectedFormats}`)
   }).pipe(
-    Effect.flatMap((resource) => {
-      if (resource._tag === "project") {
-        return parseGetProjectParams({ project: resource.project }).pipe(
-          Effect.flatMap(getProject),
-          Effect.map(project => projectReadResult(resource.uri, project)),
-          Effect.mapError(error => mapReadErrorToMcp(resource.uri, error))
-        )
-      }
-
-      return parseGetIssueParams({ project: resource.project, identifier: resource.identifier }).pipe(
-        Effect.flatMap(getIssue),
-        Effect.map(issue => issueReadResult(resource.uri, issue)),
-        Effect.mapError(error => mapReadErrorToMcp(resource.uri, error))
-      )
-    })
+    Effect.flatMap(readParsedHulyResource)
   )
 
 const createResourceClientResolutionError = (uri: string, _error: unknown): McpError =>

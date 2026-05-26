@@ -120,6 +120,8 @@ describe("createFilteredRegistry", () => {
 
       expect(toolNames).toEqual([
         "list_associations",
+        "create_association",
+        "delete_association",
         "list_relations",
         "create_relation",
         "delete_relation"

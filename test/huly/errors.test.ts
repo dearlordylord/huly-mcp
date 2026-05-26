@@ -4,8 +4,11 @@ import { expect } from "vitest"
 import { AssociationId, DocId, ObjectClassName, RelationId } from "../../src/domain/schemas/shared.js"
 import {
   ActivityMessageNotFoundError,
+  AssociationConflictError,
   AssociationIdentifierAmbiguousError,
+  AssociationInUseError,
   AssociationNotFoundError,
+  AssociationSystemClassUnsupportedError,
   AttachmentNotFoundError,
   BYTES_PER_MB,
   CalendarNotAccessibleError,
@@ -55,6 +58,8 @@ import {
   ProjectNotFoundError,
   ReactionNotFoundError,
   RecurringEventNotFoundError,
+  RelationCardinalityViolationError,
+  RelationDirectionAmbiguousError,
   RelationEndpointClassMismatchError,
   RelationIdentifierAmbiguousError,
   RelationMutationUnsupportedError,
@@ -803,12 +808,22 @@ describe("Huly Errors", () => {
               return `association:${error.identifier}`
             case "AssociationIdentifierAmbiguousError":
               return `association-ambiguous:${error.identifier}:${error.candidates.length}`
+            case "AssociationSystemClassUnsupportedError":
+              return `association-system:${error.operation}:${error.className}`
+            case "AssociationConflictError":
+              return `association-conflict:${error.associationId}:${error.reason}`
+            case "AssociationInUseError":
+              return `association-in-use:${error.associationId}:${error.relationCount}:${error.sampleRelationIds.length}`
             case "RelationNotFoundError":
               return `relation:${error.identifier}`
             case "RelationIdentifierAmbiguousError":
               return `relation-ambiguous:${error.identifier}:${error.relationIds.length}`
             case "RelationMutationUnsupportedError":
               return `relation-unsupported:${error.reason}`
+            case "RelationCardinalityViolationError":
+              return `relation-cardinality:${error.associationId}:${error.cardinality}:${error.reason}`
+            case "RelationDirectionAmbiguousError":
+              return `relation-direction:${error.associationId}:${error.reason}`
             case "RelationEndpointClassMismatchError":
               return `relation-mismatch:${error.field}:${error.expectedClass}:${error.actualClass}`
             case "GenericObjectIdentifierAmbiguousError":
@@ -913,6 +928,31 @@ describe("Huly Errors", () => {
             })
           )
         ).toBe("association-ambiguous:links:2")
+        expect(
+          matchError(
+            new AssociationSystemClassUnsupportedError({
+              className: ObjectClassName.make("core:class:Doc"),
+              operation: "create_relation"
+            })
+          )
+        ).toBe("association-system:create_relation:core:class:Doc")
+        expect(
+          matchError(
+            new AssociationConflictError({
+              associationId: AssociationId.make("assoc-1"),
+              reason: "different cardinality"
+            })
+          )
+        ).toBe("association-conflict:assoc-1:different cardinality")
+        expect(
+          matchError(
+            new AssociationInUseError({
+              associationId: AssociationId.make("assoc-1"),
+              relationCount: 2,
+              sampleRelationIds: [RelationId.make("rel-1"), RelationId.make("rel-2")]
+            })
+          )
+        ).toBe("association-in-use:assoc-1:2:2")
         expect(matchError(new RelationNotFoundError({ identifier: "rel-1" }))).toBe("relation:rel-1")
         expect(
           matchError(
@@ -925,6 +965,23 @@ describe("Huly Errors", () => {
         expect(
           matchError(new RelationMutationUnsupportedError({ reason: "not validated" }))
         ).toBe("relation-unsupported:not validated")
+        expect(
+          matchError(
+            new RelationCardinalityViolationError({
+              associationId: AssociationId.make("assoc-1"),
+              cardinality: "one-to-one",
+              reason: "already linked"
+            })
+          )
+        ).toBe("relation-cardinality:assoc-1:one-to-one:already linked")
+        expect(
+          matchError(
+            new RelationDirectionAmbiguousError({
+              associationId: AssociationId.make("assoc-1"),
+              reason: "same class"
+            })
+          )
+        ).toBe("relation-direction:assoc-1:same class")
         expect(
           matchError(
             new RelationEndpointClassMismatchError({

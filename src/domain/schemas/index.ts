@@ -31,6 +31,8 @@ export {
 
 export {
   AssociationIdentifier,
+  AssociationName,
+  AssociationRoleName,
   type AssociationSummary,
   AssociationSummarySchema,
   CardinalitySchema,
@@ -39,6 +41,11 @@ export {
   CreateRelationParamsSchema,
   type CreateRelationResult,
   CreateRelationResultSchema,
+  type DeleteAssociationParams,
+  deleteAssociationParamsJsonSchema,
+  DeleteAssociationParamsSchema,
+  type DeleteAssociationResult,
+  DeleteAssociationResultSchema,
   type DeleteRelationParams,
   deleteRelationParamsJsonSchema,
   DeleteRelationParamsSchema,
@@ -57,6 +64,7 @@ export {
   type ListRelationsResult,
   ListRelationsResultSchema,
   parseCreateRelationParams,
+  parseDeleteAssociationParams,
   parseDeleteRelationParams,
   parseListAssociationsParams,
   parseListRelationsParams,
