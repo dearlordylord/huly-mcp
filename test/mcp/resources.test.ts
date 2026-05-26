@@ -20,6 +20,7 @@ import { Effect } from "effect"
 import { expect } from "vitest"
 
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
+import { HulyConnectionError } from "../../src/huly/errors.js"
 import { tracker } from "../../src/huly/huly-plugins.js"
 import {
   HULY_RESOURCE_MIME_TYPE,
@@ -273,5 +274,28 @@ describe("MCP resources", () => {
       expect(error).toBeInstanceOf(McpError)
       expect(error.code).toBe(-32002)
       expect(error.data).toEqual({ uri: "huly://projects/MISSING" })
+    }))
+
+  it.effect("does not expose backend connection error details in resource read errors", () =>
+    Effect.gen(function*() {
+      const backendSecret = "https://user:password@example.huly.app/path?token=secret"
+      const error = yield* Effect.flip(
+        readHulyResource("huly://projects/TEST").pipe(
+          Effect.provide(HulyClient.testLayer({
+            findOne: () =>
+              Effect.fail(
+                new HulyConnectionError({
+                  message: `Connection failed for ${backendSecret}`
+                })
+              )
+          }))
+        )
+      )
+
+      expect(error).toBeInstanceOf(McpError)
+      expect(error.message).toContain("Connection error while reading Huly resource")
+      expect(error.message).not.toContain(backendSecret)
+      expect(error.message).not.toContain("password")
+      expect(error.message).not.toContain("secret")
     }))
 })

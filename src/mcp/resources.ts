@@ -199,11 +199,11 @@ const mapReadErrorToMcp = (uri: string, error: HulyDomainError | ParseResult.Par
   if (error._tag === "HulyConnectionError") {
     return new McpError(
       ErrorCode.InternalError,
-      `Connection error while reading Huly resource "${uri}": ${error.message}`
+      `Connection error while reading Huly resource "${uri}". Verify Huly URL, workspace, and network connectivity.`
     )
   }
 
-  return new McpError(ErrorCode.InternalError, `Failed to read Huly resource "${uri}": ${error.message}`)
+  return new McpError(ErrorCode.InternalError, `Failed to read Huly resource "${uri}".`)
 }
 
 const projectJsonText = (value: ProjectResourceEnvelope): string =>
