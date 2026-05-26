@@ -6,6 +6,7 @@
  *
  * @module
  */
+import { timingSafeEqual } from "node:crypto"
 import type http from "node:http"
 
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js"
@@ -18,6 +19,7 @@ import type { Express, Request, Response } from "express"
 
 export const DEFAULT_HTTP_PORT = 3000
 const HTTP_METHOD_NOT_ALLOWED = 405
+const HTTP_UNAUTHORIZED = 401
 const HTTP_INTERNAL_SERVER_ERROR = 500
 const writeStderr = (message: string): void => {
   process.stderr.write(message)
@@ -29,6 +31,7 @@ const writeStderr = (message: string): void => {
 interface HttpTransportConfig {
   readonly port: number
   readonly host: string
+  readonly authToken?: string | undefined
 }
 
 /**
@@ -101,6 +104,53 @@ const defaultTransportDependencies: HttpTransportDependencies = {
   writeError: writeStderr
 }
 
+const activeAuthToken = (authToken: string | undefined): string | undefined => {
+  const trimmed = authToken?.trim()
+  return trimmed === undefined || trimmed === "" ? undefined : trimmed
+}
+
+const extractBearerToken = (authorization: unknown): string | undefined => {
+  if (typeof authorization !== "string") return undefined
+
+  const match = /^Bearer ([^ ]+)$/iu.exec(authorization)
+  return match?.[1]
+}
+
+const tokenMatches = (received: string, expected: string): boolean => {
+  const receivedBuffer = Buffer.from(received, "utf8")
+  const expectedBuffer = Buffer.from(expected, "utf8")
+  if (receivedBuffer.length !== expectedBuffer.length) return false
+  return timingSafeEqual(receivedBuffer, expectedBuffer)
+}
+
+const isAuthorizedMcpRequest = (req: Request, authToken: string | undefined): boolean => {
+  const expected = activeAuthToken(authToken)
+  if (expected === undefined) return true
+
+  const received = extractBearerToken(req.headers.authorization)
+  return received !== undefined && tokenMatches(received, expected)
+}
+
+const writeUnauthorized = (res: Response): void => {
+  res.setHeader("WWW-Authenticate", "Bearer")
+  res.status(HTTP_UNAUTHORIZED).json({
+    jsonrpc: "2.0",
+    error: { code: -32000, message: "Unauthorized" },
+    id: null
+  })
+}
+
+const writeMethodNotAllowed = (res: Response, message: string): void => {
+  res.status(HTTP_METHOD_NOT_ALLOWED).json({
+    jsonrpc: "2.0",
+    error: {
+      code: -32000,
+      message
+    },
+    id: null
+  })
+}
+
 /**
  * Service tag for HTTP server factory - allows DI for testing.
  */
@@ -122,7 +172,8 @@ export class HttpServerFactoryService extends Context.Tag("@hulymcp/HttpServerFa
  */
 export const createMcpHandlers = (
   createServer: (req: Request) => Server,
-  dependencies: HttpTransportDependencies = defaultTransportDependencies
+  dependencies: HttpTransportDependencies = defaultTransportDependencies,
+  authToken?: string
 ): {
   post: (req: Request, res: Response) => Promise<void>
   get: (req: Request, res: Response) => void
@@ -130,6 +181,11 @@ export const createMcpHandlers = (
 } => {
   const post = async (req: Request, res: Response): Promise<void> => {
     try {
+      if (!isAuthorizedMcpRequest(req, authToken)) {
+        writeUnauthorized(res)
+        return
+      }
+
       const server = createServer(req)
       // Stateless mode: no session ID generator, each request is independent
       const transport = dependencies.createTransport()
@@ -164,26 +220,22 @@ export const createMcpHandlers = (
     }
   }
 
-  const get = (_req: Request, res: Response): void => {
-    res.status(HTTP_METHOD_NOT_ALLOWED).json({
-      jsonrpc: "2.0",
-      error: {
-        code: -32000,
-        message: "Method not allowed (stateless mode - no SSE streams)"
-      },
-      id: null
-    })
+  const get = (req: Request, res: Response): void => {
+    if (!isAuthorizedMcpRequest(req, authToken)) {
+      writeUnauthorized(res)
+      return
+    }
+
+    writeMethodNotAllowed(res, "Method not allowed (stateless mode - no SSE streams)")
   }
 
-  const del = (_req: Request, res: Response): void => {
-    res.status(HTTP_METHOD_NOT_ALLOWED).json({
-      jsonrpc: "2.0",
-      error: {
-        code: -32000,
-        message: "Method not allowed (stateless mode - no sessions)"
-      },
-      id: null
-    })
+  const del = (req: Request, res: Response): void => {
+    if (!isAuthorizedMcpRequest(req, authToken)) {
+      writeUnauthorized(res)
+      return
+    }
+
+    writeMethodNotAllowed(res, "Method not allowed (stateless mode - no sessions)")
   }
 
   return { post, get, delete: del }
@@ -232,7 +284,7 @@ export const startHttpTransport = (
     const handlers = createMcpHandlers(createServer, {
       createTransport: dependencies?.createTransport ?? defaultTransportDependencies.createTransport,
       writeError
-    })
+    }, config.authToken)
     app.post("/mcp", handlers.post)
     app.get("/mcp", handlers.get)
     app.delete("/mcp", handlers.delete)

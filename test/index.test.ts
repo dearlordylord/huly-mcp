@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, it } from "@effect/vitest"
-import { Context, Effect, Layer } from "effect"
+import { Context, Effect, Layer, Option, Redacted } from "effect"
 import { expect } from "vitest"
 import { HulyClient } from "../src/huly/client.js"
 import { HulyStorageClient } from "../src/huly/storage.js"
 import { WorkspaceClient } from "../src/huly/workspace-client.js"
-import { getHttpPort, main } from "../src/index.js"
+import { getHttpPort, getMcpAuthToken, main } from "../src/index.js"
 import { DEFAULT_HTTP_PORT, HttpServerFactoryService } from "../src/mcp/http-transport.js"
 import { type ClientBundle, McpServerError, McpServerService } from "../src/mcp/server.js"
 import { TelemetryService } from "../src/telemetry/telemetry.js"
@@ -42,10 +42,12 @@ describe("Main Entry Point", () => {
     "HULY_URL",
     "HULY_EMAIL",
     "HULY_PASSWORD",
+    "HULY_TOKEN",
     "HULY_WORKSPACE",
     "HULY_CONNECTION_TIMEOUT",
     "MCP_TRANSPORT",
     "MCP_HTTP_PORT",
+    "MCP_AUTH_TOKEN",
     "PORT"
   ]
 
@@ -105,6 +107,29 @@ describe("Main Entry Point", () => {
         const port = yield* getHttpPort
 
         expect(port).toBe(DEFAULT_HTTP_PORT)
+      }))
+  })
+
+  describe("MCP HTTP auth token config", () => {
+    it.effect("treats MCP_AUTH_TOKEN as optional", () =>
+      Effect.gen(function*() {
+        const token = yield* getMcpAuthToken
+
+        expect(Option.isNone(token)).toBe(true)
+      }))
+
+    it.effect("reads MCP_AUTH_TOKEN as a redacted value independent of Huly tokens", () =>
+      Effect.gen(function*() {
+        process.env["MCP_AUTH_TOKEN"] = "mcp-endpoint-secret"
+        process.env["HULY_TOKEN"] = "huly-api-token"
+
+        const token = yield* getMcpAuthToken
+
+        expect(Option.isSome(token)).toBe(true)
+        if (Option.isSome(token)) {
+          expect(Redacted.value(token.value)).toBe("mcp-endpoint-secret")
+          expect(`${token.value}`).toBe("<redacted>")
+        }
       }))
   })
 

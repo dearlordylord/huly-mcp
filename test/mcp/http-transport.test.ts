@@ -123,6 +123,7 @@ const getServerCalls = (server: Server): { connect: Array<[]>; close: Array<[]> 
 const createMockResponse = () => {
   const statusCalls: Array<[number]> = []
   const jsonCalls: Array<[unknown]> = []
+  const setHeaderCalls: Array<[string, string]> = []
   const on = createVoidProbe<[string, (...args: Array<unknown>) => void]>()
   const response = mock<Response>({
     status(code: number) {
@@ -133,9 +134,13 @@ const createMockResponse = () => {
       jsonCalls.push([body])
       return this
     },
+    setHeader(name: string, value: string) {
+      setHeaderCalls.push([name, value])
+      return this
+    },
     headersSent: false,
     on: on.fn,
-    __calls: { status: statusCalls, json: jsonCalls, on: on.calls }
+    __calls: { status: statusCalls, json: jsonCalls, setHeader: setHeaderCalls, on: on.calls }
   })
   return response
 }
@@ -143,6 +148,7 @@ const createMockResponse = () => {
 const getResponseCalls = (response: Response): {
   status: Array<[number]>
   json: Array<[unknown]>
+  setHeader: Array<[string, string]>
   on: Array<[string, (...args: Array<unknown>) => void]>
 } =>
   // eslint-disable-next-line no-restricted-syntax -- test probe metadata is attached to a structural fake
@@ -150,6 +156,7 @@ const getResponseCalls = (response: Response): {
     __calls: {
       status: Array<[number]>
       json: Array<[unknown]>
+      setHeader: Array<[string, string]>
       on: Array<[string, (...args: Array<unknown>) => void]>
     }
   }).__calls
@@ -165,6 +172,19 @@ const createMockRequest = (
     on: on.fn,
     __calls: { on: on.calls }
   })
+}
+
+const expectUnauthorizedResponse = (response: Response): void => {
+  const calls = getResponseCalls(response)
+  expect(calls.status).toEqual([[401]])
+  expect(calls.setHeader).toEqual([["WWW-Authenticate", "Bearer"]])
+  expect(calls.json).toEqual([[
+    {
+      jsonrpc: "2.0",
+      error: { code: -32000, message: "Unauthorized" },
+      id: null
+    }
+  ]])
 }
 
 describe("HTTP Transport", () => {
@@ -244,16 +264,21 @@ describe("HTTP Transport", () => {
 
     it("passes request headers to the per-request server factory", async () => {
       const headers = {
+        authorization: "Bearer mcp-endpoint-secret",
         "x-huly-url": "https://huly.one",
         "x-huly-workspace": "workspace-one",
         "x-huly-token": "token-one"
       }
       const capturedHeaders: Array<Request["headers"]> = []
       const transport = createMockTransportDependencies()
-      const handlers = createMcpHandlers((req) => {
-        capturedHeaders.push(req.headers)
-        return createMockMcpServer()
-      }, transport.dependencies)
+      const handlers = createMcpHandlers(
+        (req) => {
+          capturedHeaders.push(req.headers)
+          return createMockMcpServer()
+        },
+        transport.dependencies,
+        "mcp-endpoint-secret"
+      )
 
       await handlers.post(
         createMockRequest({ jsonrpc: "2.0", method: "tools/list", id: 1 }, headers),
@@ -261,6 +286,151 @@ describe("HTTP Transport", () => {
       )
 
       expect(capturedHeaders).toEqual([headers])
+    })
+
+    it("allows POST without Authorization when MCP auth is disabled", async () => {
+      let createServerCalls = 0
+      const transport = createMockTransportDependencies()
+      const handlers = createMcpHandlers(() => {
+        createServerCalls++
+        return createMockMcpServer()
+      }, transport.dependencies)
+
+      const req = createMockRequest({ jsonrpc: "2.0", method: "tools/list", id: 1 })
+      const res = createMockResponse()
+
+      await handlers.post(req, res)
+
+      expect(createServerCalls).toBe(1)
+      expect(transport.calls.handleRequest).toEqual([[req, res, req.body]])
+    })
+
+    it("treats empty MCP auth config as disabled", async () => {
+      let createServerCalls = 0
+      const transport = createMockTransportDependencies()
+      const handlers = createMcpHandlers(
+        () => {
+          createServerCalls++
+          return createMockMcpServer()
+        },
+        transport.dependencies,
+        "   "
+      )
+
+      const req = createMockRequest({ jsonrpc: "2.0", method: "tools/list", id: 1 })
+      const res = createMockResponse()
+
+      await handlers.post(req, res)
+
+      expect(createServerCalls).toBe(1)
+      expect(transport.calls.handleRequest).toEqual([[req, res, req.body]])
+    })
+
+    it("returns 401 before creating a server when MCP auth header is missing", async () => {
+      let createServerCalls = 0
+      const transport = createMockTransportDependencies()
+      const handlers = createMcpHandlers(
+        () => {
+          createServerCalls++
+          return createMockMcpServer()
+        },
+        transport.dependencies,
+        "server-secret"
+      )
+
+      const res = createMockResponse()
+
+      await handlers.post(createMockRequest({ jsonrpc: "2.0", method: "tools/list", id: 1 }), res)
+
+      expectUnauthorizedResponse(res)
+      expect(createServerCalls).toBe(0)
+      expect(transport.calls.handleRequest).toHaveLength(0)
+    })
+
+    it("returns 401 for non-bearer MCP auth scheme", async () => {
+      const transport = createMockTransportDependencies()
+      const handlers = createMcpHandlers(createMockMcpServer, transport.dependencies, "server-secret")
+      const res = createMockResponse()
+
+      await handlers.post(
+        createMockRequest({ jsonrpc: "2.0", method: "tools/list", id: 1 }, { authorization: "Basic server-secret" }),
+        res
+      )
+
+      expectUnauthorizedResponse(res)
+      expect(transport.calls.handleRequest).toHaveLength(0)
+    })
+
+    it("returns 401 for wrong bearer token without leaking secrets", async () => {
+      const transport = createMockTransportDependencies()
+      const handlers = createMcpHandlers(createMockMcpServer, transport.dependencies, "server-secret")
+      const res = createMockResponse()
+
+      await handlers.post(
+        createMockRequest({ jsonrpc: "2.0", method: "tools/list", id: 1 }, { authorization: "Bearer wrong-secret" }),
+        res
+      )
+
+      expectUnauthorizedResponse(res)
+      expect(JSON.stringify(getResponseCalls(res).json)).not.toContain("server-secret")
+      expect(JSON.stringify(getResponseCalls(res).json)).not.toContain("wrong-secret")
+      expect(transport.calls.handleRequest).toHaveLength(0)
+    })
+
+    it("allows POST with correct MCP bearer token", async () => {
+      const transport = createMockTransportDependencies()
+      const handlers = createMcpHandlers(createMockMcpServer, transport.dependencies, "server-secret")
+      const req = createMockRequest(
+        { jsonrpc: "2.0", method: "tools/list", id: 1 },
+        { authorization: "Bearer server-secret" }
+      )
+      const res = createMockResponse()
+
+      await handlers.post(req, res)
+
+      expect(transport.calls.handleRequest).toEqual([[req, res, req.body]])
+      expect(getResponseCalls(res).status).toHaveLength(0)
+    })
+
+    it("ignores query-string tokens for MCP auth", async () => {
+      const transport = createMockTransportDependencies()
+      const handlers = createMcpHandlers(createMockMcpServer, transport.dependencies, "server-secret")
+      const req = mock<Request>({
+        body: { jsonrpc: "2.0", method: "tools/list", id: 1 },
+        headers: {},
+        query: { token: "server-secret" },
+        on: createVoidProbe<[string, (...args: Array<unknown>) => void]>().fn
+      })
+      const res = createMockResponse()
+
+      await handlers.post(req, res)
+
+      expectUnauthorizedResponse(res)
+      expect(transport.calls.handleRequest).toHaveLength(0)
+    })
+
+    it("returns 401 for GET and DELETE before existing 405 behavior when MCP auth is invalid", () => {
+      const handlers = createMcpHandlers(createMockMcpServer, undefined, "server-secret")
+      const getRes = createMockResponse()
+      const deleteRes = createMockResponse()
+
+      handlers.get(createMockRequest(undefined, { authorization: "Bearer wrong-secret" }), getRes)
+      handlers.delete(createMockRequest(), deleteRes)
+
+      expectUnauthorizedResponse(getRes)
+      expectUnauthorizedResponse(deleteRes)
+    })
+
+    it("keeps existing GET and DELETE 405 behavior when MCP auth succeeds", () => {
+      const handlers = createMcpHandlers(createMockMcpServer, undefined, "server-secret")
+      const getRes = createMockResponse()
+      const deleteRes = createMockResponse()
+
+      handlers.get(createMockRequest(undefined, { authorization: "Bearer server-secret" }), getRes)
+      handlers.delete(createMockRequest(undefined, { authorization: "Bearer server-secret" }), deleteRes)
+
+      expect(getResponseCalls(getRes).status).toEqual([[405]])
+      expect(getResponseCalls(deleteRes).status).toEqual([[405]])
     })
 
     // test-revizorro: approved
@@ -403,6 +573,44 @@ describe("HTTP Transport", () => {
       expect(appCalls.post).toEqual([["/mcp", expect.any(Function)]])
       expect(appCalls.get).toEqual([["/mcp", expect.any(Function)]])
       expect(appCalls.delete).toEqual([["/mcp", expect.any(Function)]])
+    })
+
+    it("passes MCP auth token to registered route handlers", async () => {
+      const { app, routes } = createMockExpressApp()
+      const mockHttp = mock<http.Server>({
+        close: createProbe<[((err?: Error) => void)?], void>((cb) => cb?.()).fn
+      })
+      const mockFactory: HttpServerFactory = {
+        createApp: () => app,
+        listen: () => Effect.succeed(mockHttp)
+      }
+
+      const program = startHttpTransport(
+        { port: 3000, host: "127.0.0.1", authToken: "server-secret" },
+        createMockMcpServer,
+        { writeError: () => {} }
+      ).pipe(
+        Effect.scoped,
+        Effect.timeout(10),
+        Effect.ignore
+      )
+
+      await Effect.runPromise(
+        program.pipe(
+          Effect.provide(Layer.succeed(HttpServerFactoryService, mockFactory))
+        )
+      )
+
+      const unauthorizedRes = createMockResponse()
+      await routes.get["/mcp"](createMockRequest(), unauthorizedRes)
+      expectUnauthorizedResponse(unauthorizedRes)
+
+      const authorizedRes = createMockResponse()
+      await routes.get["/mcp"](
+        createMockRequest(undefined, { authorization: "Bearer server-secret" }),
+        authorizedRes
+      )
+      expect(getResponseCalls(authorizedRes).status).toEqual([[405]])
     })
 
     // test-revizorro: approved
