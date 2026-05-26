@@ -21,6 +21,7 @@ import { TelemetryService } from "../telemetry/telemetry.js"
 import { VERSION } from "../version.js"
 import type { McpToolResponse } from "./error-mapping.js"
 import { createSuccessResponse, createUnknownToolError, mapDomainErrorToMcp, toMcpResponse } from "./error-mapping.js"
+import { isObjectSchema, toClientCompatibleInputSchema } from "./input-schema-compat.js"
 import { defaultToolOutputSchema, versionToolOutputSchema } from "./tool-output-schema.js"
 import type { ToolRegistry } from "./tools/index.js"
 import { CATEGORY_NAMES, createFilteredRegistry, resolveAnnotations, toolRegistry } from "./tools/index.js"
@@ -71,15 +72,6 @@ const handleVersionTool = async (): Promise<McpToolResponse> => {
   const latest = await fetchLatestNpmVersion()
   return createSuccessResponse({ current: VERSION, latest })
 }
-
-interface McpInputSchema {
-  readonly type: "object"
-  readonly properties?: Record<string, unknown>
-  readonly required?: Array<string>
-  readonly [key: string]: unknown
-}
-
-const isObjectSchema = (schema: object): schema is McpInputSchema => "type" in schema && schema.type === "object"
 
 export type McpTransportType = "stdio" | "http"
 
@@ -201,7 +193,7 @@ const createMcpServer = (
           return [{
             name: tool.name,
             description: tool.description,
-            inputSchema: tool.inputSchema,
+            inputSchema: toClientCompatibleInputSchema(tool.inputSchema),
             outputSchema: defaultToolOutputSchema,
             annotations: resolveAnnotations(tool)
           }]

@@ -207,6 +207,37 @@ const requiredModeSets = (tool: ToolDefinition): ReadonlyArray<string> => {
     : []
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+const assertSchemaObject = (value: unknown): Record<string, unknown> => {
+  if (!isRecord(value)) {
+    throw new Error("Expected schema object")
+  }
+  return value
+}
+
+interface ListedToolForTest {
+  readonly name: string
+  readonly inputSchema: unknown
+}
+
+const isListedToolForTest = (value: unknown): value is ListedToolForTest =>
+  isRecord(value) && typeof value.name === "string" && "inputSchema" in value
+
+const assertListToolsResponse = (value: unknown): { readonly tools: ReadonlyArray<ListedToolForTest> } => {
+  if (!isRecord(value)) {
+    throw new Error("Expected ListTools response object")
+  }
+
+  const tools = value.tools
+  if (!Array.isArray(tools) || !tools.every(isListedToolForTest)) {
+    throw new Error("Expected ListTools response with tool definitions")
+  }
+
+  return { tools }
+}
+
 // --- Test Helpers ---
 
 const createMockHulyClientLayer = (config: {
@@ -1593,6 +1624,54 @@ describe("McpServerService.layer operations", () => {
         expect(result.tools[0]).toHaveProperty("outputSchema")
         expect(result.tools.every((tool) => "outputSchema" in tool)).toBe(true)
         expect(firstListToolsCalled).toBe(true)
+
+        yield* cleanup(fiber)
+      }), { timeout: 5000 })
+
+    it.scoped("ListTools handler returns client-compatible root object schemas", () =>
+      Effect.gen(function*() {
+        capturedHandlers.clear()
+        const layers = Layer.mergeAll(
+          HulyClient.testLayer({}),
+          HulyStorageClient.testLayer({}),
+          WorkspaceClient.testLayer({}),
+          TelemetryService.testLayer()
+        )
+        const fiber = yield* buildAndRun(layers)
+
+        const listToolsHandler = capturedHandlers.get(ListToolsRequestSchema)
+        expect(listToolsHandler).toBeDefined()
+        if (typeof listToolsHandler !== "function") {
+          throw new Error("ListTools handler was not registered")
+        }
+
+        const result = assertListToolsResponse(yield* Effect.promise(() => Promise.resolve(listToolsHandler())))
+        const tools = new Map(result.tools.map((tool) => [tool.name, assertSchemaObject(tool.inputSchema)]))
+
+        for (const schema of tools.values()) {
+          expect(schema.type).toBe("object")
+          expect(schema.anyOf).toBeUndefined()
+          expect(schema.oneOf).toBeUndefined()
+          expect(schema.allOf).toBeUndefined()
+        }
+
+        const updateIssueSchema = assertSchemaObject(tools.get("update_issue"))
+        const updateIssueProperties = assertSchemaObject(updateIssueSchema.properties)
+        expect(updateIssueProperties.title).toBeDefined()
+        expect(updateIssueProperties.description).toBeDefined()
+        expect(updateIssueProperties.priority).toBeDefined()
+        expect(updateIssueProperties.assignee).toBeDefined()
+        expect(updateIssueProperties.status).toBeDefined()
+
+        const listActivitySchema = assertSchemaObject(tools.get("list_activity"))
+        const listActivityProperties = assertSchemaObject(listActivitySchema.properties)
+        expect(listActivityProperties.project).toBeDefined()
+        expect(listActivityProperties.issueIdentifier).toBeDefined()
+        expect(listActivityProperties.teamspace).toBeDefined()
+        expect(listActivityProperties.document).toBeDefined()
+        expect(listActivityProperties.channel).toBeDefined()
+        expect(listActivityProperties.objectId).toBeDefined()
+        expect(listActivityProperties.objectClass).toBeDefined()
 
         yield* cleanup(fiber)
       }), { timeout: 5000 })
