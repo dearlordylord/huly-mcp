@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.15.1
+
+### Patch Changes
+
+- 65fe7eb: Advertise MCP tool schemas without root-level JSON Schema composition so bulk-loading clients can load all tools.
+
 ## 0.15.0
 
 ### Minor Changes
