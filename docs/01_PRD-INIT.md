@@ -49,6 +49,7 @@ Issue management operations exposed via MCP:
 - Batch operations
 - Token authentication
 - Webhook support for change notifications
+- MCP resource subscriptions/listChanged notifications after stateful sessions and a Huly change source exist
 
 ## Technical Architecture
 

@@ -114,7 +114,15 @@ const createClientLayer = (config?: {
   const issues = config?.issues ?? []
   const statuses = config?.statuses ?? []
 
-  const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown) => {
+  const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown) => {
+    if (_class === tracker.class.Project) {
+      const archived = queryValue(query, "archived")
+      const filteredProjects = typeof archived === "boolean"
+        ? projects.filter(project => project.archived === archived)
+        : projects
+      return Effect.succeed(toFindResult([...filteredProjects]))
+    }
+
     if (_class === "core:class:Status") {
       return Effect.succeed(toFindResult([...statuses]))
     }
@@ -180,8 +188,58 @@ describe("MCP resources", () => {
       }
     ])
     expect(listResourceTemplates()).toEqual({ resourceTemplates })
-    expect(listResources()).toEqual({ resources: [] })
   })
+
+  it.effect("lists active projects as concrete MCP resources", () =>
+    Effect.gen(function*() {
+      const result = yield* listResources().pipe(
+        Effect.provide(createClientLayer({
+          projects: [
+            makeProject(),
+            makeProject({
+              _id: "project-2" as Ref<HulyProject>,
+              identifier: "OLD",
+              name: "Archived Project",
+              description: "",
+              archived: true
+            })
+          ]
+        }))
+      )
+
+      expect(result).toEqual({
+        resources: [{
+          uri: "huly://projects/TEST",
+          name: "TEST",
+          title: "Test Project",
+          description: "Project used by MCP resource tests",
+          mimeType: HULY_RESOURCE_MIME_TYPE
+        }]
+      })
+    }))
+
+  it.effect("does not hide backend connection errors while listing resources", () =>
+    Effect.gen(function*() {
+      const backendSecret = "https://user:password@example.huly.app/path?token=secret"
+      const error = yield* Effect.flip(
+        listResources().pipe(
+          Effect.provide(HulyClient.testLayer({
+            findAll: () =>
+              Effect.fail(
+                new HulyConnectionError({
+                  message: `Connection failed for ${backendSecret}`
+                })
+              )
+          }))
+        )
+      )
+
+      expect(error).toBeInstanceOf(McpError)
+      expect(error.message).toContain("Connection error while listing Huly resources")
+      expect(error.message).not.toContain(backendSecret)
+      expect(error.message).not.toContain("password")
+      expect(error.message).not.toContain("secret")
+    }))
 
   it("parses accepted Huly resource URIs", () => {
     expect(parseHulyResourceUri("huly://projects/HULY")).toEqual({

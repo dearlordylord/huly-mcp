@@ -264,7 +264,16 @@ const createMockHulyClientLayer = (config: {
   const issues = config.issues ?? []
   const statuses = config.statuses ?? []
 
-  const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown) => {
+  const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown) => {
+    if (_class === tracker.class.Project) {
+      const archived = query !== null && typeof query === "object"
+        ? Object.getOwnPropertyDescriptor(query, "archived")?.value
+        : undefined
+      const filteredProjects = typeof archived === "boolean"
+        ? projects.filter(project => project.archived === archived)
+        : projects
+      return Effect.succeed(toFindResult(filteredProjects))
+    }
     if (_class === tracker.class.Issue) {
       return Effect.succeed(toFindResult(issues))
     }
@@ -2194,11 +2203,21 @@ describe("McpServerService.layer operations", () => {
         yield* cleanup(fiber)
       }), { timeout: 5000 })
 
-    it.scoped("ListResources handler returns an intentionally empty concrete list", () =>
+    it.scoped("ListResources handler returns concrete active project resources", () =>
       Effect.gen(function*() {
         capturedHandlers.clear()
         const layers = Layer.mergeAll(
-          HulyClient.testLayer({}),
+          createMockHulyClientLayer({
+            projects: [
+              makeProject(),
+              makeProject({
+                _id: "archived-project" as Ref<HulyProject>,
+                identifier: "OLD",
+                name: "Archived Project",
+                archived: true
+              })
+            ]
+          }),
           HulyStorageClient.testLayer({}),
           WorkspaceClient.testLayer({}),
           TelemetryService.testLayer()
@@ -2206,12 +2225,20 @@ describe("McpServerService.layer operations", () => {
         const fiber = yield* buildAndRun(layers)
 
         const handler = capturedHandlers.get(ListResourcesRequestSchema) as
-          | (() => { resources: Array<unknown> })
+          | (() => Promise<{ resources: Array<unknown> }>)
           | undefined
         expect(handler).toBeDefined()
 
-        const result = handler!()
-        expect(result).toEqual({ resources: [] })
+        const result = yield* Effect.promise(() => handler!())
+        expect(result).toEqual({
+          resources: [{
+            uri: "huly://projects/TEST",
+            name: "TEST",
+            title: "Test Project",
+            description: "Project used by MCP server tests",
+            mimeType: "application/json"
+          }]
+        })
 
         yield* cleanup(fiber)
       }), { timeout: 5000 })

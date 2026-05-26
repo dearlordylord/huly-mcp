@@ -514,7 +514,7 @@ echo ""
 echo "=== 1r. MCP Resources ==="
 run_test "resources/templates/list" \
   '{"jsonrpc":"2.0","method":"resources/templates/list","id":2}'
-run_test "resources/list(empty v1)" \
+run_test "resources/list(projects)" \
   '{"jsonrpc":"2.0","method":"resources/list","id":2}'
 run_test "resources/read project($PROJECT)" \
   "{\"jsonrpc\":\"2.0\",\"method\":\"resources/read\",\"params\":{\"uri\":\"huly://projects/$PROJECT\"},\"id\":2}"

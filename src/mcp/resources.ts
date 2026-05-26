@@ -21,18 +21,21 @@ import {
   IssueSchema,
   parseGetIssueParams,
   parseGetProjectParams,
+  parseListProjectsParams,
   type Project,
-  ProjectSchema
+  ProjectSchema,
+  type ProjectSummary
 } from "../domain/schemas.js"
 import { HulyClient } from "../huly/client.js"
 import type { HulyDomainError } from "../huly/errors.js"
 import { getIssue } from "../huly/operations/issues.js"
-import { getProject } from "../huly/operations/projects.js"
+import { getProject, listProjects } from "../huly/operations/projects.js"
 import { formatParseError } from "./error-mapping.js"
 
 export const HULY_RESOURCE_MIME_TYPE = "application/json"
 
 const RESOURCE_NOT_FOUND = -32002
+const RESOURCE_LIST_LIMIT = 200
 
 const ProjectResourceEnvelopeSchema = Schema.Struct({
   type: Schema.Literal("huly.project"),
@@ -205,7 +208,47 @@ export const parseHulyResourceUri = (uri: string): HulyResource => {
   }
 }
 
-export const listResources = (): ListResourcesResult => ({ resources: [] })
+const projectSummaryResource = (project: ProjectSummary): ListResourcesResult["resources"][number] => ({
+  uri: `huly://projects/${encodeURIComponent(project.identifier)}`,
+  name: project.identifier,
+  title: project.name,
+  description: project.description ?? `Huly project ${project.identifier}`,
+  mimeType: HULY_RESOURCE_MIME_TYPE
+})
+
+const mapListErrorToMcp = (error: HulyDomainError | ParseResult.ParseError): McpError => {
+  if (ParseResult.isParseError(error)) {
+    return new McpError(
+      ErrorCode.InternalError,
+      `Failed to list Huly resources: ${formatParseError(error)}.`
+    )
+  }
+
+  if (error._tag === "HulyAuthError") {
+    return new McpError(
+      ErrorCode.InternalError,
+      "Authentication error while listing Huly resources. Check Huly credentials or request headers."
+    )
+  }
+
+  if (error._tag === "HulyConnectionError") {
+    return new McpError(
+      ErrorCode.InternalError,
+      "Connection error while listing Huly resources. Verify Huly URL, workspace, and network connectivity."
+    )
+  }
+
+  return new McpError(ErrorCode.InternalError, "Failed to list Huly resources.")
+}
+
+export const listResources = (): Effect.Effect<ListResourcesResult, McpError, HulyClient> =>
+  parseListProjectsParams({ includeArchived: false, limit: RESOURCE_LIST_LIMIT }).pipe(
+    Effect.flatMap(listProjects),
+    Effect.map(result => ({
+      resources: result.projects.map(projectSummaryResource)
+    })),
+    Effect.mapError(mapListErrorToMcp)
+  )
 
 export const listResourceTemplates = (): ListResourceTemplatesResult => ({ resourceTemplates })
 
@@ -317,6 +360,12 @@ const createResourceClientResolutionError = (uri: string, _error: unknown): McpE
     `Failed to initialize Huly clients while reading resource "${uri}". Verify Huly URL, workspace, and authentication configuration.`
   )
 
+const createResourceListClientResolutionError = (_error: unknown): McpError =>
+  new McpError(
+    ErrorCode.InternalError,
+    "Failed to initialize Huly clients while listing resources. Verify Huly URL, workspace, and authentication configuration."
+  )
+
 interface ResourceClientBundle {
   readonly hulyClient: HulyClient["Type"]
 }
@@ -333,12 +382,39 @@ const throwResourceReadError = (uri: string, cause: Cause.Cause<McpError>): neve
   throw new McpError(ErrorCode.InternalError, `Failed to read Huly resource "${uri}"`)
 }
 
+const throwResourceListError = (cause: Cause.Cause<McpError>): never => {
+  const failures = Chunk.toArray(Cause.failures(cause))
+  const failure = failures[0]
+  if (failure instanceof McpError) throw failure
+  throw new McpError(ErrorCode.InternalError, "Failed to list Huly resources")
+}
+
 export const registerResourceHandlers = (
   server: Server,
   resolveClients: () => Promise<ResourceClientBundle>,
   inflight?: InflightResourceGuard
 ): void => {
-  server.setRequestHandler(ListResourcesRequestSchema, listResources)
+  server.setRequestHandler(ListResourcesRequestSchema, async () => {
+    inflight?.enter()
+    try {
+      let clients: ResourceClientBundle
+      try {
+        clients = await resolveClients()
+      } catch (e) {
+        throw createResourceListClientResolutionError(e)
+      }
+
+      const resourceList = await Effect.runPromiseExit(
+        listResources().pipe(
+          Effect.provideService(HulyClient, clients.hulyClient)
+        )
+      )
+      if (Exit.isSuccess(resourceList)) return resourceList.value
+      return throwResourceListError(resourceList.cause)
+    } finally {
+      inflight?.leave()
+    }
+  })
   server.setRequestHandler(ListResourceTemplatesRequestSchema, listResourceTemplates)
   server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     inflight?.enter()

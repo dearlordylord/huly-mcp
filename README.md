@@ -252,7 +252,14 @@ The server exposes read-only MCP Resources as JSON context for clients that supp
 | `huly://projects/{project}/issues/{issue}` | `huly-project-issue` | Read full details for a Huly issue by project identifier and issue number, for example huly://projects/HULY/issues/123. | `application/json` |
 <!-- resources:end -->
 
-`resources/list` intentionally returns an empty concrete list in v1. Use `resources/templates/list` to discover supported URI templates, then read a known project or issue URI.
+`resources/list` returns concrete active project resources. Issue resources are template-based: use `resources/templates/list` to discover supported issue URI templates, then read a known issue URI.
+
+Resource roadmap:
+
+- Return resource links from list/search tool results for direct `resources/read` follow-up.
+- Add document resources when document reads have a stable URI shape and context-friendly payload.
+- Consider scoped/paginated issue listing only when filters prevent very large `resources/list` responses.
+- Consider resource `subscribe` and `listChanged` support after stateful sessions and a Huly change source are available.
 
 <!-- tools:start -->
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
