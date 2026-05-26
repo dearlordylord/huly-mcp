@@ -21,6 +21,7 @@ HTTP_SERVER_PID=""
 HTTP_SERVER_STDOUT=""
 HTTP_SERVER_STDERR=""
 HTTP_CURL_CONFIG=""
+GENERIC_ASSOCIATION_CLEANUP_IDS=""
 
 if [ -z "$HULY_URL" ]; then
   echo "ERROR: HULY_URL not set. Run: set -a && source .env.local && set +a"
@@ -77,7 +78,33 @@ cleanup_http_transport() {
     rm -f "$HTTP_CURL_CONFIG"
   fi
 }
-trap cleanup_http_transport EXIT
+
+cleanup_generic_associations() {
+  if [ -n "$GENERIC_ASSOCIATION_CLEANUP_IDS" ]; then
+    for association_id in $GENERIC_ASSOCIATION_CLEANUP_IDS; do
+      association_json=$(json_string "$association_id")
+      relations_result=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_relations\",\"arguments\":{\"association\":$association_json,\"limit\":200}},\"id\":2}" 2>/dev/null || true)
+      if [ -n "$relations_result" ]; then
+        relations_text=$(echo "$relations_result" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+        if [ -n "$relations_text" ]; then
+          while IFS= read -r relation_id; do
+            if [ -n "$relation_id" ]; then
+              relation_json=$(json_string "$relation_id")
+              call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_relation\",\"arguments\":{\"relation\":$relation_json}},\"id\":2}" >/dev/null 2>&1 || true
+            fi
+          done < <(printf '%s\n' "$relations_text" | jq -r '.relations[]?.relationId // empty' 2>/dev/null)
+        fi
+      fi
+      call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_association\",\"arguments\":{\"association\":$association_json}},\"id\":2}" >/dev/null 2>&1 || true
+    done
+  fi
+}
+
+cleanup_all() {
+  cleanup_generic_associations
+  cleanup_http_transport
+}
+trap cleanup_all EXIT
 
 write_http_header_config() {
   HTTP_CURL_CONFIG="$(mktemp)"
@@ -288,7 +315,7 @@ assert_json_field_nonempty() {
 assert_json_field_equals() {
   local name="$1" json="$2" jq_expr="$3" expected="$4"
   local value
-  value=$(printf '%s\n' "$json" | jq -r "$jq_expr // empty" 2>/dev/null)
+  value=$(printf '%s\n' "$json" | jq -r "$jq_expr" 2>/dev/null)
   if [ "$value" = "$expected" ]; then
     echo "PASS: $name"
     PASSED=$((PASSED + 1))
@@ -1413,9 +1440,31 @@ WRITABLE_ASSOCIATIONS_TEXT=$(run_capture "list_associations(writableOnly)" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_associations","arguments":{"writableOnly":true,"limit":1}},"id":2}')
 WRITABLE_ASSOC_ID=$(echo "$WRITABLE_ASSOCIATIONS_TEXT" | jq -r '.associations[0].associationId // empty' 2>/dev/null)
 if [ -n "$WRITABLE_ASSOC_ID" ]; then
-  skip_test "create_relation/delete_relation" "writable association discovered but disposable endpoint fixture is not defined yet"
+  assert_json_field_nonempty "list_associations(writableOnly) has writable id" "$WRITABLE_ASSOCIATIONS_TEXT" ".associations[0].associationId"
 else
-  skip_test "create_relation/delete_relation" "read-only slice: no validated writable generic association allowlist"
+  skip_test "list_associations(writableOnly) has writable id" "workspace returned no writable associations"
+fi
+
+GENERIC_ROLE_SOURCE="mcp source $RUN_ID"
+GENERIC_ROLE_TARGET="mcp target $RUN_ID"
+GENERIC_ROLE_SOURCE_JSON=$(json_string "$GENERIC_ROLE_SOURCE")
+GENERIC_ROLE_TARGET_JSON=$(json_string "$GENERIC_ROLE_TARGET")
+CREATED_ASSOC_TEXT=$(run_capture "create_association(generic_issue_one_to_many)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_association\",\"arguments\":{\"sourceClass\":\"tracker:class:Issue\",\"targetClass\":\"tracker:class:Issue\",\"sourceRole\":$GENERIC_ROLE_SOURCE_JSON,\"targetRole\":$GENERIC_ROLE_TARGET_JSON,\"cardinality\":\"one-to-many\"}},\"id\":2}")
+if [ $? -eq 0 ]; then
+  CREATED_ASSOC_ID=$(echo "$CREATED_ASSOC_TEXT" | jq -r '.association.associationId // empty' 2>/dev/null)
+  if [ -n "$CREATED_ASSOC_ID" ]; then
+    GENERIC_ASSOCIATION_CLEANUP_IDS="$GENERIC_ASSOCIATION_CLEANUP_IDS $CREATED_ASSOC_ID"
+  fi
+  assert_json_field_equals "create_association created" "$CREATED_ASSOC_TEXT" ".created" "true"
+  DUP_ASSOC_TEXT=$(run_capture "create_association(idempotent)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_association\",\"arguments\":{\"sourceClass\":\"tracker:class:Issue\",\"targetClass\":\"tracker:class:Issue\",\"sourceRole\":$GENERIC_ROLE_SOURCE_JSON,\"targetRole\":$GENERIC_ROLE_TARGET_JSON,\"cardinality\":\"one-to-many\"}},\"id\":2}")
+  if [ $? -eq 0 ]; then
+    assert_json_field_equals "create_association idempotent existing" "$DUP_ASSOC_TEXT" ".existing" "true"
+  fi
+else
+  CREATED_ASSOC_ID=""
+  skip_test "create_association idempotent existing" "create_association failed"
 fi
 
 GENERIC_SOURCE_TEXT=$(run_capture "create_issue(for_generic_associations)" \
@@ -1440,6 +1489,108 @@ if [ $? -eq 0 ]; then
     skip_test "list_relations(source raw issue)" "generic association source issue did not return issueId"
     skip_test "list_relations(source raw issue,either)" "generic association source issue did not return issueId"
   fi
+  GENERIC_TARGET_TEXT=$(run_capture "create_issue(for_generic_associations_target)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Generic Associations Target $RUN_ID\"}},\"id\":2}")
+  if [ $? -eq 0 ]; then
+    GENERIC_TARGET_ID=$(echo "$GENERIC_TARGET_TEXT" | jq -r '.identifier // empty' 2>/dev/null)
+    GENERIC_TARGET_OBJ_ID=$(echo "$GENERIC_TARGET_TEXT" | jq -r '.issueId // empty' 2>/dev/null)
+  else
+    GENERIC_TARGET_ID=""
+    GENERIC_TARGET_OBJ_ID=""
+  fi
+  GENERIC_SOURCE2_TEXT=$(run_capture "create_issue(for_generic_associations_cardinality)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Generic Associations Cardinality $RUN_ID\"}},\"id\":2}")
+  if [ $? -eq 0 ]; then
+    GENERIC_SOURCE2_ID=$(echo "$GENERIC_SOURCE2_TEXT" | jq -r '.identifier // empty' 2>/dev/null)
+    GENERIC_SOURCE2_OBJ_ID=$(echo "$GENERIC_SOURCE2_TEXT" | jq -r '.issueId // empty' 2>/dev/null)
+  else
+    GENERIC_SOURCE2_ID=""
+    GENERIC_SOURCE2_OBJ_ID=""
+  fi
+  if [ -n "$CREATED_ASSOC_ID" ] && [ -n "$GENERIC_SOURCE_OBJ_ID" ] && [ -n "$GENERIC_TARGET_OBJ_ID" ] && [ -n "$GENERIC_SOURCE2_OBJ_ID" ]; then
+    GENERIC_SOURCE_OBJ_ID_JSON=$(json_string "$GENERIC_SOURCE_OBJ_ID")
+    GENERIC_TARGET_OBJ_ID_JSON=$(json_string "$GENERIC_TARGET_OBJ_ID")
+    GENERIC_SOURCE2_OBJ_ID_JSON=$(json_string "$GENERIC_SOURCE2_OBJ_ID")
+    CREATE_RELATION_ARGS="{\"association\":\"$CREATED_ASSOC_ID\",\"source\":{\"kind\":\"raw\",\"id\":$GENERIC_SOURCE_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"},\"target\":{\"kind\":\"raw\",\"id\":$GENERIC_TARGET_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"}}"
+    CREATED_RELATION_TEXT=$(run_capture "create_relation(generic)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_relation\",\"arguments\":$CREATE_RELATION_ARGS},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      CREATED_RELATION_ID=$(echo "$CREATED_RELATION_TEXT" | jq -r '.relationId // empty' 2>/dev/null)
+      assert_json_field_equals "create_relation created" "$CREATED_RELATION_TEXT" ".created" "true"
+      EXISTING_RELATION_TEXT=$(run_capture "create_relation(idempotent)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_relation\",\"arguments\":$CREATE_RELATION_ARGS},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "create_relation idempotent existing" "$EXISTING_RELATION_TEXT" ".existing" "true"
+      fi
+      LIST_CREATED_RELATION_TEXT=$(run_capture "list_relations(generic created)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_relations\",\"arguments\":{\"association\":\"$CREATED_ASSOC_ID\",\"source\":{\"kind\":\"raw\",\"id\":$GENERIC_SOURCE_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"},\"target\":{\"kind\":\"raw\",\"id\":$GENERIC_TARGET_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"},\"limit\":3}},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "list_relations(generic created) total" "$LIST_CREATED_RELATION_TEXT" ".total" "1"
+      fi
+      run_expect_error "delete_association(in use)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_association\",\"arguments\":{\"association\":\"$CREATED_ASSOC_ID\"}},\"id\":2}"
+      run_expect_error "create_relation(cardinality violation)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_relation\",\"arguments\":{\"association\":\"$CREATED_ASSOC_ID\",\"source\":{\"kind\":\"raw\",\"id\":$GENERIC_SOURCE2_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"},\"target\":{\"kind\":\"raw\",\"id\":$GENERIC_TARGET_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"}}},\"id\":2}"
+      DELETE_TRIPLE_TEXT=$(run_capture "delete_relation(generic triple)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_relation\",\"arguments\":$CREATE_RELATION_ARGS},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "delete_relation triple deleted" "$DELETE_TRIPLE_TEXT" ".deleted" "true"
+      fi
+      DELETE_TRIPLE_AGAIN_TEXT=$(run_capture "delete_relation(generic triple idempotent)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_relation\",\"arguments\":$CREATE_RELATION_ARGS},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "delete_relation triple idempotent" "$DELETE_TRIPLE_AGAIN_TEXT" ".deleted" "false"
+      fi
+      CREATED_RELATION_BY_ID_TEXT=$(run_capture "create_relation(generic for id delete)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_relation\",\"arguments\":$CREATE_RELATION_ARGS},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        RELATION_DELETE_ID=$(echo "$CREATED_RELATION_BY_ID_TEXT" | jq -r '.relationId // empty' 2>/dev/null)
+        if [ -n "$RELATION_DELETE_ID" ]; then
+          DELETE_BY_ID_TEXT=$(run_capture "delete_relation(generic id)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_relation\",\"arguments\":{\"relation\":\"$RELATION_DELETE_ID\"}},\"id\":2}")
+          if [ $? -eq 0 ]; then
+            assert_json_field_equals "delete_relation id deleted" "$DELETE_BY_ID_TEXT" ".deleted" "true"
+          fi
+          DELETE_BY_ID_AGAIN_TEXT=$(run_capture "delete_relation(generic id idempotent)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_relation\",\"arguments\":{\"relation\":\"$RELATION_DELETE_ID\"}},\"id\":2}")
+          if [ $? -eq 0 ]; then
+            assert_json_field_equals "delete_relation id idempotent" "$DELETE_BY_ID_AGAIN_TEXT" ".deleted" "false"
+          fi
+        fi
+      fi
+      DELETE_ASSOC_TEXT=$(run_capture "delete_association(unused)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_association\",\"arguments\":{\"association\":\"$CREATED_ASSOC_ID\"}},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "delete_association unused deleted" "$DELETE_ASSOC_TEXT" ".deleted" "true"
+        assert_json_field_equals "delete_association unused relation count" "$DELETE_ASSOC_TEXT" ".relationCount" "0"
+      fi
+      DELETE_ASSOC_AGAIN_TEXT=$(run_capture "delete_association(idempotent missing)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_association\",\"arguments\":{\"association\":\"$CREATED_ASSOC_ID\"}},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "delete_association idempotent missing" "$DELETE_ASSOC_AGAIN_TEXT" ".deleted" "false"
+      fi
+    fi
+  else
+    skip_test "create_relation(generic)" "missing disposable association or issue endpoints"
+    skip_test "create_relation(idempotent)" "missing disposable association or issue endpoints"
+    skip_test "list_relations(generic created)" "missing disposable association or issue endpoints"
+    skip_test "delete_association(in use)" "missing disposable association or issue endpoints"
+    skip_test "create_relation(cardinality violation)" "missing disposable association or issue endpoints"
+    skip_test "delete_relation(generic triple)" "missing disposable association or issue endpoints"
+    skip_test "delete_relation(generic triple idempotent)" "missing disposable association or issue endpoints"
+    skip_test "delete_relation(generic id)" "missing disposable association or issue endpoints"
+    skip_test "delete_relation(generic id idempotent)" "missing disposable association or issue endpoints"
+    skip_test "delete_association(unused)" "missing disposable association or issue endpoints"
+    skip_test "delete_association(idempotent missing)" "missing disposable association or issue endpoints"
+  fi
+  if [ -n "$GENERIC_TARGET_ID" ]; then
+    run_test "delete_issue(generic_assoc_target:$GENERIC_TARGET_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$GENERIC_TARGET_ID\"}},\"id\":2}"
+  fi
+  if [ -n "$GENERIC_SOURCE2_ID" ]; then
+    run_test "delete_issue(generic_assoc_cardinality:$GENERIC_SOURCE2_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$GENERIC_SOURCE2_ID\"}},\"id\":2}"
+  fi
   if [ -n "$GENERIC_SOURCE_ID" ]; then
     run_test "delete_issue(generic_assoc:$GENERIC_SOURCE_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$GENERIC_SOURCE_ID\"}},\"id\":2}"
@@ -1447,6 +1598,17 @@ if [ $? -eq 0 ]; then
 else
   skip_test "list_relations(source raw issue)" "could not create disposable source issue"
   skip_test "list_relations(source raw issue,either)" "could not create disposable source issue"
+  skip_test "create_relation(generic)" "could not create disposable source issue"
+  skip_test "create_relation(idempotent)" "could not create disposable source issue"
+  skip_test "list_relations(generic created)" "could not create disposable source issue"
+  skip_test "delete_association(in use)" "could not create disposable source issue"
+  skip_test "create_relation(cardinality violation)" "could not create disposable source issue"
+  skip_test "delete_relation(generic triple)" "could not create disposable source issue"
+  skip_test "delete_relation(generic triple idempotent)" "could not create disposable source issue"
+  skip_test "delete_relation(generic id)" "could not create disposable source issue"
+  skip_test "delete_relation(generic id idempotent)" "could not create disposable source issue"
+  skip_test "delete_association(unused)" "could not create disposable source issue"
+  skip_test "delete_association(idempotent missing)" "could not create disposable source issue"
 fi
 echo ""
 

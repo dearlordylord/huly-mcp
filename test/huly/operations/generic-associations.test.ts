@@ -14,19 +14,31 @@ import type { Issue as HulyIssue } from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
 
-import { AssociationIdentifier } from "../../../src/domain/schemas/generic-associations.js"
+import {
+  AssociationIdentifier,
+  AssociationRoleName,
+  RelationIdentifier
+} from "../../../src/domain/schemas/generic-associations.js"
 import { MAX_LIMIT, ObjectClassName } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import {
+  AssociationConflictError,
   AssociationIdentifierAmbiguousError,
+  AssociationInUseError,
+  AssociationSystemClassUnsupportedError,
   GenericObjectLocatorInvalidError,
   GenericObjectNotFoundError,
+  RelationCardinalityViolationError,
+  RelationDirectionAmbiguousError,
   RelationEndpointClassMismatchError,
+  RelationIdentifierAmbiguousError,
   RelationMutationUnsupportedError
 } from "../../../src/huly/errors.js"
 import { core, documentPlugin, tracker } from "../../../src/huly/huly-plugins.js"
 import {
+  createAssociation,
   createRelation,
+  deleteAssociation,
   deleteRelation,
   listAssociations,
   listRelations
@@ -41,7 +53,7 @@ const issueClass = ObjectClassName.make(tracker.class.Issue)
 const documentClass = ObjectClassName.make(documentPlugin.class.Document)
 
 // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- SDK fixture builder
-const association = (overrides: Partial<HulyAssociation>): HulyAssociation => ({
+const association = (overrides: Partial<HulyAssociation> & { readonly automationOnly?: boolean }): HulyAssociation => ({
   _id: "assoc-1" as Ref<HulyAssociation>,
   _class: core.class.Association,
   space,
@@ -101,6 +113,7 @@ const documentDoc = (id: string, title: string): HulyDocument => ({
 interface TestData {
   readonly associations?: ReadonlyArray<HulyAssociation>
   readonly relations?: ReadonlyArray<HulyRelation>
+  readonly relationTotal?: number | undefined
   readonly issues?: ReadonlyArray<HulyIssue>
   readonly documents?: ReadonlyArray<HulyDocument>
 }
@@ -140,8 +153,8 @@ const resultFor = <T extends Doc>(
 }
 
 const testLayer = (data: TestData, onFindAll?: FindAllObserver) => {
-  const associations = data.associations ?? []
-  const relations = data.relations ?? []
+  const associations = [...(data.associations ?? [])]
+  const relations = [...(data.relations ?? [])]
   const issues = data.issues ?? []
   const documents = data.documents ?? []
 
@@ -151,7 +164,8 @@ const testLayer = (data: TestData, onFindAll?: FindAllObserver) => {
       return Effect.succeed(resultFor(associations, query, options))
     }
     if (_class === core.class.Relation) {
-      return Effect.succeed(resultFor(relations, query, options))
+      const result = resultFor(relations, query, options)
+      return Effect.succeed(toFindResult([...result], data.relationTotal ?? result.total))
     }
     if (_class === tracker.class.Issue) {
       return Effect.succeed(resultFor(issues, query, options))
@@ -179,7 +193,53 @@ const testLayer = (data: TestData, onFindAll?: FindAllObserver) => {
     return Effect.succeed(undefined)
   }) as HulyClientOperations["findOne"]
 
-  return HulyClient.testLayer({ findAll, findOne })
+  const createDoc: HulyClientOperations["createDoc"] = ((_class: unknown, docSpace: unknown, attributes: unknown) => {
+    if (_class === core.class.Association) {
+      const nextId = `assoc-created-${associations.length + 1}` as Ref<HulyAssociation>
+      associations.push({
+        _id: nextId,
+        _class: core.class.Association,
+        space: docSpace as Ref<Space>,
+        modifiedBy: person,
+        modifiedOn: 300,
+        createdBy: person,
+        createdOn: 300,
+        ...(attributes as object)
+      } as HulyAssociation)
+      return Effect.succeed(nextId)
+    }
+    if (_class === core.class.Relation) {
+      const nextId = `rel-created-${relations.length + 1}` as Ref<HulyRelation>
+      relations.push({
+        _id: nextId,
+        _class: core.class.Relation,
+        space: docSpace as Ref<Space>,
+        modifiedBy: person,
+        modifiedOn: 300,
+        createdBy: person,
+        createdOn: 300,
+        ...(attributes as object)
+      } as HulyRelation)
+      return Effect.succeed(nextId)
+    }
+    return Effect.die(new Error("unexpected createDoc class"))
+  }) as HulyClientOperations["createDoc"]
+
+  const removeDoc: HulyClientOperations["removeDoc"] = ((_class: unknown, _space: unknown, objectId: unknown) => {
+    if (_class === core.class.Relation) {
+      const index = relations.findIndex((doc) => doc._id === objectId)
+      if (index >= 0) relations.splice(index, 1)
+      return Effect.succeed({})
+    }
+    if (_class === core.class.Association) {
+      const index = associations.findIndex((doc) => doc._id === objectId)
+      if (index >= 0) associations.splice(index, 1)
+      return Effect.succeed({})
+    }
+    return Effect.die(new Error("unexpected removeDoc class"))
+  }) as HulyClientOperations["removeDoc"]
+
+  return HulyClient.testLayer({ findAll, findOne, createDoc, removeDoc })
 }
 
 describe("listAssociations", () => {
@@ -200,7 +260,7 @@ describe("listAssociations", () => {
       expect(result.associations[0].sourceClassLabel).toBe("Issue")
       expect(result.associations[0].targetClassLabel).toBe("Issue")
       expect(result.associations[0].canListRelations).toBe(true)
-      expect(result.associations[0].canCreateRelation).toBe(false)
+      expect(result.associations[0].canCreateRelation).toBe(true)
     }))
 
   it.effect("applies limit after hiding system associations", () =>
@@ -244,20 +304,27 @@ describe("listAssociations", () => {
       ])
     }))
 
-  it.effect("returns no writable associations until a write allowlist exists", () =>
+  it.effect("returns relation-writable associations when requested", () =>
     Effect.gen(function*() {
       const result = yield* listAssociations({ writableOnly: true }).pipe(
         Effect.provide(testLayer({ associations: [association({})] }))
       )
 
-      expect(result.associations).toEqual([])
-      expect(result.total).toBe(0)
+      expect(result.associations.map((item) => item.associationId)).toEqual(["assoc-1"])
+      expect(result.total).toBe(1)
     }))
 
-  it.effect("resolves a selected association before applying writableOnly filtering", () =>
+  it.effect("filters selected non-writable associations after resolving them", () =>
     Effect.gen(function*() {
       const result = yield* listAssociations({ association: assocId, writableOnly: true }).pipe(
-        Effect.provide(testLayer({ associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })] }))
+        Effect.provide(testLayer({
+          associations: [
+            association({
+              _id: "assoc-1" as Ref<HulyAssociation>,
+              automationOnly: true
+            })
+          ]
+        }))
       )
 
       expect(result.associations).toEqual([])
@@ -844,30 +911,279 @@ describe("listRelations", () => {
     }))
 })
 
+describe("association mutations", () => {
+  it.effect("createAssociation creates a non-system association", () =>
+    Effect.gen(function*() {
+      const result = yield* createAssociation({
+        sourceClass: issueClass,
+        targetClass: documentClass,
+        sourceRole: AssociationRoleName.make("references"),
+        targetRole: AssociationRoleName.make("referenced by"),
+        cardinality: "one-to-many"
+      }).pipe(Effect.provide(testLayer({})))
+
+      expect(result.created).toBe(true)
+      expect(result.existing).toBe(false)
+      expect(result.association.sourceClass).toBe(tracker.class.Issue)
+      expect(result.association.targetClass).toBe(documentPlugin.class.Document)
+      expect(result.association.cardinality).toBe("one-to-many")
+    }))
+
+  it.effect("createAssociation returns an identical existing association", () =>
+    Effect.gen(function*() {
+      const result = yield* createAssociation({
+        sourceClass: issueClass,
+        targetClass: issueClass,
+        sourceRole: AssociationRoleName.make("relates"),
+        targetRole: AssociationRoleName.make("relates"),
+        cardinality: "many-to-many"
+      }).pipe(Effect.provide(testLayer({ associations: [association({})] })))
+
+      expect(result.created).toBe(false)
+      expect(result.existing).toBe(true)
+      expect(result.association.associationId).toBe("assoc-1")
+    }))
+
+  it.effect("createAssociation fails on conflicting exact duplicates", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        createAssociation({
+          sourceClass: issueClass,
+          targetClass: issueClass,
+          sourceRole: AssociationRoleName.make("relates"),
+          targetRole: AssociationRoleName.make("relates"),
+          cardinality: "one-to-one"
+        }).pipe(Effect.provide(testLayer({ associations: [association({})] })))
+      )
+
+      expect(error).toBeInstanceOf(AssociationConflictError)
+    }))
+
+  it.effect("createAssociation rejects core system classes", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        createAssociation({
+          sourceClass: ObjectClassName.make(core.class.Doc),
+          targetClass: issueClass,
+          sourceRole: AssociationRoleName.make("source"),
+          targetRole: AssociationRoleName.make("target"),
+          cardinality: "many-to-many"
+        }).pipe(Effect.provide(testLayer({})))
+      )
+
+      expect(error).toBeInstanceOf(AssociationSystemClassUnsupportedError)
+    }))
+
+  it.effect("deleteAssociation deletes unused associations", () =>
+    Effect.gen(function*() {
+      const result = yield* deleteAssociation({ association: assocId }).pipe(
+        Effect.provide(testLayer({ associations: [association({})] }))
+      )
+
+      expect(result.associationId).toBe("assoc-1")
+      expect(result.deleted).toBe(true)
+      expect(result.relationCount).toBe(0)
+    }))
+
+  it.effect("deleteAssociation is idempotent when the association is missing", () =>
+    Effect.gen(function*() {
+      const result = yield* deleteAssociation({ association: AssociationIdentifier.make("missing-assoc") }).pipe(
+        Effect.provide(testLayer({}))
+      )
+
+      expect(result.association).toBe("missing-assoc")
+      expect(result.associationId).toBeUndefined()
+      expect(result.deleted).toBe(false)
+      expect(result.relationCount).toBe(0)
+      expect(result.reason).toBe("not_found")
+    }))
+
+  it.effect("deleteAssociation fails while relations still reference the association", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        deleteAssociation({ association: assocId }).pipe(
+          Effect.provide(testLayer({
+            associations: [association({})],
+            relations: [relation({})]
+          }))
+        )
+      )
+
+      expect(error).toBeInstanceOf(AssociationInUseError)
+    }))
+
+  it.effect("deleteAssociation treats returned relation rows as usage even when SDK total is stale", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        deleteAssociation({ association: assocId }).pipe(
+          Effect.provide(testLayer({
+            associations: [association({})],
+            relations: [relation({})],
+            relationTotal: 0
+          }))
+        )
+      )
+
+      expect(error).toBeInstanceOf(AssociationInUseError)
+    }))
+
+  it.effect("deleteAssociation deletes unused automation-only associations", () =>
+    Effect.gen(function*() {
+      const result = yield* deleteAssociation({ association: assocId }).pipe(
+        Effect.provide(testLayer({
+          associations: [association({ automationOnly: true })]
+        }))
+      )
+
+      expect(result.deleted).toBe(true)
+      expect(result.associationId).toBe("assoc-1")
+    }))
+})
+
 describe("relation mutations", () => {
-  it.effect("createRelation fails clearly while writes are unsupported", () =>
+  it.effect("createRelation creates a concrete relation and returns existing by default", () =>
+    Effect.gen(function*() {
+      const layer = testLayer({
+        associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })],
+        issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+      })
+      const params = {
+        association: assocId,
+        source: { kind: "raw" as const, id: docId("issue-1"), class: issueClass },
+        target: { kind: "raw" as const, id: docId("issue-2"), class: issueClass }
+      }
+
+      const created = yield* createRelation(params).pipe(Effect.provide(layer))
+      const existing = yield* createRelation(params).pipe(Effect.provide(layer))
+
+      expect(created.created).toBe(true)
+      expect(created.existing).toBe(false)
+      expect(existing.created).toBe(false)
+      expect(existing.existing).toBe(true)
+      expect(existing.relationId).toBe(created.relationId)
+    }))
+
+  it.effect("createRelation enforces ifExists=fail", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        createRelation({
+          association: assocId,
+          source: { kind: "raw", id: docId("issue-1"), class: issueClass },
+          target: { kind: "raw", id: docId("issue-2"), class: issueClass },
+          ifExists: "fail"
+        }).pipe(Effect.provide(testLayer({
+          associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })],
+          relations: [relation({})],
+          issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+        })))
+      )
+
+      expect(error).toBeInstanceOf(RelationCardinalityViolationError)
+    }))
+
+  it.effect("createRelation enforces one-to-many target-side cardinality", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        createRelation({
+          association: assocId,
+          source: { kind: "raw", id: docId("issue-3"), class: issueClass },
+          target: { kind: "raw", id: docId("issue-2"), class: issueClass }
+        }).pipe(Effect.provide(testLayer({
+          associations: [association({ _id: "assoc-1" as Ref<HulyAssociation>, type: "1:N" })],
+          relations: [relation({ docA: "issue-1" as Ref<Doc>, docB: "issue-2" as Ref<Doc> })],
+          issues: [
+            issue("issue-1", "HULY-1"),
+            issue("issue-2", "HULY-2"),
+            issue("issue-3", "HULY-3")
+          ]
+        })))
+      )
+
+      expect(error).toBeInstanceOf(RelationCardinalityViolationError)
+    }))
+
+  it.effect("createRelation rejects automation-only associations", () =>
     Effect.gen(function*() {
       const error = yield* Effect.flip(
         createRelation({
           association: assocId,
           source: { kind: "raw", id: docId("issue-1"), class: issueClass },
           target: { kind: "raw", id: docId("issue-2"), class: issueClass }
-        }).pipe(Effect.provide(testLayer({ associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })] })))
+        }).pipe(Effect.provide(testLayer({
+          associations: [association({ _id: "assoc-1" as Ref<HulyAssociation>, automationOnly: true })],
+          issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+        })))
       )
 
       expect(error).toBeInstanceOf(RelationMutationUnsupportedError)
     }))
 
-  it.effect("deleteRelation rejects validated association deletes while writes are unsupported", () =>
+  it.effect("createRelation rejects direction either for same-class associations", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        createRelation({
+          association: assocId,
+          source: { kind: "raw", id: docId("issue-1"), class: issueClass },
+          target: { kind: "raw", id: docId("issue-2"), class: issueClass },
+          direction: "either"
+        }).pipe(Effect.provide(testLayer({
+          associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })],
+          issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+        })))
+      )
+
+      expect(error).toBeInstanceOf(RelationDirectionAmbiguousError)
+    }))
+
+  it.effect("deleteRelation deletes by id and is idempotent", () =>
+    Effect.gen(function*() {
+      const layer = testLayer({
+        associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })],
+        relations: [relation({})]
+      })
+
+      const deleted = yield* deleteRelation({ relation: RelationIdentifier.make("rel-1") }).pipe(Effect.provide(layer))
+      const missing = yield* deleteRelation({ relation: RelationIdentifier.make("rel-1") }).pipe(Effect.provide(layer))
+
+      expect(deleted.deleted).toBe(true)
+      expect(deleted.associationId).toBe("assoc-1")
+      expect(missing.deleted).toBe(false)
+      expect(missing.reason).toBe("not_found")
+    }))
+
+  it.effect("deleteRelation deletes by exact triple", () =>
+    Effect.gen(function*() {
+      const result = yield* deleteRelation({
+        association: assocId,
+        source: { kind: "raw", id: docId("issue-1"), class: issueClass },
+        target: { kind: "raw", id: docId("issue-2"), class: issueClass }
+      }).pipe(Effect.provide(testLayer({
+        associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })],
+        relations: [relation({})],
+        issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+      })))
+
+      expect(result.deleted).toBe(true)
+      expect(result.relationId).toBe("rel-1")
+    }))
+
+  it.effect("deleteRelation fails on ambiguous triple matches", () =>
     Effect.gen(function*() {
       const error = yield* Effect.flip(
         deleteRelation({
           association: assocId,
           source: { kind: "raw", id: docId("issue-1"), class: issueClass },
           target: { kind: "raw", id: docId("issue-2"), class: issueClass }
-        }).pipe(Effect.provide(testLayer({ associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })] })))
+        }).pipe(Effect.provide(testLayer({
+          associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })],
+          relations: [
+            relation({ _id: "rel-1" as Ref<HulyRelation> }),
+            relation({ _id: "rel-2" as Ref<HulyRelation> })
+          ],
+          issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+        })))
       )
 
-      expect(error).toBeInstanceOf(RelationMutationUnsupportedError)
+      expect(error).toBeInstanceOf(RelationIdentifierAmbiguousError)
     }))
 })

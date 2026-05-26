@@ -98,9 +98,9 @@ Expected: JSON with `"projects": [...]`
 
 ## Full Integration Test Suite
 
-**Coverage**: 110+ tool calls across 20 domains. Self-cleaning: all created entities are deleted at the end of each section. Tools that would leak data (no delete counterpart) are skipped. Run time: ~3 minutes.
+**Coverage**: 120+ tool calls across 21 domains. Self-cleaning: all created entities are deleted at the end of each section. Tools that would leak data (no delete counterpart) are skipped. Run time: ~3 minutes.
 
-**Last verified**: 2026-05-25 — 168 passed, 0 failed, 35 skipped (of 203 total).
+**Last verified**: 2026-05-26 — 195 passed, 0 failed, 38 skipped (of 233 total).
 
 ### How to Run
 
@@ -131,6 +131,7 @@ The full suite tests CRUD lifecycles with cleanup for all domains:
 | 11. Calendar | list events/work_slots/time_reports/recurring, create/get/update/delete event, start/stop timer | Lifecycle (create_recurring_event skipped — no delete tool) |
 | 12. Notifications | list, count, contexts, settings, get, mark_read | Read operations (+ mutation if notifications exist) |
 | 13. Search | fulltext_search | Uses `searchFulltext` API |
+| 13b. Generic Associations | list_associations, create_association, delete_association, list_relations, create_relation, delete_relation | Disposable association + relation lifecycle, including idempotency, in-use association delete rejection, public association cleanup, and cardinality violation |
 | 14. Cards | list_card_spaces, list_master_tags, list_cards | Read operations with cardSpace |
 | 15. Activity | list_mentions, list_saved_messages | Read operations |
 | 16. Workspace | get_workspace_info, list_workspace_members | Read-only (management tools skipped) |
