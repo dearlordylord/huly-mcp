@@ -182,6 +182,22 @@ Configure with `MCP_HTTP_PORT` and `MCP_HTTP_HOST`:
 MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 npx -y @firfi/huly-mcp@latest
 ```
 
+For hosted or tunneled HTTP deployments, you can require an MCP endpoint bearer token:
+
+```bash
+MCP_TRANSPORT=http \
+MCP_AUTH_TOKEN="$(openssl rand -hex 32)" \
+npx -y @firfi/huly-mcp@latest
+```
+
+HTTP clients must then send:
+
+```http
+Authorization: Bearer <MCP_AUTH_TOKEN>
+```
+
+`MCP_AUTH_TOKEN` protects only the MCP HTTP `/mcp` endpoint. It is unrelated to `HULY_TOKEN`, does not authenticate to Huly, and does not replace `HULY_EMAIL` / `HULY_PASSWORD` / `HULY_TOKEN`. Huly credentials are still required through process env vars or, for hosted URL deployments, the supported `x-huly-*` headers. Stdio deployments do not use `MCP_AUTH_TOKEN`.
+
 ### Hosted HTTP Header Configuration
 
 For hosted URL deployments, keep the server process configured with `MCP_TRANSPORT=http`. A hosting layer can forward per-session Huly credentials as request headers, so one hosted server can serve different Huly workspaces without process-wide `HULY_*` env vars.
@@ -212,6 +228,7 @@ For a Smithery publish schema example, see [docs/SMITHERY_URL_PUBLISH.md](docs/S
 | `MCP_TRANSPORT` | No | Transport type: `stdio` (default) or `http` |
 | `MCP_HTTP_PORT` | No | HTTP server port (falls back to `PORT`, then 3000) |
 | `MCP_HTTP_HOST` | No | HTTP server host (default: 127.0.0.1) |
+| `MCP_AUTH_TOKEN` | No | Optional bearer token required by HTTP clients for `/mcp`. This protects the MCP endpoint only; it is not a Huly API token. |
 | `TOOLSETS` | No | Comma-separated tool categories to expose. If unset, all tools are exposed. Example: `issues,projects,search` |
 
 *Auth: Provide either `HULY_EMAIL` + `HULY_PASSWORD` or `HULY_TOKEN`.

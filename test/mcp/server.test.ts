@@ -70,6 +70,7 @@ const buildTestServerLayer = (
     transport: "stdio" | "http"
     httpPort?: number
     httpHost?: string
+    mcpAuthToken?: string
     autoExit?: boolean
     authMethod?: "token" | "password"
     httpTransportDependencies?: Partial<HttpTransportDependencies>
@@ -1122,6 +1123,94 @@ describe("McpServerService.layer operations", () => {
 
         yield* Fiber.interrupt(fiber)
       }), { timeout: 5000 })
+
+    it.scoped(
+      "http transport applies configured MCP auth token before creating MCP server",
+      () =>
+        Effect.gen(function*() {
+          let createServerCalls = 0
+          let postHandler: ((req: unknown, res: unknown) => Promise<void>) | undefined
+          const mockHttpFactory: HttpServerFactoryService["Type"] = {
+            createApp: () => {
+              const fakeApp = {
+                post: (_path: string, handler: (req: unknown, res: unknown) => Promise<void>) => {
+                  postHandler = handler
+                },
+                get: () => {},
+                delete: () => {}
+              }
+              return fakeApp as never
+            },
+            listen: () =>
+              Effect.succeed({
+                close: (cb: (err?: Error) => void) => cb()
+              } as never)
+          }
+
+          const authServerLayer = McpServerService.layer({
+            transport: "http",
+            httpPort: 19880,
+            httpHost: "127.0.0.1",
+            mcpAuthToken: "server-secret",
+            createServer: () => {
+              createServerCalls++
+              return createMockServer()
+            },
+            resolveClients: resolveClientsFromLayer(
+              Layer.mergeAll(
+                HulyClient.testLayer({}),
+                HulyStorageClient.testLayer({}),
+                WorkspaceClient.testLayer({})
+              )
+            ),
+            httpTransportDependencies: quietHttpTransportDependencies
+          }).pipe(Layer.provide(TelemetryService.testLayer()))
+
+          const authCtx = yield* Layer.build(authServerLayer)
+          const authOps = yield* McpServerService.pipe(
+            Effect.provide(Layer.succeedContext(authCtx))
+          )
+          const fiber = yield* Effect.fork(
+            authOps.run().pipe(
+              Effect.provideService(HttpServerFactoryService, mockHttpFactory)
+            )
+          )
+
+          yield* Effect.promise(() => new Promise((r) => setTimeout(r, 100)))
+
+          expect(postHandler).not.toBeUndefined()
+          if (postHandler !== undefined) {
+            const handler = postHandler
+            const unauthorizedRes = {
+              headersSent: false,
+              setHeader: () => undefined,
+              status: (code: number) => ({
+                json: (body: unknown) => ({ code, body })
+              })
+            }
+            yield* Effect.promise(() => handler({ body: {}, headers: {}, on: () => undefined }, unauthorizedRes))
+            expect(createServerCalls).toBe(0)
+
+            const authorizedRes = {
+              headersSent: false,
+              on: () => undefined,
+              setHeader: () => undefined,
+              status: () => ({ json: () => undefined })
+            }
+            yield* Effect.promise(() =>
+              handler({
+                body: {},
+                headers: { authorization: "Bearer server-secret" },
+                on: () => undefined
+              }, authorizedRes)
+            )
+          }
+
+          expect(createServerCalls).toBe(1)
+          yield* Fiber.interrupt(fiber)
+        }),
+      { timeout: 5000 }
+    )
 
     it.scoped("http transport resolves clients from each request headers independently", () =>
       Effect.gen(function*() {

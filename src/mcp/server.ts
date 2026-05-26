@@ -96,6 +96,7 @@ interface McpServerConfigData {
   readonly transport: McpTransportType
   readonly httpPort?: number
   readonly httpHost?: string
+  readonly mcpAuthToken?: string
   readonly autoExit?: boolean
   readonly authMethod?: "token" | "password"
   readonly httpTransportDependencies?: Partial<HttpTransportDependencies>
@@ -420,7 +421,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                 const host = config.httpHost ?? "127.0.0.1"
 
                 yield* startHttpTransport(
-                  { port, host },
+                  { port, host, authToken: config.mcpAuthToken },
                   (req) => {
                     const resolveClientsForRequest = config.resolveClientsForHttpRequest
                     const requestResolveClients = resolveClientsForRequest === undefined
