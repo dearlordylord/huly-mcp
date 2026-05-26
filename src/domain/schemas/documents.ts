@@ -382,6 +382,9 @@ const editDocumentGeneratedProperties = isJsonSchemaRecord(editDocumentGenerated
 const editDocumentOldTextJsonSchema = isJsonSchemaRecord(editDocumentGeneratedProperties.old_text)
   ? editDocumentGeneratedProperties.old_text
   : {}
+// NOTE (fork patch): top-level anyOf/allOf removed (Anthropic API rejects them).
+// Cross-field rules (mutual exclusion + co-required + at-least-one) live in the
+// Schema.filter on EditDocumentParamsSchema and are reported as decode errors.
 export const editDocumentParamsJsonSchema = {
   ...editDocumentGeneratedJsonSchema,
   properties: {
@@ -390,30 +393,7 @@ export const editDocumentParamsJsonSchema = {
       ...editDocumentOldTextJsonSchema,
       pattern: "\\S"
     }
-  },
-  anyOf: [{ required: ["title"] }, { required: ["content"] }, { required: ["old_text", "new_text"] }],
-  allOf: [
-    {
-      not: {
-        anyOf: [
-          { required: ["content", "old_text"] },
-          { required: ["content", "new_text"] }
-        ]
-      }
-    },
-    {
-      if: { required: ["old_text"] },
-      then: { required: ["new_text"] }
-    },
-    {
-      if: { required: ["new_text"] },
-      then: { required: ["old_text"] }
-    },
-    {
-      if: { required: ["replace_all"] },
-      then: { required: ["old_text", "new_text"] }
-    }
-  ]
+  }
 }
 export const listInlineCommentsParamsJsonSchema = JSONSchema.make(ListInlineCommentsParamsSchema)
 export const deleteDocumentParamsJsonSchema = JSONSchema.make(DeleteDocumentParamsSchema)

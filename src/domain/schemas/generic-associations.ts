@@ -283,18 +283,36 @@ export const DeleteRelationResultSchema = Schema.Struct({
 export type DeleteRelationResult = Schema.Schema.Type<typeof DeleteRelationResultSchema>
 
 export const listAssociationsParamsJsonSchema = JSONSchema.make(ListAssociationsParamsSchema)
+// NOTE (fork patch): top-level anyOf removed (Anthropic API rejects it).
+// Constraint described in `description`; runtime parser enforces.
+const listRelationsBaseJsonSchema = JSONSchema.make(ListRelationsParamsBaseSchema) as Record<string, unknown>
+const listRelationsExistingDescription = typeof listRelationsBaseJsonSchema.description === "string"
+  ? listRelationsBaseJsonSchema.description
+  : ""
+const listRelationsConstraintMessage = "At least one of `association`, `source`, or `target` must be provided."
 export const listRelationsParamsJsonSchema = {
-  ...JSONSchema.make(ListRelationsParamsBaseSchema),
-  anyOf: [
-    { required: ["association"] },
-    { required: ["source"] },
-    { required: ["target"] }
-  ]
+  ...listRelationsBaseJsonSchema,
+  description: listRelationsExistingDescription.length > 0
+    ? `${listRelationsExistingDescription} ${listRelationsConstraintMessage}`
+    : listRelationsConstraintMessage
 }
 export const createRelationParamsJsonSchema = JSONSchema.make(CreateRelationParamsSchema)
+// NOTE (fork patch): top-level anyOf (from Schema.Union) removed —
+// Anthropic API rejects it. Flat object with all targeting fields optional;
+// runtime Union parser enforces "either relation, or association+source+target".
+const deleteRelationByIdJsonSchema = JSONSchema.make(DeleteRelationByIdParamsSchema) as Record<string, unknown>
+const deleteRelationByTripleJsonSchema = JSONSchema.make(DeleteRelationByTripleParamsSchema) as Record<string, unknown>
+const deleteRelationByIdProperties = (deleteRelationByIdJsonSchema.properties ?? {}) as Record<string, unknown>
+const deleteRelationByTripleProperties = (deleteRelationByTripleJsonSchema.properties ?? {}) as Record<string, unknown>
 export const deleteRelationParamsJsonSchema = {
-  ...JSONSchema.make(DeleteRelationParamsSchema),
-  type: "object"
+  type: "object",
+  description:
+    "Idempotently delete one concrete generic relation. Provide either `relation` (concrete _id), "
+    + "or the full triple `association` + `source` + `target`. Mixing modes is rejected at runtime.",
+  properties: {
+    ...deleteRelationByIdProperties,
+    ...deleteRelationByTripleProperties
+  }
 }
 
 const strictParseOptions = { onExcessProperty: "error" } as const

@@ -37,10 +37,17 @@ export const atLeastOneUpdateFieldMessage = (fields: ReadonlyArray<string>): str
 export const withAtLeastOneRequired = <K extends string>(
   schema: object,
   fields: ReadonlyArray<K>
-): object => ({
-  ...schema,
-  anyOf: fields.map((field) => ({ required: [field] }))
-})
+): object => {
+  // NOTE (fork patch): Anthropic API rejects top-level anyOf/oneOf/allOf in
+  // input_schema. Runtime enforcement lives in requireUpdateFields — the
+  // schema just needs to describe the constraint to the LLM.
+  const existing = (schema as { readonly description?: string }).description
+  const constraint = atLeastOneUpdateFieldMessage(fields.map((field) => String(field)))
+  const description = existing !== undefined && existing.length > 0
+    ? `${existing} ${constraint}`
+    : constraint
+  return { ...schema, description }
+}
 
 // === Tier 1: Huly Internal Refs (opaque IDs from _id) ===
 

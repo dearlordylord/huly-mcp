@@ -227,55 +227,34 @@ const targetStringJsonSchema = (description: string): object => ({
   description
 })
 
+// NOTE (fork patch): top-level oneOf removed (Anthropic API rejects it).
+// All target fields optional at schema level; runtime Schema.filter on
+// ListActivityParamsSchema enforces the "choose exactly one mode" rule.
 export const listActivityParamsJsonSchema = {
   type: "object",
+  additionalProperties: false,
   description:
-    "Choose exactly one target mode for activity lookup: project+issueIdentifier, teamspace+document, channel, or objectId+objectClass.",
-  oneOf: [
-    {
-      title: "Issue activity target",
-      type: "object",
-      additionalProperties: false,
-      required: ["project", "issueIdentifier"],
-      properties: {
-        project: targetStringJsonSchema("Project identifier for issue activity, e.g. 'HULY'."),
-        issueIdentifier: targetStringJsonSchema("Issue identifier for issue activity, e.g. 'HULY-123' or '123'."),
-        limit: activityLimitJsonSchema
-      }
-    },
-    {
-      title: "Document activity target",
-      type: "object",
-      additionalProperties: false,
-      required: ["teamspace", "document"],
-      properties: {
-        teamspace: targetStringJsonSchema("Teamspace name or ID for document activity."),
-        document: targetStringJsonSchema("Document title or ID for document activity."),
-        limit: activityLimitJsonSchema
-      }
-    },
-    {
-      title: "Channel activity target",
-      type: "object",
-      additionalProperties: false,
-      required: ["channel"],
-      properties: {
-        channel: targetStringJsonSchema("Channel name or ID for channel activity."),
-        limit: activityLimitJsonSchema
-      }
-    },
-    {
-      title: "Raw Huly object activity target",
-      type: "object",
-      additionalProperties: false,
-      required: ["objectId", "objectClass"],
-      properties: {
-        objectId: targetStringJsonSchema("Internal Huly object ID to get activity for."),
-        objectClass: targetStringJsonSchema("Internal Huly object class for objectId, such as 'tracker:class:Issue'."),
-        limit: activityLimitJsonSchema
-      }
-    }
-  ]
+    "List activity for a Huly object. Choose exactly one target mode and provide all of its fields: "
+    + "(1) issue: project + issueIdentifier; "
+    + "(2) document: teamspace + document; "
+    + "(3) channel: channel; "
+    + "(4) raw: objectId + objectClass. Mixing modes is rejected at runtime.",
+  properties: {
+    project: targetStringJsonSchema("Project identifier for issue activity, e.g. 'HULY'. Use with issueIdentifier."),
+    issueIdentifier: targetStringJsonSchema(
+      "Issue identifier for issue activity, e.g. 'HULY-123' or '123'. Use with project."
+    ),
+    teamspace: targetStringJsonSchema("Teamspace name or ID for document activity. Use with document."),
+    document: targetStringJsonSchema("Document title or ID for document activity. Use with teamspace."),
+    channel: targetStringJsonSchema("Channel name or ID for channel activity."),
+    objectId: targetStringJsonSchema(
+      "Advanced: internal Huly object ID. Use with objectClass when no friendly identifiers exist."
+    ),
+    objectClass: targetStringJsonSchema(
+      "Advanced: internal Huly object class for objectId, such as 'tracker:class:Issue'."
+    ),
+    limit: activityLimitJsonSchema
+  }
 }
 export const addReactionParamsJsonSchema = JSONSchema.make(AddReactionParamsSchema)
 export const removeReactionParamsJsonSchema = JSONSchema.make(RemoveReactionParamsSchema)
