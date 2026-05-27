@@ -37,8 +37,8 @@ import {
   findProjectAndIssue,
   findProjectWithStatuses,
   resolveStatusByName,
-  type StatusInfo,
-  stringToPriority
+  stringToPriority,
+  type WorkflowStatus
 } from "./issues-shared.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
@@ -109,7 +109,7 @@ const resolveAssignee = (
 
 interface TaskTypeWorkflow {
   readonly taskType: TaskType
-  readonly statuses: ReadonlyArray<StatusInfo>
+  readonly statuses: ReadonlyArray<WorkflowStatus>
   readonly defaultStatusId: Ref<Status> | undefined
 }
 
@@ -139,7 +139,7 @@ const resolveTaskTypeWorkflow = (
   client: HulyClient["Type"],
   project: HulyProject,
   projectType: ProjectType | undefined,
-  projectStatuses: ReadonlyArray<StatusInfo>,
+  projectStatuses: ReadonlyArray<WorkflowStatus>,
   taskTypeRef: TaskTypeRef,
   projectIdentifier: ProjectIdentifier
 ): Effect.Effect<TaskTypeWorkflow, HulyClientError | HulyError> =>

@@ -387,7 +387,7 @@ describe("Issues Coverage - resolveStatusName", () => {
 
 describe("Issues Coverage - listIssues status filters", () => {
   // test-revizorro: approved
-  it.effect("open filter excludes done and canceled statuses", () =>
+  it.effect("open filter includes only non-terminal statuses", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
       const statuses = [
@@ -423,13 +423,11 @@ describe("Issues Coverage - listIssues status filters", () => {
         Effect.provide(testLayer)
       )
 
-      expect(captureQuery.query?.status).toEqual({
-        $nin: ["status-done", "status-canceled"]
-      })
+      expect(captureQuery.query?.status).toEqual({ $in: ["status-open"] })
     }))
 
   // test-revizorro: approved
-  it.effect("open filter with no done/canceled statuses does not set $nin", () =>
+  it.effect("open filter with only open statuses sets $in", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
       const statuses = [
@@ -455,7 +453,32 @@ describe("Issues Coverage - listIssues status filters", () => {
         Effect.provide(testLayer)
       )
 
-      expect(captureQuery.query?.status).toBeUndefined()
+      expect(captureQuery.query?.status).toEqual({ $in: ["status-open"] })
+    }))
+
+  it.effect("category filter fails when status category metadata is unavailable", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ identifier: "TEST" })
+      const statuses = [
+        makeStatus({
+          _id: "status-open" as Ref<Status>,
+          name: "Open"
+        })
+      ]
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        issues: [makeIssue()],
+        statuses
+      })
+
+      const error = yield* listIssues({ project: projectIdentifier("TEST"), status: statusName("open") }).pipe(
+        Effect.provide(testLayer),
+        Effect.flip
+      )
+
+      expect(error._tag).toBe("HulyConnectionError")
+      expect(error.message).toContain("did not return complete status category metadata")
     }))
 
   // test-revizorro: approved

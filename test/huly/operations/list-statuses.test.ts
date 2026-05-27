@@ -72,7 +72,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 }
 
 describe("listStatuses", () => {
-  it.effect("returns statuses with isDone, isCanceled, isDefault flags", () =>
+  it.effect("returns statuses with category and isDefault fields", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST", defaultIssueStatus: "status-1" as Ref<Status> })
       const projectType = asProjectType({
@@ -101,18 +101,15 @@ describe("listStatuses", () => {
 
       const todo = result.statuses.find(s => s.name === "Todo")
       expect(todo).toBeDefined()
-      expect(todo?.isDone).toBe(false)
-      expect(todo?.isCanceled).toBe(false)
+      expect(todo?.category).toBe("unknown")
       expect(todo?.isDefault).toBe(true)
 
       const done = result.statuses.find(s => s.name === "Done")
-      expect(done?.isDone).toBe(true)
-      expect(done?.isCanceled).toBe(false)
+      expect(done?.category).toBe("done")
       expect(done?.isDefault).toBe(false)
 
       const cancelled = result.statuses.find(s => s.name === "Cancelled")
-      expect(cancelled?.isDone).toBe(false)
-      expect(cancelled?.isCanceled).toBe(true)
+      expect(cancelled?.category).toBe("canceled")
       expect(cancelled?.isDefault).toBe(false)
     }))
 

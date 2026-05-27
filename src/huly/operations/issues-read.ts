@@ -10,7 +10,7 @@ import { Effect, Schema } from "effect"
 
 import type { GetIssueParams, Issue, IssueSummary, ListIssuesParams } from "../../domain/schemas.js"
 import { IssueSummarySchema, parseIssue } from "../../domain/schemas/issues.js"
-import { IssueId } from "../../domain/schemas/shared.js"
+import { IssueId, type ProjectIdentifier } from "../../domain/schemas/shared.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { ComponentNotFoundError, InvalidStatusError, ProjectNotFoundError } from "../errors.js"
@@ -24,7 +24,7 @@ import {
   parseIssueIdentifier,
   priorityToString,
   resolveStatusByName,
-  type StatusInfo
+  type WorkflowStatus
 } from "./issues-shared.js"
 import { clampLimit, escapeLikeWildcards, hulyQuery, type StrictDocumentQuery, withLookup } from "./query-helpers.js"
 
@@ -46,12 +46,82 @@ type IssueWithLookup = WithLookup<HulyIssue> & {
   $lookup?: { assignee?: Person }
 }
 
+const CATEGORY_STATUS_FILTER = {
+  open: "open",
+  done: "done",
+  canceled: "canceled"
+} as const
+
+type CategoryStatusFilter = typeof CATEGORY_STATUS_FILTER[keyof typeof CATEGORY_STATUS_FILTER]
+type TerminalStatusCategory = Extract<WorkflowStatus["category"], "done" | "canceled">
+
 const resolveStatusName = (
-  statuses: Array<StatusInfo>,
+  statuses: Array<WorkflowStatus>,
   statusId: Ref<Status>
 ): string => {
   const statusDoc = statuses.find(s => s._id === statusId)
   return statusDoc?.name ?? "Unknown"
+}
+
+const hasUnknownStatusCategory = (statuses: ReadonlyArray<WorkflowStatus>): boolean =>
+  statuses.some((status) => status.category === "unknown")
+
+const requireKnownStatusCategories = (
+  statuses: ReadonlyArray<WorkflowStatus>,
+  filter: CategoryStatusFilter,
+  project: ProjectIdentifier
+): Effect.Effect<void, HulyConnectionError> =>
+  hasUnknownStatusCategory(statuses)
+    ? Effect.fail(
+      new HulyConnectionError({
+        message:
+          `Cannot filter project '${project}' issues by status category '${filter}' because Huly did not return complete status category metadata. Use an exact status name instead.`
+      })
+    )
+    : Effect.void
+
+const openStatusIds = (statuses: ReadonlyArray<WorkflowStatus>): Array<Ref<Status>> =>
+  statuses
+    .filter((status) =>
+      status.category !== CATEGORY_STATUS_FILTER.done
+      && status.category !== CATEGORY_STATUS_FILTER.canceled
+      && status.category !== "unknown"
+    )
+    .map((status) => status._id)
+
+const statusIdsByTerminalCategory = (
+  statuses: ReadonlyArray<WorkflowStatus>,
+  category: TerminalStatusCategory
+): Array<Ref<Status>> =>
+  statuses
+    .filter((status) => status.category === category)
+    .map((status) => status._id)
+
+const parseCategoryStatusFilter = (value: string): CategoryStatusFilter | undefined => {
+  switch (value) {
+    case CATEGORY_STATUS_FILTER.open:
+      return CATEGORY_STATUS_FILTER.open
+    case CATEGORY_STATUS_FILTER.done:
+      return CATEGORY_STATUS_FILTER.done
+    case CATEGORY_STATUS_FILTER.canceled:
+      return CATEGORY_STATUS_FILTER.canceled
+    default:
+      return undefined
+  }
+}
+
+const statusIdsByCategoryFilter = (
+  statuses: ReadonlyArray<WorkflowStatus>,
+  filter: CategoryStatusFilter
+): Array<Ref<Status>> => {
+  switch (filter) {
+    case CATEGORY_STATUS_FILTER.open:
+      return openStatusIds(statuses)
+    case CATEGORY_STATUS_FILTER.done:
+      return statusIdsByTerminalCategory(statuses, CATEGORY_STATUS_FILTER.done)
+    case CATEGORY_STATUS_FILTER.canceled:
+      return statusIdsByTerminalCategory(statuses, CATEGORY_STATUS_FILTER.canceled)
+  }
 }
 
 /**
@@ -70,32 +140,13 @@ export const listIssues = (
 
     if (params.status !== undefined) {
       const statusFilter = normalizeForComparison(params.status)
+      const categoryStatusFilter = parseCategoryStatusFilter(statusFilter)
 
-      if (statusFilter === "open") {
-        const doneAndCanceledStatuses = statuses
-          .filter(s => s.isDone || s.isCanceled)
-          .map(s => s._id)
-
-        if (doneAndCanceledStatuses.length > 0) {
-          query.status = { $nin: doneAndCanceledStatuses }
-        }
-      } else if (statusFilter === "done") {
-        const doneStatuses = statuses
-          .filter(s => s.isDone)
-          .map(s => s._id)
-
-        if (doneStatuses.length > 0) {
-          query.status = { $in: doneStatuses }
-        } else {
-          return []
-        }
-      } else if (statusFilter === "canceled") {
-        const canceledStatuses = statuses
-          .filter(s => s.isCanceled)
-          .map(s => s._id)
-
-        if (canceledStatuses.length > 0) {
-          query.status = { $in: canceledStatuses }
+      if (categoryStatusFilter !== undefined) {
+        yield* requireKnownStatusCategories(statuses, categoryStatusFilter, params.project)
+        const matchingStatuses = statusIdsByCategoryFilter(statuses, categoryStatusFilter)
+        if (matchingStatuses.length > 0) {
+          query.status = { $in: matchingStatuses }
         } else {
           return []
         }

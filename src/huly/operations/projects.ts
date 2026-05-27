@@ -130,8 +130,7 @@ export const listStatuses = (
 
     const details: Array<StatusDetail> = statuses.map(s => ({
       name: StatusName.make(s.name),
-      isDone: s.isDone,
-      isCanceled: s.isCanceled,
+      category: s.category,
       isDefault: s._id === defaultStatusId
     }))
 

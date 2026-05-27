@@ -662,16 +662,13 @@ describe("operations helpers", () => {
         expect(result.statuses).toHaveLength(3)
 
         const open = result.statuses.find(s => s.name === "Open")
-        expect(open?.isDone).toBe(false)
-        expect(open?.isCanceled).toBe(false)
+        expect(open?.category).toBe("active")
 
         const done = result.statuses.find(s => s.name === "Done")
-        expect(done?.isDone).toBe(true)
-        expect(done?.isCanceled).toBe(false)
+        expect(done?.category).toBe("done")
 
         const canceled = result.statuses.find(s => s.name === "Canceled")
-        expect(canceled?.isDone).toBe(false)
-        expect(canceled?.isCanceled).toBe(true)
+        expect(canceled?.category).toBe("canceled")
       }))
 
     // test-revizorro: approved
@@ -696,13 +693,11 @@ describe("operations helpers", () => {
 
         const doneStatus = result.statuses.find(s => s.name === "done-task")
         expect(doneStatus).toBeDefined()
-        expect(doneStatus!.isDone).toBe(true)
-        expect(doneStatus!.isCanceled).toBe(false)
+        expect(doneStatus!.category).toBe("unknown")
 
         const canceledStatus = result.statuses.find(s => s.name === "canceled-item")
         expect(canceledStatus).toBeDefined()
-        expect(canceledStatus!.isDone).toBe(false)
-        expect(canceledStatus!.isCanceled).toBe(true)
+        expect(canceledStatus!.category).toBe("unknown")
       }))
 
     // test-revizorro: approved
@@ -758,8 +753,7 @@ describe("operations helpers", () => {
         const result = yield* findProjectWithStatuses("TEST").pipe(Effect.provide(testLayer))
 
         const backlog = result.statuses.find(s => s.name === "Backlog")
-        expect(backlog?.isDone).toBe(false)
-        expect(backlog?.isCanceled).toBe(false)
+        expect(backlog?.category).toBe("unknown")
       }))
   })
 

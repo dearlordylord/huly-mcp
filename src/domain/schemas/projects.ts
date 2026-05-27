@@ -8,6 +8,7 @@ import {
   StatusName,
   withAtLeastOneRequired
 } from "./shared.js"
+import { StatusCategoryValueSchema } from "./task-management.js"
 
 export const ProjectSummarySchema = Schema.Struct({
   identifier: ProjectIdentifier,
@@ -99,12 +100,11 @@ export type ListStatusesParams = Schema.Schema.Type<typeof ListStatusesParamsSch
 
 export const StatusDetailSchema = Schema.Struct({
   name: StatusName,
-  isDone: Schema.Boolean,
-  isCanceled: Schema.Boolean,
+  category: StatusCategoryValueSchema,
   isDefault: Schema.Boolean
 }).annotations({
   title: "StatusDetail",
-  description: "Issue status with category and default info"
+  description: "Issue status with workflow category and default info"
 })
 export type StatusDetail = Schema.Schema.Type<typeof StatusDetailSchema>
 

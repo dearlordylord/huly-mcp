@@ -51,7 +51,7 @@ export const projectTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "list_statuses",
     description:
-      "List all issue statuses for a Huly project with category info. Returns status name, isDone, isCanceled, and isDefault flags. Use this to discover valid statuses before creating or updating issues.",
+      "List all issue statuses for a Huly project with workflow category and default info. Returns status name, category, and isDefault. Use this to discover valid statuses before creating or updating issues.",
     category: CATEGORY,
     inputSchema: listStatusesParamsJsonSchema,
     handler: createToolHandler(

@@ -669,10 +669,7 @@ describe("listIssues", () => {
           Effect.provide(testLayer)
         )
 
-        // "open" filter should exclude done (Won) and canceled (Lost) statuses
-        expect(captureQuery.query?.status).toEqual({
-          $nin: ["status-done", "status-canceled"]
-        })
+        expect(captureQuery.query?.status).toEqual({ $in: ["status-open"] })
       }))
   })
 

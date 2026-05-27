@@ -273,7 +273,7 @@ Resource roadmap:
 |------|-------------|
 | `list_projects` | List all Huly projects. Returns projects sorted by name. Supports filtering by archived status. |
 | `get_project` | Get full details of a Huly project including its statuses. Returns project name, description, archived flag, default status, and all available statuses. |
-| `list_statuses` | List all issue statuses for a Huly project with category info. Returns status name, isDone, isCanceled, and isDefault flags. Use this to discover valid statuses before creating or updating issues. |
+| `list_statuses` | List all issue statuses for a Huly project with workflow category and default info. Returns status name, category, and isDefault. Use this to discover valid statuses before creating or updating issues. |
 | `create_project` | Create a new Huly tracker project. Idempotent: returns existing project if one with the same identifier already exists (created=false). Identifier must be 1-5 uppercase alphanumeric chars starting with a letter. |
 | `update_project` | Update a Huly project. Only provided fields are modified. Set description to null to clear it. |
 | `delete_project` | Permanently delete a Huly project. All issues, milestones, and components in this project will be orphaned. This action cannot be undone. |

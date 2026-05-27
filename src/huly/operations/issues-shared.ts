@@ -1,4 +1,4 @@
-import type { Ref, Status, WithLookup } from "@hcengineering/core"
+import type { Ref, Status, StatusCategory, WithLookup } from "@hcengineering/core"
 import type { ProjectType } from "@hcengineering/task"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
 import { IssuePriority } from "@hcengineering/tracker"
@@ -7,6 +7,7 @@ import { Effect } from "effect"
 import type { IssuePriority as IssuePriorityStr } from "../../domain/schemas/issues.js"
 import type { NonNegativeNumber } from "../../domain/schemas/shared.js"
 import { PositiveNumber } from "../../domain/schemas/shared.js"
+import type { StatusCategoryValue } from "../../domain/schemas/task-management.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { InvalidStatusError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
@@ -43,41 +44,45 @@ export const findProject = (
     return { client, project }
   })
 
-export type StatusInfo = {
+export type WorkflowStatus = {
   _id: Ref<Status>
   name: string
-  isDone: boolean
-  isCanceled: boolean
+  category: StatusCategoryValue
 }
 
-const statusInfoFromDoc = (doc: Status): StatusInfo => {
-  const categoryStr = doc.category ? doc.category : ""
-  return {
-    _id: doc._id,
-    name: doc.name,
-    isDone: categoryStr === task.statusCategory.Won,
-    isCanceled: categoryStr === task.statusCategory.Lost
+const statusCategoryValueFromRef = (
+  category: Ref<StatusCategory> | undefined
+): StatusCategoryValue => {
+  switch (category) {
+    case task.statusCategory.UnStarted:
+      return "backlog"
+    case task.statusCategory.ToDo:
+      return "todo"
+    case task.statusCategory.Active:
+      return "active"
+    case task.statusCategory.Won:
+      return "done"
+    case task.statusCategory.Lost:
+      return "canceled"
+    default:
+      return "unknown"
   }
 }
 
-const fallbackStatusInfoFromRef = (statusRef: Ref<Status>): StatusInfo => {
+const workflowStatusFromDoc = (doc: Status): WorkflowStatus => {
+  return {
+    _id: doc._id,
+    name: doc.name,
+    category: statusCategoryValueFromRef(doc.category)
+  }
+}
+
+const workflowStatusFromRef = (statusRef: Ref<Status>): WorkflowStatus => {
   const name = statusRef.includes(":") ? statusRef.slice(statusRef.lastIndexOf(":") + 1) : statusRef
-  const nameLower = name.toLowerCase()
-  const isDone = nameLower.includes("done")
-    || nameLower.includes("complete")
-    || nameLower.includes("finished")
-    || nameLower.includes("resolved")
-    || nameLower.includes("closed")
-  const isCanceled = nameLower.includes("cancel")
-    || nameLower.includes("reject")
-    || nameLower.includes("abort")
-    || nameLower.includes("wontfix")
-    || nameLower.includes("invalid")
   return {
     _id: statusRef,
     name,
-    isDone,
-    isCanceled
+    category: "unknown"
   }
 }
 
@@ -110,7 +115,7 @@ export const findProjectWithStatuses = (
     client: HulyClient["Type"]
     project: HulyProject
     projectType: ProjectType | undefined
-    statuses: Array<StatusInfo>
+    statuses: Array<WorkflowStatus>
     defaultStatusId: Ref<Status> | undefined
   },
   ProjectNotFoundError | HulyClientError,
@@ -128,7 +133,7 @@ export const findProjectWithStatuses = (
     )
 
     const projectType = project.$lookup?.type
-    const statuses: Array<StatusInfo> = projectType?.statuses
+    const statuses: Array<WorkflowStatus> = projectType?.statuses
       ? yield* Effect.gen(function*() {
         const statusRefs = uniqueProjectTypeStatusRefs(projectType.statuses)
         if (statusRefs.length === 0) {
@@ -149,17 +154,17 @@ export const findProjectWithStatuses = (
         )
 
         if (statusDocsResult._tag === "Right") {
-          return uniqueStatusDocs(statusDocsResult.right).map(statusInfoFromDoc)
+          return uniqueStatusDocs(statusDocsResult.right).map(workflowStatusFromDoc)
         }
 
         // Fallback: use refs without names if Status query fails
         // This allows operations to work even with malformed workspace data
         yield* Effect.logWarning(
           `Status query failed for project ${projectIdentifier}, using fallback. `
-            + `Category-based filtering (open/done/canceled) will use name heuristics. `
+            + `Category-based filtering (open/done/canceled) is unavailable until Huly returns status metadata. `
             + `Error: ${statusDocsResult.left.message}`
         )
-        return statusRefs.map(fallbackStatusInfoFromRef)
+        return statusRefs.map(workflowStatusFromRef)
       })
       : []
 
@@ -266,7 +271,7 @@ const stringToPriorityMap = {
 export const stringToPriority = (priority: IssuePriorityStr): IssuePriority => stringToPriorityMap[priority]
 
 export const resolveStatusByName = (
-  statuses: Array<StatusInfo>,
+  statuses: Array<WorkflowStatus>,
   statusName: string,
   project: string
 ): Effect.Effect<Ref<Status>, InvalidStatusError> => {
