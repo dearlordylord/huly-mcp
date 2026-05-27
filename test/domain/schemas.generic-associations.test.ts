@@ -54,7 +54,7 @@ describe("generic association schemas", () => {
       })
     }))
 
-  it.effect("parses raw, issue, and document locators", () =>
+  it.effect("parses raw, issue, document, and card locators", () =>
     Effect.gen(function*() {
       const parsed = yield* parseListRelationsParams({
         association: "links",
@@ -74,6 +74,14 @@ describe("generic association schemas", () => {
       })
       expect(documentParsed.source.kind).toBe("document")
       expect(documentParsed.direction).toBe("target-to-source")
+
+      const cardParsed = yield* parseCreateRelationParams({
+        association: "links",
+        source: { kind: "card", card: "card-1" },
+        target: { kind: "card", card: "Contract", cardSpace: "Contracts" }
+      })
+      expect(cardParsed.source.kind).toBe("card")
+      expect(cardParsed.target.kind).toBe("card")
     }))
 
   it.effect("parses create_association fields", () =>

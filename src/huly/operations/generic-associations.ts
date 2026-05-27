@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- generic association discovery, relation lookup, and guarded mutation entrypoints are kept together to preserve one feature boundary */
+import type { Card as HulyCard, CardSpace as HulyCardSpace } from "@hcengineering/card"
 import type {
   Association as HulyAssociation,
   Class,
@@ -40,6 +41,8 @@ import {
 } from "../../domain/schemas/generic-associations.js"
 import {
   AssociationId,
+  type CardIdentifier,
+  type CardSpaceIdentifier,
   DocId,
   MAX_LIMIT,
   NonEmptyString,
@@ -69,7 +72,7 @@ import {
   RelationIdentifierAmbiguousError,
   RelationMutationUnsupportedError
 } from "../errors.js"
-import { core, documentPlugin, tracker } from "../huly-plugins.js"
+import { cardPlugin, core, documentPlugin, tracker } from "../huly-plugins.js"
 import { findTeamspaceAndDocument } from "./documents.js"
 import { findIssueInProject, findProject, findProjectAndIssue } from "./issues-shared.js"
 import { clampLimit, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
@@ -839,6 +842,118 @@ const resolveDocumentWithoutTeamspace = (
     return resolvedSummary(byTitle[0], "document")
   })
 
+const findCardById = (
+  client: HulyClientOperations,
+  identifier: CardIdentifier
+): Effect.Effect<HulyCard | undefined, HulyClientError> =>
+  client.findOne<HulyCard>(
+    cardPlugin.class.Card,
+    hulyQuery<HulyCard>({ _id: toRef<HulyCard>(identifier) })
+  )
+
+const findCardSpace = (
+  client: HulyClientOperations,
+  identifier: CardSpaceIdentifier,
+  field: string
+): Effect.Effect<HulyCardSpace, GenericAssociationsError> =>
+  Effect.gen(function*() {
+    const byId = yield* client.findOne<HulyCardSpace>(
+      cardPlugin.class.CardSpace,
+      hulyQuery<HulyCardSpace>({ _id: toRef<HulyCardSpace>(identifier) })
+    )
+    if (byId !== undefined) {
+      return byId
+    }
+
+    const byName = yield* client.findAll<HulyCardSpace>(
+      cardPlugin.class.CardSpace,
+      hulyQuery<HulyCardSpace>({ name: identifier, archived: false }),
+      { limit: 2 }
+    )
+    if (byName.length === 0) {
+      return yield* new GenericObjectNotFoundError({
+        field,
+        identifier,
+        class: cardPlugin.class.CardSpace
+      })
+    }
+    if (byName.length > 1) {
+      return yield* new GenericObjectIdentifierAmbiguousError({
+        field,
+        identifier,
+        candidates: byName.map((space) => ({
+          id: DocId.make(space._id),
+          class: ObjectClassName.make(space._class),
+          display: space.name
+        }))
+      })
+    }
+    return byName[0]
+  })
+
+const resolveCardInSpace = (
+  client: HulyClientOperations,
+  identifier: CardIdentifier,
+  cardSpace: HulyCardSpace,
+  field: string
+): Effect.Effect<ResolvedObjectSummary, GenericAssociationsError> =>
+  Effect.gen(function*() {
+    const byId = yield* client.findOne<HulyCard>(
+      cardPlugin.class.Card,
+      hulyQuery<HulyCard>({ _id: toRef<HulyCard>(identifier), space: cardSpace._id })
+    )
+    if (byId !== undefined) {
+      return resolvedSummary(byId, "card")
+    }
+
+    const byTitle = yield* client.findAll<HulyCard>(
+      cardPlugin.class.Card,
+      hulyQuery<HulyCard>({ title: identifier, space: cardSpace._id }),
+      { limit: 2 }
+    )
+    if (byTitle.length === 0) {
+      return yield* new GenericObjectNotFoundError({
+        field,
+        identifier,
+        class: cardPlugin.class.Card
+      })
+    }
+    if (byTitle.length > 1) {
+      return yield* new GenericObjectIdentifierAmbiguousError({
+        field,
+        identifier,
+        candidates: byTitle.map((card) => ({
+          id: DocId.make(card._id),
+          class: ObjectClassName.make(card._class),
+          display: card.title
+        }))
+      })
+    }
+    return resolvedSummary(byTitle[0], "card")
+  })
+
+const resolveCardLocator = (
+  client: HulyClientOperations,
+  locator: Extract<GenericObjectLocator, { kind: "card" }>,
+  field: string
+): Effect.Effect<ResolvedObjectSummary, GenericAssociationsError> =>
+  Effect.gen(function*() {
+    if (locator.cardSpace !== undefined) {
+      const cardSpace = yield* findCardSpace(client, locator.cardSpace, field)
+      return yield* resolveCardInSpace(client, locator.card, cardSpace, field)
+    }
+
+    const byId = yield* findCardById(client, locator.card)
+    if (byId !== undefined) {
+      return resolvedSummary(byId, "card")
+    }
+
+    return yield* new GenericObjectLocatorInvalidError({
+      field,
+      reason: "card title lookup requires cardSpace; card ID lookup may omit cardSpace"
+    })
+  })
+
 const resolveGenericObject = (
   client: HulyClientOperations,
   locator: GenericObjectLocator,
@@ -882,6 +997,11 @@ const resolveGenericObject = (
             })).doc,
             "document"
           )
+        yield* validateExpectedClass(summary, expectedClass, field)
+        return summary
+      }
+      case "card": {
+        const summary = yield* resolveCardLocator(client, locator, field)
         yield* validateExpectedClass(summary, expectedClass, field)
         return summary
       }

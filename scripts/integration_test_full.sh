@@ -358,6 +358,14 @@ skip_test() {
   SKIPPED=$((SKIPPED + 1))
 }
 
+fail_test() {
+  local name="$1"
+  local reason="$2"
+  echo "FAIL: $name ($reason)"
+  FAILED=$((FAILED + 1))
+  ERRORS="${ERRORS}\n  - ${name}: ${reason}"
+}
+
 # Like run_capture but does NOT count toward PASS/FAIL — used only for extracting data
 run_capture_only() {
   local payload="$1"
@@ -1710,6 +1718,90 @@ else
   skip_test "delete_relation(generic id idempotent)" "could not create disposable source issue"
   skip_test "delete_association(unused)" "could not create disposable source issue"
   skip_test "delete_association(idempotent missing)" "could not create disposable source issue"
+fi
+
+CARD_LOCATOR_MASTER_TEXT=$(run_capture "card locator list_master_tags(Default)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_master_tags","arguments":{"cardSpace":"Default"}},"id":2}')
+CARD_LOCATOR_MASTER_ID=$(echo "$CARD_LOCATOR_MASTER_TEXT" | jq -r '.masterTags[0].id // empty' 2>/dev/null)
+if [ -n "$CARD_LOCATOR_MASTER_ID" ]; then
+  CARD_LOCATOR_TITLE="IntTest Generic Association Card $RUN_ID"
+  CARD_LOCATOR_TITLE_JSON=$(json_string "$CARD_LOCATOR_TITLE")
+  CARD_LOCATOR_MASTER_ID_JSON=$(json_string "$CARD_LOCATOR_MASTER_ID")
+  CARD_LOCATOR_CARD_TEXT=$(run_capture "create_card(for_generic_card_locator)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_card\",\"arguments\":{\"cardSpace\":\"Default\",\"type\":$CARD_LOCATOR_MASTER_ID_JSON,\"title\":$CARD_LOCATOR_TITLE_JSON,\"content\":\"Temporary card for generic association locator integration.\"}},\"id\":2}")
+  if [ $? -eq 0 ]; then
+    CARD_LOCATOR_CARD_ID=$(echo "$CARD_LOCATOR_CARD_TEXT" | jq -r '.id // empty' 2>/dev/null)
+  else
+    CARD_LOCATOR_CARD_ID=""
+  fi
+
+  CARD_LOCATOR_ISSUE_TEXT=$(run_capture "create_issue(for_generic_card_locator)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Generic Card Locator Target $RUN_ID\"}},\"id\":2}")
+  if [ $? -eq 0 ]; then
+    CARD_LOCATOR_ISSUE_ID=$(echo "$CARD_LOCATOR_ISSUE_TEXT" | jq -r '.identifier // empty' 2>/dev/null)
+    CARD_LOCATOR_ISSUE_OBJ_ID=$(echo "$CARD_LOCATOR_ISSUE_TEXT" | jq -r '.issueId // empty' 2>/dev/null)
+  else
+    CARD_LOCATOR_ISSUE_ID=""
+    CARD_LOCATOR_ISSUE_OBJ_ID=""
+  fi
+
+  CARD_LOCATOR_SOURCE_ROLE="mcp card source $RUN_ID"
+  CARD_LOCATOR_TARGET_ROLE="mcp issue target $RUN_ID"
+  CARD_LOCATOR_SOURCE_ROLE_JSON=$(json_string "$CARD_LOCATOR_SOURCE_ROLE")
+  CARD_LOCATOR_TARGET_ROLE_JSON=$(json_string "$CARD_LOCATOR_TARGET_ROLE")
+  CARD_LOCATOR_ASSOC_TEXT=$(run_capture "create_association(generic_card_to_issue)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_association\",\"arguments\":{\"sourceClass\":$CARD_LOCATOR_MASTER_ID_JSON,\"targetClass\":\"tracker:class:Issue\",\"sourceRole\":$CARD_LOCATOR_SOURCE_ROLE_JSON,\"targetRole\":$CARD_LOCATOR_TARGET_ROLE_JSON,\"cardinality\":\"many-to-many\"}},\"id\":2}")
+  if [ $? -eq 0 ]; then
+    CARD_LOCATOR_ASSOC_ID=$(echo "$CARD_LOCATOR_ASSOC_TEXT" | jq -r '.association.associationId // empty' 2>/dev/null)
+    if [ -n "$CARD_LOCATOR_ASSOC_ID" ]; then
+      GENERIC_ASSOCIATION_CLEANUP_IDS="$GENERIC_ASSOCIATION_CLEANUP_IDS $CARD_LOCATOR_ASSOC_ID"
+    fi
+  else
+    CARD_LOCATOR_ASSOC_ID=""
+  fi
+
+  if [ -n "$CARD_LOCATOR_ASSOC_ID" ] && [ -n "$CARD_LOCATOR_CARD_ID" ] && [ -n "$CARD_LOCATOR_ISSUE_OBJ_ID" ]; then
+    CARD_LOCATOR_CARD_ID_JSON=$(json_string "$CARD_LOCATOR_CARD_ID")
+    CARD_LOCATOR_ISSUE_OBJ_ID_JSON=$(json_string "$CARD_LOCATOR_ISSUE_OBJ_ID")
+    CARD_RELATION_ARGS_BY_ID="{\"association\":\"$CARD_LOCATOR_ASSOC_ID\",\"source\":{\"kind\":\"card\",\"card\":$CARD_LOCATOR_CARD_ID_JSON},\"target\":{\"kind\":\"raw\",\"id\":$CARD_LOCATOR_ISSUE_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"}}"
+    CARD_RELATION_ARGS_BY_TITLE="{\"association\":\"$CARD_LOCATOR_ASSOC_ID\",\"source\":{\"kind\":\"card\",\"card\":$CARD_LOCATOR_TITLE_JSON,\"cardSpace\":\"Default\"},\"target\":{\"kind\":\"raw\",\"id\":$CARD_LOCATOR_ISSUE_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"}}"
+    CARD_RELATION_TEXT=$(run_capture "create_relation(card locator by id)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_relation\",\"arguments\":$CARD_RELATION_ARGS_BY_ID},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "create_relation card locator by id created" "$CARD_RELATION_TEXT" ".created" "true"
+      CARD_RELATION_TITLE_TEXT=$(run_capture "create_relation(card locator by title)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_relation\",\"arguments\":$CARD_RELATION_ARGS_BY_TITLE},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "create_relation card locator by title existing" "$CARD_RELATION_TITLE_TEXT" ".existing" "true"
+      fi
+      CARD_LIST_RELATIONS_TEXT=$(run_capture "list_relations(card locator by title)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_relations\",\"arguments\":{\"association\":\"$CARD_LOCATOR_ASSOC_ID\",\"source\":{\"kind\":\"card\",\"card\":$CARD_LOCATOR_TITLE_JSON,\"cardSpace\":\"Default\"},\"target\":{\"kind\":\"raw\",\"id\":$CARD_LOCATOR_ISSUE_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"},\"limit\":3}},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "list_relations card locator by title total" "$CARD_LIST_RELATIONS_TEXT" ".total" "1"
+      fi
+      run_test "delete_relation(card locator by title)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_relation\",\"arguments\":$CARD_RELATION_ARGS_BY_TITLE},\"id\":2}"
+    fi
+    run_test "delete_association(generic_card_to_issue)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_association\",\"arguments\":{\"association\":\"$CARD_LOCATOR_ASSOC_ID\"}},\"id\":2}"
+  else
+    fail_test "generic association card locator setup" "missing disposable card, issue, or association"
+    if [ -n "$CARD_LOCATOR_ASSOC_ID" ]; then
+      run_test "delete_association(generic_card_to_issue)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_association\",\"arguments\":{\"association\":\"$CARD_LOCATOR_ASSOC_ID\"}},\"id\":2}"
+    fi
+  fi
+
+  if [ -n "$CARD_LOCATOR_ISSUE_ID" ]; then
+    run_test "delete_issue(generic_card_locator:$CARD_LOCATOR_ISSUE_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$CARD_LOCATOR_ISSUE_ID\"}},\"id\":2}"
+  fi
+  if [ -n "$CARD_LOCATOR_CARD_ID" ]; then
+    run_test "delete_card(generic_card_locator:$CARD_LOCATOR_CARD_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_card\",\"arguments\":{\"cardSpace\":\"Default\",\"card\":\"$CARD_LOCATOR_CARD_ID\"}},\"id\":2}"
+  fi
+else
+  fail_test "generic association card locator setup" "Default card space returned no master tags"
 fi
 echo ""
 

@@ -85,7 +85,7 @@ export const genericAssociationTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "list_relations",
     description:
-      "List concrete Huly relation instances under an association, optionally filtered by source and target documents. Requires at least one filter to avoid broad workspace scans.",
+      "List concrete Huly relation instances under an association, optionally filtered by source and target documents. Endpoint locators support raw, issue, document, and card. For card locators, card IDs can be used without cardSpace; exact card title lookup requires cardSpace to avoid ambiguous card names. Requires at least one filter to avoid broad workspace scans.",
     category: CATEGORY,
     inputSchema: listRelationsParamsJsonSchema,
     handler: createEncodedToolHandler(
@@ -98,7 +98,7 @@ export const genericAssociationTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "create_relation",
     description:
-      "Idempotently create one concrete relation between two resolved documents for a writable association. Enforces association endpoint classes, direction, duplicate handling, automation-only restrictions, and cardinality.",
+      "Idempotently create one concrete relation between two resolved documents for a writable association. Endpoint locators support raw, issue, document, and card. For card locators, card IDs can be used without cardSpace; exact card title lookup requires cardSpace to avoid ambiguous card names. Enforces association endpoint classes, direction, duplicate handling, automation-only restrictions, and cardinality.",
     category: CATEGORY,
     inputSchema: createRelationParamsJsonSchema,
     annotations: {
@@ -117,7 +117,7 @@ export const genericAssociationTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "delete_relation",
     description:
-      "Idempotently delete one concrete relation by relation ID or by exact association/source/target triple. Triple deletes use the same direction semantics as create_relation and fail if the selector is ambiguous.",
+      "Idempotently delete one concrete relation by relation ID or by exact association/source/target triple. Triple endpoint locators support raw, issue, document, and card. For card locators, card IDs can be used without cardSpace; exact card title lookup requires cardSpace to avoid ambiguous card names. Triple deletes use the same direction semantics as create_relation and fail if the selector is ambiguous.",
     category: CATEGORY,
     inputSchema: deleteRelationParamsJsonSchema,
     annotations: {

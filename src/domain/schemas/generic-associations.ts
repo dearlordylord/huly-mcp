@@ -2,6 +2,8 @@ import { JSONSchema, Schema } from "effect"
 
 import {
   AssociationId,
+  CardIdentifier,
+  CardSpaceIdentifier,
   DocId,
   DocumentIdentifier,
   enumValuesDescription,
@@ -86,14 +88,27 @@ const DocumentObjectLocatorSchema = Schema.Struct({
   }))
 })
 
+const CardObjectLocatorSchema = Schema.Struct({
+  kind: Schema.Literal("card"),
+  card: CardIdentifier.annotations({
+    description:
+      "Card ID or exact card title. Card IDs can be resolved without cardSpace; title lookup requires cardSpace."
+  }),
+  cardSpace: Schema.optional(CardSpaceIdentifier.annotations({
+    description:
+      "Card space name or ID. Required when card is a title so title lookup is scoped and not ambiguous across the workspace."
+  }))
+})
+
 export const GenericObjectLocatorSchema = Schema.Union(
   RawObjectLocatorSchema,
   IssueObjectLocatorSchema,
-  DocumentObjectLocatorSchema
+  DocumentObjectLocatorSchema,
+  CardObjectLocatorSchema
 ).annotations({
   title: "GenericObjectLocator",
   description:
-    "Explicit locator for a Huly document endpoint. Use raw for known _id values, issue for tracker issues, or document for Huly documents. Card locators are intentionally not included until a robust card resolver is available."
+    "Explicit locator for a Huly document endpoint. Use raw for known _id/class pairs, issue for tracker issues, document for Huly documents, or card for Huly cards. Card title lookup requires cardSpace; card ID lookup does not."
 })
 export type GenericObjectLocator = Schema.Schema.Type<typeof GenericObjectLocatorSchema>
 
@@ -101,7 +116,7 @@ export const ResolvedObjectSummarySchema = Schema.Struct({
   id: DocId,
   class: ObjectClassName,
   display: NonEmptyString,
-  locatorKind: Schema.Literal("raw", "issue", "document"),
+  locatorKind: Schema.Literal("raw", "issue", "document", "card"),
   warning: Schema.optional(Schema.String)
 })
 export type ResolvedObjectSummary = Schema.Schema.Type<typeof ResolvedObjectSummarySchema>

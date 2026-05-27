@@ -1,6 +1,8 @@
 import { describe, it } from "@effect/vitest"
+import type { Card as HulyCard, CardSpace as HulyCardSpace } from "@hcengineering/card"
 import type {
   Association as HulyAssociation,
+  Class,
   Doc,
   FindResult,
   PersonId,
@@ -19,13 +21,14 @@ import {
   AssociationRoleName,
   RelationIdentifier
 } from "../../../src/domain/schemas/generic-associations.js"
-import { MAX_LIMIT, ObjectClassName } from "../../../src/domain/schemas/shared.js"
+import { CardIdentifier, CardSpaceIdentifier, MAX_LIMIT, ObjectClassName } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import {
   AssociationConflictError,
   AssociationIdentifierAmbiguousError,
   AssociationInUseError,
   AssociationSystemClassUnsupportedError,
+  GenericObjectIdentifierAmbiguousError,
   GenericObjectLocatorInvalidError,
   GenericObjectNotFoundError,
   RelationCardinalityViolationError,
@@ -34,7 +37,7 @@ import {
   RelationIdentifierAmbiguousError,
   RelationMutationUnsupportedError
 } from "../../../src/huly/errors.js"
-import { core, documentPlugin, tracker } from "../../../src/huly/huly-plugins.js"
+import { cardPlugin, core, documentPlugin, tracker } from "../../../src/huly/huly-plugins.js"
 import {
   createAssociation,
   createRelation,
@@ -51,6 +54,12 @@ const assocId = AssociationIdentifier.make("assoc-1")
 const relatesAssociation = AssociationIdentifier.make("relates")
 const issueClass = ObjectClassName.make(tracker.class.Issue)
 const documentClass = ObjectClassName.make(documentPlugin.class.Document)
+const cardClass = ObjectClassName.make("card:class:Contract")
+
+// Huly SDK document interfaces include package-specific structural details that
+// are irrelevant to resolver behavior; fixtures cross that SDK boundary here.
+const asCardSpace = (value: unknown): HulyCardSpace => value as HulyCardSpace
+const asCard = (value: unknown): HulyCard => value as HulyCard
 
 // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- SDK fixture builder
 const association = (overrides: Partial<HulyAssociation> & { readonly automationOnly?: boolean }): HulyAssociation => ({
@@ -110,12 +119,45 @@ const documentDoc = (id: string, title: string): HulyDocument => ({
   title
 } as HulyDocument)
 
+const cardSpaceDoc = (id: string, name: string): HulyCardSpace =>
+  asCardSpace({
+    _id: id as Ref<HulyCardSpace>,
+    _class: cardPlugin.class.CardSpace,
+    space,
+    modifiedBy: person,
+    modifiedOn: 100,
+    createdBy: person,
+    createdOn: 100,
+    name,
+    description: "",
+    archived: false,
+    types: ["card:class:Contract" as Ref<HulyCard>]
+  })
+
+const cardDoc = (id: string, title: string, cardSpace: string = "cards-1"): HulyCard =>
+  asCard({
+    _id: id as Ref<HulyCard>,
+    _class: "card:class:Contract" as Ref<HulyCard>,
+    space: cardSpace as Ref<Space>,
+    modifiedBy: person,
+    modifiedOn: 100,
+    createdBy: person,
+    createdOn: 100,
+    title,
+    content: "markup-1",
+    blobs: {},
+    parentInfo: [],
+    rank: "a"
+  })
+
 interface TestData {
   readonly associations?: ReadonlyArray<HulyAssociation>
   readonly relations?: ReadonlyArray<HulyRelation>
   readonly relationTotal?: number | undefined
   readonly issues?: ReadonlyArray<HulyIssue>
   readonly documents?: ReadonlyArray<HulyDocument>
+  readonly cards?: ReadonlyArray<HulyCard>
+  readonly cardSpaces?: ReadonlyArray<HulyCardSpace>
 }
 
 type FindAllObserver = (
@@ -157,6 +199,8 @@ const testLayer = (data: TestData, onFindAll?: FindAllObserver) => {
   const relations = [...(data.relations ?? [])]
   const issues = data.issues ?? []
   const documents = data.documents ?? []
+  const cards = data.cards ?? []
+  const cardSpaces = data.cardSpaces ?? []
 
   const findAll: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown, options: unknown) => {
     onFindAll?.({ _class, query, options })
@@ -173,6 +217,12 @@ const testLayer = (data: TestData, onFindAll?: FindAllObserver) => {
     if (_class === documentPlugin.class.Document) {
       return Effect.succeed(resultFor(documents, query, options))
     }
+    if (_class === cardPlugin.class.CardSpace) {
+      return Effect.succeed(resultFor(cardSpaces, query, options))
+    }
+    if (_class === cardPlugin.class.Card || cards.some((card) => card._class === _class)) {
+      return Effect.succeed(resultFor(cards, query, options))
+    }
     return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
 
@@ -186,6 +236,12 @@ const testLayer = (data: TestData, onFindAll?: FindAllObserver) => {
     }
     if (_class === documentPlugin.class.Document) {
       return Effect.succeed(documents.find((doc) => matchesQuery(doc, q)))
+    }
+    if (_class === cardPlugin.class.CardSpace) {
+      return Effect.succeed(cardSpaces.find((doc) => matchesQuery(doc, q)))
+    }
+    if (_class === cardPlugin.class.Card || cards.some((card) => card._class === _class)) {
+      return Effect.succeed(cards.find((doc) => matchesQuery(doc, q)))
     }
     if (_class === core.class.Relation) {
       return Effect.succeed(relations.find((doc) => matchesQuery(doc, q)))
@@ -908,6 +964,112 @@ describe("listRelations", () => {
       )
 
       expect(error).toBeInstanceOf(GenericObjectNotFoundError)
+    }))
+
+  it.effect("resolves card locators by ID without requiring a card space", () =>
+    Effect.gen(function*() {
+      const cardToIssue = association({
+        _id: "assoc-1" as Ref<HulyAssociation>,
+        classA: "card:class:Contract" as Ref<Class<Doc>>,
+        classB: tracker.class.Issue,
+        nameA: "card",
+        nameB: "issue"
+      })
+
+      const result = yield* listRelations({
+        association: assocId,
+        source: { kind: "card", card: CardIdentifier.make("card-1") },
+        target: { kind: "raw", id: docId("issue-1"), class: issueClass }
+      }).pipe(
+        Effect.provide(testLayer({
+          associations: [cardToIssue],
+          relations: [
+            relation({
+              docA: "card-1" as Ref<Doc>,
+              docB: "issue-1" as Ref<Doc>
+            })
+          ],
+          cards: [cardDoc("card-1", "Contract")],
+          issues: [issue("issue-1", "HULY-1")]
+        }))
+      )
+
+      expect(result.total).toBe(1)
+      expect(result.relations[0].source.display).toBe("Contract")
+      expect(result.relations[0].source.class).toBe(cardClass)
+    }))
+
+  it.effect("resolves card locators by title when card space is provided", () =>
+    Effect.gen(function*() {
+      const cardToIssue = association({
+        _id: "assoc-1" as Ref<HulyAssociation>,
+        classA: "card:class:Contract" as Ref<Class<Doc>>,
+        classB: tracker.class.Issue,
+        nameA: "card",
+        nameB: "issue"
+      })
+
+      const result = yield* listRelations({
+        association: assocId,
+        source: {
+          kind: "card",
+          card: CardIdentifier.make("Contract"),
+          cardSpace: CardSpaceIdentifier.make("Contracts")
+        },
+        target: { kind: "raw", id: docId("issue-1"), class: issueClass }
+      }).pipe(
+        Effect.provide(testLayer({
+          associations: [cardToIssue],
+          relations: [
+            relation({
+              docA: "card-1" as Ref<Doc>,
+              docB: "issue-1" as Ref<Doc>
+            })
+          ],
+          cardSpaces: [cardSpaceDoc("cards-1", "Contracts")],
+          cards: [cardDoc("card-1", "Contract")],
+          issues: [issue("issue-1", "HULY-1")]
+        }))
+      )
+
+      expect(result.total).toBe(1)
+      expect(result.relations[0].source.display).toBe("Contract")
+    }))
+
+  it.effect("requires card space for card title lookup", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        listRelations({
+          source: { kind: "card", card: CardIdentifier.make("Contract") }
+        }).pipe(Effect.provide(testLayer({
+          associations: [association({})],
+          cards: [cardDoc("card-1", "Different title")]
+        })))
+      )
+
+      expect(error).toBeInstanceOf(GenericObjectLocatorInvalidError)
+    }))
+
+  it.effect("fails on ambiguous card titles inside the selected card space", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        listRelations({
+          source: {
+            kind: "card",
+            card: CardIdentifier.make("Contract"),
+            cardSpace: CardSpaceIdentifier.make("Contracts")
+          }
+        }).pipe(Effect.provide(testLayer({
+          associations: [association({})],
+          cardSpaces: [cardSpaceDoc("cards-1", "Contracts")],
+          cards: [
+            cardDoc("card-1", "Contract"),
+            cardDoc("card-2", "Contract")
+          ]
+        })))
+      )
+
+      expect(error).toBeInstanceOf(GenericObjectIdentifierAmbiguousError)
     }))
 })
 
