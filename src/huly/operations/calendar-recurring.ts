@@ -211,7 +211,7 @@ export const listEventInstances = (
         for (const instance of instances) {
           const instanceParticipants = instance.participants
             .map(ref => participantById.get(PersonId.make(ref)))
-            .filter((p): p is Participant => p !== undefined)
+            .filter((p) => p !== undefined)
           participantMap.set(instance.eventId, instanceParticipants)
         }
       } else {

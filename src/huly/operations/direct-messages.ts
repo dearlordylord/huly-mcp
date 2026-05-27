@@ -134,7 +134,8 @@ export const findDirectMessage = (
       ...new Set(
         employees
           .map((e) => e.personUuid)
-          .filter((u): u is HulyAccountUuid => u !== undefined && u !== accountUuid)
+          .filter((u) => u !== undefined)
+          .filter((u) => u !== accountUuid)
       )
     ]
 

@@ -120,7 +120,7 @@ export const listInlineComments = (
       // Resolve sender names in one batch
       const senderIds = [
         ...new Set(
-          allReplies.map(r => r.createdBy).filter((id): id is PersonId => id !== undefined)
+          allReplies.map(r => r.createdBy).filter((id) => id !== undefined)
         )
       ]
       nameMap = yield* buildSocialIdToPersonNameMap(client, senderIds)
