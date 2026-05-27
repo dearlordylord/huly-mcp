@@ -32,6 +32,8 @@ const asTaskType = (value: unknown): TaskType => value as TaskType
 // Huly SDK fixture objects contain branded Ref fields. Brands are erased at runtime,
 // and these tests provide plain object fixtures for service-layer operations.
 const asStatus = (value: unknown): Status => value as Status
+// Huly Ref brands are erased at runtime; these tests build fixture refs from stable string ids.
+const statusRef = (value: string): Ref<Status> => value as Ref<Status>
 
 const makeProjectType = (overrides?: Partial<ProjectType>): ProjectType =>
   asProjectType({
@@ -206,6 +208,33 @@ describe("task management operations", () => {
       expect(captures.mixins).toEqual([])
     }))
 
+  it.effect("repairs duplicate statuses on an existing task type matched by normalized name", () =>
+    Effect.gen(function*() {
+      const captures: Captures = { createDocs: [], updates: [], mixins: [] }
+      const result = yield* createTaskType({ name: "issue" }).pipe(
+        Effect.provide(createLayer({
+          taskTypes: [
+            makeTaskType({ statuses: [openStatusId, openStatusId, doneStatusId] }),
+            makeTaskType({ _id: subTaskTypeId, name: "Sub-issue", kind: "subtask", statuses: [openStatusId] })
+          ],
+          captures
+        }))
+      )
+
+      expect(result.created).toBe(true)
+      expect(result.taskType.id).toBe(taskTypeId)
+      expect(result.taskType.statusCount).toBe(2)
+      expect(captures.createDocs).toEqual([])
+      expect(captures.updates).toEqual([
+        {
+          classId: String(task.class.TaskType),
+          objectId: taskTypeId,
+          operations: { statuses: [openStatusId, doneStatusId] }
+        }
+      ])
+      expect(captures.mixins).toEqual([])
+    }))
+
   it.effect("recovers an existing task type missing from project type links", () =>
     Effect.gen(function*() {
       const captures: Captures = { createDocs: [], updates: [], mixins: [] }
@@ -263,6 +292,128 @@ describe("task management operations", () => {
         String(task.class.TaskType),
         String(task.class.ProjectType)
       ])
+    }))
+
+  it.effect("deduplicates project type status links while attaching a new issue status", () =>
+    Effect.gen(function*() {
+      const captures: Captures = { createDocs: [], updates: [], mixins: [] }
+      const projectType = makeProjectType({
+        statuses: [
+          { _id: openStatusId, taskType: taskTypeId },
+          { _id: openStatusId, taskType: taskTypeId },
+          { _id: doneStatusId, taskType: taskTypeId },
+          { _id: openStatusId, taskType: subTaskTypeId },
+          { _id: openStatusId, taskType: subTaskTypeId }
+        ]
+      })
+
+      const result = yield* createIssueStatus({ name: "QA", category: "active" }).pipe(
+        Effect.provide(createLayer({ projectTypes: [projectType], captures }))
+      )
+
+      const projectTypeUpdate = captures.updates.find((call) => call.classId === String(task.class.ProjectType))
+      expect(projectTypeUpdate?.operations).toEqual({
+        statuses: [
+          { _id: openStatusId, taskType: taskTypeId },
+          { _id: doneStatusId, taskType: taskTypeId },
+          { _id: openStatusId, taskType: subTaskTypeId },
+          { _id: result.status.id, taskType: taskTypeId },
+          { _id: result.status.id, taskType: subTaskTypeId }
+        ]
+      })
+    }))
+
+  it.effect("preserves same-name statuses with different ids while normalizing workflow links", () =>
+    Effect.gen(function*() {
+      const captures: Captures = { createDocs: [], updates: [], mixins: [] }
+      const alternateDoneStatusId = statusRef("status-done-secondary")
+      const projectType = makeProjectType({
+        statuses: [
+          { _id: openStatusId, taskType: taskTypeId },
+          { _id: doneStatusId, taskType: taskTypeId },
+          { _id: alternateDoneStatusId, taskType: taskTypeId },
+          { _id: alternateDoneStatusId, taskType: taskTypeId },
+          { _id: openStatusId, taskType: subTaskTypeId }
+        ]
+      })
+      const issueTaskType = makeTaskType({ statuses: [openStatusId, doneStatusId, alternateDoneStatusId] })
+
+      const result = yield* createIssueStatus({ name: "QA", category: "active" }).pipe(
+        Effect.provide(createLayer({
+          projectTypes: [projectType],
+          taskTypes: [
+            issueTaskType,
+            makeTaskType({ _id: subTaskTypeId, name: "Sub-issue", kind: "subtask", statuses: [openStatusId] })
+          ],
+          statuses: [
+            makeStatus(),
+            makeStatus({ _id: doneStatusId, name: "Done", category: task.statusCategory.Won }),
+            makeStatus({ _id: alternateDoneStatusId, name: "Done", category: task.statusCategory.Won })
+          ],
+          captures
+        }))
+      )
+
+      const issueTaskTypeUpdate = captures.updates.find((call) => call.objectId === taskTypeId)
+      const projectTypeUpdate = captures.updates.find((call) => call.classId === String(task.class.ProjectType))
+      expect(issueTaskTypeUpdate?.operations).toEqual({
+        statuses: [openStatusId, doneStatusId, alternateDoneStatusId, result.status.id]
+      })
+      expect(projectTypeUpdate?.operations).toEqual({
+        statuses: [
+          { _id: openStatusId, taskType: taskTypeId },
+          { _id: doneStatusId, taskType: taskTypeId },
+          { _id: alternateDoneStatusId, taskType: taskTypeId },
+          { _id: openStatusId, taskType: subTaskTypeId },
+          { _id: result.status.id, taskType: taskTypeId },
+          { _id: result.status.id, taskType: subTaskTypeId }
+        ]
+      })
+    }))
+
+  it.effect("deduplicates task type statuses when the target status is already present", () =>
+    Effect.gen(function*() {
+      const captures: Captures = { createDocs: [], updates: [], mixins: [] }
+      const duplicatedTaskType = makeTaskType({ statuses: [openStatusId, openStatusId, doneStatusId] })
+
+      const result = yield* createIssueStatus({
+        name: "todo",
+        category: "todo",
+        taskType: TaskTypeRefSchema.make("Issue")
+      }).pipe(
+        Effect.provide(createLayer({ taskTypes: [duplicatedTaskType], captures }))
+      )
+
+      expect(result.created).toBe(true)
+      expect(captures.createDocs).toEqual([])
+      expect(captures.updates).toHaveLength(1)
+      expect(captures.updates[0].classId).toBe(String(task.class.TaskType))
+      expect(captures.updates[0].operations).toEqual({ statuses: [openStatusId, doneStatusId] })
+    }))
+
+  it.effect("deduplicates template statuses when creating a task type", () =>
+    Effect.gen(function*() {
+      const captures: Captures = { createDocs: [], updates: [], mixins: [] }
+      const template = makeTaskType({ statuses: [openStatusId, doneStatusId, openStatusId] })
+
+      const result = yield* createTaskType({ name: "Bug", templateTaskType: TaskTypeRefSchema.make("Issue") }).pipe(
+        Effect.provide(createLayer({ taskTypes: [template], captures }))
+      )
+
+      const taskTypeCreate = captures.createDocs.find((call) => call.classId === String(task.class.TaskType))
+      const projectTypeUpdate = captures.updates.find((call) => call.classId === String(task.class.ProjectType))
+      expect(result.taskType.statusCount).toBe(2)
+      expect(taskTypeCreate?.attributes).toMatchObject({ statuses: [openStatusId, doneStatusId] })
+      expect(projectTypeUpdate?.operations).toEqual({
+        tasks: [taskTypeId, subTaskTypeId, result.taskType.id],
+        statuses: [
+          { _id: openStatusId, taskType: taskTypeId },
+          { _id: doneStatusId, taskType: taskTypeId },
+          { _id: openStatusId, taskType: subTaskTypeId },
+          { _id: openStatusId, taskType: result.taskType.id },
+          { _id: doneStatusId, taskType: result.taskType.id }
+        ]
+      })
     }))
 
   it.effect("creates an issue status when the broad recovery lookup fails", () =>

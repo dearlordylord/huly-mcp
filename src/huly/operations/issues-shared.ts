@@ -50,6 +50,52 @@ export type StatusInfo = {
   isCanceled: boolean
 }
 
+const statusInfoFromDoc = (doc: Status): StatusInfo => {
+  const categoryStr = doc.category ? doc.category : ""
+  return {
+    _id: doc._id,
+    name: doc.name,
+    isDone: categoryStr === task.statusCategory.Won,
+    isCanceled: categoryStr === task.statusCategory.Lost
+  }
+}
+
+const fallbackStatusInfoFromRef = (statusRef: Ref<Status>): StatusInfo => {
+  const name = statusRef.includes(":") ? statusRef.slice(statusRef.lastIndexOf(":") + 1) : statusRef
+  const nameLower = name.toLowerCase()
+  const isDone = nameLower.includes("done")
+    || nameLower.includes("complete")
+    || nameLower.includes("finished")
+    || nameLower.includes("resolved")
+    || nameLower.includes("closed")
+  const isCanceled = nameLower.includes("cancel")
+    || nameLower.includes("reject")
+    || nameLower.includes("abort")
+    || nameLower.includes("wontfix")
+    || nameLower.includes("invalid")
+  return {
+    _id: statusRef,
+    name,
+    isDone,
+    isCanceled
+  }
+}
+
+export const uniqueStatusRefs = (refs: ReadonlyArray<Ref<Status>>): Array<Ref<Status>> =>
+  refs.reduce<Array<Ref<Status>>>(
+    (unique, ref) => unique.includes(ref) ? unique : [...unique, ref],
+    []
+  )
+
+export const uniqueStatusDocs = (statuses: Iterable<Status>): Array<Status> =>
+  Array.from(statuses).reduce<Array<Status>>(
+    (unique, status) => unique.some((existing) => existing._id === status._id) ? unique : [...unique, status],
+    []
+  )
+
+const uniqueProjectTypeStatusRefs = (statuses: ReadonlyArray<{ readonly _id: Ref<Status> }>): Array<Ref<Status>> =>
+  uniqueStatusRefs(statuses.map((status) => status._id))
+
 /**
  * Find project with its ProjectType lookup to get status information.
  * This avoids querying IssueStatus directly which can fail on some workspaces.
@@ -82,11 +128,13 @@ export const findProjectWithStatuses = (
     )
 
     const projectType = project.$lookup?.type
-    const statuses: Array<StatusInfo> = []
+    const statuses: Array<StatusInfo> = projectType?.statuses
+      ? yield* Effect.gen(function*() {
+        const statusRefs = uniqueProjectTypeStatusRefs(projectType.statuses)
+        if (statusRefs.length === 0) {
+          return []
+        }
 
-    if (projectType?.statuses) {
-      const statusRefs = projectType.statuses.map(s => s._id)
-      if (statusRefs.length > 0) {
         // Try to query Status documents for names. Historical manual-test proof
         // is in `git show 31ccf83e^:PROBLEMS.md`: on workspace
         // `internalai @ huly.app.monadical.io`, querying Status docs failed with
@@ -101,46 +149,19 @@ export const findProjectWithStatuses = (
         )
 
         if (statusDocsResult._tag === "Right") {
-          for (const doc of statusDocsResult.right) {
-            const categoryStr = doc.category ? doc.category : ""
-            statuses.push({
-              _id: doc._id,
-              name: doc.name,
-              isDone: categoryStr === task.statusCategory.Won,
-              isCanceled: categoryStr === task.statusCategory.Lost
-            })
-          }
-        } else {
-          // Fallback: use refs without names if Status query fails
-          // This allows operations to work even with malformed workspace data
-          yield* Effect.logWarning(
-            `Status query failed for project ${projectIdentifier}, using fallback. `
-              + `Category-based filtering (open/done/canceled) will use name heuristics. `
-              + `Error: ${statusDocsResult.left.message}`
-          )
-          for (const ps of projectType.statuses) {
-            const name = ps._id.split(":").pop() ?? "Unknown"
-            const nameLower = name.toLowerCase()
-            const isDone = nameLower.includes("done")
-              || nameLower.includes("complete")
-              || nameLower.includes("finished")
-              || nameLower.includes("resolved")
-              || nameLower.includes("closed")
-            const isCanceled = nameLower.includes("cancel")
-              || nameLower.includes("reject")
-              || nameLower.includes("abort")
-              || nameLower.includes("wontfix")
-              || nameLower.includes("invalid")
-            statuses.push({
-              _id: ps._id,
-              name,
-              isDone,
-              isCanceled
-            })
-          }
+          return uniqueStatusDocs(statusDocsResult.right).map(statusInfoFromDoc)
         }
-      }
-    }
+
+        // Fallback: use refs without names if Status query fails
+        // This allows operations to work even with malformed workspace data
+        yield* Effect.logWarning(
+          `Status query failed for project ${projectIdentifier}, using fallback. `
+            + `Category-based filtering (open/done/canceled) will use name heuristics. `
+            + `Error: ${statusDocsResult.left.message}`
+        )
+        return statusRefs.map(fallbackStatusInfoFromRef)
+      })
+      : []
 
     // project.defaultIssueStatus is typed as required Ref<IssueStatus> in the SDK,
     // but is undefined or "" at runtime when no explicit default was chosen at project creation.

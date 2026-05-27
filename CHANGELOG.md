@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.17.2
+
+### Patch Changes
+
+- Normalize workflow status reference arrays on read and write so repeated status and task-type operations do not amplify duplicate Huly workflow metadata.
+
 ## 0.17.1
 
 ### Patch Changes

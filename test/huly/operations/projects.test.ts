@@ -21,6 +21,8 @@ import { projectIdentifier } from "../../helpers/brands.js"
 
 const asProject = (v: unknown) => v as HulyProject
 const asProjectType = (v: unknown) => v as ProjectType
+// Huly Ref brands are erased at runtime; these tests build fixture refs from stable string ids.
+const statusRef = (value: string): Ref<Status> => value as Ref<Status>
 
 const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
   const result = asProject({
@@ -353,7 +355,8 @@ describe("listProjects", () => {
 describe("getProject", () => {
   it.effect("returns project with statuses", () =>
     Effect.gen(function*() {
-      const defaultStatusId = "status-1" as Ref<Status>
+      const defaultStatusId = statusRef("status-1")
+      const inProgressStatusId = statusRef("status-2")
       const proj = makeProject({
         identifier: "HULY",
         name: "Huly",
@@ -365,12 +368,12 @@ describe("getProject", () => {
         projects: [proj],
         statuses: [
           { _id: defaultStatusId, name: "Backlog" },
-          { _id: "status-2" as Ref<Status>, name: "In Progress" }
+          { _id: inProgressStatusId, name: "In Progress" }
         ],
         projectType: asProjectType({
           statuses: [
             { _id: defaultStatusId },
-            { _id: "status-2" as Ref<Status> }
+            { _id: inProgressStatusId }
           ]
         })
       })
@@ -382,6 +385,42 @@ describe("getProject", () => {
       expect(result.identifier).toBe("HULY")
       expect(result.name).toBe("Huly")
       expect(result.description).toBe("Main project")
+      expect(result.defaultStatus).toBe("Backlog")
+      expect(result.statuses).toEqual(["Backlog", "In Progress"])
+    }))
+
+  it.effect("returns each status once when project type links and status docs are duplicated", () =>
+    Effect.gen(function*() {
+      const defaultStatusId = statusRef("status-1")
+      const inProgressStatusId = statusRef("status-2")
+      const proj = makeProject({
+        identifier: "HULY",
+        name: "Huly",
+        defaultIssueStatus: defaultStatusId
+      })
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [proj],
+        statuses: [
+          { _id: defaultStatusId, name: "Backlog" },
+          { _id: defaultStatusId, name: "Backlog" },
+          { _id: inProgressStatusId, name: "In Progress" },
+          { _id: inProgressStatusId, name: "In Progress" }
+        ],
+        projectType: asProjectType({
+          statuses: [
+            { _id: defaultStatusId },
+            { _id: defaultStatusId },
+            { _id: inProgressStatusId },
+            { _id: inProgressStatusId }
+          ]
+        })
+      })
+
+      const result = yield* getProject({
+        project: projectIdentifier("HULY")
+      }).pipe(Effect.provide(testLayer))
+
       expect(result.defaultStatus).toBe("Backlog")
       expect(result.statuses).toEqual(["Backlog", "In Progress"])
     }))
