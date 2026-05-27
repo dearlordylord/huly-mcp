@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.17.0
+
+### Minor Changes
+
+- Add MCP context diagnostics, read-only resources for Huly projects and issues, streamable HTTP transport support, and optional bearer-token protection for hosted MCP deployments.
+
 ## 0.16.0
 
 ### Minor Changes

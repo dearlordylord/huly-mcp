@@ -1,6 +1,6 @@
 {
   "name": "@firfi/huly-mcp",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "MCP server for Huly integration",
   "mcpName": "io.github.dearlordylord/huly-mcp",
   "type": "module",
@@ -42,8 +42,7 @@
     "update-readme": "node scripts/update-readme-tools.mjs"
   },
   "bin": {
-    "huly-mcp": "./dist/index.cjs",
-    "@firfi/huly-mcp": "./dist/index.cjs"
+    "huly-mcp": "dist/index.cjs"
   },
   "keywords": [
     "mcp",
