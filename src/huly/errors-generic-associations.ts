@@ -1,6 +1,10 @@
 import { Schema } from "effect"
 
-import { AssociationName, CardinalitySchema } from "../domain/schemas/generic-associations.js"
+import {
+  AssociationName,
+  CardinalitySchema,
+  RelationEndpointFieldSchema
+} from "../domain/schemas/generic-associations.js"
 import { AssociationId, DocId, ObjectClassName, RelationId } from "../domain/schemas/shared.js"
 
 const CandidateSchema = Schema.Struct({
@@ -154,7 +158,7 @@ export class RelationDirectionAmbiguousError extends Schema.TaggedError<Relation
 export class RelationEndpointClassMismatchError extends Schema.TaggedError<RelationEndpointClassMismatchError>()(
   "RelationEndpointClassMismatchError",
   {
-    field: Schema.String,
+    field: RelationEndpointFieldSchema,
     expectedClass: Schema.String,
     actualClass: Schema.String
   }
@@ -167,7 +171,7 @@ export class RelationEndpointClassMismatchError extends Schema.TaggedError<Relat
 export class GenericObjectIdentifierAmbiguousError extends Schema.TaggedError<GenericObjectIdentifierAmbiguousError>()(
   "GenericObjectIdentifierAmbiguousError",
   {
-    field: Schema.String,
+    field: RelationEndpointFieldSchema,
     identifier: Schema.String,
     candidates: Schema.Array(Schema.Struct({
       id: DocId,
@@ -186,7 +190,7 @@ export class GenericObjectIdentifierAmbiguousError extends Schema.TaggedError<Ge
 export class GenericObjectLocatorInvalidError extends Schema.TaggedError<GenericObjectLocatorInvalidError>()(
   "GenericObjectLocatorInvalidError",
   {
-    field: Schema.String,
+    field: RelationEndpointFieldSchema,
     reason: Schema.String
   }
 ) {
@@ -198,7 +202,7 @@ export class GenericObjectLocatorInvalidError extends Schema.TaggedError<Generic
 export class GenericObjectNotFoundError extends Schema.TaggedError<GenericObjectNotFoundError>()(
   "GenericObjectNotFoundError",
   {
-    field: Schema.String,
+    field: RelationEndpointFieldSchema,
     identifier: Schema.String,
     class: Schema.optional(Schema.String)
   }

@@ -30,6 +30,7 @@ import type {
   ListRelationsResult,
   ListRelationsWarning as ListRelationsWarningType,
   RelationDirection,
+  RelationEndpointField,
   RelationSummary,
   ResolvedObjectSummary
 } from "../../domain/schemas/generic-associations.js"
@@ -716,7 +717,7 @@ const findDocsByClass = (
 const validateExpectedClass = (
   summary: ResolvedObjectSummary,
   expectedClass: string | undefined,
-  field: string
+  field: RelationEndpointField
 ): Effect.Effect<void, RelationEndpointClassMismatchError> => {
   if (expectedClass !== undefined && summary.class !== expectedClass) {
     return Effect.fail(
@@ -780,7 +781,7 @@ const validateEitherEndpointClasses = (
 
 const resolveIssueLocator = (
   locator: Extract<GenericObjectLocator, { kind: "issue" }>,
-  field: string
+  field: RelationEndpointField
 ): Effect.Effect<ResolvedObjectSummary, GenericAssociationsError, HulyClient> =>
   Effect.gen(function*() {
     if (locator.project !== undefined) {
@@ -804,7 +805,7 @@ const resolveIssueLocator = (
 const resolveDocumentWithoutTeamspace = (
   client: HulyClientOperations,
   identifier: string,
-  field: string
+  field: RelationEndpointField
 ): Effect.Effect<ResolvedObjectSummary, GenericAssociationsError> =>
   Effect.gen(function*() {
     const byId = yield* client.findOne<HulyDocument>(
@@ -854,7 +855,7 @@ const findCardById = (
 const findCardSpace = (
   client: HulyClientOperations,
   identifier: CardSpaceIdentifier,
-  field: string
+  field: RelationEndpointField
 ): Effect.Effect<HulyCardSpace, GenericAssociationsError> =>
   Effect.gen(function*() {
     const byId = yield* client.findOne<HulyCardSpace>(
@@ -895,7 +896,7 @@ const resolveCardInSpace = (
   client: HulyClientOperations,
   identifier: CardIdentifier,
   cardSpace: HulyCardSpace,
-  field: string
+  field: RelationEndpointField
 ): Effect.Effect<ResolvedObjectSummary, GenericAssociationsError> =>
   Effect.gen(function*() {
     const byId = yield* client.findOne<HulyCard>(
@@ -935,7 +936,7 @@ const resolveCardInSpace = (
 const resolveCardLocator = (
   client: HulyClientOperations,
   locator: Extract<GenericObjectLocator, { kind: "card" }>,
-  field: string
+  field: RelationEndpointField
 ): Effect.Effect<ResolvedObjectSummary, GenericAssociationsError> =>
   Effect.gen(function*() {
     if (locator.cardSpace !== undefined) {
@@ -950,7 +951,7 @@ const resolveCardLocator = (
 
     return yield* new GenericObjectLocatorInvalidError({
       field,
-      reason: "card title lookup requires cardSpace; card ID lookup may omit cardSpace"
+      reason: `card '${locator.card}' was not found by ID; exact card title lookup requires cardSpace`
     })
   })
 
@@ -958,7 +959,7 @@ const resolveGenericObject = (
   client: HulyClientOperations,
   locator: GenericObjectLocator,
   expectedClass: string | undefined,
-  field: string
+  field: RelationEndpointField
 ): Effect.Effect<ResolvedObjectSummary, GenericAssociationsError, HulyClient> =>
   Effect.gen(function*() {
     switch (locator.kind) {

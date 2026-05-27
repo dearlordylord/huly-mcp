@@ -55,6 +55,9 @@ const relationDirectionDescription = `Relation traversal direction: ${
 export const RelationIfExistsSchema = Schema.Literal("return_existing", "fail")
 export type RelationIfExists = Schema.Schema.Type<typeof RelationIfExistsSchema>
 
+export const RelationEndpointFieldSchema = Schema.Literal("source", "target")
+export type RelationEndpointField = Schema.Schema.Type<typeof RelationEndpointFieldSchema>
+
 const AssociationIfExistsSchema = Schema.Literal("return_existing", "fail")
 
 const RawObjectLocatorSchema = Schema.Struct({
