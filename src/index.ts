@@ -24,6 +24,7 @@ import { HulyStorageClient, type StorageClientError } from "./huly/storage.js"
 import { WorkspaceClient, type WorkspaceClientError } from "./huly/workspace-client.js"
 import { DEFAULT_HTTP_PORT, HttpServerFactoryService } from "./mcp/http-transport.js"
 import { type ClientBundle, type McpServerError, McpServerService, type McpTransportType } from "./mcp/server.js"
+import { type ConsoleRedirectHandle, redirectConsoleToStderr } from "./mcp/stdio-output.js"
 import { TelemetryService } from "./telemetry/telemetry.js"
 
 type AppError =
@@ -65,6 +66,11 @@ const getLazyEnvs = Config.string("LAZY_ENVS").pipe(
   Config.withDefault("false"),
   Effect.map((v) => v.toLowerCase() === "true")
 )
+
+const restoreConsoleRedirect = (redirect: ConsoleRedirectHandle | undefined): Effect.Effect<void> =>
+  Effect.sync(() => {
+    redirect?.restore()
+  })
 
 /**
  * Build the combined client layer (not yet evaluated — deferred until first use).
@@ -235,49 +241,58 @@ const buildAppLayer = (
   return Layer.merge(mcpServerLayer, HttpServerFactoryService.defaultLayer)
 }
 
+const runConfiguredServer = (transport: McpTransportType): Effect.Effect<void, AppError> =>
+  Effect.gen(function*() {
+    const httpPort = yield* getHttpPort
+    const httpHost = yield* getHttpHost
+    const mcpAuthToken = transport === "http"
+      ? Option.map(yield* getMcpAuthToken, Redacted.value).pipe(Option.getOrUndefined)
+      : undefined
+    const autoExit = yield* getAutoExit
+    const lazyEnvs = yield* getLazyEnvs
+    const authMethod: "token" | "password" = process.env["HULY_TOKEN"] ? "token" : "password"
+
+    const combinedClientLayer = buildCombinedClientLayer()
+    const [resolveClients, primeClients] = createClientResolver(combinedClientLayer)
+    const resolveHttpClients = createHttpClientResolver(combinedClientLayer, resolveClients)
+
+    if (!lazyEnvs && transport === "stdio") {
+      // Eager init: build client layers within the Effect pipeline to preserve
+      // typed errors (ConfigValidationError, HulyClientError, etc.).
+      // This also primes the memoized resolver for subsequent tool calls.
+      yield* Effect.gen(function*() {
+        const bundle = yield* buildClientBundle(combinedClientLayer)
+        primeClients(bundle)
+      })
+    }
+
+    // stdout reserved for MCP protocol in stdio mode - no console output here
+    const appLayer = buildAppLayer(
+      transport,
+      httpPort,
+      httpHost,
+      mcpAuthToken,
+      autoExit,
+      authMethod,
+      resolveClients,
+      resolveHttpClients
+    )
+
+    yield* Effect.gen(function*() {
+      const server = yield* McpServerService
+      yield* server.run()
+    }).pipe(
+      Effect.provide(appLayer),
+      Effect.scoped
+    )
+  })
+
 export const main: Effect.Effect<void, AppError> = Effect.gen(function*() {
   const transport = yield* getTransportType
-  const httpPort = yield* getHttpPort
-  const httpHost = yield* getHttpHost
-  const mcpAuthToken = transport === "http"
-    ? Option.map(yield* getMcpAuthToken, Redacted.value).pipe(Option.getOrUndefined)
-    : undefined
-  const autoExit = yield* getAutoExit
-  const lazyEnvs = yield* getLazyEnvs
-  const authMethod: "token" | "password" = process.env["HULY_TOKEN"] ? "token" : "password"
+  const consoleRedirect = yield* Effect.sync(() => transport === "stdio" ? redirectConsoleToStderr() : undefined)
 
-  const combinedClientLayer = buildCombinedClientLayer()
-  const [resolveClients, primeClients] = createClientResolver(combinedClientLayer)
-  const resolveHttpClients = createHttpClientResolver(combinedClientLayer, resolveClients)
-
-  if (!lazyEnvs && transport === "stdio") {
-    // Eager init: build client layers within the Effect pipeline to preserve
-    // typed errors (ConfigValidationError, HulyClientError, etc.).
-    // This also primes the memoized resolver for subsequent tool calls.
-    yield* Effect.gen(function*() {
-      const bundle = yield* buildClientBundle(combinedClientLayer)
-      primeClients(bundle)
-    })
-  }
-
-  // stdout reserved for MCP protocol in stdio mode - no console output here
-  const appLayer = buildAppLayer(
-    transport,
-    httpPort,
-    httpHost,
-    mcpAuthToken,
-    autoExit,
-    authMethod,
-    resolveClients,
-    resolveHttpClients
-  )
-
-  yield* Effect.gen(function*() {
-    const server = yield* McpServerService
-    yield* server.run()
-  }).pipe(
-    Effect.provide(appLayer),
-    Effect.scoped
+  yield* runConfiguredServer(transport).pipe(
+    Effect.ensuring(restoreConsoleRedirect(consoleRedirect))
   )
 })
 
