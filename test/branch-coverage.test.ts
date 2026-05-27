@@ -78,15 +78,17 @@ describe("buildSocialIdToPersonNameMap - person not found in map (channels.ts li
   it.effect("resolves some but skips others when only some persons exist", () =>
     Effect.gen(function*() {
       const client = yield* HulyClient
+      const foundSocialId = "social-found" as PersonId
+      const orphanSocialId = "social-orphan" as PersonId
 
       const result = yield* buildSocialIdToPersonNameMap(
         client,
-        ["social-found" as PersonId, "social-orphan" as PersonId]
+        [foundSocialId, orphanSocialId]
       )
 
       expect(result.size).toBe(1)
-      expect(result.get("social-found")).toBe("Found Person")
-      expect(result.has("social-orphan")).toBe(false)
+      expect(result.get(foundSocialId)).toBe("Found Person")
+      expect(result.has(orphanSocialId)).toBe(false)
     }).pipe(
       Effect.provide(
         HulyClient.testLayer({

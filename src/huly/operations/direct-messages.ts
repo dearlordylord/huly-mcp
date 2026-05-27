@@ -37,13 +37,7 @@ import type {
   UpdateDmMessageParams,
   UpdateDmMessageResult
 } from "../../domain/schemas/direct-messages.js"
-import {
-  ChannelId,
-  type DirectMessageIdentifier,
-  MessageId,
-  PersonName,
-  type PersonRefInput
-} from "../../domain/schemas/shared.js"
+import { ChannelId, type DirectMessageIdentifier, MessageId, type PersonRefInput } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { PersonIdentifierAmbiguousError } from "../errors.js"
 import {
@@ -231,7 +225,7 @@ export const listDirectMessageMessages = (
       return {
         id: MessageId.make(msg._id),
         body: markupToMarkdownString(msg.message, markupUrlConfig),
-        sender: senderName !== undefined ? PersonName.make(senderName) : undefined,
+        sender: senderName,
         senderId: msg.modifiedBy,
         createdOn: msg.createdOn,
         modifiedOn: msg.modifiedOn,

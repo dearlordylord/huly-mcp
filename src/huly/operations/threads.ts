@@ -24,7 +24,7 @@ import type {
   ListThreadRepliesResult,
   UpdateThreadReplyResult
 } from "../../domain/schemas/channels.js"
-import { ChannelId, MessageId, PersonName, ThreadReplyId } from "../../domain/schemas/shared.js"
+import { ChannelId, MessageId, ThreadReplyId } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { ChannelNotFoundError, MessageNotFoundError } from "../errors.js"
 import { ThreadReplyNotFoundError } from "../errors.js"
@@ -128,7 +128,7 @@ export const listThreadReplies = (
       return {
         id: ThreadReplyId.make(msg._id),
         body: markupToMarkdownString(msg.message, markupUrlConfig),
-        sender: senderName !== undefined ? PersonName.make(senderName) : undefined,
+        sender: senderName,
         senderId: msg.modifiedBy,
         createdOn: msg.createdOn,
         modifiedOn: msg.modifiedOn,

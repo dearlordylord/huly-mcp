@@ -209,11 +209,12 @@ describe("buildSocialIdToPersonNameMap - person resolved (channels.ts line 159)"
   it.effect("resolves person names from socialIdentity IDs", () =>
     Effect.gen(function*() {
       const client = yield* HulyClient
+      const socialId = "social-alice" as PersonId
 
-      const result = yield* buildSocialIdToPersonNameMap(client, ["social-alice" as PersonId])
+      const result = yield* buildSocialIdToPersonNameMap(client, [socialId])
 
       expect(result.size).toBe(1)
-      expect(result.get("social-alice")).toBe("Alice Smith")
+      expect(result.get(socialId)).toBe("Alice Smith")
     }).pipe(
       Effect.provide(
         createChannelTestLayer({

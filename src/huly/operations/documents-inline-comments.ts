@@ -20,6 +20,7 @@ import type {
   InlineCommentThread,
   ListInlineCommentsResult
 } from "../../domain/schemas/documents.js"
+import type { PersonName } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js"
 import { chunter } from "../huly-plugins.js"
@@ -96,7 +97,7 @@ export const listInlineComments = (
     }
 
     // Fetch replies in one batch if requested
-    let nameMap = new Map<string, string>()
+    let nameMap: ReadonlyMap<PersonId, PersonName> = new Map<PersonId, PersonName>()
     const threadRepliesMap = new Map<string, Array<HulyThreadMessage>>()
 
     if (params.includeReplies) {

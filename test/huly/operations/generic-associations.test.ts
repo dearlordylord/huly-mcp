@@ -1,5 +1,5 @@
 import { describe, it } from "@effect/vitest"
-import type { Card as HulyCard, CardSpace as HulyCardSpace } from "@hcengineering/card"
+import type { Card as HulyCard, CardSpace as HulyCardSpace, MasterTag } from "@hcengineering/card"
 import type {
   Association as HulyAssociation,
   Class,
@@ -54,7 +54,10 @@ const assocId = AssociationIdentifier.make("assoc-1")
 const relatesAssociation = AssociationIdentifier.make("relates")
 const issueClass = ObjectClassName.make(tracker.class.Issue)
 const documentClass = ObjectClassName.make(documentPlugin.class.Document)
-const cardClass = ObjectClassName.make("card:class:Contract")
+const contractCardClassName = "card:class:Contract"
+const contractCardClassRef = contractCardClassName as Ref<MasterTag>
+const contractAssociationClassRef = contractCardClassName as Ref<Class<Doc>>
+const cardClass = ObjectClassName.make(contractCardClassRef)
 
 // Huly SDK document interfaces include package-specific structural details that
 // are irrelevant to resolver behavior; fixtures cross that SDK boundary here.
@@ -131,13 +134,13 @@ const cardSpaceDoc = (id: string, name: string): HulyCardSpace =>
     name,
     description: "",
     archived: false,
-    types: ["card:class:Contract" as Ref<HulyCard>]
+    types: [contractCardClassRef]
   })
 
 const cardDoc = (id: string, title: string, cardSpace: string = "cards-1"): HulyCard =>
   asCard({
     _id: id as Ref<HulyCard>,
-    _class: "card:class:Contract" as Ref<HulyCard>,
+    _class: contractCardClassRef,
     space: cardSpace as Ref<Space>,
     modifiedBy: person,
     modifiedOn: 100,
@@ -970,7 +973,7 @@ describe("listRelations", () => {
     Effect.gen(function*() {
       const cardToIssue = association({
         _id: "assoc-1" as Ref<HulyAssociation>,
-        classA: "card:class:Contract" as Ref<Class<Doc>>,
+        classA: contractAssociationClassRef,
         classB: tracker.class.Issue,
         nameA: "card",
         nameB: "issue"
@@ -1003,7 +1006,7 @@ describe("listRelations", () => {
     Effect.gen(function*() {
       const cardToIssue = association({
         _id: "assoc-1" as Ref<HulyAssociation>,
-        classA: "card:class:Contract" as Ref<Class<Doc>>,
+        classA: contractAssociationClassRef,
         classB: tracker.class.Issue,
         nameA: "card",
         nameB: "issue"

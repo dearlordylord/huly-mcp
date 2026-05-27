@@ -122,10 +122,10 @@ export const findChannel = (
 export const buildSocialIdToPersonNameMap = (
   client: HulyClient["Type"],
   socialIds: Array<PersonId>
-): Effect.Effect<Map<string, string>, HulyClientError> =>
+): Effect.Effect<ReadonlyMap<PersonId, PersonName>, HulyClientError> =>
   Effect.gen(function*() {
     if (socialIds.length === 0) {
-      return new Map<string, string>()
+      return new Map<PersonId, PersonName>()
     }
 
     const socialIdentities = yield* client.findAll<SocialIdentity>(
@@ -134,7 +134,7 @@ export const buildSocialIdToPersonNameMap = (
     )
 
     if (socialIdentities.length === 0) {
-      return new Map<string, string>()
+      return new Map<PersonId, PersonName>()
     }
 
     const personRefs = [...new Set(socialIdentities.map((si) => si.attachedTo))]
@@ -144,12 +144,12 @@ export const buildSocialIdToPersonNameMap = (
     )
 
     const personById = new Map(persons.map((p) => [p._id, p]))
-    const result = new Map<string, string>()
+    const result = new Map<PersonId, PersonName>()
 
     for (const si of socialIdentities) {
       const person = personById.get(si.attachedTo)
       if (person !== undefined) {
-        result.set(si._id, person.name)
+        result.set(si._id, PersonName.make(person.name))
       }
     }
 
@@ -163,10 +163,10 @@ export const buildSocialIdToPersonNameMap = (
 const buildAccountUuidToNameMap = (
   client: HulyClient["Type"],
   accountUuids: Array<HulyAccountUuid>
-): Effect.Effect<Map<string, string>, HulyClientError> =>
+): Effect.Effect<ReadonlyMap<HulyAccountUuid, PersonName>, HulyClientError> =>
   Effect.gen(function*() {
     if (accountUuids.length === 0) {
-      return new Map<string, string>()
+      return new Map<HulyAccountUuid, PersonName>()
     }
 
     const employees = yield* client.findAll<HulyEmployee>(
@@ -174,10 +174,10 @@ const buildAccountUuidToNameMap = (
       { personUuid: { $in: accountUuids } }
     )
 
-    const result = new Map<string, string>()
+    const result = new Map<HulyAccountUuid, PersonName>()
     for (const emp of employees) {
       if (emp.personUuid !== undefined) {
-        result.set(emp.personUuid, emp.name)
+        result.set(emp.personUuid, PersonName.make(emp.name))
       }
     }
 
@@ -255,7 +255,7 @@ export const getChannel = (
         const accountUuidToName = yield* buildAccountUuidToNameMap(client, channel.members)
         return channel.members
           .map((m) => accountUuidToName.get(m))
-          .filter((n): n is string => n !== undefined)
+          .filter((n): n is PersonName => n !== undefined)
       })
       : undefined
 
@@ -266,7 +266,7 @@ export const getChannel = (
       description: channel.description || undefined,
       private: channel.private,
       archived: channel.archived,
-      members: memberNames?.map(m => PersonName.make(m)),
+      members: memberNames,
       messages: channel.messages,
       modifiedOn: channel.modifiedOn,
       createdOn: channel.createdOn
@@ -405,7 +405,7 @@ export const listChannelMessages = (
       return {
         id: MessageId.make(msg._id),
         body: markupToMarkdownString(msg.message, markupUrlConfig),
-        sender: senderName !== undefined ? PersonName.make(senderName) : undefined,
+        sender: senderName,
         senderId: msg.modifiedBy,
         createdOn: msg.createdOn,
         modifiedOn: msg.modifiedOn,
@@ -489,8 +489,7 @@ export const listDirectMessages = (
     const summaries: Array<DirectMessageSummary> = dms.map((dm) => {
       const participants = dm.members
         .map((m) => accountUuidToName.get(m))
-        .filter((n): n is string => n !== undefined)
-        .map((n) => PersonName.make(n))
+        .filter((n): n is PersonName => n !== undefined)
 
       const participantIds = dm.members.map((m) => AccountUuid.make(m))
 
