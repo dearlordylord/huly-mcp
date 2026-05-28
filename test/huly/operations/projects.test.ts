@@ -154,7 +154,6 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 
 describe("listProjects", () => {
   describe("basic functionality", () => {
-    // test-revizorro: approved
     it.effect("returns all active projects by default", () =>
       Effect.gen(function*() {
         const projects = [
@@ -172,7 +171,6 @@ describe("listProjects", () => {
         expect(result.total).toBe(2)
       }))
 
-    // test-revizorro: approved
     it.effect("transforms project fields correctly", () =>
       Effect.gen(function*() {
         const project = makeProject({
@@ -195,7 +193,6 @@ describe("listProjects", () => {
         })
       }))
 
-    // test-revizorro: approved
     it.effect("handles empty description", () =>
       Effect.gen(function*() {
         const project = makeProject({
@@ -211,7 +208,6 @@ describe("listProjects", () => {
         expect(result.projects[0].description).toBeUndefined()
       }))
 
-    // test-revizorro: approved
     it.effect("returns empty array when no projects", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({ projects: [] })
@@ -224,7 +220,6 @@ describe("listProjects", () => {
   })
 
   describe("archived filtering", () => {
-    // test-revizorro: approved
     it.effect("excludes archived projects by default", () =>
       Effect.gen(function*() {
         const captureQuery: MockConfig["captureQuery"] = {}
@@ -242,7 +237,6 @@ describe("listProjects", () => {
         expect(result.projects[0].identifier).toBe("ACTIVE")
       }))
 
-    // test-revizorro: approved
     it.effect("includes archived when includeArchived=true", () =>
       Effect.gen(function*() {
         const captureQuery: MockConfig["captureQuery"] = {}
@@ -261,7 +255,6 @@ describe("listProjects", () => {
         expect(result.total).toBe(2)
       }))
 
-    // test-revizorro: approved
     it.effect("excludes archived when includeArchived=false explicitly", () =>
       Effect.gen(function*() {
         const captureQuery: MockConfig["captureQuery"] = {}
@@ -281,7 +274,6 @@ describe("listProjects", () => {
   })
 
   describe("limit handling", () => {
-    // test-revizorro: approved
     it.effect("uses default limit of 50", () =>
       Effect.gen(function*() {
         const captureQuery: MockConfig["captureQuery"] = {}
@@ -293,7 +285,6 @@ describe("listProjects", () => {
         expect(captureQuery.options?.limit).toBe(50)
       }))
 
-    // test-revizorro: approved
     it.effect("uses provided limit", () =>
       Effect.gen(function*() {
         const captureQuery: MockConfig["captureQuery"] = {}
@@ -305,7 +296,6 @@ describe("listProjects", () => {
         expect(captureQuery.options?.limit).toBe(10)
       }))
 
-    // test-revizorro: approved
     it.effect("enforces max limit of 200", () =>
       Effect.gen(function*() {
         const captureQuery: MockConfig["captureQuery"] = {}
@@ -319,7 +309,6 @@ describe("listProjects", () => {
   })
 
   describe("sorting", () => {
-    // test-revizorro: approved
     it.effect("sorts by name ascending", () =>
       Effect.gen(function*() {
         const captureQuery: MockConfig["captureQuery"] = {}
@@ -333,7 +322,6 @@ describe("listProjects", () => {
   })
 
   describe("pagination info", () => {
-    // test-revizorro: approved
     it.effect("returns total count", () =>
       Effect.gen(function*() {
         const projects = [

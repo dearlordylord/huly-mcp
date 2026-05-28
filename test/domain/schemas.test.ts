@@ -89,7 +89,6 @@ const expectJsonSchemaProperties = (schema: JsonSchemaObject): NonNullable<JsonS
 
 describe("Domain Schemas", () => {
   describe("IssuePrioritySchema", () => {
-    // test-revizorro: approved
     it.effect("accepts valid priorities", () =>
       Effect.gen(function*() {
         for (const priority of IssuePriorityValues) {
@@ -98,7 +97,6 @@ describe("Domain Schemas", () => {
         }
       }))
 
-    // test-revizorro: approved
     it.effect("rejects invalid priority", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -153,21 +151,18 @@ describe("Domain Schemas", () => {
   })
 
   describe("LabelSchema", () => {
-    // test-revizorro: approved
     it.effect("parses label with title only", () =>
       Effect.gen(function*() {
         const result = yield* Schema.decodeUnknown(LabelSchema)({ title: "bug" })
         expect(result).toEqual({ title: "bug" })
       }))
 
-    // test-revizorro: approved
     it.effect("parses label with title and color", () =>
       Effect.gen(function*() {
         const result = yield* Schema.decodeUnknown(LabelSchema)({ title: "feature", color: 5 })
         expect(result).toEqual({ title: "feature", color: 5 })
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty title", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -178,14 +173,12 @@ describe("Domain Schemas", () => {
   })
 
   describe("PersonRefSchema", () => {
-    // test-revizorro: approved
     it.effect("parses with id only", () =>
       Effect.gen(function*() {
         const result = yield* Schema.decodeUnknown(PersonRefSchema)({ id: "person-123" })
         expect(result).toEqual({ id: "person-123" })
       }))
 
-    // test-revizorro: approved
     it.effect("parses with all fields", () =>
       Effect.gen(function*() {
         const result = yield* Schema.decodeUnknown(PersonRefSchema)({
@@ -235,7 +228,6 @@ describe("Domain Schemas", () => {
   })
 
   describe("ProjectSchema", () => {
-    // test-revizorro: approved
     it.effect("parses full project", () =>
       Effect.gen(function*() {
         const result = yield* parseProject({
@@ -256,7 +248,6 @@ describe("Domain Schemas", () => {
   })
 
   describe("IssueSummarySchema", () => {
-    // test-revizorro: approved
     it.effect("parses minimal issue summary", () =>
       Effect.gen(function*() {
         const result = yield* parseIssueSummary({
@@ -273,7 +264,6 @@ describe("Domain Schemas", () => {
         })
       }))
 
-    // test-revizorro: approved
     it.effect("parses with all optional fields", () =>
       Effect.gen(function*() {
         const result = yield* parseIssueSummary({
@@ -292,7 +282,6 @@ describe("Domain Schemas", () => {
   })
 
   describe("IssueSchema", () => {
-    // test-revizorro: approved
     it.effect("parses minimal issue", () =>
       Effect.gen(function*() {
         const result = yield* parseIssue({
@@ -308,7 +297,6 @@ describe("Domain Schemas", () => {
         expect(result.project).toBe("HULY")
       }))
 
-    // test-revizorro: approved
     it.effect("parses full issue", () =>
       Effect.gen(function*() {
         const result = yield* parseIssue({
@@ -342,7 +330,6 @@ describe("Domain Schemas", () => {
         expect(result.estimation).toBe(3600000)
       }))
 
-    // test-revizorro: approved
     it.effect("handles null dueDate", () =>
       Effect.gen(function*() {
         const result = yield* parseIssue({
@@ -358,14 +345,12 @@ describe("Domain Schemas", () => {
   })
 
   describe("ListIssuesParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses minimal params", () =>
       Effect.gen(function*() {
         const result = yield* parseListIssuesParams({ project: "HULY" })
         expect(result).toEqual({ project: "HULY" })
       }))
 
-    // test-revizorro: approved
     it.effect("parses with all options", () =>
       Effect.gen(function*() {
         const result = yield* parseListIssuesParams({
@@ -407,7 +392,6 @@ describe("Domain Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects negative limit", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -416,7 +400,6 @@ describe("Domain Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects non-integer limit", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -436,14 +419,12 @@ describe("Domain Schemas", () => {
   })
 
   describe("GetIssueParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses valid params", () =>
       Effect.gen(function*() {
         const result = yield* parseGetIssueParams({ project: "HULY", identifier: "HULY-123" })
         expect(result).toEqual({ project: "HULY", identifier: "HULY-123" })
       }))
 
-    // test-revizorro: approved
     it.effect("rejects missing identifier", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -454,14 +435,12 @@ describe("Domain Schemas", () => {
   })
 
   describe("CreateIssueParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses minimal params", () =>
       Effect.gen(function*() {
         const result = yield* parseCreateIssueParams({ project: "HULY", title: "New issue" })
         expect(result).toEqual({ project: "HULY", title: "New issue" })
       }))
 
-    // test-revizorro: approved
     it.effect("parses with all options", () =>
       Effect.gen(function*() {
         const result = yield* parseCreateIssueParams({
@@ -480,7 +459,6 @@ describe("Domain Schemas", () => {
         expect(result.status).toBe("Open")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty title", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -491,7 +469,6 @@ describe("Domain Schemas", () => {
   })
 
   describe("UpdateIssueParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses minimal params and advertises update-field requirement in JSON Schema", () =>
       Effect.gen(function*() {
         const result = yield* parseUpdateIssueParams({ project: "HULY", identifier: "HULY-123" })
@@ -512,7 +489,6 @@ describe("Domain Schemas", () => {
         )
       }))
 
-    // test-revizorro: approved
     it.effect("parses with update fields", () =>
       Effect.gen(function*() {
         const result = yield* parseUpdateIssueParams({
@@ -599,7 +575,6 @@ describe("Domain Schemas", () => {
   })
 
   describe("AddLabelParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses valid params", () =>
       Effect.gen(function*() {
         const result = yield* parseAddLabelParams({
@@ -614,7 +589,6 @@ describe("Domain Schemas", () => {
         })
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty label", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -629,14 +603,12 @@ describe("Domain Schemas", () => {
   })
 
   describe("ListProjectsParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses empty params", () =>
       Effect.gen(function*() {
         const result = yield* parseListProjectsParams({})
         expect(result).toEqual({})
       }))
 
-    // test-revizorro: approved
     it.effect("parses with all options", () =>
       Effect.gen(function*() {
         const result = yield* parseListProjectsParams({
@@ -649,7 +621,6 @@ describe("Domain Schemas", () => {
         })
       }))
 
-    // test-revizorro: approved
     it.effect("rejects negative limit", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -658,7 +629,6 @@ describe("Domain Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects non-integer limit", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -667,7 +637,6 @@ describe("Domain Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects zero limit", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -678,7 +647,6 @@ describe("Domain Schemas", () => {
   })
 
   describe("JSON Schema Generation", () => {
-    // test-revizorro: approved
     it.effect("generates JSON Schema for ListIssuesParams", () =>
       Effect.gen(function*() {
         const schema = expectJsonSchemaObject(listIssuesParamsJsonSchema)
@@ -687,7 +655,6 @@ describe("Domain Schemas", () => {
         expect(schema.required).toContain("project")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for ListProjectsParams", () =>
       Effect.gen(function*() {
         const schema = expectJsonSchemaObject(listProjectsParamsJsonSchema)
@@ -699,7 +666,6 @@ describe("Domain Schemas", () => {
         expect(schema.properties).toHaveProperty("limit")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for GetIssueParams", () =>
       Effect.gen(function*() {
         const schema = expectJsonSchemaObject(getIssueParamsJsonSchema)
@@ -708,7 +674,6 @@ describe("Domain Schemas", () => {
         expect(schema.required).toContain("identifier")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for CreateIssueParams", () =>
       Effect.gen(function*() {
         const schema = expectJsonSchemaObject(createIssueParamsJsonSchema)
@@ -722,7 +687,6 @@ describe("Domain Schemas", () => {
         expect(schema.properties).toHaveProperty("parentIssue")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for UpdateIssueParams", () =>
       Effect.gen(function*() {
         const schema = expectJsonSchemaObject(updateIssueParamsJsonSchema)
@@ -731,7 +695,6 @@ describe("Domain Schemas", () => {
         expect(schema.required).toContain("identifier")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for AddLabelParams", () =>
       Effect.gen(function*() {
         const schema = expectJsonSchemaObject(addLabelParamsJsonSchema)
@@ -741,7 +704,6 @@ describe("Domain Schemas", () => {
         expect(schema.required).toContain("label")
       }))
 
-    // test-revizorro: approved
     it.effect("schema is valid JSON Schema draft-07", () =>
       Effect.gen(function*() {
         const schema = expectJsonSchemaObject(createIssueParamsJsonSchema)
@@ -755,14 +717,12 @@ describe("Domain Schemas", () => {
   // --- Document Schema Tests ---
 
   describe("ListTeamspacesParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses empty params", () =>
       Effect.gen(function*() {
         const result = yield* parseListTeamspacesParams({})
         expect(result).toEqual({})
       }))
 
-    // test-revizorro: approved
     it.effect("parses with all options", () =>
       Effect.gen(function*() {
         const result = yield* parseListTeamspacesParams({
@@ -773,7 +733,6 @@ describe("Domain Schemas", () => {
         expect(result.limit).toBe(25)
       }))
 
-    // test-revizorro: approved
     it.effect("rejects limit over 200", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -784,14 +743,12 @@ describe("Domain Schemas", () => {
   })
 
   describe("ListDocumentsParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses minimal params", () =>
       Effect.gen(function*() {
         const result = yield* parseListDocumentsParams({ teamspace: "My Docs" })
         expect(result).toEqual({ teamspace: "My Docs" })
       }))
 
-    // test-revizorro: approved
     it.effect("parses with limit", () =>
       Effect.gen(function*() {
         const result = yield* parseListDocumentsParams({
@@ -801,7 +758,6 @@ describe("Domain Schemas", () => {
         expect(result.limit).toBe(100)
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty teamspace", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -812,7 +768,6 @@ describe("Domain Schemas", () => {
   })
 
   describe("GetDocumentParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses valid params", () =>
       Effect.gen(function*() {
         const result = yield* parseGetDocumentParams({
@@ -823,7 +778,6 @@ describe("Domain Schemas", () => {
         expect(result.document).toBe("Getting Started")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects missing document", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -834,7 +788,6 @@ describe("Domain Schemas", () => {
   })
 
   describe("CreateDocumentParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses minimal params", () =>
       Effect.gen(function*() {
         const result = yield* parseCreateDocumentParams({
@@ -846,7 +799,6 @@ describe("Domain Schemas", () => {
         expect(result.content).toBeUndefined()
       }))
 
-    // test-revizorro: approved
     it.effect("parses with content", () =>
       Effect.gen(function*() {
         const result = yield* parseCreateDocumentParams({
@@ -857,7 +809,6 @@ describe("Domain Schemas", () => {
         expect(result.content).toBe("# Introduction\n\nSome content here.")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty title", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -996,7 +947,6 @@ describe("Domain Schemas", () => {
   })
 
   describe("DeleteDocumentParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses valid params", () =>
       Effect.gen(function*() {
         const result = yield* parseDeleteDocumentParams({
@@ -1009,7 +959,6 @@ describe("Domain Schemas", () => {
   })
 
   describe("Document JSON Schema Generation", () => {
-    // test-revizorro: approved
     it.effect("generates JSON Schema for ListTeamspacesParams", () =>
       Effect.gen(function*() {
         const schema = expectJsonSchemaObject(listTeamspacesParamsJsonSchema)
@@ -1019,7 +968,6 @@ describe("Domain Schemas", () => {
         expect(schema.properties).toHaveProperty("limit")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for ListDocumentsParams", () =>
       Effect.gen(function*() {
         const schema = expectJsonSchemaObject(listDocumentsParamsJsonSchema)
@@ -1029,7 +977,6 @@ describe("Domain Schemas", () => {
         expect(schema.properties).toHaveProperty("limit")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for GetDocumentParams", () =>
       Effect.gen(function*() {
         const schema = expectJsonSchemaObject(getDocumentParamsJsonSchema)
@@ -1038,7 +985,6 @@ describe("Domain Schemas", () => {
         expect(schema.required).toContain("document")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for CreateDocumentParams", () =>
       Effect.gen(function*() {
         const schema = expectJsonSchemaObject(createDocumentParamsJsonSchema)
@@ -1062,7 +1008,6 @@ describe("Domain Schemas", () => {
         expect(properties.old_text.pattern).toBe("\\S")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for DeleteDocumentParams", () =>
       Effect.gen(function*() {
         const schema = expectJsonSchemaObject(deleteDocumentParamsJsonSchema)
@@ -1075,7 +1020,6 @@ describe("Domain Schemas", () => {
   // --- Time Schema Tests ---
 
   describe("LogTimeParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses minimal params", () =>
       Effect.gen(function*() {
         const result = yield* parseLogTimeParams({
@@ -1088,7 +1032,6 @@ describe("Domain Schemas", () => {
         expect(result.value).toBe(30)
       }))
 
-    // test-revizorro: approved
     it.effect("parses with description", () =>
       Effect.gen(function*() {
         const result = yield* parseLogTimeParams({
@@ -1100,7 +1043,6 @@ describe("Domain Schemas", () => {
         expect(result.description).toBe("Worked on feature")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects non-positive value", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -1113,7 +1055,6 @@ describe("Domain Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects negative value", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -1128,7 +1069,6 @@ describe("Domain Schemas", () => {
   })
 
   describe("GetTimeReportParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses valid params", () =>
       Effect.gen(function*() {
         const result = yield* parseGetTimeReportParams({
@@ -1139,7 +1079,6 @@ describe("Domain Schemas", () => {
         expect(result.identifier).toBe("TEST-1")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty project", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -1153,14 +1092,12 @@ describe("Domain Schemas", () => {
   })
 
   describe("ListTimeSpendReportsParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses empty params", () =>
       Effect.gen(function*() {
         const result = yield* parseListTimeSpendReportsParams({})
         expect(result).toEqual({})
       }))
 
-    // test-revizorro: approved
     it.effect("parses with all options", () =>
       Effect.gen(function*() {
         const result = yield* parseListTimeSpendReportsParams({
@@ -1175,7 +1112,6 @@ describe("Domain Schemas", () => {
         expect(result.limit).toBe(100)
       }))
 
-    // test-revizorro: approved
     it.effect("rejects limit over 200", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -1186,7 +1122,6 @@ describe("Domain Schemas", () => {
   })
 
   describe("StartTimerParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses valid params", () =>
       Effect.gen(function*() {
         const result = yield* parseStartTimerParams({
@@ -1199,7 +1134,6 @@ describe("Domain Schemas", () => {
   })
 
   describe("StopTimerParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses valid params", () =>
       Effect.gen(function*() {
         const result = yield* parseStopTimerParams({
@@ -1212,7 +1146,6 @@ describe("Domain Schemas", () => {
   })
 
   describe("Time JSON Schema Generation", () => {
-    // test-revizorro: approved
     it.effect("generates JSON Schema for LogTimeParams", () =>
       Effect.gen(function*() {
         const schema = expectJsonSchemaObject(logTimeParamsJsonSchema)
@@ -1223,7 +1156,6 @@ describe("Domain Schemas", () => {
         expect(schema.required).toContain("value")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for GetTimeReportParams", () =>
       Effect.gen(function*() {
         const schema = expectJsonSchemaObject(getTimeReportParamsJsonSchema)
@@ -1232,7 +1164,6 @@ describe("Domain Schemas", () => {
         expect(schema.required).toContain("identifier")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for StartTimerParams", () =>
       Effect.gen(function*() {
         const schema = expectJsonSchemaObject(startTimerParamsJsonSchema)
@@ -1241,7 +1172,6 @@ describe("Domain Schemas", () => {
         expect(schema.required).toContain("identifier")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for StopTimerParams", () =>
       Effect.gen(function*() {
         const schema = expectJsonSchemaObject(stopTimerParamsJsonSchema)

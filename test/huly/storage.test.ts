@@ -62,7 +62,6 @@ const testSdkLayer = Layer.succeed(HulySdk, testSdk)
 
 describe("HulyStorageClient Service", () => {
   describe("testLayer", () => {
-    // test-revizorro: approved
     it.effect("provides default noop operations that return valid results", () =>
       Effect.gen(function*() {
         const testLayer = HulyStorageClient.testLayer({})
@@ -80,7 +79,6 @@ describe("HulyStorageClient Service", () => {
         expect(url).toContain("workspace=test")
       }))
 
-    // test-revizorro: approved
     it.effect("default uploadFile returns test blob", () =>
       Effect.gen(function*() {
         const testLayer = HulyStorageClient.testLayer({})
@@ -98,7 +96,6 @@ describe("HulyStorageClient Service", () => {
         expect(result.url).toContain("test-blob-id")
       }))
 
-    // test-revizorro: approved
     it.effect("default getFileUrl returns constructed URL", () =>
       Effect.gen(function*() {
         const testLayer = HulyStorageClient.testLayer({})
@@ -111,7 +108,6 @@ describe("HulyStorageClient Service", () => {
         expect(url).toContain("file=")
       }))
 
-    // test-revizorro: approved
     it.effect("allows overriding uploadFile", () =>
       Effect.gen(function*() {
         const customResult: UploadFileResult = {
@@ -137,7 +133,6 @@ describe("HulyStorageClient Service", () => {
         expect(result.size).toBe(12345)
       }))
 
-    // test-revizorro: approved
     it.effect("allows overriding getFileUrl", () =>
       Effect.gen(function*() {
         const testLayer = HulyStorageClient.testLayer({
@@ -152,7 +147,6 @@ describe("HulyStorageClient Service", () => {
   })
 
   describe("mock operations with errors", () => {
-    // test-revizorro: approved
     it.effect("can mock uploadFile to return FileUploadError", () =>
       Effect.gen(function*() {
         const testLayer = HulyStorageClient.testLayer({
@@ -173,7 +167,6 @@ describe("HulyStorageClient Service", () => {
         expect(error.message).toBe("Storage quota exceeded")
       }))
 
-    // test-revizorro: approved
     it.effect("can mock uploadFile to return HulyConnectionError", () =>
       Effect.gen(function*() {
         const testLayer = HulyStorageClient.testLayer({
@@ -196,7 +189,6 @@ describe("HulyStorageClient Service", () => {
   })
 
   describe("error handling patterns", () => {
-    // test-revizorro: approved
     it.effect("can catch FileUploadError with catchTag", () =>
       Effect.gen(function*() {
         const testLayer = HulyStorageClient.testLayer({
@@ -226,7 +218,6 @@ describe("HulyStorageClient Service", () => {
   })
 
   describe("operation tracking", () => {
-    // test-revizorro: approved
     it.effect("tracks uploadFile calls for testing", () =>
       Effect.gen(function*() {
         const uploads: Array<{ filename: string; contentType: string; size: number }> = []
@@ -261,7 +252,6 @@ describe("HulyStorageClient Service", () => {
 })
 
 describe("decodeBase64", () => {
-  // test-revizorro: approved
   it.effect("decodes valid base64 string", () =>
     Effect.gen(function*() {
       const original = "Hello, World!"
@@ -272,7 +262,6 @@ describe("decodeBase64", () => {
       expect(buffer.toString()).toBe(original)
     }))
 
-  // test-revizorro: approved
   it.effect("decodes base64 with data URL prefix", () =>
     Effect.gen(function*() {
       const original = "PNG image data"
@@ -284,7 +273,6 @@ describe("decodeBase64", () => {
       expect(buffer.toString()).toBe(original)
     }))
 
-  // test-revizorro: approved
   it.effect("handles binary data correctly", () =>
     Effect.gen(function*() {
       const binaryData = Buffer.from([0x00, 0x01, 0x02, 0xff, 0xfe, 0xfd])
@@ -295,7 +283,6 @@ describe("decodeBase64", () => {
       expect(buffer).toEqual(binaryData)
     }))
 
-  // test-revizorro: approved
   it.effect("handles base64 with whitespace", () =>
     Effect.gen(function*() {
       const original = "test data"
@@ -307,7 +294,6 @@ describe("decodeBase64", () => {
       expect(buffer.toString()).toBe(original)
     }))
 
-  // test-revizorro: approved
   it.effect("returns InvalidFileDataError for invalid base64", () =>
     Effect.gen(function*() {
       // This is not valid base64 - contains invalid characters
@@ -319,7 +305,6 @@ describe("decodeBase64", () => {
       expect(error.message).toContain("Invalid base64")
     }))
 
-  // test-revizorro: approved
   it.effect("returns InvalidFileDataError for empty string after data URL prefix", () =>
     Effect.gen(function*() {
       const emptyDataUrl = "data:image/png;base64,"
@@ -330,7 +315,6 @@ describe("decodeBase64", () => {
       expect(error.message).toContain("Invalid base64")
     }))
 
-  // test-revizorro: approved
   it.effect("handles large base64 strings", () =>
     Effect.gen(function*() {
       // Create a larger buffer (1KB)
@@ -345,14 +329,12 @@ describe("decodeBase64", () => {
 })
 
 describe("FileUploadError", () => {
-  // test-revizorro: approved
   it.effect("has correct tag", () =>
     Effect.gen(function*() {
       const error = new FileUploadError({ message: "Upload failed" })
       expect(error._tag).toBe("FileUploadError")
     }))
 
-  // test-revizorro: approved
   it.effect("includes cause when provided", () =>
     Effect.gen(function*() {
       const cause = new Error("Network error")
@@ -365,7 +347,6 @@ describe("FileUploadError", () => {
 })
 
 describe("InvalidFileDataError", () => {
-  // test-revizorro: approved
   it.effect("has correct tag", () =>
     Effect.gen(function*() {
       const error = new InvalidFileDataError({ message: "Bad data" })
@@ -374,7 +355,6 @@ describe("InvalidFileDataError", () => {
 })
 
 describe("readFromFilePath", () => {
-  // test-revizorro: approved
   it.effect("reads existing file", () =>
     Effect.gen(function*() {
       const tmpDir = os.tmpdir()
@@ -391,7 +371,6 @@ describe("readFromFilePath", () => {
       }
     }))
 
-  // test-revizorro: approved
   it.effect("returns FileNotFoundError for missing file", () =>
     Effect.gen(function*() {
       const error = yield* Effect.flip(readFromFilePath("/nonexistent/path/file.txt"))
@@ -400,7 +379,6 @@ describe("readFromFilePath", () => {
       expect((error as FileNotFoundError).filePath).toBe("/nonexistent/path/file.txt")
     }))
 
-  // test-revizorro: approved
   it.effect("resolves relative paths", () =>
     Effect.gen(function*() {
       const tmpDir = os.tmpdir()
@@ -418,7 +396,6 @@ describe("readFromFilePath", () => {
       }
     }))
 
-  // test-revizorro: approved
   it.effect("returns InvalidFileDataError for non-ENOENT errors (e.g. reading a directory)", () =>
     Effect.gen(function*() {
       const tmpDir = os.tmpdir()
@@ -431,7 +408,6 @@ describe("readFromFilePath", () => {
 })
 
 describe("fetchFromUrl", () => {
-  // test-revizorro: approved
   it.effect("returns FileFetchError for invalid URL", () =>
     Effect.gen(function*() {
       const error = yield* Effect.flip(fetchFromUrl("https://nonexistent.invalid.domain.test/file.png"))
@@ -440,7 +416,6 @@ describe("fetchFromUrl", () => {
       expect(error.fileUrl).toBe("https://nonexistent.invalid.domain.test/file.png")
     }))
 
-  // test-revizorro: approved
   it.effect("blocks localhost URLs", () =>
     Effect.gen(function*() {
       const error = yield* Effect.flip(fetchFromUrl("http://localhost:8080/file.png"))
@@ -448,7 +423,6 @@ describe("fetchFromUrl", () => {
       expect(error.reason).toContain("blocked")
     }))
 
-  // test-revizorro: approved
   it.effect("blocks private IP URLs", () =>
     Effect.gen(function*() {
       const error = yield* Effect.flip(fetchFromUrl("http://192.168.1.1/file.png"))
@@ -456,7 +430,6 @@ describe("fetchFromUrl", () => {
       expect(error.reason).toContain("blocked")
     }))
 
-  // test-revizorro: approved
   it.effect("returns FileFetchError for non-ok HTTP responses", () =>
     Effect.gen(function*() {
       const originalFetch = globalThis.fetch
@@ -480,7 +453,6 @@ describe("fetchFromUrl", () => {
       }
     }))
 
-  // test-revizorro: approved
   it.effect("returns buffer on successful fetch", () =>
     Effect.gen(function*() {
       const originalFetch = globalThis.fetch
@@ -508,14 +480,12 @@ describe("fetchFromUrl", () => {
 })
 
 describe("validateFileSize", () => {
-  // test-revizorro: approved
   it.effect("accepts buffer within size limit", () =>
     Effect.gen(function*() {
       const buffer = Buffer.alloc(100, "x")
       yield* validateFileSize(buffer, "small.txt")
     }))
 
-  // test-revizorro: approved
   it.effect("rejects buffer exceeding size limit", () =>
     Effect.gen(function*() {
       // 100 MB + 1 byte exceeds the MAX_FILE_SIZE (100 * 1024 * 1024)
@@ -529,7 +499,6 @@ describe("validateFileSize", () => {
 })
 
 describe("validateContentType", () => {
-  // test-revizorro: approved
   it.effect("accepts allowed content types", () =>
     Effect.gen(function*() {
       yield* validateContentType("image/png", "photo.png")
@@ -538,7 +507,6 @@ describe("validateContentType", () => {
       yield* validateContentType("application/octet-stream", "data.bin")
     }))
 
-  // test-revizorro: approved
   it.effect("rejects disallowed content types", () =>
     Effect.gen(function*() {
       const error = yield* Effect.flip(
@@ -552,7 +520,6 @@ describe("validateContentType", () => {
 })
 
 describe("getBufferFromParams", () => {
-  // test-revizorro: approved
   it.effect("reads from filePath", () =>
     Effect.gen(function*() {
       const tmpFile = path.join(os.tmpdir(), `test-gbfp-${0}.txt`)
@@ -566,7 +533,6 @@ describe("getBufferFromParams", () => {
       }
     }))
 
-  // test-revizorro: approved
   it.effect("decodes base64 data", () =>
     Effect.gen(function*() {
       const original = "base64 content"
@@ -576,7 +542,6 @@ describe("getBufferFromParams", () => {
       expect(buffer.toString()).toBe(original)
     }))
 
-  // test-revizorro: approved
   it.effect("returns error for blocked URL", () =>
     Effect.gen(function*() {
       const error = yield* Effect.flip(
@@ -587,31 +552,26 @@ describe("getBufferFromParams", () => {
 })
 
 describe("isBlockedUrl", () => {
-  // test-revizorro: approved
   it("blocks localhost", () => {
     expect(isBlockedUrl("http://localhost/file")).toBe(true)
     expect(isBlockedUrl("http://localhost:8080/file")).toBe(true)
   })
 
-  // test-revizorro: approved
   it("blocks 127.x.x.x loopback range", () => {
     expect(isBlockedUrl("http://127.0.0.1/file")).toBe(true)
     expect(isBlockedUrl("http://127.0.0.2/file")).toBe(true)
     expect(isBlockedUrl("http://127.255.255.255/file")).toBe(true)
   })
 
-  // test-revizorro: approved
   it("blocks ::1 IPv6 loopback", () => {
     expect(isBlockedUrl("http://[::1]/file")).toBe(true)
   })
 
-  // test-revizorro: approved
   it("blocks 10.x.x.x private range", () => {
     expect(isBlockedUrl("http://10.0.0.1/file")).toBe(true)
     expect(isBlockedUrl("http://10.255.255.255/file")).toBe(true)
   })
 
-  // test-revizorro: approved
   it("blocks 172.16-31.x.x private range", () => {
     expect(isBlockedUrl("http://172.16.0.1/file")).toBe(true)
     expect(isBlockedUrl("http://172.31.255.255/file")).toBe(true)
@@ -620,7 +580,6 @@ describe("isBlockedUrl", () => {
     expect(isBlockedUrl("http://172.32.0.1/file")).toBe(false)
   })
 
-  // test-revizorro: approved
   it("blocks 192.168.x.x private range", () => {
     expect(isBlockedUrl("http://192.168.0.1/file")).toBe(true)
     expect(isBlockedUrl("http://192.168.255.255/file")).toBe(true)
@@ -628,25 +587,21 @@ describe("isBlockedUrl", () => {
     expect(isBlockedUrl("http://192.167.0.1/file")).toBe(false)
   })
 
-  // test-revizorro: approved
   it("blocks 169.254.x.x link-local range (includes cloud metadata)", () => {
     expect(isBlockedUrl("http://169.254.169.254/latest/meta-data")).toBe(true)
     expect(isBlockedUrl("http://169.254.0.1/file")).toBe(true)
   })
 
-  // test-revizorro: approved
   it("blocks Google cloud metadata hostname", () => {
     expect(isBlockedUrl("http://metadata.google.internal/file")).toBe(true)
   })
 
-  // test-revizorro: approved
   it("allows public URLs", () => {
     expect(isBlockedUrl("https://example.com/file.png")).toBe(false)
     expect(isBlockedUrl("https://8.8.8.8/file")).toBe(false)
     expect(isBlockedUrl("https://cdn.example.org/image.jpg")).toBe(false)
   })
 
-  // test-revizorro: approved
   it("blocks invalid URLs", () => {
     expect(isBlockedUrl("not-a-url")).toBe(true)
     expect(isBlockedUrl("")).toBe(true)
@@ -695,7 +650,6 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
     }))
   }
 
-  // test-revizorro: approved
   it.effect("connects and provides uploadFile and getFileUrl operations", () =>
     Effect.gen(function*() {
       setupMocksForSuccess()
@@ -739,7 +693,6 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
       ])
     }))
 
-  // test-revizorro: approved
   it.effect("getFileUrl constructs correct URL without calling API", () =>
     Effect.gen(function*() {
       setupMocksForSuccess()
@@ -754,7 +707,6 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
       expect(url).toBe("https://huly.example.com/files?workspace=ws-uuid-123&file=some-blob-id")
     }))
 
-  // test-revizorro: approved
   it.effect("wraps upload errors in FileUploadError", () =>
     Effect.gen(function*() {
       setupMocksForSuccess()
@@ -773,7 +725,6 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
       expect(error.message).toContain("S3 bucket full")
     }))
 
-  // test-revizorro: approved
   it("fails layer construction when loadServerConfig rejects", async () => {
     mockLoadServerConfig.mockClear()
     mockGetWorkspaceToken.mockClear()

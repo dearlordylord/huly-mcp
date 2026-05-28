@@ -22,7 +22,6 @@ type JsonSchemaObject = {
 
 describe("Comment Schemas", () => {
   describe("CommentSchema", () => {
-    // test-revizorro: approved
     it.effect("parses minimal comment", () =>
       Effect.gen(function*() {
         const result = yield* parseComment({
@@ -36,7 +35,6 @@ describe("Comment Schemas", () => {
         expect(result.createdOn).toBeUndefined()
       }))
 
-    // test-revizorro: approved
     it.effect("parses full comment with all fields", () =>
       Effect.gen(function*() {
         const result = yield* parseComment({
@@ -57,7 +55,6 @@ describe("Comment Schemas", () => {
         expect(result.editedOn).toBe(1706550000000)
       }))
 
-    // test-revizorro: approved
     it.effect("handles null editedOn", () =>
       Effect.gen(function*() {
         const result = yield* parseComment({
@@ -68,7 +65,6 @@ describe("Comment Schemas", () => {
         expect(result.editedOn).toBeNull()
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty body", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -80,7 +76,6 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects missing id", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -89,7 +84,6 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty id", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -98,7 +92,6 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("trims id whitespace", () =>
       Effect.gen(function*() {
         const result = yield* parseComment({
@@ -110,7 +103,6 @@ describe("Comment Schemas", () => {
   })
 
   describe("ListCommentsParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses minimal params", () =>
       Effect.gen(function*() {
         const result = yield* parseListCommentsParams({
@@ -122,7 +114,6 @@ describe("Comment Schemas", () => {
         expect(result.limit).toBeUndefined()
       }))
 
-    // test-revizorro: approved
     it.effect("parses with limit", () =>
       Effect.gen(function*() {
         const result = yield* parseListCommentsParams({
@@ -135,7 +126,6 @@ describe("Comment Schemas", () => {
         expect(result.limit).toBe(25)
       }))
 
-    // test-revizorro: approved
     it.effect("parses with numeric issue identifier", () =>
       Effect.gen(function*() {
         const result = yield* parseListCommentsParams({
@@ -146,7 +136,6 @@ describe("Comment Schemas", () => {
         expect(result.issueIdentifier).toBe("456")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty project", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -158,7 +147,6 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty issueIdentifier", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -170,7 +158,6 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects negative limit", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -183,7 +170,6 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects non-integer limit", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -196,7 +182,6 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects zero limit", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -209,7 +194,6 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects limit over 200", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -222,7 +206,6 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("trims project whitespace", () =>
       Effect.gen(function*() {
         const result = yield* parseListCommentsParams({
@@ -234,7 +217,6 @@ describe("Comment Schemas", () => {
   })
 
   describe("AddCommentParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses valid params", () =>
       Effect.gen(function*() {
         const result = yield* parseAddCommentParams({
@@ -247,7 +229,6 @@ describe("Comment Schemas", () => {
         expect(result.body).toBe("This is a new comment")
       }))
 
-    // test-revizorro: approved
     it.effect("parses with markdown body", () =>
       Effect.gen(function*() {
         const result = yield* parseAddCommentParams({
@@ -260,7 +241,6 @@ describe("Comment Schemas", () => {
         expect(result.body).toBe("# Heading\n\n- Item 1\n- Item 2\n\n```js\nconsole.log('hello');\n```")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty body", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -273,7 +253,6 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects missing body", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -285,7 +264,6 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty project", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -298,7 +276,6 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("trims body whitespace", () =>
       Effect.gen(function*() {
         const result = yield* parseAddCommentParams({
@@ -311,7 +288,6 @@ describe("Comment Schemas", () => {
   })
 
   describe("UpdateCommentParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses valid params", () =>
       Effect.gen(function*() {
         const result = yield* parseUpdateCommentParams({
@@ -326,7 +302,6 @@ describe("Comment Schemas", () => {
         expect(result.body).toBe("Updated comment body")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty commentId", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -340,7 +315,6 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects missing commentId", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -353,7 +327,6 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty body", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -367,7 +340,6 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("trims all string fields", () =>
       Effect.gen(function*() {
         const result = yield* parseUpdateCommentParams({
@@ -384,7 +356,6 @@ describe("Comment Schemas", () => {
   })
 
   describe("DeleteCommentParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses valid params", () =>
       Effect.gen(function*() {
         const result = yield* parseDeleteCommentParams({
@@ -397,7 +368,6 @@ describe("Comment Schemas", () => {
         expect(result.commentId).toBe("comment-789")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects missing commentId", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -409,7 +379,6 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty commentId", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -422,7 +391,6 @@ describe("Comment Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("trims all string fields", () =>
       Effect.gen(function*() {
         const result = yield* parseDeleteCommentParams({
@@ -437,7 +405,6 @@ describe("Comment Schemas", () => {
   })
 
   describe("JSON Schema Generation", () => {
-    // test-revizorro: approved
     it.effect("generates JSON Schema for ListCommentsParams", () =>
       Effect.gen(function*() {
         const schema = listCommentsParamsJsonSchema as JsonSchemaObject
@@ -448,7 +415,6 @@ describe("Comment Schemas", () => {
         expect(schema.properties).toHaveProperty("limit")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for AddCommentParams", () =>
       Effect.gen(function*() {
         const schema = addCommentParamsJsonSchema as JsonSchemaObject
@@ -458,7 +424,6 @@ describe("Comment Schemas", () => {
         expect(schema.required).toContain("body")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for UpdateCommentParams", () =>
       Effect.gen(function*() {
         const schema = updateCommentParamsJsonSchema as JsonSchemaObject
@@ -469,7 +434,6 @@ describe("Comment Schemas", () => {
         expect(schema.required).toContain("body")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for DeleteCommentParams", () =>
       Effect.gen(function*() {
         const schema = deleteCommentParamsJsonSchema as JsonSchemaObject
@@ -479,7 +443,6 @@ describe("Comment Schemas", () => {
         expect(schema.required).toContain("commentId")
       }))
 
-    // test-revizorro: approved
     it.effect("schemas have additionalProperties: false", () =>
       Effect.gen(function*() {
         // eslint-disable-next-line no-restricted-syntax -- tuple type doesn't overlap with Array<Record<string, unknown>>
@@ -495,7 +458,6 @@ describe("Comment Schemas", () => {
         }
       }))
 
-    // test-revizorro: approved
     it.effect("ListCommentsParams has property descriptions", () =>
       Effect.gen(function*() {
         const schema = listCommentsParamsJsonSchema as JsonSchemaObject

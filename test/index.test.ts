@@ -71,7 +71,6 @@ describe("Main Entry Point", () => {
   })
 
   describe("main program", () => {
-    // test-revizorro: approved
     it.effect("fails on missing config with ConfigValidationError", () =>
       Effect.gen(function*() {
         // Don't set any env vars - config should fail
@@ -153,7 +152,6 @@ describe("Main Entry Point", () => {
   })
 
   describe("error handling", () => {
-    // test-revizorro: approved
     it.effect("reports config validation errors clearly", () =>
       Effect.gen(function*() {
         // Invalid URL
@@ -168,7 +166,6 @@ describe("Main Entry Point", () => {
         expect(error.message).toContain("Configuration error")
       }))
 
-    // test-revizorro: approved
     it.effect("reports missing required config", () =>
       Effect.gen(function*() {
         // Missing HULY_PASSWORD
@@ -183,7 +180,6 @@ describe("Main Entry Point", () => {
   })
 
   describe("McpServerService integration", () => {
-    // test-revizorro: approved
     it.effect("server run/stop cycle works", () =>
       Effect.gen(function*() {
         let runCalled = false
@@ -210,7 +206,6 @@ describe("Main Entry Point", () => {
         expect(stopCalled).toBe(true)
       }).pipe(Effect.provide(HttpServerFactoryService.defaultLayer)))
 
-    // test-revizorro: approved
     it.effect("server error is properly typed", () =>
       Effect.gen(function*() {
         const mockServerLayer = McpServerService.testLayer({

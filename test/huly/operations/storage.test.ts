@@ -55,7 +55,6 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 
 describe("uploadFile operation", () => {
   describe("basic functionality", () => {
-    // test-revizorro: approved
     it.effect("uploads file with base64 data", () =>
       Effect.gen(function*() {
         const captureUpload: MockConfig["captureUpload"] = {}
@@ -85,7 +84,6 @@ describe("uploadFile operation", () => {
         expect(captureUpload.dataSize).toBe(11) // "Hello World".length
       }))
 
-    // test-revizorro: approved
     it.effect("handles data URL prefix", () =>
       Effect.gen(function*() {
         const captureUpload: MockConfig["captureUpload"] = {}
@@ -107,7 +105,6 @@ describe("uploadFile operation", () => {
         expect(captureUpload.dataSize).toBe(imageData.length)
       }))
 
-    // test-revizorro: approved
     it.effect("preserves binary data through base64 encoding", () =>
       Effect.gen(function*() {
         let capturedBuffer: Buffer | undefined
@@ -139,7 +136,6 @@ describe("uploadFile operation", () => {
   })
 
   describe("error handling", () => {
-    // test-revizorro: approved
     it.effect("returns InvalidFileDataError for invalid base64", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({})
@@ -155,7 +151,6 @@ describe("uploadFile operation", () => {
         expect(error._tag).toBe("InvalidFileDataError")
       }))
 
-    // test-revizorro: approved
     it.effect("returns FileUploadError when storage fails", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({
@@ -174,7 +169,6 @@ describe("uploadFile operation", () => {
         expect(error.message).toContain("Storage service unavailable")
       }))
 
-    // test-revizorro: approved
     it.effect("returns InvalidFileDataError for empty base64 data", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({})
@@ -193,7 +187,6 @@ describe("uploadFile operation", () => {
   })
 
   describe("content type handling", () => {
-    // test-revizorro: approved
     it.effect("passes content type to storage client", () =>
       Effect.gen(function*() {
         const captureUpload: MockConfig["captureUpload"] = {}
@@ -211,7 +204,6 @@ describe("uploadFile operation", () => {
         expect(captureUpload.contentType).toBe("application/json")
       }))
 
-    // test-revizorro: approved
     it.effect("handles common image types", () =>
       Effect.gen(function*() {
         const captures: Array<string> = []
@@ -244,7 +236,6 @@ describe("uploadFile operation", () => {
   })
 
   describe("filename handling", () => {
-    // test-revizorro: approved
     it.effect("passes filename to storage client", () =>
       Effect.gen(function*() {
         const captureUpload: MockConfig["captureUpload"] = {}
@@ -262,7 +253,6 @@ describe("uploadFile operation", () => {
         expect(captureUpload.filename).toBe("my-document.pdf")
       }))
 
-    // test-revizorro: approved
     it.effect("handles filenames with special characters", () =>
       Effect.gen(function*() {
         const captureUpload: MockConfig["captureUpload"] = {}
@@ -283,7 +273,6 @@ describe("uploadFile operation", () => {
 })
 
 describe("getFileUrl operation", () => {
-  // test-revizorro: approved
   it.effect("delegates to storage client getFileUrl with correct blobId", () =>
     Effect.gen(function*() {
       let capturedBlobId: string | undefined

@@ -36,7 +36,6 @@ describe("Telemetry", () => {
   })
 
   describe("createNoopTelemetry", () => {
-    // test-revizorro: approved
     it("all methods are callable without throwing", () => {
       const noop = createNoopTelemetry()
       expect(() =>
@@ -57,7 +56,6 @@ describe("Telemetry", () => {
       ).not.toThrow()
     })
 
-    // test-revizorro: approved
     it("shutdown resolves", async () => {
       const noop = createNoopTelemetry()
       await expect(noop.shutdown()).resolves.toBeUndefined()
@@ -65,7 +63,6 @@ describe("Telemetry", () => {
   })
 
   describe("createPostHogTelemetry", () => {
-    // test-revizorro: approved
     it("sessionStart captures with correct event and properties", () => {
       const telemetry = createTelemetry(false)
       telemetry.sessionStart({
@@ -88,7 +85,6 @@ describe("Telemetry", () => {
       expect(call.properties.version).toBeTypeOf("string")
     })
 
-    // test-revizorro: approved
     it("toolCalled captures with correct event and properties", () => {
       const telemetry = createTelemetry(false)
       telemetry.toolCalled({
@@ -108,7 +104,6 @@ describe("Telemetry", () => {
       expect(call.properties).not.toHaveProperty("error_tag")
     })
 
-    // test-revizorro: approved
     it("toolCalled with error captures errorTag", () => {
       const telemetry = createTelemetry(false)
       telemetry.toolCalled({
@@ -126,7 +121,6 @@ describe("Telemetry", () => {
       })
     })
 
-    // test-revizorro: approved
     it("sessionId is consistent across calls", () => {
       const telemetry = createTelemetry(false)
       telemetry.sessionStart({
@@ -148,7 +142,6 @@ describe("Telemetry", () => {
       expect(id1).toMatch(/^[0-9a-f-]{36}$/)
     })
 
-    // test-revizorro: approved
     it("firstListTools deduplicates — only first call captures", () => {
       const telemetry = createTelemetry(false)
 
@@ -162,7 +155,6 @@ describe("Telemetry", () => {
       expect(listToolsCalls).toHaveLength(1)
     })
 
-    // test-revizorro: approved
     it("debug mode logs to stderr", () => {
       const telemetry = createTelemetry(true)
 
@@ -176,7 +168,6 @@ describe("Telemetry", () => {
       expect(debugMessages).toContainEqual(expect.stringContaining("[telemetry] session_start"))
     })
 
-    // test-revizorro: approved
     it("shutdown captures session_end then flushes", async () => {
       const telemetry = createTelemetry(false)
       await telemetry.shutdown()
@@ -189,7 +180,6 @@ describe("Telemetry", () => {
       expect(mockShutdown.mock.calls).toContainEqual([2000])
     })
 
-    // test-revizorro: approved
     it("capture failure does not throw", () => {
       mockCapture.mockImplementationOnce(() => {
         throw new Error("network down")

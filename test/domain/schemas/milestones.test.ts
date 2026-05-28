@@ -35,7 +35,6 @@ const expectJsonSchemaObject = (schema: unknown): JsonSchemaObject => {
 
 describe("Milestone Schemas", () => {
   describe("MilestoneStatusSchema", () => {
-    // test-revizorro: approved
     it.effect("accepts all valid statuses", () =>
       Effect.gen(function*() {
         for (const status of MilestoneStatusValues) {
@@ -44,7 +43,6 @@ describe("Milestone Schemas", () => {
         }
       }))
 
-    // test-revizorro: approved
     it.effect("rejects invalid status", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -53,7 +51,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty string", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -64,7 +61,6 @@ describe("Milestone Schemas", () => {
   })
 
   describe("MilestoneSummarySchema", () => {
-    // test-revizorro: approved
     it.effect("parses minimal milestone summary", () =>
       Effect.gen(function*() {
         const result = yield* parseMilestoneSummary({
@@ -81,7 +77,6 @@ describe("Milestone Schemas", () => {
         })
       }))
 
-    // test-revizorro: approved
     it.effect("parses with modifiedOn", () =>
       Effect.gen(function*() {
         const result = yield* parseMilestoneSummary({
@@ -94,7 +89,6 @@ describe("Milestone Schemas", () => {
         expect(result.modifiedOn).toBe(1706400000000)
       }))
 
-    // test-revizorro: approved
     it.effect("rejects missing id", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -107,7 +101,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty id", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -121,7 +114,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects invalid status", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -135,7 +127,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects negative targetDate", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -151,7 +142,6 @@ describe("Milestone Schemas", () => {
   })
 
   describe("MilestoneSchema", () => {
-    // test-revizorro: approved
     it.effect("parses minimal milestone", () =>
       Effect.gen(function*() {
         const result = yield* parseMilestone({
@@ -168,7 +158,6 @@ describe("Milestone Schemas", () => {
         expect(result.project).toBe("HULY")
       }))
 
-    // test-revizorro: approved
     it.effect("parses full milestone", () =>
       Effect.gen(function*() {
         const result = yield* parseMilestone({
@@ -191,7 +180,6 @@ describe("Milestone Schemas", () => {
         expect(result.createdOn).toBe(1706300000000)
       }))
 
-    // test-revizorro: approved
     it.effect("description is optional", () =>
       Effect.gen(function*() {
         const result = yield* parseMilestone({
@@ -204,7 +192,6 @@ describe("Milestone Schemas", () => {
         expect(result.description).toBeUndefined()
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty project", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -221,14 +208,12 @@ describe("Milestone Schemas", () => {
   })
 
   describe("ListMilestonesParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses minimal params", () =>
       Effect.gen(function*() {
         const result = yield* parseListMilestonesParams({ project: "HULY" })
         expect(result).toEqual({ project: "HULY" })
       }))
 
-    // test-revizorro: approved
     it.effect("parses with limit", () =>
       Effect.gen(function*() {
         const result = yield* parseListMilestonesParams({
@@ -239,7 +224,6 @@ describe("Milestone Schemas", () => {
         expect(result.limit).toBe(25)
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty project", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -248,7 +232,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects missing project", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -257,7 +240,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects negative limit", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -266,7 +248,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects zero limit", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -275,7 +256,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects non-integer limit", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -284,7 +264,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects limit over 200", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -293,7 +272,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("trims project whitespace", () =>
       Effect.gen(function*() {
         const result = yield* parseListMilestonesParams({ project: "  HULY  " })
@@ -302,7 +280,6 @@ describe("Milestone Schemas", () => {
   })
 
   describe("GetMilestoneParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses valid params", () =>
       Effect.gen(function*() {
         const result = yield* parseGetMilestoneParams({
@@ -313,7 +290,6 @@ describe("Milestone Schemas", () => {
         expect(result.milestone).toBe("Sprint 1")
       }))
 
-    // test-revizorro: approved
     it.effect("parses with milestone ID", () =>
       Effect.gen(function*() {
         const result = yield* parseGetMilestoneParams({
@@ -324,7 +300,6 @@ describe("Milestone Schemas", () => {
         expect(result.milestone).toBe("6789abcd")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects missing milestone", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -333,7 +308,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty milestone", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -342,7 +316,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("trims both fields", () =>
       Effect.gen(function*() {
         const result = yield* parseGetMilestoneParams({
@@ -355,7 +328,6 @@ describe("Milestone Schemas", () => {
   })
 
   describe("CreateMilestoneParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses minimal params", () =>
       Effect.gen(function*() {
         const result = yield* parseCreateMilestoneParams({
@@ -368,7 +340,6 @@ describe("Milestone Schemas", () => {
         expect(result.targetDate).toBe(1706500000000)
       }))
 
-    // test-revizorro: approved
     it.effect("parses with description", () =>
       Effect.gen(function*() {
         const result = yield* parseCreateMilestoneParams({
@@ -383,7 +354,6 @@ describe("Milestone Schemas", () => {
         expect(result.targetDate).toBe(1706500000000)
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty label", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -396,7 +366,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects missing targetDate", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -408,7 +377,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects negative targetDate", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -421,7 +389,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects non-integer targetDate", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -436,7 +403,6 @@ describe("Milestone Schemas", () => {
   })
 
   describe("UpdateMilestoneParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses minimal params and advertises update-field requirement in JSON Schema", () =>
       Effect.gen(function*() {
         const result = yield* parseUpdateMilestoneParams({
@@ -456,7 +422,6 @@ describe("Milestone Schemas", () => {
         )
       }))
 
-    // test-revizorro: approved
     it.effect("parses with label update", () =>
       Effect.gen(function*() {
         const result = yield* parseUpdateMilestoneParams({
@@ -467,7 +432,6 @@ describe("Milestone Schemas", () => {
         expect(result.label).toBe("Sprint 1 - Updated")
       }))
 
-    // test-revizorro: approved
     it.effect("parses with description update", () =>
       Effect.gen(function*() {
         const result = yield* parseUpdateMilestoneParams({
@@ -480,7 +444,6 @@ describe("Milestone Schemas", () => {
         expect(result.description).toBe("Updated description")
       }))
 
-    // test-revizorro: approved
     it.effect("parses with targetDate update", () =>
       Effect.gen(function*() {
         const result = yield* parseUpdateMilestoneParams({
@@ -493,7 +456,6 @@ describe("Milestone Schemas", () => {
         expect(result.targetDate).toBe(1706600000000)
       }))
 
-    // test-revizorro: approved
     it.effect("parses with status update", () =>
       Effect.gen(function*() {
         const result = yield* parseUpdateMilestoneParams({
@@ -506,7 +468,6 @@ describe("Milestone Schemas", () => {
         expect(result.status).toBe("completed")
       }))
 
-    // test-revizorro: approved
     it.effect("parses with all updates", () =>
       Effect.gen(function*() {
         const result = yield* parseUpdateMilestoneParams({
@@ -523,7 +484,6 @@ describe("Milestone Schemas", () => {
         expect(result.status).toBe("completed")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects invalid status", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -536,7 +496,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty label update", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -551,7 +510,6 @@ describe("Milestone Schemas", () => {
   })
 
   describe("SetIssueMilestoneParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses with milestone assignment", () =>
       Effect.gen(function*() {
         const result = yield* parseSetIssueMilestoneParams({
@@ -564,7 +522,6 @@ describe("Milestone Schemas", () => {
         expect(result.milestone).toBe("Sprint 1")
       }))
 
-    // test-revizorro: approved
     it.effect("parses with null to clear milestone", () =>
       Effect.gen(function*() {
         const result = yield* parseSetIssueMilestoneParams({
@@ -575,7 +532,6 @@ describe("Milestone Schemas", () => {
         expect(result.milestone).toBeNull()
       }))
 
-    // test-revizorro: approved
     it.effect("rejects missing milestone field", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -587,7 +543,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty identifier", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -600,7 +555,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("trims identifier and project", () =>
       Effect.gen(function*() {
         const result = yield* parseSetIssueMilestoneParams({
@@ -614,7 +568,6 @@ describe("Milestone Schemas", () => {
   })
 
   describe("DeleteMilestoneParamsSchema", () => {
-    // test-revizorro: approved
     it.effect("parses valid params", () =>
       Effect.gen(function*() {
         const result = yield* parseDeleteMilestoneParams({
@@ -625,7 +578,6 @@ describe("Milestone Schemas", () => {
         expect(result.milestone).toBe("Sprint 1")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty project", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -637,7 +589,6 @@ describe("Milestone Schemas", () => {
         expect(error._tag).toBe("ParseError")
       }))
 
-    // test-revizorro: approved
     it.effect("rejects empty milestone", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(
@@ -651,7 +602,6 @@ describe("Milestone Schemas", () => {
   })
 
   describe("JSON Schema Generation", () => {
-    // test-revizorro: approved
     it.effect("generates JSON Schema for ListMilestonesParams", () =>
       Effect.gen(function*() {
         const schema = listMilestonesParamsJsonSchema as JsonSchemaObject
@@ -661,7 +611,6 @@ describe("Milestone Schemas", () => {
         expect(schema.properties).toHaveProperty("limit")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for GetMilestoneParams", () =>
       Effect.gen(function*() {
         const schema = getMilestoneParamsJsonSchema as JsonSchemaObject
@@ -670,7 +619,6 @@ describe("Milestone Schemas", () => {
         expect(schema.required).toContain("milestone")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for CreateMilestoneParams", () =>
       Effect.gen(function*() {
         const schema = createMilestoneParamsJsonSchema as JsonSchemaObject
@@ -681,7 +629,6 @@ describe("Milestone Schemas", () => {
         expect(schema.properties).toHaveProperty("description")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for UpdateMilestoneParams", () =>
       Effect.gen(function*() {
         const schema = updateMilestoneParamsJsonSchema as JsonSchemaObject
@@ -694,7 +641,6 @@ describe("Milestone Schemas", () => {
         expect(schema.properties).toHaveProperty("status")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for SetIssueMilestoneParams", () =>
       Effect.gen(function*() {
         const schema = setIssueMilestoneParamsJsonSchema as JsonSchemaObject
@@ -704,7 +650,6 @@ describe("Milestone Schemas", () => {
         expect(schema.required).toContain("milestone")
       }))
 
-    // test-revizorro: approved
     it.effect("generates JSON Schema for DeleteMilestoneParams", () =>
       Effect.gen(function*() {
         const schema = deleteMilestoneParamsJsonSchema as JsonSchemaObject
@@ -713,7 +658,6 @@ describe("Milestone Schemas", () => {
         expect(schema.required).toContain("milestone")
       }))
 
-    // test-revizorro: approved
     it.effect("all JSON schemas use draft-07", () =>
       Effect.gen(function*() {
         const schemas = [
@@ -730,7 +674,6 @@ describe("Milestone Schemas", () => {
         }
       }))
 
-    // test-revizorro: approved
     it.effect("all JSON schemas have additionalProperties false", () =>
       Effect.gen(function*() {
         // eslint-disable-next-line no-restricted-syntax -- tuple type doesn't overlap with Array<Record<string, unknown>>

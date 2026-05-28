@@ -25,19 +25,16 @@ const expectJsonSchemaObject = (schema: unknown): JsonSchemaObject => {
 
 describe("Contact Schemas", () => {
   describe("ListPersonsParamsSchema", () => {
-    // test-revizorro: approved
     it("accepts empty object", () => {
       const result = Schema.decodeUnknownSync(ListPersonsParamsSchema)({})
       expect(result).toEqual({})
     })
 
-    // test-revizorro: approved
     it("accepts valid limit", () => {
       const result = Schema.decodeUnknownSync(ListPersonsParamsSchema)({ limit: 50 })
       expect(result).toEqual({ limit: 50 })
     })
 
-    // test-revizorro: approved
     it("rejects limit over 200", () => {
       const result = Effect.runSync(
         Effect.either(parseListPersonsParams({ limit: 201 }))
@@ -45,7 +42,6 @@ describe("Contact Schemas", () => {
       expect(Either.isLeft(result)).toBe(true)
     })
 
-    // test-revizorro: approved
     it("rejects zero limit", () => {
       const result = Effect.runSync(
         Effect.either(parseListPersonsParams({ limit: 0 }))
@@ -53,7 +49,6 @@ describe("Contact Schemas", () => {
       expect(Either.isLeft(result)).toBe(true)
     })
 
-    // test-revizorro: approved
     it("rejects negative limit", () => {
       const result = Effect.runSync(
         Effect.either(parseListPersonsParams({ limit: -1 }))
@@ -63,7 +58,6 @@ describe("Contact Schemas", () => {
   })
 
   describe("GetPersonParamsSchema", () => {
-    // test-revizorro: approved
     it("accepts personId", () => {
       const result = Schema.decodeUnknownSync(GetPersonParamsSchema)({
         personId: "abc123"
@@ -71,7 +65,6 @@ describe("Contact Schemas", () => {
       expect(result).toEqual({ personId: "abc123" })
     })
 
-    // test-revizorro: approved
     it("accepts email", () => {
       const result = Schema.decodeUnknownSync(GetPersonParamsSchema)({
         email: "test@example.com"
@@ -79,7 +72,6 @@ describe("Contact Schemas", () => {
       expect(result).toEqual({ email: "test@example.com" })
     })
 
-    // test-revizorro: approved
     it("prefers personId when both are provided", () => {
       const result = Schema.decodeUnknownSync(GetPersonParamsSchema)({
         personId: "abc123",
@@ -88,7 +80,6 @@ describe("Contact Schemas", () => {
       expect(result).toEqual({ personId: "abc123" })
     })
 
-    // test-revizorro: approved
     it("rejects empty object (requires at least one identifier)", () => {
       const result = Effect.runSync(
         Effect.either(parseGetPersonParams({}))
@@ -96,7 +87,6 @@ describe("Contact Schemas", () => {
       expect(Either.isLeft(result)).toBe(true)
     })
 
-    // test-revizorro: approved
     it("trims personId whitespace", () => {
       const result = Schema.decodeUnknownSync(GetPersonParamsSchema)({
         personId: "  abc123  "
@@ -104,7 +94,6 @@ describe("Contact Schemas", () => {
       expect(result).toEqual({ personId: "abc123" })
     })
 
-    // test-revizorro: approved
     it("rejects whitespace-only personId", () => {
       const result = Effect.runSync(
         Effect.either(parseGetPersonParams({ personId: "   " }))
@@ -112,7 +101,6 @@ describe("Contact Schemas", () => {
       expect(Either.isLeft(result)).toBe(true)
     })
 
-    // test-revizorro: approved
     it("rejects email without @", () => {
       const result = Effect.runSync(
         Effect.either(parseGetPersonParams({ email: "invalid" }))
@@ -122,7 +110,6 @@ describe("Contact Schemas", () => {
   })
 
   describe("CreatePersonParamsSchema", () => {
-    // test-revizorro: approved
     it("accepts valid person with required fields", () => {
       const result = Schema.decodeUnknownSync(CreatePersonParamsSchema)({
         firstName: "John",
@@ -131,7 +118,6 @@ describe("Contact Schemas", () => {
       expect(result).toEqual({ firstName: "John", lastName: "Doe" })
     })
 
-    // test-revizorro: approved
     it("accepts all optional fields", () => {
       const result = Schema.decodeUnknownSync(CreatePersonParamsSchema)({
         firstName: "John",
@@ -147,7 +133,6 @@ describe("Contact Schemas", () => {
       })
     })
 
-    // test-revizorro: approved
     it("trims firstName and lastName", () => {
       const result = Schema.decodeUnknownSync(CreatePersonParamsSchema)({
         firstName: "  John  ",
@@ -156,7 +141,6 @@ describe("Contact Schemas", () => {
       expect(result).toEqual({ firstName: "John", lastName: "Doe" })
     })
 
-    // test-revizorro: approved
     it("rejects empty firstName", () => {
       const result = Effect.runSync(
         Effect.either(parseCreatePersonParams({
@@ -167,7 +151,6 @@ describe("Contact Schemas", () => {
       expect(Either.isLeft(result)).toBe(true)
     })
 
-    // test-revizorro: approved
     it("rejects empty lastName", () => {
       const result = Effect.runSync(
         Effect.either(parseCreatePersonParams({
@@ -178,7 +161,6 @@ describe("Contact Schemas", () => {
       expect(Either.isLeft(result)).toBe(true)
     })
 
-    // test-revizorro: approved
     it("rejects whitespace-only firstName", () => {
       const result = Effect.runSync(
         Effect.either(parseCreatePersonParams({
@@ -189,7 +171,6 @@ describe("Contact Schemas", () => {
       expect(Either.isLeft(result)).toBe(true)
     })
 
-    // test-revizorro: approved
     it("rejects missing required fields", () => {
       const result = Effect.runSync(
         Effect.either(parseCreatePersonParams({}))
@@ -199,7 +180,6 @@ describe("Contact Schemas", () => {
   })
 
   describe("UpdatePersonParamsSchema", () => {
-    // test-revizorro: approved
     it("accepts personId only and advertises update-field requirement in JSON Schema", () => {
       const result = Schema.decodeUnknownEither(UpdatePersonParamsSchema)({
         personId: "abc123"
@@ -212,7 +192,6 @@ describe("Contact Schemas", () => {
       )
     })
 
-    // test-revizorro: approved
     it("accepts city as null (to clear)", () => {
       const result = Schema.decodeUnknownSync(UpdatePersonParamsSchema)({
         personId: "abc123",
@@ -221,7 +200,6 @@ describe("Contact Schemas", () => {
       expect(result).toEqual({ personId: "abc123", city: null })
     })
 
-    // test-revizorro: approved
     it("accepts city as string", () => {
       const result = Schema.decodeUnknownSync(UpdatePersonParamsSchema)({
         personId: "abc123",
@@ -230,7 +208,6 @@ describe("Contact Schemas", () => {
       expect(result).toEqual({ personId: "abc123", city: "London" })
     })
 
-    // test-revizorro: approved
     it("accepts firstName update", () => {
       const result = Schema.decodeUnknownSync(UpdatePersonParamsSchema)({
         personId: "abc123",
@@ -239,7 +216,6 @@ describe("Contact Schemas", () => {
       expect(result).toEqual({ personId: "abc123", firstName: "Jane" })
     })
 
-    // test-revizorro: approved
     it("rejects empty firstName in update", () => {
       const result = Effect.runSync(
         Effect.either(

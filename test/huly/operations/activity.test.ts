@@ -366,7 +366,6 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 }
 
 describe("listActivity", () => {
-  // test-revizorro: approved
   it.effect("returns activity messages for an object", () =>
     Effect.gen(function*() {
       const messages = [
@@ -396,7 +395,6 @@ describe("listActivity", () => {
       expect(result[1].id).toBe("msg-2")
     }))
 
-  // test-revizorro: approved
   it.effect("returns empty array when no activity exists", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({ activityMessages: [] })
@@ -409,7 +407,6 @@ describe("listActivity", () => {
       expect(result).toHaveLength(0)
     }))
 
-  // test-revizorro: approved
   it.effect("maps activity message fields correctly", () =>
     Effect.gen(function*() {
       const msg = makeActivityMessage({
@@ -444,7 +441,6 @@ describe("listActivity", () => {
       })
     }))
 
-  // test-revizorro: approved
   it.effect("filters by objectClass", () =>
     Effect.gen(function*() {
       const messages = [
@@ -471,7 +467,6 @@ describe("listActivity", () => {
       expect(result[0].id).toBe("msg-1")
     }))
 
-  // test-revizorro: approved
   it.effect("resolves issue identifiers before listing activity", () =>
     Effect.gen(function*() {
       const project = makeProject()
@@ -497,7 +492,6 @@ describe("listActivity", () => {
       expect(result[0].objectClass).toBe(String(tracker.class.Issue))
     }))
 
-  // test-revizorro: approved
   it.effect("resolves document identifiers before listing activity", () =>
     Effect.gen(function*() {
       const teamspace = makeTeamspace()
@@ -523,7 +517,6 @@ describe("listActivity", () => {
       expect(result[0].objectClass).toBe(String(documentPlugin.class.Document))
     }))
 
-  // test-revizorro: approved
   it.effect("resolves channel identifiers before listing activity", () =>
     Effect.gen(function*() {
       const channel = makeChannel()
@@ -548,7 +541,6 @@ describe("listActivity", () => {
 })
 
 describe("addReaction", () => {
-  // test-revizorro: approved
   it.effect("adds reaction to an activity message", () =>
     Effect.gen(function*() {
       const msg = makeActivityMessage({
@@ -572,7 +564,6 @@ describe("addReaction", () => {
       expect(captureAddCollection.attributes?.emoji).toBe(":thumbsup:")
     }))
 
-  // test-revizorro: approved
   it.effect("returns ActivityMessageNotFoundError when message does not exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({ activityMessages: [] })
@@ -590,7 +581,6 @@ describe("addReaction", () => {
 })
 
 describe("removeReaction", () => {
-  // test-revizorro: approved
   it.effect("removes reaction from a message", () =>
     Effect.gen(function*() {
       const reaction = makeReaction({
@@ -615,7 +605,6 @@ describe("removeReaction", () => {
       expect(captureRemoveDoc.called).toBe(true)
     }))
 
-  // test-revizorro: approved
   it.effect("returns ReactionNotFoundError when reaction does not exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({ reactions: [] })
@@ -632,7 +621,6 @@ describe("removeReaction", () => {
       expect((error as ReactionNotFoundError).emoji).toBe(":nonexistent:")
     }))
 
-  // test-revizorro: approved
   it.effect("matches on both messageId and emoji", () =>
     Effect.gen(function*() {
       const reactions = [
@@ -670,7 +658,6 @@ describe("removeReaction", () => {
 })
 
 describe("listReactions", () => {
-  // test-revizorro: approved
   it.effect("returns reactions for a message", () =>
     Effect.gen(function*() {
       const reactions = [
@@ -709,7 +696,6 @@ describe("listReactions", () => {
       })
     }))
 
-  // test-revizorro: approved
   it.effect("returns empty array when no reactions exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({ reactions: [] })
@@ -743,7 +729,6 @@ describe("listReactions", () => {
       }])
     }))
 
-  // test-revizorro: approved
   it.effect("filters reactions by messageId", () =>
     Effect.gen(function*() {
       const reactions = [
@@ -771,7 +756,6 @@ describe("listReactions", () => {
 })
 
 describe("saveMessage", () => {
-  // test-revizorro: approved
   it.effect("saves an activity message", () =>
     Effect.gen(function*() {
       const msg = makeActivityMessage({
@@ -793,7 +777,6 @@ describe("saveMessage", () => {
       expect(captureCreateDoc.attributes?.attachedTo).toBe("msg-1")
     }))
 
-  // test-revizorro: approved
   it.effect("returns ActivityMessageNotFoundError when message does not exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({ activityMessages: [] })
@@ -810,7 +793,6 @@ describe("saveMessage", () => {
 })
 
 describe("unsaveMessage", () => {
-  // test-revizorro: approved
   it.effect("removes a saved message", () =>
     Effect.gen(function*() {
       const saved = makeSavedMessage({
@@ -833,7 +815,6 @@ describe("unsaveMessage", () => {
       expect(captureRemoveDoc.called).toBe(true)
     }))
 
-  // test-revizorro: approved
   it.effect("returns SavedMessageNotFoundError when saved message does not exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({ savedMessages: [] })
@@ -850,7 +831,6 @@ describe("unsaveMessage", () => {
 })
 
 describe("listSavedMessages", () => {
-  // test-revizorro: approved
   it.effect("returns saved messages", () =>
     Effect.gen(function*() {
       const saved = [
@@ -873,7 +853,6 @@ describe("listSavedMessages", () => {
       expect(result[1]).toEqual({ id: "saved-2", messageId: "msg-2" })
     }))
 
-  // test-revizorro: approved
   it.effect("returns empty array when no saved messages exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({ savedMessages: [] })
@@ -885,7 +864,6 @@ describe("listSavedMessages", () => {
 })
 
 describe("listMentions", () => {
-  // test-revizorro: approved
   it.effect("returns mentions for current user", () =>
     Effect.gen(function*() {
       const mentions = [
@@ -922,7 +900,6 @@ describe("listMentions", () => {
       })
     }))
 
-  // test-revizorro: approved
   it.effect("returns empty array when no mentions exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({ mentions: [] })

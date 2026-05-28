@@ -189,7 +189,6 @@ const expectUnauthorizedResponse = (response: Response): void => {
 
 describe("HTTP Transport", () => {
   describe("createMcpHandlers", () => {
-    // test-revizorro: approved
     it("should handle tool calls in stateless mode (connect server and delegate to transport)", async () => {
       const mockServer = createMockMcpServer()
       const transport = createMockTransportDependencies()
@@ -205,7 +204,6 @@ describe("HTTP Transport", () => {
       expect(transport.calls.handleRequest).toEqual([[req, res, req.body]])
     })
 
-    // test-revizorro: approved
     it("should handle initialize requests in stateless mode", async () => {
       const mockServer = createMockMcpServer()
       const transport = createMockTransportDependencies()
@@ -230,7 +228,6 @@ describe("HTTP Transport", () => {
       expect(transport.calls.handleRequest).toEqual([[req, res, req.body]])
     })
 
-    // test-revizorro: approved
     it("should create fresh server for each request in stateless mode", async () => {
       const serverInstances: Array<Server> = []
       const transport = createMockTransportDependencies()
@@ -433,7 +430,6 @@ describe("HTTP Transport", () => {
       expect(getResponseCalls(deleteRes).status).toEqual([[405]])
     })
 
-    // test-revizorro: approved
     it("should reject GET requests in stateless mode", async () => {
       const mockServer = createMockMcpServer()
       const handlers = createMcpHandlers(() => mockServer)
@@ -456,7 +452,6 @@ describe("HTTP Transport", () => {
       ])
     })
 
-    // test-revizorro: approved
     it("should reject DELETE requests in stateless mode", async () => {
       const mockServer = createMockMcpServer()
       const handlers = createMcpHandlers(() => mockServer)
@@ -479,7 +474,6 @@ describe("HTTP Transport", () => {
       ])
     })
 
-    // test-revizorro: approved
     it("should not send 500 when server factory throws and headers already sent", async () => {
       const handlers = createMcpHandlers(() => {
         throw new Error("Factory error")
@@ -500,7 +494,6 @@ describe("HTTP Transport", () => {
       expect(calls.json).toHaveLength(0)
     })
 
-    // test-revizorro: approved
     it("should return 500 when server factory throws", async () => {
       const handlers = createMcpHandlers(() => {
         throw new Error("Factory error")
@@ -533,7 +526,6 @@ describe("HTTP Transport", () => {
   })
 
   describe("startHttpTransport", () => {
-    // test-revizorro: approved
     it("should register POST, GET, DELETE handlers on /mcp", async () => {
       const { app, calls: appCalls } = createMockExpressApp()
       const closeProbe = createProbe<[((err?: Error) => void)?], void>((cb) => cb?.())
@@ -613,7 +605,6 @@ describe("HTTP Transport", () => {
       expect(getResponseCalls(authorizedRes).status).toEqual([[405]])
     })
 
-    // test-revizorro: approved
     it("should close server when scope closes", async () => {
       const { app } = createMockExpressApp()
       const closeProbe = createProbe<[((err?: Error) => void)?], void>((cb) => cb?.())
@@ -651,7 +642,6 @@ describe("HTTP Transport", () => {
       expect(closeProbe.calls).toHaveLength(1)
     })
 
-    // test-revizorro: approved
     it("should fail if listen fails", async () => {
       const { app } = createMockExpressApp()
       const createAppProbe = createProbe<[string], Express>(() => app)
@@ -689,7 +679,6 @@ describe("HTTP Transport", () => {
       }
     })
 
-    // test-revizorro: approved
     it("should log to stderr and continue when server close fails during release", async () => {
       const { app } = createMockExpressApp()
       const closeProbe = createProbe<[((err?: Error) => void)?], void>((cb) => cb?.(new Error("close failed")))
@@ -730,7 +719,6 @@ describe("HTTP Transport", () => {
       expect(closeErrorCall).toBeDefined()
     })
 
-    // test-revizorro: approved
     it("should shut down when SIGINT is received", async () => {
       const { app } = createMockExpressApp()
       const closeProbe = createProbe<[((err?: Error) => void)?], void>((cb) => cb?.())
@@ -773,7 +761,6 @@ describe("HTTP Transport", () => {
   })
 
   describe("createMcpHandlers - close cleanup", () => {
-    // test-revizorro: approved
     it("should register close handler and call cleanup on close", async () => {
       const mockServer = createMockMcpServer()
       const handlers = createMcpHandlers(() => mockServer)
@@ -816,7 +803,6 @@ describe("HTTP Transport", () => {
       expect(getServerCalls(mockServer).close).toHaveLength(1)
     })
 
-    // test-revizorro: approved
     it("should log to stderr when transport.close rejects during cleanup", async () => {
       const writeError = createProbe<[string], void>(() => undefined)
       const transportClose = createProbe<[], Promise<void>>(() => Promise.reject(new Error("transport close boom")))
@@ -869,7 +855,6 @@ describe("HTTP Transport", () => {
       expect(transportCleanupCall).toBeDefined()
     })
 
-    // test-revizorro: approved
     it("should log to stderr when server.close rejects during cleanup", async () => {
       const connect = createProbe<[], Promise<void>>(() => Promise.resolve())
       const close = createProbe<[], Promise<void>>(() => Promise.reject(new Error("server close failed")))
@@ -929,7 +914,6 @@ describe("HTTP Transport", () => {
   })
 
   describe("defaultHttpServerFactory via defaultLayer", () => {
-    // test-revizorro: approved
     it("should succeed when app.listen calls back without error", async () => {
       const fakeHttp = mock<http.Server>({ close: createVoidProbe<[((err?: Error) => void)?]>().fn })
       const mockApp = mock<Express>({
@@ -955,7 +939,6 @@ describe("HTTP Transport", () => {
       expect(result).toBe(fakeHttp)
     })
 
-    // test-revizorro: approved
     it("should fail with HttpTransportError when app.listen calls back with error", async () => {
       const mockApp = mock<Express>({
         get: createVoidProbe<Array<unknown>>().fn,
@@ -979,7 +962,6 @@ describe("HTTP Transport", () => {
       expect(Exit.isFailure(result)).toBe(true)
     })
 
-    // test-revizorro: approved
     it("should call createMcpExpressApp via createApp", async () => {
       const program = Effect.gen(function*() {
         const factory = yield* HttpServerFactoryService
@@ -1000,7 +982,6 @@ describe("HTTP Transport", () => {
   })
 
   describe("HttpTransportError", () => {
-    // test-revizorro: approved
     it("should include message and optional cause", () => {
       const cause = new Error("underlying error")
       const error = new HttpTransportError({

@@ -129,7 +129,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
     clearAllMockFns()
   })
 
-  // test-revizorro: approved
   it.effect("constructs layer and getWorkspaceMembers delegates to AccountClient", () =>
     Effect.gen(function*() {
       const mockMembers: Array<WorkspaceMemberInfo> = [
@@ -144,7 +143,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
       expect(mockGetWorkspaceMembers.mock.calls).toHaveLength(1)
     }).pipe(Effect.provide(liveLayer)))
 
-  // test-revizorro: approved
   it.effect("getPersonInfo delegates to AccountClient", () =>
     Effect.gen(function*() {
       const personInfo = asPersonInfo({ name: "Alice", socialIds: [] })
@@ -157,7 +155,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
       expect(mockGetPersonInfo.mock.calls).toContainEqual(["person-1"])
     }).pipe(Effect.provide(liveLayer)))
 
-  // test-revizorro: approved
   it.effect("updateWorkspaceRole delegates to AccountClient", () =>
     Effect.gen(function*() {
       mockUpdateWorkspaceRole.mockResolvedValue(undefined)
@@ -168,7 +165,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
       expect(mockUpdateWorkspaceRole.mock.calls).toContainEqual(["acc-1", AccountRole.Maintainer])
     }).pipe(Effect.provide(liveLayer)))
 
-  // test-revizorro: approved
   it.effect("getWorkspaceInfo delegates to AccountClient", () =>
     Effect.gen(function*() {
       const wsInfo = asWsInfo({ uuid: "ws-1", name: "Test" })
@@ -181,7 +177,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
       expect(mockGetWorkspaceInfo.mock.calls).toContainEqual([true])
     }).pipe(Effect.provide(liveLayer)))
 
-  // test-revizorro: approved
   it.effect("getWorkspaceInfo without arg delegates correctly", () =>
     Effect.gen(function*() {
       const wsInfo = asWsInfo({ uuid: "ws-2", name: "Test2" })
@@ -194,7 +189,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
       expect(mockGetWorkspaceInfo.mock.calls).toContainEqual([undefined])
     }).pipe(Effect.provide(liveLayer)))
 
-  // test-revizorro: approved
   it.effect("getUserWorkspaces delegates to AccountClient", () =>
     Effect.gen(function*() {
       const workspaces = [{ uuid: "ws-1" }] as Array<WorkspaceInfoWithStatus>
@@ -207,7 +201,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
       expect(mockGetUserWorkspaces.mock.calls).toHaveLength(1)
     }).pipe(Effect.provide(liveLayer)))
 
-  // test-revizorro: approved
   it.effect("createWorkspace delegates to AccountClient", () =>
     Effect.gen(function*() {
       const loginInfo = asLoginInfo({ workspace: "new-ws", workspaceUrl: "new-ws-url" })
@@ -220,7 +213,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
       expect(mockCreateWorkspace.mock.calls).toContainEqual(["My Workspace", "us-east"])
     }).pipe(Effect.provide(liveLayer)))
 
-  // test-revizorro: approved
   it.effect("deleteWorkspace delegates to AccountClient", () =>
     Effect.gen(function*() {
       mockDeleteWorkspace.mockResolvedValue(undefined)
@@ -231,7 +223,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
       expect(mockDeleteWorkspace.mock.calls).toHaveLength(1)
     }).pipe(Effect.provide(liveLayer)))
 
-  // test-revizorro: approved
   it.effect("getUserProfile delegates to AccountClient", () =>
     Effect.gen(function*() {
       const profile = asProfile({ uuid: "p1", firstName: "John" })
@@ -244,7 +235,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
       expect(mockGetUserProfile.mock.calls).toContainEqual(["person-uuid"])
     }).pipe(Effect.provide(liveLayer)))
 
-  // test-revizorro: approved
   it.effect("getUserProfile without arg delegates correctly", () =>
     Effect.gen(function*() {
       mockGetUserProfile.mockResolvedValue(null)
@@ -256,7 +246,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
       expect(mockGetUserProfile.mock.calls).toContainEqual([undefined])
     }).pipe(Effect.provide(liveLayer)))
 
-  // test-revizorro: approved
   it.effect("setMyProfile delegates to AccountClient", () =>
     Effect.gen(function*() {
       mockSetMyProfile.mockResolvedValue(undefined)
@@ -267,7 +256,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
       expect(mockSetMyProfile.mock.calls).toContainEqual([{ bio: "dev" }])
     }).pipe(Effect.provide(liveLayer)))
 
-  // test-revizorro: approved
   it.effect("createAccessLink delegates to AccountClient", () =>
     Effect.gen(function*() {
       mockCreateAccessLink.mockResolvedValue("https://huly.test/invite")
@@ -292,7 +280,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
       ])
     }).pipe(Effect.provide(liveLayer)))
 
-  // test-revizorro: approved
   it.effect("updateAllowReadOnlyGuests delegates to AccountClient", () =>
     Effect.gen(function*() {
       mockUpdateAllowReadOnlyGuests.mockResolvedValue(undefined)
@@ -304,7 +291,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
       expect(mockUpdateAllowReadOnlyGuests.mock.calls).toContainEqual([true])
     }).pipe(Effect.provide(liveLayer)))
 
-  // test-revizorro: approved
   it.effect("updateAllowGuestSignUp delegates to AccountClient", () =>
     Effect.gen(function*() {
       mockUpdateAllowGuestSignUp.mockResolvedValue(undefined)
@@ -315,7 +301,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
       expect(mockUpdateAllowGuestSignUp.mock.calls).toContainEqual([false])
     }).pipe(Effect.provide(liveLayer)))
 
-  // test-revizorro: approved
   it.effect("getRegionInfo delegates to AccountClient", () =>
     Effect.gen(function*() {
       const regions: Array<RegionInfo> = [{ region: "us-east", name: "US East" }]
@@ -329,7 +314,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
     }).pipe(Effect.provide(liveLayer)))
 
   describe("error handling (withClient)", () => {
-    // test-revizorro: approved
     it.effect("wraps operation rejection as HulyConnectionError", () =>
       Effect.gen(function*() {
         mockGetWorkspaceMembers.mockRejectedValue(new Error("network failure"))
@@ -342,7 +326,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
         expect(error.message).toContain("network failure")
       }).pipe(Effect.provide(liveLayer)))
 
-    // test-revizorro: approved
     it.effect("wraps getPersonInfo rejection as HulyConnectionError", () =>
       Effect.gen(function*() {
         mockGetPersonInfo.mockRejectedValue(new Error("person lookup failed"))
@@ -354,7 +337,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
         expect(error.message).toContain("Failed to get person info")
       }).pipe(Effect.provide(liveLayer)))
 
-    // test-revizorro: approved
     it.effect("wraps updateWorkspaceRole rejection", () =>
       Effect.gen(function*() {
         mockUpdateWorkspaceRole.mockRejectedValue(new Error("role update error"))
@@ -366,7 +348,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
         expect(error.message).toContain("Failed to update workspace role")
       }).pipe(Effect.provide(liveLayer)))
 
-    // test-revizorro: approved
     it.effect("wraps getWorkspaceInfo rejection", () =>
       Effect.gen(function*() {
         mockGetWorkspaceInfo.mockRejectedValue(new Error("ws info error"))
@@ -378,7 +359,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
         expect(error.message).toContain("Failed to get workspace info")
       }).pipe(Effect.provide(liveLayer)))
 
-    // test-revizorro: approved
     it.effect("wraps getUserWorkspaces rejection", () =>
       Effect.gen(function*() {
         mockGetUserWorkspaces.mockRejectedValue(new Error("list error"))
@@ -390,7 +370,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
         expect(error.message).toContain("Failed to get user workspaces")
       }).pipe(Effect.provide(liveLayer)))
 
-    // test-revizorro: approved
     it.effect("wraps createWorkspace rejection", () =>
       Effect.gen(function*() {
         mockCreateWorkspace.mockRejectedValue(new Error("create error"))
@@ -402,7 +381,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
         expect(error.message).toContain("Failed to create workspace")
       }).pipe(Effect.provide(liveLayer)))
 
-    // test-revizorro: approved
     it.effect("wraps deleteWorkspace rejection", () =>
       Effect.gen(function*() {
         mockDeleteWorkspace.mockRejectedValue(new Error("delete error"))
@@ -414,7 +392,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
         expect(error.message).toContain("Failed to delete workspace")
       }).pipe(Effect.provide(liveLayer)))
 
-    // test-revizorro: approved
     it.effect("wraps getUserProfile rejection", () =>
       Effect.gen(function*() {
         mockGetUserProfile.mockRejectedValue(new Error("profile error"))
@@ -426,7 +403,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
         expect(error.message).toContain("Failed to get user profile")
       }).pipe(Effect.provide(liveLayer)))
 
-    // test-revizorro: approved
     it.effect("wraps setMyProfile rejection", () =>
       Effect.gen(function*() {
         mockSetMyProfile.mockRejectedValue(new Error("set profile error"))
@@ -438,7 +414,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
         expect(error.message).toContain("Failed to set my profile")
       }).pipe(Effect.provide(liveLayer)))
 
-    // test-revizorro: approved
     it.effect("wraps createAccessLink rejection", () =>
       Effect.gen(function*() {
         mockCreateAccessLink.mockRejectedValue(new Error("link error"))
@@ -450,7 +425,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
         expect(error.message).toContain("Failed to create access link")
       }).pipe(Effect.provide(liveLayer)))
 
-    // test-revizorro: approved
     it.effect("wraps updateAllowReadOnlyGuests rejection", () =>
       Effect.gen(function*() {
         mockUpdateAllowReadOnlyGuests.mockRejectedValue(new Error("guest error"))
@@ -462,7 +436,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
         expect(error.message).toContain("Failed to update read-only guest setting")
       }).pipe(Effect.provide(liveLayer)))
 
-    // test-revizorro: approved
     it.effect("wraps updateAllowGuestSignUp rejection", () =>
       Effect.gen(function*() {
         mockUpdateAllowGuestSignUp.mockRejectedValue(new Error("signup error"))
@@ -474,7 +447,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
         expect(error.message).toContain("Failed to update guest sign-up setting")
       }).pipe(Effect.provide(liveLayer)))
 
-    // test-revizorro: approved
     it.effect("wraps getRegionInfo rejection", () =>
       Effect.gen(function*() {
         mockGetRegionInfo.mockRejectedValue(new Error("region error"))
@@ -489,7 +461,6 @@ describe("WorkspaceClient.layer (real layer)", () => {
 })
 
 describe("WorkspaceClient.testLayer", () => {
-  // test-revizorro: approved
   it.effect("provides all default operations", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -510,7 +481,6 @@ describe("WorkspaceClient.testLayer", () => {
       expect(client.getRegionInfo).toBeDefined()
     }))
 
-  // test-revizorro: approved
   it.effect("default getWorkspaceMembers returns empty array", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -520,7 +490,6 @@ describe("WorkspaceClient.testLayer", () => {
       expect(result).toEqual([])
     }))
 
-  // test-revizorro: approved
   it.effect("default getUserWorkspaces returns empty array", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -530,7 +499,6 @@ describe("WorkspaceClient.testLayer", () => {
       expect(result).toEqual([])
     }))
 
-  // test-revizorro: approved
   it.effect("default getUserProfile returns null", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -540,7 +508,6 @@ describe("WorkspaceClient.testLayer", () => {
       expect(result).toBeNull()
     }))
 
-  // test-revizorro: approved
   it.effect("default getRegionInfo returns empty array", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -550,7 +517,6 @@ describe("WorkspaceClient.testLayer", () => {
       expect(result).toEqual([])
     }))
 
-  // test-revizorro: approved
   it.effect("default getPersonInfo dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -560,7 +526,6 @@ describe("WorkspaceClient.testLayer", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: approved
   it.effect("default updateWorkspaceRole dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -570,7 +535,6 @@ describe("WorkspaceClient.testLayer", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: approved
   it.effect("default getWorkspaceInfo dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -580,7 +544,6 @@ describe("WorkspaceClient.testLayer", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: approved
   it.effect("default createWorkspace dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -590,7 +553,6 @@ describe("WorkspaceClient.testLayer", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: approved
   it.effect("default deleteWorkspace dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -600,7 +562,6 @@ describe("WorkspaceClient.testLayer", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: approved
   it.effect("default setMyProfile dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -610,7 +571,6 @@ describe("WorkspaceClient.testLayer", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: approved
   it.effect("default updateAllowReadOnlyGuests dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -620,7 +580,6 @@ describe("WorkspaceClient.testLayer", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: approved
   it.effect("default updateAllowGuestSignUp dies (not implemented)", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -630,7 +589,6 @@ describe("WorkspaceClient.testLayer", () => {
       expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
-  // test-revizorro: approved
   it.effect("overrides merge with defaults", () =>
     Effect.gen(function*() {
       const customMembers = [{ person: "p1" }] as Array<WorkspaceMemberInfo>
@@ -648,7 +606,6 @@ describe("WorkspaceClient.testLayer", () => {
       expect(profile).toBeNull()
     }))
 
-  // test-revizorro: approved
   it.effect("can mock operation to return error", () =>
     Effect.gen(function*() {
       const client = yield* WorkspaceClient.pipe(
@@ -664,7 +621,6 @@ describe("WorkspaceClient.testLayer", () => {
 })
 
 describe("WorkspaceClientError type", () => {
-  // test-revizorro: approved
   it.effect("is union of HulyConnectionError and HulyAuthError", () =>
     Effect.gen(function*() {
       const handleError = (error: WorkspaceClientError): string => {

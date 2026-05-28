@@ -364,7 +364,6 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 }
 
 describe("listChannels", () => {
-  // test-revizorro: approved
   it.effect("returns channels sorted by name", () =>
     Effect.gen(function*() {
       const channels = [
@@ -381,7 +380,6 @@ describe("listChannels", () => {
       expect(result[1].name).toBe("zebra")
     }))
 
-  // test-revizorro: approved
   it.effect("excludes archived channels by default", () =>
     Effect.gen(function*() {
       const captureQuery: MockConfig["captureChannelQuery"] = {}
@@ -396,7 +394,6 @@ describe("listChannels", () => {
       expect(captureQuery.query?.archived).toBe(false)
     }))
 
-  // test-revizorro: approved
   it.effect("includes archived channels when requested", () =>
     Effect.gen(function*() {
       const captureQuery: MockConfig["captureChannelQuery"] = {}
@@ -411,7 +408,6 @@ describe("listChannels", () => {
       expect(captureQuery.query?.archived).toBeUndefined()
     }))
 
-  // test-revizorro: approved
   it.effect("uses default limit of 50", () =>
     Effect.gen(function*() {
       const captureQuery: MockConfig["captureChannelQuery"] = {}
@@ -426,7 +422,6 @@ describe("listChannels", () => {
       expect(captureQuery.options?.limit).toBe(50)
     }))
 
-  // test-revizorro: approved
   it.effect("enforces max limit of 200", () =>
     Effect.gen(function*() {
       const captureQuery: MockConfig["captureChannelQuery"] = {}
@@ -441,7 +436,6 @@ describe("listChannels", () => {
       expect(captureQuery.options?.limit).toBe(200)
     }))
 
-  // test-revizorro: approved
   it.effect("maps channel fields correctly", () =>
     Effect.gen(function*() {
       const channel = makeChannel({
@@ -473,7 +467,6 @@ describe("listChannels", () => {
 })
 
 describe("getChannel", () => {
-  // test-revizorro: approved
   it.effect("returns channel by name", () =>
     Effect.gen(function*() {
       const channel = makeChannel({
@@ -504,7 +497,6 @@ describe("getChannel", () => {
       expect(result.createdOn).toBe(1706400000000)
     }))
 
-  // test-revizorro: approved
   it.effect("returns channel by ID", () =>
     Effect.gen(function*() {
       const channel = makeChannel({
@@ -520,7 +512,6 @@ describe("getChannel", () => {
       expect(result.name).toBe("random")
     }))
 
-  // test-revizorro: approved
   it.effect("returns ChannelNotFoundError when channel doesn't exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({ channels: [] })
@@ -533,7 +524,6 @@ describe("getChannel", () => {
       expect((error as ChannelNotFoundError).identifier).toBe("nonexistent")
     }))
 
-  // test-revizorro: approved
   it.effect("resolves member names", () =>
     Effect.gen(function*() {
       const channel = makeChannel({
@@ -555,7 +545,6 @@ describe("getChannel", () => {
 })
 
 describe("createChannel", () => {
-  // test-revizorro: approved
   it.effect("creates channel with minimal params", () =>
     Effect.gen(function*() {
       const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
@@ -572,7 +561,6 @@ describe("createChannel", () => {
       expect(captureCreateDoc.attributes?.owners).toEqual(["test-account-uuid"])
     }))
 
-  // test-revizorro: approved
   it.effect("creates channel with topic and private flag", () =>
     Effect.gen(function*() {
       const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
@@ -592,7 +580,6 @@ describe("createChannel", () => {
 })
 
 describe("updateChannel", () => {
-  // test-revizorro: approved
   it.effect("updates channel name", () =>
     Effect.gen(function*() {
       const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "old-name" })
@@ -610,7 +597,6 @@ describe("updateChannel", () => {
       expect(captureUpdateDoc.operations?.name).toBe("new-name")
     }))
 
-  // test-revizorro: approved
   it.effect("updates channel topic", () =>
     Effect.gen(function*() {
       const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
@@ -628,7 +614,6 @@ describe("updateChannel", () => {
       expect(captureUpdateDoc.operations?.topic).toBe("New topic")
     }))
 
-  // test-revizorro: approved
   it.effect("fails when no fields provided", () =>
     Effect.gen(function*() {
       const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
@@ -642,7 +627,6 @@ describe("updateChannel", () => {
       expect(error._tag).toBe("NoUpdateFieldsError")
     }))
 
-  // test-revizorro: approved
   it.effect("returns ChannelNotFoundError when channel doesn't exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({ channels: [] })
@@ -657,7 +641,6 @@ describe("updateChannel", () => {
 })
 
 describe("deleteChannel", () => {
-  // test-revizorro: approved
   it.effect("deletes channel", () =>
     Effect.gen(function*() {
       const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "to-delete" })
@@ -672,7 +655,6 @@ describe("deleteChannel", () => {
       expect(captureRemoveDoc.called).toBe(true)
     }))
 
-  // test-revizorro: approved
   it.effect("returns ChannelNotFoundError when channel doesn't exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({ channels: [] })
@@ -686,7 +668,6 @@ describe("deleteChannel", () => {
 })
 
 describe("listChannelMessages", () => {
-  // test-revizorro: approved
   it.effect("returns messages sorted by creation date descending", () =>
     Effect.gen(function*() {
       const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
@@ -714,7 +695,6 @@ describe("listChannelMessages", () => {
       expect(result.messages[1].id).toBe("msg-1")
     }))
 
-  // test-revizorro: approved
   it.effect("resolves sender names via buildSocialIdToPersonNameMap", () =>
     Effect.gen(function*() {
       const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
@@ -774,7 +754,6 @@ describe("listChannelMessages", () => {
       expect(result.messages[2].senderId).toBe("social-alice")
     }))
 
-  // test-revizorro: approved
   it.effect("returns ChannelNotFoundError when channel doesn't exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({ channels: [] })
@@ -788,7 +767,6 @@ describe("listChannelMessages", () => {
 })
 
 describe("sendChannelMessage", () => {
-  // test-revizorro: approved
   it.effect("sends message to channel", () =>
     Effect.gen(function*() {
       const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
@@ -805,7 +783,6 @@ describe("sendChannelMessage", () => {
       expect(captureAddCollection.attributes).toBeDefined()
     }))
 
-  // test-revizorro: approved
   it.effect("returns ChannelNotFoundError when channel doesn't exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({ channels: [] })
@@ -929,7 +906,6 @@ describe("deleteChannelMessage", () => {
 })
 
 describe("listDirectMessages", () => {
-  // test-revizorro: approved
   it.effect("returns DM conversations sorted by modification date descending", () =>
     Effect.gen(function*() {
       const dms = [
@@ -954,7 +930,6 @@ describe("listDirectMessages", () => {
       expect(result.conversations[1].id).toBe("dm-1")
     }))
 
-  // test-revizorro: approved
   it.effect("resolves participant names", () =>
     Effect.gen(function*() {
       const dm = makeDirectMessage({
@@ -998,7 +973,6 @@ describe("listDirectMessages", () => {
 })
 
 describe("listThreadReplies", () => {
-  // test-revizorro: approved
   it.effect("returns thread replies sorted by creation date ascending", () =>
     Effect.gen(function*() {
       const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
@@ -1052,7 +1026,6 @@ describe("listThreadReplies", () => {
       expect(result.replies[1].modifiedOn).toBe(2500)
     }))
 
-  // test-revizorro: approved
   it.effect("returns MessageNotFoundError when message doesn't exist", () =>
     Effect.gen(function*() {
       const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
@@ -1073,7 +1046,6 @@ describe("listThreadReplies", () => {
       expect((error as MessageNotFoundError).messageId).toBe("nonexistent")
     }))
 
-  // test-revizorro: approved
   it.effect("returns ChannelNotFoundError when channel doesn't exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({ channels: [] })
@@ -1090,7 +1062,6 @@ describe("listThreadReplies", () => {
 })
 
 describe("addThreadReply", () => {
-  // test-revizorro: approved
   it.effect("adds reply to message thread", () =>
     Effect.gen(function*() {
       const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
@@ -1117,7 +1088,6 @@ describe("addThreadReply", () => {
       expect(captureAddCollection.attributes).toBeDefined()
     }))
 
-  // test-revizorro: approved
   it.effect("returns MessageNotFoundError when message doesn't exist", () =>
     Effect.gen(function*() {
       const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
@@ -1140,7 +1110,6 @@ describe("addThreadReply", () => {
 })
 
 describe("updateThreadReply", () => {
-  // test-revizorro: approved
   it.effect("updates thread reply", () =>
     Effect.gen(function*() {
       const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
@@ -1174,7 +1143,6 @@ describe("updateThreadReply", () => {
       expect(captureUpdateDoc.operations).toBeDefined()
     }))
 
-  // test-revizorro: approved
   it.effect("returns ThreadReplyNotFoundError when reply doesn't exist", () =>
     Effect.gen(function*() {
       const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
@@ -1204,7 +1172,6 @@ describe("updateThreadReply", () => {
 })
 
 describe("deleteThreadReply", () => {
-  // test-revizorro: approved
   it.effect("deletes thread reply", () =>
     Effect.gen(function*() {
       const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
@@ -1237,7 +1204,6 @@ describe("deleteThreadReply", () => {
       expect(captureRemoveDoc.called).toBe(true)
     }))
 
-  // test-revizorro: approved
   it.effect("returns ThreadReplyNotFoundError when reply doesn't exist", () =>
     Effect.gen(function*() {
       const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })

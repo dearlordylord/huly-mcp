@@ -166,7 +166,6 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 // --- Branch coverage tests ---
 
 describe("listDocuments - titleSearch branch (line 196)", () => {
-  // test-revizorro: approved
   it.effect("applies titleSearch filter to query", () =>
     Effect.gen(function*() {
       const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -185,7 +184,6 @@ describe("listDocuments - titleSearch branch (line 196)", () => {
       expect(captureQuery.query?.title).toEqual({ $like: "%design%" })
     }))
 
-  // test-revizorro: approved
   it.effect("skips titleSearch when whitespace-only", () =>
     Effect.gen(function*() {
       const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -206,7 +204,6 @@ describe("listDocuments - titleSearch branch (line 196)", () => {
 })
 
 describe("listDocuments - contentSearch branch (line 200)", () => {
-  // test-revizorro: approved
   it.effect("applies contentSearch to $search query", () =>
     Effect.gen(function*() {
       const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -225,7 +222,6 @@ describe("listDocuments - contentSearch branch (line 200)", () => {
       expect(captureQuery.query?.$search).toBe("implementation")
     }))
 
-  // test-revizorro: approved
   it.effect("skips contentSearch when whitespace-only", () =>
     Effect.gen(function*() {
       const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })

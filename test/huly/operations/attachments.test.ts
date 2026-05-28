@@ -260,7 +260,6 @@ const createTestLayer = (config: MockConfig) => {
 // --- Tests ---
 
 describe("listAttachments", () => {
-  // test-revizorro: approved
   it.effect("returns attachment summaries", () =>
     Effect.gen(function*() {
       const attachments = [
@@ -279,7 +278,6 @@ describe("listAttachments", () => {
       expect(result[1].name).toBe("file2.png")
     }))
 
-  // test-revizorro: approved
   it.effect("returns empty array when no attachments", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayer({})
@@ -292,7 +290,6 @@ describe("listAttachments", () => {
       expect(result).toHaveLength(0)
     }))
 
-  // test-revizorro: approved
   it.effect("handles null pinned and description via nullish coalescing", () =>
     Effect.gen(function*() {
       const att = makeAttachment({
@@ -317,7 +314,6 @@ describe("listAttachments", () => {
 })
 
 describe("getAttachment", () => {
-  // test-revizorro: approved
   it.effect("returns full attachment with URL", () =>
     Effect.gen(function*() {
       const att = makeAttachment({
@@ -338,7 +334,6 @@ describe("getAttachment", () => {
       expect(result.url).toContain("blob-123")
     }))
 
-  // test-revizorro: approved
   it.effect("fails with AttachmentNotFoundError when not found", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayer({})
@@ -351,7 +346,6 @@ describe("getAttachment", () => {
       expect((error as AttachmentNotFoundError).attachmentId).toBe("nonexistent")
     }))
 
-  // test-revizorro: approved
   it.effect("handles null pinned and description via nullish coalescing", () =>
     Effect.gen(function*() {
       const att = makeAttachment({
@@ -377,7 +371,6 @@ describe("getAttachment", () => {
 })
 
 describe("addAttachment", () => {
-  // test-revizorro: approved
   it.effect("uploads and attaches file via base64 data", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -402,7 +395,6 @@ describe("addAttachment", () => {
       expect(captureAddCollection.attributes?.type).toBe("text/plain")
     }))
 
-  // test-revizorro: approved
   it.effect("includes description in attachment data when provided", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -421,7 +413,6 @@ describe("addAttachment", () => {
       expect(captureAddCollection.attributes?.description).toBe("My attachment")
     }))
 
-  // test-revizorro: approved
   it.effect("uploads file via filePath (covers toFileSourceParams filePath branch)", () =>
     Effect.gen(function*() {
       const tmpDir = os.tmpdir()
@@ -449,7 +440,6 @@ describe("addAttachment", () => {
 })
 
 describe("updateAttachment", () => {
-  // test-revizorro: approved
   it.effect("updates attachment description", () =>
     Effect.gen(function*() {
       const att = makeAttachment({ _id: "att-1" as Ref<HulyAttachment> })
@@ -466,7 +456,6 @@ describe("updateAttachment", () => {
       expect(captureUpdateDoc.operations?.description).toBe("Updated description")
     }))
 
-  // test-revizorro: approved
   it.effect("clears description with null", () =>
     Effect.gen(function*() {
       const att = makeAttachment({ _id: "att-1" as Ref<HulyAttachment> })
@@ -482,7 +471,6 @@ describe("updateAttachment", () => {
       expect(captureUpdateDoc.operations?.description).toBe("")
     }))
 
-  // test-revizorro: approved
   it.effect("updates pinned status", () =>
     Effect.gen(function*() {
       const att = makeAttachment({ _id: "att-1" as Ref<HulyAttachment> })
@@ -498,7 +486,6 @@ describe("updateAttachment", () => {
       expect(captureUpdateDoc.operations?.pinned).toBe(true)
     }))
 
-  // test-revizorro: approved
   it.effect("fails when no fields provided", () =>
     Effect.gen(function*() {
       const att = makeAttachment({ _id: "att-1" as Ref<HulyAttachment> })
@@ -513,7 +500,6 @@ describe("updateAttachment", () => {
       expect(error._tag).toBe("NoUpdateFieldsError")
     }))
 
-  // test-revizorro: approved
   it.effect("fails with AttachmentNotFoundError when not found", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayer({})
@@ -530,7 +516,6 @@ describe("updateAttachment", () => {
 })
 
 describe("deleteAttachment", () => {
-  // test-revizorro: approved
   it.effect("deletes attachment", () =>
     Effect.gen(function*() {
       const att = makeAttachment({ _id: "att-1" as Ref<HulyAttachment> })
@@ -546,7 +531,6 @@ describe("deleteAttachment", () => {
       expect(captureRemoveDoc.id).toBe("att-1")
     }))
 
-  // test-revizorro: approved
   it.effect("fails with AttachmentNotFoundError when not found", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayer({})
@@ -561,7 +545,6 @@ describe("deleteAttachment", () => {
 })
 
 describe("pinAttachment", () => {
-  // test-revizorro: approved
   it.effect("pins attachment", () =>
     Effect.gen(function*() {
       const att = makeAttachment({ _id: "att-1" as Ref<HulyAttachment>, pinned: false })
@@ -578,7 +561,6 @@ describe("pinAttachment", () => {
       expect(captureUpdateDoc.operations?.pinned).toBe(true)
     }))
 
-  // test-revizorro: approved
   it.effect("unpins attachment", () =>
     Effect.gen(function*() {
       const att = makeAttachment({ _id: "att-1" as Ref<HulyAttachment>, pinned: true })
@@ -594,7 +576,6 @@ describe("pinAttachment", () => {
       expect(captureUpdateDoc.operations?.pinned).toBe(false)
     }))
 
-  // test-revizorro: approved
   it.effect("fails with AttachmentNotFoundError when not found", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayer({})
@@ -608,7 +589,6 @@ describe("pinAttachment", () => {
 })
 
 describe("downloadAttachment", () => {
-  // test-revizorro: approved
   it.effect("returns download URL and metadata", () =>
     Effect.gen(function*() {
       const att = makeAttachment({
@@ -631,7 +611,6 @@ describe("downloadAttachment", () => {
       expect(result.size).toBe(4096)
     }))
 
-  // test-revizorro: approved
   it.effect("fails with AttachmentNotFoundError when not found", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayer({})
@@ -645,7 +624,6 @@ describe("downloadAttachment", () => {
 })
 
 describe("addIssueAttachment", () => {
-  // test-revizorro: approved
   it.effect("uploads and attaches file to issue", () =>
     Effect.gen(function*() {
       const project = makeProject({ _id: "project-1" as Ref<HulyProject>, identifier: "TEST" })
@@ -682,7 +660,6 @@ describe("addIssueAttachment", () => {
 })
 
 describe("addDocumentAttachment", () => {
-  // test-revizorro: approved
   it.effect("uploads and attaches file to document", () =>
     Effect.gen(function*() {
       const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })

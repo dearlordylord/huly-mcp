@@ -61,7 +61,6 @@ const makeMilestone = (overrides?: Partial<HulyMilestone>): HulyMilestone => {
 }
 
 describe("milestones - status mapping exhaustiveness", () => {
-  // test-revizorro: approved
   it.effect("all MilestoneStatus enum values map to correct domain strings via listMilestones", () =>
     Effect.gen(function*() {
       const project = makeProject()

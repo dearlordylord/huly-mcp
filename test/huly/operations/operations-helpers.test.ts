@@ -304,14 +304,12 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 
 describe("operations helpers", () => {
   describe("toRef", () => {
-    // test-revizorro: approved
     it("converts a domain identifier to Ref without changing the runtime value", () => {
       const id = NonEmptyString.make("some-id")
       const ref = toRef<Doc>(id)
       expect(ref).toBe(id)
     })
 
-    // test-revizorro: approved
     it("preserves an existing SDK Ref without changing the runtime value", () => {
       const existingRef = "doc-1" as Ref<Doc>
       const ref = toRef<Doc>(existingRef)
@@ -320,12 +318,10 @@ describe("operations helpers", () => {
   })
 
   describe("zeroAsUnset", () => {
-    // test-revizorro: approved
     it("returns undefined for zero", () => {
       expect(zeroAsUnset(NonNegativeNumber.make(0))).toBeUndefined()
     })
 
-    // test-revizorro: approved
     it("returns PositiveNumber for positive values", () => {
       const result = zeroAsUnset(NonNegativeNumber.make(5))
       expect(result).toBe(5)
@@ -333,38 +329,32 @@ describe("operations helpers", () => {
   })
 
   describe("clampLimit", () => {
-    // test-revizorro: approved
     it("uses default 50 when undefined", () => {
       expect(clampLimit(undefined)).toBe(50)
     })
 
-    // test-revizorro: approved
     it("uses provided value when under max", () => {
       expect(clampLimit(25)).toBe(25)
     })
 
-    // test-revizorro: approved
     it("clamps to MAX_LIMIT (200) when over", () => {
       expect(clampLimit(500)).toBe(200)
     })
   })
 
   describe("validatePersonUuid", () => {
-    // test-revizorro: approved
     it.effect("returns undefined for undefined input", () =>
       Effect.gen(function*() {
         const result = yield* validatePersonUuid(undefined)
         expect(result).toBeUndefined()
       }))
 
-    // test-revizorro: approved
     it.effect("returns valid UUID", () =>
       Effect.gen(function*() {
         const result = yield* validatePersonUuid("550e8400-e29b-41d4-a716-446655440000")
         expect(result).toBe("550e8400-e29b-41d4-a716-446655440000")
       }))
 
-    // test-revizorro: approved
     it.effect("fails for invalid UUID format", () =>
       Effect.gen(function*() {
         const error = yield* Effect.flip(validatePersonUuid("not-a-uuid"))
@@ -409,35 +399,30 @@ describe("operations helpers", () => {
   })
 
   describe("parseIssueIdentifier", () => {
-    // test-revizorro: approved
     it("parses full identifier like TEST-123", () => {
       const result = parseIssueIdentifier("TEST-123", "PROJ")
       expect(result.fullIdentifier).toBe("TEST-123")
       expect(result.number).toBe(123)
     })
 
-    // test-revizorro: approved
     it("parses lowercase identifier like test-5", () => {
       const result = parseIssueIdentifier("test-5", "PROJ")
       expect(result.fullIdentifier).toBe("TEST-5")
       expect(result.number).toBe(5)
     })
 
-    // test-revizorro: approved
     it("parses pure numeric identifier", () => {
       const result = parseIssueIdentifier("42", "PROJ")
       expect(result.fullIdentifier).toBe("PROJ-42")
       expect(result.number).toBe(42)
     })
 
-    // test-revizorro: approved
     it("parses numeric identifier (number type)", () => {
       const result = parseIssueIdentifier(99, "PROJ")
       expect(result.fullIdentifier).toBe("PROJ-99")
       expect(result.number).toBe(99)
     })
 
-    // test-revizorro: approved
     it("returns raw string when it doesn't match any pattern", () => {
       const result = parseIssueIdentifier("random-text-here", "PROJ")
       expect(result.fullIdentifier).toBe("random-text-here")
@@ -446,61 +431,50 @@ describe("operations helpers", () => {
   })
 
   describe("priorityToString", () => {
-    // test-revizorro: approved
     it("converts Urgent", () => {
       expect(priorityToString(IssuePriority.Urgent)).toBe("urgent")
     })
 
-    // test-revizorro: approved
     it("converts High", () => {
       expect(priorityToString(IssuePriority.High)).toBe("high")
     })
 
-    // test-revizorro: approved
     it("converts Medium", () => {
       expect(priorityToString(IssuePriority.Medium)).toBe("medium")
     })
 
-    // test-revizorro: approved
     it("converts Low", () => {
       expect(priorityToString(IssuePriority.Low)).toBe("low")
     })
 
-    // test-revizorro: approved
     it("converts NoPriority", () => {
       expect(priorityToString(IssuePriority.NoPriority)).toBe("no-priority")
     })
   })
 
   describe("stringToPriority", () => {
-    // test-revizorro: approved
     it("converts 'urgent'", () => {
       expect(stringToPriority("urgent")).toBe(IssuePriority.Urgent)
     })
 
-    // test-revizorro: approved
     it("converts 'high'", () => {
       expect(stringToPriority("high")).toBe(IssuePriority.High)
     })
 
-    // test-revizorro: approved
     it("converts 'medium'", () => {
       expect(stringToPriority("medium")).toBe(IssuePriority.Medium)
     })
 
-    // test-revizorro: approved
     it("converts 'low'", () => {
       expect(stringToPriority("low")).toBe(IssuePriority.Low)
     })
 
-    // test-revizorro: approved
     it("converts 'no-priority'", () => {
       expect(stringToPriority("no-priority")).toBe(IssuePriority.NoPriority)
     })
   })
 
   describe("findOneOrFail", () => {
-    // test-revizorro: approved
     it.effect("returns document when found", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -517,7 +491,6 @@ describe("operations helpers", () => {
         expect(result.identifier).toBe("TEST")
       }))
 
-    // test-revizorro: approved
     it.effect("fails with error when not found", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({ projects: [] })
@@ -537,7 +510,6 @@ describe("operations helpers", () => {
   })
 
   describe("findByNameOrId", () => {
-    // test-revizorro: approved
     it.effect("returns result from primary query when found", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -555,7 +527,6 @@ describe("operations helpers", () => {
         expect(result!.identifier).toBe("TEST")
       }))
 
-    // test-revizorro: approved
     it.effect("falls back to second query when primary returns nothing", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "FALLBACK" })
@@ -573,7 +544,6 @@ describe("operations helpers", () => {
         expect(result!.identifier).toBe("FALLBACK")
       }))
 
-    // test-revizorro: approved
     it.effect("returns undefined when neither query matches", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({ projects: [] })
@@ -591,7 +561,6 @@ describe("operations helpers", () => {
   })
 
   describe("findProject", () => {
-    // test-revizorro: approved
     it.effect("returns client and project when found", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -605,7 +574,6 @@ describe("operations helpers", () => {
         expect(result.client.findAll).toBeDefined()
       }))
 
-    // test-revizorro: approved
     it.effect("fails with ProjectNotFoundError when not found", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({ projects: [] })
@@ -618,7 +586,6 @@ describe("operations helpers", () => {
   })
 
   describe("findProjectWithStatuses", () => {
-    // test-revizorro: approved
     it.effect("fails with ProjectNotFoundError when project not found", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({ projects: [], statuses: [] })
@@ -631,7 +598,6 @@ describe("operations helpers", () => {
         expect((error as ProjectNotFoundError).identifier).toBe("NONEXISTENT")
       }))
 
-    // test-revizorro: approved
     it.effect("returns project with resolved statuses", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -671,7 +637,6 @@ describe("operations helpers", () => {
         expect(canceled?.category).toBe("Lost")
       }))
 
-    // test-revizorro: approved
     it.effect("uses fallback when status query fails", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -700,7 +665,6 @@ describe("operations helpers", () => {
         expect(canceledStatus!.category).toBe("unknown")
       }))
 
-    // test-revizorro: approved
     it.effect("returns empty statuses when project type has no statuses", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -735,7 +699,6 @@ describe("operations helpers", () => {
         expect(result.statuses).toEqual([])
       }))
 
-    // test-revizorro: approved
     it.effect("handles status with no category", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -758,7 +721,6 @@ describe("operations helpers", () => {
   })
 
   describe("findProjectAndIssue", () => {
-    // test-revizorro: approved
     it.effect("returns project and issue by full identifier", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -777,7 +739,6 @@ describe("operations helpers", () => {
         expect(result.issue.identifier).toBe("TEST-1")
       }))
 
-    // test-revizorro: approved
     it.effect("falls back to number-based lookup", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "PROJ" })
@@ -821,7 +782,6 @@ describe("operations helpers", () => {
         expect(result.issue.number).toBe(42)
       }))
 
-    // test-revizorro: approved
     it.effect("fails with IssueNotFoundError when issue not found", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -841,7 +801,6 @@ describe("operations helpers", () => {
         expect((error as IssueNotFoundError).identifier).toBe("TEST-999")
       }))
 
-    // test-revizorro: approved
     it.effect("fails with ProjectNotFoundError when project not found", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({ projects: [], issues: [] })
@@ -855,7 +814,6 @@ describe("operations helpers", () => {
         expect(error._tag).toBe("ProjectNotFoundError")
       }))
 
-    // test-revizorro: approved
     it.effect("returns issue found only by number fallback (identifier not matched directly)", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
@@ -901,7 +859,6 @@ describe("operations helpers", () => {
   })
 
   describe("findPersonByEmailOrName", () => {
-    // test-revizorro: approved
     it.effect("finds person by exact email channel match", () =>
       Effect.gen(function*() {
         const person = makePerson({ _id: "person-1" as Ref<Person>, name: "John Doe" })
@@ -922,7 +879,6 @@ describe("operations helpers", () => {
         expect(result!._id).toBe("person-1")
       }))
 
-    // test-revizorro: approved
     it.effect("finds person by exact name match when email not found", () =>
       Effect.gen(function*() {
         const person = makePerson({ _id: "person-1" as Ref<Person>, name: "John Doe" })
@@ -939,7 +895,6 @@ describe("operations helpers", () => {
         expect(result!._id).toBe("person-1")
       }))
 
-    // test-revizorro: approved
     it.effect("finds person by substring email channel match via $like", () =>
       Effect.gen(function*() {
         const person = makePerson({ _id: "person-1" as Ref<Person>, name: "John Doe" })
@@ -961,7 +916,6 @@ describe("operations helpers", () => {
         expect(result!._id).toBe("person-1")
       }))
 
-    // test-revizorro: approved
     it.effect("finds person by substring name match via $like", () =>
       Effect.gen(function*() {
         const person = makePerson({ _id: "person-1" as Ref<Person>, name: "John Doe" })
@@ -978,7 +932,6 @@ describe("operations helpers", () => {
         expect(result!._id).toBe("person-1")
       }))
 
-    // test-revizorro: approved
     it.effect("returns undefined when no match at all", () =>
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({
@@ -992,7 +945,6 @@ describe("operations helpers", () => {
         expect(result).toBeUndefined()
       }))
 
-    // test-revizorro: approved
     it.effect("finds person via email channel even when person lookup for channel returns undefined", () =>
       Effect.gen(function*() {
         // Channel exists but person behind it doesn't -- should fall through to name match
