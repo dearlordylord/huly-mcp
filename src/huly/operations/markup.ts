@@ -40,7 +40,10 @@ interface SanitizedMarks {
   readonly changed: boolean
 }
 
-const removeMarkdownUnsupportedMarks = (marks: Array<MarkupMark> | undefined): SanitizedMarks => {
+const removeMarkdownUnsupportedMarks = (
+  // MarkupNode.marks is optional in Huly's JSON shape; preserve absence instead of normalizing to [].
+  marks: Array<MarkupMark> | undefined
+): SanitizedMarks => {
   if (marks === undefined) {
     return { marks: undefined, changed: false }
   }
