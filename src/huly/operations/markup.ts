@@ -22,6 +22,7 @@ export interface MarkupUrlConfig {
   readonly imageUrl: UrlString
 }
 
+// Mirrors @hcengineering/text-markdown's serializer options; callers use branded MarkupUrlConfig.
 interface MarkupMarkdownOptions {
   readonly refUrl: string
   readonly imageUrl: string
