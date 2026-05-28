@@ -22,11 +22,9 @@ export interface MarkupUrlConfig {
   readonly imageUrl: UrlString
 }
 
-type MarkdownSerializerUrl = string
-
 interface MarkupMarkdownOptions {
-  readonly refUrl: MarkdownSerializerUrl
-  readonly imageUrl: MarkdownSerializerUrl
+  readonly refUrl: string
+  readonly imageUrl: string
 }
 
 // Test-only fixture for callers that need deterministic conversion without a real Huly workspace.
