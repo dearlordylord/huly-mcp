@@ -7,10 +7,31 @@
  * @module
  */
 import type { Markup } from "@hcengineering/core"
-import { jsonToMarkup, markupToJSON } from "@hcengineering/text"
+import type { MarkupNode } from "@hcengineering/text"
+import { jsonToMarkup, markupToJSON, traverseNode } from "@hcengineering/text"
 import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown"
 
 import { type UrlString, UrlString as UrlStringSchema } from "../../domain/schemas/shared.js"
+
+const INLINE_COMMENT_MARK_TYPE = "inline-comment"
+
+/**
+ * Remove inline-comment marks before markdown serialization.
+ * @hcengineering/text-markdown has no serializer for this Huly-specific mark and throws otherwise.
+ * The highlighted text is preserved; use list_inline_comments for thread metadata.
+ */
+export const stripInlineCommentMarks = (root: MarkupNode): MarkupNode => {
+  traverseNode(root, (node) => {
+    if (node.marks !== undefined && node.marks.length > 0) {
+      const filtered = node.marks.filter((mark) => String(mark.type) !== INLINE_COMMENT_MARK_TYPE)
+      if (filtered.length !== node.marks.length) {
+        node.marks = filtered
+      }
+    }
+    return true
+  })
+  return root
+}
 
 // SDK: jsonToMarkup return type doesn't match Markup; cast contained here.
 const jsonAsMarkup: (json: ReturnType<typeof markdownToMarkup>) => Markup = jsonToMarkup
@@ -27,7 +48,7 @@ export const testMarkupUrlConfig: MarkupUrlConfig = {
 }
 
 export const markupToMarkdownString = (markup: Markup, urls: MarkupUrlConfig): string => {
-  const json = markupToJSON(markup)
+  const json = stripInlineCommentMarks(markupToJSON(markup))
   return markupToMarkdown(json, urls)
 }
 

@@ -90,7 +90,13 @@ const testSdk: HulySdkDependencies = {
   jsonToHTML: mockFn().mockImplementation((json: unknown) => `<html>${JSON.stringify(json)}</html>`),
   jsonToMarkup: mockFn().mockImplementation((json: unknown) => `markup:${JSON.stringify(json)}`),
   markdownToMarkup: mockFn().mockImplementation((md: string) => ({ type: "md-parsed", content: md })),
-  markupToJSON: mockFn().mockImplementation((markup: string) => ({ type: "markup-parsed", content: markup })),
+  markupToJSON: mockFn().mockImplementation((markup: string) => ({
+    type: "doc",
+    content: [{
+      type: "paragraph",
+      content: [{ type: "text", text: markup, marks: [] }]
+    }]
+  })),
   markupToMarkdown: mockFn().mockImplementation((_json: unknown, _opts: unknown) => "# Markdown output")
 }
 
