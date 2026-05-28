@@ -35,6 +35,7 @@ export const testMarkupUrlConfig: MarkupUrlConfig = {
 }
 
 interface SanitizedMarks {
+  // MarkupNode.marks is optional in Huly's JSON shape; preserve absence instead of normalizing to [].
   readonly marks: Array<MarkupMark> | undefined
   readonly changed: boolean
 }
