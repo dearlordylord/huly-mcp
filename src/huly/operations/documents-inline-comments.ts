@@ -26,10 +26,9 @@ import type { DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js
 import { chunter } from "../huly-plugins.js"
 import { buildSocialIdToPersonNameMap } from "./channels.js"
 import { findTeamspaceAndDocument } from "./documents.js"
+import { isInlineCommentMark } from "./inline-comment-mark.js"
 import { optionalMarkupToMarkdown } from "./markup.js"
 import { toRef } from "./sdk-boundary.js"
-
-const INLINE_COMMENT_MARK_TYPE = "inline-comment"
 
 interface ExtractedComment {
   readonly threadId: string
@@ -44,7 +43,7 @@ export const extractInlineComments = (root: MarkupNode): ReadonlyArray<Extracted
   const threadMap = new Map<string, Array<string>>()
 
   traverseAllMarks(root, (textNode: MarkupNode, mark: MarkupMark) => {
-    if (String(mark.type) !== INLINE_COMMENT_MARK_TYPE) return
+    if (!isInlineCommentMark(mark)) return
     // MarkupMark.attrs is Record<string, any> | undefined per SDK types
     const threadId = mark.attrs?.thread
     if (typeof threadId !== "string" || threadId === "") return

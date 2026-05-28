@@ -1,33 +1,46 @@
 import { describe, it } from "@effect/vitest"
-import type { MarkupMark, MarkupNode } from "@hcengineering/text"
+import type { MarkupNode } from "@hcengineering/text"
+import { markupToJSON } from "@hcengineering/text"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { extractInlineComments } from "../../../src/huly/operations/documents-inline-comments.js"
+import { INLINE_COMMENT_MARK_TYPE } from "../../../src/huly/operations/inline-comment-mark.js"
 
-const makeMarkupDoc = (...content: Array<MarkupNode>): MarkupNode => ({
-  type: "doc" as MarkupNode["type"],
-  content
-})
-
-const makeParagraph = (...content: Array<MarkupNode>): MarkupNode => ({
-  type: "paragraph" as MarkupNode["type"],
-  content
-})
-
-const makeText = (text: string, marks?: Array<{ type: string; attrs?: Record<string, unknown> }>): MarkupNode => {
-  const node: MarkupNode = { type: "text" as MarkupNode["type"], text }
-  if (marks !== undefined) {
-    node.marks = marks as Array<MarkupMark>
-  }
-  return node
+interface TestMark {
+  readonly type: string
+  readonly attrs?: Record<string, unknown>
 }
+
+interface TestNode {
+  readonly type: string
+  readonly content?: ReadonlyArray<TestNode>
+  readonly marks?: ReadonlyArray<TestMark>
+  readonly text?: string
+}
+
+const makeMarkupDoc = (...content: Array<TestNode>): MarkupNode =>
+  markupToJSON(JSON.stringify({
+    type: "doc",
+    content
+  }))
+
+const makeParagraph = (...content: Array<TestNode>): TestNode => ({
+  type: "paragraph",
+  content
+})
+
+const makeText = (text: string, marks?: Array<TestMark>): TestNode => ({
+  type: "text",
+  text,
+  ...(marks === undefined ? {} : { marks })
+})
 
 describe("extractInlineComments", () => {
   it.effect("extracts single inline comment thread", () =>
     Effect.gen(function*() {
       const root = makeMarkupDoc(
         makeParagraph(
-          makeText("hello ", [{ type: "inline-comment", attrs: { thread: "thread-1" } }]),
+          makeText("hello ", [{ type: INLINE_COMMENT_MARK_TYPE, attrs: { thread: "thread-1" } }]),
           makeText("world")
         )
       )
@@ -43,9 +56,9 @@ describe("extractInlineComments", () => {
     Effect.gen(function*() {
       const root = makeMarkupDoc(
         makeParagraph(
-          makeText("first ", [{ type: "inline-comment", attrs: { thread: "t1" } }]),
+          makeText("first ", [{ type: INLINE_COMMENT_MARK_TYPE, attrs: { thread: "t1" } }]),
           makeText("middle"),
-          makeText("second", [{ type: "inline-comment", attrs: { thread: "t1" } }])
+          makeText("second", [{ type: INLINE_COMMENT_MARK_TYPE, attrs: { thread: "t1" } }])
         )
       )
 
@@ -60,8 +73,8 @@ describe("extractInlineComments", () => {
     Effect.gen(function*() {
       const root = makeMarkupDoc(
         makeParagraph(
-          makeText("a", [{ type: "inline-comment", attrs: { thread: "t1" } }]),
-          makeText("b", [{ type: "inline-comment", attrs: { thread: "t2" } }])
+          makeText("a", [{ type: INLINE_COMMENT_MARK_TYPE, attrs: { thread: "t1" } }]),
+          makeText("b", [{ type: INLINE_COMMENT_MARK_TYPE, attrs: { thread: "t2" } }])
         )
       )
 
@@ -99,8 +112,8 @@ describe("extractInlineComments", () => {
     Effect.gen(function*() {
       const root = makeMarkupDoc(
         makeParagraph(
-          makeText("no thread", [{ type: "inline-comment", attrs: {} }]),
-          makeText("empty thread", [{ type: "inline-comment", attrs: { thread: "" } }])
+          makeText("no thread", [{ type: INLINE_COMMENT_MARK_TYPE, attrs: {} }]),
+          makeText("empty thread", [{ type: INLINE_COMMENT_MARK_TYPE, attrs: { thread: "" } }])
         )
       )
 

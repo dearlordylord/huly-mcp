@@ -45,7 +45,7 @@ import { type Auth, HulyConfigService } from "../config/config.js"
 import { UrlString, WorkspaceUrlSlug } from "../domain/schemas/shared.js"
 import { concatLink } from "../utils/url.js"
 import { HulyAuthError, HulyConnectionError } from "./errors.js"
-import { type MarkupUrlConfig, testMarkupUrlConfig } from "./operations/markup.js"
+import { markupNodeToMarkdownString, type MarkupUrlConfig, testMarkupUrlConfig } from "./operations/markup.js"
 import { HulySdk, type HulySdkDependencies } from "./sdk-deps.js"
 import { testWorkbenchUrlConfig, type WorkbenchUrlConfig } from "./url-builders.js"
 
@@ -169,7 +169,7 @@ function fromInternalMarkup(
     case "html":
       return sdk.jsonToHTML(sdk.markupToJSON(markup))
     case "markdown":
-      return sdk.markupToMarkdown(sdk.markupToJSON(markup), opts)
+      return markupNodeToMarkdownString(sdk.markupToJSON(markup), opts, sdk.markupToMarkdown)
     default:
       absurd(format)
       throw new Error(`Invalid format: ${format}`)

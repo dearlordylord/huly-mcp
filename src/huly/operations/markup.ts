@@ -7,10 +7,12 @@
  * @module
  */
 import type { Markup } from "@hcengineering/core"
+import type { MarkupMark, MarkupNode } from "@hcengineering/text"
 import { jsonToMarkup, markupToJSON } from "@hcengineering/text"
 import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown"
 
 import { type UrlString, UrlString as UrlStringSchema } from "../../domain/schemas/shared.js"
+import { isMarkdownSerializableMark } from "./inline-comment-mark.js"
 
 // SDK: jsonToMarkup return type doesn't match Markup; cast contained here.
 const jsonAsMarkup: (json: ReturnType<typeof markdownToMarkup>) => Markup = jsonToMarkup
@@ -20,15 +22,76 @@ export interface MarkupUrlConfig {
   readonly imageUrl: UrlString
 }
 
+type MarkdownSerializerUrl = string
+
+interface MarkupMarkdownOptions {
+  readonly refUrl: MarkdownSerializerUrl
+  readonly imageUrl: MarkdownSerializerUrl
+}
+
 // Test-only fixture for callers that need deterministic conversion without a real Huly workspace.
 export const testMarkupUrlConfig: MarkupUrlConfig = {
   refUrl: UrlStringSchema.make("https://test.invalid/browse?workspace=test"),
   imageUrl: UrlStringSchema.make("https://test.invalid/files?workspace=test&file=")
 }
 
+interface SanitizedMarks {
+  readonly marks: Array<MarkupMark> | undefined
+  readonly changed: boolean
+}
+
+const removeMarkdownUnsupportedMarks = (marks: Array<MarkupMark> | undefined): SanitizedMarks => {
+  if (marks === undefined) {
+    return { marks: undefined, changed: false }
+  }
+
+  const filtered = marks.filter(isMarkdownSerializableMark)
+  return { marks: filtered, changed: filtered.length !== marks.length }
+}
+
+interface SanitizedContent {
+  readonly content: Array<MarkupNode> | undefined
+  readonly changed: boolean
+}
+
+const sanitizeContentForMarkdown = (content: Array<MarkupNode> | undefined): SanitizedContent => {
+  if (content === undefined) {
+    return { content: undefined, changed: false }
+  }
+
+  const sanitized = content.map(sanitizeNodeForMarkdown)
+  return {
+    content: sanitized,
+    changed: sanitized.some((node, index) => node !== content[index])
+  }
+}
+
+export const sanitizeNodeForMarkdown = (node: MarkupNode): MarkupNode => {
+  const content = sanitizeContentForMarkdown(node.content)
+  const marks = removeMarkdownUnsupportedMarks(node.marks)
+
+  if (!content.changed && !marks.changed) {
+    return node
+  }
+
+  return {
+    ...node,
+    ...(content.content === undefined ? {} : { content: content.content }),
+    ...(marks.marks === undefined ? {} : { marks: marks.marks })
+  }
+}
+
+type MarkupNodeToMarkdown = (node: MarkupNode, urls: MarkupMarkdownOptions) => string
+
+export const markupNodeToMarkdownString = (
+  node: MarkupNode,
+  urls: MarkupMarkdownOptions,
+  serialize: MarkupNodeToMarkdown = markupToMarkdown
+): string => serialize(sanitizeNodeForMarkdown(node), urls)
+
 export const markupToMarkdownString = (markup: Markup, urls: MarkupUrlConfig): string => {
   const json = markupToJSON(markup)
-  return markupToMarkdown(json, urls)
+  return markupNodeToMarkdownString(json, urls)
 }
 
 export const markdownToMarkupString = (markdown: string, urls: MarkupUrlConfig): Markup => {

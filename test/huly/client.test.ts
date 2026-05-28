@@ -16,11 +16,14 @@ import {
   type TxResult,
   type WithLookup
 } from "@hcengineering/core"
+import { markupToJSON as parseMarkupToJSON } from "@hcengineering/text"
+import { markupToMarkdown as realMarkupToMarkdown } from "@hcengineering/text-markdown"
 import { Cause, Effect, Exit, Fiber, Layer, TestClock } from "effect"
 import { beforeEach, expect } from "vitest"
 import { HulyConfigService } from "../../src/config/config.js"
 import { HulyClient, type HulyClientError } from "../../src/huly/client.js"
 import { HulyAuthError, HulyConnectionError } from "../../src/huly/errors.js"
+import { INLINE_COMMENT_MARK_TYPE } from "../../src/huly/operations/inline-comment-mark.js"
 import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
 import { mockFn } from "../helpers/mock-fn.js"
 
@@ -90,11 +93,29 @@ const testSdk: HulySdkDependencies = {
   jsonToHTML: mockFn().mockImplementation((json: unknown) => `<html>${JSON.stringify(json)}</html>`),
   jsonToMarkup: mockFn().mockImplementation((json: unknown) => `markup:${JSON.stringify(json)}`),
   markdownToMarkup: mockFn().mockImplementation((md: string) => ({ type: "md-parsed", content: md })),
-  markupToJSON: mockFn().mockImplementation((markup: string) => ({ type: "markup-parsed", content: markup })),
+  markupToJSON: mockFn().mockImplementation((markup: string) => ({
+    type: "doc",
+    content: [{
+      type: "paragraph",
+      content: [{ type: "text", text: markup }]
+    }]
+  })),
   markupToMarkdown: mockFn().mockImplementation((_json: unknown, _opts: unknown) => "# Markdown output")
 }
 
 const testSdkLayer = Layer.succeed(HulySdk, testSdk)
+
+const inlineCommentMarkup = JSON.stringify({
+  type: "doc",
+  content: [{
+    type: "paragraph",
+    content: [{
+      type: "text",
+      text: "highlighted text",
+      marks: [{ type: INLINE_COMMENT_MARK_TYPE, attrs: { thread: "thread-1" } }]
+    }]
+  }]
+})
 
 const resetSdkDefaults = () => {
   mockLoadServerConfig.mockResolvedValue({
@@ -1065,6 +1086,33 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         // markupToJSON mock receives the stored markup and returns a parsed object
         // markupToMarkdown mock receives that object and returns "# Markdown output"
         expect(result).toBe("# Markdown output")
+      }))
+
+    // test-revizorro: approved
+    it.effect("fetches markdown content with inline comment marks without exposing thread metadata", () =>
+      Effect.gen(function*() {
+        mockGetMarkup.mockResolvedValue("stored-markup")
+        const realMarkdownSdk: HulySdkDependencies = {
+          ...testSdk,
+          markupToJSON: mockFn().mockImplementation(() => parseMarkupToJSON(inlineCommentMarkup)),
+          markupToMarkdown: realMarkupToMarkdown
+        }
+        const layer = HulyClient.layerWithDependencies.pipe(
+          Layer.provide(Layer.merge(testConfigLayer, Layer.succeed(HulySdk, realMarkdownSdk)))
+        )
+
+        const client = yield* HulyClient.pipe(Effect.provide(layer))
+        const result = yield* client.fetchMarkup(
+          "docClass" as DocRef<Class<Doc>>,
+          "docId" as DocRef<Doc>,
+          "content",
+          "ref-md" as MarkupRef,
+          "markdown"
+        )
+
+        expect(result.trim()).toBe("highlighted text")
+        expect(result).not.toContain(INLINE_COMMENT_MARK_TYPE)
+        expect(result).not.toContain("thread-1")
       }))
 
     // test-revizorro: approved
