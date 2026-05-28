@@ -45,6 +45,7 @@ const removeMarkdownUnsupportedMarks = (marks: Array<MarkupMark> | undefined): S
     return { marks: undefined, changed: false }
   }
 
+  // Compatibility shim until @hcengineering/text-markdown includes https://github.com/hcengineering/huly.core/pull/19.
   const filtered = marks.filter(isMarkdownSerializableMark)
   return { marks: filtered, changed: filtered.length !== marks.length }
 }

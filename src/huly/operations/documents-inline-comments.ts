@@ -10,7 +10,7 @@
 import type { ChatMessage, ThreadMessage as HulyThreadMessage } from "@hcengineering/chunter"
 import type { PersonId } from "@hcengineering/core"
 import { SortingOrder } from "@hcengineering/core"
-import type { MarkupMark, MarkupNode } from "@hcengineering/text"
+import type { MarkupNode } from "@hcengineering/text"
 import { markupToJSON, traverseAllMarks } from "@hcengineering/text"
 import { Effect } from "effect"
 
@@ -35,6 +35,26 @@ interface ExtractedComment {
   readonly textFragments: Array<string>
 }
 
+type ReadonlyMarkupMark = {
+  readonly type: unknown
+  readonly attrs?: Readonly<Record<string, unknown>>
+}
+
+type ReadonlyMarkupNode = Readonly<Omit<MarkupNode, "attrs" | "content" | "marks">> & {
+  readonly attrs?: Readonly<Record<string, unknown>>
+  readonly content?: ReadonlyArray<ReadonlyMarkupNode>
+  readonly marks?: ReadonlyArray<ReadonlyMarkupMark>
+}
+
+const traverseReadonlyMarks = (
+  root: MarkupNode,
+  visit: (node: ReadonlyMarkupNode, mark: ReadonlyMarkupMark) => void
+): void => {
+  traverseAllMarks(root, (node, mark) => {
+    visit(node, mark)
+  })
+}
+
 /**
  * Extract inline comment threads from a parsed markup tree.
  * Groups text fragments by thread ID, preserving insertion order (Map guarantees).
@@ -42,9 +62,8 @@ interface ExtractedComment {
 export const extractInlineComments = (root: MarkupNode): ReadonlyArray<ExtractedComment> => {
   const threadMap = new Map<string, Array<string>>()
 
-  traverseAllMarks(root, (textNode: MarkupNode, mark: MarkupMark) => {
+  traverseReadonlyMarks(root, (textNode, mark) => {
     if (!isInlineCommentMark(mark)) return
-    // MarkupMark.attrs is Record<string, any> | undefined per SDK types
     const threadId = mark.attrs?.thread
     if (typeof threadId !== "string" || threadId === "") return
 
