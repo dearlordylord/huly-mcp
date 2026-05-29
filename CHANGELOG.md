@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.18.2
+
+### Patch Changes
+
+- 50ba72e: Refresh the bundled Effect runtime dependency.
+
 ## 0.18.1
 
 ### Patch Changes
