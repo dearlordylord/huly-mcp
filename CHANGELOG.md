@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.19.0
+
+### Minor Changes
+
+- 76d3e65: Add generic Huly tag tools and reuse the SDK tag model for tracker labels.
+
 ## 0.18.2
 
 ### Patch Changes
