@@ -30,7 +30,7 @@ type DeleteTagCategoryError = HulyClientError | TagCategoryNotFoundError
 
 const issueClassRef = toRef<Class<Doc>>(tracker.class.Issue)
 
-export const findCategoryByIdOrLabel = (
+const findCategoryByIdOrLabel = (
   client: HulyClient["Type"],
   idOrLabel: string
 ): Effect.Effect<HulyTagCategory | undefined, HulyClientError> =>

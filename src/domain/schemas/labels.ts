@@ -47,7 +47,7 @@ export const CreateLabelParamsSchema = Schema.Struct({
   }),
   color: Schema.optional(
     ColorCode.annotations({
-      description: "Color code (0-9, default: 0)"
+      description: "Non-negative Huly platform color index (default: 0)"
     })
   ),
   description: Schema.optional(Schema.String.annotations({
@@ -76,7 +76,7 @@ export const UpdateLabelParamsSchema = Schema.Struct({
   })),
   color: Schema.optional(
     ColorCode.annotations({
-      description: "New color code (0-9)"
+      description: "New non-negative Huly platform color index"
     })
   ),
   description: Schema.optional(Schema.String.annotations({

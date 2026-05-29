@@ -154,6 +154,9 @@ export type TimeSpendReportId = Schema.Schema.Type<typeof TimeSpendReportId>
 export const TagElementId = HulyRef("TagElementId")
 export type TagElementId = Schema.Schema.Type<typeof TagElementId>
 
+export const TagReferenceId = HulyRef("TagReferenceId")
+export type TagReferenceId = Schema.Schema.Type<typeof TagReferenceId>
+
 export const TagCategoryId = HulyRef("TagCategoryId")
 export type TagCategoryId = Schema.Schema.Type<typeof TagCategoryId>
 
@@ -291,9 +294,11 @@ export type PositiveNumber = Schema.Schema.Type<typeof PositiveNumber>
 export const ColorCode = Schema.Number.pipe(
   Schema.int(),
   Schema.greaterThanOrEqualTo(0),
-  Schema.lessThanOrEqualTo(9), // eslint-disable-line no-magic-numbers -- Huly color palette has 10 colors (0-9)
   Schema.brand("ColorCode")
-)
+).annotations({
+  title: "ColorCode",
+  description: "Non-negative Huly platform color index. Huly SDK stores tag colors as numbers."
+})
 export type ColorCode = Schema.Schema.Type<typeof ColorCode>
 
 // === Tier 6: Dual-Semantic Lookup Types ===
