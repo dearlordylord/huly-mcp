@@ -3,31 +3,24 @@
  *
  * @module
  */
-import {
-  type AttachedData,
-  type Class,
-  type Data,
-  type Doc,
-  type DocumentUpdate,
-  generateId,
-  type Ref,
-  type Space
-} from "@hcengineering/core"
-import type { TagElement, TagReference } from "@hcengineering/tags"
+import { type Class, type Doc, type DocumentUpdate, type Ref } from "@hcengineering/core"
 import { type Issue as HulyIssue, type IssueParentInfo, type Project as HulyProject } from "@hcengineering/tracker"
 import { Effect } from "effect"
 
 import type { AddLabelParams, MoveIssueParams } from "../../domain/schemas.js"
 import type { AddLabelResult, MoveIssueResult } from "../../domain/schemas/issues.js"
 import { IssueIdentifier } from "../../domain/schemas/shared.js"
+import { TagTargetClass } from "../../domain/schemas/tags.js"
 import type { HulyClient, HulyClientError } from "../client.js"
-import type { IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
-import { core, tags, tracker } from "../huly-plugins.js"
+import type { IssueNotFoundError, ProjectNotFoundError, TagCategoryNotFoundError } from "../errors.js"
+import { tracker } from "../huly-plugins.js"
 import { findIssueInProject, findProjectAndIssue } from "./issues-shared.js"
 import { toRef } from "./sdk-boundary.js"
+import { attachTagReference, ensureTagElement } from "./tags-shared.js"
 
 type AddLabelError =
   | HulyClientError
+  | TagCategoryNotFoundError
   | ProjectNotFoundError
   | IssueNotFoundError
 
@@ -35,6 +28,8 @@ type MoveIssueError =
   | HulyClientError
   | ProjectNotFoundError
   | IssueNotFoundError
+
+const issueTargetClass = TagTargetClass.make(String(tracker.class.Issue))
 
 /**
  * Add a label/tag to an issue.
@@ -48,74 +43,25 @@ export const addLabel = (
   params: AddLabelParams
 ): Effect.Effect<AddLabelResult, AddLabelError, HulyClient> =>
   Effect.gen(function*() {
-    const { client, issue, project } = yield* findProjectAndIssue(params)
-
-    const existingLabels = yield* client.findAll<TagReference>(
-      tags.class.TagReference,
-      {
-        attachedTo: issue._id,
-        attachedToClass: tracker.class.Issue
-      }
-    )
-
+    const { issue, project } = yield* findProjectAndIssue(params)
     const labelTitle = params.label.trim()
-    const labelExists = existingLabels.some(
-      (l) => l.title.toLowerCase() === labelTitle.toLowerCase()
-    )
-    if (labelExists) {
-      return { identifier: IssueIdentifier.make(issue.identifier), labelAdded: false }
-    }
+    const tag = yield* ensureTagElement({
+      targetClass: issueTargetClass,
+      titleOrId: labelTitle,
+      color: params.color,
+      fallbackCategory: tracker.category.Other
+    })
 
-    const color = params.color ?? 0
+    const result = yield* attachTagReference({
+      tag,
+      objectId: issue._id,
+      objectClass: tracker.class.Issue,
+      space: project._id,
+      collection: "labels",
+      matchTitleCaseInsensitive: true
+    })
 
-    let tagElement = yield* client.findOne<TagElement>(
-      tags.class.TagElement,
-      {
-        title: labelTitle,
-        targetClass: toRef<Class<Doc>>(tracker.class.Issue)
-      }
-    )
-
-    if (tagElement === undefined) {
-      const tagElementId: Ref<TagElement> = generateId()
-      const tagElementData: Data<TagElement> = {
-        title: labelTitle,
-        description: "",
-        targetClass: toRef<Class<Doc>>(tracker.class.Issue),
-        color,
-        category: tracker.category.Other
-      }
-      yield* client.createDoc(
-        tags.class.TagElement,
-        toRef<Space>(core.space.Workspace),
-        tagElementData,
-        tagElementId
-      )
-      tagElement = yield* client.findOne<TagElement>(
-        tags.class.TagElement,
-        { _id: tagElementId }
-      )
-    }
-
-    if (tagElement === undefined) {
-      return { identifier: IssueIdentifier.make(issue.identifier), labelAdded: false }
-    }
-
-    const tagRefData: AttachedData<TagReference> = {
-      title: tagElement.title,
-      color: tagElement.color,
-      tag: tagElement._id
-    }
-    yield* client.addCollection(
-      tags.class.TagReference,
-      project._id,
-      issue._id,
-      tracker.class.Issue,
-      "labels",
-      tagRefData
-    )
-
-    return { identifier: IssueIdentifier.make(issue.identifier), labelAdded: true }
+    return { identifier: IssueIdentifier.make(issue.identifier), labelAdded: result.attached }
   })
 
 export const moveIssue = (

@@ -988,6 +988,36 @@ if [ $? -eq 0 ]; then
   run_test "delete_label($LBL_ID)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_label\",\"arguments\":{\"label\":\"$LBL_ID\"}},\"id\":2}"
 fi
+
+GENERIC_TAG_TITLE="inttest-generic-tag-$RUN_ID"
+GENERIC_TAG_UPDATED_TITLE="updated-generic-tag-$RUN_ID"
+GENERIC_TAG_TITLE_JSON=$(json_string "$GENERIC_TAG_TITLE")
+GENERIC_TAG_UPDATED_TITLE_JSON=$(json_string "$GENERIC_TAG_UPDATED_TITLE")
+GENERIC_TAG_TEXT=$(run_capture "create_tag(generic)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_tag\",\"arguments\":{\"targetClass\":\"core:class:Space\",\"title\":$GENERIC_TAG_TITLE_JSON,\"color\":3}},\"id\":2}")
+if [ $? -eq 0 ]; then
+  GENERIC_TAG_ID=$(echo "$GENERIC_TAG_TEXT" | jq -r '.id' 2>/dev/null)
+  echo "  => generic_tag: $GENERIC_TAG_ID"
+  assert_json_field_nonempty "create_tag(generic) returns id" "$GENERIC_TAG_TEXT" '.id'
+  run_test "list_tags(generic)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_tags\",\"arguments\":{\"targetClass\":\"core:class:Space\",\"titleSearch\":$GENERIC_TAG_TITLE_JSON}},\"id\":2}"
+  run_test "update_tag($GENERIC_TAG_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_tag\",\"arguments\":{\"targetClass\":\"core:class:Space\",\"tag\":\"$GENERIC_TAG_ID\",\"title\":$GENERIC_TAG_UPDATED_TITLE_JSON,\"color\":4,\"description\":\"Generic tag integration test\"}},\"id\":2}"
+  ATTACH_TAG_TEXT=$(run_capture "attach_tag($GENERIC_TAG_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"attach_tag\",\"arguments\":{\"targetClass\":\"core:class:Space\",\"tag\":\"$GENERIC_TAG_ID\",\"object\":{\"objectId\":\"core:space:Workspace\",\"objectClass\":\"core:class:Space\",\"space\":\"core:space:Workspace\",\"collection\":\"tags\"},\"weight\":3}},\"id\":2}")
+  if [ $? -eq 0 ]; then
+    assert_json_field_equals "attach_tag($GENERIC_TAG_ID) attached" "$ATTACH_TAG_TEXT" '.attached' 'true'
+    run_test "list_attached_tags($GENERIC_TAG_ID)" \
+      '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_attached_tags","arguments":{"objectId":"core:space:Workspace","objectClass":"core:class:Space","space":"core:space:Workspace","collection":"tags"}},"id":2}'
+    DETACH_TAG_TEXT=$(run_capture "detach_tag($GENERIC_TAG_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"detach_tag\",\"arguments\":{\"targetClass\":\"core:class:Space\",\"tag\":\"$GENERIC_TAG_ID\",\"object\":{\"objectId\":\"core:space:Workspace\",\"objectClass\":\"core:class:Space\",\"space\":\"core:space:Workspace\",\"collection\":\"tags\"}}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "detach_tag($GENERIC_TAG_ID) detached" "$DETACH_TAG_TEXT" '.detached' 'true'
+    fi
+  fi
+  run_test "delete_tag($GENERIC_TAG_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_tag\",\"arguments\":{\"targetClass\":\"core:class:Space\",\"tag\":\"$GENERIC_TAG_ID\"}},\"id\":2}"
+fi
 echo ""
 
 ##############################

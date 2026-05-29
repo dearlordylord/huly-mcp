@@ -547,8 +547,8 @@ describe("Issues Extended Coverage", () => {
       }))
   })
 
-  describe("addLabel - tagElement undefined after creation (line 622-623)", () => {
-    it.effect("returns labelAdded=false when tag element not found after creation", () =>
+  describe("addLabel - created tag can be attached without read-after-write", () => {
+    it.effect("returns labelAdded=true without re-reading the created tag element", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1", number: 1 })
@@ -571,9 +571,8 @@ describe("Issues Extended Coverage", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(result.identifier).toBe("TEST-1")
-        expect(result.labelAdded).toBe(false)
-        // addCollection for TagReference should not have been called
-        expect(captureAddCollection.attributes).toBeUndefined()
+        expect(result.labelAdded).toBe(true)
+        expect(captureAddCollection.attributes).toMatchObject({ title: "NewTag" })
       }))
   })
 
