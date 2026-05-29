@@ -1,6 +1,5 @@
-import type { Class, Data, Doc, DocumentUpdate, Ref, Space } from "@hcengineering/core"
-import { generateId, SortingOrder } from "@hcengineering/core"
-import type { TagCategory as HulyTagCategory, TagElement as HulyTagElement, TagReference } from "@hcengineering/tags"
+import type { Class, Doc } from "@hcengineering/core"
+import type { TagReference } from "@hcengineering/tags"
 import { Effect } from "effect"
 
 import type { CreateLabelParams, DeleteLabelParams, ListLabelsParams, UpdateLabelParams } from "../../domain/schemas.js"
@@ -12,103 +11,51 @@ import type {
   UpdateLabelResult
 } from "../../domain/schemas/labels.js"
 import { UPDATE_LABEL_FIELDS } from "../../domain/schemas/labels.js"
-import { ColorCode, IssueIdentifier, TagElementId } from "../../domain/schemas/shared.js"
-import { HulyClient, type HulyClientError } from "../client.js"
-import type { IssueNotFoundError, NoUpdateFieldsError, ProjectNotFoundError } from "../errors.js"
-import { TagCategoryNotFoundError, TagNotFoundError } from "../errors.js"
-import { core, tags, tracker } from "../huly-plugins.js"
+import { IssueIdentifier, TagElementId } from "../../domain/schemas/shared.js"
+import { TagTargetClass } from "../../domain/schemas/tags.js"
+import type { HulyClient, HulyClientError } from "../client.js"
+import type {
+  IssueNotFoundError,
+  NoUpdateFieldsError,
+  ProjectNotFoundError,
+  TagCategoryNotFoundError
+} from "../errors.js"
+import { TagNotFoundError } from "../errors.js"
+import { tags, tracker } from "../huly-plugins.js"
 import { findProjectAndIssue } from "./issues-shared.js"
-import { clampLimit, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
+import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
-import { findCategoryByIdOrLabel } from "./tag-categories.js"
+import { ensureTagElement } from "./tags-shared.js"
+import { deleteTag, listTags, updateTag } from "./tags.js"
 import { requireUpdateFields } from "./update-guards.js"
 
 type ListLabelsError = HulyClientError | TagCategoryNotFoundError
 type CreateLabelError = HulyClientError | TagCategoryNotFoundError
-type UpdateLabelError = HulyClientError | NoUpdateFieldsError | TagNotFoundError
+type UpdateLabelError = HulyClientError | NoUpdateFieldsError | TagCategoryNotFoundError | TagNotFoundError
 type DeleteLabelError = HulyClientError | TagNotFoundError
 type RemoveIssueLabelError = HulyClientError | ProjectNotFoundError | IssueNotFoundError | TagNotFoundError
 
+// Huly Tracker "labels" are generic tag definitions scoped to tracker issues:
+// TagElement.targetClass = tracker.class.Issue. Each issue's `labels`
+// collection stores TagReference attachments to those elements. These
+// operations expose the Tracker label namespace, not arbitrary SDK tags.
 const issueClassRef = toRef<Class<Doc>>(tracker.class.Issue)
-
-const findTagByIdOrTitle = (
-  client: HulyClient["Type"],
-  idOrTitle: string
-): Effect.Effect<HulyTagElement | undefined, HulyClientError> =>
-  Effect.gen(function*() {
-    const tag = (yield* client.findOne<HulyTagElement>(
-      tags.class.TagElement,
-      hulyQuery<HulyTagElement>({
-        _id: toRef<HulyTagElement>(idOrTitle),
-        targetClass: issueClassRef
-      })
-    )) ?? (yield* client.findOne<HulyTagElement>(
-      tags.class.TagElement,
-      hulyQuery<HulyTagElement>({
-        title: idOrTitle,
-        targetClass: issueClassRef
-      })
-    ))
-
-    return tag
-  })
-
-const findTagOrFail = (
-  client: HulyClient["Type"],
-  idOrTitle: string
-): Effect.Effect<HulyTagElement, TagNotFoundError | HulyClientError> =>
-  Effect.gen(function*() {
-    const tag = yield* findTagByIdOrTitle(client, idOrTitle)
-    if (tag === undefined) {
-      return yield* new TagNotFoundError({ identifier: idOrTitle })
-    }
-    return tag
-  })
-
-const resolveCategoryRef = (
-  client: HulyClient["Type"],
-  categoryIdOrLabel: string | undefined
-): Effect.Effect<Ref<HulyTagCategory> | undefined, TagCategoryNotFoundError | HulyClientError> =>
-  Effect.gen(function*() {
-    if (categoryIdOrLabel === undefined) return undefined
-    const cat = yield* findCategoryByIdOrLabel(client, categoryIdOrLabel)
-    if (cat === undefined) {
-      return yield* new TagCategoryNotFoundError({ identifier: categoryIdOrLabel })
-    }
-    return cat._id
-  })
+const issueTargetClass = TagTargetClass.make(String(issueClassRef))
 
 export const listLabels = (
   params: ListLabelsParams
 ): Effect.Effect<Array<TagElementSummary>, ListLabelsError, HulyClient> =>
   Effect.gen(function*() {
-    const client = yield* HulyClient
+    const result = yield* listTags({
+      targetClass: issueTargetClass,
+      category: params.category,
+      limit: params.limit
+    })
 
-    const limit = clampLimit(params.limit)
-
-    const query: StrictDocumentQuery<HulyTagElement> = { targetClass: issueClassRef }
-
-    if (params.category !== undefined) {
-      const catRef = yield* resolveCategoryRef(client, params.category)
-      if (catRef !== undefined) {
-        query.category = catRef
-      }
-    }
-
-    const elements = yield* client.findAll<HulyTagElement>(
-      tags.class.TagElement,
-      hulyQuery(query),
-      {
-        limit,
-        sort: { modifiedOn: SortingOrder.Descending }
-      }
-    )
-
-    return elements.map(e => ({
-      id: TagElementId.make(e._id),
+    return result.map(e => ({
+      id: e.id,
       title: e.title,
-      // Clamp to valid range — Huly API may return out-of-range color values
-      color: ColorCode.make(Math.max(0, Math.min(9, Math.trunc(e.color)))), // eslint-disable-line no-magic-numbers
+      color: e.color,
       category: e.category
     }))
   })
@@ -117,41 +64,16 @@ export const createLabel = (
   params: CreateLabelParams
 ): Effect.Effect<CreateLabelResult, CreateLabelError, HulyClient> =>
   Effect.gen(function*() {
-    const client = yield* HulyClient
+    const result = yield* ensureTagElement({
+      targetClass: issueTargetClass,
+      titleOrId: params.title,
+      color: params.color,
+      description: params.description,
+      category: params.category,
+      fallbackCategory: tracker.category.Other
+    })
 
-    const existing = yield* client.findOne<HulyTagElement>(
-      tags.class.TagElement,
-      hulyQuery<HulyTagElement>({
-        title: params.title,
-        targetClass: issueClassRef
-      })
-    )
-
-    if (existing !== undefined) {
-      return { id: TagElementId.make(existing._id), title: existing.title, created: false }
-    }
-
-    const categoryRef = yield* resolveCategoryRef(client, params.category)
-
-    const tagId: Ref<HulyTagElement> = generateId()
-    const color = params.color ?? 0
-
-    const tagData: Data<HulyTagElement> = {
-      title: params.title,
-      description: params.description ?? "",
-      targetClass: issueClassRef,
-      color,
-      category: categoryRef ?? tracker.category.Other
-    }
-
-    yield* client.createDoc(
-      tags.class.TagElement,
-      toRef<Space>(core.space.Workspace),
-      tagData,
-      tagId
-    )
-
-    return { id: TagElementId.make(tagId), title: params.title, created: true }
+    return { id: TagElementId.make(result.id), title: result.title, created: result.created }
   })
 
 export const updateLabel = (
@@ -160,47 +82,27 @@ export const updateLabel = (
   Effect.gen(function*() {
     yield* requireUpdateFields("update_label", params, UPDATE_LABEL_FIELDS)
 
-    const client = yield* HulyClient
+    const result = yield* updateTag({
+      targetClass: issueTargetClass,
+      tag: params.label,
+      title: params.title,
+      color: params.color,
+      description: params.description
+    })
 
-    const tag = yield* findTagOrFail(client, params.label)
-
-    const updateOps: DocumentUpdate<HulyTagElement> = {}
-
-    if (params.title !== undefined) {
-      updateOps.title = params.title
-    }
-    if (params.color !== undefined) {
-      updateOps.color = params.color
-    }
-    if (params.description !== undefined) {
-      updateOps.description = params.description
-    }
-
-    yield* client.updateDoc(
-      tags.class.TagElement,
-      toRef<Space>(core.space.Workspace),
-      tag._id,
-      updateOps
-    )
-
-    return { id: TagElementId.make(tag._id), updated: true }
+    return { id: result.id, updated: result.updated }
   })
 
 export const deleteLabel = (
   params: DeleteLabelParams
 ): Effect.Effect<DeleteLabelResult, DeleteLabelError, HulyClient> =>
   Effect.gen(function*() {
-    const client = yield* HulyClient
+    const result = yield* deleteTag({
+      targetClass: issueTargetClass,
+      tag: params.label
+    })
 
-    const tag = yield* findTagOrFail(client, params.label)
-
-    yield* client.removeDoc(
-      tags.class.TagElement,
-      toRef<Space>(core.space.Workspace),
-      tag._id
-    )
-
-    return { id: TagElementId.make(tag._id), deleted: true }
+    return { id: result.id, deleted: result.deleted }
   })
 
 export const removeIssueLabel = (

@@ -32,6 +32,7 @@ import {
 import { searchTools } from "./search.js"
 import { storageTools } from "./storage.js"
 import { tagCategoryTools } from "./tag-categories.js"
+import { tagTools } from "./tags.js"
 import { taskManagementTools } from "./task-management.js"
 import { testManagementCoreTools } from "./test-management-core.js"
 import { testManagementPlansTools } from "./test-management-plans.js"
@@ -43,6 +44,7 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...projectTools,
   ...issueTools,
   ...labelTools,
+  ...tagTools,
   ...tagCategoryTools,
   ...commentTools,
   ...deletionTools,

@@ -321,7 +321,7 @@ export const AddLabelParamsSchema = Schema.Struct({
   }),
   color: Schema.optional(
     ColorCode.annotations({
-      description: "Color code (0-9, default: 0)"
+      description: "Non-negative Huly platform color index (default: 0)"
     })
   )
 }).annotations({
