@@ -1,0 +1,520 @@
+{
+  "schemaVersion": 1,
+  "description": "Auditable classification of installed @hcengineering SDK model exports for MCP sdk-parity tracking. Every discovered plugin class or exported model-like declaration must be covered, marked as a gap, ignored, or classified as not MCP-facing.",
+  "referenceModelAreas": [
+    {
+      "status": "covered",
+      "matrixLocation": "Current high-level MCP categories",
+      "rationale": "These reference model areas correspond to current first-class MCP tool categories, although individual installed SDK exports can still be partial in the export ledger below.",
+      "areas": [
+        "activity",
+        "attachment",
+        "calendar",
+        "card",
+        "chunter",
+        "contact",
+        "core",
+        "document",
+        "notification",
+        "process",
+        "tags",
+        "task",
+        "test-management",
+        "time",
+        "tracker"
+      ]
+    },
+    {
+      "status": "gap",
+      "matrixLocation": "Missing Or Partially Missing SDK Surfaces",
+      "rationale": "These reference model areas are represented by explicit rows in the feature gap matrix.",
+      "areas": [
+        "analytics-collector",
+        "billing",
+        "bitrix",
+        "board",
+        "communication",
+        "controlled-documents",
+        "drive",
+        "gmail",
+        "hr",
+        "inventory",
+        "lead",
+        "love",
+        "preference",
+        "products",
+        "questions",
+        "rating",
+        "recruit",
+        "request",
+        "setting",
+        "support",
+        "survey",
+        "telegram",
+        "templates",
+        "training",
+        "view",
+        "workbench"
+      ]
+    },
+    {
+      "status": "not-mcp-facing",
+      "rationale": "These reference model areas are platform plumbing, UI/editor/presentation metadata, server-only model support, or build/upload/export infrastructure rather than first-class LLM-facing resources today.",
+      "areas": [
+        "converter",
+        "desktop-preferences",
+        "emoji",
+        "export",
+        "guest",
+        "presentation",
+        "server-core",
+        "server-notification",
+        "server-process",
+        "server-templates",
+        "server-time",
+        "server-view",
+        "text-editor",
+        "uploader"
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "package": "@hcengineering/activity",
+      "status": "covered",
+      "matrixLocation": "Activity gaps",
+      "rationale": "Current activity tools expose reactions, saved messages, and mentions as first-class MCP operations.",
+      "exports": [
+        "Reaction",
+        "SavedMessage",
+        "UserMentionInfo"
+      ]
+    },
+    {
+      "package": "@hcengineering/activity",
+      "status": "gap",
+      "matrixLocation": "Activity gaps",
+      "rationale": "Activity model/configuration exports are only partially exposed; pinning, generic replies, filters, references, and update-message introspection remain matrix gaps.",
+      "exports": [
+        "ActivityAttributeUpdatesPresenter",
+        "ActivityDoc",
+        "ActivityExtension",
+        "ActivityInfoMessage",
+        "ActivityMessage",
+        "ActivityMessageControl",
+        "ActivityMessagePreview",
+        "ActivityMessageViewlet",
+        "ActivityMessagesFilter",
+        "ActivityReference",
+        "DocUpdateMessage",
+        "DocUpdateMessageViewlet",
+        "IgnoreActivity",
+        "ReplyProvider"
+      ]
+    },
+    {
+      "package": "@hcengineering/attachment",
+      "status": "covered",
+      "matrixLocation": "Attachments gaps",
+      "rationale": "Generic attachment CRUD/download/pin and issue/document convenience attachment tools cover the base Attachment model.",
+      "exports": [
+        "Attachment"
+      ]
+    },
+    {
+      "package": "@hcengineering/attachment",
+      "status": "gap",
+      "matrixLocation": "Attachments gaps",
+      "rationale": "Class-specific attachment/media preferences and subclasses are represented in the matrix but not yet first-class tools.",
+      "exports": [
+        "Drawing",
+        "Embedding",
+        "Photo",
+        "SavedAttachments"
+      ]
+    },
+    {
+      "package": "@hcengineering/calendar",
+      "status": "covered",
+      "matrixLocation": "Calendar schedules and integrations",
+      "rationale": "Existing calendar tools cover event CRUD plus recurring events and recurring instances.",
+      "exports": [
+        "Event",
+        "ReccuringEvent",
+        "ReccuringInstance"
+      ]
+    },
+    {
+      "package": "@hcengineering/calendar",
+      "status": "gap",
+      "matrixLocation": "Calendar schedules and integrations",
+      "rationale": "Calendar configuration, primary-calendar preferences, external calendars, schedules, and presenter metadata are tracked as remaining gaps.",
+      "exports": [
+        "Calendar",
+        "CalendarEventPresenter",
+        "ExternalCalendar",
+        "PrimaryCalendar",
+        "Schedule"
+      ]
+    },
+    {
+      "package": "@hcengineering/card",
+      "status": "covered",
+      "matrixLocation": "`@hcengineering/card` package row",
+      "rationale": "Current card tools cover card spaces, master tags, and card CRUD.",
+      "exports": [
+        "Card",
+        "CardSpace",
+        "MasterTag"
+      ]
+    },
+    {
+      "package": "@hcengineering/card",
+      "status": "gap",
+      "matrixLocation": "`@hcengineering/card` package row",
+      "rationale": "Card favorites, roles, sections, editor sections, and advanced tag/schema metadata remain matrix gaps.",
+      "exports": [
+        "CardSection",
+        "FavoriteCard",
+        "MasterTagEditorSection",
+        "Role",
+        "Tag"
+      ]
+    },
+    {
+      "package": "@hcengineering/chunter",
+      "status": "covered",
+      "matrixLocation": "Chat channel membership/options",
+      "rationale": "Current channel and direct-message tools cover channels, channel messages, one-to-one DM listing, and thread replies.",
+      "exports": [
+        "Channel",
+        "ChatMessage",
+        "ChunterSpace",
+        "DirectMessage",
+        "ThreadMessage"
+      ]
+    },
+    {
+      "package": "@hcengineering/chunter",
+      "status": "gap",
+      "matrixLocation": "Chat channel membership/options",
+      "rationale": "Chat viewlets, sync metadata, object chat panels, DM writes, and membership/options are represented as remaining gaps.",
+      "exports": [
+        "ChatMessageViewlet",
+        "ChatSyncInfo",
+        "ObjectChatPanel"
+      ]
+    },
+    {
+      "package": "@hcengineering/contact",
+      "status": "covered",
+      "matrixLocation": "Contact channels and identities",
+      "rationale": "Current contacts tools expose person, organization, employee/member, and organization-channel operations.",
+      "exports": [
+        "Contact",
+        "Member",
+        "Organization",
+        "Person"
+      ]
+    },
+    {
+      "package": "@hcengineering/contact",
+      "status": "gap",
+      "matrixLocation": "Contact channels and identities",
+      "rationale": "Contact channels, identities, providers, statuses, person spaces, user profiles, and related contact administration remain matrix gaps.",
+      "exports": [
+        "Channel",
+        "ChannelItem",
+        "ChannelProvider",
+        "PersonSpace",
+        "SocialIdentity",
+        "SocialIdentityProvider",
+        "Status",
+        "UserProfile"
+      ]
+    },
+    {
+      "package": "@hcengineering/contact",
+      "status": "not-mcp-facing",
+      "rationale": "Avatar, UI tab, translation preference, and low-level user-role support objects are not currently treated as first-class LLM-facing MCP resources.",
+      "exports": [
+        "AvatarInfo",
+        "AvatarProvider",
+        "ContactsTab",
+        "Translation",
+        "UserRole"
+      ]
+    },
+    {
+      "package": "@hcengineering/core",
+      "status": "covered",
+      "matrixLocation": "Core classes, attributes, enums; Core spaces, permissions, roles",
+      "rationale": "Existing tools expose user statuses, full-text search, blobs through storage/download flows, and generic association/relation discovery/mutation helpers.",
+      "exports": [
+        "Association",
+        "Blob",
+        "FullTextSearchContext",
+        "Relation",
+        "UserStatus"
+      ]
+    },
+    {
+      "package": "@hcengineering/core",
+      "status": "gap",
+      "matrixLocation": "Core classes, attributes, enums; Core spaces, permissions, roles",
+      "rationale": "Core schema/configuration, spaces, permissions, collaborators, sequences, statuses, and metadata discovery are represented as matrix gaps.",
+      "exports": [
+        "Attribute",
+        "AttributePermission",
+        "ClassCollaborators",
+        "ClassPermission",
+        "Classifier",
+        "Collaborator",
+        "Configuration",
+        "ConfigurationElement",
+        "CustomSequence",
+        "DomainIndexConfiguration",
+        "Enum",
+        "EnumOf",
+        "MigrationState",
+        "Permission",
+        "PluginConfiguration",
+        "Role",
+        "Sequence",
+        "Space",
+        "SpaceType",
+        "SpaceTypeDescriptor",
+        "Status",
+        "StatusCategory",
+        "SystemSpace",
+        "TypedSpace"
+      ]
+    },
+    {
+      "package": "@hcengineering/core",
+      "status": "not-mcp-facing",
+      "rationale": "Core primitive model infrastructure, transaction classes, type wrappers, and versioning internals are not LLM-facing product resources by themselves.",
+      "exports": [
+        "ArrOf",
+        "AttachedDoc",
+        "BenchmarkDoc",
+        "Class",
+        "Collection",
+        "Doc",
+        "Interface",
+        "Mixin",
+        "Obj",
+        "RefTo",
+        "TransientConfiguration",
+        "Tx",
+        "TxAccessLevel",
+        "TxApplyIf",
+        "TxCUD",
+        "TxCreateDoc",
+        "TxDomainEvent",
+        "TxMixin",
+        "TxModelUpgrade",
+        "TxRemoveDoc",
+        "TxUpdateDoc",
+        "TxWorkspaceEvent",
+        "Type",
+        "TypeAccountUuid",
+        "TypeAny",
+        "TypeBlob",
+        "TypeBoolean",
+        "TypeCollaborativeDoc",
+        "TypeDate",
+        "TypeFileSize",
+        "TypeHyperlink",
+        "TypeIdentifier",
+        "TypeIntlString",
+        "TypeMarkup",
+        "TypeNumber",
+        "TypePersonId",
+        "TypeRank",
+        "TypeRecord",
+        "TypeRelatedDocument",
+        "TypeRelation",
+        "TypeString",
+        "TypeTimestamp",
+        "Version",
+        "VersionableClass",
+        "VersionableDoc"
+      ]
+    },
+    {
+      "package": "@hcengineering/document",
+      "status": "covered",
+      "matrixLocation": "Document preferences and history",
+      "rationale": "Current document tools cover non-controlled document teamspaces and document CRUD/content operations.",
+      "exports": [
+        "Document",
+        "Teamspace"
+      ]
+    },
+    {
+      "package": "@hcengineering/document",
+      "status": "gap",
+      "matrixLocation": "Document preferences and history",
+      "rationale": "Saved documents and document snapshots/history are represented in the matrix but not yet first-class MCP tools.",
+      "exports": [
+        "DocumentSnapshot",
+        "SavedDocument"
+      ]
+    },
+    {
+      "package": "@hcengineering/notification",
+      "status": "covered",
+      "matrixLocation": "Inbox / notification gaps",
+      "rationale": "Current notification tools cover listing/getting/read/archive/delete flows for notifications and contexts.",
+      "exports": [
+        "ActivityInboxNotification",
+        "CommonInboxNotification",
+        "DocNotifyContext",
+        "InboxNotification",
+        "MentionInboxNotification"
+      ]
+    },
+    {
+      "package": "@hcengineering/notification",
+      "status": "gap",
+      "matrixLocation": "Inbox / notification gaps",
+      "rationale": "Provider settings, type settings, defaults, preferences, collaborators, push/browser records, and hidden/mute/unsubscribe behavior remain matrix gaps.",
+      "exports": [
+        "BrowserNotification",
+        "Collaborators",
+        "NotificationGroup",
+        "NotificationPreferencesGroup",
+        "NotificationProvider",
+        "NotificationProviderDefaults",
+        "NotificationProviderSetting",
+        "NotificationType",
+        "NotificationTypeSetting",
+        "OldCollaborators",
+        "PushSubscription"
+      ]
+    },
+    {
+      "package": "@hcengineering/notification",
+      "status": "not-mcp-facing",
+      "rationale": "Notification presenters, previews, and viewlets are UI/resource metadata rather than first-class MCP resources.",
+      "exports": [
+        "ActivityNotificationViewlet",
+        "NotificationContextPresenter",
+        "NotificationObjectPresenter",
+        "NotificationPreview"
+      ]
+    },
+    {
+      "package": "@hcengineering/tags",
+      "status": "covered",
+      "matrixLocation": "Tags/labels beyond tracker issues",
+      "rationale": "SDK-level generic tag elements, references, and categories are covered; matrix gaps are now module-specific wrappers above the generic tag model.",
+      "exports": [
+        "TagCategory",
+        "TagElement",
+        "TagReference"
+      ]
+    },
+    {
+      "package": "@hcengineering/task",
+      "status": "covered",
+      "matrixLocation": "`@hcengineering/task` package row",
+      "rationale": "Current task-management and tracker tools expose safe project/task type and task/project surfaces through higher-level issue/project workflows.",
+      "exports": [
+        "Project",
+        "ProjectType",
+        "Task",
+        "TaskType"
+      ]
+    },
+    {
+      "package": "@hcengineering/task",
+      "status": "gap",
+      "matrixLocation": "`@hcengineering/task` package row",
+      "rationale": "Descriptor and class-level task/project configuration remains a matrix gap because writes can affect workspace-wide model behavior.",
+      "exports": [
+        "ProjectTypeClass",
+        "ProjectTypeDescriptor",
+        "TaskTypeClass",
+        "TaskTypeDescriptor"
+      ]
+    },
+    {
+      "package": "@hcengineering/task",
+      "status": "not-mcp-facing",
+      "rationale": "Ranking and presenter/class support objects are implementation metadata unless promoted through a concrete user workflow.",
+      "exports": [
+        "DocWithRank",
+        "KanbanCard"
+      ]
+    },
+    {
+      "package": "@hcengineering/time",
+      "status": "covered",
+      "matrixLocation": "Planner / ToDos",
+      "rationale": "Current time tools cover work slots and issue time reporting.",
+      "exports": [
+        "WorkSlot"
+      ]
+    },
+    {
+      "package": "@hcengineering/time",
+      "status": "gap",
+      "matrixLocation": "Planner / ToDos",
+      "rationale": "Personal and project ToDo lifecycle plus automation helper visibility remain matrix gaps.",
+      "exports": [
+        "ProjectToDo",
+        "ToDo",
+        "TodoAutomationHelper"
+      ]
+    },
+    {
+      "package": "@hcengineering/time",
+      "status": "not-mcp-facing",
+      "rationale": "Presenter and priority type support objects are not first-class MCP resources by themselves.",
+      "exports": [
+        "ItemPresenter",
+        "TypeToDoPriority"
+      ]
+    },
+    {
+      "package": "@hcengineering/tracker",
+      "status": "covered",
+      "matrixLocation": "`@hcengineering/tracker` package row",
+      "rationale": "Current project, issue, component, milestone, issue-template, status, relation, and time-reporting tools cover core tracker resources.",
+      "exports": [
+        "Component",
+        "Issue",
+        "IssueStatus",
+        "IssueTemplate",
+        "Milestone",
+        "Project",
+        "RelatedIssueTarget",
+        "TimeSpendReport"
+      ]
+    },
+    {
+      "package": "@hcengineering/tracker",
+      "status": "gap",
+      "matrixLocation": "`@hcengineering/tracker` package row",
+      "rationale": "Tracker preference/saved-view and workflow automation behavior remains partial in the matrix.",
+      "exports": [
+        "ProjectTargetPreference"
+      ]
+    },
+    {
+      "package": "@hcengineering/tracker",
+      "status": "not-mcp-facing",
+      "rationale": "Tracker type wrappers and the tracker-local Document support type are implementation metadata unless promoted through a concrete workflow.",
+      "exports": [
+        "Document",
+        "TypeEstimation",
+        "TypeIssuePriority",
+        "TypeMilestoneStatus",
+        "TypeRemainingTime",
+        "TypeReportedTime"
+      ]
+    }
+  ]
+}
