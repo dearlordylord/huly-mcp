@@ -1,6 +1,6 @@
 # SDK Coverage Backlog
 
-> Status: unvalidated backlog candidates. These are not accepted implementation scope until each item has a small PRD or issue with an integration-test strategy.
+> Status: archived validation notes from the initial SDK audit. Do not maintain this file as an active backlog; use `plans/huly-sdk-gap-matrix.md` plus `plans/sdk-parity-ledger.json` for current SDK coverage tracking.
 
 These candidate gaps came from a local comparison of current MCP tools, installed Huly SDK/plugin types, and `.reference/huly-examples/platform-api`. They are not yet validated against live Huly behavior, user demand, permissions, or SDK write semantics.
 
@@ -29,26 +29,25 @@ Prioritize read/write operations for existing DM conversations before creation. 
 
 ## 2. Saved Documents
 
-- [ ] Not completed: saved document tools, such as save document, unsave document, and list saved documents.
+- [x] Rejected as stale: do not implement `save_document`, `unsave_document`, or `list_saved_documents` against `@hcengineering/document#SavedDocument`.
 
 **Context**
 
-The installed `@hcengineering/document` SDK exposes `SavedDocument extends Preference` with `attachedTo: Ref<Document>`. Current document tools cover teamspaces, document CRUD, content edit, inline comments, and deletion. Activity already has saved-message operations backed by a preference-like `SavedMessage` flow, so there is an existing module pattern for save/list/unsave semantics.
+The installed `@hcengineering/document` SDK exposes `SavedDocument extends Preference` with `attachedTo: Ref<Document>`, but current platform source removed the model registration and document-resource star/unstar usage in hcengineering/platform#10124. Current document stars are represented by the rating model (`DocReaction` with `ReactionKind.Star`), not by `document.class.SavedDocument`.
 
 **Evaluation**
 
-This looks like a small, likely useful read/write gap. The risk is moderate because preference documents often depend on account/user scoping and may have uniqueness rules. The operation should avoid duplicate saved preferences and should be idempotent.
+This candidate is invalid for current SDK parity. Implementing it against `document.class.SavedDocument` targets a removed historical model. Implementing it against generic `preference.class.Preference` is not parity and is not proven to produce current Huly UI behavior.
 
 **Validation**
 
-- Confirm the class ref for `SavedDocument` from the document plugin runtime export.
-- Inspect whether saved documents are stored in a fixed preference space or in the current user/account context.
-- Validate duplicate behavior by saving the same document twice in a local Huly workspace.
-- Add tests for list, idempotent save, idempotent unsave, and encoded output schemas.
+- Historical tags `v0.7.235` through `v0.7.266` include `SavedDocument`.
+- Current `upstream/main`, `upstream/develop`, and integration runtime `0.7.343` do not register `document:class:SavedDocument`.
+- PR #10124 introduced the rating system and removed the old document-specific saved/star model.
 
 **Recommendation**
 
-Good candidate for the next small feature PR. Build `save_document`, `unsave_document`, and `list_saved_documents` as one vertical slice with schema-backed inputs, encoded outputs, and idempotent behavior. Use existing document resolution helpers instead of requiring callers to pass raw refs.
+Do not build saved-document tools from this backlog item. Track current document stars under the Rating / reputation row in `plans/huly-sdk-gap-matrix.md`.
 
 ## 3. Document Snapshots And History
 
