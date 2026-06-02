@@ -3,18 +3,14 @@
  *
  * @module
  */
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import {
   ErrorCode,
-  ListResourcesRequestSchema,
   type ListResourcesResult,
-  ListResourceTemplatesRequestSchema,
   type ListResourceTemplatesResult,
   McpError,
-  ReadResourceRequestSchema,
   type ReadResourceResult
 } from "@modelcontextprotocol/sdk/types.js"
-import { Cause, Chunk, Effect, Exit, ParseResult, Schema } from "effect"
+import { Effect, ParseResult, Schema } from "effect"
 
 import {
   type Issue,
@@ -27,7 +23,7 @@ import {
   type ProjectSummary
 } from "../domain/schemas.js"
 import { IssueIdentifier, MAX_LIMIT, ProjectIdentifier } from "../domain/schemas/shared.js"
-import { HulyClient } from "../huly/client.js"
+import type { HulyClient } from "../huly/client.js"
 import type { HulyDomainError } from "../huly/errors.js"
 import { getIssue } from "../huly/operations/issues.js"
 import { getProject, listProjects } from "../huly/operations/projects.js"
@@ -371,91 +367,3 @@ export const readHulyResource = (
   }).pipe(
     Effect.flatMap(readParsedHulyResource)
   )
-
-const createResourceClientResolutionError = (uri: string, _error: unknown): McpError =>
-  new McpError(
-    ErrorCode.InternalError,
-    `Failed to initialize Huly clients while reading resource "${uri}". Verify Huly URL, workspace, and authentication configuration.`
-  )
-
-const createResourceListClientResolutionError = (_error: unknown): McpError =>
-  new McpError(
-    ErrorCode.InternalError,
-    "Failed to initialize Huly clients while listing resources. Verify Huly URL, workspace, and authentication configuration."
-  )
-
-interface ResourceClientBundle {
-  readonly hulyClient: HulyClient["Type"]
-}
-
-interface InflightResourceGuard {
-  readonly enter: () => void
-  readonly leave: () => void
-}
-
-const resolveResourceClientsOrThrow = async (
-  resolveClients: () => Promise<ResourceClientBundle>,
-  mapError: (error: unknown) => McpError
-): Promise<ResourceClientBundle> => {
-  try {
-    return await resolveClients()
-  } catch (e) {
-    throw mapError(e)
-  }
-}
-
-const throwResourceReadError = (uri: string, cause: Cause.Cause<McpError>): never => {
-  const failures = Chunk.toArray(Cause.failures(cause))
-  const failure = failures[0]
-  if (failure instanceof McpError) throw failure
-  throw new McpError(ErrorCode.InternalError, `Failed to read Huly resource "${uri}"`)
-}
-
-const throwResourceListError = (cause: Cause.Cause<McpError>): never => {
-  const failures = Chunk.toArray(Cause.failures(cause))
-  const failure = failures[0]
-  if (failure instanceof McpError) throw failure
-  throw new McpError(ErrorCode.InternalError, "Failed to list Huly resources")
-}
-
-export const registerResourceHandlers = (
-  server: Server,
-  resolveClients: () => Promise<ResourceClientBundle>,
-  inflight?: InflightResourceGuard
-): void => {
-  server.setRequestHandler(ListResourcesRequestSchema, async () => {
-    inflight?.enter()
-    try {
-      const clients = await resolveResourceClientsOrThrow(resolveClients, createResourceListClientResolutionError)
-      const resourceList = await Effect.runPromiseExit(
-        listResources().pipe(
-          Effect.provideService(HulyClient, clients.hulyClient)
-        )
-      )
-      if (Exit.isSuccess(resourceList)) return resourceList.value
-      return throwResourceListError(resourceList.cause)
-    } finally {
-      inflight?.leave()
-    }
-  })
-  server.setRequestHandler(ListResourceTemplatesRequestSchema, listResourceTemplates)
-  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-    inflight?.enter()
-    try {
-      const { uri } = request.params
-      const clients = await resolveResourceClientsOrThrow(
-        resolveClients,
-        error => createResourceClientResolutionError(uri, error)
-      )
-      const resourceRead = await Effect.runPromiseExit(
-        readHulyResource(uri).pipe(
-          Effect.provideService(HulyClient, clients.hulyClient)
-        )
-      )
-      if (Exit.isSuccess(resourceRead)) return resourceRead.value
-      return throwResourceReadError(uri, resourceRead.cause)
-    } finally {
-      inflight?.leave()
-    }
-  })
-}

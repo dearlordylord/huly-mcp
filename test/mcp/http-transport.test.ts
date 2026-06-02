@@ -9,6 +9,7 @@
 import type http from "node:http"
 
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js"
+import { McpError } from "@modelcontextprotocol/sdk/types.js"
 import { Effect, Exit, Layer } from "effect"
 import type { Express, Request, Response } from "express"
 import { describe, expect, it } from "vitest"
@@ -21,6 +22,7 @@ import {
   HttpTransportError,
   startHttpTransport
 } from "../../src/mcp/http-transport.js"
+import type { McpProtocolHandlers } from "../../src/mcp/protocol-handlers.js"
 
 // Test mock factory: accepts any object, returns it typed as T.
 // Single cast from Record<string,unknown> to T (valid for test mocks of large interfaces).
@@ -174,6 +176,46 @@ const createMockRequest = (
   })
 }
 
+const modernMeta = {
+  "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+  "io.modelcontextprotocol/clientInfo": { name: "test", version: "1.0.0" },
+  "io.modelcontextprotocol/clientCapabilities": {}
+}
+
+const modernHeaders = (method: string, name?: string): Request["headers"] => ({
+  accept: "application/json, text/event-stream",
+  "mcp-protocol-version": "2026-07-28",
+  "mcp-method": method,
+  ...(name === undefined ? {} : { "mcp-name": name })
+})
+
+const createMockProtocolHandlers = (): McpProtocolHandlers => ({
+  listTools: () => Promise.resolve({ tools: [] }),
+  callTool: () =>
+    Promise.resolve({
+      content: [{ type: "text", text: "ok" }]
+    }),
+  listResources: () => Promise.resolve({ resources: [] }),
+  listResourceTemplates: () => ({ resourceTemplates: [] }),
+  readResource: (request) =>
+    Promise.resolve({
+      contents: [{
+        uri: request.params.uri,
+        mimeType: "application/json",
+        text: "{}"
+      }]
+    }),
+  serverDiscover: () => ({
+    resultType: "complete",
+    supportedVersions: ["2026-07-28"],
+    capabilities: { tools: {}, resources: {} },
+    serverInfo: { name: "huly-mcp", version: "0.0.0-test" }
+  }),
+  drainInflight: () => Promise.resolve()
+})
+
+const modernHandlerFactory = createMockProtocolHandlers
+
 const expectUnauthorizedResponse = (response: Response): void => {
   const calls = getResponseCalls(response)
   expect(calls.status).toEqual([[401]])
@@ -224,6 +266,311 @@ describe("HTTP Transport", () => {
 
       await handlers.post(req, res)
 
+      expect(getServerCalls(mockServer).connect).toHaveLength(1)
+      expect(transport.calls.handleRequest).toEqual([[req, res, req.body]])
+    })
+
+    it("dispatches server/discover on the 2026 path without initialize", async () => {
+      const transport = createMockTransportDependencies()
+      const handlers = createMcpHandlers(createMockMcpServer, transport.dependencies, undefined, modernHandlerFactory)
+      const req = createMockRequest(
+        { jsonrpc: "2.0", method: "server/discover", id: "discover", params: { _meta: modernMeta } },
+        modernHeaders("server/discover")
+      )
+      const res = createMockResponse()
+
+      await handlers.post(req, res)
+
+      const calls = getResponseCalls(res)
+      expect(transport.calls.handleRequest).toHaveLength(0)
+      expect(calls.status).toEqual([[200]])
+      expect(calls.json).toEqual([[
+        {
+          jsonrpc: "2.0",
+          id: "discover",
+          result: {
+            resultType: "complete",
+            supportedVersions: ["2026-07-28"],
+            capabilities: { tools: {}, resources: {} },
+            serverInfo: { name: "huly-mcp", version: "0.0.0-test" }
+          }
+        }
+      ]])
+    })
+
+    it("adds resultType and public cache hints to 2026 tools/list", async () => {
+      const handlers = createMcpHandlers(createMockMcpServer, undefined, undefined, modernHandlerFactory)
+      const res = createMockResponse()
+
+      await handlers.post(
+        createMockRequest(
+          { jsonrpc: "2.0", method: "tools/list", id: 1, params: { _meta: modernMeta } },
+          modernHeaders("tools/list")
+        ),
+        res
+      )
+
+      expect(getResponseCalls(res).json).toEqual([[
+        {
+          jsonrpc: "2.0",
+          id: 1,
+          result: { tools: [], resultType: "complete", ttlMs: 300000, cacheScope: "public" }
+        }
+      ]])
+    })
+
+    it("adds resultType to 2026 tools/call", async () => {
+      const handlers = createMcpHandlers(createMockMcpServer, undefined, undefined, modernHandlerFactory)
+      const res = createMockResponse()
+
+      await handlers.post(
+        createMockRequest(
+          {
+            jsonrpc: "2.0",
+            method: "tools/call",
+            id: 2,
+            params: { name: "get_huly_context", arguments: {}, _meta: modernMeta }
+          },
+          modernHeaders("tools/call", "get_huly_context")
+        ),
+        res
+      )
+
+      expect(getResponseCalls(res).json).toEqual([[
+        {
+          jsonrpc: "2.0",
+          id: 2,
+          result: { content: [{ type: "text", text: "ok" }], resultType: "complete" }
+        }
+      ]])
+    })
+
+    it("adds resultType and cache hints to 2026 resource list, template list, and read results", async () => {
+      const handlers = createMcpHandlers(createMockMcpServer, undefined, undefined, modernHandlerFactory)
+      const listRes = createMockResponse()
+      const templatesRes = createMockResponse()
+      const readRes = createMockResponse()
+
+      await handlers.post(
+        createMockRequest(
+          { jsonrpc: "2.0", method: "resources/list", id: 3, params: { _meta: modernMeta } },
+          modernHeaders("resources/list")
+        ),
+        listRes
+      )
+      await handlers.post(
+        createMockRequest(
+          { jsonrpc: "2.0", method: "resources/templates/list", id: 4, params: { _meta: modernMeta } },
+          modernHeaders("resources/templates/list")
+        ),
+        templatesRes
+      )
+      await handlers.post(
+        createMockRequest(
+          {
+            jsonrpc: "2.0",
+            method: "resources/read",
+            id: 5,
+            params: { uri: "huly://projects/HULY", _meta: modernMeta }
+          },
+          modernHeaders("resources/read", "huly://projects/HULY")
+        ),
+        readRes
+      )
+
+      expect(getResponseCalls(listRes).json).toEqual([[
+        {
+          jsonrpc: "2.0",
+          id: 3,
+          result: { resources: [], resultType: "complete", ttlMs: 60000, cacheScope: "private" }
+        }
+      ]])
+      expect(getResponseCalls(templatesRes).json).toEqual([[
+        {
+          jsonrpc: "2.0",
+          id: 4,
+          result: { resourceTemplates: [], resultType: "complete", ttlMs: 300000, cacheScope: "public" }
+        }
+      ]])
+      expect(getResponseCalls(readRes).json).toEqual([[
+        {
+          jsonrpc: "2.0",
+          id: 5,
+          result: {
+            contents: [{ uri: "huly://projects/HULY", mimeType: "application/json", text: "{}" }],
+            resultType: "complete",
+            ttlMs: 60000,
+            cacheScope: "private"
+          }
+        }
+      ]])
+    })
+
+    it("returns modern header validation errors for missing and mismatched 2026 headers", async () => {
+      const handlers = createMcpHandlers(createMockMcpServer, undefined, undefined, modernHandlerFactory)
+      const missingMethod = createMockResponse()
+      const missingName = createMockResponse()
+      const mismatchedName = createMockResponse()
+
+      await handlers.post(
+        createMockRequest(
+          { jsonrpc: "2.0", method: "tools/list", id: 6, params: { _meta: modernMeta } },
+          {
+            accept: "application/json, text/event-stream",
+            "mcp-protocol-version": "2026-07-28"
+          }
+        ),
+        missingMethod
+      )
+      await handlers.post(
+        createMockRequest(
+          {
+            jsonrpc: "2.0",
+            method: "tools/call",
+            id: 7,
+            params: { name: "get_huly_context", arguments: {}, _meta: modernMeta }
+          },
+          {
+            accept: "application/json, text/event-stream",
+            "mcp-protocol-version": "2026-07-28",
+            "mcp-method": "tools/call"
+          }
+        ),
+        missingName
+      )
+      await handlers.post(
+        createMockRequest(
+          {
+            jsonrpc: "2.0",
+            method: "resources/read",
+            id: 8,
+            params: { uri: "huly://projects/HULY", _meta: modernMeta }
+          },
+          modernHeaders("resources/read", "huly://projects/OTHER")
+        ),
+        mismatchedName
+      )
+
+      expect(getResponseCalls(missingMethod).status).toEqual([[400]])
+      expect(getResponseCalls(missingMethod).json[0]?.[0]).toMatchObject({
+        error: { code: -32001, message: expect.stringContaining("Mcp-Method") }
+      })
+      expect(getResponseCalls(missingName).status).toEqual([[400]])
+      expect(getResponseCalls(missingName).json[0]?.[0]).toMatchObject({
+        error: { code: -32001, message: expect.stringContaining("Mcp-Name") }
+      })
+      expect(getResponseCalls(mismatchedName).status).toEqual([[400]])
+      expect(getResponseCalls(mismatchedName).json[0]?.[0]).toMatchObject({
+        error: { code: -32001, message: expect.stringContaining("does not match") }
+      })
+    })
+
+    it("returns modern errors for missing _meta, unsupported protocol, invalid body, and unknown methods", async () => {
+      const handlers = createMcpHandlers(createMockMcpServer, undefined, undefined, modernHandlerFactory)
+      const missingMeta = createMockResponse()
+      const unsupported = createMockResponse()
+      const invalidBody = createMockResponse()
+      const unknownMethod = createMockResponse()
+
+      await handlers.post(
+        createMockRequest(
+          { jsonrpc: "2.0", method: "tools/list", id: 9, params: {} },
+          modernHeaders("tools/list")
+        ),
+        missingMeta
+      )
+      await handlers.post(
+        createMockRequest(
+          {
+            jsonrpc: "2.0",
+            method: "server/discover",
+            id: 10,
+            params: {
+              _meta: {
+                ...modernMeta,
+                "io.modelcontextprotocol/protocolVersion": "1900-01-01"
+              }
+            }
+          },
+          {
+            ...modernHeaders("server/discover"),
+            "mcp-protocol-version": "1900-01-01"
+          }
+        ),
+        unsupported
+      )
+      await handlers.post(
+        createMockRequest(
+          [{ jsonrpc: "2.0", method: "tools/list", id: 11 }],
+          modernHeaders("tools/list")
+        ),
+        invalidBody
+      )
+      await handlers.post(
+        createMockRequest(
+          { jsonrpc: "2.0", method: "unknown/method", id: 12, params: { _meta: modernMeta } },
+          modernHeaders("unknown/method")
+        ),
+        unknownMethod
+      )
+
+      expect(getResponseCalls(missingMeta).json[0]?.[0]).toMatchObject({ error: { code: -32001 } })
+      expect(getResponseCalls(unsupported).json[0]?.[0]).toMatchObject({
+        error: { code: -32004, data: { supported: ["2026-07-28"], requested: "1900-01-01" } }
+      })
+      expect(getResponseCalls(invalidBody).json[0]?.[0]).toMatchObject({ error: { code: -32600 } })
+      expect(getResponseCalls(unknownMethod).status).toEqual([[404]])
+      expect(getResponseCalls(unknownMethod).json[0]?.[0]).toMatchObject({ error: { code: -32601 } })
+    })
+
+    it("maps 2026 resource-not-found failures to invalid params", async () => {
+      const handlers = createMcpHandlers(
+        createMockMcpServer,
+        undefined,
+        undefined,
+        () => ({
+          ...createMockProtocolHandlers(),
+          readResource: () =>
+            Promise.reject(new McpError(-32002, "Resource not found", { uri: "huly://projects/NOPE" }))
+        })
+      )
+      const res = createMockResponse()
+
+      await handlers.post(
+        createMockRequest(
+          {
+            jsonrpc: "2.0",
+            method: "resources/read",
+            id: 14,
+            params: { uri: "huly://projects/NOPE", _meta: modernMeta }
+          },
+          modernHeaders("resources/read", "huly://projects/NOPE")
+        ),
+        res
+      )
+
+      expect(getResponseCalls(res).status).toEqual([[400]])
+      expect(getResponseCalls(res).json[0]?.[0]).toMatchObject({
+        error: { code: -32602, message: "Resource not found", data: { uri: "huly://projects/NOPE" } }
+      })
+    })
+
+    it("delegates legacy HTTP requests to the SDK transport even when a 2026 handler factory exists", async () => {
+      const mockServer = createMockMcpServer()
+      const transport = createMockTransportDependencies()
+      const createProtocolHandlers = createProbe<[Request], McpProtocolHandlers>(modernHandlerFactory)
+      const handlers = createMcpHandlers(
+        () => mockServer,
+        transport.dependencies,
+        undefined,
+        createProtocolHandlers.fn
+      )
+      const req = createMockRequest({ jsonrpc: "2.0", method: "tools/list", id: 13 })
+      const res = createMockResponse()
+
+      await handlers.post(req, res)
+
+      expect(createProtocolHandlers.calls).toHaveLength(0)
       expect(getServerCalls(mockServer).connect).toHaveLength(1)
       expect(transport.calls.handleRequest).toEqual([[req, res, req.body]])
     })

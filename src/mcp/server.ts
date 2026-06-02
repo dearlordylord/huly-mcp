@@ -12,6 +12,7 @@ import { type ClientBundle, createMcpServer } from "./create-mcp-server.js"
 import type { HttpServerFactoryService, HttpTransportDependencies, HttpTransportError } from "./http-transport.js"
 import { DEFAULT_HTTP_PORT, startHttpTransport } from "./http-transport.js"
 import { buildHulyContext, parseToolsets } from "./huly-context-tool.js"
+import { createMcpProtocolHandlers } from "./protocol-handlers.js"
 
 import { type SanitizedHulyRuntimeConfigContext, sanitizeHulyRuntimeConfigFromEnv } from "../config/config.js"
 import type { GetHulyContextResult } from "../domain/schemas/index.js"
@@ -171,18 +172,21 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
               } else {
                 const port = config.httpPort ?? DEFAULT_HTTP_PORT
                 const host = config.httpHost ?? "127.0.0.1"
+                const createHttpRequestContext = (req: Request) => {
+                  const resolveClientsForRequest = config.resolveClientsForHttpRequest
+                  const requestResolveClients = resolveClientsForRequest === undefined
+                    ? config.resolveClients
+                    : () => resolveClientsForRequest(req)
+                  const requestRuntimeConfig = config.getRuntimeConfigContextForHttpRequest === undefined
+                    ? getRuntimeConfigContext()
+                    : config.getRuntimeConfigContextForHttpRequest(req)
+                  return { requestResolveClients, requestRuntimeConfig }
+                }
 
                 yield* startHttpTransport(
                   { port, host, authToken: config.mcpAuthToken },
                   (req) => {
-                    const resolveClientsForRequest = config.resolveClientsForHttpRequest
-                    const requestResolveClients = resolveClientsForRequest === undefined
-                      ? config.resolveClients
-                      : () => resolveClientsForRequest(req)
-                    const getRuntimeConfigContextForRequest = config.getRuntimeConfigContextForHttpRequest
-                    const requestRuntimeConfig = getRuntimeConfigContextForRequest === undefined
-                      ? getRuntimeConfigContext()
-                      : getRuntimeConfigContextForRequest(req)
+                    const { requestResolveClients, requestRuntimeConfig } = createHttpRequestContext(req)
                     return createMcpServer(
                       requestResolveClients,
                       telemetry,
@@ -191,7 +195,16 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                       config.createServer
                     )[0]
                   },
-                  config.httpTransportDependencies
+                  config.httpTransportDependencies,
+                  (req) => {
+                    const { requestResolveClients, requestRuntimeConfig } = createHttpRequestContext(req)
+                    return createMcpProtocolHandlers(
+                      requestResolveClients,
+                      telemetry,
+                      registry,
+                      () => getHulyContext(requestRuntimeConfig)
+                    )
+                  }
                 ).pipe(
                   Effect.scoped,
                   Effect.mapError(

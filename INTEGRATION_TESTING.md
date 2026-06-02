@@ -70,6 +70,19 @@ HULY_URL="${HULY_URL/localhost/host.docker.internal}" \
 
 By default, this starts `node dist/index.cjs` with `MCP_TRANSPORT=http` and lets the server resolve Huly credentials from process environment variables. This tests HTTP transport parity with local stdio configuration.
 
+The HTTP server supports both the existing SDK initialize-compatible request flow and the 2026 stateless request flow at the same `/mcp` endpoint. Dispatch is per request: 2026 requests use `MCP-Protocol-Version: 2026-07-28` and per-request `_meta`; requests without those 2026 signals continue through the SDK transport.
+
+`INTEGRATION_MCP_PROTOCOL=legacy|2026` is only a test harness switch for choosing which request shape the suite sends. It does not configure the server to support only one protocol mode. The HTTP suite defaults to `legacy` initialize-compatible MCP requests. To exercise the 2026 stateless HTTP path, add `INTEGRATION_MCP_PROTOCOL=2026`; the harness injects per-request `_meta`, `MCP-Protocol-Version`, `Mcp-Method`, and `Mcp-Name` headers:
+
+```bash
+pnpm build
+set -a && source .env.local && set +a
+HULY_URL="${HULY_URL/localhost/host.docker.internal}" \
+  INTEGRATION_TRANSPORT=http \
+  INTEGRATION_MCP_PROTOCOL=2026 \
+  bash scripts/integration_test_full.sh
+```
+
 To test hosted URL header configuration, provide a Huly API token and run the same suite with credentials sent as request headers:
 
 ```bash

@@ -17,6 +17,9 @@ import type { Scope } from "effect"
 import { Context, Effect, Layer, Schema } from "effect"
 import type { Express, Request, Response } from "express"
 
+import { dispatchMcp2026Request, shouldDispatchMcp2026Request } from "./http-2026-dispatcher.js"
+import type { McpProtocolHandlers } from "./protocol-handlers.js"
+
 export const DEFAULT_HTTP_PORT = 3000
 const HTTP_METHOD_NOT_ALLOWED = 405
 const HTTP_UNAUTHORIZED = 401
@@ -99,6 +102,8 @@ export interface HttpTransportDependencies {
   readonly writeError: (message: string) => void
 }
 
+type HttpProtocolHandlerFactory = (req: Request) => McpProtocolHandlers
+
 const defaultTransportDependencies: HttpTransportDependencies = {
   createTransport: () => new StreamableHTTPServerTransport({}),
   writeError: writeStderr
@@ -173,7 +178,8 @@ export class HttpServerFactoryService extends Context.Tag("@hulymcp/HttpServerFa
 export const createMcpHandlers = (
   createServer: (req: Request) => Server,
   dependencies: HttpTransportDependencies = defaultTransportDependencies,
-  authToken?: string
+  authToken?: string,
+  createProtocolHandlers?: HttpProtocolHandlerFactory
 ): {
   post: (req: Request, res: Response) => Promise<void>
   get: (req: Request, res: Response) => void
@@ -183,6 +189,11 @@ export const createMcpHandlers = (
     try {
       if (!isAuthorizedMcpRequest(req, authToken)) {
         writeUnauthorized(res)
+        return
+      }
+
+      if (createProtocolHandlers !== undefined && shouldDispatchMcp2026Request(req)) {
+        await dispatchMcp2026Request(req, res, createProtocolHandlers(req))
         return
       }
 
@@ -274,17 +285,23 @@ const closeHttpServer = (
 export const startHttpTransport = (
   config: HttpTransportConfig,
   createServer: (req: Request) => Server,
-  dependencies?: Partial<HttpTransportDependencies>
+  dependencies?: Partial<HttpTransportDependencies>,
+  createProtocolHandlers?: HttpProtocolHandlerFactory
 ): Effect.Effect<void, HttpTransportError, HttpServerFactoryService | Scope.Scope> =>
   Effect.gen(function*() {
     const factory = yield* HttpServerFactoryService
     const writeError: (message: string) => void = dependencies?.writeError ?? factory.writeError ?? writeStderr
 
     const app = factory.createApp(config.host)
-    const handlers = createMcpHandlers(createServer, {
-      createTransport: dependencies?.createTransport ?? defaultTransportDependencies.createTransport,
-      writeError
-    }, config.authToken)
+    const handlers = createMcpHandlers(
+      createServer,
+      {
+        createTransport: dependencies?.createTransport ?? defaultTransportDependencies.createTransport,
+        writeError
+      },
+      config.authToken,
+      createProtocolHandlers
+    )
     app.post("/mcp", handlers.post)
     app.get("/mcp", handlers.get)
     app.delete("/mcp", handlers.delete)

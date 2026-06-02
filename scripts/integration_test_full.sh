@@ -13,6 +13,7 @@ if ! command -v jq &>/dev/null; then
 fi
 
 INTEGRATION_TRANSPORT="${INTEGRATION_TRANSPORT:-stdio}"
+INTEGRATION_MCP_PROTOCOL="${INTEGRATION_MCP_PROTOCOL:-legacy}"
 INTEGRATION_HTTP_CONFIG="${INTEGRATION_HTTP_CONFIG:-env}"
 INTEGRATION_HTTP_HOST="${INTEGRATION_HTTP_HOST:-127.0.0.1}"
 INTEGRATION_HTTP_PORT="${INTEGRATION_HTTP_PORT:-19888}"
@@ -33,6 +34,16 @@ fi
 
 if [ "$INTEGRATION_TRANSPORT" != "stdio" ] && [ "$INTEGRATION_TRANSPORT" != "http" ]; then
   echo "ERROR: INTEGRATION_TRANSPORT must be 'stdio' or 'http'"
+  exit 1
+fi
+
+if [ "$INTEGRATION_MCP_PROTOCOL" != "legacy" ] && [ "$INTEGRATION_MCP_PROTOCOL" != "2026" ]; then
+  echo "ERROR: INTEGRATION_MCP_PROTOCOL must be 'legacy' or '2026'"
+  exit 1
+fi
+
+if [ "$INTEGRATION_MCP_PROTOCOL" = "2026" ] && [ "$INTEGRATION_TRANSPORT" != "http" ]; then
+  echo "ERROR: INTEGRATION_MCP_PROTOCOL=2026 requires INTEGRATION_TRANSPORT=http"
   exit 1
 fi
 
@@ -57,6 +68,7 @@ if [ "$INTEGRATION_TRANSPORT" = "http" ] && [ "$INTEGRATION_HTTP_CONFIG" = "head
 fi
 
 INIT='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
+MCP_2026_META='{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"hulymcp-integration","version":"1.0"},"io.modelcontextprotocol/clientCapabilities":{}}'
 PROJECT="HULY"
 RUN_ID="$(date +%s)-$$"
 PASSED=0
@@ -202,7 +214,23 @@ call_tool_stdio() {
 call_tool_http() {
   local payload="$1"
   local response
-  response=$(curl -sS --max-time "$TOOL_TIMEOUT" --config "$HTTP_CURL_CONFIG" --request POST --data "$payload" "$HTTP_ENDPOINT" 2>/dev/null)
+  local request_payload="$payload"
+  local curl_args=(-sS --max-time "$TOOL_TIMEOUT" --config "$HTTP_CURL_CONFIG" --request POST)
+  if [ "$INTEGRATION_MCP_PROTOCOL" = "2026" ]; then
+    local method
+    local name
+    request_payload=$(printf '%s\n' "$payload" | jq -c --argjson meta "$MCP_2026_META" '.params = ((.params // {}) + {"_meta": $meta})')
+    method=$(printf '%s\n' "$request_payload" | jq -r '.method')
+    name=$(printf '%s\n' "$request_payload" | jq -r 'if .method == "tools/call" then .params.name elif .method == "resources/read" then .params.uri else empty end')
+    curl_args+=(
+      --header "MCP-Protocol-Version: 2026-07-28"
+      --header "Mcp-Method: $method"
+    )
+    if [ -n "$name" ]; then
+      curl_args+=(--header "Mcp-Name: $name")
+    fi
+  fi
+  response=$(curl "${curl_args[@]}" --data "$request_payload" "$HTTP_ENDPOINT" 2>/dev/null)
   extract_http_json_response "$response" | grep '"id":2'
 }
 
