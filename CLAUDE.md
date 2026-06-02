@@ -13,9 +13,9 @@ When setting up a new project from this one, ALL of these components must be cop
 
 1. **Test coverage** (`vitest.config.ts`): v8 provider, 99% thresholds, `test:coverage` script. Requires `@vitest/coverage-v8` dev dep.
 2. **Code duplication** (`.jscpd.json` + `jscpd src` in lint script): threshold 2%, console reporter.
-3. **Circular dependency detection** (`madge --circular` in `circular` script): catches import cycles.
+3. **Circular dependency detection** (`madge --circular` in `circular` script, wired into `check-all`): catches import cycles.
 4. **Pre-commit hooks** (`.husky/pre-commit`): lint-staged + gitleaks secrets scanning.
-5. **check-all** (`pnpm check-all`): build + typecheck + lint (eslint + jscpd) + test. Gate for all work.
+5. **check-all** (`pnpm check-all`): build + typecheck + circular + lint (eslint + jscpd) + test. Gate for all work.
 6. **Effect testing** (`@effect/vitest`): Effect-aware test runner integration.
 7. **ESLint** (`@effect/eslint-plugin`, `eslint-plugin-functional`, `@effect/dprint`): formatting + lint.
 
@@ -28,7 +28,7 @@ Use `pnpm`, not npm. Prefer package.json scripts over raw commands (e.g., `pnpm 
 ## Verification
 
 Run before considering work complete:
-1. `pnpm check-all` (runs build, typecheck, lint, test)
+1. `pnpm check-all` (runs build, typecheck, circular, lint, test)
 2. Integration tests against local Huly (Docker) — **required** for any new feature, major change, or pre-release. Do not defer to the user; run them yourself. See `INTEGRATION_TESTING.md` for test patterns and `CLAUDE.local.md` for credentials/setup.
 
 ## Type Safety

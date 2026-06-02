@@ -40,15 +40,11 @@ import type {
   UpdateTeamspaceResult
 } from "../../domain/schemas/documents.js"
 import { UPDATE_TEAMSPACE_FIELDS } from "../../domain/schemas/documents.js"
-import {
-  DocumentId,
-  type DocumentIdentifier,
-  TeamspaceId,
-  type TeamspaceIdentifier
-} from "../../domain/schemas/shared.js"
+import { DocumentId, TeamspaceId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import { DocumentNotFoundError, type NoUpdateFieldsError, TeamspaceNotFoundError } from "../errors.js"
+import { DocumentNotFoundError, type NoUpdateFieldsError, type TeamspaceNotFoundError } from "../errors.js"
 import { buildDocumentUrlFromConfig } from "../url-builders.js"
+import { findTeamspace, findTeamspaceAndDocument } from "./documents-shared.js"
 import {
   clampLimit,
   escapeLikeWildcards,
@@ -102,74 +98,7 @@ type DeleteDocumentError =
 
 // --- Helpers ---
 
-/**
- * Find a teamspace by name or ID.
- * By default only finds non-archived teamspaces. Pass includeArchived to find any.
- */
-const findTeamspace = (
-  identifier: TeamspaceIdentifier,
-  opts?: { includeArchived?: boolean }
-): Effect.Effect<
-  { client: HulyClient["Type"]; teamspace: HulyTeamspace },
-  TeamspaceNotFoundError | HulyClientError,
-  HulyClient
-> =>
-  Effect.gen(function*() {
-    const client = yield* HulyClient
-
-    const nameQuery: StrictDocumentQuery<HulyTeamspace> = { name: identifier }
-    const idQuery: StrictDocumentQuery<HulyTeamspace> = { _id: toRef<HulyTeamspace>(identifier) }
-    if (!opts?.includeArchived) {
-      nameQuery.archived = false
-      idQuery.archived = false
-    }
-
-    const teamspace = yield* findByNameOrId(
-      client,
-      documentPlugin.class.Teamspace,
-      nameQuery,
-      idQuery
-    )
-
-    if (teamspace === undefined) {
-      return yield* new TeamspaceNotFoundError({ identifier })
-    }
-
-    return { client, teamspace }
-  })
-
-/**
- * Find a teamspace and document.
- */
-export const findTeamspaceAndDocument = (
-  params: {
-    readonly teamspace: TeamspaceIdentifier
-    readonly document: DocumentIdentifier
-  }
-): Effect.Effect<
-  { client: HulyClient["Type"]; teamspace: HulyTeamspace; doc: HulyDocument },
-  TeamspaceNotFoundError | DocumentNotFoundError | HulyClientError,
-  HulyClient
-> =>
-  Effect.gen(function*() {
-    const { client, teamspace } = yield* findTeamspace(params.teamspace)
-
-    const doc = yield* findByNameOrId(
-      client,
-      documentPlugin.class.Document,
-      { space: teamspace._id, title: params.document },
-      { space: teamspace._id, _id: toRef<HulyDocument>(params.document) }
-    )
-
-    if (doc === undefined) {
-      return yield* new DocumentNotFoundError({
-        identifier: params.document,
-        teamspace: params.teamspace
-      })
-    }
-
-    return { client, teamspace, doc }
-  })
+export { findTeamspaceAndDocument }
 
 // --- Operations ---
 

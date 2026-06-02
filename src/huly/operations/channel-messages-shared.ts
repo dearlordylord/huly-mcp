@@ -5,7 +5,7 @@ import type { ChannelIdentifier, MessageId } from "../../domain/schemas/shared.j
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { ChannelNotFoundError } from "../errors.js"
 import { MessageNotFoundError } from "../errors.js"
-import { findChannel } from "./channels.js"
+import { findChannel } from "./channels-shared.js"
 import { toRef } from "./sdk-boundary.js"
 
 import { chunter } from "../huly-plugins.js"

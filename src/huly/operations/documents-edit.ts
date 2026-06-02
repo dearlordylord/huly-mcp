@@ -24,7 +24,7 @@ import {
   type TeamspaceNotFoundError
 } from "../errors.js"
 import { buildDocumentUrlFromConfig } from "../url-builders.js"
-import { findTeamspaceAndDocument } from "./documents.js"
+import { findTeamspaceAndDocument } from "./documents-shared.js"
 
 import { documentPlugin } from "../huly-plugins.js"
 

@@ -39,9 +39,10 @@ import type {
 import { UPDATE_CHANNEL_FIELDS } from "../../domain/schemas/channels.js"
 import { AccountUuid, ChannelId, ChannelName, MessageId, PersonName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import { ChannelNotFoundError, type NoUpdateFieldsError } from "../errors.js"
+import type { ChannelNotFoundError, NoUpdateFieldsError } from "../errors.js"
+import { findChannel } from "./channels-shared.js"
 import { markdownToMarkupString, markupToMarkdownString } from "./markup.js"
-import { clampLimit, escapeLikeWildcards, findByNameOrId } from "./query-helpers.js"
+import { clampLimit, escapeLikeWildcards } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import { requireUpdateFields } from "./update-guards.js"
 
@@ -90,29 +91,7 @@ const personIdsAsSocialIdentityRefs = (
 
 // --- Helpers ---
 
-export const findChannel = (
-  identifier: string
-): Effect.Effect<
-  { client: HulyClient["Type"]; channel: HulyChannel },
-  ChannelNotFoundError | HulyClientError,
-  HulyClient
-> =>
-  Effect.gen(function*() {
-    const client = yield* HulyClient
-
-    const channel = yield* findByNameOrId(
-      client,
-      chunter.class.Channel,
-      { name: identifier },
-      { _id: toRef<HulyChannel>(identifier) }
-    )
-
-    if (channel === undefined) {
-      return yield* new ChannelNotFoundError({ identifier })
-    }
-
-    return { client, channel }
-  })
+export { findChannel }
 
 /**
  * Build a map from SocialIdentity ID to Person name.
