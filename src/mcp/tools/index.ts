@@ -29,6 +29,7 @@ import {
   requiresArgumentsObject,
   resolveAnnotations
 } from "./registry.js"
+import { sdkDiscoveryTools } from "./sdk-discovery.js"
 import { searchTools } from "./search.js"
 import { storageTools } from "./storage.js"
 import { tagCategoryTools } from "./tag-categories.js"
@@ -51,6 +52,7 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...milestoneTools,
   ...documentTools,
   ...genericAssociationTools,
+  ...sdkDiscoveryTools,
   ...storageTools,
   ...attachmentTools,
   ...contactTools,

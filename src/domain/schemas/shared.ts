@@ -166,6 +166,12 @@ export type WorkSlotId = Schema.Schema.Type<typeof WorkSlotId>
 export const CustomFieldId = HulyRef("CustomFieldId")
 export type CustomFieldId = Schema.Schema.Type<typeof CustomFieldId>
 
+export const HulyAttributeId = HulyRef("HulyAttributeId")
+export type HulyAttributeId = Schema.Schema.Type<typeof HulyAttributeId>
+
+export const HulyEnumId = HulyRef("HulyEnumId")
+export type HulyEnumId = Schema.Schema.Type<typeof HulyEnumId>
+
 export const TestProjectId = HulyRef("TestProjectId")
 export type TestProjectId = Schema.Schema.Type<typeof TestProjectId>
 

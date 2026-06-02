@@ -2,8 +2,6 @@
 
 Scope: features that are represented in the local Huly SDK/dev reference tree or installed `@hcengineering/*` packages, but are not exposed by this MCP server as first-class LLM-facing tools.
 
-Relationship to `plans/sdk-coverage-backlog.md`: this gap matrix is the canonical broad inventory. The SDK coverage backlog is historical validation notes from the initial audit; do not maintain it as a second active backlog.
-
 Audit guard: `plans/sdk-parity-ledger.json` classifies every installed `@hcengineering/*` plugin class or model-like export and every `.reference/platform/models/*` area discovered by `scripts/audit-sdk-parity.mjs` as `covered`, `gap`, `ignored`, or `not-mcp-facing`. `pnpm verify-sdk-parity` fails when a newly installed SDK model export or reference model area is not classified here.
 
 Local evidence sources:
@@ -43,7 +41,7 @@ Current high-level MCP categories:
 | Activity gaps | Installed `@hcengineering/activity`; `.reference/platform/models/activity/src/index.ts`: pinned messages, replies, references, filters, saved messages, reactions, mentions | List activity, reactions, save/unsave, mentions | Pin/unpin activity messages, generic activity replies on raw object activity, activity filters, activity references/mentions to objects, activity update-message introspection |
 | Attachments gaps | Installed `@hcengineering/attachment`; `.reference/platform/models/attachment/src/index.ts`: `Attachment`, `Embedding`, `Photo`, `SavedAttachments`, `Drawing` | Generic attachment CRUD/download/pin; issue/document convenience add | Saved attachments, photo-specific collections, embeddings, drawings, attachment previews/preview metadata, object-specific friendly wrappers beyond issue/document |
 | Tags/labels beyond tracker issues | Installed `@hcengineering/tags`; `.reference/platform/models/tags/src/index.ts`: `TagElement`, `TagReference`, `TagCategory` with arbitrary `targetClass` | SDK-level generic tags are covered: target-class TagElement CRUD, raw TagReference list/attach/detach, tracker `labels` wrappers, and arbitrary-target tag categories | Module-specific friendly wrappers remain for recruiting skills, board labels, controlled-doc labels, and contact tags so callers do not need raw object IDs/classes/collection names |
-| Core classes, attributes, enums | Installed `@hcengineering/core`; `.reference/platform/models/core/src/core.ts`: `Class`, `Mixin`, `Enum`, `Attribute`, type classes, sequence/custom sequence | Custom-field read/set; no schema management | Class listing/details, attribute/property create/update/delete/hide, enum CRUD/options, sequence management, class metadata discovery for LLM-safe raw-object operations |
+| Core classes, attributes, enums | Installed `@hcengineering/core`; `.reference/platform/models/core/src/core.ts`: `Class`, `Mixin`, `Enum`, `Attribute`, type classes, sequence/custom sequence | Custom-field read/set; read-only `list_huly_classes`, `get_huly_class`, `list_huly_attributes`, `list_huly_enums` expose class/interface/mixin IDs, attributes, inherited fields, enum values, and purpose-built MCP tool hints | Attribute/property create/update/delete/hide, enum CRUD/options, sequence management, space-type metadata discovery |
 | Core spaces, permissions, roles | Installed `@hcengineering/core`; `.reference/platform/models/core/src/security.ts`: `Space`, `TypedSpace`, `SpaceType`, `Role`, `Permission`, permission groups | Workspace member role update, project/teamspace create/update partial | Generic space listing/details/members, space roles, space type roles, permissions, owners/members/private/auto-join across modules, global spaces admins |
 | Settings / integrations registry | `.reference/platform/models/setting/src/index.ts`: `Integration`, `IntegrationType`, settings categories, invite settings, role capability settings, office settings, workspace settings | Guest settings and access links, workspace info/profile | List integrations/integration types, connect/disconnect/configure integration records where backend supports it, invite settings, role capability settings, office settings, workspace setting icon/metadata |
 | GitHub integration | Huly docs plus integration architecture in settings; PR task type appears through tracker/task type model when GitHub is enabled | No GitHub integration tools; issue tools may operate on synced issues after setup | Connect/list mapped repositories, map/unmap repo to project, list pull requests, issue GitHub sync controls, GitHub link metadata |
@@ -84,8 +82,8 @@ Current high-level MCP categories:
 
 ## Highest-Value Additions For LLM Agents
 
-1. **Generic SDK object discovery**: list classes, attributes, enums, space types, and known plugin class IDs with human labels. This reduces hallucination when using raw-object tools.
-2. **Generic space/member/role tools**: many modules share `TypedSpace`, roles, members, privacy, and auto-join patterns.
+1. **Generic space/member/role tools**: many modules share `TypedSpace`, roles, members, privacy, and auto-join patterns.
+2. **SDK discovery phase 2**: add space type, role/permission, plugin configuration, and sequence metadata discovery on top of the class/attribute/enum tools.
 3. **Drive**: high-value and strongly modeled (`Drive`, `Folder`, `File`, `FileVersion`) but absent.
 4. **Planner/ToDos**: strongly modeled and user-visible; current `WorkSlot` tools are not enough.
 5. **Recruiting**: strongly modeled, currently absent, and requires first-class resolvers for vacancies/talents/applications.

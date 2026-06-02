@@ -148,6 +148,7 @@ The full suite tests CRUD lifecycles with cleanup for all domains:
 | 11. Calendar | list events/work_slots/time_reports/recurring, create/get/update/delete event, start/stop timer | Lifecycle (create_recurring_event skipped — no delete tool) |
 | 12. Notifications | list, count, contexts, settings, get, mark_read | Read operations (+ mutation if notifications exist) |
 | 13. Search | fulltext_search | Uses `searchFulltext` API |
+| 13a. SDK Discovery | list_huly_classes, get_huly_class, list_huly_attributes, list_huly_enums | Read-only model discovery for class IDs, attributes, inherited fields, purpose-built tool hints, and enum totals |
 | 13b. Generic Associations | list_associations, create_association, delete_association, list_relations, create_relation, delete_relation | Disposable association + relation lifecycle, including idempotency, in-use association delete rejection, public association cleanup, cardinality violation, and card endpoint locators by ID and title |
 | 14. Cards | list_card_spaces, list_master_tags, list_cards | Read operations with cardSpace |
 | 15. Activity | list_mentions, list_saved_messages | Read operations |

@@ -43,6 +43,7 @@ describe("CATEGORY_NAMES", () => {
       expect(CATEGORY_NAMES.has("comments")).toBe(true)
       expect(CATEGORY_NAMES.has("task-management")).toBe(true)
       expect(CATEGORY_NAMES.has("associations")).toBe(true)
+      expect(CATEGORY_NAMES.has("sdk-discovery")).toBe(true)
       expect(CATEGORY_NAMES.has("user-statuses")).toBe(true)
       expect(CATEGORY_NAMES.size).toBeGreaterThan(5)
     }))

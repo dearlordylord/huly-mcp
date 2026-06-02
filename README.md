@@ -265,7 +265,7 @@ Resource roadmap:
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
 ## Available Tools
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `leads`, `processes`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `leads`, `processes`, `sdk-discovery`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`
 
 ### Projects
 
@@ -550,6 +550,15 @@ Resource roadmap:
 | `list_process_executions` | List read-only Huly Process workflow executions. Supports filters by process ID/name, card/document ID/title, and status. Rows are enriched with process name, card title, and current state title when available. |
 | `start_process` | Start a new active Huly Process workflow execution on a card/document. Accepts process ID or exact process name, and card/document ID or exact title; ambiguous names or titles fail with candidate IDs. This is not idempotent: each successful call creates a new execution unless the process forbids parallel active executions for the same card, in which case the existing active execution ID is returned in a typed error. |
 | `cancel_execution` | Idempotently cancel one Huly Process execution by execution ID. Active executions are marked cancelled; already-cancelled executions succeed with cancelled=false; completed executions fail without changing history. |
+
+### Sdk-Discovery
+
+| Tool | Description |
+|------|-------------|
+| `list_huly_classes` | Discover Huly model class, interface, and mixin IDs visible in this workspace. Use this before raw-object, generic association, custom field, or model-backed work when you need exact class IDs instead of guessing. |
+| `get_huly_class` | Read one Huly class/interface/mixin by exact ID and return its inheritance chain plus model attributes. Use this when you need fields, ref targets, enum IDs, or hints about purpose-built MCP tool categories for the class. |
+| `list_huly_attributes` | Discover Huly model attributes across the workspace or directly on one class/mixin. Returns attribute IDs, owner classes, labels, type families, ref targets, enum IDs, and custom-field markers. |
+| `list_huly_enums` | Discover Huly enum model documents and their valid values. Use enum IDs from get_huly_class or list_huly_attributes to inspect allowed enum values before writing or interpreting enum fields. |
 
 ### Tag-Categories
 

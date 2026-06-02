@@ -1525,6 +1525,53 @@ run_test "fulltext_search" \
 echo ""
 
 ##############################
+# 13a. SDK DISCOVERY
+##############################
+echo "=== 13a. SDK Discovery ==="
+SDK_CLASSES_TEXT=$(run_capture "list_huly_classes(issue)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_huly_classes","arguments":{"query":"Issue","limit":10}},"id":2}')
+if [ $? -eq 0 ]; then
+  if printf '%s\n' "$SDK_CLASSES_TEXT" | jq -e 'any(.classes[]?; .classId == "tracker:class:Issue" and .label == "Issue")' >/dev/null 2>&1; then
+    echo "PASS: list_huly_classes includes tracker issue"
+    PASSED=$((PASSED + 1))
+  else
+    fail_test "list_huly_classes includes tracker issue" "tracker:class:Issue missing"
+  fi
+fi
+
+SDK_CLASS_TEXT=$(run_capture "get_huly_class(tracker:class:Issue)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_huly_class","arguments":{"class":"tracker:class:Issue"}},"id":2}')
+if [ $? -eq 0 ]; then
+  assert_json_field_equals "get_huly_class returns issue class" "$SDK_CLASS_TEXT" ".class.classId" "tracker:class:Issue"
+  assert_json_field_nonempty "get_huly_class returns attributes" "$SDK_CLASS_TEXT" ".attributes[0].attributeId"
+  if printf '%s\n' "$SDK_CLASS_TEXT" | jq -e 'any(.attributes[]?; .inherited == true)' >/dev/null 2>&1; then
+    echo "PASS: get_huly_class returns inherited attributes"
+    PASSED=$((PASSED + 1))
+  else
+    fail_test "get_huly_class returns inherited attributes" "no inherited attributes returned"
+  fi
+  if printf '%s\n' "$SDK_CLASS_TEXT" | jq -e 'any(.class.firstClassToolHints[]?; .category == "issues" and any(.exampleTools[]?; . == "get_issue"))' >/dev/null 2>&1; then
+    echo "PASS: get_huly_class returns first-class tool hints"
+    PASSED=$((PASSED + 1))
+  else
+    fail_test "get_huly_class returns first-class tool hints" "issues tool hint missing"
+  fi
+fi
+
+SDK_ATTRIBUTES_TEXT=$(run_capture "list_huly_attributes(issue)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_huly_attributes","arguments":{"class":"tracker:class:Issue","limit":5}},"id":2}')
+if [ $? -eq 0 ]; then
+  assert_json_field_nonempty "list_huly_attributes returns attribute id" "$SDK_ATTRIBUTES_TEXT" ".attributes[0].attributeId"
+fi
+
+SDK_ENUMS_TEXT=$(run_capture "list_huly_enums" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_huly_enums","arguments":{"limit":5}},"id":2}')
+if [ $? -eq 0 ]; then
+  assert_json_field_nonempty "list_huly_enums returns total" "$SDK_ENUMS_TEXT" ".total"
+fi
+echo ""
+
+##############################
 # 13b. GENERIC ASSOCIATIONS
 ##############################
 echo "=== 13b. Generic Associations ==="

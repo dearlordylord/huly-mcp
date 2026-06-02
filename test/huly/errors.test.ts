@@ -32,6 +32,7 @@ import {
   GenericObjectLocatorInvalidError,
   GenericObjectNotFoundError,
   HulyAuthError,
+  HulyClassNotFoundError,
   HulyConnectionError,
   type HulyDomainError,
   HulyDomainError as HulyDomainErrorSchema,
@@ -832,6 +833,8 @@ describe("Huly Errors", () => {
               return `generic-object-invalid:${error.field}:${error.reason}`
             case "GenericObjectNotFoundError":
               return `generic-object-not-found:${error.field}:${error.identifier}:${error.class ?? ""}`
+            case "HulyClassNotFoundError":
+              return `huly-class-not-found:${error.classId}`
             case "NoUpdateFieldsError":
               return `no-update-fields:${error.operation}:${error.fields.length}`
             case "CannotDirectMessageSelfError":
@@ -1018,6 +1021,9 @@ describe("Huly Errors", () => {
             })
           )
         ).toBe("generic-object-not-found:target:missing-doc:document:class:Document")
+        expect(matchError(new HulyClassNotFoundError({ classId: ObjectClassName.make("missing:class:Thing") }))).toBe(
+          "huly-class-not-found:missing:class:Thing"
+        )
         expect(matchError(new NoUpdateFieldsError({ operation: "update_issue", fields: ["title"] }))).toBe(
           "no-update-fields:update_issue:1"
         )

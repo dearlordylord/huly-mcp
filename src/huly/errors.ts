@@ -91,6 +91,7 @@ import {
   ProcessNotFoundError,
   ProcessParallelExecutionForbiddenError
 } from "./errors-processes.js"
+import { HulyClassNotFoundError } from "./errors-sdk-discovery.js"
 import {
   TestCaseNotFoundError,
   TestPlanItemNotFoundError,
@@ -146,6 +147,7 @@ export {
   GenericObjectLocatorInvalidError,
   GenericObjectNotFoundError,
   HulyAuthError,
+  HulyClassNotFoundError,
   HulyConnectionError,
   HulyError,
   InvalidContactProviderError,
@@ -291,7 +293,8 @@ export const HulyDomainError: Schema.Union<
     typeof RelationEndpointClassMismatchError,
     typeof GenericObjectIdentifierAmbiguousError,
     typeof GenericObjectLocatorInvalidError,
-    typeof GenericObjectNotFoundError
+    typeof GenericObjectNotFoundError,
+    typeof HulyClassNotFoundError
   ]
 > = Schema.Union(
   HulyError,
@@ -379,7 +382,8 @@ export const HulyDomainError: Schema.Union<
   RelationEndpointClassMismatchError,
   GenericObjectIdentifierAmbiguousError,
   GenericObjectLocatorInvalidError,
-  GenericObjectNotFoundError
+  GenericObjectNotFoundError,
+  HulyClassNotFoundError
 )
 
 /**
