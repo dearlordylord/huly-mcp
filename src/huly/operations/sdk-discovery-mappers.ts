@@ -49,17 +49,16 @@ const decodeVerbatim = Schema.decodeUnknownEither(NonEmptyString)
 const verbatimOrDefault = (value: unknown, fallback: NonEmptyString): NonEmptyString =>
   Either.getOrElse(decodeVerbatim(value), () => fallback)
 
-const classNameOption = (value: unknown): Option.Option<ObjectClassName> => {
+const nonEmptyTrimmed = (value: unknown): Option.Option<string> => {
   if (typeof value !== "string") return Option.none()
   const normalized = value.trim()
-  return normalized === "" ? Option.none() : Option.some(ObjectClassName.make(normalized))
+  return normalized === "" ? Option.none() : Option.some(normalized)
 }
 
-const enumIdOption = (value: unknown): Option.Option<HulyEnumId> => {
-  if (typeof value !== "string") return Option.none()
-  const normalized = value.trim()
-  return normalized === "" ? Option.none() : Option.some(HulyEnumId.make(normalized))
-}
+const classNameOption = (value: unknown): Option.Option<ObjectClassName> =>
+  Option.map(nonEmptyTrimmed(value), ObjectClassName.make)
+
+const enumIdOption = (value: unknown): Option.Option<HulyEnumId> => Option.map(nonEmptyTrimmed(value), HulyEnumId.make)
 
 const decodeSdkClassifierKind = (kind: unknown): HulyClassifierKind =>
   Either.getOrElse(Schema.decodeUnknownEither(HulySdkClassifierKindSchema)(kind), () => "unknown")
