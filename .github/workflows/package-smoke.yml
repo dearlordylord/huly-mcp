@@ -1,0 +1,93 @@
+name: Package Smoke
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  packed-package:
+    name: Packed package (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version:
+          - 22.x
+          - 24.x
+          - 26.x
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build package
+        run: pnpm build
+
+      - name: Verify bundled version
+        run: pnpm verify-version
+
+      - name: Pack package
+        run: |
+          mkdir -p .package-smoke
+          npm_config_ignore_scripts=true pnpm pack --pack-destination .package-smoke
+
+      - name: Install and initialize packed package
+        run: |
+          set -euo pipefail
+
+          tarball="$(realpath "$(ls .package-smoke/*.tgz | head -n 1)")"
+          expected_version="$(node -p "require('./package.json').version")"
+          smoke_dir="$(mktemp -d)"
+
+          cd "$smoke_dir"
+          printf '{"private":true,"type":"module"}\n' > package.json
+          pnpm add "$tarball"
+
+          if ! printf '%s\n' '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"package-smoke","version":"1.0.0"}},"id":1}' \
+            | env LAZY_ENVS=true MCP_AUTO_EXIT=true timeout 10 pnpm exec huly-mcp > stdout.log 2> stderr.log; then
+            echo "::group::stdout"
+            cat stdout.log
+            echo "::endgroup::"
+            echo "::group::stderr"
+            cat stderr.log
+            echo "::endgroup::"
+            exit 1
+          fi
+
+          node - "$expected_version" <<'NODE'
+          const { readFileSync } = require("node:fs")
+
+          const expectedVersion = process.argv[2]
+          const stdout = readFileSync("stdout.log", "utf8").trim()
+          const response = JSON.parse(stdout)
+          const serverInfo = response.result?.serverInfo
+
+          if (serverInfo?.name !== "huly-mcp") {
+            throw new Error(`Unexpected server name: ${serverInfo?.name}`)
+          }
+
+          if (serverInfo?.version !== expectedVersion) {
+            throw new Error(`Unexpected server version: ${serverInfo?.version}; expected ${expectedVersion}`)
+          }
+          NODE
