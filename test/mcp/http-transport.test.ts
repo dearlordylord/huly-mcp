@@ -9,7 +9,7 @@
 import type http from "node:http"
 
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js"
-import { McpError } from "@modelcontextprotocol/sdk/types.js"
+import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js"
 import { Effect, Exit, Layer } from "effect"
 import type { Express, Request, Response } from "express"
 import { describe, expect, it } from "vitest"
@@ -573,6 +573,80 @@ describe("HTTP Transport", () => {
       expect(createProtocolHandlers.calls).toHaveLength(0)
       expect(getServerCalls(mockServer).connect).toHaveLength(1)
       expect(transport.calls.handleRequest).toEqual([[req, res, req.body]])
+    })
+
+    it("maps thrown 2026 internal errors to HTTP 500", async () => {
+      const handlers = createMcpHandlers(
+        createMockMcpServer,
+        undefined,
+        undefined,
+        () => ({
+          ...createMockProtocolHandlers(),
+          callTool: () => Promise.reject(new McpError(ErrorCode.InternalError, "boom"))
+        })
+      )
+      const res = createMockResponse()
+
+      await handlers.post(
+        createMockRequest(
+          {
+            jsonrpc: "2.0",
+            method: "tools/call",
+            id: 15,
+            params: { name: "get_huly_context", arguments: {}, _meta: modernMeta }
+          },
+          modernHeaders("tools/call", "get_huly_context")
+        ),
+        res
+      )
+
+      expect(getResponseCalls(res).status).toEqual([[500]])
+      expect(getResponseCalls(res).json[0]?.[0]).toMatchObject({
+        error: { code: -32603, message: expect.stringContaining("boom") }
+      })
+    })
+
+    it("routes a bare MCP-Protocol-Version request (no Mcp-Method or _meta) to the SDK transport", async () => {
+      const mockServer = createMockMcpServer()
+      const transport = createMockTransportDependencies()
+      const createProtocolHandlers = createProbe<[Request], McpProtocolHandlers>(modernHandlerFactory)
+      const handlers = createMcpHandlers(
+        () => mockServer,
+        transport.dependencies,
+        undefined,
+        createProtocolHandlers.fn
+      )
+      const req = createMockRequest(
+        { jsonrpc: "2.0", method: "tools/list", id: 16 },
+        { "mcp-protocol-version": "2026-07-28" }
+      )
+      const res = createMockResponse()
+
+      await handlers.post(req, res)
+
+      expect(createProtocolHandlers.calls).toHaveLength(0)
+      expect(transport.calls.handleRequest).toEqual([[req, res, req.body]])
+    })
+
+    it("accepts Accept media types carrying q-parameters and spaces on the 2026 path", async () => {
+      const handlers = createMcpHandlers(createMockMcpServer, undefined, undefined, modernHandlerFactory)
+      const res = createMockResponse()
+
+      await handlers.post(
+        createMockRequest(
+          { jsonrpc: "2.0", method: "tools/list", id: 17, params: { _meta: modernMeta } },
+          { ...modernHeaders("tools/list"), accept: "application/json ; q=0.9, text/event-stream;q=0.8" }
+        ),
+        res
+      )
+
+      expect(getResponseCalls(res).json).toEqual([[
+        {
+          jsonrpc: "2.0",
+          id: 17,
+          result: { tools: [], resultType: "complete", ttlMs: 300000, cacheScope: "public" }
+        }
+      ]])
     })
 
     it("should create fresh server for each request in stateless mode", async () => {

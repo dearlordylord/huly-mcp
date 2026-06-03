@@ -1,20 +1,23 @@
-import { McpError } from "@modelcontextprotocol/sdk/types.js"
+import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js"
 import type { Request, Response } from "express"
 
+import { McpErrorCode } from "./error-mapping.js"
 import type { McpProtocolHandlers } from "./protocol-handlers.js"
 
 const MCP_2026_PROTOCOL_VERSION = "2026-07-28"
 
+// JSON-RPC error codes specific to the MCP 2026-07-28 stateless transport. Standard
+// JSON-RPC codes come from the SDK's ErrorCode enum (ErrorCode.InvalidRequest etc.), and
+// the shared resource-not-found code from McpErrorCode (src/mcp/error-mapping.ts).
+// HEADER_MISMATCH (-32001) intentionally reuses the numeric value the SDK assigns to
+// ErrorCode.RequestTimeout, but carries a distinct 2026 meaning (header/body/_meta
+// mismatch), so it stays a named local rather than ErrorCode.RequestTimeout.
 const HEADER_MISMATCH = -32001
 const UNSUPPORTED_PROTOCOL_VERSION = -32004
-const INVALID_REQUEST = -32600
-const METHOD_NOT_FOUND = -32601
-const INVALID_PARAMS = -32602
-const INTERNAL_ERROR = -32603
-const RESOURCE_NOT_FOUND = -32002
 
 const HTTP_BAD_REQUEST = 400
 const HTTP_NOT_FOUND = 404
+const HTTP_INTERNAL_SERVER_ERROR = 500
 const HTTP_OK = 200
 const PUBLIC_LIST_TTL_MS = 300_000
 const PRIVATE_RESOURCE_TTL_MS = 60_000
@@ -77,8 +80,15 @@ const bodyMethod = (body: unknown): string | undefined => {
   return typeof body.method === "string" ? body.method : undefined
 }
 
+// A request is handled by the 2026 stateless dispatcher when it carries a signal the
+// legacy SDK Streamable HTTP transport never emits: the Mcp-Method routing header
+// (mandatory in the 2026 transport), a 2026 protocol version inside params._meta, or
+// the server/discover bootstrap call. We deliberately do NOT trigger on
+// MCP-Protocol-Version alone — the SDK client sends that header with its own negotiated
+// version, so routing on it would hijack legacy clients once the SDK advertises
+// 2026-07-28. The header is still required (and validated) once a request is dispatched.
 export const shouldDispatchMcp2026Request = (req: Request): boolean =>
-  firstHeader(req.headers["mcp-protocol-version"]) === MCP_2026_PROTOCOL_VERSION
+  firstHeader(req.headers["mcp-method"]) !== undefined
   || metaProtocolVersion(req.body) === MCP_2026_PROTOCOL_VERSION
   || bodyMethod(req.body) === "server/discover"
 
@@ -110,25 +120,34 @@ const writeSuccess = (res: Response, id: string | number | null, result: unknown
   res.status(HTTP_OK).json(body)
 }
 
+// Internal failures (ErrorCode.InternalError, -32603) are the server's fault, so they map
+// to 500 — matching the SDK transport path. Unknown methods map to 404; all other
+// protocol/validation errors are client errors and map to 400.
+const httpStatusForErrorCode = (code: number): number => {
+  if (code === ErrorCode.MethodNotFound) return HTTP_NOT_FOUND
+  if (code === ErrorCode.InternalError) return HTTP_INTERNAL_SERVER_ERROR
+  return HTTP_BAD_REQUEST
+}
+
 const acceptsModernResponseTypes = (req: Request): boolean => {
   const accept = firstHeader(req.headers.accept)
   if (accept === undefined) return false
-  const parts = accept.split(",").map(part => part.trim().toLowerCase().split(";")[0])
+  const parts = accept.split(",").map(part => part.split(";")[0].trim().toLowerCase())
   return parts.includes("application/json") && parts.includes("text/event-stream")
 }
 
 const validateJsonRpcRequest = (body: unknown): JsonRpcRequest | JsonRpcErrorObject => {
   if (Array.isArray(body)) {
-    return { code: INVALID_REQUEST, message: "Batch JSON-RPC requests are not supported" }
+    return { code: ErrorCode.InvalidRequest, message: "Batch JSON-RPC requests are not supported" }
   }
   if (!isRecord(body)) {
-    return { code: INVALID_REQUEST, message: "Request body must be a single JSON-RPC object" }
+    return { code: ErrorCode.InvalidRequest, message: "Request body must be a single JSON-RPC object" }
   }
   if (body.jsonrpc !== "2.0") {
-    return { code: INVALID_REQUEST, message: "Request body must include jsonrpc: \"2.0\"" }
+    return { code: ErrorCode.InvalidRequest, message: "Request body must include jsonrpc: \"2.0\"" }
   }
   if (typeof body.method !== "string" || body.method === "") {
-    return { code: INVALID_REQUEST, message: "Request body must include a non-empty method" }
+    return { code: ErrorCode.InvalidRequest, message: "Request body must include a non-empty method" }
   }
   return {
     jsonrpc: "2.0",
@@ -230,7 +249,7 @@ const validateNameHeader = (
   const bodyName = method === "tools/call" ? params.name : params.uri
   if (typeof bodyName !== "string" || bodyName === "") {
     return {
-      code: INVALID_PARAMS,
+      code: ErrorCode.InvalidParams,
       message: method === "tools/call"
         ? "Invalid params: tools/call requires params.name"
         : "Invalid params: resources/read requires params.uri"
@@ -261,8 +280,8 @@ const cacheable = (
 })
 
 const toModernMcpError = (error: McpError): JsonRpcErrorObject => {
-  if (error.code === RESOURCE_NOT_FOUND) {
-    return { code: INVALID_PARAMS, message: "Resource not found", data: error.data }
+  if (error.code === McpErrorCode.ResourceNotFound) {
+    return { code: ErrorCode.InvalidParams, message: "Resource not found", data: error.data }
   }
   return {
     code: error.code,
@@ -273,7 +292,7 @@ const toModernMcpError = (error: McpError): JsonRpcErrorObject => {
 
 const thrownToJsonRpcError = (error: unknown): JsonRpcErrorObject => {
   if (error instanceof McpError) return toModernMcpError(error)
-  return { code: INTERNAL_ERROR, message: `Internal server error: ${String(error)}` }
+  return { code: ErrorCode.InternalError, message: `Internal server error: ${String(error)}` }
 }
 
 export const dispatchMcp2026Request = async (
@@ -285,8 +304,7 @@ export const dispatchMcp2026Request = async (
 
   const validation = validateHeadersAndMeta(req)
   if ("error" in validation) {
-    const status = validation.error.code === METHOD_NOT_FOUND ? HTTP_NOT_FOUND : HTTP_BAD_REQUEST
-    res.status(status).json(validation)
+    res.status(httpStatusForErrorCode(validation.error.code)).json(validation)
     return
   }
 
@@ -306,7 +324,7 @@ export const dispatchMcp2026Request = async (
             res,
             HTTP_BAD_REQUEST,
             validation.id,
-            INVALID_PARAMS,
+            ErrorCode.InvalidParams,
             "Invalid params: tools/call requires params.name"
           )
           return
@@ -339,7 +357,7 @@ export const dispatchMcp2026Request = async (
             res,
             HTTP_BAD_REQUEST,
             validation.id,
-            INVALID_PARAMS,
+            ErrorCode.InvalidParams,
             "Invalid params: resources/read requires params.uri"
           )
           return
@@ -356,17 +374,10 @@ export const dispatchMcp2026Request = async (
         return
 
       default:
-        writeError(res, HTTP_NOT_FOUND, validation.id, METHOD_NOT_FOUND, "Method not found")
+        writeError(res, HTTP_NOT_FOUND, validation.id, ErrorCode.MethodNotFound, "Method not found")
     }
   } catch (error) {
     const mapped = thrownToJsonRpcError(error)
-    writeError(
-      res,
-      mapped.code === METHOD_NOT_FOUND ? HTTP_NOT_FOUND : HTTP_BAD_REQUEST,
-      validation.id,
-      mapped.code,
-      mapped.message,
-      mapped.data
-    )
+    writeError(res, httpStatusForErrorCode(mapped.code), validation.id, mapped.code, mapped.message, mapped.data)
   }
 }

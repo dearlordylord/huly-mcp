@@ -6,7 +6,7 @@ import type {
   ReadResourceResult
 } from "@modelcontextprotocol/sdk/types.js"
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js"
-import { Cause, Chunk, Effect, Exit, Schema } from "effect"
+import { Cause, Chunk, Clock, Effect, Exit, Schema } from "effect"
 
 import { type GetHulyContextResult, GetHulyContextResultSchema } from "../domain/schemas/index.js"
 import { HulyClient } from "../huly/client.js"
@@ -99,12 +99,25 @@ const deriveEditMode = (name: string, args: unknown): string | undefined => {
 const validateHulyContextResult = (value: unknown): GetHulyContextResult =>
   Schema.decodeUnknownSync(GetHulyContextResultSchema)(value)
 
-const createDrainInflight = (getInflight: () => number): () => Promise<void> => () => {
+/**
+ * Injected wall-clock reader for telemetry timing and the drain-timeout loop. The live
+ * implementation reads Effect's Clock so production code performs no direct wall-clock
+ * reads; tests pass a deterministic stub through createMcpProtocolHandlers.
+ */
+export interface NowClock {
+  readonly currentTimeMillis: () => number
+}
+
+export const liveNowClock: NowClock = {
+  currentTimeMillis: () => Effect.runSync(Clock.currentTimeMillis)
+}
+
+const createDrainInflight = (getInflight: () => number, clock: NowClock): () => Promise<void> => () => {
   if (getInflight() <= 0) return Promise.resolve()
   return new Promise((resolve) => {
-    const start = Date.now() // eslint-disable-line no-restricted-syntax -- non-Effect Promise-based drain loop
+    const start = clock.currentTimeMillis()
     const check = () => {
-      if (getInflight() <= 0 || Date.now() - start > DRAIN_TIMEOUT_MS) { // eslint-disable-line no-restricted-syntax
+      if (getInflight() <= 0 || clock.currentTimeMillis() - start > DRAIN_TIMEOUT_MS) {
         resolve()
       } else {
         setTimeout(check, DRAIN_POLL_MS)
@@ -205,10 +218,11 @@ export const createMcpProtocolHandlers = (
   resolveClients: () => Promise<ClientBundle>,
   telemetry: TelemetryOperations,
   registry: ToolRegistry,
-  getHulyContext: () => GetHulyContextResult
+  getHulyContext: () => GetHulyContextResult,
+  clock: NowClock = liveNowClock
 ): McpProtocolHandlers => {
   let inflight = 0
-  const drainInflight = createDrainInflight(() => inflight)
+  const drainInflight = createDrainInflight(() => inflight, clock)
   const enter = () => {
     inflight++
   }
@@ -227,8 +241,8 @@ export const createMcpProtocolHandlers = (
           return [{
             name: tool.name,
             description: tool.description,
-            inputSchema: toProtocolObjectSchema(toClientCompatibleInputSchema(tool.inputSchema)),
-            outputSchema: toProtocolObjectSchema(defaultToolOutputSchema),
+            inputSchema: toClientCompatibleInputSchema(tool.inputSchema),
+            outputSchema: defaultToolOutputSchema,
             annotations: resolveAnnotations(tool)
           }]
         })
@@ -245,11 +259,11 @@ export const createMcpProtocolHandlers = (
     try {
       const { arguments: args, name } = request.params
 
-      const start = Date.now() // eslint-disable-line no-restricted-syntax -- non-Effect async handler
+      const start = clock.currentTimeMillis()
       const inputBytes = JSON.stringify(args ?? {}).length
 
       const returnError = (errorResponse: McpToolResponse, editMode?: string) => {
-        const durationMs = Date.now() - start // eslint-disable-line no-restricted-syntax -- non-Effect async handler
+        const durationMs = clock.currentTimeMillis() - start
         telemetry.toolCalled({
           toolName: name,
           status: "error",
@@ -267,7 +281,7 @@ export const createMcpProtocolHandlers = (
 
         const latest = await fetchLatestNpmVersion()
         const versionResponse = createSuccessResponse({ current: VERSION, latest })
-        const durationMs = Date.now() - start // eslint-disable-line no-restricted-syntax -- non-Effect async handler
+        const durationMs = clock.currentTimeMillis() - start
         telemetry.toolCalled({
           toolName: name,
           status: "success",
@@ -289,7 +303,7 @@ export const createMcpProtocolHandlers = (
         }
 
         const contextResponse = createSuccessResponse(context)
-        const durationMs = Date.now() - start // eslint-disable-line no-restricted-syntax -- non-Effect async handler
+        const durationMs = clock.currentTimeMillis() - start
         telemetry.toolCalled({
           toolName: name,
           status: "success",
@@ -330,7 +344,7 @@ export const createMcpProtocolHandlers = (
         clients.storageClient,
         clients.workspaceClient
       )
-      const durationMs = Date.now() - start // eslint-disable-line no-restricted-syntax
+      const durationMs = clock.currentTimeMillis() - start
       if (response === null) return returnError(createUnknownToolError(name), editMode)
 
       telemetry.toolCalled({

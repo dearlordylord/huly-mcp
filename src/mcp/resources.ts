@@ -27,11 +27,9 @@ import type { HulyClient } from "../huly/client.js"
 import type { HulyDomainError } from "../huly/errors.js"
 import { getIssue } from "../huly/operations/issues.js"
 import { getProject, listProjects } from "../huly/operations/projects.js"
-import { formatParseError } from "./error-mapping.js"
+import { formatParseError, McpErrorCode } from "./error-mapping.js"
 
 export const HULY_RESOURCE_MIME_TYPE = "application/json"
-
-const RESOURCE_NOT_FOUND = -32002
 
 const ProjectResourceEnvelopeSchema = Schema.Struct({
   type: Schema.Literal("huly.project"),
@@ -278,7 +276,7 @@ const mapReadErrorToMcp = (uri: string, error: HulyDomainError | ParseResult.Par
   }
 
   if (isNotFoundError(error)) {
-    return new McpError(RESOURCE_NOT_FOUND, "Resource not found", { uri })
+    return new McpError(McpErrorCode.ResourceNotFound, "Resource not found", { uri })
   }
 
   if (error._tag === "HulyAuthError") {

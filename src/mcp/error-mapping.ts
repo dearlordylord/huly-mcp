@@ -15,10 +15,14 @@ import type { HulyDomainError } from "../huly/errors.js"
 
 /**
  * MCP standard error codes.
+ *
+ * Single source of truth for MCP JSON-RPC error codes shared across modules — e.g.
+ * resources.ts produces ResourceNotFound and the 2026 HTTP dispatcher remaps it.
  */
 export const McpErrorCode = {
   InvalidParams: -32602,
-  InternalError: -32603
+  InternalError: -32603,
+  ResourceNotFound: -32002
 } as const
 
 export type McpErrorCode = (typeof McpErrorCode)[keyof typeof McpErrorCode]
