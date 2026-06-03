@@ -4,6 +4,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
 const LEDGER_PATH = "plans/sdk-parity-ledger.json"
+const REFERENCE_MODELS_ROOT = ".reference/platform/models"
 
 const MODEL_ROOT_NAMES = [
   "ActivityMessage",
@@ -126,7 +127,7 @@ const extractCandidates = () => {
 }
 
 const extractReferenceModelAreas = () => {
-  const root = ".reference/platform/models"
+  const root = REFERENCE_MODELS_ROOT
   if (!existsSync(root)) return new Set()
 
   const areas = new Set()
@@ -231,6 +232,13 @@ const formatEntry = (entry) => `${entry.key} (${entry.sources.join(", ")})`
 
 const main = () => {
   const candidates = extractCandidates()
+  const referenceModelsAvailable = existsSync(REFERENCE_MODELS_ROOT)
+  if (!referenceModelsAvailable) {
+    console.warn(
+      `WARNING: ${REFERENCE_MODELS_ROOT} not found — skipping reference model area parity. `
+        + "Clone the Huly platform repo there to enable this check."
+    )
+  }
   const referenceAreas = extractReferenceModelAreas()
   const ledger = readJson(LEDGER_PATH)
   const shapeErrors = validateLedgerShape(ledger)
@@ -242,8 +250,12 @@ const main = () => {
 
   const unmapped = [...candidates.values()].filter((candidate) => !entries.has(candidate.key))
   const stale = [...entries.values()].filter((entry) => !candidates.has(entry.key))
-  const unmappedReferenceAreas = [...referenceAreas.values()].filter((area) => !referenceAreaEntries.has(area))
-  const staleReferenceAreas = [...referenceAreaEntries.values()].filter((entry) => !referenceAreas.has(entry.area))
+  const unmappedReferenceAreas = referenceModelsAvailable
+    ? [...referenceAreas.values()].filter((area) => !referenceAreaEntries.has(area))
+    : []
+  const staleReferenceAreas = referenceModelsAvailable
+    ? [...referenceAreaEntries.values()].filter((entry) => !referenceAreas.has(entry.area))
+    : []
   const errors = [
     ...shapeErrors,
     ...duplicateKeys.map((key) => `duplicate ledger classification for ${key}`),
