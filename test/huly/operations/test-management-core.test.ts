@@ -1,10 +1,12 @@
 import { describe, it } from "@effect/vitest"
+import type { Person as HulyPerson } from "@hcengineering/contact"
 import type { Doc, PersonId, Ref, Space } from "@hcengineering/core"
 import { toFindResult } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type { TestCaseNotFoundError, TestSuiteNotFoundError } from "../../../src/huly/errors.js"
+import { contact } from "../../../src/huly/huly-plugins.js"
 import {
   createTestCase,
   createTestSuite,
@@ -93,16 +95,19 @@ interface MockConfig {
   readonly projects?: ReadonlyArray<TestProject>
   readonly suites?: ReadonlyArray<TestSuite>
   readonly cases?: ReadonlyArray<TestCase>
+  readonly persons?: ReadonlyArray<HulyPerson>
   readonly captureCreateDoc?: { attributes?: Record<string, unknown>; id?: string }
   readonly captureAddCollection?: { attributes?: Record<string, unknown>; id?: string }
   readonly captureUpdateDoc?: { operations?: Record<string, unknown> }
   readonly captureRemoveDoc?: { called?: boolean; objectId?: string }
+  readonly captureUploadMarkup?: { markup?: string }
 }
 
 const createTestLayerWithMocks = (config: MockConfig) => {
   const projects = config.projects ?? []
   const suites = config.suites ?? []
   const cases = config.cases ?? []
+  const persons = config.persons ?? []
 
   const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown) => {
     const q = query as Record<string, unknown>
@@ -150,6 +155,9 @@ const createTestLayerWithMocks = (config: MockConfig) => {
           && (!q.space || tc.space === q.space)
       )
       return Effect.succeed(found)
+    }
+    if (_class === contact.class.Person) {
+      return Effect.succeed(persons.find((p) => (q._id && p._id === q._id) || (q.name && p.name === q.name)))
     }
     return Effect.succeed(undefined)
   }) as HulyClientOperations["findOne"]
@@ -202,13 +210,26 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     }
   ) as HulyClientOperations["removeDoc"]
 
+  const uploadMarkupImpl: HulyClientOperations["uploadMarkup"] = ((
+    _class: unknown,
+    _id: unknown,
+    _attr: unknown,
+    markup: unknown
+  ) => {
+    if (config.captureUploadMarkup) {
+      config.captureUploadMarkup.markup = markup as string
+    }
+    return Effect.succeed("markup-ref" as never)
+  }) as HulyClientOperations["uploadMarkup"]
+
   return HulyClient.testLayer({
     findAll: findAllImpl,
     findOne: findOneImpl,
     createDoc: createDocImpl,
     addCollection: addCollectionImpl,
     updateDoc: updateDocImpl,
-    removeDoc: removeDocImpl
+    removeDoc: removeDocImpl,
+    uploadMarkup: uploadMarkupImpl
   })
 }
 
@@ -663,5 +684,269 @@ describe("deleteTestCase", () => {
 
       expect(error._tag).toBe("TestCaseNotFoundError")
       expect((error as TestCaseNotFoundError).identifier).toBe("nonexistent")
+    }))
+})
+
+const makePerson = (id: string, name: string): HulyPerson => {
+  const base = {
+    _id: id as Ref<HulyPerson>,
+    _class: contact.class.Person,
+    name,
+    city: "",
+    modifiedBy: "user-1" as PersonId,
+    modifiedOn: 0,
+    createdBy: "user-1" as PersonId,
+    createdOn: 0
+  }
+  // eslint-disable-next-line no-restricted-syntax -- SDK Person nominal type has no object-literal constructor
+  return base as unknown as HulyPerson
+}
+
+describe("createTestCase — optional fields", () => {
+  it.effect("uploads a non-empty description and resolves an assignee", () =>
+    Effect.gen(function*() {
+      const captureAddCollection: { attributes?: Record<string, unknown>; id?: string } = {}
+      const captureUploadMarkup: { markup?: string } = {}
+      const layer = createTestLayerWithMocks({
+        projects: [makeTestProject()],
+        suites: [makeTestSuite()],
+        persons: [makePerson("person-1", "Alice")],
+        captureAddCollection,
+        captureUploadMarkup
+      })
+
+      yield* createTestCase({
+        project: testProjectIdentifier("QA Project"),
+        suite: testSuiteIdentifier("Login Suite"),
+        name: "With desc",
+        description: "Detailed steps",
+        assignee: "Alice"
+      }).pipe(Effect.provide(layer))
+
+      expect(captureUploadMarkup.markup).toBe("Detailed steps")
+      expect(captureAddCollection.attributes?.description).toBe("markup-ref")
+      expect(captureAddCollection.attributes?.assignee).toBe("person-1")
+    }))
+
+  it.effect("treats a whitespace-only description as no description", () =>
+    Effect.gen(function*() {
+      const captureAddCollection: { attributes?: Record<string, unknown>; id?: string } = {}
+      const layer = createTestLayerWithMocks({
+        projects: [makeTestProject()],
+        suites: [makeTestSuite()],
+        captureAddCollection
+      })
+
+      yield* createTestCase({
+        project: testProjectIdentifier("QA Project"),
+        suite: testSuiteIdentifier("Login Suite"),
+        name: "Blank desc",
+        description: "   "
+      }).pipe(Effect.provide(layer))
+
+      expect(captureAddCollection.attributes?.description).toBeNull()
+    }))
+})
+
+describe("updateTestCase — optional fields", () => {
+  const baseCase = () =>
+    makeTestCase({ _id: "tc-1" as Ref<TestCase>, name: "Case 1", attachedTo: "ts-1" as Ref<TestSuite> })
+
+  it.effect("uploads a new description and updates priority + status", () =>
+    Effect.gen(function*() {
+      const captureUpdateDoc: { operations?: Record<string, unknown> } = {}
+      const captureUploadMarkup: { markup?: string } = {}
+      const layer = createTestLayerWithMocks({
+        projects: [makeTestProject()],
+        suites: [makeTestSuite()],
+        cases: [baseCase()],
+        captureUpdateDoc,
+        captureUploadMarkup
+      })
+
+      yield* updateTestCase({
+        project: testProjectIdentifier("QA Project"),
+        testCase: testCaseIdentifier("Case 1"),
+        description: "Revised",
+        priority: "high",
+        status: "approved"
+      }).pipe(Effect.provide(layer))
+
+      expect(captureUploadMarkup.markup).toBe("Revised")
+      expect(captureUpdateDoc.operations?.description).toBe("markup-ref")
+      expect(captureUpdateDoc.operations?.priority).toBe(TestCasePriority.High)
+      expect(captureUpdateDoc.operations?.status).toBe(TestCaseStatus.Approved)
+    }))
+
+  it.effect("clears description and assignee when set to null", () =>
+    Effect.gen(function*() {
+      const captureUpdateDoc: { operations?: Record<string, unknown> } = {}
+      const layer = createTestLayerWithMocks({
+        projects: [makeTestProject()],
+        suites: [makeTestSuite()],
+        cases: [baseCase()],
+        captureUpdateDoc
+      })
+
+      yield* updateTestCase({
+        project: testProjectIdentifier("QA Project"),
+        testCase: testCaseIdentifier("Case 1"),
+        description: null,
+        assignee: null
+      }).pipe(Effect.provide(layer))
+
+      expect(captureUpdateDoc.operations?.description).toBeNull()
+      expect(captureUpdateDoc.operations?.assignee).toBeNull()
+    }))
+
+  it.effect("resolves an assignee by name", () =>
+    Effect.gen(function*() {
+      const captureUpdateDoc: { operations?: Record<string, unknown> } = {}
+      const layer = createTestLayerWithMocks({
+        projects: [makeTestProject()],
+        suites: [makeTestSuite()],
+        cases: [baseCase()],
+        persons: [makePerson("person-2", "Bob")],
+        captureUpdateDoc
+      })
+
+      yield* updateTestCase({
+        project: testProjectIdentifier("QA Project"),
+        testCase: testCaseIdentifier("Case 1"),
+        assignee: "Bob"
+      }).pipe(Effect.provide(layer))
+
+      expect(captureUpdateDoc.operations?.assignee).toBe("person-2")
+    }))
+
+  it.effect("ignores unrecognized type, priority, and status values", () =>
+    Effect.gen(function*() {
+      const captureUpdateDoc: { operations?: Record<string, unknown> } = {}
+      const layer = createTestLayerWithMocks({
+        projects: [makeTestProject()],
+        suites: [makeTestSuite()],
+        cases: [baseCase()],
+        captureUpdateDoc
+      })
+
+      yield* updateTestCase({
+        project: testProjectIdentifier("QA Project"),
+        testCase: testCaseIdentifier("Case 1"),
+        name: "Renamed",
+        type: "bogus-type",
+        priority: "bogus-priority",
+        status: "bogus-status"
+      }).pipe(Effect.provide(layer))
+
+      expect(captureUpdateDoc.operations?.name).toBe("Renamed")
+      expect(captureUpdateDoc.operations?.type).toBeUndefined()
+      expect(captureUpdateDoc.operations?.priority).toBeUndefined()
+      expect(captureUpdateDoc.operations?.status).toBeUndefined()
+    }))
+})
+
+describe("test-management-core summary and filter branches", () => {
+  it.effect("omits description for a project without one", () =>
+    Effect.gen(function*() {
+      const result = yield* listTestProjects({}).pipe(
+        Effect.provide(createTestLayerWithMocks({ projects: [makeTestProject({ description: "" })] }))
+      )
+      expect(result.projects[0].description).toBeUndefined()
+    }))
+
+  it.effect("filters test cases by assignee and surfaces it in the summary", () =>
+    Effect.gen(function*() {
+      // eslint-disable-next-line no-restricted-syntax -- Ref<Employee> brand has no runtime constructor
+      const assigneeRef = "person-2" as unknown as TestCase["assignee"]
+      const assignedCase = makeTestCase({ _id: "tc-9" as Ref<TestCase>, name: "Assigned", assignee: assigneeRef })
+      const result = yield* listTestCases({
+        project: testProjectIdentifier("QA Project"),
+        assignee: "Bob"
+      }).pipe(
+        Effect.provide(createTestLayerWithMocks({
+          projects: [makeTestProject()],
+          suites: [makeTestSuite()],
+          cases: [assignedCase],
+          persons: [makePerson("person-2", "Bob")]
+        }))
+      )
+      expect(result.testCases).toHaveLength(1)
+      expect(result.testCases[0].assignee).toBe("person-2")
+    }))
+})
+
+describe("updateTestSuite — description branch", () => {
+  it.effect("unsets the description when set to null", () =>
+    Effect.gen(function*() {
+      const captureUpdateDoc: { operations?: Record<string, unknown> } = {}
+      yield* updateTestSuite({
+        project: testProjectIdentifier("QA Project"),
+        suite: testSuiteIdentifier("Login Suite"),
+        description: null
+      }).pipe(Effect.provide(createTestLayerWithMocks({
+        projects: [makeTestProject()],
+        suites: [makeTestSuite()],
+        captureUpdateDoc
+      })))
+      expect(captureUpdateDoc.operations?.$unset).toEqual({ description: "" })
+    }))
+
+  it.effect("sets a new description string", () =>
+    Effect.gen(function*() {
+      const captureUpdateDoc: { operations?: Record<string, unknown> } = {}
+      yield* updateTestSuite({
+        project: testProjectIdentifier("QA Project"),
+        suite: testSuiteIdentifier("Login Suite"),
+        description: "New description"
+      }).pipe(Effect.provide(createTestLayerWithMocks({
+        projects: [makeTestProject()],
+        suites: [makeTestSuite()],
+        captureUpdateDoc
+      })))
+      expect(captureUpdateDoc.operations?.description).toBe("New description")
+    }))
+})
+
+describe("createTestCase + getTestCase enum and optional branches", () => {
+  it.effect("falls back to defaults for unrecognized type, priority, and status", () =>
+    Effect.gen(function*() {
+      const captureAddCollection: { attributes?: Record<string, unknown>; id?: string } = {}
+      yield* createTestCase({
+        project: testProjectIdentifier("QA Project"),
+        suite: testSuiteIdentifier("Login Suite"),
+        name: "Defaults",
+        type: "bogus",
+        priority: "bogus",
+        status: "bogus"
+      }).pipe(Effect.provide(createTestLayerWithMocks({
+        projects: [makeTestProject()],
+        suites: [makeTestSuite()],
+        captureAddCollection
+      })))
+      expect(captureAddCollection.attributes?.type).toBe(TestCaseType.Functional)
+      expect(captureAddCollection.attributes?.priority).toBe(TestCasePriority.Medium)
+      expect(captureAddCollection.attributes?.status).toBe(TestCaseStatus.Draft)
+    }))
+
+  it.effect("returns a case summary without description or suite when both are absent", () =>
+    Effect.gen(function*() {
+      // eslint-disable-next-line no-restricted-syntax -- Ref<Doc> brand has no runtime constructor
+      const noSuite = null as unknown as TestCase["attachedTo"]
+      const bareCase = makeTestCase({
+        _id: "tc-bare" as Ref<TestCase>,
+        name: "Bare",
+        description: null,
+        attachedTo: noSuite
+      })
+      const result = yield* getTestCase({
+        project: testProjectIdentifier("QA Project"),
+        testCase: testCaseIdentifier("Bare")
+      }).pipe(Effect.provide(createTestLayerWithMocks({
+        projects: [makeTestProject()],
+        suites: [makeTestSuite()],
+        cases: [bareCase]
+      })))
+      expect(result.description).toBeUndefined()
+      expect(result.suite).toBeUndefined()
     }))
 })
