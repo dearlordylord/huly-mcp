@@ -1,6 +1,7 @@
 node_modules
 .reference
 dist/
+coverage/
 *.tsbuildinfo
 .ralph/
 .ralph-tests/
