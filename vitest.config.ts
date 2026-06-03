@@ -25,10 +25,10 @@ export default defineConfig({
       // across the board. Current floor is set at/below the measured numbers so
       // `check-all` stays green while we raise tests toward the goal.
       thresholds: {
-        lines: 97.4,
-        functions: 97.2,
-        branches: 88,
-        statements: 97.2,
+        lines: 97.8,
+        functions: 97.5,
+        branches: 89,
+        statements: 97.6,
       },
     },
   },

@@ -548,9 +548,12 @@ describe("Lead Operations", () => {
 describe("Lead status resolution failures", () => {
   it.effect("fails when the funnel is missing its ProjectType reference", () =>
     Effect.gen(function*() {
+      // A real Huly funnel can lack its `type` ref; the SDK type marks it required, so override it.
+      // eslint-disable-next-line no-restricted-syntax -- exercise the runtime guard for a funnel without a ProjectType ref
+      const funnelWithoutType = { ...makeFunnel(), type: undefined } as unknown as MockFunnel
       const error = yield* Effect.flip(
         listLeads({ funnel: funnelReference("funnel-1") }).pipe(
-          Effect.provide(createTestLayer({ funnels: [makeFunnel({ type: undefined })], leads: [] }))
+          Effect.provide(createTestLayer({ funnels: [funnelWithoutType], leads: [] }))
         )
       )
       expect(error._tag).toBe("HulyConnectionError")

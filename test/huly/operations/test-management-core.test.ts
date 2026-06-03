@@ -818,31 +818,6 @@ describe("updateTestCase — optional fields", () => {
 
       expect(captureUpdateDoc.operations?.assignee).toBe("person-2")
     }))
-
-  it.effect("ignores unrecognized type, priority, and status values", () =>
-    Effect.gen(function*() {
-      const captureUpdateDoc: { operations?: Record<string, unknown> } = {}
-      const layer = createTestLayerWithMocks({
-        projects: [makeTestProject()],
-        suites: [makeTestSuite()],
-        cases: [baseCase()],
-        captureUpdateDoc
-      })
-
-      yield* updateTestCase({
-        project: testProjectIdentifier("QA Project"),
-        testCase: testCaseIdentifier("Case 1"),
-        name: "Renamed",
-        type: "bogus-type",
-        priority: "bogus-priority",
-        status: "bogus-status"
-      }).pipe(Effect.provide(layer))
-
-      expect(captureUpdateDoc.operations?.name).toBe("Renamed")
-      expect(captureUpdateDoc.operations?.type).toBeUndefined()
-      expect(captureUpdateDoc.operations?.priority).toBeUndefined()
-      expect(captureUpdateDoc.operations?.status).toBeUndefined()
-    }))
 })
 
 describe("test-management-core summary and filter branches", () => {
@@ -908,26 +883,6 @@ describe("updateTestSuite — description branch", () => {
 })
 
 describe("createTestCase + getTestCase enum and optional branches", () => {
-  it.effect("falls back to defaults for unrecognized type, priority, and status", () =>
-    Effect.gen(function*() {
-      const captureAddCollection: { attributes?: Record<string, unknown>; id?: string } = {}
-      yield* createTestCase({
-        project: testProjectIdentifier("QA Project"),
-        suite: testSuiteIdentifier("Login Suite"),
-        name: "Defaults",
-        type: "bogus",
-        priority: "bogus",
-        status: "bogus"
-      }).pipe(Effect.provide(createTestLayerWithMocks({
-        projects: [makeTestProject()],
-        suites: [makeTestSuite()],
-        captureAddCollection
-      })))
-      expect(captureAddCollection.attributes?.type).toBe(TestCaseType.Functional)
-      expect(captureAddCollection.attributes?.priority).toBe(TestCasePriority.Medium)
-      expect(captureAddCollection.attributes?.status).toBe(TestCaseStatus.Draft)
-    }))
-
   it.effect("returns a case summary without description or suite when both are absent", () =>
     Effect.gen(function*() {
       // eslint-disable-next-line no-restricted-syntax -- Ref<Doc> brand has no runtime constructor

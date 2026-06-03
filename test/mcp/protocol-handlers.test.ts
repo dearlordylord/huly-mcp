@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest"
 
 import { type GetHulyContextResult, GetHulyContextResultSchema } from "../../src/domain/schemas/index.js"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
-import { HulyError } from "../../src/huly/errors.js"
+import { HulyConnectionError } from "../../src/huly/errors.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import { GET_HULY_CONTEXT_TOOL_NAME, VERSION_TOOL_NAME } from "../../src/mcp/huly-context-tool.js"
 import {
@@ -406,7 +406,7 @@ describe("createMcpProtocolHandlers — resource handlers", () => {
 
   it("surfaces an McpError when the backend fails while listing resources", async () => {
     const handlers = createMcpProtocolHandlers(
-      buildStubClients({ findAll: () => Effect.fail(new HulyError({ message: "backend down" })) }),
+      buildStubClients({ findAll: () => Effect.fail(new HulyConnectionError({ message: "backend down" })) }),
       createTelemetryProbe().telemetry,
       emptyRegistry,
       unusedGetHulyContext

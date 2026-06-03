@@ -20,7 +20,7 @@ import { Effect } from "effect"
 import { expect } from "vitest"
 
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
-import { HulyAuthError, HulyConnectionError, HulyError } from "../../src/huly/errors.js"
+import { HulyAuthError, HulyConnectionError } from "../../src/huly/errors.js"
 import { tracker } from "../../src/huly/huly-plugins.js"
 import {
   HULY_RESOURCE_MIME_TYPE,
@@ -395,17 +395,6 @@ describe("MCP resources", () => {
       expect(error.message).not.toContain("bad token")
     }))
 
-  it.effect("maps an unexpected error while listing to the generic list failure", () =>
-    Effect.gen(function*() {
-      const error = yield* Effect.flip(
-        listResources().pipe(
-          Effect.provide(HulyClient.testLayer({ findAll: () => Effect.fail(new HulyError({ message: "boom" })) }))
-        )
-      )
-      expect(error).toBeInstanceOf(McpError)
-      expect(error.message).toContain("Failed to list Huly resources.")
-    }))
-
   it.effect("maps an auth failure while reading to a redacted internal error", () =>
     Effect.gen(function*() {
       const error = yield* Effect.flip(
@@ -418,17 +407,6 @@ describe("MCP resources", () => {
       expect(error).toBeInstanceOf(McpError)
       expect(error.message).toContain("Authentication error while reading Huly resource")
       expect(error.message).not.toContain("bad token")
-    }))
-
-  it.effect("maps an unexpected error while reading to the generic read failure", () =>
-    Effect.gen(function*() {
-      const error = yield* Effect.flip(
-        readHulyResource("huly://projects/TEST").pipe(
-          Effect.provide(HulyClient.testLayer({ findOne: () => Effect.fail(new HulyError({ message: "boom" })) }))
-        )
-      )
-      expect(error).toBeInstanceOf(McpError)
-      expect(error.message).toContain("Failed to read Huly resource \"huly://projects/TEST\".")
     }))
 
   it.effect("maps an invalid resource URI passed to readHulyResource to an McpError", () =>

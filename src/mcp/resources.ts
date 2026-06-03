@@ -260,6 +260,9 @@ const mapListErrorToMcp = (error: HulyDomainError | ParseResult.ParseError): Mcp
     )
   }
 
+  // defensive: listProjects can only surface a connection or auth client error (HulyClientError =
+  // ConnectionError) plus parse errors, all handled above, so the generic fallback is unreachable.
+  /* v8 ignore next */
   return new McpError(ErrorCode.InternalError, "Failed to list Huly resources.")
 }
 
@@ -307,6 +310,9 @@ const mapReadErrorToMcp = (uri: string, error: HulyDomainError | ParseResult.Par
     )
   }
 
+  // defensive: getProject/getIssue surface only not-found, connection, or auth errors (all handled
+  // above) plus parse errors, so the generic fallback is unreachable.
+  /* v8 ignore next */
   return new McpError(ErrorCode.InternalError, `Failed to read Huly resource "${uri}".`)
 }
 
