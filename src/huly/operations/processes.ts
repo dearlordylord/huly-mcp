@@ -114,9 +114,11 @@ const looksLikeCardId = (identifier: string): boolean =>
 
 const masterTagLabel = (tag: MasterTag | Tag): string | undefined => nonEmpty(tag.label)
 
+const masterTagName = (tag: MasterTag | Tag): string => masterTagLabel(tag) ?? String(tag._id)
+
 const masterTagDisplay = (tag: MasterTag | Tag): MasterTagDisplay => ({
   id: tag._id,
-  name: masterTagLabel(tag) ?? String(tag._id)
+  name: masterTagName(tag)
 })
 
 const findMasterTagsByIds = (
@@ -143,8 +145,6 @@ const loadProcessDefinitionData = (
   processes: ReadonlyArray<HulyProcessDefinition>
 ): Effect.Effect<ReadonlyArray<ProcessDefinitionData>, HulyClientError> =>
   Effect.gen(function*() {
-    if (processes.length === 0) return []
-
     const processIds = processes.map((process) => process._id)
     const [masterTags, states, transitions] = yield* Effect.all([
       findMasterTagsByIds(client, processes.map((process) => process.masterTag)),
@@ -279,7 +279,7 @@ const resolveMasterTag = (
         identifier,
         candidates: matches.map((tag) => ({
           id: MasterTagId.make(tag._id),
-          name: masterTagLabel(tag) ?? String(tag._id)
+          name: masterTagName(tag)
         }))
       })
     )

@@ -706,3 +706,161 @@ describe("process operations", () => {
       }
     }))
 })
+
+describe("process operations branch coverage", () => {
+  it.effect("reports a connection error when a process fails output schema validation", () =>
+    Effect.gen(function*() {
+      const result = yield* Effect.either(
+        listProcesses({}).pipe(Effect.provide(createLayer({ processes: [makeProcess({ name: "" })] })))
+      )
+      expect(result._tag).toBe("Left")
+      if (result._tag === "Left") expect(result.left._tag).toBe("HulyConnectionError")
+    }))
+
+  it.effect("defaults optional process flags and omits an empty description", () =>
+    Effect.gen(function*() {
+      const bare = asProcess({
+        ...makeProcess(),
+        description: undefined,
+        autoStart: undefined,
+        automationOnly: undefined,
+        parallelExecutionForbidden: undefined
+      })
+      const result = yield* listProcesses({}).pipe(Effect.provide(createLayer({ processes: [bare] })))
+      const summary = result.processes[0]
+      expect(summary.autoStart).toBe(false)
+      expect(summary.automationOnly).toBe(false)
+      expect(summary.parallelExecutionForbidden).toBe(false)
+      expect(summary.description).toBeUndefined()
+    }))
+
+  it.effect("falls back to the master tag id when its label is empty", () =>
+    Effect.gen(function*() {
+      const result = yield* listProcesses({}).pipe(Effect.provide(createLayer({
+        processes: [makeProcess({ masterTag: masterTagId })],
+        masterTags: [makeMasterTag({ label: asIntlString("") })]
+      })))
+      expect(result.processes[0]?.masterTagName).toBe(String(masterTagId))
+    }))
+
+  it.effect("lists no processes when none exist", () =>
+    Effect.gen(function*() {
+      const result = yield* listProcesses({}).pipe(Effect.provide(createLayer({ processes: [] })))
+      expect(result).toEqual({ processes: [], total: 0 })
+    }))
+
+  it.effect("omits the initial state when no null-origin transition exists", () =>
+    Effect.gen(function*() {
+      const result = yield* getProcess({ process: ProcessIdentifier.make(processId) }).pipe(
+        Effect.provide(createLayer({ transitions: [makeTransition()] }))
+      )
+      expect(result.initialStateId).toBeUndefined()
+    }))
+
+  it.effect("fails get_process when the identifier matches no process", () =>
+    Effect.gen(function*() {
+      const result = yield* Effect.either(
+        getProcess({ process: ProcessIdentifier.make("Nonexistent") }).pipe(
+          Effect.provide(createLayer({ processes: [makeProcess()] }))
+        )
+      )
+      expect(result._tag).toBe("Left")
+      if (result._tag === "Left") expect(result.left._tag).toBe("ProcessNotFoundError")
+    }))
+
+  it.effect("resolves a master tag filter by exact id", () =>
+    Effect.gen(function*() {
+      const result = yield* listProcesses({ masterTag: ProcessMasterTagIdentifier.make(masterTagId) }).pipe(
+        Effect.provide(createLayer())
+      )
+      expect(result.processes.map((process) => process.id)).toEqual([processId])
+    }))
+
+  it.effect("tolerates unlabeled tags while matching a master tag display name", () =>
+    Effect.gen(function*() {
+      const thirdTagId = "card:class:Blank" as Ref<MasterTag>
+      const result = yield* listProcesses({ masterTag: ProcessMasterTagIdentifier.make("Proposal") }).pipe(
+        Effect.provide(createLayer({
+          processes: [makeProcess({ _id: duplicateProcessId, name: "Proposal QA", masterTag: otherMasterTagId })],
+          masterTags: [
+            makeMasterTag(),
+            makeMasterTag({ _id: otherMasterTagId, label: asIntlString("Proposal") }),
+            makeMasterTag({ _id: thirdTagId, label: asIntlString("") })
+          ]
+        }))
+      )
+      expect(result.processes.map((process) => process.id)).toEqual([duplicateProcessId])
+    }))
+
+  it.effect("fails an ambiguous master tag filter with candidate ids", () =>
+    Effect.gen(function*() {
+      const dupTagId = "card:class:Dup" as Ref<MasterTag>
+      const result = yield* Effect.either(
+        listProcesses({ masterTag: ProcessMasterTagIdentifier.make("Document") }).pipe(
+          Effect.provide(createLayer({
+            masterTags: [makeMasterTag(), makeMasterTag({ _id: dupTagId, label: asIntlString("Document") })]
+          }))
+        )
+      )
+      expect(result._tag).toBe("Left")
+      if (result._tag === "Left") expect(result.left._tag).toBe("ProcessMasterTagAmbiguousError")
+    }))
+
+  it.effect("lists no executions when none exist", () =>
+    Effect.gen(function*() {
+      const result = yield* listExecutions({}).pipe(Effect.provide(createLayer({ executions: [] })))
+      expect(result).toEqual({ executions: [], total: 0 })
+    }))
+
+  it.effect("filters executions by a resolved process", () =>
+    Effect.gen(function*() {
+      const result = yield* listExecutions({ process: ProcessIdentifier.make(processId) }).pipe(
+        Effect.provide(createLayer())
+      )
+      expect(result.executions.every((execution) => execution.processId === processId)).toBe(true)
+      expect(result.executions.length).toBeGreaterThan(0)
+    }))
+
+  it.effect("fails start_process when a synthesized card id resolves to no document", () =>
+    Effect.gen(function*() {
+      const result = yield* Effect.either(
+        startProcess({
+          process: ProcessIdentifier.make(processId),
+          card: ProcessCardIdentifier.make("card:class:Ghost")
+        }).pipe(Effect.provide(createLayer({ executions: [], cards: [] })))
+      )
+      expect(result._tag).toBe("Left")
+      if (result._tag === "Left") expect(result.left._tag).toBe("ProcessCardNotFoundError")
+    }))
+
+  it.effect("fails start_process when the initial state document is missing", () =>
+    Effect.gen(function*() {
+      const result = yield* Effect.either(
+        startProcess({
+          process: ProcessIdentifier.make(processId),
+          card: ProcessCardIdentifier.make(cardId)
+        }).pipe(Effect.provide(createLayer({
+          executions: [],
+          states: [],
+          transitions: [makeInitialTransition()]
+        })))
+      )
+      expect(result._tag).toBe("Left")
+      if (result._tag === "Left") expect(result.left._tag).toBe("ProcessInitialStateNotFoundError")
+    }))
+
+  it.effect("starts a parallel-forbidden process when no active execution exists", () =>
+    Effect.gen(function*() {
+      const createDocCalls: Array<CreateDocCall> = []
+      const result = yield* startProcess({
+        process: ProcessIdentifier.make(processId),
+        card: ProcessCardIdentifier.make(cardId)
+      }).pipe(Effect.provide(createLayer({
+        processes: [makeProcess({ parallelExecutionForbidden: true })],
+        executions: [],
+        createDocCalls
+      })))
+      expect(result.status).toBe("active")
+      expect(createDocCalls).toHaveLength(1)
+    }))
+})
