@@ -109,9 +109,6 @@ interface WorkflowData {
   readonly statuses: ReadonlyArray<Status>
 }
 
-const uniqueTaskTypeRefs = (refs: ReadonlyArray<Ref<TaskType>>): Array<Ref<TaskType>> =>
-  refs.reduce<Array<Ref<TaskType>>>((unique, ref) => unique.includes(ref) ? unique : [...unique, ref], [])
-
 const uniqueStatusIds = (projectType: ProjectType): Array<Ref<Status>> =>
   uniqueStatusRefs(projectType.statuses.map((status) => status._id))
 
@@ -192,11 +189,11 @@ const projectTypeSummary = (data: WorkflowData): ProjectTypeSummary => ({
 })
 
 const statusTaskTypeIds = (projectType: ProjectType, statusId: Ref<Status>): ReadonlyArray<Ref<TaskType>> =>
-  uniqueTaskTypeRefs(
-    uniqueProjectStatuses(projectType.statuses).filter((status) => status._id === statusId).map((status) =>
-      status.taskType
-    )
-  )
+  // uniqueProjectStatuses already removes duplicate (_id, taskType) pairs, so the surviving
+  // statuses for a single status id already carry distinct task types.
+  uniqueProjectStatuses(projectType.statuses)
+    .filter((status) => status._id === statusId)
+    .map((status) => status.taskType)
 
 const statusSummary = (projectType: ProjectType, status: Status): IssueStatusSummary => ({
   id: IssueStatusId.make(status._id),

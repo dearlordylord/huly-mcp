@@ -69,6 +69,16 @@ type RunPlanError = HulyClientError | TestProjectNotFoundError | TestPlanNotFoun
 
 const BATCH_CONCURRENCY = 10
 
+// `params.status` is schema-validated (TestRunStatusSchema) to a known status string, all of which
+// map, so the Untested fallback only guards stringToTestRunStatus's `| undefined` return type.
+const resolveStatusOrUntested = (status: string): TestRunStatus => {
+  const resolved = stringToTestRunStatus(status)
+  /* v8 ignore start -- unreachable: status is schema-validated to a known TestRunStatus string */
+  if (resolved === undefined) return TestRunStatus.Untested
+  /* v8 ignore stop */
+  return resolved
+}
+
 const toRunSummary = (r: TestRun): TestRunSummary => ({
   id: TestRunId.make(r._id),
   name: r.name,
@@ -244,7 +254,7 @@ export const createTestResult = (
       name,
       testCase: tc._id,
       status: params.status !== undefined
-        ? (stringToTestRunStatus(params.status) ?? TestRunStatus.Untested)
+        ? resolveStatusOrUntested(params.status)
         : TestRunStatus.Untested,
       description: null
     }
@@ -274,7 +284,7 @@ export const updateTestResult = (
     const project = yield* findTestProject(client, params.project)
     const result = yield* findTestResult(client, project, params.result)
     const ops: DocumentUpdate<TestResult> = {}
-    if (params.status !== undefined) ops.status = stringToTestRunStatus(params.status) ?? TestRunStatus.Untested
+    if (params.status !== undefined) ops.status = resolveStatusOrUntested(params.status)
     if (params.assignee !== undefined) {
       if (params.assignee === null) ops.$unset = { ...ops.$unset, assignee: "" }
       else ops.assignee = toRef<Employee>((yield* resolveAssignee(params.assignee))._id)

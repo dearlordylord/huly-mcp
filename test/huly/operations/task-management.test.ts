@@ -511,3 +511,158 @@ describe("listTaskTypes", () => {
       expect(result.total).toBe(result.taskTypes.length)
     }))
 })
+
+describe("task management branch coverage", () => {
+  it.effect("maps missing and unrecognized status categories to 'unknown'", () =>
+    Effect.gen(function*() {
+      const noCategory = asStatus({ ...makeStatus(), category: undefined })
+      const unknownCategory = asStatus({
+        ...makeStatus(),
+        _id: doneStatusId,
+        name: "Done",
+        category: "category:custom:Mystery"
+      })
+
+      const result = yield* getProjectType({ projectType: ProjectTypeRefSchema.make("classic") }).pipe(
+        Effect.provide(createLayer({ statuses: [noCategory, unknownCategory] }))
+      )
+
+      expect(result.statuses.map((status) => status.category)).toEqual(["unknown", "unknown"])
+    }))
+
+  it.effect("recognizes a non-default-id classic project type by its classic flag", () =>
+    Effect.gen(function*() {
+      const projectType = makeProjectType({ _id: "pt-custom" as Ref<ProjectType>, name: "Engineering", classic: true })
+      const result = yield* listProjectTypes({}).pipe(Effect.provide(createLayer({ projectTypes: [projectType] })))
+      expect(result.projectTypes[0]?.isDefaultClassic).toBe(true)
+    }))
+
+  it.effect("recognizes a classic project type by its normalized name", () =>
+    Effect.gen(function*() {
+      const projectType = makeProjectType({ _id: "pt-named" as Ref<ProjectType>, name: "Classic", classic: false })
+      const result = yield* listProjectTypes({}).pipe(Effect.provide(createLayer({ projectTypes: [projectType] })))
+      expect(result.projectTypes[0]?.isDefaultClassic).toBe(true)
+    }))
+
+  it.effect("omits an empty project type description in details", () =>
+    Effect.gen(function*() {
+      const projectType = makeProjectType({ description: "" })
+      const result = yield* getProjectType({ projectType: ProjectTypeRefSchema.make("classic") }).pipe(
+        Effect.provide(createLayer({ projectTypes: [projectType] }))
+      )
+      expect(result.description).toBeUndefined()
+    }))
+
+  it.effect("loads a project type with no task types or statuses", () =>
+    Effect.gen(function*() {
+      const projectType = makeProjectType({ tasks: [], statuses: [] })
+      const result = yield* getProjectType({ projectType: ProjectTypeRefSchema.make("classic") }).pipe(
+        Effect.provide(createLayer({ projectTypes: [projectType], taskTypes: [], statuses: [] }))
+      )
+      expect(result.taskTypes).toEqual([])
+      expect(result.statuses).toEqual([])
+    }))
+
+  it.effect("fails when no default classic project type can be selected", () =>
+    Effect.gen(function*() {
+      const projectType = makeProjectType({ _id: "pt-x" as Ref<ProjectType>, name: "Engineering", classic: false })
+      const error = yield* Effect.flip(
+        getProjectType({}).pipe(Effect.provide(createLayer({ projectTypes: [projectType] })))
+      )
+      expect(error.message).toContain("Could not select a default Classic project type")
+    }))
+
+  it.effect("fails when a named project type does not resolve uniquely", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        getProjectType({ projectType: ProjectTypeRefSchema.make("nonexistent") }).pipe(
+          Effect.provide(createLayer())
+        )
+      )
+      expect(error.message).toContain("did not resolve to exactly one project type")
+    }))
+
+  it.effect("fails task type creation when the template reference does not resolve", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        createTaskType({ name: "Bug", templateTaskType: TaskTypeRefSchema.make("nonexistent") }).pipe(
+          Effect.provide(createLayer())
+        )
+      )
+      expect(error.message).toContain("did not resolve to exactly one task type")
+    }))
+
+  it.effect("fails task type creation when the project type has no template to copy", () =>
+    Effect.gen(function*() {
+      const projectType = makeProjectType({ tasks: [], statuses: [] })
+      const error = yield* Effect.flip(
+        createTaskType({ name: "Bug" }).pipe(
+          Effect.provide(createLayer({ projectTypes: [projectType], taskTypes: [] }))
+        )
+      )
+      expect(error.message).toContain("has no task type to copy")
+    }))
+
+  it.effect("creates a task type from the default first template when none is named", () =>
+    Effect.gen(function*() {
+      const captures: Captures = { createDocs: [], updates: [], mixins: [] }
+      const result = yield* createTaskType({ name: "Brand New Type" }).pipe(
+        Effect.provide(createLayer({ captures }))
+      )
+      expect(result.created).toBe(true)
+      expect(result.taskType.name).toBe("Brand New Type")
+      expect(captures.createDocs.map((call) => call.classId)).toContain(String(task.class.TaskType))
+    }))
+
+  it.effect("copies template icon, color, and allowedAsChildOf onto the new task type", () =>
+    Effect.gen(function*() {
+      const captures: Captures = { createDocs: [], updates: [], mixins: [] }
+      const template = makeTaskType({
+        icon: "icon:Bug" as TaskType["icon"],
+        color: 7,
+        allowedAsChildOf: [subTaskTypeId]
+      })
+      yield* createTaskType({ name: "Bug", templateTaskType: TaskTypeRefSchema.make("Issue") }).pipe(
+        Effect.provide(createLayer({ taskTypes: [template], captures }))
+      )
+
+      const mixinCreate = captures.createDocs.find((call) => call.classId === String(core.class.Mixin))
+      const taskTypeCreate = captures.createDocs.find((call) => call.classId === String(task.class.TaskType))
+      expect(mixinCreate?.attributes).toMatchObject({ icon: "icon:Bug" })
+      expect(taskTypeCreate?.attributes).toMatchObject({
+        icon: "icon:Bug",
+        color: 7,
+        allowedAsChildOf: [subTaskTypeId]
+      })
+    }))
+
+  it.effect("fails issue status creation when target task types do not share a status class", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        createIssueStatus({ name: "QA", category: "Active" }).pipe(
+          Effect.provide(createLayer({
+            taskTypes: [
+              makeTaskType({ statusClass: tracker.class.IssueStatus }),
+              makeTaskType({
+                _id: subTaskTypeId,
+                name: "Sub-issue",
+                statuses: [openStatusId],
+                statusClass: core.class.Status
+              })
+            ]
+          }))
+        )
+      )
+      expect(error.message).toContain("do not share one issue status class")
+    }))
+
+  it.effect("reports a connection error when the result fails output schema validation", () =>
+    Effect.gen(function*() {
+      const projectType = makeProjectType({ name: "" as ProjectType["name"] })
+      const error = yield* Effect.flip(
+        listProjectTypes({}).pipe(Effect.provide(createLayer({ projectTypes: [projectType] })))
+      )
+      expect(error._tag).toBe("HulyConnectionError")
+      expect(error.message).toContain("response failed schema validation")
+    }))
+})

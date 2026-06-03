@@ -222,6 +222,10 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     return Effect.succeed("markup-ref" as never)
   }) as HulyClientOperations["uploadMarkup"]
 
+  const fetchMarkupImpl: HulyClientOperations["fetchMarkup"] = (
+    () => Effect.succeed("fetched content")
+  ) as HulyClientOperations["fetchMarkup"]
+
   return HulyClient.testLayer({
     findAll: findAllImpl,
     findOne: findOneImpl,
@@ -229,7 +233,8 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     addCollection: addCollectionImpl,
     updateDoc: updateDocImpl,
     removeDoc: removeDocImpl,
-    uploadMarkup: uploadMarkupImpl
+    uploadMarkup: uploadMarkupImpl,
+    fetchMarkup: fetchMarkupImpl
   })
 }
 
@@ -879,6 +884,57 @@ describe("updateTestSuite — description branch", () => {
         captureUpdateDoc
       })))
       expect(captureUpdateDoc.operations?.description).toBe("New description")
+    }))
+})
+
+describe("test suite summary and createTestSuite parent branches", () => {
+  it.effect("omits description and parent for a bare suite", () =>
+    Effect.gen(function*() {
+      const bare = makeTestSuite({ _id: "ts-bare" as Ref<TestSuite>, name: "Bare Suite" })
+      // eslint-disable-next-line no-restricted-syntax -- removing optional SDK fields from a nominal fixture
+      const bareRecord = bare as unknown as Record<string, unknown>
+      delete bareRecord.description
+      delete bareRecord.parent
+      const result = yield* listTestSuites({
+        project: testProjectIdentifier("QA Project")
+      }).pipe(Effect.provide(createTestLayerWithMocks({ projects: [makeTestProject()], suites: [bare] })))
+      expect(result.suites[0].description).toBeUndefined()
+      expect(result.suites[0].parent).toBeUndefined()
+    }))
+
+  it.effect("creates a child suite under an explicit parent suite", () =>
+    Effect.gen(function*() {
+      const captureCreateDoc: { attributes?: Record<string, unknown>; id?: string } = {}
+      const parent = makeTestSuite({ _id: "ts-parent" as Ref<TestSuite>, name: "Parent Suite" })
+      yield* createTestSuite({
+        project: testProjectIdentifier("QA Project"),
+        name: "Child Suite",
+        parent: testSuiteIdentifier("Parent Suite")
+      }).pipe(Effect.provide(createTestLayerWithMocks({
+        projects: [makeTestProject()],
+        suites: [parent],
+        captureCreateDoc
+      })))
+      expect(captureCreateDoc.attributes?.parent).toBe("ts-parent")
+    }))
+
+  it.effect("includes a fetched description in the test case detail", () =>
+    Effect.gen(function*() {
+      const described = makeTestCase({
+        _id: "tc-desc" as Ref<TestCase>,
+        name: "Described",
+        // eslint-disable-next-line no-restricted-syntax -- MarkupBlobRef brand has no runtime constructor
+        description: "markup-ref" as unknown as TestCase["description"]
+      })
+      const result = yield* getTestCase({
+        project: testProjectIdentifier("QA Project"),
+        testCase: testCaseIdentifier("Described")
+      }).pipe(Effect.provide(createTestLayerWithMocks({
+        projects: [makeTestProject()],
+        suites: [makeTestSuite()],
+        cases: [described]
+      })))
+      expect(result.description).toBe("fetched content")
     }))
 })
 
