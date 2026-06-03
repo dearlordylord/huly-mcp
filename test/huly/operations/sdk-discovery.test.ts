@@ -12,7 +12,7 @@ import {
   ListHulyEnumsResultSchema,
   SDK_DISCOVERY_DEFAULT_LIMIT
 } from "../../../src/domain/schemas/sdk-discovery.js"
-import { ObjectClassName } from "../../../src/domain/schemas/shared.js"
+import { HulyEnumId, ObjectClassName } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { contact, core, tracker } from "../../../src/huly/huly-plugins.js"
 import {
@@ -468,5 +468,133 @@ describe("sdk discovery operations", () => {
         enums: [{ enumId: "enum:priority", name: "Priority", values: ["Low", "High"] }],
         total: 1
       })
+    }))
+
+  it.effect("filters classes by a known classifier kind and domain via the SDK query", () =>
+    Effect.gen(function*() {
+      const classes = [
+        makeClassDoc({ _id: tracker.class.Issue, label: "tracker:class:Issue", domain: "tracker" }),
+        makeClassDoc({ _id: contact.class.Person, label: "contact:class:Person", domain: "contact" })
+      ]
+
+      const result = yield* listHulyClasses({ kind: "class", domain: "tracker", limit: 10 }).pipe(
+        Effect.provide(createTestLayer({ classes }))
+      )
+      const encoded = yield* Schema.encodeUnknown(ListHulyClassesResultSchema)(result)
+
+      expect(encoded.classes.map((cls) => cls.classId)).toEqual([tracker.class.Issue])
+      expect(encoded.total).toBe(1)
+    }))
+
+  it.effect("returns no classes and skips the attribute fetch when nothing matches the query", () =>
+    Effect.gen(function*() {
+      const classes = [makeClassDoc({ _id: tracker.class.Issue, label: "tracker:class:Issue" })]
+
+      const result = yield* listHulyClasses({ query: HulyModelSearch.make("nonexistent") }).pipe(
+        Effect.provide(createTestLayer({ classes }))
+      )
+      const encoded = yield* Schema.encodeUnknown(ListHulyClassesResultSchema)(result)
+
+      expect(encoded).toEqual({ classes: [], total: 0 })
+    }))
+
+  it.effect("lists attributes without a class filter and falls back to the id for owners absent from the model", () =>
+    Effect.gen(function*() {
+      const attributes = [
+        makeAttribute({ _id: "attr:orphan", name: "orphan", attributeOf: "ghost:class:Gone" })
+      ]
+
+      const result = yield* listHulyAttributes({}).pipe(
+        Effect.provide(createTestLayer({ attributes }))
+      )
+      const encoded = yield* Schema.encodeUnknown(ListHulyAttributesResultSchema)(result)
+
+      expect(encoded.attributes).toEqual([
+        expect.objectContaining({
+          name: "orphan",
+          ownerClassId: "ghost:class:Gone",
+          ownerClassLabel: "ghost:class:Gone"
+        })
+      ])
+    }))
+
+  it.effect("falls back to the owner id when the owner class label cannot be decoded", () =>
+    Effect.gen(function*() {
+      const classes = [makeClassDoc({ _id: tracker.class.Issue, label: 12345 })]
+      const attributes = [makeAttribute({ _id: "attr:title", name: "title", attributeOf: tracker.class.Issue })]
+
+      const result = yield* listHulyAttributes({ class: ObjectClassName.make(tracker.class.Issue) }).pipe(
+        Effect.provide(createTestLayer({ classes, attributes }))
+      )
+      const encoded = yield* Schema.encodeUnknown(ListHulyAttributesResultSchema)(result)
+
+      expect(encoded.attributes[0]?.ownerClassLabel).toBe(tracker.class.Issue)
+    }))
+
+  it.effect("returns no attributes when the class has none", () =>
+    Effect.gen(function*() {
+      const classes = [makeClassDoc({ _id: tracker.class.Issue, label: "tracker:class:Issue" })]
+
+      const result = yield* listHulyAttributes({ class: ObjectClassName.make(tracker.class.Issue) }).pipe(
+        Effect.provide(createTestLayer({ classes, attributes: [] }))
+      )
+      const encoded = yield* Schema.encodeUnknown(ListHulyAttributesResultSchema)(result)
+
+      expect(encoded).toEqual({ attributes: [], total: 0 })
+    }))
+
+  it.effect("deduplicates a diamond ancestor reached via two parents and reports zero counts", () =>
+    Effect.gen(function*() {
+      const a = "test:class:A"
+      const b = "test:class:B"
+      const c = "test:class:C"
+      const d = "test:class:D"
+      const classes = [
+        makeClassDoc({ _id: a, label: "test:class:A" }),
+        makeClassDoc({ _id: b, label: "test:class:B", extends: [a] }),
+        makeClassDoc({ _id: c, label: "test:class:C", extends: [a] }),
+        makeClassDoc({ _id: d, label: "test:class:D", extends: [b, c] })
+      ]
+
+      const result = yield* getHulyClass({ class: ObjectClassName.make(d) }).pipe(
+        Effect.provide(createTestLayer({ classes }))
+      )
+      const encoded = yield* Schema.encodeUnknown(GetHulyClassResultSchema)(result)
+
+      expect(encoded.ancestors.map((ancestor) => ancestor.classId)).toEqual([b, a, c])
+      expect(encoded.class.attributesCount).toBe(0)
+      expect(encoded.ancestors.every((ancestor) => ancestor.attributesCount === 0)).toBe(true)
+    }))
+
+  it.effect("truncates ancestor resolution at the maximum depth", () =>
+    Effect.gen(function*() {
+      const depth = 40
+      const classes = Array.from({ length: depth }, (_, index) => {
+        const id = `test:class:Chain${index}`
+        return index === depth - 1
+          ? makeClassDoc({ _id: id, label: id })
+          : makeClassDoc({ _id: id, label: id, extends: `test:class:Chain${index + 1}` })
+      })
+
+      const result = yield* getHulyClass({ class: ObjectClassName.make("test:class:Chain0") }).pipe(
+        Effect.provide(createTestLayer({ classes }))
+      )
+      const encoded = yield* Schema.encodeUnknown(GetHulyClassResultSchema)(result)
+
+      // MAX_ANCESTOR_DEPTH caps the resolved ancestry well below the 39-deep chain.
+      expect(encoded.ancestors).toHaveLength(32)
+    }))
+
+  it.effect("filters enums by id and drops non-matching query text", () =>
+    Effect.gen(function*() {
+      const byId = yield* listHulyEnums({ enum: HulyEnumId.make("enum:priority") }).pipe(
+        Effect.provide(createTestLayer({ enums: [makeEnum({})] }))
+      )
+      expect(byId.total).toBe(1)
+
+      const filtered = yield* listHulyEnums({ query: HulyModelSearch.make("zzz") }).pipe(
+        Effect.provide(createTestLayer({ enums: [makeEnum({})] }))
+      )
+      expect(filtered.total).toBe(0)
     }))
 })
