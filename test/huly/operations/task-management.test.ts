@@ -13,7 +13,8 @@ import {
   createIssueStatus,
   createTaskType,
   getProjectType,
-  listProjectTypes
+  listProjectTypes,
+  listTaskTypes
 } from "../../../src/huly/operations/task-management.js"
 
 const personId = "person-1" as PersonId
@@ -491,5 +492,22 @@ describe("task management operations", () => {
       expect(result.status.id).toBe(openStatusId)
       expect(captures.createDocs).toEqual([])
       expect(captures.updates).toEqual([])
+    }))
+})
+
+describe("listTaskTypes", () => {
+  it.effect("lists task types across all project types by default", () =>
+    Effect.gen(function*() {
+      const result = yield* listTaskTypes({}).pipe(Effect.provide(createLayer()))
+      expect(result.total).toBe(result.taskTypes.length)
+      expect(result.taskTypes.length).toBeGreaterThan(0)
+    }))
+
+  it.effect("lists task types for a specific project type", () =>
+    Effect.gen(function*() {
+      const result = yield* listTaskTypes({ projectType: ProjectTypeRefSchema.make("classic") }).pipe(
+        Effect.provide(createLayer())
+      )
+      expect(result.total).toBe(result.taskTypes.length)
     }))
 })
