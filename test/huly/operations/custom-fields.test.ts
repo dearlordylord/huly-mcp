@@ -5,6 +5,7 @@ import { Effect, Schema } from "effect"
 import { expect } from "vitest"
 
 import { ListCustomFieldsResultSchema } from "../../../src/domain/schemas/custom-fields.js"
+import { NonEmptyString } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { core } from "../../../src/huly/huly-plugins.js"
 import { getCustomFieldValues, listCustomFields, setCustomField } from "../../../src/huly/operations/custom-fields.js"
@@ -280,5 +281,150 @@ describe("custom-fields operations", () => {
       })
       expect(captureUpdateMixin.mixin).toBe("tracker:mixin:IssueTypeData")
       expect(captureUpdateMixin.attributes).toEqual({ qaApproved: true })
+    }))
+})
+
+describe("custom-fields branch coverage", () => {
+  it.effect("lists primitive string and number fields filtered by targetClass", () =>
+    Effect.gen(function*() {
+      const attrs = [
+        makeAttribute({
+          _id: "attr-str",
+          name: "code",
+          label: "tracker:field:Code",
+          type: { _class: "core:class:TypeString" }
+        }),
+        makeAttribute({
+          _id: "attr-num",
+          name: "points",
+          label: "tracker:field:Points",
+          type: { _class: "core:class:TypeNumber" }
+        })
+      ]
+      const result = yield* listCustomFields({ targetClass: NonEmptyString.make("tracker:mixin:IssueTypeData") }).pipe(
+        Effect.provide(createTestLayer({ attributes: attrs }))
+      )
+      expect(result.map((field) => field.type)).toEqual(["string", "number"])
+    }))
+
+  it.effect("returns an empty list when there are no custom attributes", () =>
+    Effect.gen(function*() {
+      const result = yield* listCustomFields({}).pipe(Effect.provide(createTestLayer({ attributes: [] })))
+      expect(result).toEqual([])
+    }))
+
+  it.effect("falls back to the attribute name when the label cannot be decoded", () =>
+    Effect.gen(function*() {
+      const attr = makeAttribute({
+        _id: "attr-raw",
+        name: "raw",
+        label: 12345,
+        type: { _class: "core:class:TypeString" }
+      })
+      const result = yield* listCustomFields({}).pipe(Effect.provide(createTestLayer({ attributes: [attr] })))
+      expect(result[0]?.label).toBe("raw")
+    }))
+
+  it.effect("defaults a non-numeric class kind to CLASS when resolving owner labels", () =>
+    Effect.gen(function*() {
+      const attr = makeAttribute({
+        _id: "attr-c",
+        name: "c",
+        attributeOf: "tracker:class:Issue",
+        type: { _class: "core:class:TypeString" }
+      })
+      const ownerClass = makeDoc({ _id: "tracker:class:Issue", label: "tracker:class:Issue", kind: "not-a-number" })
+      const result = yield* listCustomFields({}).pipe(
+        Effect.provide(createTestLayer({ attributes: [attr], classDocs: [ownerClass] }))
+      )
+      expect(result[0]?.ownerLabel).toBe("Issue")
+    }))
+
+  it.effect("reports object-not-found when reading values for a missing document", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        getCustomFieldValues({
+          objectId: docId("ghost"),
+          objectClass: objectClassName("tracker:class:Issue")
+        }).pipe(Effect.provide(createTestLayer({ attributes: [], doc: undefined })))
+      )
+      expect(error._tag).toBe("CustomFieldObjectNotFoundError")
+    }))
+
+  it.effect("reports field-not-found when setting an unknown field", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        setCustomField({
+          objectId: docId("issue-1"),
+          objectClass: objectClassName("tracker:class:Issue"),
+          fieldId: customFieldId("nonexistent"),
+          value: "x"
+        }).pipe(Effect.provide(createTestLayer({ attributes: [], doc: makeDoc() })))
+      )
+      expect(error._tag).toBe("CustomFieldNotFoundError")
+    }))
+
+  it.effect("reports object-not-found when setting a field on a missing document", () =>
+    Effect.gen(function*() {
+      const attr = makeAttribute({ _id: "attr-1", type: { _class: "core:class:TypeString" } })
+      const error = yield* Effect.flip(
+        setCustomField({
+          objectId: docId("ghost"),
+          objectClass: objectClassName("tracker:class:Issue"),
+          fieldId: customFieldId("attr-1"),
+          value: "x"
+        }).pipe(Effect.provide(createTestLayer({ attributes: [attr], doc: undefined })))
+      )
+      expect(error._tag).toBe("CustomFieldObjectNotFoundError")
+    }))
+
+  it.effect("updates a non-mixin field via updateDoc with a string value", () =>
+    Effect.gen(function*() {
+      const attr = makeAttribute({
+        _id: "attr-str",
+        name: "code",
+        attributeOf: "tracker:class:Issue",
+        type: { _class: "core:class:TypeString" }
+      })
+      const doc = makeDoc({ _id: "issue-1", space: "space-1" as Ref<Space> })
+      const captureUpdateDoc: { operations?: Record<string, unknown> } = {}
+      const result = yield* setCustomField({
+        objectId: docId("issue-1"),
+        objectClass: objectClassName("tracker:class:Issue"),
+        fieldId: customFieldId("attr-str"),
+        value: "ABC"
+      }).pipe(Effect.provide(createTestLayer({ attributes: [attr], doc, classDocs: [], captureUpdateDoc })))
+      expect(result.value).toBe("ABC")
+      expect(captureUpdateDoc.operations).toEqual({ code: "ABC" })
+    }))
+
+  it.effect("parses numeric and non-numeric values for a number field", () =>
+    Effect.gen(function*() {
+      const attr = makeAttribute({ _id: "attr-num", name: "points", type: { _class: "core:class:TypeNumber" } })
+      const ownerClass = makeDoc({
+        _id: "tracker:mixin:IssueTypeData",
+        label: "tracker:class:Issue Type Data",
+        kind: ClassifierKind.MIXIN
+      })
+      const baseConfig = {
+        attributes: [attr],
+        doc: makeDoc({ _id: "issue-1", space: "space-1" as Ref<Space> }),
+        classDocs: [ownerClass]
+      }
+      const parsed = yield* setCustomField({
+        objectId: docId("issue-1"),
+        objectClass: objectClassName("tracker:class:Issue"),
+        fieldId: customFieldId("attr-num"),
+        value: "42"
+      }).pipe(Effect.provide(createTestLayer(baseConfig)))
+      expect(parsed.value).toBe(42)
+
+      const fallback = yield* setCustomField({
+        objectId: docId("issue-1"),
+        objectClass: objectClassName("tracker:class:Issue"),
+        fieldId: customFieldId("attr-num"),
+        value: "not-a-number"
+      }).pipe(Effect.provide(createTestLayer(baseConfig)))
+      expect(fallback.value).toBe("not-a-number")
     }))
 })

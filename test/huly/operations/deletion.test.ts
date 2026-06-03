@@ -559,3 +559,141 @@ describe("PreviewDeletionParamsSchema validation", () => {
       expect(result.identifier).toBe("PROJ-1")
     }))
 })
+
+const makeTemplate = (id: string): HulyIssueTemplate =>
+  // eslint-disable-next-line no-restricted-syntax -- minimal IssueTemplate fixture; only `space` is read here
+  ({ _id: id as Ref<HulyIssueTemplate>, space: "proj-1" as Ref<HulyProject> }) as unknown as HulyIssueTemplate
+
+describe("previewDeletion - pluralization branches", () => {
+  it.effect("uses singular and plural warning forms by issue attachment counts", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
+      const issue = makeIssue({
+        _id: "issue-1" as Ref<HulyIssue>,
+        space: "proj-1" as Ref<HulyProject>,
+        identifier: "PROJ-7",
+        number: 7,
+        subIssues: 1,
+        comments: 1,
+        attachments: 2,
+        blockedBy: [{ _id: "issue-2" as Ref<Doc>, _class: tracker.class.Issue }],
+        relations: [
+          { _id: "issue-3" as Ref<Doc>, _class: tracker.class.Issue },
+          { _id: "issue-4" as Ref<Doc>, _class: tracker.class.Issue }
+        ]
+      })
+      const result = yield* previewDeletion({
+        entityType: "issue",
+        project: projectIdentifier("PROJ"),
+        identifier: "PROJ-7"
+      }).pipe(Effect.provide(createTestLayerWithMocks({ projects: [project], issues: [issue] })))
+      expect(result.impact).toEqual({ subIssues: 1, comments: 1, attachments: 2, blockedBy: 1, relations: 2 })
+      expect(result.warnings).toHaveLength(5)
+    }))
+
+  it.effect("defaults a missing comment count to zero", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
+      const issue = makeIssue({
+        _id: "issue-1" as Ref<HulyIssue>,
+        space: "proj-1" as Ref<HulyProject>,
+        identifier: "PROJ-8",
+        number: 8,
+        subIssues: 0
+      })
+      // eslint-disable-next-line no-restricted-syntax -- exercise the `comments ?? 0` SDK-boundary default
+      delete (issue as unknown as Record<string, unknown>).comments
+      const result = yield* previewDeletion({
+        entityType: "issue",
+        project: projectIdentifier("PROJ"),
+        identifier: "PROJ-8"
+      }).pipe(Effect.provide(createTestLayerWithMocks({ projects: [project], issues: [issue] })))
+      expect(result.impact.comments).toBe(0)
+    }))
+
+  it.effect("uses plural forms and a single template form for project contents", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
+      const result = yield* previewDeletion({
+        entityType: "project",
+        project: projectIdentifier("PROJ")
+      }).pipe(Effect.provide(createTestLayerWithMocks({
+        projects: [project],
+        issues: [makeIssue({ _id: "i1" as Ref<HulyIssue>, space: "proj-1" as Ref<HulyProject> })],
+        components: [
+          makeComponent({ _id: "c1" as Ref<HulyComponent>, space: "proj-1" as Ref<HulyProject> }),
+          makeComponent({ _id: "c2" as Ref<HulyComponent>, space: "proj-1" as Ref<HulyProject> })
+        ],
+        milestones: [
+          makeMilestone({ _id: "m1" as Ref<HulyMilestone>, space: "proj-1" as Ref<HulyProject> }),
+          makeMilestone({ _id: "m2" as Ref<HulyMilestone>, space: "proj-1" as Ref<HulyProject> })
+        ],
+        templates: [makeTemplate("t1")]
+      })))
+      expect(result.impact).toEqual({ issues: 1, components: 2, milestones: 2, templates: 1 })
+      expect(result.warnings).toHaveLength(4)
+    }))
+
+  it.effect("uses the plural template form for multiple templates", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
+      const result = yield* previewDeletion({
+        entityType: "project",
+        project: projectIdentifier("PROJ")
+      }).pipe(Effect.provide(createTestLayerWithMocks({
+        projects: [project],
+        templates: [makeTemplate("t1"), makeTemplate("t2")]
+      })))
+      expect(result.impact.templates).toBe(2)
+    }))
+
+  it.effect("uses singular verb forms for a component used by one issue", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
+      const comp = makeComponent({
+        _id: "comp-1" as Ref<HulyComponent>,
+        label: "Backend",
+        space: "proj-1" as Ref<HulyProject>
+      })
+      const result = yield* previewDeletion({
+        entityType: "component",
+        project: projectIdentifier("PROJ"),
+        identifier: "Backend"
+      }).pipe(Effect.provide(createTestLayerWithMocks({
+        projects: [project],
+        components: [comp],
+        issues: [makeIssue({
+          _id: "i1" as Ref<HulyIssue>,
+          space: "proj-1" as Ref<HulyProject>,
+          component: "comp-1" as Ref<HulyComponent>
+        })]
+      })))
+      expect(result.impact.issues).toBe(1)
+      expect(result.warnings[0]).toContain("1 issue uses this component")
+    }))
+
+  it.effect("uses singular verb forms for a milestone with one issue", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
+      const ms = makeMilestone({
+        _id: "ms-1" as Ref<HulyMilestone>,
+        label: "v1.0",
+        space: "proj-1" as Ref<HulyProject>
+      })
+      const result = yield* previewDeletion({
+        entityType: "milestone",
+        project: projectIdentifier("PROJ"),
+        identifier: "v1.0"
+      }).pipe(Effect.provide(createTestLayerWithMocks({
+        projects: [project],
+        milestones: [ms],
+        issues: [makeIssue({
+          _id: "i1" as Ref<HulyIssue>,
+          space: "proj-1" as Ref<HulyProject>,
+          milestone: "ms-1" as Ref<HulyMilestone>
+        })]
+      })))
+      expect(result.impact.issues).toBe(1)
+      expect(result.warnings[0]).toContain("1 issue is in this milestone")
+    }))
+})
