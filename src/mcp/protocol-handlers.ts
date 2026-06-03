@@ -88,7 +88,7 @@ const NPM_PACKAGE_NAME = "@firfi/huly-mcp"
 const computeOutputBytes = (response: McpToolResponse): number =>
   response.content.reduce((sum, c) => sum + c.text.length, 0)
 
-const deriveEditMode = (name: string, args: unknown): string | undefined => {
+export const deriveEditMode = (name: string, args: unknown): string | undefined => {
   if (name !== "edit_document" || args === undefined) return undefined
   if (typeof args !== "object" || args === null || Array.isArray(args)) return undefined
   if ("old_text" in args) return "search_and_replace"
@@ -127,9 +127,14 @@ const createDrainInflight = (getInflight: () => number, clock: NowClock): () => 
   })
 }
 
-const fetchLatestNpmVersion = async (): Promise<string> => {
+/**
+ * Fetch the latest published npm version. The `fetch` implementation is injected
+ * (defaulting to the global) so tests can supply a deterministic stub instead of
+ * reaching the network — no mocks required.
+ */
+export const fetchLatestNpmVersion = async (fetchImpl: typeof fetch = fetch): Promise<string> => {
   try {
-    const res = await fetch(`https://registry.npmjs.org/${NPM_PACKAGE_NAME}/latest`, {
+    const res = await fetchImpl(`https://registry.npmjs.org/${NPM_PACKAGE_NAME}/latest`, {
       signal: AbortSignal.timeout(NPM_FETCH_TIMEOUT_MS)
     })
     if (!res.ok) return "unknown"
@@ -219,7 +224,8 @@ export const createMcpProtocolHandlers = (
   telemetry: TelemetryOperations,
   registry: ToolRegistry,
   getHulyContext: () => GetHulyContextResult,
-  clock: NowClock = liveNowClock
+  clock: NowClock = liveNowClock,
+  fetchLatestVersion: () => Promise<string> = fetchLatestNpmVersion
 ): McpProtocolHandlers => {
   let inflight = 0
   const drainInflight = createDrainInflight(() => inflight, clock)
@@ -279,7 +285,7 @@ export const createMcpProtocolHandlers = (
       if (name === VERSION_TOOL_NAME) {
         if (!isEmptyArgumentsObject(args)) return returnError(createUnexpectedArgumentsError(name))
 
-        const latest = await fetchLatestNpmVersion()
+        const latest = await fetchLatestVersion()
         const versionResponse = createSuccessResponse({ current: VERSION, latest })
         const durationMs = clock.currentTimeMillis() - start
         telemetry.toolCalled({
