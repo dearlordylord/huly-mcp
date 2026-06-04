@@ -12,7 +12,7 @@ import type { Document as HulyDocument, Teamspace as HulyTeamspace } from "@hcen
 import type { TaskType } from "@hcengineering/task"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
 import { IssuePriority, TimeReportDayType } from "@hcengineering/tracker"
-import { Effect } from "effect"
+import { Cause, Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type {
@@ -439,6 +439,47 @@ describe("listActivity", () => {
         reactions: 3,
         editedOn: 1706500001000
       })
+    }))
+
+  it.effect("omits reply and reaction counts when absent on the message", () =>
+    Effect.gen(function*() {
+      // A bare message (no replies/reactions/editedOn) exercises the undefined
+      // arm of optionalActivityCount.
+      const msg: HulyActivityMessage = {
+        _id: "msg-bare" as Ref<HulyActivityMessage>,
+        _class: activity.class.ActivityMessage,
+        space: "space-1" as Ref<Space>,
+        attachedTo: "obj-1" as Ref<Doc>,
+        attachedToClass: "tracker:class:Issue" as Ref<Class<Doc>>,
+        collection: "activity",
+        modifiedBy: "user-1" as PersonId,
+        modifiedOn: 0,
+        isPinned: false
+      }
+      const testLayer = createTestLayerWithMocks({ activityMessages: [msg] })
+
+      const result = yield* listActivity({
+        objectId: docId("obj-1"),
+        objectClass: objectClassName("tracker:class:Issue")
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result[0].replies).toBeUndefined()
+      expect(result[0].reactions).toBeUndefined()
+      expect(result[0].editedOn).toBeUndefined()
+    }))
+
+  it.effect("dies when no activity target mode is provided", () =>
+    Effect.gen(function*() {
+      const testLayer = createTestLayerWithMocks({})
+
+      // Schema validation normally guarantees one target mode; calling the
+      // operation directly with none exercises the defensive dieMessage.
+      const exit = yield* listActivity({}).pipe(Effect.provide(testLayer), Effect.exit)
+
+      expect(exit._tag).toBe("Failure")
+      if (exit._tag === "Failure") {
+        expect(Cause.isDie(exit.cause)).toBe(true)
+      }
     }))
 
   it.effect("filters by objectClass", () =>

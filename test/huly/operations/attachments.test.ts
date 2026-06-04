@@ -4,7 +4,7 @@ import type { Blob, Class, Doc, Ref, Space } from "@hcengineering/core"
 import { toFindResult } from "@hcengineering/core"
 import type { Document as HulyDocument, Teamspace as HulyTeamspace } from "@hcengineering/document"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
-import { Effect, Layer } from "effect"
+import { Cause, Effect, Layer } from "effect"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
@@ -411,6 +411,46 @@ describe("addAttachment", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(captureAddCollection.attributes?.description).toBe("My attachment")
+    }))
+
+  it.effect("dies when no file source is provided", () =>
+    Effect.gen(function*() {
+      const testLayer = createTestLayer({})
+
+      // The params schema guarantees one of filePath/fileUrl/data; calling the
+      // operation directly with none exercises toFileSourceParams' defensive throw.
+      const exit = yield* addAttachment({
+        objectId: docId("parent-1"),
+        objectClass: objectClassName("tracker:class:Issue"),
+        space: spaceBrandId("space-1"),
+        filename: "test.txt",
+        contentType: mimeType("text/plain")
+      }).pipe(Effect.provide(testLayer), Effect.exit)
+
+      expect(exit._tag).toBe("Failure")
+      if (exit._tag === "Failure") {
+        expect(Cause.isDie(exit.cause)).toBe(true)
+      }
+    }))
+
+  it.effect("builds fileUrl source params and rejects a blocked URL", () =>
+    Effect.gen(function*() {
+      const testLayer = createTestLayer({})
+
+      // toFileSourceParams builds the fileUrl tag; the SSRF guard then rejects the
+      // loopback host synchronously (no network), surfacing FileFetchError.
+      const error = yield* Effect.flip(
+        addAttachment({
+          objectId: docId("parent-1"),
+          objectClass: objectClassName("tracker:class:Issue"),
+          space: spaceBrandId("space-1"),
+          filename: "test.txt",
+          contentType: mimeType("text/plain"),
+          fileUrl: "http://localhost/secret.txt"
+        }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(error._tag).toBe("FileFetchError")
     }))
 
   it.effect("uploads file via filePath (covers toFileSourceParams filePath branch)", () =>

@@ -77,9 +77,6 @@ type ListSavedMessagesError = HulyClientError
 
 type ListMentionsError = HulyClientError
 
-const optionalTimestamp = (value: number | undefined): Timestamp | undefined =>
-  value === undefined ? undefined : Timestamp.make(value)
-
 const optionalNullableTimestamp = (value: number | null | undefined): Timestamp | null | undefined =>
   value === undefined || value === null ? value : Timestamp.make(value)
 
@@ -176,7 +173,8 @@ export const listActivity = (
       objectId: DocId.make(msg.attachedTo),
       objectClass: ObjectClassName.make(msg.attachedToClass),
       modifiedBy: PersonId.make(msg.modifiedBy),
-      modifiedOn: optionalTimestamp(msg.modifiedOn),
+      // Doc.modifiedOn is always present, so no optional handling is needed.
+      modifiedOn: Timestamp.make(msg.modifiedOn),
       isPinned: msg.isPinned,
       replies: optionalActivityCount(msg.replies),
       reactions: optionalActivityCount(msg.reactions),
