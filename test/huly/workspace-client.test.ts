@@ -280,6 +280,27 @@ describe("WorkspaceClient.layer (real layer)", () => {
       ])
     }).pipe(Effect.provide(liveLayer)))
 
+  it.effect("createAccessLink forwards the personalization name and navigation fields", () =>
+    Effect.gen(function*() {
+      mockCreateAccessLink.mockResolvedValue("https://huly.test/named")
+
+      const client = yield* WorkspaceClient
+      yield* client.createAccessLink(AccountRole.Guest, {
+        firstName: "Ada",
+        lastName: "Lovelace",
+        navigateUrl: "https://huly.test/board"
+      })
+
+      expect(mockCreateAccessLink.mock.calls).toContainEqual([
+        AccountRole.Guest,
+        {
+          firstName: "Ada",
+          lastName: "Lovelace",
+          navigateUrl: "https://huly.test/board"
+        }
+      ])
+    }).pipe(Effect.provide(liveLayer)))
+
   it.effect("updateAllowReadOnlyGuests delegates to AccountClient", () =>
     Effect.gen(function*() {
       mockUpdateAllowReadOnlyGuests.mockResolvedValue(undefined)

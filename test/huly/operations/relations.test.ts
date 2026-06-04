@@ -768,3 +768,84 @@ describe("listIssueRelations", () => {
       expect(result.documents[0]._class).toBe(String(documentPlugin.class.Document))
     }))
 })
+
+describe("relation state branch coverage", () => {
+  const proj = () => makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "TEST" })
+  const tgt = () =>
+    makeIssue({
+      _id: "issue-2" as Ref<HulyIssue>,
+      space: "proj-1" as Ref<HulyProject>,
+      identifier: "TEST-2",
+      number: 2
+    })
+
+  it.effect("returns added=false when an 'is-blocked-by' relation already exists", () =>
+    Effect.gen(function*() {
+      const source = makeIssue({
+        _id: "issue-1" as Ref<HulyIssue>,
+        space: "proj-1" as Ref<HulyProject>,
+        identifier: "TEST-1",
+        number: 1,
+        blockedBy: [{ _id: "issue-2" as Ref<Doc>, _class: tracker.class.Issue }]
+      })
+      const captured: MockConfig["capturedUpdateDocs"] = []
+      const result = yield* addIssueRelation({
+        project: projectIdentifier("TEST"),
+        issueIdentifier: issueIdentifier("TEST-1"),
+        targetIssue: issueIdentifier("TEST-2"),
+        relationType: "is-blocked-by"
+      }).pipe(
+        Effect.provide(
+          createTestLayerWithMocks({ projects: [proj()], issues: [source, tgt()], capturedUpdateDocs: captured })
+        )
+      )
+      expect(result.added).toBe(false)
+      expect(captured).toHaveLength(0)
+    }))
+
+  it.effect("returns removed=false when an 'is-blocked-by' relation is absent", () =>
+    Effect.gen(function*() {
+      const source = makeIssue({
+        _id: "issue-1" as Ref<HulyIssue>,
+        space: "proj-1" as Ref<HulyProject>,
+        identifier: "TEST-1",
+        number: 1
+      })
+      const captured: MockConfig["capturedUpdateDocs"] = []
+      const result = yield* removeIssueRelation({
+        project: projectIdentifier("TEST"),
+        issueIdentifier: issueIdentifier("TEST-1"),
+        targetIssue: issueIdentifier("TEST-2"),
+        relationType: "is-blocked-by"
+      }).pipe(
+        Effect.provide(
+          createTestLayerWithMocks({ projects: [proj()], issues: [source, tgt()], capturedUpdateDocs: captured })
+        )
+      )
+      expect(result.removed).toBe(false)
+      expect(captured).toHaveLength(0)
+    }))
+
+  it.effect("returns removed=false when a 'relates-to' relation is absent", () =>
+    Effect.gen(function*() {
+      const source = makeIssue({
+        _id: "issue-1" as Ref<HulyIssue>,
+        space: "proj-1" as Ref<HulyProject>,
+        identifier: "TEST-1",
+        number: 1
+      })
+      const captured: MockConfig["capturedUpdateDocs"] = []
+      const result = yield* removeIssueRelation({
+        project: projectIdentifier("TEST"),
+        issueIdentifier: issueIdentifier("TEST-1"),
+        targetIssue: issueIdentifier("TEST-2"),
+        relationType: "relates-to"
+      }).pipe(
+        Effect.provide(
+          createTestLayerWithMocks({ projects: [proj()], issues: [source, tgt()], capturedUpdateDocs: captured })
+        )
+      )
+      expect(result.removed).toBe(false)
+      expect(captured).toHaveLength(0)
+    }))
+})
