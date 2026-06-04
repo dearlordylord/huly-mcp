@@ -1,15 +1,25 @@
 import { describe, it } from "@effect/vitest"
-import { type Doc, type MarkupBlobRef, type PersonId, type Ref, type Space, toFindResult } from "@hcengineering/core"
+import {
+  type Blob,
+  type Doc,
+  type MarkupBlobRef,
+  type PersonId,
+  type Ref,
+  type Space,
+  toFindResult
+} from "@hcengineering/core"
 import type { Document as HulyDocument, Teamspace as HulyTeamspace } from "@hcengineering/document"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
-import type {
-  DocumentEmptyContentError,
-  DocumentNotFoundError,
-  DocumentTextMultipleMatchesError,
-  DocumentTextNotFoundError,
-  TeamspaceNotFoundError
+import {
+  type DocumentContentCorruptedError,
+  type DocumentEmptyContentError,
+  type DocumentNotFoundError,
+  type DocumentTextMultipleMatchesError,
+  type DocumentTextNotFoundError,
+  HulyConnectionError,
+  type TeamspaceNotFoundError
 } from "../../../src/huly/errors.js"
 import {
   createDocument,
@@ -25,7 +35,7 @@ import {
 } from "../../../src/huly/operations/documents.js"
 import { documentIdentifier, teamspaceIdentifier } from "../../helpers/brands.js"
 
-import { documentPlugin } from "../../../src/huly/huly-plugins.js"
+import { core, documentPlugin } from "../../../src/huly/huly-plugins.js"
 
 // --- Mock Data Builders ---
 
@@ -63,12 +73,30 @@ const makeDocument = (overrides?: Partial<HulyDocument>): HulyDocument => {
   return result
 }
 
+const makeBlob = (overrides?: Partial<Blob>): Blob => ({
+  _id: "blob-1" as Ref<Blob>,
+  _class: core.class.Blob,
+  space: "space-1" as Ref<Space>,
+  provider: "test",
+  contentType: "application/json",
+  etag: "etag",
+  version: null,
+  size: 0,
+  modifiedBy: "user-1" as PersonId,
+  modifiedOn: 0,
+  createdBy: "user-1" as PersonId,
+  createdOn: 0,
+  ...overrides
+})
+
 // --- Test Helpers ---
 
 interface MockConfig {
   teamspaces?: Array<HulyTeamspace>
   documents?: Array<HulyDocument>
+  blobs?: Array<Blob>
   markupContent?: Record<string, string>
+  fetchMarkupError?: HulyConnectionError
   captureDocumentQuery?: { query?: Record<string, unknown>; options?: Record<string, unknown> }
   captureCreateDoc?: { attributes?: Record<string, unknown>; id?: string }
   captureUpdateDoc?: { operations?: Record<string, unknown> }
@@ -80,6 +108,7 @@ interface MockConfig {
 const createTestLayerWithMocks = (config: MockConfig) => {
   const teamspaces = config.teamspaces ?? []
   const documents = config.documents ?? []
+  const blobs = config.blobs ?? []
 
   const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown, options: unknown) => {
     if (_class === documentPlugin.class.Teamspace) {
@@ -133,12 +162,20 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       )
       return Effect.succeed(found)
     }
+    if (_class === core.class.Blob) {
+      const q = query as Record<string, unknown>
+      const found = blobs.find(blob => blob._id === q._id)
+      return Effect.succeed(found)
+    }
     return Effect.succeed(undefined)
   }) as HulyClientOperations["findOne"]
 
   const markupContent = config.markupContent ?? {}
   const fetchMarkupImpl: HulyClientOperations["fetchMarkup"] = (
     (_objectClass: unknown, _objectId: unknown, _objectAttr: unknown, id: unknown) => {
+      if (config.fetchMarkupError !== undefined) {
+        return Effect.fail(config.fetchMarkupError)
+      }
       const content = markupContent[id as string] ?? ""
       return Effect.succeed(content)
     }
@@ -367,13 +404,13 @@ describe("getDocument", () => {
           _id: "doc-1" as Ref<HulyDocument>,
           title: "Test Doc",
           space: "ts-1" as Ref<HulyTeamspace>,
-          content: "markup-id-123" as MarkupBlobRef
+          content: "doc-1-content-1700000000000" as MarkupBlobRef
         })
 
         const testLayer = createTestLayerWithMocks({
           teamspaces: [teamspace],
           documents: [doc],
-          markupContent: { "markup-id-123": "# Hello World" }
+          markupContent: { "doc-1-content-1700000000000": "# Hello World" }
         })
 
         const result = yield* getDocument({
@@ -432,6 +469,140 @@ describe("getDocument", () => {
         )
 
         expect(result.content).toBeUndefined()
+      }))
+
+    it.effect("preserves fetchMarkup failures as HulyConnectionError", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const doc = makeDocument({
+          _id: "doc-1" as Ref<HulyDocument>,
+          title: "Corrupted Doc",
+          space: "ts-1" as Ref<HulyTeamspace>,
+          content: "doc-1-content-1700000000000" as MarkupBlobRef
+        })
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: [doc],
+          fetchMarkupError: new HulyConnectionError({ message: "fetchMarkup failed: HTTP error 500" })
+        })
+
+        const error = yield* Effect.flip(
+          getDocument({
+            teamspace: teamspaceIdentifier("My Docs"),
+            document: documentIdentifier("Corrupted Doc")
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error).toBeInstanceOf(HulyConnectionError)
+        expect(error.message).toBe("fetchMarkup failed: HTTP error 500")
+      }))
+
+    it.effect("maps obvious raw markdown content refs to DocumentContentCorruptedError", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const doc = makeDocument({
+          _id: "doc-1" as Ref<HulyDocument>,
+          title: "Raw Doc",
+          space: "ts-1" as Ref<HulyTeamspace>,
+          content: "raw-markdown-that-is-not-a-blob-ref" as MarkupBlobRef
+        })
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: [doc]
+        })
+
+        const error = yield* Effect.flip(
+          getDocument({
+            teamspace: teamspaceIdentifier("My Docs"),
+            document: documentIdentifier("Raw Doc")
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("DocumentContentCorruptedError")
+        expect((error as DocumentContentCorruptedError).causeMessage).toBe(
+          "Document.content references a missing markup blob."
+        )
+      }))
+
+    it.effect("maps empty content from a missing shaped blob to DocumentContentCorruptedError", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const doc = makeDocument({
+          _id: "doc-1" as Ref<HulyDocument>,
+          title: "Missing Blob Doc",
+          space: "ts-1" as Ref<HulyTeamspace>,
+          content: "doc-1-content-1700000000000" as MarkupBlobRef
+        })
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: [doc],
+          markupContent: { "doc-1-content-1700000000000": "" }
+        })
+
+        const error = yield* Effect.flip(
+          getDocument({
+            teamspace: teamspaceIdentifier("My Docs"),
+            document: documentIdentifier("Missing Blob Doc")
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("DocumentContentCorruptedError")
+        expect((error as DocumentContentCorruptedError).causeMessage).toBe(
+          "Document.content references a missing markup blob."
+        )
+      }))
+
+    it.effect("returns content from non-standard refs when Huly can read them", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const doc = makeDocument({
+          _id: "doc-1" as Ref<HulyDocument>,
+          title: "Legacy Doc",
+          space: "ts-1" as Ref<HulyTeamspace>,
+          content: "legacy-markup-ref" as MarkupBlobRef
+        })
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: [doc],
+          markupContent: { "legacy-markup-ref": "# Legacy Content" }
+        })
+
+        const result = yield* getDocument({
+          teamspace: teamspaceIdentifier("My Docs"),
+          document: documentIdentifier("Legacy Doc")
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result.content).toBe("# Legacy Content")
+      }))
+
+    it.effect("returns empty content from non-standard refs when the blob exists", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const doc = makeDocument({
+          _id: "doc-1" as Ref<HulyDocument>,
+          title: "Empty Legacy Doc",
+          space: "ts-1" as Ref<HulyTeamspace>,
+          content: "legacy-content-ref" as MarkupBlobRef
+        })
+        const blob = makeBlob({ _id: "legacy-content-ref" as Ref<Blob> })
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: [doc],
+          blobs: [blob],
+          markupContent: { "legacy-content-ref": "" }
+        })
+
+        const result = yield* getDocument({
+          teamspace: teamspaceIdentifier("My Docs"),
+          document: documentIdentifier("Empty Legacy Doc")
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result.content).toBe("")
       }))
   })
 
@@ -513,9 +684,8 @@ describe("createDocument", () => {
         expect(result.id).toBeDefined()
         expect(captureUploadMarkup.markup).toBe("# Heading\n\nSome content here.")
         expect(captureCreateDoc.attributes?.title).toBe("Doc with Content")
-        // uploadMarkup was called (markup captured) and its return value flows into createDoc
-        expect(captureCreateDoc.attributes?.content).not.toBeNull()
-        expect(typeof captureCreateDoc.attributes?.content).toBe("string")
+        expect(captureCreateDoc.attributes?.content).toBe("markup-ref-123")
+        expect(captureCreateDoc.attributes?.content).not.toBe("# Heading\n\nSome content here.")
       }))
     it.effect("calculates rank for new document", () =>
       Effect.gen(function*() {
@@ -741,7 +911,7 @@ describe("editDocument", () => {
           _id: "doc-1" as Ref<HulyDocument>,
           title: "Test Doc",
           space: "ts-1" as Ref<HulyTeamspace>,
-          content: "markup-old" as MarkupBlobRef
+          content: "doc-1-content-1700000000000" as MarkupBlobRef
         })
         const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 
@@ -758,6 +928,66 @@ describe("editDocument", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(captureUpdateDoc.operations?.content).toBeNull()
+      }))
+
+    it.effect("updates existing content through updateMarkup without writing raw markdown to updateDoc", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const doc = makeDocument({
+          _id: "doc-1" as Ref<HulyDocument>,
+          title: "Test Doc",
+          space: "ts-1" as Ref<HulyTeamspace>,
+          content: "doc-1-content-1700000000000" as MarkupBlobRef
+        })
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUpdateMarkup: MockConfig["captureUpdateMarkup"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: [doc],
+          captureUpdateDoc,
+          captureUpdateMarkup
+        })
+
+        yield* editDocument({
+          teamspace: teamspaceIdentifier("My Docs"),
+          document: documentIdentifier("Test Doc"),
+          content: "# Updated Content"
+        }).pipe(Effect.provide(testLayer))
+
+        expect(captureUpdateMarkup.markup).toBe("# Updated Content")
+        expect(captureUpdateDoc.operations?.content).toBeUndefined()
+        expect(captureUpdateDoc.operations).toBeUndefined()
+      }))
+
+    it.effect("full replace repairs raw-corrupted document content through updateMarkup", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const doc = makeDocument({
+          _id: "doc-1" as Ref<HulyDocument>,
+          title: "Corrupted Doc",
+          space: "ts-1" as Ref<HulyTeamspace>,
+          content: "# Raw markdown stored in Document.content" as MarkupBlobRef
+        })
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUpdateMarkup: MockConfig["captureUpdateMarkup"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: [doc],
+          captureUpdateDoc,
+          captureUpdateMarkup
+        })
+
+        yield* editDocument({
+          teamspace: teamspaceIdentifier("My Docs"),
+          document: documentIdentifier("Corrupted Doc"),
+          content: "# Repaired"
+        }).pipe(Effect.provide(testLayer))
+
+        expect(captureUpdateMarkup.markup).toBe("# Repaired")
+        expect(captureUpdateDoc.operations?.content).toBeUndefined()
+        expect(captureUpdateDoc.operations).toBeUndefined()
       }))
 
     it.effect("fails when no fields provided", () =>
@@ -819,13 +1049,13 @@ describe("editDocument", () => {
           _id: "doc-1" as Ref<HulyDocument>,
           title: "Test Doc",
           space: "ts-1" as Ref<HulyTeamspace>,
-          content: "markup-id-1" as MarkupBlobRef
+          content: "doc-1-content-1700000000000" as MarkupBlobRef
         })
 
         const testLayer = createTestLayerWithMocks({
           teamspaces: [teamspace],
           documents: [doc],
-          markupContent: { "markup-id-1": "old content" }
+          markupContent: { "doc-1-content-1700000000000": "old content" }
         })
 
         const error = yield* Effect.flip(
@@ -880,13 +1110,13 @@ describe("editDocument", () => {
           _id: "doc-1" as Ref<HulyDocument>,
           title: "Test Doc",
           space: "ts-1" as Ref<HulyTeamspace>,
-          content: "markup-id-1" as MarkupBlobRef
+          content: "doc-1-content-1700000000000" as MarkupBlobRef
         })
 
         const testLayer = createTestLayerWithMocks({
           teamspaces: [teamspace],
           documents: [doc],
-          markupContent: { "markup-id-1": "content" }
+          markupContent: { "doc-1-content-1700000000000": "content" }
         })
 
         const error = yield* Effect.flip(
@@ -945,14 +1175,14 @@ describe("editDocument", () => {
           _id: "doc-1" as Ref<HulyDocument>,
           title: "Test Doc",
           space: "ts-1" as Ref<HulyTeamspace>,
-          content: "markup-id-1" as MarkupBlobRef
+          content: "doc-1-content-1700000000000" as MarkupBlobRef
         })
         const captureUpdateMarkup: MockConfig["captureUpdateMarkup"] = {}
 
         const testLayer = createTestLayerWithMocks({
           teamspaces: [teamspace],
           documents: [doc],
-          markupContent: { "markup-id-1": "Hello world, this is a test." },
+          markupContent: { "doc-1-content-1700000000000": "Hello world, this is a test." },
           captureUpdateMarkup
         })
 
@@ -974,14 +1204,14 @@ describe("editDocument", () => {
           _id: "doc-1" as Ref<HulyDocument>,
           title: "Test Doc",
           space: "ts-1" as Ref<HulyTeamspace>,
-          content: "markup-id-1" as MarkupBlobRef
+          content: "doc-1-content-1700000000000" as MarkupBlobRef
         })
         const captureUpdateMarkup: MockConfig["captureUpdateMarkup"] = {}
 
         const testLayer = createTestLayerWithMocks({
           teamspaces: [teamspace],
           documents: [doc],
-          markupContent: { "markup-id-1": "Remove this section please." },
+          markupContent: { "doc-1-content-1700000000000": "Remove this section please." },
           captureUpdateMarkup
         })
 
@@ -1003,14 +1233,14 @@ describe("editDocument", () => {
           _id: "doc-1" as Ref<HulyDocument>,
           title: "Test Doc",
           space: "ts-1" as Ref<HulyTeamspace>,
-          content: "markup-id-1" as MarkupBlobRef
+          content: "doc-1-content-1700000000000" as MarkupBlobRef
         })
         const captureUpdateMarkup: MockConfig["captureUpdateMarkup"] = {}
 
         const testLayer = createTestLayerWithMocks({
           teamspaces: [teamspace],
           documents: [doc],
-          markupContent: { "markup-id-1": "foo bar foo baz foo" },
+          markupContent: { "doc-1-content-1700000000000": "foo bar foo baz foo" },
           captureUpdateMarkup
         })
 
@@ -1033,7 +1263,7 @@ describe("editDocument", () => {
           _id: "doc-1" as Ref<HulyDocument>,
           title: "Old Title",
           space: "ts-1" as Ref<HulyTeamspace>,
-          content: "markup-id-1" as MarkupBlobRef
+          content: "doc-1-content-1700000000000" as MarkupBlobRef
         })
         const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
         const captureUpdateMarkup: MockConfig["captureUpdateMarkup"] = {}
@@ -1041,7 +1271,7 @@ describe("editDocument", () => {
         const testLayer = createTestLayerWithMocks({
           teamspaces: [teamspace],
           documents: [doc],
-          markupContent: { "markup-id-1": "Some content here." },
+          markupContent: { "doc-1-content-1700000000000": "Some content here." },
           captureUpdateDoc,
           captureUpdateMarkup
         })
@@ -1068,13 +1298,13 @@ describe("editDocument", () => {
           _id: "doc-1" as Ref<HulyDocument>,
           title: "Test Doc",
           space: "ts-1" as Ref<HulyTeamspace>,
-          content: "markup-id-1" as MarkupBlobRef
+          content: "doc-1-content-1700000000000" as MarkupBlobRef
         })
 
         const testLayer = createTestLayerWithMocks({
           teamspaces: [teamspace],
           documents: [doc],
-          markupContent: { "markup-id-1": "Hello world." }
+          markupContent: { "doc-1-content-1700000000000": "Hello world." }
         })
 
         const error = yield* Effect.flip(
@@ -1097,13 +1327,13 @@ describe("editDocument", () => {
           _id: "doc-1" as Ref<HulyDocument>,
           title: "Test Doc",
           space: "ts-1" as Ref<HulyTeamspace>,
-          content: "markup-id-1" as MarkupBlobRef
+          content: "doc-1-content-1700000000000" as MarkupBlobRef
         })
 
         const testLayer = createTestLayerWithMocks({
           teamspaces: [teamspace],
           documents: [doc],
-          markupContent: { "markup-id-1": "foo bar foo baz foo" }
+          markupContent: { "doc-1-content-1700000000000": "foo bar foo baz foo" }
         })
 
         const error = yield* Effect.flip(

@@ -27,6 +27,7 @@ import {
   AssociationConflictError,
   AssociationIdentifierAmbiguousError,
   AssociationInUseError,
+  AssociationNotFoundError,
   AssociationSystemClassUnsupportedError,
   GenericObjectIdentifierAmbiguousError,
   GenericObjectLocatorInvalidError,
@@ -1203,6 +1204,142 @@ describe("association mutations", () => {
       expect(result.deleted).toBe(true)
       expect(result.associationId).toBe("assoc-1")
     }))
+
+  it.effect("createAssociation fails when ifExists is fail and an identical association exists", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        createAssociation({
+          sourceClass: issueClass,
+          targetClass: issueClass,
+          sourceRole: AssociationRoleName.make("relates"),
+          targetRole: AssociationRoleName.make("relates"),
+          cardinality: "many-to-many",
+          ifExists: "fail"
+        }).pipe(Effect.provide(testLayer({ associations: [association({})] })))
+      )
+      expect(error).toBeInstanceOf(AssociationConflictError)
+      expect((error as AssociationConflictError).reason).toContain("ifExists=fail")
+    }))
+
+  it.effect("createAssociation fails when automationOnly differs from an existing association", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        createAssociation({
+          sourceClass: issueClass,
+          targetClass: issueClass,
+          sourceRole: AssociationRoleName.make("relates"),
+          targetRole: AssociationRoleName.make("relates"),
+          cardinality: "many-to-many",
+          automationOnly: true
+        }).pipe(Effect.provide(testLayer({ associations: [association({})] })))
+      )
+      expect(error).toBeInstanceOf(AssociationConflictError)
+      expect((error as AssociationConflictError).reason).toContain("automationOnly")
+    }))
+
+  it.effect("deleteAssociation rejects an association whose source is a core system class", () =>
+    Effect.gen(function*() {
+      const system = association({
+        _id: "assoc-sys" as Ref<HulyAssociation>,
+        classA: core.class.Doc,
+        classB: tracker.class.Issue
+      })
+      const error = yield* Effect.flip(
+        deleteAssociation({ association: AssociationIdentifier.make("assoc-sys") }).pipe(
+          Effect.provide(testLayer({ associations: [system] }))
+        )
+      )
+      expect(error).toBeInstanceOf(AssociationSystemClassUnsupportedError)
+    }))
+
+  it.effect("deleteAssociation rejects an association whose target is a core system class", () =>
+    Effect.gen(function*() {
+      const system = association({
+        _id: "assoc-sys" as Ref<HulyAssociation>,
+        classA: tracker.class.Issue,
+        classB: core.class.Doc
+      })
+      const error = yield* Effect.flip(
+        deleteAssociation({ association: AssociationIdentifier.make("assoc-sys") }).pipe(
+          Effect.provide(testLayer({ associations: [system] }))
+        )
+      )
+      expect(error).toBeInstanceOf(AssociationSystemClassUnsupportedError)
+    }))
+
+  it.effect("deleteAssociation resolves an association by its target role name", () =>
+    Effect.gen(function*() {
+      const assoc = association({
+        _id: "assoc-roles" as Ref<HulyAssociation>,
+        nameA: "references",
+        nameB: "referenced by"
+      })
+      const result = yield* deleteAssociation({ association: AssociationIdentifier.make("referenced by") }).pipe(
+        Effect.provide(testLayer({ associations: [assoc] }))
+      )
+      expect(result.deleted).toBe(true)
+      expect(result.associationId).toBe("assoc-roles")
+    }))
+
+  it.effect("deleteAssociation resolves an association by its 'source -> target' role pair", () =>
+    Effect.gen(function*() {
+      const assoc = association({
+        _id: "assoc-roles" as Ref<HulyAssociation>,
+        nameA: "references",
+        nameB: "referenced by"
+      })
+      const result = yield* deleteAssociation({
+        association: AssociationIdentifier.make("references -> referenced by")
+      }).pipe(Effect.provide(testLayer({ associations: [assoc] })))
+      expect(result.deleted).toBe(true)
+      expect(result.associationId).toBe("assoc-roles")
+    }))
+})
+
+describe("listAssociations branch coverage", () => {
+  it.effect("summarizes a system association with an unsupported-write reason when included", () =>
+    Effect.gen(function*() {
+      const system = association({
+        _id: "assoc-sys" as Ref<HulyAssociation>,
+        classA: core.class.Doc,
+        classB: core.class.Doc
+      })
+      const result = yield* listAssociations({ includeSystem: true }).pipe(
+        Effect.provide(testLayer({ associations: [system] }))
+      )
+      const summary = result.associations.find((item) => item.associationId === "assoc-sys")
+      expect(summary?.system).toBe(true)
+      expect(summary?.canCreateRelation).toBe(false)
+      expect(summary?.unsupportedReason).toContain("system class")
+    }))
+
+  it.effect("filters association discovery by source and target class", () =>
+    Effect.gen(function*() {
+      const match = association({
+        _id: "assoc-it" as Ref<HulyAssociation>,
+        classA: tracker.class.Issue,
+        classB: documentPlugin.class.Document
+      })
+      const result = yield* listAssociations({ sourceClass: issueClass, targetClass: documentClass }).pipe(
+        Effect.provide(testLayer({ associations: [match] }))
+      )
+      expect(result.associations.map((item) => item.associationId)).toEqual(["assoc-it"])
+    }))
+
+  it.effect("reports a system association as not found when system classes are excluded", () =>
+    Effect.gen(function*() {
+      const system = association({
+        _id: "assoc-sys" as Ref<HulyAssociation>,
+        classA: core.class.Doc,
+        classB: core.class.Doc
+      })
+      const error = yield* Effect.flip(
+        listAssociations({ association: AssociationIdentifier.make("assoc-sys") }).pipe(
+          Effect.provide(testLayer({ associations: [system] }))
+        )
+      )
+      expect(error).toBeInstanceOf(AssociationNotFoundError)
+    }))
 })
 
 describe("relation mutations", () => {
@@ -1350,5 +1487,168 @@ describe("relation mutations", () => {
       )
 
       expect(error).toBeInstanceOf(RelationIdentifierAmbiguousError)
+    }))
+})
+
+describe("generic-associations resolver and mutation branch coverage", () => {
+  it.effect("createRelation rejects associations on a core system class", () =>
+    Effect.gen(function*() {
+      const system = association({
+        _id: "assoc-1" as Ref<HulyAssociation>,
+        classA: core.class.Doc,
+        classB: tracker.class.Issue
+      })
+      const error = yield* Effect.flip(
+        createRelation({
+          association: assocId,
+          source: { kind: "raw", id: docId("issue-1"), class: issueClass },
+          target: { kind: "raw", id: docId("issue-2"), class: issueClass }
+        }).pipe(Effect.provide(testLayer({
+          associations: [system],
+          issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+        })))
+      )
+      expect(error).toBeInstanceOf(AssociationSystemClassUnsupportedError)
+    }))
+
+  it.effect("createAssociation conflict reason defaults a missing automationOnly to false", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        createAssociation({
+          sourceClass: issueClass,
+          targetClass: issueClass,
+          sourceRole: AssociationRoleName.make("relates"),
+          targetRole: AssociationRoleName.make("relates"),
+          cardinality: "many-to-many"
+        }).pipe(Effect.provide(testLayer({ associations: [association({ automationOnly: true })] })))
+      )
+      expect(error).toBeInstanceOf(AssociationConflictError)
+      expect((error as AssociationConflictError).reason).toContain("requested false")
+    }))
+
+  it.effect("deleteRelation by triple is idempotent when no relation matches", () =>
+    Effect.gen(function*() {
+      const result = yield* deleteRelation({
+        association: assocId,
+        source: { kind: "raw", id: docId("issue-1"), class: issueClass },
+        target: { kind: "raw", id: docId("issue-2"), class: issueClass }
+      }).pipe(Effect.provide(testLayer({
+        associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })],
+        issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+      })))
+      expect(result.deleted).toBe(false)
+      expect(result.reason).toBe("not_found")
+    }))
+
+  it.effect("resolves a document endpoint by its id", () =>
+    Effect.gen(function*() {
+      const docToIssue = association({
+        _id: "assoc-1" as Ref<HulyAssociation>,
+        classA: documentPlugin.class.Document,
+        classB: tracker.class.Issue,
+        nameA: "document",
+        nameB: "issue"
+      })
+      const result = yield* listRelations({
+        association: assocId,
+        source: { kind: "document", document: documentIdentifier("doc-1") },
+        target: { kind: "raw", id: docId("issue-1"), class: issueClass }
+      }).pipe(Effect.provide(testLayer({
+        associations: [docToIssue],
+        relations: [relation({ docA: "doc-1" as Ref<Doc>, docB: "issue-1" as Ref<Doc> })],
+        documents: [documentDoc("doc-1", "Spec")],
+        issues: [issue("issue-1", "HULY-1")]
+      })))
+      expect(result.total).toBe(1)
+      expect(result.relations[0].source.display).toBe("Spec")
+    }))
+
+  it.effect("fails on ambiguous document titles without a teamspace", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        listRelations({
+          source: { kind: "document", document: documentIdentifier("Shared Title") }
+        }).pipe(Effect.provide(testLayer({
+          associations: [association({})],
+          documents: [documentDoc("doc-1", "Shared Title"), documentDoc("doc-2", "Shared Title")]
+        })))
+      )
+      expect(error).toBeInstanceOf(GenericObjectIdentifierAmbiguousError)
+    }))
+
+  it.effect("resolves a card endpoint by id within a card space resolved by id", () =>
+    Effect.gen(function*() {
+      const cardToIssue = association({
+        _id: "assoc-1" as Ref<HulyAssociation>,
+        classA: contractAssociationClassRef,
+        classB: tracker.class.Issue,
+        nameA: "card",
+        nameB: "issue"
+      })
+      const result = yield* listRelations({
+        association: assocId,
+        source: { kind: "card", card: CardIdentifier.make("card-1"), cardSpace: CardSpaceIdentifier.make("cards-1") },
+        target: { kind: "raw", id: docId("issue-1"), class: issueClass }
+      }).pipe(Effect.provide(testLayer({
+        associations: [cardToIssue],
+        relations: [relation({ docA: "card-1" as Ref<Doc>, docB: "issue-1" as Ref<Doc> })],
+        cardSpaces: [cardSpaceDoc("cards-1", "Contracts")],
+        cards: [cardDoc("card-1", "Contract")],
+        issues: [issue("issue-1", "HULY-1")]
+      })))
+      expect(result.total).toBe(1)
+    }))
+
+  it.effect("fails when the referenced card space does not exist", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        listRelations({
+          source: {
+            kind: "card",
+            card: CardIdentifier.make("Contract"),
+            cardSpace: CardSpaceIdentifier.make("Nonexistent")
+          }
+        }).pipe(Effect.provide(testLayer({
+          associations: [association({})],
+          cards: [cardDoc("card-1", "Contract")]
+        })))
+      )
+      expect(error).toBeInstanceOf(GenericObjectNotFoundError)
+    }))
+
+  it.effect("fails on an ambiguous card space name", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        listRelations({
+          source: {
+            kind: "card",
+            card: CardIdentifier.make("Contract"),
+            cardSpace: CardSpaceIdentifier.make("Contracts")
+          }
+        }).pipe(Effect.provide(testLayer({
+          associations: [association({})],
+          cardSpaces: [cardSpaceDoc("cards-1", "Contracts"), cardSpaceDoc("cards-2", "Contracts")],
+          cards: [cardDoc("card-1", "Contract")]
+        })))
+      )
+      expect(error).toBeInstanceOf(GenericObjectIdentifierAmbiguousError)
+    }))
+
+  it.effect("fails when a card title is missing inside the selected card space", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        listRelations({
+          source: {
+            kind: "card",
+            card: CardIdentifier.make("Missing Card"),
+            cardSpace: CardSpaceIdentifier.make("Contracts")
+          }
+        }).pipe(Effect.provide(testLayer({
+          associations: [association({})],
+          cardSpaces: [cardSpaceDoc("cards-1", "Contracts")],
+          cards: [cardDoc("card-1", "Contract")]
+        })))
+      )
+      expect(error).toBeInstanceOf(GenericObjectNotFoundError)
     }))
 })

@@ -19,6 +19,7 @@ import {
   CalendarNotAccessibleError,
   DirectMessageIdentifierAmbiguousError,
   DirectMessageNotFoundError,
+  DocumentContentCorruptedError,
   FileFetchError,
   FileNotFoundError,
   FileUploadError,
@@ -348,6 +349,22 @@ describe("Error Mapping to MCP", () => {
             expect(response._meta.errorTag).toBeUndefined()
             expect(response.content[0].text).toBe(error.message)
           }
+        }))
+
+      it.effect("maps DocumentContentCorruptedError with repair instruction", () =>
+        Effect.gen(function*() {
+          const error = new DocumentContentCorruptedError({
+            identifier: "Spec",
+            causeMessage: "missing markup blob"
+          })
+          const response = mapDomainErrorToMcp(error)
+
+          expect(response.isError).toBe(true)
+          expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+          expect(response._meta.errorTag).toBeUndefined()
+          expect(response.content[0].text).toBe(
+            "Document content is unreadable or corrupted. Use edit_document with the full content field to replace and repair it."
+          )
         }))
     })
 

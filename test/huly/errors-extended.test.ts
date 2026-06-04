@@ -20,6 +20,7 @@ import {
   CardSpaceNotFoundError,
   CustomFieldNotFoundError,
   CustomFieldObjectNotFoundError,
+  DocumentContentCorruptedError,
   DocumentEditModeError,
   DocumentEmptyContentError,
   DocumentTextMultipleMatchesError,
@@ -172,6 +173,12 @@ describe("Extended Huly error message getters", () => {
         error: new DocumentEmptyContentError({ identifier: "doc-1" }),
         tag: "DocumentEmptyContentError",
         message: "Document 'doc-1' has no content. Use 'content' mode or create_document to set initial content."
+      },
+      {
+        error: new DocumentContentCorruptedError({ identifier: "doc-1", causeMessage: "missing markup blob" }),
+        tag: "DocumentContentCorruptedError",
+        message:
+          "Document content is unreadable or corrupted. Use edit_document with the full content field to replace and repair it."
       },
       {
         error: new DocumentEditModeError({ reason: "mixed modes" }),
@@ -349,7 +356,8 @@ describe("Extended Huly error message getters", () => {
           relationCount: 1,
           sampleRelationIds: [RelationId.make("rel-1")]
         }),
-        new ProcessExecutionNotFoundError({ executionId: ProcessExecutionId.make("exec-1") })
+        new ProcessExecutionNotFoundError({ executionId: ProcessExecutionId.make("exec-1") }),
+        new DocumentContentCorruptedError({ identifier: "doc-1" })
       ]
 
       for (const sample of samples) {
