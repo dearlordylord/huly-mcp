@@ -953,6 +953,17 @@ describe("listDirectMessages", () => {
       expect(result.conversations[0].participantIds).toEqual(["test-account-uuid", "account-2"])
     }))
 
+  it.effect("returns no conversations and skips name resolution when there are no DMs", () =>
+    Effect.gen(function*() {
+      // With no DMs, the deduped account-uuid list is empty, exercising the
+      // early-return in buildAccountUuidToNameMap.
+      const testLayer = createTestLayerWithMocks({ directMessages: [] })
+
+      const result = yield* listDirectMessages({}).pipe(Effect.provide(testLayer))
+
+      expect(result.conversations).toHaveLength(0)
+    }))
+
   it.effect("only returns DM conversations containing the authenticated account", () =>
     Effect.gen(function*() {
       const ownDm = makeDirectMessage({

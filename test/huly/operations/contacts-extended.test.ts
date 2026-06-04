@@ -1,7 +1,9 @@
 import { describe, it } from "@effect/vitest"
 import type {
   Channel,
+  Contact,
   Employee as HulyEmployee,
+  Member as HulyMember,
   Organization as HulyOrganization,
   Person as HulyPerson
 } from "@hcengineering/contact"
@@ -91,11 +93,30 @@ const createMockOrganization = (overrides: Partial<HulyOrganization> = {}): Huly
   return data as HulyOrganization
 }
 
+const createMockMember = (overrides: Partial<HulyMember> = {}): HulyMember => {
+  const data = {
+    _id: "member-1" as Ref<HulyMember>,
+    _class: contact.class.Member,
+    space: contact.space.Contacts,
+    attachedTo: "org-1" as Ref<HulyOrganization>,
+    attachedToClass: contact.class.Organization,
+    collection: "members",
+    contact: "person-123" as Ref<Contact>,
+    modifiedOn: 1700000000000,
+    modifiedBy: "user" as CorePersonId,
+    createdOn: 1699000000000,
+    createdBy: "user" as CorePersonId,
+    ...overrides
+  }
+  return data as HulyMember
+}
+
 interface MockConfig {
   persons?: Array<HulyPerson>
   channels?: Array<Channel>
   employees?: Array<HulyEmployee>
   organizations?: Array<HulyOrganization>
+  members?: Array<HulyMember>
   captureCreateDoc?: { data?: Record<string, unknown>; id?: string; class?: unknown }
   captureAddCollection?: { attributes?: Record<string, unknown>; attachedTo?: string; class?: unknown }
   captureUpdateDoc?: { operations?: Record<string, unknown> }
@@ -107,6 +128,7 @@ const createTestLayer = (config: MockConfig) => {
   const channels = config.channels ?? []
   const employees = config.employees ?? []
   const organizations = config.organizations ?? []
+  const members = config.members ?? []
 
   const matchesLike = (value: string, pattern: string): boolean => {
     const escaped = pattern.replace(/%/g, ".*").replace(/_/g, ".")
@@ -125,9 +147,12 @@ const createTestLayer = (config: MockConfig) => {
         }
       }
       if (q.name !== undefined) {
-        const nameFilter = q.name as { $like?: string } | string
+        const nameFilter = q.name as { $like?: string; $regex?: string } | string
         if (typeof nameFilter === "object" && "$like" in nameFilter) {
           filtered = filtered.filter(p => matchesLike(p.name, nameFilter.$like!))
+        } else if (typeof nameFilter === "object" && "$regex" in nameFilter) {
+          const re = new RegExp(nameFilter.$regex)
+          filtered = filtered.filter(p => re.test(p.name))
         }
       }
       const opts = (options ?? {}) as { limit?: number }
@@ -170,15 +195,23 @@ const createTestLayer = (config: MockConfig) => {
       return Effect.succeed(toFindResult(filtered))
     }
     if (_class === contact.class.Organization) {
+      const q = (query ?? {}) as Record<string, unknown>
       const opts = (options ?? {}) as { limit?: number }
       let filtered = [...organizations]
+      const idFilter = q._id as { $in?: Array<unknown> } | undefined
+      const inValues = idFilter?.$in
+      if (Array.isArray(inValues)) {
+        filtered = filtered.filter(o => inValues.includes(o._id))
+      }
       if (opts.limit !== undefined) {
         filtered = filtered.slice(0, opts.limit)
       }
       return Effect.succeed(toFindResult(filtered))
     }
     if (_class === contact.class.Member) {
-      return Effect.succeed(toFindResult([]))
+      const q = (query ?? {}) as Record<string, unknown>
+      const filtered = q.contact === undefined ? members : members.filter(m => m.contact === q.contact)
+      return Effect.succeed(toFindResult(filtered))
     }
     return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
@@ -310,6 +343,28 @@ describe("Contacts Extended Coverage", () => {
 
         expect(error._tag).toBe("PersonNotFoundError")
       }))
+
+    it.effect("includes the organizations a person belongs to", () =>
+      Effect.gen(function*() {
+        const mockPerson = createMockPerson()
+        const mockChannel = createMockChannel({
+          value: "john@example.com",
+          attachedTo: "person-123" as Ref<Doc>
+        })
+        const org = createMockOrganization()
+        const member = createMockMember({ contact: "person-123" as Ref<Contact>, attachedTo: "org-1" as Ref<Doc> })
+
+        const testLayer = createTestLayer({
+          persons: [mockPerson],
+          channels: [mockChannel],
+          organizations: [org],
+          members: [member]
+        })
+
+        const result = yield* getPerson({ email: Email.make("john@example.com") }).pipe(Effect.provide(testLayer))
+
+        expect(result.organizations).toEqual([{ id: "org-1", name: "Test Corp" }])
+      }))
   })
 
   describe("batchGetEmailsForPersons - duplicate channels", () => {
@@ -380,6 +435,26 @@ describe("Contacts Extended Coverage", () => {
         const result = yield* listPersons({ nameSearch: "  ", limit: 10 }).pipe(
           Effect.provide(testLayer)
         )
+
+        expect(result).toHaveLength(1)
+      }))
+
+    it.effect("applies a nameRegex filter", () =>
+      Effect.gen(function*() {
+        const person1 = createMockPerson({ _id: "person-1" as Ref<HulyPerson>, name: "Doe,John" })
+        const person2 = createMockPerson({ _id: "person-2" as Ref<HulyPerson>, name: "Smith,Jane" })
+        const testLayer = createTestLayer({ persons: [person1, person2], channels: [] })
+
+        const result = yield* listPersons({ nameRegex: "^Doe", limit: 10 }).pipe(Effect.provide(testLayer))
+
+        expect(result.map(p => p.id)).toEqual(["person-1"])
+      }))
+
+    it.effect("ignores a blank nameRegex", () =>
+      Effect.gen(function*() {
+        const testLayer = createTestLayer({ persons: [createMockPerson()], channels: [] })
+
+        const result = yield* listPersons({ nameRegex: "   ", limit: 10 }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
       }))

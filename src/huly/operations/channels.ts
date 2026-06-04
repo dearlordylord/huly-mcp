@@ -155,9 +155,14 @@ const buildAccountUuidToNameMap = (
 
     const result = new Map<HulyAccountUuid, PersonName>()
     for (const emp of employees) {
+      // The `{ personUuid: { $in: accountUuids } }` query above only returns
+      // employees whose personUuid is defined, so this narrowing of the optional
+      // SDK field can never take its else arm.
+      /* v8 ignore start -- personUuid is guaranteed present by the $in query above */
       if (emp.personUuid !== undefined) {
         result.set(emp.personUuid, PersonName.make(emp.name))
       }
+      /* v8 ignore stop */
     }
 
     return result
