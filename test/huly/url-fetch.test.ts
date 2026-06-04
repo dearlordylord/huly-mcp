@@ -251,4 +251,12 @@ describe("requestUrl", () => {
     // the server is now closed; the pinned connection is refused
     await expect(requestUrl(closedPortUrl, LOOPBACK)).rejects.toThrow()
   })
+
+  it("selects the https agent for https URLs", async () => {
+    await withServer((_req, res) => res.end("plaintext"), async (url) => {
+      // a plain-HTTP server cannot complete a TLS handshake, but the https branch is taken first
+      const httpsUrl = new URL(`https://127.0.0.1:${url.port}/file`)
+      await expect(requestUrl(httpsUrl, LOOPBACK)).rejects.toThrow()
+    })
+  })
 })

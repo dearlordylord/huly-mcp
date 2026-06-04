@@ -618,7 +618,7 @@ describe("task management branch coverage", () => {
     Effect.gen(function*() {
       const captures: Captures = { createDocs: [], updates: [], mixins: [] }
       const template = makeTaskType({
-        icon: "icon:Bug" as TaskType["icon"],
+        icon: "icon:Bug" as NonNullable<TaskType["icon"]>,
         color: 7,
         allowedAsChildOf: [subTaskTypeId]
       })

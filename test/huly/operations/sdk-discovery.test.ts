@@ -6,6 +6,7 @@ import { expect } from "vitest"
 
 import {
   GetHulyClassResultSchema,
+  HulyDomainName,
   HulyModelSearch,
   ListHulyAttributesResultSchema,
   ListHulyClassesResultSchema,
@@ -477,7 +478,7 @@ describe("sdk discovery operations", () => {
         makeClassDoc({ _id: contact.class.Person, label: "contact:class:Person", domain: "contact" })
       ]
 
-      const result = yield* listHulyClasses({ kind: "class", domain: "tracker", limit: 10 }).pipe(
+      const result = yield* listHulyClasses({ kind: "class", domain: HulyDomainName.make("tracker"), limit: 10 }).pipe(
         Effect.provide(createTestLayer({ classes }))
       )
       const encoded = yield* Schema.encodeUnknown(ListHulyClassesResultSchema)(result)

@@ -817,7 +817,7 @@ describe("process operations branch coverage", () => {
       const result = yield* listExecutions({ process: ProcessIdentifier.make(processId) }).pipe(
         Effect.provide(createLayer())
       )
-      expect(result.executions.every((execution) => execution.processId === processId)).toBe(true)
+      expect(result.executions.every((execution) => String(execution.processId) === String(processId))).toBe(true)
       expect(result.executions.length).toBeGreaterThan(0)
     }))
 
