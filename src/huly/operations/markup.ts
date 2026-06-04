@@ -22,6 +22,18 @@ export interface MarkupUrlConfig {
   readonly imageUrl: UrlString
 }
 
+// Sent to markdownToMarkup as a fake "home" URL so Huly browse links in MCP
+// markdown input stay plain links instead of auto-converting to reference nodes.
+// This URL is not used for read serialization or image handling.
+export const MARKDOWN_INPUT_REF_URL = "https://huly-mcp.invalid/no-reference-conversion"
+
+const markdownInputRefUrl = UrlStringSchema.make(MARKDOWN_INPUT_REF_URL)
+
+const markdownInputUrlConfig = (urls: MarkupUrlConfig): MarkupUrlConfig => ({
+  refUrl: markdownInputRefUrl,
+  imageUrl: urls.imageUrl
+})
+
 // Mirrors @hcengineering/text-markdown's serializer options; callers use branded MarkupUrlConfig.
 interface MarkupMarkdownOptions {
   readonly refUrl: string
@@ -99,7 +111,7 @@ export const markupToMarkdownString = (markup: Markup, urls: MarkupUrlConfig): s
 }
 
 export const markdownToMarkupString = (markdown: string, urls: MarkupUrlConfig): Markup => {
-  const json = markdownToMarkup(markdown, urls)
+  const json = markdownToMarkup(markdown, markdownInputUrlConfig(urls))
   return jsonAsMarkup(json)
 }
 

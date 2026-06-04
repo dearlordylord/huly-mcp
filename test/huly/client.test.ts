@@ -27,6 +27,7 @@ import { HulyConfigService } from "../../src/config/config.js"
 import { HulyClient, type HulyClientError } from "../../src/huly/client.js"
 import { HulyAuthError, HulyConnectionError } from "../../src/huly/errors.js"
 import { INLINE_COMMENT_MARK_TYPE } from "../../src/huly/operations/inline-comment-mark.js"
+import { MARKDOWN_INPUT_REF_URL } from "../../src/huly/operations/markup.js"
 import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
 import { mockFn } from "../helpers/mock-fn.js"
 
@@ -60,6 +61,7 @@ const mockTxOperations = {
 const mockGetMarkup = mockFn()
 const mockCreateMarkup = mockFn()
 const mockUpdateMarkup = mockFn()
+const mockMarkdownToMarkup = mockFn().mockImplementation((md: string) => ({ type: "md-parsed", content: md }))
 
 const clearAllMockFns = () => {
   mockFindAll.mockClear()
@@ -76,6 +78,7 @@ const clearAllMockFns = () => {
   mockGetMarkup.mockClear()
   mockCreateMarkup.mockClear()
   mockUpdateMarkup.mockClear()
+  mockMarkdownToMarkup.mockClear()
 }
 
 const mockCollaboratorClient = {
@@ -104,7 +107,7 @@ const testSdk: HulySdkDependencies = {
   htmlToJSON: mockFn().mockImplementation((html: string) => ({ type: "html-parsed", content: html })),
   jsonToHTML: mockFn().mockImplementation((json: unknown) => `<html>${JSON.stringify(json)}</html>`),
   jsonToMarkup: mockFn().mockImplementation((json: unknown) => `markup:${JSON.stringify(json)}`),
-  markdownToMarkup: mockFn().mockImplementation((md: string) => ({ type: "md-parsed", content: md })),
+  markdownToMarkup: mockMarkdownToMarkup,
   markupToJSON: mockFn().mockImplementation((markup: string) => ({
     type: "doc",
     content: [{
@@ -1029,6 +1032,10 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
 
         expect(result).toBe("ref-md")
         expect(mockCreateMarkup.mock.calls).toHaveLength(1)
+        expect(mockMarkdownToMarkup.mock.calls[0][1]).toEqual({
+          refUrl: MARKDOWN_INPUT_REF_URL,
+          imageUrl: "http://localhost:8080/files?workspace=ws-123&file="
+        })
         const uploadedValue = mockCreateMarkup.mock.calls[0][1] as string
         expect(uploadedValue).toContain("md-parsed")
       }))
@@ -1198,6 +1205,10 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         )
 
         expect(mockUpdateMarkup.mock.calls).toHaveLength(1)
+        expect(mockMarkdownToMarkup.mock.calls[0][1]).toEqual({
+          refUrl: MARKDOWN_INPUT_REF_URL,
+          imageUrl: "http://localhost:8080/files?workspace=ws-123&file="
+        })
         const uploadedValue = mockUpdateMarkup.mock.calls[0][1] as string
         expect(uploadedValue).toContain("md-parsed")
       }))
