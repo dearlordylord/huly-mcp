@@ -81,6 +81,21 @@ export class DocumentEmptyContentError extends Schema.TaggedError<DocumentEmptyC
 }
 
 /**
+ * Document.content points at a missing or invalid markup blob.
+ */
+export class DocumentContentCorruptedError extends Schema.TaggedError<DocumentContentCorruptedError>()(
+  "DocumentContentCorruptedError",
+  {
+    identifier: Schema.String,
+    causeMessage: Schema.optional(Schema.String)
+  }
+) {
+  override get message(): string {
+    return "Document content is unreadable or corrupted. Use edit_document with the full content field to replace and repair it."
+  }
+}
+
+/**
  * edit_document parameters mix mutually exclusive edit modes.
  */
 export class DocumentEditModeError extends Schema.TaggedError<DocumentEditModeError>()(
