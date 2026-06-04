@@ -98,9 +98,6 @@ type ArchiveAllNotificationsError = HulyClientError
 
 // --- Helpers ---
 
-const optionalDocId = (value: string | undefined): DocId | undefined =>
-  value === undefined ? undefined : DocId.make(value)
-
 const findNotification = (
   notificationId: string
 ): Effect.Effect<
@@ -180,7 +177,7 @@ export const listNotifications = (
       id: NotificationId.make(n._id),
       isViewed: n.isViewed,
       archived: n.archived,
-      objectId: optionalDocId(n.objectId),
+      objectId: DocId.make(n.objectId),
       objectClass: ObjectClassName.make(n.objectClass),
       title: n.title,
       body: n.body,
@@ -204,7 +201,7 @@ export const getNotification = (
       id: NotificationId.make(notif._id),
       isViewed: notif.isViewed,
       archived: notif.archived,
-      objectId: optionalDocId(notif.objectId),
+      objectId: DocId.make(notif.objectId),
       objectClass: ObjectClassName.make(notif.objectClass),
       docNotifyContextId: NotificationContextId.make(notif.docNotifyContext),
       title: notif.title,

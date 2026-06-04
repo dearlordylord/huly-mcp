@@ -19,6 +19,12 @@ export type FunnelIdentifier = Schema.Schema.Type<typeof FunnelIdentifier>
 // - https://github.com/hcengineering/platform/blob/b9657d53d130a2ed8034c1b71ab0cf8b7a0b4994/models/lead/src/migration.ts#L67
 const CanonicalLeadIdentifier = Schema.Trim.pipe(
   Schema.pattern(/^LEAD-\d+$/, {
+    // `CanonicalLeadIdentifier` is private and only consumed as the transform
+    // target of `LeadIdentifier` below, whose decode always emits a canonical
+    // `LEAD-<digits>` string. This pattern therefore never fails, so the message
+    // thunk is never formatted; the user-facing failure message lives in the
+    // transform's `decode` instead.
+    /* v8 ignore next -- unreachable: transform always feeds a canonical LEAD-<n> value */
     message: () => "Expected lead identifier like 'LEAD-1'"
   }),
   Schema.brand("LeadIdentifier")

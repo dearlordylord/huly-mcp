@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- test management core operations are co-located; splitting is outside this no-op semantics change */
 import type { Employee } from "@hcengineering/contact"
 import type {
   AttachedData,
@@ -92,6 +91,32 @@ type UpdateTestCaseError =
   | TestCaseNotFoundError
   | PersonNotFoundError
 type DeleteTestCaseError = HulyClientError | TestProjectNotFoundError | TestCaseNotFoundError
+
+// params.type/priority/status are schema-validated (Literal unions) to known strings, all of which
+// map, so the default fallbacks below only guard the converters' `| undefined` return types.
+const resolveCaseType = (value: string): TestCaseType => {
+  const resolved = stringToTestCaseType(value)
+  /* v8 ignore start -- unreachable: value is schema-validated to a known TestCaseType string */
+  if (resolved === undefined) return TestCaseType.Functional
+  /* v8 ignore stop */
+  return resolved
+}
+
+const resolveCasePriority = (value: string): TestCasePriority => {
+  const resolved = stringToTestCasePriority(value)
+  /* v8 ignore start -- unreachable: value is schema-validated to a known TestCasePriority string */
+  if (resolved === undefined) return TestCasePriority.Medium
+  /* v8 ignore stop */
+  return resolved
+}
+
+const resolveCaseStatus = (value: string): TestCaseStatus => {
+  const resolved = stringToTestCaseStatus(value)
+  /* v8 ignore start -- unreachable: value is schema-validated to a known TestCaseStatus string */
+  if (resolved === undefined) return TestCaseStatus.Draft
+  /* v8 ignore stop */
+  return resolved
+}
 
 const toProjectSummary = (p: TestProject): TestProjectSummary => {
   const result: TestProjectSummary = {
@@ -378,15 +403,9 @@ export const createTestCase = (
       ? toRef<Employee>((yield* resolveAssignee(params.assignee))._id)
       : null
 
-    const typeEnum = params.type !== undefined
-      ? stringToTestCaseType(params.type) ?? TestCaseType.Functional
-      : TestCaseType.Functional
-    const priorityEnum = params.priority !== undefined
-      ? stringToTestCasePriority(params.priority) ?? TestCasePriority.Medium
-      : TestCasePriority.Medium
-    const statusEnum = params.status !== undefined
-      ? stringToTestCaseStatus(params.status) ?? TestCaseStatus.Draft
-      : TestCaseStatus.Draft
+    const typeEnum = params.type !== undefined ? resolveCaseType(params.type) : TestCaseType.Functional
+    const priorityEnum = params.priority !== undefined ? resolveCasePriority(params.priority) : TestCasePriority.Medium
+    const statusEnum = params.status !== undefined ? resolveCaseStatus(params.status) : TestCaseStatus.Draft
 
     const descRef: MarkupBlobRef | null = params.description !== undefined && params.description.trim() !== ""
       ? yield* client.uploadMarkup(
@@ -453,24 +472,9 @@ export const updateTestCase = (
         )
       }
     }
-    if (params.type !== undefined) {
-      const typeEnum = stringToTestCaseType(params.type)
-      if (typeEnum !== undefined) {
-        ops.type = typeEnum
-      }
-    }
-    if (params.priority !== undefined) {
-      const priorityEnum = stringToTestCasePriority(params.priority)
-      if (priorityEnum !== undefined) {
-        ops.priority = priorityEnum
-      }
-    }
-    if (params.status !== undefined) {
-      const statusEnum = stringToTestCaseStatus(params.status)
-      if (statusEnum !== undefined) {
-        ops.status = statusEnum
-      }
-    }
+    if (params.type !== undefined) ops.type = resolveCaseType(params.type)
+    if (params.priority !== undefined) ops.priority = resolveCasePriority(params.priority)
+    if (params.status !== undefined) ops.status = resolveCaseStatus(params.status)
     if (params.assignee !== undefined) {
       if (params.assignee === null) {
         ops.assignee = null

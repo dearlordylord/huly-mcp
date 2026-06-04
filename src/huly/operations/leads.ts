@@ -79,7 +79,10 @@ const markupBlobRefAsMarkupRef = (value: MarkupBlobRef): MarkupRef => value as M
 
 const normalizeLeadIdentifier = (identifier: string): string => {
   const match = /^(?:LEAD-)?(\d+)$/i.exec(identifier.trim())
-  return match !== null ? `LEAD-${match[1]}` : identifier.trim().toUpperCase()
+  /* v8 ignore start -- unreachable: callers pass a validated LeadIdentifier (LEAD-N), always matching the numeric pattern */
+  if (match === null) return identifier.trim().toUpperCase()
+  /* v8 ignore stop */
+  return `LEAD-${match[1]}`
 }
 
 const SORT_LEFT_BEFORE_RIGHT = -1

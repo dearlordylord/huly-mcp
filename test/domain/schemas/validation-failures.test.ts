@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest"
 
 import { ListActivityParamsSchema } from "../../../src/domain/schemas/activity.js"
 import { ListCardsParamsSchema, UpdateCardParamsSchema } from "../../../src/domain/schemas/cards.js"
+import { ListChannelsParamsSchema } from "../../../src/domain/schemas/channels.js"
+import { ListPersonsParamsSchema } from "../../../src/domain/schemas/contacts.js"
 import { CustomFieldInfoWireSchema } from "../../../src/domain/schemas/custom-fields.js"
+import { ListDocumentsParamsSchema } from "../../../src/domain/schemas/documents.js"
 import { assertDecodeFailure, assertDecodeSuccess } from "../../helpers/property.js"
 
 describe("ListActivityParamsSchema target-mode refinement", () => {
@@ -43,6 +46,36 @@ describe("ListCardsParamsSchema search refinement", () => {
 
   it("accepts a single search filter", () => {
     assertDecodeSuccess(ListCardsParamsSchema, { cardSpace: "Cards", titleSearch: "a" })
+  })
+})
+
+describe("ListDocumentsParamsSchema search refinement", () => {
+  it("rejects providing both titleSearch and titleRegex", () => {
+    assertDecodeFailure(ListDocumentsParamsSchema, { teamspace: "Docs", titleSearch: "a", titleRegex: "b" })
+  })
+
+  it("accepts a single search filter", () => {
+    assertDecodeSuccess(ListDocumentsParamsSchema, { teamspace: "Docs", titleRegex: "^RFC" })
+  })
+})
+
+describe("ListChannelsParamsSchema search refinement", () => {
+  it("rejects providing both nameSearch and nameRegex", () => {
+    assertDecodeFailure(ListChannelsParamsSchema, { nameSearch: "dev", nameRegex: "^dev-" })
+  })
+
+  it("accepts a single search filter", () => {
+    assertDecodeSuccess(ListChannelsParamsSchema, { nameSearch: "dev" })
+  })
+})
+
+describe("ListPersonsParamsSchema search refinement", () => {
+  it("rejects providing both nameSearch and nameRegex", () => {
+    assertDecodeFailure(ListPersonsParamsSchema, { nameSearch: "Smith", nameRegex: "^Smith" })
+  })
+
+  it("accepts a single search filter", () => {
+    assertDecodeSuccess(ListPersonsParamsSchema, { nameSearch: "Smith" })
   })
 })
 

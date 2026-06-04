@@ -47,7 +47,13 @@ import {
   listAssociations,
   listRelations
 } from "../../../src/huly/operations/generic-associations.js"
-import { docId, documentIdentifier, issueIdentifier } from "../../helpers/brands.js"
+import {
+  docId,
+  documentIdentifier,
+  issueIdentifier,
+  projectIdentifier,
+  teamspaceIdentifier
+} from "../../helpers/brands.js"
 
 const person = "person-1" as PersonId
 const space = "space-1" as Ref<Space>
@@ -1650,5 +1656,318 @@ describe("generic-associations resolver and mutation branch coverage", () => {
         })))
       )
       expect(error).toBeInstanceOf(GenericObjectNotFoundError)
+    }))
+})
+
+describe("generic-associations direction and cardinality branch coverage", () => {
+  const issueDocAssoc = (overrides: Partial<HulyAssociation> = {}): HulyAssociation =>
+    association({
+      _id: "assoc-1" as Ref<HulyAssociation>,
+      classA: tracker.class.Issue,
+      classB: documentPlugin.class.Document,
+      nameA: "references",
+      nameB: "referenced by",
+      ...overrides
+    })
+
+  it.effect("lists relations for a target-to-source direction with a known association", () =>
+    Effect.gen(function*() {
+      const result = yield* listRelations({
+        association: assocId,
+        source: { kind: "document", document: documentIdentifier("doc-1") },
+        direction: "target-to-source"
+      }).pipe(Effect.provide(testLayer({
+        associations: [issueDocAssoc()],
+        relations: [relation({ docA: "issue-1" as Ref<Doc>, docB: "doc-1" as Ref<Doc> })],
+        issues: [issue("issue-1", "HULY-1")],
+        documents: [documentDoc("doc-1", "Spec")]
+      })))
+      expect(result.total).toBe(1)
+    }))
+
+  it.effect("lists relations for an either direction with a known association", () =>
+    Effect.gen(function*() {
+      const result = yield* listRelations({
+        association: assocId,
+        source: { kind: "raw", id: docId("issue-1"), class: issueClass },
+        direction: "either"
+      }).pipe(Effect.provide(testLayer({
+        associations: [issueDocAssoc()],
+        relations: [relation({ docA: "issue-1" as Ref<Doc>, docB: "doc-1" as Ref<Doc> })],
+        issues: [issue("issue-1", "HULY-1")],
+        documents: [documentDoc("doc-1", "Spec")]
+      })))
+      expect(result.total).toBe(1)
+    }))
+
+  it.effect("discovers relations for a target-to-source direction without an association", () =>
+    Effect.gen(function*() {
+      const result = yield* listRelations({
+        source: { kind: "raw", id: docId("issue-2"), class: issueClass },
+        direction: "target-to-source"
+      }).pipe(Effect.provide(testLayer({
+        associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })],
+        relations: [relation({ docA: "issue-1" as Ref<Doc>, docB: "issue-2" as Ref<Doc> })],
+        issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+      })))
+      expect(result.total).toBe(1)
+    }))
+
+  it.effect("discovers relations for an either direction without an association", () =>
+    Effect.gen(function*() {
+      const result = yield* listRelations({
+        source: { kind: "raw", id: docId("issue-1"), class: issueClass },
+        direction: "either"
+      }).pipe(Effect.provide(testLayer({
+        associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })],
+        relations: [relation({ docA: "issue-1" as Ref<Doc>, docB: "issue-2" as Ref<Doc> })],
+        issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+      })))
+      expect(result.total).toBe(1)
+    }))
+
+  it.effect("flags a relation endpoint that cannot be resolved for display", () =>
+    Effect.gen(function*() {
+      const result = yield* listRelations({
+        association: assocId
+      }).pipe(Effect.provide(testLayer({
+        associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })],
+        relations: [relation({ docA: "ghost-issue" as Ref<Doc>, docB: "issue-2" as Ref<Doc> })],
+        issues: [issue("issue-2", "HULY-2")]
+      })))
+      expect(result.relations[0].source.warning).toContain("Could not resolve")
+    }))
+
+  it.effect("fails an issue locator carrying a project the workspace cannot resolve", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        listRelations({
+          source: { kind: "issue", issue: issueIdentifier("1"), project: projectIdentifier("HULY") }
+        }).pipe(Effect.provide(testLayer({ associations: [association({})] })))
+      )
+      expect(error._tag).toBeDefined()
+    }))
+
+  it.effect("fails a project-prefixed issue locator the workspace cannot resolve", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        listRelations({
+          source: { kind: "issue", issue: issueIdentifier("HULY-1") }
+        }).pipe(Effect.provide(testLayer({ associations: [association({})] })))
+      )
+      expect(error._tag).toBeDefined()
+    }))
+
+  it.effect("createRelation resolves endpoints for a target-to-source direction", () =>
+    Effect.gen(function*() {
+      const result = yield* createRelation({
+        association: assocId,
+        source: { kind: "raw", id: docId("doc-1"), class: documentClass },
+        target: { kind: "raw", id: docId("issue-1"), class: issueClass },
+        direction: "target-to-source"
+      }).pipe(Effect.provide(testLayer({
+        associations: [issueDocAssoc()],
+        issues: [issue("issue-1", "HULY-1")],
+        documents: [documentDoc("doc-1", "Spec")]
+      })))
+      expect(result.created).toBe(true)
+    }))
+
+  it.effect("createRelation picks the forward orientation for an either direction", () =>
+    Effect.gen(function*() {
+      const result = yield* createRelation({
+        association: assocId,
+        source: { kind: "raw", id: docId("issue-1"), class: issueClass },
+        target: { kind: "raw", id: docId("doc-1"), class: documentClass },
+        direction: "either"
+      }).pipe(Effect.provide(testLayer({
+        associations: [issueDocAssoc()],
+        issues: [issue("issue-1", "HULY-1")],
+        documents: [documentDoc("doc-1", "Spec")]
+      })))
+      expect(result.created).toBe(true)
+    }))
+
+  it.effect("createRelation picks the reverse orientation for an either direction", () =>
+    Effect.gen(function*() {
+      const result = yield* createRelation({
+        association: assocId,
+        source: { kind: "raw", id: docId("doc-1"), class: documentClass },
+        target: { kind: "raw", id: docId("issue-1"), class: issueClass },
+        direction: "either"
+      }).pipe(Effect.provide(testLayer({
+        associations: [issueDocAssoc()],
+        issues: [issue("issue-1", "HULY-1")],
+        documents: [documentDoc("doc-1", "Spec")]
+      })))
+      expect(result.created).toBe(true)
+    }))
+
+  it.effect("createRelation enforces one-to-one source-side cardinality", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        createRelation({
+          association: assocId,
+          source: { kind: "raw", id: docId("issue-1"), class: issueClass },
+          target: { kind: "raw", id: docId("issue-3"), class: issueClass }
+        }).pipe(Effect.provide(testLayer({
+          associations: [association({ _id: "assoc-1" as Ref<HulyAssociation>, type: "1:1" })],
+          relations: [relation({ docA: "issue-1" as Ref<Doc>, docB: "issue-2" as Ref<Doc> })],
+          issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2"), issue("issue-3", "HULY-3")]
+        })))
+      )
+      expect(error).toBeInstanceOf(RelationCardinalityViolationError)
+      expect((error as RelationCardinalityViolationError).reason).toContain("one-to-one")
+    }))
+})
+
+describe("generic-associations either-orientation and discovery edge cases", () => {
+  const issueDocAssoc = (overrides: Partial<HulyAssociation> = {}): HulyAssociation =>
+    association({
+      _id: "assoc-1" as Ref<HulyAssociation>,
+      classA: tracker.class.Issue,
+      classB: documentPlugin.class.Document,
+      nameA: "references",
+      nameB: "referenced by",
+      ...overrides
+    })
+
+  it.effect("lists relations for an either direction with no endpoints", () =>
+    Effect.gen(function*() {
+      const result = yield* listRelations({ association: assocId, direction: "either" }).pipe(
+        Effect.provide(testLayer({
+          associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })],
+          relations: [relation({})],
+          issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+        }))
+      )
+      expect(result.total).toBe(1)
+    }))
+
+  it.effect("returns no relations when no association matches the discovered endpoint class", () =>
+    Effect.gen(function*() {
+      const result = yield* listRelations({
+        source: { kind: "raw", id: docId("doc-1"), class: documentClass }
+      }).pipe(Effect.provide(testLayer({
+        associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })],
+        documents: [documentDoc("doc-1", "Spec")]
+      })))
+      expect(result.total).toBe(0)
+    }))
+
+  it.effect("discovers relations using only a target endpoint", () =>
+    Effect.gen(function*() {
+      const result = yield* listRelations({
+        target: { kind: "raw", id: docId("issue-2"), class: issueClass }
+      }).pipe(Effect.provide(testLayer({
+        associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })],
+        relations: [relation({ docA: "issue-1" as Ref<Doc>, docB: "issue-2" as Ref<Doc> })],
+        issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+      })))
+      expect(result.total).toBe(1)
+    }))
+
+  it.effect("sorts multiple discovered relations by recency", () =>
+    Effect.gen(function*() {
+      const result = yield* listRelations({
+        source: { kind: "raw", id: docId("issue-1"), class: issueClass }
+      }).pipe(Effect.provide(testLayer({
+        associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })],
+        relations: [
+          relation({
+            _id: "rel-1" as Ref<HulyRelation>,
+            docA: "issue-1" as Ref<Doc>,
+            docB: "issue-2" as Ref<Doc>,
+            modifiedOn: 100
+          }),
+          relation({
+            _id: "rel-2" as Ref<HulyRelation>,
+            docA: "issue-1" as Ref<Doc>,
+            docB: "issue-3" as Ref<Doc>,
+            modifiedOn: 200
+          })
+        ],
+        issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2"), issue("issue-3", "HULY-3")]
+      })))
+      expect(result.total).toBe(2)
+    }))
+
+  it.effect("createRelation rejects an either endpoint whose class matches neither side", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        createRelation({
+          association: assocId,
+          source: { kind: "raw", id: docId("issue-1"), class: issueClass },
+          target: { kind: "raw", id: docId("card-1"), class: cardClass },
+          direction: "either"
+        }).pipe(Effect.provide(testLayer({
+          associations: [issueDocAssoc()],
+          issues: [issue("issue-1", "HULY-1")],
+          cards: [cardDoc("card-1", "Contract")]
+        })))
+      )
+      expect(error).toBeInstanceOf(RelationEndpointClassMismatchError)
+    }))
+
+  it.effect("createRelation rejects either endpoints that both match the source side", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        createRelation({
+          association: assocId,
+          source: { kind: "raw", id: docId("issue-1"), class: issueClass },
+          target: { kind: "raw", id: docId("issue-2"), class: issueClass },
+          direction: "either"
+        }).pipe(Effect.provide(testLayer({
+          associations: [issueDocAssoc()],
+          issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+        })))
+      )
+      expect(error).toBeInstanceOf(RelationEndpointClassMismatchError)
+    }))
+
+  it.effect("createRelation rejects either endpoints that both match the target side", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        createRelation({
+          association: assocId,
+          source: { kind: "raw", id: docId("doc-1"), class: documentClass },
+          target: { kind: "raw", id: docId("doc-2"), class: documentClass },
+          direction: "either"
+        }).pipe(Effect.provide(testLayer({
+          associations: [issueDocAssoc()],
+          documents: [documentDoc("doc-1", "Spec A"), documentDoc("doc-2", "Spec B")]
+        })))
+      )
+      expect(error).toBeInstanceOf(RelationEndpointClassMismatchError)
+    }))
+
+  it.effect("fails a document locator that requires an unresolvable teamspace", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        listRelations({
+          source: {
+            kind: "document",
+            document: documentIdentifier("Spec"),
+            teamspace: teamspaceIdentifier("Engineering")
+          }
+        }).pipe(
+          Effect.provide(testLayer({ associations: [association({})], documents: [documentDoc("doc-1", "Spec")] }))
+        )
+      )
+      expect(error._tag).toBeDefined()
+    }))
+})
+
+describe("generic-associations display fallback", () => {
+  it.effect("falls back to the document id when no display field is present", () =>
+    Effect.gen(function*() {
+      const result = yield* listRelations({
+        association: assocId
+      }).pipe(Effect.provide(testLayer({
+        associations: [association({ _id: "assoc-1" as Ref<HulyAssociation> })],
+        relations: [relation({ docA: "bare-1" as Ref<Doc>, docB: "issue-2" as Ref<Doc> })],
+        issues: [issue("bare-1", ""), issue("issue-2", "HULY-2")]
+      })))
+      expect(result.relations[0].source.display).toBe("bare-1")
     }))
 })

@@ -239,7 +239,11 @@ const createTestLayer = (config: LeadMockConfig) => {
     }
 
     if (_class === contact.class.Person) {
-      return Effect.succeed(persons.find((person) => person._id === q._id))
+      return Effect.succeed(
+        persons.find((person) =>
+          (q._id !== undefined && person._id === q._id) || (q.name !== undefined && person.name === q.name)
+        )
+      )
     }
 
     if (_class === contact.class.Contact) {
@@ -579,5 +583,130 @@ describe("Lead status resolution failures", () => {
         )
       )
       expect(error._tag).toBe("InvalidStatusError")
+    }))
+
+  it.effect("fails when the ProjectType document is missing its statuses array", () =>
+    Effect.gen(function*() {
+      // A real Huly ProjectType can lack a statuses array; the SDK type marks it present.
+      // eslint-disable-next-line no-restricted-syntax -- exercise the guard for a ProjectType without statuses
+      const projectType = { ...makeProjectType([]), statuses: undefined } as unknown as ReturnType<
+        typeof makeProjectType
+      >
+      const error = yield* Effect.flip(
+        listLeads({ funnel: funnelReference("funnel-1") }).pipe(
+          Effect.provide(createTestLayer({ leads: [], projectType }))
+        )
+      )
+      expect(error._tag).toBe("HulyConnectionError")
+      expect(error.message).toContain("without statuses")
+    }))
+
+  it.effect("fails when a lead references a status outside the funnel ProjectType", () =>
+    Effect.gen(function*() {
+      const lead = makeLead({ status: statusRef("status-orphan") })
+      const error = yield* Effect.flip(
+        listLeads({ funnel: funnelReference("funnel-1") }).pipe(
+          Effect.provide(createTestLayer({ leads: [lead], statuses: [makeStatus("status-1", "Active")] }))
+        )
+      )
+      expect(error._tag).toBe("HulyConnectionError")
+      expect(error.message).toContain("not defined on the funnel ProjectType")
+    }))
+
+  it.effect("reports a connection error when a lead summary fails output validation", () =>
+    Effect.gen(function*() {
+      const lead = makeLead({ modifiedOn: -1 })
+      const error = yield* Effect.flip(
+        listLeads({ funnel: funnelReference("funnel-1") }).pipe(
+          Effect.provide(createTestLayer({ leads: [lead] }))
+        )
+      )
+      expect(error._tag).toBe("HulyConnectionError")
+      expect(error.message).toContain("listLeads response failed schema validation")
+    }))
+})
+
+describe("Lead funnel sorting and filter branches", () => {
+  it.effect("sorts colliding funnel names by archived flag then recency", () =>
+    Effect.gen(function*() {
+      const archived = makeFunnel({
+        _id: docRef<MockFunnel>("f-archived"),
+        name: "Sales",
+        archived: true,
+        modifiedOn: 1700000009000
+      })
+      const olderActive = makeFunnel({
+        _id: docRef<MockFunnel>("f-old"),
+        name: "Sales",
+        archived: false,
+        modifiedOn: 1700000001000
+      })
+      const newerActive = makeFunnel({
+        _id: docRef<MockFunnel>("f-new"),
+        name: "Sales",
+        archived: false,
+        modifiedOn: 1700000005000
+      })
+      const lead = makeLead({ space: spaceRef("f-new") })
+
+      const result = yield* listLeads({ funnel: funnelReference("sales") }).pipe(
+        Effect.provide(createTestLayer({ funnels: [olderActive, archived, newerActive], leads: [lead] }))
+      )
+      expect(result).toHaveLength(1)
+    }))
+
+  it.effect("includes archived funnels when requested", () =>
+    Effect.gen(function*() {
+      const active = makeFunnel({ _id: docRef<MockFunnel>("f-1"), name: "Sales", archived: false })
+      const archived = makeFunnel({ _id: docRef<MockFunnel>("f-2"), name: "Old", archived: true })
+      const result = yield* listFunnels({ includeArchived: true }).pipe(
+        Effect.provide(createTestLayer({ funnels: [active, archived] }))
+      )
+      expect(result.funnels).toHaveLength(2)
+    }))
+
+  it.effect("filters leads by a resolved assignee and a title search", () =>
+    Effect.gen(function*() {
+      const assignee = makePerson("person-1", "found@example.com")
+      const lead = makeLead({ assignee: personRef("person-1"), title: "Big Deal" })
+      const result = yield* listLeads({
+        funnel: funnelReference("funnel-1"),
+        assignee: email("found@example.com"),
+        titleSearch: "Deal"
+      }).pipe(Effect.provide(createTestLayer({ leads: [lead], persons: [assignee] })))
+      expect(result).toHaveLength(1)
+    }))
+
+  it.effect("ignores a blank title search", () =>
+    Effect.gen(function*() {
+      const lead = makeLead()
+      const result = yield* listLeads({ funnel: funnelReference("funnel-1"), titleSearch: "   " }).pipe(
+        Effect.provide(createTestLayer({ leads: [lead] }))
+      )
+      expect(result).toHaveLength(1)
+    }))
+})
+
+describe("getLead branch coverage", () => {
+  it.effect("returns a lead with no assignee", () =>
+    Effect.gen(function*() {
+      const lead = makeLead({ assignee: null })
+      const result = yield* getLead({
+        funnel: funnelReference("funnel-1"),
+        identifier: leadIdentifier("LEAD-1")
+      }).pipe(Effect.provide(createTestLayer({ leads: [lead] })))
+      expect(result.assignee).toBeUndefined()
+    }))
+
+  it.effect("reports a connection error when the lead detail fails output validation", () =>
+    Effect.gen(function*() {
+      const lead = makeLead({ createdOn: -1 })
+      const error = yield* Effect.flip(
+        getLead({ funnel: funnelReference("funnel-1"), identifier: leadIdentifier("LEAD-1") }).pipe(
+          Effect.provide(createTestLayer({ leads: [lead] }))
+        )
+      )
+      expect(error._tag).toBe("HulyConnectionError")
+      expect(error.message).toContain("getLead response failed schema validation")
     }))
 })

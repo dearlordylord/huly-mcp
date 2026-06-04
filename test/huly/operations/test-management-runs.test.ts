@@ -1,10 +1,10 @@
 /* eslint-disable no-restricted-syntax -- test mocks require double assertion since local interfaces extend SDK base types not structurally compatible with object literals */
 import { describe, it } from "@effect/vitest"
-import { type Doc, type PersonId, type Ref, toFindResult } from "@hcengineering/core"
+import { type Doc, type MarkupBlobRef, type PersonId, type Ref, toFindResult } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
 
-import type { Person as HulyPerson } from "@hcengineering/contact"
+import type { Employee, Person as HulyPerson } from "@hcengineering/contact"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { contact } from "../../../src/huly/huly-plugins.js"
 import {
@@ -27,7 +27,8 @@ import type {
   TestPlanItem,
   TestProject,
   TestResult,
-  TestRun
+  TestRun,
+  TestSuite
 } from "../../../src/huly/test-management-types.js"
 import { TestRunStatus } from "../../../src/huly/test-management-types.js"
 import {
@@ -346,8 +347,8 @@ describe("getTestResult", () => {
     Effect.gen(function*() {
       const r = makeResult("r-1", "tc-1", {
         status: TestRunStatus.Passed,
-        assignee: "emp-1" as unknown as Ref<import("@hcengineering/contact").Employee>,
-        description: "markup-ref" as unknown as import("@hcengineering/core").MarkupBlobRef
+        assignee: "emp-1" as unknown as Ref<Employee>,
+        description: "markup-ref" as unknown as MarkupBlobRef
       })
       const detail = yield* getTestResult({
         project: testProjectIdentifier("QA Project"),
@@ -569,5 +570,128 @@ describe("updateTestResult — status, assignee, description branches", () => {
       }).pipe(Effect.provide(buildLayer({ results: [baseResult()], captureUpdateDoc: cap })))
       expect(cap.operations?.$unset).toEqual({ assignee: "" })
       expect(cap.operations?.description).toBeNull()
+    }))
+})
+
+describe("test run summary optional fields", () => {
+  it.effect("includes a run dueDate in list and detail summaries", () =>
+    Effect.gen(function*() {
+      const run = makeRun({ dueDate: 5000 })
+      const listed = yield* listTestRuns({ project: testProjectIdentifier("QA Project") }).pipe(
+        Effect.provide(buildLayer({ runs: [run] }))
+      )
+      expect(listed.runs[0]?.dueDate).toBe(5000)
+
+      const detail = yield* getTestRun({
+        project: testProjectIdentifier("QA Project"),
+        run: testRunIdentifier("Nightly Run")
+      }).pipe(Effect.provide(buildLayer({ runs: [run] })))
+      expect(detail.dueDate).toBe(5000)
+    }))
+
+  it.effect("includes a fetched run description in the detail", () =>
+    Effect.gen(function*() {
+      const run = makeRun({
+        description: "markup-ref" as unknown as MarkupBlobRef
+      })
+      const detail = yield* getTestRun({
+        project: testProjectIdentifier("QA Project"),
+        run: testRunIdentifier("Nightly Run")
+      }).pipe(Effect.provide(buildLayer({ runs: [run] })))
+      expect(detail.description).toBe("fetched content")
+    }))
+
+  it.effect("summarizes a result that has an assignee but no status", () =>
+    Effect.gen(function*() {
+      const r = makeResult("r-a", "tc-1", {
+        assignee: "emp-1" as unknown as Ref<Employee>
+      })
+      delete (r as unknown as Record<string, unknown>).status
+      const listed = yield* listTestResults({
+        project: testProjectIdentifier("QA Project"),
+        run: testRunIdentifier("Nightly Run")
+      }).pipe(Effect.provide(buildLayer({ runs: [makeRun()], results: [r] })))
+      expect(listed.results[0]?.assignee).toBe("emp-1")
+      expect(listed.results[0]).not.toHaveProperty("status")
+    }))
+
+  it.effect("includes a testSuite in the result detail", () =>
+    Effect.gen(function*() {
+      const r = makeResult("r-1", "tc-1", {
+        testSuite: "suite-1" as unknown as Ref<TestSuite>
+      })
+      const detail = yield* getTestResult({
+        project: testProjectIdentifier("QA Project"),
+        result: testResultIdentifier("r-1")
+      }).pipe(Effect.provide(buildLayer({ results: [r] })))
+      expect(detail.testSuite).toBe("suite-1")
+    }))
+})
+
+describe("createTestRun optional fields", () => {
+  it.effect("uploads a description and sets a dueDate on creation", () =>
+    Effect.gen(function*() {
+      const cap: MockConfig["captureCreateDoc"] = {}
+      yield* createTestRun({
+        project: testProjectIdentifier("QA Project"),
+        name: "Release Run",
+        description: "Release checklist",
+        dueDate: 9000
+      }).pipe(Effect.provide(buildLayer({ captureCreateDoc: cap })))
+      expect(cap.attributes?.description).toBe("markup-ref")
+      expect(cap.attributes?.dueDate).toBe(9000)
+    }))
+
+  it.effect("treats a blank description as no description", () =>
+    Effect.gen(function*() {
+      const cap: MockConfig["captureCreateDoc"] = {}
+      yield* createTestRun({
+        project: testProjectIdentifier("QA Project"),
+        name: "Blank Desc Run",
+        description: "   "
+      }).pipe(Effect.provide(buildLayer({ captureCreateDoc: cap })))
+      expect(cap.attributes?.description).toBeNull()
+    }))
+})
+
+describe("runTestPlan branch coverage", () => {
+  it.effect("fails when a plan item references a missing test case", () =>
+    Effect.gen(function*() {
+      const plan = makePlan("p-1", "My Plan")
+      const items = [makePlanItem("pi-1", "tc-missing", "p-1")]
+      const err = yield* Effect.flip(
+        runTestPlan({
+          project: testProjectIdentifier("QA Project"),
+          plan: testPlanIdentifier("My Plan")
+        }).pipe(Effect.provide(buildLayer({ plans: [plan], planItems: items, testCases: [] })))
+      )
+      expect(err._tag).toBe("TestCaseNotFoundError")
+    }))
+
+  it.effect("sets a dueDate and carries item testSuite and assignee onto results", () =>
+    Effect.gen(function*() {
+      const plan = makePlan("p-1", "My Plan")
+      const tc = makeTestCase("tc-1", "Login")
+      const item = {
+        ...makePlanItem("pi-1", "tc-1", "p-1"),
+        testSuite: "suite-1",
+        assignee: "emp-1"
+      } as unknown as TestPlanItem
+      const cap: Array<Record<string, unknown>> = []
+      const createCap: MockConfig["captureCreateDoc"] = {}
+      yield* runTestPlan({
+        project: testProjectIdentifier("QA Project"),
+        plan: testPlanIdentifier("My Plan"),
+        dueDate: 4242
+      }).pipe(Effect.provide(buildLayer({
+        plans: [plan],
+        planItems: [item],
+        testCases: [tc],
+        captureCreateDoc: createCap,
+        captureAddCollection: cap
+      })))
+      expect(createCap.attributes?.dueDate).toBe(4242)
+      expect(cap[0]?.testSuite).toBe("suite-1")
+      expect(cap[0]?.assignee).toBe("emp-1")
     }))
 })

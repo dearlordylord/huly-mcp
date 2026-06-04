@@ -73,6 +73,21 @@ const batchResolveClassLabels = (
     return new Map<ObjectClassName, NonEmptyString>([...modelEntries, ...fallbackEntries])
   })
 
+// `batchResolveClassLabels` returns a label for every requested owner id (a decoded model label,
+// or an id fallback when the class is absent from the model). Callers only ever look up owner ids
+// drawn from that same requested set, so the nullish branch below is a type-guard for `Map.get`'s
+// `| undefined` return and is unreachable at runtime.
+const ownerLabelOrId = (
+  labels: ReadonlyMap<ObjectClassName, NonEmptyString>,
+  ownerClassId: ObjectClassName
+): NonEmptyString => {
+  const label = labels.get(ownerClassId)
+  /* v8 ignore start -- unreachable: every owner id is a key in the resolved label map */
+  if (label === undefined) return NonEmptyString.make(ownerClassId)
+  /* v8 ignore stop */
+  return label
+}
+
 const countAttributesByClass = (
   attributes: ReadonlyArray<AnyAttribute>
 ): Map<ObjectClassName, number> => {
@@ -260,7 +275,7 @@ export const getHulyClass = (
       ),
       attributes: rawAttributes.map((attr) => {
         const ownerClassId = ObjectClassName.make(String(attr.attributeOf))
-        return toAttributeSummary(attr, labels.get(ownerClassId) ?? NonEmptyString.make(ownerClassId), params.class)
+        return toAttributeSummary(attr, ownerLabelOrId(labels, ownerClassId), params.class)
       })
     }
   })
@@ -279,7 +294,7 @@ export const listHulyAttributes = (
     const attributes = rawAttributes
       .map((attr) => {
         const ownerClassId = ObjectClassName.make(String(attr.attributeOf))
-        return toAttributeSummary(attr, labels.get(ownerClassId) ?? NonEmptyString.make(ownerClassId), params.class)
+        return toAttributeSummary(attr, ownerLabelOrId(labels, ownerClassId), params.class)
       })
       .filter((attr) => includesQuery(attributeSearchText(attr), query))
       .slice(0, limit)

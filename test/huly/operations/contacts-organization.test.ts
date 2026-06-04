@@ -23,7 +23,7 @@ import {
   updateOrganization
 } from "../../../src/huly/operations/organizations.js"
 import { listPersonOrganizations } from "../../../src/huly/operations/persons.js"
-import { memberReference, organizationId, personId } from "../../helpers/brands.js"
+import { email, memberReference, organizationId, personId } from "../../helpers/brands.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   const result = docs as FindResult<T>
@@ -790,6 +790,20 @@ describe("Organization CRUD, Customer Mixin, Channels, and Membership", () => {
   })
 
   describe("addOrganizationMember", () => {
+    it.effect("returns OrganizationNotFoundError when the organization is missing", () =>
+      Effect.gen(function*() {
+        const testLayer = createTestLayer({ organizations: [], persons: [createMockPerson()] })
+
+        const error = yield* Effect.flip(
+          addOrganizationMember({
+            organizationId: organizationId("missing-org"),
+            personIdentifier: "person-123"
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("OrganizationNotFoundError")
+      }))
+
     it.effect("adds person as member by person ID", () =>
       Effect.gen(function*() {
         const org = createMockOrganization()
@@ -998,6 +1012,42 @@ describe("Organization CRUD, Customer Mixin, Channels, and Membership", () => {
 
         const error = yield* Effect.flip(
           listPersonOrganizations({ personId: personId("nonexistent") }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("PersonNotFoundError")
+      }))
+
+    it.effect("resolves the person by email and lists their organizations", () =>
+      Effect.gen(function*() {
+        const person = createMockPerson()
+        const org = createMockOrganization()
+        const channel = createMockChannel({ value: "john@example.com", attachedTo: "person-123" as Ref<Doc> })
+        const member = createMockMember({
+          attachedTo: "org-1" as Ref<Doc>,
+          contact: "person-123" as Ref<Contact>
+        })
+
+        const testLayer = createTestLayer({
+          persons: [person],
+          organizations: [org],
+          channels: [channel],
+          members: [member]
+        })
+
+        const result = yield* listPersonOrganizations({ email: email("john@example.com") }).pipe(
+          Effect.provide(testLayer)
+        )
+
+        expect(result.personId).toBe("person-123")
+        expect(result.organizations.map(o => o.id)).toEqual(["org-1"])
+      }))
+
+    it.effect("returns PersonNotFoundError keyed by email when no person matches", () =>
+      Effect.gen(function*() {
+        const testLayer = createTestLayer({ persons: [], channels: [] })
+
+        const error = yield* Effect.flip(
+          listPersonOrganizations({ email: email("nobody@example.com") }).pipe(Effect.provide(testLayer))
         )
 
         expect(error._tag).toBe("PersonNotFoundError")

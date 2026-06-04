@@ -576,6 +576,27 @@ describe("createAccessLink", () => {
         personalized: false
       })
     }))
+
+  it.effect("forwards a personalized guest's first and last name", () =>
+    Effect.gen(function*() {
+      let capturedOptions: { readonly firstName?: string; readonly lastName?: string } | undefined
+
+      const testLayer = WorkspaceClient.testLayer({
+        createAccessLink: (_role, options) => {
+          capturedOptions = options
+          return Effect.succeed("https://huly.test/named")
+        }
+      })
+
+      const result = yield* createAccessLink({
+        firstName: "Ada",
+        lastName: "Lovelace",
+        personalized: true
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result.link).toBe("https://huly.test/named")
+      expect(capturedOptions).toEqual({ firstName: "Ada", lastName: "Lovelace", personalized: true })
+    }))
 })
 
 describe("getRegions", () => {

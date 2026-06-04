@@ -14,6 +14,7 @@ import { Effect, Exit, Layer } from "effect"
 import type { Express, Request, Response } from "express"
 import { describe, expect, it } from "vitest"
 
+import { shouldDispatchMcp2026Request } from "../../src/mcp/http-2026-dispatcher.js"
 import {
   createMcpHandlers,
   type HttpServerFactory,
@@ -1592,5 +1593,112 @@ describe("2026 dispatcher validation errors", () => {
       modernHeaders("tools/list")
     )
     expect(result.error?.message).toContain("params._meta is required")
+  })
+})
+
+describe("2026 dispatcher null-id and routing branches", () => {
+  const noId = (method: string, params: Record<string, unknown> = { _meta: modernMeta }): Record<string, unknown> => ({
+    jsonrpc: "2.0",
+    method,
+    params
+  })
+
+  const postRaw = async (
+    body: unknown,
+    headers: Request["headers"],
+    factory: () => McpProtocolHandlers = modernHandlerFactory
+  ): Promise<{ status: number | undefined; json: { id?: unknown; error?: { code: number } } | undefined }> => {
+    const handlers = createMcpHandlers(createMockMcpServer, undefined, undefined, factory)
+    const res = createMockResponse()
+    await handlers.post(createMockRequest(body, headers), res)
+    const calls = getResponseCalls(res)
+    return { status: calls.status[0]?.[0], json: calls.json[0]?.[0] as { id?: unknown; error?: { code: number } } }
+  }
+
+  it("returns a null id for an Accept-header mismatch on an id-less request", async () => {
+    const { json } = await postRaw(noId("tools/list"), { ...modernHeaders("tools/list"), accept: "application/json" })
+    expect(json?.id).toBeNull()
+    expect(json?.error?.code).toBe(-32001)
+  })
+
+  it("returns a null id when the protocol header is missing", async () => {
+    const headers = { ...modernHeaders("tools/list") }
+    delete (headers as Record<string, unknown>)["mcp-protocol-version"]
+    const { json } = await postRaw(noId("tools/list"), headers)
+    expect(json?.id).toBeNull()
+  })
+
+  it("returns a null id for an unsupported protocol version", async () => {
+    const { json } = await postRaw(noId("tools/list"), {
+      ...modernHeaders("tools/list"),
+      "mcp-protocol-version": "1900-01-01"
+    })
+    expect(json?.id).toBeNull()
+    expect(json?.error?.code).toBe(-32004)
+  })
+
+  it("returns a null id when the Mcp-Method header is missing", async () => {
+    const headers = { ...modernHeaders("tools/list") }
+    delete (headers as Record<string, unknown>)["mcp-method"]
+    const { json } = await postRaw(noId("tools/list"), headers)
+    expect(json?.id).toBeNull()
+  })
+
+  it("returns a null id when the Mcp-Method header does not match the body", async () => {
+    const { json } = await postRaw(noId("tools/list"), modernHeaders("resources/list"))
+    expect(json?.id).toBeNull()
+  })
+
+  it("returns a null id when params._meta is missing", async () => {
+    const { json } = await postRaw(noId("tools/list", {}), modernHeaders("tools/list"))
+    expect(json?.id).toBeNull()
+  })
+
+  it("returns a null id when the Mcp-Name header is missing for tools/call", async () => {
+    const headers = { ...modernHeaders("tools/call") }
+    const { json } = await postRaw(noId("tools/call", { name: "get_huly_context", _meta: modernMeta }), headers)
+    expect(json?.id).toBeNull()
+  })
+
+  it("returns a null id on a successful id-less dispatch", async () => {
+    const { json } = await postRaw(noId("tools/list"), modernHeaders("tools/list"))
+    expect(json?.id).toBeNull()
+    expect(json?.error).toBeUndefined()
+  })
+
+  it("maps a thrown MethodNotFound error to a 404", async () => {
+    const factory = (): McpProtocolHandlers => ({
+      ...createMockProtocolHandlers(),
+      callTool: () => Promise.reject(new McpError(ErrorCode.MethodNotFound, "no such tool"))
+    })
+    const { status } = await postRaw(
+      {
+        jsonrpc: "2.0",
+        method: "tools/call",
+        id: 1,
+        params: { name: "get_huly_context", arguments: {}, _meta: modernMeta }
+      },
+      modernHeaders("tools/call", "get_huly_context"),
+      factory
+    )
+    expect(status).toBe(404)
+  })
+
+  it("does not dispatch a request whose _meta protocol version is not a string", () => {
+    const req = createMockRequest(
+      { jsonrpc: "2.0", method: "tools/list", params: { _meta: { "io.modelcontextprotocol/protocolVersion": 2026 } } },
+      { accept: "application/json, text/event-stream" }
+    )
+    expect(shouldDispatchMcp2026Request(req)).toBe(false)
+  })
+
+  it("does not dispatch a non-object request body", () => {
+    const req = createMockRequest("not-a-record", {})
+    expect(shouldDispatchMcp2026Request(req)).toBe(false)
+  })
+
+  it("does not dispatch a request whose body method is not a string", () => {
+    const req = createMockRequest({ jsonrpc: "2.0", method: 123 }, { accept: "application/json, text/event-stream" })
+    expect(shouldDispatchMcp2026Request(req)).toBe(false)
   })
 })

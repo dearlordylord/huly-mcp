@@ -393,6 +393,26 @@ describe("listDocuments", () => {
         expect(captureQuery.options?.limit).toBe(200)
       }))
   })
+
+  describe("titleRegex", () => {
+    it.effect("applies titleRegex to the document query", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const captureQuery: MockConfig["captureDocumentQuery"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: [],
+          captureDocumentQuery: captureQuery
+        })
+
+        yield* listDocuments({ teamspace: teamspaceIdentifier("My Docs"), titleRegex: "^Spec" }).pipe(
+          Effect.provide(testLayer)
+        )
+
+        expect(captureQuery.query?.title).toEqual({ $regex: "^Spec" })
+      }))
+  })
 })
 
 describe("getDocument", () => {
@@ -1544,6 +1564,23 @@ describe("getTeamspace", () => {
       expect(result.archived).toBe(true)
     }))
 
+  it.effect("returns undefined description for empty teamspace descriptions", () =>
+    Effect.gen(function*() {
+      const teamspace = makeTeamspace({
+        _id: "ts-1" as Ref<HulyTeamspace>,
+        name: "No Description",
+        description: ""
+      })
+
+      const testLayer = createTestLayerWithMocks({ teamspaces: [teamspace] })
+
+      const result = yield* getTeamspace({ teamspace: teamspaceIdentifier("No Description") }).pipe(
+        Effect.provide(testLayer)
+      )
+
+      expect(result.description).toBeUndefined()
+    }))
+
   it.effect("returns TeamspaceNotFoundError when not found", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({})
@@ -1626,6 +1663,20 @@ describe("updateTeamspace", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(captureUpdateDoc.operations?.description).toBe("")
+    }))
+
+  it.effect("sets description to a non-null value", () =>
+    Effect.gen(function*() {
+      const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "TS" })
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+      const testLayer = createTestLayerWithMocks({ teamspaces: [teamspace], captureUpdateDoc })
+
+      yield* updateTeamspace({
+        teamspace: teamspaceIdentifier("TS"),
+        description: "Updated description"
+      }).pipe(Effect.provide(testLayer))
+
+      expect(captureUpdateDoc.operations?.description).toBe("Updated description")
     }))
 
   it.effect("sets archived status", () =>

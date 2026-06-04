@@ -256,6 +256,17 @@ describe("createTestPlan", () => {
       expect(result.id).toBe(PLAN_ID)
       expect(cap.attributes).toBeUndefined()
     }))
+
+  it.effect("uploads a non-empty description on creation", () =>
+    Effect.gen(function*() {
+      const cap: MockConfig["captureCreateDoc"] = {}
+      yield* createTestPlan({
+        project: testProjectIdentifier("QA Project"),
+        name: "Documented Plan",
+        description: "Plan scope"
+      }).pipe(Effect.provide(buildLayer({ captureCreateDoc: cap })))
+      expect(cap.attributes?.description).toBe("markup-ref")
+    }))
 })
 
 describe("updateTestPlan", () => {

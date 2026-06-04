@@ -1,13 +1,32 @@
 import { describe, it } from "@effect/vitest"
 import type { Channel as HulyChannel } from "@hcengineering/chunter"
 import type { Person, SocialIdentity } from "@hcengineering/contact"
-import { type PersonId, type Ref, toFindResult } from "@hcengineering/core"
+import { type PersonId, type Ref, SocialIdType, type Space, toFindResult } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { buildSocialIdToPersonNameMap, listChannels } from "../../../src/huly/operations/channels.js"
 
 import { chunter, contact } from "../../../src/huly/huly-plugins.js"
+
+const makeSocialIdentity = (overrides?: Partial<SocialIdentity>): SocialIdentity => {
+  const result: SocialIdentity = {
+    // SocialIdentity._id is Ref<SocialIdentity> & PersonId — double cast required for this intersection phantom type
+    _id: "social-1" as Ref<SocialIdentity> & PersonId,
+    _class: contact.class.SocialIdentity,
+    space: "space-1" as Ref<Space>,
+    attachedTo: "person-1" as Ref<Person>,
+    attachedToClass: contact.class.Person,
+    collection: "socialIds",
+    type: SocialIdType.HULY,
+    value: "user@example.com",
+    key: "huly:user@example.com",
+    modifiedBy: "user-1" as PersonId,
+    modifiedOn: 0,
+    ...overrides
+  }
+  return result
+}
 
 interface MockConfig {
   channels?: Array<HulyChannel>
@@ -84,6 +103,23 @@ describe("buildSocialIdToPersonNameMap - empty socialIds branch (line 136)", () 
       expect(result).toBeInstanceOf(Map)
       expect(result.size).toBe(0)
     }).pipe(Effect.provide(createTestLayerWithMocks({}))))
+
+  it.effect("skips a social identity whose person no longer exists", () => {
+    // The social identity resolves, but its person is absent from the persons
+    // lookup (e.g. deleted), exercising the `person !== undefined` else arm.
+    const socialIdentity = makeSocialIdentity({
+      _id: "social-gone" as Ref<SocialIdentity> & PersonId,
+      attachedTo: "person-gone" as Ref<Person>
+    })
+
+    return Effect.gen(function*() {
+      const client = yield* HulyClient
+
+      const result = yield* buildSocialIdToPersonNameMap(client, ["social-gone" as PersonId])
+
+      expect(result.size).toBe(0)
+    }).pipe(Effect.provide(createTestLayerWithMocks({ socialIdentities: [socialIdentity], persons: [] })))
+  })
 })
 
 describe("listChannels - nameSearch branch (line 214)", () => {
@@ -109,6 +145,34 @@ describe("listChannels - nameSearch branch (line 214)", () => {
       })
 
       yield* listChannels({ nameSearch: "   " }).pipe(Effect.provide(testLayer))
+
+      expect(captureQuery.query?.name).toBeUndefined()
+    }))
+})
+
+describe("listChannels - nameRegex branch", () => {
+  it.effect("applies nameRegex filter to query", () =>
+    Effect.gen(function*() {
+      const captureQuery: MockConfig["captureChannelQuery"] = {}
+      const testLayer = createTestLayerWithMocks({
+        channels: [],
+        captureChannelQuery: captureQuery
+      })
+
+      yield* listChannels({ nameRegex: "^dev-" }).pipe(Effect.provide(testLayer))
+
+      expect(captureQuery.query?.name).toEqual({ $regex: "^dev-" })
+    }))
+
+  it.effect("skips nameRegex when blank", () =>
+    Effect.gen(function*() {
+      const captureQuery: MockConfig["captureChannelQuery"] = {}
+      const testLayer = createTestLayerWithMocks({
+        channels: [],
+        captureChannelQuery: captureQuery
+      })
+
+      yield* listChannels({ nameRegex: "  " }).pipe(Effect.provide(testLayer))
 
       expect(captureQuery.query?.name).toBeUndefined()
     }))

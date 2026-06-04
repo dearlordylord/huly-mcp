@@ -21,14 +21,12 @@ export default defineConfig({
         'src/polyfills.ts',
         'src/version.ts',
       ],
-      // Ratcheted upward as coverage improves; never lowered. Target is 99
-      // across the board. Current floor is set at/below the measured numbers so
-      // `check-all` stays green while we raise tests toward the goal.
+      // Final gate: keep all coverage metrics at or above 99%.
       thresholds: {
-        lines: 97.8,
-        functions: 97.5,
-        branches: 89,
-        statements: 97.6,
+        lines: 99,
+        functions: 99,
+        branches: 99,
+        statements: 99,
       },
     },
   },

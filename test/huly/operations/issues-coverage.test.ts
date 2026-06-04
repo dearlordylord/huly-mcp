@@ -15,6 +15,7 @@ import type { ProjectType, TaskType } from "@hcengineering/task"
 import type {
   Component as HulyComponent,
   Issue as HulyIssue,
+  IssueParentInfo,
   IssueStatus,
   Project as HulyProject
 } from "@hcengineering/tracker"
@@ -739,6 +740,82 @@ describe("Issues Coverage - listIssues titleSearch", () => {
     }))
 })
 
+describe("Issues Coverage - listIssues parent and summary branches", () => {
+  it.effect("sets attachedTo when filtering by parentIssue", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ identifier: "TEST" })
+      const parent = makeIssue({
+        _id: "parent-issue" as Ref<HulyIssue>,
+        identifier: "TEST-99",
+        number: 99
+      })
+      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+      const captureQuery: MockConfig["captureIssueQuery"] = {}
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        issues: [parent],
+        statuses,
+        captureIssueQuery: captureQuery
+      })
+
+      yield* listIssues({
+        project: projectIdentifier("TEST"),
+        parentIssue: issueIdentifier("TEST-99")
+      }).pipe(Effect.provide(testLayer))
+
+      expect(captureQuery.query?.attachedTo).toBe("parent-issue")
+    }))
+
+  it.effect("returns parentIssue and subIssues when present in listed issues", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ identifier: "TEST" })
+      const parentInfo: IssueParentInfo = {
+        identifier: "TEST-1",
+        parentId: "parent-1" as Ref<HulyIssue>,
+        parentTitle: "Parent",
+        space: "project-1" as Ref<Space>
+      }
+      const issue = makeIssue({
+        identifier: "TEST-2",
+        parents: [parentInfo],
+        subIssues: 3
+      })
+      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        issues: [issue],
+        statuses
+      })
+
+      const result = yield* listIssues({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
+
+      expect(result[0].parentIssue).toBe("TEST-1")
+      expect(result[0].subIssues).toBe(3)
+    }))
+
+  it.effect("maps invalid listed issue data to HulyConnectionError", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ identifier: "TEST" })
+      const issue = makeIssue()
+      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "" })]
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        issues: [issue],
+        statuses
+      })
+
+      const error = yield* Effect.flip(
+        listIssues({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(error._tag).toBe("HulyConnectionError")
+      expect(error.message).toContain("listIssues response failed schema validation")
+    }))
+})
+
 describe("Issues Coverage - listIssues descriptionSearch", () => {
   it.effect("sets $search query for descriptionSearch", () =>
     Effect.gen(function*() {
@@ -1112,6 +1189,52 @@ describe("Issues Coverage - updateIssue branches", () => {
       expect(captureUpdateDoc.operations?.priority).toBe(IssuePriority.Low)
     }))
 
+  it.effect("updates dueDate", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ identifier: "TEST" })
+      const issue = makeIssue({ identifier: "TEST-1", number: 1 })
+      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        issues: [issue],
+        statuses,
+        captureUpdateDoc
+      })
+
+      yield* updateIssue({
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1"),
+        dueDate: 1800000000000
+      }).pipe(Effect.provide(testLayer))
+
+      expect(captureUpdateDoc.operations?.dueDate).toBe(1800000000000)
+    }))
+
+  it.effect("clears estimation with null", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ identifier: "TEST" })
+      const issue = makeIssue({ identifier: "TEST-1", number: 1, estimation: 5 })
+      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        issues: [issue],
+        statuses,
+        captureUpdateDoc
+      })
+
+      yield* updateIssue({
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1"),
+        estimation: null
+      }).pipe(Effect.provide(testLayer))
+
+      expect(captureUpdateDoc.operations?.estimation).toBe(0)
+    }))
+
   it.effect("updates status", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -1406,5 +1529,88 @@ describe("Issues Coverage - getIssue assignee person not found", () => {
 
       expect(result.assignee).toBeUndefined()
       expect(result.assigneeRef).toBeUndefined()
+    }))
+})
+
+describe("Issues Coverage - getIssue detail branches", () => {
+  it.effect("returns parentIssue, subIssues, and estimation when present", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ identifier: "TEST" })
+      const parentInfo: IssueParentInfo = {
+        identifier: "TEST-1",
+        parentId: "parent-1" as Ref<HulyIssue>,
+        parentTitle: "Parent",
+        space: "project-1" as Ref<Space>
+      }
+      const issue = makeIssue({
+        identifier: "TEST-2",
+        number: 2,
+        parents: [parentInfo],
+        subIssues: 2,
+        estimation: 8
+      })
+      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        issues: [issue],
+        statuses
+      })
+
+      const result = yield* getIssue({
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-2")
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result.parentIssue).toBe("TEST-1")
+      expect(result.subIssues).toBe(2)
+      expect(result.estimation).toBe(8)
+    }))
+
+  it.effect("returns IssueNotFoundError for a non-numeric identifier without fallback lookup", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ identifier: "TEST" })
+      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        issues: [],
+        statuses
+      })
+
+      const error = yield* Effect.flip(
+        getIssue({
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("NOT-A-NUMBER")
+        }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(error._tag).toBe("IssueNotFoundError")
+    }))
+
+  it.effect("maps invalid issue details to HulyConnectionError", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ identifier: "TEST" })
+      const issue = makeIssue({
+        identifier: "TEST-1",
+        number: 1
+      })
+      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "" })]
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        issues: [issue],
+        statuses
+      })
+
+      const error = yield* Effect.flip(
+        getIssue({
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1")
+        }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(error._tag).toBe("HulyConnectionError")
+      expect(error.message).toContain("getIssue response failed schema validation")
     }))
 })

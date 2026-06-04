@@ -127,31 +127,15 @@ const ipv4FromMappedIpv6Hextets = (hostname: string): readonly [number, number, 
     return null
   }
 
+  // Each capture is 1-4 hex digits, so high/low are bounded by IPV6_HEXTET_MAX by construction.
   const high = Number.parseInt(match[1], 16)
   const low = Number.parseInt(match[2], 16)
-  if (high > IPV6_HEXTET_MAX || low > IPV6_HEXTET_MAX) {
-    return null
-  }
-
   return [
     Math.floor(high / BYTE_BASE),
     high % BYTE_BASE,
     Math.floor(low / BYTE_BASE),
     low % BYTE_BASE
   ]
-}
-
-const parseIpv6FirstHextet = (hostname: string): number | null => {
-  if (hostname.startsWith("::")) {
-    return 0
-  }
-
-  const [firstHextet] = hostname.split(":")
-  if (!/^[0-9a-f]{1,4}$/i.test(firstHextet)) {
-    return null
-  }
-
-  return Number.parseInt(firstHextet, 16)
 }
 
 const parseIpv6Hextet = (value: string): number | null => {
@@ -186,8 +170,8 @@ const parseIpv6Hextets = (hostname: string): ReadonlyArray<number> | null => {
     return null
   }
 
-  const left = parseIpv6Side(compressedParts[0] ?? "")
-  const right = compressedParts.length === 2 ? parseIpv6Side(compressedParts[1] ?? "") : []
+  const left = parseIpv6Side(compressedParts[0])
+  const right = compressedParts.length === 2 ? parseIpv6Side(compressedParts[1]) : []
   if (left === null || right === null) {
     return null
   }
@@ -272,14 +256,12 @@ const isBlockedIpv6Address = (hostname: string): boolean => {
     return true
   }
 
-  const firstHextet = parseIpv6FirstHextet(normalizedHostname)
-  if (firstHextet === null) {
-    return true
-  }
-
+  // parseIpv6Hextets always yields 8 validated hextets, so the first is the global-unicast selector.
+  const firstHextet = hextets[0]
   return firstHextet < IPV6_GLOBAL_UNICAST_MIN || firstHextet > IPV6_GLOBAL_UNICAST_MAX
 }
 
+/* v8 ignore start -- default DNS resolver: unit tests inject `resolveHostname` via FetchFromUrlDependencies; the real-DNS path (and its family-filtering helpers) is exercised by integration tests */
 const isSupportedAddressFamily = (family: number): family is 4 | 6 => family === 4 || family === 6
 
 const toResolvedAddress = (address: LookupAddress): ResolvedAddress | null =>
@@ -297,6 +279,7 @@ const resolveHostname = async (hostname: string): Promise<ReadonlyArray<Resolved
     return resolved === null ? [] : [resolved]
   })
 }
+/* v8 ignore stop */
 
 const isBlockedResolvedAddress = (address: ResolvedAddress): boolean => {
   const normalizedAddress = normalizeUrlHostname(address.address)
@@ -315,12 +298,13 @@ const isBlockedResolvedAddress = (address: ResolvedAddress): boolean => {
 }
 
 const makePinnedLookup = (address: ResolvedAddress): LookupFunction => (_hostname, options, callback) => {
-  if (options.all === true) {
-    callback(null, [address])
+  /* v8 ignore start -- Node always invokes the pinned lookup with { all: true }; the single-address callback form is unused */
+  if (options.all !== true) {
+    callback(null, address.address, address.family)
     return
   }
-
-  callback(null, address.address, address.family)
+  /* v8 ignore stop */
+  callback(null, [address])
 }
 
 const responseTooLargeError = (receivedBytes: number, maxBytes: number): Error =>
@@ -330,7 +314,9 @@ export const requestUrl = (url: URL, address: ResolvedAddress, maxBytes = MAX_FI
   new Promise((resolve, reject) => {
     const effectiveMaxBytes = Math.min(maxBytes, MAX_FILE_SIZE)
     const controller = new AbortController()
+    /* v8 ignore start -- abort fires only on the 30s fetch timeout (integration-tested) */
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+    /* v8 ignore stop */
     let settled = false
     let receivedBytes = 0
     const rejectOnce = (error: Error): void => {
@@ -350,7 +336,9 @@ export const requestUrl = (url: URL, address: ResolvedAddress, maxBytes = MAX_FI
         timeout: FETCH_TIMEOUT_MS
       },
       (response) => {
+        /* v8 ignore start -- Node always sets statusCode on a parsed response */
         const statusCode = response.statusCode ?? 0
+        /* v8 ignore stop */
         const chunks: Array<Buffer> = []
 
         response.on("error", (error) => {
@@ -358,7 +346,9 @@ export const requestUrl = (url: URL, address: ResolvedAddress, maxBytes = MAX_FI
         })
 
         response.on("data", (chunk: Buffer | string) => {
+          /* v8 ignore start -- Node delivers response bodies as Buffers; the string branch is defensive */
           const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+          /* v8 ignore stop */
           const nextReceivedBytes = receivedBytes + buffer.length
 
           if (nextReceivedBytes > effectiveMaxBytes) {
@@ -374,14 +364,18 @@ export const requestUrl = (url: URL, address: ResolvedAddress, maxBytes = MAX_FI
         })
 
         response.on("end", () => {
+          /* v8 ignore start -- end firing after the response already settled (size-limit/abort) is a timing race */
           if (settled) {
             return
           }
+          /* v8 ignore stop */
 
           settled = true
           clearTimeout(timeout)
           if (statusCode < HTTP_STATUS_OK_MIN || statusCode >= HTTP_STATUS_REDIRECT_MIN) {
+            /* v8 ignore start -- Node populates statusMessage for parsed responses */
             reject(new Error(`HTTP ${statusCode}: ${response.statusMessage ?? "Unknown status"}`))
+            /* v8 ignore stop */
             return
           }
 
@@ -390,15 +384,19 @@ export const requestUrl = (url: URL, address: ResolvedAddress, maxBytes = MAX_FI
       }
     )
 
+    /* v8 ignore start -- request timeout/abort fire only on the 30s fetch timeout (integration-tested) */
     request.on("timeout", () => {
       request.destroy(new Error("Request timed out"))
     })
+    /* v8 ignore stop */
     request.on("error", (error) => {
       rejectOnce(error)
     })
+    /* v8 ignore start -- abort listener fires only on the 30s fetch timeout (integration-tested) */
     controller.signal.addEventListener("abort", () => {
       request.destroy(new Error("Request timed out"))
     }, { once: true })
+    /* v8 ignore stop */
     request.end()
   })
 

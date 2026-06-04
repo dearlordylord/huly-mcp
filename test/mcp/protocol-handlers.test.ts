@@ -13,11 +13,17 @@ import { McpError } from "@modelcontextprotocol/sdk/types.js"
 import { Context, Effect, Layer, Schema } from "effect"
 import { describe, expect, it } from "vitest"
 
+import { sanitizeHulyRuntimeConfigFromEnv } from "../../src/config/config.js"
 import { type GetHulyContextResult, GetHulyContextResultSchema } from "../../src/domain/schemas/index.js"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyConnectionError } from "../../src/huly/errors.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
-import { GET_HULY_CONTEXT_TOOL_NAME, VERSION_TOOL_NAME } from "../../src/mcp/huly-context-tool.js"
+import {
+  buildHulyContext,
+  GET_HULY_CONTEXT_TOOL_NAME,
+  parseToolsets,
+  VERSION_TOOL_NAME
+} from "../../src/mcp/huly-context-tool.js"
 import {
   type ClientBundle,
   createMcpProtocolHandlers,
@@ -26,7 +32,7 @@ import {
   liveNowClock,
   type NowClock
 } from "../../src/mcp/protocol-handlers.js"
-import { createFilteredRegistry, toolRegistry } from "../../src/mcp/tools/index.js"
+import { createFilteredRegistry, type ToolRegistry, toolRegistry } from "../../src/mcp/tools/index.js"
 import { isNoArgumentTool, requiresArgumentsObject } from "../../src/mcp/tools/registry.js"
 import { createNoopTelemetry } from "../../src/telemetry/noop.js"
 import type { TelemetryOperations, ToolCalledProps } from "../../src/telemetry/telemetry.js"
@@ -108,6 +114,21 @@ describe("createMcpProtocolHandlers", () => {
       }
       expect(probe.firstListTools).toHaveLength(1)
     })
+
+    it("omits properties when a registered object schema does not declare them", async () => {
+      const handlers = createMcpProtocolHandlers(
+        unusedResolveClients,
+        createTelemetryProbe().telemetry,
+        propertylessObjectRegistry,
+        unusedGetHulyContext
+      )
+
+      const result = await handlers.listTools()
+      const listed = result.tools.find(tool => tool.name === "propertyless_tool")
+
+      expect(listed).toBeDefined()
+      expect(listed?.inputSchema).not.toHaveProperty("properties")
+    })
   })
 
   describe("callTool telemetry clock seam", () => {
@@ -168,6 +189,33 @@ const buildStubClients = (hulyOps: Partial<HulyClientOperations> = {}): () => Pr
   )
 
 const rejectingResolveClients = (): Promise<ClientBundle> => Promise.reject(new Error("client init boom"))
+const rejectingResolveClientsWithString = (): Promise<ClientBundle> => Promise.reject("client init boom")
+
+const propertylessObjectRegistry: ToolRegistry = {
+  tools: new Map([
+    [
+      "propertyless_tool",
+      {
+        name: "propertyless_tool",
+        description: "Tool with an object schema that does not declare properties.",
+        inputSchema: { type: "object" },
+        category: "test",
+        handler: async () => ({
+          content: [{ type: "text", text: "ok" }]
+        })
+      }
+    ]
+  ]),
+  definitions: [
+    {
+      name: "propertyless_tool",
+      description: "Tool with an object schema that does not declare properties.",
+      inputSchema: { type: "object" },
+      category: "test"
+    }
+  ],
+  handleToolCall: async () => null
+}
 
 // Narrow the MCP content union to the text variant (no cast).
 const firstText = (content: ReadonlyArray<unknown>): string => {
@@ -309,6 +357,21 @@ describe("createMcpProtocolHandlers — get_huly_context tool", () => {
   })
 })
 
+describe("buildHulyContext", () => {
+  it("uses default HTTP host and port when omitted or blank", () => {
+    const context = buildHulyContext(
+      { transport: "http", httpHost: "   " },
+      emptyRegistry,
+      parseToolsets(undefined, () => {}),
+      sanitizeHulyRuntimeConfigFromEnv({})
+    )
+
+    expect(context.transport.type).toBe("http")
+    expect(context.transport.http?.host).toBe("127.0.0.1")
+    expect(context.transport.http?.port).toBe(3000)
+  })
+})
+
 describe("createMcpProtocolHandlers — tool dispatch", () => {
   it("dispatches to a registered tool with resolved clients", async () => {
     const probe = createTelemetryProbe()
@@ -333,6 +396,37 @@ describe("createMcpProtocolHandlers — tool dispatch", () => {
 
     expect(response.isError).toBe(true)
     expect(probe.toolCalled[0]?.status).toBe("error")
+  })
+
+  it("maps a non-Error client-resolution rejection to an error", async () => {
+    const probe = createTelemetryProbe()
+    const handlers = createMcpProtocolHandlers(
+      rejectingResolveClientsWithString,
+      probe.telemetry,
+      toolRegistry,
+      unusedGetHulyContext
+    )
+
+    const response = await handlers.callTool({ params: { name: "list_projects", arguments: {} } })
+
+    expect(response.isError).toBe(true)
+    expect(firstText(response.content)).toContain("client init boom")
+  })
+
+  it("maps a null registry dispatch response to an unknown-tool error", async () => {
+    const probe = createTelemetryProbe()
+    const handlers = createMcpProtocolHandlers(
+      buildStubClients(),
+      probe.telemetry,
+      propertylessObjectRegistry,
+      unusedGetHulyContext
+    )
+
+    const response = await handlers.callTool({ params: { name: "propertyless_tool", arguments: {} } })
+
+    expect(response.isError).toBe(true)
+    expect(firstText(response.content)).toContain("Unknown tool")
+    expect(probe.toolCalled[0]).toMatchObject({ toolName: "propertyless_tool", status: "error" })
   })
 
   it("threads the derived edit mode into telemetry when client resolution fails", async () => {

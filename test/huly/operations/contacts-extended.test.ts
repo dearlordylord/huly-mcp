@@ -1,18 +1,24 @@
 import { describe, it } from "@effect/vitest"
 import type {
   Channel,
+  Contact,
   Employee as HulyEmployee,
+  Member as HulyMember,
   Organization as HulyOrganization,
-  Person as HulyPerson
+  Person as HulyPerson,
+  SocialIdentity
 } from "@hcengineering/contact"
 import type { Doc, FindResult, PersonId as CorePersonId, Ref } from "@hcengineering/core"
+import { SocialIdType } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { Email, PersonId } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { contact } from "../../../src/huly/huly-plugins.js"
+import { findPersonByExactEmailOrName } from "../../../src/huly/operations/contacts-shared.js"
 import { createOrganization, listOrganizations } from "../../../src/huly/operations/organizations.js"
 import { getPerson, listEmployees, listPersons, updatePerson } from "../../../src/huly/operations/persons.js"
+import { resolveAssignee } from "../../../src/huly/operations/test-management-shared.js"
 import { memberReference } from "../../helpers/brands.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
@@ -56,6 +62,26 @@ const createMockChannel = (overrides: Partial<Channel> = {}): Channel => {
   return data as Channel
 }
 
+const createMockSocialIdentity = (overrides: Partial<SocialIdentity> = {}): SocialIdentity => {
+  const data = {
+    _id: "social-1" as Ref<SocialIdentity>,
+    _class: contact.class.SocialIdentity,
+    space: contact.space.Contacts,
+    attachedTo: "person-123" as Ref<Doc>,
+    attachedToClass: contact.class.Person,
+    collection: "socialIds",
+    key: "email:john@example.com",
+    type: SocialIdType.EMAIL,
+    value: "john@example.com",
+    modifiedBy: "user" as CorePersonId,
+    modifiedOn: 0,
+    createdBy: "user" as CorePersonId,
+    createdOn: 0,
+    ...overrides
+  }
+  return data as SocialIdentity
+}
+
 const createMockEmployee = (overrides: Partial<HulyEmployee> = {}): HulyEmployee => {
   const data = {
     _id: "employee-1" as Ref<HulyEmployee>,
@@ -91,11 +117,31 @@ const createMockOrganization = (overrides: Partial<HulyOrganization> = {}): Huly
   return data as HulyOrganization
 }
 
+const createMockMember = (overrides: Partial<HulyMember> = {}): HulyMember => {
+  const data = {
+    _id: "member-1" as Ref<HulyMember>,
+    _class: contact.class.Member,
+    space: contact.space.Contacts,
+    attachedTo: "org-1" as Ref<HulyOrganization>,
+    attachedToClass: contact.class.Organization,
+    collection: "members",
+    contact: "person-123" as Ref<Contact>,
+    modifiedOn: 1700000000000,
+    modifiedBy: "user" as CorePersonId,
+    createdOn: 1699000000000,
+    createdBy: "user" as CorePersonId,
+    ...overrides
+  }
+  return data as HulyMember
+}
+
 interface MockConfig {
   persons?: Array<HulyPerson>
   channels?: Array<Channel>
+  socialIdentities?: Array<SocialIdentity>
   employees?: Array<HulyEmployee>
   organizations?: Array<HulyOrganization>
+  members?: Array<HulyMember>
   captureCreateDoc?: { data?: Record<string, unknown>; id?: string; class?: unknown }
   captureAddCollection?: { attributes?: Record<string, unknown>; attachedTo?: string; class?: unknown }
   captureUpdateDoc?: { operations?: Record<string, unknown> }
@@ -105,8 +151,10 @@ interface MockConfig {
 const createTestLayer = (config: MockConfig) => {
   const persons = config.persons ?? []
   const channels = config.channels ?? []
+  const socialIdentities = config.socialIdentities ?? []
   const employees = config.employees ?? []
   const organizations = config.organizations ?? []
+  const members = config.members ?? []
 
   const matchesLike = (value: string, pattern: string): boolean => {
     const escaped = pattern.replace(/%/g, ".*").replace(/_/g, ".")
@@ -125,9 +173,12 @@ const createTestLayer = (config: MockConfig) => {
         }
       }
       if (q.name !== undefined) {
-        const nameFilter = q.name as { $like?: string } | string
+        const nameFilter = q.name as { $like?: string; $regex?: string } | string
         if (typeof nameFilter === "object" && "$like" in nameFilter) {
           filtered = filtered.filter(p => matchesLike(p.name, nameFilter.$like!))
+        } else if (typeof nameFilter === "object" && "$regex" in nameFilter) {
+          const re = new RegExp(nameFilter.$regex)
+          filtered = filtered.filter(p => re.test(p.name))
         }
       }
       const opts = (options ?? {}) as { limit?: number }
@@ -161,6 +212,15 @@ const createTestLayer = (config: MockConfig) => {
       }
       return Effect.succeed(toFindResult(filtered))
     }
+    if (_class === contact.class.SocialIdentity) {
+      const q = query as Record<string, unknown>
+      const filtered = socialIdentities.filter(identity => {
+        if (q.type !== undefined && identity.type !== q.type) return false
+        if (q.value !== undefined && identity.value !== q.value) return false
+        return true
+      })
+      return Effect.succeed(toFindResult(filtered))
+    }
     if (_class === contact.mixin.Employee) {
       const opts = (options ?? {}) as { limit?: number }
       let filtered = [...employees]
@@ -170,15 +230,23 @@ const createTestLayer = (config: MockConfig) => {
       return Effect.succeed(toFindResult(filtered))
     }
     if (_class === contact.class.Organization) {
+      const q = (query ?? {}) as Record<string, unknown>
       const opts = (options ?? {}) as { limit?: number }
       let filtered = [...organizations]
+      const idFilter = q._id as { $in?: Array<unknown> } | undefined
+      const inValues = idFilter?.$in
+      if (Array.isArray(inValues)) {
+        filtered = filtered.filter(o => inValues.includes(o._id))
+      }
       if (opts.limit !== undefined) {
         filtered = filtered.slice(0, opts.limit)
       }
       return Effect.succeed(toFindResult(filtered))
     }
     if (_class === contact.class.Member) {
-      return Effect.succeed(toFindResult([]))
+      const q = (query ?? {}) as Record<string, unknown>
+      const filtered = q.contact === undefined ? members : members.filter(m => m.contact === q.contact)
+      return Effect.succeed(toFindResult(filtered))
     }
     return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
@@ -187,6 +255,26 @@ const createTestLayer = (config: MockConfig) => {
     if (_class === contact.class.Person) {
       const q = query as Record<string, unknown>
       const found = persons.find(p => p._id === q._id)
+      return Effect.succeed(found)
+    }
+    if (_class === contact.class.SocialIdentity) {
+      const q = query as Record<string, unknown>
+      const found = socialIdentities.find(identity => identity.type === q.type && identity.value === q.value)
+      return Effect.succeed(found)
+    }
+    if (_class === contact.class.Channel) {
+      const q = query as Record<string, unknown>
+      const found = channels.find(channel => {
+        if (q.provider !== undefined && channel.provider !== q.provider) return false
+        if (q.value !== undefined) {
+          const value = q.value as { $like?: string } | string
+          if (typeof value === "object" && "$like" in value) {
+            return matchesLike(channel.value, value.$like)
+          }
+          return channel.value === value
+        }
+        return true
+      })
       return Effect.succeed(found)
     }
     return Effect.succeed(undefined)
@@ -256,6 +344,51 @@ const createTestLayer = (config: MockConfig) => {
 }
 
 describe("Contacts Extended Coverage", () => {
+  describe("findPersonByExactEmailOrName", () => {
+    it.effect("returns undefined when exact email has no identity or channel matches", () =>
+      Effect.gen(function*() {
+        const testLayer = createTestLayer({ persons: [], channels: [], socialIdentities: [] })
+
+        const result = yield* Effect.gen(function*() {
+          const client = yield* HulyClient
+          return yield* findPersonByExactEmailOrName(client, Email.make("missing@example.com"))
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result).toBeUndefined()
+      }))
+
+    it.effect("returns undefined when exact email resolves ids but no matching person docs", () =>
+      Effect.gen(function*() {
+        const identity = createMockSocialIdentity({
+          value: "orphan@example.com",
+          attachedTo: "orphan-person" as Ref<HulyPerson>
+        })
+        const testLayer = createTestLayer({ persons: [], socialIdentities: [identity] })
+
+        const result = yield* Effect.gen(function*() {
+          const client = yield* HulyClient
+          return yield* findPersonByExactEmailOrName(client, Email.make("orphan@example.com"))
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result).toBeUndefined()
+      }))
+  })
+
+  describe("resolveAssignee", () => {
+    it.effect("returns PersonNotFoundError when no contact lookup path matches", () =>
+      Effect.gen(function*() {
+        const testLayer = createTestLayer({ persons: [], channels: [], socialIdentities: [] })
+
+        const error = yield* Effect.flip(
+          resolveAssignee("missing@example.com").pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("PersonNotFoundError")
+        if (error._tag !== "PersonNotFoundError") throw new Error("expected PersonNotFoundError")
+        expect(error.identifier).toBe("missing@example.com")
+      }))
+  })
+
   describe("getPerson by email (findPersonByEmail path)", () => {
     it.effect("finds person by email when channel exists", () =>
       Effect.gen(function*() {
@@ -309,6 +442,28 @@ describe("Contacts Extended Coverage", () => {
         )
 
         expect(error._tag).toBe("PersonNotFoundError")
+      }))
+
+    it.effect("includes the organizations a person belongs to", () =>
+      Effect.gen(function*() {
+        const mockPerson = createMockPerson()
+        const mockChannel = createMockChannel({
+          value: "john@example.com",
+          attachedTo: "person-123" as Ref<Doc>
+        })
+        const org = createMockOrganization()
+        const member = createMockMember({ contact: "person-123" as Ref<Contact>, attachedTo: "org-1" as Ref<Doc> })
+
+        const testLayer = createTestLayer({
+          persons: [mockPerson],
+          channels: [mockChannel],
+          organizations: [org],
+          members: [member]
+        })
+
+        const result = yield* getPerson({ email: Email.make("john@example.com") }).pipe(Effect.provide(testLayer))
+
+        expect(result.organizations).toEqual([{ id: "org-1", name: "Test Corp" }])
       }))
   })
 
@@ -380,6 +535,26 @@ describe("Contacts Extended Coverage", () => {
         const result = yield* listPersons({ nameSearch: "  ", limit: 10 }).pipe(
           Effect.provide(testLayer)
         )
+
+        expect(result).toHaveLength(1)
+      }))
+
+    it.effect("applies a nameRegex filter", () =>
+      Effect.gen(function*() {
+        const person1 = createMockPerson({ _id: "person-1" as Ref<HulyPerson>, name: "Doe,John" })
+        const person2 = createMockPerson({ _id: "person-2" as Ref<HulyPerson>, name: "Smith,Jane" })
+        const testLayer = createTestLayer({ persons: [person1, person2], channels: [] })
+
+        const result = yield* listPersons({ nameRegex: "^Doe", limit: 10 }).pipe(Effect.provide(testLayer))
+
+        expect(result.map(p => p.id)).toEqual(["person-1"])
+      }))
+
+    it.effect("ignores a blank nameRegex", () =>
+      Effect.gen(function*() {
+        const testLayer = createTestLayer({ persons: [createMockPerson()], channels: [] })
+
+        const result = yield* listPersons({ nameRegex: "   ", limit: 10 }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
       }))

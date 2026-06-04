@@ -475,3 +475,53 @@ describe("SDK discovery mapper properties", () => {
     )
   })
 })
+
+describe("SDK discovery mapper edge cases", () => {
+  const owner = NonEmptyString.make("Owner")
+  const summarize = (type: unknown): ReturnType<typeof toAttributeSummary> =>
+    toAttributeSummary(makeAttribute({ _id: "attr:edge", attributeOf: "test:class:Owner", type }), owner)
+
+  it("includes decoded short and plural labels when present", () => {
+    const summary = toClassSummary(makeClassDoc({
+      _id: "test:class:Foo",
+      shortLabel: "core:label:Short",
+      pluralLabel: "core:label:Plural"
+    }))
+    expect(summary).toMatchObject({ shortLabel: "Short", pluralLabel: "Plural" })
+  })
+
+  it("wraps a non-object type descriptor and maps it to unknown", () => {
+    const summary = summarize("scalar")
+    expect(summary.type.kind).toBe("unknown")
+  })
+
+  it("drops the classId when the type descriptor has no _class", () => {
+    const summary = summarize({ foo: "bar" })
+    expect(summary.type.kind).toBe("unknown")
+    expect(summary.type).not.toHaveProperty("classId")
+  })
+
+  it("maps a ref/enum/collection with a blank target to unknown", () => {
+    expect(summarize({ _class: core.class.RefTo, to: "" }).type.kind).toBe("unknown")
+    expect(summarize({ _class: core.class.EnumOf, of: "   " }).type.kind).toBe("unknown")
+    expect(summarize({ _class: core.class.Collection, of: "" }).type.kind).toBe("unknown")
+  })
+
+  it("maps an array descriptor without an element type to unknown", () => {
+    expect(summarize({ _class: core.class.ArrOf }).type.kind).toBe("unknown")
+  })
+
+  it("preserves index, defaultValue, and automationOnly when present", () => {
+    const summary = toAttributeSummary(
+      makeAttribute({
+        _id: "attr:opts",
+        attributeOf: "test:class:Owner",
+        index: 1,
+        defaultValue: "preset",
+        automationOnly: true
+      }),
+      owner
+    )
+    expect(summary).toMatchObject({ index: 1, defaultValue: "preset", automationOnly: true })
+  })
+})

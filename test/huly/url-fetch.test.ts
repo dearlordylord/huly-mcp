@@ -68,18 +68,29 @@ describe("isBlockedUrl", () => {
     "http://[fe80::1]/",
     "http://[1000::1]/",
     "http://[4001::1]/",
+    "http://[1:2:3:4:5:6:7:8]/",
     // IPv4-mapped IPv6 (dotted + hextet form)
     "http://[::ffff:10.0.0.1]/",
     "http://[::ffff:0a00:0001]/",
-    // malformed IPv6
+    "http://[::ffff:ffff:ffff]/",
+    // malformed IPv6 (parsing edge cases)
     "http://[1::2::3]/",
-    "http://[gggg::]/"
+    "http://[gggg::]/",
+    "http://[::ffff:zzzz]/",
+    "http://[12345::1]/",
+    "http://[1:2:3:4:5:6:7]/",
+    "http://[1:2:3:4:5:6:7:8:9]/",
+    "http://[::1:2:3:4:5:6:7:8]/",
+    // documentation prefix 2001:db8::/32 (full 8-hextet form)
+    "http://[2001:db8:1:2:3:4:5:6]/"
   ]
 
   const allowed = [
     "http://8.8.8.8/",
     "https://93.184.216.34/",
     "http://[2001:4860:4860::8888]/",
+    // global unicast, full 8-hextet form, not a special-use prefix
+    "http://[2606:4700:4700:1111:2222:3333:4444:5555]/",
     "http://example.com/file"
   ]
 
@@ -123,6 +134,34 @@ describe("fetchFromUrl", () => {
       const error = yield* Effect.flip(fetchFromUrl("http://example.com/file", deps))
       expect(error.reason).toContain("internal/private/non-global address")
     }))
+
+  // DNS-resolved addresses are not URL-validated, so these reach the IPv6/IPv4 parsers directly
+  // (a bracketed literal would be rejected by `new URL` first).
+  const blockedResolvedAddresses: ReadonlyArray<ResolvedAddress> = [
+    { address: "not-an-ip", family: 4 }, // unparseable IPv4
+    { address: "256.1.1.1", family: 4 }, // octet above 255
+    { address: "-1.1.1.1", family: 4 }, // octet below 0
+    { address: "fc00::1", family: 6 }, // ULA IPv6
+    { address: "::ffff:127.0.0.1", family: 6 }, // IPv4-mapped loopback (dotted)
+    { address: "::ffff:0a00:0001", family: 6 }, // IPv4-mapped loopback (hextet)
+    { address: "::ffff:zzzz", family: 6 }, // mapped form with an invalid hextet
+    { address: "::a", family: 6 }, // leading "::" first hextet below global range
+    { address: "12345::1", family: 6 }, // hextet too long
+    { address: "1:2:3:4:5:6:7", family: 6 }, // too few hextets
+    { address: "1:2:3:4:5:6:7:8:9", family: 6 }, // too many hextets
+    { address: "::1:2:3:4:5:6:7:8", family: 6 }, // compression leaves no zero gap
+    { address: "gggg::", family: 6 }, // invalid hextet
+    { address: "1::2::3", family: 6 }, // two compression markers
+    { address: "1.2.3.4", family: 6 } // dotted form routed through the IPv6 parser
+  ]
+  for (const address of blockedResolvedAddresses) {
+    it.effect(`rejects a resolved ${address.family === 4 ? "IPv4" : "IPv6"} address ${address.address}`, () =>
+      Effect.gen(function*() {
+        const deps: Deps = { resolveHostname: async () => [address], requestUrl: unusedRequestUrl }
+        const error = yield* Effect.flip(fetchFromUrl("http://example.com/file", deps))
+        expect(error.reason).toContain("internal/private/non-global address")
+      }))
+  }
 
   it.effect("returns the body on success", () =>
     Effect.gen(function*() {
@@ -192,6 +231,18 @@ describe("requestUrl", () => {
     })
   })
 
+  it("uses the pinned lookup when the URL host is a name", async () => {
+    await withServer((_req, res) => {
+      res.writeHead(200)
+      res.end("pinned")
+    }, async (url) => {
+      // a hostname URL forces Node to call the pinned DNS lookup that resolves to the server
+      const hostUrl = new URL(`http://localhost:${url.port}/file`)
+      const buffer = await requestUrl(hostUrl, LOOPBACK)
+      expect(buffer.toString()).toBe("pinned")
+    })
+  })
+
   it("rejects when the connection cannot be established", async () => {
     let closedPortUrl = new URL("http://127.0.0.1/file")
     await withServer((_req, res) => res.end(), async (url) => {
@@ -199,5 +250,13 @@ describe("requestUrl", () => {
     })
     // the server is now closed; the pinned connection is refused
     await expect(requestUrl(closedPortUrl, LOOPBACK)).rejects.toThrow()
+  })
+
+  it("selects the https agent for https URLs", async () => {
+    await withServer((_req, res) => res.end("plaintext"), async (url) => {
+      // a plain-HTTP server cannot complete a TLS handshake, but the https branch is taken first
+      const httpsUrl = new URL(`https://127.0.0.1:${url.port}/file`)
+      await expect(requestUrl(httpsUrl, LOOPBACK)).rejects.toThrow()
+    })
   })
 })

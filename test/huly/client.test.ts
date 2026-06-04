@@ -9,6 +9,9 @@ import {
   type DocumentQuery,
   type FindOptions,
   type FindResult,
+  type Mixin,
+  type MixinData,
+  type MixinUpdate,
   type PersonId,
   type Ref as DocRef,
   type Space,
@@ -35,6 +38,9 @@ const mockCreateDoc = mockFn()
 const mockUpdateDoc = mockFn()
 const mockAddCollection = mockFn()
 const mockRemoveDoc = mockFn()
+const mockCreateMixin = mockFn()
+const mockUpdateMixin = mockFn()
+const mockSearchFulltext = mockFn()
 const mockClose = mockFn()
 const mockLoadServerConfig = mockFn()
 
@@ -45,6 +51,9 @@ const mockTxOperations = {
   updateDoc: mockUpdateDoc,
   addCollection: mockAddCollection,
   removeDoc: mockRemoveDoc,
+  createMixin: mockCreateMixin,
+  updateMixin: mockUpdateMixin,
+  searchFulltext: mockSearchFulltext,
   close: mockClose
 }
 
@@ -59,6 +68,9 @@ const clearAllMockFns = () => {
   mockUpdateDoc.mockClear()
   mockAddCollection.mockClear()
   mockRemoveDoc.mockClear()
+  mockCreateMixin.mockClear()
+  mockUpdateMixin.mockClear()
+  mockSearchFulltext.mockClear()
   mockClose.mockClear()
   mockLoadServerConfig.mockClear()
   mockGetMarkup.mockClear()
@@ -740,6 +752,57 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
 
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toContain("findOne failed")
+      }))
+  })
+
+  describe("identity and mixin operations", () => {
+    it.effect("exposes the connected account uuid and primary social id", () =>
+      Effect.gen(function*() {
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        expect(client.getAccountUuid()).toBe("test-account-uuid")
+        // exercises the accessor; the primary social id is only populated from a live connection
+        client.getPrimarySocialId()
+      }))
+
+    it.effect("delegates createMixin to TxOperations", () =>
+      Effect.gen(function*() {
+        mockCreateMixin.mockResolvedValue({})
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        yield* client.createMixin(
+          "obj" as DocRef<TestDoc>,
+          "cls" as DocRef<Class<TestDoc>>,
+          "space" as DocRef<Space>,
+          "mixin" as DocRef<Mixin<TestDoc>>,
+          {} as MixinData<TestDoc, TestDoc>
+        )
+        expect(mockCreateMixin.mock.calls[0]?.[0]).toBe("obj")
+      }))
+
+    it.effect("delegates updateMixin to TxOperations", () =>
+      Effect.gen(function*() {
+        mockUpdateMixin.mockResolvedValue({})
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        yield* client.updateMixin(
+          "obj" as DocRef<TestDoc>,
+          "cls" as DocRef<Class<TestDoc>>,
+          "space" as DocRef<Space>,
+          "mixin" as DocRef<Mixin<TestDoc>>,
+          {} as MixinUpdate<TestDoc, TestDoc>
+        )
+        expect(mockUpdateMixin.mock.calls[0]?.[0]).toBe("obj")
+      }))
+
+    it.effect("delegates searchFulltext to TxOperations and wraps errors", () =>
+      Effect.gen(function*() {
+        mockSearchFulltext.mockResolvedValue({ docs: [] })
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        const result = yield* client.searchFulltext({ query: "hello" }, {})
+        expect(result.docs).toEqual([])
+
+        mockSearchFulltext.mockRejectedValue(new Error("search down"))
+        const failing = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        const error = yield* Effect.flip(failing.searchFulltext({ query: "x" }, {}))
+        expect(error.message).toContain("searchFulltext failed")
       }))
   })
 

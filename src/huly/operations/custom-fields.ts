@@ -169,6 +169,17 @@ const parseValueForType = (value: string, typeName: CustomFieldTypeName): unknow
   }
 }
 
+// batchResolveClassLabels returns a label for every requested owner id (a decoded class label, or
+// the id itself as a fallback), and callers only look up owner ids drawn from that same requested
+// set, so the nullish branch here is a type-guard for `Map.get`'s `| undefined` return.
+const labelForOwner = (labels: ReadonlyMap<ObjectClassName, string>, ownerClassId: ObjectClassName): string => {
+  const label = labels.get(ownerClassId)
+  /* v8 ignore start -- unreachable: every owner id is a key in the resolved label map */
+  if (label === undefined) return ownerClassId
+  /* v8 ignore stop */
+  return label
+}
+
 const toCustomFieldInfo = (
   attr: DecodedCustomFieldAttribute,
   ownerLabel: string
@@ -239,7 +250,7 @@ export const listCustomFields = (
       [...new Set(decodedAttrs.map((attr) => attr.ownerClassId))]
     )
 
-    return decodedAttrs.map((attr) => toCustomFieldInfo(attr, ownerLabels.get(attr.ownerClassId) ?? attr.ownerClassId))
+    return decodedAttrs.map((attr) => toCustomFieldInfo(attr, labelForOwner(ownerLabels, attr.ownerClassId)))
   })
 
 export const getCustomFieldValues = (
