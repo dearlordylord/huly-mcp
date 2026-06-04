@@ -790,6 +790,20 @@ describe("Organization CRUD, Customer Mixin, Channels, and Membership", () => {
   })
 
   describe("addOrganizationMember", () => {
+    it.effect("returns OrganizationNotFoundError when the organization is missing", () =>
+      Effect.gen(function*() {
+        const testLayer = createTestLayer({ organizations: [], persons: [createMockPerson()] })
+
+        const error = yield* Effect.flip(
+          addOrganizationMember({
+            organizationId: organizationId("missing-org"),
+            personIdentifier: "person-123"
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("OrganizationNotFoundError")
+      }))
+
     it.effect("adds person as member by person ID", () =>
       Effect.gen(function*() {
         const org = createMockOrganization()

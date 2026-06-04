@@ -1,6 +1,6 @@
 import { describe, it } from "@effect/vitest"
 import type { Doc, DocumentUpdate, FindResult, PersonId, Ref, Space, TxResult } from "@hcengineering/core"
-import type { Document as HulyDocument } from "@hcengineering/document"
+import type { Document as HulyDocument, Teamspace as HulyTeamspace } from "@hcengineering/document"
 import type { TaskType } from "@hcengineering/task"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
 import { IssuePriority, TimeReportDayType } from "@hcengineering/tracker"
@@ -99,10 +99,44 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
   return result
 }
 
+const makeDocument = (overrides: Partial<HulyDocument> & Pick<HulyDocument, "_id">): HulyDocument => {
+  const base = {
+    _id: overrides._id,
+    _class: documentPlugin.class.Document,
+    space: "teamspace-1" as Ref<HulyTeamspace>,
+    title: "Spec",
+    modifiedBy: "user-1" as PersonId,
+    modifiedOn: 0,
+    createdBy: "user-1" as PersonId,
+    createdOn: 0
+  }
+  return Object.assign(base, overrides) as HulyDocument
+}
+
+const makeTeamspace = (id: string, name: string): HulyTeamspace => {
+  const teamspace: HulyTeamspace = {
+    _id: id as Ref<HulyTeamspace>,
+    _class: documentPlugin.class.Teamspace,
+    space: "space-1" as Ref<Space>,
+    type: "space-type-1" as Ref<never>,
+    name,
+    description: "",
+    private: false,
+    members: [],
+    archived: false,
+    modifiedBy: "user-1" as PersonId,
+    modifiedOn: 0,
+    createdBy: "user-1" as PersonId,
+    createdOn: 0
+  }
+  return teamspace
+}
+
 interface MockConfig {
   projects?: Array<HulyProject>
   issues?: Array<HulyIssue>
   documents?: Array<HulyDocument>
+  teamspaces?: Array<HulyTeamspace>
   capturedFindAllQueries?: Array<{
     _class: unknown
     query: unknown
@@ -120,6 +154,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
   const projects = config.projects ?? []
   const issues = config.issues ?? []
   const documents = config.documents ?? []
+  const teamspaces = config.teamspaces ?? []
   const capturedFindAllQueries = config.capturedFindAllQueries ?? []
   const captured = config.capturedUpdateDocs ?? []
 
@@ -145,6 +180,11 @@ const createTestLayerWithMocks = (config: MockConfig) => {
         return Effect.succeed(toFindResult(filtered))
       }
       return Effect.succeed(toFindResult(documents))
+    }
+    if (_class === documentPlugin.class.Teamspace) {
+      const inValues = inQueryValues(recordValue(query, "_id"))
+      const filtered = inValues === undefined ? teamspaces : teamspaces.filter(ts => inValues.includes(ts._id))
+      return Effect.succeed(toFindResult(filtered))
     }
     return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
@@ -187,6 +227,31 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 }
 
 describe("addIssueRelation", () => {
+  it.effect("uses same-project lookup when the target identifier has no parseable project prefix", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "TEST" })
+      const source = makeIssue({
+        _id: "issue-1" as Ref<HulyIssue>,
+        space: "proj-1" as Ref<HulyProject>,
+        identifier: "TEST-1",
+        number: 1
+      })
+      const testLayer = createTestLayerWithMocks({ projects: [project], issues: [source] })
+
+      // "not-an-id" is neither PREFIX-<n> nor a bare number, so parseIssueIdentifier
+      // returns it unchanged and the prefix regex yields null (no cross-project hop).
+      const error = yield* Effect.flip(
+        addIssueRelation({
+          project: projectIdentifier("TEST"),
+          issueIdentifier: issueIdentifier("TEST-1"),
+          targetIssue: issueIdentifier("not-an-id"),
+          relationType: "blocks"
+        }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(error._tag).toBe("IssueNotFoundError")
+    }))
+
   it.effect("adds 'blocks' relation — pushes source into target's blockedBy", () =>
     Effect.gen(function*() {
       const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "TEST" })
@@ -621,6 +686,74 @@ describe("listIssueRelations", () => {
       expect(result.relations[0].identifier).toBe("TEST-3")
       expect(result.relations[0]._id).toBe("issue-3")
       expect(result.documents).toHaveLength(0)
+    }))
+
+  it.effect("resolves document relations and falls back when a document is missing", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "TEST" })
+      const issue = makeIssue({
+        _id: "issue-1" as Ref<HulyIssue>,
+        space: "proj-1" as Ref<HulyProject>,
+        identifier: "TEST-1",
+        number: 1,
+        relations: [
+          { _id: "doc-1" as Ref<Doc>, _class: documentPlugin.class.Document },
+          { _id: "doc-missing" as Ref<Doc>, _class: documentPlugin.class.Document }
+        ]
+      })
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        issues: [issue],
+        documents: [
+          makeDocument({
+            _id: "doc-1" as Ref<HulyDocument>,
+            title: "Design Spec",
+            space: "teamspace-1" as Ref<HulyTeamspace>
+          })
+        ],
+        teamspaces: [makeTeamspace("teamspace-1", "Engineering Docs")]
+      })
+
+      const result = yield* listIssueRelations({
+        project: projectIdentifier("TEST"),
+        issueIdentifier: issueIdentifier("TEST-1")
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result.documents).toHaveLength(2)
+      // Resolvable document: title + teamspace name come from the resolved docs.
+      expect(result.documents[0]).toMatchObject({
+        _id: "doc-1",
+        title: "Design Spec",
+        teamspace: "Engineering Docs"
+      })
+      // Missing document: both title and teamspace fall back to the raw _id.
+      expect(result.documents[1]).toMatchObject({
+        _id: "doc-missing",
+        title: "doc-missing",
+        teamspace: "doc-missing"
+      })
+    }))
+
+  it.effect("skips the teamspace lookup when no related document resolves", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "TEST" })
+      const issue = makeIssue({
+        _id: "issue-1" as Ref<HulyIssue>,
+        space: "proj-1" as Ref<HulyProject>,
+        identifier: "TEST-1",
+        number: 1,
+        relations: [{ _id: "doc-gone" as Ref<Doc>, _class: documentPlugin.class.Document }]
+      })
+      // No documents fixture, so `docs` is empty and `spaceIds.length > 0` is false.
+      const testLayer = createTestLayerWithMocks({ projects: [project], issues: [issue] })
+
+      const result = yield* listIssueRelations({
+        project: projectIdentifier("TEST"),
+        issueIdentifier: issueIdentifier("TEST-1")
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result.documents).toHaveLength(1)
+      expect(result.documents[0]).toMatchObject({ _id: "doc-gone", title: "doc-gone", teamspace: "doc-gone" })
     }))
 
   it.effect("returns issues blocked by the current issue", () =>

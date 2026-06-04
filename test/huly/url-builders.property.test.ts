@@ -8,7 +8,9 @@ import { propertyTestParameters } from "../helpers/property.js"
 const nonEmptyPathSegmentArbitrary = fc.stringMatching(/^[a-z][a-z0-9-]{0,16}$/)
 const hulyRefArbitrary = fc.stringMatching(/^[a-z][a-z0-9:._-]{0,24}$/)
 const baseUrlArbitrary = fc.record({
-  host: fc.stringMatching(/^[a-z][a-z0-9-]{0,12}$/),
+  // Exclude the reserved IDNA ACE prefix "xn--": such labels are only valid when
+  // they encode real punycode, so `new URL("https://xn--.example")` throws.
+  host: fc.stringMatching(/^[a-z][a-z0-9-]{0,12}$/).filter((host) => !host.startsWith("xn--")),
   trailingSlashCount: fc.integer({ min: 0, max: 3 })
 }).map(({ host, trailingSlashCount }) => UrlString.make(`https://${host}.example${"/".repeat(trailingSlashCount)}`))
 
