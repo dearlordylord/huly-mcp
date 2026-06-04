@@ -99,6 +99,23 @@ describe("GetHulyContextResultSchema", () => {
       ).toThrow()
     }))
 
+  it.effect("rejects an origin that is not a parseable URL", () =>
+    Effect.gen(function*() {
+      // A non-empty string that throws in `new URL(...)` exercises the catch arm.
+      expect(() =>
+        Schema.decodeUnknownSync(GetHulyContextResultSchema)({
+          ...validContext,
+          huly: {
+            ...validContext.huly,
+            url: {
+              ...validContext.huly.url,
+              origin: "not-a-valid-url"
+            }
+          }
+        })
+      ).toThrow()
+    }))
+
   it.effect("rejects empty diagnostic strings", () =>
     Effect.gen(function*() {
       for (

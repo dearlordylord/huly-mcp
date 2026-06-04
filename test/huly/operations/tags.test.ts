@@ -137,9 +137,12 @@ const createFixtureLayer = (config: FixtureConfig) => {
   const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown) => {
     const q = query as Record<string, unknown>
     if (_class === tags.class.TagElement) {
+      const titleLike = (q.title as { readonly $like?: string } | undefined)?.$like
+      const titleNeedle = titleLike === undefined ? undefined : titleLike.replace(/^%|%$/g, "")
       const filtered = tagElements.filter((tag) =>
         (!q.targetClass || tag.targetClass === q.targetClass)
         && (!q.category || tag.category === q.category)
+        && (titleNeedle === undefined || tag.title.includes(titleNeedle))
       )
       return Effect.succeed(toFindResult(filtered))
     }
@@ -283,6 +286,24 @@ describe("listTags", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result.map((tag) => tag.title)).toEqual(["p0"])
+    }))
+
+  it.effect("filters by a title substring when titleSearch is provided", () =>
+    Effect.gen(function*() {
+      const testLayer = createFixtureLayer({
+        tagElements: [
+          makeTagElement({ _id: toRef<HulyTagElement>("tag-bug"), title: "bug" }),
+          makeTagElement({ _id: toRef<HulyTagElement>("tag-debug"), title: "debug-helper" }),
+          makeTagElement({ _id: toRef<HulyTagElement>("tag-feature"), title: "feature" })
+        ]
+      })
+
+      const result = yield* listTags({
+        targetClass: TARGET_CLASS,
+        titleSearch: "bug"
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result.map((tag) => tag.title).sort()).toEqual(["bug", "debug-helper"])
     }))
 })
 

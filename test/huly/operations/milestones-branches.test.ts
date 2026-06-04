@@ -16,8 +16,8 @@ import { Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { tracker } from "../../../src/huly/huly-plugins.js"
-import { listMilestones } from "../../../src/huly/operations/milestones.js"
-import { projectIdentifier } from "../../helpers/brands.js"
+import { listMilestones, updateMilestone } from "../../../src/huly/operations/milestones.js"
+import { milestoneIdentifier, projectIdentifier } from "../../helpers/brands.js"
 
 const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
   const base = {
@@ -103,5 +103,109 @@ describe("milestones - status mapping exhaustiveness", () => {
       expect(result[1].status).toBe("in-progress")
       expect(result[2].status).toBe("completed")
       expect(result[3].status).toBe("canceled")
+    }))
+})
+
+describe("updateMilestone - description dual-write", () => {
+  it.effect("uploads markup when a non-empty description is provided", () =>
+    Effect.gen(function*() {
+      const project = makeProject()
+      const milestone = makeMilestone({ _id: "m-1" as Ref<HulyMilestone>, label: "Sprint 1" })
+
+      const uploads: Array<{ readonly attr: string; readonly value: string }> = []
+      const updates: Array<Record<string, unknown>> = []
+
+      const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown) => {
+        if (_class === tracker.class.Project) return Effect.succeed(project)
+        if (_class === tracker.class.Milestone) return Effect.succeed(milestone)
+        return Effect.succeed(undefined)
+      }) as HulyClientOperations["findOne"]
+
+      // eslint-disable-next-line no-restricted-syntax -- stub returns Effect<string> which doesn't overlap the SDK's Effect<MarkupRef> return
+      const uploadMarkupImpl: HulyClientOperations["uploadMarkup"] = ((
+        _objectClass: unknown,
+        _objectId: unknown,
+        objectAttr: unknown,
+        value: unknown
+      ) => {
+        uploads.push({ attr: String(objectAttr), value: String(value) })
+        return Effect.succeed("markup-ref")
+      }) as unknown as HulyClientOperations["uploadMarkup"]
+
+      const updateDocImpl: HulyClientOperations["updateDoc"] = ((
+        _class: unknown,
+        _space: unknown,
+        _objectId: unknown,
+        operations: Record<string, unknown>
+      ) => {
+        updates.push(operations)
+        return Effect.succeed({})
+      }) as HulyClientOperations["updateDoc"]
+
+      const testLayer = HulyClient.testLayer({
+        findOne: findOneImpl,
+        updateDoc: updateDocImpl,
+        uploadMarkup: uploadMarkupImpl
+      })
+
+      const result = yield* updateMilestone({
+        project: projectIdentifier("TEST"),
+        milestone: milestoneIdentifier("Sprint 1"),
+        description: "Updated milestone notes"
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result).toEqual({ id: "m-1", updated: true })
+      expect(uploads).toEqual([{ attr: "description", value: "Updated milestone notes" }])
+      expect(updates[0]).toHaveProperty("description")
+    }))
+
+  it.effect("skips markup upload when the description is blank", () =>
+    Effect.gen(function*() {
+      const project = makeProject()
+      const milestone = makeMilestone({ _id: "m-1" as Ref<HulyMilestone>, label: "Sprint 1" })
+
+      const uploads: Array<string> = []
+      const updates: Array<Record<string, unknown>> = []
+
+      const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown) => {
+        if (_class === tracker.class.Project) return Effect.succeed(project)
+        if (_class === tracker.class.Milestone) return Effect.succeed(milestone)
+        return Effect.succeed(undefined)
+      }) as HulyClientOperations["findOne"]
+
+      // eslint-disable-next-line no-restricted-syntax -- stub returns Effect<string> which doesn't overlap the SDK's Effect<MarkupRef> return
+      const uploadMarkupImpl: HulyClientOperations["uploadMarkup"] = ((
+        _objectClass: unknown,
+        _objectId: unknown,
+        objectAttr: unknown
+      ) => {
+        uploads.push(String(objectAttr))
+        return Effect.succeed("markup-ref")
+      }) as unknown as HulyClientOperations["uploadMarkup"]
+
+      const updateDocImpl: HulyClientOperations["updateDoc"] = ((
+        _class: unknown,
+        _space: unknown,
+        _objectId: unknown,
+        operations: Record<string, unknown>
+      ) => {
+        updates.push(operations)
+        return Effect.succeed({})
+      }) as HulyClientOperations["updateDoc"]
+
+      const testLayer = HulyClient.testLayer({
+        findOne: findOneImpl,
+        updateDoc: updateDocImpl,
+        uploadMarkup: uploadMarkupImpl
+      })
+
+      const result = yield* updateMilestone({
+        project: projectIdentifier("TEST"),
+        milestone: milestoneIdentifier("Sprint 1"),
+        description: "   "
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result).toEqual({ id: "m-1", updated: true })
+      expect(uploads).toEqual([])
     }))
 })

@@ -6,6 +6,7 @@ import { expect } from "vitest"
 import { INLINE_COMMENT_MARK_TYPE } from "../../../src/huly/operations/inline-comment-mark.js"
 import {
   markupToMarkdownString,
+  optionalMarkupToMarkdown,
   sanitizeNodeForMarkdown,
   testMarkupUrlConfig
 } from "../../../src/huly/operations/markup.js"
@@ -30,6 +31,26 @@ describe("markupToMarkdownString", () => {
       expect(markdown.trim()).toBe("highlighted text")
       expect(markdown).not.toContain(INLINE_COMMENT_MARK_TYPE)
       expect(markdown).not.toContain("thread-1")
+    }))
+})
+
+describe("optionalMarkupToMarkdown", () => {
+  it.effect("returns the fallback when markup is null", () =>
+    Effect.gen(function*() {
+      // A `fallback` of undefined is coerced to "" by the default parameter.
+      expect(optionalMarkupToMarkdown(null, testMarkupUrlConfig)).toBe("")
+      expect(optionalMarkupToMarkdown(null, testMarkupUrlConfig, undefined)).toBe("")
+    }))
+
+  it.effect("returns the fallback when markup is undefined", () =>
+    Effect.gen(function*() {
+      expect(optionalMarkupToMarkdown(undefined, testMarkupUrlConfig, "none")).toBe("none")
+    }))
+
+  it.effect("serializes the markup when present", () =>
+    Effect.gen(function*() {
+      expect(optionalMarkupToMarkdown(markupWithInlineComment, testMarkupUrlConfig).trim())
+        .toBe("highlighted text")
     }))
 })
 

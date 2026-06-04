@@ -14,10 +14,10 @@ import type {
 import { AccessLevel, getPrimaryCalendar } from "@hcengineering/calendar"
 import type { Channel, Contact, Person } from "@hcengineering/contact"
 import type { Class, Doc, MarkupBlobRef, Ref } from "@hcengineering/core"
-import { Effect } from "effect"
+import { Array as Arr, Effect } from "effect"
 
 import type { Participant, Visibility } from "../../domain/schemas/calendar.js"
-import type { CalendarId } from "../../domain/schemas/shared.js"
+import type { CalendarId, Email } from "../../domain/schemas/shared.js"
 import { PersonId, PersonName } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import { CalendarNotAccessibleError } from "../errors.js"
@@ -59,11 +59,9 @@ export const ONE_HOUR_MS = SECONDS_PER_MINUTE * MINUTES_PER_HOUR * MS_PER_SECOND
 
 const findPersonsByEmails = (
   client: HulyClient["Type"],
-  emails: ReadonlyArray<string>
+  emails: Arr.NonEmptyReadonlyArray<Email>
 ): Effect.Effect<Array<Person>, HulyClientError> =>
   Effect.gen(function*() {
-    if (emails.length === 0) return []
-
     const allChannels = yield* client.findAll<Channel>(
       contact.class.Channel,
       { value: { $in: [...emails] } }
@@ -168,7 +166,7 @@ interface ResolvedEventInputs {
 export const resolveEventInputs = (
   client: HulyClient["Type"],
   params: {
-    readonly participants?: ReadonlyArray<string> | undefined
+    readonly participants?: ReadonlyArray<Email> | undefined
     readonly description?: string | undefined
     readonly calendarId?: CalendarId | undefined
   },
@@ -178,9 +176,10 @@ export const resolveEventInputs = (
   Effect.gen(function*() {
     const calendarRef = yield* resolveCalendarRef(client, params.calendarId)
 
-    const participantRefs: Array<Ref<Contact>> = params.participants && params.participants.length > 0
-      ? (yield* findPersonsByEmails(client, params.participants)).map(p => p._id)
-      : []
+    const participantRefs: Array<Ref<Contact>> =
+      params.participants !== undefined && Arr.isNonEmptyReadonlyArray(params.participants)
+        ? (yield* findPersonsByEmails(client, params.participants)).map(p => p._id)
+        : []
 
     const descriptionRef: MarkupBlobRef | null = params.description && params.description.trim() !== ""
       ? yield* client.uploadMarkup(

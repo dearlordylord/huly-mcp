@@ -2,7 +2,7 @@ import { describe, it } from "@effect/vitest"
 import { Cause, Effect, Schema } from "effect"
 import type { ParseResult } from "effect"
 import { expect } from "vitest"
-import { mapParseCauseToMcp, McpErrorCode } from "../../src/mcp/error-mapping.js"
+import { createSuccessResponse, mapParseCauseToMcp, McpErrorCode } from "../../src/mcp/error-mapping.js"
 
 describe("Error Mapping Branch Coverage", () => {
   describe("mapParseCauseToMcp - Sequential cause with ParseError (line 148)", () => {
@@ -59,6 +59,17 @@ describe("Error Mapping Branch Coverage", () => {
         expect(response.isError).toBe(true)
         expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
         expect(response.content[0].text).toBe("An unexpected error occurred")
+      }))
+  })
+
+  describe("createSuccessResponse - non-serializable result (encodeJsonText line 218)", () => {
+    it.effect("falls back to the literal \"null\" text when JSON.stringify yields undefined", () =>
+      Effect.gen(function*() {
+        // JSON.stringify(undefined) returns undefined, exercising the non-string branch.
+        const response = createSuccessResponse(undefined)
+
+        expect(response.content[0].text).toBe("null")
+        expect(response.structuredContent).toEqual({ result: undefined })
       }))
   })
 })

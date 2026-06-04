@@ -9,8 +9,10 @@ export const hulyModelLabelTail = (value: string): string => {
   // Huly SDK model labels and IDs are namespaced tokens; for example,
   // tracker.class.Issue currently serializes as "tracker:class:Issue".
   // MCP display labels use the final segment so agents see "Issue".
+  // `split` always yields a non-empty array, so the final segment is always a
+  // defined string (this repo has no noUncheckedIndexedAccess); no fallback.
   const segments = value.split(HULY_MODEL_ID_SEPARATOR)
-  return segments[segments.length - FINAL_SEGMENT_OFFSET] ?? value
+  return segments[segments.length - FINAL_SEGMENT_OFFSET]
 }
 
 export const decodeHulyModelLabelTail = (value: unknown) =>
