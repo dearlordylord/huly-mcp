@@ -573,6 +573,39 @@ describe("listCalendars", () => {
         isPrimary: false
       })
     }))
+
+  it.effect("defaults missing visibility to private", () =>
+    Effect.gen(function*() {
+      const calendarWithoutVisibility = makeCalendar({
+        _id: "no-visibility-calendar" as Ref<HulyCalendar>,
+        // eslint-disable-next-line no-restricted-syntax -- malformed SDK data for coverage of defensive fallback
+        visibility: undefined as unknown as HulyCalendar["visibility"]
+      })
+      const testLayer = createTestLayer({ calendars: [calendarWithoutVisibility] })
+
+      const result = yield* listCalendars({}).pipe(Effect.provide(testLayer))
+
+      expect(result).toHaveLength(1)
+      expect(result[0].visibility).toBe("private")
+    }))
+
+  it.effect("drops a malformed writable calendar with unmapped access", () =>
+    Effect.gen(function*() {
+      const malformed = makeCalendar({
+        _id: "malformed-calendar" as Ref<HulyCalendar>,
+        // eslint-disable-next-line no-restricted-syntax -- malformed SDK data for coverage of defensive fallback
+        access: "calendar:access:Unexpected" as unknown as HulyCalendar["access"]
+      })
+      const findAllImpl: HulyClientOperations["findAll"] = ((classRef: unknown) =>
+        classRef === calendar.class.Calendar
+          ? Effect.succeed(toFindResult([malformed]))
+          : Effect.succeed(toFindResult([]))) as HulyClientOperations["findAll"]
+      const testLayer = HulyClient.testLayer({ findAll: findAllImpl })
+
+      const result = yield* listCalendars({}).pipe(Effect.provide(testLayer))
+
+      expect(result).toEqual([])
+    }))
 })
 
 // --- updateEvent coverage (lines 354-437) ---

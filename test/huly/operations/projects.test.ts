@@ -54,6 +54,7 @@ interface MockConfig {
   captureUpdateDoc?: { operations?: Record<string, unknown> }
   captureRemoveDoc?: { called?: boolean }
   statuses?: Array<{ _id: Ref<Status>; name: string; category?: string }>
+  failStatusLookup?: boolean
   projectType?: ProjectType
 }
 
@@ -83,6 +84,9 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       return Effect.succeed(result)
     }
     if (_class === core.class.Status) {
+      if (config.failStatusLookup === true) {
+        return Effect.fail(new Error("status lookup failed") as never)
+      }
       // Status mock objects only need _id, name, and category for our tests.
       // toFindResult expects Doc[], but mock statuses are partial — cast is safe in tests.
       return Effect.succeed(toFindResult(statuses as Array<never>))
@@ -206,6 +210,21 @@ describe("listProjects", () => {
         const result = yield* listProjects({}).pipe(Effect.provide(testLayer))
 
         expect(result.projects[0].description).toBeUndefined()
+      }))
+
+    it.effect("fails when a listed project has invalid SDK data", () =>
+      Effect.gen(function*() {
+        const project = makeProject({
+          identifier: "",
+          name: "Invalid Project",
+          archived: false
+        })
+        const testLayer = createTestLayerWithMocks({ projects: [project] })
+
+        const error = yield* Effect.flip(listProjects({}).pipe(Effect.provide(testLayer)))
+
+        expect(error._tag).toBe("HulyConnectionError")
+        expect(error.message).toContain("listProjects response failed schema validation")
       }))
 
     it.effect("returns empty array when no projects", () =>
@@ -411,6 +430,69 @@ describe("getProject", () => {
 
       expect(result.defaultStatus).toBe("Backlog")
       expect(result.statuses).toEqual(["Backlog", "In Progress"])
+    }))
+
+  it.effect("uses the first status when defaultIssueStatus is empty at runtime", () =>
+    Effect.gen(function*() {
+      const firstStatusId = statusRef("status-1")
+      const proj = makeProject({
+        identifier: "HULY",
+        name: "Huly",
+
+        defaultIssueStatus: "" as Ref<Status>
+      })
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [proj],
+        statuses: [{ _id: firstStatusId, name: "Backlog" }],
+        projectType: asProjectType({ statuses: [{ _id: firstStatusId }] })
+      })
+
+      const result = yield* getProject({ project: projectIdentifier("HULY") }).pipe(Effect.provide(testLayer))
+
+      expect(result.defaultStatus).toBe("Backlog")
+    }))
+
+  it.effect("falls back to raw status refs when status document lookup fails", () =>
+    Effect.gen(function*() {
+      const statusId = statusRef("plainstatus")
+      const proj = makeProject({
+        identifier: "HULY",
+        name: "Huly",
+        defaultIssueStatus: statusId
+      })
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [proj],
+        failStatusLookup: true,
+        projectType: asProjectType({ statuses: [{ _id: statusId }] })
+      })
+
+      const result = yield* getProject({ project: projectIdentifier("HULY") }).pipe(Effect.provide(testLayer))
+
+      expect(result.defaultStatus).toBe("plainstatus")
+      expect(result.statuses).toEqual(["plainstatus"])
+    }))
+
+  it.effect("fails when project details have invalid SDK data", () =>
+    Effect.gen(function*() {
+      const proj = makeProject({
+        identifier: "HULY",
+        name: "",
+        description: ""
+      })
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [proj],
+        projectType: asProjectType({ statuses: [] })
+      })
+
+      const error = yield* Effect.flip(
+        getProject({ project: projectIdentifier("HULY") }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(error._tag).toBe("HulyConnectionError")
+      expect(error.message).toContain("getProject response failed schema validation")
     }))
 
   it.effect("returns ProjectNotFoundError for nonexistent project", () =>

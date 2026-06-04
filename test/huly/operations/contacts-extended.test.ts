@@ -5,16 +5,20 @@ import type {
   Employee as HulyEmployee,
   Member as HulyMember,
   Organization as HulyOrganization,
-  Person as HulyPerson
+  Person as HulyPerson,
+  SocialIdentity
 } from "@hcengineering/contact"
 import type { Doc, FindResult, PersonId as CorePersonId, Ref } from "@hcengineering/core"
+import { SocialIdType } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { Email, PersonId } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { contact } from "../../../src/huly/huly-plugins.js"
+import { findPersonByExactEmailOrName } from "../../../src/huly/operations/contacts-shared.js"
 import { createOrganization, listOrganizations } from "../../../src/huly/operations/organizations.js"
 import { getPerson, listEmployees, listPersons, updatePerson } from "../../../src/huly/operations/persons.js"
+import { resolveAssignee } from "../../../src/huly/operations/test-management-shared.js"
 import { memberReference } from "../../helpers/brands.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
@@ -56,6 +60,26 @@ const createMockChannel = (overrides: Partial<Channel> = {}): Channel => {
     ...overrides
   }
   return data as Channel
+}
+
+const createMockSocialIdentity = (overrides: Partial<SocialIdentity> = {}): SocialIdentity => {
+  const data = {
+    _id: "social-1" as Ref<SocialIdentity>,
+    _class: contact.class.SocialIdentity,
+    space: contact.space.Contacts,
+    attachedTo: "person-123" as Ref<Doc>,
+    attachedToClass: contact.class.Person,
+    collection: "socialIds",
+    key: "email:john@example.com",
+    type: SocialIdType.EMAIL,
+    value: "john@example.com",
+    modifiedBy: "user" as CorePersonId,
+    modifiedOn: 0,
+    createdBy: "user" as CorePersonId,
+    createdOn: 0,
+    ...overrides
+  }
+  return data as SocialIdentity
 }
 
 const createMockEmployee = (overrides: Partial<HulyEmployee> = {}): HulyEmployee => {
@@ -114,6 +138,7 @@ const createMockMember = (overrides: Partial<HulyMember> = {}): HulyMember => {
 interface MockConfig {
   persons?: Array<HulyPerson>
   channels?: Array<Channel>
+  socialIdentities?: Array<SocialIdentity>
   employees?: Array<HulyEmployee>
   organizations?: Array<HulyOrganization>
   members?: Array<HulyMember>
@@ -126,6 +151,7 @@ interface MockConfig {
 const createTestLayer = (config: MockConfig) => {
   const persons = config.persons ?? []
   const channels = config.channels ?? []
+  const socialIdentities = config.socialIdentities ?? []
   const employees = config.employees ?? []
   const organizations = config.organizations ?? []
   const members = config.members ?? []
@@ -186,6 +212,15 @@ const createTestLayer = (config: MockConfig) => {
       }
       return Effect.succeed(toFindResult(filtered))
     }
+    if (_class === contact.class.SocialIdentity) {
+      const q = query as Record<string, unknown>
+      const filtered = socialIdentities.filter(identity => {
+        if (q.type !== undefined && identity.type !== q.type) return false
+        if (q.value !== undefined && identity.value !== q.value) return false
+        return true
+      })
+      return Effect.succeed(toFindResult(filtered))
+    }
     if (_class === contact.mixin.Employee) {
       const opts = (options ?? {}) as { limit?: number }
       let filtered = [...employees]
@@ -220,6 +255,26 @@ const createTestLayer = (config: MockConfig) => {
     if (_class === contact.class.Person) {
       const q = query as Record<string, unknown>
       const found = persons.find(p => p._id === q._id)
+      return Effect.succeed(found)
+    }
+    if (_class === contact.class.SocialIdentity) {
+      const q = query as Record<string, unknown>
+      const found = socialIdentities.find(identity => identity.type === q.type && identity.value === q.value)
+      return Effect.succeed(found)
+    }
+    if (_class === contact.class.Channel) {
+      const q = query as Record<string, unknown>
+      const found = channels.find(channel => {
+        if (q.provider !== undefined && channel.provider !== q.provider) return false
+        if (q.value !== undefined) {
+          const value = q.value as { $like?: string } | string
+          if (typeof value === "object" && "$like" in value) {
+            return matchesLike(channel.value, value.$like)
+          }
+          return channel.value === value
+        }
+        return true
+      })
       return Effect.succeed(found)
     }
     return Effect.succeed(undefined)
@@ -289,6 +344,51 @@ const createTestLayer = (config: MockConfig) => {
 }
 
 describe("Contacts Extended Coverage", () => {
+  describe("findPersonByExactEmailOrName", () => {
+    it.effect("returns undefined when exact email has no identity or channel matches", () =>
+      Effect.gen(function*() {
+        const testLayer = createTestLayer({ persons: [], channels: [], socialIdentities: [] })
+
+        const result = yield* Effect.gen(function*() {
+          const client = yield* HulyClient
+          return yield* findPersonByExactEmailOrName(client, Email.make("missing@example.com"))
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result).toBeUndefined()
+      }))
+
+    it.effect("returns undefined when exact email resolves ids but no matching person docs", () =>
+      Effect.gen(function*() {
+        const identity = createMockSocialIdentity({
+          value: "orphan@example.com",
+          attachedTo: "orphan-person" as Ref<HulyPerson>
+        })
+        const testLayer = createTestLayer({ persons: [], socialIdentities: [identity] })
+
+        const result = yield* Effect.gen(function*() {
+          const client = yield* HulyClient
+          return yield* findPersonByExactEmailOrName(client, Email.make("orphan@example.com"))
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result).toBeUndefined()
+      }))
+  })
+
+  describe("resolveAssignee", () => {
+    it.effect("returns PersonNotFoundError when no contact lookup path matches", () =>
+      Effect.gen(function*() {
+        const testLayer = createTestLayer({ persons: [], channels: [], socialIdentities: [] })
+
+        const error = yield* Effect.flip(
+          resolveAssignee("missing@example.com").pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("PersonNotFoundError")
+        if (error._tag !== "PersonNotFoundError") throw new Error("expected PersonNotFoundError")
+        expect(error.identifier).toBe("missing@example.com")
+      }))
+  })
+
   describe("getPerson by email (findPersonByEmail path)", () => {
     it.effect("finds person by email when channel exists", () =>
       Effect.gen(function*() {

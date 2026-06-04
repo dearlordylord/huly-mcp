@@ -13,6 +13,7 @@ import {
   listTagCategories,
   updateTagCategory
 } from "../../../src/huly/operations/tag-categories.js"
+import { resolveTagCategoryRef } from "../../../src/huly/operations/tags-shared.js"
 import { tagCategoryIdentifier } from "../../helpers/brands.js"
 
 const makeTagCategory = (overrides?: Partial<HulyTagCategory>): HulyTagCategory => {
@@ -148,6 +149,50 @@ describe("listTagCategories", () => {
 
       expect(result).toHaveLength(1)
       expect(result[0].label).toBe("Issues")
+    }))
+})
+
+describe("resolveTagCategoryRef", () => {
+  it.effect("resolves an explicit category by id before trying label lookup", () =>
+    Effect.gen(function*() {
+      const category = makeTagCategory({ _id: "cat-by-id" as Ref<HulyTagCategory>, label: "By Id" })
+      const testLayer = createTestLayerWithMocks({ categories: [category] })
+
+      const result = yield* Effect.gen(function*() {
+        const client = yield* HulyClient
+        return yield* resolveTagCategoryRef(client, "tracker:class:Issue", "cat-by-id")
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result).toBe("cat-by-id")
+    }))
+
+  it.effect("uses fallback category when no default category exists", () =>
+    Effect.gen(function*() {
+      const testLayer = createTestLayerWithMocks({ categories: [] })
+
+      const result = yield* Effect.gen(function*() {
+        const client = yield* HulyClient
+        return yield* resolveTagCategoryRef(
+          client,
+          "tracker:class:Issue",
+          undefined,
+          "fallback-category" as Ref<HulyTagCategory>
+        )
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result).toBe("fallback-category")
+    }))
+
+  it.effect("uses Huly no-category when no explicit, default, or fallback category exists", () =>
+    Effect.gen(function*() {
+      const testLayer = createTestLayerWithMocks({ categories: [] })
+
+      const result = yield* Effect.gen(function*() {
+        const client = yield* HulyClient
+        return yield* resolveTagCategoryRef(client, "tracker:class:Issue", undefined)
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result).toBe(tags.category.NoCategory)
     }))
 })
 
