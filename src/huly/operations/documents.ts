@@ -42,9 +42,14 @@ import type {
 import { UPDATE_TEAMSPACE_FIELDS } from "../../domain/schemas/documents.js"
 import { DocumentId, TeamspaceId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import { DocumentNotFoundError, type NoUpdateFieldsError, type TeamspaceNotFoundError } from "../errors.js"
+import {
+  type DocumentContentCorruptedError,
+  DocumentNotFoundError,
+  type NoUpdateFieldsError,
+  type TeamspaceNotFoundError
+} from "../errors.js"
 import { buildDocumentUrlFromConfig } from "../url-builders.js"
-import { findTeamspace, findTeamspaceAndDocument } from "./documents-shared.js"
+import { fetchReadableDocumentContent, findTeamspace, findTeamspaceAndDocument } from "./documents-shared.js"
 import {
   clampLimit,
   escapeLikeWildcards,
@@ -85,6 +90,7 @@ type GetDocumentError =
   | HulyClientError
   | TeamspaceNotFoundError
   | DocumentNotFoundError
+  | DocumentContentCorruptedError
 
 type CreateDocumentError =
   | HulyClientError
@@ -338,15 +344,12 @@ export const getDocument = (
       document: params.document
     })
 
-    const content: string | undefined = doc.content
-      ? yield* client.fetchMarkup(
-        doc._class,
-        doc._id,
-        "content",
-        doc.content,
-        "markdown"
-      )
-      : undefined
+    const content: string | undefined = yield* fetchReadableDocumentContent({
+      client,
+      doc,
+      format: "markdown",
+      identifier: params.document
+    })
 
     const result: Document = {
       id: DocumentId.make(doc._id),

@@ -87,6 +87,7 @@ const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDo
   "DocumentTextNotFoundError",
   "DocumentTextMultipleMatchesError",
   "DocumentEmptyContentError",
+  "DocumentContentCorruptedError",
   "DocumentEditModeError",
   "CommentNotFoundError",
   "MilestoneNotFoundError",

@@ -20,6 +20,7 @@ import {
   ComponentNotFoundError,
   DirectMessageIdentifierAmbiguousError,
   DirectMessageNotFoundError,
+  DocumentContentCorruptedError,
   DocumentEditModeError,
   DocumentNotFoundError,
   EventNotFoundError,
@@ -707,6 +708,8 @@ describe("Huly Errors", () => {
               return `docmulti:${error.matchCount}`
             case "DocumentEmptyContentError":
               return `docempty:${error.identifier}`
+            case "DocumentContentCorruptedError":
+              return `doccorrupt:${error.identifier}:${error.causeMessage ?? ""}`
             case "DocumentEditModeError":
               return `doceditmode:${error.reason}`
             case "CommentNotFoundError":
@@ -871,6 +874,9 @@ describe("Huly Errors", () => {
         expect(matchError(new HulyError({ message: "oops" }))).toBe("generic")
         expect(matchError(new TeamspaceNotFoundError({ identifier: "ts-1" }))).toBe("teamspace:ts-1")
         expect(matchError(new DocumentNotFoundError({ identifier: "doc-1", teamspace: "eng" }))).toBe("document:doc-1")
+        expect(
+          matchError(new DocumentContentCorruptedError({ identifier: "doc-1", causeMessage: "missing markup blob" }))
+        ).toBe("doccorrupt:doc-1:missing markup blob")
         expect(matchError(new DocumentEditModeError({ reason: "bad mode" }))).toBe("doceditmode:bad mode")
         expect(
           matchError(new CommentNotFoundError({ commentId: "c-1", issueIdentifier: "H-1", project: "P" }))

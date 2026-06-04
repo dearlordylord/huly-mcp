@@ -2,13 +2,14 @@
 import { describe, it } from "@effect/vitest"
 import type { ThreadMessage as HulyThreadMessage } from "@hcengineering/chunter"
 import type { Person, SocialIdentity } from "@hcengineering/contact"
-import { type MarkupBlobRef, type PersonId, type Ref, toFindResult } from "@hcengineering/core"
+import { type Blob, type MarkupBlobRef, type PersonId, type Ref, toFindResult } from "@hcengineering/core"
 import type { Document as HulyDocument, Teamspace as HulyTeamspace } from "@hcengineering/document"
 import { Effect } from "effect"
 import { expect } from "vitest"
 
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
-import { chunter, contact, documentPlugin } from "../../../src/huly/huly-plugins.js"
+import { HulyConnectionError } from "../../../src/huly/errors.js"
+import { chunter, contact, core, documentPlugin } from "../../../src/huly/huly-plugins.js"
 import { listInlineComments } from "../../../src/huly/operations/documents-inline-comments.js"
 import { INLINE_COMMENT_MARK_TYPE } from "../../../src/huly/operations/inline-comment-mark.js"
 import { documentIdentifier, teamspaceIdentifier } from "../../helpers/brands.js"
@@ -31,11 +32,17 @@ const makeDocument = (overrides?: Partial<HulyDocument>): HulyDocument =>
     _class: documentPlugin.class.Document,
     space: TEAMSPACE_ID,
     title: "Spec",
-    content: "content-blob" as MarkupBlobRef,
+    content: "doc-1-content-1700000000000" as MarkupBlobRef,
     modifiedOn: 0,
     createdOn: 0,
     ...overrides
   }) as unknown as HulyDocument
+
+const makeBlob = (id: string): Blob =>
+  ({
+    _id: id as Ref<Blob>,
+    _class: core.class.Blob
+  }) as unknown as Blob
 
 const markupText = (text: string): string =>
   JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] })
@@ -62,7 +69,9 @@ const makeReply = (id: string, thread: string, createdBy: string | undefined, me
 interface InlineMock {
   teamspaces?: ReadonlyArray<HulyTeamspace>
   documents?: ReadonlyArray<HulyDocument>
+  blobs?: ReadonlyArray<Blob>
   markup?: string
+  fetchMarkupError?: HulyConnectionError
   replies?: ReadonlyArray<HulyThreadMessage>
   socialIdentities?: ReadonlyArray<SocialIdentity>
   persons?: ReadonlyArray<Person>
@@ -82,6 +91,9 @@ const buildLayer = (m: InlineMock) => {
         documents.find((d) => (d.space === q.space && d.title === q.title) || (d.space === q.space && d._id === q._id))
       )
     }
+    if (_class === core.class.Blob) {
+      return Effect.succeed((m.blobs ?? []).find((blob) => blob._id === q._id))
+    }
     return Effect.succeed(undefined)
   }) as HulyClientOperations["findOne"]
 
@@ -92,8 +104,10 @@ const buildLayer = (m: InlineMock) => {
     return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
 
-  const fetchMarkupImpl: HulyClientOperations["fetchMarkup"] =
-    (() => Effect.succeed(m.markup ?? "")) as HulyClientOperations["fetchMarkup"]
+  const fetchMarkupImpl: HulyClientOperations["fetchMarkup"] = (() =>
+    m.fetchMarkupError === undefined
+      ? Effect.succeed(m.markup ?? "")
+      : Effect.fail(m.fetchMarkupError)) as HulyClientOperations["fetchMarkup"]
 
   return HulyClient.testLayer({ findOne: findOneImpl, findAll: findAllImpl, fetchMarkup: fetchMarkupImpl })
 }
@@ -121,6 +135,45 @@ describe("listInlineComments", () => {
     Effect.gen(function*() {
       const result = yield* listInlineComments(PARAMS).pipe(
         Effect.provide(buildLayer({ documents: [makeDocument({ content: null })] }))
+      )
+      expect(result).toEqual({ comments: [], total: 0 })
+    }))
+
+  it.effect("preserves fetchMarkup failures as HulyConnectionError", () =>
+    Effect.gen(function*() {
+      const err = yield* Effect.flip(
+        listInlineComments(PARAMS).pipe(
+          Effect.provide(buildLayer({
+            documents: [makeDocument()],
+            fetchMarkupError: new HulyConnectionError({ message: "fetchMarkup failed: HTTP error 500" })
+          }))
+        )
+      )
+      expect(err).toBeInstanceOf(HulyConnectionError)
+      expect(err.message).toBe("fetchMarkup failed: HTTP error 500")
+    }))
+
+  it.effect("maps empty content from a missing blob to DocumentContentCorruptedError", () =>
+    Effect.gen(function*() {
+      const err = yield* Effect.flip(
+        listInlineComments(PARAMS).pipe(
+          Effect.provide(buildLayer({
+            documents: [makeDocument()],
+            markup: ""
+          }))
+        )
+      )
+      expect(err._tag).toBe("DocumentContentCorruptedError")
+    }))
+
+  it.effect("returns empty when readable stored content is empty", () =>
+    Effect.gen(function*() {
+      const result = yield* listInlineComments(PARAMS).pipe(
+        Effect.provide(buildLayer({
+          documents: [makeDocument()],
+          blobs: [makeBlob("doc-1-content-1700000000000")],
+          markup: ""
+        }))
       )
       expect(result).toEqual({ comments: [], total: 0 })
     }))

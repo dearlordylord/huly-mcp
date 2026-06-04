@@ -22,10 +22,10 @@ import type {
 } from "../../domain/schemas/documents.js"
 import type { PersonName } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
-import type { DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js"
+import type { DocumentContentCorruptedError, DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js"
 import { chunter } from "../huly-plugins.js"
 import { buildSocialIdToPersonNameMap } from "./channels.js"
-import { findTeamspaceAndDocument } from "./documents-shared.js"
+import { fetchReadableDocumentContent, findTeamspaceAndDocument } from "./documents-shared.js"
 import { isInlineCommentMark } from "./inline-comment-mark.js"
 import { traverseAllMarks } from "./markup-traversal.js"
 import { optionalMarkupToMarkdown } from "./markup.js"
@@ -65,6 +65,7 @@ type ListInlineCommentsError =
   | HulyClientError
   | TeamspaceNotFoundError
   | DocumentNotFoundError
+  | DocumentContentCorruptedError
 
 export const listInlineComments = (
   params: ListInlineCommentsParams
@@ -76,17 +77,16 @@ export const listInlineComments = (
     })
     const markupUrlConfig = client.markupUrlConfig
 
-    if (!doc.content) {
+    const rawMarkup = yield* fetchReadableDocumentContent({
+      client,
+      doc,
+      format: "markup",
+      identifier: params.document
+    })
+
+    if (rawMarkup === undefined) {
       return { comments: [], total: 0 }
     }
-
-    const rawMarkup: string = yield* client.fetchMarkup(
-      doc._class,
-      doc._id,
-      "content",
-      doc.content,
-      "markup"
-    )
 
     const root = markupToJSON(rawMarkup)
     const extracted = extractInlineComments(root)

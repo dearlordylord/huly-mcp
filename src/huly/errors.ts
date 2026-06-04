@@ -31,6 +31,7 @@ import {
 } from "./errors-contacts.js"
 import { CustomFieldNotFoundError, CustomFieldObjectNotFoundError } from "./errors-custom-fields.js"
 import {
+  DocumentContentCorruptedError,
   DocumentEditModeError,
   DocumentEmptyContentError,
   DocumentNotFoundError,
@@ -134,6 +135,7 @@ export {
   CustomFieldObjectNotFoundError,
   DirectMessageIdentifierAmbiguousError,
   DirectMessageNotFoundError,
+  DocumentContentCorruptedError,
   DocumentEditModeError,
   DocumentEmptyContentError,
   DocumentNotFoundError,
@@ -233,6 +235,7 @@ export const HulyDomainError: Schema.Union<
     typeof DocumentTextNotFoundError,
     typeof DocumentTextMultipleMatchesError,
     typeof DocumentEmptyContentError,
+    typeof DocumentContentCorruptedError,
     typeof DocumentEditModeError,
     typeof CommentNotFoundError,
     typeof MilestoneNotFoundError,
@@ -322,6 +325,7 @@ export const HulyDomainError: Schema.Union<
   DocumentTextNotFoundError,
   DocumentTextMultipleMatchesError,
   DocumentEmptyContentError,
+  DocumentContentCorruptedError,
   DocumentEditModeError,
   CommentNotFoundError,
   MilestoneNotFoundError,

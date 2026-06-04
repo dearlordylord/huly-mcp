@@ -441,6 +441,21 @@ assert_json_field_equals() {
   return 1
 }
 
+assert_json_field_contains() {
+  local name="$1" json="$2" jq_expr="$3" expected="$4"
+  local value
+  value=$(printf '%s\n' "$json" | jq -r "$jq_expr // empty" 2>/dev/null)
+  if printf '%s\n' "$value" | grep -qF -- "$expected"; then
+    echo "PASS: $name"
+    PASSED=$((PASSED + 1))
+    return 0
+  fi
+  echo "FAIL: $name (field $jq_expr missing substring: $expected)"
+  FAILED=$((FAILED + 1))
+  ERRORS="${ERRORS}\n  - ${name}: field ${jq_expr} missing substring"
+  return 1
+}
+
 assert_json_issue_summary_contains_issue_id() {
   local name="$1" json="$2" identifier="$3" issue_id="$4"
   if printf '%s\n' "$json" | jq -e --arg identifier "$identifier" --arg issue_id "$issue_id" \
@@ -524,6 +539,33 @@ run_expect_error() {
   return 1
 }
 
+run_expect_error_contains() {
+  local name="$1"
+  local payload="$2"
+  local expected="$3"
+  local result
+  result=$(call_tool "$payload")
+  if [ -z "$result" ]; then
+    echo "FAIL: $name (no response, expected error)"
+    FAILED=$((FAILED + 1))
+    ERRORS="${ERRORS}\n  - ${name}: no response (expected error)"
+    return 1
+  fi
+  local is_error
+  is_error=$(echo "$result" | jq -r '.result.isError // false' 2>/dev/null)
+  local err_text
+  err_text=$(echo "$result" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+  if [ "$is_error" = "true" ] && printf '%s\n' "$err_text" | grep -qF -- "$expected"; then
+    echo "PASS: $name (got expected error)"
+    PASSED=$((PASSED + 1))
+    return 0
+  fi
+  echo "FAIL: $name (expected error containing: $expected)"
+  FAILED=$((FAILED + 1))
+  ERRORS="${ERRORS}\n  - ${name}: expected error containing ${expected}"
+  return 1
+}
+
 # Fetch doc content, assert substring present. Args: test_name teamspace doc_id substring
 assert_contains() {
   local name="$1" ts="$2" doc="$3" substr="$4"
@@ -536,7 +578,7 @@ assert_contains() {
     ERRORS="${ERRORS}\n  - ${name}: could not fetch doc"
     return 1
   fi
-  if printf '%s\n' "$text" | grep -qF "$substr"; then
+  if printf '%s\n' "$text" | grep -qF -- "$substr"; then
     echo "PASS: $name"
     PASSED=$((PASSED + 1))
     return 0
@@ -559,7 +601,7 @@ assert_not_contains() {
     ERRORS="${ERRORS}\n  - ${name}: could not fetch doc"
     return 1
   fi
-  if printf '%s\n' "$text" | grep -qF "$substr"; then
+  if printf '%s\n' "$text" | grep -qF -- "$substr"; then
     echo "FAIL: $name (substring should be absent: $substr)"
     FAILED=$((FAILED + 1))
     ERRORS="${ERRORS}\n  - ${name}: substring should be absent"
@@ -1061,8 +1103,16 @@ if [ -n "$TS_NAME" ]; then
   run_test "list_documents($TS_NAME)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_documents\",\"arguments\":{\"teamspace\":\"$TS_NAME\"}},\"id\":2}"
 
+  DOC_CONTENT=$'# Integration Markdown\n\nThis has **bold**, *italic*, and [Huly](https://huly.io).\n\n- First item\n- Second item'
+  DOC_CONTENT_JSON=$(json_string "$DOC_CONTENT")
+  DOC_EDITED_CONTENT=$'# Edited Integration Markdown\n\nThe full replacement path repaired this document.\n\n- Repaired item'
+  DOC_EDITED_CONTENT_JSON=$(json_string "$DOC_EDITED_CONTENT")
+  DOC_REPAIR_CONTENT=$'# Repaired After Corruption\n\nFull replacement restored readable content.'
+  DOC_REPAIR_CONTENT_JSON=$(json_string "$DOC_REPAIR_CONTENT")
+  DOC_CORRUPT_CONTENT='raw-markdown-that-is-not-a-blob-ref'
+
   DOC_TEXT=$(run_capture "create_document" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"title\":\"IntTest Doc\",\"content\":\"# Test\"}},\"id\":2}")
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"title\":\"IntTest Doc\",\"content\":$DOC_CONTENT_JSON}},\"id\":2}")
   if [ $? -eq 0 ]; then
     DOC_ID=$(echo "$DOC_TEXT" | jq -r '.id' 2>/dev/null)
     echo "  => doc: $DOC_ID"
@@ -1072,12 +1122,56 @@ if [ -n "$TS_NAME" ]; then
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\"}},\"id\":2}")
     if [ $? -eq 0 ]; then
       assert_json_field_nonempty "get_document($DOC_ID) returns url" "$GET_DOC_TEXT" '.url'
+      assert_json_field_contains "get_document($DOC_ID) round-trips heading" "$GET_DOC_TEXT" '.content' "# Integration Markdown"
+      assert_json_field_contains "get_document($DOC_ID) round-trips bold" "$GET_DOC_TEXT" '.content' "**bold**"
+      assert_json_field_contains "get_document($DOC_ID) round-trips italic" "$GET_DOC_TEXT" '.content' "*italic*"
+      assert_json_field_contains "get_document($DOC_ID) round-trips link" "$GET_DOC_TEXT" '.content' "[Huly](https://huly.io)"
+      assert_json_field_contains "get_document($DOC_ID) round-trips list" "$GET_DOC_TEXT" '.content' "- First item"
     fi
 
     EDIT_DOC_TEXT=$(run_capture "edit_document($DOC_ID) title rename" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"edit_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\",\"title\":\"Updated Doc\"}},\"id\":2}")
     if [ $? -eq 0 ]; then
       assert_json_field_nonempty "edit_document($DOC_ID) returns url" "$EDIT_DOC_TEXT" '.url'
+    fi
+
+    run_test "edit_document($DOC_ID) full replace" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"edit_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\",\"content\":$DOC_EDITED_CONTENT_JSON}},\"id\":2}"
+    GET_EDITED_DOC_TEXT=$(run_capture "get_document($DOC_ID) after full replace" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\"}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_field_contains "get_document($DOC_ID) returns full replacement" "$GET_EDITED_DOC_TEXT" '.content' "# Edited Integration Markdown"
+      assert_json_field_contains "get_document($DOC_ID) replacement list" "$GET_EDITED_DOC_TEXT" '.content' "- Repaired item"
+    fi
+
+    CORRUPT_DOC_ID=""
+    CORRUPT_DOC_TEXT=$(run_capture "create_document(raw corruption fixture)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"title\":\"IntTest Raw Corruption Fixture\"}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      CORRUPT_DOC_ID=$(echo "$CORRUPT_DOC_TEXT" | jq -r '.id' 2>/dev/null)
+      echo "  => corrupt_doc: $CORRUPT_DOC_ID"
+    fi
+
+    if [ -n "${CORRUPT_DOC_ID:-}" ] && pnpm exec tsx scripts/corrupt-document-content.ts --document "$CORRUPT_DOC_ID" --content "$DOC_CORRUPT_CONTENT" >/dev/null; then
+      sleep 2
+      run_expect_error_contains "get_document($CORRUPT_DOC_ID) corrupted content error" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$CORRUPT_DOC_ID\"}},\"id\":2}" \
+        "Document content is unreadable or corrupted. Use edit_document with the full content field to replace and repair it."
+      run_test "edit_document($CORRUPT_DOC_ID) repairs corrupted content" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"edit_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$CORRUPT_DOC_ID\",\"content\":$DOC_REPAIR_CONTENT_JSON}},\"id\":2}"
+      GET_REPAIRED_DOC_TEXT=$(run_capture "get_document($CORRUPT_DOC_ID) after repair" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$CORRUPT_DOC_ID\"}},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        assert_json_field_contains "get_document($CORRUPT_DOC_ID) repaired content" "$GET_REPAIRED_DOC_TEXT" '.content' "# Repaired After Corruption"
+      fi
+      run_test "delete_document($CORRUPT_DOC_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$CORRUPT_DOC_ID\"}},\"id\":2}"
+    else
+      fail_test "corrupt_document_content(${CORRUPT_DOC_ID:-missing})" "SDK helper failed"
+      if [ -n "${CORRUPT_DOC_ID:-}" ]; then
+        run_test "delete_document($CORRUPT_DOC_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$CORRUPT_DOC_ID\"}},\"id\":2}"
+      fi
     fi
 
     LIST_DOCS_TEXT=$(run_capture_only \
