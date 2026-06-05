@@ -96,9 +96,10 @@ describe("markdownToMarkupString", () => {
       const root = markupToJSON(rendered.markup)
       const paragraph = root.content?.[0]
       const content = paragraph?.content ?? []
+      const reference = content.find((node) => node.type === MarkupNodeType.reference)
 
       expect(rendered.malformedReferences).toEqual([])
-      expect(content.find((node) => node.type === MarkupNodeType.reference)).toMatchObject({
+      expect(reference).toMatchObject({
         type: MarkupNodeType.reference,
         attrs: {
           id: "doc-1",
@@ -106,6 +107,7 @@ describe("markdownToMarkupString", () => {
           label: "Test Document"
         }
       })
+      expect(reference?.content).toBeUndefined()
     }))
 
   it.effect("converts supported Huly browse URL classes without caller-side reference schemas", () =>
@@ -121,6 +123,7 @@ describe("markdownToMarkupString", () => {
       const references = root.content?.[0]?.content?.filter((node) => node.type === MarkupNodeType.reference) ?? []
 
       expect(rendered.malformedReferences).toEqual([])
+      expect(references.every((node) => node.content === undefined)).toBe(true)
       expect(references.map((node) => node.attrs)).toEqual([
         {
           id: "project-1",

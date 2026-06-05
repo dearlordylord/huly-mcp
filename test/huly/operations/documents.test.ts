@@ -817,6 +817,7 @@ describe("createDocument", () => {
             label: "HULY-1 First Issue"
           }
         })
+        expect(Object.hasOwn(reference ?? {}, "content")).toBe(false)
       }))
 
     it.effect("fails malformed native Huly browse links before creating document", () =>
@@ -1168,6 +1169,7 @@ describe("editDocument", () => {
             label: "HULY-1 First Issue"
           }
         })
+        expect(Object.hasOwn(reference ?? {}, "content")).toBe(false)
       }))
 
     it.effect("fails malformed native Huly browse links before editing document content", () =>

@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.21.1
+
+### Patch Changes
+
+- Write native Huly document references as editor-compatible leaf nodes so the Huly UI renders and preserves them.
+
 ## 0.21.0
 
 ### Minor Changes

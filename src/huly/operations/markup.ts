@@ -248,12 +248,7 @@ const referenceNodeFromTextNode = (
     id: reference.id,
     objectclass: reference.objectClass,
     label: reference.label
-  },
-  content: [{
-    type: MarkupNodeType.text,
-    text: typeof node.text === "string" && node.text !== "" ? node.text : reference.label,
-    marks: []
-  }]
+  }
 })
 
 const transformNativeReferenceLinks = (node: MarkupNode, urls: MarkupUrlConfig): NativeLinkTransformResult => {
