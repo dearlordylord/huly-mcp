@@ -45,10 +45,16 @@ import { HulyClient, type HulyClientError } from "../client.js"
 import {
   type DocumentContentCorruptedError,
   DocumentNotFoundError,
+  type DocumentReferenceError,
+  type IssueNotFoundError,
   type NoUpdateFieldsError,
+  type PersonIdentifierAmbiguousError,
+  type PersonNotFoundError,
+  type ProjectNotFoundError,
   type TeamspaceNotFoundError
 } from "../errors.js"
 import { buildDocumentUrlFromConfig } from "../url-builders.js"
+import { renderDocumentContentForWrite } from "./document-native-references.js"
 import { fetchReadableDocumentContent, findTeamspace, findTeamspaceAndDocument } from "./documents-shared.js"
 import {
   clampLimit,
@@ -96,6 +102,11 @@ type CreateDocumentError =
   | HulyClientError
   | TeamspaceNotFoundError
   | DocumentNotFoundError
+  | DocumentReferenceError
+  | ProjectNotFoundError
+  | IssueNotFoundError
+  | PersonIdentifierAmbiguousError
+  | PersonNotFoundError
 
 type DeleteDocumentError =
   | HulyClientError
@@ -350,7 +361,6 @@ export const getDocument = (
       format: "markdown",
       identifier: params.document
     })
-
     const result: Document = {
       id: DocumentId.make(doc._id),
       title: doc.title,
@@ -412,14 +422,18 @@ export const createDocument = (
     )
     const rank = makeRank(lastDoc?.rank, undefined)
 
-    const contentMarkupRef: MarkupBlobRef | null = params.content !== undefined && params.content.trim() !== ""
-      ? yield* client.uploadMarkup(
-        documentPlugin.class.Document,
-        documentId,
-        "content",
-        params.content,
-        "markdown"
-      )
+    const content = params.content
+    const contentMarkupRef: MarkupBlobRef | null = content !== undefined && content.trim() !== ""
+      ? yield* Effect.gen(function*() {
+        const renderedContent = yield* renderDocumentContentForWrite(content)
+        return yield* client.uploadMarkup(
+          documentPlugin.class.Document,
+          documentId,
+          "content",
+          renderedContent.markup,
+          renderedContent.format
+        )
+      })
       : null
 
     const documentData: Data<HulyDocument> = {

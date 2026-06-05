@@ -1,4 +1,5 @@
 import { describe, it } from "@effect/vitest"
+import type { Person as HulyPerson } from "@hcengineering/contact"
 import {
   type Blob,
   type Doc,
@@ -9,8 +10,10 @@ import {
   toFindResult
 } from "@hcengineering/core"
 import type { Document as HulyDocument, Teamspace as HulyTeamspace } from "@hcengineering/document"
-import { Effect } from "effect"
+import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
+import { Effect, Schema } from "effect"
 import { expect } from "vitest"
+
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import {
   type DocumentContentCorruptedError,
@@ -35,9 +38,20 @@ import {
 } from "../../../src/huly/operations/documents.js"
 import { documentIdentifier, teamspaceIdentifier } from "../../helpers/brands.js"
 
-import { core, documentPlugin } from "../../../src/huly/huly-plugins.js"
+import { contact, core, documentPlugin, tracker } from "../../../src/huly/huly-plugins.js"
 
 // --- Mock Data Builders ---
+
+const CapturedMarkupChildNodeSchema = Schema.Struct({
+  type: Schema.optional(Schema.String),
+  attrs: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown }))
+})
+
+const CapturedMarkupTreeSchema = Schema.Struct({
+  content: Schema.optional(Schema.Array(Schema.Struct({
+    content: Schema.optional(Schema.Array(CapturedMarkupChildNodeSchema))
+  })))
+})
 
 // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- mock builder
 const makeTeamspace = (overrides?: Partial<HulyTeamspace>): HulyTeamspace => ({
@@ -95,13 +109,16 @@ interface MockConfig {
   teamspaces?: Array<HulyTeamspace>
   documents?: Array<HulyDocument>
   blobs?: Array<Blob>
-  markupContent?: Record<string, string>
+  projects?: Array<HulyProject>
+  issues?: Array<HulyIssue>
+  persons?: Array<HulyPerson>
+  markupContent?: Record<string, string | undefined>
   fetchMarkupError?: HulyConnectionError
   captureDocumentQuery?: { query?: Record<string, unknown>; options?: Record<string, unknown> }
   captureCreateDoc?: { attributes?: Record<string, unknown>; id?: string }
   captureUpdateDoc?: { operations?: Record<string, unknown> }
-  captureUploadMarkup?: { markup?: string }
-  captureUpdateMarkup?: { markup?: string }
+  captureUploadMarkup?: { markup?: string; format?: string }
+  captureUpdateMarkup?: { markup?: string; format?: string }
   captureRemoveDoc?: { id?: string }
 }
 
@@ -109,6 +126,9 @@ const createTestLayerWithMocks = (config: MockConfig) => {
   const teamspaces = config.teamspaces ?? []
   const documents = config.documents ?? []
   const blobs = config.blobs ?? []
+  const projects = config.projects ?? []
+  const issues = config.issues ?? []
+  const persons = config.persons ?? []
 
   const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown, options: unknown) => {
     if (_class === documentPlugin.class.Teamspace) {
@@ -126,6 +146,12 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       }
       const q = query as Record<string, unknown>
       let filtered = documents.filter(d => d.space === q.space)
+      if (typeof q.title === "string") {
+        filtered = filtered.filter(d => d.title === q.title)
+      }
+      if (typeof q._id === "string") {
+        filtered = filtered.filter(d => d._id === q._id)
+      }
       // Apply sorting if specified
       const opts = options as { sort?: Record<string, number> } | undefined
       if (opts?.sort?.modifiedOn !== undefined) {
@@ -136,6 +162,11 @@ const createTestLayerWithMocks = (config: MockConfig) => {
         const direction = opts.sort.rank
         filtered = filtered.sort((a, b) => direction * a.rank.localeCompare(b.rank))
       }
+      return Effect.succeed(toFindResult(filtered as Array<Doc>))
+    }
+    if (_class === contact.class.Person) {
+      const q = query as Record<string, unknown>
+      const filtered = persons.filter(person => q.name === undefined || person.name === q.name)
       return Effect.succeed(toFindResult(filtered as Array<Doc>))
     }
     return Effect.succeed(toFindResult([]))
@@ -167,16 +198,45 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       const found = blobs.find(blob => blob._id === q._id)
       return Effect.succeed(found)
     }
+    if (_class === tracker.class.Project) {
+      const q = query as Record<string, unknown>
+      const found = projects.find(project => project.identifier === q.identifier || project._id === q._id)
+      return Effect.succeed(found)
+    }
+    if (_class === tracker.class.Issue) {
+      const q = query as Record<string, unknown>
+      const found = issues.find(issue =>
+        (q.space === undefined || issue.space === q.space)
+        && (
+          issue.identifier === q.identifier
+          || issue._id === q._id
+          || issue.number === q.number
+        )
+      )
+      return Effect.succeed(found)
+    }
+    if (_class === contact.class.Person) {
+      const q = query as Record<string, unknown>
+      const found = persons.find(person =>
+        person.name === q.name
+        || person._id === q._id
+      )
+      return Effect.succeed(found)
+    }
     return Effect.succeed(undefined)
   }) as HulyClientOperations["findOne"]
 
   const markupContent = config.markupContent ?? {}
   const fetchMarkupImpl: HulyClientOperations["fetchMarkup"] = (
-    (_objectClass: unknown, _objectId: unknown, _objectAttr: unknown, id: unknown) => {
+    (_objectClass: unknown, _objectId: unknown, _objectAttr: unknown, id: unknown, format: unknown) => {
       if (config.fetchMarkupError !== undefined) {
         return Effect.fail(config.fetchMarkupError)
       }
-      const content = markupContent[id as string] ?? ""
+      const idString = id as string
+      const formatString = typeof format === "string" ? format : ""
+      const content = markupContent[`${idString}:${formatString}`]
+        ?? (formatString === "markup" ? JSON.stringify({ type: "doc", content: [] }) : markupContent[idString])
+        ?? ""
       return Effect.succeed(content)
     }
   ) as HulyClientOperations["fetchMarkup"]
@@ -208,10 +268,12 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     _objectClass: unknown,
     _objectId: unknown,
     _objectAttr: unknown,
-    markup: unknown
+    markup: unknown,
+    format: unknown
   ) => {
     if (config.captureUploadMarkup) {
       config.captureUploadMarkup.markup = markup as string
+      config.captureUploadMarkup.format = format as string
     }
     return Effect.succeed("markup-ref-123")
   }) as unknown as HulyClientOperations["uploadMarkup"]
@@ -221,10 +283,12 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     _objectClass: unknown,
     _objectId: unknown,
     _objectAttr: unknown,
-    markup: unknown
+    markup: unknown,
+    format: unknown
   ) => {
     if (config.captureUpdateMarkup) {
       config.captureUpdateMarkup.markup = markup as string
+      config.captureUpdateMarkup.format = format as string
     }
     return Effect.succeed(undefined)
   }) as unknown as HulyClientOperations["updateMarkup"]
@@ -249,6 +313,13 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     uploadMarkup: uploadMarkupImpl,
     updateMarkup: updateMarkupImpl,
     removeDoc: removeDocImpl
+  })
+}
+
+const expectMarkupParagraphText = (markup: string | undefined, text: string): void => {
+  expect(JSON.parse(markup ?? "{}")).toMatchObject({
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text }] }]
   })
 }
 
@@ -445,6 +516,7 @@ describe("getDocument", () => {
         expect(result.content).toBe("# Hello World")
         expect(result.teamspace).toBe("My Docs")
       }))
+
     it.effect("finds document by ID", () =>
       Effect.gen(function*() {
         const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -702,11 +774,82 @@ describe("createDocument", () => {
 
         expect(result.title).toBe("Doc with Content")
         expect(result.id).toBeDefined()
-        expect(captureUploadMarkup.markup).toBe("# Heading\n\nSome content here.")
+        expect(captureUploadMarkup.format).toBe("markup")
+        expect(JSON.parse(captureUploadMarkup.markup ?? "{}")).toMatchObject({
+          type: "doc",
+          content: [
+            { type: "heading", content: [{ type: "text", text: "Heading" }] },
+            { type: "paragraph", content: [{ type: "text", text: "Some content here." }] }
+          ]
+        })
         expect(captureCreateDoc.attributes?.title).toBe("Doc with Content")
         expect(captureCreateDoc.attributes?.content).toBe("markup-ref-123")
         expect(captureCreateDoc.attributes?.content).not.toBe("# Heading\n\nSome content here.")
       }))
+
+    it.effect("creates document content with canonical Huly native reference URLs", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          captureUploadMarkup
+        })
+
+        yield* createDocument({
+          teamspace: teamspaceIdentifier("My Docs"),
+          title: "Doc with Native Ref",
+          content:
+            "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1%20First%20Issue) and [plain](https://example.com)."
+        }).pipe(Effect.provide(testLayer))
+
+        expect(captureUploadMarkup.format).toBe("markup")
+        const parsedMarkup = Schema.decodeUnknownSync(CapturedMarkupTreeSchema)(
+          JSON.parse(captureUploadMarkup.markup ?? "{}")
+        )
+        const reference = (parsedMarkup.content?.[0]?.content ?? []).find((node) => node.type === "reference")
+        expect(reference).toMatchObject({
+          type: "reference",
+          attrs: {
+            id: "issue-1",
+            objectclass: "tracker:class:Issue",
+            label: "HULY-1 First Issue"
+          }
+        })
+      }))
+
+    it.effect("fails malformed native Huly browse links before creating document", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
+        const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: [],
+          captureCreateDoc,
+          captureUploadMarkup
+        })
+
+        const error = yield* Effect.flip(
+          createDocument({
+            teamspace: teamspaceIdentifier("My Docs"),
+            title: "Broken Reference",
+            content: "[bad](https://test.invalid/browse?workspace=test&_id=doc-1)"
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("DocumentReferenceError")
+        if (error._tag === "DocumentReferenceError") {
+          expect(error.reason).toBe(
+            "malformed Huly native reference links in content: 'reference missing objectclass, label'"
+          )
+        }
+        expect(captureUploadMarkup.markup).toBeUndefined()
+        expect(captureCreateDoc.attributes).toBeUndefined()
+      }))
+
     it.effect("calculates rank for new document", () =>
       Effect.gen(function*() {
         const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
@@ -920,7 +1063,11 @@ describe("editDocument", () => {
           content: "# Updated Content"
         }).pipe(Effect.provide(testLayer))
 
-        expect(captureUploadMarkup.markup).toBe("# Updated Content")
+        expect(captureUploadMarkup.format).toBe("markup")
+        expect(JSON.parse(captureUploadMarkup.markup ?? "{}")).toMatchObject({
+          type: "doc",
+          content: [{ type: "heading", content: [{ type: "text", text: "Updated Content" }] }]
+        })
         expect(captureUpdateDoc.operations?.content).toBe("markup-ref-123")
       }))
 
@@ -975,9 +1122,86 @@ describe("editDocument", () => {
           content: "# Updated Content"
         }).pipe(Effect.provide(testLayer))
 
-        expect(captureUpdateMarkup.markup).toBe("# Updated Content")
+        expect(captureUpdateMarkup.format).toBe("markup")
+        expect(JSON.parse(captureUpdateMarkup.markup ?? "{}")).toMatchObject({
+          type: "doc",
+          content: [{ type: "heading", content: [{ type: "text", text: "Updated Content" }] }]
+        })
         expect(captureUpdateDoc.operations?.content).toBeUndefined()
         expect(captureUpdateDoc.operations).toBeUndefined()
+      }))
+
+    it.effect("updates existing document content with canonical Huly native reference URLs", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const doc = makeDocument({
+          _id: "doc-1" as Ref<HulyDocument>,
+          title: "Test Doc",
+          space: "ts-1" as Ref<HulyTeamspace>,
+          content: "doc-1-content-1700000000000" as MarkupBlobRef
+        })
+        const captureUpdateMarkup: MockConfig["captureUpdateMarkup"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: [doc],
+          captureUpdateMarkup
+        })
+
+        yield* editDocument({
+          teamspace: teamspaceIdentifier("My Docs"),
+          document: documentIdentifier("Test Doc"),
+          content:
+            "Updated [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1%20First%20Issue)"
+        }).pipe(Effect.provide(testLayer))
+
+        expect(captureUpdateMarkup.format).toBe("markup")
+        const parsedMarkup = Schema.decodeUnknownSync(CapturedMarkupTreeSchema)(
+          JSON.parse(captureUpdateMarkup.markup ?? "{}")
+        )
+        const reference = (parsedMarkup.content?.[0]?.content ?? []).find((node) => node.type === "reference")
+        expect(reference).toMatchObject({
+          type: "reference",
+          attrs: {
+            id: "issue-1",
+            objectclass: "tracker:class:Issue",
+            label: "HULY-1 First Issue"
+          }
+        })
+      }))
+
+    it.effect("fails malformed native Huly browse links before editing document content", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const doc = makeDocument({
+          _id: "doc-1" as Ref<HulyDocument>,
+          title: "Test Doc",
+          space: "ts-1" as Ref<HulyTeamspace>,
+          content: "doc-1-content-1700000000000" as MarkupBlobRef
+        })
+        const captureUpdateMarkup: MockConfig["captureUpdateMarkup"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: [doc],
+          captureUpdateMarkup
+        })
+
+        const error = yield* Effect.flip(
+          editDocument({
+            teamspace: teamspaceIdentifier("My Docs"),
+            document: documentIdentifier("Test Doc"),
+            content: "[bad](https://test.invalid/browse?workspace=test&_id=doc-1)"
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("DocumentReferenceError")
+        if (error._tag === "DocumentReferenceError") {
+          expect(error.reason).toBe(
+            "malformed Huly native reference links in content: 'reference missing objectclass, label'"
+          )
+        }
+        expect(captureUpdateMarkup.markup).toBeUndefined()
       }))
 
     it.effect("full replace repairs raw-corrupted document content through updateMarkup", () =>
@@ -1005,7 +1229,11 @@ describe("editDocument", () => {
           content: "# Repaired"
         }).pipe(Effect.provide(testLayer))
 
-        expect(captureUpdateMarkup.markup).toBe("# Repaired")
+        expect(captureUpdateMarkup.format).toBe("markup")
+        expect(JSON.parse(captureUpdateMarkup.markup ?? "{}")).toMatchObject({
+          type: "doc",
+          content: [{ type: "heading", content: [{ type: "text", text: "Repaired" }] }]
+        })
         expect(captureUpdateDoc.operations?.content).toBeUndefined()
         expect(captureUpdateDoc.operations).toBeUndefined()
       }))
@@ -1181,7 +1409,11 @@ describe("editDocument", () => {
 
         expect(result.id).toBe("doc-1")
         expect(result.updated).toBe(true)
-        expect(captureUploadMarkup.markup).toBe("New Content")
+        expect(captureUploadMarkup.format).toBe("markup")
+        expect(JSON.parse(captureUploadMarkup.markup ?? "{}")).toMatchObject({
+          type: "doc",
+          content: [{ type: "paragraph", content: [{ type: "text", text: "New Content" }] }]
+        })
         expect(captureUpdateDoc.operations?.title).toBe("New Title")
         expect(captureUpdateDoc.operations?.content).toBeDefined()
       }))
@@ -1214,7 +1446,8 @@ describe("editDocument", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(result.updated).toBe(true)
-        expect(captureUpdateMarkup.markup).toBe("Hello universe, this is a test.")
+        expect(captureUpdateMarkup.format).toBe("markup")
+        expectMarkupParagraphText(captureUpdateMarkup.markup, "Hello universe, this is a test.")
       }))
 
     it.effect("deletes text when new_text is empty", () =>
@@ -1243,7 +1476,8 @@ describe("editDocument", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(result.updated).toBe(true)
-        expect(captureUpdateMarkup.markup).toBe("Remove please.")
+        expect(captureUpdateMarkup.format).toBe("markup")
+        expectMarkupParagraphText(captureUpdateMarkup.markup, "Remove please.")
       }))
 
     it.effect("replaces all occurrences when replace_all is true", () =>
@@ -1273,7 +1507,8 @@ describe("editDocument", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(result.updated).toBe(true)
-        expect(captureUpdateMarkup.markup).toBe("qux bar qux baz qux")
+        expect(captureUpdateMarkup.format).toBe("markup")
+        expectMarkupParagraphText(captureUpdateMarkup.markup, "qux bar qux baz qux")
       }))
 
     it.effect("combines title rename with search-and-replace", () =>
@@ -1306,7 +1541,45 @@ describe("editDocument", () => {
 
         expect(result.updated).toBe(true)
         expect(captureUpdateDoc.operations?.title).toBe("New Title")
-        expect(captureUpdateMarkup.markup).toBe("Some text here.")
+        expect(captureUpdateMarkup.format).toBe("markup")
+        expectMarkupParagraphText(captureUpdateMarkup.markup, "Some text here.")
+      }))
+
+    it.effect("preserves existing native references during targeted edits", () =>
+      Effect.gen(function*() {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const doc = makeDocument({
+          _id: "doc-1" as Ref<HulyDocument>,
+          title: "Test Doc",
+          space: "ts-1" as Ref<HulyTeamspace>,
+          content: "doc-1-content-1700000000000" as MarkupBlobRef
+        })
+        const captureUpdateMarkup: MockConfig["captureUpdateMarkup"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          teamspaces: [teamspace],
+          documents: [doc],
+          markupContent: {
+            "doc-1-content-1700000000000":
+              "Before [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1%20First%20Issue) after."
+          },
+          captureUpdateMarkup
+        })
+
+        const result = yield* editDocument({
+          teamspace: teamspaceIdentifier("My Docs"),
+          document: documentIdentifier("Test Doc"),
+          old_text: "Before",
+          new_text: "After"
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result.updated).toBe(true)
+        expect(captureUpdateMarkup.format).toBe("markup")
+        const updatedMarkup = JSON.stringify(JSON.parse(captureUpdateMarkup.markup ?? "{}"))
+        expect(updatedMarkup).toContain(`"type":"reference"`)
+        expect(updatedMarkup).toContain(`"id":"issue-1"`)
+        expect(updatedMarkup).toContain(`"objectclass":"tracker:class:Issue"`)
+        expect(updatedMarkup).toContain(`"label":"HULY-1 First Issue"`)
       }))
   })
 

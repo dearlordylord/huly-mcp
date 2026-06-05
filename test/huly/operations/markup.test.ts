@@ -6,6 +6,7 @@ import { expect } from "vitest"
 import { INLINE_COMMENT_MARK_TYPE } from "../../../src/huly/operations/inline-comment-mark.js"
 import {
   markdownToMarkupString,
+  markdownToMarkupStringWithHulyLinks,
   markupToMarkdownString,
   optionalMarkupToMarkdown,
   sanitizeNodeForMarkdown,
@@ -84,6 +85,118 @@ describe("markdownToMarkupString", () => {
             "https://test.invalid/browse?workspace=test&_class=document%3Aclass%3ADocument&_id=doc-1&label=Test%20Document"
         }
       })
+    }))
+
+  it.effect("converts matching Huly browse URLs to native reference nodes when using real Huly links", () =>
+    Effect.gen(function*() {
+      const markdown =
+        "I meant [Test Document](https://test.invalid/browse?workspace=test&_class=document%3Aclass%3ADocument&_id=doc-1&label=Test%20Document) like this"
+
+      const rendered = markdownToMarkupStringWithHulyLinks(markdown, testMarkupUrlConfig)
+      const root = markupToJSON(rendered.markup)
+      const paragraph = root.content?.[0]
+      const content = paragraph?.content ?? []
+
+      expect(rendered.malformedReferences).toEqual([])
+      expect(content.find((node) => node.type === MarkupNodeType.reference)).toMatchObject({
+        type: MarkupNodeType.reference,
+        attrs: {
+          id: "doc-1",
+          objectclass: "document:class:Document",
+          label: "Test Document"
+        }
+      })
+    }))
+
+  it.effect("converts supported Huly browse URL classes without caller-side reference schemas", () =>
+    Effect.gen(function*() {
+      const markdown = [
+        "[HULY](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AProject&_id=project-1&label=HULY)",
+        "[Alice](https://test.invalid/browse?workspace=test&_class=contact%3Aclass%3APerson&_id=person-1&label=Alice)",
+        "[GAME-4](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=GAME-4)"
+      ].join(" ")
+
+      const rendered = markdownToMarkupStringWithHulyLinks(markdown, testMarkupUrlConfig)
+      const root = markupToJSON(rendered.markup)
+      const references = root.content?.[0]?.content?.filter((node) => node.type === MarkupNodeType.reference) ?? []
+
+      expect(rendered.malformedReferences).toEqual([])
+      expect(references.map((node) => node.attrs)).toEqual([
+        {
+          id: "project-1",
+          objectclass: "tracker:class:Project",
+          label: "HULY"
+        },
+        {
+          id: "person-1",
+          objectclass: "contact:class:Person",
+          label: "Alice"
+        },
+        {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "GAME-4"
+        }
+      ])
+    }))
+
+  it.effect("keeps native-looking browse URLs for other workspaces as plain links", () =>
+    Effect.gen(function*() {
+      const markdown =
+        "[GAME-4](https://test.invalid/browse?workspace=test-workspace&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=GAME-4)"
+
+      const rendered = markdownToMarkupStringWithHulyLinks(markdown, testMarkupUrlConfig)
+      const root = markupToJSON(rendered.markup)
+      const content = root.content?.[0]?.content ?? []
+
+      expect(rendered.malformedReferences).toEqual([])
+      expect(content.some((node) => node.type === MarkupNodeType.reference)).toBe(false)
+      expect(content.find((node) => node.type === MarkupNodeType.text && node.text === "GAME-4")?.marks)
+        .toContainEqual({
+          type: MarkupMarkType.link,
+          attrs: {
+            href:
+              "https://test.invalid/browse?workspace=test-workspace&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=GAME-4"
+          }
+        })
+    }))
+
+  it.effect("keeps Huly browse URLs without native reference fields as plain links", () =>
+    Effect.gen(function*() {
+      const markdown = "[Browse](https://test.invalid/browse?workspace=test)"
+
+      const rendered = markdownToMarkupStringWithHulyLinks(markdown, testMarkupUrlConfig)
+      const root = markupToJSON(rendered.markup)
+      const content = root.content?.[0]?.content ?? []
+
+      expect(rendered.malformedReferences).toEqual([])
+      expect(content.some((node) => node.type === MarkupNodeType.reference)).toBe(false)
+      expect(content.find((node) => node.type === MarkupNodeType.text && node.text === "Browse")?.marks)
+        .toContainEqual({
+          type: MarkupMarkType.link,
+          attrs: { href: "https://test.invalid/browse?workspace=test" }
+        })
+    }))
+
+  it.effect("keeps invalid markdown link URLs as plain links", () =>
+    Effect.gen(function*() {
+      const markdown = "[Invalid](not-a-url)"
+
+      const rendered = markdownToMarkupStringWithHulyLinks(markdown, testMarkupUrlConfig)
+      const root = markupToJSON(rendered.markup)
+      const content = root.content?.[0]?.content ?? []
+
+      expect(rendered.malformedReferences).toEqual([])
+      expect(content.some((node) => node.type === MarkupNodeType.reference)).toBe(false)
+    }))
+
+  it.effect("reports malformed auto-converted Huly browse URLs", () =>
+    Effect.gen(function*() {
+      const markdown = "Broken [Doc](https://test.invalid/browse?workspace=test&_id=doc-1)."
+
+      const rendered = markdownToMarkupStringWithHulyLinks(markdown, testMarkupUrlConfig)
+
+      expect(rendered.malformedReferences).toEqual(["reference missing objectclass, label"])
     }))
 })
 

@@ -606,6 +606,11 @@ export {
 } from "./issue-templates.js"
 
 export {
+  DOCUMENT_NATIVE_REFERENCE_LINK_USAGE,
+  DOCUMENT_NATIVE_REFERENCE_TOOL_USAGE
+} from "./document-native-references.js"
+
+export {
   type CreateDocumentParams,
   createDocumentParamsJsonSchema,
   CreateDocumentParamsSchema,

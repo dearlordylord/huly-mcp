@@ -191,7 +191,7 @@ export const EditDocumentParamsSchema = EditDocumentParamsBase.pipe(
     const hasUpdateField = params.title !== undefined || hasContent || hasSearchReplace
 
     if (hasContent && (hasOldText || hasNewText)) {
-      return "Cannot provide both 'content' (full replace) and 'old_text'/'new_text' (search-and-replace). Use one mode or the other."
+      return "Cannot provide 'content' with 'old_text'/'new_text'. Use full replace or search-and-replace, not both."
     }
 
     if (hasOldText !== hasNewText) {
@@ -382,6 +382,7 @@ export const createDocumentParamsJsonSchema = JSONSchema.make(CreateDocumentPara
 const editDocumentGeneratedJsonSchema = JSONSchema.make(EditDocumentParamsSchema)
 const isJsonSchemaRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null
+/* v8 ignore start -- defensive: JSONSchema.make on this Struct-derived schema always yields object properties */
 const editDocumentGeneratedProperties = isJsonSchemaRecord(editDocumentGeneratedJsonSchema)
     && isJsonSchemaRecord(editDocumentGeneratedJsonSchema.properties)
   ? editDocumentGeneratedJsonSchema.properties
@@ -389,6 +390,7 @@ const editDocumentGeneratedProperties = isJsonSchemaRecord(editDocumentGenerated
 const editDocumentOldTextJsonSchema = isJsonSchemaRecord(editDocumentGeneratedProperties.old_text)
   ? editDocumentGeneratedProperties.old_text
   : {}
+/* v8 ignore stop */
 export const editDocumentParamsJsonSchema = {
   ...editDocumentGeneratedJsonSchema,
   properties: {

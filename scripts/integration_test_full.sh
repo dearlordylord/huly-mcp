@@ -456,6 +456,21 @@ assert_json_field_contains() {
   return 1
 }
 
+assert_json_field_count() {
+  local name="$1" json="$2" jq_expr="$3" expected="$4"
+  local value
+  value=$(printf '%s\n' "$json" | jq -r "$jq_expr" 2>/dev/null)
+  if [ "$value" = "$expected" ]; then
+    echo "PASS: $name"
+    PASSED=$((PASSED + 1))
+    return 0
+  fi
+  echo "FAIL: $name (expected count $expected, got ${value:-<empty>})"
+  FAILED=$((FAILED + 1))
+  ERRORS="${ERRORS}\n  - ${name}: expected count ${expected}, got ${value:-<empty>}"
+  return 1
+}
+
 assert_json_issue_summary_contains_issue_id() {
   local name="$1" json="$2" identifier="$3" issue_id="$4"
   if printf '%s\n' "$json" | jq -e --arg identifier "$identifier" --arg issue_id "$issue_id" \
@@ -512,6 +527,10 @@ assert_json_activity_contains_object_id() {
 
 json_string() {
   jq -Rn --arg value "$1" '$value'
+}
+
+url_encode() {
+  jq -nr --arg value "$1" '$value | @uri'
 }
 
 # Like run_test but EXPECTS isError:true. PASSes if error, FAILs if success.
@@ -1192,6 +1211,126 @@ if [ -n "$TS_NAME" ]; then
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_inline_comments\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\"}},\"id\":2}"
     run_test "delete_document($DOC_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\"}},\"id\":2}"
+  fi
+
+  NATIVE_REF_ISSUE_ID=""
+  NATIVE_REF_ISSUE_OBJ_ID=""
+  NATIVE_URL_DOC_ID=""
+  NATIVE_REF_DOC_ID=""
+  NATIVE_REF_WORKSPACE_UUID=""
+  if run_capture_to_var NATIVE_REF_WORKSPACE_TEXT "get_workspace_info(native_reference)" \
+    '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_workspace_info","arguments":{}},"id":2}'; then
+    NATIVE_REF_WORKSPACE_UUID=$(echo "$NATIVE_REF_WORKSPACE_TEXT" | jq -r '.uuid // empty' 2>/dev/null)
+  fi
+  if run_capture_to_var NATIVE_REF_ISSUE_TEXT "create_issue(for_native_document_reference)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Native Document Reference Fixture\",\"description\":\"Integration test native document reference\"}},\"id\":2}"; then
+    NATIVE_REF_ISSUE_ID=$(echo "$NATIVE_REF_ISSUE_TEXT" | jq -r '.identifier' 2>/dev/null)
+    NATIVE_REF_ISSUE_OBJ_ID=$(echo "$NATIVE_REF_ISSUE_TEXT" | jq -r '.issueId' 2>/dev/null)
+    echo "  => native_ref_issue: $NATIVE_REF_ISSUE_ID ($NATIVE_REF_ISSUE_OBJ_ID)"
+
+    EXTERNAL_URL="https://example.com/plain"
+    NATIVE_REF_LABEL_ENCODED=$(url_encode "$NATIVE_REF_ISSUE_ID")
+    NATIVE_REF_URL="${HULY_URL%/}/browse?workspace=${NATIVE_REF_WORKSPACE_UUID}&_class=tracker%3Aclass%3AIssue&_id=${NATIVE_REF_ISSUE_OBJ_ID}&label=${NATIVE_REF_LABEL_ENCODED}"
+    NATIVE_REF_CONTENT="Native issue: [${NATIVE_REF_ISSUE_ID}](${NATIVE_REF_URL}). External link stays [plain](${EXTERNAL_URL})."
+    NATIVE_REF_CONTENT_JSON=$(json_string "$NATIVE_REF_CONTENT")
+    if run_capture_to_var NATIVE_REF_DOC_TEXT "create_document(native_reference)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"title\":\"IntTest Native Reference Doc\",\"content\":$NATIVE_REF_CONTENT_JSON}},\"id\":2}"; then
+      NATIVE_REF_DOC_ID=$(echo "$NATIVE_REF_DOC_TEXT" | jq -r '.id' 2>/dev/null)
+      echo "  => native_ref_doc: $NATIVE_REF_DOC_ID"
+
+      if run_capture_to_var GET_NATIVE_REF_DOC_TEXT "get_document($NATIVE_REF_DOC_ID native_reference)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$NATIVE_REF_DOC_ID\"}},\"id\":2}"; then
+        assert_json_field_contains "get_document($NATIVE_REF_DOC_ID) serializes native reference as link" "$GET_NATIVE_REF_DOC_TEXT" '.content' "$NATIVE_REF_ISSUE_ID"
+        assert_json_field_contains "get_document($NATIVE_REF_DOC_ID) serializes native reference url" "$GET_NATIVE_REF_DOC_TEXT" '.content' "$NATIVE_REF_ISSUE_OBJ_ID"
+        assert_json_field_contains "get_document($NATIVE_REF_DOC_ID) keeps external link" "$GET_NATIVE_REF_DOC_TEXT" '.content' "$EXTERNAL_URL"
+
+        NATIVE_URL_CONTENT="Auto native issue: [${NATIVE_REF_ISSUE_ID}](${NATIVE_REF_URL})."
+        NATIVE_URL_CONTENT_JSON=$(json_string "$NATIVE_URL_CONTENT")
+        if run_capture_to_var NATIVE_URL_DOC_TEXT "create_document(native_reference_from_url)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"title\":\"IntTest Native Reference URL\",\"content\":$NATIVE_URL_CONTENT_JSON}},\"id\":2}"; then
+          NATIVE_URL_DOC_ID=$(echo "$NATIVE_URL_DOC_TEXT" | jq -r '.id' 2>/dev/null)
+          echo "  => native_ref_url_doc: $NATIVE_URL_DOC_ID"
+
+          if run_capture_to_var GET_NATIVE_URL_DOC_TEXT "get_document($NATIVE_URL_DOC_ID native_reference_from_url)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$NATIVE_URL_DOC_ID\"}},\"id\":2}"; then
+            assert_json_field_contains "get_document($NATIVE_URL_DOC_ID) serializes auto native reference label" "$GET_NATIVE_URL_DOC_TEXT" '.content' "$NATIVE_REF_ISSUE_ID"
+            assert_json_field_contains "get_document($NATIVE_URL_DOC_ID) serializes auto native reference url" "$GET_NATIVE_URL_DOC_TEXT" '.content' "$NATIVE_REF_ISSUE_OBJ_ID"
+          fi
+
+          run_test "delete_document($NATIVE_URL_DOC_ID native_reference_from_url)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$NATIVE_URL_DOC_ID\"}},\"id\":2}"
+        fi
+      fi
+
+      NATIVE_REF_EDITED_CONTENT="Edited native issue: [${NATIVE_REF_ISSUE_ID}](${NATIVE_REF_URL})."
+      NATIVE_REF_EDITED_CONTENT_JSON=$(json_string "$NATIVE_REF_EDITED_CONTENT")
+      run_test "edit_document($NATIVE_REF_DOC_ID native_reference full replace)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"edit_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$NATIVE_REF_DOC_ID\",\"content\":$NATIVE_REF_EDITED_CONTENT_JSON}},\"id\":2}"
+      if run_capture_to_var GET_EDITED_NATIVE_REF_DOC_TEXT "get_document($NATIVE_REF_DOC_ID edited native_reference)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$NATIVE_REF_DOC_ID\"}},\"id\":2}"; then
+        assert_json_field_contains "get_document($NATIVE_REF_DOC_ID edited) content" "$GET_EDITED_NATIVE_REF_DOC_TEXT" '.content' "Edited native issue"
+        assert_json_field_contains "get_document($NATIVE_REF_DOC_ID edited) serializes native reference url" "$GET_EDITED_NATIVE_REF_DOC_TEXT" '.content' "$NATIVE_REF_ISSUE_OBJ_ID"
+      fi
+
+      run_test "delete_document($NATIVE_REF_DOC_ID native_reference)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$NATIVE_REF_DOC_ID\"}},\"id\":2}"
+    fi
+
+    run_test "delete_issue(native_reference:$NATIVE_REF_ISSUE_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$NATIVE_REF_ISSUE_ID\"}},\"id\":2}"
+  fi
+
+  NATIVE_MULTI_TARGET_DOC_ID=""
+  NATIVE_MULTI_DOC_ID=""
+  NATIVE_MULTI_PERSON_ID=""
+  NATIVE_MULTI_PERSON_EMAIL="native-ref-${RUN_ID}@test.local"
+  NATIVE_MULTI_TARGET_TITLE="IntTest Native Reference Target ${RUN_ID}"
+  NATIVE_MULTI_TARGET_TITLE_JSON=$(json_string "$NATIVE_MULTI_TARGET_TITLE")
+  NATIVE_MULTI_TARGET_CONTENT_JSON=$(json_string "Native reference target fixture.")
+  if run_capture_to_var NATIVE_MULTI_TARGET_TEXT "create_document(native_reference_target)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"title\":$NATIVE_MULTI_TARGET_TITLE_JSON,\"content\":$NATIVE_MULTI_TARGET_CONTENT_JSON}},\"id\":2}"; then
+    NATIVE_MULTI_TARGET_DOC_ID=$(echo "$NATIVE_MULTI_TARGET_TEXT" | jq -r '.id' 2>/dev/null)
+    echo "  => native_ref_target_doc: $NATIVE_MULTI_TARGET_DOC_ID"
+
+    if run_capture_to_var NATIVE_MULTI_PERSON_TEXT "create_person(native_reference_person)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":\"Reference\",\"lastName\":\"Person\",\"email\":\"$NATIVE_MULTI_PERSON_EMAIL\"}},\"id\":2}"; then
+      NATIVE_MULTI_PERSON_ID=$(echo "$NATIVE_MULTI_PERSON_TEXT" | jq -r '.id' 2>/dev/null)
+      echo "  => native_ref_person: $NATIVE_MULTI_PERSON_ID"
+
+      # Give Huly's search indexes a moment to expose the newly created person/document to the next MCP process.
+      sleep 1
+
+      NATIVE_MULTI_PERSON_NAME="Reference Person"
+      NATIVE_MULTI_TARGET_TITLE_ENCODED=$(url_encode "$NATIVE_MULTI_TARGET_TITLE")
+      NATIVE_MULTI_PERSON_NAME_ENCODED=$(url_encode "$NATIVE_MULTI_PERSON_NAME")
+      NATIVE_MULTI_DOC_URL="${HULY_URL%/}/browse?workspace=${NATIVE_REF_WORKSPACE_UUID}&_class=document%3Aclass%3ADocument&_id=${NATIVE_MULTI_TARGET_DOC_ID}&label=${NATIVE_MULTI_TARGET_TITLE_ENCODED}"
+      NATIVE_MULTI_PERSON_URL="${HULY_URL%/}/browse?workspace=${NATIVE_REF_WORKSPACE_UUID}&_class=contact%3Aclass%3APerson&_id=${NATIVE_MULTI_PERSON_ID}&label=${NATIVE_MULTI_PERSON_NAME_ENCODED}"
+      NATIVE_MULTI_CONTENT="Native refs: document [${NATIVE_MULTI_TARGET_TITLE}](${NATIVE_MULTI_DOC_URL}), person [${NATIVE_MULTI_PERSON_NAME}](${NATIVE_MULTI_PERSON_URL})."
+      NATIVE_MULTI_CONTENT_JSON=$(json_string "$NATIVE_MULTI_CONTENT")
+      if run_capture_to_var NATIVE_MULTI_DOC_TEXT "create_document(native_reference_document_person)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"title\":\"IntTest Native Reference Multi\",\"content\":$NATIVE_MULTI_CONTENT_JSON}},\"id\":2}"; then
+        NATIVE_MULTI_DOC_ID=$(echo "$NATIVE_MULTI_DOC_TEXT" | jq -r '.id' 2>/dev/null)
+        echo "  => native_ref_multi_doc: $NATIVE_MULTI_DOC_ID"
+
+        if run_capture_to_var GET_NATIVE_MULTI_DOC_TEXT "get_document($NATIVE_MULTI_DOC_ID native_reference_document_person)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$NATIVE_MULTI_DOC_ID\"}},\"id\":2}"; then
+          assert_json_field_contains "get_document($NATIVE_MULTI_DOC_ID) serializes document reference" "$GET_NATIVE_MULTI_DOC_TEXT" '.content' "$NATIVE_MULTI_TARGET_TITLE"
+          assert_json_field_contains "get_document($NATIVE_MULTI_DOC_ID) serializes document reference url" "$GET_NATIVE_MULTI_DOC_TEXT" '.content' "$NATIVE_MULTI_TARGET_DOC_ID"
+          assert_json_field_contains "get_document($NATIVE_MULTI_DOC_ID) serializes person reference url" "$GET_NATIVE_MULTI_DOC_TEXT" '.content' "$NATIVE_MULTI_PERSON_ID"
+        fi
+
+        run_test "delete_document($NATIVE_MULTI_DOC_ID native_reference_document_person)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$NATIVE_MULTI_DOC_ID\"}},\"id\":2}"
+      fi
+    fi
+  fi
+  if [ -n "${NATIVE_MULTI_TARGET_DOC_ID:-}" ]; then
+    run_test "delete_document($NATIVE_MULTI_TARGET_DOC_ID native_reference_target)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$NATIVE_MULTI_TARGET_DOC_ID\"}},\"id\":2}"
+  fi
+  if [ -n "${NATIVE_MULTI_PERSON_ID:-}" ]; then
+    run_test "delete_person($NATIVE_MULTI_PERSON_ID native_reference_person)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":\"$NATIVE_MULTI_PERSON_ID\"}},\"id\":2}"
   fi
 else
   skip_test "documents" "no teamspace found"

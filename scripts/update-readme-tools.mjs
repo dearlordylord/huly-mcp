@@ -49,6 +49,19 @@ const propertyNameText = (name) => {
   return undefined
 }
 
+const setBindingValue = (bindings, name, value) => {
+  if (ts.isIdentifier(name)) {
+    bindings.set(name.text, value)
+    return
+  }
+
+  if (ts.isArrayBindingPattern(name) && Array.isArray(value)) {
+    name.elements.forEach((element, index) => {
+      if (ts.isBindingElement(element)) setBindingValue(bindings, element.name, value[index])
+    })
+  }
+}
+
 const moduleBindingsFor = (filePath) => {
   const resolved = sourcePath(filePath)
   const cached = moduleBindingsCache.get(resolved)
@@ -146,40 +159,92 @@ const bindingValue = (filePath, name) => {
   return value
 }
 
-const expressionValue = (node, filePath) => {
+const functionValue = (node, filePath, localBindings) => {
+  if (ts.isIdentifier(node)) {
+    const binding = moduleBindingsFor(filePath).get(node.text)
+    if (binding?.kind === "local" && ts.isArrowFunction(binding.initializer)) {
+      return functionValue(binding.initializer, filePath, localBindings)
+    }
+    return undefined
+  }
+
+  if (!ts.isArrowFunction(node)) return undefined
+
+  return (...args) => {
+    const scopedBindings = new Map(localBindings)
+    node.parameters.forEach((parameter, index) => {
+      setBindingValue(scopedBindings, parameter.name, args[index])
+    })
+
+    return ts.isBlock(node.body)
+      ? undefined
+      : expressionValue(node.body, filePath, scopedBindings)
+  }
+}
+
+const expressionValue = (node, filePath, localBindings = new Map()) => {
   if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text
   if (ts.isNumericLiteral(node)) return Number(node.text)
-  if (ts.isIdentifier(node)) return bindingValue(filePath, node.text)
+  if (ts.isIdentifier(node)) {
+    return localBindings.has(node.text) ? localBindings.get(node.text) : bindingValue(filePath, node.text)
+  }
   if (ts.isAsExpression(node) || ts.isSatisfiesExpression(node) || ts.isParenthesizedExpression(node)) {
-    return expressionValue(node.expression, filePath)
+    return expressionValue(node.expression, filePath, localBindings)
   }
   if (ts.isArrayLiteralExpression(node)) {
-    return node.elements.map((element) => expressionValue(element, filePath))
+    return node.elements.map((element) => expressionValue(element, filePath, localBindings))
   }
   if (ts.isObjectLiteralExpression(node)) {
     const value = {}
     for (const property of node.properties) {
       if (ts.isPropertyAssignment(property)) {
         const key = propertyNameText(property.name)
-        if (key !== undefined) value[key] = expressionValue(property.initializer, filePath)
+        if (key !== undefined) value[key] = expressionValue(property.initializer, filePath, localBindings)
       }
     }
     return value
   }
   if (ts.isPropertyAccessExpression(node)) {
-    const target = expressionValue(node.expression, filePath)
+    const target = expressionValue(node.expression, filePath, localBindings)
     return target?.[node.name.text]
   }
   if (ts.isTemplateExpression(node)) {
     return node.templateSpans.reduce(
-      (output, span) => `${output}${String(expressionValue(span.expression, filePath))}${span.literal.text}`,
+      (output, span) => `${output}${String(expressionValue(span.expression, filePath, localBindings))}${span.literal.text}`,
       node.head.text
     )
   }
+  if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+    const left = expressionValue(node.left, filePath, localBindings)
+    const right = expressionValue(node.right, filePath, localBindings)
+    return typeof left === "string" || typeof right === "string" ? `${left ?? ""}${right ?? ""}` : undefined
+  }
   if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
     if (node.expression.text === "enumValuesDescription" && node.arguments.length === 1) {
-      const values = expressionValue(node.arguments[0], filePath)
+      const values = expressionValue(node.arguments[0], filePath, localBindings)
       return Array.isArray(values) ? values.join(", ") : undefined
+    }
+
+    const fn = functionValue(node.expression, filePath, localBindings)
+    if (fn !== undefined) {
+      return fn(...node.arguments.map((argument) => expressionValue(argument, filePath, localBindings)))
+    }
+  }
+
+  if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+    const target = expressionValue(node.expression.expression, filePath, localBindings)
+    const method = node.expression.name.text
+
+    if (method === "join" && Array.isArray(target)) {
+      const separator = node.arguments.length > 0
+        ? expressionValue(node.arguments[0], filePath, localBindings)
+        : ","
+      return target.join(typeof separator === "string" ? separator : ",")
+    }
+
+    if (method === "map" && Array.isArray(target) && node.arguments.length === 1) {
+      const mapper = functionValue(node.arguments[0], filePath, localBindings)
+      return mapper === undefined ? undefined : target.map((item) => mapper(item))
     }
   }
 

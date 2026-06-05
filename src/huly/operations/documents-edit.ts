@@ -18,12 +18,18 @@ import {
   DocumentEditModeError,
   DocumentEmptyContentError,
   type DocumentNotFoundError,
+  type DocumentReferenceError,
   DocumentTextMultipleMatchesError,
   DocumentTextNotFoundError,
+  type IssueNotFoundError,
   NoUpdateFieldsError,
+  type PersonIdentifierAmbiguousError,
+  type PersonNotFoundError,
+  type ProjectNotFoundError,
   type TeamspaceNotFoundError
 } from "../errors.js"
 import { buildDocumentUrlFromConfig } from "../url-builders.js"
+import { renderDocumentContentForWrite } from "./document-native-references.js"
 import { findTeamspaceAndDocument } from "./documents-shared.js"
 
 import { documentPlugin } from "../huly-plugins.js"
@@ -36,6 +42,11 @@ type EditDocumentError =
   | DocumentTextMultipleMatchesError
   | DocumentEmptyContentError
   | DocumentEditModeError
+  | DocumentReferenceError
+  | ProjectNotFoundError
+  | IssueNotFoundError
+  | PersonIdentifierAmbiguousError
+  | PersonNotFoundError
   | NoUpdateFieldsError
 
 export const editDocument = (
@@ -91,20 +102,22 @@ export const editDocument = (
       if (params.content.trim() === "") {
         updateOps.content = null
       } else if (doc.content) {
+        const renderedContent = yield* renderDocumentContentForWrite(params.content)
         yield* client.updateMarkup(
           documentPlugin.class.Document,
           doc._id,
           "content",
-          params.content,
-          "markdown"
+          renderedContent.markup,
+          renderedContent.format
         )
       } else {
+        const renderedContent = yield* renderDocumentContentForWrite(params.content)
         const contentMarkupRef = yield* client.uploadMarkup(
           documentPlugin.class.Document,
           doc._id,
           "content",
-          params.content,
-          "markdown"
+          renderedContent.markup,
+          renderedContent.format
         )
         updateOps.content = contentMarkupRef
       }
@@ -144,12 +157,14 @@ export const editDocument = (
         ? currentContent.split(params.old_text).join(params.new_text)
         : currentContent.substring(0, idx) + params.new_text + currentContent.substring(idx + params.old_text.length)
 
+      const renderedContent = yield* renderDocumentContentForWrite(newContent)
+
       yield* client.updateMarkup(
         documentPlugin.class.Document,
         doc._id,
         "content",
-        newContent,
-        "markdown"
+        renderedContent.markup,
+        renderedContent.format
       )
     }
 

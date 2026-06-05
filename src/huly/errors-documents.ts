@@ -108,3 +108,17 @@ export class DocumentEditModeError extends Schema.TaggedError<DocumentEditModeEr
     return `Invalid edit_document mode: ${this.reason}`
   }
 }
+
+/**
+ * Native document reference links are invalid.
+ */
+export class DocumentReferenceError extends Schema.TaggedError<DocumentReferenceError>()(
+  "DocumentReferenceError",
+  {
+    reason: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Invalid document references: ${this.reason}`
+  }
+}

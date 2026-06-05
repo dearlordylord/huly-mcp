@@ -269,7 +269,10 @@ describe("editDocument - in-place content update branch (full replace mode)", ()
 
       expect(result.updated).toBe(true)
       expect(captureUpdateMarkup.called).toBe(true)
-      expect(captureUpdateMarkup.markup).toBe("# Updated in place")
+      expect(JSON.parse(captureUpdateMarkup.markup ?? "{}")).toMatchObject({
+        type: "doc",
+        content: [{ type: "heading", content: [{ type: "text", text: "Updated in place" }] }]
+      })
       // When content is updated in-place, the updateDoc should NOT set content field
       // (contentUpdatedInPlace = true means content is not in updateOps)
       expect(captureUpdateDoc.operations?.content).toBeUndefined()

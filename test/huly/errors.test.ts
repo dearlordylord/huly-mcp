@@ -23,6 +23,7 @@ import {
   DocumentContentCorruptedError,
   DocumentEditModeError,
   DocumentNotFoundError,
+  DocumentReferenceError,
   EventNotFoundError,
   FileFetchError,
   FileNotFoundError,
@@ -712,6 +713,8 @@ describe("Huly Errors", () => {
               return `doccorrupt:${error.identifier}:${error.causeMessage ?? ""}`
             case "DocumentEditModeError":
               return `doceditmode:${error.reason}`
+            case "DocumentReferenceError":
+              return `docreference:${error.reason}`
             case "CommentNotFoundError":
               return `comment:${error.commentId}`
             case "MilestoneNotFoundError":
@@ -878,6 +881,9 @@ describe("Huly Errors", () => {
           matchError(new DocumentContentCorruptedError({ identifier: "doc-1", causeMessage: "missing markup blob" }))
         ).toBe("doccorrupt:doc-1:missing markup blob")
         expect(matchError(new DocumentEditModeError({ reason: "bad mode" }))).toBe("doceditmode:bad mode")
+        expect(matchError(new DocumentReferenceError({ reason: "bad reference" }))).toBe(
+          "docreference:bad reference"
+        )
         expect(
           matchError(new CommentNotFoundError({ commentId: "c-1", issueIdentifier: "H-1", project: "P" }))
         ).toBe("comment:c-1")
