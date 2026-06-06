@@ -510,7 +510,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
     const defaultOps: HulyClientOperations = {
       // AccountUuid is a double-branded string type with no public constructor
       // eslint-disable-next-line no-restricted-syntax -- see above
-      getAccountUuid: () => "test-account-uuid" as AccountUuid,
+      getAccountUuid: () => "00000000-0000-4000-8000-000000000000" as AccountUuid,
       // PersonId is a branded string type with no public constructor
       // eslint-disable-next-line no-restricted-syntax -- see above
       getPrimarySocialId: () => "test-primary-social-id" as PersonId,

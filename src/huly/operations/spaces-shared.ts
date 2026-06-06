@@ -6,10 +6,11 @@ import type {
   TypedSpace
 } from "@hcengineering/core"
 import { SortingOrder } from "@hcengineering/core"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 
 import type { SpaceClassFilter, SpaceIdentifier, SpaceTypeId } from "../../domain/schemas/shared.js"
 import {
+  AccountUuid,
   NonEmptyString,
   ObjectClassName,
   SpaceId,
@@ -49,8 +50,6 @@ export type SpaceMemberMutationError =
   | PersonNotAnEmployeeError
 
 export type UpdateSpaceError = SpaceMutationError | NoUpdateFieldsError
-
-const ACCOUNT_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export const spaceClass = toClassRef<GenericSpace>(core.class.Space)
 
@@ -163,6 +162,6 @@ export const resolveMembers = (
   SpaceMemberMutationError
 > =>
   Effect.forEach(members, (member) =>
-    ACCOUNT_UUID_RE.test(member)
+    Schema.is(AccountUuid)(member)
       ? Effect.succeed(toAccountUuid(member))
       : resolveEmployeeAccountUuid(client, member)).pipe(Effect.map(uniqueSorted))

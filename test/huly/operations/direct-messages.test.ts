@@ -44,7 +44,7 @@ const asEmployee = (v: unknown) => v as HulyEmployee
 const asPerson = (v: unknown) => v as Person
 const asContactChannel = (v: unknown) => v as ContactChannel
 
-const currentAccountUuid = "test-account-uuid" as HulyAccountUuid
+const currentAccountUuid = "00000000-0000-4000-8000-000000000000" as HulyAccountUuid
 
 const makeDirectMessage = (overrides?: Partial<HulyDirectMessage>): HulyDirectMessage => {
   const result: HulyDirectMessage = {
@@ -399,7 +399,7 @@ describe("findDirectMessage", () => {
     Effect.gen(function*() {
       const dm = makeDirectMessage({
         _id: "dm-42" as Ref<HulyDirectMessage>,
-        members: ["account-other" as HulyAccountUuid]
+        members: ["00000000-0000-4000-8000-000000000099" as HulyAccountUuid]
       })
       const layer = createTestLayer({ directMessages: [dm] })
 
@@ -413,7 +413,7 @@ describe("findDirectMessage", () => {
 
   it.effect("resolves by participant display name via Employee.personUuid", () =>
     Effect.gen(function*() {
-      const accountUuid = "account-shannon" as HulyAccountUuid
+      const accountUuid = "00000000-0000-4000-8000-000000000010" as HulyAccountUuid
       const dm = makeDirectMessage({
         _id: "dm-named" as Ref<HulyDirectMessage>,
         members: [currentAccountUuid, accountUuid]
@@ -449,7 +449,7 @@ describe("findDirectMessage", () => {
     Effect.gen(function*() {
       const employee = makeEmployee({
         name: "Solo,Stranger",
-        personUuid: "account-stranger" as HulyAccountUuid
+        personUuid: "00000000-0000-4000-8000-000000000011" as HulyAccountUuid
       })
       const layer = createTestLayer({ directMessages: [], employees: [employee] })
 
@@ -484,7 +484,7 @@ describe("findDirectMessage", () => {
 
   it.effect("does not resolve the authenticated user's own display name to an arbitrary DM", () =>
     Effect.gen(function*() {
-      const otherAccountUuid = "account-other" as HulyAccountUuid
+      const otherAccountUuid = "00000000-0000-4000-8000-000000000099" as HulyAccountUuid
       const dm = makeDirectMessage({
         _id: "dm-other" as Ref<HulyDirectMessage>,
         members: [currentAccountUuid, otherAccountUuid]
@@ -507,8 +507,8 @@ describe("findDirectMessage", () => {
 
   it.effect("does not resolve a participant name to a DM that excludes the authenticated account", () =>
     Effect.gen(function*() {
-      const accountUuid = "account-shannon" as HulyAccountUuid
-      const unrelatedAccountUuid = "account-unrelated" as HulyAccountUuid
+      const accountUuid = "00000000-0000-4000-8000-000000000010" as HulyAccountUuid
+      const unrelatedAccountUuid = "00000000-0000-4000-8000-000000000012" as HulyAccountUuid
       const dm = makeDirectMessage({
         _id: "dm-unrelated" as Ref<HulyDirectMessage>,
         members: [unrelatedAccountUuid, accountUuid]
@@ -531,8 +531,8 @@ describe("findDirectMessage", () => {
 
   it.effect("does not resolve a participant name to a group DM", () =>
     Effect.gen(function*() {
-      const accountUuid = "account-shannon" as HulyAccountUuid
-      const extraAccountUuid = "account-extra" as HulyAccountUuid
+      const accountUuid = "00000000-0000-4000-8000-000000000010" as HulyAccountUuid
+      const extraAccountUuid = "00000000-0000-4000-8000-000000000013" as HulyAccountUuid
       const dm = makeDirectMessage({
         _id: "dm-group" as Ref<HulyDirectMessage>,
         members: [currentAccountUuid, accountUuid, extraAccountUuid]
@@ -555,8 +555,8 @@ describe("findDirectMessage", () => {
 
   it.effect("fails with ambiguity when duplicate display names each have a one-to-one DM", () =>
     Effect.gen(function*() {
-      const firstAccountUuid = "account-first" as HulyAccountUuid
-      const secondAccountUuid = "account-second" as HulyAccountUuid
+      const firstAccountUuid = "00000000-0000-4000-8000-000000000014" as HulyAccountUuid
+      const secondAccountUuid = "00000000-0000-4000-8000-000000000015" as HulyAccountUuid
       const firstDm = makeDirectMessage({
         _id: "dm-first" as Ref<HulyDirectMessage>,
         members: [currentAccountUuid, firstAccountUuid]
@@ -595,7 +595,7 @@ describe("findDirectMessage", () => {
 describe("listDirectMessageMessages", () => {
   it.effect("returns messages with sender names resolved from social identities", () =>
     Effect.gen(function*() {
-      const accountUuid = "account-shannon" as HulyAccountUuid
+      const accountUuid = "00000000-0000-4000-8000-000000000010" as HulyAccountUuid
       const socialId = "social-shannon" as Ref<SocialIdentity> & PersonId
       const dm = makeDirectMessage({
         _id: "dm-1" as Ref<HulyDirectMessage>,
@@ -779,7 +779,7 @@ describe("deleteDirectMessage", () => {
 describe("createDirectMessage", () => {
   it.effect("returns existing one-to-one DM with created=false", () =>
     Effect.gen(function*() {
-      const billAccount = "account-bill" as HulyAccountUuid
+      const billAccount = "00000000-0000-4000-8000-000000000016" as HulyAccountUuid
       const billPerson = makePerson({ _id: "person-bill" as Ref<Person>, name: "Smith,Bill" })
       const billEmployee = makeEmployee({
         _id: "person-bill" as Ref<HulyEmployee>,
@@ -807,7 +807,7 @@ describe("createDirectMessage", () => {
 
   it.effect("returns an existing DM whose members are stored in the opposite order", () =>
     Effect.gen(function*() {
-      const billAccount = "account-bill" as HulyAccountUuid
+      const billAccount = "00000000-0000-4000-8000-000000000016" as HulyAccountUuid
       const billPerson = makePerson({ _id: "person-bill" as Ref<Person>, name: "Smith,Bill" })
       const billEmployee = makeEmployee({
         _id: "person-bill" as Ref<HulyEmployee>,
@@ -835,7 +835,7 @@ describe("createDirectMessage", () => {
 
   it.effect("creates a new one-to-one DM when none exists, with sorted members", () =>
     Effect.gen(function*() {
-      const billAccount = "account-bill" as HulyAccountUuid
+      const billAccount = "00000000-0000-4000-8000-000000000016" as HulyAccountUuid
       const billPerson = makePerson({ _id: "person-bill" as Ref<Person>, name: "Smith,Bill" })
       const billEmployee = makeEmployee({
         _id: "person-bill" as Ref<HulyEmployee>,
@@ -864,8 +864,8 @@ describe("createDirectMessage", () => {
 
   it.effect("ignores group DMs when looking for an existing one-to-one", () =>
     Effect.gen(function*() {
-      const billAccount = "account-bill" as HulyAccountUuid
-      const extraAccount = "account-extra" as HulyAccountUuid
+      const billAccount = "00000000-0000-4000-8000-000000000016" as HulyAccountUuid
+      const extraAccount = "00000000-0000-4000-8000-000000000013" as HulyAccountUuid
       const billPerson = makePerson({ _id: "person-bill" as Ref<Person>, name: "Smith,Bill" })
       const billEmployee = makeEmployee({
         _id: "person-bill" as Ref<HulyEmployee>,
@@ -890,7 +890,7 @@ describe("createDirectMessage", () => {
 
   it.effect("resolves the participant by exact email social identity", () =>
     Effect.gen(function*() {
-      const billAccount = "account-bill" as HulyAccountUuid
+      const billAccount = "00000000-0000-4000-8000-000000000016" as HulyAccountUuid
       const billPerson = makePerson({ _id: "person-bill" as Ref<Person>, name: "Smith,Bill" })
       const billEmployee = makeEmployee({
         _id: "person-bill" as Ref<HulyEmployee>,
@@ -915,7 +915,7 @@ describe("createDirectMessage", () => {
 
   it.effect("resolves the participant by exact email contact channel", () =>
     Effect.gen(function*() {
-      const billAccount = "account-bill" as HulyAccountUuid
+      const billAccount = "00000000-0000-4000-8000-000000000016" as HulyAccountUuid
       const billPerson = makePerson({ _id: "person-bill" as Ref<Person>, name: "Smith,Bill" })
       const billEmployee = makeEmployee({
         _id: "person-bill" as Ref<HulyEmployee>,
@@ -939,7 +939,7 @@ describe("createDirectMessage", () => {
 
   it.effect("falls back to an email channel when a matching social identity points to no person", () =>
     Effect.gen(function*() {
-      const billAccount = "account-bill" as HulyAccountUuid
+      const billAccount = "00000000-0000-4000-8000-000000000016" as HulyAccountUuid
       const billPerson = makePerson({ _id: "person-bill" as Ref<Person>, name: "Smith,Bill" })
       const billEmployee = makeEmployee({
         _id: "person-bill" as Ref<HulyEmployee>,
@@ -973,7 +973,7 @@ describe("createDirectMessage", () => {
       const billEmployee = makeEmployee({
         _id: "person-bill" as Ref<HulyEmployee>,
         name: "Smith,Bill",
-        personUuid: "account-bill" as HulyAccountUuid
+        personUuid: "00000000-0000-4000-8000-000000000016" as HulyAccountUuid
       })
       const layer = createTestLayer({ persons: [billPerson], employees: [billEmployee] })
 

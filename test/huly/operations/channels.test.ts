@@ -529,11 +529,22 @@ describe("getChannel", () => {
       const channel = makeChannel({
         _id: "ch-1" as Ref<HulyChannel>,
         name: "team",
-        members: ["account-1" as AccountUuid, "account-2" as AccountUuid]
+        members: [
+          "00000000-0000-4000-8000-000000000001" as AccountUuid,
+          "00000000-0000-4000-8000-000000000002" as AccountUuid
+        ]
       })
       const employees = [
-        makeEmployee({ _id: "emp-1" as Ref<HulyEmployee>, name: "Alice", personUuid: "account-1" as AccountUuid }),
-        makeEmployee({ _id: "emp-2" as Ref<HulyEmployee>, name: "Bob", personUuid: "account-2" as AccountUuid })
+        makeEmployee({
+          _id: "emp-1" as Ref<HulyEmployee>,
+          name: "Alice",
+          personUuid: "00000000-0000-4000-8000-000000000001" as AccountUuid
+        }),
+        makeEmployee({
+          _id: "emp-2" as Ref<HulyEmployee>,
+          name: "Bob",
+          personUuid: "00000000-0000-4000-8000-000000000002" as AccountUuid
+        })
       ]
 
       const testLayer = createTestLayerWithMocks({ channels: [channel], employees })
@@ -557,8 +568,8 @@ describe("createChannel", () => {
       expect(captureCreateDoc.attributes?.name).toBe("new-channel")
       expect(captureCreateDoc.attributes?.private).toBe(false)
       expect(captureCreateDoc.attributes?.archived).toBe(false)
-      expect(captureCreateDoc.attributes?.members).toEqual(["test-account-uuid"])
-      expect(captureCreateDoc.attributes?.owners).toEqual(["test-account-uuid"])
+      expect(captureCreateDoc.attributes?.members).toEqual(["00000000-0000-4000-8000-000000000000"])
+      expect(captureCreateDoc.attributes?.owners).toEqual(["00000000-0000-4000-8000-000000000000"])
     }))
 
   it.effect("creates channel with topic and private flag", () =>
@@ -911,12 +922,18 @@ describe("listDirectMessages", () => {
       const dms = [
         makeDirectMessage({
           _id: "dm-1" as Ref<DirectMessage>,
-          members: ["test-account-uuid" as AccountUuid, "account-1" as AccountUuid],
+          members: [
+            "00000000-0000-4000-8000-000000000000" as AccountUuid,
+            "00000000-0000-4000-8000-000000000001" as AccountUuid
+          ],
           modifiedOn: 1000
         }),
         makeDirectMessage({
           _id: "dm-2" as Ref<DirectMessage>,
-          members: ["test-account-uuid" as AccountUuid, "account-2" as AccountUuid],
+          members: [
+            "00000000-0000-4000-8000-000000000000" as AccountUuid,
+            "00000000-0000-4000-8000-000000000002" as AccountUuid
+          ],
           modifiedOn: 2000
         })
       ]
@@ -934,15 +951,22 @@ describe("listDirectMessages", () => {
     Effect.gen(function*() {
       const dm = makeDirectMessage({
         _id: "dm-1" as Ref<DirectMessage>,
-        members: ["test-account-uuid" as AccountUuid, "account-2" as AccountUuid]
+        members: [
+          "00000000-0000-4000-8000-000000000000" as AccountUuid,
+          "00000000-0000-4000-8000-000000000002" as AccountUuid
+        ]
       })
       const employees = [
         makeEmployee({
           _id: "emp-1" as Ref<HulyEmployee>,
           name: "Alice",
-          personUuid: "test-account-uuid" as AccountUuid
+          personUuid: "00000000-0000-4000-8000-000000000000" as AccountUuid
         }),
-        makeEmployee({ _id: "emp-2" as Ref<HulyEmployee>, name: "Bob", personUuid: "account-2" as AccountUuid })
+        makeEmployee({
+          _id: "emp-2" as Ref<HulyEmployee>,
+          name: "Bob",
+          personUuid: "00000000-0000-4000-8000-000000000002" as AccountUuid
+        })
       ]
 
       const testLayer = createTestLayerWithMocks({ directMessages: [dm], employees })
@@ -950,7 +974,10 @@ describe("listDirectMessages", () => {
       const result = yield* listDirectMessages({}).pipe(Effect.provide(testLayer))
 
       expect(result.conversations[0].participants).toEqual(["Alice", "Bob"])
-      expect(result.conversations[0].participantIds).toEqual(["test-account-uuid", "account-2"])
+      expect(result.conversations[0].participantIds).toEqual([
+        "00000000-0000-4000-8000-000000000000",
+        "00000000-0000-4000-8000-000000000002"
+      ])
     }))
 
   it.effect("returns no conversations and skips name resolution when there are no DMs", () =>
@@ -968,11 +995,17 @@ describe("listDirectMessages", () => {
     Effect.gen(function*() {
       const ownDm = makeDirectMessage({
         _id: "dm-own" as Ref<DirectMessage>,
-        members: ["test-account-uuid" as AccountUuid, "account-2" as AccountUuid]
+        members: [
+          "00000000-0000-4000-8000-000000000000" as AccountUuid,
+          "00000000-0000-4000-8000-000000000002" as AccountUuid
+        ]
       })
       const unrelatedDm = makeDirectMessage({
         _id: "dm-unrelated" as Ref<DirectMessage>,
-        members: ["account-3" as AccountUuid, "account-4" as AccountUuid]
+        members: [
+          "00000000-0000-4000-8000-000000000003" as AccountUuid,
+          "00000000-0000-4000-8000-000000000004" as AccountUuid
+        ]
       })
       const testLayer = createTestLayerWithMocks({ directMessages: [ownDm, unrelatedDm] })
 

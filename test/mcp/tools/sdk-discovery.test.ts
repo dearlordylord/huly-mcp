@@ -47,7 +47,7 @@ const noopStorageClient: HulyStorageOperations = {
 }
 
 const hulyClient: HulyClientOperations = {
-  getAccountUuid: () => "account-1" as AccountUuid,
+  getAccountUuid: () => "00000000-0000-4000-8000-000000000001" as AccountUuid,
   getPrimarySocialId: () => person,
   markupUrlConfig: testMarkupUrlConfig,
   workbenchUrlConfig: testWorkbenchUrlConfig,

@@ -348,7 +348,7 @@ export type PersonUuid = Schema.Schema.Type<typeof PersonUuid>
 export const AccountId = NonEmptyString.pipe(Schema.brand("AccountId"))
 export type AccountId = Schema.Schema.Type<typeof AccountId>
 
-export const AccountUuid = Schema.String.pipe(Schema.brand("AccountUuid"))
+export const AccountUuid = Schema.UUID.pipe(Schema.brand("AccountUuid"))
 export type AccountUuid = Schema.Schema.Type<typeof AccountUuid>
 
 export const RegionId = Schema.String.pipe(Schema.brand("RegionId"))

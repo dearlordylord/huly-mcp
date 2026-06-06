@@ -89,7 +89,7 @@ const mockCollaboratorClient = {
 
 const testSdk: HulySdkDependencies = {
   createRestClient: mockFn().mockImplementation(() => ({
-    getAccount: mockFn().mockResolvedValue({ uuid: "test-account-uuid" })
+    getAccount: mockFn().mockResolvedValue({ uuid: "00000000-0000-4000-8000-000000000000" })
   })),
   createRestTxOperations: mockFn().mockImplementation(() => Promise.resolve(mockTxOperations)),
   getWorkspaceToken: mockFn().mockImplementation(() =>
@@ -762,7 +762,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
     it.effect("exposes the connected account uuid and primary social id", () =>
       Effect.gen(function*() {
         const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
-        expect(client.getAccountUuid()).toBe("test-account-uuid")
+        expect(client.getAccountUuid()).toBe("00000000-0000-4000-8000-000000000000")
         // exercises the accessor; the primary social id is only populated from a live connection
         client.getPrimarySocialId()
       }))

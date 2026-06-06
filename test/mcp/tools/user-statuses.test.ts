@@ -24,7 +24,7 @@ const userStatus = {
 }
 
 const hulyClient: HulyClientOperations = {
-  getAccountUuid: () => "test-account-uuid" as AccountUuid,
+  getAccountUuid: () => "00000000-0000-4000-8000-000000000000" as AccountUuid,
   getPrimarySocialId: () => "test-primary-social-id" as PersonId,
   markupUrlConfig: testMarkupUrlConfig,
   workbenchUrlConfig: testWorkbenchUrlConfig,
