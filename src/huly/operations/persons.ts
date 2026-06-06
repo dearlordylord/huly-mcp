@@ -29,12 +29,8 @@ import type {
   PersonSummary,
   UpdatePersonParams
 } from "../../domain/schemas.js"
-import type {
-  CreatePersonResult,
-  DeletePersonResult,
-  ListPersonOrganizationsResult,
-  UpdatePersonResult
-} from "../../domain/schemas/contacts.js"
+import type { ListPersonOrganizationsResult } from "../../domain/schemas/contact-organizations.js"
+import type { CreatePersonResult, DeletePersonResult, UpdatePersonResult } from "../../domain/schemas/contacts.js"
 import { UPDATE_PERSON_FIELDS } from "../../domain/schemas/contacts.js"
 import { ContactProvider, Email, OrganizationId, PersonId, PersonName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"

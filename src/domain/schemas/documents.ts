@@ -2,6 +2,7 @@ import { JSONSchema, Schema } from "effect"
 
 import type { DocumentId, TeamspaceId, UrlString } from "./shared.js"
 import {
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   DocumentIdentifier,
   hasAtLeastOneDefined,
@@ -266,11 +267,11 @@ export const CreateTeamspaceParamsSchema = Schema.Struct({
 
 export type CreateTeamspaceParams = Schema.Schema.Type<typeof CreateTeamspaceParamsSchema>
 
-export const UPDATE_TEAMSPACE_FIELDS: ReadonlyArray<"name" | "description" | "archived"> = [
+export const UPDATE_TEAMSPACE_FIELDS = [
   "name",
   "description",
   "archived"
-]
+] as const satisfies ReadonlyArray<"name" | "description" | "archived">
 
 export const UpdateTeamspaceParamsSchema = Schema.Struct({
   teamspace: TeamspaceIdentifier.annotations({
@@ -297,6 +298,7 @@ export const UpdateTeamspaceParamsSchema = Schema.Struct({
 })
 
 export type UpdateTeamspaceParams = Schema.Schema.Type<typeof UpdateTeamspaceParamsSchema>
+assertUpdateFields<UpdateTeamspaceParams>()(["teamspace"], UPDATE_TEAMSPACE_FIELDS)
 
 export const DeleteTeamspaceParamsSchema = Schema.Struct({
   teamspace: TeamspaceIdentifier.annotations({

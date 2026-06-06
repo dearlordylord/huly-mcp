@@ -2,6 +2,7 @@ import { JSONSchema, ParseResult, Schema } from "effect"
 
 import { normalizeForComparison } from "../../utils/normalize.js"
 import {
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   ColorCode,
   ComponentIdentifier,
@@ -261,9 +262,18 @@ export const CreateIssueParamsSchema = Schema.Struct({
 
 export type CreateIssueParams = Schema.Schema.Type<typeof CreateIssueParamsSchema>
 
-export const UPDATE_ISSUE_FIELDS: ReadonlyArray<
+export const UPDATE_ISSUE_FIELDS = [
+  "title",
+  "description",
+  "priority",
+  "assignee",
+  "status",
+  "taskType",
+  "dueDate",
+  "estimation"
+] as const satisfies ReadonlyArray<
   "title" | "description" | "priority" | "assignee" | "status" | "taskType" | "dueDate" | "estimation"
-> = ["title", "description", "priority", "assignee", "status", "taskType", "dueDate", "estimation"]
+>
 
 export const UpdateIssueParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotations({
@@ -313,6 +323,7 @@ export const UpdateIssueParamsSchema = Schema.Struct({
 })
 
 export type UpdateIssueParams = Schema.Schema.Type<typeof UpdateIssueParamsSchema>
+assertUpdateFields<UpdateIssueParams>()(["project", "identifier"], UPDATE_ISSUE_FIELDS)
 
 export const AddLabelParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotations({

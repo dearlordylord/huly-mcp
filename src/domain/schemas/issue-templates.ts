@@ -3,6 +3,7 @@ import { JSONSchema, Schema } from "effect"
 import { IssuePrioritySchema } from "./issues.js"
 import type { IssueId, IssueIdentifier } from "./shared.js"
 import {
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   ComponentIdentifier,
   ComponentLabel,
@@ -199,9 +200,16 @@ export const CreateIssueFromTemplateParamsSchema = Schema.Struct({
 
 export type CreateIssueFromTemplateParams = Schema.Schema.Type<typeof CreateIssueFromTemplateParamsSchema>
 
-export const UPDATE_ISSUE_TEMPLATE_FIELDS: ReadonlyArray<
+export const UPDATE_ISSUE_TEMPLATE_FIELDS = [
+  "title",
+  "description",
+  "priority",
+  "assignee",
+  "component",
+  "estimation"
+] as const satisfies ReadonlyArray<
   "title" | "description" | "priority" | "assignee" | "component" | "estimation"
-> = ["title", "description", "priority", "assignee", "component", "estimation"]
+>
 
 export const UpdateIssueTemplateParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotations({
@@ -246,6 +254,7 @@ export const UpdateIssueTemplateParamsSchema = Schema.Struct({
 })
 
 export type UpdateIssueTemplateParams = Schema.Schema.Type<typeof UpdateIssueTemplateParamsSchema>
+assertUpdateFields<UpdateIssueTemplateParams>()(["project", "template"], UPDATE_ISSUE_TEMPLATE_FIELDS)
 
 export const DeleteIssueTemplateParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotations({

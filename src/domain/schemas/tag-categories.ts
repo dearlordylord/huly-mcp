@@ -1,6 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
 import {
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   hasAtLeastOneDefined,
   LimitParam,
@@ -62,7 +63,7 @@ export const CreateTagCategoryParamsSchema = Schema.Struct({
 
 export type CreateTagCategoryParams = Schema.Schema.Type<typeof CreateTagCategoryParamsSchema>
 
-export const UPDATE_TAG_CATEGORY_FIELDS: ReadonlyArray<"label" | "default"> = ["label", "default"]
+export const UPDATE_TAG_CATEGORY_FIELDS = ["label", "default"] as const satisfies ReadonlyArray<"label" | "default">
 
 export const UpdateTagCategoryParamsSchema = Schema.Struct({
   category: TagCategoryIdentifier.annotations({
@@ -88,6 +89,7 @@ export const UpdateTagCategoryParamsSchema = Schema.Struct({
 })
 
 export type UpdateTagCategoryParams = Schema.Schema.Type<typeof UpdateTagCategoryParamsSchema>
+assertUpdateFields<UpdateTagCategoryParams>()(["category"], UPDATE_TAG_CATEGORY_FIELDS)
 
 export const DeleteTagCategoryParamsSchema = Schema.Struct({
   category: TagCategoryIdentifier.annotations({

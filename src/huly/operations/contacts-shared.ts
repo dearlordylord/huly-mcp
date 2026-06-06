@@ -1,14 +1,14 @@
-import type { Channel, Person as HulyPerson, SocialIdentity } from "@hcengineering/contact"
-import type { Doc, Ref } from "@hcengineering/core"
+import type { Channel, Employee as HulyEmployee, Person as HulyPerson, SocialIdentity } from "@hcengineering/contact"
+import type { AccountUuid, Doc, Ref } from "@hcengineering/core"
 import { SocialIdType } from "@hcengineering/core"
 import { Effect, Schema } from "effect"
 
-import { Email, type PersonName, type PersonRefInput } from "../../domain/schemas/shared.js"
+import { Email, type NonEmptyString, PersonName, type PersonRefInput } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
-import { PersonIdentifierAmbiguousError } from "../errors.js"
+import { PersonIdentifierAmbiguousError, PersonNotAnEmployeeError, PersonNotFoundError } from "../errors.js"
 import { contact } from "../huly-plugins.js"
-import { escapeLikeWildcards } from "./query-helpers.js"
-import { toRef } from "./sdk-boundary.js"
+import { escapeLikeWildcards, hulyQuery } from "./query-helpers.js"
+import { toAccountUuid, toRef } from "./sdk-boundary.js"
 
 const isEmailIdentifier = Schema.is(Email)
 
@@ -165,6 +165,40 @@ export const findPersonByExactEmailOrName = (
   isEmailIdentifier(identifier)
     ? findPersonByExactEmail(client, identifier)
     : findPersonByExactName(client, identifier)
+
+/**
+ * Resolve a person identifier (email or exact display name) to the AccountUuid
+ * carried on contact.mixin.Employee.personUuid. Non-employee Persons have no
+ * workspace account and cannot be used in member arrays.
+ */
+export const resolveEmployeeAccountUuid = (
+  client: HulyClient["Type"],
+  identifier: NonEmptyString | PersonRefInput
+): Effect.Effect<
+  AccountUuid,
+  HulyClientError | PersonIdentifierAmbiguousError | PersonNotFoundError | PersonNotAnEmployeeError
+> =>
+  Effect.gen(function*() {
+    const person = yield* (
+      isEmailIdentifier(identifier)
+        ? findPersonByExactEmail(client, identifier)
+        : findPersonByExactName(client, PersonName.make(identifier))
+    )
+    if (person === undefined) {
+      return yield* new PersonNotFoundError({ identifier })
+    }
+
+    const employee = yield* client.findOne<HulyEmployee>(
+      contact.mixin.Employee,
+      hulyQuery<HulyEmployee>({ _id: toRef<HulyEmployee>(person._id) })
+    )
+
+    if (employee?.personUuid === undefined) {
+      return yield* new PersonNotAnEmployeeError({ identifier })
+    }
+
+    return toAccountUuid(employee.personUuid)
+  })
 
 export const findPersonByEmailOrName = (
   client: HulyClient["Type"],

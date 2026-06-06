@@ -456,6 +456,45 @@ assert_json_field_contains() {
   return 1
 }
 
+assert_json_array_contains() {
+  local name="$1" json="$2" jq_expr="$3" expected="$4"
+  if printf '%s\n' "$json" | jq -e --arg expected "$expected" "($jq_expr) | any(.[]?; . == \$expected)" >/dev/null 2>&1; then
+    echo "PASS: $name"
+    PASSED=$((PASSED + 1))
+    return 0
+  fi
+  echo "FAIL: $name (array $jq_expr does not contain $expected)"
+  FAILED=$((FAILED + 1))
+  ERRORS="${ERRORS}\n  - ${name}: array ${jq_expr} does not contain ${expected}"
+  return 1
+}
+
+assert_json_array_not_contains() {
+  local name="$1" json="$2" jq_expr="$3" expected="$4"
+  if printf '%s\n' "$json" | jq -e --arg expected "$expected" "($jq_expr) | all(.[]?; . != \$expected)" >/dev/null 2>&1; then
+    echo "PASS: $name"
+    PASSED=$((PASSED + 1))
+    return 0
+  fi
+  echo "FAIL: $name (array $jq_expr contains $expected)"
+  FAILED=$((FAILED + 1))
+  ERRORS="${ERRORS}\n  - ${name}: array ${jq_expr} contains ${expected}"
+  return 1
+}
+
+assert_json_array_same_set() {
+  local name="$1" json="$2" jq_expr="$3" expected_json="$4"
+  if printf '%s\n' "$json" | jq -e --argjson expected "$expected_json" "($jq_expr | sort) == (\$expected | sort)" >/dev/null 2>&1; then
+    echo "PASS: $name"
+    PASSED=$((PASSED + 1))
+    return 0
+  fi
+  echo "FAIL: $name (array $jq_expr does not match $expected_json)"
+  FAILED=$((FAILED + 1))
+  ERRORS="${ERRORS}\n  - ${name}: array ${jq_expr} does not match ${expected_json}"
+  return 1
+}
+
 assert_json_field_count() {
   local name="$1" json="$2" jq_expr="$3" expected="$4"
   local value
@@ -1833,9 +1872,170 @@ fi
 echo ""
 
 ##############################
-# 13b. GENERIC ASSOCIATIONS
+# 13b. SPACES
 ##############################
-echo "=== 13b. Generic Associations ==="
+echo "=== 13b. Spaces ==="
+SPACES_TEXT=$(run_capture "list_spaces" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_spaces","arguments":{"limit":5}},"id":2}')
+if [ $? -eq 0 ]; then
+  assert_json_field_nonempty "list_spaces returns total" "$SPACES_TEXT" ".total"
+  FIRST_SPACE_ID=$(echo "$SPACES_TEXT" | jq -r '.spaces[0].id // empty' 2>/dev/null)
+  if [ -n "$FIRST_SPACE_ID" ]; then
+    run_test "get_space($FIRST_SPACE_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_space\",\"arguments\":{\"space\":\"$FIRST_SPACE_ID\",\"includeArchived\":true}},\"id\":2}"
+  fi
+fi
+
+SPACE_TYPES_TEXT=$(run_capture "list_space_types" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_space_types","arguments":{"limit":5}},"id":2}')
+if [ $? -eq 0 ]; then
+  assert_json_field_nonempty "list_space_types returns total" "$SPACE_TYPES_TEXT" ".total"
+  FIRST_SPACE_TYPE_ID=$(echo "$SPACE_TYPES_TEXT" | jq -r '.spaceTypes[0].id // empty' 2>/dev/null)
+  if [ -n "$FIRST_SPACE_TYPE_ID" ]; then
+    run_test "get_space_type($FIRST_SPACE_TYPE_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_space_type\",\"arguments\":{\"spaceType\":\"$FIRST_SPACE_TYPE_ID\"}},\"id\":2}"
+  else
+    skip_test "get_space_type" "no space types found"
+  fi
+fi
+
+run_test "list_space_permissions" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_space_permissions","arguments":{"limit":5}},"id":2}'
+
+GENERIC_SPACE_NAME="IntTest Generic Space $RUN_ID"
+GENERIC_SPACE_UPDATED_NAME="IntTest Generic Space Updated $RUN_ID"
+GENERIC_SPACE_NAME_JSON=$(json_string "$GENERIC_SPACE_NAME")
+GENERIC_SPACE_UPDATED_NAME_JSON=$(json_string "$GENERIC_SPACE_UPDATED_NAME")
+GENERIC_SPACE_TEXT=$(run_capture "create_teamspace(for_generic_space)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_teamspace\",\"arguments\":{\"name\":$GENERIC_SPACE_NAME_JSON,\"description\":\"generic spaces integration fixture\",\"private\":false}},\"id\":2}")
+if [ $? -eq 0 ]; then
+  GENERIC_SPACE_ID=$(echo "$GENERIC_SPACE_TEXT" | jq -r '.id' 2>/dev/null)
+  echo "  => generic_space_fixture: $GENERIC_SPACE_ID"
+  run_capture_to_var GENERIC_SPACE_GET_TEXT "get_space($GENERIC_SPACE_ID fixture)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_space\",\"arguments\":{\"space\":\"$GENERIC_SPACE_ID\",\"includeArchived\":true}},\"id\":2}"
+
+  run_test "update_space($GENERIC_SPACE_ID metadata)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_space\",\"arguments\":{\"space\":\"$GENERIC_SPACE_ID\",\"name\":$GENERIC_SPACE_UPDATED_NAME_JSON,\"description\":\"generic spaces integration updated\",\"private\":true}},\"id\":2}"
+  sleep 2
+  UPDATED_TEAMSPACE_TEXT=$(run_capture "get_teamspace($GENERIC_SPACE_ID after update_space)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_teamspace\",\"arguments\":{\"teamspace\":\"$GENERIC_SPACE_ID\"}},\"id\":2}")
+  if [ $? -eq 0 ]; then
+    assert_json_field_equals "get_teamspace sees update_space name" "$UPDATED_TEAMSPACE_TEXT" ".name" "$GENERIC_SPACE_UPDATED_NAME"
+    assert_json_field_equals "get_teamspace sees update_space private" "$UPDATED_TEAMSPACE_TEXT" ".private" "true"
+  fi
+  run_test "update_space($GENERIC_SPACE_ID restore public)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_space\",\"arguments\":{\"space\":\"$GENERIC_SPACE_ID\",\"private\":false}},\"id\":2}"
+  sleep 1
+
+  MEMBERS_TEXT=$(run_capture_only \
+    '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_workspace_members","arguments":{"limit":20}},"id":2}')
+  if [ -n "$MEMBERS_TEXT" ] && [ -n "$GENERIC_SPACE_GET_TEXT" ]; then
+    INITIAL_OWNERS_JSON=$(printf '%s\n' "$GENERIC_SPACE_GET_TEXT" | jq -c '.owners // []' 2>/dev/null)
+    INITIAL_OWNER_COUNT=$(printf '%s\n' "$INITIAL_OWNERS_JSON" | jq -r 'length' 2>/dev/null)
+    GENERIC_MEMBER_CANDIDATE=$(jq -nr \
+      --argjson members "$MEMBERS_TEXT" \
+      --argjson space "$GENERIC_SPACE_GET_TEXT" \
+      '$members[]?.personId as $person | select((($space.members // []) | index($person) | not) and (($space.owners // []) | index($person) | not)) | $person' \
+      2>/dev/null | head -n 1)
+    if [ -n "$GENERIC_MEMBER_CANDIDATE" ]; then
+      GENERIC_MEMBER_JSON=$(json_string "$GENERIC_MEMBER_CANDIDATE")
+      run_capture_to_var ADD_MEMBERS_TEXT "add_space_members($GENERIC_SPACE_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_space_members\",\"arguments\":{\"space\":\"$GENERIC_SPACE_ID\",\"members\":[$GENERIC_MEMBER_JSON]}},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        if printf '%s\n' "$ADD_MEMBERS_TEXT" | jq -e --arg member "$GENERIC_MEMBER_CANDIDATE" 'any(.members[]?; . == $member)' >/dev/null 2>&1; then
+          echo "PASS: add_space_members includes candidate"
+          PASSED=$((PASSED + 1))
+        else
+          fail_test "add_space_members includes candidate" "member not returned after add"
+        fi
+        sleep 2
+        if run_capture_to_var ADD_MEMBERS_PERSISTED_TEXT "get_space($GENERIC_SPACE_ID after add_space_members)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_space\",\"arguments\":{\"space\":\"$GENERIC_SPACE_ID\",\"includeArchived\":true}},\"id\":2}"; then
+          assert_json_array_contains "get_space sees add_space_members persisted" "$ADD_MEMBERS_PERSISTED_TEXT" ".members // []" "$GENERIC_MEMBER_CANDIDATE"
+        fi
+      fi
+
+      if [ "${INITIAL_OWNER_COUNT:-0}" -gt 0 ]; then
+        OWNER_ARGS_JSON=$(printf '%s\n' "$INITIAL_OWNERS_JSON" | jq -c --arg member "$GENERIC_MEMBER_CANDIDATE" '. + [$member] | unique' 2>/dev/null)
+        if run_test "set_space_owners($GENERIC_SPACE_ID add candidate owner)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_space_owners\",\"arguments\":{\"space\":\"$GENERIC_SPACE_ID\",\"owners\":$OWNER_ARGS_JSON,\"ensureMembers\":true}},\"id\":2}"; then
+          sleep 2
+          if run_capture_to_var OWNERS_ADD_PERSISTED_TEXT "get_space($GENERIC_SPACE_ID after set_space_owners add)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_space\",\"arguments\":{\"space\":\"$GENERIC_SPACE_ID\",\"includeArchived\":true}},\"id\":2}"; then
+            assert_json_array_contains "get_space sees set_space_owners owner persisted" "$OWNERS_ADD_PERSISTED_TEXT" ".owners // []" "$GENERIC_MEMBER_CANDIDATE"
+            assert_json_array_contains "get_space sees set_space_owners ensureMembers persisted" "$OWNERS_ADD_PERSISTED_TEXT" ".members // []" "$GENERIC_MEMBER_CANDIDATE"
+          fi
+        fi
+        if run_test "set_space_owners($GENERIC_SPACE_ID restore owners)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_space_owners\",\"arguments\":{\"space\":\"$GENERIC_SPACE_ID\",\"owners\":$INITIAL_OWNERS_JSON,\"ensureMembers\":true}},\"id\":2}"; then
+          sleep 2
+          if run_capture_to_var OWNERS_RESTORE_PERSISTED_TEXT "get_space($GENERIC_SPACE_ID after set_space_owners restore)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_space\",\"arguments\":{\"space\":\"$GENERIC_SPACE_ID\",\"includeArchived\":true}},\"id\":2}"; then
+            assert_json_array_same_set "get_space sees set_space_owners restore persisted" "$OWNERS_RESTORE_PERSISTED_TEXT" ".owners // []" "$INITIAL_OWNERS_JSON"
+          fi
+        fi
+      else
+        skip_test "set_space_owners" "generic space fixture has no owner list to restore"
+      fi
+
+      if run_test "remove_space_members($GENERIC_SPACE_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_space_members\",\"arguments\":{\"space\":\"$GENERIC_SPACE_ID\",\"members\":[$GENERIC_MEMBER_JSON]}},\"id\":2}"; then
+        sleep 2
+        if run_capture_to_var REMOVE_MEMBERS_PERSISTED_TEXT "get_space($GENERIC_SPACE_ID after remove_space_members)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_space\",\"arguments\":{\"space\":\"$GENERIC_SPACE_ID\",\"includeArchived\":true}},\"id\":2}"; then
+          assert_json_array_not_contains "get_space sees remove_space_members persisted" "$REMOVE_MEMBERS_PERSISTED_TEXT" ".members // []" "$GENERIC_MEMBER_CANDIDATE"
+        fi
+      fi
+    else
+      GENERIC_EXISTING_MEMBER=$(printf '%s\n' "$GENERIC_SPACE_GET_TEXT" | jq -r '.members[0] // empty' 2>/dev/null)
+      if [ -n "$GENERIC_EXISTING_MEMBER" ]; then
+        GENERIC_EXISTING_MEMBER_JSON=$(json_string "$GENERIC_EXISTING_MEMBER")
+        if run_test "remove_space_members($GENERIC_SPACE_ID existing member)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_space_members\",\"arguments\":{\"space\":\"$GENERIC_SPACE_ID\",\"members\":[$GENERIC_EXISTING_MEMBER_JSON]}},\"id\":2}"; then
+          sleep 2
+          if run_capture_to_var REMOVE_EXISTING_PERSISTED_TEXT "get_space($GENERIC_SPACE_ID after remove existing member)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_space\",\"arguments\":{\"space\":\"$GENERIC_SPACE_ID\",\"includeArchived\":true}},\"id\":2}"; then
+            assert_json_array_not_contains "get_space sees remove existing member persisted" "$REMOVE_EXISTING_PERSISTED_TEXT" ".members // []" "$GENERIC_EXISTING_MEMBER"
+          fi
+        fi
+        if run_test "add_space_members($GENERIC_SPACE_ID restore existing member)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_space_members\",\"arguments\":{\"space\":\"$GENERIC_SPACE_ID\",\"members\":[$GENERIC_EXISTING_MEMBER_JSON]}},\"id\":2}"; then
+          sleep 2
+          if run_capture_to_var RESTORE_EXISTING_PERSISTED_TEXT "get_space($GENERIC_SPACE_ID after restore existing member)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_space\",\"arguments\":{\"space\":\"$GENERIC_SPACE_ID\",\"includeArchived\":true}},\"id\":2}"; then
+            assert_json_array_contains "get_space sees restore existing member persisted" "$RESTORE_EXISTING_PERSISTED_TEXT" ".members // []" "$GENERIC_EXISTING_MEMBER"
+          fi
+        fi
+      else
+        skip_test "add/remove_space_members" "generic space fixture has no members to restore"
+      fi
+      if [ "${INITIAL_OWNER_COUNT:-0}" -gt 0 ]; then
+        if run_test "set_space_owners($GENERIC_SPACE_ID existing owners)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_space_owners\",\"arguments\":{\"space\":\"$GENERIC_SPACE_ID\",\"owners\":$INITIAL_OWNERS_JSON,\"ensureMembers\":true}},\"id\":2}"; then
+          sleep 2
+          if run_capture_to_var OWNERS_EXISTING_PERSISTED_TEXT "get_space($GENERIC_SPACE_ID after set existing owners)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_space\",\"arguments\":{\"space\":\"$GENERIC_SPACE_ID\",\"includeArchived\":true}},\"id\":2}"; then
+            assert_json_array_same_set "get_space sees set existing owners persisted" "$OWNERS_EXISTING_PERSISTED_TEXT" ".owners // []" "$INITIAL_OWNERS_JSON"
+          fi
+        fi
+      else
+        skip_test "set_space_owners" "generic space fixture has no owner list to restore"
+      fi
+    fi
+  else
+    skip_test "add/remove_space_members" "workspace members or generic space details unavailable"
+    skip_test "set_space_owners" "workspace members or generic space details unavailable"
+  fi
+
+  run_test "delete_teamspace($GENERIC_SPACE_ID generic_fixture)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_teamspace\",\"arguments\":{\"teamspace\":\"$GENERIC_SPACE_ID\"}},\"id\":2}"
+fi
+echo ""
+
+##############################
+# 13c. GENERIC ASSOCIATIONS
+##############################
+echo "=== 13c. Generic Associations ==="
 ASSOCIATIONS_TEXT=$(run_capture "list_associations" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_associations","arguments":{"limit":5}},"id":2}')
 ASSOC_ID=$(echo "$ASSOCIATIONS_TEXT" | jq -r '.associations[0].associationId // empty' 2>/dev/null)

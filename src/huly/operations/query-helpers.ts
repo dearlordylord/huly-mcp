@@ -1,7 +1,7 @@
 import type { Class, Doc, DocumentQuery, FindOptions, Lookup, Ref, WithLookup } from "@hcengineering/core"
 import { Effect } from "effect"
 
-import { MAX_LIMIT } from "../../domain/schemas/shared.js"
+import { DEFAULT_LIMIT, MAX_LIMIT } from "../../domain/schemas/shared.js"
 import type { HulyClientError, HulyClientOperations } from "../client.js"
 
 export type StrictDocumentQuery<T extends Doc> =
@@ -85,7 +85,5 @@ export const findByNameOrIdOrFail = <T extends Doc, E>(
         ? Effect.succeed(result)
         : Effect.fail(onNotFound())
   )
-
-const DEFAULT_LIMIT = 50
 
 export const clampLimit = (limit?: number): number => Math.min(limit ?? DEFAULT_LIMIT, MAX_LIMIT)

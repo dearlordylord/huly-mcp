@@ -1,6 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
 import {
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   ComponentId,
   ComponentIdentifier,
@@ -93,11 +94,11 @@ export const CreateComponentParamsSchema = Schema.Struct({
 
 export type CreateComponentParams = Schema.Schema.Type<typeof CreateComponentParamsSchema>
 
-export const UPDATE_COMPONENT_FIELDS: ReadonlyArray<"label" | "description" | "lead"> = [
+export const UPDATE_COMPONENT_FIELDS = [
   "label",
   "description",
   "lead"
-]
+] as const satisfies ReadonlyArray<"label" | "description" | "lead">
 
 export const UpdateComponentParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotations({
@@ -129,6 +130,7 @@ export const UpdateComponentParamsSchema = Schema.Struct({
 })
 
 export type UpdateComponentParams = Schema.Schema.Type<typeof UpdateComponentParamsSchema>
+assertUpdateFields<UpdateComponentParams>()(["project", "component"], UPDATE_COMPONENT_FIELDS)
 
 export const SetIssueComponentParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotations({

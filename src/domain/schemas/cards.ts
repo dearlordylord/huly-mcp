@@ -2,6 +2,7 @@ import { JSONSchema, Schema } from "effect"
 
 import type { CardId, CardSpaceId, MasterTagId } from "./shared.js"
 import {
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   CardIdentifier,
   CardSpaceIdentifier,
@@ -160,7 +161,7 @@ export const CreateCardParamsSchema = Schema.Struct({
 
 export type CreateCardParams = Schema.Schema.Type<typeof CreateCardParamsSchema>
 
-export const UPDATE_CARD_FIELDS: ReadonlyArray<"title" | "content"> = ["title", "content"]
+export const UPDATE_CARD_FIELDS = ["title", "content"] as const satisfies ReadonlyArray<"title" | "content">
 
 export const UpdateCardParamsSchema = Schema.Struct({
   cardSpace: CardSpaceIdentifier.annotations({
@@ -185,6 +186,7 @@ export const UpdateCardParamsSchema = Schema.Struct({
 })
 
 export type UpdateCardParams = Schema.Schema.Type<typeof UpdateCardParamsSchema>
+assertUpdateFields<UpdateCardParams>()(["cardSpace", "card"], UPDATE_CARD_FIELDS)
 
 export const DeleteCardParamsSchema = Schema.Struct({
   cardSpace: CardSpaceIdentifier.annotations({

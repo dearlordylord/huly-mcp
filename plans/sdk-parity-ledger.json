@@ -268,7 +268,7 @@
       "package": "@hcengineering/core",
       "status": "gap",
       "matrixLocation": "Core classes, attributes, enums; Core spaces, permissions, roles",
-      "rationale": "Remaining core schema/configuration, spaces, permissions, collaborators, sequences, statuses, and write-side model management are represented as matrix gaps.",
+      "rationale": "Remaining core schema/configuration, role assignment writes, role/permission definition writes, generic space creation, collaborators, sequences, statuses, and write-side model management are represented as matrix gaps. Generic space discovery, space type/permission reads, safe existing-space metadata updates, member mutations, and owner replacement are covered by the spaces toolset.",
       "exports": [
         "AttributePermission",
         "ClassCollaborators",

@@ -2,6 +2,7 @@ import { JSONSchema, Schema } from "effect"
 
 import type { AccountUuid, ChannelId, ChannelName, PersonName } from "./shared.js"
 import {
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   ChannelIdentifier,
   hasAtLeastOneDefined,
@@ -129,7 +130,7 @@ export type CreateChannelParams = Schema.Schema.Type<typeof CreateChannelParamsS
 
 // --- Update Channel Params ---
 
-export const UPDATE_CHANNEL_FIELDS: ReadonlyArray<"name" | "topic"> = ["name", "topic"]
+export const UPDATE_CHANNEL_FIELDS = ["name", "topic"] as const satisfies ReadonlyArray<"name" | "topic">
 
 export const UpdateChannelParamsSchema = Schema.Struct({
   channel: ChannelIdentifier.annotations({
@@ -153,6 +154,7 @@ export const UpdateChannelParamsSchema = Schema.Struct({
 })
 
 export type UpdateChannelParams = Schema.Schema.Type<typeof UpdateChannelParamsSchema>
+assertUpdateFields<UpdateChannelParams>()(["channel"], UPDATE_CHANNEL_FIELDS)
 
 // --- Delete Channel Params ---
 

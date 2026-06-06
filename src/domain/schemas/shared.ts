@@ -1,6 +1,14 @@
 import { JSONSchema, Schema } from "effect"
 
 export const MAX_LIMIT = 200
+export const DEFAULT_LIMIT = 50
+
+export const ListTotal = Schema.NonNegativeInt.pipe(Schema.brand("ListTotal")).annotations({
+  identifier: "ListTotal",
+  title: "ListTotal",
+  description: "Non-negative integer count of matching list results."
+})
+export type ListTotal = Schema.Schema.Type<typeof ListTotal>
 
 export const NonEmptyString = Schema.Trim.pipe(Schema.nonEmptyString())
 export type NonEmptyString = Schema.Schema.Type<typeof NonEmptyString>
@@ -41,6 +49,29 @@ export const withAtLeastOneRequired = <K extends string>(
   ...schema,
   anyOf: fields.map((field) => ({ required: [field] }))
 })
+
+type UpdateFieldExactness<
+  Params,
+  NonUpdateFields extends ReadonlyArray<string>,
+  Fields extends ReadonlyArray<string>
+> = Exclude<Extract<keyof Params, string>, NonUpdateFields[number] | Fields[number]> extends never ? Extract<
+    NonUpdateFields[number],
+    Fields[number]
+  > extends never ? unknown : {
+    readonly __overlappingUpdateFields: Extract<NonUpdateFields[number], Fields[number]>
+  }
+  : {
+    readonly __missingUpdateFields: Exclude<Extract<keyof Params, string>, NonUpdateFields[number] | Fields[number]>
+  }
+
+export const assertUpdateFields = <Params>() =>
+<
+  const NonUpdateFields extends ReadonlyArray<Extract<keyof Params, string>>,
+  const Fields extends ReadonlyArray<Extract<keyof Params, string>>
+>(
+  _nonUpdateFields: NonUpdateFields,
+  fields: Fields & UpdateFieldExactness<Params, NonUpdateFields, Fields>
+): Fields => fields
 
 // === Tier 1: Huly Internal Refs (opaque IDs from _id) ===
 
@@ -145,6 +176,15 @@ export type TodoId = Schema.Schema.Type<typeof TodoId>
 export const SpaceId = HulyRef("SpaceId")
 export type SpaceId = Schema.Schema.Type<typeof SpaceId>
 
+export const SpaceTypeId = HulyRef("SpaceTypeId")
+export type SpaceTypeId = Schema.Schema.Type<typeof SpaceTypeId>
+
+export const RoleId = HulyRef("RoleId")
+export type RoleId = Schema.Schema.Type<typeof RoleId>
+
+export const PermissionId = HulyRef("PermissionId")
+export type PermissionId = Schema.Schema.Type<typeof PermissionId>
+
 export const CommentId = HulyRef("CommentId")
 export type CommentId = Schema.Schema.Type<typeof CommentId>
 
@@ -200,6 +240,15 @@ export type ProjectIdentifier = Schema.Schema.Type<typeof ProjectIdentifier>
 
 export const IssueIdentifier = NonEmptyString.pipe(Schema.brand("IssueIdentifier"))
 export type IssueIdentifier = Schema.Schema.Type<typeof IssueIdentifier>
+
+export const SpaceIdentifier = NonEmptyString.pipe(Schema.brand("SpaceIdentifier"))
+export type SpaceIdentifier = Schema.Schema.Type<typeof SpaceIdentifier>
+
+export const SpaceClassFilter = NonEmptyString.pipe(Schema.brand("SpaceClassFilter"))
+export type SpaceClassFilter = Schema.Schema.Type<typeof SpaceClassFilter>
+
+export const SpaceTypeIdentifier = NonEmptyString.pipe(Schema.brand("SpaceTypeIdentifier"))
+export type SpaceTypeIdentifier = Schema.Schema.Type<typeof SpaceTypeIdentifier>
 
 // === Tier 3: Constrained String Domains ===
 

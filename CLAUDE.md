@@ -21,6 +21,8 @@ When setting up a new project from this one, ALL of these components must be cop
 
 Missing any of these degrades the quality gate. Coverage and duplication detection are especially easy to forget.
 
+Line-count limits are architecture signals. If `max-lines` fails, split the file along a coherent module boundary; do not shave, compress, alias, or otherwise game individual lines just to get under the threshold.
+
 ## Package Manager
 
 Use `pnpm`, not npm. Prefer package.json scripts over raw commands (e.g., `pnpm typecheck` not `pnpm tsc --noEmit`).

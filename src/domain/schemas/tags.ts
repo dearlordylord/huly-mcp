@@ -2,6 +2,7 @@ import type { TagReference as HulyTagReference } from "@hcengineering/tags"
 import { JSONSchema, Schema } from "effect"
 
 import {
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   ColorCode,
   DocId,
@@ -155,7 +156,9 @@ const updateTagFields = {
 
 export type UpdateTagField = keyof typeof updateTagFields
 const UpdateTagFieldSchema = Schema.Struct(updateTagFields)
-export const UPDATE_TAG_FIELDS = Object.keys(updateTagFields)
+export const UPDATE_TAG_FIELDS = ["title", "color", "description", "category"] as const satisfies ReadonlyArray<
+  UpdateTagField
+>
 
 export const UpdateTagParamsSchema = Schema.Struct({
   targetClass: TagTargetClass,
@@ -172,6 +175,7 @@ export const UpdateTagParamsSchema = Schema.Struct({
   description: `Update a generic Huly tag definition. ${atLeastOneUpdateFieldMessage(UPDATE_TAG_FIELDS)}`
 })
 export type UpdateTagParams = Schema.Schema.Type<typeof UpdateTagParamsSchema>
+assertUpdateFields<UpdateTagParams>()(["targetClass", "tag"], UPDATE_TAG_FIELDS)
 
 export const DeleteTagParamsSchema = Schema.Struct({
   targetClass: TagTargetClass,

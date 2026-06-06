@@ -12,7 +12,7 @@ Local evidence sources:
 
 Current high-level MCP categories:
 
-`projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `leads`, `processes`, `tags`, `tag-categories`, `task-management`, `test-management`, `user-statuses`.
+`projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `spaces`, `cards`, `custom-fields`, `labels`, `leads`, `processes`, `sdk-discovery`, `tags`, `tag-categories`, `task-management`, `test-management`, `user-statuses`.
 
 ## Missing Or Partially Missing SDK Surfaces
 
@@ -41,8 +41,8 @@ Current high-level MCP categories:
 | Activity gaps | Installed `@hcengineering/activity`; `.reference/platform/models/activity/src/index.ts`: pinned messages, replies, references, filters, saved messages, reactions, mentions | List activity, reactions, save/unsave, mentions | Pin/unpin activity messages, generic activity replies on raw object activity, activity filters, activity references/mentions to objects, activity update-message introspection |
 | Attachments gaps | Installed `@hcengineering/attachment`; `.reference/platform/models/attachment/src/index.ts`: `Attachment`, `Embedding`, `Photo`, `SavedAttachments`, `Drawing` | Generic attachment CRUD/download/pin; issue/document convenience add | Saved attachments, photo-specific collections, embeddings, drawings, attachment previews/preview metadata, object-specific friendly wrappers beyond issue/document |
 | Tags/labels beyond tracker issues | Installed `@hcengineering/tags`; `.reference/platform/models/tags/src/index.ts`: `TagElement`, `TagReference`, `TagCategory` with arbitrary `targetClass` | SDK-level generic tags are covered: target-class TagElement CRUD, raw TagReference list/attach/detach, tracker `labels` wrappers, and arbitrary-target tag categories | Module-specific friendly wrappers remain for recruiting skills, board labels, controlled-doc labels, and contact tags so callers do not need raw object IDs/classes/collection names |
-| Core classes, attributes, enums | Installed `@hcengineering/core`; `.reference/platform/models/core/src/core.ts`: `Class`, `Mixin`, `Enum`, `Attribute`, type classes, sequence/custom sequence | Custom-field read/set; read-only `list_huly_classes`, `get_huly_class`, `list_huly_attributes`, `list_huly_enums` expose class/interface/mixin IDs, attributes, inherited fields, enum values, and purpose-built MCP tool hints | Attribute/property create/update/delete/hide, enum CRUD/options, sequence management, space-type metadata discovery |
-| Core spaces, permissions, roles | Installed `@hcengineering/core`; `.reference/platform/models/core/src/security.ts`: `Space`, `TypedSpace`, `SpaceType`, `Role`, `Permission`, permission groups | Workspace member role update, project/teamspace create/update partial | Generic space listing/details/members, space roles, space type roles, permissions, owners/members/private/auto-join across modules, global spaces admins |
+| Core classes, attributes, enums | Installed `@hcengineering/core`; `.reference/platform/models/core/src/core.ts`: `Class`, `Mixin`, `Enum`, `Attribute`, type classes, sequence/custom sequence | Custom-field read/set; read-only `list_huly_classes`, `get_huly_class`, `list_huly_attributes`, `list_huly_enums` expose class/interface/mixin IDs, attributes, inherited fields, enum values, and purpose-built MCP tool hints | Attribute/property create/update/delete/hide, enum CRUD/options, sequence management |
+| Core spaces, permissions, roles | Installed `@hcengineering/core`; `.reference/platform/models/core/src/security.ts`: `Space`, `TypedSpace`, `SpaceType`, `Role`, `Permission`, permission groups | Generic `spaces` tools list/get spaces, list/get space types, list permissions, update safe existing-space metadata, add/remove members, and replace owners; workspace member role update; project/teamspace create/update partial | Role assignment mutations, role/permission definition writes, generic space creation, global spaces admins, module-specific wrappers above the generic foundation |
 | Settings / integrations registry | `.reference/platform/models/setting/src/index.ts`: `Integration`, `IntegrationType`, settings categories, invite settings, role capability settings, office settings, workspace settings | Guest settings and access links, workspace info/profile | List integrations/integration types, connect/disconnect/configure integration records where backend supports it, invite settings, role capability settings, office settings, workspace setting icon/metadata |
 | GitHub integration | Huly docs plus integration architecture in settings; PR task type appears through tracker/task type model when GitHub is enabled | No GitHub integration tools; issue tools may operate on synced issues after setup | Connect/list mapped repositories, map/unmap repo to project, list pull requests, issue GitHub sync controls, GitHub link metadata |
 | Google Calendar integration | Settings integration architecture; external calendar model in calendar | No integration management | Connect/configure/disconnect Google Calendar, list synced calendars, enable/disable synced calendars, sync status/errors |
@@ -72,7 +72,7 @@ Current high-level MCP categories:
 | `@hcengineering/card` | Mostly basic CRUD | Card roles/permissions, favorites, export extensions, advanced master tag schema management |
 | `@hcengineering/chunter` | Partial | Group DMs, channel membership, join/leave, pin/star/archive semantics, message attachments/translation |
 | `@hcengineering/contact` | Partial | Person channels/social identities, employee invite/kick/reinvite, merge contacts, contact statuses |
-| `@hcengineering/core` | Partial | Classes/enums/attributes, generic spaces, permissions, roles, collaborators, sequences |
+| `@hcengineering/core` | Partial | Attribute/enum writes, role assignment mutations, role/permission definition writes, generic space creation, collaborators, sequences |
 | `@hcengineering/document` | Partial | Snapshots/history, backlinks, notes, structured action items/tables, PDF/export, advanced document relationships |
 | `@hcengineering/notification` | Partial | Mark unread, unarchive, hide/unhide/mute contexts, notification type settings, collaborators |
 | `@hcengineering/tags` | SDK-level covered; module wrappers partial | Module-specific wrappers for tag-backed concepts such as recruiting skills, board labels, controlled-doc labels, and contact tags |
@@ -82,8 +82,8 @@ Current high-level MCP categories:
 
 ## Highest-Value Additions For LLM Agents
 
-1. **Generic space/member/role tools**: many modules share `TypedSpace`, roles, members, privacy, and auto-join patterns.
-2. **SDK discovery phase 2**: add space type, role/permission, plugin configuration, and sequence metadata discovery on top of the class/attribute/enum tools.
+1. **Generic space/member/role foundation follow-ups**: role assignment mutations, role/permission definition writes, generic space creation, and module-specific wrappers are still separate work. Generic space discovery, space type/permission reads, safe metadata updates, member mutations, and owner replacement are implemented under `spaces`.
+2. **SDK discovery phase 2**: add plugin configuration and sequence metadata discovery on top of the class/attribute/enum/space-type/permission tools.
 3. **Drive**: high-value and strongly modeled (`Drive`, `Folder`, `File`, `FileVersion`) but absent.
 4. **Planner/ToDos**: strongly modeled and user-visible; current `WorkSlot` tools are not enough.
 5. **Recruiting**: strongly modeled, currently absent, and requires first-class resolvers for vacancies/talents/applications.

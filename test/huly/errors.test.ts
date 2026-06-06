@@ -841,6 +841,14 @@ describe("Huly Errors", () => {
               return `generic-object-not-found:${error.field}:${error.identifier}:${error.class ?? ""}`
             case "HulyClassNotFoundError":
               return `huly-class-not-found:${error.classId}`
+            case "SpaceNotFoundError":
+              return `space:${error.identifier}`
+            case "SpaceIdentifierAmbiguousError":
+              return `space-ambiguous:${error.identifier}:${error.matches.length}`
+            case "SpaceTypeNotFoundError":
+              return `space-type:${error.identifier}`
+            case "SpaceTypeIdentifierAmbiguousError":
+              return `space-type-ambiguous:${error.identifier}:${error.matches.length}`
             case "NoUpdateFieldsError":
               return `no-update-fields:${error.operation}:${error.fields.length}`
             case "CannotDirectMessageSelfError":

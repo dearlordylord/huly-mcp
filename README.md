@@ -263,18 +263,66 @@ The server exposes read-only MCP Resources as JSON context for clients that supp
 
 `resources/list` returns concrete active project resources. Issue resources are template-based: use `resources/templates/list` to discover supported issue URI templates, then read a known issue URI.
 
-Resource roadmap:
+## Roadmap
+
+The roadmap is driven by SDK parity and the project principle that this server should expose LLM-first tools: clear names, self-contained parameters, automatic identifier resolution, and single-call correctness. The audited source of truth lives in [plans/huly-sdk-gap-matrix.md](plans/huly-sdk-gap-matrix.md), with machine-checkable classifications in [plans/sdk-parity-ledger.json](plans/sdk-parity-ledger.json).
+
+Highest-value additions for coding agents:
+
+- Generic space follow-ups: role assignment mutations, role/permission definition writes, generic space creation, and module-specific wrappers above the shared space foundation.
+- SDK discovery phase 2: space types, roles, permissions, plugin configuration, sequence metadata, and richer tool hints.
+- Drive tools: drive spaces, folders, files, file versions, path traversal, moves, permissions, and comments/activity.
+- Planner/ToDos: personal and project ToDo CRUD, scheduling, complete/reopen, priority, privacy/visibility, and document action items.
+- Recruiting: vacancies, candidates, applications, application statuses, recruiter assignment, reviews, opinions, skills, and related comments/attachments/activity.
+- Controlled documents and trainings: controlled document spaces/projects, review/approval workflows, templates, categories, snapshots/history, training assignments, attempts, scoring, and results.
+- Module-specific tag wrappers for tag-backed concepts such as recruiting skills, board labels, controlled-document labels, and contact tags.
+
+Planned feature surfaces:
+
+- Implemented foundation: generic space discovery and safe existing-space administration are covered by `spaces` tools for listing/getting spaces, listing/getting space types, reading permissions, updating common metadata, adding/removing members, and replacing owners.
+- Controlled Documents / TraceX documents: controlled spaces/projects, controlled document CRUD, quality/technical docs, co-authors/reviewers/approvers, e-signature workflows, release/effective-date metadata, change control, training linkage, controlled-document comments, and snapshots/history.
+- Products and product versions: product spaces, members, descriptions, attachments, versions, version state transitions, and change-control links.
+- Trainings, questions, and assessments: training revisions, releases, requests, due dates, max attempts, question banks, answer options, correct-answer data, submissions, scoring, and reporting.
+- Drive: drives, folders, files, file versions, current-version selection, path traversal, moves, uploads, comments/activity, and permissions/members.
+- HR: departments, nested departments, staff mixins, managers, subscribers, team leads, request types, PTO/sick/overtime/remote requests, public holidays, and schedule/table reports.
+- Recruiting: vacancies, talents/candidates, applications, matches, reviews, verdicts/opinions, vacancy-company lists, skills, and recruiting-specific custom fields/relations.
+- Surveys and polls: survey CRUD, poll creation/attachment, survey question data, completion status, and results.
+- Generic approval requests: create/list/approve/reject/cancel approval requests, decision comments, required approval counts, request status, and requested/approved/rejected people.
+- Boards: board CRUD, board cards, status workflows, members/assignees, location, cover/archive fields, board labels, and menu/archive views.
+- Inventory: categories, products, variants/SKUs, product photos, attachments, activity/comments, and hierarchy tools.
+- Leads write surface: create/update/delete funnels and leads, status changes, assignment, start dates, customer descriptions, person customer support, and lead comments/attachments/labels/relations.
+- Contacts: person channels, social identities, provider discovery, contact statuses, notes/comments, person attachments, person merge, employee invite/create/kick/reinvite, and inactive employee management.
+- Calendar: calendar CRUD/config, external calendar sync metadata, primary calendar management, schedule objects, participant mutations, and RSVP/status support when stable.
+- Team planner and schedule reporting: team agendas, workload/capacity summaries, and visibility-aware free/busy views across members/projects.
+- Virtual office and meetings: offices, floors, rooms, access/language/default recording/transcription settings, meeting schedules, active participants, room info, meeting minutes, transcripts, recordings, and device preferences.
+- Chat and communication: direct-message send/update/delete, group DMs, channel member mutations, join/leave/request access, archive/unarchive, star/favorite channels, close/reopen conversations, pinned messages, message attachments, translation, applets, in-message polls, and guest communication settings.
+- Notifications and activity: mark unread, unarchive, hide/unhide/mute contexts, unsubscribe per context/type, notification type settings, collaborators, pin/unpin activity messages, generic activity replies, filters, references, mentions, and update-message introspection.
+- Attachments and media: saved attachments, photos, drawings, embeddings, previews/preview metadata, and friendly wrappers for additional object types.
+- Core schema and workspace administration: attribute/property create/update/delete/hide, enum CRUD/options, sequence management, role assignment mutations, role/permission definition writes, generic space creation, global space admins, integrations registry, invite settings, role capability settings, and workspace setting metadata.
+- Integrations: GitHub repository/project mappings and sync metadata, Google Calendar connect/configure/sync controls, Bitrix entity/field mappings and sync status, Gmail/email channel messages, Telegram messages, Huly Mail/Mail plugin behavior, AI assistant integration state, and AI bot configuration if server-side APIs expose stable behavior.
+- Templates, rating, support, billing, analytics, views, workbench, and preferences: message templates/categories/fields, document/person rating data, support conversations, billing tier/status discovery, onboarding channels, saved filtered views, user view preferences, tabs/widgets/apps, and module preference discovery/update.
+- Document-specific gaps: document snapshots/history, backlinks, notes, structured action items/tables, PDF/export, advanced document relationships, and document printing/export once SDK support is safe.
+
+MCP resource roadmap:
 
 - Return resource links from list/search tool results for direct `resources/read` follow-up.
 - Add document resources when document reads have a stable URI shape and context-friendly payload.
 - Consider scoped/paginated issue listing only when filters prevent very large `resources/list` responses.
 - Consider resource `subscribe` and `listChanged` support after stateful sessions and a Huly change source are available.
 
+SDK upgrade revisit:
+
+- Revisit `@hcengineering/*` upgrades when a newer release is available after `0.7.423`.
+- Verify published tarballs, not only npm metadata, before accepting SDK upgrades.
+- Require valid published declaration files for direct Huly dependencies.
+- Upgrade direct Huly package declarations coherently in `package.json`; do not accept lockfile-only transitive rewrites.
+- Run `pnpm check-all` and local Huly integration tests before treating an SDK upgrade as viable.
+
 <!-- tools:start -->
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
 ## Available Tools
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `leads`, `processes`, `sdk-discovery`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `leads`, `processes`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`
 
 ### Projects
 
@@ -568,6 +616,20 @@ Resource roadmap:
 | `get_huly_class` | Read one Huly class/interface/mixin by exact ID and return its inheritance chain plus model attributes. Use this when you need fields, ref targets, enum IDs, or hints about purpose-built MCP tool categories for the class. |
 | `list_huly_attributes` | Discover Huly model attributes across the workspace or directly on one class/mixin. Returns attribute IDs, owner classes, labels, type families, ref targets, enum IDs, and custom-field markers. |
 | `list_huly_enums` | Discover Huly enum model documents and their valid values. Use enum IDs from get_huly_class or list_huly_attributes to inspect allowed enum values before writing or interpreting enum fields. |
+
+### Spaces
+
+| Tool | Description |
+|------|-------------|
+| `list_spaces` | List generic Huly spaces across modules. Defaults to active/non-archived spaces. Returns raw space id, class, type, privacy, archived, autoJoin, member count, and owner count so module-specific tools can reuse the result. |
+| `get_space` | Get one generic Huly space by raw space _id or exact space name. Resolution tries _id first, then exact name. If a name matches multiple spaces, pass class and/or type to narrow; ambiguous errors include matching ids/classes/types. |
+| `list_space_types` | List configured Huly SpaceType records. Returns descriptor id, base class, target class, default members, autoJoin, and role count for discovering typed-space configuration. |
+| `get_space_type` | Get one Huly SpaceType by raw SpaceType _id or exact name, including descriptor metadata, role definitions, role permission ids/labels, and available permissions. |
+| `list_space_permissions` | List core Huly Permission records for space/workspace access control discovery. Filter by scope, objectClass, or search text. This is read-only and does not assign permissions. |
+| `update_space` | Update safe common metadata on an existing Huly space: name, description, private, archived, and autoJoin. Does not create/delete spaces or mutate module-specific required fields. |
+| `add_space_members` | Idempotently add members to an existing Huly space. Members accept account UUID, exact email, or exact person display name and resolve to Huly account UUIDs before replacing the full members array. |
+| `remove_space_members` | Idempotently remove members from an existing Huly space. Members accept account UUID, exact email, or exact person display name and resolve to Huly account UUIDs before replacing the full members array. |
+| `set_space_owners` | Replace owners on an existing Huly space. Owners accept account UUID, exact email, or exact person display name. By default, owners are also ensured in members. |
 
 ### Tag-Categories
 

@@ -12,24 +12,22 @@ import type {
   AddOrganizationChannelParams,
   AddOrganizationMemberParams,
   CreateOrganizationParams,
+  CreateOrganizationResult,
   DeleteOrganizationParams,
+  DeleteOrganizationResult,
   GetOrganizationParams,
+  GetOrganizationResult,
   ListOrganizationMembersParams,
+  ListOrganizationMembersResult,
   ListOrganizationsParams,
+  OrganizationMemberEntry,
   OrganizationSummary,
   RemoveOrganizationMemberParams,
-  UpdateOrganizationParams
-} from "../../domain/schemas.js"
-import type {
-  CreateOrganizationResult,
-  DeleteOrganizationResult,
-  GetOrganizationResult,
-  ListOrganizationMembersResult,
-  OrganizationMemberEntry,
   RemoveOrganizationMemberResult,
+  UpdateOrganizationParams,
   UpdateOrganizationResult
-} from "../../domain/schemas/contacts.js"
-import { UPDATE_ORGANIZATION_FIELDS } from "../../domain/schemas/contacts.js"
+} from "../../domain/schemas/contact-organizations.js"
+import { UPDATE_ORGANIZATION_FIELDS } from "../../domain/schemas/contact-organizations.js"
 import { Email, OrganizationId, PersonId, PersonName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import {
