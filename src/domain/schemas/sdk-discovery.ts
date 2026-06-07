@@ -2,6 +2,7 @@ import { ClassifierKind } from "@hcengineering/core"
 import { JSONSchema, Schema } from "effect"
 
 import {
+  Count,
   enumValuesDescription,
   HulyAttributeId,
   HulyEnumId,
@@ -158,9 +159,10 @@ export const HulyClassToolHintSchema = Schema.Struct({
 })
 export type HulyClassToolHint = Schema.Schema.Type<typeof HulyClassToolHintSchema>
 
-const HulyDiscoveryCount = Schema.NonNegativeInt.annotations({
+export const HulyDiscoveryCount = Count.pipe(Schema.brand("HulyDiscoveryCount")).annotations({
   description: "Non-negative integer count"
 })
+export type HulyDiscoveryCount = Schema.Schema.Type<typeof HulyDiscoveryCount>
 
 export const HulyClassSummarySchema = Schema.Struct({
   classId: ObjectClassName,

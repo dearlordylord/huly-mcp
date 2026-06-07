@@ -54,6 +54,7 @@ import {
   type TeamspaceNotFoundError
 } from "../errors.js"
 import { buildDocumentUrlFromConfig } from "../url-builders.js"
+import { listTotal } from "./counts.js"
 import { renderDocumentContentForWrite } from "./document-native-references.js"
 import { fetchReadableDocumentContent, findTeamspace, findTeamspaceAndDocument } from "./documents-shared.js"
 import {
@@ -64,7 +65,7 @@ import {
   type StrictDocumentQuery
 } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 import { core, documentPlugin } from "../huly-plugins.js"
 
@@ -159,7 +160,7 @@ export const listTeamspaces = (
 
     return {
       teamspaces: summaries,
-      total
+      total: listTotal(total)
     }
   })
 
@@ -183,7 +184,7 @@ export const getTeamspace = (
       description: teamspace.description || undefined,
       archived: teamspace.archived,
       private: teamspace.private,
-      documents: docs.total
+      documents: listTotal(docs.total)
     }
   })
 
@@ -243,19 +244,22 @@ export const updateTeamspace = (
 
     const { client, teamspace } = yield* findTeamspace(params.teamspace, { includeArchived: true })
 
-    const updateOps: DocumentUpdate<HulyTeamspace> = {}
-
-    if (params.name !== undefined) {
-      updateOps.name = params.name
+    type UpdateTeamspaceField = typeof UPDATE_TEAMSPACE_FIELDS[number]
+    type UpdateTeamspaceEntries = {
+      readonly [Field in UpdateTeamspaceField]: DirectUpdateEntry<
+        UpdateTeamspaceField,
+        DocumentUpdate<HulyTeamspace>,
+        Field
+      >
     }
-
-    if (params.description !== undefined) {
-      updateOps.description = params.description === null ? "" : params.description
-    }
-
-    if (params.archived !== undefined) {
-      updateOps.archived = params.archived
-    }
+    const updateEntries = {
+      name: params.name === undefined ? {} : { name: params.name },
+      description: params.description === undefined ? {} : {
+        description: params.description === null ? "" : params.description
+      },
+      archived: params.archived === undefined ? {} : { archived: params.archived }
+    } satisfies UpdateTeamspaceEntries
+    const updateOps: DocumentUpdate<HulyTeamspace> = mergeUpdateEntries(Object.values(updateEntries))
 
     yield* client.updateDoc(
       documentPlugin.class.Teamspace,
@@ -334,7 +338,7 @@ export const listDocuments = (
 
     return {
       documents: summaries,
-      total
+      total: listTotal(total)
     }
   })
 

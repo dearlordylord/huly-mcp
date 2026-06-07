@@ -4,11 +4,13 @@ import {
   AssociationId,
   CardIdentifier,
   CardSpaceIdentifier,
+  Count,
   DocId,
   DocumentIdentifier,
   enumValuesDescription,
   IssueIdentifier,
   LimitParam,
+  ListTotal,
   NonEmptyString,
   ObjectClassName,
   ProjectIdentifier,
@@ -188,7 +190,7 @@ export type ListAssociationsParams = Schema.Schema.Type<typeof ListAssociationsP
 
 export const ListAssociationsResultSchema = Schema.Struct({
   associations: Schema.Array(AssociationSummarySchema),
-  total: Schema.Number
+  total: ListTotal
 })
 export type ListAssociationsResult = Schema.Schema.Type<typeof ListAssociationsResultSchema>
 
@@ -244,7 +246,7 @@ export const DeleteAssociationResultSchema = Schema.Struct({
   association: AssociationIdentifier,
   associationId: Schema.optional(AssociationId),
   deleted: Schema.Boolean,
-  relationCount: Schema.Number,
+  relationCount: Count,
   reason: Schema.optional(Schema.Literal("not_found", "deleted"))
 })
 export type DeleteAssociationResult = Schema.Schema.Type<typeof DeleteAssociationResultSchema>
@@ -284,7 +286,7 @@ export type ListRelationsParams = Schema.Schema.Type<typeof ListRelationsParamsS
 
 export const ListRelationsResultSchema = Schema.Struct({
   relations: Schema.Array(RelationSummarySchema),
-  total: Schema.Number,
+  total: ListTotal,
   warnings: Schema.optional(
     Schema.NonEmptyArray(ListRelationsWarning).annotations({
       description:

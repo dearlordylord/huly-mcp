@@ -5,7 +5,14 @@ import {
   CardinalitySchema,
   RelationEndpointFieldSchema
 } from "../domain/schemas/generic-associations.js"
-import { AssociationId, DocId, ObjectClassName, RelationId } from "../domain/schemas/shared.js"
+import {
+  AssociationId,
+  DocId,
+  ListTotal,
+  ObjectClassName,
+  RelationId,
+  UNKNOWN_TOTAL
+} from "../domain/schemas/shared.js"
 
 const CandidateSchema = Schema.Struct({
   id: AssociationId,
@@ -118,7 +125,7 @@ export class AssociationInUseError extends Schema.TaggedError<AssociationInUseEr
   "AssociationInUseError",
   {
     associationId: AssociationId,
-    relationCount: Schema.Number,
+    relationCount: ListTotal,
     sampleRelationIds: Schema.Array(RelationId)
   }
 ) {
@@ -126,7 +133,10 @@ export class AssociationInUseError extends Schema.TaggedError<AssociationInUseEr
     const sample = this.sampleRelationIds.length === 0
       ? ""
       : ` Sample relation IDs: ${this.sampleRelationIds.join(", ")}.`
-    return `Association '${this.associationId}' cannot be deleted because ${this.relationCount} relation(s) still reference it. Delete those relations first.${sample}`
+    const countLabel = this.relationCount === UNKNOWN_TOTAL
+      ? "an unknown number of relations"
+      : `${this.relationCount} relation(s)`
+    return `Association '${this.associationId}' cannot be deleted because ${countLabel} still reference it. Delete those relations first.${sample}`
   }
 }
 

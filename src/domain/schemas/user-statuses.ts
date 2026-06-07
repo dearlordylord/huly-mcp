@@ -1,6 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
-import { LimitParam, NonEmptyString, Timestamp } from "./shared.js"
+import { LimitParam, ListTotal, NonEmptyString, Timestamp } from "./shared.js"
 
 export const UserStatusId = NonEmptyString.pipe(Schema.brand("UserStatusId"))
 export type UserStatusId = Schema.Schema.Type<typeof UserStatusId>
@@ -34,7 +34,7 @@ export type ListUserStatusesParams = Schema.Schema.Type<typeof ListUserStatusesP
 
 export const ListUserStatusesResultSchema = Schema.Struct({
   statuses: Schema.Array(UserStatusSummarySchema),
-  total: Schema.NonNegativeInt
+  total: ListTotal
 })
 export type ListUserStatusesResult = Schema.Schema.Type<typeof ListUserStatusesResultSchema>
 

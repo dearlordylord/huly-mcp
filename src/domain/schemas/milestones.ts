@@ -1,6 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
 import {
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   enumValuesDescription,
   hasAtLeastOneDefined,
@@ -103,12 +104,12 @@ export const CreateMilestoneParamsSchema = Schema.Struct({
 
 export type CreateMilestoneParams = Schema.Schema.Type<typeof CreateMilestoneParamsSchema>
 
-export const UPDATE_MILESTONE_FIELDS: ReadonlyArray<"label" | "description" | "targetDate" | "status"> = [
+export const UPDATE_MILESTONE_FIELDS = [
   "label",
   "description",
   "targetDate",
   "status"
-]
+] as const satisfies ReadonlyArray<"label" | "description" | "targetDate" | "status">
 
 export const UpdateMilestoneParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotations({
@@ -141,6 +142,7 @@ export const UpdateMilestoneParamsSchema = Schema.Struct({
 })
 
 export type UpdateMilestoneParams = Schema.Schema.Type<typeof UpdateMilestoneParamsSchema>
+assertUpdateFields<UpdateMilestoneParams>()(["project", "milestone"], UPDATE_MILESTONE_FIELDS)
 
 export const SetIssueMilestoneParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotations({

@@ -6,7 +6,7 @@
 import { JSONSchema, Schema } from "effect"
 
 import type { MessageSummary } from "./channels.js"
-import type { ChannelId } from "./shared.js"
+import type { ChannelId, ListTotal } from "./shared.js"
 import { DirectMessageIdentifier, LimitParam, MessageId, NonEmptyString, PersonRefInput } from "./shared.js"
 
 // --- List DM Messages Params ---
@@ -117,7 +117,7 @@ export const parseCreateDirectMessageParams = Schema.decodeUnknown(CreateDirectM
 
 export interface ListDmMessagesResult {
   readonly messages: ReadonlyArray<MessageSummary>
-  readonly total: number
+  readonly total: ListTotal
 }
 
 export interface SendDmMessageResult {

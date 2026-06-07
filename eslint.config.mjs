@@ -41,6 +41,79 @@ const mockBanSelectors = [
   message: "jest.mock is banned — use dependency injection. See CLAUDE.md \"No Test Mocks\"."
 }])
 
+const schemaPrimitiveBanSelectors = [{
+  selector: "MemberExpression[property.name='NonNegativeInt']",
+  message:
+    "Use NonNegativeInteger from src/domain/schemas/shared.ts instead of NonNegativeInt. Domain numeric primitives are centralized in shared.ts."
+}, {
+  selector: "MemberExpression[computed=true][property.value='NonNegativeInt']",
+  message:
+    "Use NonNegativeInteger from src/domain/schemas/shared.ts instead of NonNegativeInt. Domain numeric primitives are centralized in shared.ts."
+}, {
+  selector: "ObjectPattern Property[key.name='NonNegativeInt']",
+  message:
+    "Do not destructure NonNegativeInt. Use NonNegativeInteger from src/domain/schemas/shared.ts instead."
+}, {
+  selector: "ObjectPattern Property[computed=true][key.value='NonNegativeInt']",
+  message:
+    "Do not destructure NonNegativeInt. Use NonNegativeInteger from src/domain/schemas/shared.ts instead."
+}]
+
+const effectSchemaAliasBanSelectors = [{
+  selector: "ImportDeclaration[source.value='effect'] ImportSpecifier[imported.name='Schema']:not([local.name='Schema'])",
+  message:
+    "Do not alias Schema imports from effect. ESLint guards domain schema primitives through the canonical Schema identifier."
+}, {
+  selector: "ImportDeclaration[source.value='effect'] ImportNamespaceSpecifier",
+  message:
+    "Do not namespace-import effect. Import Schema by name so ESLint can enforce centralized domain schema primitives."
+}]
+
+const restrictedSyntaxSelectors = [
+  doubleAssertionSelector,
+  ...dateBanSelectors,
+  ...mockBanSelectors,
+  ...effectSchemaAliasBanSelectors,
+  ...schemaPrimitiveBanSelectors,
+  {
+    selector: "TSAsExpression:not([typeAnnotation.typeName.name='const'])",
+    message:
+      "Type assertion (as T) is banned. Use Effect Schema decode, satisfies, or restructure code to avoid the cast. If truly unavoidable at an SDK boundary, add eslint-disable with justification."
+  }
+]
+
+const sharedSchemaRestrictedSyntaxSelectors = [
+  doubleAssertionSelector,
+  ...dateBanSelectors,
+  ...mockBanSelectors,
+  ...effectSchemaAliasBanSelectors,
+  {
+    selector: "TSAsExpression:not([typeAnnotation.typeName.name='const'])",
+    message:
+      "Type assertion (as T) is banned. Use Effect Schema decode, satisfies, or restructure code to avoid the cast. If truly unavoidable at an SDK boundary, add eslint-disable with justification."
+  }
+]
+
+const testRestrictedSyntaxSelectors = [
+  doubleAssertionSelector,
+  ...dateBanSelectors,
+  ...mockBanSelectors,
+  ...effectSchemaAliasBanSelectors,
+  ...schemaPrimitiveBanSelectors
+]
+
+const nonPropertyTestRestrictedSyntaxSelectors = [
+  ...testRestrictedSyntaxSelectors,
+  {
+    selector: "ImportDeclaration[source.value='fast-check']",
+    message: "Property-based tests must live in *.property.test.ts files."
+  },
+  {
+    selector: "CallExpression[callee.object.name='fc'][callee.property.name='property']",
+    message: "Move fc.property tests to a *.property.test.ts file."
+  }
+]
+
 export default [
   {
     ignores: ["**/dist", "**/build", "**/*.md", "**/.reference"]
@@ -115,10 +188,7 @@ export default [
       "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/no-unnecessary-type-assertion": "error",
       "@typescript-eslint/no-unnecessary-condition": "error",
-      "no-restricted-syntax": ["error", doubleAssertionSelector, ...dateBanSelectors, ...mockBanSelectors, {
-        selector: "TSAsExpression:not([typeAnnotation.typeName.name='const'])",
-        message: "Type assertion (as T) is banned. Use Effect Schema decode, satisfies, or restructure code to avoid the cast. If truly unavoidable at an SDK boundary, add eslint-disable with justification."
-      }],
+      "no-restricted-syntax": ["error", ...restrictedSyntaxSelectors],
       "no-restricted-imports": ["error", {
         paths: [{
           name: "@hcengineering/text",
@@ -170,6 +240,13 @@ export default [
     }
   },
 
+  {
+    files: ["src/domain/schemas/shared.ts"],
+    rules: {
+      "no-restricted-syntax": ["error", ...sharedSchemaRestrictedSyntaxSelectors]
+    }
+  },
+
   // Dead export detection (import-x supports flat config, unlike import/no-unused-modules)
   {
     files: ["src/**/*.ts"],
@@ -198,7 +275,15 @@ export default [
       "no-magic-numbers": "off",
       "functional/immutable-data": "off",
       // Override: keep Date, mock and double-assertion bans; drop the general `as T` ban since test drivers need branded casts.
-      "no-restricted-syntax": ["error", doubleAssertionSelector, ...dateBanSelectors, ...mockBanSelectors]
+      "no-restricted-syntax": ["error", ...testRestrictedSyntaxSelectors]
+    }
+  },
+
+  {
+    files: ["test/**/*.test.ts", "test/**/*.spec.ts"],
+    ignores: ["test/**/*.property.test.ts", "test/**/*.property.spec.ts"],
+    rules: {
+      "no-restricted-syntax": ["error", ...nonPropertyTestRestrictedSyntaxSelectors]
     }
   }
 ]

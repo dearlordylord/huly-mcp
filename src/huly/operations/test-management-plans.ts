@@ -34,6 +34,7 @@ import type {
 import { TestPlanItemNotFoundError } from "../errors.js"
 import { testManagement } from "../test-management-classes.js"
 import type { TestPlan, TestPlanItem } from "../test-management-types.js"
+import { listTotal } from "./counts.js"
 import { clampLimit } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import {
@@ -43,7 +44,7 @@ import {
   findTestProject,
   resolveAssignee
 } from "./test-management-shared.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 type PlanOpError = HulyClientError | TestProjectNotFoundError
 type PlanMutateError = PlanOpError | TestPlanNotFoundError
@@ -74,7 +75,7 @@ export const listTestPlans = (
       { space: project._id },
       { limit, sort: { modifiedOn: SortingOrder.Descending } }
     )
-    return { plans: plans.map(toPlanSummary), total: plans.total }
+    return { plans: plans.map(toPlanSummary), total: listTotal(plans.total) }
   })
 
 export const getTestPlan = (
@@ -141,20 +142,30 @@ export const updateTestPlan = (
     const client = yield* HulyClient
     const project = yield* findTestProject(client, params.project)
     const plan = yield* findTestPlan(client, project, params.plan)
-    const ops: DocumentUpdate<TestPlan> = {}
-    if (params.name !== undefined) ops.name = params.name
-    if (params.description !== undefined) {
-      if (params.description === null) ops.description = null
-      else {
-        ops.description = yield* client.uploadMarkup(
-          testManagement.class.TestPlan,
-          plan._id,
-          "description",
-          params.description,
-          "markdown"
-        )
-      }
+    type UpdateTestPlanField = typeof UPDATE_TEST_PLAN_FIELDS[number]
+    type UpdateTestPlanEntries = {
+      readonly [Field in UpdateTestPlanField]: Effect.Effect<
+        DirectUpdateEntry<UpdateTestPlanField, DocumentUpdate<TestPlan>, Field>,
+        HulyClientError
+      >
     }
+    const updateEntries = {
+      name: Effect.succeed(params.name === undefined ? {} : { name: params.name }),
+      description: Effect.gen(function*() {
+        if (params.description === undefined) return {}
+        if (params.description === null) return { description: null }
+        return {
+          description: yield* client.uploadMarkup(
+            testManagement.class.TestPlan,
+            plan._id,
+            "description",
+            params.description,
+            "markdown"
+          )
+        }
+      })
+    } satisfies UpdateTestPlanEntries
+    const ops: DocumentUpdate<TestPlan> = mergeUpdateEntries(yield* Effect.all(Object.values(updateEntries)))
     yield* client.updateDoc(testManagement.class.TestPlan, project._id, plan._id, ops)
     return { id: TestPlanId.make(plan._id), updated: true }
   })

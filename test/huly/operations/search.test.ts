@@ -2,8 +2,13 @@ import { describe, it } from "@effect/vitest"
 import type { SearchOptions, SearchQuery, SearchResult } from "@hcengineering/core"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
-import { type ParsedSearchResultDoc, SearchResultDocSchema } from "../../../src/domain/schemas/search.js"
+import {
+  type ParsedSearchResultDoc,
+  SearchResultDocSchema,
+  UNKNOWN_SEARCH_TOTAL
+} from "../../../src/domain/schemas/search.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import { HulyConnectionError } from "../../../src/huly/errors.js"
 import { fulltextSearch } from "../../../src/huly/operations/search.js"
 
 const parseSearchResultDoc = Schema.decodeUnknownSync(SearchResultDocSchema)
@@ -146,6 +151,29 @@ describe("fulltextSearch", () => {
 
       const result = yield* fulltextSearch({ query: "test" }).pipe(Effect.provide(testLayer))
 
-      expect(result.total).toBe(-1)
+      expect(result.total).toBe(UNKNOWN_SEARCH_TOTAL)
+    }))
+
+  it.effect("preserves negative backend total sentinel as -1", () =>
+    Effect.gen(function*() {
+      const testLayer = createTestLayer([], UNKNOWN_SEARCH_TOTAL)
+
+      const result = yield* fulltextSearch({ query: "test" }).pipe(Effect.provide(testLayer))
+
+      expect(result.total).toBe(UNKNOWN_SEARCH_TOTAL)
+    }))
+
+  it.effect("maps invalid SDK search results to connection errors", () =>
+    Effect.gen(function*() {
+      const searchFulltextImpl: HulyClientOperations["searchFulltext"] = (() => {
+        // eslint-disable-next-line no-restricted-syntax -- malformed SDK boundary fixture
+        return Effect.succeed({ docs: [{ id: "doc-1", doc: { _id: "doc-1" } }] } as unknown as SearchResult)
+      }) as HulyClientOperations["searchFulltext"]
+      const testLayer = HulyClient.testLayer({ searchFulltext: searchFulltextImpl })
+
+      const error = yield* fulltextSearch({ query: "test" }).pipe(Effect.provide(testLayer), Effect.flip)
+
+      expect(error).toBeInstanceOf(HulyConnectionError)
+      expect(error.message).toContain("searchFulltext response failed schema validation")
     }))
 })

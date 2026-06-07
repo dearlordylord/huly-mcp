@@ -1,7 +1,8 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { TestPlanId, TestPlanItemId, TestResultId, TestRunId } from "./shared.js"
+import type { Count, ListTotal, TestPlanId, TestPlanItemId, TestResultId, TestRunId } from "./shared.js"
 import {
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   enumValuesDescription,
   hasAtLeastOneDefined,
@@ -59,7 +60,7 @@ export const ListTestPlansParamsSchema = Schema.Struct({
 export type ListTestPlansParams = Schema.Schema.Type<typeof ListTestPlansParamsSchema>
 export interface ListTestPlansResult {
   readonly plans: ReadonlyArray<TestPlanSummary>
-  readonly total: number
+  readonly total: ListTotal
 }
 
 export const GetTestPlanParamsSchema = Schema.Struct({
@@ -86,7 +87,9 @@ export interface CreateTestPlanResult {
   readonly created: boolean
 }
 
-export const UPDATE_TEST_PLAN_FIELDS: ReadonlyArray<"name" | "description"> = ["name", "description"]
+export const UPDATE_TEST_PLAN_FIELDS = ["name", "description"] as const satisfies ReadonlyArray<
+  "name" | "description"
+>
 
 export const UpdateTestPlanParamsSchema = Schema.Struct({
   project: projectField,
@@ -104,6 +107,7 @@ export const UpdateTestPlanParamsSchema = Schema.Struct({
   description: `Update a test plan. ${atLeastOneUpdateFieldMessage(UPDATE_TEST_PLAN_FIELDS)}`
 })
 export type UpdateTestPlanParams = Schema.Schema.Type<typeof UpdateTestPlanParamsSchema>
+assertUpdateFields<UpdateTestPlanParams>()(["project", "plan"], UPDATE_TEST_PLAN_FIELDS)
 export interface UpdateTestPlanResult {
   readonly id: TestPlanId
   readonly updated: boolean
@@ -149,7 +153,7 @@ export const ListTestRunsParamsSchema = Schema.Struct({
 export type ListTestRunsParams = Schema.Schema.Type<typeof ListTestRunsParamsSchema>
 export interface ListTestRunsResult {
   readonly runs: ReadonlyArray<TestRunSummary>
-  readonly total: number
+  readonly total: ListTotal
 }
 
 export const GetTestRunParamsSchema = Schema.Struct({
@@ -180,11 +184,11 @@ export interface CreateTestRunResult {
   readonly created: boolean
 }
 
-export const UPDATE_TEST_RUN_FIELDS: ReadonlyArray<"name" | "description" | "dueDate"> = [
+export const UPDATE_TEST_RUN_FIELDS = [
   "name",
   "description",
   "dueDate"
-]
+] as const satisfies ReadonlyArray<"name" | "description" | "dueDate">
 
 export const UpdateTestRunParamsSchema = Schema.Struct({
   project: projectField,
@@ -207,6 +211,7 @@ export const UpdateTestRunParamsSchema = Schema.Struct({
   description: `Update a test run. ${atLeastOneUpdateFieldMessage(UPDATE_TEST_RUN_FIELDS)}`
 })
 export type UpdateTestRunParams = Schema.Schema.Type<typeof UpdateTestRunParamsSchema>
+assertUpdateFields<UpdateTestRunParams>()(["project", "run"], UPDATE_TEST_RUN_FIELDS)
 export interface UpdateTestRunResult {
   readonly id: TestRunId
   readonly updated: boolean
@@ -230,7 +235,7 @@ export const ListTestResultsParamsSchema = Schema.Struct({
 export type ListTestResultsParams = Schema.Schema.Type<typeof ListTestResultsParamsSchema>
 export interface ListTestResultsResult {
   readonly results: ReadonlyArray<TestResultSummary>
-  readonly total: number
+  readonly total: ListTotal
 }
 
 export const GetTestResultParamsSchema = Schema.Struct({
@@ -267,11 +272,11 @@ export interface CreateTestResultResult {
   readonly created: boolean
 }
 
-export const UPDATE_TEST_RESULT_FIELDS: ReadonlyArray<"status" | "assignee" | "description"> = [
+export const UPDATE_TEST_RESULT_FIELDS = [
   "status",
   "assignee",
   "description"
-]
+] as const satisfies ReadonlyArray<"status" | "assignee" | "description">
 
 export const UpdateTestResultParamsSchema = Schema.Struct({
   project: projectField,
@@ -292,6 +297,7 @@ export const UpdateTestResultParamsSchema = Schema.Struct({
   description: `Update a test result. ${atLeastOneUpdateFieldMessage(UPDATE_TEST_RESULT_FIELDS)}`
 })
 export type UpdateTestResultParams = Schema.Schema.Type<typeof UpdateTestResultParamsSchema>
+assertUpdateFields<UpdateTestResultParams>()(["project", "result"], UPDATE_TEST_RESULT_FIELDS)
 export interface UpdateTestResultResult {
   readonly id: TestResultId
   readonly updated: boolean
@@ -317,7 +323,7 @@ export type RunTestPlanParams = Schema.Schema.Type<typeof RunTestPlanParamsSchem
 export interface RunTestPlanResult {
   readonly runId: TestRunId
   readonly name: string
-  readonly resultsCreated: number
+  readonly resultsCreated: Count
 }
 
 export const listTestPlansParamsJsonSchema = JSONSchema.make(ListTestPlansParamsSchema)

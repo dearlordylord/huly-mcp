@@ -1,12 +1,11 @@
 import { Effect, Either, Schema } from "effect"
 import { describe, expect, it } from "vitest"
 
+import { AddOrganizationChannelParamsSchema, parseAddOrganizationChannelParams } from "./contact-organizations.js"
 import {
-  AddOrganizationChannelParamsSchema,
   CreatePersonParamsSchema,
   GetPersonParamsSchema,
   ListPersonsParamsSchema,
-  parseAddOrganizationChannelParams,
   parseCreatePersonParams,
   parseGetPersonParams,
   parseListPersonsParams,

@@ -14,6 +14,7 @@ import { MilestoneStatus, TimeReportDayType } from "@hcengineering/tracker"
 import { Effect, Exit } from "effect"
 import { expect } from "vitest"
 import { parsePreviewDeletionParams } from "../../../src/domain/schemas/deletion.js"
+import { UNKNOWN_TOTAL } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type {
   ComponentNotFoundError,
@@ -119,6 +120,12 @@ interface MockConfig {
   components?: Array<HulyComponent>
   milestones?: Array<HulyMilestone>
   templates?: Array<HulyIssueTemplate>
+  totals?: {
+    readonly issues?: number
+    readonly components?: number
+    readonly milestones?: number
+    readonly templates?: number
+  }
 }
 
 const createTestLayerWithMocks = (config: MockConfig) => {
@@ -143,7 +150,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       }
       const result = toFindResult(filtered)
       if (useTotal) {
-        return Effect.succeed(Object.assign(result, { total: filtered.length }))
+        return Effect.succeed(Object.assign(result, { total: config.totals?.issues ?? filtered.length }))
       }
       return Effect.succeed(result)
     }
@@ -151,7 +158,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       const filtered = components.filter(c => q.space === undefined || c.space === q.space)
       const result = toFindResult(filtered)
       if (useTotal) {
-        return Effect.succeed(Object.assign(result, { total: filtered.length }))
+        return Effect.succeed(Object.assign(result, { total: config.totals?.components ?? filtered.length }))
       }
       return Effect.succeed(result)
     }
@@ -159,7 +166,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       const filtered = milestones.filter(m => q.space === undefined || m.space === q.space)
       const result = toFindResult(filtered)
       if (useTotal) {
-        return Effect.succeed(Object.assign(result, { total: filtered.length }))
+        return Effect.succeed(Object.assign(result, { total: config.totals?.milestones ?? filtered.length }))
       }
       return Effect.succeed(result)
     }
@@ -167,7 +174,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       const filtered = templates.filter(t => q.space === undefined || t.space === q.space)
       const result = toFindResult(filtered)
       if (useTotal) {
-        return Effect.succeed(Object.assign(result, { total: filtered.length }))
+        return Effect.succeed(Object.assign(result, { total: config.totals?.templates ?? filtered.length }))
       }
       return Effect.succeed(result)
     }
@@ -349,6 +356,30 @@ describe("previewDeletion - project", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result.totalAffected).toBe(0)
+      expect(result.warnings).toHaveLength(0)
+    }))
+
+  it.effect("preserves unknown backend totals for project contents", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        totals: {
+          issues: UNKNOWN_TOTAL,
+          components: 0,
+          milestones: 0,
+          templates: 0
+        }
+      })
+
+      const result = yield* previewDeletion({
+        entityType: "project",
+        project: projectIdentifier("PROJ")
+      }).pipe(Effect.provide(testLayer))
+
+      expect(result.impact.issues).toBe(UNKNOWN_TOTAL)
+      expect(result.impact.components).toBe(0)
+      expect(result.totalAffected).toBe(UNKNOWN_TOTAL)
       expect(result.warnings).toHaveLength(0)
     }))
 

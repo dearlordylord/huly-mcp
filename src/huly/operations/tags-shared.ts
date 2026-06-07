@@ -3,7 +3,7 @@ import { generateId, SortingOrder } from "@hcengineering/core"
 import type { TagCategory as HulyTagCategory, TagElement as HulyTagElement, TagReference } from "@hcengineering/tags"
 import { Effect } from "effect"
 
-import { ColorCode, TagElementId, TagReferenceId } from "../../domain/schemas/shared.js"
+import { ColorCode, Count, TagElementId, TagReferenceId } from "../../domain/schemas/shared.js"
 import type { AttachedTagSummary, AttachTagResult, DetachTagResult, TagWeight } from "../../domain/schemas/tags.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { TagCategoryNotFoundError, TagNotFoundError } from "../errors.js"
@@ -339,6 +339,6 @@ export const detachTagReference = (
 
     return {
       detached: matchingRefs.length > 0,
-      detachedCount: matchingRefs.length
+      detachedCount: Count.make(matchingRefs.length)
     }
   })

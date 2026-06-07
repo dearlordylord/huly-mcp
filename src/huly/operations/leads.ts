@@ -40,6 +40,7 @@ import { HulyConnectionError, InvalidStatusError } from "../errors.js"
 import { contact, core, task } from "../huly-plugins.js"
 import { leadClassIds } from "../lead-plugin.js"
 import { findPersonByEmailOrName } from "./contacts-shared.js"
+import { listTotal } from "./counts.js"
 import { clampLimit, escapeLikeWildcards } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
@@ -243,7 +244,7 @@ export const listFunnels = (
       archived: funnel.archived
     }))
 
-    return { funnels: summaries, total: funnels.total }
+    return { funnels: summaries, total: listTotal(funnels.total) }
   })
 
 type ListLeadsError =

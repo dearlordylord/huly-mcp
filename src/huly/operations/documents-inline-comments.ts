@@ -25,6 +25,7 @@ import type { HulyClient, HulyClientError } from "../client.js"
 import type { DocumentContentCorruptedError, DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js"
 import { chunter } from "../huly-plugins.js"
 import { buildSocialIdToPersonNameMap } from "./channels.js"
+import { listTotal } from "./counts.js"
 import { fetchReadableDocumentContent, findTeamspaceAndDocument } from "./documents-shared.js"
 import { isInlineCommentMark } from "./inline-comment-mark.js"
 import { traverseAllMarks } from "./markup-traversal.js"
@@ -85,14 +86,14 @@ export const listInlineComments = (
     })
 
     if (rawMarkup === undefined) {
-      return { comments: [], total: 0 }
+      return { comments: [], total: listTotal(0) }
     }
 
     const root = markupToJSON(rawMarkup)
     const extracted = extractInlineComments(root)
 
     if (extracted.length === 0) {
-      return { comments: [], total: 0 }
+      return { comments: [], total: listTotal(0) }
     }
 
     // Fetch replies in one batch if requested
@@ -145,5 +146,5 @@ export const listInlineComments = (
       return thread
     })
 
-    return { comments, total: comments.length }
+    return { comments, total: listTotal(comments.length) }
   })

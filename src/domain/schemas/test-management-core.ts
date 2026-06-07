@@ -1,7 +1,8 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { TestCaseId, TestProjectId, TestSuiteId } from "./shared.js"
+import type { ListTotal, TestCaseId, TestProjectId, TestSuiteId } from "./shared.js"
 import {
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   enumValuesDescription,
   hasAtLeastOneDefined,
@@ -145,7 +146,9 @@ export const CreateTestSuiteParamsSchema = Schema.Struct({
 
 export type CreateTestSuiteParams = Schema.Schema.Type<typeof CreateTestSuiteParamsSchema>
 
-export const UPDATE_TEST_SUITE_FIELDS: ReadonlyArray<"name" | "description"> = ["name", "description"]
+export const UPDATE_TEST_SUITE_FIELDS = ["name", "description"] as const satisfies ReadonlyArray<
+  "name" | "description"
+>
 
 export const UpdateTestSuiteParamsSchema = Schema.Struct({
   project: TestProjectIdentifier.annotations({
@@ -178,6 +181,7 @@ export const UpdateTestSuiteParamsSchema = Schema.Struct({
 })
 
 export type UpdateTestSuiteParams = Schema.Schema.Type<typeof UpdateTestSuiteParamsSchema>
+assertUpdateFields<UpdateTestSuiteParams>()(["project", "suite"], UPDATE_TEST_SUITE_FIELDS)
 
 export const DeleteTestSuiteParamsSchema = Schema.Struct({
   project: TestProjectIdentifier.annotations({
@@ -275,9 +279,14 @@ export const CreateTestCaseParamsSchema = Schema.Struct({
 
 export type CreateTestCaseParams = Schema.Schema.Type<typeof CreateTestCaseParamsSchema>
 
-export const UPDATE_TEST_CASE_FIELDS: ReadonlyArray<
-  "name" | "description" | "type" | "priority" | "status" | "assignee"
-> = ["name", "description", "type", "priority", "status", "assignee"]
+export const UPDATE_TEST_CASE_FIELDS = [
+  "name",
+  "description",
+  "type",
+  "priority",
+  "status",
+  "assignee"
+] as const satisfies ReadonlyArray<"name" | "description" | "type" | "priority" | "status" | "assignee">
 
 export const UpdateTestCaseParamsSchema = Schema.Struct({
   project: TestProjectIdentifier.annotations({
@@ -330,6 +339,7 @@ export const UpdateTestCaseParamsSchema = Schema.Struct({
 })
 
 export type UpdateTestCaseParams = Schema.Schema.Type<typeof UpdateTestCaseParamsSchema>
+assertUpdateFields<UpdateTestCaseParams>()(["project", "testCase"], UPDATE_TEST_CASE_FIELDS)
 
 export const DeleteTestCaseParamsSchema = Schema.Struct({
   project: TestProjectIdentifier.annotations({
@@ -383,16 +393,16 @@ export const parseDeleteTestCaseParams = Schema.decodeUnknown(DeleteTestCasePara
 
 export interface ListTestProjectsResult {
   readonly projects: ReadonlyArray<TestProjectSummary>
-  readonly total: number
+  readonly total: ListTotal
 }
 
 export interface ListTestSuitesResult {
   readonly suites: ReadonlyArray<TestSuiteSummary>
-  readonly total: number
+  readonly total: ListTotal
 }
 
 export interface GetTestSuiteResult extends TestSuiteSummary {
-  readonly testCases: number
+  readonly testCases: ListTotal
 }
 
 export interface CreateTestSuiteResult {
@@ -413,7 +423,7 @@ export interface DeleteTestSuiteResult {
 
 export interface ListTestCasesResult {
   readonly testCases: ReadonlyArray<TestCaseSummary>
-  readonly total: number
+  readonly total: ListTotal
 }
 
 export interface GetTestCaseResult extends TestCaseSummary {

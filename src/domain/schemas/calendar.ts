@@ -1,6 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
 import {
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   CalendarId,
   Email,
@@ -267,9 +268,17 @@ export const CreateEventParamsSchema = Schema.Struct({
 
 export type CreateEventParams = Schema.Schema.Type<typeof CreateEventParamsSchema>
 
-export const UPDATE_EVENT_FIELDS: ReadonlyArray<
+export const UPDATE_EVENT_FIELDS = [
+  "title",
+  "description",
+  "date",
+  "dueDate",
+  "allDay",
+  "location",
+  "visibility"
+] as const satisfies ReadonlyArray<
   "title" | "description" | "date" | "dueDate" | "allDay" | "location" | "visibility"
-> = ["title", "description", "date", "dueDate", "allDay", "location", "visibility"]
+>
 
 export const UpdateEventParamsSchema = Schema.Struct({
   eventId: EventId.annotations({
@@ -306,6 +315,7 @@ export const UpdateEventParamsSchema = Schema.Struct({
 })
 
 export type UpdateEventParams = Schema.Schema.Type<typeof UpdateEventParamsSchema>
+assertUpdateFields<UpdateEventParams>()(["eventId"], UPDATE_EVENT_FIELDS)
 
 export const DeleteEventParamsSchema = Schema.Struct({
   eventId: EventId.annotations({

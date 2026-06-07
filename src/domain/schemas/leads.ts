@@ -1,5 +1,6 @@
 import { JSONSchema, ParseResult, Schema } from "effect"
 
+import type { ListTotal } from "./shared.js"
 import { DocId, LimitParam, NonEmptyString, PersonName, PersonRefInput, StatusName, Timestamp } from "./shared.js"
 
 // --- Lead IDs ---
@@ -170,5 +171,5 @@ export const parseLeadSummary = Schema.decodeUnknown(LeadSummarySchema)
 
 export interface ListFunnelsResult {
   readonly funnels: ReadonlyArray<FunnelSummary>
-  readonly total: number
+  readonly total: ListTotal
 }

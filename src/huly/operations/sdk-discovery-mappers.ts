@@ -8,7 +8,7 @@ import type {
   HulyClassSummary,
   HulyEnumSummary
 } from "../../domain/schemas/sdk-discovery.js"
-import { HulyDomainName, HulySdkClassifierKindSchema } from "../../domain/schemas/sdk-discovery.js"
+import { HulyDiscoveryCount, HulyDomainName, HulySdkClassifierKindSchema } from "../../domain/schemas/sdk-discovery.js"
 import { HulyAttributeId, HulyEnumId, NonEmptyString, ObjectClassName } from "../../domain/schemas/shared.js"
 import { hulyAttributeTypeKindFromClass } from "../huly-attribute-types.js"
 import { decodeHulyModelLabelTail } from "../huly-labels.js"
@@ -133,7 +133,7 @@ export const toClassSummary = (
     ...pluralLabelField(pluralLabel),
     ...(typeof record.hidden === "boolean" ? { hidden: record.hidden } : {}),
     ...(typeof record.readonly === "boolean" ? { readonly: record.readonly } : {}),
-    ...(attributesCount === undefined ? {} : { attributesCount }),
+    ...(attributesCount === undefined ? {} : { attributesCount: HulyDiscoveryCount.make(attributesCount) }),
     firstClassToolHints: (firstClassToolHints.get(String(cls._id)) ?? []).map((item) => ({
       category: item.category,
       exampleTools: [...item.exampleTools]

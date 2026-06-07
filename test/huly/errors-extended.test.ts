@@ -5,11 +5,13 @@ import { AssociationName } from "../../src/domain/schemas/generic-associations.j
 import { ProcessExecutionId, ProcessId } from "../../src/domain/schemas/processes.js"
 import {
   AssociationId,
+  Count,
   DocId,
   MasterTagId,
   NonEmptyString,
   ObjectClassName,
-  RelationId
+  RelationId,
+  UNKNOWN_TOTAL
 } from "../../src/domain/schemas/shared.js"
 import {
   AssociationConflictError,
@@ -162,7 +164,7 @@ describe("Extended Huly error message getters", () => {
         message: "String to replace not found in document.\nString: foo"
       },
       {
-        error: new DocumentTextMultipleMatchesError({ searchText: "bar", matchCount: 3 }),
+        error: new DocumentTextMultipleMatchesError({ searchText: "bar", matchCount: Count.make(3) }),
         tag: "DocumentTextMultipleMatchesError",
         message: "Found 3 matches of the string to replace, but replace_all is false. "
           + "To replace all occurrences, set replace_all to true. "
@@ -210,7 +212,7 @@ describe("Extended Huly error message getters", () => {
         // sampleRelationIds non-empty branch
         error: new AssociationInUseError({
           associationId: AssociationId.make("assoc-1"),
-          relationCount: 2,
+          relationCount: Count.make(2),
           sampleRelationIds: [RelationId.make("rel-1"), RelationId.make("rel-2")]
         }),
         tag: "AssociationInUseError",
@@ -221,12 +223,22 @@ describe("Extended Huly error message getters", () => {
         // sampleRelationIds empty branch
         error: new AssociationInUseError({
           associationId: AssociationId.make("assoc-2"),
-          relationCount: 0,
+          relationCount: Count.make(0),
           sampleRelationIds: []
         }),
         tag: "AssociationInUseError",
         message:
           "Association 'assoc-2' cannot be deleted because 0 relation(s) still reference it. Delete those relations first."
+      },
+      {
+        error: new AssociationInUseError({
+          associationId: AssociationId.make("assoc-3"),
+          relationCount: UNKNOWN_TOTAL,
+          sampleRelationIds: [RelationId.make("rel-3")]
+        }),
+        tag: "AssociationInUseError",
+        message:
+          "Association 'assoc-3' cannot be deleted because an unknown number of relations still reference it. Delete those relations first. Sample relation IDs: rel-3."
       },
       {
         error: new RelationCardinalityViolationError({
@@ -353,7 +365,7 @@ describe("Extended Huly error message getters", () => {
         new DocumentEditModeError({ reason: "mixed modes" }),
         new AssociationInUseError({
           associationId: AssociationId.make("assoc-1"),
-          relationCount: 1,
+          relationCount: Count.make(1),
           sampleRelationIds: [RelationId.make("rel-1")]
         }),
         new ProcessExecutionNotFoundError({ executionId: ProcessExecutionId.make("exec-1") }),

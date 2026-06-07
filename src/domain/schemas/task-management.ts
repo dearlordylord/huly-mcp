@@ -2,7 +2,15 @@ import type { Ref, StatusCategory } from "@hcengineering/core"
 import { JSONSchema, ParseResult, Schema } from "effect"
 
 import { task } from "../../huly/huly-plugins.js"
-import { enumValuesDescription, IssueStatusId, NonEmptyString, ProjectTypeId, TaskTypeId } from "./shared.js"
+import {
+  Count,
+  enumValuesDescription,
+  IssueStatusId,
+  ListTotal,
+  NonEmptyString,
+  ProjectTypeId,
+  TaskTypeId
+} from "./shared.js"
 
 export const StatusCategoryBySdkKey = {
   UnStarted: task.statusCategory.UnStarted,
@@ -114,7 +122,7 @@ export const TaskTypeSummarySchema = Schema.Struct({
   projectTypeName: NonEmptyString,
   kind: TaskTypeKindSchema,
   issueClass: NonEmptyString,
-  statusCount: Schema.NonNegativeInt
+  statusCount: Count
 })
 export type TaskTypeSummary = Schema.Schema.Type<typeof TaskTypeSummarySchema>
 
@@ -122,8 +130,8 @@ export const ProjectTypeSummarySchema = Schema.Struct({
   id: ProjectTypeId,
   name: NonEmptyString,
   descriptor: NonEmptyString,
-  taskTypeCount: Schema.NonNegativeInt,
-  statusCount: Schema.NonNegativeInt,
+  taskTypeCount: Count,
+  statusCount: Count,
   isDefaultClassic: Schema.Boolean
 })
 export type ProjectTypeSummary = Schema.Schema.Type<typeof ProjectTypeSummarySchema>
@@ -192,13 +200,13 @@ export type CreateIssueStatusParams = Schema.Schema.Type<typeof CreateIssueStatu
 
 export const ListProjectTypesResultSchema = Schema.Struct({
   projectTypes: Schema.Array(ProjectTypeSummarySchema),
-  total: Schema.NonNegativeInt
+  total: ListTotal
 })
 export type ListProjectTypesResult = Schema.Schema.Type<typeof ListProjectTypesResultSchema>
 
 export const ListTaskTypesResultSchema = Schema.Struct({
   taskTypes: Schema.Array(TaskTypeSummarySchema),
-  total: Schema.NonNegativeInt
+  total: ListTotal
 })
 export type ListTaskTypesResult = Schema.Schema.Type<typeof ListTaskTypesResultSchema>
 

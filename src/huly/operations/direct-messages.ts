@@ -37,19 +37,24 @@ import type {
   UpdateDmMessageParams,
   UpdateDmMessageResult
 } from "../../domain/schemas/direct-messages.js"
-import { ChannelId, type DirectMessageIdentifier, MessageId, type PersonRefInput } from "../../domain/schemas/shared.js"
+import {
+  ChannelId,
+  Count,
+  type DirectMessageIdentifier,
+  MessageId,
+  type PersonRefInput
+} from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import type { PersonIdentifierAmbiguousError } from "../errors.js"
+import type { PersonIdentifierAmbiguousError, PersonNotAnEmployeeError, PersonNotFoundError } from "../errors.js"
 import {
   CannotDirectMessageSelfError,
   DirectMessageIdentifierAmbiguousError,
   DirectMessageNotFoundError,
-  MessageNotFoundError,
-  PersonNotAnEmployeeError,
-  PersonNotFoundError
+  MessageNotFoundError
 } from "../errors.js"
 import { buildSocialIdToPersonNameMap } from "./channels.js"
-import { findPersonByExactEmailOrName } from "./contacts-shared.js"
+import { resolveEmployeeAccountUuid } from "./contacts-shared.js"
+import { listTotal, optionalCount } from "./counts.js"
 import { markdownToMarkupString, markupToMarkdownString } from "./markup.js"
 import { clampLimit } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
@@ -156,7 +161,7 @@ export const findDirectMessage = (
     }
 
     if (matches.length > 1) {
-      return yield* new DirectMessageIdentifierAmbiguousError({ identifier, matches: matches.length })
+      return yield* new DirectMessageIdentifierAmbiguousError({ identifier, matches: Count.make(matches.length) })
     }
 
     return { client, dm: matches[0] }
@@ -231,11 +236,11 @@ export const listDirectMessageMessages = (
         createdOn: msg.createdOn,
         modifiedOn: msg.modifiedOn,
         editedOn: msg.editedOn,
-        replies: msg.replies
+        replies: optionalCount(msg.replies)
       }
     })
 
-    return { messages: summaries, total }
+    return { messages: summaries, total: listTotal(total) }
   })
 
 /**
@@ -330,22 +335,7 @@ const resolveEmployeeAccount = (
 > =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-
-    const person = yield* findPersonByExactEmailOrName(client, identifier)
-    if (person === undefined) {
-      return yield* new PersonNotFoundError({ identifier })
-    }
-
-    const employee = yield* client.findOne<HulyEmployee>(
-      contact.mixin.Employee,
-      { _id: toRef<HulyEmployee>(person._id) }
-    )
-
-    if (employee?.personUuid === undefined) {
-      return yield* new PersonNotAnEmployeeError({ identifier })
-    }
-
-    return employee.personUuid
+    return yield* resolveEmployeeAccountUuid(client, identifier)
   })
 
 /**

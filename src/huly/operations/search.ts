@@ -7,9 +7,15 @@
  */
 import { Effect } from "effect"
 
-import { type FulltextSearchParams, type FulltextSearchResult, parseSearchResult } from "../../domain/schemas.js"
+import {
+  type FulltextSearchParams,
+  type FulltextSearchResult,
+  parseSearchResult,
+  UNKNOWN_SEARCH_TOTAL
+} from "../../domain/schemas.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { HulyConnectionError } from "../errors.js"
+import { listTotal } from "./counts.js"
 import { clampLimit } from "./query-helpers.js"
 
 export const fulltextSearch = (
@@ -34,8 +40,6 @@ export const fulltextSearch = (
       )
     )
 
-    const total = results.total ?? -1
-
     const items = results.docs.map((doc) => ({
       id: doc.doc._id,
       class: doc.doc._class,
@@ -47,7 +51,7 @@ export const fulltextSearch = (
 
     return {
       items,
-      total,
+      total: results.total === undefined ? UNKNOWN_SEARCH_TOTAL : listTotal(results.total),
       query: params.query
     }
   })

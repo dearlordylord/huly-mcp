@@ -3,9 +3,11 @@ import { JSONSchema, Schema } from "effect"
 import { IssuePrioritySchema } from "./issues.js"
 import type { IssueId, IssueIdentifier } from "./shared.js"
 import {
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   ComponentIdentifier,
   ComponentLabel,
+  Count,
   hasAtLeastOneDefined,
   IssueTemplateChildId,
   IssueTemplateId,
@@ -73,7 +75,7 @@ export const IssueTemplateSummarySchema = Schema.Struct({
   id: IssueTemplateId,
   title: NonEmptyString,
   priority: Schema.optional(IssuePrioritySchema),
-  childrenCount: Schema.optional(Schema.Number),
+  childrenCount: Schema.optional(Count),
   modifiedOn: Schema.optional(Timestamp)
 }).annotations({
   title: "IssueTemplateSummary",
@@ -199,9 +201,16 @@ export const CreateIssueFromTemplateParamsSchema = Schema.Struct({
 
 export type CreateIssueFromTemplateParams = Schema.Schema.Type<typeof CreateIssueFromTemplateParamsSchema>
 
-export const UPDATE_ISSUE_TEMPLATE_FIELDS: ReadonlyArray<
+export const UPDATE_ISSUE_TEMPLATE_FIELDS = [
+  "title",
+  "description",
+  "priority",
+  "assignee",
+  "component",
+  "estimation"
+] as const satisfies ReadonlyArray<
   "title" | "description" | "priority" | "assignee" | "component" | "estimation"
-> = ["title", "description", "priority", "assignee", "component", "estimation"]
+>
 
 export const UpdateIssueTemplateParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotations({
@@ -246,6 +255,7 @@ export const UpdateIssueTemplateParamsSchema = Schema.Struct({
 })
 
 export type UpdateIssueTemplateParams = Schema.Schema.Type<typeof UpdateIssueTemplateParamsSchema>
+assertUpdateFields<UpdateIssueTemplateParams>()(["project", "template"], UPDATE_ISSUE_TEMPLATE_FIELDS)
 
 export const DeleteIssueTemplateParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotations({
@@ -342,7 +352,7 @@ export interface DeleteIssueTemplateResult {
 export interface CreateIssueFromTemplateResult {
   readonly identifier: IssueIdentifier
   readonly issueId: IssueId
-  readonly childrenCreated?: number
+  readonly childrenCreated?: Count
 }
 
 export interface AddTemplateChildResult {

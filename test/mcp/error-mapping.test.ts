@@ -7,6 +7,7 @@ import { ProcessId } from "../../src/domain/schemas/processes.js"
 import {
   AssociationId,
   CardId,
+  Count,
   DocId,
   MasterTagId,
   NonEmptyString,
@@ -125,7 +126,7 @@ describe("Error Mapping to MCP", () => {
         Effect.gen(function*() {
           const error = new PersonIdentifierAmbiguousError({
             identifier: "Smith,Bill",
-            matches: 2
+            matches: Count.make(2)
           })
           const response = mapDomainErrorToMcp(error)
 
@@ -150,7 +151,7 @@ describe("Error Mapping to MCP", () => {
         Effect.gen(function*() {
           const error = new OrganizationIdentifierAmbiguousError({
             identifier: "Acme",
-            matches: 2
+            matches: Count.make(2)
           })
           const response = mapDomainErrorToMcp(error)
 
@@ -241,7 +242,10 @@ describe("Error Mapping to MCP", () => {
 
       it.effect("maps DirectMessageIdentifierAmbiguousError with descriptive message", () =>
         Effect.gen(function*() {
-          const error = new DirectMessageIdentifierAmbiguousError({ identifier: "Kerr,Shannon", matches: 2 })
+          const error = new DirectMessageIdentifierAmbiguousError({
+            identifier: "Kerr,Shannon",
+            matches: Count.make(2)
+          })
           const response = mapDomainErrorToMcp(error)
 
           expect(response.isError).toBe(true)

@@ -3,6 +3,7 @@ import { JSONSchema, Schema } from "effect"
 import type { PersonName, SpaceId as SpaceIdType, UrlString } from "./shared.js"
 import {
   AccountId,
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   Email,
   EmptyParamsSchema,
@@ -140,9 +141,14 @@ export const CreateWorkspaceParamsSchema = Schema.Struct({
 
 export type CreateWorkspaceParams = Schema.Schema.Type<typeof CreateWorkspaceParamsSchema>
 
-export const UPDATE_USER_PROFILE_FIELDS: ReadonlyArray<
-  "bio" | "city" | "country" | "website" | "socialLinks" | "isPublic"
-> = ["bio", "city", "country", "website", "socialLinks", "isPublic"]
+export const UPDATE_USER_PROFILE_FIELDS = [
+  "bio",
+  "city",
+  "country",
+  "website",
+  "socialLinks",
+  "isPublic"
+] as const satisfies ReadonlyArray<"bio" | "city" | "country" | "website" | "socialLinks" | "isPublic">
 
 export const UpdateUserProfileParamsSchema = Schema.Struct({
   bio: Schema.optional(
@@ -187,11 +193,12 @@ export const UpdateUserProfileParamsSchema = Schema.Struct({
 })
 
 export type UpdateUserProfileParams = Schema.Schema.Type<typeof UpdateUserProfileParamsSchema>
+assertUpdateFields<UpdateUserProfileParams>()([], UPDATE_USER_PROFILE_FIELDS)
 
-export const UPDATE_GUEST_SETTINGS_FIELDS: ReadonlyArray<"allowReadOnly" | "allowSignUp"> = [
+export const UPDATE_GUEST_SETTINGS_FIELDS = [
   "allowReadOnly",
   "allowSignUp"
-]
+] as const satisfies ReadonlyArray<"allowReadOnly" | "allowSignUp">
 
 export const UpdateGuestSettingsParamsSchema = Schema.Struct({
   allowReadOnly: Schema.optional(
@@ -216,6 +223,7 @@ export const UpdateGuestSettingsParamsSchema = Schema.Struct({
 })
 
 export type UpdateGuestSettingsParams = Schema.Schema.Type<typeof UpdateGuestSettingsParamsSchema>
+assertUpdateFields<UpdateGuestSettingsParams>()([], UPDATE_GUEST_SETTINGS_FIELDS)
 
 const MAX_UNIX_SECONDS_TIMESTAMP = 9_999_999_999
 

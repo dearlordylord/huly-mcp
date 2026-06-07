@@ -73,6 +73,14 @@ const lookupEnumValue = <T>(map: Readonly<Record<string, T>>, value: string): T 
 export const testCaseTypeToString = (t: TestCaseType): TestCaseTypeStr => caseTypeToString[t]
 export const stringToTestCaseType = (s: string): TestCaseType | undefined => lookupEnumValue(stringToCaseType, s)
 
+export const resolveCaseType = (value: string): TestCaseType => {
+  const resolved = stringToTestCaseType(value)
+  /* v8 ignore start -- unreachable: value is schema-validated to a known TestCaseType string */
+  if (resolved === undefined) return CaseType.Functional
+  /* v8 ignore stop */
+  return resolved
+}
+
 const casePriorityToString: Record<TestCasePriority, TestCasePriorityStr> = {
   [CasePriority.Low]: "low",
   [CasePriority.Medium]: "medium",
@@ -92,6 +100,14 @@ const stringToCasePriority: Readonly<Record<string, TestCasePriority>> = stringT
 export const testCasePriorityToString = (p: TestCasePriority): TestCasePriorityStr => casePriorityToString[p]
 export const stringToTestCasePriority = (s: string): TestCasePriority | undefined =>
   lookupEnumValue(stringToCasePriority, s)
+
+export const resolveCasePriority = (value: string): TestCasePriority => {
+  const resolved = stringToTestCasePriority(value)
+  /* v8 ignore start -- unreachable: value is schema-validated to a known TestCasePriority string */
+  if (resolved === undefined) return CasePriority.Medium
+  /* v8 ignore stop */
+  return resolved
+}
 
 const caseStatusToString: Record<TestCaseStatus, TestCaseStatusStr> = {
   [CaseStatus.Draft]: "draft",
@@ -113,6 +129,14 @@ const stringToCaseStatus: Readonly<Record<string, TestCaseStatus>> = stringToCas
 
 export const testCaseStatusToString = (s: TestCaseStatus): TestCaseStatusStr => caseStatusToString[s]
 export const stringToTestCaseStatus = (s: string): TestCaseStatus | undefined => lookupEnumValue(stringToCaseStatus, s)
+
+export const resolveCaseStatus = (value: string): TestCaseStatus => {
+  const resolved = stringToTestCaseStatus(value)
+  /* v8 ignore start -- unreachable: value is schema-validated to a known TestCaseStatus string */
+  if (resolved === undefined) return CaseStatus.Draft
+  /* v8 ignore stop */
+  return resolved
+}
 
 const runStatusToString: Record<TestRunStatus, TestRunStatusStr> = {
   [RunStatus.Untested]: "untested",

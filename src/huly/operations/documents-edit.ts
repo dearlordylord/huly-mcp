@@ -12,7 +12,7 @@ import { Effect } from "effect"
 
 import type { EditDocumentParams } from "../../domain/schemas.js"
 import { EDIT_DOCUMENT_UPDATE_FIELD_GROUPS, type EditDocumentResult } from "../../domain/schemas/documents.js"
-import { DocumentId } from "../../domain/schemas/shared.js"
+import { Count, DocumentId } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import {
   DocumentEditModeError,
@@ -146,7 +146,7 @@ export const editDocument = (
       if (occurrences > 1 && !params.replace_all) {
         return yield* new DocumentTextMultipleMatchesError({
           searchText: params.old_text,
-          matchCount: occurrences
+          matchCount: Count.make(occurrences)
         })
       }
 

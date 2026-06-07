@@ -1,5 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
+import type { Count, ListTotal } from "./shared.js"
 import { enumValuesDescription, ProjectIdentifier } from "./shared.js"
 
 const EntityTypeValues = ["issue", "project", "component", "milestone"] as const
@@ -44,18 +45,18 @@ export interface DeletionImpact {
   readonly entityType: EntityType
   readonly identifier: string
   readonly impact: {
-    readonly subIssues?: number | undefined
-    readonly comments?: number | undefined
-    readonly attachments?: number | undefined
-    readonly blockedBy?: number | undefined
-    readonly relations?: number | undefined
-    readonly issues?: number | undefined
-    readonly components?: number | undefined
-    readonly milestones?: number | undefined
-    readonly templates?: number | undefined
+    readonly subIssues?: Count | undefined
+    readonly comments?: Count | undefined
+    readonly attachments?: Count | undefined
+    readonly blockedBy?: Count | undefined
+    readonly relations?: Count | undefined
+    readonly issues?: ListTotal | undefined
+    readonly components?: ListTotal | undefined
+    readonly milestones?: ListTotal | undefined
+    readonly templates?: ListTotal | undefined
   }
   readonly warnings: ReadonlyArray<string>
-  readonly totalAffected: number
+  readonly totalAffected: ListTotal
 }
 
 export const previewDeletionParamsJsonSchema = JSONSchema.make(PreviewDeletionParamsSchema)

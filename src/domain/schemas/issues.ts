@@ -2,9 +2,11 @@ import { JSONSchema, ParseResult, Schema } from "effect"
 
 import { normalizeForComparison } from "../../utils/normalize.js"
 import {
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   ColorCode,
   ComponentIdentifier,
+  Count,
   Email,
   enumValuesDescription,
   hasAtLeastOneDefined,
@@ -96,7 +98,7 @@ export const IssueSummarySchema = Schema.Struct({
   priority: Schema.optional(IssuePrioritySchema),
   assignee: Schema.optional(PersonName),
   parentIssue: Schema.optional(IssueIdentifier),
-  subIssues: Schema.optional(Schema.Number),
+  subIssues: Schema.optional(Count),
   modifiedOn: Schema.optional(Timestamp)
 }).annotations({
   title: "IssueSummary",
@@ -118,7 +120,7 @@ export const IssueSchema = Schema.Struct({
   labels: Schema.optional(Schema.Array(LabelSchema)),
   project: ProjectIdentifier,
   parentIssue: Schema.optional(IssueIdentifier),
-  subIssues: Schema.optional(Schema.Number),
+  subIssues: Schema.optional(Count),
   modifiedOn: Schema.optional(Timestamp),
   createdOn: Schema.optional(Timestamp),
   dueDate: Schema.optional(Schema.NullOr(Timestamp)),
@@ -261,9 +263,18 @@ export const CreateIssueParamsSchema = Schema.Struct({
 
 export type CreateIssueParams = Schema.Schema.Type<typeof CreateIssueParamsSchema>
 
-export const UPDATE_ISSUE_FIELDS: ReadonlyArray<
+export const UPDATE_ISSUE_FIELDS = [
+  "title",
+  "description",
+  "priority",
+  "assignee",
+  "status",
+  "taskType",
+  "dueDate",
+  "estimation"
+] as const satisfies ReadonlyArray<
   "title" | "description" | "priority" | "assignee" | "status" | "taskType" | "dueDate" | "estimation"
-> = ["title", "description", "priority", "assignee", "status", "taskType", "dueDate", "estimation"]
+>
 
 export const UpdateIssueParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotations({
@@ -313,6 +324,7 @@ export const UpdateIssueParamsSchema = Schema.Struct({
 })
 
 export type UpdateIssueParams = Schema.Schema.Type<typeof UpdateIssueParamsSchema>
+assertUpdateFields<UpdateIssueParams>()(["project", "identifier"], UPDATE_ISSUE_FIELDS)
 
 export const AddLabelParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotations({

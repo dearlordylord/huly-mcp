@@ -1,5 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
+import { Count } from "./shared.js"
+
 const NonEmptyTrimmedString = Schema.NonEmptyTrimmedString
 
 const SanitizedUrlSchema = Schema.Struct({
@@ -77,8 +79,8 @@ const ToolsetsContextSchema = Schema.Struct({
   enabledCategories: Schema.Array(NonEmptyTrimmedString),
   ignoredCategories: Schema.Array(NonEmptyTrimmedString),
   availableCategories: Schema.Array(NonEmptyTrimmedString),
-  visibleRegisteredToolCount: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
-  totalRegisteredToolCount: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
+  visibleRegisteredToolCount: Count,
+  totalRegisteredToolCount: Count,
   builtinTools: Schema.Array(Schema.Literal("get_version", "get_huly_context"))
 })
 

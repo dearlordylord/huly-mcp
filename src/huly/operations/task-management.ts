@@ -24,6 +24,7 @@ import type {
   TaskTypeSummary
 } from "../../domain/schemas.js"
 import {
+  Count,
   CreateIssueStatusResultSchema,
   CreateTaskTypeResultSchema,
   IssueStatusId,
@@ -38,6 +39,7 @@ import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError, type HulyClientOperations } from "../client.js"
 import { HulyConnectionError, HulyError } from "../errors.js"
 import { core, task, tracker } from "../huly-plugins.js"
+import { listTotal } from "./counts.js"
 import { uniqueStatusDocs, uniqueStatusRefs } from "./issues-shared.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
@@ -183,8 +185,8 @@ const projectTypeSummary = (data: WorkflowData): ProjectTypeSummary => ({
   id: ProjectTypeId.make(data.projectType._id),
   name: data.projectType.name,
   descriptor: data.projectType.descriptor,
-  taskTypeCount: data.taskTypes.length,
-  statusCount: uniqueStatusIds(data.projectType).length,
+  taskTypeCount: Count.make(data.taskTypes.length),
+  statusCount: Count.make(uniqueStatusIds(data.projectType).length),
   isDefaultClassic: isDefaultClassicProjectType(data.projectType)
 })
 
@@ -209,7 +211,7 @@ const taskTypeSummary = (projectType: ProjectType, taskType: TaskType): TaskType
   projectTypeName: projectType.name,
   kind: taskType.kind,
   issueClass: taskType.ofClass,
-  statusCount: uniqueStatusRefs(taskType.statuses).length
+  statusCount: Count.make(uniqueStatusRefs(taskType.statuses).length)
 })
 
 const projectTypeDetail = (data: WorkflowData): ProjectTypeDetail => ({
@@ -338,7 +340,7 @@ export const listProjectTypes = (
     const workflowData = yield* Effect.all(projectTypes.map((projectType) => loadWorkflowData(client, projectType)))
     const result = {
       projectTypes: workflowData.map(projectTypeSummary),
-      total: workflowData.length
+      total: listTotal(workflowData.length)
     }
     return yield* encodeOrConnectionError(ListProjectTypesResultSchema, result, "listProjectTypes")
   })
@@ -365,7 +367,7 @@ export const listTaskTypes = (
     const taskTypes = workflowData.flatMap((data) =>
       data.taskTypes.map((taskType) => taskTypeSummary(data.projectType, taskType))
     )
-    const result = { taskTypes, total: taskTypes.length }
+    const result = { taskTypes, total: listTotal(taskTypes.length) }
     return yield* encodeOrConnectionError(ListTaskTypesResultSchema, result, "listTaskTypes")
   })
 

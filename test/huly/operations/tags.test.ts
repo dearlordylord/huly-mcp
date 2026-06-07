@@ -16,6 +16,7 @@ import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { tags, tracker } from "../../../src/huly/huly-plugins.js"
 import { toRef } from "../../../src/huly/operations/sdk-boundary.js"
+import { normalizeColorCode } from "../../../src/huly/operations/tags-shared.js"
 import {
   attachTag,
   createTag,
@@ -37,6 +38,12 @@ import {
 const USER = "user-1" as PersonId
 const WORKSPACE_SPACE = "core:space:Workspace" as Ref<Space>
 const TARGET_CLASS = objectClassName("tracker:class:Issue")
+
+describe("normalizeColorCode", () => {
+  it("normalizes non-finite colors to zero", () => {
+    expect(normalizeColorCode(Infinity)).toBe(0)
+  })
+})
 
 const makeTagElement = (overrides?: Partial<HulyTagElement>): HulyTagElement => ({
   _id: toRef<HulyTagElement>("tag-1"),

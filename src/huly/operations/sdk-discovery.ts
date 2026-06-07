@@ -12,7 +12,7 @@ import type {
   ListHulyEnumsParams,
   ListHulyEnumsResult
 } from "../../domain/schemas/sdk-discovery.js"
-import { SDK_DISCOVERY_DEFAULT_LIMIT } from "../../domain/schemas/sdk-discovery.js"
+import { HulyDiscoveryCount, SDK_DISCOVERY_DEFAULT_LIMIT } from "../../domain/schemas/sdk-discovery.js"
 import { NonEmptyString, ObjectClassName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { HulyClassNotFoundError } from "../errors-sdk-discovery.js"
@@ -241,10 +241,10 @@ export const listHulyClasses = (
     )
     const summaries = matched.map((summary) => ({
       ...summary,
-      attributesCount: attributeCounts.get(summary.classId) ?? 0
+      attributesCount: HulyDiscoveryCount.make(attributeCounts.get(summary.classId) ?? 0)
     }))
 
-    return { classes: summaries, total: summaries.length }
+    return { classes: summaries, total: HulyDiscoveryCount.make(summaries.length) }
   })
 
 export const getHulyClass = (
@@ -299,7 +299,7 @@ export const listHulyAttributes = (
       .filter((attr) => includesQuery(attributeSearchText(attr), query))
       .slice(0, limit)
 
-    return { attributes, total: attributes.length }
+    return { attributes, total: HulyDiscoveryCount.make(attributes.length) }
   })
 
 export const listHulyEnums = (
@@ -324,5 +324,5 @@ export const listHulyEnums = (
       .filter((summary) => includesQuery(enumSearchText(summary), queryText))
       .slice(0, limit)
 
-    return { enums, total: enums.length }
+    return { enums, total: HulyDiscoveryCount.make(enums.length) }
   })

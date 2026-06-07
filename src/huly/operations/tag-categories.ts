@@ -21,7 +21,7 @@ import { type NoUpdateFieldsError, TagCategoryNotFoundError } from "../errors.js
 import { core, tags, tracker } from "../huly-plugins.js"
 import { clampLimit } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 type ListTagCategoriesError = HulyClientError
 type CreateTagCategoryError = HulyClientError
@@ -144,14 +144,19 @@ export const updateTagCategory = (
 
     const cat = yield* findCategoryOrFail(client, params.category)
 
-    const updateOps: DocumentUpdate<HulyTagCategory> = {}
-
-    if (params.label !== undefined) {
-      updateOps.label = params.label
+    type UpdateTagCategoryField = typeof UPDATE_TAG_CATEGORY_FIELDS[number]
+    type UpdateTagCategoryEntries = {
+      readonly [Field in UpdateTagCategoryField]: DirectUpdateEntry<
+        UpdateTagCategoryField,
+        DocumentUpdate<HulyTagCategory>,
+        Field
+      >
     }
-    if (params.default !== undefined) {
-      updateOps.default = params.default
-    }
+    const updateEntries = {
+      label: params.label === undefined ? {} : { label: params.label },
+      default: params.default === undefined ? {} : { default: params.default }
+    } satisfies UpdateTagCategoryEntries
+    const updateOps: DocumentUpdate<HulyTagCategory> = mergeUpdateEntries(Object.values(updateEntries))
 
     yield* client.updateDoc(
       tags.class.TagCategory,

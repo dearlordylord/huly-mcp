@@ -31,6 +31,7 @@ import {
 } from "./registry.js"
 import { sdkDiscoveryTools } from "./sdk-discovery.js"
 import { searchTools } from "./search.js"
+import { spaceTools } from "./spaces.js"
 import { storageTools } from "./storage.js"
 import { tagCategoryTools } from "./tag-categories.js"
 import { tagTools } from "./tags.js"
@@ -52,6 +53,7 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...milestoneTools,
   ...documentTools,
   ...genericAssociationTools,
+  ...spaceTools,
   ...sdkDiscoveryTools,
   ...storageTools,
   ...attachmentTools,

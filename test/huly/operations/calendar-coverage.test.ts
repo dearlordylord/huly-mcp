@@ -385,7 +385,10 @@ describe("createRecurringEvent - ruleToHulyRule with all optional fields", () =>
 
   it.effect("uses primary calendar preference when calendarId is omitted", () =>
     Effect.gen(function*() {
-      const defaultCalendar = makeCalendar({ _id: "test-account-uuid_calendar" as Ref<HulyCalendar>, name: "Default" })
+      const defaultCalendar = makeCalendar({
+        _id: "00000000-0000-4000-8000-000000000000_calendar" as Ref<HulyCalendar>,
+        name: "Default"
+      })
       const preferredCalendar = makeCalendar({ _id: "preferred-calendar" as Ref<HulyCalendar>, name: "Preferred" })
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
       const testLayer = createTestLayer({
@@ -496,7 +499,10 @@ describe("createEvent - description and participants", () => {
 
   it.effect("uses primary calendar preference when calendarId is omitted", () =>
     Effect.gen(function*() {
-      const defaultCalendar = makeCalendar({ _id: "test-account-uuid_calendar" as Ref<HulyCalendar>, name: "Default" })
+      const defaultCalendar = makeCalendar({
+        _id: "00000000-0000-4000-8000-000000000000_calendar" as Ref<HulyCalendar>,
+        name: "Default"
+      })
       const preferredCalendar = makeCalendar({ _id: "preferred-calendar" as Ref<HulyCalendar>, name: "Preferred" })
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
       const testLayer = createTestLayer({
@@ -553,7 +559,10 @@ describe("createEvent - description and participants", () => {
 describe("listCalendars", () => {
   it.effect("lists calendars and marks the primary calendar", () =>
     Effect.gen(function*() {
-      const primary = makeCalendar({ _id: "test-account-uuid_calendar" as Ref<HulyCalendar>, name: "Personal" })
+      const primary = makeCalendar({
+        _id: "00000000-0000-4000-8000-000000000000_calendar" as Ref<HulyCalendar>,
+        name: "Personal"
+      })
       const secondary = makeCalendar({ _id: "team-calendar" as Ref<HulyCalendar>, name: "Team" })
       const hidden = makeCalendar({ _id: "hidden-calendar" as Ref<HulyCalendar>, hidden: true })
       const readonly = makeCalendar({ _id: "readonly-calendar" as Ref<HulyCalendar>, access: AccessLevel.Reader })
@@ -563,7 +572,7 @@ describe("listCalendars", () => {
 
       expect(result).toHaveLength(2)
       expect(result[0]).toMatchObject({
-        calendarId: "test-account-uuid_calendar",
+        calendarId: "00000000-0000-4000-8000-000000000000_calendar",
         name: "Personal",
         isPrimary: true
       })
@@ -840,7 +849,7 @@ describe("createEvent - no listed calendar fallback", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result.eventId).toBeDefined()
-      expect(captureAddCollection.attributes?.calendar).toBe("test-account-uuid_calendar")
+      expect(captureAddCollection.attributes?.calendar).toBe("00000000-0000-4000-8000-000000000000_calendar")
     }))
 })
 

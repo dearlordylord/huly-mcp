@@ -1,6 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
 import {
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   ColorCode,
   hasAtLeastOneDefined,
@@ -66,7 +67,9 @@ export const CreateLabelParamsSchema = Schema.Struct({
 
 export type CreateLabelParams = Schema.Schema.Type<typeof CreateLabelParamsSchema>
 
-export const UPDATE_LABEL_FIELDS: ReadonlyArray<"title" | "color" | "description"> = ["title", "color", "description"]
+export const UPDATE_LABEL_FIELDS = ["title", "color", "description"] as const satisfies ReadonlyArray<
+  "title" | "color" | "description"
+>
 
 export const UpdateLabelParamsSchema = Schema.Struct({
   label: TagIdentifier.annotations({
@@ -93,6 +96,7 @@ export const UpdateLabelParamsSchema = Schema.Struct({
 })
 
 export type UpdateLabelParams = Schema.Schema.Type<typeof UpdateLabelParamsSchema>
+assertUpdateFields<UpdateLabelParams>()(["label"], UPDATE_LABEL_FIELDS)
 
 export const DeleteLabelParamsSchema = Schema.Struct({
   label: TagIdentifier.annotations({

@@ -27,7 +27,7 @@ import { MilestoneNotFoundError } from "../errors.js"
 import { findProject, findProjectAndIssue } from "./issues-shared.js"
 import { clampLimit, findByNameOrId } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 import { tracker } from "../huly-plugins.js"
 import { optionalMarkdownToMarkup, optionalMarkupToMarkdown } from "./markup.js"
@@ -215,33 +215,33 @@ export const updateMilestone = (
     const { client, milestone, project } = yield* findProjectAndMilestone(params)
     const markupUrlConfig = client.markupUrlConfig
 
-    const updateOps: DocumentUpdate<HulyMilestone> = {}
-
-    if (params.label !== undefined) {
-      updateOps.label = params.label
+    type UpdateMilestoneField = typeof UPDATE_MILESTONE_FIELDS[number]
+    type UpdateMilestoneEntries = {
+      readonly [Field in UpdateMilestoneField]: Effect.Effect<
+        DirectUpdateEntry<UpdateMilestoneField, DocumentUpdate<HulyMilestone>, Field>,
+        HulyClientError
+      >
     }
-
-    if (params.description !== undefined) {
-      // Dual-write: see comment in createMilestone for rationale.
-      if (params.description.trim() !== "") {
-        yield* client.uploadMarkup(
-          tracker.class.Milestone,
-          milestone._id,
-          "description",
-          params.description,
-          "markdown"
-        )
-      }
-      updateOps.description = optionalMarkdownToMarkup(params.description, markupUrlConfig, "")
-    }
-
-    if (params.targetDate !== undefined) {
-      updateOps.targetDate = params.targetDate
-    }
-
-    if (params.status !== undefined) {
-      updateOps.status = stringToMilestoneStatus(params.status)
-    }
+    const updateEntries = {
+      label: Effect.succeed(params.label === undefined ? {} : { label: params.label }),
+      description: Effect.gen(function*() {
+        if (params.description === undefined) return {}
+        // Dual-write: see comment in createMilestone for rationale.
+        if (params.description.trim() !== "") {
+          yield* client.uploadMarkup(
+            tracker.class.Milestone,
+            milestone._id,
+            "description",
+            params.description,
+            "markdown"
+          )
+        }
+        return { description: optionalMarkdownToMarkup(params.description, markupUrlConfig, "") }
+      }),
+      targetDate: Effect.succeed(params.targetDate === undefined ? {} : { targetDate: params.targetDate }),
+      status: Effect.succeed(params.status === undefined ? {} : { status: stringToMilestoneStatus(params.status) })
+    } satisfies UpdateMilestoneEntries
+    const updateOps: DocumentUpdate<HulyMilestone> = mergeUpdateEntries(yield* Effect.all(Object.values(updateEntries)))
 
     yield* client.updateDoc(
       tracker.class.Milestone,

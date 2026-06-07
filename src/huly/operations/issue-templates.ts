@@ -46,6 +46,7 @@ import type {
 import { UPDATE_ISSUE_TEMPLATE_FIELDS } from "../../domain/schemas/issue-templates.js"
 import {
   ComponentLabel,
+  Count,
   Email,
   IssueTemplateChildId,
   IssueTemplateId,
@@ -72,7 +73,7 @@ import { findPersonByEmailOrName } from "./contacts-shared.js"
 import { findProject, priorityToString, stringToPriority, zeroAsUnset } from "./issues-shared.js"
 import { createIssue } from "./issues.js"
 import { toRef } from "./sdk-boundary.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 import { contact, tracker } from "../huly-plugins.js"
 import { type MarkupUrlConfig, optionalMarkdownToMarkup, optionalMarkupToMarkdown } from "./markup.js"
@@ -292,7 +293,7 @@ export const listIssueTemplates = (
       }
       // exactOptionalPropertyTypes: only set childrenCount when > 0
       if (t.children.length > 0) {
-        return { ...base, childrenCount: t.children.length }
+        return { ...base, childrenCount: Count.make(t.children.length) }
       }
       return base
     })
@@ -516,7 +517,7 @@ export const createIssueFromTemplate = (
 
       return {
         ...result,
-        childrenCreated: template.children.length
+        childrenCreated: Count.make(template.children.length)
       }
     }
 
@@ -532,36 +533,33 @@ export const updateIssueTemplate = (
     const { client, project, template } = yield* findProjectAndTemplate(params)
     const markupUrlConfig = client.markupUrlConfig
 
-    const updateOps: DocumentUpdate<HulyIssueTemplate> = {}
-
-    if (params.title !== undefined) {
-      updateOps.title = params.title
+    type UpdateIssueTemplateField = typeof UPDATE_ISSUE_TEMPLATE_FIELDS[number]
+    type UpdateIssueTemplateEntries = {
+      readonly [Field in UpdateIssueTemplateField]: Effect.Effect<
+        DirectUpdateEntry<UpdateIssueTemplateField, DocumentUpdate<HulyIssueTemplate>, Field>,
+        HulyClientError | ComponentNotFoundError | PersonNotFoundError
+      >
     }
-
-    if (params.description !== undefined) {
-      updateOps.description = optionalMarkdownToMarkup(params.description, markupUrlConfig, "")
-    }
-
-    if (params.priority !== undefined) {
-      updateOps.priority = stringToPriority(params.priority)
-    }
-
-    if (params.assignee !== undefined) {
-      if (params.assignee === null) {
-        updateOps.assignee = null
-      } else {
+    const updateEntries = {
+      title: Effect.succeed(params.title === undefined ? {} : { title: params.title }),
+      description: Effect.succeed(
+        params.description === undefined
+          ? {}
+          : { description: optionalMarkdownToMarkup(params.description, markupUrlConfig, "") }
+      ),
+      priority: Effect.succeed(params.priority === undefined ? {} : { priority: stringToPriority(params.priority) }),
+      assignee: Effect.gen(function*() {
+        if (params.assignee === undefined) return {}
+        if (params.assignee === null) return { assignee: null }
         const person = yield* findPersonByEmailOrName(client, params.assignee)
         if (person === undefined) {
           return yield* new PersonNotFoundError({ identifier: params.assignee })
         }
-        updateOps.assignee = person._id
-      }
-    }
-
-    if (params.component !== undefined) {
-      if (params.component === null) {
-        updateOps.component = null
-      } else {
+        return { assignee: person._id }
+      }),
+      component: Effect.gen(function*() {
+        if (params.component === undefined) return {}
+        if (params.component === null) return { component: null }
         const component = yield* findComponentByIdOrLabel(client, project._id, params.component)
         if (component === undefined) {
           return yield* new ComponentNotFoundError({
@@ -569,13 +567,13 @@ export const updateIssueTemplate = (
             project: params.project
           })
         }
-        updateOps.component = component._id
-      }
-    }
-
-    if (params.estimation !== undefined) {
-      updateOps.estimation = params.estimation
-    }
+        return { component: component._id }
+      }),
+      estimation: Effect.succeed(params.estimation === undefined ? {} : { estimation: params.estimation })
+    } satisfies UpdateIssueTemplateEntries
+    const updateOps: DocumentUpdate<HulyIssueTemplate> = mergeUpdateEntries(
+      yield* Effect.all(Object.values(updateEntries))
+    )
 
     yield* client.updateDoc(
       tracker.class.IssueTemplate,

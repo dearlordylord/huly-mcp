@@ -1,5 +1,6 @@
 import type { SanitizedHulyRuntimeConfigContext } from "../config/config.js"
 import type { GetHulyContextResult } from "../domain/schemas/index.js"
+import { Count } from "../domain/schemas/index.js"
 import { VERSION } from "../version.js"
 import { DEFAULT_HTTP_PORT } from "./http-transport.js"
 import { hulyContextToolOutputSchema, versionToolOutputSchema } from "./tool-output-schema.js"
@@ -136,8 +137,8 @@ export const buildHulyContext = (
     enabledCategories: toolsetSummary.enabledCategories === undefined ? [] : [...toolsetSummary.enabledCategories],
     ignoredCategories: toolsetSummary.ignoredCategories,
     availableCategories: [...CATEGORY_NAMES],
-    visibleRegisteredToolCount: registry.definitions.length,
-    totalRegisteredToolCount: toolRegistry.definitions.length,
+    visibleRegisteredToolCount: Count.make(registry.definitions.length),
+    totalRegisteredToolCount: Count.make(toolRegistry.definitions.length),
     builtinTools: builtinToolNames
   }
 })

@@ -12,6 +12,7 @@ import {
 } from "../../domain/schemas.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { core } from "../huly-plugins.js"
+import { listTotal } from "./counts.js"
 import { clampLimit, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
 import { toAccountUuid } from "./sdk-boundary.js"
 
@@ -42,6 +43,6 @@ export const listUserStatuses = (
 
     return ListUserStatusesResultSchema.make({
       statuses: statuses.map(userStatusSummary),
-      total: statuses.length
+      total: listTotal(statuses.length)
     })
   })

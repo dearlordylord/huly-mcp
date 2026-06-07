@@ -2,6 +2,7 @@ import { JSONSchema, Schema } from "effect"
 
 import type { BlobId } from "./shared.js"
 import {
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   AttachmentId,
   DocId,
@@ -127,7 +128,9 @@ export const AddAttachmentParamsSchema = AddAttachmentParamsBase.pipe(
 
 export type AddAttachmentParams = Schema.Schema.Type<typeof AddAttachmentParamsSchema>
 
-export const UPDATE_ATTACHMENT_FIELDS: ReadonlyArray<"description" | "pinned"> = ["description", "pinned"]
+export const UPDATE_ATTACHMENT_FIELDS = ["description", "pinned"] as const satisfies ReadonlyArray<
+  "description" | "pinned"
+>
 
 export const UpdateAttachmentParamsSchema = Schema.Struct({
   attachmentId: AttachmentId.annotations({
@@ -153,6 +156,7 @@ export const UpdateAttachmentParamsSchema = Schema.Struct({
 })
 
 export type UpdateAttachmentParams = Schema.Schema.Type<typeof UpdateAttachmentParamsSchema>
+assertUpdateFields<UpdateAttachmentParams>()(["attachmentId"], UPDATE_ATTACHMENT_FIELDS)
 
 export const DeleteAttachmentParamsSchema = Schema.Struct({
   attachmentId: AttachmentId.annotations({

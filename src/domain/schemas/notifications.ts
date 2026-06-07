@@ -1,6 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { NotificationTypeId } from "./shared.js"
+import type { Count, ListTotal, NotificationTypeId } from "./shared.js"
 import {
   DocId,
   LimitParam,
@@ -259,7 +259,7 @@ export interface MarkNotificationReadResult {
 }
 
 export interface MarkAllNotificationsReadResult {
-  readonly count: number
+  readonly count: Count
 }
 
 export interface ArchiveNotificationResult {
@@ -268,7 +268,7 @@ export interface ArchiveNotificationResult {
 }
 
 export interface ArchiveAllNotificationsResult {
-  readonly count: number
+  readonly count: Count
 }
 
 export interface DeleteNotificationResult {
@@ -288,5 +288,5 @@ export interface UpdateNotificationProviderSettingResult {
 }
 
 export interface UnreadCountResult {
-  readonly count: number
+  readonly count: ListTotal
 }

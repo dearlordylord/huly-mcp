@@ -39,9 +39,10 @@ import {
   type NoUpdateFieldsError
 } from "../errors.js"
 import { cardPlugin } from "../huly-plugins.js"
+import { listTotal, optionalCount } from "./counts.js"
 import { clampLimit, escapeLikeWildcards, findByNameOrId } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 type ListCardSpacesError = HulyClientError
 
@@ -195,7 +196,7 @@ export const listCardSpaces = (
 
     return {
       cardSpaces: summaries,
-      total: spaces.total
+      total: listTotal(spaces.total)
     }
   })
 
@@ -207,7 +208,7 @@ export const listMasterTags = (
 
     const typeRefs = cardSpace.types
     if (typeRefs.length === 0) {
-      return { masterTags: [], total: 0 }
+      return { masterTags: [], total: listTotal(0) }
     }
 
     const tags = yield* client.findAll<HulyMasterTag>(
@@ -222,7 +223,7 @@ export const listMasterTags = (
 
     return {
       masterTags: summaries,
-      total: tags.total
+      total: listTotal(tags.total)
     }
   })
 
@@ -275,7 +276,7 @@ export const listCards = (
 
     return {
       cards: summaries,
-      total: cards.total
+      total: listTotal(cards.total)
     }
   })
 
@@ -304,7 +305,7 @@ export const getCard = (
       content,
       type: String(card._class),
       parent: card.parent ? String(card.parent) : undefined,
-      children: card.children,
+      children: optionalCount(card.children),
       cardSpace: cardSpace.name,
       modifiedOn: card.modifiedOn,
       createdOn: card.createdOn
@@ -396,24 +397,23 @@ export const updateCard = (
       cardSpace: params.cardSpace
     })
 
-    const updateOps: DocumentUpdate<HulyCard> = {}
-
-    if (params.title !== undefined) {
-      updateOps.title = params.title
+    type UpdateCardField = typeof UPDATE_CARD_FIELDS[number]
+    type UpdateCardEntries = {
+      readonly [Field in UpdateCardField]: Effect.Effect<
+        DirectUpdateEntry<UpdateCardField, DocumentUpdate<HulyCard>, Field>,
+        HulyClientError
+      >
     }
-
-    if (params.content !== undefined) {
-      // Card.content is non-nullable MarkupBlobRef (unlike Document.content which can be null).
-      // Empty string clears the content blob rather than nulling the field.
-      if (card.content) {
-        yield* client.updateMarkup(
-          card._class,
-          card._id,
-          "content",
-          params.content,
-          "markdown"
-        )
-      } else {
+    const updateEntries = {
+      title: Effect.succeed(params.title === undefined ? {} : { title: params.title }),
+      content: Effect.gen(function*() {
+        if (params.content === undefined) return {}
+        // Card.content is non-nullable MarkupBlobRef (unlike Document.content which can be null).
+        // Empty string clears the content blob rather than nulling the field.
+        if (card.content) {
+          yield* client.updateMarkup(card._class, card._id, "content", params.content, "markdown")
+          return {}
+        }
         const contentMarkupRef = yield* client.uploadMarkup(
           card._class,
           card._id,
@@ -421,9 +421,10 @@ export const updateCard = (
           params.content,
           "markdown"
         )
-        updateOps.content = contentMarkupRef
-      }
-    }
+        return { content: contentMarkupRef }
+      })
+    } satisfies UpdateCardEntries
+    const updateOps: DocumentUpdate<HulyCard> = mergeUpdateEntries(yield* Effect.all(Object.values(updateEntries)))
 
     if (Object.keys(updateOps).length > 0) {
       yield* client.updateDoc(

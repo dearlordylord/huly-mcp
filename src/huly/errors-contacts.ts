@@ -5,7 +5,10 @@
  */
 import { Schema } from "effect"
 
+import { Count } from "../domain/schemas/shared.js"
+
 const MIN_AMBIGUOUS_PERSON_MATCHES = 2
+const AmbiguousMatchCount = Count.pipe(Schema.greaterThanOrEqualTo(MIN_AMBIGUOUS_PERSON_MATCHES))
 
 /**
  * Person (assignee) not found.
@@ -28,7 +31,7 @@ export class PersonIdentifierAmbiguousError extends Schema.TaggedError<PersonIde
   "PersonIdentifierAmbiguousError",
   {
     identifier: Schema.String,
-    matches: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(MIN_AMBIGUOUS_PERSON_MATCHES))
+    matches: AmbiguousMatchCount
   }
 ) {
   override get message(): string {
@@ -57,7 +60,7 @@ export class OrganizationIdentifierAmbiguousError extends Schema.TaggedError<Org
   "OrganizationIdentifierAmbiguousError",
   {
     identifier: Schema.String,
-    matches: Schema.Number
+    matches: AmbiguousMatchCount
   }
 ) {
   override get message(): string {

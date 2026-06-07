@@ -1,6 +1,8 @@
 import { JSONSchema, Schema } from "effect"
 
+import type { ListTotal } from "./shared.js"
 import {
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   hasAtLeastOneDefined,
   LimitParam,
@@ -41,7 +43,7 @@ export type ListProjectsParams = Schema.Schema.Type<typeof ListProjectsParamsSch
 
 export interface ListProjectsResult {
   readonly projects: ReadonlyArray<ProjectSummary>
-  readonly total: number
+  readonly total: ListTotal
 }
 
 export const ProjectSchema = Schema.Struct({
@@ -75,7 +77,7 @@ export const CreateProjectParamsSchema = Schema.Struct({
 }).annotations({ title: "CreateProjectParams", description: "Parameters for creating a project" })
 export type CreateProjectParams = Schema.Schema.Type<typeof CreateProjectParamsSchema>
 
-export const UPDATE_PROJECT_FIELDS: ReadonlyArray<"name" | "description"> = ["name", "description"]
+export const UPDATE_PROJECT_FIELDS = ["name", "description"] as const satisfies ReadonlyArray<"name" | "description">
 
 export const UpdateProjectParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotations({ description: "Project identifier to update" }),
@@ -94,6 +96,7 @@ export const UpdateProjectParamsSchema = Schema.Struct({
   description: `Parameters for updating a project. ${atLeastOneUpdateFieldMessage(UPDATE_PROJECT_FIELDS)}`
 })
 export type UpdateProjectParams = Schema.Schema.Type<typeof UpdateProjectParamsSchema>
+assertUpdateFields<UpdateProjectParams>()(["project"], UPDATE_PROJECT_FIELDS)
 
 export const DeleteProjectParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotations({ description: "Project identifier to delete" })
@@ -117,7 +120,7 @@ export type StatusDetail = Schema.Schema.Type<typeof StatusDetailSchema>
 
 export interface ListStatusesResult {
   readonly statuses: ReadonlyArray<StatusDetail>
-  readonly total: number
+  readonly total: ListTotal
 }
 
 export const listProjectsParamsJsonSchema = JSONSchema.make(ListProjectsParamsSchema)

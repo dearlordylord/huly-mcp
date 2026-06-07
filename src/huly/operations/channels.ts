@@ -37,14 +37,15 @@ import type {
   UpdateChannelResult
 } from "../../domain/schemas/channels.js"
 import { UPDATE_CHANNEL_FIELDS } from "../../domain/schemas/channels.js"
-import { AccountUuid, ChannelId, ChannelName, MessageId, PersonName } from "../../domain/schemas/shared.js"
+import { AccountUuid, ChannelId, ChannelName, Count, MessageId, PersonName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { ChannelNotFoundError, NoUpdateFieldsError } from "../errors.js"
 import { findChannel } from "./channels-shared.js"
+import { listTotal, optionalCount } from "./counts.js"
 import { markdownToMarkupString, markupToMarkdownString } from "./markup.js"
 import { clampLimit, escapeLikeWildcards } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 import { chunter, contact } from "../huly-plugins.js"
 
@@ -217,8 +218,8 @@ export const listChannels = (
       topic: ch.topic || undefined,
       private: ch.private,
       archived: ch.archived,
-      members: ch.members.length,
-      messages: ch.messages,
+      members: Count.make(ch.members.length),
+      messages: optionalCount(ch.messages),
       modifiedOn: ch.modifiedOn
     }))
 
@@ -251,7 +252,7 @@ export const getChannel = (
       private: channel.private,
       archived: channel.archived,
       members: memberNames,
-      messages: channel.messages,
+      messages: optionalCount(channel.messages),
       modifiedOn: channel.modifiedOn,
       createdOn: channel.createdOn
     }
@@ -305,15 +306,15 @@ export const updateChannel = (
 
     const { channel, client } = yield* findChannel(params.channel)
 
-    const updateOps: DocumentUpdate<HulyChannel> = {}
-
-    if (params.name !== undefined) {
-      updateOps.name = params.name
+    type UpdateChannelField = typeof UPDATE_CHANNEL_FIELDS[number]
+    type UpdateChannelEntries = {
+      readonly [Field in UpdateChannelField]: DirectUpdateEntry<UpdateChannelField, DocumentUpdate<HulyChannel>, Field>
     }
-
-    if (params.topic !== undefined) {
-      updateOps.topic = params.topic
-    }
+    const updateEntries = {
+      name: params.name === undefined ? {} : { name: params.name },
+      topic: params.topic === undefined ? {} : { topic: params.topic }
+    } satisfies UpdateChannelEntries
+    const updateOps: DocumentUpdate<HulyChannel> = mergeUpdateEntries(Object.values(updateEntries))
 
     yield* client.updateDoc(
       chunter.class.Channel,
@@ -394,11 +395,11 @@ export const listChannelMessages = (
         createdOn: msg.createdOn,
         modifiedOn: msg.modifiedOn,
         editedOn: msg.editedOn,
-        replies: msg.replies
+        replies: optionalCount(msg.replies)
       }
     })
 
-    return { messages: summaries, total }
+    return { messages: summaries, total: listTotal(total) }
   })
 
 // --- Send Channel Message ---
@@ -481,10 +482,10 @@ export const listDirectMessages = (
         id: ChannelId.make(dm._id),
         participants,
         participantIds,
-        messages: dm.messages,
+        messages: optionalCount(dm.messages),
         modifiedOn: dm.modifiedOn
       }
     })
 
-    return { conversations: summaries, total }
+    return { conversations: summaries, total: listTotal(total) }
   })

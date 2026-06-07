@@ -3,7 +3,7 @@ import { SortingOrder } from "@hcengineering/core"
 import type { TagElement as HulyTagElement } from "@hcengineering/tags"
 import { Effect } from "effect"
 
-import { TagElementId } from "../../domain/schemas/shared.js"
+import { Count, TagElementId } from "../../domain/schemas/shared.js"
 import type {
   AttachedTagSummary,
   AttachTagParams,
@@ -39,7 +39,7 @@ import {
   toResolvedTagElement,
   toTargetClassRef
 } from "./tags-shared.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 type ListTagsError = HulyClientError | TagCategoryNotFoundError
 type CreateTagError = HulyClientError | TagCategoryNotFoundError
@@ -57,7 +57,7 @@ const toTagSummary = (tag: HulyTagElement): TagSummary => {
     category: tag.category
   }
 
-  return tag.refCount === undefined ? summary : { ...summary, refCount: tag.refCount }
+  return tag.refCount === undefined ? summary : { ...summary, refCount: Count.make(tag.refCount) }
 }
 
 const buildUpdateTagOperations = (
@@ -65,6 +65,9 @@ const buildUpdateTagOperations = (
   params: UpdateTagParams
 ): Effect.Effect<DocumentUpdate<HulyTagElement>, HulyClientError | TagCategoryNotFoundError> =>
   Effect.gen(function*() {
+    type UpdateTagEntries = {
+      readonly [Field in UpdateTagField]: DirectUpdateEntry<UpdateTagField, DocumentUpdate<HulyTagElement>, Field>
+    }
     const updateEntries = {
       category: params.category === undefined
         ? {}
@@ -72,9 +75,9 @@ const buildUpdateTagOperations = (
       color: params.color === undefined ? {} : { color: params.color },
       description: params.description === undefined ? {} : { description: params.description },
       title: params.title === undefined ? {} : { title: params.title }
-    } satisfies Record<UpdateTagField, DocumentUpdate<HulyTagElement>>
+    } satisfies UpdateTagEntries
 
-    return Object.assign({}, ...Object.values(updateEntries))
+    return mergeUpdateEntries(Object.values(updateEntries))
   })
 
 export const listTags = (

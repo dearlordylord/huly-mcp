@@ -1,6 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
-import { CardId, DocId, LimitParam, MasterTagId, NonEmptyString, Timestamp } from "./shared.js"
+import { CardId, Count, DocId, LimitParam, ListTotal, MasterTagId, NonEmptyString, Timestamp } from "./shared.js"
 
 export const ProcessId = DocId.pipe(Schema.brand("ProcessId"))
 export type ProcessId = Schema.Schema.Type<typeof ProcessId>
@@ -43,8 +43,8 @@ export const ProcessSummarySchema = Schema.Struct({
   autoStart: Schema.Boolean,
   automationOnly: Schema.Boolean,
   parallelExecutionForbidden: Schema.Boolean,
-  stateCount: Schema.NonNegativeInt,
-  transitionCount: Schema.NonNegativeInt
+  stateCount: Count,
+  transitionCount: Count
 })
 export type ProcessSummary = Schema.Schema.Type<typeof ProcessSummarySchema>
 
@@ -61,7 +61,7 @@ export const ProcessTransitionSummarySchema = Schema.Struct({
   toStateId: ProcessStateId,
   toStateTitle: Schema.optional(NonEmptyString),
   triggerId: NonEmptyString,
-  actionCount: Schema.NonNegativeInt
+  actionCount: Count
 })
 export type ProcessTransitionSummary = Schema.Schema.Type<typeof ProcessTransitionSummarySchema>
 
@@ -83,7 +83,7 @@ export const ProcessExecutionSummarySchema = Schema.Struct({
   currentStateId: ProcessStateId,
   currentStateTitle: Schema.optional(NonEmptyString),
   status: ProcessExecutionStatusSchema,
-  errorCount: Schema.NonNegativeInt,
+  errorCount: Count,
   hasError: Schema.Boolean,
   hasParent: Schema.Boolean,
   parentExecutionId: Schema.optional(ProcessExecutionId),
@@ -165,13 +165,13 @@ export type CancelExecutionParams = Schema.Schema.Type<typeof CancelExecutionPar
 
 export const ListProcessesResultSchema = Schema.Struct({
   processes: Schema.Array(ProcessSummarySchema),
-  total: Schema.NonNegativeInt
+  total: ListTotal
 })
 export type ListProcessesResult = Schema.Schema.Type<typeof ListProcessesResultSchema>
 
 export const ListExecutionsResultSchema = Schema.Struct({
   executions: Schema.Array(ProcessExecutionSummarySchema),
-  total: Schema.NonNegativeInt
+  total: ListTotal
 })
 export type ListExecutionsResult = Schema.Schema.Type<typeof ListExecutionsResultSchema>
 

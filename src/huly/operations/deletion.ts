@@ -7,6 +7,7 @@ import type {
 import { Effect } from "effect"
 
 import type { DeletionImpact, PreviewDeletionParams } from "../../domain/schemas/deletion.js"
+import { Count, type ListTotal, UNKNOWN_TOTAL } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import {
   ComponentNotFoundError,
@@ -16,6 +17,7 @@ import {
 } from "../errors.js"
 import { tracker } from "../huly-plugins.js"
 import { findComponentByIdOrLabel } from "./components.js"
+import { listTotal } from "./counts.js"
 import { findProject, findProjectAndIssue } from "./issues-shared.js"
 import { findByNameOrId } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
@@ -26,6 +28,9 @@ type PreviewDeletionError =
   | IssueNotFoundError
   | ComponentNotFoundError
   | MilestoneNotFoundError
+
+const sumListTotals = (values: ReadonlyArray<ListTotal>): ListTotal =>
+  values.includes(UNKNOWN_TOTAL) ? UNKNOWN_TOTAL : Count.make(values.reduce((sum, value) => sum + value, 0))
 
 const previewIssueDeletion = (
   params: PreviewDeletionParams & { identifier: string }
@@ -60,9 +65,15 @@ const previewIssueDeletion = (
     return {
       entityType: "issue" as const,
       identifier: issue.identifier,
-      impact: { subIssues, comments, attachments, blockedBy, relations },
+      impact: {
+        subIssues: Count.make(subIssues),
+        comments: Count.make(comments),
+        attachments: Count.make(attachments),
+        blockedBy: Count.make(blockedBy),
+        relations: Count.make(relations)
+      },
       warnings,
-      totalAffected
+      totalAffected: Count.make(totalAffected)
     }
   })
 
@@ -95,10 +106,10 @@ const previewProjectDeletion = (
       )
     ])
 
-    const issueCount = issues.total
-    const componentCount = components.total
-    const milestoneCount = milestones.total
-    const templateCount = templates.total
+    const issueCount = listTotal(issues.total)
+    const componentCount = listTotal(components.total)
+    const milestoneCount = listTotal(milestones.total)
+    const templateCount = listTotal(templates.total)
 
     const warnings: Array<string> = []
     if (issueCount > 0) warnings.push(`Contains ${issueCount} issue${issueCount > 1 ? "s" : ""} that will be deleted`)
@@ -112,7 +123,7 @@ const previewProjectDeletion = (
       warnings.push(`Contains ${templateCount} template${templateCount > 1 ? "s" : ""} that will be deleted`)
     }
 
-    const totalAffected = issueCount + componentCount + milestoneCount + templateCount
+    const totalAffected = sumListTotals([issueCount, componentCount, milestoneCount, templateCount])
 
     return {
       entityType: "project" as const,
@@ -145,7 +156,7 @@ const previewComponentDeletion = (
       { limit: 1, total: true }
     )
 
-    const issueCount = issues.total
+    const issueCount = listTotal(issues.total)
 
     const warnings: Array<string> = []
     if (issueCount > 0) {
@@ -185,7 +196,7 @@ const previewMilestoneDeletion = (
       { limit: 1, total: true }
     )
 
-    const issueCount = issues.total
+    const issueCount = listTotal(issues.total)
 
     const warnings: Array<string> = []
     if (issueCount > 0) {

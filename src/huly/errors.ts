@@ -97,6 +97,12 @@ import {
 } from "./errors-processes.js"
 import { HulyClassNotFoundError } from "./errors-sdk-discovery.js"
 import {
+  SpaceIdentifierAmbiguousError,
+  SpaceNotFoundError,
+  SpaceTypeIdentifierAmbiguousError,
+  SpaceTypeNotFoundError
+} from "./errors-spaces.js"
+import {
   TestCaseNotFoundError,
   TestPlanItemNotFoundError,
   TestPlanNotFoundError,
@@ -197,6 +203,10 @@ export {
   RelationMutationUnsupportedError,
   RelationNotFoundError,
   SavedMessageNotFoundError,
+  SpaceIdentifierAmbiguousError,
+  SpaceNotFoundError,
+  SpaceTypeIdentifierAmbiguousError,
+  SpaceTypeNotFoundError,
   TagCategoryNotFoundError,
   TagNotFoundError,
   TeamspaceNotFoundError,
@@ -304,7 +314,11 @@ export const HulyDomainError: Schema.Union<
     typeof GenericObjectIdentifierAmbiguousError,
     typeof GenericObjectLocatorInvalidError,
     typeof GenericObjectNotFoundError,
-    typeof HulyClassNotFoundError
+    typeof HulyClassNotFoundError,
+    typeof SpaceNotFoundError,
+    typeof SpaceIdentifierAmbiguousError,
+    typeof SpaceTypeNotFoundError,
+    typeof SpaceTypeIdentifierAmbiguousError
   ]
 > = Schema.Union(
   HulyError,
@@ -395,7 +409,11 @@ export const HulyDomainError: Schema.Union<
   GenericObjectIdentifierAmbiguousError,
   GenericObjectLocatorInvalidError,
   GenericObjectNotFoundError,
-  HulyClassNotFoundError
+  HulyClassNotFoundError,
+  SpaceNotFoundError,
+  SpaceIdentifierAmbiguousError,
+  SpaceTypeNotFoundError,
+  SpaceTypeIdentifierAmbiguousError
 )
 
 /**

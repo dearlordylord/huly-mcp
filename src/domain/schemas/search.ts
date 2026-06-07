@@ -1,6 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
-import { DocId, LimitParam, NonEmptyString, ObjectClassName } from "./shared.js"
+import type { Count } from "./shared.js"
+import { DocId, LimitParam, NonEmptyString, ObjectClassName, UNKNOWN_TOTAL } from "./shared.js"
 
 export const FulltextSearchParamsSchema = Schema.Struct({
   query: NonEmptyString.annotations({
@@ -54,9 +55,11 @@ export interface SearchResultItem {
   readonly createdOn?: number | undefined
 }
 
+export const UNKNOWN_SEARCH_TOTAL = UNKNOWN_TOTAL
+
 export interface FulltextSearchResult {
   readonly items: ReadonlyArray<SearchResultItem>
-  readonly total: number
+  readonly total: Count | typeof UNKNOWN_SEARCH_TOTAL
   readonly query: string
 }
 

@@ -15,6 +15,8 @@ Every function, type, and export must have at least one call site at time of wri
 
 Don't write tests that only verify compile-time guarantees (type assignments, interface conformance). If the compiler checks it, a test adds nothing.
 
+Property-based tests must live in `*.property.test.ts` files. Flag any `fast-check` import or `fc.property` use in ordinary `*.test.ts` files; those tests must be moved, not hidden inside example suites. When reviewing generated tests, verify the property is stronger than "does not throw" unless the tested contract is explicitly a no-crash boundary.
+
 ## Type Safety — Cast Review Checklist
 
 For every `as T` cast, verify:

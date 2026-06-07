@@ -3,6 +3,7 @@ import { JSONSchema, Schema } from "effect"
 import {
   ActivityMessageId,
   ChannelIdentifier,
+  Count,
   DocId,
   DocumentIdentifier,
   EmojiCode,
@@ -19,7 +20,7 @@ import {
   Timestamp
 } from "./shared.js"
 
-export const ActivityCount = Schema.NonNegativeInt.annotations({
+export const ActivityCount = Count.pipe(Schema.brand("ActivityCount")).annotations({
   identifier: "ActivityCount",
   title: "ActivityCount",
   description: "Non-negative integer count for activity replies or reactions"

@@ -30,9 +30,11 @@ import {
 } from "../../../src/domain/schemas/components.js"
 import {
   UPDATE_ORGANIZATION_FIELDS,
-  UPDATE_PERSON_FIELDS,
   updateOrganizationParamsJsonSchema,
-  UpdateOrganizationParamsSchema,
+  UpdateOrganizationParamsSchema
+} from "../../../src/domain/schemas/contact-organizations.js"
+import {
+  UPDATE_PERSON_FIELDS,
   updatePersonParamsJsonSchema,
   UpdatePersonParamsSchema
 } from "../../../src/domain/schemas/contacts.js"
@@ -73,6 +75,11 @@ import {
   UpdateProjectParamsSchema
 } from "../../../src/domain/schemas/projects.js"
 import { atLeastOneUpdateFieldMessage, NonEmptyString } from "../../../src/domain/schemas/shared.js"
+import {
+  UPDATE_SPACE_FIELDS,
+  updateSpaceParamsJsonSchema,
+  UpdateSpaceParamsSchema
+} from "../../../src/domain/schemas/spaces.js"
 import {
   UPDATE_TAG_CATEGORY_FIELDS,
   updateTagCategoryParamsJsonSchema,
@@ -364,6 +371,20 @@ const updateSchemaCases: ReadonlyArray<UpdateSchemaCase> = [
     values: { description: null, name: "Updated" }
   },
   {
+    name: "UpdateSpaceParamsSchema",
+    schema: UpdateSpaceParamsSchema,
+    jsonSchema: updateSpaceParamsJsonSchema,
+    base: { space: "Engineering" },
+    fields: UPDATE_SPACE_FIELDS,
+    values: {
+      archived: true,
+      autoJoin: true,
+      description: "Updated",
+      name: "Updated",
+      private: true
+    }
+  },
+  {
     name: "UpdateTagCategoryParamsSchema",
     schema: UpdateTagCategoryParamsSchema,
     jsonSchema: updateTagCategoryParamsJsonSchema,
@@ -584,8 +605,10 @@ describe("update schema runtime and JSON Schema agreement", () => {
     for (const testCase of updateSchemaCases) {
       expectDecodeFailure(testCase.schema, testCase.base)
       expect(jsonSchemaRequiredFields(testCase.jsonSchema)).toEqual(testCase.fields)
+      const properties = isRecord(testCase.jsonSchema.properties) ? testCase.jsonSchema.properties : {}
 
       for (const field of testCase.fields) {
+        expect(properties).toHaveProperty(field)
         expectDecodeSuccess(testCase.schema, { ...testCase.base, [field]: testCase.values[field] })
       }
 

@@ -30,6 +30,7 @@ import type { ChannelNotFoundError, MessageNotFoundError } from "../errors.js"
 import { ThreadReplyNotFoundError } from "../errors.js"
 import { findChannelMessage } from "./channel-messages-shared.js"
 import { buildSocialIdToPersonNameMap } from "./channels.js"
+import { listTotal } from "./counts.js"
 import { markdownToMarkupString, markupToMarkdownString } from "./markup.js"
 import { toRef } from "./sdk-boundary.js"
 
@@ -136,7 +137,7 @@ export const listThreadReplies = (
       }
     })
 
-    return { replies: threadMessages, total }
+    return { replies: threadMessages, total: listTotal(total) }
   })
 
 export const addThreadReply = (

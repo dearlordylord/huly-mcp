@@ -44,11 +44,14 @@ import {
   AssociationId,
   type CardIdentifier,
   type CardSpaceIdentifier,
+  Count,
   DocId,
+  type ListTotal,
   MAX_LIMIT,
   NonEmptyString,
   ObjectClassName,
-  RelationId
+  RelationId,
+  UNKNOWN_TOTAL
 } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError, type HulyClientOperations } from "../client.js"
 import type {
@@ -74,6 +77,7 @@ import {
   RelationMutationUnsupportedError
 } from "../errors.js"
 import { cardPlugin, core, documentPlugin, tracker } from "../huly-plugins.js"
+import { listTotal } from "./counts.js"
 import { findTeamspaceAndDocument } from "./documents.js"
 import { findIssueInProject, findProject, findProjectAndIssue } from "./issues-shared.js"
 import { clampLimit, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
@@ -564,7 +568,10 @@ const ensureAssociationDeletionSupported = (
 const countAssociationRelations = (
   client: HulyClientOperations,
   association: HulyAssociation
-): Effect.Effect<Readonly<{ total: number; sampleRelationIds: Array<RelationId> }>, HulyClientError> =>
+): Effect.Effect<
+  Readonly<{ total: ListTotal; hasRelations: boolean; sampleRelationIds: Array<RelationId> }>,
+  HulyClientError
+> =>
   Effect.map(
     client.findAll<HulyRelation>(
       core.class.Relation,
@@ -573,10 +580,14 @@ const countAssociationRelations = (
       }),
       { limit: 5 }
     ),
-    (relations) => ({
-      total: Math.max(relations.total, relations.length),
-      sampleRelationIds: relations.map((relation) => RelationId.make(relation._id))
-    })
+    (relations) => {
+      const sdkTotal = listTotal(relations.total)
+      return {
+        total: sdkTotal === UNKNOWN_TOTAL ? UNKNOWN_TOTAL : Count.make(Math.max(sdkTotal, relations.length)),
+        hasRelations: relations.total > 0 || relations.length > 0,
+        sampleRelationIds: relations.map((relation) => RelationId.make(relation._id))
+      }
+    }
   )
 
 export const deleteAssociation = (
@@ -596,14 +607,14 @@ export const deleteAssociation = (
       return {
         association: params.association,
         deleted: false,
-        relationCount: 0,
+        relationCount: Count.make(0),
         reason: "not_found"
       }
     }
 
     yield* ensureAssociationDeletionSupported(association)
     const relationUsage = yield* countAssociationRelations(client, association)
-    if (relationUsage.total > 0) {
+    if (relationUsage.hasRelations) {
       return yield* new AssociationInUseError({
         associationId: AssociationId.make(association._id),
         relationCount: relationUsage.total,
@@ -616,7 +627,7 @@ export const deleteAssociation = (
       association: params.association,
       associationId: AssociationId.make(association._id),
       deleted: true,
-      relationCount: 0,
+      relationCount: Count.make(0),
       reason: "deleted"
     }
   })
@@ -632,7 +643,7 @@ export const listAssociations = (
       const summary = toAssociationSummary(association)
       return {
         associations: params.writableOnly === true && !summary.canCreateRelation ? [] : [summary],
-        total: params.writableOnly === true && !summary.canCreateRelation ? 0 : 1
+        total: listTotal(params.writableOnly === true && !summary.canCreateRelation ? 0 : 1)
       }
     }
 
@@ -644,7 +655,7 @@ export const listAssociations = (
 
     return {
       associations: summaries,
-      total: summaries.length
+      total: listTotal(summaries.length)
     }
   })
 
@@ -1381,7 +1392,7 @@ export const listRelations = (
 
       return {
         relations: summaries,
-        total: summaries.length,
+        total: listTotal(summaries.length),
         ...(warnings !== undefined ? { warnings } : {})
       }
     }
@@ -1410,7 +1421,7 @@ export const listRelations = (
 
     return {
       relations: summaries,
-      total: summaries.length
+      total: listTotal(summaries.length)
     }
   })
 

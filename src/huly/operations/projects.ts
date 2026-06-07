@@ -32,10 +32,11 @@ import { HulyClient, type HulyClientError } from "../client.js"
 import type { NoUpdateFieldsError, ProjectNotFoundError } from "../errors.js"
 import { HulyConnectionError } from "../errors.js"
 import { tracker } from "../huly-plugins.js"
+import { listTotal } from "./counts.js"
 import { findProject, findProjectWithStatuses } from "./issues-shared.js"
 import { clampLimit } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 type ListProjectsError = HulyClientError | HulyConnectionError
 type GetProjectError = ProjectNotFoundError | HulyClientError | HulyConnectionError
@@ -89,7 +90,7 @@ export const listProjects = (
 
     return {
       projects: validated,
-      total
+      total: listTotal(total)
     }
   })
 
@@ -134,7 +135,7 @@ export const listStatuses = (
       isDefault: s._id === defaultStatusId
     }))
 
-    return { statuses: details, total: details.length }
+    return { statuses: details, total: listTotal(details.length) }
   })
 
 export const createProject = (
@@ -209,15 +210,17 @@ export const updateProject = (
 
     const { client, project } = yield* findProject(params.project)
 
-    const updateOps: DocumentUpdate<HulyProject> = {}
-
-    if (params.name !== undefined) {
-      updateOps.name = params.name
+    type UpdateProjectField = typeof UPDATE_PROJECT_FIELDS[number]
+    type UpdateProjectEntries = {
+      readonly [Field in UpdateProjectField]: DirectUpdateEntry<UpdateProjectField, DocumentUpdate<HulyProject>, Field>
     }
-
-    if (params.description !== undefined) {
-      updateOps.description = params.description === null ? "" : params.description
-    }
+    const updateEntries = {
+      name: params.name === undefined ? {} : { name: params.name },
+      description: params.description === undefined
+        ? {}
+        : { description: params.description === null ? "" : params.description }
+    } satisfies UpdateProjectEntries
+    const updateOps: DocumentUpdate<HulyProject> = mergeUpdateEntries(Object.values(updateEntries))
 
     yield* client.updateDoc(
       tracker.class.Project,

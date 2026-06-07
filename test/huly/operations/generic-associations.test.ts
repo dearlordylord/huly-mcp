@@ -13,7 +13,7 @@ import type {
 import { SortingOrder, toFindResult } from "@hcengineering/core"
 import type { Document as HulyDocument } from "@hcengineering/document"
 import type { Issue as HulyIssue } from "@hcengineering/tracker"
-import { Effect } from "effect"
+import { Cause, Effect, Exit } from "effect"
 import { expect } from "vitest"
 
 import {
@@ -21,7 +21,14 @@ import {
   AssociationRoleName,
   RelationIdentifier
 } from "../../../src/domain/schemas/generic-associations.js"
-import { CardIdentifier, CardSpaceIdentifier, MAX_LIMIT, ObjectClassName } from "../../../src/domain/schemas/shared.js"
+import {
+  CardIdentifier,
+  CardSpaceIdentifier,
+  MAX_LIMIT,
+  ObjectClassName,
+  RelationId,
+  UNKNOWN_TOTAL
+} from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import {
   AssociationConflictError,
@@ -1197,6 +1204,41 @@ describe("association mutations", () => {
       )
 
       expect(error).toBeInstanceOf(AssociationInUseError)
+    }))
+
+  it.effect("deleteAssociation preserves unknown relation totals when sampled rows show usage", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        deleteAssociation({ association: assocId }).pipe(
+          Effect.provide(testLayer({
+            associations: [association({})],
+            relations: [relation({})],
+            relationTotal: UNKNOWN_TOTAL
+          }))
+        )
+      )
+
+      expect(error).toBeInstanceOf(AssociationInUseError)
+      if (!(error instanceof AssociationInUseError)) {
+        throw new Error("Expected AssociationInUseError")
+      }
+      expect(error.relationCount).toBe(UNKNOWN_TOTAL)
+      expect(error.sampleRelationIds).toEqual([RelationId.make("rel-1")])
+    }))
+
+  it.effect("deleteAssociation rejects invalid negative relation totals before sample fallback", () =>
+    Effect.gen(function*() {
+      const exit = yield* Effect.exit(
+        deleteAssociation({ association: assocId }).pipe(
+          Effect.provide(testLayer({
+            associations: [association({})],
+            relations: [],
+            relationTotal: -2
+          }))
+        )
+      )
+
+      expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true)
     }))
 
   it.effect("deleteAssociation deletes unused automation-only associations", () =>

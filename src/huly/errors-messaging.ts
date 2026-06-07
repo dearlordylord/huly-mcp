@@ -5,7 +5,10 @@
  */
 import { Schema } from "effect"
 
+import { Count } from "../domain/schemas/shared.js"
+
 const MIN_AMBIGUOUS_DM_MATCHES = 2
+const AmbiguousMatchCount = Count.pipe(Schema.greaterThanOrEqualTo(MIN_AMBIGUOUS_DM_MATCHES))
 
 /**
  * Channel not found in the workspace.
@@ -45,7 +48,7 @@ export class DirectMessageIdentifierAmbiguousError extends Schema.TaggedError<Di
   "DirectMessageIdentifierAmbiguousError",
   {
     identifier: Schema.String,
-    matches: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(MIN_AMBIGUOUS_DM_MATCHES))
+    matches: AmbiguousMatchCount
   }
 ) {
   override get message(): string {

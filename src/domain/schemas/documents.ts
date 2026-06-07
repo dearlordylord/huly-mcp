@@ -1,7 +1,8 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { DocumentId, TeamspaceId, UrlString } from "./shared.js"
+import type { DocumentId, ListTotal, TeamspaceId, UrlString } from "./shared.js"
 import {
+  assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   DocumentIdentifier,
   hasAtLeastOneDefined,
@@ -38,7 +39,7 @@ export type ListTeamspacesParams = Schema.Schema.Type<typeof ListTeamspacesParam
 
 export interface ListTeamspacesResult {
   readonly teamspaces: ReadonlyArray<TeamspaceSummary>
-  readonly total: number
+  readonly total: ListTotal
 }
 
 export interface DocumentSummary {
@@ -86,7 +87,7 @@ export type ListDocumentsParams = Schema.Schema.Type<typeof ListDocumentsParamsS
 
 export interface ListDocumentsResult {
   readonly documents: ReadonlyArray<DocumentSummary>
-  readonly total: number
+  readonly total: ListTotal
 }
 
 export interface Document {
@@ -266,11 +267,11 @@ export const CreateTeamspaceParamsSchema = Schema.Struct({
 
 export type CreateTeamspaceParams = Schema.Schema.Type<typeof CreateTeamspaceParamsSchema>
 
-export const UPDATE_TEAMSPACE_FIELDS: ReadonlyArray<"name" | "description" | "archived"> = [
+export const UPDATE_TEAMSPACE_FIELDS = [
   "name",
   "description",
   "archived"
-]
+] as const satisfies ReadonlyArray<"name" | "description" | "archived">
 
 export const UpdateTeamspaceParamsSchema = Schema.Struct({
   teamspace: TeamspaceIdentifier.annotations({
@@ -297,6 +298,7 @@ export const UpdateTeamspaceParamsSchema = Schema.Struct({
 })
 
 export type UpdateTeamspaceParams = Schema.Schema.Type<typeof UpdateTeamspaceParamsSchema>
+assertUpdateFields<UpdateTeamspaceParams>()(["teamspace"], UPDATE_TEAMSPACE_FIELDS)
 
 export const DeleteTeamspaceParamsSchema = Schema.Struct({
   teamspace: TeamspaceIdentifier.annotations({
@@ -310,7 +312,7 @@ export const DeleteTeamspaceParamsSchema = Schema.Struct({
 export type DeleteTeamspaceParams = Schema.Schema.Type<typeof DeleteTeamspaceParamsSchema>
 
 export interface GetTeamspaceResult extends TeamspaceSummary {
-  readonly documents: number
+  readonly documents: ListTotal
 }
 
 export interface CreateTeamspaceResult {
@@ -363,7 +365,7 @@ export interface InlineCommentThread {
 
 export interface ListInlineCommentsResult {
   readonly comments: ReadonlyArray<InlineCommentThread>
-  readonly total: number
+  readonly total: ListTotal
 }
 
 // --- JSON Schemas & Parsers ---

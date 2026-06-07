@@ -3,7 +3,7 @@ import type { DocumentUpdate, MarkupBlobRef, Ref } from "@hcengineering/core"
 import { generateId, SortingOrder } from "@hcengineering/core"
 import { Effect } from "effect"
 
-import { TestResultId, TestRunId } from "../../domain/schemas/shared.js"
+import { Count, TestResultId, TestRunId } from "../../domain/schemas/shared.js"
 import type {
   CreateTestResultParams,
   CreateTestResultResult,
@@ -44,6 +44,7 @@ import { TestCaseNotFoundError } from "../errors.js"
 import { testManagement } from "../test-management-classes.js"
 import type { TestCase, TestPlanItem, TestResult, TestRun } from "../test-management-types.js"
 import { TestRunStatus } from "../test-management-types.js"
+import { listTotal } from "./counts.js"
 import { clampLimit } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import {
@@ -57,7 +58,14 @@ import {
   stringToTestRunStatus,
   testRunStatusToString
 } from "./test-management-shared.js"
-import { requireUpdateFields } from "./update-guards.js"
+import {
+  type CoveredUpdateEntry,
+  coveredUpdateEntry,
+  type DirectOrUnsetUpdateEntry,
+  type DirectUpdateEntry,
+  mergeCoveredUpdateEntries,
+  requireUpdateFields
+} from "./update-guards.js"
 
 type TestRunOpError = HulyClientError | TestProjectNotFoundError
 type TestRunMutateError = TestRunOpError | TestRunNotFoundError
@@ -105,7 +113,7 @@ export const listTestRuns = (
       { space: project._id },
       { limit, sort: { modifiedOn: SortingOrder.Descending } }
     )
-    return { runs: runs.map(toRunSummary), total: runs.total }
+    return { runs: runs.map(toRunSummary), total: listTotal(runs.total) }
   })
 
 export const getTestRun = (
@@ -167,25 +175,55 @@ export const updateTestRun = (
     const client = yield* HulyClient
     const project = yield* findTestProject(client, params.project)
     const run = yield* findTestRun(client, project, params.run)
-    const ops: DocumentUpdate<TestRun> = {}
-    if (params.name !== undefined) ops.name = params.name
-    if (params.description !== undefined) {
-      if (params.description === null) {
-        ops.description = null
-      } else {
-        ops.description = yield* client.uploadMarkup(
-          testManagement.class.TestRun,
-          run._id,
+    type UpdateTestRunField = typeof UPDATE_TEST_RUN_FIELDS[number]
+    type UpdateTestRunEntries = {
+      readonly name: Effect.Effect<
+        CoveredUpdateEntry<
+          "name",
+          DirectUpdateEntry<UpdateTestRunField, DocumentUpdate<TestRun>, "name">
+        >,
+        HulyClientError
+      >
+      readonly description: Effect.Effect<
+        CoveredUpdateEntry<
           "description",
-          params.description,
-          "markdown"
-        )
-      }
+          DirectUpdateEntry<UpdateTestRunField, DocumentUpdate<TestRun>, "description">
+        >,
+        HulyClientError
+      >
+      readonly dueDate: Effect.Effect<
+        CoveredUpdateEntry<
+          "dueDate",
+          DirectOrUnsetUpdateEntry<UpdateTestRunField, DocumentUpdate<TestRun>, "dueDate">
+        >,
+        HulyClientError
+      >
     }
-    if (params.dueDate !== undefined) {
-      if (params.dueDate === null) ops.$unset = { dueDate: "" }
-      else ops.dueDate = params.dueDate
-    }
+    const updateEntries = {
+      name: Effect.succeed(coveredUpdateEntry("name", params.name === undefined ? {} : { name: params.name })),
+      description: Effect.gen(function*() {
+        if (params.description === undefined) return coveredUpdateEntry("description", {})
+        if (params.description === null) return coveredUpdateEntry("description", { description: null })
+        return coveredUpdateEntry("description", {
+          description: yield* client.uploadMarkup(
+            testManagement.class.TestRun,
+            run._id,
+            "description",
+            params.description,
+            "markdown"
+          )
+        })
+      }),
+      dueDate: Effect.succeed(coveredUpdateEntry(
+        "dueDate",
+        params.dueDate === undefined
+          ? {}
+          : params.dueDate === null
+          ? { $unset: { dueDate: "" } }
+          : { dueDate: params.dueDate }
+      ))
+    } satisfies UpdateTestRunEntries
+    const ops: DocumentUpdate<TestRun> = mergeCoveredUpdateEntries(yield* Effect.all(Object.values(updateEntries)))
     yield* client.updateDoc(testManagement.class.TestRun, project._id, run._id, ops)
     return { id: TestRunId.make(run._id), updated: true }
   })
@@ -214,7 +252,7 @@ export const listTestResults = (
       { attachedTo: run._id },
       { limit, sort: { modifiedOn: SortingOrder.Descending } }
     )
-    return { results: results.map(toResultSummary), total: results.total }
+    return { results: results.map(toResultSummary), total: listTotal(results.total) }
   })
 
 export const getTestResult = (
@@ -283,24 +321,62 @@ export const updateTestResult = (
     const client = yield* HulyClient
     const project = yield* findTestProject(client, params.project)
     const result = yield* findTestResult(client, project, params.result)
-    const ops: DocumentUpdate<TestResult> = {}
-    if (params.status !== undefined) ops.status = resolveStatusOrUntested(params.status)
-    if (params.assignee !== undefined) {
-      if (params.assignee === null) ops.$unset = { ...ops.$unset, assignee: "" }
-      else ops.assignee = toRef<Employee>((yield* resolveAssignee(params.assignee))._id)
-    }
-    if (params.description !== undefined) {
-      if (params.description === null) ops.description = null
-      else {
-        ops.description = yield* client.uploadMarkup(
-          testManagement.class.TestResult,
-          result._id,
+    type UpdateTestResultField = typeof UPDATE_TEST_RESULT_FIELDS[number]
+    type UpdateTestResultEntries = {
+      readonly status: Effect.Effect<
+        CoveredUpdateEntry<
+          "status",
+          DirectUpdateEntry<UpdateTestResultField, DocumentUpdate<TestResult>, "status">
+        >,
+        HulyClientError
+      >
+      readonly assignee: Effect.Effect<
+        CoveredUpdateEntry<
+          "assignee",
+          DirectOrUnsetUpdateEntry<UpdateTestResultField, DocumentUpdate<TestResult>, "assignee">
+        >,
+        HulyClientError | PersonNotFoundError,
+        HulyClient
+      >
+      readonly description: Effect.Effect<
+        CoveredUpdateEntry<
           "description",
-          params.description,
-          "markdown"
-        )
-      }
+          DirectUpdateEntry<UpdateTestResultField, DocumentUpdate<TestResult>, "description">
+        >,
+        HulyClientError
+      >
     }
+    const updateEntries = {
+      status: Effect.succeed(
+        coveredUpdateEntry(
+          "status",
+          params.status === undefined ? {} : { status: resolveStatusOrUntested(params.status) }
+        )
+      ),
+      assignee: Effect.gen(function*() {
+        if (params.assignee === undefined) return coveredUpdateEntry("assignee", {})
+        if (params.assignee === null) {
+          return coveredUpdateEntry("assignee", { $unset: { assignee: "" } })
+        }
+        return coveredUpdateEntry("assignee", {
+          assignee: toRef<Employee>((yield* resolveAssignee(params.assignee))._id)
+        })
+      }),
+      description: Effect.gen(function*() {
+        if (params.description === undefined) return coveredUpdateEntry("description", {})
+        if (params.description === null) return coveredUpdateEntry("description", { description: null })
+        return coveredUpdateEntry("description", {
+          description: yield* client.uploadMarkup(
+            testManagement.class.TestResult,
+            result._id,
+            "description",
+            params.description,
+            "markdown"
+          )
+        })
+      })
+    } satisfies UpdateTestResultEntries
+    const ops: DocumentUpdate<TestResult> = mergeCoveredUpdateEntries(yield* Effect.all(Object.values(updateEntries)))
     yield* client.updateDoc(testManagement.class.TestResult, result.space, result._id, ops)
     return { id: TestResultId.make(result._id), updated: true }
   })
@@ -367,5 +443,5 @@ export const runTestPlan = (
           attrs as Parameters<typeof client.addCollection<TestRun, TestResult>>[5]
         )
       }), { concurrency: BATCH_CONCURRENCY })
-    return { runId: TestRunId.make(runId), name: runName, resultsCreated: results.length }
+    return { runId: TestRunId.make(runId), name: runName, resultsCreated: Count.make(results.length) }
   })

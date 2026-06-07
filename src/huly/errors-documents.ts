@@ -5,6 +5,8 @@
  */
 import { Schema } from "effect"
 
+import { Count } from "../domain/schemas/shared.js"
+
 /**
  * Teamspace not found in the workspace.
  */
@@ -55,7 +57,7 @@ export class DocumentTextMultipleMatchesError extends Schema.TaggedError<Documen
   "DocumentTextMultipleMatchesError",
   {
     searchText: Schema.String,
-    matchCount: Schema.Number
+    matchCount: Count
   }
 ) {
   override get message(): string {

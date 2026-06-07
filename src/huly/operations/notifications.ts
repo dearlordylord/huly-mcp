@@ -35,6 +35,7 @@ import type {
   UpdateNotificationProviderSettingResult
 } from "../../domain/schemas/notifications.js"
 import {
+  Count,
   DocId,
   NotificationContextId,
   NotificationId,
@@ -43,6 +44,7 @@ import {
 } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { NotificationContextNotFoundError, NotificationNotFoundError } from "../errors.js"
+import { listTotal } from "./counts.js"
 import { clampLimit, findOneOrFail } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
@@ -271,7 +273,7 @@ export const markAllNotificationsRead = (): Effect.Effect<
       { concurrency: 10 }
     )
 
-    return { count: unreadNotifications.length }
+    return { count: Count.make(unreadNotifications.length) }
   })
 
 /**
@@ -331,7 +333,7 @@ export const archiveAllNotifications = (): Effect.Effect<
       { concurrency: 10 }
     )
 
-    return { count: activeNotifications.length }
+    return { count: Count.make(activeNotifications.length) }
   })
 
 /**
@@ -512,5 +514,5 @@ export const getUnreadNotificationCount = (): Effect.Effect<UnreadCountResult, H
 
     const count = unreadNotifications.total
 
-    return { count }
+    return { count: listTotal(count) }
   })

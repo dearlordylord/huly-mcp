@@ -31,7 +31,7 @@ import {
   ProcessTransitionId,
   StartProcessResultSchema
 } from "../../domain/schemas.js"
-import { CardId, MasterTagId } from "../../domain/schemas/shared.js"
+import { CardId, Count, MasterTagId } from "../../domain/schemas/shared.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError, type HulyClientOperations } from "../client.js"
 import {
@@ -55,6 +55,7 @@ import {
   type HulyProcessTransition,
   processPlugin
 } from "../process-plugin.js"
+import { listTotal } from "./counts.js"
 import { clampLimit } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
@@ -173,8 +174,8 @@ const processSummary = (data: ProcessDefinitionData): ProcessSummary => ({
   autoStart: data.process.autoStart ?? false,
   automationOnly: data.process.automationOnly ?? false,
   parallelExecutionForbidden: data.process.parallelExecutionForbidden ?? false,
-  stateCount: data.stateCount,
-  transitionCount: data.transitionCount
+  stateCount: Count.make(data.stateCount),
+  transitionCount: Count.make(data.transitionCount)
 })
 
 const stateTitleMap = (
@@ -191,7 +192,7 @@ const transitionSummary = (
   toStateId: ProcessStateId.make(transition.to),
   toStateTitle: titles.get(transition.to),
   triggerId: transition.trigger,
-  actionCount: transition.actions.length
+  actionCount: Count.make(transition.actions.length)
 })
 
 const initialTransition = (
@@ -346,7 +347,7 @@ const executionSummary = (
   currentStateId: ProcessStateId.make(execution.currentState),
   currentStateTitle: states.get(execution.currentState)?.title,
   status: execution.status,
-  errorCount: execution.error?.length ?? 0,
+  errorCount: Count.make(execution.error?.length ?? 0),
   hasError: (execution.error?.length ?? 0) > 0,
   hasParent: execution.parentId !== undefined,
   parentExecutionId: execution.parentId === undefined ? undefined : ProcessExecutionId.make(execution.parentId),
@@ -403,7 +404,7 @@ export const listProcesses = (
     const data = yield* loadProcessDefinitionData(client, [...processes])
     const result = {
       processes: data.map(processSummary),
-      total: data.length
+      total: listTotal(data.length)
     }
     return yield* encodeOrConnectionError(ListProcessesResultSchema, result, "listProcesses")
   })
@@ -465,7 +466,7 @@ export const listExecutions = (
 
     const result = {
       executions: executions.map((execution) => executionSummary(execution, processes, states, cards)),
-      total: executions.length
+      total: listTotal(executions.length)
     }
     return yield* encodeOrConnectionError(ListExecutionsResultSchema, result, "listExecutions")
   })

@@ -1,7 +1,7 @@
 import { describe, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
-import { AssociationId, DocId, ObjectClassName, RelationId } from "../../src/domain/schemas/shared.js"
+import { AssociationId, Count, DocId, ObjectClassName, RelationId } from "../../src/domain/schemas/shared.js"
 import {
   ActivityMessageNotFoundError,
   AssociationConflictError,
@@ -309,7 +309,10 @@ describe("Huly Errors", () => {
   describe("DirectMessageIdentifierAmbiguousError", () => {
     it.effect("creates with identifier and match count", () =>
       Effect.gen(function*() {
-        const error = new DirectMessageIdentifierAmbiguousError({ identifier: "Kerr,Shannon", matches: 2 })
+        const error = new DirectMessageIdentifierAmbiguousError({
+          identifier: "Kerr,Shannon",
+          matches: Count.make(2)
+        })
         expect(error._tag).toBe("DirectMessageIdentifierAmbiguousError")
         expect(error.identifier).toBe("Kerr,Shannon")
         expect(error.matches).toBe(2)
@@ -317,7 +320,10 @@ describe("Huly Errors", () => {
 
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
-        const error = new DirectMessageIdentifierAmbiguousError({ identifier: "Kerr,Shannon", matches: 2 })
+        const error = new DirectMessageIdentifierAmbiguousError({
+          identifier: "Kerr,Shannon",
+          matches: Count.make(2)
+        })
         expect(error.message).toBe("Direct message 'Kerr,Shannon' is ambiguous (2 matches); use the DM _id")
       }))
   })
@@ -325,7 +331,7 @@ describe("Huly Errors", () => {
   describe("PersonIdentifierAmbiguousError", () => {
     it.effect("creates with identifier and match count", () =>
       Effect.gen(function*() {
-        const error = new PersonIdentifierAmbiguousError({ identifier: "Smith,Bill", matches: 2 })
+        const error = new PersonIdentifierAmbiguousError({ identifier: "Smith,Bill", matches: Count.make(2) })
         expect(error._tag).toBe("PersonIdentifierAmbiguousError")
         expect(error.identifier).toBe("Smith,Bill")
         expect(error.matches).toBe(2)
@@ -333,7 +339,7 @@ describe("Huly Errors", () => {
 
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
-        const error = new PersonIdentifierAmbiguousError({ identifier: "Smith,Bill", matches: 2 })
+        const error = new PersonIdentifierAmbiguousError({ identifier: "Smith,Bill", matches: Count.make(2) })
         expect(error.message).toBe(
           "Person identifier 'Smith,Bill' matched 2 people; use an exact email address instead"
         )
@@ -841,6 +847,14 @@ describe("Huly Errors", () => {
               return `generic-object-not-found:${error.field}:${error.identifier}:${error.class ?? ""}`
             case "HulyClassNotFoundError":
               return `huly-class-not-found:${error.classId}`
+            case "SpaceNotFoundError":
+              return `space:${error.identifier}`
+            case "SpaceIdentifierAmbiguousError":
+              return `space-ambiguous:${error.identifier}:${error.matches.length}`
+            case "SpaceTypeNotFoundError":
+              return `space-type:${error.identifier}`
+            case "SpaceTypeIdentifierAmbiguousError":
+              return `space-type-ambiguous:${error.identifier}:${error.matches.length}`
             case "NoUpdateFieldsError":
               return `no-update-fields:${error.operation}:${error.fields.length}`
             case "CannotDirectMessageSelfError":
@@ -858,12 +872,13 @@ describe("Huly Errors", () => {
         expect(matchError(new ProjectNotFoundError({ identifier: "Z" }))).toBe("project:Z")
         expect(matchError(new InvalidStatusError({ status: "bad", project: "P" }))).toBe("status:bad")
         expect(matchError(new PersonNotFoundError({ identifier: "john@example.com" }))).toBe("person:john@example.com")
-        expect(matchError(new PersonIdentifierAmbiguousError({ identifier: "Smith,Bill", matches: 2 }))).toBe(
-          "person-ambiguous:Smith,Bill:2"
-        )
+        expect(matchError(new PersonIdentifierAmbiguousError({ identifier: "Smith,Bill", matches: Count.make(2) })))
+          .toBe(
+            "person-ambiguous:Smith,Bill:2"
+          )
         expect(matchError(new OrganizationNotFoundError({ identifier: "Acme" }))).toBe("organization:Acme")
         expect(
-          matchError(new OrganizationIdentifierAmbiguousError({ identifier: "Acme", matches: 2 }))
+          matchError(new OrganizationIdentifierAmbiguousError({ identifier: "Acme", matches: Count.make(2) }))
         ).toBe("organization-ambiguous:Acme:2")
         expect(matchError(new InvalidContactProviderError({ provider: "fax" }))).toBe("contactprovider:fax")
         expect(matchError(new FileUploadError({ message: "quota exceeded" }))).toBe("upload:quota exceeded")
@@ -889,9 +904,10 @@ describe("Huly Errors", () => {
         ).toBe("comment:c-1")
         expect(matchError(new MilestoneNotFoundError({ identifier: "m-1", project: "P" }))).toBe("milestone:m-1")
         expect(matchError(new ChannelNotFoundError({ identifier: "ch-1" }))).toBe("channel:ch-1")
-        expect(matchError(new DirectMessageIdentifierAmbiguousError({ identifier: "dm-1", matches: 2 }))).toBe(
-          "dm-ambiguous:dm-1:2"
-        )
+        expect(matchError(new DirectMessageIdentifierAmbiguousError({ identifier: "dm-1", matches: Count.make(2) })))
+          .toBe(
+            "dm-ambiguous:dm-1:2"
+          )
         expect(matchError(new DirectMessageNotFoundError({ identifier: "dm-1" }))).toBe("dm:dm-1")
         expect(matchError(new MessageNotFoundError({ messageId: "msg-1", channel: "ch-1" }))).toBe("message:msg-1")
         expect(matchError(new ThreadReplyNotFoundError({ replyId: "r-1", messageId: "msg-1" }))).toBe("reply:r-1")
@@ -963,7 +979,7 @@ describe("Huly Errors", () => {
           matchError(
             new AssociationInUseError({
               associationId: AssociationId.make("assoc-1"),
-              relationCount: 2,
+              relationCount: Count.make(2),
               sampleRelationIds: [RelationId.make("rel-1"), RelationId.make("rel-2")]
             })
           )
