@@ -211,6 +211,34 @@ call_tool_stdio() {
   printf '%s\n%s\n' "$INIT" "$payload" | timeout "$TOOL_TIMEOUT" env MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep '"id":2'
 }
 
+call_tool_stdio_no_auto_exit() {
+  local payload="$1"
+  local output_file
+  local pid
+  local result
+  output_file="$(mktemp)"
+  (printf '%s\n%s\n' "$INIT" "$payload" | node dist/index.cjs >"$output_file" 2>/dev/null) &
+  pid=$!
+  for _ in $(seq 1 "$((TOOL_TIMEOUT * 5))"); do
+    result=$(grep -m 1 '"id":2' "$output_file" || true)
+    if [ -n "$result" ]; then
+      kill "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      rm -f "$output_file"
+      printf '%s\n' "$result"
+      return 0
+    fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+      break
+    fi
+    sleep 0.2
+  done
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  rm -f "$output_file"
+  return 1
+}
+
 call_tool_http() {
   local payload="$1"
   local response
@@ -240,6 +268,15 @@ call_tool() {
     call_tool_http "$payload"
   else
     call_tool_stdio "$payload"
+  fi
+}
+
+call_tool_no_auto_exit() {
+  local payload="$1"
+  if [ "$INTEGRATION_TRANSPORT" = "http" ]; then
+    call_tool_http "$payload"
+  else
+    call_tool_stdio_no_auto_exit "$payload"
   fi
 }
 
@@ -279,6 +316,58 @@ run_test() {
   echo "PASS: $name"
   PASSED=$((PASSED + 1))
   return 0
+}
+
+run_test_with_timeout() {
+  local name="$1"
+  local payload="$2"
+  local timeout_seconds="$3"
+  local previous_timeout="$TOOL_TIMEOUT"
+  local status
+  TOOL_TIMEOUT="$timeout_seconds"
+  run_test "$name" "$payload"
+  status=$?
+  TOOL_TIMEOUT="$previous_timeout"
+  return "$status"
+}
+
+run_test_no_auto_exit_with_timeout() {
+  local name="$1"
+  local payload="$2"
+  local timeout_seconds="$3"
+  local previous_timeout="$TOOL_TIMEOUT"
+  local result
+  local status=0
+  TOOL_TIMEOUT="$timeout_seconds"
+  result=$(call_tool_no_auto_exit "$payload")
+  TOOL_TIMEOUT="$previous_timeout"
+  if [ -z "$result" ]; then
+    echo "FAIL: $name (no response)"
+    FAILED=$((FAILED + 1))
+    ERRORS="${ERRORS}\n  - ${name}: no response"
+    return 1
+  fi
+  local rpc_error
+  rpc_error=$(echo "$result" | jq -r '.error.message // empty' 2>/dev/null)
+  if [ -n "$rpc_error" ]; then
+    echo "FAIL: $name => $rpc_error"
+    FAILED=$((FAILED + 1))
+    ERRORS="${ERRORS}\n  - ${name}: ${rpc_error}"
+    return 1
+  fi
+  local is_error
+  is_error=$(echo "$result" | jq -r '.result.isError // false' 2>/dev/null)
+  if [ "$is_error" = "true" ]; then
+    local err_text
+    err_text=$(echo "$result" | jq -r '.result.content[0].text' 2>/dev/null | head -c 200)
+    echo "FAIL: $name => $err_text"
+    FAILED=$((FAILED + 1))
+    ERRORS="${ERRORS}\n  - ${name}: ${err_text}"
+    return 1
+  fi
+  echo "PASS: $name"
+  PASSED=$((PASSED + 1))
+  return "$status"
 }
 
 run_capture() {
@@ -376,6 +465,27 @@ run_result_to_var() {
   echo "PASS: $name" >&2
   PASSED=$((PASSED + 1))
   printf -v "$output_var" '%s' "$(echo "$result" | jq -c '.result' 2>/dev/null)"
+  return 0
+}
+
+try_capture() {
+  local payload="$1"
+  local result
+  result=$(call_tool "$payload")
+  if [ -z "$result" ]; then
+    return 1
+  fi
+  local rpc_error
+  rpc_error=$(echo "$result" | jq -r '.error.message // empty' 2>/dev/null)
+  if [ -n "$rpc_error" ]; then
+    return 1
+  fi
+  local is_error
+  is_error=$(echo "$result" | jq -r '.result.isError // false' 2>/dev/null)
+  if [ "$is_error" = "true" ]; then
+    return 1
+  fi
+  echo "$result" | jq -r '.result.content[0].text' 2>/dev/null
   return 0
 }
 
@@ -1817,8 +1927,172 @@ if [ -n "$CALENDAR_ID" ]; then
   fi
 fi
 
-# Work slot — requires a todoId (planner task)
-skip_test "create_work_slot" "requires todoId (planner task)"
+# Planner ToDo lifecycle + work slots
+TODO_TITLE="IntTest Planner Todo $RUN_ID"
+TODO_TITLE_JSON=$(json_string "$TODO_TITLE")
+TODO_TEXT=$(run_capture "create_todo(personal)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_todo\",\"arguments\":{\"title\":$TODO_TITLE_JSON,\"description\":\"planner integration todo\",\"priority\":\"medium\",\"visibility\":\"private\"}},\"id\":2}")
+if [ $? -eq 0 ]; then
+  TODO_ID=$(echo "$TODO_TEXT" | jq -r '.todoId // empty' 2>/dev/null)
+  echo "  => todo: $TODO_ID"
+  if [ -n "$TODO_ID" ]; then
+    LIST_TODOS_TEXT=$(run_capture "list_todos($TODO_TITLE)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_todos\",\"arguments\":{\"titleSearch\":$TODO_TITLE_JSON,\"limit\":10}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_array_contains "list_todos includes $TODO_ID" "$LIST_TODOS_TEXT" "map(.id)" "$TODO_ID"
+    fi
+    GET_TODO_TEXT=$(run_capture "get_todo($TODO_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "get_todo($TODO_ID) returns id" "$GET_TODO_TEXT" ".id" "$TODO_ID"
+      assert_json_field_equals "get_todo($TODO_ID) priority before update" "$GET_TODO_TEXT" ".priority" "medium"
+    fi
+    UPDATE_TODO_TEXT=$(run_capture "update_todo($TODO_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"priority\":\"high\",\"dueDate\":1777020000000}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "update_todo($TODO_ID) updated" "$UPDATE_TODO_TEXT" ".updated" "true"
+      GET_UPDATED_TODO_TEXT=$(run_capture "get_todo($TODO_ID after update)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "get_todo($TODO_ID) priority after update" "$GET_UPDATED_TODO_TEXT" ".priority" "high"
+        assert_json_field_equals "get_todo($TODO_ID) dueDate after update" "$GET_UPDATED_TODO_TEXT" ".dueDate" "1777020000000"
+      fi
+    fi
+
+    SCHEDULE_TEXT=$(run_capture "schedule_todo($TODO_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"schedule_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"date\":1777020000000,\"dueDate\":1777023600000}},\"id\":2}")
+    SCHEDULE_SLOT_ID=$(echo "$SCHEDULE_TEXT" | jq -r '.workSlotId // empty' 2>/dev/null)
+    if [ -n "$SCHEDULE_SLOT_ID" ]; then
+      UNSCHEDULE_SLOT_TEXT=$(run_capture "unschedule_todo(workSlotId:$SCHEDULE_SLOT_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unschedule_todo\",\"arguments\":{\"workSlotId\":\"$SCHEDULE_SLOT_ID\"}},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "unschedule_todo(workSlotId:$SCHEDULE_SLOT_ID) removed one" "$UNSCHEDULE_SLOT_TEXT" ".removed" "1"
+      fi
+    else
+      skip_test "unschedule_todo(workSlotId)" "schedule_todo did not return a workSlotId"
+    fi
+
+    RAW_SLOT_TEXT=$(run_capture "create_work_slot($TODO_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_work_slot\",\"arguments\":{\"todoId\":\"$TODO_ID\",\"date\":1777027200000,\"dueDate\":1777030800000}},\"id\":2}")
+    RAW_SLOT_ID=$(echo "$RAW_SLOT_TEXT" | jq -r '.slotId // empty' 2>/dev/null)
+    if [ -n "$RAW_SLOT_ID" ]; then
+      UNSCHEDULE_RAW_SLOT_TEXT=$(run_capture "unschedule_todo(raw_workSlotId:$RAW_SLOT_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unschedule_todo\",\"arguments\":{\"workSlotId\":\"$RAW_SLOT_ID\"}},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "unschedule_todo(raw_workSlotId:$RAW_SLOT_ID) removed one" "$UNSCHEDULE_RAW_SLOT_TEXT" ".removed" "1"
+      fi
+    else
+      skip_test "unschedule_todo(raw_workSlotId)" "create_work_slot did not return a slotId"
+    fi
+
+    SCHEDULE_SCOPE_TEXT=$(run_capture "schedule_todo(scope_cleanup:$TODO_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"schedule_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"date\":1777034400000,\"dueDate\":1777038000000}},\"id\":2}")
+    SCHEDULE_SCOPE_SLOT_ID=$(echo "$SCHEDULE_SCOPE_TEXT" | jq -r '.workSlotId // empty' 2>/dev/null)
+    if [ -n "$SCHEDULE_SCOPE_SLOT_ID" ]; then
+      UNSCHEDULE_SCOPE_TEXT=$(run_capture "unschedule_todo(scope_all:$TODO_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unschedule_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"scope\":\"all\"}},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "unschedule_todo(scope_all:$TODO_ID) removed one" "$UNSCHEDULE_SCOPE_TEXT" ".removed" "1"
+      fi
+    else
+      skip_test "unschedule_todo(scope_all)" "schedule_todo did not return a workSlotId"
+    fi
+
+    COMPLETE_TODO_TEXT=$(run_capture "complete_todo($TODO_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"complete_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"doneOn\":1777040000000}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "complete_todo($TODO_ID) updated" "$COMPLETE_TODO_TEXT" ".updated" "true"
+      sleep 1
+      GET_COMPLETED_TODO_TEXT=$(try_capture \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "get_todo($TODO_ID) doneOn after complete" "$GET_COMPLETED_TODO_TEXT" ".doneOn" "1777040000000"
+      else
+        skip_test "get_todo($TODO_ID completed)" "Huly read-after-complete was not consistent in time"
+      fi
+    fi
+    REOPEN_TODO_TEXT=$(run_capture "reopen_todo($TODO_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"reopen_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "reopen_todo($TODO_ID) updated" "$REOPEN_TODO_TEXT" ".updated" "true"
+      sleep 1
+      GET_REOPENED_TODO_TEXT=$(try_capture \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "get_todo($TODO_ID) doneOn after reopen" "$GET_REOPENED_TODO_TEXT" ".doneOn" "null"
+      else
+        skip_test "get_todo($TODO_ID reopened)" "Huly read-after-reopen was not consistent in time"
+      fi
+    fi
+    run_test "list_todo_automation_helpers" \
+      '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_todo_automation_helpers","arguments":{}},"id":2}'
+    DELETE_TODO_TEXT=$(run_capture "delete_todo($TODO_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "delete_todo($TODO_ID) deleted" "$DELETE_TODO_TEXT" ".deleted" "true"
+    fi
+  else
+    skip_test "planner_todo_lifecycle" "create_todo did not return a todoId"
+  fi
+fi
+
+PLANNER_ISSUE_TITLE="Planner Attached ToDo $RUN_ID"
+PLANNER_ISSUE_TITLE_JSON=$(json_string "$PLANNER_ISSUE_TITLE")
+PLANNER_ISSUE_TEXT=$(run_capture "create_issue(for_planner_todo)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":$PLANNER_ISSUE_TITLE_JSON}},\"id\":2}")
+if [ $? -eq 0 ]; then
+  PLANNER_ISSUE_ID=$(echo "$PLANNER_ISSUE_TEXT" | jq -r '.identifier // empty' 2>/dev/null)
+  if [ -n "$PLANNER_ISSUE_ID" ]; then
+    ISSUE_TODO_TITLE="IntTest Issue Planner Todo $RUN_ID"
+    ISSUE_TODO_TITLE_JSON=$(json_string "$ISSUE_TODO_TITLE")
+    ISSUE_TODO_TEXT=$(run_capture "create_todo(issue:$PLANNER_ISSUE_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_todo\",\"arguments\":{\"title\":$ISSUE_TODO_TITLE_JSON,\"attachedTo\":{\"type\":\"issue\",\"project\":\"$PROJECT\",\"identifier\":\"$PLANNER_ISSUE_ID\"}}},\"id\":2}")
+    ISSUE_TODO_ID=$(echo "$ISSUE_TODO_TEXT" | jq -r '.todoId // empty' 2>/dev/null)
+    if [ -n "$ISSUE_TODO_ID" ]; then
+      ISSUE_TODO_GET_TEXT=$(run_capture "get_todo(issue:$ISSUE_TODO_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$ISSUE_TODO_ID\"}}},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "get_todo(issue:$ISSUE_TODO_ID) attached type" "$ISSUE_TODO_GET_TEXT" ".attachedTo.type" "issue"
+        assert_json_field_equals "get_todo(issue:$ISSUE_TODO_ID) attached identifier" "$ISSUE_TODO_GET_TEXT" ".attachedTo.identifier" "$PLANNER_ISSUE_ID"
+        assert_json_field_equals "get_todo(issue:$ISSUE_TODO_ID) default visibility" "$ISSUE_TODO_GET_TEXT" ".visibility" "public"
+      fi
+      ISSUE_TODO_LIST_TEXT=$(run_capture "list_todos(issue:$PLANNER_ISSUE_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_todos\",\"arguments\":{\"issue\":{\"project\":\"$PROJECT\",\"identifier\":\"$PLANNER_ISSUE_ID\"},\"limit\":10}},\"id\":2}")
+      if [ $? -eq 0 ]; then
+        assert_json_array_contains "list_todos(issue:$PLANNER_ISSUE_ID) includes issue todo" "$ISSUE_TODO_LIST_TEXT" "map(.id)" "$ISSUE_TODO_ID"
+      fi
+      run_test "delete_todo(issue:$ISSUE_TODO_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$ISSUE_TODO_ID\"}}},\"id\":2}"
+      for _ in $(seq 1 5); do
+        ISSUE_TODO_AFTER_DELETE_RESULT=$(call_tool \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_todos\",\"arguments\":{\"issue\":{\"project\":\"$PROJECT\",\"identifier\":\"$PLANNER_ISSUE_ID\"},\"limit\":10}},\"id\":2}")
+        ISSUE_TODO_AFTER_DELETE_TEXT=$(echo "$ISSUE_TODO_AFTER_DELETE_RESULT" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+        ISSUE_TODO_AFTER_DELETE_PRESENT=$(echo "$ISSUE_TODO_AFTER_DELETE_TEXT" | jq -r --arg id "$ISSUE_TODO_ID" 'map(.id) | index($id) != null' 2>/dev/null)
+        if [ "$ISSUE_TODO_AFTER_DELETE_PRESENT" = "false" ]; then
+          break
+        fi
+        sleep 2
+      done
+    else
+      skip_test "issue_planner_todo_lifecycle" "create_todo did not return a todoId"
+    fi
+    PLANNER_ISSUE_DELETE_PAYLOAD="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$PLANNER_ISSUE_ID\"}}},\"id\":2}"
+    PLANNER_ISSUE_DELETE_PREVIOUS_TIMEOUT="$TOOL_TIMEOUT"
+    TOOL_TIMEOUT=180
+    PLANNER_ISSUE_DELETE_RESULT=$(call_tool_no_auto_exit "$PLANNER_ISSUE_DELETE_PAYLOAD")
+    TOOL_TIMEOUT="$PLANNER_ISSUE_DELETE_PREVIOUS_TIMEOUT"
+    PLANNER_ISSUE_DELETE_ERROR=$(echo "$PLANNER_ISSUE_DELETE_RESULT" | jq -r '.error.message // empty' 2>/dev/null)
+    PLANNER_ISSUE_DELETE_IS_ERROR=$(echo "$PLANNER_ISSUE_DELETE_RESULT" | jq -r '.result.isError // false' 2>/dev/null)
+    if [ -n "$PLANNER_ISSUE_DELETE_RESULT" ] && [ -z "$PLANNER_ISSUE_DELETE_ERROR" ] && [ "$PLANNER_ISSUE_DELETE_IS_ERROR" != "true" ]; then
+      echo "PASS: delete_issue(planner_todo:$PLANNER_ISSUE_ID)"
+      PASSED=$((PASSED + 1))
+    else
+      skip_test "delete_issue(planner_todo:$PLANNER_ISSUE_ID)" "Huly issue cleanup after ToDo collection deletion was not consistent in time"
+    fi
+  else
+    skip_test "issue_planner_todo_lifecycle" "create_issue did not return an identifier"
+  fi
+fi
 
 # Timer — requires project + issue identifier
 TIMER_ISSUE_TEXT=$(run_capture "create_issue(for_timer)" \

@@ -234,6 +234,15 @@ export interface HulyClientOperations extends HulyClientContext {
     id?: Ref<P>
   ) => Effect.Effect<Ref<P>, HulyClientError>
 
+  readonly removeCollection?: <T extends Doc, P extends AttachedDoc>(
+    _class: Ref<Class<P>>,
+    space: Ref<Space>,
+    objectId: Ref<P>,
+    attachedTo: Ref<T>,
+    attachedToClass: Ref<Class<T>>,
+    collection: Extract<keyof T, string> | string
+  ) => Effect.Effect<Ref<T>, HulyClientError>
+
   readonly removeDoc: <T extends Doc>(
     _class: Ref<Class<T>>,
     space: Ref<Space>,
@@ -406,6 +415,19 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
                 id
               ),
             "addCollection failed"
+          ),
+
+        removeCollection: <T extends Doc, P extends AttachedDoc>(
+          _class: Ref<Class<P>>,
+          space: Ref<Space>,
+          objectId: Ref<P>,
+          attachedTo: Ref<T>,
+          attachedToClass: Ref<Class<T>>,
+          collection: Extract<keyof T, string> | string
+        ) =>
+          withClient(
+            (client) => client.removeCollection(_class, space, objectId, attachedTo, attachedToClass, collection),
+            "removeCollection failed"
           ),
 
         removeDoc: <T extends Doc>(

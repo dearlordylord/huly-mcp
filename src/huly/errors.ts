@@ -83,6 +83,7 @@ import {
   ThreadReplyNotFoundError
 } from "./errors-messaging.js"
 import { NotificationContextNotFoundError, NotificationNotFoundError } from "./errors-notifications.js"
+import { TodoIdentifierAmbiguousError, TodoNotFoundError, TodoWorkSlotNotFoundError } from "./errors-planner.js"
 import {
   ProcessCardIdentifierAmbiguousError,
   ProcessCardNotFoundError,
@@ -218,7 +219,10 @@ export {
   TestResultNotFoundError,
   TestRunNotFoundError,
   TestSuiteNotFoundError,
-  ThreadReplyNotFoundError
+  ThreadReplyNotFoundError,
+  TodoIdentifierAmbiguousError,
+  TodoNotFoundError,
+  TodoWorkSlotNotFoundError
 }
 
 /**
@@ -318,7 +322,10 @@ export const HulyDomainError: Schema.Union<
     typeof SpaceNotFoundError,
     typeof SpaceIdentifierAmbiguousError,
     typeof SpaceTypeNotFoundError,
-    typeof SpaceTypeIdentifierAmbiguousError
+    typeof SpaceTypeIdentifierAmbiguousError,
+    typeof TodoNotFoundError,
+    typeof TodoIdentifierAmbiguousError,
+    typeof TodoWorkSlotNotFoundError
   ]
 > = Schema.Union(
   HulyError,
@@ -413,7 +420,10 @@ export const HulyDomainError: Schema.Union<
   SpaceNotFoundError,
   SpaceIdentifierAmbiguousError,
   SpaceTypeNotFoundError,
-  SpaceTypeIdentifierAmbiguousError
+  SpaceTypeIdentifierAmbiguousError,
+  TodoNotFoundError,
+  TodoIdentifierAmbiguousError,
+  TodoWorkSlotNotFoundError
 )
 
 /**

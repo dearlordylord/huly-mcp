@@ -1,0 +1,147 @@
+import { Effect } from "effect"
+import {
+  completeTodoParamsJsonSchema,
+  CompleteTodoResultSchema,
+  createTodoParamsJsonSchema,
+  CreateTodoResultSchema,
+  deleteTodoParamsJsonSchema,
+  DeleteTodoResultSchema,
+  emptyParamsJsonSchema,
+  getTodoParamsJsonSchema,
+  ListTodoAutomationHelpersResultSchema,
+  listTodosParamsJsonSchema,
+  ListTodosResultSchema,
+  parseCompleteTodoParams,
+  parseCreateTodoParams,
+  parseDeleteTodoParams,
+  parseGetTodoParams,
+  parseListTodosParams,
+  parseReopenTodoParams,
+  parseScheduleTodoParams,
+  parseUnscheduleTodoParams,
+  parseUpdateTodoParams,
+  reopenTodoParamsJsonSchema,
+  ReopenTodoResultSchema,
+  scheduleTodoParamsJsonSchema,
+  ScheduleTodoResultSchema,
+  TodoDetailSchema,
+  unscheduleTodoParamsJsonSchema,
+  UnscheduleTodoResultSchema,
+  updateTodoParamsJsonSchema,
+  UpdateTodoResultSchema
+} from "../../domain/schemas.js"
+import {
+  completeTodo,
+  createTodo,
+  deleteTodo,
+  getTodo,
+  listTodoAutomationHelpers,
+  listTodos,
+  reopenTodo,
+  scheduleTodo,
+  unscheduleTodo,
+  updateTodo
+} from "../../huly/operations/planner.js"
+import { createEncodedToolHandler, type RegisteredTool } from "./registry.js"
+
+const CATEGORY = "planner" as const
+
+export const plannerTools: ReadonlyArray<RegisteredTool> = [
+  {
+    name: "list_todos",
+    description:
+      "List Huly Planner ToDos. Use owner names/emails, issue identifiers, title filters, due-date filters, priority, visibility, and completion state; raw Huly class IDs are not required.",
+    category: CATEGORY,
+    inputSchema: listTodosParamsJsonSchema,
+    handler: createEncodedToolHandler("list_todos", parseListTodosParams, listTodos, ListTodosResultSchema)
+  },
+  {
+    name: "get_todo",
+    description:
+      "Get one Planner ToDo by raw todoId or by human locator such as issue + title + owner. Returns stable ToDo fields, owner, attachment context, description, rank, labels count, and work slot count.",
+    category: CATEGORY,
+    inputSchema: getTodoParamsJsonSchema,
+    handler: createEncodedToolHandler("get_todo", parseGetTodoParams, getTodo, TodoDetailSchema)
+  },
+  {
+    name: "create_todo",
+    description:
+      "Create a Planner ToDo. Omit attachedTo for a personal ToDo, or pass attachedTo.type=issue with project and identifier for an issue action item. The owner defaults to the authenticated user.",
+    category: CATEGORY,
+    inputSchema: createTodoParamsJsonSchema,
+    handler: createEncodedToolHandler("create_todo", parseCreateTodoParams, createTodo, CreateTodoResultSchema)
+  },
+  {
+    name: "update_todo",
+    description:
+      "Update a Planner ToDo by human locator or raw todoId. Supports title, markdown description, owner, dueDate including null to clear, priority, and visibility.",
+    category: CATEGORY,
+    inputSchema: updateTodoParamsJsonSchema,
+    handler: createEncodedToolHandler("update_todo", parseUpdateTodoParams, updateTodo, UpdateTodoResultSchema)
+  },
+  {
+    name: "complete_todo",
+    description:
+      "Complete a Planner ToDo by setting doneOn. Huly may trim future work slots and run issue automation when the ToDo is attached to an issue.",
+    category: CATEGORY,
+    inputSchema: completeTodoParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "complete_todo",
+      parseCompleteTodoParams,
+      completeTodo,
+      CompleteTodoResultSchema
+    )
+  },
+  {
+    name: "reopen_todo",
+    description:
+      "Reopen a completed Planner ToDo by clearing doneOn. Human locators search completed ToDos by default; raw todoId locators target that exact ToDo.",
+    category: CATEGORY,
+    inputSchema: reopenTodoParamsJsonSchema,
+    handler: createEncodedToolHandler("reopen_todo", parseReopenTodoParams, reopenTodo, ReopenTodoResultSchema)
+  },
+  {
+    name: "delete_todo",
+    description:
+      "Delete a Planner ToDo. This is destructive; deleting the last open issue ToDo can cause Huly classic issue status automation.",
+    category: CATEGORY,
+    inputSchema: deleteTodoParamsJsonSchema,
+    annotations: { destructiveHint: true, idempotentHint: true },
+    handler: createEncodedToolHandler("delete_todo", parseDeleteTodoParams, deleteTodo, DeleteTodoResultSchema)
+  },
+  {
+    name: "schedule_todo",
+    description:
+      "Schedule a Planner ToDo by locator, creating a work slot. Prefer this over create_work_slot when you do not already know the raw todoId.",
+    category: CATEGORY,
+    inputSchema: scheduleTodoParamsJsonSchema,
+    handler: createEncodedToolHandler("schedule_todo", parseScheduleTodoParams, scheduleTodo, ScheduleTodoResultSchema)
+  },
+  {
+    name: "unschedule_todo",
+    description:
+      "Remove ToDo work slots. Pass either workSlotId to remove one slot, locator with scope=all, or locator with scope=future and optional from.",
+    category: CATEGORY,
+    inputSchema: unscheduleTodoParamsJsonSchema,
+    annotations: { destructiveHint: true, idempotentHint: true },
+    handler: createEncodedToolHandler(
+      "unschedule_todo",
+      parseUnscheduleTodoParams,
+      unscheduleTodo,
+      UnscheduleTodoResultSchema
+    )
+  },
+  {
+    name: "list_todo_automation_helpers",
+    description:
+      "List Huly ToDo automation helper documents. This is read-only visibility into helper resource IDs; it does not mutate automation.",
+    category: CATEGORY,
+    inputSchema: emptyParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "list_todo_automation_helpers",
+      () => Effect.succeed({}),
+      listTodoAutomationHelpers,
+      ListTodoAutomationHelpersResultSchema
+    )
+  }
+]

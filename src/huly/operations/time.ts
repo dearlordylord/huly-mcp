@@ -11,6 +11,7 @@ import {
   SortingOrder,
   type WithLookup
 } from "@hcengineering/core"
+import type { ToDo as HulyToDo, WorkSlot as HulyWorkSlot } from "@hcengineering/time"
 import {
   type Issue as HulyIssue,
   type Project as HulyProject,
@@ -76,6 +77,12 @@ type ListWorkSlotsError = HulyClientError
 type CreateWorkSlotError = HulyClientError
 type StartTimerError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
 type StopTimerError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
+
+interface CreateWorkSlotForTodoInput extends CreateWorkSlotParams {
+  readonly title: string
+  readonly description: string
+  readonly visibility: "public" | "freeBusy" | "private"
+}
 
 export const logTime = (
   params: LogTimeParams
@@ -376,17 +383,11 @@ export const listWorkSlots = (
     }))
   })
 
-export const createWorkSlot = (
-  params: CreateWorkSlotParams
-): Effect.Effect<CreateWorkSlotResult, CreateWorkSlotError, HulyClient> =>
+const addWorkSlotForTodo = (
+  client: HulyClient["Type"],
+  params: CreateWorkSlotForTodoInput
+): Effect.Effect<CreateWorkSlotResult, CreateWorkSlotError> =>
   Effect.gen(function*() {
-    const client = yield* HulyClient
-
-    /* eslint-disable @typescript-eslint/consistent-type-imports -- inline type for generic */
-    type HulyWorkSlot = import("@hcengineering/time").WorkSlot
-    type HulyToDo = import("@hcengineering/time").ToDo
-    /* eslint-enable @typescript-eslint/consistent-type-imports */
-
     const slotId: Ref<HulyWorkSlot> = generateId()
 
     // Huly API: WorkSlot requires all calendar event fields even for simple slots.
@@ -395,13 +396,13 @@ export const createWorkSlot = (
     const slotData: AttachedData<HulyWorkSlot> = {
       date: params.date,
       dueDate: params.dueDate,
-      title: "",
-      description: "",
+      title: params.title,
+      description: params.description,
       allDay: false,
       participants: [],
       access: AccessLevel.Owner,
       reminders: [],
-      visibility: "public" as const,
+      visibility: params.visibility,
       eventId: "",
       calendar: serverPopulatedCalendar,
       user: serverPopulatedPersonId,
@@ -419,6 +420,22 @@ export const createWorkSlot = (
     )
 
     return { slotId: WorkSlotId.make(slotId) }
+  })
+
+export const createWorkSlot = (
+  params: CreateWorkSlotParams
+): Effect.Effect<CreateWorkSlotResult, CreateWorkSlotError, HulyClient> =>
+  Effect.gen(function*() {
+    const client = yield* HulyClient
+    return yield* addWorkSlotForTodo(client, { ...params, title: "", description: "", visibility: "public" })
+  })
+
+export const createPlannerWorkSlot = (
+  params: CreateWorkSlotForTodoInput
+): Effect.Effect<CreateWorkSlotResult, CreateWorkSlotError, HulyClient> =>
+  Effect.gen(function*() {
+    const client = yield* HulyClient
+    return yield* addWorkSlotForTodo(client, params)
   })
 
 /**

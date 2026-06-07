@@ -106,7 +106,8 @@ export const timeTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "create_work_slot",
-    description: "Create a scheduled work slot. Attaches a time block to a ToDo for planning purposes.",
+    description:
+      "Create a scheduled work slot when you already have a raw ToDo ID. If you only know the ToDo title, issue, or owner, use schedule_todo instead.",
     category: CATEGORY,
     inputSchema: createWorkSlotParamsJsonSchema,
     handler: createEncodedToolHandler(

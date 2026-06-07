@@ -128,7 +128,7 @@ For HTTP header mode, send the same JSON-RPC methods to `/mcp` with `x-huly-url`
 
 **Coverage**: 120+ tool calls across 22 domains. Self-cleaning: all created entities are deleted at the end of each section. Tools that would leak data (no delete counterpart) are skipped. Run time: ~3 minutes.
 
-**Last verified**: 2026-06-07 — 286 passed, 0 failed, 35 skipped (of 321 total).
+**Last verified**: 2026-06-07 — 317 passed, 0 failed, 37 skipped (of 354 total).
 
 ### How to Run
 
@@ -158,7 +158,7 @@ The full suite tests CRUD lifecycles with cleanup for all domains:
 | 8. Teamspaces | create, get, update, delete | Full CRUD |
 | 9. Channels | list, get, messages, DMs, DM messages (list/send/update/delete), create channel, send_message, thread replies (add/list/update/delete), reactions (add/list/remove), save/unsave, update/delete channel | Channel messaging in temp channel (deleted at end); DM message test cleans up its own message and requires `HULY_TEST_DM_ID` or at least one existing DM |
 | 10. Contacts | list_persons, list_employees, list_organizations, get_user_profile, create/update/delete person | CRUD (create_organization skipped — no delete tool) |
-| 11. Calendar | list events/work_slots/time_reports/recurring, create/get/update/delete event, start/stop timer | Lifecycle (create_recurring_event skipped — no delete tool) |
+| 11. Calendar, Time, Planner | list events/work_slots/time_reports/recurring, create/get/update/delete event, create/list/get/update/complete/reopen/delete ToDo, schedule/unschedule ToDo, create_work_slot, list_todo_automation_helpers, start/stop timer | Event + Planner lifecycle; create_work_slot is covered through a disposable ToDo (create_recurring_event skipped — no delete tool) |
 | 12. Notifications | list, count, contexts, settings, get, mark_read | Read operations (+ mutation if notifications exist) |
 | 13. Search | fulltext_search | Uses `searchFulltext` API |
 | 13a. SDK Discovery | list_huly_classes, get_huly_class, list_huly_attributes, list_huly_enums | Read-only model discovery for class IDs, attributes, inherited fields, purpose-built tool hints, and enum totals |
@@ -172,16 +172,15 @@ The full suite tests CRUD lifecycles with cleanup for all domains:
 | 19. Processes | list_processes, get_process, list_process_executions, start_process, cancel_execution | Read/write; write checks run only when the workspace has a process with an initial state and a matching safe card fixture, then cancel the created execution |
 | 20. User Statuses | list_user_statuses | Read-only presence records; filtered call runs when at least one row exists |
 
-### Intentionally Skipped (19 fixed + up to 15 conditional)
+### Intentionally Skipped (18 fixed + up to 15 conditional)
 
-**Always skipped (19):**
+**Always skipped (18):**
 - **create/update/delete_project** (3): Would pollute workspace
 - **Workspace management** (6): list_workspaces, create/delete_workspace, get_regions, update_member_role, update_guest_settings — dangerous
 - **update_user_profile** (1): Would modify test user
 - **create_organization** (1): No delete tool — would leak data
 - **create_recurring_event, list_event_instances** (2): No delete tool — would leak data
 - **upload_file(standalone)** (1): No blob delete tool — would leak data
-- **create_work_slot** (1): Requires existing planner task (todoId)
 - **get_person** (1): Covered by create+update cycle
 - **update_card** (1): Card update lifecycle is skipped; create/get/delete_card are exercised by the derived master-tag card lifecycle and the generic association card locator smoke
 - **add_attachment, add_document_attachment** (2): Covered by add_issue_attachment

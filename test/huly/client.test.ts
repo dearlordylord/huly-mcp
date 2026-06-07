@@ -38,6 +38,7 @@ const mockFindOne = mockFn()
 const mockCreateDoc = mockFn()
 const mockUpdateDoc = mockFn()
 const mockAddCollection = mockFn()
+const mockRemoveCollection = mockFn()
 const mockRemoveDoc = mockFn()
 const mockCreateMixin = mockFn()
 const mockUpdateMixin = mockFn()
@@ -51,6 +52,7 @@ const mockTxOperations = {
   createDoc: mockCreateDoc,
   updateDoc: mockUpdateDoc,
   addCollection: mockAddCollection,
+  removeCollection: mockRemoveCollection,
   removeDoc: mockRemoveDoc,
   createMixin: mockCreateMixin,
   updateMixin: mockUpdateMixin,
@@ -69,6 +71,7 @@ const clearAllMockFns = () => {
   mockCreateDoc.mockClear()
   mockUpdateDoc.mockClear()
   mockAddCollection.mockClear()
+  mockRemoveCollection.mockClear()
   mockRemoveDoc.mockClear()
   mockCreateMixin.mockClear()
   mockUpdateMixin.mockClear()
@@ -170,6 +173,7 @@ describe("HulyClient Service", () => {
     mockCreateDoc.mockResolvedValue("new-id")
     mockUpdateDoc.mockResolvedValue({})
     mockAddCollection.mockResolvedValue("new-attached-id")
+    mockRemoveCollection.mockResolvedValue("parent-id")
     mockRemoveDoc.mockResolvedValue({})
     mockGetMarkup.mockResolvedValue("raw-markup")
     mockCreateMarkup.mockResolvedValue("markup-ref-id")
@@ -939,6 +943,57 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
 
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toContain("addCollection failed")
+      }))
+  })
+
+  describe("removeCollection", () => {
+    it.effect("delegates to TxOperations.removeCollection", () =>
+      Effect.gen(function*() {
+        mockRemoveCollection.mockResolvedValue("parent-id")
+
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        const removeCollection = client.removeCollection
+        if (removeCollection === undefined) return yield* Effect.die(new Error("removeCollection missing"))
+        const result = yield* removeCollection(
+          "childClass" as DocRef<Class<AttachedDoc>>,
+          "space" as DocRef<Space>,
+          "childId" as DocRef<AttachedDoc>,
+          "parentId" as DocRef<Doc>,
+          "parentClass" as DocRef<Class<Doc>>,
+          "comments"
+        )
+
+        expect(result).toBe("parent-id")
+        expect(mockRemoveCollection.mock.calls).toContainEqual([
+          "childClass",
+          "space",
+          "childId",
+          "parentId",
+          "parentClass",
+          "comments"
+        ])
+      }))
+
+    it.effect("wraps errors in HulyConnectionError", () =>
+      Effect.gen(function*() {
+        mockRemoveCollection.mockRejectedValue(new Error("collection remove error"))
+
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        const removeCollection = client.removeCollection
+        if (removeCollection === undefined) return yield* Effect.die(new Error("removeCollection missing"))
+        const error = yield* Effect.flip(
+          removeCollection(
+            "c" as DocRef<Class<AttachedDoc>>,
+            "s" as DocRef<Space>,
+            "id" as DocRef<AttachedDoc>,
+            "p" as DocRef<Doc>,
+            "pc" as DocRef<Class<Doc>>,
+            "col"
+          )
+        )
+
+        expect(error._tag).toBe("HulyConnectionError")
+        expect(error.message).toContain("removeCollection failed")
       }))
   })
 

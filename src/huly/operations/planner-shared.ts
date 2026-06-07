@@ -1,0 +1,359 @@
+import type { Visibility as HulyVisibility } from "@hcengineering/calendar"
+import type { Employee, Person } from "@hcengineering/contact"
+import type { Class, Doc, DocumentQuery, MarkupBlobRef, Ref, Space, WithLookup } from "@hcengineering/core"
+import { SortingOrder } from "@hcengineering/core"
+import { makeRank } from "@hcengineering/rank"
+import { type ToDo as HulyToDo, ToDoPriority } from "@hcengineering/time"
+import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
+import { Effect } from "effect"
+
+import type {
+  TodoAttachmentInput,
+  TodoAttachmentSummary,
+  TodoCompletionState,
+  TodoLocator,
+  TodoOwnerSummary,
+  TodoPriority,
+  TodoSummary,
+  TodoVisibility
+} from "../../domain/schemas/planner.js"
+import {
+  Count,
+  DocId,
+  Email,
+  IssueId,
+  IssueIdentifier,
+  ObjectClassName,
+  PersonId,
+  PersonName,
+  ProjectIdentifier,
+  Timestamp,
+  TodoId
+} from "../../domain/schemas/shared.js"
+import { isExistent } from "../../utils/assertions.js"
+import { HulyClient, type HulyClientError } from "../client.js"
+import type {
+  IssueNotFoundError,
+  PersonIdentifierAmbiguousError,
+  PersonNotAnEmployeeError,
+  PersonNotFoundError,
+  ProjectNotFoundError,
+  TodoIdentifierAmbiguousError
+} from "../errors.js"
+import {
+  PersonNotAnEmployeeError as PersonNotEmployee,
+  PersonNotFoundError as PersonMissing,
+  TodoIdentifierAmbiguousError as AmbiguousTodo,
+  TodoNotFoundError
+} from "../errors.js"
+import { contact, time, tracker } from "../huly-plugins.js"
+import { findPersonByExactEmailOrName } from "./contacts-shared.js"
+import { findProjectAndIssue } from "./issues-shared.js"
+import { hulyQuery, type StrictDocumentQuery, withLookup } from "./query-helpers.js"
+import { toRef } from "./sdk-boundary.js"
+
+export type HulyTodoWithLookup = WithLookup<HulyToDo> & {
+  readonly $lookup?: {
+    readonly user?: Person
+    readonly attachedTo?: HulyIssue
+  }
+}
+
+export const todoLookup = {
+  user: contact.class.Person,
+  attachedTo: tracker.class.Issue
+} as const
+
+interface ResolvedTodoAttachment {
+  readonly type: "none" | "issue"
+  readonly attachedTo: Ref<Doc>
+  readonly attachedToClass: Ref<Class<Doc>>
+  readonly attachedSpace?: Ref<Space> | undefined
+  readonly project?: HulyProject | undefined
+  readonly issue?: HulyIssue | undefined
+}
+
+export type PlannerLookupError =
+  | HulyClientError
+  | ProjectNotFoundError
+  | IssueNotFoundError
+  | PersonIdentifierAmbiguousError
+  | PersonNotFoundError
+  | PersonNotAnEmployeeError
+  | TodoIdentifierAmbiguousError
+  | TodoNotFoundError
+
+const TODO_PRIORITY_TO_STRING = {
+  [ToDoPriority.NoPriority]: "no-priority",
+  [ToDoPriority.Low]: "low",
+  [ToDoPriority.Medium]: "medium",
+  [ToDoPriority.High]: "high",
+  [ToDoPriority.Urgent]: "urgent"
+} as const satisfies Record<ToDoPriority, TodoPriority>
+
+const STRING_TO_TODO_PRIORITY = {
+  "no-priority": ToDoPriority.NoPriority,
+  low: ToDoPriority.Low,
+  medium: ToDoPriority.Medium,
+  high: ToDoPriority.High,
+  urgent: ToDoPriority.Urgent
+} as const satisfies Record<TodoPriority, ToDoPriority>
+
+const todoPriorityToString = (priority: ToDoPriority): TodoPriority => TODO_PRIORITY_TO_STRING[priority]
+export const stringToTodoPriority = (priority: TodoPriority): ToDoPriority => STRING_TO_TODO_PRIORITY[priority]
+
+const todoVisibilityToString = (visibility: HulyVisibility): TodoVisibility => visibility
+export const stringToTodoVisibility = (visibility: TodoVisibility): HulyVisibility => visibility
+
+// SDK: ToDo["description"] is Markup, but persisted markup references are plain strings.
+export const todoDescriptionAsMarkupRef = (description: HulyToDo["description"]): MarkupBlobRef =>
+  // eslint-disable-next-line no-restricted-syntax -- Brands are erased at runtime; both SDK markup refs are strings.
+  description as MarkupBlobRef
+
+export const markupRefAsTodoDescription = (ref: MarkupBlobRef | null): HulyToDo["description"] => ref ?? ""
+
+export const resolveTodoOwner = (
+  client: HulyClient["Type"],
+  owner?: string
+): Effect.Effect<
+  Ref<Employee>,
+  HulyClientError | PersonIdentifierAmbiguousError | PersonNotFoundError | PersonNotAnEmployeeError
+> =>
+  Effect.gen(function*() {
+    if (owner === undefined) {
+      const employee = yield* client.findOne<Employee>(
+        contact.mixin.Employee,
+        hulyQuery<Employee>({ personUuid: client.getAccountUuid() })
+      )
+      if (employee === undefined) {
+        return yield* new PersonNotEmployee({ identifier: "authenticated user" })
+      }
+      return employee._id
+    }
+
+    const byId = yield* client.findOne<Employee>(
+      contact.mixin.Employee,
+      hulyQuery<Employee>({ _id: toRef<Employee>(owner) })
+    )
+    if (byId !== undefined) return byId._id
+
+    const personRef = owner.includes("@") ? Email.make(owner) : PersonName.make(owner)
+    const person = yield* findPersonByExactEmailOrName(client, personRef)
+    if (person === undefined) {
+      return yield* new PersonMissing({ identifier: owner })
+    }
+
+    const employee = yield* client.findOne<Employee>(
+      contact.mixin.Employee,
+      hulyQuery<Employee>({ _id: toRef<Employee>(person._id) })
+    )
+    if (employee === undefined) {
+      return yield* new PersonNotEmployee({ identifier: owner })
+    }
+    return employee._id
+  })
+
+export const resolveTodoAttachment = (
+  client: HulyClient["Type"],
+  attachment?: TodoAttachmentInput
+): Effect.Effect<
+  ResolvedTodoAttachment,
+  HulyClientError | ProjectNotFoundError | IssueNotFoundError,
+  never
+> =>
+  Effect.gen(function*() {
+    if (attachment?.type === "issue") {
+      const { issue, project } = yield* findProjectAndIssue({
+        project: attachment.project,
+        identifier: attachment.identifier
+      }).pipe(Effect.provideService(HulyClient, client))
+      return {
+        type: "issue",
+        attachedTo: issue._id,
+        attachedToClass: tracker.class.Issue,
+        attachedSpace: issue.space,
+        project,
+        issue
+      }
+    }
+
+    return {
+      type: "none",
+      attachedTo: time.ids.NotAttached,
+      attachedToClass: time.class.ToDo
+    }
+  })
+
+export const latestOpenTodoRank = (
+  client: HulyClient["Type"],
+  owner: Ref<Employee>
+): Effect.Effect<string, HulyClientError> =>
+  Effect.gen(function*() {
+    const latestTodo = yield* client.findOne<HulyToDo>(
+      time.class.ToDo,
+      hulyQuery<HulyToDo>({
+        user: owner,
+        doneOn: null
+      }),
+      { sort: { rank: SortingOrder.Ascending } }
+    )
+    return makeRank(undefined, latestTodo?.rank)
+  })
+
+const applyCompletionState = (
+  query: StrictDocumentQuery<HulyToDo>,
+  completionState: TodoCompletionState | undefined
+): void => {
+  if (completionState === "open") query.doneOn = null
+  if (completionState === "completed") {
+    const completedFilter: DocumentQuery<HulyToDo>["doneOn"] = { $ne: null }
+    query.doneOn = completedFilter
+  }
+}
+
+const queryForAttachment = (
+  query: StrictDocumentQuery<HulyToDo>,
+  attachment: ResolvedTodoAttachment
+): void => {
+  query.attachedTo = attachment.attachedTo
+  query.attachedToClass = attachment.attachedToClass
+}
+
+const describeLocator = (locator: TodoLocator): string => JSON.stringify(locator)
+
+export const queryFromListFilters = (
+  owner: Ref<Employee> | undefined,
+  attachment: ResolvedTodoAttachment | undefined,
+  filters: {
+    readonly title?: string | undefined
+    readonly dueFrom?: Timestamp | undefined
+    readonly dueTo?: Timestamp | undefined
+    readonly completionState?: TodoCompletionState | undefined
+    readonly priority?: TodoPriority | undefined
+    readonly visibility?: TodoVisibility | undefined
+  }
+): StrictDocumentQuery<HulyToDo> => {
+  const query: StrictDocumentQuery<HulyToDo> = {}
+  if (owner !== undefined) query.user = owner
+  if (attachment !== undefined) queryForAttachment(query, attachment)
+  if (filters.title !== undefined) query.title = filters.title
+  if (filters.dueFrom !== undefined || filters.dueTo !== undefined) {
+    query.dueDate = {}
+    if (filters.dueFrom !== undefined) query.dueDate.$gte = filters.dueFrom
+    if (filters.dueTo !== undefined) query.dueDate.$lte = filters.dueTo
+  }
+  applyCompletionState(query, filters.completionState)
+  if (filters.priority !== undefined) query.priority = stringToTodoPriority(filters.priority)
+  if (filters.visibility !== undefined) query.visibility = stringToTodoVisibility(filters.visibility)
+  return query
+}
+
+const queryFromLocator = (
+  owner: Ref<Employee> | undefined,
+  attachment: ResolvedTodoAttachment | undefined,
+  locator: Exclude<TodoLocator, { readonly todoId: unknown }>,
+  defaultCompletionState: TodoCompletionState
+): StrictDocumentQuery<HulyToDo> => {
+  const query: StrictDocumentQuery<HulyToDo> = {}
+  if ("title" in locator && locator.title !== undefined) query.title = locator.title
+  if (owner !== undefined) query.user = owner
+  if (attachment !== undefined) queryForAttachment(query, attachment)
+  applyCompletionState(query, locator.completionState ?? defaultCompletionState)
+  return query
+}
+
+export const findTodo = (
+  client: HulyClient["Type"],
+  locator: TodoLocator,
+  defaultCompletionState: TodoCompletionState = "open"
+): Effect.Effect<HulyToDo, PlannerLookupError> =>
+  Effect.gen(function*() {
+    if ("todoId" in locator) {
+      const todo = yield* client.findOne<HulyToDo>(
+        time.class.ToDo,
+        hulyQuery<HulyToDo>({ _id: toRef<HulyToDo>(locator.todoId) }),
+        withLookup<HulyToDo>(undefined, todoLookup)
+      )
+      if (todo === undefined) return yield* new TodoNotFoundError({ locator: describeLocator(locator) })
+      return todo
+    }
+
+    const owner = "owner" in locator ? yield* resolveTodoOwner(client, locator.owner) : undefined
+    const attachment = "issue" in locator
+      ? yield* resolveTodoAttachment(client, { type: "issue", ...locator.issue })
+      : "attachedTo" in locator
+      ? yield* resolveTodoAttachment(client, locator.attachedTo)
+      : undefined
+
+    const todos = yield* client.findAll<HulyToDo>(
+      time.class.ToDo,
+      hulyQuery<HulyToDo>(queryFromLocator(owner, attachment, locator, defaultCompletionState)),
+      { limit: 2, sort: { rank: SortingOrder.Ascending } }
+    )
+
+    if (todos.length === 0) return yield* new TodoNotFoundError({ locator: describeLocator(locator) })
+    if (todos.length > 1) {
+      return yield* new AmbiguousTodo({ locator: describeLocator(locator), matches: todos.length })
+    }
+    return todos[0]
+  })
+
+const todoOwnerSummary = (
+  todo: HulyTodoWithLookup,
+  emailByPersonId: Map<string, string>
+): TodoOwnerSummary => {
+  const name = todo.$lookup?.user?.name
+  const email = emailByPersonId.get(todo.user)
+  return {
+    id: PersonId.make(todo.user),
+    ...(name === undefined ? {} : { name: PersonName.make(name) }),
+    ...(email === undefined ? {} : { email: Email.make(email) })
+  }
+}
+
+const todoAttachmentSummary = (todo: HulyTodoWithLookup): TodoAttachmentSummary => {
+  if (todo.attachedTo === time.ids.NotAttached) return { type: "none" }
+  const issue = todo.$lookup?.attachedTo
+  if (todo.attachedToClass === tracker.class.Issue && issue !== undefined) {
+    return {
+      type: "issue",
+      id: IssueId.make(issue._id),
+      project: ProjectIdentifier.make(IssueIdentifier.make(issue.identifier).split("-")[0]),
+      identifier: IssueIdentifier.make(issue.identifier),
+      title: issue.title
+    }
+  }
+  return {
+    type: "unknown",
+    id: DocId.make(todo.attachedTo),
+    class: ObjectClassName.make(todo.attachedToClass)
+  }
+}
+
+const runtimeCount = (value: unknown): Count => Count.make(Number(value))
+
+const runtimeTimestampOrNull = (value: unknown): Timestamp | null | undefined =>
+  value === undefined || value === null ? value : Timestamp.make(Number(value))
+
+export const todoSummary = (
+  todo: HulyTodoWithLookup,
+  emailByPersonId: Map<string, string>
+): TodoSummary => {
+  const labels = Reflect.get(todo, "labels")
+  return {
+    id: TodoId.make(todo._id),
+    title: todo.title,
+    priority: todoPriorityToString(todo.priority),
+    visibility: todoVisibilityToString(todo.visibility),
+    owner: todoOwnerSummary(todo, emailByPersonId),
+    attachedTo: todoAttachmentSummary(todo),
+    workslots: runtimeCount(Reflect.get(todo, "workslots")),
+    ...(todo.dueDate === undefined ? {} : { dueDate: runtimeTimestampOrNull(todo.dueDate) }),
+    doneOn: runtimeTimestampOrNull(todo.doneOn),
+    ...(labels === undefined ? {} : { labels: runtimeCount(labels) }),
+    rank: todo.rank
+  }
+}
+
+export const uniqueTodoOwnerIds = (todos: ReadonlyArray<HulyToDo>): Array<Ref<Person>> =>
+  [...new Set(todos.map((todo) => todo.user).filter(isExistent))].map(toRef<Person>)

@@ -73,7 +73,10 @@ import {
   TeamspaceNotFoundError,
   TemplateChildNotFoundError,
   TestPlanItemNotFoundError,
-  ThreadReplyNotFoundError
+  ThreadReplyNotFoundError,
+  TodoIdentifierAmbiguousError,
+  TodoNotFoundError,
+  TodoWorkSlotNotFoundError
 } from "../../src/huly/errors.js"
 import { funnelIdentifier, funnelReference, leadIdentifier } from "../helpers/brands.js"
 
@@ -861,6 +864,12 @@ describe("Huly Errors", () => {
               return `dm-self:${error.identifier}`
             case "PersonNotAnEmployeeError":
               return `not-employee:${error.identifier}`
+            case "TodoNotFoundError":
+              return `todo:${error.locator}`
+            case "TodoIdentifierAmbiguousError":
+              return `todo-ambiguous:${error.locator}:${error.matches}`
+            case "TodoWorkSlotNotFoundError":
+              return `todo-workslot:${error.workSlotId}`
             default: {
               const _exhaustive: never = error
               return _exhaustive
@@ -876,6 +885,22 @@ describe("Huly Errors", () => {
           .toBe(
             "person-ambiguous:Smith,Bill:2"
           )
+        expect(matchError(new TodoNotFoundError({ locator: "{\"todoId\":\"todo-1\"}" }))).toBe(
+          "todo:{\"todoId\":\"todo-1\"}"
+        )
+        expect(new TodoNotFoundError({ locator: "missing" }).message).toBe(
+          "Planner ToDo not found for locator: missing"
+        )
+        expect(matchError(new TodoIdentifierAmbiguousError({ locator: "title:Fix bug", matches: 2 }))).toBe(
+          "todo-ambiguous:title:Fix bug:2"
+        )
+        expect(new TodoIdentifierAmbiguousError({ locator: "title:Fix bug", matches: 2 }).message).toBe(
+          "Planner ToDo locator is ambiguous: title:Fix bug matched 2 ToDos"
+        )
+        expect(matchError(new TodoWorkSlotNotFoundError({ workSlotId: "slot-1" }))).toBe("todo-workslot:slot-1")
+        expect(new TodoWorkSlotNotFoundError({ workSlotId: "slot-1" }).message).toBe(
+          "Planner ToDo work slot 'slot-1' not found"
+        )
         expect(matchError(new OrganizationNotFoundError({ identifier: "Acme" }))).toBe("organization:Acme")
         expect(
           matchError(new OrganizationIdentifierAmbiguousError({ identifier: "Acme", matches: Count.make(2) }))
