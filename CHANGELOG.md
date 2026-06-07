@@ -1,5 +1,18 @@
 # @firfi/huly-mcp
 
+## 0.22.0
+
+### Minor Changes
+
+- f888a71: Add a uniform `null` clear contract for clearable update fields across spaces, channels, calendar events, issues, issue templates, components, milestones, tags, labels, and cards.
+- 1c389e5: Add the generic `spaces` MCP toolset for safe Huly space discovery, metadata updates, member/owner administration, and space type/role/permission reads.
+
+  This release also centralizes shared count/list-total schema contracts, adds reusable update-field coverage helpers, enforces property-test file placement in the lint harness, and documents the deferred follow-ups for generic space creation, role assignment mutations, role/permission definition writes, and module-specific wrappers.
+
+### Patch Changes
+
+- Fix card master-tag resolution so `create_card`, `list_cards`, and `list_master_tags` support derived child card types by label or ID.
+
 ## 0.21.1
 
 ### Patch Changes
