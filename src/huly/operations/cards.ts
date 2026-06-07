@@ -32,13 +32,10 @@ import type {
 import { UPDATE_CARD_FIELDS } from "../../domain/schemas/cards.js"
 import { CardId, CardSpaceId, MasterTagId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import {
-  CardNotFoundError,
-  CardSpaceNotFoundError,
-  MasterTagNotFoundError,
-  type NoUpdateFieldsError
-} from "../errors.js"
+import { CardNotFoundError, CardSpaceNotFoundError } from "../errors.js"
+import type { MasterTagNotFoundError, NoUpdateFieldsError } from "../errors.js"
 import { cardPlugin } from "../huly-plugins.js"
+import { fetchMasterTagsForSpace, findMasterTag, masterTagDisplayName } from "./card-master-tags.js"
 import { clearTextAsEmptyString } from "./clear-field-updates.js"
 import { listTotal, optionalCount } from "./counts.js"
 import { clampLimit, escapeLikeWildcards, findByNameOrId } from "./query-helpers.js"
@@ -131,37 +128,6 @@ const findCardSpaceAndCard = (
     return { card, cardSpace, client }
   })
 
-const findMasterTag = (
-  client: HulyClient["Type"],
-  cardSpace: HulyCardSpace,
-  identifier: string
-): Effect.Effect<HulyMasterTag, MasterTagNotFoundError | HulyClientError> =>
-  Effect.gen(function*() {
-    const typeRefs = cardSpace.types
-    if (typeRefs.length === 0) {
-      return yield* new MasterTagNotFoundError({
-        identifier,
-        cardSpace: cardSpace.name
-      })
-    }
-
-    const allTags = yield* client.findAll<HulyMasterTag>(
-      cardPlugin.class.MasterTag,
-      { _id: { $in: typeRefs } }
-    )
-
-    const byName = allTags.find((t) => t.label === identifier)
-    if (byName !== undefined) return byName
-
-    const byId = allTags.find((t) => t._id === identifier)
-    if (byId !== undefined) return byId
-
-    return yield* new MasterTagNotFoundError({
-      identifier,
-      cardSpace: cardSpace.name
-    })
-  })
-
 // --- Operations ---
 
 export const listCardSpaces = (
@@ -207,24 +173,16 @@ export const listMasterTags = (
   Effect.gen(function*() {
     const { cardSpace, client } = yield* findCardSpace(params.cardSpace)
 
-    const typeRefs = cardSpace.types
-    if (typeRefs.length === 0) {
-      return { masterTags: [], total: listTotal(0) }
-    }
-
-    const tags = yield* client.findAll<HulyMasterTag>(
-      cardPlugin.class.MasterTag,
-      { _id: { $in: typeRefs } }
-    )
+    const tags = yield* fetchMasterTagsForSpace(client, cardSpace)
 
     const summaries: Array<MasterTagSummary> = tags.map((t) => ({
       id: MasterTagId.make(t._id),
-      name: t.label
+      name: masterTagDisplayName(t)
     }))
 
     return {
       masterTags: summaries,
-      total: listTotal(tags.total)
+      total: listTotal(summaries.length)
     }
   })
 

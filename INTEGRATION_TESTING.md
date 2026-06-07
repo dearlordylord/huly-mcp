@@ -128,7 +128,7 @@ For HTTP header mode, send the same JSON-RPC methods to `/mcp` with `x-huly-url`
 
 **Coverage**: 120+ tool calls across 22 domains. Self-cleaning: all created entities are deleted at the end of each section. Tools that would leak data (no delete counterpart) are skipped. Run time: ~3 minutes.
 
-**Last verified**: 2026-06-06 — 282 passed, 0 failed, 38 skipped (of 320 total).
+**Last verified**: 2026-06-07 — 286 passed, 0 failed, 35 skipped (of 321 total).
 
 ### How to Run
 
@@ -164,7 +164,7 @@ The full suite tests CRUD lifecycles with cleanup for all domains:
 | 13a. SDK Discovery | list_huly_classes, get_huly_class, list_huly_attributes, list_huly_enums | Read-only model discovery for class IDs, attributes, inherited fields, purpose-built tool hints, and enum totals |
 | 13b. Spaces | list_spaces, get_space, list_space_types, get_space_type, list_space_permissions, update_space, add_space_members, remove_space_members, set_space_owners | Generic space discovery plus safe metadata/member/owner updates against a disposable teamspace, verified through module-specific teamspace reads |
 | 13c. Generic Associations | list_associations, create_association, delete_association, list_relations, create_relation, delete_relation | Disposable association + relation lifecycle, including idempotency, in-use association delete rejection, public association cleanup, cardinality violation, and card endpoint locators by ID and title |
-| 14. Cards | list_card_spaces, list_master_tags, list_cards | Read operations with cardSpace |
+| 14. Cards | list_card_spaces, list_master_tags, list_cards, create_card, get_card, delete_card | Read operations plus derived master-tag create/get/delete coverage with cardSpace |
 | 15. Activity | list_mentions, list_saved_messages | Read operations |
 | 16. Workspace | get_workspace_info, list_workspace_members | Read-only (management tools skipped) |
 | 17. Attachments | add_issue_attachment, list/get/pin/update/download/delete attachment | Full CRUD (upload_file standalone skipped — no blob delete) |
@@ -172,9 +172,9 @@ The full suite tests CRUD lifecycles with cleanup for all domains:
 | 19. Processes | list_processes, get_process, list_process_executions, start_process, cancel_execution | Read/write; write checks run only when the workspace has a process with an initial state and a matching safe card fixture, then cancel the created execution |
 | 20. User Statuses | list_user_statuses | Read-only presence records; filtered call runs when at least one row exists |
 
-### Intentionally Skipped (22 fixed + up to 14 conditional)
+### Intentionally Skipped (19 fixed + up to 15 conditional)
 
-**Always skipped (22):**
+**Always skipped (19):**
 - **create/update/delete_project** (3): Would pollute workspace
 - **Workspace management** (6): list_workspaces, create/delete_workspace, get_regions, update_member_role, update_guest_settings — dangerous
 - **update_user_profile** (1): Would modify test user
@@ -183,7 +183,7 @@ The full suite tests CRUD lifecycles with cleanup for all domains:
 - **upload_file(standalone)** (1): No blob delete tool — would leak data
 - **create_work_slot** (1): Requires existing planner task (todoId)
 - **get_person** (1): Covered by create+update cycle
-- **Cards section CRUD** (4): create/get/update/delete_card — section-level lifecycle is skipped; create_card/delete_card are exercised by the generic association card locator smoke
+- **update_card** (1): Card update lifecycle is skipped; create/get/delete_card are exercised by the derived master-tag card lifecycle and the generic association card locator smoke
 - **add_attachment, add_document_attachment** (2): Covered by add_issue_attachment
 
 **Conditionally skipped (up to 15):**

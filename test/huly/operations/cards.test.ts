@@ -1,13 +1,13 @@
 /* eslint-disable no-restricted-syntax -- test fixtures build Huly SDK docs whose nominal types are not structurally compatible with plain object literals, and branded refs have no runtime constructors */
 import { describe, it } from "@effect/vitest"
 import type { Card as HulyCard, CardSpace as HulyCardSpace, MasterTag as HulyMasterTag } from "@hcengineering/card"
-import { type Doc, type Ref, toFindResult } from "@hcengineering/core"
+import { ClassifierKind, type Doc, type Ref, toFindResult } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
 
 import { CardIdentifier, CardSpaceIdentifier, MasterTagIdentifier } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
-import { cardPlugin } from "../../../src/huly/huly-plugins.js"
+import { cardPlugin, core } from "../../../src/huly/huly-plugins.js"
 import {
   createCard,
   deleteCard,
@@ -20,6 +20,10 @@ import {
 
 const SPACE_ID = "space-1" as Ref<HulyCardSpace>
 const TAG_ID = "tag-1" as Ref<HulyMasterTag>
+const CHILD_TAG_ID = "tag-child-1" as Ref<HulyMasterTag>
+const OTHER_TAG_ID = "tag-other-1" as Ref<HulyMasterTag>
+
+const tagLabel = (value: string): HulyMasterTag["label"] => value as HulyMasterTag["label"]
 
 const makeSpace = (overrides?: Partial<HulyCardSpace>): HulyCardSpace =>
   ({
@@ -41,6 +45,8 @@ const makeTag = (overrides?: Partial<HulyMasterTag>): HulyMasterTag =>
     _id: TAG_ID,
     _class: cardPlugin.class.MasterTag,
     label: "Document",
+    kind: ClassifierKind.CLASS,
+    extends: cardPlugin.class.Card,
     ...overrides
   }) as unknown as HulyMasterTag
 
@@ -59,6 +65,17 @@ const makeCard = (overrides?: Partial<HulyCard>): HulyCard =>
     createdOn: 150,
     ...overrides
   }) as unknown as HulyCard
+
+const idMatches = (actual: unknown, query: unknown): boolean => {
+  if (query === undefined) return true
+  if (typeof query === "object" && query !== null && "$in" in query) {
+    return Array.isArray(query.$in) && query.$in.includes(actual)
+  }
+  return actual === query
+}
+
+const docMatches = (doc: object, query: Record<string, unknown>): boolean =>
+  Object.entries(query).every(([key, value]) => idMatches(Reflect.get(doc, key), value))
 
 interface Captures {
   findAll?: { class?: unknown; query?: Record<string, unknown> }
@@ -89,10 +106,14 @@ const buildLayer = (m: CardsMock) => {
       cap.findAll.class = _class
       cap.findAll.query = q
     }
-    if (_class === cardPlugin.class.CardSpace) return Effect.succeed(toFindResult([...spaces]))
-    if (_class === cardPlugin.class.MasterTag) return Effect.succeed(toFindResult([...masterTags]))
+    if (_class === cardPlugin.class.CardSpace) {
+      return Effect.succeed(toFindResult(spaces.filter((space) => docMatches(space, q))))
+    }
+    if (_class === cardPlugin.class.MasterTag || _class === core.class.Class) {
+      return Effect.succeed(toFindResult(masterTags.filter((tag) => docMatches(tag, q))))
+    }
     if (_class === cardPlugin.class.Card) {
-      return Effect.succeed(toFindResult(cards.filter((c) => c.space === q.space)))
+      return Effect.succeed(toFindResult(cards.filter((card) => docMatches(card, q))))
     }
     return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
@@ -248,6 +269,55 @@ describe("listMasterTags", () => {
       expect(result.total).toBe(1)
       expect(result.masterTags[0]).toEqual({ id: "tag-1", name: "Document" })
     }))
+
+  it.effect("includes master tags derived from the space's top-level types", () =>
+    Effect.gen(function*() {
+      const result = yield* listMasterTags({ cardSpace: SPACE }).pipe(
+        Effect.provide(buildLayer({
+          spaces: [makeSpace()],
+          masterTags: [
+            makeTag(),
+            makeTag({ _id: CHILD_TAG_ID, label: tagLabel("Character"), extends: TAG_ID })
+          ]
+        }))
+      )
+
+      expect(result.masterTags).toContainEqual({ id: "tag-child-1", name: "Character" })
+      expect(result.total).toBe(2)
+    }))
+
+  it.effect("falls back to the raw master tag label when the display label is empty", () =>
+    Effect.gen(function*() {
+      const result = yield* listMasterTags({ cardSpace: SPACE }).pipe(
+        Effect.provide(buildLayer({ spaces: [makeSpace()], masterTags: [makeTag({ label: tagLabel("") })] }))
+      )
+
+      expect(result.masterTags[0]).toEqual({ id: "tag-1", name: "" })
+    }))
+
+  it.effect("excludes classes outside the space type ancestry", () =>
+    Effect.gen(function*() {
+      const cycleA = "cycle-a" as Ref<HulyMasterTag>
+      const cycleB = "cycle-b" as Ref<HulyMasterTag>
+      const result = yield* listMasterTags({ cardSpace: SPACE }).pipe(
+        Effect.provide(buildLayer({
+          spaces: [makeSpace()],
+          masterTags: [
+            makeTag(),
+            makeTag({ _id: OTHER_TAG_ID, label: tagLabel("Other"), extends: cardPlugin.class.Card }),
+            makeTag({
+              _id: "missing-parent" as Ref<HulyMasterTag>,
+              label: tagLabel("Missing"),
+              extends: "missing" as never
+            }),
+            makeTag({ _id: cycleA, label: tagLabel("Cycle A"), extends: cycleB }),
+            makeTag({ _id: cycleB, label: tagLabel("Cycle B"), extends: cycleA })
+          ]
+        }))
+      )
+
+      expect(result.masterTags).toEqual([{ id: "tag-1", name: "Document" }])
+    }))
 })
 
 describe("listCards", () => {
@@ -307,6 +377,23 @@ describe("listCards", () => {
         Effect.provide(buildLayer({ spaces: [makeSpace()], masterTags: [makeTag()], cards: [makeCard()], captures }))
       )
       expect(captures.findAll?.query?._class).toBe(TAG_ID)
+    }))
+
+  it.effect("resolves the type filter by a derived master tag label", () =>
+    Effect.gen(function*() {
+      const captures: Captures = { findAll: {} }
+      yield* listCards({ cardSpace: SPACE, type: MasterTagIdentifier.make("Character") }).pipe(
+        Effect.provide(buildLayer({
+          spaces: [makeSpace()],
+          masterTags: [
+            makeTag(),
+            makeTag({ _id: CHILD_TAG_ID, label: tagLabel("Character"), extends: TAG_ID })
+          ],
+          cards: [makeCard({ _class: CHILD_TAG_ID })],
+          captures
+        }))
+      )
+      expect(captures.findAll?.query?._class).toBe(CHILD_TAG_ID)
     }))
 
   it.effect("applies a titleSearch (LIKE) filter, escaping wildcards", () =>
@@ -413,6 +500,26 @@ describe("createCard", () => {
       expect(captures.createDoc?.attributes?.parent).toBeNull()
       expect(captures.createDoc?.attributes?.parentInfo).toEqual([])
       expect(captures.uploadMarkup?.value).toBe("hello")
+    }))
+
+  it.effect("creates a card using a derived master tag id", () =>
+    Effect.gen(function*() {
+      const captures: Captures = { createDoc: {}, uploadMarkup: {} }
+      yield* createCard({
+        cardSpace: SPACE,
+        type: MasterTagIdentifier.make("tag-child-1"),
+        title: "New character"
+      }).pipe(Effect.provide(buildLayer({
+        spaces: [makeSpace()],
+        masterTags: [
+          makeTag(),
+          makeTag({ _id: CHILD_TAG_ID, label: tagLabel("Character"), extends: TAG_ID })
+        ],
+        captures
+      })))
+
+      expect(captures.createDoc?.class).toBe(CHILD_TAG_ID)
+      expect(captures.uploadMarkup?.value).toBe("")
     }))
 
   it.effect("creates a child card under a parent, threading parentInfo", () =>

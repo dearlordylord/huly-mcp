@@ -2349,15 +2349,79 @@ echo ""
 echo "=== 14. Cards ==="
 run_test "list_card_spaces" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_card_spaces","arguments":{}},"id":2}'
-run_test "list_master_tags(Default)" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_master_tags","arguments":{"cardSpace":"Default"}},"id":2}'
+CARDS_MASTER_TEXT=$(run_capture "list_master_tags(Default)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_master_tags","arguments":{"cardSpace":"Default"}},"id":2}')
 run_test "list_cards(Default)" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_cards","arguments":{"cardSpace":"Default","limit":3}},"id":2}'
-# Card CRUD requires a master tag; skip
-skip_test "create_card" "requires master tag"
-skip_test "get_card" "requires card"
+DERIVED_CARD_TYPE_NAME="Character"
+DERIVED_CARD_TYPE_ID=$(printf '%s\n' "$CARDS_MASTER_TEXT" | jq -r --arg name "$DERIVED_CARD_TYPE_NAME" \
+  '.masterTags[]? | select(.name == $name) | .id' 2>/dev/null | head -n 1)
+if [ -n "$DERIVED_CARD_TYPE_ID" ]; then
+  DERIVED_CARD_TYPE_NAME_JSON=$(json_string "$DERIVED_CARD_TYPE_NAME")
+  DERIVED_CARD_TYPE_ID_JSON=$(json_string "$DERIVED_CARD_TYPE_ID")
+  DERIVED_CARD_LABEL_TITLE="IntTest Derived Label Card $RUN_ID"
+  DERIVED_CARD_ID_TITLE="IntTest Derived Id Card $RUN_ID"
+  DERIVED_CARD_LABEL_TITLE_JSON=$(json_string "$DERIVED_CARD_LABEL_TITLE")
+  DERIVED_CARD_ID_TITLE_JSON=$(json_string "$DERIVED_CARD_ID_TITLE")
+
+  DERIVED_CARD_LABEL_TEXT=$(run_capture "create_card(derived label:$DERIVED_CARD_TYPE_NAME)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_card\",\"arguments\":{\"cardSpace\":\"Default\",\"type\":$DERIVED_CARD_TYPE_NAME_JSON,\"title\":$DERIVED_CARD_LABEL_TITLE_JSON,\"content\":\"Temporary derived card created by label.\"}},\"id\":2}")
+  if [ $? -eq 0 ]; then
+    DERIVED_CARD_LABEL_ID=$(printf '%s\n' "$DERIVED_CARD_LABEL_TEXT" | jq -r '.id // empty' 2>/dev/null)
+  else
+    DERIVED_CARD_LABEL_ID=""
+  fi
+  if [ -n "$DERIVED_CARD_LABEL_ID" ]; then
+    DERIVED_CARD_LABEL_ID_JSON=$(json_string "$DERIVED_CARD_LABEL_ID")
+    DERIVED_CARD_LABEL_GET_TEXT=$(run_capture "get_card(derived label:$DERIVED_CARD_LABEL_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_card\",\"arguments\":{\"cardSpace\":\"Default\",\"card\":$DERIVED_CARD_LABEL_ID_JSON}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "get_card derived label keeps type" "$DERIVED_CARD_LABEL_GET_TEXT" ".type" "$DERIVED_CARD_TYPE_ID"
+    fi
+    DERIVED_CARD_LIST_TEXT=$(run_capture "list_cards(Default,type:$DERIVED_CARD_TYPE_NAME)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"type\":$DERIVED_CARD_TYPE_NAME_JSON,\"limit\":10}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_array_contains "list_cards derived label includes card" "$DERIVED_CARD_LIST_TEXT" ".cards | map(.id)" "$DERIVED_CARD_LABEL_ID"
+    fi
+  else
+    fail_test "create_card(derived label:$DERIVED_CARD_TYPE_NAME) returns id" "missing id"
+  fi
+
+  DERIVED_CARD_ID_TEXT=$(run_capture "create_card(derived id:$DERIVED_CARD_TYPE_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_card\",\"arguments\":{\"cardSpace\":\"Default\",\"type\":$DERIVED_CARD_TYPE_ID_JSON,\"title\":$DERIVED_CARD_ID_TITLE_JSON,\"content\":\"Temporary derived card created by id.\"}},\"id\":2}")
+  if [ $? -eq 0 ]; then
+    DERIVED_CARD_ID_ID=$(printf '%s\n' "$DERIVED_CARD_ID_TEXT" | jq -r '.id // empty' 2>/dev/null)
+  else
+    DERIVED_CARD_ID_ID=""
+  fi
+  if [ -n "$DERIVED_CARD_ID_ID" ]; then
+    DERIVED_CARD_ID_ID_JSON=$(json_string "$DERIVED_CARD_ID_ID")
+    DERIVED_CARD_ID_GET_TEXT=$(run_capture "get_card(derived id:$DERIVED_CARD_ID_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_card\",\"arguments\":{\"cardSpace\":\"Default\",\"card\":$DERIVED_CARD_ID_ID_JSON}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "get_card derived id keeps type" "$DERIVED_CARD_ID_GET_TEXT" ".type" "$DERIVED_CARD_TYPE_ID"
+    fi
+  else
+    fail_test "create_card(derived id:$DERIVED_CARD_TYPE_ID) returns id" "missing id"
+  fi
+
+  if [ -n "$DERIVED_CARD_LABEL_ID" ]; then
+    run_test "delete_card(derived label:$DERIVED_CARD_LABEL_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_card\",\"arguments\":{\"cardSpace\":\"Default\",\"card\":\"$DERIVED_CARD_LABEL_ID\"}},\"id\":2}"
+  fi
+  if [ -n "$DERIVED_CARD_ID_ID" ]; then
+    run_test "delete_card(derived id:$DERIVED_CARD_ID_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_card\",\"arguments\":{\"cardSpace\":\"Default\",\"card\":\"$DERIVED_CARD_ID_ID\"}},\"id\":2}"
+  fi
+else
+  skip_test "create_card(derived label:Character)" "Default card space has no Character master tag"
+  skip_test "get_card(derived label)" "Default card space has no Character master tag"
+  skip_test "list_cards(Default,type:Character)" "Default card space has no Character master tag"
+  skip_test "create_card(derived id)" "Default card space has no Character master tag"
+  skip_test "get_card(derived id)" "Default card space has no Character master tag"
+  skip_test "delete_card(derived cards)" "Default card space has no Character master tag"
+fi
 skip_test "update_card" "requires card"
-skip_test "delete_card" "requires card"
 echo ""
 
 ##############################
