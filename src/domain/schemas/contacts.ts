@@ -52,7 +52,7 @@ const ListPersonsParamsBase = Schema.Struct({
   })),
   nameRegex: Schema.optional(Schema.String.annotations({
     description:
-      "Filter persons by name using a regex pattern (e.g., '^Smith'). Mutually exclusive with nameSearch. Note: regex support depends on the Huly backend; use nameSearch for broader compatibility."
+      "Filter persons by name using a JavaScript regex pattern (e.g., '^Smith'). Mutually exclusive with nameSearch; use nameSearch for simple substring matching."
   })),
   emailSearch: Schema.optional(Schema.String.annotations({
     description: "Search persons by email substring (case-insensitive)"

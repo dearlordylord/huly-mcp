@@ -3,6 +3,7 @@ import { Effect } from "effect"
 
 import { DEFAULT_LIMIT, MAX_LIMIT } from "../../domain/schemas/shared.js"
 import type { HulyClientError, HulyClientOperations } from "../client.js"
+import { HulyError } from "../errors-base.js"
 
 export type StrictDocumentQuery<T extends Doc> =
   & {
@@ -23,6 +24,48 @@ export const escapeLikeWildcards = (input: string): string =>
     .replace(/\\/g, "\\\\")
     .replace(/%/g, "\\%")
     .replace(/_/g, "\\_")
+
+type RegexParameterName = "nameRegex" | "titleRegex"
+
+const compileUserRegex = (
+  pattern: string,
+  parameterName: RegexParameterName
+): Effect.Effect<RegExp, HulyError> =>
+  Effect.try({
+    try: () => new RegExp(pattern),
+    catch: (cause) =>
+      new HulyError({
+        message: `Invalid ${parameterName}: ${String(cause)}`,
+        cause
+      })
+  })
+
+export const compileOptionalUserRegex = (
+  pattern: string | undefined,
+  parameterName: RegexParameterName
+): Effect.Effect<RegExp | undefined, HulyError> =>
+  pattern !== undefined && pattern.trim() !== ""
+    ? compileUserRegex(pattern, parameterName)
+    : Effect.succeed(undefined)
+
+export const filterByRegex = <T>(
+  items: ReadonlyArray<T>,
+  regex: RegExp | undefined,
+  getValue: (item: T) => string
+): Array<T> => {
+  if (regex === undefined) return [...items]
+  const statelessRegex = new RegExp(regex.source, regex.flags.replace(/[gy]/g, ""))
+  return items.filter((item) => statelessRegex.test(getValue(item)))
+}
+
+export const findOptionsForOptionalRegex = <T extends Doc>(
+  limit: number,
+  sort: NonNullable<FindOptions<T>["sort"]>,
+  regex: RegExp | undefined
+): FindOptions<T> =>
+  regex === undefined
+    ? { limit, sort }
+    : { sort }
 
 /**
  * Add lookup to FindOptions for relationship joins.

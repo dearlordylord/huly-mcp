@@ -59,7 +59,7 @@ const ListDocumentsParamsBase = Schema.Struct({
   })),
   titleRegex: Schema.optional(Schema.String.annotations({
     description:
-      "Filter documents by title using a regex pattern (e.g., '^RFC'). Mutually exclusive with titleSearch. Note: regex support depends on the Huly backend; use titleSearch for broader compatibility."
+      "Filter documents by title using a JavaScript regex pattern (e.g., '^RFC'). Mutually exclusive with titleSearch; use titleSearch for simple substring matching."
   })),
   contentSearch: Schema.optional(Schema.String.annotations({
     description: "Search documents by content (fulltext search)"

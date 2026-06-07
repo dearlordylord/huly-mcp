@@ -28,6 +28,27 @@ const makeSocialIdentity = (overrides?: Partial<SocialIdentity>): SocialIdentity
   return result
 }
 
+const makeChannel = (overrides?: Partial<HulyChannel>): HulyChannel => {
+  const result: HulyChannel = {
+    _id: "channel-1" as Ref<HulyChannel>,
+    _class: chunter.class.Channel,
+    space: "space-1" as Ref<Space>,
+    name: "general",
+    topic: "",
+    description: "",
+    private: false,
+    archived: false,
+    members: [],
+    messages: 0,
+    modifiedBy: "user-1" as PersonId,
+    modifiedOn: 0,
+    createdBy: "user-1" as PersonId,
+    createdOn: 0,
+    ...overrides
+  }
+  return result
+}
+
 interface MockConfig {
   channels?: Array<HulyChannel>
   socialIdentities?: Array<SocialIdentity>
@@ -151,17 +172,22 @@ describe("listChannels - nameSearch branch (line 214)", () => {
 })
 
 describe("listChannels - nameRegex branch", () => {
-  it.effect("applies nameRegex filter to query", () =>
+  it.effect("applies nameRegex locally", () =>
     Effect.gen(function*() {
       const captureQuery: MockConfig["captureChannelQuery"] = {}
       const testLayer = createTestLayerWithMocks({
-        channels: [],
+        channels: [
+          makeChannel({ _id: "channel-dev" as Ref<HulyChannel>, name: "dev-alpha" }),
+          makeChannel({ _id: "channel-prod" as Ref<HulyChannel>, name: "prod-alpha" })
+        ],
         captureChannelQuery: captureQuery
       })
 
-      yield* listChannels({ nameRegex: "^dev-" }).pipe(Effect.provide(testLayer))
+      const result = yield* listChannels({ nameRegex: "^dev-" }).pipe(Effect.provide(testLayer))
 
-      expect(captureQuery.query?.name).toEqual({ $regex: "^dev-" })
+      expect(captureQuery.query?.name).toBeUndefined()
+      expect(captureQuery.options?.limit).toBeUndefined()
+      expect(result.map(channel => channel.id)).toEqual(["channel-dev"])
     }))
 
   it.effect("skips nameRegex when blank", () =>

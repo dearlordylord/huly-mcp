@@ -1,6 +1,12 @@
 import { describe, it } from "@effect/vitest"
 import type { Attribute, Class, Doc, FindResult, PersonId, Ref, Space, Status } from "@hcengineering/core"
-import { type Issue as HulyIssue, type Project as HulyProject, TimeReportDayType } from "@hcengineering/tracker"
+import type { TaskType } from "@hcengineering/task"
+import {
+  type Issue as HulyIssue,
+  type IssueStatus,
+  type Project as HulyProject,
+  TimeReportDayType
+} from "@hcengineering/tracker"
 import type { ParseResult } from "effect"
 import { Effect, Exit, Schema } from "effect"
 import { expect } from "vitest"
@@ -42,6 +48,41 @@ const makeStatus = (overrides?: Partial<Status>): Status => {
     space: "space-1" as Ref<Space>,
     ofAttribute: "tracker:attribute:IssueStatus" as Ref<Attribute<Status>>,
     name: "Open",
+    modifiedBy: "user-1" as PersonId,
+    modifiedOn: 0,
+    createdBy: "user-1" as PersonId,
+    createdOn: 0,
+    ...overrides
+  }
+  return result
+}
+
+const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => {
+  const result: HulyIssue = {
+    _id: "issue-1" as Ref<HulyIssue>,
+    _class: tracker.class.Issue,
+    space: "project-1" as Ref<HulyProject>,
+    identifier: "TEST-1",
+    title: "Test Issue",
+    description: null,
+    status: "status-open" as Ref<IssueStatus>,
+    priority: 3,
+    assignee: null,
+    kind: "task-type-1" as Ref<TaskType>,
+    number: 1,
+    dueDate: null,
+    rank: "0|aaa",
+    attachedTo: "no-parent" as Ref<HulyIssue>,
+    attachedToClass: tracker.class.Issue,
+    collection: "subIssues",
+    component: null,
+    subIssues: 0,
+    parents: [],
+    estimation: 0,
+    remainingTime: 0,
+    reportedTime: 0,
+    reports: 0,
+    childInfo: [],
     modifiedBy: "user-1" as PersonId,
     modifiedOn: 0,
     createdBy: "user-1" as PersonId,
@@ -124,19 +165,26 @@ describe("listIssues filters", () => {
   const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
   describe("titleRegex", () => {
-    it.effect("builds $regex query", () =>
+    it.effect("applies titleRegex locally", () =>
       Effect.gen(function*() {
         const captureQuery: MockConfig["captureIssueQuery"] = {}
         const testLayer = createTestLayer({
           projects: [project],
-          issues: [],
+          issues: [
+            makeIssue({ _id: "issue-bug" as Ref<HulyIssue>, identifier: "TEST-1", title: "BUG: parser" }),
+            makeIssue({ _id: "issue-task" as Ref<HulyIssue>, identifier: "TEST-2", title: "TASK: parser" })
+          ],
           statuses,
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: projectIdentifier("TEST"), titleRegex: "^BUG" }).pipe(Effect.provide(testLayer))
+        const result = yield* listIssues({ project: projectIdentifier("TEST"), titleRegex: "^BUG" }).pipe(
+          Effect.provide(testLayer)
+        )
 
-        expect(captureQuery.query?.title).toEqual({ $regex: "^BUG" })
+        expect(captureQuery.query?.title).toBeUndefined()
+        expect(captureQuery.options?.limit).toBeUndefined()
+        expect(result.map(issue => issue.issueId)).toEqual(["issue-bug"])
       }))
 
     it.effect("ignores empty titleRegex", () =>

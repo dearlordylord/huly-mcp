@@ -39,11 +39,17 @@ import type {
 import { UPDATE_CHANNEL_FIELDS } from "../../domain/schemas/channels.js"
 import { AccountUuid, ChannelId, ChannelName, Count, MessageId, PersonName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import type { ChannelNotFoundError, NoUpdateFieldsError } from "../errors.js"
+import type { ChannelNotFoundError, HulyError, NoUpdateFieldsError } from "../errors.js"
 import { findChannel } from "./channels-shared.js"
 import { listTotal, optionalCount } from "./counts.js"
 import { markdownToMarkupString, markupToMarkdownString } from "./markup.js"
-import { clampLimit, escapeLikeWildcards } from "./query-helpers.js"
+import {
+  clampLimit,
+  compileOptionalUserRegex,
+  escapeLikeWildcards,
+  filterByRegex,
+  findOptionsForOptionalRegex
+} from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import {
   type DirectOrUnsetUpdateEntry,
@@ -58,7 +64,7 @@ export { deleteChannelMessage, updateChannelMessage } from "./channels-messages.
 
 // --- Error Types ---
 
-type ListChannelsError = HulyClientError
+type ListChannelsError = HulyClientError | HulyError
 
 type GetChannelError =
   | HulyClientError
@@ -186,6 +192,7 @@ export const listChannels = (
 ): Effect.Effect<Array<ChannelSummary>, ListChannelsError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
+    const nameRegex = yield* compileOptionalUserRegex(params.nameRegex, "nameRegex")
 
     const query: DocumentQuery<HulyChannel> = {}
     if (!params.includeArchived) {
@@ -196,28 +203,25 @@ export const listChannels = (
       query.name = { $like: `%${escapeLikeWildcards(params.nameSearch)}%` }
     }
 
-    if (params.nameRegex !== undefined && params.nameRegex.trim() !== "") {
-      query.name = { $regex: params.nameRegex }
-    }
-
     if (params.topicSearch !== undefined && params.topicSearch.trim() !== "") {
       query.topic = { $like: `%${escapeLikeWildcards(params.topicSearch)}%` }
     }
 
     const limit = clampLimit(params.limit)
+    const findOptions = findOptionsForOptionalRegex<HulyChannel>(
+      limit,
+      { name: SortingOrder.Ascending },
+      nameRegex
+    )
 
     const channels = yield* client.findAll<HulyChannel>(
       chunter.class.Channel,
       query,
-      {
-        limit,
-        sort: {
-          name: SortingOrder.Ascending
-        }
-      }
+      findOptions
     )
+    const filteredChannels = filterByRegex(channels, nameRegex, (channel) => channel.name).slice(0, limit)
 
-    const summaries: Array<ChannelSummary> = channels.map((ch) => ({
+    const summaries: Array<ChannelSummary> = filteredChannels.map((ch) => ({
       id: ChannelId.make(ch._id),
       name: ChannelName.make(ch.name),
       topic: ch.topic || undefined,

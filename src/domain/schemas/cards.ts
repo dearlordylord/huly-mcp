@@ -82,7 +82,7 @@ const ListCardsParamsBase = Schema.Struct({
   })),
   titleRegex: Schema.optional(Schema.String.annotations({
     description:
-      "Filter cards by title using a regex pattern (e.g., '^TODO'). Mutually exclusive with titleSearch. Note: regex support depends on the Huly backend; use titleSearch for broader compatibility."
+      "Filter cards by title using a JavaScript regex pattern (e.g., '^TODO'). Mutually exclusive with titleSearch; use titleSearch for simple substring matching."
   })),
   contentSearch: Schema.optional(Schema.String.annotations({
     description: "Search cards by content (fulltext search)"

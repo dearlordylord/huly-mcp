@@ -46,6 +46,7 @@ import {
   type DocumentContentCorruptedError,
   DocumentNotFoundError,
   type DocumentReferenceError,
+  type HulyError,
   type IssueNotFoundError,
   type NoUpdateFieldsError,
   type PersonIdentifierAmbiguousError,
@@ -59,8 +60,11 @@ import { renderDocumentContentForWrite } from "./document-native-references.js"
 import { fetchReadableDocumentContent, findTeamspace, findTeamspaceAndDocument } from "./documents-shared.js"
 import {
   clampLimit,
+  compileOptionalUserRegex,
   escapeLikeWildcards,
+  filterByRegex,
   findByNameOrId,
+  findOptionsForOptionalRegex,
   hulyQuery,
   type StrictDocumentQuery
 } from "./query-helpers.js"
@@ -91,6 +95,7 @@ type DeleteTeamspaceError =
 
 type ListDocumentsError =
   | HulyClientError
+  | HulyError
   | TeamspaceNotFoundError
 
 type GetDocumentError =
@@ -298,6 +303,7 @@ export const listDocuments = (
     const { client, teamspace } = yield* findTeamspace(params.teamspace)
 
     const limit = clampLimit(params.limit)
+    const titleRegex = yield* compileOptionalUserRegex(params.titleRegex, "titleRegex")
 
     const query: StrictDocumentQuery<HulyDocument> = {
       space: teamspace._id
@@ -307,28 +313,27 @@ export const listDocuments = (
       query.title = { $like: `%${escapeLikeWildcards(params.titleSearch)}%` }
     }
 
-    if (params.titleRegex !== undefined && params.titleRegex.trim() !== "") {
-      query.title = { $regex: params.titleRegex }
-    }
-
     if (params.contentSearch !== undefined && params.contentSearch.trim() !== "") {
       query.$search = params.contentSearch
     }
 
+    const findOptions = findOptionsForOptionalRegex<HulyDocument>(
+      limit,
+      { modifiedOn: SortingOrder.Descending },
+      titleRegex
+    )
+
     const documents = yield* client.findAll<HulyDocument>(
       documentPlugin.class.Document,
       hulyQuery(query),
-      {
-        limit,
-        sort: {
-          modifiedOn: SortingOrder.Descending
-        }
-      }
+      findOptions
     )
 
-    const total = documents.total
+    const matchingDocuments = filterByRegex(documents, titleRegex, (doc) => doc.title)
+    const limitedDocuments = matchingDocuments.slice(0, limit)
+    const total = titleRegex === undefined ? documents.total : matchingDocuments.length
 
-    const summaries: Array<DocumentSummary> = documents.map((doc) => ({
+    const summaries: Array<DocumentSummary> = limitedDocuments.map((doc) => ({
       id: DocumentId.make(doc._id),
       title: doc.title,
       teamspace: teamspace.name,

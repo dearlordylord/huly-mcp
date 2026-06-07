@@ -27,6 +27,8 @@ import {
 } from "../../../src/huly/operations/issues-shared.js"
 import {
   clampLimit,
+  compileOptionalUserRegex,
+  filterByRegex,
   findByNameOrId,
   findByNameOrIdOrFail,
   findOneOrFail
@@ -339,6 +341,34 @@ describe("operations helpers", () => {
 
     it("clamps to MAX_LIMIT (200) when over", () => {
       expect(clampLimit(500)).toBe(200)
+    })
+  })
+
+  describe("regex helpers", () => {
+    it.effect("compiles a non-empty user regex", () =>
+      Effect.gen(function*() {
+        const regex = yield* compileOptionalUserRegex("^TODO", "titleRegex")
+        expect(regex?.test("TODO item")).toBe(true)
+        expect(regex?.test("DONE item")).toBe(false)
+      }))
+
+    it.effect("returns undefined for a blank user regex", () =>
+      Effect.gen(function*() {
+        const regex = yield* compileOptionalUserRegex("   ", "titleRegex")
+        expect(regex).toBeUndefined()
+      }))
+
+    it.effect("fails with HulyError for an invalid user regex", () =>
+      Effect.gen(function*() {
+        const error = yield* Effect.flip(compileOptionalUserRegex("(", "titleRegex"))
+        expect(error._tag).toBe("HulyError")
+        expect(error.message).toContain("Invalid titleRegex")
+      }))
+
+    it("filters values with a compiled regex and resets regex state", () => {
+      const regex = /a/g
+      const values = filterByRegex(["alpha", "beta", "sky"], regex, value => value)
+      expect(values).toEqual(["alpha", "beta"])
     })
   })
 

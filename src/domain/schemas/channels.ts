@@ -66,7 +66,7 @@ const ListChannelsParamsBase = Schema.Struct({
   })),
   nameRegex: Schema.optional(Schema.String.annotations({
     description:
-      "Filter channels by name using a regex pattern (e.g., '^dev-'). Mutually exclusive with nameSearch. Note: regex support depends on the Huly backend; use nameSearch for broader compatibility."
+      "Filter channels by name using a JavaScript regex pattern (e.g., '^dev-'). Mutually exclusive with nameSearch; use nameSearch for simple substring matching."
   })),
   topicSearch: Schema.optional(Schema.String.annotations({
     description: "Search channels by topic substring (case-insensitive)"
