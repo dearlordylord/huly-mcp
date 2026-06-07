@@ -35,12 +35,10 @@ import type {
   TestCaseSummary,
   TestProjectSummary,
   TestSuiteSummary,
-  UpdateTestCaseParams,
-  UpdateTestCaseResult,
   UpdateTestSuiteParams,
   UpdateTestSuiteResult
 } from "../../domain/schemas/test-management-core.js"
-import { UPDATE_TEST_CASE_FIELDS, UPDATE_TEST_SUITE_FIELDS } from "../../domain/schemas/test-management-core.js"
+import { UPDATE_TEST_SUITE_FIELDS } from "../../domain/schemas/test-management-core.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type {
   NoUpdateFieldsError,
@@ -67,14 +65,16 @@ import {
   findTestProject,
   findTestSuite,
   resolveAssignee,
-  stringToTestCasePriority,
-  stringToTestCaseStatus,
-  stringToTestCaseType,
+  resolveCasePriority,
+  resolveCaseStatus,
+  resolveCaseType,
   testCasePriorityToString,
   testCaseStatusToString,
   testCaseTypeToString
 } from "./test-management-shared.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
+
+export { updateTestCase } from "./test-management-case-update.js"
 
 type ListTestProjectsError = HulyClientError
 type ListTestSuitesError = HulyClientError | TestProjectNotFoundError | TestSuiteNotFoundError
@@ -85,39 +85,7 @@ type DeleteTestSuiteError = HulyClientError | TestProjectNotFoundError | TestSui
 type ListTestCasesError = HulyClientError | TestProjectNotFoundError | TestSuiteNotFoundError | PersonNotFoundError
 type GetTestCaseError = HulyClientError | TestProjectNotFoundError | TestCaseNotFoundError
 type CreateTestCaseError = HulyClientError | TestProjectNotFoundError | TestSuiteNotFoundError | PersonNotFoundError
-type UpdateTestCaseError =
-  | HulyClientError
-  | NoUpdateFieldsError
-  | TestProjectNotFoundError
-  | TestCaseNotFoundError
-  | PersonNotFoundError
 type DeleteTestCaseError = HulyClientError | TestProjectNotFoundError | TestCaseNotFoundError
-
-// params.type/priority/status are schema-validated (Literal unions) to known strings, all of which
-// map, so the default fallbacks below only guard the converters' `| undefined` return types.
-const resolveCaseType = (value: string): TestCaseType => {
-  const resolved = stringToTestCaseType(value)
-  /* v8 ignore start -- unreachable: value is schema-validated to a known TestCaseType string */
-  if (resolved === undefined) return TestCaseType.Functional
-  /* v8 ignore stop */
-  return resolved
-}
-
-const resolveCasePriority = (value: string): TestCasePriority => {
-  const resolved = stringToTestCasePriority(value)
-  /* v8 ignore start -- unreachable: value is schema-validated to a known TestCasePriority string */
-  if (resolved === undefined) return TestCasePriority.Medium
-  /* v8 ignore stop */
-  return resolved
-}
-
-const resolveCaseStatus = (value: string): TestCaseStatus => {
-  const resolved = stringToTestCaseStatus(value)
-  /* v8 ignore start -- unreachable: value is schema-validated to a known TestCaseStatus string */
-  if (resolved === undefined) return TestCaseStatus.Draft
-  /* v8 ignore stop */
-  return resolved
-}
 
 const toProjectSummary = (p: TestProject): TestProjectSummary => {
   const result: TestProjectSummary = {
@@ -285,18 +253,16 @@ export const updateTestSuite = (
     const project = yield* findTestProject(client, params.project)
     const suite = yield* findTestSuite(client, project, params.suite)
 
-    const updateOps: DocumentUpdate<TestSuite> = {}
-
-    if (params.name !== undefined) {
-      updateOps.name = params.name
-    }
-    if (params.description !== undefined) {
-      if (params.description === null) {
-        updateOps.$unset = { ...updateOps.$unset, description: "" }
-      } else {
-        updateOps.description = params.description
-      }
-    }
+    type UpdateTestSuiteField = typeof UPDATE_TEST_SUITE_FIELDS[number]
+    const updateEntries = {
+      name: params.name === undefined ? {} : { name: params.name },
+      description: params.description === undefined
+        ? {}
+        : params.description === null
+        ? { $unset: { description: "" } }
+        : { description: params.description }
+    } satisfies Record<UpdateTestSuiteField, DocumentUpdate<TestSuite>>
+    const updateOps = mergeUpdateEntries(Object.values(updateEntries))
 
     yield* client.updateDoc(
       testManagement.class.TestSuite,
@@ -441,59 +407,6 @@ export const createTestCase = (
     )
 
     return { id: TestCaseId.make(caseId), name: params.name, created: true }
-  })
-
-// --- Update Test Case ---
-
-export const updateTestCase = (
-  params: UpdateTestCaseParams
-): Effect.Effect<UpdateTestCaseResult, UpdateTestCaseError, HulyClient> =>
-  Effect.gen(function*() {
-    yield* requireUpdateFields("update_test_case", params, UPDATE_TEST_CASE_FIELDS)
-
-    const client = yield* HulyClient
-    const project = yield* findTestProject(client, params.project)
-    const tc = yield* findTestCase(client, project, params.testCase)
-
-    const ops: Record<string, unknown> = {}
-
-    if (params.name !== undefined) {
-      ops.name = params.name
-    }
-    if (params.description !== undefined) {
-      if (params.description === null) {
-        ops.description = null
-      } else {
-        ops.description = yield* client.uploadMarkup(
-          testManagement.class.TestCase,
-          tc._id,
-          "description",
-          params.description,
-          "markdown"
-        )
-      }
-    }
-    if (params.type !== undefined) ops.type = resolveCaseType(params.type)
-    if (params.priority !== undefined) ops.priority = resolveCasePriority(params.priority)
-    if (params.status !== undefined) ops.status = resolveCaseStatus(params.status)
-    if (params.assignee !== undefined) {
-      if (params.assignee === null) {
-        ops.assignee = null
-      } else {
-        const person = yield* resolveAssignee(params.assignee)
-        ops.assignee = toRef<Employee>(person._id)
-      }
-    }
-
-    yield* client.updateDoc(
-      testManagement.class.TestCase,
-      project._id,
-      tc._id,
-      // eslint-disable-next-line no-restricted-syntax -- DocumentUpdate<TestCase> SDK boundary, no typed constructor
-      ops as DocumentUpdate<TestCase>
-    )
-
-    return { id: TestCaseId.make(tc._id), updated: true }
   })
 
 // --- Delete Test Case ---

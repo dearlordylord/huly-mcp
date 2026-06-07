@@ -43,7 +43,7 @@ import { batchGetEmailsForPersons, findPersonByEmail, findPersonById } from "./c
 import { toChannelProviderRef } from "./organization-channel-providers.js"
 import { clampLimit } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 type ListOrganizationsError = HulyClientError
 type CreateOrganizationError = HulyClientError | PersonNotFoundError
@@ -258,32 +258,31 @@ export const updateOrganization = (
       return yield* new OrganizationNotFoundError({ identifier: params.identifier })
     }
 
-    const updateOps: DocumentUpdate<HulyOrganization> = {}
-
-    if (params.name !== undefined) {
-      updateOps.name = params.name
-    }
-    if (params.city !== undefined) {
-      updateOps.city = params.city === null ? "" : params.city
-    }
-    yield* Effect.gen(function*() {
-      if (params.description === undefined) return
-      if (params.description === null || params.description === "") {
-        updateOps.description = null
-        return
-      }
-      if (org.description !== null) {
-        yield* client.updateMarkup(contact.class.Organization, org._id, "description", params.description, "markdown")
-        return
-      }
-      updateOps.description = yield* client.uploadMarkup(
-        contact.class.Organization,
-        org._id,
-        "description",
-        params.description,
-        "markdown"
-      )
-    })
+    type UpdateOrganizationField = typeof UPDATE_ORGANIZATION_FIELDS[number]
+    const updateEntries = {
+      name: Effect.succeed(params.name === undefined ? {} : { name: params.name }),
+      city: Effect.succeed(params.city === undefined ? {} : { city: params.city === null ? "" : params.city }),
+      description: Effect.gen(function*() {
+        if (params.description === undefined) return {}
+        if (params.description === null || params.description === "") {
+          return { description: null }
+        }
+        if (org.description !== null) {
+          yield* client.updateMarkup(contact.class.Organization, org._id, "description", params.description, "markdown")
+          return {}
+        }
+        return {
+          description: yield* client.uploadMarkup(
+            contact.class.Organization,
+            org._id,
+            "description",
+            params.description,
+            "markdown"
+          )
+        }
+      })
+    } satisfies Record<UpdateOrganizationField, Effect.Effect<DocumentUpdate<HulyOrganization>, HulyClientError>>
+    const updateOps = mergeUpdateEntries(yield* Effect.all(Object.values(updateEntries)))
 
     if (Object.keys(updateOps).length > 0) {
       yield* client.updateDoc(

@@ -42,7 +42,7 @@ import { cardPlugin } from "../huly-plugins.js"
 import { listTotal, optionalCount } from "./counts.js"
 import { clampLimit, escapeLikeWildcards, findByNameOrId } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 type ListCardSpacesError = HulyClientError
 
@@ -397,24 +397,17 @@ export const updateCard = (
       cardSpace: params.cardSpace
     })
 
-    const updateOps: DocumentUpdate<HulyCard> = {}
-
-    if (params.title !== undefined) {
-      updateOps.title = params.title
-    }
-
-    if (params.content !== undefined) {
-      // Card.content is non-nullable MarkupBlobRef (unlike Document.content which can be null).
-      // Empty string clears the content blob rather than nulling the field.
-      if (card.content) {
-        yield* client.updateMarkup(
-          card._class,
-          card._id,
-          "content",
-          params.content,
-          "markdown"
-        )
-      } else {
+    type UpdateCardField = typeof UPDATE_CARD_FIELDS[number]
+    const updateEntries = {
+      title: Effect.succeed(params.title === undefined ? {} : { title: params.title }),
+      content: Effect.gen(function*() {
+        if (params.content === undefined) return {}
+        // Card.content is non-nullable MarkupBlobRef (unlike Document.content which can be null).
+        // Empty string clears the content blob rather than nulling the field.
+        if (card.content) {
+          yield* client.updateMarkup(card._class, card._id, "content", params.content, "markdown")
+          return {}
+        }
         const contentMarkupRef = yield* client.uploadMarkup(
           card._class,
           card._id,
@@ -422,9 +415,10 @@ export const updateCard = (
           params.content,
           "markdown"
         )
-        updateOps.content = contentMarkupRef
-      }
-    }
+        return { content: contentMarkupRef }
+      })
+    } satisfies Record<UpdateCardField, Effect.Effect<DocumentUpdate<HulyCard>, HulyClientError>>
+    const updateOps = mergeUpdateEntries(yield* Effect.all(Object.values(updateEntries)))
 
     if (Object.keys(updateOps).length > 0) {
       yield* client.updateDoc(

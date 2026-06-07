@@ -42,7 +42,7 @@ import {
 } from "./issues-shared.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 type CreateIssueError =
   | HulyClientError
@@ -401,27 +401,21 @@ export const updateIssue = (
         params.project
       )
 
-    const updateOps: DocumentUpdate<HulyIssue> = {}
-    let descriptionUpdatedInPlace = false
+    const descriptionUpdatedInPlace = params.description !== undefined
+      && params.description.trim() !== ""
+      && Boolean(issue.description)
 
-    if (params.title !== undefined) {
-      updateOps.title = params.title
-    }
-
-    if (params.description !== undefined) {
-      if (params.description.trim() === "") {
-        updateOps.description = null
-      } else if (issue.description) {
-        // Issue already has description - update in place
-        yield* client.updateMarkup(
-          tracker.class.Issue,
-          issue._id,
-          "description",
-          params.description,
-          "markdown"
-        )
-        descriptionUpdatedInPlace = true
-      } else {
+    type UpdateIssueField = typeof UPDATE_ISSUE_FIELDS[number]
+    const updateEntries = {
+      title: Effect.succeed(params.title === undefined ? {} : { title: params.title }),
+      description: Effect.gen(function*() {
+        if (params.description === undefined) return {}
+        if (params.description.trim() === "") return { description: null }
+        if (issue.description) {
+          // Issue already has description - update in place
+          yield* client.updateMarkup(tracker.class.Issue, issue._id, "description", params.description, "markdown")
+          return {}
+        }
         // Issue has no description yet - create new
         const descriptionMarkupRef = yield* client.uploadMarkup(
           tracker.class.Issue,
@@ -430,42 +424,35 @@ export const updateIssue = (
           params.description,
           "markdown"
         )
-        updateOps.description = descriptionMarkupRef
-      }
-    }
-
-    if (taskTypeWorkflow !== undefined) {
-      const nextStatus = yield* chooseStatusForTaskType(taskTypeWorkflow, params.status, issue.status, params.project)
-      if (taskTypeWorkflow.taskType._id !== issue.kind) {
-        updateOps.kind = taskTypeWorkflow.taskType._id
-      }
-      if (nextStatus !== issue.status) {
-        updateOps.status = nextStatus
-      }
-    } else if (params.status !== undefined) {
-      updateOps.status = yield* resolveStatusByName(workflowData.statuses, params.status, params.project)
-    }
-
-    if (params.priority !== undefined) {
-      updateOps.priority = stringToPriority(params.priority)
-    }
-
-    if (params.assignee !== undefined) {
-      if (params.assignee === null) {
-        updateOps.assignee = null
-      } else {
+        return { description: descriptionMarkupRef }
+      }),
+      priority: Effect.succeed(params.priority === undefined ? {} : { priority: stringToPriority(params.priority) }),
+      assignee: Effect.gen(function*() {
+        if (params.assignee === undefined) return {}
+        if (params.assignee === null) return { assignee: null }
         const person = yield* resolveAssignee(client, params.assignee)
-        updateOps.assignee = person._id
-      }
-    }
-
-    if (params.dueDate !== undefined) {
-      updateOps.dueDate = params.dueDate
-    }
-
-    if (params.estimation !== undefined) {
-      updateOps.estimation = params.estimation ?? 0
-    }
+        return { assignee: person._id }
+      }),
+      status: Effect.gen(function*() {
+        if (taskTypeWorkflow !== undefined || params.status === undefined) return {}
+        return { status: yield* resolveStatusByName(workflowData.statuses, params.status, params.project) }
+      }),
+      taskType: Effect.gen(function*() {
+        if (taskTypeWorkflow === undefined) return {}
+        const nextStatus = yield* chooseStatusForTaskType(taskTypeWorkflow, params.status, issue.status, params.project)
+        const taskTypeOps: DocumentUpdate<HulyIssue> = mergeUpdateEntries([
+          taskTypeWorkflow.taskType._id === issue.kind ? {} : { kind: taskTypeWorkflow.taskType._id },
+          nextStatus === issue.status ? {} : { status: nextStatus }
+        ])
+        return taskTypeOps
+      }),
+      dueDate: Effect.succeed(params.dueDate === undefined ? {} : { dueDate: params.dueDate }),
+      estimation: Effect.succeed(params.estimation === undefined ? {} : { estimation: params.estimation ?? 0 })
+    } satisfies Record<
+      UpdateIssueField,
+      Effect.Effect<DocumentUpdate<HulyIssue>, HulyClientError | HulyError | InvalidStatusError | PersonNotFoundError>
+    >
+    const updateOps = mergeUpdateEntries(yield* Effect.all(Object.values(updateEntries)))
 
     if (Object.keys(updateOps).length === 0 && !descriptionUpdatedInPlace) {
       return { identifier: IssueIdentifier.make(issue.identifier), updated: false }

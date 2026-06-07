@@ -25,7 +25,7 @@ import {
   updateSpaceDoc,
   type UpdateSpaceError
 } from "./spaces-shared.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 type MemberListMutation = (
   currentMembers: ReadonlyArray<HulyAccountUuid>,
@@ -48,6 +48,34 @@ const mutateSpaceMembers = (
     return { id: SpaceId.make(space._id), members: nextMembers.map((member) => AccountUuid.make(member)), changed }
   })
 
+type UpdateSpaceField = typeof UPDATE_SPACE_FIELDS[number]
+
+type EmptyUpdateSpaceEntry = {
+  readonly [K in UpdateSpaceField]?: never
+}
+
+type UpdateSpaceEntry<K extends UpdateSpaceField> =
+  | EmptyUpdateSpaceEntry
+  | {
+    readonly [P in K]: Exclude<UpdateSpaceParams[P], undefined>
+  }
+
+type UpdateSpaceEntries = {
+  readonly [K in UpdateSpaceField]: UpdateSpaceEntry<K>
+}
+
+const buildUpdateSpaceOperations = (params: UpdateSpaceParams): DocumentUpdate<GenericSpace> => {
+  const updateEntries = {
+    name: params.name === undefined ? {} : { name: params.name },
+    description: params.description === undefined ? {} : { description: params.description },
+    private: params.private === undefined ? {} : { private: params.private },
+    archived: params.archived === undefined ? {} : { archived: params.archived },
+    autoJoin: params.autoJoin === undefined ? {} : { autoJoin: params.autoJoin }
+  } satisfies UpdateSpaceEntries
+
+  return mergeUpdateEntries(Object.values(updateEntries))
+}
+
 export const updateSpace = (
   params: UpdateSpaceParams
 ): Effect.Effect<UpdateSpaceResult, UpdateSpaceError, HulyClient> =>
@@ -56,14 +84,7 @@ export const updateSpace = (
     const client = yield* HulyClient
     const space = yield* findSpace(client, params)
 
-    const operations: DocumentUpdate<GenericSpace> = {}
-    if (params.name !== undefined) operations.name = params.name
-    if (params.description !== undefined) operations.description = params.description
-    if (params.private !== undefined) operations.private = params.private
-    if (params.archived !== undefined) operations.archived = params.archived
-    if (params.autoJoin !== undefined) operations.autoJoin = params.autoJoin
-
-    yield* updateSpaceDoc(client, space, operations)
+    yield* updateSpaceDoc(client, space, buildUpdateSpaceOperations(params))
     return { id: SpaceId.make(space._id), updated: true }
   })
 

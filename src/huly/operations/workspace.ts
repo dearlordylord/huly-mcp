@@ -43,7 +43,7 @@ import type { InvalidPersonUuidError, NoUpdateFieldsError } from "../errors.js"
 import { WorkspaceClient, type WorkspaceClientError } from "../workspace-client.js"
 import { clampLimit } from "./query-helpers.js"
 import { validatePersonUuid } from "./sdk-boundary.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 // Exhaustive map guarantees compile-time alignment between AccountRole literals and HulyAccountRole enum.
 // If either side adds a value, TS will error here.
@@ -245,26 +245,18 @@ export const updateUserProfile = (
 
     const ops = yield* WorkspaceClient
 
-    const profileUpdate: Parameters<typeof ops.setMyProfile>[0] = {}
-
-    if (params.bio !== undefined) {
-      profileUpdate.bio = params.bio === null ? "" : params.bio
-    }
-    if (params.city !== undefined) {
-      profileUpdate.city = params.city === null ? "" : params.city
-    }
-    if (params.country !== undefined) {
-      profileUpdate.country = params.country === null ? "" : params.country
-    }
-    if (params.website !== undefined) {
-      profileUpdate.website = params.website === null ? "" : params.website
-    }
-    if (params.socialLinks !== undefined) {
-      profileUpdate.socialLinks = params.socialLinks === null ? {} : params.socialLinks
-    }
-    if (params.isPublic !== undefined) {
-      profileUpdate.isPublic = params.isPublic
-    }
+    type UpdateUserProfileField = typeof UPDATE_USER_PROFILE_FIELDS[number]
+    const profileEntries = {
+      bio: params.bio === undefined ? {} : { bio: params.bio === null ? "" : params.bio },
+      city: params.city === undefined ? {} : { city: params.city === null ? "" : params.city },
+      country: params.country === undefined ? {} : { country: params.country === null ? "" : params.country },
+      website: params.website === undefined ? {} : { website: params.website === null ? "" : params.website },
+      socialLinks: params.socialLinks === undefined
+        ? {}
+        : { socialLinks: params.socialLinks === null ? {} : params.socialLinks },
+      isPublic: params.isPublic === undefined ? {} : { isPublic: params.isPublic }
+    } satisfies Record<UpdateUserProfileField, Parameters<typeof ops.setMyProfile>[0]>
+    const profileUpdate = mergeUpdateEntries(Object.values(profileEntries))
 
     yield* ops.setMyProfile(profileUpdate)
 
@@ -279,13 +271,14 @@ export const updateGuestSettings = (
 
     const ops = yield* WorkspaceClient
 
-    if (params.allowReadOnly !== undefined) {
-      yield* ops.updateAllowReadOnlyGuests(params.allowReadOnly)
-    }
-
-    if (params.allowSignUp !== undefined) {
-      yield* ops.updateAllowGuestSignUp(params.allowSignUp)
-    }
+    type UpdateGuestSettingsField = typeof UPDATE_GUEST_SETTINGS_FIELDS[number]
+    const updateEntries = {
+      allowReadOnly: params.allowReadOnly === undefined
+        ? Effect.void
+        : ops.updateAllowReadOnlyGuests(params.allowReadOnly),
+      allowSignUp: params.allowSignUp === undefined ? Effect.void : ops.updateAllowGuestSignUp(params.allowSignUp)
+    } satisfies Record<UpdateGuestSettingsField, Effect.Effect<void, WorkspaceClientError>>
+    yield* Effect.all(Object.values(updateEntries), { discard: true })
 
     return {
       updated: true,

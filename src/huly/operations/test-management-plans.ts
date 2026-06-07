@@ -44,7 +44,7 @@ import {
   findTestProject,
   resolveAssignee
 } from "./test-management-shared.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 type PlanOpError = HulyClientError | TestProjectNotFoundError
 type PlanMutateError = PlanOpError | TestPlanNotFoundError
@@ -142,20 +142,24 @@ export const updateTestPlan = (
     const client = yield* HulyClient
     const project = yield* findTestProject(client, params.project)
     const plan = yield* findTestPlan(client, project, params.plan)
-    const ops: DocumentUpdate<TestPlan> = {}
-    if (params.name !== undefined) ops.name = params.name
-    if (params.description !== undefined) {
-      if (params.description === null) ops.description = null
-      else {
-        ops.description = yield* client.uploadMarkup(
-          testManagement.class.TestPlan,
-          plan._id,
-          "description",
-          params.description,
-          "markdown"
-        )
-      }
-    }
+    type UpdateTestPlanField = typeof UPDATE_TEST_PLAN_FIELDS[number]
+    const updateEntries = {
+      name: Effect.succeed(params.name === undefined ? {} : { name: params.name }),
+      description: Effect.gen(function*() {
+        if (params.description === undefined) return {}
+        if (params.description === null) return { description: null }
+        return {
+          description: yield* client.uploadMarkup(
+            testManagement.class.TestPlan,
+            plan._id,
+            "description",
+            params.description,
+            "markdown"
+          )
+        }
+      })
+    } satisfies Record<UpdateTestPlanField, Effect.Effect<DocumentUpdate<TestPlan>, HulyClientError>>
+    const ops = mergeUpdateEntries(yield* Effect.all(Object.values(updateEntries)))
     yield* client.updateDoc(testManagement.class.TestPlan, project._id, plan._id, ops)
     return { id: TestPlanId.make(plan._id), updated: true }
   })

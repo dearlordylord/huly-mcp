@@ -11,3 +11,5 @@ export const requireUpdateFields = <K extends string>(
   hasAtLeastOneDefined(params, fields)
     ? Effect.void
     : Effect.fail(new NoUpdateFieldsError({ operation, fields: fields.map(String) }))
+
+export const mergeUpdateEntries = <T extends object>(entries: ReadonlyArray<T>): T => Object.assign({}, ...entries)

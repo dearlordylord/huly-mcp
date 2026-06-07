@@ -54,7 +54,7 @@ import {
 } from "./calendar-shared.js"
 import { clampLimit } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 // Re-export recurring operations for barrel consumers
 export { createRecurringEvent, listEventInstances, listRecurringEvents } from "./calendar-recurring.js"
@@ -272,24 +272,16 @@ export const updateEvent = (
       return yield* new EventNotFoundError({ eventId: params.eventId })
     }
 
-    const updateOps: DocumentUpdate<HulyEvent> = {}
-
-    if (params.title !== undefined) {
-      updateOps.title = params.title
-    }
-
-    if (params.description !== undefined) {
-      if (params.description.trim() === "") {
-        updateOps.description = emptyEventDescription
-      } else if (event.description) {
-        yield* client.updateMarkup(
-          calendar.class.Event,
-          event._id,
-          "description",
-          params.description,
-          "markdown"
-        )
-      } else {
+    type UpdateEventField = typeof UPDATE_EVENT_FIELDS[number]
+    const updateEntries = {
+      title: Effect.succeed(params.title === undefined ? {} : { title: params.title }),
+      description: Effect.gen(function*() {
+        if (params.description === undefined) return {}
+        if (params.description.trim() === "") return { description: emptyEventDescription }
+        if (event.description) {
+          yield* client.updateMarkup(calendar.class.Event, event._id, "description", params.description, "markdown")
+          return {}
+        }
         const descriptionRef = yield* client.uploadMarkup(
           calendar.class.Event,
           event._id,
@@ -297,32 +289,22 @@ export const updateEvent = (
           params.description,
           "markdown"
         )
-        updateOps.description = markupRefAsDescription(descriptionRef)
-      }
-    }
-
-    if (params.date !== undefined) {
-      updateOps.date = params.date
-    }
-
-    if (params.dueDate !== undefined) {
-      updateOps.dueDate = params.dueDate
-    }
-
-    if (params.allDay !== undefined) {
-      updateOps.allDay = params.allDay
-    }
-
-    if (params.location !== undefined) {
-      updateOps.location = params.location
-    }
-
-    if (params.visibility !== undefined) {
-      const vis = stringToVisibility(params.visibility)
-      if (vis !== undefined) {
-        updateOps.visibility = vis
-      }
-    }
+        return { description: markupRefAsDescription(descriptionRef) }
+      }),
+      date: Effect.succeed(params.date === undefined ? {} : { date: params.date }),
+      dueDate: Effect.succeed(params.dueDate === undefined ? {} : { dueDate: params.dueDate }),
+      allDay: Effect.succeed(params.allDay === undefined ? {} : { allDay: params.allDay }),
+      location: Effect.succeed(params.location === undefined ? {} : { location: params.location }),
+      visibility: Effect.succeed(
+        params.visibility === undefined
+          ? {}
+          : (() => {
+            const visibility = stringToVisibility(params.visibility)
+            return visibility === undefined ? {} : { visibility }
+          })()
+      )
+    } satisfies Record<UpdateEventField, Effect.Effect<DocumentUpdate<HulyEvent>, HulyClientError>>
+    const updateOps = mergeUpdateEntries(yield* Effect.all(Object.values(updateEntries)))
 
     if (Object.keys(updateOps).length > 0) {
       yield* client.updateDoc(

@@ -45,7 +45,7 @@ import { listTotal, optionalCount } from "./counts.js"
 import { markdownToMarkupString, markupToMarkdownString } from "./markup.js"
 import { clampLimit, escapeLikeWildcards } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 import { chunter, contact } from "../huly-plugins.js"
 
@@ -306,15 +306,12 @@ export const updateChannel = (
 
     const { channel, client } = yield* findChannel(params.channel)
 
-    const updateOps: DocumentUpdate<HulyChannel> = {}
-
-    if (params.name !== undefined) {
-      updateOps.name = params.name
-    }
-
-    if (params.topic !== undefined) {
-      updateOps.topic = params.topic
-    }
+    type UpdateChannelField = typeof UPDATE_CHANNEL_FIELDS[number]
+    const updateEntries = {
+      name: params.name === undefined ? {} : { name: params.name },
+      topic: params.topic === undefined ? {} : { topic: params.topic }
+    } satisfies Record<UpdateChannelField, DocumentUpdate<HulyChannel>>
+    const updateOps = mergeUpdateEntries(Object.values(updateEntries))
 
     yield* client.updateDoc(
       chunter.class.Channel,

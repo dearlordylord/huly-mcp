@@ -65,7 +65,7 @@ import {
   type StrictDocumentQuery
 } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 import { core, documentPlugin } from "../huly-plugins.js"
 
@@ -244,19 +244,15 @@ export const updateTeamspace = (
 
     const { client, teamspace } = yield* findTeamspace(params.teamspace, { includeArchived: true })
 
-    const updateOps: DocumentUpdate<HulyTeamspace> = {}
-
-    if (params.name !== undefined) {
-      updateOps.name = params.name
-    }
-
-    if (params.description !== undefined) {
-      updateOps.description = params.description === null ? "" : params.description
-    }
-
-    if (params.archived !== undefined) {
-      updateOps.archived = params.archived
-    }
+    type UpdateTeamspaceField = typeof UPDATE_TEAMSPACE_FIELDS[number]
+    const updateEntries = {
+      name: params.name === undefined ? {} : { name: params.name },
+      description: params.description === undefined ? {} : {
+        description: params.description === null ? "" : params.description
+      },
+      archived: params.archived === undefined ? {} : { archived: params.archived }
+    } satisfies Record<UpdateTeamspaceField, DocumentUpdate<HulyTeamspace>>
+    const updateOps = mergeUpdateEntries(Object.values(updateEntries))
 
     yield* client.updateDoc(
       documentPlugin.class.Teamspace,

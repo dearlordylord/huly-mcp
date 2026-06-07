@@ -37,7 +37,7 @@ import { ComponentNotFoundError, PersonNotFoundError } from "../errors.js"
 import { findPersonByEmailOrName } from "./contacts-shared.js"
 import { findProject, findProjectAndIssue } from "./issues-shared.js"
 import { toRef } from "./sdk-boundary.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 import { contact, tracker } from "../huly-plugins.js"
 import { optionalMarkdownToMarkup, optionalMarkupToMarkdown } from "./markup.js"
@@ -237,29 +237,30 @@ export const updateComponent = (
     const { client, component, project } = yield* findProjectAndComponent(params)
     const markupUrlConfig = client.markupUrlConfig
 
-    const updateOps: DocumentUpdate<HulyComponent> = {}
-
-    if (params.label !== undefined) {
-      updateOps.label = params.label
-    }
-
-    if (params.description !== undefined) {
-      updateOps.description = optionalMarkdownToMarkup(params.description, markupUrlConfig, "")
-    }
-
-    if (params.lead !== undefined) {
-      if (params.lead === null) {
-        updateOps.lead = null
-      } else {
+    type UpdateComponentField = typeof UPDATE_COMPONENT_FIELDS[number]
+    const updateEntries = {
+      label: Effect.succeed(params.label === undefined ? {} : { label: params.label }),
+      description: Effect.succeed(
+        params.description === undefined
+          ? {}
+          : { description: optionalMarkdownToMarkup(params.description, markupUrlConfig, "") }
+      ),
+      lead: Effect.gen(function*() {
+        if (params.lead === undefined) return {}
+        if (params.lead === null) return { lead: null }
         const person = yield* findPersonByEmailOrName(client, params.lead)
         if (person === undefined) {
           return yield* new PersonNotFoundError({ identifier: params.lead })
         }
         // Huly API: Component.lead expects Ref<Employee>, but we look up Person by email.
         // Employee extends Person, so this is safe when person is actually an employee.
-        updateOps.lead = toRef<Employee>(person._id)
-      }
-    }
+        return { lead: toRef<Employee>(person._id) }
+      })
+    } satisfies Record<
+      UpdateComponentField,
+      Effect.Effect<DocumentUpdate<HulyComponent>, HulyClientError | PersonNotFoundError>
+    >
+    const updateOps = mergeUpdateEntries(yield* Effect.all(Object.values(updateEntries)))
 
     yield* client.updateDoc(
       tracker.class.Component,

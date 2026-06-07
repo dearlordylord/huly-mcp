@@ -65,7 +65,7 @@ import { findTeamspaceAndDocument } from "./documents.js"
 import { findProjectAndIssue } from "./issues-shared.js"
 import { clampLimit, findOneOrFail } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 import { attachment, documentPlugin, tracker } from "../huly-plugins.js"
 
@@ -321,19 +321,20 @@ export const updateAttachment = (
       () => new AttachmentNotFoundError({ attachmentId: params.attachmentId })
     )
 
-    const updateOps: DocumentUpdate<HulyAttachment> = {}
-
+    type UpdateAttachmentField = typeof UPDATE_ATTACHMENT_FIELDS[number]
+    const descriptionOps: DocumentUpdate<HulyAttachment> = {}
     if (params.description !== undefined) {
       if (params.description === null) {
-        clearAttachmentDescription(updateOps)
+        clearAttachmentDescription(descriptionOps)
       } else {
-        updateOps.description = params.description
+        descriptionOps.description = params.description
       }
     }
-
-    if (params.pinned !== undefined) {
-      updateOps.pinned = params.pinned
-    }
+    const updateEntries = {
+      description: descriptionOps,
+      pinned: params.pinned === undefined ? {} : { pinned: params.pinned }
+    } satisfies Record<UpdateAttachmentField, DocumentUpdate<HulyAttachment>>
+    const updateOps = mergeUpdateEntries(Object.values(updateEntries))
 
     yield* client.updateDoc(
       attachment.class.Attachment,

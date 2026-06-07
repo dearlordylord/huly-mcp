@@ -58,7 +58,7 @@ import {
   stringToTestRunStatus,
   testRunStatusToString
 } from "./test-management-shared.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 type TestRunOpError = HulyClientError | TestProjectNotFoundError
 type TestRunMutateError = TestRunOpError | TestRunNotFoundError
@@ -168,25 +168,31 @@ export const updateTestRun = (
     const client = yield* HulyClient
     const project = yield* findTestProject(client, params.project)
     const run = yield* findTestRun(client, project, params.run)
-    const ops: DocumentUpdate<TestRun> = {}
-    if (params.name !== undefined) ops.name = params.name
-    if (params.description !== undefined) {
-      if (params.description === null) {
-        ops.description = null
-      } else {
-        ops.description = yield* client.uploadMarkup(
-          testManagement.class.TestRun,
-          run._id,
-          "description",
-          params.description,
-          "markdown"
-        )
-      }
-    }
-    if (params.dueDate !== undefined) {
-      if (params.dueDate === null) ops.$unset = { dueDate: "" }
-      else ops.dueDate = params.dueDate
-    }
+    type UpdateTestRunField = typeof UPDATE_TEST_RUN_FIELDS[number]
+    const updateEntries = {
+      name: Effect.succeed(params.name === undefined ? {} : { name: params.name }),
+      description: Effect.gen(function*() {
+        if (params.description === undefined) return {}
+        if (params.description === null) return { description: null }
+        return {
+          description: yield* client.uploadMarkup(
+            testManagement.class.TestRun,
+            run._id,
+            "description",
+            params.description,
+            "markdown"
+          )
+        }
+      }),
+      dueDate: Effect.succeed(
+        params.dueDate === undefined
+          ? {}
+          : params.dueDate === null
+          ? { $unset: { dueDate: "" } }
+          : { dueDate: params.dueDate }
+      )
+    } satisfies Record<UpdateTestRunField, Effect.Effect<DocumentUpdate<TestRun>, HulyClientError>>
+    const ops = mergeUpdateEntries(yield* Effect.all(Object.values(updateEntries)))
     yield* client.updateDoc(testManagement.class.TestRun, project._id, run._id, ops)
     return { id: TestRunId.make(run._id), updated: true }
   })
@@ -284,24 +290,38 @@ export const updateTestResult = (
     const client = yield* HulyClient
     const project = yield* findTestProject(client, params.project)
     const result = yield* findTestResult(client, project, params.result)
-    const ops: DocumentUpdate<TestResult> = {}
-    if (params.status !== undefined) ops.status = resolveStatusOrUntested(params.status)
-    if (params.assignee !== undefined) {
-      if (params.assignee === null) ops.$unset = { ...ops.$unset, assignee: "" }
-      else ops.assignee = toRef<Employee>((yield* resolveAssignee(params.assignee))._id)
-    }
-    if (params.description !== undefined) {
-      if (params.description === null) ops.description = null
-      else {
-        ops.description = yield* client.uploadMarkup(
-          testManagement.class.TestResult,
-          result._id,
-          "description",
-          params.description,
-          "markdown"
-        )
-      }
-    }
+    type UpdateTestResultField = typeof UPDATE_TEST_RESULT_FIELDS[number]
+    const updateEntries = {
+      status: Effect.succeed(params.status === undefined ? {} : { status: resolveStatusOrUntested(params.status) }),
+      assignee: Effect.gen(function*() {
+        if (params.assignee === undefined) return {}
+        if (params.assignee === null) {
+          const unassignOps: DocumentUpdate<TestResult> = { $unset: { assignee: "" } }
+          return unassignOps
+        }
+        const assignOps: DocumentUpdate<TestResult> = {
+          assignee: toRef<Employee>((yield* resolveAssignee(params.assignee))._id)
+        }
+        return assignOps
+      }),
+      description: Effect.gen(function*() {
+        if (params.description === undefined) return {}
+        if (params.description === null) return { description: null }
+        return {
+          description: yield* client.uploadMarkup(
+            testManagement.class.TestResult,
+            result._id,
+            "description",
+            params.description,
+            "markdown"
+          )
+        }
+      })
+    } satisfies Record<
+      UpdateTestResultField,
+      Effect.Effect<DocumentUpdate<TestResult>, HulyClientError | PersonNotFoundError, HulyClient>
+    >
+    const ops = mergeUpdateEntries(yield* Effect.all(Object.values(updateEntries)))
     yield* client.updateDoc(testManagement.class.TestResult, result.space, result._id, ops)
     return { id: TestResultId.make(result._id), updated: true }
   })

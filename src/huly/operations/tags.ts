@@ -39,7 +39,7 @@ import {
   toResolvedTagElement,
   toTargetClassRef
 } from "./tags-shared.js"
-import { requireUpdateFields } from "./update-guards.js"
+import { mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 type ListTagsError = HulyClientError | TagCategoryNotFoundError
 type CreateTagError = HulyClientError | TagCategoryNotFoundError
@@ -74,7 +74,7 @@ const buildUpdateTagOperations = (
       title: params.title === undefined ? {} : { title: params.title }
     } satisfies Record<UpdateTagField, DocumentUpdate<HulyTagElement>>
 
-    return Object.assign({}, ...Object.values(updateEntries))
+    return mergeUpdateEntries(Object.values(updateEntries))
   })
 
 export const listTags = (

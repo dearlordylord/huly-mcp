@@ -82,13 +82,14 @@ Current high-level MCP categories:
 
 ## Highest-Value Additions For LLM Agents
 
-1. **Generic space/member/role foundation follow-ups**: role assignment mutations, role/permission definition writes, generic space creation, and module-specific wrappers are still separate work. Generic space discovery, space type/permission reads, safe metadata updates, member mutations, and owner replacement are implemented under `spaces`.
-2. **SDK discovery phase 2**: add plugin configuration and sequence metadata discovery on top of the class/attribute/enum/space-type/permission tools.
-3. **Drive**: high-value and strongly modeled (`Drive`, `Folder`, `File`, `FileVersion`) but absent.
-4. **Planner/ToDos**: strongly modeled and user-visible; current `WorkSlot` tools are not enough.
-5. **Recruiting**: strongly modeled, currently absent, and requires first-class resolvers for vacancies/talents/applications.
-6. **Controlled documents + trainings**: broad TraceX surface with many modeled objects; likely larger implementation but clearly represented in dev libs.
-7. **Tag-backed module wrappers**: generic tags now exist, but recruiting skills and similar module concepts still need LLM-first object resolvers.
+1. **Common clear-field contract for update tools**: Huly `DocumentUpdate<T>` supports `$unset`, but existing domain tools use a mix of field-specific clearing semantics: `null` for some optional relationships/dates/text, empty string for some descriptions/topics, and markup-specific empty references for rich descriptions. The LLM-first contract should be generalized so clearable fields consistently accept `null` unless there is strong evidence that `null` is a valid stored value or that the SDK requires another representation. Pre-research from current update schemas: already clearable fields include issue assignee/dueDate/estimation, component lead, teamspace/project/person/organization/attachment/test-management descriptions or city fields, user-profile optional fields, and test assignees; likely gaps include `update_space.description`, `update_channel.topic`, event description/location, milestone target date, issue-template estimation, tag/label descriptions, and tag category assignment.
+2. **Generic space/member/role foundation follow-ups**: role assignment mutations, role/permission definition writes, generic space creation, and module-specific wrappers are still separate work. Generic space discovery, space type/permission reads, safe metadata updates, member mutations, and owner replacement are implemented under `spaces`.
+3. **SDK discovery phase 2**: add plugin configuration and sequence metadata discovery on top of the class/attribute/enum/space-type/permission tools.
+4. **Drive**: high-value and strongly modeled (`Drive`, `Folder`, `File`, `FileVersion`) but absent.
+5. **Planner/ToDos**: strongly modeled and user-visible; current `WorkSlot` tools are not enough.
+6. **Recruiting**: strongly modeled, currently absent, and requires first-class resolvers for vacancies/talents/applications.
+7. **Controlled documents + trainings**: broad TraceX surface with many modeled objects; likely larger implementation but clearly represented in dev libs.
+8. **Tag-backed module wrappers**: generic tags now exist, but recruiting skills and similar module concepts still need LLM-first object resolvers.
 
 ## Notes
 

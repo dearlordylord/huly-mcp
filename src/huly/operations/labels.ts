@@ -82,12 +82,16 @@ export const updateLabel = (
   Effect.gen(function*() {
     yield* requireUpdateFields("update_label", params, UPDATE_LABEL_FIELDS)
 
-    const result = yield* updateTag({
-      targetClass: issueTargetClass,
-      tag: params.label,
+    type UpdateLabelField = typeof UPDATE_LABEL_FIELDS[number]
+    const updateEntries = {
       title: params.title,
       color: params.color,
       description: params.description
+    } satisfies Record<UpdateLabelField, UpdateLabelParams[UpdateLabelField]>
+    const result = yield* updateTag({
+      targetClass: issueTargetClass,
+      tag: params.label,
+      ...updateEntries
     })
 
     return { id: result.id, updated: result.updated }
