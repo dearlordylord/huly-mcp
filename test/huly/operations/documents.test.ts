@@ -466,28 +466,22 @@ describe("listDocuments", () => {
   })
 
   describe("titleRegex", () => {
-    it.effect("applies titleRegex locally", () =>
+    it.effect("applies titleRegex to the document query", () =>
       Effect.gen(function*() {
         const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
         const captureQuery: MockConfig["captureDocumentQuery"] = {}
 
         const testLayer = createTestLayerWithMocks({
           teamspaces: [teamspace],
-          documents: [
-            makeDocument({ _id: "doc-spec" as Ref<HulyDocument>, space: teamspace._id, title: "Spec One" }),
-            makeDocument({ _id: "doc-note" as Ref<HulyDocument>, space: teamspace._id, title: "Note One" })
-          ],
+          documents: [],
           captureDocumentQuery: captureQuery
         })
 
-        const result = yield* listDocuments({ teamspace: teamspaceIdentifier("My Docs"), titleRegex: "^Spec" }).pipe(
+        yield* listDocuments({ teamspace: teamspaceIdentifier("My Docs"), titleRegex: "Spec%" }).pipe(
           Effect.provide(testLayer)
         )
 
-        expect(captureQuery.query?.title).toBeUndefined()
-        expect(captureQuery.options?.limit).toBeUndefined()
-        expect(result.documents.map(doc => doc.id)).toEqual(["doc-spec"])
-        expect(result.total).toBe(1)
+        expect(captureQuery.query?.title).toEqual({ $regex: "Spec%" })
       }))
   })
 })

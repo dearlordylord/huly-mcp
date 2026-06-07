@@ -32,25 +32,13 @@ import type {
 import { UPDATE_CARD_FIELDS } from "../../domain/schemas/cards.js"
 import { CardId, CardSpaceId, MasterTagId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import {
-  CardNotFoundError,
-  CardSpaceNotFoundError,
-  type HulyError,
-  type MasterTagNotFoundError,
-  type NoUpdateFieldsError
-} from "../errors.js"
+import { CardNotFoundError, CardSpaceNotFoundError } from "../errors.js"
+import type { MasterTagNotFoundError, NoUpdateFieldsError } from "../errors.js"
 import { cardPlugin } from "../huly-plugins.js"
 import { fetchMasterTagsForSpace, findMasterTag, masterTagDisplayName } from "./card-master-tags.js"
 import { clearTextAsEmptyString } from "./clear-field-updates.js"
 import { listTotal, optionalCount } from "./counts.js"
-import {
-  clampLimit,
-  compileOptionalUserRegex,
-  escapeLikeWildcards,
-  filterByRegex,
-  findByNameOrId,
-  findOptionsForOptionalRegex
-} from "./query-helpers.js"
+import { clampLimit, escapeLikeWildcards, findByNameOrId } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
@@ -62,7 +50,6 @@ type ListMasterTagsError =
 
 type ListCardsError =
   | HulyClientError
-  | HulyError
   | CardSpaceNotFoundError
   | MasterTagNotFoundError
 
@@ -206,7 +193,6 @@ export const listCards = (
     const { cardSpace, client } = yield* findCardSpace(params.cardSpace)
 
     const limit = clampLimit(params.limit)
-    const titleRegex = yield* compileOptionalUserRegex(params.titleRegex, "titleRegex")
 
     const query: DocumentQuery<HulyCard> = {
       space: cardSpace._id
@@ -221,25 +207,26 @@ export const listCards = (
       query.title = { $like: `%${escapeLikeWildcards(params.titleSearch)}%` }
     }
 
+    if (params.titleRegex !== undefined && params.titleRegex.trim() !== "") {
+      query.title = { $regex: params.titleRegex }
+    }
+
     if (params.contentSearch !== undefined && params.contentSearch.trim() !== "") {
       query.$search = params.contentSearch
     }
 
-    const findOptions = findOptionsForOptionalRegex<HulyCard>(
-      limit,
-      { modifiedOn: SortingOrder.Descending },
-      titleRegex
-    )
-
     const cards = yield* client.findAll<HulyCard>(
       cardPlugin.class.Card,
       query,
-      findOptions
+      {
+        limit,
+        sort: {
+          modifiedOn: SortingOrder.Descending
+        }
+      }
     )
-    const matchingCards = filterByRegex(cards, titleRegex, (card) => card.title)
-    const limitedCards = matchingCards.slice(0, limit)
 
-    const summaries: Array<CardSummary> = limitedCards.map((c) => ({
+    const summaries: Array<CardSummary> = cards.map((c) => ({
       id: CardId.make(c._id),
       title: c.title,
       type: String(c._class),
@@ -248,7 +235,7 @@ export const listCards = (
 
     return {
       cards: summaries,
-      total: listTotal(titleRegex === undefined ? cards.total : matchingCards.length)
+      total: listTotal(cards.total)
     }
   })
 

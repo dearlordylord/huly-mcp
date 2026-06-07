@@ -66,7 +66,7 @@ const ListChannelsParamsBase = Schema.Struct({
   })),
   nameRegex: Schema.optional(Schema.String.annotations({
     description:
-      "Filter channels by name using a JavaScript regex pattern (e.g., '^dev-'). Mutually exclusive with nameSearch; use nameSearch for simple substring matching."
+      "Filter channels by name using Huly $regex. On the supported Postgres backend this is SQL SIMILAR TO, not JavaScript RegExp: use '%' for any string (e.g., '%dev%' contains, 'dev%' prefix). Mutually exclusive with nameSearch; use nameSearch for simple substring matching."
   })),
   topicSearch: Schema.optional(Schema.String.annotations({
     description: "Search channels by topic substring (case-insensitive)"

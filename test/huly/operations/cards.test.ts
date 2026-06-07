@@ -415,22 +415,13 @@ describe("listCards", () => {
       expect(captures.findAll?.query?.title).toBeUndefined()
     }))
 
-  it.effect("applies a titleRegex filter locally", () =>
+  it.effect("applies a titleRegex filter", () =>
     Effect.gen(function*() {
       const captures: Captures = { findAll: {} }
-      const result = yield* listCards({ cardSpace: SPACE, titleRegex: "^TODO" }).pipe(
-        Effect.provide(buildLayer({
-          spaces: [makeSpace()],
-          cards: [
-            makeCard({ _id: "card-todo" as Ref<HulyCard>, title: "TODO: fix parser" }),
-            makeCard({ _id: "card-done" as Ref<HulyCard>, title: "DONE: fix parser" })
-          ],
-          captures
-        }))
+      yield* listCards({ cardSpace: SPACE, titleRegex: "TODO%" }).pipe(
+        Effect.provide(buildLayer({ spaces: [makeSpace()], captures }))
       )
-      expect(captures.findAll?.query?.title).toBeUndefined()
-      expect(captures.findAll?.options?.limit).toBeUndefined()
-      expect(result.cards.map(card => card.id)).toEqual(["card-todo"])
+      expect(captures.findAll?.query?.title).toEqual({ $regex: "TODO%" })
     }))
 
   it.effect("applies a contentSearch (fulltext) filter", () =>

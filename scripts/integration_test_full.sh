@@ -2383,24 +2383,21 @@ if [ -n "$DERIVED_CARD_TYPE_ID" ]; then
     if [ $? -eq 0 ]; then
       assert_json_array_contains "list_cards derived label includes card" "$DERIVED_CARD_LIST_TEXT" ".cards | map(.id)" "$DERIVED_CARD_LABEL_ID"
     fi
-    DERIVED_CARD_REGEX_TEXT=$(run_capture "list_cards(Default,titleRegex JS contains)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"titleRegex\":\".*Derived Label Card.*\",\"limit\":10}},\"id\":2}")
+    DERIVED_CARD_REGEX_TEXT=$(run_capture "list_cards(Default,titleRegex SIMILAR TO contains)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"titleRegex\":\"%Derived Label Card%\",\"limit\":10}},\"id\":2}")
     if [ $? -eq 0 ]; then
-      assert_json_array_contains "list_cards titleRegex JS contains includes card" "$DERIVED_CARD_REGEX_TEXT" ".cards | map(.id)" "$DERIVED_CARD_LABEL_ID"
+      assert_json_array_contains "list_cards titleRegex SIMILAR TO contains includes card" "$DERIVED_CARD_REGEX_TEXT" ".cards | map(.id)" "$DERIVED_CARD_LABEL_ID"
     fi
-    DERIVED_CARD_REGEX_ANCHORED_TEXT=$(run_capture "list_cards(Default,titleRegex JS anchored)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"titleRegex\":\"^IntTest Derived Label Card\",\"limit\":10}},\"id\":2}")
+    DERIVED_CARD_REGEX_PREFIX_TEXT=$(run_capture "list_cards(Default,titleRegex SIMILAR TO prefix)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"titleRegex\":\"IntTest Derived Label Card%\",\"limit\":10}},\"id\":2}")
     if [ $? -eq 0 ]; then
-      assert_json_array_contains "list_cards titleRegex JS anchored includes card" "$DERIVED_CARD_REGEX_ANCHORED_TEXT" ".cards | map(.id)" "$DERIVED_CARD_LABEL_ID"
+      assert_json_array_contains "list_cards titleRegex SIMILAR TO prefix includes card" "$DERIVED_CARD_REGEX_PREFIX_TEXT" ".cards | map(.id)" "$DERIVED_CARD_LABEL_ID"
     fi
     DERIVED_CARD_REGEX_CASE_TEXT=$(run_capture "list_cards(Default,titleRegex case-sensitive miss)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"titleRegex\":\"derived label card\",\"limit\":10}},\"id\":2}")
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"titleRegex\":\"%derived label card%\",\"limit\":10}},\"id\":2}")
     if [ $? -eq 0 ]; then
       assert_json_array_not_contains "list_cards titleRegex is case-sensitive" "$DERIVED_CARD_REGEX_CASE_TEXT" ".cards | map(.id)" "$DERIVED_CARD_LABEL_ID"
     fi
-    run_expect_error_contains "list_cards(Default,titleRegex invalid)" \
-      '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_cards","arguments":{"cardSpace":"Default","titleRegex":"("}},"id":2}' \
-      "Invalid titleRegex"
   else
     fail_test "create_card(derived label:$DERIVED_CARD_TYPE_NAME) returns id" "missing id"
   fi

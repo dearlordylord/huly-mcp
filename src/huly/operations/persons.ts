@@ -34,17 +34,11 @@ import type { CreatePersonResult, DeletePersonResult, UpdatePersonResult } from 
 import { UPDATE_PERSON_FIELDS } from "../../domain/schemas/contacts.js"
 import { ContactProvider, Email, OrganizationId, PersonId, PersonName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import { type HulyError, type NoUpdateFieldsError, PersonNotFoundError } from "../errors.js"
+import { type NoUpdateFieldsError, PersonNotFoundError } from "../errors.js"
 import { contact } from "../huly-plugins.js"
 import { buildContactUrlFromConfig } from "../url-builders.js"
 import { batchGetEmailsForPersons, findPersonByEmail, findPersonById } from "./contacts-shared.js"
-import {
-  clampLimit,
-  compileOptionalUserRegex,
-  escapeLikeWildcards,
-  filterByRegex,
-  findOptionsForOptionalRegex
-} from "./query-helpers.js"
+import { clampLimit, escapeLikeWildcards } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import {
   type CoveredUpdateEntry,
@@ -55,7 +49,7 @@ import {
   requireUpdateFields
 } from "./update-guards.js"
 
-type ListPersonsError = HulyClientError | HulyError
+type ListPersonsError = HulyClientError
 type GetPersonError = HulyClientError | PersonNotFoundError
 type CreatePersonError = HulyClientError
 type UpdatePersonError = HulyClientError | NoUpdateFieldsError | PersonNotFoundError
@@ -121,12 +115,15 @@ export const listPersons = (
     const client = yield* HulyClient
     const limit = clampLimit(params.limit)
     const emailSearch = params.emailSearch?.trim()
-    const nameRegex = yield* compileOptionalUserRegex(params.nameRegex, "nameRegex")
 
     const query: DocumentQuery<HulyPerson> = {}
 
     if (params.nameSearch !== undefined && params.nameSearch.trim() !== "") {
       query.name = { $like: `%${escapeLikeWildcards(params.nameSearch)}%` }
+    }
+
+    if (params.nameRegex !== undefined && params.nameRegex.trim() !== "") {
+      query.name = { $regex: params.nameRegex }
     }
 
     if (emailSearch !== undefined && emailSearch !== "") {
@@ -137,23 +134,19 @@ export const listPersons = (
       query._id = { $in: matchingPersonIds }
     }
 
-    const findOptions = findOptionsForOptionalRegex<HulyPerson>(
-      limit,
-      { modifiedOn: SortingOrder.Descending },
-      nameRegex
-    )
-
     const persons = yield* client.findAll<HulyPerson>(
       contact.class.Person,
       query,
-      findOptions
+      {
+        limit,
+        sort: { modifiedOn: SortingOrder.Descending }
+      }
     )
-    const filteredPersons = filterByRegex(persons, nameRegex, (person) => person.name).slice(0, limit)
 
-    const personIds = filteredPersons.map(p => p._id)
+    const personIds = persons.map(p => p._id)
     const emailMap = yield* batchGetEmailsForPersons(client, personIds)
 
-    return filteredPersons.map(person => {
+    return persons.map(person => {
       const emailValue = emailMap.get(person._id)
       const id = PersonId.make(person._id)
       return {

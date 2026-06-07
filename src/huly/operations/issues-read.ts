@@ -18,7 +18,7 @@ import type {
 import { IssueSummarySchema, parseIssue } from "../../domain/schemas/issues.js"
 import { IssueId, type ProjectIdentifier } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
-import type { ComponentNotFoundError, HulyError, InvalidStatusError, ProjectNotFoundError } from "../errors.js"
+import type { ComponentNotFoundError, InvalidStatusError, ProjectNotFoundError } from "../errors.js"
 import { HulyConnectionError, IssueNotFoundError } from "../errors.js"
 import { contact, tracker } from "../huly-plugins.js"
 import { findComponentByIdOrLabel } from "./components.js"
@@ -31,20 +31,10 @@ import {
   resolveStatusByName,
   type WorkflowStatus
 } from "./issues-shared.js"
-import {
-  clampLimit,
-  compileOptionalUserRegex,
-  escapeLikeWildcards,
-  filterByRegex,
-  findOptionsForOptionalRegex,
-  hulyQuery,
-  type StrictDocumentQuery,
-  withLookup
-} from "./query-helpers.js"
+import { clampLimit, escapeLikeWildcards, hulyQuery, type StrictDocumentQuery, withLookup } from "./query-helpers.js"
 
 type ListIssuesError =
   | HulyClientError
-  | HulyError
   | HulyConnectionError
   | ProjectNotFoundError
   | IssueNotFoundError
@@ -103,7 +93,6 @@ export const listIssues = (
 ): Effect.Effect<Array<IssueSummary>, ListIssuesError, HulyClient> =>
   Effect.gen(function*() {
     const { client, project, statuses } = yield* findProjectWithStatuses(params.project)
-    const titleRegex = yield* compileOptionalUserRegex(params.titleRegex, "titleRegex")
 
     const query: StrictDocumentQuery<IssueWithLookup> = {
       space: project._id
@@ -135,6 +124,10 @@ export const listIssues = (
     // Apply title search using $like operator
     if (params.titleSearch !== undefined && params.titleSearch.trim() !== "") {
       query.title = { $like: `%${escapeLikeWildcards(params.titleSearch)}%` }
+    }
+
+    if (params.titleRegex !== undefined && params.titleRegex.trim() !== "") {
+      query.title = { $regex: params.titleRegex }
     }
 
     if (params.descriptionSearch !== undefined && params.descriptionSearch.trim() !== "") {
@@ -178,24 +171,22 @@ export const listIssues = (
     }
 
     const limit = clampLimit(params.limit)
-    const findOptions = findOptionsForOptionalRegex<IssueWithLookup>(
-      limit,
-      { modifiedOn: SortingOrder.Descending },
-      titleRegex
-    )
 
     const issues = yield* client.findAll<IssueWithLookup>(
       tracker.class.Issue,
       hulyQuery(query),
       withLookup<IssueWithLookup>(
-        findOptions,
+        {
+          limit,
+          sort: {
+            modifiedOn: SortingOrder.Descending
+          }
+        },
         { assignee: contact.class.Person }
       )
     )
-    const matchingIssues = filterByRegex(issues, titleRegex, (issue) => issue.title)
-    const limitedIssues = matchingIssues.slice(0, limit)
 
-    const rawSummaries = limitedIssues.map((issue) => {
+    const rawSummaries = issues.map((issue) => {
       const statusName = resolveStatusName(statuses, issue.status)
       const assigneeName = issue.$lookup?.assignee?.name
       const directParent = issue.parents.length > 0
