@@ -52,7 +52,7 @@ const ListPersonsParamsBase = Schema.Struct({
   })),
   nameRegex: Schema.optional(Schema.String.annotations({
     description:
-      "Filter persons by name using Huly $regex. On the supported Postgres backend this is SQL SIMILAR TO, not JavaScript RegExp: use '%' for any string (e.g., '%Smith%' contains, 'Smith%' prefix). Mutually exclusive with nameSearch; use nameSearch for simple substring matching."
+      "Filter persons by name using Huly $regex. On the supported Postgres backend this is SQL SIMILAR TO, not JavaScript RegExp; matching is case-sensitive and the pattern must match the whole name: use '%' for any string (e.g., '%Smith%' contains, 'Smith%' prefix). Mutually exclusive with nameSearch; use nameSearch for simple substring matching."
   })),
   emailSearch: Schema.optional(Schema.String.annotations({
     description: "Search persons by email substring (case-insensitive)"

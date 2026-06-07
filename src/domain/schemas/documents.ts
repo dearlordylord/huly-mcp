@@ -59,7 +59,7 @@ const ListDocumentsParamsBase = Schema.Struct({
   })),
   titleRegex: Schema.optional(Schema.String.annotations({
     description:
-      "Filter documents by title using Huly $regex. On the supported Postgres backend this is SQL SIMILAR TO, not JavaScript RegExp: use '%' for any string (e.g., '%RFC%' contains, 'RFC%' prefix). Mutually exclusive with titleSearch; use titleSearch for simple substring matching."
+      "Filter documents by title using Huly $regex. On the supported Postgres backend this is SQL SIMILAR TO, not JavaScript RegExp; matching is case-sensitive and the pattern must match the whole title: use '%' for any string (e.g., '%RFC%' contains, 'RFC%' prefix). Mutually exclusive with titleSearch; use titleSearch for simple substring matching."
   })),
   contentSearch: Schema.optional(Schema.String.annotations({
     description: "Search documents by content (fulltext search)"

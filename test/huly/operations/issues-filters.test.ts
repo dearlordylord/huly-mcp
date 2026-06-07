@@ -304,7 +304,7 @@ describe("listIssues filters", () => {
         Schema.decodeUnknown(ListIssuesParamsSchema)({
           project: "TEST",
           titleSearch: "bug",
-          titleRegex: "^BUG"
+          titleRegex: "BUG%"
         })
       )
 

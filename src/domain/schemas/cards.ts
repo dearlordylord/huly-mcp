@@ -82,7 +82,7 @@ const ListCardsParamsBase = Schema.Struct({
   })),
   titleRegex: Schema.optional(Schema.String.annotations({
     description:
-      "Filter cards by title using Huly $regex. On the supported Postgres backend this is SQL SIMILAR TO, not JavaScript RegExp: use '%' for any string (e.g., '%TODO%' contains, 'TODO%' prefix). Mutually exclusive with titleSearch; use titleSearch for simple substring matching."
+      "Filter cards by title using Huly $regex. On the supported Postgres backend this is SQL SIMILAR TO, not JavaScript RegExp; matching is case-sensitive and the pattern must match the whole title: use '%' for any string (e.g., '%TODO%' contains, 'TODO%' prefix). Mutually exclusive with titleSearch; use titleSearch for simple substring matching."
   })),
   contentSearch: Schema.optional(Schema.String.annotations({
     description: "Search cards by content (fulltext search)"

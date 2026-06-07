@@ -177,12 +177,9 @@ const createTestLayer = (config: MockConfig) => {
         }
       }
       if (q.name !== undefined) {
-        const nameFilter = q.name as { $like?: string; $regex?: string } | string
+        const nameFilter = q.name as { $like?: string } | string
         if (typeof nameFilter === "object" && "$like" in nameFilter) {
           filtered = filtered.filter(p => matchesLike(p.name, nameFilter.$like!))
-        } else if (typeof nameFilter === "object" && "$regex" in nameFilter) {
-          const re = new RegExp(nameFilter.$regex)
-          filtered = filtered.filter(p => re.test(p.name))
         }
       }
       const opts = (options ?? {}) as { limit?: number }
