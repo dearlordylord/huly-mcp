@@ -134,9 +134,9 @@ describe("listIssues filters", () => {
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: projectIdentifier("TEST"), titleRegex: "^BUG" }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST"), titleRegex: "BUG%" }).pipe(Effect.provide(testLayer))
 
-        expect(captureQuery.query?.title).toEqual({ $regex: "^BUG" })
+        expect(captureQuery.query?.title).toEqual({ $regex: "BUG%" })
       }))
 
     it.effect("ignores empty titleRegex", () =>
@@ -304,7 +304,7 @@ describe("listIssues filters", () => {
         Schema.decodeUnknown(ListIssuesParamsSchema)({
           project: "TEST",
           titleSearch: "bug",
-          titleRegex: "^BUG"
+          titleRegex: "BUG%"
         })
       )
 

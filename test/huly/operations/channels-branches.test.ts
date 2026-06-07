@@ -159,9 +159,9 @@ describe("listChannels - nameRegex branch", () => {
         captureChannelQuery: captureQuery
       })
 
-      yield* listChannels({ nameRegex: "^dev-" }).pipe(Effect.provide(testLayer))
+      yield* listChannels({ nameRegex: "dev%" }).pipe(Effect.provide(testLayer))
 
-      expect(captureQuery.query?.name).toEqual({ $regex: "^dev-" })
+      expect(captureQuery.query?.name).toEqual({ $regex: "dev%" })
     }))
 
   it.effect("skips nameRegex when blank", () =>

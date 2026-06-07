@@ -851,8 +851,12 @@ echo ""
 echo "=== 2. Issues CRUD ==="
 ISSUE_ID=""
 ISSUE_OBJ_ID=""
+ISSUE_TITLE="IntTest Issue $RUN_ID"
+ISSUE_TITLE_JSON=$(json_string "$ISSUE_TITLE")
+ISSUE_TITLE_REGEX_JSON=$(json_string "%$ISSUE_TITLE%")
+ISSUE_TITLE_CASE_REGEX_JSON=$(json_string "%inttest issue $RUN_ID%")
 ISSUE_TEXT=$(run_capture "create_issue" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"IntTest Issue\",\"description\":\"Integration test\",\"priority\":\"low\"}},\"id\":2}")
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":$ISSUE_TITLE_JSON,\"description\":\"Integration test\",\"priority\":\"low\"}},\"id\":2}")
 if [ $? -eq 0 ]; then
   ISSUE_ID=$(echo "$ISSUE_TEXT" | jq -r '.identifier' 2>/dev/null)
   ISSUE_OBJ_ID=$(echo "$ISSUE_TEXT" | jq -r '.issueId' 2>/dev/null)
@@ -868,9 +872,21 @@ if [ $? -eq 0 ]; then
     "{\"jsonrpc\":\"2.0\",\"method\":\"resources/read\",\"params\":{\"uri\":\"huly://issues/$ISSUE_ID\"},\"id\":2}"
 
   run_capture_to_var LIST_ISSUES_TEXT "list_issues" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_issues\",\"arguments\":{\"project\":\"$PROJECT\",\"titleSearch\":\"IntTest Issue\",\"limit\":10}},\"id\":2}"
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_issues\",\"arguments\":{\"project\":\"$PROJECT\",\"titleSearch\":$ISSUE_TITLE_JSON,\"limit\":10}},\"id\":2}"
   if [ $? -eq 0 ] && [ -n "$ISSUE_OBJ_ID" ]; then
     assert_json_issue_summary_contains_issue_id "list_issues includes issueId" "$LIST_ISSUES_TEXT" "$ISSUE_ID" "$ISSUE_OBJ_ID"
+  fi
+
+  run_capture_to_var LIST_ISSUES_REGEX_TEXT "list_issues(titleRegex SIMILAR TO contains)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_issues\",\"arguments\":{\"project\":\"$PROJECT\",\"titleRegex\":$ISSUE_TITLE_REGEX_JSON,\"limit\":10}},\"id\":2}"
+  if [ $? -eq 0 ] && [ -n "$ISSUE_OBJ_ID" ]; then
+    assert_json_issue_summary_contains_issue_id "list_issues titleRegex SIMILAR TO contains includes issueId" "$LIST_ISSUES_REGEX_TEXT" "$ISSUE_ID" "$ISSUE_OBJ_ID"
+  fi
+
+  run_capture_to_var LIST_ISSUES_REGEX_CASE_TEXT "list_issues(titleRegex case-sensitive miss)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_issues\",\"arguments\":{\"project\":\"$PROJECT\",\"titleRegex\":$ISSUE_TITLE_CASE_REGEX_JSON,\"limit\":10}},\"id\":2}"
+  if [ $? -eq 0 ] && [ -n "$ISSUE_OBJ_ID" ]; then
+    assert_json_array_not_contains "list_issues titleRegex is case-sensitive" "$LIST_ISSUES_REGEX_CASE_TEXT" "map(.issueId)" "$ISSUE_OBJ_ID"
   fi
 
   run_test "update_issue($ISSUE_ID)" \
@@ -1163,6 +1179,10 @@ if [ -n "$TS_NAME" ]; then
 
   DOC_CONTENT=$'# Integration Markdown\n\nThis has **bold**, *italic*, and [Huly](https://huly.io).\n\n- First item\n- Second item'
   DOC_CONTENT_JSON=$(json_string "$DOC_CONTENT")
+  DOC_TITLE="IntTest Doc $RUN_ID"
+  DOC_TITLE_JSON=$(json_string "$DOC_TITLE")
+  DOC_TITLE_REGEX_JSON=$(json_string "%$DOC_TITLE%")
+  DOC_TITLE_CASE_REGEX_JSON=$(json_string "%inttest doc $RUN_ID%")
   DOC_EDITED_CONTENT=$'# Edited Integration Markdown\n\nThe full replacement path repaired this document.\n\n- Repaired item'
   DOC_EDITED_CONTENT_JSON=$(json_string "$DOC_EDITED_CONTENT")
   DOC_REPAIR_CONTENT=$'# Repaired After Corruption\n\nFull replacement restored readable content.'
@@ -1170,7 +1190,7 @@ if [ -n "$TS_NAME" ]; then
   DOC_CORRUPT_CONTENT='raw-markdown-that-is-not-a-blob-ref'
 
   DOC_TEXT=$(run_capture "create_document" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"title\":\"IntTest Doc\",\"content\":$DOC_CONTENT_JSON}},\"id\":2}")
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"title\":$DOC_TITLE_JSON,\"content\":$DOC_CONTENT_JSON}},\"id\":2}")
   if [ $? -eq 0 ]; then
     DOC_ID=$(echo "$DOC_TEXT" | jq -r '.id' 2>/dev/null)
     echo "  => doc: $DOC_ID"
@@ -1185,6 +1205,18 @@ if [ -n "$TS_NAME" ]; then
       assert_json_field_contains "get_document($DOC_ID) round-trips italic" "$GET_DOC_TEXT" '.content' "*italic*"
       assert_json_field_contains "get_document($DOC_ID) round-trips link" "$GET_DOC_TEXT" '.content' "[Huly](https://huly.io)"
       assert_json_field_contains "get_document($DOC_ID) round-trips list" "$GET_DOC_TEXT" '.content' "- First item"
+    fi
+
+    LIST_DOCS_REGEX_TEXT=$(run_capture "list_documents($TS_NAME,titleRegex SIMILAR TO contains)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_documents\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"titleRegex\":$DOC_TITLE_REGEX_JSON,\"limit\":10}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_array_contains "list_documents titleRegex SIMILAR TO contains includes document" "$LIST_DOCS_REGEX_TEXT" ".documents | map(.id)" "$DOC_ID"
+    fi
+
+    LIST_DOCS_REGEX_CASE_TEXT=$(run_capture "list_documents($TS_NAME,titleRegex case-sensitive miss)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_documents\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"titleRegex\":$DOC_TITLE_CASE_REGEX_JSON,\"limit\":10}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_array_not_contains "list_documents titleRegex is case-sensitive" "$LIST_DOCS_REGEX_CASE_TEXT" ".documents | map(.id)" "$DOC_ID"
     fi
 
     EDIT_DOC_TEXT=$(run_capture "edit_document($DOC_ID) title rename" \
@@ -1554,14 +1586,30 @@ else
 fi
 
 # Create a temp channel for message/thread/reaction tests — deleting it cleans up all messages
+CHANNEL_NAME="inttest-chan-$RUN_ID"
+CHANNEL_NAME_JSON=$(json_string "$CHANNEL_NAME")
+CHANNEL_NAME_REGEX_JSON=$(json_string "%$CHANNEL_NAME%")
+CHANNEL_NAME_CASE_REGEX_JSON=$(json_string "%INTTEST-CHAN-$RUN_ID%")
 CH_TEXT=$(run_capture "create_channel" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_channel","arguments":{"name":"inttest-chan","topic":"test channel"}},"id":2}')
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_channel\",\"arguments\":{\"name\":$CHANNEL_NAME_JSON,\"topic\":\"test channel\"}},\"id\":2}")
 if [ $? -eq 0 ]; then
   CH_ID=$(echo "$CH_TEXT" | jq -r '.id' 2>/dev/null)
   echo "  => channel: $CH_ID"
 
+  CH_REGEX_TEXT=$(run_capture "list_channels(nameRegex SIMILAR TO contains)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_channels\",\"arguments\":{\"nameRegex\":$CHANNEL_NAME_REGEX_JSON,\"limit\":10}},\"id\":2}")
+  if [ $? -eq 0 ]; then
+    assert_json_array_contains "list_channels nameRegex SIMILAR TO contains includes channel" "$CH_REGEX_TEXT" "map(.id)" "$CH_ID"
+  fi
+
+  CH_REGEX_CASE_TEXT=$(run_capture "list_channels(nameRegex case-sensitive miss)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_channels\",\"arguments\":{\"nameRegex\":$CHANNEL_NAME_CASE_REGEX_JSON,\"limit\":10}},\"id\":2}")
+  if [ $? -eq 0 ]; then
+    assert_json_array_not_contains "list_channels nameRegex is case-sensitive" "$CH_REGEX_CASE_TEXT" "map(.id)" "$CH_ID"
+  fi
+
   # Send a channel message, then reply + reactions
-  MSG_TEXT=$(run_capture "send_channel_message(inttest-chan)" \
+  MSG_TEXT=$(run_capture "send_channel_message($CHANNEL_NAME)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"send_channel_message\",\"arguments\":{\"channel\":\"$CH_ID\",\"body\":\"IntTest msg\"}},\"id\":2}")
   if [ $? -eq 0 ]; then
     MSG_ID=$(echo "$MSG_TEXT" | jq -r '.id' 2>/dev/null)
@@ -1616,11 +1664,28 @@ run_test "list_organizations" \
 run_test "get_user_profile" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_user_profile","arguments":{}},"id":2}'
 
+PERSON_FIRST_NAME="IntTest-$RUN_ID"
+PERSON_EMAIL="inttest-$RUN_ID@test.local"
+PERSON_FIRST_NAME_JSON=$(json_string "$PERSON_FIRST_NAME")
+PERSON_EMAIL_JSON=$(json_string "$PERSON_EMAIL")
+PERSON_NAME_REGEX_JSON=$(json_string "%$PERSON_FIRST_NAME%")
+PERSON_NAME_CASE_REGEX_JSON=$(json_string "%inttest-$RUN_ID%")
 PERSON_TEXT=$(run_capture "create_person" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_person","arguments":{"firstName":"IntTest","lastName":"Person","email":"inttest@test.local"}},"id":2}')
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":$PERSON_FIRST_NAME_JSON,\"lastName\":\"Person\",\"email\":$PERSON_EMAIL_JSON}},\"id\":2}")
 if [ $? -eq 0 ]; then
   PERSON_ID=$(echo "$PERSON_TEXT" | jq -r '.id' 2>/dev/null)
   echo "  => person: $PERSON_ID"
+  PERSON_REGEX_TEXT=$(run_capture "list_persons(nameRegex SIMILAR TO contains)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_persons\",\"arguments\":{\"nameRegex\":$PERSON_NAME_REGEX_JSON,\"limit\":10}},\"id\":2}")
+  if [ $? -eq 0 ]; then
+    assert_json_array_contains "list_persons nameRegex SIMILAR TO contains includes person" "$PERSON_REGEX_TEXT" "map(.id)" "$PERSON_ID"
+  fi
+
+  PERSON_REGEX_CASE_TEXT=$(run_capture "list_persons(nameRegex case-sensitive miss)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_persons\",\"arguments\":{\"nameRegex\":$PERSON_NAME_CASE_REGEX_JSON,\"limit\":10}},\"id\":2}")
+  if [ $? -eq 0 ]; then
+    assert_json_array_not_contains "list_persons nameRegex is case-sensitive" "$PERSON_REGEX_CASE_TEXT" "map(.id)" "$PERSON_ID"
+  fi
   run_test "update_person($PERSON_ID)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_person\",\"arguments\":{\"personId\":\"$PERSON_ID\",\"city\":\"TestCity\"}},\"id\":2}"
   run_test "delete_person($PERSON_ID)" \
@@ -2353,9 +2418,8 @@ CARDS_MASTER_TEXT=$(run_capture "list_master_tags(Default)" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_master_tags","arguments":{"cardSpace":"Default"}},"id":2}')
 run_test "list_cards(Default)" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_cards","arguments":{"cardSpace":"Default","limit":3}},"id":2}'
-DERIVED_CARD_TYPE_NAME="Character"
-DERIVED_CARD_TYPE_ID=$(printf '%s\n' "$CARDS_MASTER_TEXT" | jq -r --arg name "$DERIVED_CARD_TYPE_NAME" \
-  '.masterTags[]? | select(.name == $name) | .id' 2>/dev/null | head -n 1)
+DERIVED_CARD_TYPE_NAME=$(printf '%s\n' "$CARDS_MASTER_TEXT" | jq -r '.masterTags[0].name // empty' 2>/dev/null)
+DERIVED_CARD_TYPE_ID=$(printf '%s\n' "$CARDS_MASTER_TEXT" | jq -r '.masterTags[0].id // empty' 2>/dev/null)
 if [ -n "$DERIVED_CARD_TYPE_ID" ]; then
   DERIVED_CARD_TYPE_NAME_JSON=$(json_string "$DERIVED_CARD_TYPE_NAME")
   DERIVED_CARD_TYPE_ID_JSON=$(json_string "$DERIVED_CARD_TYPE_ID")
@@ -2363,6 +2427,10 @@ if [ -n "$DERIVED_CARD_TYPE_ID" ]; then
   DERIVED_CARD_ID_TITLE="IntTest Derived Id Card $RUN_ID"
   DERIVED_CARD_LABEL_TITLE_JSON=$(json_string "$DERIVED_CARD_LABEL_TITLE")
   DERIVED_CARD_ID_TITLE_JSON=$(json_string "$DERIVED_CARD_ID_TITLE")
+  DERIVED_CARD_LABEL_TITLE_LOWER=$(printf '%s' "$DERIVED_CARD_LABEL_TITLE" | tr '[:upper:]' '[:lower:]')
+  DERIVED_CARD_LABEL_REGEX_JSON=$(json_string "%$DERIVED_CARD_LABEL_TITLE%")
+  DERIVED_CARD_LABEL_PREFIX_REGEX_JSON=$(json_string "$DERIVED_CARD_LABEL_TITLE%")
+  DERIVED_CARD_LABEL_CASE_REGEX_JSON=$(json_string "%$DERIVED_CARD_LABEL_TITLE_LOWER%")
 
   DERIVED_CARD_LABEL_TEXT=$(run_capture "create_card(derived label:$DERIVED_CARD_TYPE_NAME)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_card\",\"arguments\":{\"cardSpace\":\"Default\",\"type\":$DERIVED_CARD_TYPE_NAME_JSON,\"title\":$DERIVED_CARD_LABEL_TITLE_JSON,\"content\":\"Temporary derived card created by label.\"}},\"id\":2}")
@@ -2382,6 +2450,21 @@ if [ -n "$DERIVED_CARD_TYPE_ID" ]; then
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"type\":$DERIVED_CARD_TYPE_NAME_JSON,\"limit\":10}},\"id\":2}")
     if [ $? -eq 0 ]; then
       assert_json_array_contains "list_cards derived label includes card" "$DERIVED_CARD_LIST_TEXT" ".cards | map(.id)" "$DERIVED_CARD_LABEL_ID"
+    fi
+    DERIVED_CARD_REGEX_TEXT=$(run_capture "list_cards(Default,titleRegex SIMILAR TO contains)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"titleRegex\":$DERIVED_CARD_LABEL_REGEX_JSON,\"limit\":10}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_array_contains "list_cards titleRegex SIMILAR TO contains includes card" "$DERIVED_CARD_REGEX_TEXT" ".cards | map(.id)" "$DERIVED_CARD_LABEL_ID"
+    fi
+    DERIVED_CARD_REGEX_PREFIX_TEXT=$(run_capture "list_cards(Default,titleRegex SIMILAR TO prefix)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"titleRegex\":$DERIVED_CARD_LABEL_PREFIX_REGEX_JSON,\"limit\":10}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_array_contains "list_cards titleRegex SIMILAR TO prefix includes card" "$DERIVED_CARD_REGEX_PREFIX_TEXT" ".cards | map(.id)" "$DERIVED_CARD_LABEL_ID"
+    fi
+    DERIVED_CARD_REGEX_CASE_TEXT=$(run_capture "list_cards(Default,titleRegex case-sensitive miss)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"titleRegex\":$DERIVED_CARD_LABEL_CASE_REGEX_JSON,\"limit\":10}},\"id\":2}")
+    if [ $? -eq 0 ]; then
+      assert_json_array_not_contains "list_cards titleRegex is case-sensitive" "$DERIVED_CARD_REGEX_CASE_TEXT" ".cards | map(.id)" "$DERIVED_CARD_LABEL_ID"
     fi
   else
     fail_test "create_card(derived label:$DERIVED_CARD_TYPE_NAME) returns id" "missing id"
@@ -2414,12 +2497,12 @@ if [ -n "$DERIVED_CARD_TYPE_ID" ]; then
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_card\",\"arguments\":{\"cardSpace\":\"Default\",\"card\":\"$DERIVED_CARD_ID_ID\"}},\"id\":2}"
   fi
 else
-  skip_test "create_card(derived label:Character)" "Default card space has no Character master tag"
-  skip_test "get_card(derived label)" "Default card space has no Character master tag"
-  skip_test "list_cards(Default,type:Character)" "Default card space has no Character master tag"
-  skip_test "create_card(derived id)" "Default card space has no Character master tag"
-  skip_test "get_card(derived id)" "Default card space has no Character master tag"
-  skip_test "delete_card(derived cards)" "Default card space has no Character master tag"
+  skip_test "create_card(derived label)" "Default card space has no master tags"
+  skip_test "get_card(derived label)" "Default card space has no master tags"
+  skip_test "list_cards(Default,type)" "Default card space has no master tags"
+  skip_test "create_card(derived id)" "Default card space has no master tags"
+  skip_test "get_card(derived id)" "Default card space has no master tags"
+  skip_test "delete_card(derived cards)" "Default card space has no master tags"
 fi
 skip_test "update_card" "requires card"
 echo ""

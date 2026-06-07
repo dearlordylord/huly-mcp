@@ -142,6 +142,7 @@ interface MockConfig {
   employees?: Array<HulyEmployee>
   organizations?: Array<HulyOrganization>
   members?: Array<HulyMember>
+  capturePersonQuery?: { query?: Record<string, unknown> }
   captureCreateDoc?: { data?: Record<string, unknown>; id?: string; class?: unknown }
   captureAddCollection?: { attributes?: Record<string, unknown>; attachedTo?: string; class?: unknown }
   captureUpdateDoc?: { operations?: Record<string, unknown> }
@@ -164,6 +165,9 @@ const createTestLayer = (config: MockConfig) => {
   const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown, options?: unknown) => {
     if (_class === contact.class.Person) {
       const q = (query ?? {}) as Record<string, unknown>
+      if (config.capturePersonQuery !== undefined) {
+        config.capturePersonQuery.query = q
+      }
       let filtered = persons
       if (q._id !== undefined) {
         const idFilter = q._id as { $in?: Array<unknown> } | unknown
@@ -173,12 +177,9 @@ const createTestLayer = (config: MockConfig) => {
         }
       }
       if (q.name !== undefined) {
-        const nameFilter = q.name as { $like?: string; $regex?: string } | string
+        const nameFilter = q.name as { $like?: string } | string
         if (typeof nameFilter === "object" && "$like" in nameFilter) {
           filtered = filtered.filter(p => matchesLike(p.name, nameFilter.$like!))
-        } else if (typeof nameFilter === "object" && "$regex" in nameFilter) {
-          const re = new RegExp(nameFilter.$regex)
-          filtered = filtered.filter(p => re.test(p.name))
         }
       }
       const opts = (options ?? {}) as { limit?: number }
@@ -541,13 +542,12 @@ describe("Contacts Extended Coverage", () => {
 
     it.effect("applies a nameRegex filter", () =>
       Effect.gen(function*() {
-        const person1 = createMockPerson({ _id: "person-1" as Ref<HulyPerson>, name: "Doe,John" })
-        const person2 = createMockPerson({ _id: "person-2" as Ref<HulyPerson>, name: "Smith,Jane" })
-        const testLayer = createTestLayer({ persons: [person1, person2], channels: [] })
+        const capturePersonQuery: MockConfig["capturePersonQuery"] = {}
+        const testLayer = createTestLayer({ persons: [], channels: [], capturePersonQuery })
 
-        const result = yield* listPersons({ nameRegex: "^Doe", limit: 10 }).pipe(Effect.provide(testLayer))
+        yield* listPersons({ nameRegex: "Doe%", limit: 10 }).pipe(Effect.provide(testLayer))
 
-        expect(result.map(p => p.id)).toEqual(["person-1"])
+        expect(capturePersonQuery.query?.name).toEqual({ $regex: "Doe%" })
       }))
 
     it.effect("ignores a blank nameRegex", () =>

@@ -55,13 +55,13 @@ describe("ListDocumentsParamsSchema search refinement", () => {
   })
 
   it("accepts a single search filter", () => {
-    assertDecodeSuccess(ListDocumentsParamsSchema, { teamspace: "Docs", titleRegex: "^RFC" })
+    assertDecodeSuccess(ListDocumentsParamsSchema, { teamspace: "Docs", titleRegex: "RFC%" })
   })
 })
 
 describe("ListChannelsParamsSchema search refinement", () => {
   it("rejects providing both nameSearch and nameRegex", () => {
-    assertDecodeFailure(ListChannelsParamsSchema, { nameSearch: "dev", nameRegex: "^dev-" })
+    assertDecodeFailure(ListChannelsParamsSchema, { nameSearch: "dev", nameRegex: "dev-%" })
   })
 
   it("accepts a single search filter", () => {
@@ -71,7 +71,7 @@ describe("ListChannelsParamsSchema search refinement", () => {
 
 describe("ListPersonsParamsSchema search refinement", () => {
   it("rejects providing both nameSearch and nameRegex", () => {
-    assertDecodeFailure(ListPersonsParamsSchema, { nameSearch: "Smith", nameRegex: "^Smith" })
+    assertDecodeFailure(ListPersonsParamsSchema, { nameSearch: "Smith", nameRegex: "Smith%" })
   })
 
   it("accepts a single search filter", () => {

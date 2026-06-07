@@ -477,11 +477,11 @@ describe("listDocuments", () => {
           captureDocumentQuery: captureQuery
         })
 
-        yield* listDocuments({ teamspace: teamspaceIdentifier("My Docs"), titleRegex: "^Spec" }).pipe(
+        yield* listDocuments({ teamspace: teamspaceIdentifier("My Docs"), titleRegex: "Spec%" }).pipe(
           Effect.provide(testLayer)
         )
 
-        expect(captureQuery.query?.title).toEqual({ $regex: "^Spec" })
+        expect(captureQuery.query?.title).toEqual({ $regex: "Spec%" })
       }))
   })
 })

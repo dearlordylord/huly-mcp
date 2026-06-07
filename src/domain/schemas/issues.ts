@@ -156,7 +156,7 @@ const ListIssuesParamsBase = Schema.Struct({
   })),
   titleRegex: Schema.optional(Schema.String.annotations({
     description:
-      "Filter issues by title using a regex pattern (e.g., '^BUG'). Mutually exclusive with titleSearch. Note: regex support depends on the Huly backend; use titleSearch for broader compatibility."
+      "Filter issues by title using Huly $regex. On the supported Postgres backend this is SQL SIMILAR TO, not JavaScript RegExp; matching is case-sensitive and the pattern must match the whole title: use '%' for any string (e.g., '%BUG%' contains, 'BUG%' prefix). Mutually exclusive with titleSearch; use titleSearch for simple substring matching."
   })),
   descriptionSearch: Schema.optional(Schema.String.annotations({
     description: "Search issues by description content (fulltext search)"

@@ -77,8 +77,13 @@ const idMatches = (actual: unknown, query: unknown): boolean => {
 const docMatches = (doc: object, query: Record<string, unknown>): boolean =>
   Object.entries(query).every(([key, value]) => idMatches(Reflect.get(doc, key), value))
 
+interface CapturedFindOptions {
+  readonly limit?: number
+  readonly sort?: unknown
+}
+
 interface Captures {
-  findAll?: { class?: unknown; query?: Record<string, unknown> }
+  findAll?: { class?: unknown; query?: Record<string, unknown>; options?: CapturedFindOptions | undefined }
   createDoc?: { class?: unknown; space?: unknown; attributes?: Record<string, unknown>; id?: unknown }
   updateDoc?: { called?: boolean; operations?: Record<string, unknown> }
   removeDoc?: { called?: boolean; id?: unknown }
@@ -94,17 +99,32 @@ interface CardsMock {
   captures?: Captures
 }
 
+const captureFindOptions = (options: unknown): CapturedFindOptions | undefined => {
+  if (typeof options !== "object" || options === null) {
+    return undefined
+  }
+
+  const limit = Reflect.get(options, "limit")
+  const sort = Reflect.get(options, "sort")
+
+  return {
+    ...(typeof limit === "number" ? { limit } : {}),
+    ...(sort !== undefined ? { sort } : {})
+  }
+}
+
 const buildLayer = (m: CardsMock) => {
   const spaces = m.spaces ?? []
   const cards = m.cards ?? []
   const masterTags = m.masterTags ?? []
   const cap = m.captures
 
-  const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown) => {
+  const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown, options: unknown) => {
     const q = query as Record<string, unknown>
     if (cap?.findAll) {
       cap.findAll.class = _class
       cap.findAll.query = q
+      cap.findAll.options = captureFindOptions(options)
     }
     if (_class === cardPlugin.class.CardSpace) {
       return Effect.succeed(toFindResult(spaces.filter((space) => docMatches(space, q))))
@@ -417,10 +437,10 @@ describe("listCards", () => {
   it.effect("applies a titleRegex filter", () =>
     Effect.gen(function*() {
       const captures: Captures = { findAll: {} }
-      yield* listCards({ cardSpace: SPACE, titleRegex: "^TODO" }).pipe(
+      yield* listCards({ cardSpace: SPACE, titleRegex: "TODO%" }).pipe(
         Effect.provide(buildLayer({ spaces: [makeSpace()], captures }))
       )
-      expect(captures.findAll?.query?.title).toEqual({ $regex: "^TODO" })
+      expect(captures.findAll?.query?.title).toEqual({ $regex: "TODO%" })
     }))
 
   it.effect("applies a contentSearch (fulltext) filter", () =>
