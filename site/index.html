@@ -489,7 +489,7 @@ Ask me for:
 - HULY_WORKSPACE
 - Either HULY_TOKEN, or HULY_EMAIL and HULY_PASSWORD
 
-Do not commit credentials to the repository. Prefer user-level MCP configuration over project files when credentials are involved.
+Do not write Huly credentials into project files. Prefer user-level MCP configuration when credentials are involved, and do not expose secrets in chat, logs, or summaries.
 
 After adding the server, tell me how to restart or reload my MCP client. Then verify the setup by calling get_huly_context and checking that the workspace, URL origin, transport, and auth mode look right without exposing secrets.
   </template>
