@@ -1,5 +1,5 @@
 import { describe, it } from "@effect/vitest"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import { expect } from "vitest"
 
 import {
@@ -8,6 +8,7 @@ import {
   parseUnscheduleTodoParams,
   parseUpdateTodoParams,
   TodoPriorityValues,
+  TodoSummarySchema,
   TodoVisibilityValues,
   updateTodoParamsJsonSchema
 } from "../../src/domain/schemas.js"
@@ -98,6 +99,40 @@ describe("planner schemas", () => {
   it("exposes stable priority and visibility enums", () => {
     expect(TodoPriorityValues).toEqual(["no-priority", "low", "medium", "high", "urgent"])
     expect(TodoVisibilityValues).toEqual(["public", "freeBusy", "private"])
+  })
+
+  it("rejects empty titles in ToDo output summaries", () => {
+    const result = Schema.decodeUnknownEither(TodoSummarySchema)({
+      id: "todo-1",
+      title: "",
+      priority: "high",
+      visibility: "private",
+      owner: { id: "person-1" },
+      attachedTo: { type: "none" },
+      workslots: 0
+    })
+
+    expect(result._tag).toBe("Left")
+  })
+
+  it("rejects empty titles in issue attachment output summaries", () => {
+    const result = Schema.decodeUnknownEither(TodoSummarySchema)({
+      id: "todo-1",
+      title: "Follow up",
+      priority: "high",
+      visibility: "private",
+      owner: { id: "person-1" },
+      attachedTo: {
+        type: "issue",
+        id: "issue-1",
+        project: "HULY",
+        identifier: "HULY-94",
+        title: ""
+      },
+      workslots: 0
+    })
+
+    expect(result._tag).toBe("Left")
   })
 
   it("adds anyOf requirements to update_todo JSON schema", () => {

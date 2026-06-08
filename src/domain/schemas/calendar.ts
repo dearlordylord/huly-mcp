@@ -1,3 +1,4 @@
+import type { Visibility as HulyVisibility } from "@hcengineering/calendar"
 import { JSONSchema, Schema } from "effect"
 
 import { clearableText } from "./clearable.js"
@@ -18,6 +19,12 @@ import {
 import type { PersonId, PersonName } from "./shared.js"
 
 export const VisibilityValues = ["public", "freeBusy", "private"] as const
+type VisibilityValue = typeof VisibilityValues[number]
+type ExactVisibilityValues = [HulyVisibility] extends [VisibilityValue]
+  ? [VisibilityValue] extends [HulyVisibility] ? true : never
+  : never
+const exactVisibilityValues = <T extends true>(value: T): T => value
+exactVisibilityValues<ExactVisibilityValues>(true)
 
 export const VisibilitySchema = Schema.Literal(...VisibilityValues).annotations({
   title: "Visibility",

@@ -2024,8 +2024,6 @@ if [ $? -eq 0 ]; then
         skip_test "get_todo($TODO_ID reopened)" "Huly read-after-reopen was not consistent in time"
       fi
     fi
-    run_test "list_todo_automation_helpers" \
-      '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_todo_automation_helpers","arguments":{}},"id":2}'
     DELETE_TODO_TEXT=$(run_capture "delete_todo($TODO_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}")
     if [ $? -eq 0 ]; then

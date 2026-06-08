@@ -10,7 +10,6 @@ import {
 import {
   type ProjectToDo as HulyProjectToDo,
   type ToDo as HulyToDo,
-  type TodoAutomationHelper,
   type WorkSlot as HulyWorkSlot
 } from "@hcengineering/time"
 import type { Issue as HulyIssue } from "@hcengineering/tracker"
@@ -27,9 +26,9 @@ import type {
   ReopenTodoParams,
   ScheduleTodoParams,
   ScheduleTodoResult,
-  TodoAutomationHelperSummary,
   TodoDetail,
   TodoMutationResult,
+  TodoRank,
   TodoSummary,
   UnscheduleTodoParams,
   UnscheduleTodoResult,
@@ -56,6 +55,7 @@ import {
   todoDescriptionAsMarkupRef,
   todoLookup,
   todoSummary,
+  todoTitleOrFallback,
   uniqueTodoOwnerIds
 } from "./planner-shared.js"
 import { clampLimit, hulyQuery, withLookup } from "./query-helpers.js"
@@ -116,7 +116,7 @@ const createPersonalTodo = (
   owner: Ref<Employee>,
   todoId: Ref<HulyToDo>,
   description: HulyToDo["description"],
-  rank: string
+  rank: TodoRank
 ): Effect.Effect<void, HulyClientError> => {
   const data: AttachedData<HulyToDo> = {
     workslots: 0,
@@ -147,7 +147,7 @@ const createIssueTodo = (
   issue: HulyIssue,
   todoId: Ref<HulyProjectToDo>,
   description: HulyToDo["description"],
-  rank: string
+  rank: TodoRank
 ): Effect.Effect<void, HulyClientError> => {
   const data: AttachedData<HulyProjectToDo> = {
     workslots: 0,
@@ -343,7 +343,7 @@ export const scheduleTodo = (
       todoId: TodoId.make(todo._id),
       date: params.date,
       dueDate: params.dueDate,
-      title: todo.title,
+      title: todoTitleOrFallback(todo.title),
       description: description ?? "",
       visibility: todo.visibility
     })
@@ -402,22 +402,4 @@ export const unscheduleTodo = (
     const slots = yield* client.findAll<HulyWorkSlot>(time.class.WorkSlot, query)
     yield* Effect.all(slots.map((slot) => removeWorkSlot(client, slot)))
     return { todoId: TodoId.make(todo._id), removed: Count.make(slots.length) }
-  })
-
-export const listTodoAutomationHelpers = (): Effect.Effect<
-  Array<TodoAutomationHelperSummary>,
-  HulyClientError,
-  HulyClient
-> =>
-  Effect.gen(function*() {
-    const client = yield* HulyClient
-    const helpers = yield* client.findAll<TodoAutomationHelper>(
-      time.class.TodoAutomationHelper,
-      {},
-      { sort: { modifiedOn: SortingOrder.Descending } }
-    )
-    return helpers.map((helper) => ({
-      id: helper._id,
-      onDoneTester: String(helper.onDoneTester)
-    }))
   })

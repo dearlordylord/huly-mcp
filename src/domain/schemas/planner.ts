@@ -1,3 +1,4 @@
+import type { Visibility as HulyVisibility } from "@hcengineering/calendar"
 import { JSONSchema, Schema } from "effect"
 
 import { clearableText } from "./clearable.js"
@@ -24,6 +25,25 @@ import {
   WorkSlotId
 } from "./shared.js"
 
+export const TodoTitle = NonEmptyString.pipe(Schema.brand("TodoTitle")).annotations({
+  identifier: "TodoTitle",
+  title: "TodoTitle",
+  description: "Non-empty Planner ToDo title."
+})
+export type TodoTitle = Schema.Schema.Type<typeof TodoTitle>
+
+export const TodoAttachmentTitle = NonEmptyString.pipe(Schema.brand("TodoAttachmentTitle")).annotations({
+  identifier: "TodoAttachmentTitle",
+  title: "TodoAttachmentTitle",
+  description: "Non-empty title of the Huly object attached to a ToDo."
+})
+export type TodoAttachmentTitle = Schema.Schema.Type<typeof TodoAttachmentTitle>
+
+// Internal Huly LexoRank token used only to create ordered ToDos; never expose it in MCP output.
+export const TodoRank = NonEmptyString.pipe(Schema.brand("TodoRank"))
+export type TodoRank = Schema.Schema.Type<typeof TodoRank>
+
+// Kept 1:1 with Huly ToDoPriority by the bidirectional maps in planner-shared.ts.
 export const TodoPriorityValues = ["no-priority", "low", "medium", "high", "urgent"] as const
 export const TodoPrioritySchema = Schema.Literal(...TodoPriorityValues).annotations({
   title: "TodoPriority",
@@ -32,6 +52,13 @@ export const TodoPrioritySchema = Schema.Literal(...TodoPriorityValues).annotati
 export type TodoPriority = Schema.Schema.Type<typeof TodoPrioritySchema>
 
 export const TodoVisibilityValues = ["public", "freeBusy", "private"] as const
+type TodoVisibilityValue = typeof TodoVisibilityValues[number]
+type ExactTodoVisibilityValues = [HulyVisibility] extends [TodoVisibilityValue]
+  ? [TodoVisibilityValue] extends [HulyVisibility] ? true : never
+  : never
+const exactTodoVisibilityValues = <T extends true>(value: T): T => value
+exactTodoVisibilityValues<ExactTodoVisibilityValues>(true)
+
 export const TodoVisibilitySchema = Schema.Literal(...TodoVisibilityValues).annotations({
   title: "TodoVisibility",
   description: `Planner ToDo visibility. Allowed values: ${enumValuesDescription(TodoVisibilityValues)}.`
@@ -41,7 +68,8 @@ export type TodoVisibility = Schema.Schema.Type<typeof TodoVisibilitySchema>
 export const TodoCompletionStateValues = ["open", "completed", "all"] as const
 export const TodoCompletionStateSchema = Schema.Literal(...TodoCompletionStateValues).annotations({
   title: "TodoCompletionState",
-  description: "Filter by completion state. Default is open for mutation locators and all for list_todos."
+  description:
+    "Local MCP filter over Huly doneOn: open means doneOn is null, completed means doneOn is set, all applies no doneOn filter."
 })
 export type TodoCompletionState = Schema.Schema.Type<typeof TodoCompletionStateSchema>
 
@@ -139,7 +167,8 @@ export const ListTodosParamsSchema = Schema.Struct({
   }))
 }).annotations({
   title: "ListTodosParams",
-  description: "Parameters for listing Planner ToDos."
+  description:
+    "Parameters for listing Planner ToDos. Empty input is allowed: returns up to 50 ToDos, ordered by Huly planner order, with completionState=all."
 })
 export type ListTodosParams = Schema.Schema.Type<typeof ListTodosParamsSchema>
 
@@ -295,7 +324,6 @@ export type {
   DeleteTodoResult,
   ScheduleTodoResult,
   TodoAttachmentSummary,
-  TodoAutomationHelperSummary,
   TodoDetail,
   TodoMutationResult,
   TodoOwnerSummary,
@@ -316,18 +344,20 @@ const TodoAttachmentSummarySchema = Schema.Union(
     id: IssueId,
     project: ProjectIdentifier,
     identifier: IssueIdentifier,
-    title: Schema.String
+    title: TodoAttachmentTitle
   }),
   Schema.Struct({
     type: Schema.Literal("unknown"),
     id: DocId,
     class: ObjectClassName
+  }).annotations({
+    description: "Attached to a Huly object type this Planner tool does not resolve yet."
   })
 )
 
 export const TodoSummarySchema = Schema.Struct({
   id: TodoId,
-  title: Schema.String,
+  title: TodoTitle,
   dueDate: Schema.optional(Schema.NullOr(Timestamp)),
   priority: TodoPrioritySchema,
   visibility: TodoVisibilitySchema,
@@ -335,14 +365,15 @@ export const TodoSummarySchema = Schema.Struct({
   owner: TodoOwnerSummarySchema,
   attachedTo: TodoAttachmentSummarySchema,
   workslots: Count,
-  labels: Schema.optional(Count),
-  rank: Schema.optional(Schema.String)
+  labels: Schema.optional(Count)
 })
 
 export const TodoDetailSchema = Schema.extend(
   TodoSummarySchema,
   Schema.Struct({
-    description: Schema.optional(Schema.String),
+    description: Schema.optional(Schema.String.annotations({
+      description: "Markdown ToDo description; empty string is valid."
+    })),
     attachedSpace: Schema.optional(SpaceId),
     createdOn: Schema.optional(Timestamp),
     modifiedOn: Schema.optional(Timestamp)
@@ -371,13 +402,8 @@ export const UnscheduleTodoResultSchema = Schema.Struct({
   todoId: Schema.optional(TodoId),
   removed: Count
 })
-export const TodoAutomationHelperSummarySchema = Schema.Struct({
-  id: Schema.String,
-  onDoneTester: Schema.String
-})
 
 export const ListTodosResultSchema = Schema.Array(TodoSummarySchema)
-export const ListTodoAutomationHelpersResultSchema = Schema.Array(TodoAutomationHelperSummarySchema)
 
 export const listTodosParamsJsonSchema = JSONSchema.make(ListTodosParamsSchema)
 export const getTodoParamsJsonSchema = JSONSchema.make(GetTodoParamsSchema)

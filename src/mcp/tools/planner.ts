@@ -1,4 +1,3 @@
-import { Effect } from "effect"
 import {
   completeTodoParamsJsonSchema,
   CompleteTodoResultSchema,
@@ -6,9 +5,7 @@ import {
   CreateTodoResultSchema,
   deleteTodoParamsJsonSchema,
   DeleteTodoResultSchema,
-  emptyParamsJsonSchema,
   getTodoParamsJsonSchema,
-  ListTodoAutomationHelpersResultSchema,
   listTodosParamsJsonSchema,
   ListTodosResultSchema,
   parseCompleteTodoParams,
@@ -35,7 +32,6 @@ import {
   createTodo,
   deleteTodo,
   getTodo,
-  listTodoAutomationHelpers,
   listTodos,
   reopenTodo,
   scheduleTodo,
@@ -50,7 +46,7 @@ export const plannerTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "list_todos",
     description:
-      "List Huly Planner ToDos. Use owner names/emails, issue identifiers, title filters, due-date filters, priority, visibility, and completion state; raw Huly class IDs are not required.",
+      "List Huly Planner ToDos. Empty input returns up to 50 ToDos in planner order with all completion states. Use owner, issue, title, due date, priority, visibility, or completion filters to narrow results.",
     category: CATEGORY,
     inputSchema: listTodosParamsJsonSchema,
     handler: createEncodedToolHandler("list_todos", parseListTodosParams, listTodos, ListTodosResultSchema)
@@ -58,7 +54,7 @@ export const plannerTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "get_todo",
     description:
-      "Get one Planner ToDo by raw todoId or by human locator such as issue + title + owner. Returns stable ToDo fields, owner, attachment context, description, rank, labels count, and work slot count.",
+      "Get one Planner ToDo by raw todoId or by human locator such as issue + title + owner. Returns stable ToDo fields, owner, attachment context, description, labels count, and work slot count.",
     category: CATEGORY,
     inputSchema: getTodoParamsJsonSchema,
     handler: createEncodedToolHandler("get_todo", parseGetTodoParams, getTodo, TodoDetailSchema)
@@ -129,19 +125,6 @@ export const plannerTools: ReadonlyArray<RegisteredTool> = [
       parseUnscheduleTodoParams,
       unscheduleTodo,
       UnscheduleTodoResultSchema
-    )
-  },
-  {
-    name: "list_todo_automation_helpers",
-    description:
-      "List Huly ToDo automation helper documents. This is read-only visibility into helper resource IDs; it does not mutate automation.",
-    category: CATEGORY,
-    inputSchema: emptyParamsJsonSchema,
-    handler: createEncodedToolHandler(
-      "list_todo_automation_helpers",
-      () => Effect.succeed({}),
-      listTodoAutomationHelpers,
-      ListTodoAutomationHelpersResultSchema
     )
   }
 ]

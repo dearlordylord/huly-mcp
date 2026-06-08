@@ -10,12 +10,7 @@ import {
   type Space,
   toFindResult
 } from "@hcengineering/core"
-import {
-  type ToDo as HulyToDo,
-  type TodoAutomationHelper,
-  ToDoPriority,
-  type WorkSlot as HulyWorkSlot
-} from "@hcengineering/time"
+import { type ToDo as HulyToDo, ToDoPriority, type WorkSlot as HulyWorkSlot } from "@hcengineering/time"
 import type { Issue as HulyIssue, IssueStatus, Project as HulyProject } from "@hcengineering/tracker"
 import { IssuePriority, TimeReportDayType } from "@hcengineering/tracker"
 import { Effect, TestClock } from "effect"
@@ -30,7 +25,6 @@ import {
   createTodo,
   deleteTodo,
   getTodo,
-  listTodoAutomationHelpers,
   listTodos,
   reopenTodo,
   scheduleTodo,
@@ -46,7 +40,6 @@ const asTodo = (v: unknown) => v as HulyToDo
 const asPerson = (v: unknown) => v as Person
 const asEmployee = (v: unknown) => v as Employee
 const asWorkSlot = (v: unknown) => v as HulyWorkSlot
-const asAutomationHelper = (v: unknown) => v as TodoAutomationHelper
 
 const makeProject = (overrides?: Partial<HulyProject>): HulyProject =>
   asProject({
@@ -172,19 +165,6 @@ const makeWorkSlot = (overrides?: Partial<HulyWorkSlot>): HulyWorkSlot =>
     ...overrides
   })
 
-const makeAutomationHelper = (overrides?: Partial<TodoAutomationHelper>): TodoAutomationHelper =>
-  asAutomationHelper({
-    _id: "helper-1" as Ref<TodoAutomationHelper>,
-    _class: time.class.TodoAutomationHelper,
-    space: time.space.ToDos,
-    onDoneTester: "time:test:done",
-    modifiedBy: "user-1" as PersonId,
-    modifiedOn: 10,
-    createdBy: "user-1" as PersonId,
-    createdOn: 1,
-    ...overrides
-  })
-
 interface Captures {
   addCollection?: {
     readonly classId: string
@@ -227,7 +207,6 @@ interface TestConfig {
   readonly persons?: ReadonlyArray<Person>
   readonly employees?: ReadonlyArray<Employee>
   readonly workSlots?: ReadonlyArray<HulyWorkSlot>
-  readonly helpers?: ReadonlyArray<TodoAutomationHelper>
   readonly captures?: Captures
   readonly removeCollectionAvailable?: boolean
 }
@@ -239,7 +218,6 @@ const createLayer = (config: TestConfig) => {
   const persons = [...(config.persons ?? [])]
   const employees = [...(config.employees ?? [])]
   const workSlots = [...(config.workSlots ?? [])]
-  const helpers = [...(config.helpers ?? [])]
 
   const withTodoLookup = (todo: HulyToDo): HulyToDo => {
     const issue = issues.find((i) => i._id === todo.attachedTo)
@@ -322,7 +300,6 @@ const createLayer = (config: TestConfig) => {
       )
       return Effect.succeed(toFindResult(filtered as Array<Doc>))
     }
-    if (_class === time.class.TodoAutomationHelper) return Effect.succeed(toFindResult(helpers as Array<Doc>))
     return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
 
@@ -729,6 +706,27 @@ describe("planner operations", () => {
       expect(result[0].doneOn).toBe(100)
     }))
 
+  it.effect("uses non-empty output fallbacks for legacy blank titles", () =>
+    Effect.gen(function*() {
+      const issue = makeIssue({ title: "" })
+      const result = yield* listTodos({}).pipe(
+        Effect.provide(createLayer({
+          issues: [issue],
+          todos: [
+            makeTodo({
+              title: "   ",
+              attachedTo: issue._id,
+              attachedToClass: tracker.class.Issue
+            })
+          ],
+          captures: {}
+        }))
+      )
+
+      expect(result[0].title).toBe("Untitled ToDo")
+      expect(result[0].attachedTo).toMatchObject({ type: "issue", title: "HULY-94" })
+    }))
+
   it.effect("returns an ambiguous locator error for duplicate title matches", () =>
     Effect.gen(function*() {
       const error = yield* Effect.flip(
@@ -1097,14 +1095,5 @@ describe("planner operations", () => {
 
       expect(result.todoId).toBe("todo-1")
       expect(result.removed).toBe(1)
-    }))
-
-  it.effect("lists ToDo automation helpers", () =>
-    Effect.gen(function*() {
-      const result = yield* listTodoAutomationHelpers().pipe(
-        Effect.provide(createLayer({ helpers: [makeAutomationHelper()], captures: {} }))
-      )
-
-      expect(result).toEqual([{ id: "helper-1", onDoneTester: "time:test:done" }])
     }))
 })

@@ -33,6 +33,7 @@ import type {
   TimeSpendReport,
   WorkSlot
 } from "../../domain/schemas.js"
+import type { TodoTitle, TodoVisibility } from "../../domain/schemas/planner.js"
 import {
   IssueIdentifier,
   NonNegativeNumber,
@@ -78,10 +79,16 @@ type CreateWorkSlotError = HulyClientError
 type StartTimerError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
 type StopTimerError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
 
-interface CreateWorkSlotForTodoInput extends CreateWorkSlotParams {
-  readonly title: string
+interface AddWorkSlotForTodoInput extends CreateWorkSlotParams {
+  // Public create_work_slot creates a bare slot by raw ToDo ID, so it has no user-facing title.
+  readonly title: TodoTitle | ""
+  // Markdown copied from the ToDo at scheduling time; empty string means no description.
   readonly description: string
-  readonly visibility: "public" | "freeBusy" | "private"
+  readonly visibility: TodoVisibility
+}
+
+interface CreateWorkSlotForTodoInput extends AddWorkSlotForTodoInput {
+  readonly title: TodoTitle
 }
 
 export const logTime = (
@@ -385,7 +392,7 @@ export const listWorkSlots = (
 
 const addWorkSlotForTodo = (
   client: HulyClient["Type"],
-  params: CreateWorkSlotForTodoInput
+  params: AddWorkSlotForTodoInput
 ): Effect.Effect<CreateWorkSlotResult, CreateWorkSlotError> =>
   Effect.gen(function*() {
     const slotId: Ref<HulyWorkSlot> = generateId()

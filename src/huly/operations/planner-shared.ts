@@ -14,15 +14,18 @@ import type {
   TodoLocator,
   TodoOwnerSummary,
   TodoPriority,
+  TodoRank,
   TodoSummary,
   TodoVisibility
 } from "../../domain/schemas/planner.js"
+import { TodoAttachmentTitle, TodoRank as TodoRankSchema, TodoTitle } from "../../domain/schemas/planner.js"
 import {
   Count,
   DocId,
   Email,
   IssueId,
   IssueIdentifier,
+  type NonEmptyString,
   ObjectClassName,
   PersonId,
   PersonName,
@@ -102,8 +105,21 @@ const STRING_TO_TODO_PRIORITY = {
 const todoPriorityToString = (priority: ToDoPriority): TodoPriority => TODO_PRIORITY_TO_STRING[priority]
 export const stringToTodoPriority = (priority: TodoPriority): ToDoPriority => STRING_TO_TODO_PRIORITY[priority]
 
-const todoVisibilityToString = (visibility: HulyVisibility): TodoVisibility => visibility
-export const stringToTodoVisibility = (visibility: TodoVisibility): HulyVisibility => visibility
+const TODO_VISIBILITY_TO_HULY = {
+  public: "public",
+  freeBusy: "freeBusy",
+  private: "private"
+} as const satisfies Record<TodoVisibility, HulyVisibility>
+
+const HULY_VISIBILITY_TO_TODO = {
+  public: "public",
+  freeBusy: "freeBusy",
+  private: "private"
+} as const satisfies Record<HulyVisibility, TodoVisibility>
+
+const todoVisibilityToString = (visibility: HulyVisibility): TodoVisibility => HULY_VISIBILITY_TO_TODO[visibility]
+export const stringToTodoVisibility = (visibility: TodoVisibility): HulyVisibility =>
+  TODO_VISIBILITY_TO_HULY[visibility]
 
 // SDK: ToDo["description"] is Markup, but persisted markup references are plain strings.
 export const todoDescriptionAsMarkupRef = (description: HulyToDo["description"]): MarkupBlobRef =>
@@ -112,9 +128,15 @@ export const todoDescriptionAsMarkupRef = (description: HulyToDo["description"])
 
 export const markupRefAsTodoDescription = (ref: MarkupBlobRef | null): HulyToDo["description"] => ref ?? ""
 
+// Huly can contain legacy/API-created blank titles; MCP output keeps list/get responses non-empty.
+export const todoTitleOrFallback = (title: string): TodoTitle => TodoTitle.make(title.trim() || "Untitled ToDo")
+
+const attachmentTitleOrFallback = (title: string, fallback: string): TodoAttachmentTitle =>
+  TodoAttachmentTitle.make(title.trim() || fallback)
+
 export const resolveTodoOwner = (
   client: HulyClient["Type"],
-  owner?: string
+  owner?: NonEmptyString
 ): Effect.Effect<
   Ref<Employee>,
   HulyClientError | PersonIdentifierAmbiguousError | PersonNotFoundError | PersonNotAnEmployeeError
@@ -187,7 +209,7 @@ export const resolveTodoAttachment = (
 export const latestOpenTodoRank = (
   client: HulyClient["Type"],
   owner: Ref<Employee>
-): Effect.Effect<string, HulyClientError> =>
+): Effect.Effect<TodoRank, HulyClientError> =>
   Effect.gen(function*() {
     const latestTodo = yield* client.findOne<HulyToDo>(
       time.class.ToDo,
@@ -197,7 +219,7 @@ export const latestOpenTodoRank = (
       }),
       { sort: { rank: SortingOrder.Ascending } }
     )
-    return makeRank(undefined, latestTodo?.rank)
+    return TodoRankSchema.make(makeRank(undefined, latestTodo?.rank))
   })
 
 const applyCompletionState = (
@@ -219,13 +241,14 @@ const queryForAttachment = (
   query.attachedToClass = attachment.attachedToClass
 }
 
+// Error diagnostics use compact JSON because locators are already LLM-facing shapes.
 const describeLocator = (locator: TodoLocator): string => JSON.stringify(locator)
 
 export const queryFromListFilters = (
   owner: Ref<Employee> | undefined,
   attachment: ResolvedTodoAttachment | undefined,
   filters: {
-    readonly title?: string | undefined
+    readonly title?: NonEmptyString | undefined
     readonly dueFrom?: Timestamp | undefined
     readonly dueTo?: Timestamp | undefined
     readonly completionState?: TodoCompletionState | undefined
@@ -320,7 +343,7 @@ const todoAttachmentSummary = (todo: HulyTodoWithLookup): TodoAttachmentSummary 
       id: IssueId.make(issue._id),
       project: ProjectIdentifier.make(IssueIdentifier.make(issue.identifier).split("-")[0]),
       identifier: IssueIdentifier.make(issue.identifier),
-      title: issue.title
+      title: attachmentTitleOrFallback(issue.title, issue.identifier)
     }
   }
   return {
@@ -342,7 +365,7 @@ export const todoSummary = (
   const labels = Reflect.get(todo, "labels")
   return {
     id: TodoId.make(todo._id),
-    title: todo.title,
+    title: todoTitleOrFallback(todo.title),
     priority: todoPriorityToString(todo.priority),
     visibility: todoVisibilityToString(todo.visibility),
     owner: todoOwnerSummary(todo, emailByPersonId),
@@ -350,8 +373,7 @@ export const todoSummary = (
     workslots: runtimeCount(Reflect.get(todo, "workslots")),
     ...(todo.dueDate === undefined ? {} : { dueDate: runtimeTimestampOrNull(todo.dueDate) }),
     doneOn: runtimeTimestampOrNull(todo.doneOn),
-    ...(labels === undefined ? {} : { labels: runtimeCount(labels) }),
-    rank: todo.rank
+    ...(labels === undefined ? {} : { labels: runtimeCount(labels) })
   }
 }
 
