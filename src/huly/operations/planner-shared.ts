@@ -327,14 +327,15 @@ export const findTodo = (
 
 const todoOwnerSummary = (
   todo: HulyTodoWithLookup,
-  emailByPersonId: Map<string, string>
+  emailByPersonId: ReadonlyMap<Ref<Person>, Email>
 ): TodoOwnerSummary => {
+  const ownerId = toRef<Person>(todo.user)
   const name = todo.$lookup?.user?.name
-  const email = emailByPersonId.get(todo.user)
+  const email = emailByPersonId.get(ownerId)
   return {
-    id: PersonId.make(todo.user),
+    id: PersonId.make(ownerId),
     ...(name === undefined ? {} : { name: PersonName.make(name) }),
-    ...(email === undefined ? {} : { email: Email.make(email) })
+    ...(email === undefined ? {} : { email })
   }
 }
 
@@ -364,7 +365,7 @@ const runtimeTimestampOrNull = (value: unknown): Timestamp | null | undefined =>
 
 export const todoSummary = (
   todo: HulyTodoWithLookup,
-  emailByPersonId: Map<string, string>
+  emailByPersonId: ReadonlyMap<Ref<Person>, Email>
 ): TodoSummary => {
   const labels = Reflect.get(todo, "labels")
   return {

@@ -48,7 +48,7 @@ export const findPersonByEmail = (
 export const batchGetEmailsForPersons = <T extends Doc>(
   client: HulyClient["Type"],
   personIds: Array<Ref<T>>
-): Effect.Effect<Map<string, string>, HulyClientError> =>
+): Effect.Effect<Map<Ref<T>, Email>, HulyClientError> =>
   Effect.gen(function*() {
     if (personIds.length === 0) {
       return new Map()
@@ -62,10 +62,11 @@ export const batchGetEmailsForPersons = <T extends Doc>(
       }
     )
 
-    const emailMap = new Map<string, string>()
+    const emailMap = new Map<Ref<T>, Email>()
     for (const channel of channels) {
-      if (!emailMap.has(channel.attachedTo)) {
-        emailMap.set(channel.attachedTo, channel.value)
+      const personId = toRef<T>(channel.attachedTo)
+      if (!emailMap.has(personId)) {
+        emailMap.set(personId, Email.make(channel.value))
       }
     }
     return emailMap

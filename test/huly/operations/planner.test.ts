@@ -16,7 +16,7 @@ import { IssuePriority, TimeReportDayType } from "@hcengineering/tracker"
 import { Effect, TestClock } from "effect"
 import { expect } from "vitest"
 
-import { WorkSlotId } from "../../../src/domain/schemas/shared.js"
+import { Email, WorkSlotId } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { contact, time, tracker } from "../../../src/huly/huly-plugins.js"
 import { queryFromListFilters, todoSummary } from "../../../src/huly/operations/planner-shared.js"
@@ -622,7 +622,7 @@ describe("planner operations", () => {
         workslots: "3",
         labels: "2"
       }),
-      new Map([["employee-1", "jane@example.test"]])
+      new Map([[toRef<Person>("employee-1"), Email.make("jane@example.test")]])
     )
 
     expect(result.owner.email).toBe("jane@example.test")
