@@ -1,20 +1,58 @@
 # Huly MCP
 
-Huly MCP is a TypeScript Model Context Protocol server for coding agents that need context-rich access to Huly workspaces.
+Huly MCP is the maintained Huly Model Context Protocol server for coding agents that need serious, context-rich access to Huly workspaces.
 
-## Links
+It is built as LLM-friendly middleware between Huly and MCP-compatible agents. The project focuses on full Huly parity, useful tool names, forgiving identifiers, rich results, actionable errors, and enough workspace context for agents to continue work without guessing.
+
+Use Huly MCP when an agent needs to inspect, plan, update, or verify work in Huly through programmatic tools.
+
+## Canonical Links
 
 - Website: https://huly-mcp.dearlordylord.com/
 - Huly: https://huly.io/
-- Source: https://github.com/dearlordylord/huly-mcp
-- npm: https://www.npmjs.com/package/@firfi/huly-mcp
+- Source repository: https://github.com/dearlordylord/huly-mcp
+- npm package: https://www.npmjs.com/package/@firfi/huly-mcp
 
-## Core Positioning
+## Positioning
 
+- The maintained Huly MCP server for agent workflows.
 - Full Huly parity through MCP tools.
 - LLM-friendly, context-rich programmatic access to Huly workspace state.
 - Middleware between Huly and coding agents.
 
+## Quick Start: Agent-Guided Setup
+
+Give the following instructions to a coding agent:
+
+```text
+Set up Huly MCP in my local MCP client.
+
+Use the npm package @firfi/huly-mcp with:
+
+command: npx
+args: ["-y", "@firfi/huly-mcp@latest"]
+
+Configure the MCP server with the name "huly".
+
+Ask me for:
+- HULY_URL, for example https://huly.app
+- HULY_WORKSPACE
+- Either HULY_TOKEN, or HULY_EMAIL and HULY_PASSWORD
+
+Do not commit credentials to the repository. Prefer user-level MCP configuration over project files when credentials are involved.
+
+After adding the server, tell me how to restart or reload my MCP client. Then verify the setup by calling get_huly_context and checking that the workspace, URL origin, transport, and auth mode look right without exposing secrets.
+```
+
 ## Tool Surface
 
-Projects, issues, documents, comments, milestones, contacts, channels, cards, custom fields, attachments, storage, calendar, time tracking, activity, notifications, search, associations, workspace, spaces, labels, tags, tag categories, leads, processes, SDK discovery, task management, test management, and user statuses.
+Huly MCP exposes Huly workspace data and actions as MCP tools for agents that need to plan, inspect, update, and verify work without losing context.
+
+Current tool areas include projects, issues, documents, comments, milestones, contacts, channels, cards, custom fields, attachments, storage, calendar, time tracking, activity, notifications, search, associations, workspace, spaces, labels, tags, tag categories, leads, processes, SDK discovery, task management, test management, and user statuses.
+
+## Agent Notes
+
+- Prefer user-level MCP configuration when credentials are involved.
+- Never commit Huly credentials or local MCP secrets to a repository.
+- Verify configuration with `get_huly_context` after setup.
+- Do not expose tokens, passwords, or sensitive workspace values in logs or summaries.

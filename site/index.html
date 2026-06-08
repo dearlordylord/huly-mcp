@@ -473,8 +473,9 @@
       MIT licensed. Built for Huly workspaces and MCP-compatible agents.
     </footer>
   </main>
-  <script>
-    const agentInstructions = `Set up Huly MCP in my local MCP client.
+
+  <template id="agent-instructions">
+Set up Huly MCP in my local MCP client.
 
 Use the npm package @firfi/huly-mcp with:
 
@@ -490,8 +491,11 @@ Ask me for:
 
 Do not commit credentials to the repository. Prefer user-level MCP configuration over project files when credentials are involved.
 
-After adding the server, tell me how to restart or reload my MCP client. Then verify the setup by calling get_huly_context and checking that the workspace, URL origin, transport, and auth mode look right without exposing secrets.`;
+After adding the server, tell me how to restart or reload my MCP client. Then verify the setup by calling get_huly_context and checking that the workspace, URL origin, transport, and auth mode look right without exposing secrets.
+  </template>
 
+  <script>
+    const agentInstructions = document.querySelector("#agent-instructions")?.textContent.trim() ?? "";
     const button = document.querySelector("[data-copy-agent-instructions]");
     const label = document.querySelector("[data-copy-label]");
     const defaultLabel = label?.textContent ?? "Copy Agent Instructions";
