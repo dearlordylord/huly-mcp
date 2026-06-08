@@ -211,34 +211,6 @@ call_tool_stdio() {
   printf '%s\n%s\n' "$INIT" "$payload" | timeout "$TOOL_TIMEOUT" env MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep '"id":2'
 }
 
-call_tool_stdio_no_auto_exit() {
-  local payload="$1"
-  local output_file
-  local pid
-  local result
-  output_file="$(mktemp)"
-  (printf '%s\n%s\n' "$INIT" "$payload" | node dist/index.cjs >"$output_file" 2>/dev/null) &
-  pid=$!
-  for _ in $(seq 1 "$((TOOL_TIMEOUT * 5))"); do
-    result=$(grep -m 1 '"id":2' "$output_file" || true)
-    if [ -n "$result" ]; then
-      kill "$pid" 2>/dev/null || true
-      wait "$pid" 2>/dev/null || true
-      rm -f "$output_file"
-      printf '%s\n' "$result"
-      return 0
-    fi
-    if ! kill -0 "$pid" 2>/dev/null; then
-      break
-    fi
-    sleep 0.2
-  done
-  kill "$pid" 2>/dev/null || true
-  wait "$pid" 2>/dev/null || true
-  rm -f "$output_file"
-  return 1
-}
-
 call_tool_http() {
   local payload="$1"
   local response
@@ -268,15 +240,6 @@ call_tool() {
     call_tool_http "$payload"
   else
     call_tool_stdio "$payload"
-  fi
-}
-
-call_tool_no_auto_exit() {
-  local payload="$1"
-  if [ "$INTEGRATION_TRANSPORT" = "http" ]; then
-    call_tool_http "$payload"
-  else
-    call_tool_stdio_no_auto_exit "$payload"
   fi
 }
 
@@ -316,58 +279,6 @@ run_test() {
   echo "PASS: $name"
   PASSED=$((PASSED + 1))
   return 0
-}
-
-run_test_with_timeout() {
-  local name="$1"
-  local payload="$2"
-  local timeout_seconds="$3"
-  local previous_timeout="$TOOL_TIMEOUT"
-  local status
-  TOOL_TIMEOUT="$timeout_seconds"
-  run_test "$name" "$payload"
-  status=$?
-  TOOL_TIMEOUT="$previous_timeout"
-  return "$status"
-}
-
-run_test_no_auto_exit_with_timeout() {
-  local name="$1"
-  local payload="$2"
-  local timeout_seconds="$3"
-  local previous_timeout="$TOOL_TIMEOUT"
-  local result
-  local status=0
-  TOOL_TIMEOUT="$timeout_seconds"
-  result=$(call_tool_no_auto_exit "$payload")
-  TOOL_TIMEOUT="$previous_timeout"
-  if [ -z "$result" ]; then
-    echo "FAIL: $name (no response)"
-    FAILED=$((FAILED + 1))
-    ERRORS="${ERRORS}\n  - ${name}: no response"
-    return 1
-  fi
-  local rpc_error
-  rpc_error=$(echo "$result" | jq -r '.error.message // empty' 2>/dev/null)
-  if [ -n "$rpc_error" ]; then
-    echo "FAIL: $name => $rpc_error"
-    FAILED=$((FAILED + 1))
-    ERRORS="${ERRORS}\n  - ${name}: ${rpc_error}"
-    return 1
-  fi
-  local is_error
-  is_error=$(echo "$result" | jq -r '.result.isError // false' 2>/dev/null)
-  if [ "$is_error" = "true" ]; then
-    local err_text
-    err_text=$(echo "$result" | jq -r '.result.content[0].text' 2>/dev/null | head -c 200)
-    echo "FAIL: $name => $err_text"
-    FAILED=$((FAILED + 1))
-    ERRORS="${ERRORS}\n  - ${name}: ${err_text}"
-    return 1
-  fi
-  echo "PASS: $name"
-  PASSED=$((PASSED + 1))
-  return "$status"
 }
 
 run_capture() {
@@ -2074,19 +1985,8 @@ if [ $? -eq 0 ]; then
     else
       skip_test "issue_planner_todo_lifecycle" "create_todo did not return a todoId"
     fi
-    PLANNER_ISSUE_DELETE_PAYLOAD="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$PLANNER_ISSUE_ID\"}}},\"id\":2}"
-    PLANNER_ISSUE_DELETE_PREVIOUS_TIMEOUT="$TOOL_TIMEOUT"
-    TOOL_TIMEOUT=180
-    PLANNER_ISSUE_DELETE_RESULT=$(call_tool_no_auto_exit "$PLANNER_ISSUE_DELETE_PAYLOAD")
-    TOOL_TIMEOUT="$PLANNER_ISSUE_DELETE_PREVIOUS_TIMEOUT"
-    PLANNER_ISSUE_DELETE_ERROR=$(echo "$PLANNER_ISSUE_DELETE_RESULT" | jq -r '.error.message // empty' 2>/dev/null)
-    PLANNER_ISSUE_DELETE_IS_ERROR=$(echo "$PLANNER_ISSUE_DELETE_RESULT" | jq -r '.result.isError // false' 2>/dev/null)
-    if [ -n "$PLANNER_ISSUE_DELETE_RESULT" ] && [ -z "$PLANNER_ISSUE_DELETE_ERROR" ] && [ "$PLANNER_ISSUE_DELETE_IS_ERROR" != "true" ]; then
-      echo "PASS: delete_issue(planner_todo:$PLANNER_ISSUE_ID)"
-      PASSED=$((PASSED + 1))
-    else
-      skip_test "delete_issue(planner_todo:$PLANNER_ISSUE_ID)" "Huly issue cleanup after ToDo collection deletion was not consistent in time"
-    fi
+    run_test "delete_issue(planner_todo:$PLANNER_ISSUE_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$PLANNER_ISSUE_ID\"}}},\"id\":2}"
   else
     skip_test "issue_planner_todo_lifecycle" "create_issue did not return an identifier"
   fi
