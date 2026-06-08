@@ -3,12 +3,49 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Huly MCP</title>
-  <meta name="description" content="MCP server for connecting AI agents to Huly workspaces.">
+  <title>Huly MCP - Model Context Protocol server for Huly workspaces</title>
+  <meta name="description" content="Huly MCP is a TypeScript Model Context Protocol server that gives coding agents context-rich, full-parity access to Huly workspaces.">
+  <meta name="robots" content="index,follow">
+  <meta name="application-name" content="Huly MCP">
+  <meta name="theme-color" content="#05080a">
+  <link rel="canonical" href="https://huly-mcp.dearlordylord.com/">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Huly MCP">
+  <meta property="og:title" content="Huly MCP">
+  <meta property="og:description" content="Context-rich MCP middleware for coding agents working with Huly workspaces.">
+  <meta property="og:url" content="https://huly-mcp.dearlordylord.com/">
+  <meta property="og:image" content="https://huly-mcp.dearlordylord.com/icon.svg">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Huly MCP">
+  <meta name="twitter:description" content="Context-rich MCP middleware for coding agents working with Huly workspaces.">
+  <meta name="twitter:image" content="https://huly-mcp.dearlordylord.com/icon.svg">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Huly MCP",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Cross-platform",
+      "description": "TypeScript Model Context Protocol server for context-rich programmatic access to Huly workspaces.",
+      "url": "https://huly-mcp.dearlordylord.com/",
+      "codeRepository": "https://github.com/dearlordylord/huly-mcp",
+      "downloadUrl": "https://www.npmjs.com/package/@firfi/huly-mcp",
+      "license": "https://github.com/dearlordylord/huly-mcp/blob/master/LICENSE",
+      "programmingLanguage": "TypeScript",
+      "isAccessibleForFree": true,
+      "keywords": "Huly MCP, Model Context Protocol, MCP server, Huly, coding agents, AI agents, TypeScript",
+      "sameAs": [
+        "https://huly.io/",
+        "https://github.com/dearlordylord/huly-mcp",
+        "https://www.npmjs.com/package/@firfi/huly-mcp"
+      ]
+    }
+  </script>
   <style>
-    @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap");
-
     :root {
       color-scheme: dark;
       --bg: #05080a;
@@ -248,6 +285,13 @@
       font-size: 15px;
     }
 
+    .section-copy {
+      max-width: 680px;
+      margin: -8px 0 18px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
     .scope {
       display: flex;
       flex-wrap: wrap;
@@ -389,6 +433,10 @@
 
     <section aria-labelledby="scope-heading">
       <h2 id="scope-heading">Tool Surface</h2>
+      <p class="section-copy">
+        Huly MCP exposes Huly workspace data and actions as MCP tools for agents that need to
+        plan, inspect, update, and verify work without losing context.
+      </p>
       <ul class="scope">
         <li>projects</li>
         <li>issues</li>
@@ -396,15 +444,28 @@
         <li>comments</li>
         <li>milestones</li>
         <li>contacts</li>
+        <li>channels</li>
         <li>cards</li>
+        <li>custom fields</li>
         <li>attachments</li>
+        <li>storage</li>
         <li>calendar</li>
+        <li>time tracking</li>
         <li>activity</li>
         <li>notifications</li>
         <li>search</li>
+        <li>associations</li>
         <li>workspace</li>
+        <li>spaces</li>
+        <li>labels</li>
+        <li>tags</li>
+        <li>tag categories</li>
+        <li>leads</li>
         <li>processes</li>
+        <li>sdk discovery</li>
+        <li>task management</li>
         <li>test management</li>
+        <li>user statuses</li>
       </ul>
     </section>
 

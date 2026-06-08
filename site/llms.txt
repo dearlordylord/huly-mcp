@@ -1,0 +1,20 @@
+# Huly MCP
+
+Huly MCP is a TypeScript Model Context Protocol server for coding agents that need context-rich access to Huly workspaces.
+
+## Links
+
+- Website: https://huly-mcp.dearlordylord.com/
+- Huly: https://huly.io/
+- Source: https://github.com/dearlordylord/huly-mcp
+- npm: https://www.npmjs.com/package/@firfi/huly-mcp
+
+## Core Positioning
+
+- Full Huly parity through MCP tools.
+- LLM-friendly, context-rich programmatic access to Huly workspace state.
+- Middleware between Huly and coding agents.
+
+## Tool Surface
+
+Projects, issues, documents, comments, milestones, contacts, channels, cards, custom fields, attachments, storage, calendar, time tracking, activity, notifications, search, associations, workspace, spaces, labels, tags, tag categories, leads, processes, SDK discovery, task management, test management, and user statuses.

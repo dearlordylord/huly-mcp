@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://huly-mcp.dearlordylord.com/sitemap.xml
