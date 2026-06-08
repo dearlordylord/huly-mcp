@@ -379,27 +379,6 @@ run_result_to_var() {
   return 0
 }
 
-try_capture() {
-  local payload="$1"
-  local result
-  result=$(call_tool "$payload")
-  if [ -z "$result" ]; then
-    return 1
-  fi
-  local rpc_error
-  rpc_error=$(echo "$result" | jq -r '.error.message // empty' 2>/dev/null)
-  if [ -n "$rpc_error" ]; then
-    return 1
-  fi
-  local is_error
-  is_error=$(echo "$result" | jq -r '.result.isError // false' 2>/dev/null)
-  if [ "$is_error" = "true" ]; then
-    return 1
-  fi
-  echo "$result" | jq -r '.result.content[0].text' 2>/dev/null
-  return 0
-}
-
 skip_test() {
   local name="$1"
   local reason="$2"
@@ -1914,12 +1893,10 @@ if [ $? -eq 0 ]; then
     if [ $? -eq 0 ]; then
       assert_json_field_equals "complete_todo($TODO_ID) updated" "$COMPLETE_TODO_TEXT" ".updated" "true"
       sleep 1
-      GET_COMPLETED_TODO_TEXT=$(try_capture \
+      GET_COMPLETED_TODO_TEXT=$(run_capture "get_todo($TODO_ID completed)" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}")
       if [ $? -eq 0 ]; then
         assert_json_field_equals "get_todo($TODO_ID) doneOn after complete" "$GET_COMPLETED_TODO_TEXT" ".doneOn" "1777040000000"
-      else
-        skip_test "get_todo($TODO_ID completed)" "Huly read-after-complete was not consistent in time"
       fi
     fi
     REOPEN_TODO_TEXT=$(run_capture "reopen_todo($TODO_ID)" \
@@ -1927,12 +1904,10 @@ if [ $? -eq 0 ]; then
     if [ $? -eq 0 ]; then
       assert_json_field_equals "reopen_todo($TODO_ID) updated" "$REOPEN_TODO_TEXT" ".updated" "true"
       sleep 1
-      GET_REOPENED_TODO_TEXT=$(try_capture \
+      GET_REOPENED_TODO_TEXT=$(run_capture "get_todo($TODO_ID reopened)" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}")
       if [ $? -eq 0 ]; then
         assert_json_field_equals "get_todo($TODO_ID) doneOn after reopen" "$GET_REOPENED_TODO_TEXT" ".doneOn" "null"
-      else
-        skip_test "get_todo($TODO_ID reopened)" "Huly read-after-reopen was not consistent in time"
       fi
     fi
     DELETE_TODO_TEXT=$(run_capture "delete_todo($TODO_ID)" \
