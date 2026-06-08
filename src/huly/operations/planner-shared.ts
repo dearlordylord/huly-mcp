@@ -51,6 +51,7 @@ import {
 } from "../errors.js"
 import { contact, time, tracker } from "../huly-plugins.js"
 import { findPersonByExactEmailOrName } from "./contacts-shared.js"
+import { hulyDisplayTextOrFallback } from "./display-text.js"
 import { findProjectAndIssue } from "./issues-shared.js"
 import { hulyQuery, type StrictDocumentQuery, withLookup } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
@@ -128,11 +129,14 @@ export const todoDescriptionAsMarkupRef = (description: HulyToDo["description"])
 
 export const markupRefAsTodoDescription = (ref: MarkupBlobRef | null): HulyToDo["description"] => ref ?? ""
 
+const UNTITLED_TODO = TodoTitle.make("Untitled ToDo")
+
 // Huly can contain legacy/API-created blank titles; MCP output keeps list/get responses non-empty.
-export const todoTitleOrFallback = (title: string): TodoTitle => TodoTitle.make(title.trim() || "Untitled ToDo")
+export const todoTitleOrFallback = (title: string): TodoTitle =>
+  hulyDisplayTextOrFallback(TodoTitle, title, UNTITLED_TODO)
 
 const attachmentTitleOrFallback = (title: string, fallback: string): TodoAttachmentTitle =>
-  TodoAttachmentTitle.make(title.trim() || fallback)
+  hulyDisplayTextOrFallback(TodoAttachmentTitle, title, TodoAttachmentTitle.make(fallback))
 
 export const resolveTodoOwner = (
   client: HulyClient["Type"],
