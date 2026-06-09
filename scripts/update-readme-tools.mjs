@@ -7,6 +7,7 @@ import ts from "typescript"
 
 const require = createRequire(import.meta.url)
 const hulyTaskPlugin = require("@hcengineering/task").default
+const checkMode = process.argv.includes("--check")
 
 const sourceCache = new Map()
 const bindingCache = new Map()
@@ -420,7 +421,8 @@ const replaceGeneratedSection = (content, startMarker, endMarker, generated) => 
 }
 
 const readmePath = join(process.cwd(), "README.md")
-let content = readFileSync(readmePath, "utf-8")
+const originalContent = readFileSync(readmePath, "utf-8")
+let content = originalContent
 
 const autoGenComment =
   "<!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->"
@@ -436,6 +438,18 @@ content = replaceGeneratedSection(
   "<!-- tools:end -->",
   `${autoGenComment}\n${generateToolsSection()}`
 )
+
+if (checkMode) {
+  if (content !== originalContent) {
+    console.error("README.md generated sections are stale. Run `pnpm update-readme` and commit the result.")
+    process.exit(1)
+  }
+
+  console.log(
+    `✅ README.md is up to date with ${allTools.length} tools in ${toolsByCategory.size} categories and ${resourceTemplates.length} resource templates`
+  )
+  process.exit(0)
+}
 
 writeFileSync(readmePath, content, "utf-8")
 console.log(

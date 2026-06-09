@@ -31,7 +31,7 @@
     "lint:fix": "find src test -name '*.ts' -print0 | xargs -0 eslint --fix",
     "format": "find src test -name '*.ts' -print0 | xargs -0 eslint --fix --rule '@effect/dprint: error'",
     "check-format": "find src test -name '*.ts' -print0 | xargs -0 eslint --rule '@effect/dprint: error'",
-    "check-all": "pnpm build && pnpm typecheck && pnpm circular && pnpm verify-registry-metadata && pnpm verify-sdk-parity && pnpm lint && pnpm test:coverage",
+    "check-all": "pnpm build && pnpm typecheck && pnpm circular && pnpm verify-registry-metadata && pnpm verify-sdk-parity && pnpm verify-readme && pnpm lint && pnpm test:coverage",
     "circular": "madge --extensions ts --circular src",
     "local-release": "pnpm dlx @changesets/cli@2.30.0 version && pnpm sync-registry-metadata && git add package.json CHANGELOG.md server.json .changeset && (git diff --cached --quiet || HUSKY=0 git commit -m \"RELEASING: Releasing 1 package(s)\") && PKG_VERSION=$(node -p \"require('./package.json').version\") && pnpm dlx esbuild@0.27.2 src/index.ts --bundle --platform=node --format=cjs --outfile=dist/index.cjs --external:ws \"--define:PKG_VERSION=\\\"$PKG_VERSION\\\"\" && pnpm verify-version && npm_config_ignore_scripts=true pnpm dlx @changesets/cli@2.30.0 publish",
     "verify-version": "node -e \"const v=require('./package.json').version; const d=require('fs').readFileSync('dist/index.cjs','utf8'); if(!d.includes('\\\"'+v+'\\\"'))throw new Error('dist version mismatch: expected '+v)\"",
@@ -40,7 +40,8 @@
     "sync-registry-metadata": "node scripts/sync-registry-metadata.mjs",
     "prepack": "pnpm build && pnpm verify-version",
     "prepublishOnly": "pnpm check-all && pnpm verify-version",
-    "update-readme": "tsx scripts/update-readme-tools.mjs"
+    "update-readme": "tsx scripts/update-readme-tools.mjs",
+    "verify-readme": "tsx scripts/update-readme-tools.mjs --check"
   },
   "bin": {
     "huly-mcp": "./dist/index.cjs",

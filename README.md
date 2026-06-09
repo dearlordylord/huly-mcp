@@ -322,7 +322,7 @@ SDK upgrade revisit:
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
 ## Available Tools
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `leads`, `processes`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `leads`, `planner`, `processes`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`
 
 ### Projects
 
@@ -493,7 +493,7 @@ SDK upgrade revisit:
 | `list_time_spend_reports` | List all time entries across issues. Supports filtering by project and date range. Returns entries sorted by date (newest first). |
 | `get_detailed_time_report` | Get detailed time breakdown for a project. Shows total time grouped by issue and by employee. Supports date range filtering. |
 | `list_work_slots` | List scheduled work slots. Shows planned time blocks attached to ToDos. Supports filtering by employee and date range. |
-| `create_work_slot` | Create a scheduled work slot. Attaches a time block to a ToDo for planning purposes. |
+| `create_work_slot` | Create a scheduled work slot when you already have a raw ToDo ID. If you only know the ToDo title, issue, or owner, use schedule_todo instead. |
 | `start_timer` | Start a client-side timer on a Huly issue. Validates the issue exists and returns a start timestamp. Use log_time to record the elapsed time when done. |
 | `stop_timer` | Stop a client-side timer on a Huly issue. Returns the stop timestamp. Calculate elapsed time from start/stop timestamps and use log_time to record it. |
 
@@ -597,6 +597,20 @@ SDK upgrade revisit:
 | `list_funnels` | List all Huly sales funnels (lead pipelines). Returns each funnel's stable ID and display name, sorted by name. Supports filtering by archived status. |
 | `list_leads` | Query Huly leads in a funnel with optional filters. Pass the funnel ID returned by list_funnels, or a funnel name for convenience lookup. Returns leads sorted by modification date (newest first). Supports filtering by status, assignee, and title search. |
 | `get_lead` | Retrieve full details for a Huly lead including markdown description, customer name, funnel ID and funnel name, and status. Lead identifiers follow the upstream Huly format like 'LEAD-1'. |
+
+### Planner
+
+| Tool | Description |
+|------|-------------|
+| `list_todos` | List Huly Planner ToDos. Empty input returns up to 50 ToDos in planner order with all completion states. Use owner, issue, title, due date, priority, visibility, or completion filters to narrow results. |
+| `get_todo` | Get one Planner ToDo by raw todoId or by human locator such as issue + title + owner. Returns stable ToDo fields, owner, attachment context, description, labels count, and work slot count. |
+| `create_todo` | Create a Planner ToDo. Omit attachedTo for a personal ToDo, or pass attachedTo.type=issue with project and identifier for an issue action item. The owner defaults to the authenticated user. |
+| `update_todo` | Update a Planner ToDo by human locator or raw todoId. Supports title, markdown description, owner, dueDate including null to clear, priority, and visibility. |
+| `complete_todo` | Complete a Planner ToDo by setting doneOn. Huly may trim future work slots and run issue automation when the ToDo is attached to an issue. |
+| `reopen_todo` | Reopen a completed Planner ToDo by clearing doneOn. Human locators search completed ToDos by default; raw todoId locators target that exact ToDo. |
+| `delete_todo` | Delete a Planner ToDo. This is destructive; deleting the last open issue ToDo can cause Huly classic issue status automation. |
+| `schedule_todo` | Schedule a Planner ToDo by locator, creating a work slot. Prefer this over create_work_slot when you do not already know the raw todoId. |
+| `unschedule_todo` | Remove ToDo work slots. Pass either workSlotId to remove one slot, locator with scope=all, or locator with scope=future and optional from. |
 
 ### Processes
 
