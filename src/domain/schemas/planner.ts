@@ -6,6 +6,7 @@ import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   Count,
+  DEFAULT_LIMIT,
   DocId,
   Email,
   enumValuesDescription,
@@ -163,12 +164,12 @@ export const ListTodosParamsSchema = Schema.Struct({
   priority: Schema.optional(TodoPrioritySchema),
   visibility: Schema.optional(TodoVisibilitySchema),
   limit: Schema.optional(LimitParam.annotations({
-    description: "Maximum number of ToDos to return (default: 50)."
+    description: `Maximum number of ToDos to return (default: ${DEFAULT_LIMIT}).`
   }))
 }).annotations({
   title: "ListTodosParams",
   description:
-    "Parameters for listing Planner ToDos. Empty input is allowed: returns up to 50 ToDos, ordered by Huly planner order, with completionState=all."
+    `Parameters for listing Planner ToDos. Empty input is allowed: returns up to ${DEFAULT_LIMIT} ToDos, ordered by Huly planner order, with completionState=all.`
 })
 export type ListTodosParams = Schema.Schema.Type<typeof ListTodosParamsSchema>
 

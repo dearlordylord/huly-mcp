@@ -3,6 +3,7 @@ import {
   CompleteTodoResultSchema,
   createTodoParamsJsonSchema,
   CreateTodoResultSchema,
+  DEFAULT_LIMIT,
   deleteTodoParamsJsonSchema,
   DeleteTodoResultSchema,
   getTodoParamsJsonSchema,
@@ -46,7 +47,7 @@ export const plannerTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "list_todos",
     description:
-      "List Huly Planner ToDos. Empty input returns up to 50 ToDos in planner order with all completion states. Use owner, issue, title, due date, priority, visibility, or completion filters to narrow results.",
+      `List Huly Planner ToDos. Empty input returns up to ${DEFAULT_LIMIT} ToDos in planner order with all completion states. Use owner, issue, title, due date, priority, visibility, or completion filters to narrow results.`,
     category: CATEGORY,
     inputSchema: listTodosParamsJsonSchema,
     handler: createEncodedToolHandler("list_todos", parseListTodosParams, listTodos, ListTodosResultSchema)
