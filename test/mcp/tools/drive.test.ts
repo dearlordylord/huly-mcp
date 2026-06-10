@@ -15,6 +15,10 @@ describe("driveTools", () => {
         "get_drive_item",
         "create_drive_folder",
         "upload_drive_file",
+        "upload_drive_file_version",
+        "move_drive_item",
+        "rename_drive_item",
+        "delete_drive_item",
         "list_drive_file_versions",
         "restore_drive_file_version"
       ])
@@ -23,5 +27,12 @@ describe("driveTools", () => {
         expect(tool.category).toBe("drive")
         expect(TOOL_DEFINITIONS[tool.name]).toBe(tool)
       }
+
+      expect(driveTools.find((tool) => tool.name === "move_drive_item")?.description).toContain(
+        "file or folder"
+      )
+      expect(driveTools.find((tool) => tool.name === "delete_drive_item")?.description).toContain(
+        "permanent deletion"
+      )
     }))
 })

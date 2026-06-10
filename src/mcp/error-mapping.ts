@@ -153,6 +153,17 @@ const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDo
   "SpaceIdentifierAmbiguousError",
   "SpaceTypeNotFoundError",
   "SpaceTypeIdentifierAmbiguousError",
+  "DriveNotFoundError",
+  "DriveIdentifierAmbiguousError",
+  "DrivePathNotFoundError",
+  "DrivePathAmbiguousError",
+  "DriveParentNotFolderError",
+  "DriveFileNotFoundError",
+  "DriveFileVersionNotFoundError",
+  "DrivePathConflictError",
+  "DriveInvalidMoveError",
+  "DriveInvalidItemOperationError",
+  "DriveFolderNotEmptyError",
   "NoUpdateFieldsError"
 ])
 

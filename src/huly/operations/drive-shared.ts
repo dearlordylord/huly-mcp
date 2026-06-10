@@ -4,7 +4,10 @@ import type { DriveSpace, File, Folder } from "../drive-sdk.js"
 import type {
   DriveFileNotFoundError,
   DriveFileVersionNotFoundError,
+  DriveFolderNotEmptyError,
   DriveIdentifierAmbiguousError,
+  DriveInvalidItemOperationError,
+  DriveInvalidMoveError,
   DriveNotFoundError,
   DriveParentNotFolderError,
   DrivePathAmbiguousError,
@@ -27,6 +30,9 @@ export type DriveOperationError =
   | DriveFileNotFoundError
   | DriveFileVersionNotFoundError
   | DrivePathConflictError
+  | DriveInvalidMoveError
+  | DriveInvalidItemOperationError
+  | DriveFolderNotEmptyError
 
 export type DriveItem = Folder | File
 

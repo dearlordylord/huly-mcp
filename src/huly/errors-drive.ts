@@ -5,12 +5,14 @@
  */
 import { Schema } from "effect"
 
-import { NonEmptyString } from "../domain/schemas/shared.js"
+import { Count, NonEmptyString } from "../domain/schemas/shared.js"
 
 const DriveAmbiguousMatchSchema = Schema.Struct({
   id: NonEmptyString,
   name: NonEmptyString
 })
+
+const MINIMUM_AMBIGUOUS_MATCHES = 2
 
 const PathAmbiguousCandidateSchema = Schema.Struct({
   id: NonEmptyString,
@@ -31,7 +33,7 @@ export class DriveIdentifierAmbiguousError extends Schema.TaggedError<DriveIdent
   "DriveIdentifierAmbiguousError",
   {
     drive: NonEmptyString,
-    matches: Schema.Array(DriveAmbiguousMatchSchema).pipe(Schema.minItems(2))
+    matches: Schema.Array(DriveAmbiguousMatchSchema).pipe(Schema.minItems(MINIMUM_AMBIGUOUS_MATCHES))
   }
 ) {
   override get message(): string {
@@ -57,7 +59,7 @@ export class DrivePathAmbiguousError extends Schema.TaggedError<DrivePathAmbiguo
   {
     drive: NonEmptyString,
     path: NonEmptyString,
-    candidates: Schema.Array(PathAmbiguousCandidateSchema).pipe(Schema.minItems(2))
+    candidates: Schema.Array(PathAmbiguousCandidateSchema).pipe(Schema.minItems(MINIMUM_AMBIGUOUS_MATCHES))
   }
 ) {
   override get message(): string {
@@ -116,5 +118,55 @@ export class DrivePathConflictError extends Schema.TaggedError<DrivePathConflict
 ) {
   override get message(): string {
     return `Drive path '${this.path}' already exists as a ${this.existingKind} in drive '${this.drive}'`
+  }
+}
+
+export class DriveInvalidMoveError extends Schema.TaggedError<DriveInvalidMoveError>()(
+  "DriveInvalidMoveError",
+  {
+    drive: NonEmptyString,
+    path: NonEmptyString,
+    targetFolderPath: NonEmptyString,
+    reason: NonEmptyString
+  }
+) {
+  override get message(): string {
+    return `Cannot move Drive item '${this.path}' to '${this.targetFolderPath}' in drive '${this.drive}': ${this.reason}`
+  }
+}
+
+export class DriveInvalidItemOperationError extends Schema.TaggedError<DriveInvalidItemOperationError>()(
+  "DriveInvalidItemOperationError",
+  {
+    drive: NonEmptyString,
+    path: NonEmptyString,
+    operation: Schema.Literal("move", "rename", "delete"),
+    reason: NonEmptyString
+  }
+) {
+  override get message(): string {
+    return `Cannot ${this.operation} Drive item '${this.path}' in drive '${this.drive}': ${this.reason}`
+  }
+}
+
+const DriveFolderChildSummarySchema = Schema.Struct({
+  id: NonEmptyString,
+  title: NonEmptyString,
+  kind: Schema.Literal("folder", "file")
+})
+
+export class DriveFolderNotEmptyError extends Schema.TaggedError<DriveFolderNotEmptyError>()(
+  "DriveFolderNotEmptyError",
+  {
+    drive: NonEmptyString,
+    path: NonEmptyString,
+    childCount: Count,
+    children: Schema.Array(DriveFolderChildSummarySchema)
+  }
+) {
+  override get message(): string {
+    const shown = this.children.map((child) => `${child.title} (${child.kind} ${child.id})`).join(", ")
+    const suffix = shown.length === 0 ? "" : ` Children: ${shown}`
+    return `Drive folder '${this.path}' in drive '${this.drive}' is not empty (${this.childCount} child items).${suffix}`
   }
 }

@@ -17,13 +17,17 @@ import { expect } from "vitest"
 
 import {
   parseCreateDriveFolderParams,
+  parseDeleteDriveItemParams,
   parseGetDriveItemParams,
   parseGetDriveParams,
   parseListDriveFileVersionsParams,
   parseListDriveItemsParams,
   parseListDrivesParams,
+  parseMoveDriveItemParams,
+  parseRenameDriveItemParams,
   parseRestoreDriveFileVersionParams,
-  parseUploadDriveFileParams
+  parseUploadDriveFileParams,
+  parseUploadDriveFileVersionParams
 } from "../../../src/domain/schemas.js"
 import { BlobId } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
@@ -31,7 +35,10 @@ import { drive, type DriveSpace, type File, type FileVersion, type Folder } from
 import {
   DriveFileNotFoundError,
   DriveFileVersionNotFoundError,
+  DriveFolderNotEmptyError,
   DriveIdentifierAmbiguousError,
+  DriveInvalidItemOperationError,
+  DriveInvalidMoveError,
   DriveNotFoundError,
   DriveParentNotFolderError,
   DrivePathAmbiguousError,
@@ -40,13 +47,17 @@ import {
 } from "../../../src/huly/errors-drive.js"
 import {
   createDriveFolder,
+  deleteDriveItem,
   getDrive,
   getDriveItem,
   listDriveFileVersions,
   listDriveItems,
   listDrives,
+  moveDriveItem,
+  renameDriveItem,
   restoreDriveFileVersion,
-  uploadDriveFile
+  uploadDriveFile,
+  uploadDriveFileVersion
 } from "../../../src/huly/operations/drive.js"
 import { toRef } from "../../../src/huly/operations/sdk-boundary.js"
 import { HulyStorageClient, type HulyStorageOperations } from "../../../src/huly/storage.js"
@@ -59,7 +70,11 @@ interface DriveState {
   readonly files: Array<File>
   readonly versions: Array<FileVersion>
   nextId: number
-  updatedFile?: { readonly id: string; readonly operations: DocumentUpdate<File> }
+  readonly updatedFiles?: Array<{ readonly id: string; readonly operations: DocumentUpdate<File> }>
+  readonly updatedFolders?: Array<{ readonly id: string; readonly operations: DocumentUpdate<Folder> }>
+  readonly removedDocs?: Array<{ readonly classRef: string; readonly id: string }>
+  readonly removedCollections?: Array<{ readonly classRef: string; readonly id: string; readonly attachedTo: string }>
+  readonly removeCollectionUnavailable?: boolean
 }
 
 const personId = corePersonId("person-1")
@@ -220,16 +235,61 @@ const makeLayer = (state: DriveState): Layer.Layer<HulyClient | HulyStorageClien
   }
 
   const updateDoc: HulyClientOperations["updateDoc"] = <T extends Doc>(
-    _class: Ref<Class<T>>,
+    classRef: Ref<Class<T>>,
     _space: Ref<Space>,
     objectId: Ref<T>,
     operations: DocumentUpdate<T>
   ) => {
-    state.updatedFile = { id: String(objectId), operations: operations as unknown as DocumentUpdate<File> }
-    const targetIndex = state.files.findIndex((candidate) => String(candidate._id) === String(objectId))
-    const target = state.files[targetIndex]
-    if ("file" in operations) {
-      state.files[targetIndex] = { ...target, file: operations.file as Ref<FileVersion> }
+    if (classRef === drive.class.File) {
+      state.updatedFiles?.push({ id: String(objectId), operations: operations as unknown as DocumentUpdate<File> })
+      const targetIndex = state.files.findIndex((candidate) => String(candidate._id) === String(objectId))
+      const target = state.files[targetIndex]
+      state.files[targetIndex] = { ...target, ...(operations as unknown as Partial<File>) }
+    }
+    if (classRef === drive.class.Folder) {
+      state.updatedFolders?.push({ id: String(objectId), operations: operations as unknown as DocumentUpdate<Folder> })
+      const targetIndex = state.folders.findIndex((candidate) => String(candidate._id) === String(objectId))
+      const target = state.folders[targetIndex]
+      state.folders[targetIndex] = { ...target, ...(operations as unknown as Partial<Folder>) }
+    }
+    return Effect.succeed([])
+  }
+
+  const removeCollection: HulyClientOperations["removeCollection"] = <T extends Doc, P extends AttachedDoc>(
+    classRef: Ref<Class<P>>,
+    _space: Ref<Space>,
+    objectId: Ref<P>,
+    attachedTo: Ref<T>
+  ) => {
+    state.removedCollections?.push({
+      classRef: String(classRef),
+      id: String(objectId),
+      attachedTo: String(attachedTo)
+    })
+    if (classRef === drive.class.FileVersion) {
+      const index = state.versions.findIndex((candidate) => String(candidate._id) === String(objectId))
+      if (index >= 0) state.versions.splice(index, 1)
+    }
+    return Effect.succeed(attachedTo)
+  }
+
+  const removeDoc: HulyClientOperations["removeDoc"] = <T extends Doc>(
+    classRef: Ref<Class<T>>,
+    _space: Ref<Space>,
+    objectId: Ref<T>
+  ) => {
+    state.removedDocs?.push({ classRef: String(classRef), id: String(objectId) })
+    if (classRef === drive.class.File) {
+      const index = state.files.findIndex((candidate) => String(candidate._id) === String(objectId))
+      if (index >= 0) state.files.splice(index, 1)
+    }
+    if (classRef === drive.class.Folder) {
+      const index = state.folders.findIndex((candidate) => String(candidate._id) === String(objectId))
+      if (index >= 0) state.folders.splice(index, 1)
+    }
+    if (classRef === drive.class.FileVersion) {
+      const index = state.versions.findIndex((candidate) => String(candidate._id) === String(objectId))
+      if (index >= 0) state.versions.splice(index, 1)
     }
     return Effect.succeed([])
   }
@@ -245,15 +305,19 @@ const makeLayer = (state: DriveState): Layer.Layer<HulyClient | HulyStorageClien
     getFileUrl: (blobId) => `https://files.test/${blobId}`
   }
 
+  const clientOperations = {
+    findAll,
+    findOne,
+    createDoc,
+    updateDoc,
+    addCollection,
+    ...(state.removeCollectionUnavailable ? {} : { removeCollection }),
+    removeDoc,
+    workbenchUrlConfig: testWorkbenchUrlConfig
+  }
+
   return Layer.merge(
-    HulyClient.testLayer({
-      findAll,
-      findOne,
-      createDoc,
-      updateDoc,
-      addCollection,
-      workbenchUrlConfig: testWorkbenchUrlConfig
-    }),
+    HulyClient.testLayer(clientOperations),
     HulyStorageClient.testLayer(storage)
   )
 }
@@ -274,7 +338,8 @@ describe("drive operations", () => {
         folders: [],
         files: [],
         versions: [],
-        nextId: 1
+        nextId: 1,
+        updatedFiles: []
       }
 
       const listParams = yield* parseListDrivesParams({ query: "arc" })
@@ -533,7 +598,14 @@ describe("drive operations", () => {
   it.effect("reports a folder locator when file versions require a file", () =>
     Effect.gen(function*() {
       const specs = folder("folder-specs", "Specs", drive.ids.Root)
-      const state: DriveState = { drives: [driveSpace()], folders: [specs], files: [], versions: [], nextId: 1 }
+      const state: DriveState = {
+        drives: [driveSpace()],
+        folders: [specs],
+        files: [],
+        versions: [],
+        nextId: 1,
+        updatedFiles: []
+      }
 
       const params = yield* parseListDriveFileVersionsParams({ drive: "Docs", file: "/Specs" })
       const error = yield* Effect.flip(listDriveFileVersions(params).pipe(Effect.provide(makeLayer(state))))
@@ -545,7 +617,14 @@ describe("drive operations", () => {
     Effect.gen(function*() {
       yield* TestClock.adjust("123 millis")
       const specs = folder("folder-specs", "Specs", drive.ids.Root)
-      const state: DriveState = { drives: [driveSpace()], folders: [specs], files: [], versions: [], nextId: 1 }
+      const state: DriveState = {
+        drives: [driveSpace()],
+        folders: [specs],
+        files: [],
+        versions: [],
+        nextId: 1,
+        updatedFiles: []
+      }
 
       const uploadParams = yield* parseUploadDriveFileParams({
         drive: "Docs",
@@ -572,7 +651,7 @@ describe("drive operations", () => {
       expect(state.versions[0]?.file).toBe("blob-API.md")
       expect(versions.total).toBe(2)
       expect(restored.restored).toBe(true)
-      expect(state.updatedFile?.operations).toMatchObject({ file: "version-previous" })
+      expect(state.updatedFiles?.at(-1)?.operations).toMatchObject({ file: "version-previous" })
     }))
 
   it.effect("restores numeric versions idempotently and reports missing versions", () =>
@@ -593,7 +672,7 @@ describe("drive operations", () => {
       const missing = yield* Effect.flip(restoreDriveFileVersion(missingParams).pipe(Effect.provide(makeLayer(state))))
 
       expect(restored.restored).toBe(false)
-      expect(state.updatedFile).toBeUndefined()
+      expect(state.updatedFiles).toBeUndefined()
       expect(missing).toBeInstanceOf(DriveFileVersionNotFoundError)
     }))
 
@@ -611,5 +690,298 @@ describe("drive operations", () => {
       const error = yield* Effect.flip(uploadDriveFile(params).pipe(Effect.provide(makeLayer(state))))
 
       expect(error).toBeInstanceOf(DrivePathConflictError)
+    }))
+
+  it.effect("uploads a new version for an existing Drive file", () =>
+    Effect.gen(function*() {
+      yield* TestClock.adjust("321 millis")
+      const specs = folder("folder-specs", "Specs", drive.ids.Root)
+      const api = file("file-api", "API.md", specs._id, [specs._id], "version-1", 1)
+      const state: DriveState = {
+        drives: [driveSpace()],
+        folders: [specs],
+        files: [api],
+        versions: [version("version-1", api._id, 1)],
+        nextId: 1,
+        updatedFiles: []
+      }
+
+      const params = yield* parseUploadDriveFileVersionParams({
+        drive: "Docs",
+        file: "/Specs/API.md",
+        contentType: "text/markdown",
+        data: "SGVsbG8="
+      })
+      const result = yield* uploadDriveFileVersion(params).pipe(Effect.provide(makeLayer(state)))
+
+      expect(result.currentVersion.version).toBe(2)
+      expect(result.currentVersion.lastModified).toBe(321)
+      expect(result.file.currentVersionId).toBe(result.currentVersion.id)
+      expect(state.files[0]).toMatchObject({ version: 2, file: result.currentVersion.id })
+      expect(state.versions.map((item) => item.version)).toEqual([1, 2])
+      expect(state.updatedFiles?.map((update) => update.operations)).toMatchObject([
+        { version: 2 },
+        { file: result.currentVersion.id }
+      ])
+    }))
+
+  it.effect("moves files and folders within the same Drive and rewrites descendant paths", () =>
+    Effect.gen(function*() {
+      const specs = folder("folder-specs", "Specs", drive.ids.Root)
+      const archive = folder("folder-archive", "Archive", drive.ids.Root)
+      const api = file("file-api", "API.md", specs._id, [specs._id])
+      const guide = folder("folder-guide", "Guide", specs._id, [specs._id])
+      const page = file("file-page", "Page.md", guide._id, [guide._id, specs._id], "version-page")
+      const state: DriveState = {
+        drives: [driveSpace()],
+        folders: [specs, archive, guide],
+        files: [api, page],
+        versions: [version("version-1", api._id, 1), version("version-page", page._id, 1)],
+        nextId: 1,
+        updatedFiles: [],
+        updatedFolders: []
+      }
+
+      const moveFileParams = yield* parseMoveDriveItemParams({
+        drive: "Docs",
+        path: "/Specs/API.md",
+        targetFolderPath: "/Archive"
+      })
+      const movedFile = yield* moveDriveItem(moveFileParams).pipe(Effect.provide(makeLayer(state)))
+      const moveFolderParams = yield* parseMoveDriveItemParams({
+        drive: "Docs",
+        path: "/Specs",
+        targetFolderPath: "/Archive"
+      })
+      const movedFolder = yield* moveDriveItem(moveFolderParams).pipe(Effect.provide(makeLayer(state)))
+      const idempotentParams = yield* parseMoveDriveItemParams({
+        drive: "Docs",
+        itemId: specs._id,
+        targetFolderPath: "/Archive"
+      })
+      const idempotent = yield* moveDriveItem(idempotentParams).pipe(Effect.provide(makeLayer(state)))
+
+      expect(movedFile).toMatchObject({ moved: true, fromPath: "/Specs/API.md", toPath: "/Archive/API.md" })
+      expect(state.files.find((item) => item._id === api._id)).toMatchObject({
+        parent: archive._id,
+        path: [archive._id]
+      })
+      expect(movedFolder).toMatchObject({ moved: true, fromPath: "/Specs", toPath: "/Archive/Specs" })
+      expect(state.folders.find((item) => item._id === specs._id)).toMatchObject({
+        parent: archive._id,
+        path: [archive._id]
+      })
+      expect(state.folders.find((item) => item._id === guide._id)?.path).toEqual([specs._id, archive._id])
+      expect(state.files.find((item) => item._id === page._id)?.path).toEqual([guide._id, specs._id, archive._id])
+      expect(idempotent.moved).toBe(false)
+    }))
+
+  it.effect("moves a nested file to the Drive root", () =>
+    Effect.gen(function*() {
+      const specs = folder("folder-specs", "Specs", drive.ids.Root)
+      const api = file("file-api", "API.md", specs._id, [specs._id])
+      const state: DriveState = {
+        drives: [driveSpace()],
+        folders: [specs],
+        files: [api],
+        versions: [version("version-1", api._id, 1)],
+        nextId: 1,
+        updatedFiles: []
+      }
+
+      const params = yield* parseMoveDriveItemParams({
+        drive: "Docs",
+        path: "/Specs/API.md",
+        targetFolderPath: "/"
+      })
+      const moved = yield* moveDriveItem(params).pipe(Effect.provide(makeLayer(state)))
+
+      expect(moved).toMatchObject({ moved: true, fromPath: "/Specs/API.md", toPath: "/API.md" })
+      expect(state.files[0]).toMatchObject({ parent: drive.ids.Root, path: [] })
+    }))
+
+  it.effect("rejects move collisions and descendant folder moves", () =>
+    Effect.gen(function*() {
+      const specs = folder("folder-specs", "Specs", drive.ids.Root)
+      const child = folder("folder-child", "Child", specs._id, [specs._id])
+      const archive = folder("folder-archive", "Archive", drive.ids.Root)
+      const api = file("file-api", "API.md", specs._id, [specs._id])
+      const existing = file("file-existing", "API.md", archive._id, [archive._id], "version-existing")
+      const state: DriveState = {
+        drives: [driveSpace()],
+        folders: [specs, child, archive],
+        files: [api, existing],
+        versions: [version("version-1", api._id, 1), version("version-existing", existing._id, 1)],
+        nextId: 1
+      }
+
+      const collisionParams = yield* parseMoveDriveItemParams({
+        drive: "Docs",
+        path: "/Specs/API.md",
+        targetFolderPath: "/Archive"
+      })
+      const collision = yield* Effect.flip(moveDriveItem(collisionParams).pipe(Effect.provide(makeLayer(state))))
+      const descendantParams = yield* parseMoveDriveItemParams({
+        drive: "Docs",
+        path: "/Specs",
+        targetFolderPath: "/Specs/Child"
+      })
+      const descendant = yield* Effect.flip(moveDriveItem(descendantParams).pipe(Effect.provide(makeLayer(state))))
+
+      expect(collision).toBeInstanceOf(DrivePathConflictError)
+      expect(descendant).toBeInstanceOf(DriveInvalidMoveError)
+    }))
+
+  it.effect("renames Drive items idempotently and rejects sibling collisions", () =>
+    Effect.gen(function*() {
+      const specs = folder("folder-specs", "Specs", drive.ids.Root)
+      const api = file("file-api", "API.md", specs._id, [specs._id])
+      const existing = file("file-existing", "Guide.md", specs._id, [specs._id], "version-existing")
+      const state: DriveState = {
+        drives: [driveSpace()],
+        folders: [specs],
+        files: [api, existing],
+        versions: [version("version-1", api._id, 1), version("version-existing", existing._id, 1)],
+        nextId: 1,
+        updatedFiles: []
+      }
+
+      const renameParams = yield* parseRenameDriveItemParams({
+        drive: "Docs",
+        path: "/Specs/API.md",
+        title: "OpenAPI.md"
+      })
+      const renamed = yield* renameDriveItem(renameParams).pipe(Effect.provide(makeLayer(state)))
+      const unchangedParams = yield* parseRenameDriveItemParams({
+        drive: "Docs",
+        path: "/Specs/OpenAPI.md",
+        title: "OpenAPI.md"
+      })
+      const unchanged = yield* renameDriveItem(unchangedParams).pipe(Effect.provide(makeLayer(state)))
+      const collisionParams = yield* parseRenameDriveItemParams({
+        drive: "Docs",
+        path: "/Specs/OpenAPI.md",
+        title: "Guide.md"
+      })
+      const collision = yield* Effect.flip(renameDriveItem(collisionParams).pipe(Effect.provide(makeLayer(state))))
+
+      expect(renamed).toMatchObject({ renamed: true, fromPath: "/Specs/API.md", toPath: "/Specs/OpenAPI.md" })
+      expect(unchanged.renamed).toBe(false)
+      expect(collision).toBeInstanceOf(DrivePathConflictError)
+      expect(state.files.find((item) => item._id === api._id)?.title).toBe("OpenAPI.md")
+    }))
+
+  it.effect("renames by item id using reconstructed paths", () =>
+    Effect.gen(function*() {
+      const specs = folder("folder-specs", "Specs", drive.ids.Root)
+      const api = file("file-api", "API.md", specs._id, [specs._id])
+      const orphan = file("file-orphan", "Orphan.md", toRef<Folder>("folder-missing"), [
+        toRef<Folder>("folder-missing")
+      ])
+      const root = file("file-root", "README.md", drive.ids.Root, [], "version-root")
+      const state: DriveState = {
+        drives: [driveSpace()],
+        folders: [specs],
+        files: [api, orphan, root],
+        versions: [
+          version("version-1", api._id, 1),
+          version("version-orphan", orphan._id, 1),
+          version("version-root", root._id, 1)
+        ],
+        nextId: 1,
+        updatedFiles: []
+      }
+
+      const idParams = yield* parseRenameDriveItemParams({
+        drive: "Docs",
+        itemId: "file-api",
+        title: "API.md"
+      })
+      const unchanged = yield* renameDriveItem(idParams).pipe(Effect.provide(makeLayer(state)))
+      const rootParams = yield* parseRenameDriveItemParams({
+        drive: "Docs",
+        itemId: "file-root",
+        title: "Readme.md"
+      })
+      const renamedRoot = yield* renameDriveItem(rootParams).pipe(Effect.provide(makeLayer(state)))
+      const orphanParams = yield* parseRenameDriveItemParams({
+        drive: "Docs",
+        itemId: "file-orphan",
+        title: "Orphan.md"
+      })
+      const unchangedOrphan = yield* renameDriveItem(orphanParams).pipe(Effect.provide(makeLayer(state)))
+
+      expect(unchanged).toMatchObject({ renamed: false, fromPath: "/Specs/API.md", toPath: "/Specs/API.md" })
+      expect(renamedRoot).toMatchObject({ renamed: true, fromPath: "/README.md", toPath: "/Readme.md" })
+      expect(unchangedOrphan.fromPath).toBe("/folder-missing/Orphan.md")
+    }))
+
+  it.effect("deletes files with versions, deletes empty folders, and rejects non-empty folders", () =>
+    Effect.gen(function*() {
+      const empty = folder("folder-empty", "Empty", drive.ids.Root)
+      const full = folder("folder-full", "Full", drive.ids.Root)
+      const api = file("file-api", "API.md", drive.ids.Root, [], "version-2", 2)
+      const child = file("file-child", "Child.md", full._id, [full._id], "version-child")
+      const state: DriveState = {
+        drives: [driveSpace()],
+        folders: [empty, full],
+        files: [api, child],
+        versions: [
+          version("version-1", api._id, 1),
+          version("version-2", api._id, 2),
+          version("version-child", child._id, 1)
+        ],
+        nextId: 1,
+        removedCollections: [],
+        removedDocs: []
+      }
+
+      const fileParams = yield* parseDeleteDriveItemParams({ drive: "Docs", path: "/API.md" })
+      const deletedFile = yield* deleteDriveItem(fileParams).pipe(Effect.provide(makeLayer(state)))
+      const folderParams = yield* parseDeleteDriveItemParams({ drive: "Docs", path: "/Empty" })
+      const deletedFolder = yield* deleteDriveItem(folderParams).pipe(Effect.provide(makeLayer(state)))
+      const fullParams = yield* parseDeleteDriveItemParams({ drive: "Docs", path: "/Full" })
+      const fullError = yield* Effect.flip(deleteDriveItem(fullParams).pipe(Effect.provide(makeLayer(state))))
+
+      expect(deletedFile).toMatchObject({ deleted: true, deletedVersions: 2 })
+      expect(state.files.some((item) => item._id === api._id)).toBe(false)
+      expect(state.versions.some((item) => item.attachedTo === api._id)).toBe(false)
+      expect(state.removedCollections?.filter((item) => item.attachedTo === api._id)).toHaveLength(2)
+      expect(deletedFolder).toMatchObject({ deleted: true, deletedVersions: 0 })
+      expect(state.folders.some((item) => item._id === empty._id)).toBe(false)
+      expect(fullError).toBeInstanceOf(DriveFolderNotEmptyError)
+    }))
+
+  it.effect("reports root mutation attempts and falls back to removeDoc for file versions", () =>
+    Effect.gen(function*() {
+      const api = file("file-api", "API.md", drive.ids.Root, [], "version-2", 2)
+      const state: DriveState = {
+        drives: [driveSpace()],
+        folders: [],
+        files: [api],
+        versions: [version("version-1", api._id, 1), version("version-2", api._id, 2)],
+        nextId: 1,
+        removedDocs: [],
+        removeCollectionUnavailable: true
+      }
+
+      const rootError = yield* Effect.flip(
+        deleteDriveItem({ drive: "Docs", path: "/" } as unknown as Parameters<typeof deleteDriveItem>[0]).pipe(
+          Effect.provide(makeLayer(state))
+        )
+      )
+      const defaultRootError = yield* Effect.flip(
+        deleteDriveItem({ drive: "Docs" } as unknown as Parameters<typeof deleteDriveItem>[0]).pipe(
+          Effect.provide(makeLayer(state))
+        )
+      )
+      const deleteParams = yield* parseDeleteDriveItemParams({ drive: "Docs", itemId: "file-api" })
+      const deleted = yield* deleteDriveItem(deleteParams).pipe(Effect.provide(makeLayer(state)))
+
+      expect(rootError).toBeInstanceOf(DriveInvalidItemOperationError)
+      expect(defaultRootError).toBeInstanceOf(DriveInvalidItemOperationError)
+      expect(deleted.deletedVersions).toBe(2)
+      expect(state.removedDocs?.filter((item) => item.classRef === drive.class.FileVersion)).toHaveLength(2)
+      expect(state.removedDocs?.some((item) => item.id === "file-api")).toBe(true)
     }))
 })

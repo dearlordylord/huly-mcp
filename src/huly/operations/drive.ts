@@ -1,4 +1,3 @@
-import type { AttachedData, Blob, Ref } from "@hcengineering/core"
 import { generateId, SortingOrder } from "@hcengineering/core"
 import { Clock, Effect } from "effect"
 
@@ -30,13 +29,7 @@ import { Count, DEFAULT_INCLUDE_ARCHIVED } from "../../domain/schemas/shared.js"
 import { HulyClient } from "../client.js"
 import { drive, type DriveSpace, type File, type FileVersion } from "../drive-sdk.js"
 import { DrivePathConflictError, DrivePathNotFoundError } from "../errors-drive.js"
-import {
-  type FileSourceParams,
-  getBufferFromParams,
-  HulyStorageClient,
-  validateContentType,
-  validateFileSize
-} from "../storage.js"
+import { getBufferFromParams, HulyStorageClient, validateContentType, validateFileSize } from "../storage.js"
 import { pathForItem, toDriveItemSummary, toDriveSummary, toFileVersionSummary } from "./drive-mappers.js"
 import { childPath, normalizeDrivePath, parentPathOf } from "./drive-path.js"
 import {
@@ -53,8 +46,11 @@ import {
   resolveVersion
 } from "./drive-resolvers.js"
 import { type DriveOperationError, filterDrivesByQuery, itemKind, VERSIONS_COLLECTION } from "./drive-shared.js"
+import { makeFileVersionData, uploadSource } from "./drive-upload-shared.js"
 import { clampLimit, hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
+
+export { deleteDriveItem, moveDriveItem, renameDriveItem, uploadDriveFileVersion } from "./drive-file-operations.js"
 
 export const listDrives = (
   params: ListDrivesParams
@@ -269,26 +265,3 @@ export const restoreDriveFileVersion = (
       restored
     }
   })
-
-const uploadSource = (params: UploadDriveFileParams): FileSourceParams => {
-  if (params.filePath !== undefined) return { _tag: "filePath", filePath: params.filePath }
-  if (params.fileUrl !== undefined) return { _tag: "fileUrl", fileUrl: params.fileUrl }
-  return { _tag: "base64", data: params.data ?? "" }
-}
-
-const makeFileVersionData = (
-  title: string,
-  blobId: Ref<Blob>,
-  size: number,
-  contentType: string,
-  lastModified: number,
-  version: number
-): AttachedData<FileVersion> => ({
-  title,
-  file: blobId,
-  size,
-  type: contentType,
-  lastModified,
-  metadata: {},
-  version
-})

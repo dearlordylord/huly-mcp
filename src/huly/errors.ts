@@ -49,7 +49,10 @@ import {
 import {
   DriveFileNotFoundError,
   DriveFileVersionNotFoundError,
+  DriveFolderNotEmptyError,
   DriveIdentifierAmbiguousError,
+  DriveInvalidItemOperationError,
+  DriveInvalidMoveError,
   DriveNotFoundError,
   DriveParentNotFolderError,
   DrivePathAmbiguousError,
@@ -177,7 +180,10 @@ export {
   DrawingNotFoundError,
   DriveFileNotFoundError,
   DriveFileVersionNotFoundError,
+  DriveFolderNotEmptyError,
   DriveIdentifierAmbiguousError,
+  DriveInvalidItemOperationError,
+  DriveInvalidMoveError,
   DriveNotFoundError,
   DriveParentNotFolderError,
   DrivePathAmbiguousError,
@@ -380,7 +386,10 @@ export const HulyDomainError = Schema.Union(
   DriveParentNotFolderError,
   DriveFileNotFoundError,
   DriveFileVersionNotFoundError,
-  DrivePathConflictError
+  DrivePathConflictError,
+  DriveInvalidMoveError,
+  DriveInvalidItemOperationError,
+  DriveFolderNotEmptyError
 )
 
 /**

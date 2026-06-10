@@ -38,7 +38,10 @@ import {
   DrawingNotFoundError,
   DriveFileNotFoundError,
   DriveFileVersionNotFoundError,
+  DriveFolderNotEmptyError,
   DriveIdentifierAmbiguousError,
+  DriveInvalidItemOperationError,
+  DriveInvalidMoveError,
   DriveNotFoundError,
   DriveParentNotFolderError,
   DrivePathAmbiguousError,
@@ -953,6 +956,12 @@ describe("Huly Errors", () => {
               return `drive-version:${error.drive}:${error.file}:${error.version}`
             case "DrivePathConflictError":
               return `drive-path-conflict:${error.drive}:${error.path}:${error.existingKind}`
+            case "DriveInvalidMoveError":
+              return `drive-invalid-move:${error.drive}:${error.path}:${error.targetFolderPath}:${error.reason}`
+            case "DriveInvalidItemOperationError":
+              return `drive-invalid-item-operation:${error.drive}:${error.path}:${error.operation}:${error.reason}`
+            case "DriveFolderNotEmptyError":
+              return `drive-folder-not-empty:${error.drive}:${error.path}:${error.childCount}:${error.children.length}`
             default: {
               const _exhaustive: never = error
               return _exhaustive
@@ -1263,6 +1272,58 @@ describe("Huly Errors", () => {
         expect(new DrivePathConflictError({ drive: "Docs", path: "/x", existingKind: "file" }).message).toBe(
           "Drive path '/x' already exists as a file in drive 'Docs'"
         )
+        expect(matchError(
+          new DriveInvalidMoveError({
+            drive: "Docs",
+            path: "/Specs",
+            targetFolderPath: "/Specs/API",
+            reason: "a folder cannot be moved into itself or one of its descendants"
+          })
+        )).toBe(
+          "drive-invalid-move:Docs:/Specs:/Specs/API:a folder cannot be moved into itself or one of its descendants"
+        )
+        expect(
+          new DriveInvalidMoveError({
+            drive: "Docs",
+            path: "/Specs",
+            targetFolderPath: "/Specs/API",
+            reason: "a folder cannot be moved into itself or one of its descendants"
+          }).message
+        ).toBe(
+          "Cannot move Drive item '/Specs' to '/Specs/API' in drive 'Docs': a folder cannot be moved into itself or one of its descendants"
+        )
+        expect(
+          new DriveInvalidItemOperationError({
+            drive: "Docs",
+            path: "/",
+            operation: "delete",
+            reason: "the Drive root is not a file or folder item"
+          }).message
+        ).toBe("Cannot delete Drive item '/' in drive 'Docs': the Drive root is not a file or folder item")
+        expect(matchError(
+          new DriveFolderNotEmptyError({
+            drive: "Docs",
+            path: "/Specs",
+            childCount: Count.make(1),
+            children: [{ id: "file-1", title: "API.md", kind: "file" }]
+          })
+        )).toBe("drive-folder-not-empty:Docs:/Specs:1:1")
+        expect(
+          new DriveFolderNotEmptyError({
+            drive: "Docs",
+            path: "/Specs",
+            childCount: Count.make(1),
+            children: [{ id: "file-1", title: "API.md", kind: "file" }]
+          }).message
+        ).toBe("Drive folder '/Specs' in drive 'Docs' is not empty (1 child items). Children: API.md (file file-1)")
+        expect(
+          new DriveFolderNotEmptyError({
+            drive: "Docs",
+            path: "/Specs",
+            childCount: Count.make(0),
+            children: []
+          }).message
+        ).toBe("Drive folder '/Specs' in drive 'Docs' is not empty (0 child items).")
       }))
   })
 })

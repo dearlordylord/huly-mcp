@@ -636,6 +636,10 @@ SDK upgrade revisit:
 | `get_drive_item` | Get one Drive folder or file by either exact itemId or path. Provide only one locator. File results include current version, size, MIME type, and download URL when available. |
 | `create_drive_folder` | Idempotently create a Drive folder path, creating missing parents like mkdir -p. Returns created=false when the full folder path already exists. |
 | `upload_drive_file` | Upload a file into Drive at a full path including filename. Provide exactly one source: filePath, fileUrl, or base64 data. By default createParents=true creates missing parent folders and reports them. |
+| `upload_drive_file_version` | Upload a new version for an existing Drive file resolved by file id or file path. Provide exactly one source: filePath, fileUrl, or base64 data. This increments the file version counter and makes the uploaded version current. |
+| `move_drive_item` | Move a Drive item, meaning a file or folder, to another existing folder path in the same Drive without renaming it. Idempotent when the item is already in that folder. Rejects sibling title collisions and rejects moving a folder into itself or a descendant. |
+| `rename_drive_item` | Rename a Drive item, meaning a file or folder, in its current folder. Idempotent when the title is unchanged. Rejects sibling title collisions; use move_drive_item to change folders. |
+| `delete_drive_item` | Permanently delete a Drive item, meaning a file or folder. Files are deleted with their version records. Folders must be empty; non-empty folders fail with child count and child summaries. This is permanent deletion, not archive or trash. |
 | `list_drive_file_versions` | List versions for a Drive file resolved by file id or file path. Marks the current version and includes blob id, size, MIME type, lastModified, and download URL. |
 | `restore_drive_file_version` | Restore an existing Drive file version by version id or numeric version. Idempotent when the requested version is already current and does not increment the file version counter. |
 
