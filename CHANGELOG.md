@@ -1,5 +1,15 @@
 # @firfi/huly-mcp
 
+## 0.24.0
+
+### Minor Changes
+
+- Add calendar schedule tools, broader calendar event parity, and read-only Huly virtual office discovery.
+
+  Calendar events now support stable SDK fields such as participants, external participants, reminders, access, time zone, block-time behavior, and calendar moves by ID or name. The release also adds schedule CRUD tools with owner/calendar locators and room-aware schedule summaries.
+
+  Virtual office support adds read-only discovery for floors, rooms, offices, active room occupancy, participants, meeting notes/transcript records (minutes), device preferences, and room-level recording/transcription defaults.
+
 ## 0.23.0
 
 ### Minor Changes
