@@ -6,21 +6,27 @@ import {
   emptyParamsJsonSchema,
   getNotificationContextParamsJsonSchema,
   getNotificationParamsJsonSchema,
+  hideNotificationContextParamsJsonSchema,
   listNotificationContextsParamsJsonSchema,
   listNotificationSettingsParamsJsonSchema,
   listNotificationsParamsJsonSchema,
   markNotificationReadParamsJsonSchema,
+  markNotificationUnreadParamsJsonSchema,
   parseArchiveNotificationParams,
   parseDeleteNotificationParams,
   parseGetNotificationContextParams,
   parseGetNotificationParams,
+  parseHideNotificationContextParams,
   parseListNotificationContextsParams,
   parseListNotificationSettingsParams,
   parseListNotificationsParams,
   parseMarkNotificationReadParams,
+  parseMarkNotificationUnreadParams,
   parsePinNotificationContextParams,
+  parseUnarchiveNotificationParams,
   parseUpdateNotificationProviderSettingParams,
   pinNotificationContextParamsJsonSchema,
+  unarchiveNotificationParamsJsonSchema,
   updateNotificationProviderSettingParamsJsonSchema
 } from "../../domain/schemas.js"
 import {
@@ -30,12 +36,15 @@ import {
   getNotification,
   getNotificationContext,
   getUnreadNotificationCount,
+  hideNotificationContext,
   listNotificationContexts,
   listNotifications,
   listNotificationSettings,
   markAllNotificationsRead,
   markNotificationRead,
+  markNotificationUnread,
   pinNotificationContext,
+  unarchiveNotification,
   updateNotificationProviderSetting
 } from "../../huly/operations/notifications.js"
 import { createToolHandler, type RegisteredTool } from "./registry.js"
@@ -68,13 +77,24 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "mark_notification_read",
-    description: "Mark a notification as read.",
+    description: "Mark a notification as read. Idempotent: returns success when the notification is already read.",
     category: CATEGORY,
     inputSchema: markNotificationReadParamsJsonSchema,
     handler: createToolHandler(
       "mark_notification_read",
       parseMarkNotificationReadParams,
       markNotificationRead
+    )
+  },
+  {
+    name: "mark_notification_unread",
+    description: "Mark a notification as unread. Idempotent: returns success when the notification is already unread.",
+    category: CATEGORY,
+    inputSchema: markNotificationUnreadParamsJsonSchema,
+    handler: createToolHandler(
+      "mark_notification_unread",
+      parseMarkNotificationUnreadParams,
+      markNotificationUnread
     )
   },
   {
@@ -90,13 +110,26 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "archive_notification",
-    description: "Archive a notification. Archived notifications are hidden from the main inbox view.",
+    description:
+      "Archive a notification. Archived notifications are hidden from the main inbox view. Idempotent when already archived.",
     category: CATEGORY,
     inputSchema: archiveNotificationParamsJsonSchema,
     handler: createToolHandler(
       "archive_notification",
       parseArchiveNotificationParams,
       archiveNotification
+    )
+  },
+  {
+    name: "unarchive_notification",
+    description:
+      "Unarchive a notification so it can appear in active notification lists again. Idempotent when already active.",
+    category: CATEGORY,
+    inputSchema: unarchiveNotificationParamsJsonSchema,
+    handler: createToolHandler(
+      "unarchive_notification",
+      parseUnarchiveNotificationParams,
+      unarchiveNotification
     )
   },
   {
@@ -135,7 +168,7 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "list_notification_contexts",
     description:
-      "List notification contexts. Returns contexts sorted by last update timestamp (newest first). Supports filtering by pinned status.",
+      "List notification contexts. Returns contexts sorted by last update timestamp (newest first). Supports filtering by pinned status and can include hidden contexts.",
     category: CATEGORY,
     inputSchema: listNotificationContextsParamsJsonSchema,
     handler: createToolHandler(
@@ -146,13 +179,26 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
   },
   {
     name: "pin_notification_context",
-    description: "Pin or unpin a notification context. Pinned contexts are highlighted in the inbox.",
+    description:
+      "Pin or unpin a notification context. Pinned contexts are highlighted in the inbox. Idempotent when the pin state already matches.",
     category: CATEGORY,
     inputSchema: pinNotificationContextParamsJsonSchema,
     handler: createToolHandler(
       "pin_notification_context",
       parsePinNotificationContextParams,
       pinNotificationContext
+    )
+  },
+  {
+    name: "hide_notification_context",
+    description:
+      "Hide or unhide a notification context. Hidden contexts are omitted from list_notification_contexts unless includeHidden is true. Idempotent when the hidden state already matches.",
+    category: CATEGORY,
+    inputSchema: hideNotificationContextParamsJsonSchema,
+    handler: createToolHandler(
+      "hide_notification_context",
+      parseHideNotificationContextParams,
+      hideNotificationContext
     )
   },
   {

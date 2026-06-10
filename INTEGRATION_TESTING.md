@@ -32,6 +32,65 @@ set -a && source .env.local && set +a
 # If unset, the suite uses the first conversation returned by list_direct_messages.
 ```
 
+## Local Workspace Bootstrap Status
+
+The current local fixture is not a complete from-scratch test bootstrap. The
+checked-in instructions start Huly and point the suite at an existing
+`test-workspace`, but they do not yet create every data condition needed for
+zero-skip integration coverage.
+
+Known incomplete fixture:
+
+- A second workspace member is needed to deterministically test notification
+  write tools. Huly does not normally create inbox notifications for actions
+  performed by the same account that later reads the inbox, so a one-member
+  workspace leaves notification mutations skipped.
+
+Manual setup that works:
+
+1. Open `http://localhost:8087`.
+2. Log in as the owner from `.env.local` (`agent@local.dev` in the default local fixture).
+3. Use the Huly UI to invite a workspace member.
+4. Open the invite link in a private/incognito browser session.
+5. Join as:
+
+   ```bash
+   HULY_TEST_ACTOR_EMAIL=actor@local.dev
+   HULY_TEST_ACTOR_PASSWORD=actor123
+   ```
+
+6. Confirm `list_workspace_members` returns both the owner and actor accounts.
+7. Create one cross-user notification by acting as `actor@local.dev` in the UI
+   (for example, assign/comment/mention the owner on an issue) before expecting
+   notification mutation checks to run.
+
+Attempted automation paths on the local self-host image:
+
+- `AccountClient.signUp(...)` can create a standalone local account such as
+  `actor@local.dev`.
+- `AccountClient.assignWorkspace(...)` with the workspace owner token returns
+  `Forbidden`; it appears to require service/admin privileges.
+- `AccountClient.createInviteLink(...)` with the workspace owner token returns
+  `Forbidden`.
+- `AccountClient.createAccessLink(...)` succeeds, but consuming the returned
+  token through `signUpJoin`, `joinByToken`, `checkAutoJoin`, or `checkJoin`
+  returns `InternalServerError` on the current local image.
+- Temporarily enabling `allowGuestSignUp` as the owner does not let the actor
+  account join/select the workspace; `selectWorkspace` returns `Forbidden` and
+  `checkAutoJoin` returns `InternalServerError`.
+
+Once the actor account is present, set these local-only values in `.env.local`
+so future harness changes can seed cross-user notifications directly:
+
+```bash
+HULY_TEST_ACTOR_EMAIL=actor@local.dev
+HULY_TEST_ACTOR_PASSWORD=actor123
+```
+
+Do not mark the local setup as fully automated until a documented host-side
+command or script can create that second workspace member from a clean Huly
+deployment.
+
 ## Running from a Container (e.g., Claude Code devcontainer)
 
 When the test environment runs inside a container, `localhost:8087` is unreachable. Huly's `/config.json` also returns internal URLs pointing to `localhost:8087` (`ACCOUNTS_URL`, `COLLABORATOR_URL`, etc.), so simply changing `HULY_URL` isn't enough.

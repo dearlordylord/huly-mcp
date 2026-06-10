@@ -47,13 +47,16 @@ describe("notificationTools", () => {
         "list_notifications",
         "get_notification",
         "mark_notification_read",
+        "mark_notification_unread",
         "mark_all_notifications_read",
         "archive_notification",
+        "unarchive_notification",
         "archive_all_notifications",
         "delete_notification",
         "get_notification_context",
         "list_notification_contexts",
         "pin_notification_context",
+        "hide_notification_context",
         "list_notification_settings",
         "update_notification_provider_setting",
         "get_unread_notification_count"
@@ -153,6 +156,26 @@ describe("notification tool handlers", () => {
       expect(result.isError).toBe(true)
     }))
 
+  it.effect("mark_notification_unread handler returns error for missing notification", () =>
+    Effect.gen(function*() {
+      const tool = findTool("mark_notification_unread")
+      const result = yield* Effect.promise(() =>
+        tool.handler({ notificationId: "nonexistent" }, noopHulyClient, noopStorageClient)
+      )
+
+      expect(result.isError).toBe(true)
+    }))
+
+  it.effect("unarchive_notification handler returns error for missing notification", () =>
+    Effect.gen(function*() {
+      const tool = findTool("unarchive_notification")
+      const result = yield* Effect.promise(() =>
+        tool.handler({ notificationId: "nonexistent" }, noopHulyClient, noopStorageClient)
+      )
+
+      expect(result.isError).toBe(true)
+    }))
+
   it.effect("delete_notification handler returns error for missing notification", () =>
     Effect.gen(function*() {
       const tool = findTool("delete_notification")
@@ -195,6 +218,20 @@ describe("notification tool handlers", () => {
       const result = yield* Effect.promise(() =>
         tool.handler(
           { contextId: "nonexistent", pinned: true },
+          noopHulyClient,
+          noopStorageClient
+        )
+      )
+
+      expect(result.isError).toBe(true)
+    }))
+
+  it.effect("hide_notification_context handler returns error for missing context", () =>
+    Effect.gen(function*() {
+      const tool = findTool("hide_notification_context")
+      const result = yield* Effect.promise(() =>
+        tool.handler(
+          { contextId: "nonexistent", hidden: true },
           noopHulyClient,
           noopStorageClient
         )

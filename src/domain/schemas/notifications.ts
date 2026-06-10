@@ -14,6 +14,7 @@ import {
 
 const DEFAULT_UNREAD_ONLY = false
 const DEFAULT_PINNED_CONTEXTS_ONLY = false
+const DEFAULT_INCLUDE_HIDDEN_CONTEXTS = false
 
 // No codec needed — internal type, not used for runtime validation
 export interface NotificationSummary {
@@ -116,6 +117,19 @@ export const MarkNotificationReadParamsSchema = Schema.Struct({
 
 export type MarkNotificationReadParams = Schema.Schema.Type<typeof MarkNotificationReadParamsSchema>
 
+// --- Mark Notification Unread Params ---
+
+export const MarkNotificationUnreadParamsSchema = Schema.Struct({
+  notificationId: NotificationId.annotations({
+    description: "Notification ID to mark as unread"
+  })
+}).annotations({
+  title: "MarkNotificationUnreadParams",
+  description: "Parameters for marking a notification as unread"
+})
+
+export type MarkNotificationUnreadParams = Schema.Schema.Type<typeof MarkNotificationUnreadParamsSchema>
+
 // --- Archive Notification Params ---
 
 export const ArchiveNotificationParamsSchema = Schema.Struct({
@@ -128,6 +142,19 @@ export const ArchiveNotificationParamsSchema = Schema.Struct({
 })
 
 export type ArchiveNotificationParams = Schema.Schema.Type<typeof ArchiveNotificationParamsSchema>
+
+// --- Unarchive Notification Params ---
+
+export const UnarchiveNotificationParamsSchema = Schema.Struct({
+  notificationId: NotificationId.annotations({
+    description: "Notification ID to unarchive"
+  })
+}).annotations({
+  title: "UnarchiveNotificationParams",
+  description: "Parameters for unarchiving a notification"
+})
+
+export type UnarchiveNotificationParams = Schema.Schema.Type<typeof UnarchiveNotificationParamsSchema>
 
 // --- Delete Notification Params ---
 
@@ -170,6 +197,11 @@ export const ListNotificationContextsParamsSchema = Schema.Struct({
     Schema.Boolean.annotations({
       description: `Return only pinned contexts (default: ${DEFAULT_PINNED_CONTEXTS_ONLY})`
     })
+  ),
+  includeHidden: Schema.optional(
+    Schema.Boolean.annotations({
+      description: `Include hidden notification contexts in results (default: ${DEFAULT_INCLUDE_HIDDEN_CONTEXTS})`
+    })
   )
 }).annotations({
   title: "ListNotificationContextsParams",
@@ -193,6 +225,22 @@ export const PinNotificationContextParamsSchema = Schema.Struct({
 })
 
 export type PinNotificationContextParams = Schema.Schema.Type<typeof PinNotificationContextParamsSchema>
+
+// --- Hide/Unhide Context Params ---
+
+export const HideNotificationContextParamsSchema = Schema.Struct({
+  contextId: NotificationContextId.annotations({
+    description: "Notification context ID to hide/unhide"
+  }),
+  hidden: Schema.Boolean.annotations({
+    description: "Whether to hide (true) or unhide (false) the context"
+  })
+}).annotations({
+  title: "HideNotificationContextParams",
+  description: "Parameters for hiding/unhiding a notification context"
+})
+
+export type HideNotificationContextParams = Schema.Schema.Type<typeof HideNotificationContextParamsSchema>
 
 // --- List Notification Settings Params ---
 
@@ -232,11 +280,14 @@ export type UpdateNotificationProviderSettingParams = Schema.Schema.Type<
 export const listNotificationsParamsJsonSchema = JSONSchema.make(ListNotificationsParamsSchema)
 export const getNotificationParamsJsonSchema = JSONSchema.make(GetNotificationParamsSchema)
 export const markNotificationReadParamsJsonSchema = JSONSchema.make(MarkNotificationReadParamsSchema)
+export const markNotificationUnreadParamsJsonSchema = JSONSchema.make(MarkNotificationUnreadParamsSchema)
 export const archiveNotificationParamsJsonSchema = JSONSchema.make(ArchiveNotificationParamsSchema)
+export const unarchiveNotificationParamsJsonSchema = JSONSchema.make(UnarchiveNotificationParamsSchema)
 export const deleteNotificationParamsJsonSchema = JSONSchema.make(DeleteNotificationParamsSchema)
 export const getNotificationContextParamsJsonSchema = JSONSchema.make(GetNotificationContextParamsSchema)
 export const listNotificationContextsParamsJsonSchema = JSONSchema.make(ListNotificationContextsParamsSchema)
 export const pinNotificationContextParamsJsonSchema = JSONSchema.make(PinNotificationContextParamsSchema)
+export const hideNotificationContextParamsJsonSchema = JSONSchema.make(HideNotificationContextParamsSchema)
 export const listNotificationSettingsParamsJsonSchema = JSONSchema.make(ListNotificationSettingsParamsSchema)
 export const updateNotificationProviderSettingParamsJsonSchema = JSONSchema.make(
   UpdateNotificationProviderSettingParamsSchema
@@ -247,11 +298,14 @@ export const updateNotificationProviderSettingParamsJsonSchema = JSONSchema.make
 export const parseListNotificationsParams = Schema.decodeUnknown(ListNotificationsParamsSchema)
 export const parseGetNotificationParams = Schema.decodeUnknown(GetNotificationParamsSchema)
 export const parseMarkNotificationReadParams = Schema.decodeUnknown(MarkNotificationReadParamsSchema)
+export const parseMarkNotificationUnreadParams = Schema.decodeUnknown(MarkNotificationUnreadParamsSchema)
 export const parseArchiveNotificationParams = Schema.decodeUnknown(ArchiveNotificationParamsSchema)
+export const parseUnarchiveNotificationParams = Schema.decodeUnknown(UnarchiveNotificationParamsSchema)
 export const parseDeleteNotificationParams = Schema.decodeUnknown(DeleteNotificationParamsSchema)
 export const parseGetNotificationContextParams = Schema.decodeUnknown(GetNotificationContextParamsSchema)
 export const parseListNotificationContextsParams = Schema.decodeUnknown(ListNotificationContextsParamsSchema)
 export const parsePinNotificationContextParams = Schema.decodeUnknown(PinNotificationContextParamsSchema)
+export const parseHideNotificationContextParams = Schema.decodeUnknown(HideNotificationContextParamsSchema)
 export const parseListNotificationSettingsParams = Schema.decodeUnknown(ListNotificationSettingsParamsSchema)
 export const parseUpdateNotificationProviderSettingParams = Schema.decodeUnknown(
   UpdateNotificationProviderSettingParamsSchema
@@ -263,11 +317,21 @@ export interface MarkNotificationReadResult {
   readonly marked: boolean
 }
 
+export interface MarkNotificationUnreadResult {
+  readonly id: NotificationId
+  readonly marked: boolean
+}
+
 export interface MarkAllNotificationsReadResult {
   readonly count: Count
 }
 
 export interface ArchiveNotificationResult {
+  readonly id: NotificationId
+  readonly archived: boolean
+}
+
+export interface UnarchiveNotificationResult {
   readonly id: NotificationId
   readonly archived: boolean
 }
@@ -284,6 +348,11 @@ export interface DeleteNotificationResult {
 export interface PinNotificationContextResult {
   readonly id: NotificationContextId
   readonly isPinned: boolean
+}
+
+export interface HideNotificationContextResult {
+  readonly id: NotificationContextId
+  readonly hidden: boolean
 }
 
 export interface UpdateNotificationProviderSettingResult {
