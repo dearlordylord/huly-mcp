@@ -51,7 +51,8 @@ import {
   IssueTemplateChildId,
   IssueTemplateId,
   NonNegativeNumber,
-  PersonName
+  PersonName,
+  Timestamp
 } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type {
@@ -290,7 +291,7 @@ export const listIssueTemplates = (
         id: IssueTemplateId.make(t._id),
         title: t.title,
         priority: priorityToString(t.priority),
-        modifiedOn: t.modifiedOn
+        modifiedOn: Timestamp.make(t.modifiedOn)
       }
       // exactOptionalPropertyTypes: only set childrenCount when > 0
       if (t.children.length > 0) {
@@ -331,8 +332,8 @@ export const getIssueTemplate = (
       component: componentLabel !== undefined ? ComponentLabel.make(componentLabel) : undefined,
       estimation: zeroAsUnset(NonNegativeNumber.make(template.estimation)),
       project: params.project,
-      modifiedOn: template.modifiedOn,
-      createdOn: template.createdOn
+      modifiedOn: Timestamp.make(template.modifiedOn),
+      createdOn: template.createdOn === undefined ? undefined : Timestamp.make(template.createdOn)
     }
 
     // exactOptionalPropertyTypes: only set children when non-empty

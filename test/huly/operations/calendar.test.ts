@@ -8,8 +8,12 @@ import {
 } from "@hcengineering/calendar"
 import type { Contact, Person } from "@hcengineering/contact"
 import { type Class, type Doc, type MarkupBlobRef, type Ref, type Space, toFindResult } from "@hcengineering/core"
+import type { Meeting as HulyMeeting, Room as HulyRoom } from "@hcengineering/love"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { CalendarEventTitle, CalendarName } from "../../../src/domain/schemas/calendar.js"
+import { RecurrenceCount, RecurrenceInterval } from "../../../src/domain/schemas/recurrence-primitives.js"
+import { CalendarId, Email, PersonId, PersonName, Timestamp, TimeZoneId } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type { EventNotFoundError, RecurringEventNotFoundError } from "../../../src/huly/errors.js"
 import {
@@ -24,7 +28,7 @@ import {
 } from "../../../src/huly/operations/calendar.js"
 import { eventBrandId } from "../../helpers/brands.js"
 
-import { calendar, contact } from "../../../src/huly/huly-plugins.js"
+import { calendar, contact, love } from "../../../src/huly/huly-plugins.js"
 
 // --- Mock Data Builders ---
 
@@ -33,6 +37,9 @@ const asCalendar = (v: unknown) => v as HulyCalendar
 const asRecurringEvent = (v: unknown) => v as HulyRecurringEvent
 const asRecurringInstance = (v: unknown) => v as HulyRecurringInstance
 const asPerson = (v: unknown) => v as Person
+const asMeeting = (v: unknown) => v as HulyMeeting
+const asRoom = (v: unknown) => v as HulyRoom
+const calendarEventTitle = CalendarEventTitle.make
 
 const makeEvent = (overrides?: Partial<HulyEvent>): HulyEvent =>
   asHulyEvent({
@@ -42,8 +49,8 @@ const makeEvent = (overrides?: Partial<HulyEvent>): HulyEvent =>
     title: "Test Event",
     description: "" as HulyEvent["description"],
     eventId: "evt-id-1",
-    date: 1700000000000,
-    dueDate: 1700003600000,
+    date: Timestamp.make(1700000000000),
+    dueDate: Timestamp.make(1700003600000),
     allDay: false,
     participants: [],
     // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
@@ -68,7 +75,7 @@ const makeRecurringEvent = (overrides?: Partial<HulyRecurringEvent>): HulyRecurr
     rules: [{ freq: "WEEKLY" }],
     exdate: [],
     rdate: [],
-    originalStartTime: 1700000000000,
+    originalStartTime: Timestamp.make(1700000000000),
     timeZone: "UTC",
     ...overrides
   })
@@ -78,11 +85,21 @@ const makeRecurringInstance = (overrides?: Partial<HulyRecurringInstance>): Huly
     ...makeRecurringEvent(),
     _class: calendar.class.ReccuringInstance,
     recurringEventId: "evt-id-1",
-    originalStartTime: 1700000000000,
+    originalStartTime: Timestamp.make(1700000000000),
     isCancelled: false,
     virtual: false,
     ...overrides
   })
+
+const makeEventWithoutMetadata = (): HulyEvent => {
+  const { createdOn: _createdOn, modifiedOn: _modifiedOn, timeZone: _timeZone, ...event } = makeEvent()
+  return asHulyEvent(event)
+}
+
+const makeRecurringEventWithoutTimeZone = (): HulyRecurringEvent => {
+  const { timeZone: _timeZone, ...event } = makeRecurringEvent()
+  return asRecurringEvent(event)
+}
 
 const makePerson = (overrides?: Partial<Person>): Person =>
   asPerson({
@@ -114,12 +131,35 @@ const makeCalendar = (overrides?: Partial<HulyCalendar>): HulyCalendar =>
     ...overrides
   })
 
+const makeRoom = (overrides?: Partial<HulyRoom>): HulyRoom =>
+  asRoom({
+    _id: "room-1" as Ref<HulyRoom>,
+    _class: love.class.Room,
+    space: "love:space:Office" as Ref<Space>,
+    name: "Focus Room",
+    modifiedBy: "user-1" as Doc["modifiedBy"],
+    modifiedOn: 0,
+    createdBy: "user-1" as Doc["createdBy"],
+    createdOn: 0,
+    ...overrides
+  })
+
+const makeMeeting = (overrides?: Partial<HulyMeeting>): HulyMeeting =>
+  asMeeting({
+    ...makeEvent(),
+    _class: love.mixin.Meeting,
+    room: "room-1" as Ref<HulyRoom>,
+    ...overrides
+  })
+
 // --- Test Helpers ---
 
 interface MockConfig {
   events?: Array<HulyEvent>
   recurringEvents?: Array<HulyRecurringEvent>
   recurringInstances?: Array<HulyRecurringInstance>
+  meetings?: Array<HulyMeeting>
+  rooms?: Array<HulyRoom>
   calendars?: Array<HulyCalendar>
   persons?: Array<Person>
   markupContent?: Record<string, string>
@@ -134,6 +174,8 @@ const createTestLayer = (config: MockConfig) => {
   const events = config.events ?? []
   const recurringEvents = config.recurringEvents ?? []
   const recurringInstances = config.recurringInstances ?? []
+  const meetings = config.meetings ?? []
+  const rooms = config.rooms ?? []
   const calendars = config.calendars ?? [makeCalendar()]
   const persons = config.persons ?? []
 
@@ -149,6 +191,12 @@ const createTestLayer = (config: MockConfig) => {
     }
     if (_class === calendar.class.Calendar) {
       return Effect.succeed(toFindResult(calendars))
+    }
+    if (_class === love.mixin.Meeting) {
+      return Effect.succeed(toFindResult(meetings))
+    }
+    if (_class === love.class.Room) {
+      return Effect.succeed(toFindResult(rooms))
     }
     if (_class === contact.class.Person) {
       const q = query as Record<string, unknown>
@@ -181,10 +229,17 @@ const createTestLayer = (config: MockConfig) => {
       if (q._id !== undefined) {
         return Effect.succeed(calendars.find(c => c._id === q._id))
       }
+      if (q.name !== undefined) {
+        return Effect.succeed(calendars.find(c => c.name === q.name))
+      }
       return Effect.succeed(calendars[0])
     }
     if (_class === calendar.class.PrimaryCalendar) {
       return Effect.succeed(undefined)
+    }
+    if (_class === contact.class.Person) {
+      const q = query as Record<string, unknown>
+      return Effect.succeed(persons.find(p => p._id === q._id))
     }
     return Effect.succeed(undefined)
   }) as HulyClientOperations["findOne"]
@@ -263,8 +318,8 @@ describe("listEvents", () => {
   it.effect("returns event summaries", () =>
     Effect.gen(function*() {
       const events = [
-        makeEvent({ eventId: "evt-1", title: "Meeting", date: 1000, dueDate: 2000 }),
-        makeEvent({ eventId: "evt-2", title: "Lunch", date: 3000, dueDate: 4000 })
+        makeEvent({ eventId: "evt-1", title: "Meeting", date: Timestamp.make(1000), dueDate: Timestamp.make(2000) }),
+        makeEvent({ eventId: "evt-2", title: "Lunch", date: Timestamp.make(3000), dueDate: Timestamp.make(4000) })
       ]
       const testLayer = createTestLayer({ events })
 
@@ -283,6 +338,48 @@ describe("listEvents", () => {
 
       expect(result).toHaveLength(0)
     }))
+
+  it.effect("summarizes legacy events without eventId or calendar", () =>
+    Effect.gen(function*() {
+      const eventWithoutCalendar = makeEvent({
+        eventId: "" as HulyEvent["eventId"],
+        _id: "legacy-event-doc" as Ref<HulyEvent>,
+        calendar: "" as HulyEvent["calendar"]
+      })
+      const testLayer = createTestLayer({ events: [eventWithoutCalendar] })
+
+      const result = yield* listEvents({}).pipe(Effect.provide(testLayer))
+
+      expect(result[0].eventId).toBe("legacy-event-doc")
+      expect(result[0].calendarId).toBeUndefined()
+    }))
+
+  it.effect("summarizes meeting rooms from love meeting mixins", () =>
+    Effect.gen(function*() {
+      const event = makeEvent({ _id: "event-1" as Ref<HulyEvent>, eventId: "evt-1" })
+      const result = yield* listEvents({}).pipe(
+        Effect.provide(createTestLayer({
+          events: [event],
+          meetings: [makeMeeting({ _id: "event-1" as Ref<HulyMeeting> })],
+          rooms: [makeRoom()]
+        }))
+      )
+
+      expect(result[0].meetingRoom).toEqual({ roomId: "room-1", name: "Focus Room" })
+    }))
+
+  it.effect("skips legacy events without any usable id", () =>
+    Effect.gen(function*() {
+      const event = makeEvent({
+        eventId: "" as HulyEvent["eventId"],
+        _id: "" as Ref<HulyEvent>
+      })
+      const testLayer = createTestLayer({ events: [event] })
+
+      const result = yield* listEvents({}).pipe(Effect.provide(testLayer))
+
+      expect(result).toEqual([])
+    }))
 })
 
 describe("getEvent", () => {
@@ -293,6 +390,7 @@ describe("getEvent", () => {
         eventId: "evt-1",
         title: "Team Sync",
         participants: ["person-1" as Ref<Contact>],
+        timeZone: "UTC",
         description: "desc-ref" as HulyEvent["description"]
       })
       const testLayer = createTestLayer({
@@ -306,6 +404,7 @@ describe("getEvent", () => {
       expect(result.eventId).toBe("evt-1")
       expect(result.title).toBe("Team Sync")
       expect(result.description).toBe("# Meeting notes")
+      expect(result.timeZone).toBe("UTC")
       expect(result.participants).toHaveLength(1)
       expect(result.participants?.[0].name).toBe("Alice")
     }))
@@ -318,6 +417,42 @@ describe("getEvent", () => {
       const result = yield* getEvent({ eventId: eventBrandId("evt-1") }).pipe(Effect.provide(testLayer))
 
       expect(result.description).toBeUndefined()
+    }))
+
+  it.effect("maps event reminders when present", () =>
+    Effect.gen(function*() {
+      const event = makeEvent({ eventId: "evt-1", reminders: [1700000300000] })
+      const result = yield* getEvent({ eventId: eventBrandId("evt-1") }).pipe(
+        Effect.provide(createTestLayer({ events: [event] }))
+      )
+
+      expect(result.reminders).toEqual([1700000300000])
+    }))
+
+  it.effect("maps event meeting room from love meeting mixin", () =>
+    Effect.gen(function*() {
+      const event = makeEvent({ _id: "event-1" as Ref<HulyEvent>, eventId: "evt-1" })
+      const result = yield* getEvent({ eventId: eventBrandId("evt-1") }).pipe(
+        Effect.provide(createTestLayer({
+          events: [event],
+          meetings: [makeMeeting({ _id: "event-1" as Ref<HulyMeeting> })],
+          rooms: []
+        }))
+      )
+
+      expect(result.meetingRoom).toEqual({ roomId: "room-1", name: undefined })
+    }))
+
+  it.effect("omits optional event metadata when Huly leaves it unset", () =>
+    Effect.gen(function*() {
+      const event = makeEventWithoutMetadata()
+      const result = yield* getEvent({ eventId: eventBrandId(event.eventId) }).pipe(
+        Effect.provide(createTestLayer({ events: [event] }))
+      )
+
+      expect(result.modifiedOn).toBeUndefined()
+      expect(result.createdOn).toBeUndefined()
+      expect(result.timeZone).toBeUndefined()
     }))
 
   it.effect("fails with EventNotFoundError when event does not exist", () =>
@@ -338,11 +473,11 @@ describe("createEvent", () => {
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
       const testLayer = createTestLayer({ captureAddCollection })
-      const startDate = 1700000000000
+      const startDate = Timestamp.make(1700000000000)
       const ONE_HOUR_MS = 3600000
 
       const result = yield* createEvent({
-        title: "New Event",
+        title: calendarEventTitle("New Event"),
         date: startDate
       }).pipe(Effect.provide(testLayer))
 
@@ -358,9 +493,9 @@ describe("createEvent", () => {
       const testLayer = createTestLayer({ captureAddCollection })
 
       const result = yield* createEvent({
-        title: "Full Event",
-        date: 1700000000000,
-        dueDate: 1700010000000,
+        title: calendarEventTitle("Full Event"),
+        date: Timestamp.make(1700000000000),
+        dueDate: Timestamp.make(1700010000000),
         allDay: true,
         location: "Room 42",
         visibility: "private"
@@ -372,14 +507,50 @@ describe("createEvent", () => {
       expect(captureAddCollection.attributes?.visibility).toBe("private")
     }))
 
+  it.effect("creates event with stable calendar fields", () =>
+    Effect.gen(function*() {
+      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+      const testLayer = createTestLayer({ captureAddCollection })
+
+      yield* createEvent({
+        title: calendarEventTitle("Stable fields"),
+        date: Timestamp.make(1700000000000),
+        externalParticipants: [Email.make("guest@example.com")],
+        reminders: [Timestamp.make(1700000300000)],
+        access: "reader",
+        timeZone: TimeZoneId.make("UTC"),
+        blockTime: true,
+        calendarName: CalendarName.make("Primary")
+      }).pipe(Effect.provide(testLayer))
+
+      expect(captureAddCollection.attributes?.externalParticipants).toEqual(["guest@example.com"])
+      expect(captureAddCollection.attributes?.reminders).toEqual([1700000300000])
+      expect(captureAddCollection.attributes?.access).toBe(AccessLevel.Reader)
+      expect(captureAddCollection.attributes?.timeZone).toBe("UTC")
+      expect(captureAddCollection.attributes?.blockTime).toBe(true)
+    }))
+
+  it.effect("ignores malformed create visibility defensively", () =>
+    Effect.gen(function*() {
+      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+      yield* createEvent({
+        title: calendarEventTitle("Malformed visibility"),
+        date: Timestamp.make(1700000000000),
+        visibility: "workspace" as never
+      }).pipe(Effect.provide(createTestLayer({ captureAddCollection })))
+
+      expect(captureAddCollection.attributes?.visibility).toBe("workspace")
+    }))
+
   it.effect("defaults dueDate to date + 1 hour when not provided", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
       const testLayer = createTestLayer({ captureAddCollection })
-      const startDate = 1700000000000
+      const startDate = Timestamp.make(1700000000000)
       const ONE_HOUR_MS = 3600000
 
-      yield* createEvent({ title: "Quick Event", date: startDate }).pipe(Effect.provide(testLayer))
+      yield* createEvent({ title: calendarEventTitle("Quick Event"), date: startDate }).pipe(Effect.provide(testLayer))
 
       expect(captureAddCollection.attributes?.dueDate).toBe(startDate + ONE_HOUR_MS)
     }))
@@ -394,7 +565,7 @@ describe("updateEvent", () => {
 
       const result = yield* updateEvent({
         eventId: eventBrandId("evt-1"),
-        title: "New Title"
+        title: calendarEventTitle("New Title")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.eventId).toBe("evt-1")
@@ -492,12 +663,171 @@ describe("updateEvent", () => {
       expect(captureUpdateDoc.operations?.description).toBe("markup-ref-123")
     }))
 
+  it.effect("updates stable event fields and participant collections", () =>
+    Effect.gen(function*() {
+      const person1 = makePerson({ _id: "person-1" as Ref<Person>, name: "Alice" })
+      const person2 = makePerson({ _id: "person-2" as Ref<Person>, name: "Bob" })
+      const targetCalendar = makeCalendar({ _id: "cal-2" as Ref<HulyCalendar>, name: "Team" })
+      const event = makeEvent({
+        eventId: "evt-1",
+        participants: ["person-1" as Ref<Contact>],
+        externalParticipants: ["old@example.com", "drop@example.com"]
+      })
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+      const testLayer = createTestLayer({
+        events: [event],
+        persons: [person1, person2],
+        calendars: [makeCalendar(), targetCalendar],
+        captureUpdateDoc
+      })
+
+      yield* updateEvent({
+        eventId: eventBrandId("evt-1"),
+        participants: [{ personId: PersonId.make("person-2") }],
+        addParticipants: [{ personId: PersonId.make("person-1") }],
+        removeParticipants: [{ personId: PersonId.make("person-1") }],
+        externalParticipants: [Email.make("replace@example.com")],
+        addExternalParticipants: [Email.make("old@example.com"), Email.make("new@example.com")],
+        removeExternalParticipants: [Email.make("drop@example.com")],
+        reminders: [Timestamp.make(1700000300000)],
+        access: "writer",
+        timeZone: TimeZoneId.make("Europe/London"),
+        blockTime: true,
+        calendarId: CalendarId.make("cal-2")
+      }).pipe(Effect.provide(testLayer))
+
+      expect(captureUpdateDoc.operations?.participants).toEqual([])
+      expect(captureUpdateDoc.operations?.externalParticipants).toEqual(["old@example.com"])
+      expect(captureUpdateDoc.operations?.reminders).toEqual([1700000300000])
+      expect(captureUpdateDoc.operations?.access).toBe(AccessLevel.Writer)
+      expect(captureUpdateDoc.operations?.timeZone).toBe("Europe/London")
+      expect(captureUpdateDoc.operations?.blockTime).toBe(true)
+      expect(captureUpdateDoc.operations?.calendar).toBe("cal-2")
+    }))
+
+  it.effect("moves an event by calendar name", () =>
+    Effect.gen(function*() {
+      const targetCalendar = makeCalendar({ _id: "cal-2" as Ref<HulyCalendar>, name: "Team" })
+      const event = makeEvent({ eventId: "evt-1" })
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+      yield* updateEvent({
+        eventId: eventBrandId("evt-1"),
+        calendarName: CalendarName.make("Team")
+      }).pipe(
+        Effect.provide(createTestLayer({
+          events: [event],
+          calendars: [makeCalendar(), targetCalendar],
+          captureUpdateDoc
+        }))
+      )
+
+      expect(captureUpdateDoc.operations?.calendar).toBe("cal-2")
+    }))
+
+  it.effect("updates participants by name locator and handles empty participant replacement", () =>
+    Effect.gen(function*() {
+      const person = makePerson({ _id: "person-1" as Ref<Person>, name: "Alice" })
+      const event = makeEvent({ eventId: "evt-1", participants: ["person-1" as Ref<Contact>] })
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+      yield* updateEvent({
+        eventId: eventBrandId("evt-1"),
+        participants: [{ name: PersonName.make("Alice") }]
+      }).pipe(Effect.provide(createTestLayer({ events: [event], persons: [person], captureUpdateDoc })))
+
+      expect(captureUpdateDoc.operations?.participants).toEqual(["person-1"])
+
+      yield* updateEvent({
+        eventId: eventBrandId("evt-1"),
+        participants: []
+      }).pipe(Effect.provide(createTestLayer({ events: [event], persons: [person], captureUpdateDoc })))
+
+      expect(captureUpdateDoc.operations?.participants).toEqual([])
+    }))
+
+  it.effect("updates external participant collections when the event has none", () =>
+    Effect.gen(function*() {
+      const event = makeEvent({ eventId: "evt-1" })
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+      yield* updateEvent({
+        eventId: eventBrandId("evt-1"),
+        addExternalParticipants: [Email.make("new@example.com")]
+      }).pipe(Effect.provide(createTestLayer({ events: [event], captureUpdateDoc })))
+
+      expect(captureUpdateDoc.operations?.externalParticipants).toEqual(["new@example.com"])
+
+      yield* updateEvent({
+        eventId: eventBrandId("evt-1"),
+        removeExternalParticipants: [Email.make("new@example.com")]
+      }).pipe(Effect.provide(createTestLayer({ events: [event], captureUpdateDoc })))
+
+      expect(captureUpdateDoc.operations?.externalParticipants).toEqual([])
+    }))
+
+  it.effect("ignores malformed update visibility defensively", () =>
+    Effect.gen(function*() {
+      const event = makeEvent({ eventId: "evt-1" })
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+      yield* updateEvent({
+        eventId: eventBrandId("evt-1"),
+        visibility: "workspace" as never
+      }).pipe(Effect.provide(createTestLayer({ events: [event], captureUpdateDoc })))
+
+      expect(captureUpdateDoc.operations).toEqual({ visibility: "workspace" })
+    }))
+
+  it.effect("fails when participant personId cannot be resolved", () =>
+    Effect.gen(function*() {
+      const event = makeEvent({ eventId: "evt-1" })
+      const error = yield* Effect.flip(
+        updateEvent({
+          eventId: eventBrandId("evt-1"),
+          participants: [{ personId: PersonId.make("missing-person") }]
+        }).pipe(Effect.provide(createTestLayer({ events: [event], persons: [] })))
+      )
+
+      expect(error._tag).toBe("PersonNotFoundError")
+    }))
+
+  it.effect("fails defensively for an empty participant locator object", () =>
+    Effect.gen(function*() {
+      const event = makeEvent({ eventId: "evt-1" })
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- direct-operation defensive test bypasses schema validation intentionally
+      const emptyLocator = {} as never
+      const error = yield* Effect.flip(
+        updateEvent({
+          eventId: eventBrandId("evt-1"),
+          participants: [emptyLocator]
+        }).pipe(Effect.provide(createTestLayer({ events: [event], persons: [] })))
+      )
+
+      expect(error._tag).toBe("PersonNotFoundError")
+    }))
+
+  it.effect("fails when participant name cannot be resolved", () =>
+    Effect.gen(function*() {
+      const event = makeEvent({ eventId: "evt-1" })
+      const error = yield* Effect.flip(
+        updateEvent({
+          eventId: eventBrandId("evt-1"),
+          participants: [{ name: PersonName.make("Nobody") }]
+        }).pipe(Effect.provide(createTestLayer({ events: [event], persons: [] })))
+      )
+
+      expect(error._tag).toBe("PersonNotFoundError")
+    }))
+
   it.effect("fails with EventNotFoundError when event does not exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayer({})
 
       const error = yield* Effect.flip(
-        updateEvent({ eventId: eventBrandId("nonexistent"), title: "X" }).pipe(Effect.provide(testLayer))
+        updateEvent({ eventId: eventBrandId("nonexistent"), title: calendarEventTitle("X") }).pipe(
+          Effect.provide(testLayer)
+        )
       )
 
       expect(error._tag).toBe("EventNotFoundError")
@@ -556,6 +886,77 @@ describe("listRecurringEvents", () => {
 
       expect(result).toHaveLength(0)
     }))
+
+  it.effect("returns recurring events without timezone when Huly omits it", () =>
+    Effect.gen(function*() {
+      const result = yield* listRecurringEvents({}).pipe(
+        Effect.provide(createTestLayer({
+          recurringEvents: [makeRecurringEventWithoutTimeZone()]
+        }))
+      )
+
+      expect(result[0].timeZone).toBeUndefined()
+    }))
+
+  it.effect("returns recurring events without modified timestamp when Huly omits it", () =>
+    Effect.gen(function*() {
+      const { modifiedOn: _modifiedOn, ...recurringEventWithoutModifiedOn } = makeRecurringEvent()
+      const result = yield* listRecurringEvents({}).pipe(
+        Effect.provide(createTestLayer({
+          recurringEvents: [asRecurringEvent(recurringEventWithoutModifiedOn)]
+        }))
+      )
+
+      expect(result[0].modifiedOn).toBeUndefined()
+    }))
+
+  it.effect("brands full SDK recurring rule numeric fields", () =>
+    Effect.gen(function*() {
+      const result = yield* listRecurringEvents({}).pipe(
+        Effect.provide(createTestLayer({
+          recurringEvents: [
+            makeRecurringEvent({
+              rules: [{
+                freq: "YEARLY",
+                count: 4,
+                interval: 2,
+                byMonthDay: [1, 31],
+                byMonth: [0, 11],
+                bySetPos: [-1, 1]
+              }]
+            })
+          ]
+        }))
+      )
+
+      expect(result[0].rules[0]).toMatchObject({
+        count: 4,
+        interval: 2,
+        byMonthDay: [1, 31],
+        byMonth: [0, 11],
+        bySetPos: [-1, 1]
+      })
+    }))
+
+  it.effect("rejects invalid Huly recurring rule fields on read", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        listRecurringEvents({}).pipe(
+          Effect.provide(createTestLayer({
+            recurringEvents: [
+              makeRecurringEvent({
+                rules: [{
+                  freq: "MONTHLY",
+                  byMonthDay: [-1]
+                }]
+              })
+            ]
+          }))
+        )
+      )
+
+      expect(error._tag).toBe("HulyConnectionError")
+    }))
 })
 
 describe("createRecurringEvent", () => {
@@ -565,8 +966,8 @@ describe("createRecurringEvent", () => {
       const testLayer = createTestLayer({ captureAddCollection })
 
       const result = yield* createRecurringEvent({
-        title: "Daily Standup",
-        startDate: 1700000000000,
+        title: calendarEventTitle("Daily Standup"),
+        startDate: Timestamp.make(1700000000000),
         rules: [{ freq: "DAILY" }]
       }).pipe(Effect.provide(testLayer))
 
@@ -578,23 +979,33 @@ describe("createRecurringEvent", () => {
   it.effect("creates recurring event with all optional fields", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
-      const testLayer = createTestLayer({ captureAddCollection })
+      const person = makePerson({ _id: "person-1" as Ref<Person>, name: "Alice" })
+      const testLayer = createTestLayer({ captureAddCollection, persons: [person] })
 
       yield* createRecurringEvent({
-        title: "Monthly Review",
-        startDate: 1700000000000,
-        dueDate: 1700003600000,
-        rules: [{ freq: "MONTHLY", count: 12, interval: 1 }],
+        title: calendarEventTitle("Monthly Review"),
+        startDate: Timestamp.make(1700000000000),
+        dueDate: Timestamp.make(1700003600000),
+        rules: [{ freq: "MONTHLY", count: RecurrenceCount.make(12), interval: RecurrenceInterval.make(1) }],
         allDay: true,
         location: "Conference Room",
-        timeZone: "America/New_York",
-        visibility: "public"
+        timeZone: TimeZoneId.make("America/New_York"),
+        visibility: "public",
+        participants: [{ personId: PersonId.make("person-1") }],
+        externalParticipants: [Email.make("guest@example.com")],
+        reminders: [Timestamp.make(1700000300000)],
+        access: "reader",
+        blockTime: true
       }).pipe(Effect.provide(testLayer))
 
       expect(captureAddCollection.attributes?.allDay).toBe(true)
       expect(captureAddCollection.attributes?.location).toBe("Conference Room")
       expect(captureAddCollection.attributes?.timeZone).toBe("America/New_York")
       expect(captureAddCollection.attributes?.visibility).toBe("public")
+      expect(captureAddCollection.attributes?.externalParticipants).toEqual(["guest@example.com"])
+      expect(captureAddCollection.attributes?.reminders).toEqual([1700000300000])
+      expect(captureAddCollection.attributes?.access).toBe(AccessLevel.Reader)
+      expect(captureAddCollection.attributes?.blockTime).toBe(true)
     }))
 })
 

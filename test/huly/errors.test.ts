@@ -1,7 +1,18 @@
 import { describe, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
-import { AssociationId, Count, DocId, ObjectClassName, RelationId } from "../../src/domain/schemas/shared.js"
+import {
+  AssociationId,
+  Count,
+  DocId,
+  EventId,
+  FloorId,
+  MeetingMinutesId,
+  ObjectClassName,
+  RelationId,
+  RoomId,
+  ScheduleId
+} from "../../src/domain/schemas/shared.js"
 import {
   ActivityMessageNotFoundError,
   AssociationConflictError,
@@ -29,6 +40,7 @@ import {
   FileNotFoundError,
   FileTooLargeError,
   FileUploadError,
+  FloorNotFoundError,
   FunnelNotFoundError,
   GenericObjectIdentifierAmbiguousError,
   GenericObjectLocatorInvalidError,
@@ -48,6 +60,7 @@ import {
   IssueTemplateNotFoundError,
   LeadNotFoundError,
   MasterTagNotFoundError,
+  MeetingMinutesNotFoundError,
   MessageNotFoundError,
   MilestoneNotFoundError,
   NotificationContextNotFoundError,
@@ -67,7 +80,9 @@ import {
   RelationIdentifierAmbiguousError,
   RelationMutationUnsupportedError,
   RelationNotFoundError,
+  RoomNotFoundError,
   SavedMessageNotFoundError,
+  ScheduleNotFoundError,
   TagCategoryNotFoundError,
   TagNotFoundError,
   TeamspaceNotFoundError,
@@ -384,14 +399,14 @@ describe("Huly Errors", () => {
   describe("EventNotFoundError", () => {
     it.effect("creates with eventId", () =>
       Effect.gen(function*() {
-        const error = new EventNotFoundError({ eventId: "evt-100" })
+        const error = new EventNotFoundError({ eventId: EventId.make("evt-100") })
         expect(error._tag).toBe("EventNotFoundError")
         expect(error.eventId).toBe("evt-100")
       }))
 
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
-        const error = new EventNotFoundError({ eventId: "evt-100" })
+        const error = new EventNotFoundError({ eventId: EventId.make("evt-100") })
         expect(error.message).toBe("Event 'evt-100' not found")
       }))
   })
@@ -399,14 +414,14 @@ describe("Huly Errors", () => {
   describe("RecurringEventNotFoundError", () => {
     it.effect("creates with eventId", () =>
       Effect.gen(function*() {
-        const error = new RecurringEventNotFoundError({ eventId: "rec-200" })
+        const error = new RecurringEventNotFoundError({ eventId: EventId.make("rec-200") })
         expect(error._tag).toBe("RecurringEventNotFoundError")
         expect(error.eventId).toBe("rec-200")
       }))
 
     it.effect("generates message from fields", () =>
       Effect.gen(function*() {
-        const error = new RecurringEventNotFoundError({ eventId: "rec-200" })
+        const error = new RecurringEventNotFoundError({ eventId: EventId.make("rec-200") })
         expect(error.message).toBe("Recurring event 'rec-200' not found")
       }))
   })
@@ -423,6 +438,30 @@ describe("Huly Errors", () => {
       Effect.gen(function*() {
         const error = new CalendarNotAccessibleError({ calendarId: "cal-100" })
         expect(error.message).toBe("Calendar 'cal-100' not found or not accessible")
+      }))
+  })
+
+  describe("ScheduleNotFoundError", () => {
+    it.effect("generates message from fields", () =>
+      Effect.gen(function*() {
+        const error = new ScheduleNotFoundError({ scheduleId: ScheduleId.make("sched-100") })
+        expect(error.message).toBe("Schedule 'sched-100' not found")
+      }))
+  })
+
+  describe("Virtual office errors", () => {
+    it.effect("generate messages from fields", () =>
+      Effect.gen(function*() {
+        expect(new FloorNotFoundError({ floorId: FloorId.make("floor-100") }).message).toBe(
+          "Office floor 'floor-100' not found"
+        )
+        expect(new RoomNotFoundError({ roomId: RoomId.make("room-100") }).message).toBe(
+          "Office room 'room-100' not found"
+        )
+        expect(new MeetingMinutesNotFoundError({ meetingMinutesId: MeetingMinutesId.make("minutes-100") }).message)
+          .toBe(
+            "Meeting minutes 'minutes-100' not found"
+          )
       }))
   })
 
@@ -744,6 +783,14 @@ describe("Huly Errors", () => {
               return `event:${error.eventId}`
             case "RecurringEventNotFoundError":
               return `recurring:${error.eventId}`
+            case "ScheduleNotFoundError":
+              return `schedule:${error.scheduleId}`
+            case "FloorNotFoundError":
+              return `floor:${error.floorId}`
+            case "RoomNotFoundError":
+              return `room:${error.roomId}`
+            case "MeetingMinutesNotFoundError":
+              return `meeting-minutes:${error.meetingMinutesId}`
             case "ActivityMessageNotFoundError":
               return `activity:${error.messageId}`
             case "ReactionNotFoundError":
@@ -937,8 +984,8 @@ describe("Huly Errors", () => {
         expect(matchError(new MessageNotFoundError({ messageId: "msg-1", channel: "ch-1" }))).toBe("message:msg-1")
         expect(matchError(new ThreadReplyNotFoundError({ replyId: "r-1", messageId: "msg-1" }))).toBe("reply:r-1")
         expect(matchError(new CalendarNotAccessibleError({ calendarId: "cal-1" }))).toBe("calendar:cal-1")
-        expect(matchError(new EventNotFoundError({ eventId: "e-1" }))).toBe("event:e-1")
-        expect(matchError(new RecurringEventNotFoundError({ eventId: "re-1" }))).toBe("recurring:re-1")
+        expect(matchError(new EventNotFoundError({ eventId: EventId.make("e-1") }))).toBe("event:e-1")
+        expect(matchError(new RecurringEventNotFoundError({ eventId: EventId.make("re-1") }))).toBe("recurring:re-1")
         expect(matchError(new ActivityMessageNotFoundError({ messageId: "am-1" }))).toBe("activity:am-1")
         expect(matchError(new ReactionNotFoundError({ messageId: "msg-1", emoji: "heart" }))).toBe("reaction:heart")
         expect(matchError(new SavedMessageNotFoundError({ messageId: "sm-1" }))).toBe("saved:sm-1")
@@ -1082,6 +1129,15 @@ describe("Huly Errors", () => {
         )
         expect(matchError(new CannotDirectMessageSelfError({ identifier: "Self,User" }))).toBe("dm-self:Self,User")
         expect(matchError(new PersonNotAnEmployeeError({ identifier: "Ext,Contact" }))).toBe("not-employee:Ext,Contact")
+        expect(matchError(new ScheduleNotFoundError({ scheduleId: ScheduleId.make("sched-1") }))).toBe(
+          "schedule:sched-1"
+        )
+        expect(matchError(new FloorNotFoundError({ floorId: FloorId.make("floor-1") }))).toBe("floor:floor-1")
+        expect(matchError(new RoomNotFoundError({ roomId: RoomId.make("room-1") }))).toBe("room:room-1")
+        expect(matchError(new MeetingMinutesNotFoundError({ meetingMinutesId: MeetingMinutesId.make("minutes-1") })))
+          .toBe(
+            "meeting-minutes:minutes-1"
+          )
       }))
   })
 })

@@ -9,6 +9,7 @@
  * - errors-documents: teamspace, document errors
  * - errors-messaging: channel, message, thread, reaction errors
  * - errors-calendar: event and calendar errors
+ * - errors-love: virtual office, room, and meeting minutes errors
  * - errors-cards: card space, card, master tag errors
  * - errors-labels: tag, tag category errors
  * - errors-test-management: test project/suite/case/plan/run/result errors
@@ -19,7 +20,12 @@
 import { Schema } from "effect"
 
 import { HulyAuthError, HulyConnectionError, HulyError, NoUpdateFieldsError } from "./errors-base.js"
-import { CalendarNotAccessibleError, EventNotFoundError, RecurringEventNotFoundError } from "./errors-calendar.js"
+import {
+  CalendarNotAccessibleError,
+  EventNotFoundError,
+  RecurringEventNotFoundError,
+  ScheduleNotFoundError
+} from "./errors-calendar.js"
 import { CardNotFoundError, CardSpaceNotFoundError, MasterTagNotFoundError } from "./errors-cards.js"
 import {
   InvalidContactProviderError,
@@ -70,6 +76,7 @@ import {
 } from "./errors-generic-associations.js"
 import { TagCategoryNotFoundError, TagNotFoundError } from "./errors-labels.js"
 import { FunnelNotFoundError, LeadNotFoundError } from "./errors-leads.js"
+import { FloorNotFoundError, MeetingMinutesNotFoundError, RoomNotFoundError } from "./errors-love.js"
 import {
   ActivityMessageNotFoundError,
   CannotDirectMessageSelfError,
@@ -155,6 +162,7 @@ export {
   FileNotFoundError,
   FileTooLargeError,
   FileUploadError,
+  FloorNotFoundError,
   FunnelNotFoundError,
   GenericObjectIdentifierAmbiguousError,
   GenericObjectLocatorInvalidError,
@@ -174,6 +182,7 @@ export {
   MasterTagNotFoundError,
   MAX_FILE_SIZE,
   MAX_FILE_SIZE_MB,
+  MeetingMinutesNotFoundError,
   MessageNotFoundError,
   MilestoneNotFoundError,
   NotificationContextNotFoundError,
@@ -203,7 +212,9 @@ export {
   RelationIdentifierAmbiguousError,
   RelationMutationUnsupportedError,
   RelationNotFoundError,
+  RoomNotFoundError,
   SavedMessageNotFoundError,
+  ScheduleNotFoundError,
   SpaceIdentifierAmbiguousError,
   SpaceNotFoundError,
   SpaceTypeIdentifierAmbiguousError,
@@ -228,106 +239,7 @@ export {
 /**
  * Schema for all Huly domain errors (for serialization).
  */
-export const HulyDomainError: Schema.Union<
-  [
-    typeof HulyError,
-    typeof NoUpdateFieldsError,
-    typeof HulyConnectionError,
-    typeof HulyAuthError,
-    typeof IssueNotFoundError,
-    typeof ProjectNotFoundError,
-    typeof InvalidStatusError,
-    typeof PersonIdentifierAmbiguousError,
-    typeof PersonNotFoundError,
-    typeof OrganizationNotFoundError,
-    typeof OrganizationIdentifierAmbiguousError,
-    typeof InvalidContactProviderError,
-    typeof FileUploadError,
-    typeof InvalidFileDataError,
-    typeof FileNotFoundError,
-    typeof FileFetchError,
-    typeof TeamspaceNotFoundError,
-    typeof DocumentNotFoundError,
-    typeof DocumentTextNotFoundError,
-    typeof DocumentTextMultipleMatchesError,
-    typeof DocumentEmptyContentError,
-    typeof DocumentContentCorruptedError,
-    typeof DocumentEditModeError,
-    typeof DocumentReferenceError,
-    typeof CommentNotFoundError,
-    typeof MilestoneNotFoundError,
-    typeof ChannelNotFoundError,
-    typeof CannotDirectMessageSelfError,
-    typeof DirectMessageIdentifierAmbiguousError,
-    typeof DirectMessageNotFoundError,
-    typeof MessageNotFoundError,
-    typeof PersonNotAnEmployeeError,
-    typeof ThreadReplyNotFoundError,
-    typeof CalendarNotAccessibleError,
-    typeof EventNotFoundError,
-    typeof RecurringEventNotFoundError,
-    typeof ActivityMessageNotFoundError,
-    typeof ReactionNotFoundError,
-    typeof SavedMessageNotFoundError,
-    typeof AttachmentNotFoundError,
-    typeof CardSpaceNotFoundError,
-    typeof CardNotFoundError,
-    typeof MasterTagNotFoundError,
-    typeof TagNotFoundError,
-    typeof TagCategoryNotFoundError,
-    typeof TestProjectNotFoundError,
-    typeof TestSuiteNotFoundError,
-    typeof TestCaseNotFoundError,
-    typeof TestPlanNotFoundError,
-    typeof TestRunNotFoundError,
-    typeof TestResultNotFoundError,
-    typeof TestPlanItemNotFoundError,
-    typeof ComponentNotFoundError,
-    typeof CustomFieldNotFoundError,
-    typeof CustomFieldObjectNotFoundError,
-    typeof IssueTemplateNotFoundError,
-    typeof TemplateChildNotFoundError,
-    typeof NotificationNotFoundError,
-    typeof NotificationContextNotFoundError,
-    typeof InvalidPersonUuidError,
-    typeof FunnelNotFoundError,
-    typeof LeadNotFoundError,
-    typeof FileTooLargeError,
-    typeof InvalidContentTypeError,
-    typeof ProcessNotFoundError,
-    typeof ProcessIdentifierAmbiguousError,
-    typeof ProcessMasterTagAmbiguousError,
-    typeof ProcessMasterTagNotFoundError,
-    typeof ProcessCardIdentifierAmbiguousError,
-    typeof ProcessCardNotFoundError,
-    typeof ProcessInitialStateNotFoundError,
-    typeof ProcessParallelExecutionForbiddenError,
-    typeof ProcessExecutionNotFoundError,
-    typeof ProcessExecutionNotCancellableError,
-    typeof AssociationNotFoundError,
-    typeof AssociationIdentifierAmbiguousError,
-    typeof AssociationSystemClassUnsupportedError,
-    typeof AssociationConflictError,
-    typeof AssociationInUseError,
-    typeof RelationNotFoundError,
-    typeof RelationIdentifierAmbiguousError,
-    typeof RelationMutationUnsupportedError,
-    typeof RelationCardinalityViolationError,
-    typeof RelationDirectionAmbiguousError,
-    typeof RelationEndpointClassMismatchError,
-    typeof GenericObjectIdentifierAmbiguousError,
-    typeof GenericObjectLocatorInvalidError,
-    typeof GenericObjectNotFoundError,
-    typeof HulyClassNotFoundError,
-    typeof SpaceNotFoundError,
-    typeof SpaceIdentifierAmbiguousError,
-    typeof SpaceTypeNotFoundError,
-    typeof SpaceTypeIdentifierAmbiguousError,
-    typeof TodoNotFoundError,
-    typeof TodoIdentifierAmbiguousError,
-    typeof TodoWorkSlotNotFoundError
-  ]
-> = Schema.Union(
+export const HulyDomainError = Schema.Union(
   HulyError,
   NoUpdateFieldsError,
   HulyConnectionError,
@@ -364,6 +276,7 @@ export const HulyDomainError: Schema.Union<
   CalendarNotAccessibleError,
   EventNotFoundError,
   RecurringEventNotFoundError,
+  ScheduleNotFoundError,
   ActivityMessageNotFoundError,
   ReactionNotFoundError,
   SavedMessageNotFoundError,
@@ -390,6 +303,9 @@ export const HulyDomainError: Schema.Union<
   InvalidPersonUuidError,
   FunnelNotFoundError,
   LeadNotFoundError,
+  FloorNotFoundError,
+  RoomNotFoundError,
+  MeetingMinutesNotFoundError,
   FileTooLargeError,
   InvalidContentTypeError,
   ProcessNotFoundError,

@@ -94,6 +94,7 @@
     "@hcengineering/contact": "0.7.0",
     "@hcengineering/core": "0.7.26",
     "@hcengineering/document": "0.7.0",
+    "@hcengineering/love": "0.7.0",
     "@hcengineering/notification": "0.7.0",
     "@hcengineering/platform": "0.7.20",
     "@hcengineering/rank": "0.7.18",

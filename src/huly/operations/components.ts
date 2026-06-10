@@ -29,7 +29,7 @@ import type {
   UpdateComponentResult
 } from "../../domain/schemas/components.js"
 import { UPDATE_COMPONENT_FIELDS } from "../../domain/schemas/components.js"
-import { ComponentId, ComponentLabel, IssueIdentifier, PersonName } from "../../domain/schemas/shared.js"
+import { ComponentId, ComponentLabel, IssueIdentifier, PersonName, Timestamp } from "../../domain/schemas/shared.js"
 import { isExistent } from "../../utils/assertions.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { HulyConnectionError, IssueNotFoundError, NoUpdateFieldsError, ProjectNotFoundError } from "../errors.js"
@@ -159,7 +159,7 @@ export const listComponents = (
         id: ComponentId.make(c._id),
         label: ComponentLabel.make(c.label),
         lead: leadName !== undefined ? PersonName.make(leadName) : undefined,
-        modifiedOn: c.modifiedOn
+        modifiedOn: Timestamp.make(c.modifiedOn)
       }
     })
 
@@ -183,8 +183,8 @@ export const getComponent = (
       description: optionalMarkupToMarkdown(component.description, markupUrlConfig, undefined),
       lead: leadName !== undefined ? PersonName.make(leadName) : undefined,
       project: params.project,
-      modifiedOn: component.modifiedOn,
-      createdOn: component.createdOn
+      modifiedOn: Timestamp.make(component.modifiedOn),
+      createdOn: component.createdOn === undefined ? undefined : Timestamp.make(component.createdOn)
     }
 
     return result

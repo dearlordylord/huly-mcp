@@ -66,6 +66,9 @@ importers:
       '@hcengineering/document':
         specifier: 0.7.0
         version: 0.7.0
+      '@hcengineering/love':
+        specifier: 0.7.0
+        version: 0.7.0
       '@hcengineering/notification':
         specifier: 0.7.0
         version: 0.7.0
@@ -764,6 +767,9 @@ packages:
   '@hcengineering/analytics@0.7.19':
     resolution: {integrity: sha512-fdsNGs/OlFqBrE/byUXWWZoTwfKXLR8sg07JHgZAEumuI19W1BnJM3tb0Eih4lFQl16DEjT7zxtXaWcU797u3Q==}
 
+  '@hcengineering/analytics@0.7.423':
+    resolution: {integrity: sha512-ZsY4sfoQCjl66QdpVQ8O4ZsurcdN/rL8nyLZWeprYtXWIvmnfLt9D810YNQIjrQHMXAAeVQTshWUa1b73NLmgw==}
+
   '@hcengineering/api-client@0.7.19':
     resolution: {integrity: sha512-JjDy/wL8ag/lU8N3ZzfI/W/F/p576R75zXl2XsvRWpYVi5mRhmaiBtkQ3L7mEFa68wEHAwDxczjTW0SIR4pXhA==}
 
@@ -794,11 +800,23 @@ packages:
   '@hcengineering/core@0.7.26':
     resolution: {integrity: sha512-VUKnNnsl44VJCs/HWFP1KUVUti4/eS4YgLCVWaGjPUzwOiC0cHRGwW+7ukqAlb4b6jTD12Qwa9qdFF3qAPEz9A==}
 
+  '@hcengineering/core@0.7.423':
+    resolution: {integrity: sha512-U4g1jcIbDOz4ZUICgbaDE0imcjJdYf7k0Qe9r5K62karb4Bglzsn74mR1IWtenAtyf7k5LYuWBzP2gQuuZnYIw==}
+
   '@hcengineering/document@0.7.0':
     resolution: {integrity: sha512-RaYFnxowKI33DNkisQ7K8bewEaI7zabc0m5vhepx/cCKSffB4aLsQZW9hQqiViBXq7M2Mgki2tkqCTwkTnm9SQ==}
 
+  '@hcengineering/drive@0.7.423':
+    resolution: {integrity: sha512-Mn28w6cQ+S9SCFgP3IOSXUVb/3wlgPPm+vDasZdTSZKFscexiyjjHQM6pz06ux5ytM0CNBgfuNqYRQch4rBIew==}
+
+  '@hcengineering/love@0.7.0':
+    resolution: {integrity: sha512-oyyMxTv2s1w2usLk4bc429e+V5R1zjaxGDRZzVgsf0DPT5vr3sd1MNi73Nj91ruTPaqmE5bI7fQdG3uRG2MBzg==}
+
   '@hcengineering/measurements@0.7.19':
     resolution: {integrity: sha512-hw/fhqoJfchSBdGbjx+UbuOqf6omp/pjPsaabixcgw1BYO5F4X4G+b07yfZxMNf1PnLfwntCleisuNqLvjD+gw==}
+
+  '@hcengineering/measurements@0.7.423':
+    resolution: {integrity: sha512-miQGTdEr47ha/3cJX3MFbqbfSgnK277yTSCJ+4evTRlEAM1WvcqxBrHB+vDTJxt3enj9hCGdX39BtpLNvDR2gQ==}
 
   '@hcengineering/notification@0.7.0':
     resolution: {integrity: sha512-wO3P9XjupSV+qF5/6hqoD3tPL195RJcyC0QqGyKuH5BzZEo1EV5iUWXOHYsO4eNaNy4trj/yfX9G+6DVQudpUg==}
@@ -806,8 +824,14 @@ packages:
   '@hcengineering/platform@0.7.20':
     resolution: {integrity: sha512-T84Obdt408ZBmYCzK+WaQcehHO1g59NbynQk0F9Y+DnB819OfCcgTzoIhTh4aXNY39X2sJ9qhgacZ3D23nenuQ==}
 
+  '@hcengineering/platform@0.7.423':
+    resolution: {integrity: sha512-X+QYV5vuS4KrRAeLYzv6+eVSEU7MzOe2+Tb4aFFruM6NDDhq38iFQ3qTuKI1cuzgwefWNKKeZh8x41VIIkrF4w==}
+
   '@hcengineering/preference@0.7.0':
     resolution: {integrity: sha512-VdmWaR20xu4KhFhRAr86IZ4lB8sPD8DieN0qacIB/EXkqgdYpDov0zCR4SYI1HLSk7YR7bhnEWZXTvGc1N8a6Q==}
+
+  '@hcengineering/preference@0.7.423':
+    resolution: {integrity: sha512-zMdOkbyXw0sSkrSJ7Dah2fywCyQAk7898SypQxMOTobrFxqgtBkVH/R0cVcfByH72ylAT+4tjy7LiWgbDAdNrQ==}
 
   '@hcengineering/rank@0.7.18':
     resolution: {integrity: sha512-JwSXZpB8Xhbd8BXYwxtVi/EHV7ehh+QjY4dmFyhTuCp51mstbZZiquTYL76m6/VJFhBM2wVmfVvHAeaCiRUfkg==}
@@ -842,6 +866,9 @@ packages:
   '@hcengineering/theme@0.7.0':
     resolution: {integrity: sha512-n1sgpfNZuC+e9fO+en77DNgOE4quh0+IAy+r+/g65U+ENSD9nmUVFoym9IdwFnrUrTLPa4jyxncGrZ16fJtdsA==}
 
+  '@hcengineering/theme@0.7.423':
+    resolution: {integrity: sha512-aXFJWiBKiNdUECBuhnpeT9ZPD5B15Kqvl9vA759LvjVXRIs34jkK8RmKDVXtchNa6raj1Rbt5XW2Cn/35b+Twg==}
+
   '@hcengineering/time@0.7.0':
     resolution: {integrity: sha512-rvYdAed+Sv1TMwG+M/jRv9wDZBFDIWwLHNR/e1sn8f3KAkvUAKsOBDnnFNE7xKYVMsHFJMIN8+x+8csG11dgTw==}
 
@@ -850,6 +877,9 @@ packages:
 
   '@hcengineering/ui@0.7.0':
     resolution: {integrity: sha512-sm2T3TIVQtHBMLw94VsRksHyJQ2Xva6p5vEUkVn5CvFrimALohx72iFzBsd7Oz9MYsX0RPZJIe49IONb2GmLBQ==}
+
+  '@hcengineering/ui@0.7.423':
+    resolution: {integrity: sha512-uOSfDG3b69Q6WgzTq62S/tuiobcTZRopxUHxorXsEfO5/iqSqWb4V61eUexmTBCD+3jAEMquqGcNFW956hXcPg==}
 
   '@hcengineering/view@0.7.0':
     resolution: {integrity: sha512-qeqBD4mSHSRUqrLPFHWZ0FUDDeJH4S0DDkosVjfZuHYQ7xjlfWCRMlDpVyKhtmNvkTMnb1GLvHzxKxe1gTkl/w==}
@@ -3443,6 +3473,9 @@ packages:
     resolution: {integrity: sha512-Nc3IT5yHzflTfbjgqWcCPpo7DaKy4FnpB0l/zCAW0Tc7jxAiuqSxHasntB3D7887LSrA93kDJ9IXovxJYxyLCA==}
     engines: {node: '>=4'}
 
+  plyr@3.7.8:
+    resolution: {integrity: sha512-yG/EHDobwbB/uP+4Bm6eUpJ93f8xxHjjk2dYcD1Oqpe1EcuQl5tzzw9Oq+uVAzd2lkM11qZfydSiyIpiB8pgdA==}
+
   plyr@3.8.4:
     resolution: {integrity: sha512-DrzLbK9Wol3zeiuZCleD9aUOl0KAaBHR9H6WVVVYPZ4Ya+LYxUFTgSF1jooHcMQCv96Ws96wCaZzIoP3bES8pQ==}
 
@@ -4811,6 +4844,10 @@ snapshots:
     dependencies:
       '@hcengineering/platform': 0.7.20
 
+  '@hcengineering/analytics@0.7.423':
+    dependencies:
+      '@hcengineering/platform': 0.7.423
+
   '@hcengineering/api-client@0.7.19(prosemirror-inputrules@1.5.1)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.6)':
     dependencies:
       '@hcengineering/account-client': 0.7.25
@@ -4905,6 +4942,13 @@ snapshots:
       '@hcengineering/platform': 0.7.20
       fast-equals: 5.4.0
 
+  '@hcengineering/core@0.7.423':
+    dependencies:
+      '@hcengineering/analytics': 0.7.423
+      '@hcengineering/measurements': 0.7.423
+      '@hcengineering/platform': 0.7.423
+      fast-equals: 5.4.0
+
   '@hcengineering/document@0.7.0':
     dependencies:
       '@hcengineering/attachment': 0.7.0
@@ -4916,7 +4960,29 @@ snapshots:
       '@hcengineering/ui': 0.7.0
       '@hcengineering/view': 0.7.0
 
+  '@hcengineering/drive@0.7.423':
+    dependencies:
+      '@hcengineering/core': 0.7.423
+      '@hcengineering/platform': 0.7.423
+      '@hcengineering/preference': 0.7.423
+      '@hcengineering/ui': 0.7.423
+
+  '@hcengineering/love@0.7.0':
+    dependencies:
+      '@hcengineering/calendar': 0.7.0
+      '@hcengineering/contact': 0.7.0
+      '@hcengineering/core': 0.7.26
+      '@hcengineering/drive': 0.7.423
+      '@hcengineering/notification': 0.7.0
+      '@hcengineering/platform': 0.7.20
+      '@hcengineering/preference': 0.7.0
+      '@hcengineering/ui': 0.7.0
+      '@hcengineering/view': 0.7.0
+      '@hcengineering/workbench': 0.7.0
+
   '@hcengineering/measurements@0.7.19': {}
+
+  '@hcengineering/measurements@0.7.423': {}
 
   '@hcengineering/notification@0.7.0':
     dependencies:
@@ -4933,11 +4999,21 @@ snapshots:
     dependencies:
       intl-messageformat: 10.7.18
 
+  '@hcengineering/platform@0.7.423':
+    dependencies:
+      intl-messageformat: 10.7.18
+
   '@hcengineering/preference@0.7.0':
     dependencies:
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
       '@hcengineering/ui': 0.7.0
+
+  '@hcengineering/preference@0.7.423':
+    dependencies:
+      '@hcengineering/core': 0.7.423
+      '@hcengineering/platform': 0.7.423
+      '@hcengineering/ui': 0.7.423
 
   '@hcengineering/rank@0.7.18':
     dependencies:
@@ -5053,6 +5129,12 @@ snapshots:
       '@hcengineering/platform': 0.7.20
       svelte: 4.2.20
 
+  '@hcengineering/theme@0.7.423':
+    dependencies:
+      '@hcengineering/analytics': 0.7.423
+      '@hcengineering/platform': 0.7.423
+      svelte: 4.2.20
+
   '@hcengineering/time@0.7.0':
     dependencies:
       '@hcengineering/calendar': 0.7.0
@@ -5093,6 +5175,21 @@ snapshots:
       emojibase-regex: 16.0.0
       fast-equals: 5.4.0
       plyr: 3.8.4
+      svelte: 4.2.20
+
+  '@hcengineering/ui@0.7.423':
+    dependencies:
+      '@hcengineering/analytics': 0.7.423
+      '@hcengineering/core': 0.7.423
+      '@hcengineering/platform': 0.7.423
+      '@hcengineering/theme': 0.7.423
+      autolinker: 4.0.0
+      blurhash: 2.0.5
+      date-fns: 2.30.0
+      date-fns-tz: 2.0.1(date-fns@2.30.0)
+      dompurify: 3.3.1
+      fast-equals: 5.4.0
+      plyr: 3.7.8
       svelte: 4.2.20
 
   '@hcengineering/view@0.7.0':
@@ -7842,6 +7939,14 @@ snapshots:
   pkce-challenge@5.0.1: {}
 
   pluralize@8.0.0: {}
+
+  plyr@3.7.8:
+    dependencies:
+      core-js: 3.48.0
+      custom-event-polyfill: 1.0.7
+      loadjs: 4.3.0
+      rangetouch: 2.0.1
+      url-polyfill: 1.1.14
 
   plyr@3.8.4:
     dependencies:

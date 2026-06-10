@@ -11,7 +11,6 @@ import {
   MilestoneId,
   MilestoneIdentifier,
   MilestoneLabel,
-  NonEmptyString,
   ProjectIdentifier,
   Timestamp,
   withAtLeastOneRequired
@@ -89,7 +88,7 @@ export const CreateMilestoneParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  label: NonEmptyString.annotations({
+  label: MilestoneLabel.annotations({
     description: "Milestone name/label"
   }),
   description: Schema.optional(Schema.String.annotations({
@@ -119,7 +118,7 @@ export const UpdateMilestoneParamsSchema = Schema.Struct({
   milestone: MilestoneIdentifier.annotations({
     description: "Milestone ID or label"
   }),
-  label: Schema.optional(NonEmptyString.annotations({
+  label: Schema.optional(MilestoneLabel.annotations({
     description: "New milestone name/label"
   })),
   description: Schema.optional(clearableText("New milestone description (markdown supported).")),

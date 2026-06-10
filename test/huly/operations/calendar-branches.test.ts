@@ -8,6 +8,7 @@ import type { Person } from "@hcengineering/contact"
 import { type Class, type Doc, type MarkupBlobRef, type Ref, toFindResult } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { Timestamp } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { listEventInstances } from "../../../src/huly/operations/calendar.js"
 import { eventBrandId } from "../../helpers/brands.js"
@@ -24,8 +25,8 @@ const makeRecurringEvent = (overrides?: Partial<HulyRecurringEvent>): HulyRecurr
   title: "Weekly Standup",
   description: "" as HulyRecurringEvent["description"],
   eventId: "recur-1",
-  date: 1700000000000,
-  dueDate: 1700003600000,
+  date: Timestamp.make(1700000000000),
+  dueDate: Timestamp.make(1700003600000),
   allDay: false,
   participants: [],
   // eslint-disable-next-line no-restricted-syntax -- test mock: double assertion for branded type
@@ -39,7 +40,7 @@ const makeRecurringEvent = (overrides?: Partial<HulyRecurringEvent>): HulyRecurr
   rules: [{ freq: "WEEKLY" }],
   exdate: [],
   rdate: [],
-  originalStartTime: 1700000000000,
+  originalStartTime: Timestamp.make(1700000000000),
   timeZone: "UTC",
   modifiedBy: "user-1" as Doc["modifiedBy"],
   modifiedOn: 0,
@@ -53,7 +54,7 @@ const makeRecurringInstance = (overrides?: Partial<HulyRecurringInstance>): Huly
   ...makeRecurringEvent(),
   _class: calendar.class.ReccuringInstance,
   recurringEventId: "recur-1",
-  originalStartTime: 1700000000000,
+  originalStartTime: Timestamp.make(1700000000000),
   isCancelled: false,
   virtual: false,
   ...overrides
@@ -128,7 +129,7 @@ describe("listEventInstances - from/to date filters (lines 573, 577)", () => {
     Effect.gen(function*() {
       const recurringEvent = makeRecurringEvent({ eventId: "recur-1" })
       const instances = [
-        makeRecurringInstance({ eventId: "inst-1", recurringEventId: "recur-1", date: 1700100000000 })
+        makeRecurringInstance({ eventId: "inst-1", recurringEventId: "recur-1", date: Timestamp.make(1700100000000) })
       ]
       const testLayer = createTestLayer({
         recurringEvents: [recurringEvent],
@@ -137,7 +138,7 @@ describe("listEventInstances - from/to date filters (lines 573, 577)", () => {
 
       const result = yield* listEventInstances({
         recurringEventId: eventBrandId("recur-1"),
-        from: 1700000000000
+        from: Timestamp.make(1700000000000)
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
@@ -147,7 +148,11 @@ describe("listEventInstances - from/to date filters (lines 573, 577)", () => {
     Effect.gen(function*() {
       const recurringEvent = makeRecurringEvent({ eventId: "recur-1" })
       const instances = [
-        makeRecurringInstance({ eventId: "inst-1", recurringEventId: "recur-1", dueDate: 1700200000000 })
+        makeRecurringInstance({
+          eventId: "inst-1",
+          recurringEventId: "recur-1",
+          dueDate: Timestamp.make(1700200000000)
+        })
       ]
       const testLayer = createTestLayer({
         recurringEvents: [recurringEvent],
@@ -156,7 +161,7 @@ describe("listEventInstances - from/to date filters (lines 573, 577)", () => {
 
       const result = yield* listEventInstances({
         recurringEventId: eventBrandId("recur-1"),
-        to: 1700300000000
+        to: Timestamp.make(1700300000000)
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
@@ -175,8 +180,8 @@ describe("listEventInstances - from/to date filters (lines 573, 577)", () => {
 
       const result = yield* listEventInstances({
         recurringEventId: eventBrandId("recur-1"),
-        from: 1699000000000,
-        to: 1701000000000
+        from: Timestamp.make(1699000000000),
+        to: Timestamp.make(1701000000000)
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)

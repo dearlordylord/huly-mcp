@@ -113,7 +113,7 @@ export const TodoLocatorSchema = Schema.Union(
   }),
   Schema.Struct({
     issue: IssueTodoLocatorSchema,
-    title: Schema.optional(NonEmptyString.annotations({
+    title: Schema.optional(TodoTitle.annotations({
       description: "Optional exact title when more than one ToDo is attached to the issue."
     })),
     owner: Schema.optional(NonEmptyString.annotations({
@@ -122,7 +122,7 @@ export const TodoLocatorSchema = Schema.Union(
     completionState: Schema.optional(TodoCompletionStateSchema)
   }),
   Schema.Struct({
-    title: NonEmptyString.annotations({
+    title: TodoTitle.annotations({
       description: "Exact ToDo title."
     }),
     owner: Schema.optional(NonEmptyString.annotations({
@@ -146,7 +146,7 @@ export const ListTodosParamsSchema = Schema.Struct({
   issue: Schema.optional(IssueTodoLocatorSchema.annotations({
     description: "Filter ToDos attached to one issue."
   })),
-  title: Schema.optional(NonEmptyString.annotations({
+  title: Schema.optional(TodoTitle.annotations({
     description: "Exact ToDo title filter."
   })),
   titleSearch: Schema.optional(NonEmptyString.annotations({
@@ -182,7 +182,7 @@ export const GetTodoParamsSchema = Schema.Struct({
 export type GetTodoParams = Schema.Schema.Type<typeof GetTodoParamsSchema>
 
 export const CreateTodoParamsSchema = Schema.Struct({
-  title: NonEmptyString.annotations({
+  title: TodoTitle.annotations({
     description: "ToDo title."
   }),
   description: Schema.optional(Schema.String.annotations({
@@ -220,7 +220,7 @@ export const UPDATE_TODO_FIELDS = [
 
 export const UpdateTodoParamsSchema = Schema.Struct({
   locator: TodoLocatorSchema,
-  title: Schema.optional(NonEmptyString.annotations({
+  title: Schema.optional(TodoTitle.annotations({
     description: "New ToDo title."
   })),
   description: Schema.optional(clearableText("New ToDo description in markdown.")),

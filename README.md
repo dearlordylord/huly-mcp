@@ -294,7 +294,7 @@ Planned feature surfaces:
 - Contacts: person channels, social identities, provider discovery, contact statuses, notes/comments, person attachments, person merge, employee invite/create/kick/reinvite, and inactive employee management.
 - Calendar: calendar CRUD/config, external calendar sync metadata, primary calendar management, schedule objects, participant mutations, and RSVP/status support when stable.
 - Team planner and schedule reporting: team agendas, workload/capacity summaries, and visibility-aware free/busy views across members/projects.
-- Virtual office and meetings: offices, floors, rooms, access/language/default recording/transcription settings, meeting schedules, active participants, room info, meeting minutes, transcripts, recordings, and device preferences.
+- Virtual office and meetings: offices, floors, rooms, access/language/default recording/transcription settings, meeting schedules, active participants, room info, meeting notes/transcript records (minutes), recordings, and device preferences.
 - Chat and communication: direct-message send/update/delete, group DMs, channel member mutations, join/leave/request access, archive/unarchive, star/favorite channels, close/reopen conversations, pinned messages, message attachments, translation, applets, in-message polls, and guest communication settings.
 - Notifications and activity: mark unread, unarchive, hide/unhide/mute contexts, unsubscribe per context/type, notification type settings, collaborators, pin/unpin activity messages, generic activity replies, filters, references, mentions, and update-message introspection.
 - Attachments and media: saved attachments, photos, drawings, embeddings, previews/preview metadata, and friendly wrappers for additional object types.
@@ -322,7 +322,7 @@ SDK upgrade revisit:
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
 ## Available Tools
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `leads`, `planner`, `processes`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `labels`, `leads`, `planner`, `processes`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `virtual-office`
 
 ### Projects
 
@@ -480,6 +480,11 @@ SDK upgrade revisit:
 | `create_event` | Create a new calendar event. Description supports markdown formatting. Optional calendarId targets a specific calendar; when omitted, the event uses the authenticated user's primary personal calendar. Returns the created event ID. |
 | `update_event` | Update fields on an existing calendar event. Only provided fields are modified. Description updates support markdown. |
 | `delete_event` | Permanently delete a calendar event. This action cannot be undone. |
+| `list_schedules` | List calendar scheduling links/availability schedules. Optional owner accepts an employee/person ID, exact name, or email. |
+| `get_schedule` | Retrieve one calendar schedule including owner, availability, calendar target, time zone, and room information when it is a meeting schedule. |
+| `create_schedule` | Create a calendar schedule. Owner accepts an employee/person ID, exact name, or email; calendar can be targeted by calendarId or calendarName. |
+| `update_schedule` | Update a calendar schedule. Supports owner, title, description, duration, interval, availability, timeZone, and calendar move by calendarId or calendarName. |
+| `delete_schedule` | Delete a calendar schedule by scheduleId. |
 | `list_recurring_events` | List recurring event definitions. Returns recurring events sorted by modification date (newest first). |
 | `create_recurring_event` | Create a new recurring calendar event with RFC5545 RRULE rules. Description supports markdown. Optional calendarId targets a specific calendar; when omitted, the event uses the authenticated user's primary personal calendar. Returns the created event ID. |
 | `list_event_instances` | List instances of a recurring event. Returns instances sorted by date. Supports filtering by date range. Use includeParticipants=true to fetch full participant info (extra lookups). |
@@ -714,6 +719,23 @@ SDK upgrade revisit:
 | Tool | Description |
 |------|-------------|
 | `list_user_statuses` | List Huly user presence records. Returns account UUIDs, online status, and last modified timestamp. Use this to check who is currently connected; presence is maintained by Huly server sessions. Filter by online or account UUID. |
+
+### Virtual-Office
+
+| Tool | Description |
+|------|-------------|
+| `list_office_floors` | List virtual office floors. |
+| `get_office_floor` | Get one virtual office floor by floorId. |
+| `list_office_rooms` | List virtual office rooms, including access mode, type, floor, floor-plan position/size, language, and recording/transcription defaults. |
+| `get_office_room` | Get one virtual office room by roomId, including description when readable. |
+| `list_offices` | List personal office rooms and their assigned people when readable. |
+| `get_office` | Get one personal office room by roomId, including assigned person and description when readable. |
+| `list_active_room_info` | List transient active room occupancy summaries. |
+| `list_active_room_participants` | List transient active virtual-office participants and positions, optionally filtered by roomId. |
+| `list_meeting_minutes` | List meeting notes/transcript records (minutes) by optional attachment target and created-on range. |
+| `get_meeting_minutes` | Get one meeting notes/transcript record (minutes) by meetingMinutesId, including description when readable. |
+| `list_device_preferences` | List readable virtual-office media device preferences. |
+| `list_office_defaults` | List room-level language, default recording, and default transcription settings. |
 
 <!-- tools:end -->
 

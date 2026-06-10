@@ -5,6 +5,7 @@ import { Effect } from "effect"
 import { expect } from "vitest"
 
 import type { Employee, Person as HulyPerson } from "@hcengineering/contact"
+import { Timestamp } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { contact } from "../../../src/huly/huly-plugins.js"
 import {
@@ -495,7 +496,7 @@ describe("updateTestRun — description and dueDate branches", () => {
         project: testProjectIdentifier("QA Project"),
         run: testRunIdentifier("Nightly Run"),
         description: "Run notes",
-        dueDate: 1000
+        dueDate: Timestamp.make(1000)
       }).pipe(Effect.provide(buildLayer({ runs: [makeRun()], captureUpdateDoc: cap })))
       expect(cap.operations?.description).toBe("markup-ref")
       expect(cap.operations?.dueDate).toBe(1000)
@@ -576,7 +577,7 @@ describe("updateTestResult — status, assignee, description branches", () => {
 describe("test run summary optional fields", () => {
   it.effect("includes a run dueDate in list and detail summaries", () =>
     Effect.gen(function*() {
-      const run = makeRun({ dueDate: 5000 })
+      const run = makeRun({ dueDate: Timestamp.make(5000) })
       const listed = yield* listTestRuns({ project: testProjectIdentifier("QA Project") }).pipe(
         Effect.provide(buildLayer({ runs: [run] }))
       )
@@ -636,7 +637,7 @@ describe("createTestRun optional fields", () => {
         project: testProjectIdentifier("QA Project"),
         name: "Release Run",
         description: "Release checklist",
-        dueDate: 9000
+        dueDate: Timestamp.make(9000)
       }).pipe(Effect.provide(buildLayer({ captureCreateDoc: cap })))
       expect(cap.attributes?.description).toBe("markup-ref")
       expect(cap.attributes?.dueDate).toBe(9000)
@@ -682,7 +683,7 @@ describe("runTestPlan branch coverage", () => {
       yield* runTestPlan({
         project: testProjectIdentifier("QA Project"),
         plan: testPlanIdentifier("My Plan"),
-        dueDate: 4242
+        dueDate: Timestamp.make(4242)
       }).pipe(Effect.provide(buildLayer({
         plans: [plan],
         planItems: [item],

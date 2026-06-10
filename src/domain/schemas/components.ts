@@ -10,7 +10,6 @@ import {
   hasAtLeastOneDefined,
   IssueIdentifier,
   LimitParam,
-  NonEmptyString,
   PersonName,
   PersonRefInput,
   ProjectIdentifier,
@@ -79,7 +78,7 @@ export const CreateComponentParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
   }),
-  label: NonEmptyString.annotations({
+  label: ComponentLabel.annotations({
     description: "Component name/label"
   }),
   description: Schema.optional(Schema.String.annotations({
@@ -108,7 +107,7 @@ export const UpdateComponentParamsSchema = Schema.Struct({
   component: ComponentIdentifier.annotations({
     description: "Component ID or label"
   }),
-  label: Schema.optional(NonEmptyString.annotations({
+  label: Schema.optional(ComponentLabel.annotations({
     description: "New component name/label"
   })),
   description: Schema.optional(clearableText("New component description (markdown supported).")),

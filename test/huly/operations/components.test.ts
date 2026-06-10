@@ -11,6 +11,7 @@ import type {
 import { TimeReportDayType } from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { ComponentLabel } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type {
   ComponentNotFoundError,
@@ -32,6 +33,8 @@ import { markdownToMarkupString, testMarkupUrlConfig } from "../../../src/huly/o
 import { componentIdentifier, email, issueIdentifier, projectIdentifier } from "../../helpers/brands.js"
 
 // --- Mock Data Builders ---
+
+const componentLabel = ComponentLabel.make
 
 const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
   const result: HulyProject = {
@@ -62,7 +65,7 @@ const makeComponent = (overrides?: Partial<HulyComponent>): HulyComponent => {
     _id: "comp-1" as Ref<HulyComponent>,
     _class: tracker.class.Component,
     space: "project-1" as Ref<HulyProject>,
-    label: "Backend",
+    label: componentLabel("Backend"),
     description: "Backend component",
     lead: "person-1" as Ref<Employee>,
     comments: 0,
@@ -296,7 +299,7 @@ describe("findComponentByIdOrLabel", () => {
       expect(result?._id).toBe("comp-abc")
     }).pipe(Effect.provide(createTestLayerWithMocks({
       projects: [makeProject()],
-      components: [makeComponent({ _id: "comp-abc" as Ref<HulyComponent>, label: "Frontend" })]
+      components: [makeComponent({ _id: "comp-abc" as Ref<HulyComponent>, label: componentLabel("Frontend") })]
     }))))
 
   it.effect("finds component by label when ID lookup fails", () =>
@@ -308,7 +311,7 @@ describe("findComponentByIdOrLabel", () => {
       expect(result?.label).toBe("Frontend")
     }).pipe(Effect.provide(createTestLayerWithMocks({
       projects: [makeProject()],
-      components: [makeComponent({ _id: "comp-xyz" as Ref<HulyComponent>, label: "Frontend" })]
+      components: [makeComponent({ _id: "comp-xyz" as Ref<HulyComponent>, label: componentLabel("Frontend") })]
     }))))
 
   it.effect("returns undefined when component not found by ID or label", () =>
@@ -330,13 +333,13 @@ describe("listComponents", () => {
       const components = [
         makeComponent({
           _id: "c1" as Ref<HulyComponent>,
-          label: "Backend",
+          label: componentLabel("Backend"),
           space: "proj-1" as Ref<HulyProject>,
           lead: "person-1" as Ref<Employee>
         }),
         makeComponent({
           _id: "c2" as Ref<HulyComponent>,
-          label: "Frontend",
+          label: componentLabel("Frontend"),
           space: "proj-1" as Ref<HulyProject>,
           lead: "person-2" as Ref<Employee>
         })
@@ -362,7 +365,7 @@ describe("listComponents", () => {
       const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
       const comp = makeComponent({
         _id: "c1" as Ref<HulyComponent>,
-        label: "Infra",
+        label: componentLabel("Infra"),
         space: "proj-1" as Ref<HulyProject>,
         lead: null
       })
@@ -420,7 +423,7 @@ describe("getComponent", () => {
       const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
       const comp = makeComponent({
         _id: "comp-1" as Ref<HulyComponent>,
-        label: "Backend",
+        label: componentLabel("Backend"),
         description: "Backend services",
         lead: "person-1" as Ref<Employee>,
         space: "proj-1" as Ref<HulyProject>,
@@ -454,7 +457,7 @@ describe("getComponent", () => {
       const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
       const comp = makeComponent({
         _id: "comp-1" as Ref<HulyComponent>,
-        label: "Infra",
+        label: componentLabel("Infra"),
         lead: null,
         space: "proj-1" as Ref<HulyProject>
       })
@@ -517,7 +520,7 @@ describe("createComponent", () => {
 
       const result = yield* createComponent({
         project: projectIdentifier("PROJ"),
-        label: "New Component"
+        label: componentLabel("New Component")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.label).toBe("New Component")
@@ -547,7 +550,7 @@ describe("createComponent", () => {
 
       const result = yield* createComponent({
         project: projectIdentifier("PROJ"),
-        label: "Frontend",
+        label: componentLabel("Frontend"),
         description: "UI component",
         lead: email("alice@example.com")
       }).pipe(Effect.provide(testLayer))
@@ -568,7 +571,7 @@ describe("createComponent", () => {
       const error = yield* Effect.flip(
         createComponent({
           project: projectIdentifier("PROJ"),
-          label: "Frontend",
+          label: componentLabel("Frontend"),
           lead: email("nobody@example.com")
         }).pipe(Effect.provide(testLayer))
       )
@@ -584,7 +587,7 @@ describe("createComponent", () => {
       const error = yield* Effect.flip(
         createComponent({
           project: projectIdentifier("NOPE"),
-          label: "Frontend"
+          label: componentLabel("Frontend")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -598,7 +601,7 @@ describe("updateComponent", () => {
       const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
       const comp = makeComponent({
         _id: "comp-1" as Ref<HulyComponent>,
-        label: "Backend",
+        label: componentLabel("Backend"),
         space: "proj-1" as Ref<HulyProject>
       })
       const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
@@ -612,7 +615,7 @@ describe("updateComponent", () => {
       const result = yield* updateComponent({
         project: projectIdentifier("PROJ"),
         component: componentIdentifier("Backend"),
-        label: "Backend V2"
+        label: componentLabel("Backend V2")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.id).toBe("comp-1")
@@ -625,7 +628,7 @@ describe("updateComponent", () => {
       const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
       const comp = makeComponent({
         _id: "comp-1" as Ref<HulyComponent>,
-        label: "Backend",
+        label: componentLabel("Backend"),
         space: "proj-1" as Ref<HulyProject>
       })
       const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
@@ -653,7 +656,7 @@ describe("updateComponent", () => {
       const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
       const comp = makeComponent({
         _id: "comp-1" as Ref<HulyComponent>,
-        label: "Backend",
+        label: componentLabel("Backend"),
         space: "proj-1" as Ref<HulyProject>
       })
       const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
@@ -673,7 +676,7 @@ describe("updateComponent", () => {
       const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
       const comp = makeComponent({
         _id: "comp-1" as Ref<HulyComponent>,
-        label: "Backend",
+        label: componentLabel("Backend"),
         space: "proj-1" as Ref<HulyProject>
       })
       const person = makePerson({ _id: "person-2" as Ref<Person>, name: "Bob" })
@@ -706,7 +709,7 @@ describe("updateComponent", () => {
       const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
       const comp = makeComponent({
         _id: "comp-1" as Ref<HulyComponent>,
-        label: "Backend",
+        label: componentLabel("Backend"),
         space: "proj-1" as Ref<HulyProject>,
         lead: "person-1" as Ref<Employee>
       })
@@ -733,7 +736,7 @@ describe("updateComponent", () => {
       const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
       const comp = makeComponent({
         _id: "comp-1" as Ref<HulyComponent>,
-        label: "Backend",
+        label: componentLabel("Backend"),
         space: "proj-1" as Ref<HulyProject>
       })
 
@@ -762,7 +765,7 @@ describe("updateComponent", () => {
         updateComponent({
           project: projectIdentifier("PROJ"),
           component: componentIdentifier("Ghost"),
-          label: "New Label"
+          label: componentLabel("New Label")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -775,7 +778,7 @@ describe("updateComponent", () => {
       const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
       const comp = makeComponent({
         _id: "comp-1" as Ref<HulyComponent>,
-        label: "Backend",
+        label: componentLabel("Backend"),
         space: "proj-1" as Ref<HulyProject>
       })
 
@@ -804,7 +807,7 @@ describe("updateComponent", () => {
         updateComponent({
           project: projectIdentifier("NOPE"),
           component: componentIdentifier("Backend"),
-          label: "New"
+          label: componentLabel("New")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -818,7 +821,7 @@ describe("setIssueComponent", () => {
       const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
       const comp = makeComponent({
         _id: "comp-1" as Ref<HulyComponent>,
-        label: "Backend",
+        label: componentLabel("Backend"),
         space: "proj-1" as Ref<HulyProject>
       })
       const issue = makeIssue({
@@ -947,7 +950,7 @@ describe("deleteComponent", () => {
       const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
       const comp = makeComponent({
         _id: "comp-1" as Ref<HulyComponent>,
-        label: "Backend",
+        label: componentLabel("Backend"),
         space: "proj-1" as Ref<HulyProject>
       })
       const captureRemoveDoc: MockConfig["captureRemoveDoc"] = {}
@@ -973,7 +976,7 @@ describe("deleteComponent", () => {
       const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
       const comp = makeComponent({
         _id: "comp-abc" as Ref<HulyComponent>,
-        label: "Backend",
+        label: componentLabel("Backend"),
         space: "proj-1" as Ref<HulyProject>
       })
       const captureRemoveDoc: MockConfig["captureRemoveDoc"] = {}

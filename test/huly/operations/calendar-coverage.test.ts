@@ -19,7 +19,15 @@ import {
 } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
-import { CalendarId } from "../../../src/domain/schemas/shared.js"
+import { CalendarEventTitle } from "../../../src/domain/schemas/calendar.js"
+import {
+  MonthDayOrdinal,
+  MonthIndex,
+  RecurrenceCount,
+  RecurrenceInterval,
+  SetPositionOrdinal
+} from "../../../src/domain/schemas/recurrence-primitives.js"
+import { CalendarId, Timestamp } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import {
   createEvent,
@@ -36,6 +44,8 @@ import { calendar, contact } from "../../../src/huly/huly-plugins.js"
 
 // --- Mock Data Builders ---
 
+const calendarEventTitle = CalendarEventTitle.make
+
 const asHulyEvent = (v: unknown) => v as HulyEvent
 const asCalendar = (v: unknown) => v as HulyCalendar
 const asPerson = (v: unknown) => v as Person
@@ -51,8 +61,8 @@ const makeEvent = (overrides?: Partial<HulyEvent>): HulyEvent =>
     title: "Test Event",
     description: "" as HulyEvent["description"],
     eventId: "evt-id-1",
-    date: 1700000000000,
-    dueDate: 1700003600000,
+    date: Timestamp.make(1700000000000),
+    dueDate: Timestamp.make(1700003600000),
     allDay: false,
     participants: [],
     // eslint-disable-next-line no-restricted-syntax -- test mock requires double cast through unknown
@@ -121,7 +131,7 @@ const makeRecurringEvent = (overrides?: Partial<HulyRecurringEvent>): HulyRecurr
     rules: [{ freq: "WEEKLY" }],
     exdate: [],
     rdate: [],
-    originalStartTime: 1700000000000,
+    originalStartTime: Timestamp.make(1700000000000),
     timeZone: "UTC",
     ...overrides
   })
@@ -131,7 +141,7 @@ const makeRecurringInstance = (overrides?: Partial<HulyRecurringInstance>): Huly
     ...makeRecurringEvent(),
     _class: calendar.class.ReccuringInstance,
     recurringEventId: "evt-id-1",
-    originalStartTime: 1700000000000,
+    originalStartTime: Timestamp.make(1700000000000),
     isCancelled: false,
     virtual: false,
     ...overrides
@@ -297,13 +307,13 @@ describe("createRecurringEvent - ruleToHulyRule with all optional fields", () =>
       const testLayer = createTestLayer({ captureAddCollection })
 
       yield* createRecurringEvent({
-        title: "Recurring",
-        startDate: 1700000000000,
+        title: calendarEventTitle("Recurring"),
+        startDate: Timestamp.make(1700000000000),
         rules: [{
           freq: "WEEKLY",
-          endDate: 1710000000000,
-          count: 10,
-          interval: 2
+          endDate: Timestamp.make(1710000000000),
+          count: RecurrenceCount.make(10),
+          interval: RecurrenceInterval.make(2)
         }]
       }).pipe(Effect.provide(testLayer))
 
@@ -321,14 +331,14 @@ describe("createRecurringEvent - ruleToHulyRule with all optional fields", () =>
       const testLayer = createTestLayer({ captureAddCollection })
 
       yield* createRecurringEvent({
-        title: "Complex Recurring",
-        startDate: 1700000000000,
+        title: calendarEventTitle("Complex Recurring"),
+        startDate: Timestamp.make(1700000000000),
         rules: [{
           freq: "MONTHLY",
           byDay: ["MO", "WE", "FR"],
-          byMonthDay: [1, 15],
-          byMonth: [1, 6, 12],
-          bySetPos: [-1],
+          byMonthDay: [MonthDayOrdinal.make(1), MonthDayOrdinal.make(15)],
+          byMonth: [MonthIndex.make(0), MonthIndex.make(5), MonthIndex.make(11)],
+          bySetPos: [SetPositionOrdinal.make(-1)],
           wkst: "MO"
         }]
       }).pipe(Effect.provide(testLayer))
@@ -338,7 +348,7 @@ describe("createRecurringEvent - ruleToHulyRule with all optional fields", () =>
       expect(rules[0].freq).toBe("MONTHLY")
       expect(rules[0].byDay).toEqual(["MO", "WE", "FR"])
       expect(rules[0].byMonthDay).toEqual([1, 15])
-      expect(rules[0].byMonth).toEqual([1, 6, 12])
+      expect(rules[0].byMonth).toEqual([0, 5, 11])
       expect(rules[0].bySetPos).toEqual([-1])
       expect(rules[0].wkst).toBe("MO")
     }))
@@ -348,10 +358,10 @@ describe("createRecurringEvent - ruleToHulyRule with all optional fields", () =>
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
       const testLayer = createTestLayer({ captureAddCollection })
 
-      const originalByDay = ["TU", "TH"]
+      const originalByDay = ["TU", "TH"] as const
       yield* createRecurringEvent({
-        title: "Array Copy Test",
-        startDate: 1700000000000,
+        title: calendarEventTitle("Array Copy Test"),
+        startDate: Timestamp.make(1700000000000),
         rules: [{
           freq: "WEEKLY",
           byDay: originalByDay
@@ -374,8 +384,8 @@ describe("createRecurringEvent - ruleToHulyRule with all optional fields", () =>
       })
 
       yield* createRecurringEvent({
-        title: "Recurring With Calendar",
-        startDate: 1700000000000,
+        title: calendarEventTitle("Recurring With Calendar"),
+        startDate: Timestamp.make(1700000000000),
         rules: [{ freq: "WEEKLY" }],
         calendarId: CalendarId.make("recurring-calendar")
       }).pipe(Effect.provide(testLayer))
@@ -398,8 +408,8 @@ describe("createRecurringEvent - ruleToHulyRule with all optional fields", () =>
       })
 
       yield* createRecurringEvent({
-        title: "Recurring With Preferred Calendar",
-        startDate: 1700000000000,
+        title: calendarEventTitle("Recurring With Preferred Calendar"),
+        startDate: Timestamp.make(1700000000000),
         rules: [{ freq: "WEEKLY" }]
       }).pipe(Effect.provide(testLayer))
 
@@ -417,8 +427,8 @@ describe("createEvent - description and participants", () => {
       const testLayer = createTestLayer({ captureAddCollection, captureUploadMarkup })
 
       const result = yield* createEvent({
-        title: "Event with Desc",
-        date: 1700000000000,
+        title: calendarEventTitle("Event with Desc"),
+        date: Timestamp.make(1700000000000),
         description: "Some markdown description"
       }).pipe(Effect.provide(testLayer))
 
@@ -452,8 +462,8 @@ describe("createEvent - description and participants", () => {
       })
 
       const result = yield* createEvent({
-        title: "Event with Participants",
-        date: 1700000000000,
+        title: calendarEventTitle("Event with Participants"),
+        date: Timestamp.make(1700000000000),
         participants: [email("alice@example.com")]
       }).pipe(Effect.provide(testLayer))
 
@@ -463,6 +473,39 @@ describe("createEvent - description and participants", () => {
       expect(participants[0]).toBe("person-1")
     }))
 
+  it.effect("creates event with participants resolved from object email locators", () =>
+    Effect.gen(function*() {
+      const person = makePerson({ _id: "person-1" as Ref<Person>, name: "Alice" })
+      const channel = asChannel({
+        _id: "channel-1" as Ref<Channel>,
+        _class: contact.class.Channel,
+        space: "space-1" as Ref<Space>,
+        value: "alice@example.com",
+        attachedTo: "person-1" as Ref<Doc>,
+        attachedToClass: contact.class.Person as Ref<Class<Doc>>,
+        collection: "channels",
+        provider: "email",
+        modifiedBy: "user-1" as Doc["modifiedBy"],
+        modifiedOn: 0,
+        createdBy: "user-1" as Doc["createdBy"],
+        createdOn: 0
+      })
+      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+      const testLayer = createTestLayer({
+        persons: [person],
+        channels: [channel],
+        captureAddCollection
+      })
+
+      yield* createEvent({
+        title: calendarEventTitle("Event with Object Participants"),
+        date: Timestamp.make(1700000000000),
+        participants: [{ email: email("alice@example.com") }]
+      }).pipe(Effect.provide(testLayer))
+
+      expect(captureAddCollection.attributes?.participants).toEqual(["person-1"])
+    }))
+
   it.effect("creates event with empty description (whitespace only) - no upload", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -470,8 +513,8 @@ describe("createEvent - description and participants", () => {
       const testLayer = createTestLayer({ captureAddCollection, captureUploadMarkup })
 
       yield* createEvent({
-        title: "Event No Desc",
-        date: 1700000000000,
+        title: calendarEventTitle("Event No Desc"),
+        date: Timestamp.make(1700000000000),
         description: "   "
       }).pipe(Effect.provide(testLayer))
 
@@ -489,8 +532,8 @@ describe("createEvent - description and participants", () => {
       })
 
       yield* createEvent({
-        title: "Event With Calendar",
-        date: 1700000000000,
+        title: calendarEventTitle("Event With Calendar"),
+        date: Timestamp.make(1700000000000),
         calendarId: CalendarId.make("explicit-calendar")
       }).pipe(Effect.provide(testLayer))
 
@@ -512,8 +555,8 @@ describe("createEvent - description and participants", () => {
       })
 
       yield* createEvent({
-        title: "Event With Preferred Calendar",
-        date: 1700000000000
+        title: calendarEventTitle("Event With Preferred Calendar"),
+        date: Timestamp.make(1700000000000)
       }).pipe(Effect.provide(testLayer))
 
       expect(captureAddCollection.attributes?.calendar).toBe("preferred-calendar")
@@ -529,8 +572,8 @@ describe("createEvent - description and participants", () => {
 
       const error = yield* Effect.flip(
         createEvent({
-          title: "Event With Readonly Calendar",
-          date: 1700000000000,
+          title: calendarEventTitle("Event With Readonly Calendar"),
+          date: Timestamp.make(1700000000000),
           calendarId: CalendarId.make("readonly-calendar")
         }).pipe(Effect.provide(testLayer))
       )
@@ -545,8 +588,8 @@ describe("createEvent - description and participants", () => {
 
       const error = yield* Effect.flip(
         createEvent({
-          title: "Event With Missing Calendar",
-          date: 1700000000000,
+          title: calendarEventTitle("Event With Missing Calendar"),
+          date: Timestamp.make(1700000000000),
           calendarId: CalendarId.make("missing-calendar")
         }).pipe(Effect.provide(testLayer))
       )
@@ -628,7 +671,7 @@ describe("updateEvent - field update branches", () => {
 
       const result = yield* updateEvent({
         eventId: eventBrandId("evt-1"),
-        date: 1800000000000
+        date: Timestamp.make(1800000000000)
       }).pipe(Effect.provide(testLayer))
 
       expect(result.updated).toBe(true)
@@ -643,7 +686,7 @@ describe("updateEvent - field update branches", () => {
 
       const result = yield* updateEvent({
         eventId: eventBrandId("evt-1"),
-        dueDate: 1800003600000
+        dueDate: Timestamp.make(1800003600000)
       }).pipe(Effect.provide(testLayer))
 
       expect(result.updated).toBe(true)
@@ -703,9 +746,9 @@ describe("updateEvent - field update branches", () => {
 
       const result = yield* updateEvent({
         eventId: eventBrandId("evt-1"),
-        title: "Updated Title",
-        date: 1800000000000,
-        dueDate: 1800003600000,
+        title: calendarEventTitle("Updated Title"),
+        date: Timestamp.make(1800000000000),
+        dueDate: Timestamp.make(1800003600000),
         allDay: true,
         location: "New Place",
         visibility: "public"
@@ -764,7 +807,7 @@ describe("updateEvent - description in-place only path (line 423, 427)", () => {
       const result = yield* updateEvent({
         eventId: eventBrandId("evt-1"),
         description: "Updated description content",
-        title: "Also new title"
+        title: calendarEventTitle("Also new title")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.updated).toBe(true)
@@ -780,11 +823,11 @@ describe("updateEvent - description in-place only path (line 423, 427)", () => {
 describe("listEvents - from/to date filters", () => {
   it.effect("applies from filter when provided", () =>
     Effect.gen(function*() {
-      const events = [makeEvent({ eventId: "evt-1", date: 1700100000000 })]
+      const events = [makeEvent({ eventId: "evt-1", date: Timestamp.make(1700100000000) })]
       const captureEventQuery: MockConfig["captureEventQuery"] = {}
       const testLayer = createTestLayer({ events, captureEventQuery })
 
-      const result = yield* listEvents({ from: 1700000000000 }).pipe(Effect.provide(testLayer))
+      const result = yield* listEvents({ from: Timestamp.make(1700000000000) }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
       expect(captureEventQuery.query?.date).toEqual({ $gte: 1700000000000 })
@@ -793,11 +836,11 @@ describe("listEvents - from/to date filters", () => {
 
   it.effect("applies to filter when provided", () =>
     Effect.gen(function*() {
-      const events = [makeEvent({ eventId: "evt-1", dueDate: 1700200000000 })]
+      const events = [makeEvent({ eventId: "evt-1", dueDate: Timestamp.make(1700200000000) })]
       const captureEventQuery: MockConfig["captureEventQuery"] = {}
       const testLayer = createTestLayer({ events, captureEventQuery })
 
-      const result = yield* listEvents({ to: 1700300000000 }).pipe(Effect.provide(testLayer))
+      const result = yield* listEvents({ to: Timestamp.make(1700300000000) }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
       expect(captureEventQuery.query?.dueDate).toEqual({ $lte: 1700300000000 })
@@ -810,8 +853,8 @@ describe("listEvents - from/to date filters", () => {
       const testLayer = createTestLayer({ events })
 
       const result = yield* listEvents({
-        from: 1699000000000,
-        to: 1701000000000
+        from: Timestamp.make(1699000000000),
+        to: Timestamp.make(1701000000000)
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
@@ -844,8 +887,8 @@ describe("createEvent - no listed calendar fallback", () => {
       const testLayer = createTestLayer({ captureAddCollection, hasCalendar: false })
 
       const result = yield* createEvent({
-        title: "Event No Calendar",
-        date: 1700000000000
+        title: calendarEventTitle("Event No Calendar"),
+        date: Timestamp.make(1700000000000)
       }).pipe(Effect.provide(testLayer))
 
       expect(result.eventId).toBeDefined()
@@ -862,32 +905,33 @@ describe("createEvent - findPersonsByEmails edge cases", () => {
       const testLayer = createTestLayer({ captureAddCollection })
 
       yield* createEvent({
-        title: "No Participants",
-        date: 1700000000000,
+        title: calendarEventTitle("No Participants"),
+        date: Timestamp.make(1700000000000),
         participants: []
       }).pipe(Effect.provide(testLayer))
 
       expect(captureAddCollection.attributes?.participants).toEqual([])
     }))
 
-  it.effect("handles channels found but no matching persons (personIds.length === 0)", () =>
+  it.effect("fails when a participant locator cannot be resolved", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
-      // Channels exist but point to persons that don't exist in the persons list
       const testLayer = createTestLayer({
         captureAddCollection,
         channels: [],
         persons: []
       })
 
-      yield* createEvent({
-        title: "With Unknown Emails",
-        date: 1700000000000,
-        participants: [email("unknown@example.com")]
-      }).pipe(Effect.provide(testLayer))
+      const error = yield* Effect.flip(
+        createEvent({
+          title: calendarEventTitle("With Unknown Emails"),
+          date: Timestamp.make(1700000000000),
+          participants: [email("unknown@example.com")]
+        }).pipe(Effect.provide(testLayer))
+      )
 
-      // No channels match, so personIds is empty, so participants is empty
-      expect(captureAddCollection.attributes?.participants).toEqual([])
+      expect(error._tag).toBe("PersonNotFoundError")
+      expect(captureAddCollection.attributes).toBeUndefined()
     }))
 })
 

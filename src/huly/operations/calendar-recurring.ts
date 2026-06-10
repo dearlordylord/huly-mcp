@@ -4,7 +4,6 @@
  * @module
  */
 import {
-  AccessLevel,
   generateEventId,
   type ReccuringEvent as HulyRecurringEvent,
   type ReccuringInstance as HulyRecurringInstance,
@@ -12,7 +11,7 @@ import {
 } from "@hcengineering/calendar"
 import type { AttachedData, Class, Doc, DocumentQuery, Space } from "@hcengineering/core"
 import { SortingOrder } from "@hcengineering/core"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 
 import type {
   CreateRecurringEventParams,
@@ -20,14 +19,16 @@ import type {
   EventInstance,
   ListEventInstancesParams,
   ListRecurringEventsParams,
-  Participant,
   RecurringEventSummary,
   RecurringRule
-} from "../../domain/schemas/calendar.js"
-import { Email, EventId, PersonId } from "../../domain/schemas/shared.js"
+} from "../../domain/schemas/calendar-recurring.js"
+import { RecurringRuleSchema } from "../../domain/schemas/calendar-recurring.js"
+import type { Participant } from "../../domain/schemas/calendar.js"
+import { CalendarEventTitle } from "../../domain/schemas/calendar.js"
+import { Email, EventId, PersonId, Timestamp, TimeZoneId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import type { CalendarNotAccessibleError } from "../errors.js"
-import { RecurringEventNotFoundError } from "../errors.js"
+import type { CalendarNotAccessibleError, PersonIdentifierAmbiguousError, PersonNotFoundError } from "../errors.js"
+import { HulyConnectionError, RecurringEventNotFoundError } from "../errors.js"
 import { calendar, core } from "../huly-plugins.js"
 import {
   buildParticipants,
@@ -35,27 +36,43 @@ import {
   ONE_HOUR_MS,
   resolveEventInputs,
   serverPopulatedUser,
-  stringToVisibility,
+  stringToAccess,
   visibilityToString
 } from "./calendar-shared.js"
+import { hulyNonEmptyTextOrFallback } from "./non-empty-text.js"
 import { clampLimit } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
-type ListRecurringEventsError = HulyClientError
-type CreateRecurringEventError = HulyClientError | CalendarNotAccessibleError
+type ListRecurringEventsError = HulyClientError | HulyConnectionError
+type CreateRecurringEventError =
+  | HulyClientError
+  | CalendarNotAccessibleError
+  | PersonIdentifierAmbiguousError
+  | PersonNotFoundError
 type ListEventInstancesError = HulyClientError | RecurringEventNotFoundError
 
-const hulyRuleToRule = (rule: HulyRecurringRule): RecurringRule => ({
-  freq: rule.freq,
-  endDate: rule.endDate,
-  count: rule.count,
-  interval: rule.interval,
-  byDay: rule.byDay,
-  byMonthDay: rule.byMonthDay,
-  byMonth: rule.byMonth,
-  bySetPos: rule.bySetPos,
-  wkst: rule.wkst
-})
+const optionalTimestamp = (value: number | undefined) => value === undefined ? undefined : Timestamp.make(value)
+
+const optionalTimeZoneId = (value: string | undefined) => value === undefined ? undefined : TimeZoneId.make(value)
+
+const UNTITLED_RECURRING_EVENT = CalendarEventTitle.make("Untitled Recurring Event")
+const UNTITLED_EVENT_INSTANCE = CalendarEventTitle.make("Untitled Event Instance")
+
+const recurringEventTitle = (title: string): CalendarEventTitle =>
+  hulyNonEmptyTextOrFallback(CalendarEventTitle, title, UNTITLED_RECURRING_EVENT)
+
+const eventInstanceTitle = (title: string): CalendarEventTitle =>
+  hulyNonEmptyTextOrFallback(CalendarEventTitle, title, UNTITLED_EVENT_INSTANCE)
+
+const hulyRuleToRule = (rule: HulyRecurringRule): Effect.Effect<RecurringRule, HulyConnectionError> =>
+  Schema.decodeUnknown(RecurringRuleSchema)(rule).pipe(
+    Effect.mapError((parseError) =>
+      new HulyConnectionError({
+        message: `Recurring event rule failed schema validation: ${parseError.message}`,
+        cause: parseError
+      })
+    )
+  )
 
 const ruleToHulyRule = (rule: RecurringRule): HulyRecurringRule => {
   const result: HulyRecurringRule = {
@@ -91,14 +108,16 @@ export const listRecurringEvents = (
       }
     )
 
-    const summaries: Array<RecurringEventSummary> = events.map(event => ({
-      eventId: EventId.make(event.eventId),
-      title: event.title,
-      originalStartTime: event.originalStartTime,
-      rules: event.rules.map(hulyRuleToRule),
-      timeZone: event.timeZone,
-      modifiedOn: event.modifiedOn
-    }))
+    const summaries = yield* Effect.all(events.map(event =>
+      Effect.map(Effect.all(event.rules.map(hulyRuleToRule)), (rules): RecurringEventSummary => ({
+        eventId: EventId.make(event.eventId),
+        title: recurringEventTitle(event.title),
+        originalStartTime: Timestamp.make(event.originalStartTime),
+        rules,
+        timeZone: optionalTimeZoneId(event.timeZone),
+        modifiedOn: optionalTimestamp(event.modifiedOn)
+      }))
+    ))
 
     return summaries
   })
@@ -130,10 +149,9 @@ export const createRecurringEvent = (
       allDay: params.allDay ?? false,
       calendar: calendarRef,
       participants: participantRefs,
-      externalParticipants: [],
-      access: AccessLevel.Owner,
+      access: stringToAccess(params.access ?? "owner"),
       user: serverPopulatedUser,
-      blockTime: false,
+      blockTime: params.blockTime ?? false,
       rules: hulyRules,
       exdate: [],
       rdate: [],
@@ -141,15 +159,22 @@ export const createRecurringEvent = (
       timeZone: params.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
     }
 
+    if (params.externalParticipants !== undefined) {
+      eventData.externalParticipants = [...params.externalParticipants]
+    } else {
+      eventData.externalParticipants = []
+    }
+
+    if (params.reminders !== undefined) {
+      eventData.reminders = [...params.reminders]
+    }
+
     if (params.location !== undefined) {
       eventData.location = params.location
     }
 
     if (params.visibility !== undefined) {
-      const vis = stringToVisibility(params.visibility)
-      if (vis !== undefined) {
-        eventData.visibility = vis
-      }
+      eventData.visibility = params.visibility
     }
 
     yield* client.addCollection(
@@ -224,15 +249,16 @@ export const listEventInstances = (
     const results: Array<EventInstance> = instances.map(instance => ({
       eventId: EventId.make(instance.eventId),
       recurringEventId: EventId.make(instance.recurringEventId),
-      title: instance.title,
-      date: instance.date,
-      dueDate: instance.dueDate,
-      originalStartTime: instance.originalStartTime,
+      title: eventInstanceTitle(instance.title),
+      date: Timestamp.make(instance.date),
+      dueDate: Timestamp.make(instance.dueDate),
+      originalStartTime: Timestamp.make(instance.originalStartTime),
       allDay: instance.allDay,
       location: instance.location,
       visibility: visibilityToString(instance.visibility),
       isCancelled: instance.isCancelled,
       isVirtual: instance.virtual,
+      /* v8 ignore next -- participantMap is populated for every instance when includeParticipants is true */
       participants: params.includeParticipants ? (participantMap.get(instance.eventId) ?? []) : undefined,
       externalParticipants: instance.externalParticipants
         ? instance.externalParticipants.map(p => Email.make(p))

@@ -20,7 +20,7 @@ import type {
   UpdateMilestoneResult
 } from "../../domain/schemas/milestones.js"
 import { UPDATE_MILESTONE_FIELDS } from "../../domain/schemas/milestones.js"
-import { IssueIdentifier, MilestoneId, MilestoneLabel } from "../../domain/schemas/shared.js"
+import { IssueIdentifier, MilestoneId, MilestoneLabel, Timestamp } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { IssueNotFoundError, NoUpdateFieldsError, ProjectNotFoundError } from "../errors.js"
 import { MilestoneNotFoundError } from "../errors.js"
@@ -139,8 +139,8 @@ export const listMilestones = (
       id: MilestoneId.make(m._id),
       label: MilestoneLabel.make(m.label),
       status: milestoneStatusToString(m.status),
-      targetDate: m.targetDate,
-      modifiedOn: m.modifiedOn
+      targetDate: Timestamp.make(m.targetDate),
+      modifiedOn: Timestamp.make(m.modifiedOn)
     }))
 
     return summaries
@@ -158,10 +158,10 @@ export const getMilestone = (
       label: MilestoneLabel.make(milestone.label),
       description: optionalMarkupToMarkdown(milestone.description, markupUrlConfig, ""),
       status: milestoneStatusToString(milestone.status),
-      targetDate: milestone.targetDate,
+      targetDate: Timestamp.make(milestone.targetDate),
       project: params.project,
-      modifiedOn: milestone.modifiedOn,
-      createdOn: milestone.createdOn
+      modifiedOn: Timestamp.make(milestone.modifiedOn),
+      createdOn: milestone.createdOn === undefined ? undefined : Timestamp.make(milestone.createdOn)
     }
 
     return result

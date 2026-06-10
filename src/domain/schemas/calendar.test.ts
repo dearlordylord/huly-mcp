@@ -2,13 +2,24 @@ import { Either, Schema } from "effect"
 import { describe, expect, it } from "vitest"
 
 import {
-  CreateEventParamsSchema,
   CreateRecurringEventParamsSchema,
+  ListEventInstancesParamsSchema,
+  RecurringRuleSchema
+} from "./calendar-recurring.js"
+import {
+  CreateScheduleParamsSchema,
+  GetScheduleParamsSchema,
+  ListSchedulesParamsSchema,
+  updateScheduleParamsJsonSchema,
+  UpdateScheduleParamsSchema
+} from "./calendar-schedules.js"
+import {
+  createEventParamsJsonSchema,
+  CreateEventParamsSchema,
+  EventParticipantLocatorSchema,
   GetEventParamsSchema,
   ListCalendarsParamsSchema,
-  ListEventInstancesParamsSchema,
   ListEventsParamsSchema,
-  RecurringRuleSchema,
   updateEventParamsJsonSchema,
   UpdateEventParamsSchema,
   VisibilitySchema
@@ -16,6 +27,7 @@ import {
 
 type JsonSchemaObject = {
   readonly anyOf?: ReadonlyArray<{ readonly required?: ReadonlyArray<string> }>
+  readonly not?: { readonly required?: ReadonlyArray<string> }
 }
 
 const expectJsonSchemaObject = (schema: unknown): JsonSchemaObject => {
@@ -52,9 +64,9 @@ describe("Calendar Schemas", () => {
         count: 10,
         interval: 2,
         byDay: ["MO", "WE", "FR"],
-        byMonthDay: [1, 15],
-        byMonth: [1, 6, 12],
-        bySetPos: [-1],
+        byMonthDay: [1, 15, 31],
+        byMonth: [0, 5, 11],
+        bySetPos: [-1, 1],
         wkst: "MO"
       }
       const result = Schema.decodeUnknownEither(RecurringRuleSchema)(rule)
@@ -72,6 +84,19 @@ describe("Calendar Schemas", () => {
         wkst: "MONDAY"
       })
       expect(Either.isLeft(result)).toBe(true)
+
+      const jsonSchema = expectJsonSchemaObject(createEventParamsJsonSchema)
+      expect(jsonSchema.not).toEqual({ required: ["calendarId", "calendarName"] })
+    })
+
+    it("rejects unsupported byDay values", () => {
+      for (const byDay of [["XX"], ["1MO"], ["-1FR"]]) {
+        const result = Schema.decodeUnknownEither(RecurringRuleSchema)({
+          freq: "WEEKLY",
+          byDay
+        })
+        expect(Either.isLeft(result)).toBe(true)
+      }
     })
 
     it("rejects negative count", () => {
@@ -85,9 +110,37 @@ describe("Calendar Schemas", () => {
     it("rejects invalid month values", () => {
       const result = Schema.decodeUnknownEither(RecurringRuleSchema)({
         freq: "YEARLY",
-        byMonth: [0, 13]
+        byMonth: [-1, 12]
       })
       expect(Either.isLeft(result)).toBe(true)
+    })
+
+    it("rejects invalid month day ordinals", () => {
+      for (const byMonthDay of [[0], [-1], [32]]) {
+        const result = Schema.decodeUnknownEither(RecurringRuleSchema)({
+          freq: "MONTHLY",
+          byMonthDay
+        })
+        expect(Either.isLeft(result)).toBe(true)
+      }
+    })
+
+    it("rejects invalid set-position ordinals", () => {
+      for (const bySetPos of [[0], [367], [-367]]) {
+        const result = Schema.decodeUnknownEither(RecurringRuleSchema)({
+          freq: "MONTHLY",
+          bySetPos
+        })
+        expect(Either.isLeft(result)).toBe(true)
+      }
+    })
+
+    it("accepts Huly zero-based month indexes", () => {
+      const result = Schema.decodeUnknownEither(RecurringRuleSchema)({
+        freq: "YEARLY",
+        byMonth: [0, 11]
+      })
+      expect(Either.isRight(result)).toBe(true)
     })
   })
 
@@ -176,11 +229,26 @@ describe("Calendar Schemas", () => {
         dueDate: 1704070800000,
         allDay: false,
         location: "Conference Room A",
-        participants: ["alice@example.com", "bob@example.com"],
+        participants: ["alice@example.com", { name: "Bob Smith" }, { personId: "person-1" }],
+        externalParticipants: ["guest@example.com"],
+        reminders: [1704063600000],
+        access: "owner",
+        timeZone: "America/New_York",
+        blockTime: true,
         visibility: "private",
         calendarId: "personal-calendar"
       })
       expect(Either.isRight(result)).toBe(true)
+    })
+
+    it("rejects ambiguous calendar targets and advertises the conflict in JSON Schema", () => {
+      const result = Schema.decodeUnknownEither(CreateEventParamsSchema)({
+        title: "Team Standup",
+        date: 1704067200000,
+        calendarId: "personal-calendar",
+        calendarName: "Personal"
+      })
+      expect(Either.isLeft(result)).toBe(true)
     })
 
     it("rejects empty title", () => {
@@ -226,13 +294,31 @@ describe("Calendar Schemas", () => {
       expect(jsonSchema.anyOf).toEqual(
         expect.arrayContaining([{ required: ["title"] }, { required: ["description"] }, { required: ["visibility"] }])
       )
+      expect(jsonSchema.not).toEqual({ required: ["calendarId", "calendarName"] })
+    })
+
+    it("rejects ambiguous update calendar targets", () => {
+      const result = Schema.decodeUnknownEither(UpdateEventParamsSchema)({
+        eventId: "evt-123",
+        calendarId: "cal-1",
+        calendarName: "Personal"
+      })
+      expect(Either.isLeft(result)).toBe(true)
     })
 
     it("accepts partial updates", () => {
       const result = Schema.decodeUnknownEither(UpdateEventParamsSchema)({
         eventId: "evt-123",
         title: "Updated Title",
-        location: "New Location"
+        location: "New Location",
+        addParticipants: [{ email: "alice@example.com" }],
+        removeParticipants: [{ name: "Bob Smith" }],
+        addExternalParticipants: ["guest@example.com"],
+        reminders: [1704063600000],
+        access: "writer",
+        timeZone: "UTC",
+        blockTime: false,
+        calendarName: "Team"
       })
       expect(Either.isRight(result)).toBe(true)
     })
@@ -241,6 +327,21 @@ describe("Calendar Schemas", () => {
       const result = Schema.decodeUnknownEither(UpdateEventParamsSchema)({
         eventId: "",
         title: "New Title"
+      })
+      expect(Either.isLeft(result)).toBe(true)
+    })
+  })
+
+  describe("EventParticipantLocatorSchema", () => {
+    it("rejects empty participant locator objects", () => {
+      const result = Schema.decodeUnknownEither(EventParticipantLocatorSchema)({})
+      expect(Either.isLeft(result)).toBe(true)
+    })
+
+    it("rejects participant locator objects with multiple identifiers", () => {
+      const result = Schema.decodeUnknownEither(EventParticipantLocatorSchema)({
+        email: "alice@example.com",
+        name: "Alice"
       })
       expect(Either.isLeft(result)).toBe(true)
     })
@@ -262,7 +363,7 @@ describe("Calendar Schemas", () => {
         startDate: 1704067200000,
         rules: [
           { freq: "MONTHLY", byMonthDay: [1] },
-          { freq: "YEARLY", byMonth: [6], byMonthDay: [15] }
+          { freq: "YEARLY", byMonth: [5], byMonthDay: [15] }
         ]
       })
       expect(Either.isRight(result)).toBe(true)
@@ -277,6 +378,17 @@ describe("Calendar Schemas", () => {
         calendarId: "personal-calendar"
       })
       expect(Either.isRight(result)).toBe(true)
+    })
+
+    it("rejects ambiguous calendar targets", () => {
+      const result = Schema.decodeUnknownEither(CreateRecurringEventParamsSchema)({
+        title: "Meeting",
+        startDate: 1704067200000,
+        rules: [{ freq: "DAILY" }],
+        calendarId: "personal-calendar",
+        calendarName: "Personal"
+      })
+      expect(Either.isLeft(result)).toBe(true)
     })
 
     it("rejects empty rules array", () => {
@@ -341,6 +453,94 @@ describe("Calendar Schemas", () => {
         recurringEventId: ""
       })
       expect(Either.isLeft(result)).toBe(true)
+    })
+  })
+
+  describe("Schedule schemas", () => {
+    it("accepts schedule list and get params", () => {
+      expect(Either.isRight(Schema.decodeUnknownEither(ListSchedulesParamsSchema)({ owner: "alice@example.com" })))
+        .toBe(true)
+      expect(Either.isRight(Schema.decodeUnknownEither(GetScheduleParamsSchema)({ scheduleId: "schedule-1" }))).toBe(
+        true
+      )
+    })
+
+    it("accepts create schedule params", () => {
+      const result = Schema.decodeUnknownEither(CreateScheduleParamsSchema)({
+        title: "Office hours",
+        meetingDuration: 30,
+        meetingInterval: 15,
+        availability: { monday: [{ start: 540, end: 1020 }] },
+        timeZone: "America/New_York",
+        owner: "Alice",
+        calendarName: "Personal"
+      })
+      expect(Either.isRight(result)).toBe(true)
+    })
+
+    it("rejects schedule availability outside weekday keys", () => {
+      const result = Schema.decodeUnknownEither(CreateScheduleParamsSchema)({
+        title: "Office hours",
+        meetingDuration: 30,
+        meetingInterval: 15,
+        availability: { "7": [{ start: 540, end: 1020 }] },
+        timeZone: "America/New_York"
+      })
+      expect(Either.isLeft(result)).toBe(true)
+    })
+
+    it("rejects schedule availability slots that do not end after they start", () => {
+      const result = Schema.decodeUnknownEither(CreateScheduleParamsSchema)({
+        title: "Office hours",
+        meetingDuration: 30,
+        meetingInterval: 15,
+        availability: { monday: [{ start: 540, end: 540 }] },
+        timeZone: "America/New_York"
+      })
+      expect(Either.isLeft(result)).toBe(true)
+    })
+
+    it("rejects ambiguous create schedule calendar targets", () => {
+      const result = Schema.decodeUnknownEither(CreateScheduleParamsSchema)({
+        title: "Office hours",
+        meetingDuration: 30,
+        meetingInterval: 15,
+        availability: { monday: [{ start: 540, end: 1020 }] },
+        timeZone: "America/New_York",
+        calendarId: "cal-1",
+        calendarName: "Personal"
+      })
+      expect(Either.isLeft(result)).toBe(true)
+    })
+
+    it("accepts update schedule fields", () => {
+      const result = Schema.decodeUnknownEither(UpdateScheduleParamsSchema)({
+        scheduleId: "schedule-1",
+        title: "Updated",
+        calendarId: "cal-1"
+      })
+      expect(Either.isRight(result)).toBe(true)
+    })
+
+    it("rejects ambiguous update schedule calendar targets", () => {
+      const result = Schema.decodeUnknownEither(UpdateScheduleParamsSchema)({
+        scheduleId: "schedule-1",
+        calendarId: "cal-1",
+        calendarName: "Personal"
+      })
+      expect(Either.isLeft(result)).toBe(true)
+    })
+
+    it("rejects update schedule without update fields and advertises fields", () => {
+      const result = Schema.decodeUnknownEither(UpdateScheduleParamsSchema)({ scheduleId: "schedule-1" })
+      expect(Either.isLeft(result)).toBe(true)
+
+      const jsonSchema = expectJsonSchemaObject(updateScheduleParamsJsonSchema)
+      expect(jsonSchema.anyOf).toEqual(
+        expect.arrayContaining([{ required: ["title"] }, { required: ["availability"] }, {
+          required: ["calendarName"]
+        }])
+      )
     })
   })
 })

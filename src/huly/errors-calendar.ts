@@ -5,13 +5,15 @@
  */
 import { Schema } from "effect"
 
+import { EventId, NonEmptyString, ScheduleId } from "../domain/schemas/shared.js"
+
 /**
  * Calendar event not found.
  */
 export class EventNotFoundError extends Schema.TaggedError<EventNotFoundError>()(
   "EventNotFoundError",
   {
-    eventId: Schema.String
+    eventId: EventId
   }
 ) {
   override get message(): string {
@@ -25,7 +27,7 @@ export class EventNotFoundError extends Schema.TaggedError<EventNotFoundError>()
 export class RecurringEventNotFoundError extends Schema.TaggedError<RecurringEventNotFoundError>()(
   "RecurringEventNotFoundError",
   {
-    eventId: Schema.String
+    eventId: EventId
   }
 ) {
   override get message(): string {
@@ -39,10 +41,24 @@ export class RecurringEventNotFoundError extends Schema.TaggedError<RecurringEve
 export class CalendarNotAccessibleError extends Schema.TaggedError<CalendarNotAccessibleError>()(
   "CalendarNotAccessibleError",
   {
-    calendarId: Schema.String
+    calendarId: NonEmptyString
   }
 ) {
   override get message(): string {
     return `Calendar '${this.calendarId}' not found or not accessible`
+  }
+}
+
+/**
+ * Calendar schedule not found.
+ */
+export class ScheduleNotFoundError extends Schema.TaggedError<ScheduleNotFoundError>()(
+  "ScheduleNotFoundError",
+  {
+    scheduleId: ScheduleId
+  }
+) {
+  override get message(): string {
+    return `Schedule '${this.scheduleId}' not found`
   }
 }

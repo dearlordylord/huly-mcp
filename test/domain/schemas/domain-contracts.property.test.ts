@@ -123,6 +123,7 @@ import { propertyTestParameters } from "../../helpers/property.js"
 type JsonSchemaObject = {
   readonly anyOf?: ReadonlyArray<{ readonly required?: ReadonlyArray<string> }>
   readonly allOf?: ReadonlyArray<unknown>
+  readonly not?: { readonly required?: ReadonlyArray<string> }
   readonly properties?: Record<string, unknown>
 }
 
@@ -133,6 +134,7 @@ interface UpdateSchemaCase {
   readonly base: Record<string, unknown>
   readonly fields: ReadonlyArray<string>
   readonly values: Readonly<Record<string, unknown>>
+  readonly mutuallyExclusiveFieldSets?: ReadonlyArray<ReadonlyArray<string>>
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -288,12 +290,25 @@ const updateSchemaCases: ReadonlyArray<UpdateSchemaCase> = [
     jsonSchema: updateEventParamsJsonSchema,
     base: { eventId: "event-1" },
     fields: UPDATE_EVENT_FIELDS,
+    mutuallyExclusiveFieldSets: [["calendarId", "calendarName"]],
     values: {
+      access: "reader",
+      addExternalParticipants: ["guest@example.com"],
+      addParticipants: ["john@example.com"],
       allDay: true,
+      blockTime: true,
+      calendarId: "calendar-1",
+      calendarName: "Team Calendar",
       date: 1,
       description: "Updated",
       dueDate: 1,
+      externalParticipants: ["guest@example.com"],
       location: "Updated",
+      participants: ["john@example.com"],
+      reminders: [1],
+      removeExternalParticipants: ["guest@example.com"],
+      removeParticipants: ["john@example.com"],
+      timeZone: "UTC",
       title: "Updated",
       visibility: "public"
     }
@@ -612,8 +627,20 @@ describe("update schema runtime and JSON Schema agreement", () => {
         expectDecodeSuccess(testCase.schema, { ...testCase.base, [field]: testCase.values[field] })
       }
 
+      for (const fieldSet of testCase.mutuallyExclusiveFieldSets ?? []) {
+        const payload = Object.fromEntries(fieldSet.map((field) => [field, testCase.values[field]]))
+        expect(testCase.jsonSchema.not).toEqual({ required: fieldSet })
+        expectDecodeFailure(testCase.schema, { ...testCase.base, ...payload })
+      }
+
       fc.assert(
         fc.property(fc.subarray([...testCase.fields], { minLength: 1 }), (fields) => {
+          if (
+            (testCase.mutuallyExclusiveFieldSets ?? []).some((fieldSet) =>
+              fieldSet.every((field) => fields.includes(field))
+            )
+          ) return
+
           const payload = Object.fromEntries(fields.map((field) => [field, testCase.values[field]]))
 
           expectDecodeSuccess(testCase.schema, { ...testCase.base, ...payload })

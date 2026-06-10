@@ -47,6 +47,29 @@ describe("CATEGORY_NAMES", () => {
       expect(CATEGORY_NAMES.has("user-statuses")).toBe(true)
       expect(CATEGORY_NAMES.size).toBeGreaterThan(5)
     }))
+
+  it.effect("registers calendar schedule and virtual-office tools", () =>
+    Effect.gen(function*() {
+      const names = new Set(toolRegistry.definitions.map((tool) => tool.name))
+
+      expect(names.has("list_schedules")).toBe(true)
+      expect(names.has("get_schedule")).toBe(true)
+      expect(names.has("create_schedule")).toBe(true)
+      expect(names.has("update_schedule")).toBe(true)
+      expect(names.has("delete_schedule")).toBe(true)
+      expect(names.has("list_office_floors")).toBe(true)
+      expect(names.has("get_office_floor")).toBe(true)
+      expect(names.has("list_office_rooms")).toBe(true)
+      expect(names.has("get_office_room")).toBe(true)
+      expect(names.has("list_offices")).toBe(true)
+      expect(names.has("get_office")).toBe(true)
+      expect(names.has("list_active_room_info")).toBe(true)
+      expect(names.has("list_active_room_participants")).toBe(true)
+      expect(names.has("list_meeting_minutes")).toBe(true)
+      expect(names.has("get_meeting_minutes")).toBe(true)
+      expect(names.has("list_device_preferences")).toBe(true)
+      expect(names.has("list_office_defaults")).toBe(true)
+    }))
 })
 
 describe("toolRegistry", () => {

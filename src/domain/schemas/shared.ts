@@ -10,6 +10,21 @@ export const NonNegativeInteger = Schema.NonNegativeInt.annotations({
 })
 export type NonNegativeInteger = Schema.Schema.Type<typeof NonNegativeInteger>
 
+export const PositiveInteger = Schema.Number.pipe(Schema.int(), Schema.positive(), Schema.brand("PositiveInteger"))
+  .annotations({
+    identifier: "PositiveInteger",
+    title: "PositiveInteger",
+    description: "Integer greater than zero."
+  })
+export type PositiveInteger = Schema.Schema.Type<typeof PositiveInteger>
+
+export const Integer = Schema.Number.pipe(Schema.int(), Schema.brand("Integer")).annotations({
+  identifier: "Integer",
+  title: "Integer",
+  description: "Whole number."
+})
+export type Integer = Schema.Schema.Type<typeof Integer>
+
 export const Count = NonNegativeInteger.pipe(Schema.brand("Count")).annotations({
   identifier: "Count",
   title: "Count",
@@ -29,7 +44,7 @@ export type ListTotal = Schema.Schema.Type<typeof ListTotal>
 export const NonEmptyString = Schema.Trim.pipe(Schema.nonEmptyString())
 export type NonEmptyString = Schema.Schema.Type<typeof NonEmptyString>
 
-export const Timestamp = NonNegativeInteger.annotations({
+export const Timestamp = NonNegativeInteger.pipe(Schema.brand("Timestamp")).annotations({
   identifier: "Timestamp",
   title: "Timestamp",
   description: "Unix timestamp in milliseconds (non-negative integer)"
@@ -58,12 +73,28 @@ export const hasAtLeastOneDefined = <K extends string>(
 export const atLeastOneUpdateFieldMessage = (fields: ReadonlyArray<string>): string =>
   `At least one update field must be provided: ${fields.join(", ")}.`
 
+export const mutuallyExclusiveFieldsMessage = (fields: ReadonlyArray<string>): string =>
+  `Provide only one of ${fields.join(" or ")}.`
+
+export const hasMutuallyExclusiveFields = <K extends string>(
+  params: { readonly [P in K]?: unknown },
+  fields: ReadonlyArray<K>
+): boolean => fields.every((field) => params[field] !== undefined)
+
 export const withAtLeastOneRequired = <K extends string>(
   schema: object,
   fields: ReadonlyArray<K>
 ): object => ({
   ...schema,
   anyOf: fields.map((field) => ({ required: [field] }))
+})
+
+export const withMutuallyExclusiveFields = <K extends string>(
+  schema: object,
+  fields: ReadonlyArray<K>
+): object => ({
+  ...schema,
+  not: { required: [...fields] }
 })
 
 type UpdateFieldExactness<
@@ -186,6 +217,21 @@ export type EventId = Schema.Schema.Type<typeof EventId>
 export const CalendarId = HulyRef("CalendarId")
 export type CalendarId = Schema.Schema.Type<typeof CalendarId>
 
+export const ScheduleId = HulyRef("ScheduleId")
+export type ScheduleId = Schema.Schema.Type<typeof ScheduleId>
+
+export const FloorId = HulyRef("FloorId")
+export type FloorId = Schema.Schema.Type<typeof FloorId>
+
+export const RoomId = HulyRef("RoomId")
+export type RoomId = Schema.Schema.Type<typeof RoomId>
+
+export const MeetingMinutesId = HulyRef("MeetingMinutesId")
+export type MeetingMinutesId = Schema.Schema.Type<typeof MeetingMinutesId>
+
+export const DevicePreferenceId = HulyRef("DevicePreferenceId")
+export type DevicePreferenceId = Schema.Schema.Type<typeof DevicePreferenceId>
+
 export const TodoId = HulyRef("TodoId")
 export type TodoId = Schema.Schema.Type<typeof TodoId>
 
@@ -206,6 +252,9 @@ export type CommentId = Schema.Schema.Type<typeof CommentId>
 
 export const TimeSpendReportId = HulyRef("TimeSpendReportId")
 export type TimeSpendReportId = Schema.Schema.Type<typeof TimeSpendReportId>
+
+export const ParticipantInfoId = HulyRef("ParticipantInfoId")
+export type ParticipantInfoId = Schema.Schema.Type<typeof ParticipantInfoId>
 
 export const TagElementId = HulyRef("TagElementId")
 export type TagElementId = Schema.Schema.Type<typeof TagElementId>
@@ -304,6 +353,13 @@ export type MilestoneLabel = Schema.Schema.Type<typeof MilestoneLabel>
 export const ChannelName = NonEmptyString.pipe(Schema.brand("ChannelName"))
 export type ChannelName = Schema.Schema.Type<typeof ChannelName>
 
+export const RoomName = NonEmptyString.pipe(Schema.brand("RoomName")).annotations({
+  identifier: "RoomName",
+  title: "RoomName",
+  description: "Non-empty virtual-office room name."
+})
+export type RoomName = Schema.Schema.Type<typeof RoomName>
+
 export const MimeType = NonEmptyString.pipe(Schema.brand("MimeType"))
 export type MimeType = Schema.Schema.Type<typeof MimeType>
 
@@ -351,6 +407,9 @@ export type AccountId = Schema.Schema.Type<typeof AccountId>
 export const AccountUuid = Schema.UUID.pipe(Schema.brand("AccountUuid"))
 export type AccountUuid = Schema.Schema.Type<typeof AccountUuid>
 
+export const SessionId = NonEmptyString.pipe(Schema.brand("SessionId"))
+export type SessionId = Schema.Schema.Type<typeof SessionId>
+
 export const RegionId = Schema.String.pipe(Schema.brand("RegionId"))
 export type RegionId = Schema.Schema.Type<typeof RegionId>
 
@@ -361,6 +420,62 @@ export type NonNegativeNumber = Schema.Schema.Type<typeof NonNegativeNumber>
 
 export const PositiveNumber = NonNegativeNumber.pipe(Schema.positive(), Schema.brand("PositiveNumber"))
 export type PositiveNumber = Schema.Schema.Type<typeof PositiveNumber>
+
+export const VirtualOfficeCoordinate = Schema.Number.pipe(Schema.brand("VirtualOfficeCoordinate")).annotations({
+  identifier: "VirtualOfficeCoordinate",
+  title: "VirtualOfficeCoordinate",
+  description: "Coordinate in Huly virtual-office layout space."
+})
+export type VirtualOfficeCoordinate = Schema.Schema.Type<typeof VirtualOfficeCoordinate>
+
+export const VirtualOfficeDimension = NonNegativeNumber.pipe(Schema.brand("VirtualOfficeDimension")).annotations({
+  identifier: "VirtualOfficeDimension",
+  title: "VirtualOfficeDimension",
+  description: "Non-negative dimension in Huly virtual-office layout space."
+})
+export type VirtualOfficeDimension = Schema.Schema.Type<typeof VirtualOfficeDimension>
+
+export const BlurRadius = NonNegativeNumber.pipe(Schema.brand("BlurRadius")).annotations({
+  identifier: "BlurRadius",
+  title: "BlurRadius",
+  description: "Non-negative virtual-office video blur radius."
+})
+export type BlurRadius = Schema.Schema.Type<typeof BlurRadius>
+
+export const TimeZoneId = NonEmptyString.pipe(Schema.brand("TimeZoneId")).annotations({
+  identifier: "TimeZoneId",
+  title: "TimeZoneId",
+  description: "IANA time zone identifier."
+})
+export type TimeZoneId = Schema.Schema.Type<typeof TimeZoneId>
+
+export const DurationMinutes = NonNegativeInteger.pipe(Schema.brand("DurationMinutes")).annotations({
+  identifier: "DurationMinutes",
+  title: "DurationMinutes",
+  description: "Duration expressed in whole minutes."
+})
+export type DurationMinutes = Schema.Schema.Type<typeof DurationMinutes>
+
+export const PositiveDurationMinutes = PositiveInteger.pipe(Schema.brand("PositiveDurationMinutes")).annotations({
+  identifier: "PositiveDurationMinutes",
+  title: "PositiveDurationMinutes",
+  description: "Positive duration expressed in whole minutes."
+})
+export type PositiveDurationMinutes = Schema.Schema.Type<typeof PositiveDurationMinutes>
+
+const HOURS_PER_DAY = 24
+const MINUTES_PER_HOUR = 60
+const MINUTES_PER_DAY = HOURS_PER_DAY * MINUTES_PER_HOUR
+
+export const MinuteOfDay = NonNegativeInteger.pipe(
+  Schema.lessThanOrEqualTo(MINUTES_PER_DAY),
+  Schema.brand("MinuteOfDay")
+).annotations({
+  identifier: "MinuteOfDay",
+  title: "MinuteOfDay",
+  description: "Minute offset within a day, from 0 through 1440."
+})
+export type MinuteOfDay = Schema.Schema.Type<typeof MinuteOfDay>
 
 export const ColorCode = Schema.Number.pipe(
   Schema.int(),

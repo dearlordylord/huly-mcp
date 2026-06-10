@@ -10,6 +10,7 @@ import {
 } from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { MilestoneLabel, Timestamp } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type { IssueNotFoundError, MilestoneNotFoundError, ProjectNotFoundError } from "../../../src/huly/errors.js"
 import {
@@ -24,6 +25,8 @@ import {
 import { tracker } from "../../../src/huly/huly-plugins.js"
 import { markdownToMarkupString, testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
 import { issueIdentifier, milestoneIdentifier, projectIdentifier } from "../../helpers/brands.js"
+
+const milestoneLabel = MilestoneLabel.make
 
 const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
   const base = {
@@ -52,10 +55,10 @@ const makeMilestone = (overrides?: Partial<HulyMilestone>): HulyMilestone => {
     _id: "milestone-1" as Ref<HulyMilestone>,
     _class: tracker.class.Milestone,
     space: "project-1" as Ref<HulyProject>,
-    label: "Sprint 1",
+    label: milestoneLabel("Sprint 1"),
     description: "",
     status: MilestoneStatus.Planned,
-    targetDate: 1706500000000,
+    targetDate: Timestamp.make(1706500000000),
     comments: 0,
     modifiedBy: "user-1" as PersonId,
     modifiedOn: 0,
@@ -221,8 +224,8 @@ describe("listMilestones", () => {
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
         const milestones = [
-          makeMilestone({ _id: "m-1" as Ref<HulyMilestone>, label: "Sprint 1", modifiedOn: 2000 }),
-          makeMilestone({ _id: "m-2" as Ref<HulyMilestone>, label: "Sprint 2", modifiedOn: 1000 })
+          makeMilestone({ _id: "m-1" as Ref<HulyMilestone>, label: milestoneLabel("Sprint 1"), modifiedOn: 2000 }),
+          makeMilestone({ _id: "m-2" as Ref<HulyMilestone>, label: milestoneLabel("Sprint 2"), modifiedOn: 1000 })
         ]
 
         const testLayer = createTestLayerWithMocks({
@@ -241,10 +244,10 @@ describe("listMilestones", () => {
       Effect.gen(function*() {
         const project = makeProject()
         const milestones = [
-          makeMilestone({ label: "Planned", status: MilestoneStatus.Planned, modifiedOn: 4000 }),
-          makeMilestone({ label: "In Progress", status: MilestoneStatus.InProgress, modifiedOn: 3000 }),
-          makeMilestone({ label: "Completed", status: MilestoneStatus.Completed, modifiedOn: 2000 }),
-          makeMilestone({ label: "Canceled", status: MilestoneStatus.Canceled, modifiedOn: 1000 })
+          makeMilestone({ label: milestoneLabel("Planned"), status: MilestoneStatus.Planned, modifiedOn: 4000 }),
+          makeMilestone({ label: milestoneLabel("In Progress"), status: MilestoneStatus.InProgress, modifiedOn: 3000 }),
+          makeMilestone({ label: milestoneLabel("Completed"), status: MilestoneStatus.Completed, modifiedOn: 2000 }),
+          makeMilestone({ label: milestoneLabel("Canceled"), status: MilestoneStatus.Canceled, modifiedOn: 1000 })
         ]
 
         const testLayer = createTestLayerWithMocks({
@@ -367,10 +370,10 @@ describe("getMilestone", () => {
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
         const milestone = makeMilestone({
-          label: "Sprint 1",
+          label: milestoneLabel("Sprint 1"),
           description: markdownToMarkupString("First sprint", testMarkupUrlConfig),
           status: MilestoneStatus.InProgress,
-          targetDate: 1706500000000,
+          targetDate: Timestamp.make(1706500000000),
           modifiedOn: 1706400000000,
           createdOn: 1706300000000
         })
@@ -397,7 +400,7 @@ describe("getMilestone", () => {
         const project = makeProject({ identifier: "TEST" })
         const milestone = makeMilestone({
           _id: "milestone-abc" as Ref<HulyMilestone>,
-          label: "Sprint 1",
+          label: milestoneLabel("Sprint 1"),
           status: MilestoneStatus.InProgress
         })
 
@@ -513,8 +516,8 @@ describe("createMilestone", () => {
 
         const result = yield* createMilestone({
           project: projectIdentifier("TEST"),
-          label: "Sprint 1",
-          targetDate: 1706500000000
+          label: milestoneLabel("Sprint 1"),
+          targetDate: Timestamp.make(1706500000000)
         }).pipe(Effect.provide(testLayer))
 
         expect(result.label).toBe("Sprint 1")
@@ -538,9 +541,9 @@ describe("createMilestone", () => {
 
         yield* createMilestone({
           project: projectIdentifier("TEST"),
-          label: "Sprint 1",
+          label: milestoneLabel("Sprint 1"),
           description: "First sprint of Q1",
-          targetDate: 1706500000000
+          targetDate: Timestamp.make(1706500000000)
         }).pipe(Effect.provide(testLayer))
 
         expect(captureCreateDoc.attributes?.description).toBe(
@@ -564,8 +567,8 @@ describe("createMilestone", () => {
 
         yield* createMilestone({
           project: projectIdentifier("TEST"),
-          label: "Sprint 1",
-          targetDate: 1706500000000
+          label: milestoneLabel("Sprint 1"),
+          targetDate: Timestamp.make(1706500000000)
         }).pipe(Effect.provide(testLayer))
 
         expect(captureCreateDoc.attributes?.status).toBe(MilestoneStatus.Planned)
@@ -584,8 +587,8 @@ describe("createMilestone", () => {
 
         yield* createMilestone({
           project: projectIdentifier("TEST"),
-          label: "Sprint 1",
-          targetDate: 1706500000000
+          label: milestoneLabel("Sprint 1"),
+          targetDate: Timestamp.make(1706500000000)
         }).pipe(Effect.provide(testLayer))
 
         expect(captureCreateDoc.attributes?.comments).toBe(0)
@@ -604,8 +607,8 @@ describe("createMilestone", () => {
 
         const result = yield* createMilestone({
           project: projectIdentifier("TEST"),
-          label: "Sprint 1",
-          targetDate: 1706500000000
+          label: milestoneLabel("Sprint 1"),
+          targetDate: Timestamp.make(1706500000000)
         }).pipe(Effect.provide(testLayer))
 
         expect(result.id).toBe(captureCreateDoc.id)
@@ -624,8 +627,8 @@ describe("createMilestone", () => {
         const error = yield* Effect.flip(
           createMilestone({
             project: projectIdentifier("NONEXISTENT"),
-            label: "Sprint 1",
-            targetDate: 1706500000000
+            label: milestoneLabel("Sprint 1"),
+            targetDate: Timestamp.make(1706500000000)
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -640,7 +643,7 @@ describe("updateMilestone", () => {
     it.effect("updates milestone label", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
-        const milestone = makeMilestone({ label: "Sprint 1" })
+        const milestone = makeMilestone({ label: milestoneLabel("Sprint 1") })
         const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 
         const testLayer = createTestLayerWithMocks({
@@ -652,7 +655,7 @@ describe("updateMilestone", () => {
         const result = yield* updateMilestone({
           project: projectIdentifier("TEST"),
           milestone: milestoneIdentifier("Sprint 1"),
-          label: "Sprint 1 - Updated"
+          label: milestoneLabel("Sprint 1 - Updated")
         }).pipe(Effect.provide(testLayer))
 
         expect(result.updated).toBe(true)
@@ -662,7 +665,7 @@ describe("updateMilestone", () => {
     it.effect("updates milestone description via uploadMarkup and updateDoc", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
-        const milestone = makeMilestone({ label: "Sprint 1" })
+        const milestone = makeMilestone({ label: milestoneLabel("Sprint 1") })
         const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
         const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
 
@@ -691,7 +694,7 @@ describe("updateMilestone", () => {
     it.effect("updates milestone targetDate", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
-        const milestone = makeMilestone({ label: "Sprint 1" })
+        const milestone = makeMilestone({ label: milestoneLabel("Sprint 1") })
         const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 
         const testLayer = createTestLayerWithMocks({
@@ -703,7 +706,7 @@ describe("updateMilestone", () => {
         yield* updateMilestone({
           project: projectIdentifier("TEST"),
           milestone: milestoneIdentifier("Sprint 1"),
-          targetDate: 1706600000000
+          targetDate: Timestamp.make(1706600000000)
         }).pipe(Effect.provide(testLayer))
 
         expect(captureUpdateDoc.operations?.targetDate).toBe(1706600000000)
@@ -712,7 +715,7 @@ describe("updateMilestone", () => {
     it.effect("updates milestone status", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
-        const milestone = makeMilestone({ label: "Sprint 1", status: MilestoneStatus.Planned })
+        const milestone = makeMilestone({ label: milestoneLabel("Sprint 1"), status: MilestoneStatus.Planned })
         const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 
         const testLayer = createTestLayerWithMocks({
@@ -733,7 +736,7 @@ describe("updateMilestone", () => {
     it.effect("updates multiple fields at once", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
-        const milestone = makeMilestone({ label: "Sprint 1" })
+        const milestone = makeMilestone({ label: milestoneLabel("Sprint 1") })
         const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
         const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
 
@@ -747,10 +750,10 @@ describe("updateMilestone", () => {
         yield* updateMilestone({
           project: projectIdentifier("TEST"),
           milestone: milestoneIdentifier("Sprint 1"),
-          label: "Sprint 1 Final",
+          label: milestoneLabel("Sprint 1 Final"),
           description: "Completed",
           status: "completed",
-          targetDate: 1706700000000
+          targetDate: Timestamp.make(1706700000000)
         }).pipe(Effect.provide(testLayer))
 
         expect(captureUpdateDoc.operations?.label).toBe("Sprint 1 Final")
@@ -764,7 +767,7 @@ describe("updateMilestone", () => {
     it.effect("fails when no fields provided", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
-        const milestone = makeMilestone({ label: "Sprint 1" })
+        const milestone = makeMilestone({ label: milestoneLabel("Sprint 1") })
 
         const testLayer = createTestLayerWithMocks({
           projects: [project],
@@ -826,7 +829,7 @@ describe("updateMilestone", () => {
           updateMilestone({
             project: projectIdentifier("NONEXISTENT"),
             milestone: milestoneIdentifier("Sprint 1"),
-            label: "Updated"
+            label: milestoneLabel("Updated")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -846,7 +849,7 @@ describe("updateMilestone", () => {
           updateMilestone({
             project: projectIdentifier("TEST"),
             milestone: milestoneIdentifier("NonexistentSprint"),
-            label: "Updated"
+            label: milestoneLabel("Updated")
           }).pipe(Effect.provide(testLayer))
         )
 
@@ -861,7 +864,7 @@ describe("setIssueMilestone", () => {
     it.effect("sets milestone on issue by label", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
-        const milestone = makeMilestone({ _id: "m-1" as Ref<HulyMilestone>, label: "Sprint 1" })
+        const milestone = makeMilestone({ _id: "m-1" as Ref<HulyMilestone>, label: milestoneLabel("Sprint 1") })
         const issue = makeIssue({ identifier: "TEST-1", number: 1, milestone: null })
         const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 
@@ -886,7 +889,10 @@ describe("setIssueMilestone", () => {
     it.effect("sets milestone on issue by milestone ID", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
-        const milestone = makeMilestone({ _id: "milestone-abc" as Ref<HulyMilestone>, label: "Sprint 1" })
+        const milestone = makeMilestone({
+          _id: "milestone-abc" as Ref<HulyMilestone>,
+          label: milestoneLabel("Sprint 1")
+        })
         const issue = makeIssue({ identifier: "TEST-1", number: 1 })
         const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 
@@ -933,7 +939,7 @@ describe("setIssueMilestone", () => {
     it.effect("finds issue by number", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
-        const milestone = makeMilestone({ _id: "m-1" as Ref<HulyMilestone>, label: "Sprint 1" })
+        const milestone = makeMilestone({ _id: "m-1" as Ref<HulyMilestone>, label: milestoneLabel("Sprint 1") })
         const issue = makeIssue({ identifier: "TEST-42", number: 42 })
         const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
 
@@ -979,7 +985,7 @@ describe("setIssueMilestone", () => {
     it.effect("returns IssueNotFoundError when issue doesn't exist", () =>
       Effect.gen(function*() {
         const project = makeProject()
-        const milestone = makeMilestone({ label: "Sprint 1" })
+        const milestone = makeMilestone({ label: milestoneLabel("Sprint 1") })
 
         const testLayer = createTestLayerWithMocks({
           projects: [project],
@@ -1030,7 +1036,7 @@ describe("deleteMilestone", () => {
     it.effect("deletes milestone by label", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
-        const milestone = makeMilestone({ _id: "m-1" as Ref<HulyMilestone>, label: "Sprint 1" })
+        const milestone = makeMilestone({ _id: "m-1" as Ref<HulyMilestone>, label: milestoneLabel("Sprint 1") })
         const captureRemoveDoc: MockConfig["captureRemoveDoc"] = {}
 
         const testLayer = createTestLayerWithMocks({
@@ -1052,7 +1058,10 @@ describe("deleteMilestone", () => {
     it.effect("deletes milestone by ID", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })
-        const milestone = makeMilestone({ _id: "milestone-abc" as Ref<HulyMilestone>, label: "Sprint 1" })
+        const milestone = makeMilestone({
+          _id: "milestone-abc" as Ref<HulyMilestone>,
+          label: milestoneLabel("Sprint 1")
+        })
         const captureRemoveDoc: MockConfig["captureRemoveDoc"] = {}
 
         const testLayer = createTestLayerWithMocks({

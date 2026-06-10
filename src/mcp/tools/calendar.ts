@@ -1,33 +1,52 @@
 import {
-  createEventParamsJsonSchema,
   createRecurringEventParamsJsonSchema,
+  listEventInstancesParamsJsonSchema,
+  listRecurringEventsParamsJsonSchema,
+  parseCreateRecurringEventParams,
+  parseListEventInstancesParams,
+  parseListRecurringEventsParams
+} from "../../domain/schemas/calendar-recurring.js"
+import {
+  createScheduleParamsJsonSchema,
+  deleteScheduleParamsJsonSchema,
+  getScheduleParamsJsonSchema,
+  listSchedulesParamsJsonSchema,
+  parseCreateScheduleParams,
+  parseDeleteScheduleParams,
+  parseGetScheduleParams,
+  parseListSchedulesParams,
+  parseUpdateScheduleParams,
+  updateScheduleParamsJsonSchema
+} from "../../domain/schemas/calendar-schedules.js"
+import {
+  createEventParamsJsonSchema,
   deleteEventParamsJsonSchema,
   getEventParamsJsonSchema,
   listCalendarsParamsJsonSchema,
-  listEventInstancesParamsJsonSchema,
   listEventsParamsJsonSchema,
-  listRecurringEventsParamsJsonSchema,
   parseCreateEventParams,
-  parseCreateRecurringEventParams,
   parseDeleteEventParams,
   parseGetEventParams,
   parseListCalendarsParams,
-  parseListEventInstancesParams,
   parseListEventsParams,
-  parseListRecurringEventsParams,
   parseUpdateEventParams,
   updateEventParamsJsonSchema
 } from "../../domain/schemas/calendar.js"
 import {
   createEvent,
   createRecurringEvent,
+  createSchedule,
   deleteEvent,
+  deleteSchedule,
   getEvent,
+  getSchedule,
   listCalendars,
   listEventInstances,
   listEvents,
   listRecurringEvents,
-  updateEvent
+  listSchedules,
+  updateEvent,
+  updateSchedule
 } from "../../huly/operations/calendar.js"
 import { createToolHandler, type RegisteredTool } from "./registry.js"
 
@@ -102,6 +121,65 @@ export const calendarTools: ReadonlyArray<RegisteredTool> = [
       "delete_event",
       parseDeleteEventParams,
       deleteEvent
+    )
+  },
+  {
+    name: "list_schedules",
+    description:
+      "List calendar scheduling links/availability schedules. Optional owner accepts an employee/person ID, exact name, or email.",
+    category: CATEGORY,
+    inputSchema: listSchedulesParamsJsonSchema,
+    handler: createToolHandler(
+      "list_schedules",
+      parseListSchedulesParams,
+      listSchedules
+    )
+  },
+  {
+    name: "get_schedule",
+    description:
+      "Retrieve one calendar schedule including owner, availability, calendar target, time zone, and room information when it is a meeting schedule.",
+    category: CATEGORY,
+    inputSchema: getScheduleParamsJsonSchema,
+    handler: createToolHandler(
+      "get_schedule",
+      parseGetScheduleParams,
+      getSchedule
+    )
+  },
+  {
+    name: "create_schedule",
+    description:
+      "Create a calendar schedule. Owner accepts an employee/person ID, exact name, or email; calendar can be targeted by calendarId or calendarName.",
+    category: CATEGORY,
+    inputSchema: createScheduleParamsJsonSchema,
+    handler: createToolHandler(
+      "create_schedule",
+      parseCreateScheduleParams,
+      createSchedule
+    )
+  },
+  {
+    name: "update_schedule",
+    description:
+      "Update a calendar schedule. Supports owner, title, description, duration, interval, availability, timeZone, and calendar move by calendarId or calendarName.",
+    category: CATEGORY,
+    inputSchema: updateScheduleParamsJsonSchema,
+    handler: createToolHandler(
+      "update_schedule",
+      parseUpdateScheduleParams,
+      updateSchedule
+    )
+  },
+  {
+    name: "delete_schedule",
+    description: "Delete a calendar schedule by scheduleId.",
+    category: CATEGORY,
+    inputSchema: deleteScheduleParamsJsonSchema,
+    handler: createToolHandler(
+      "delete_schedule",
+      parseDeleteScheduleParams,
+      deleteSchedule
     )
   },
   {

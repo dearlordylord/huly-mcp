@@ -31,7 +31,7 @@ import {
   ProcessTransitionId,
   StartProcessResultSchema
 } from "../../domain/schemas.js"
-import { CardId, Count, MasterTagId } from "../../domain/schemas/shared.js"
+import { CardId, Count, MasterTagId, Timestamp } from "../../domain/schemas/shared.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError, type HulyClientOperations } from "../client.js"
 import {
@@ -351,7 +351,7 @@ const executionSummary = (
   hasError: (execution.error?.length ?? 0) > 0,
   hasParent: execution.parentId !== undefined,
   parentExecutionId: execution.parentId === undefined ? undefined : ProcessExecutionId.make(execution.parentId),
-  modifiedOn: execution.modifiedOn
+  modifiedOn: Timestamp.make(execution.modifiedOn)
 })
 
 const startProcessResult = (

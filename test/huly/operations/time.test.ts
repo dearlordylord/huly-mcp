@@ -12,6 +12,7 @@ import {
 } from "@hcengineering/tracker"
 import { Clock, Effect } from "effect"
 import { expect } from "vitest"
+import { Timestamp } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../../../src/huly/errors.js"
 import { toRef } from "../../../src/huly/operations/sdk-boundary.js"
@@ -95,7 +96,7 @@ const makeTimeSpendReport = (overrides?: Partial<HulyTimeSpendReport>): HulyTime
     attachedToClass: tracker.class.Issue,
     collection: "reports",
     employee: null,
-    date: 0,
+    date: Timestamp.make(0),
     value: 30,
     description: "Worked on feature",
     modifiedBy: "user-1" as PersonId,
@@ -785,11 +786,11 @@ describe("listTimeSpendReports", () => {
       Effect.gen(function*() {
         const report1 = makeTimeSpendReport({
           _id: "report-1" as Ref<HulyTimeSpendReport>,
-          date: 1000
+          date: Timestamp.make(1000)
         })
         const report2 = makeTimeSpendReport({
           _id: "report-2" as Ref<HulyTimeSpendReport>,
-          date: 2000
+          date: Timestamp.make(2000)
         })
 
         const testLayer = createTestLayerWithMocks({
@@ -797,7 +798,7 @@ describe("listTimeSpendReports", () => {
         })
 
         const result = yield* listTimeSpendReports({
-          from: 1500
+          from: Timestamp.make(1500)
         }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
@@ -808,11 +809,11 @@ describe("listTimeSpendReports", () => {
       Effect.gen(function*() {
         const report1 = makeTimeSpendReport({
           _id: "report-1" as Ref<HulyTimeSpendReport>,
-          date: 1000
+          date: Timestamp.make(1000)
         })
         const report2 = makeTimeSpendReport({
           _id: "report-2" as Ref<HulyTimeSpendReport>,
-          date: 2000
+          date: Timestamp.make(2000)
         })
 
         const testLayer = createTestLayerWithMocks({
@@ -820,7 +821,7 @@ describe("listTimeSpendReports", () => {
         })
 
         const result = yield* listTimeSpendReports({
-          to: 1500
+          to: Timestamp.make(1500)
         }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
@@ -831,15 +832,15 @@ describe("listTimeSpendReports", () => {
       Effect.gen(function*() {
         const report1 = makeTimeSpendReport({
           _id: "report-1" as Ref<HulyTimeSpendReport>,
-          date: 1000
+          date: Timestamp.make(1000)
         })
         const report2 = makeTimeSpendReport({
           _id: "report-2" as Ref<HulyTimeSpendReport>,
-          date: 2000
+          date: Timestamp.make(2000)
         })
         const report3 = makeTimeSpendReport({
           _id: "report-3" as Ref<HulyTimeSpendReport>,
-          date: 3000
+          date: Timestamp.make(3000)
         })
 
         const testLayer = createTestLayerWithMocks({
@@ -847,8 +848,8 @@ describe("listTimeSpendReports", () => {
         })
 
         const result = yield* listTimeSpendReports({
-          from: 1500,
-          to: 2500
+          from: Timestamp.make(1500),
+          to: Timestamp.make(2500)
         }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
@@ -925,7 +926,7 @@ describe("getDetailedTimeReport", () => {
           space: "project-1" as Ref<Space>,
           employee: toRef<Employee>("person-1"),
           value: 60,
-          date: 1000,
+          date: Timestamp.make(1000),
           description: "Work on issue 1"
         })
         const report2 = makeTimeSpendReport({
@@ -934,7 +935,7 @@ describe("getDetailedTimeReport", () => {
           space: "project-1" as Ref<Space>,
           employee: toRef<Employee>("person-1"),
           value: 30,
-          date: 2000,
+          date: Timestamp.make(2000),
           description: "Work on issue 2"
         })
         const report3 = makeTimeSpendReport({
@@ -943,7 +944,7 @@ describe("getDetailedTimeReport", () => {
           space: "project-1" as Ref<Space>,
           employee: null,
           value: 15,
-          date: 3000,
+          date: Timestamp.make(3000),
           description: "Anonymous work"
         })
 
@@ -1037,13 +1038,13 @@ describe("getDetailedTimeReport", () => {
         const report1 = makeTimeSpendReport({
           _id: "r1" as Ref<HulyTimeSpendReport>,
           space: "project-1" as Ref<Space>,
-          date: 1000,
+          date: Timestamp.make(1000),
           value: 10
         })
         const report2 = makeTimeSpendReport({
           _id: "r2" as Ref<HulyTimeSpendReport>,
           space: "project-1" as Ref<Space>,
-          date: 3000,
+          date: Timestamp.make(3000),
           value: 20
         })
 
@@ -1054,7 +1055,7 @@ describe("getDetailedTimeReport", () => {
 
         const result = yield* getDetailedTimeReport({
           project: projectIdentifier("TEST"),
-          from: 2000
+          from: Timestamp.make(2000)
         }).pipe(Effect.provide(testLayer))
 
         expect(result.totalTime).toBe(20)
@@ -1066,13 +1067,13 @@ describe("getDetailedTimeReport", () => {
         const report1 = makeTimeSpendReport({
           _id: "r1" as Ref<HulyTimeSpendReport>,
           space: "project-1" as Ref<Space>,
-          date: 1000,
+          date: Timestamp.make(1000),
           value: 10
         })
         const report2 = makeTimeSpendReport({
           _id: "r2" as Ref<HulyTimeSpendReport>,
           space: "project-1" as Ref<Space>,
-          date: 3000,
+          date: Timestamp.make(3000),
           value: 20
         })
 
@@ -1083,7 +1084,7 @@ describe("getDetailedTimeReport", () => {
 
         const result = yield* getDetailedTimeReport({
           project: projectIdentifier("TEST"),
-          to: 2000
+          to: Timestamp.make(2000)
         }).pipe(Effect.provide(testLayer))
 
         expect(result.totalTime).toBe(10)
@@ -1095,19 +1096,19 @@ describe("getDetailedTimeReport", () => {
         const report1 = makeTimeSpendReport({
           _id: "r1" as Ref<HulyTimeSpendReport>,
           space: "project-1" as Ref<Space>,
-          date: 1000,
+          date: Timestamp.make(1000),
           value: 10
         })
         const report2 = makeTimeSpendReport({
           _id: "r2" as Ref<HulyTimeSpendReport>,
           space: "project-1" as Ref<Space>,
-          date: 2000,
+          date: Timestamp.make(2000),
           value: 20
         })
         const report3 = makeTimeSpendReport({
           _id: "r3" as Ref<HulyTimeSpendReport>,
           space: "project-1" as Ref<Space>,
-          date: 3000,
+          date: Timestamp.make(3000),
           value: 30
         })
 
@@ -1118,8 +1119,8 @@ describe("getDetailedTimeReport", () => {
 
         const result = yield* getDetailedTimeReport({
           project: projectIdentifier("TEST"),
-          from: 1500,
-          to: 2500
+          from: Timestamp.make(1500),
+          to: Timestamp.make(2500)
         }).pipe(Effect.provide(testLayer))
 
         expect(result.totalTime).toBe(20)
@@ -1276,15 +1277,15 @@ describe("listWorkSlots", () => {
           {
             _id: "slot-1",
             attachedTo: "todo-1",
-            date: 1000,
-            dueDate: 2000,
+            date: Timestamp.make(1000),
+            dueDate: Timestamp.make(2000),
             title: "Morning work"
           },
           {
             _id: "slot-2",
             attachedTo: "todo-2",
-            date: 3000,
-            dueDate: 4000,
+            date: Timestamp.make(3000),
+            dueDate: Timestamp.make(4000),
             title: "Afternoon work"
           }
         ]
@@ -1319,16 +1320,16 @@ describe("listWorkSlots", () => {
           {
             _id: "slot-1",
             attachedTo: "todo-1",
-            date: 1000,
-            dueDate: 2000,
+            date: Timestamp.make(1000),
+            dueDate: Timestamp.make(2000),
             title: "Alice's work",
             user: "person-1"
           },
           {
             _id: "slot-2",
             attachedTo: "todo-2",
-            date: 3000,
-            dueDate: 4000,
+            date: Timestamp.make(3000),
+            dueDate: Timestamp.make(4000),
             title: "Bob's work",
             user: "person-2"
           }
@@ -1352,16 +1353,16 @@ describe("listWorkSlots", () => {
           {
             _id: "slot-1",
             attachedTo: "todo-1",
-            date: 1000,
-            dueDate: 2000,
+            date: Timestamp.make(1000),
+            dueDate: Timestamp.make(2000),
             title: "Alice's work",
             user: "person-1"
           },
           {
             _id: "slot-2",
             attachedTo: "todo-2",
-            date: 3000,
-            dueDate: 4000,
+            date: Timestamp.make(3000),
+            dueDate: Timestamp.make(4000),
             title: "Bob's work",
             user: "person-2"
           }
@@ -1384,8 +1385,8 @@ describe("listWorkSlots", () => {
           {
             _id: "slot-1",
             attachedTo: "todo-1",
-            date: 1000,
-            dueDate: 2000,
+            date: Timestamp.make(1000),
+            dueDate: Timestamp.make(2000),
             title: "Work"
           }
         ]
@@ -1403,13 +1404,25 @@ describe("listWorkSlots", () => {
     it.effect("filters by from date", () =>
       Effect.gen(function*() {
         const slots = [
-          { _id: "slot-1", attachedTo: "todo-1", date: 1000, dueDate: 2000, title: "Early" },
-          { _id: "slot-2", attachedTo: "todo-2", date: 3000, dueDate: 4000, title: "Late" }
+          {
+            _id: "slot-1",
+            attachedTo: "todo-1",
+            date: Timestamp.make(1000),
+            dueDate: Timestamp.make(2000),
+            title: "Early"
+          },
+          {
+            _id: "slot-2",
+            attachedTo: "todo-2",
+            date: Timestamp.make(3000),
+            dueDate: Timestamp.make(4000),
+            title: "Late"
+          }
         ]
 
         const testLayer = makeWorkSlotFindAll(slots)
 
-        const result = yield* listWorkSlots({ from: 2000 }).pipe(Effect.provide(testLayer))
+        const result = yield* listWorkSlots({ from: Timestamp.make(2000) }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
         expect(result[0].id).toBe("slot-2")
@@ -1418,13 +1431,25 @@ describe("listWorkSlots", () => {
     it.effect("filters by to date", () =>
       Effect.gen(function*() {
         const slots = [
-          { _id: "slot-1", attachedTo: "todo-1", date: 1000, dueDate: 2000, title: "Early" },
-          { _id: "slot-2", attachedTo: "todo-2", date: 3000, dueDate: 4000, title: "Late" }
+          {
+            _id: "slot-1",
+            attachedTo: "todo-1",
+            date: Timestamp.make(1000),
+            dueDate: Timestamp.make(2000),
+            title: "Early"
+          },
+          {
+            _id: "slot-2",
+            attachedTo: "todo-2",
+            date: Timestamp.make(3000),
+            dueDate: Timestamp.make(4000),
+            title: "Late"
+          }
         ]
 
         const testLayer = makeWorkSlotFindAll(slots)
 
-        const result = yield* listWorkSlots({ to: 2000 }).pipe(Effect.provide(testLayer))
+        const result = yield* listWorkSlots({ to: Timestamp.make(2000) }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
         expect(result[0].id).toBe("slot-1")
@@ -1433,14 +1458,34 @@ describe("listWorkSlots", () => {
     it.effect("filters by both from and to", () =>
       Effect.gen(function*() {
         const slots = [
-          { _id: "slot-1", attachedTo: "todo-1", date: 1000, dueDate: 2000, title: "Early" },
-          { _id: "slot-2", attachedTo: "todo-2", date: 3000, dueDate: 4000, title: "Middle" },
-          { _id: "slot-3", attachedTo: "todo-3", date: 5000, dueDate: 6000, title: "Late" }
+          {
+            _id: "slot-1",
+            attachedTo: "todo-1",
+            date: Timestamp.make(1000),
+            dueDate: Timestamp.make(2000),
+            title: "Early"
+          },
+          {
+            _id: "slot-2",
+            attachedTo: "todo-2",
+            date: Timestamp.make(3000),
+            dueDate: Timestamp.make(4000),
+            title: "Middle"
+          },
+          {
+            _id: "slot-3",
+            attachedTo: "todo-3",
+            date: Timestamp.make(5000),
+            dueDate: Timestamp.make(6000),
+            title: "Late"
+          }
         ]
 
         const testLayer = makeWorkSlotFindAll(slots)
 
-        const result = yield* listWorkSlots({ from: 2000, to: 4000 }).pipe(Effect.provide(testLayer))
+        const result = yield* listWorkSlots({ from: Timestamp.make(2000), to: Timestamp.make(4000) }).pipe(
+          Effect.provide(testLayer)
+        )
 
         expect(result).toHaveLength(1)
         expect(result[0].id).toBe("slot-2")

@@ -51,6 +51,7 @@ import {
   NonEmptyString,
   ObjectClassName,
   RelationId,
+  Timestamp,
   UNKNOWN_TOTAL
 } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError, type HulyClientOperations } from "../client.js"
@@ -1062,8 +1063,8 @@ const relationToSummary = (
   associationName: associationName(association),
   source: resolveRelationEndpointFromCache(docsByClass, relation.docA, association.classA),
   target: resolveRelationEndpointFromCache(docsByClass, relation.docB, association.classB),
-  createdOn: relation.createdOn,
-  modifiedOn: relation.modifiedOn
+  createdOn: relation.createdOn === undefined ? undefined : Timestamp.make(relation.createdOn),
+  modifiedOn: Timestamp.make(relation.modifiedOn)
 })
 
 const relationsToSummaries = (

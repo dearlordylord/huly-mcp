@@ -22,6 +22,7 @@ import type {
 import { IssuePriority, TimeReportDayType } from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { Timestamp } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type { InvalidStatusError, PersonNotFoundError } from "../../../src/huly/errors.js"
 import { contact, core, task, tracker } from "../../../src/huly/huly-plugins.js"
@@ -1206,7 +1207,7 @@ describe("Issues Coverage - updateIssue branches", () => {
       yield* updateIssue({
         project: projectIdentifier("TEST"),
         identifier: issueIdentifier("TEST-1"),
-        dueDate: 1800000000000
+        dueDate: Timestamp.make(1800000000000)
       }).pipe(Effect.provide(testLayer))
 
       expect(captureUpdateDoc.operations?.dueDate).toBe(1800000000000)

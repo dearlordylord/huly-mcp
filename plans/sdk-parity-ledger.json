@@ -137,24 +137,48 @@
       "package": "@hcengineering/calendar",
       "status": "covered",
       "matrixLocation": "Calendar schedules and integrations",
-      "rationale": "Existing calendar tools cover event CRUD plus recurring events and recurring instances.",
+      "rationale": "Calendar tools cover event CRUD, recurring events/instances, stable event fields, participant mutation, calendar target moves, writable calendar discovery, and schedule CRUD.",
       "exports": [
         "Event",
         "ReccuringEvent",
-        "ReccuringInstance"
+        "ReccuringInstance",
+        "Schedule"
       ]
     },
     {
       "package": "@hcengineering/calendar",
       "status": "gap",
       "matrixLocation": "Calendar schedules and integrations",
-      "rationale": "Calendar configuration, primary-calendar preferences, external calendars, schedules, and presenter metadata are tracked as remaining gaps.",
+      "rationale": "Calendar configuration, primary-calendar preferences, external calendars, presenter metadata, and invite/RSVP response state are tracked as remaining gaps. Current 0.7.0 calendar declarations expose no RSVP response model.",
       "exports": [
         "Calendar",
         "CalendarEventPresenter",
         "ExternalCalendar",
-        "PrimaryCalendar",
-        "Schedule"
+        "PrimaryCalendar"
+      ]
+    },
+    {
+      "package": "@hcengineering/love",
+      "status": "covered",
+      "matrixLocation": "Virtual office / meetings",
+      "rationale": "Read-only virtual-office tools cover floors, rooms, offices, transient room info, transient participant info, meeting minutes, device preferences, and room recording/transcription defaults. Meeting and MeetingSchedule mixin data is exposed as room-aware calendar event/schedule summaries instead of raw mixin internals.",
+      "exports": [
+        "DevicesPreference",
+        "Floor",
+        "MeetingMinutes",
+        "Office",
+        "ParticipantInfo",
+        "Room",
+        "RoomInfo"
+      ]
+    },
+    {
+      "package": "@hcengineering/love",
+      "status": "gap",
+      "matrixLocation": "Virtual office / meetings",
+      "rationale": "Live meeting join/leave/start/stop writes, meeting schedule room writes, transcripts/recordings as first-class artifacts, and room/floor/office CRUD are deferred until transient session/LiveKit behavior and storage-backed recording/transcript models are implemented in a safe integration slice.",
+      "exports": [
+        "Meeting"
       ]
     },
     {
