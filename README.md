@@ -688,6 +688,10 @@ SDK upgrade revisit:
 | `get_huly_class` | Read one Huly class/interface/mixin by exact ID and return its inheritance chain plus model attributes. Use this when you need fields, ref targets, enum IDs, or hints about purpose-built MCP tool categories for the class. |
 | `list_huly_attributes` | Discover Huly model attributes across the workspace or directly on one class/mixin. Returns attribute IDs, owner classes, labels, type families, ref targets, enum IDs, and custom-field markers. |
 | `list_huly_enums` | Discover Huly enum model documents and their valid values. Use enum IDs from get_huly_class or list_huly_attributes to inspect allowed enum values before writing or interpreting enum fields. |
+| `list_huly_plugin_configurations` | List read-only Huly plugin configuration records from core.class.PluginConfiguration. Returns plugin id, label, enabled/beta flags, and transaction count so an LLM can see installed model plugin gates without mutating configuration. |
+| `list_huly_domain_index_configurations` | List read-only Huly domain index configuration records from core.class.DomainIndexConfiguration. Returns each domain plus disabled, skip, and enabled-index summaries while preserving SDK-open index/filter/config payloads as typed metadata. |
+| `list_huly_sequences` | List read-only Huly sequence counters from core.class.Sequence and core.class.CustomSequence. Returns sequence id, attached class id, current non-negative integer value, and custom prefix when present. |
+| `describe_huly_space_type_capabilities` | Describe one Huly SpaceType by id or exact name in a single read-only call. Returns descriptor metadata, base/target classes, roles, role permissions, default members, autoJoin, and the stored role-assignment shape. |
 
 ### Spaces
 

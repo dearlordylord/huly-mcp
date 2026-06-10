@@ -292,7 +292,8 @@ describe("SDK discovery mapper properties", () => {
             firstClassToolHints: [{
               category: hintCategory,
               exampleTools: [hintTool]
-            }]
+            }],
+            routingHints: []
           })
 
           expectSearchTextContains(classSearchText(summary), [

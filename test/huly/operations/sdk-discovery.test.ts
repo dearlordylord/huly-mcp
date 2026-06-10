@@ -167,6 +167,12 @@ describe("sdk discovery operations", () => {
           firstClassToolHints: [{
             category: "issues",
             exampleTools: ["list_issues", "get_issue", "create_issue"]
+          }],
+          routingHints: [{
+            status: "covered",
+            safestMcpTools: ["list_issues", "get_issue", "create_issue"],
+            rationale:
+              "Current project, issue, component, milestone, issue-template, status, relation, related-issue target, project target preference, and time-reporting tools cover core tracker resources. GitHub sync metadata, PDF export, saved views, and broader workflow automation remain deferred."
           }]
         }],
         total: 1
@@ -193,7 +199,8 @@ describe("sdk discovery operations", () => {
           directAncestors: [],
           domain: "tracker",
           attributesCount: 0,
-          firstClassToolHints: []
+          firstClassToolHints: [],
+          routingHints: []
         }],
         total: 1
       })

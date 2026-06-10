@@ -4,6 +4,13 @@ import { Effect, Either, Schema } from "effect"
 import { expect } from "vitest"
 
 import {
+  DescribeHulySpaceTypeCapabilitiesParamsSchema,
+  HulyClassRoutingHintSchema,
+  ListHulyDomainIndexConfigurationsResultSchema,
+  ListHulyPluginConfigurationsResultSchema,
+  ListHulySequencesResultSchema
+} from "../../src/domain/schemas/sdk-discovery-configurations.js"
+import {
   GetHulyClassParamsSchema,
   GetHulyClassResultSchema,
   HulySdkClassifierKindSchema,
@@ -88,7 +95,8 @@ describe("sdk discovery schemas", () => {
           directAncestors: [],
           domain: "tracker",
           attributesCount: 1,
-          firstClassToolHints: [{ category: "issues", exampleTools: ["list_issues"] }]
+          firstClassToolHints: [{ category: "issues", exampleTools: ["list_issues"] }],
+          routingHints: []
         }],
         total: 1
       })
@@ -100,7 +108,8 @@ describe("sdk discovery schemas", () => {
           directAncestors: [],
           domain: "tracker",
           attributesCount: 1,
-          firstClassToolHints: [{ category: "issues", exampleTools: ["list_issues"] }]
+          firstClassToolHints: [{ category: "issues", exampleTools: ["list_issues"] }],
+          routingHints: []
         }],
         total: 1
       })
@@ -166,7 +175,8 @@ describe("sdk discovery schemas", () => {
           kind: "class",
           directAncestors: [],
           attributesCount: -1,
-          firstClassToolHints: []
+          firstClassToolHints: [],
+          routingHints: []
         }],
         total: 1
       })
@@ -175,4 +185,85 @@ describe("sdk discovery schemas", () => {
     expect(() => Schema.decodeUnknownSync(ListHulyAttributesResultSchema)({ attributes: [], total: 1.5 })).toThrow()
     expect(() => Schema.decodeUnknownSync(ListHulyEnumsResultSchema)({ enums: [], total: -1 })).toThrow()
   })
+
+  it.effect("validates new read-only SDK discovery outputs", () =>
+    Effect.gen(function*() {
+      expect(
+        yield* Schema.decodeUnknown(ListHulyPluginConfigurationsResultSchema)({
+          pluginConfigurations: [{
+            pluginId: "tracker",
+            label: "Tracker",
+            enabled: true,
+            beta: false,
+            transactionCount: 3
+          }],
+          total: 1
+        })
+      ).toMatchObject({ total: 1 })
+
+      expect(
+        yield* Schema.decodeUnknown(ListHulyDomainIndexConfigurationsResultSchema)({
+          domainIndexConfigurations: [{
+            domain: "tracker",
+            disabled: [{ kind: "field", key: "legacyIndex" }],
+            indexes: [{ kind: "sdk-open-metadata", metadata: { keys: "identifier" } }],
+            skip: ["transient"]
+          }],
+          total: 1
+        })
+      ).toMatchObject({ total: 1 })
+
+      expect(
+        yield* Schema.decodeUnknown(ListHulySequencesResultSchema)({
+          sequences: [{
+            sequenceId: "sequence-issue",
+            attachedClass: "tracker:class:Issue",
+            currentValue: 0,
+            prefix: "ISSUE"
+          }],
+          total: 1
+        })
+      ).toMatchObject({ total: 1 })
+
+      expect(() =>
+        Schema.decodeUnknownSync(ListHulySequencesResultSchema)({
+          sequences: [{
+            sequenceId: "sequence-issue",
+            attachedClass: "tracker:class:Issue",
+            currentValue: -1
+          }],
+          total: 1
+        })
+      ).toThrow()
+    }))
+
+  it.effect("validates parity routing and space capability params", () =>
+    Effect.gen(function*() {
+      expect(
+        yield* Schema.decodeUnknown(HulyClassRoutingHintSchema)({
+          status: "covered",
+          safestMcpTools: ["list_issues"],
+          rationale: "Issues are covered by first-class issue tools."
+        })
+      ).toMatchObject({ status: "covered" })
+      expect(
+        yield* Schema.decodeUnknown(HulyClassRoutingHintSchema)({
+          status: "gap",
+          backlogIssue: 92,
+          rationale: "Tracked by issue 92."
+        })
+      ).toMatchObject({ status: "gap" })
+      expect(() =>
+        Schema.decodeUnknownSync(HulyClassRoutingHintSchema)({
+          status: "gap",
+          safestMcpTools: ["list_issues"],
+          rationale: "Impossible state."
+        })
+      ).toThrow()
+      expect(
+        yield* Schema.decodeUnknown(DescribeHulySpaceTypeCapabilitiesParamsSchema)({
+          spaceType: "space-type-1"
+        })
+      ).toEqual({ spaceType: "space-type-1" })
+    }))
 })

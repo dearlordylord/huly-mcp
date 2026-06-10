@@ -86,7 +86,11 @@ describe("sdkDiscoveryTools", () => {
         "list_huly_classes",
         "get_huly_class",
         "list_huly_attributes",
-        "list_huly_enums"
+        "list_huly_enums",
+        "list_huly_plugin_configurations",
+        "list_huly_domain_index_configurations",
+        "list_huly_sequences",
+        "describe_huly_space_type_capabilities"
       ])
       for (const tool of sdkDiscoveryTools) {
         expect(tool.category).toBe("sdk-discovery")
@@ -114,7 +118,8 @@ describe("sdkDiscoveryTools", () => {
   it.effect("read-only annotations are derived for all discovery tools", () =>
     Effect.gen(function*() {
       for (const tool of sdkDiscoveryTools) {
-        expect(tool.name.startsWith("list_") || tool.name.startsWith("get_")).toBe(true)
+        expect(tool.name.startsWith("list_") || tool.name.startsWith("get_") || tool.name.startsWith("describe_"))
+          .toBe(true)
       }
     }))
 

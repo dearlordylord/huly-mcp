@@ -1,6 +1,7 @@
 import { ClassifierKind } from "@hcengineering/core"
 import { JSONSchema, Schema } from "effect"
 
+import { HulyClassRoutingHintSchema, HulyDomainName } from "./sdk-discovery-configurations.js"
 import {
   Count,
   enumValuesDescription,
@@ -59,9 +60,6 @@ export const HulyAttributeTypeKindSchema = Schema.Literal(...NormalizedAttribute
     }`
 })
 export type HulyAttributeTypeKind = Schema.Schema.Type<typeof HulyAttributeTypeKindSchema>
-
-export const HulyDomainName = NonEmptyString.pipe(Schema.brand("HulyDomainName"))
-export type HulyDomainName = Schema.Schema.Type<typeof HulyDomainName>
 
 export const HulyModelSearch = NonEmptyString.pipe(Schema.brand("HulyModelSearch"))
 export type HulyModelSearch = Schema.Schema.Type<typeof HulyModelSearch>
@@ -182,6 +180,10 @@ export const HulyClassSummarySchema = Schema.Struct({
   firstClassToolHints: Schema.Array(HulyClassToolHintSchema).annotations({
     description:
       "Representative MCP categories and example tool names for purpose-built operations on this class. This is a routing hint, not an exhaustive registry."
+  }),
+  routingHints: Schema.Array(HulyClassRoutingHintSchema).annotations({
+    description:
+      "Audited SDK parity routing hints. Covered classes name the safest MCP tools; gaps include the backlog issue; not-mcp-facing/ignored classes include only rationale."
   })
 })
 export type HulyClassSummary = Schema.Schema.Type<typeof HulyClassSummarySchema>
@@ -302,6 +304,8 @@ export const ListHulyEnumsResultSchema = Schema.Struct({
   total: HulyDiscoveryCount
 })
 export type ListHulyEnumsResult = Schema.Schema.Type<typeof ListHulyEnumsResultSchema>
+
+export { HulyDomainName } from "./sdk-discovery-configurations.js"
 
 export const listHulyClassesParamsJsonSchema = JSONSchema.make(ListHulyClassesParamsSchema)
 export const getHulyClassParamsJsonSchema = JSONSchema.make(GetHulyClassParamsSchema)

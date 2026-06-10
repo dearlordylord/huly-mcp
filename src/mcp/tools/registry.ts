@@ -27,7 +27,7 @@ export interface ToolDefinition {
 const deriveTitle = (name: string): string =>
   name.split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
 
-const READ_PREFIXES = ["list_", "get_", "search_", "fulltext_", "download_", "preview_"]
+const READ_PREFIXES = ["list_", "get_", "describe_", "search_", "fulltext_", "download_", "preview_"]
 const CREATE_PREFIXES = ["create_", "add_", "upload_", "send_", "log_"]
 const UPDATE_PREFIXES = [
   "update_",

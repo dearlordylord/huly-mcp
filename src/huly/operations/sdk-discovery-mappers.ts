@@ -12,7 +12,7 @@ import { HulyDiscoveryCount, HulyDomainName, HulySdkClassifierKindSchema } from 
 import { HulyAttributeId, HulyEnumId, NonEmptyString, ObjectClassName } from "../../domain/schemas/shared.js"
 import { hulyAttributeTypeKindFromClass } from "../huly-attribute-types.js"
 import { decodeHulyModelLabelTail } from "../huly-labels.js"
-import { firstClassToolHints } from "./sdk-discovery-tool-hints.js"
+import { firstClassToolHints, parityRoutingHints } from "./sdk-discovery-tool-hints.js"
 
 export type DirectAncestorRef = Ref<Class<Obj>> | Ref<Interface<Doc>>
 
@@ -137,7 +137,8 @@ export const toClassSummary = (
     firstClassToolHints: (firstClassToolHints.get(String(cls._id)) ?? []).map((item) => ({
       category: item.category,
       exampleTools: [...item.exampleTools]
-    }))
+    })),
+    routingHints: (parityRoutingHints.get(String(cls._id)) ?? []).map((hint) => ({ ...hint }))
   }
 }
 
