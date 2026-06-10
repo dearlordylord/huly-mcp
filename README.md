@@ -296,11 +296,11 @@ Planned feature surfaces:
 - Team planner and schedule reporting: team agendas, workload/capacity summaries, and visibility-aware free/busy views across members/projects.
 - Virtual office and meetings: offices, floors, rooms, access/language/default recording/transcription settings, meeting schedules, active participants, room info, meeting notes/transcript records (minutes), recordings, and device preferences.
 - Chat and communication: direct-message send/update/delete, group DMs, channel member mutations, join/leave/request access, archive/unarchive, star/favorite channels, close/reopen conversations, pinned messages, message attachments, translation, applets, in-message polls, and guest communication settings.
-- Notifications and activity: mute contexts, unsubscribe per context/type, notification type settings, collaborators, pin/unpin activity messages, generic activity replies, filters, references, mentions, and update-message introspection.
-- Attachments and media: saved attachments, photos, drawings, embeddings, previews/preview metadata, and friendly wrappers for additional object types.
+- Notifications and activity: browser/push subscription internals, provider defaults, UI presenter/viewlet metadata, and activity control/extension metadata.
+- Attachments and media: previews/preview metadata and friendly wrappers for additional object types beyond issue/document.
 - Core schema and workspace administration: attribute/property create/update/delete/hide, enum CRUD/options, sequence management, role assignment mutations, role/permission definition writes, generic space creation, global space admins, integrations registry, invite settings, role capability settings, and workspace setting metadata.
 - Integrations: GitHub repository/project mappings and sync metadata, Google Calendar connect/configure/sync controls, Bitrix entity/field mappings and sync status, Gmail/email channel messages, Telegram messages, Huly Mail/Mail plugin behavior, AI assistant integration state, and AI bot configuration if server-side APIs expose stable behavior.
-- Templates, rating, support, billing, analytics, views, workbench, and preferences: message templates/categories/fields, document/person rating data, support conversations, billing tier/status discovery, onboarding channels, saved filtered views, user view preferences, tabs/widgets/apps, and module preference discovery/update.
+- Templates, rating, support, billing, analytics, views, workbench, and preferences: message templates/categories/fields, document/person rating data blocked by unpublished `@hcengineering/rating` SDK package (#90), support conversations, billing tier/status discovery, onboarding channels, saved filtered views, user view preferences, tabs/widgets/apps, and module preference discovery/update.
 - Document-specific gaps: document snapshots/history, backlinks, notes, structured action items/tables, PDF/export, advanced document relationships, and document printing/export once SDK support is safe.
 
 MCP resource roadmap:
@@ -322,7 +322,7 @@ SDK upgrade revisit:
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
 ## Available Tools
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `custom-fields`, `drive`, `labels`, `leads`, `planner`, `processes`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `virtual-office`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `collaborators`, `custom-fields`, `drive`, `labels`, `leads`, `planner`, `processes`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `virtual-office`
 
 ### Projects
 
@@ -423,6 +423,14 @@ SDK upgrade revisit:
 | `download_attachment` | Get download URL for an attachment along with file metadata (name, type, size). |
 | `add_issue_attachment` | Add an attachment to a Huly issue. Convenience method that finds the issue by project and identifier. Provide ONE of: filePath, fileUrl, or data. |
 | `add_document_attachment` | Add an attachment to a Huly document. Convenience method that finds the document by teamspace and title/ID. Provide ONE of: filePath, fileUrl, or data. |
+| `save_attachment` | Save/bookmark an attachment for later reference. Idempotent when already saved. |
+| `unsave_attachment` | Remove an attachment from saved/bookmarks. |
+| `list_saved_attachments` | List saved/bookmarked attachments for the current user. |
+| `list_drawings` | List drawings attached to a raw Huly parent object. |
+| `get_drawing` | Get a drawing by ID. |
+| `create_drawing` | Create a drawing under a raw Huly parent object. |
+| `update_drawing` | Update drawing content. Pass null content to clear it. |
+| `delete_drawing` | Delete a drawing. This action cannot be undone. |
 
 ### Contacts
 
@@ -523,6 +531,14 @@ SDK upgrade revisit:
 | Tool | Description |
 |------|-------------|
 | `list_activity` | List activity messages for a Huly issue, document, channel, or raw Huly object. Prefer friendly targets: project+issueIdentifier for issues, teamspace+document for documents, or channel for channels. Advanced callers may pass objectId+objectClass directly. Returns activity sorted by date (newest first). |
+| `get_activity_message` | Get a single activity message by ID, including subclass metadata when available. |
+| `pin_activity_message` | Pin or unpin an activity message. Idempotent when the pin state already matches. |
+| `list_activity_filters` | List configured activity filters in display order. |
+| `list_activity_references` | List activity references connected to a raw Huly object. Use direction to list references from the object, to the object, or both. |
+| `list_activity_replies` | List thread replies on any activity message, not only channel messages. |
+| `add_activity_reply` | Add a Markdown reply to any activity message. |
+| `update_activity_reply` | Update a generic activity reply body. |
+| `delete_activity_reply` | Delete a generic activity reply. |
 | `add_reaction` | Add an emoji reaction to an activity message. |
 | `remove_reaction` | Remove an emoji reaction from an activity message. |
 | `list_reactions` | List reactions on an activity message. |
@@ -535,6 +551,8 @@ SDK upgrade revisit:
 
 | Tool | Description |
 |------|-------------|
+| `list_notification_providers` | List notification providers such as inbox, push, and sound. Use provider IDs from this tool when updating provider or type settings. |
+| `list_notification_types` | List notification types. Use type IDs from this tool when updating provider-specific notification type settings. |
 | `list_notifications` | List inbox notifications. Returns notifications sorted by modification date (newest first). Supports filtering by read/archived status. |
 | `get_notification` | Retrieve full details for a notification. Use this to view notification content and metadata. |
 | `mark_notification_read` | Mark a notification as read. Idempotent: returns success when the notification is already read. |
@@ -548,8 +566,13 @@ SDK upgrade revisit:
 | `list_notification_contexts` | List notification contexts. Returns contexts sorted by last update timestamp (newest first). Supports filtering by pinned status and can include hidden contexts. |
 | `pin_notification_context` | Pin or unpin a notification context. Pinned contexts are highlighted in the inbox. Idempotent when the pin state already matches. |
 | `hide_notification_context` | Hide or unhide a notification context. Hidden contexts are omitted from list_notification_contexts unless includeHidden is true. Idempotent when the hidden state already matches. |
+| `archive_notification_context` | Archive all inbox notifications in a notification context. Idempotent: returns count 0 when no active notifications remain. |
+| `unarchive_notification_context` | Unarchive all archived inbox notifications in a notification context. Idempotent: returns count 0 when no archived notifications remain. |
+| `subscribe_to_object_notifications` | Subscribe the authenticated account to notifications for a raw Huly object by adding a core collaborator row. Idempotent when already subscribed. |
+| `unsubscribe_from_object_notifications` | Unsubscribe the authenticated account from notifications for a raw Huly object by removing its collaborator row. Idempotent when already absent. |
 | `list_notification_settings` | List notification provider settings. Returns current notification preferences. |
 | `update_notification_provider_setting` | Update notification provider setting. Enable or disable notifications for a specific provider. |
+| `update_notification_type_setting` | Enable or disable one notification type for one provider. Creates the type setting only when the provider has a configurable setting in this workspace. |
 | `get_unread_notification_count` | Get the count of unread notifications. |
 
 ### Workspace
@@ -579,6 +602,14 @@ SDK upgrade revisit:
 | `create_card` | Create a new card in a Huly card space. Requires a master tag (card type). Content supports markdown formatting. Returns the created card id. |
 | `update_card` | Update fields on an existing Huly card. Only provided fields are modified. Content updates support markdown. |
 | `delete_card` | Permanently delete a Huly card. This action cannot be undone. |
+
+### Collaborators
+
+| Tool | Description |
+|------|-------------|
+| `list_object_collaborators` | List notification collaborators on a Huly issue, document, or raw object. Prefer friendly targets: project+issueIdentifier for issues or teamspace+document for documents. Advanced callers may pass objectId+objectClass directly. |
+| `add_object_collaborator` | Subscribe a workspace member to object notifications by adding a core collaborator row. Member can be an account UUID, exact employee/person name, or email. Idempotent when already subscribed. |
+| `remove_object_collaborator` | Unsubscribe a workspace member from object notifications by removing its collaborator row. Member can be an account UUID, exact employee/person name, or email. Idempotent when already absent. |
 
 ### Custom-Fields
 

@@ -1,4 +1,30 @@
 import {
+  addActivityReplyParamsJsonSchema,
+  AddActivityReplyResultSchema,
+  deleteActivityReplyParamsJsonSchema,
+  DeleteActivityReplyResultSchema,
+  getActivityMessageParamsJsonSchema,
+  GetActivityMessageResultSchema,
+  listActivityFiltersParamsJsonSchema,
+  ListActivityFiltersResultSchema,
+  listActivityReferencesParamsJsonSchema,
+  ListActivityReferencesResultSchema,
+  listActivityRepliesParamsJsonSchema,
+  ListActivityRepliesResultSchema,
+  parseAddActivityReplyParams,
+  parseDeleteActivityReplyParams,
+  parseGetActivityMessageParams,
+  parseListActivityFiltersParams,
+  parseListActivityReferencesParams,
+  parseListActivityRepliesParams,
+  parsePinActivityMessageParams,
+  parseUpdateActivityReplyParams,
+  pinActivityMessageParamsJsonSchema,
+  PinActivityMessageResultSchema,
+  updateActivityReplyParamsJsonSchema,
+  UpdateActivityReplyResultSchema
+} from "../../domain/schemas/activity-messages.js"
+import {
   addReactionParamsJsonSchema,
   AddReactionResultSchema,
   listActivityParamsJsonSchema,
@@ -25,6 +51,16 @@ import {
   UnsaveMessageResultSchema
 } from "../../domain/schemas/activity.js"
 import {
+  addActivityReply,
+  deleteActivityReply,
+  getActivityMessage,
+  listActivityFilters,
+  listActivityReferences,
+  listActivityReplies,
+  pinActivityMessage,
+  updateActivityReply
+} from "../../huly/operations/activity-messages.js"
+import {
   addReaction,
   listActivity,
   listMentions,
@@ -50,6 +86,103 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
       parseListActivityParams,
       listActivity,
       ListActivityResultSchema
+    )
+  },
+  {
+    name: "get_activity_message",
+    description: "Get a single activity message by ID, including subclass metadata when available.",
+    category: CATEGORY,
+    inputSchema: getActivityMessageParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "get_activity_message",
+      parseGetActivityMessageParams,
+      getActivityMessage,
+      GetActivityMessageResultSchema
+    )
+  },
+  {
+    name: "pin_activity_message",
+    description: "Pin or unpin an activity message. Idempotent when the pin state already matches.",
+    category: CATEGORY,
+    inputSchema: pinActivityMessageParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "pin_activity_message",
+      parsePinActivityMessageParams,
+      pinActivityMessage,
+      PinActivityMessageResultSchema
+    )
+  },
+  {
+    name: "list_activity_filters",
+    description: "List configured activity filters in display order.",
+    category: CATEGORY,
+    inputSchema: listActivityFiltersParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "list_activity_filters",
+      parseListActivityFiltersParams,
+      listActivityFilters,
+      ListActivityFiltersResultSchema
+    )
+  },
+  {
+    name: "list_activity_references",
+    description:
+      "List activity references connected to a raw Huly object. Use direction to list references from the object, to the object, or both.",
+    category: CATEGORY,
+    inputSchema: listActivityReferencesParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "list_activity_references",
+      parseListActivityReferencesParams,
+      listActivityReferences,
+      ListActivityReferencesResultSchema
+    )
+  },
+  {
+    name: "list_activity_replies",
+    description: "List thread replies on any activity message, not only channel messages.",
+    category: CATEGORY,
+    inputSchema: listActivityRepliesParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "list_activity_replies",
+      parseListActivityRepliesParams,
+      listActivityReplies,
+      ListActivityRepliesResultSchema
+    )
+  },
+  {
+    name: "add_activity_reply",
+    description: "Add a Markdown reply to any activity message.",
+    category: CATEGORY,
+    inputSchema: addActivityReplyParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "add_activity_reply",
+      parseAddActivityReplyParams,
+      addActivityReply,
+      AddActivityReplyResultSchema
+    )
+  },
+  {
+    name: "update_activity_reply",
+    description: "Update a generic activity reply body.",
+    category: CATEGORY,
+    inputSchema: updateActivityReplyParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "update_activity_reply",
+      parseUpdateActivityReplyParams,
+      updateActivityReply,
+      UpdateActivityReplyResultSchema
+    )
+  },
+  {
+    name: "delete_activity_reply",
+    description: "Delete a generic activity reply.",
+    category: CATEGORY,
+    inputSchema: deleteActivityReplyParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "delete_activity_reply",
+      parseDeleteActivityReplyParams,
+      deleteActivityReply,
+      DeleteActivityReplyResultSchema
     )
   },
   {

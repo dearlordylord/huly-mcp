@@ -59,6 +59,7 @@ import {
 import {
   AttachmentNotFoundError,
   BYTES_PER_MB,
+  DrawingNotFoundError,
   FileFetchError,
   FileNotFoundError,
   FileTooLargeError,
@@ -66,7 +67,8 @@ import {
   InvalidContentTypeError,
   InvalidFileDataError,
   MAX_FILE_SIZE,
-  MAX_FILE_SIZE_MB
+  MAX_FILE_SIZE_MB,
+  SavedAttachmentNotFoundError
 } from "./errors-files.js"
 import {
   AssociationConflictError,
@@ -99,7 +101,12 @@ import {
   SavedMessageNotFoundError,
   ThreadReplyNotFoundError
 } from "./errors-messaging.js"
-import { NotificationContextNotFoundError, NotificationNotFoundError } from "./errors-notifications.js"
+import {
+  NotificationContextNotFoundError,
+  NotificationNotFoundError,
+  NotificationProviderNotConfigurableError,
+  NotificationTypeNotFoundError
+} from "./errors-notifications.js"
 import { TodoIdentifierAmbiguousError, TodoNotFoundError, TodoWorkSlotNotFoundError } from "./errors-planner.js"
 import {
   ProcessCardIdentifierAmbiguousError,
@@ -167,6 +174,7 @@ export {
   DocumentReferenceError,
   DocumentTextMultipleMatchesError,
   DocumentTextNotFoundError,
+  DrawingNotFoundError,
   DriveFileNotFoundError,
   DriveFileVersionNotFoundError,
   DriveIdentifierAmbiguousError,
@@ -205,6 +213,8 @@ export {
   MilestoneNotFoundError,
   NotificationContextNotFoundError,
   NotificationNotFoundError,
+  NotificationProviderNotConfigurableError,
+  NotificationTypeNotFoundError,
   NoUpdateFieldsError,
   OrganizationIdentifierAmbiguousError,
   OrganizationNotFoundError,
@@ -231,6 +241,7 @@ export {
   RelationMutationUnsupportedError,
   RelationNotFoundError,
   RoomNotFoundError,
+  SavedAttachmentNotFoundError,
   SavedMessageNotFoundError,
   ScheduleNotFoundError,
   SpaceIdentifierAmbiguousError,
@@ -299,6 +310,8 @@ export const HulyDomainError = Schema.Union(
   ReactionNotFoundError,
   SavedMessageNotFoundError,
   AttachmentNotFoundError,
+  SavedAttachmentNotFoundError,
+  DrawingNotFoundError,
   CardSpaceNotFoundError,
   CardNotFoundError,
   MasterTagNotFoundError,
@@ -318,6 +331,8 @@ export const HulyDomainError = Schema.Union(
   TemplateChildNotFoundError,
   NotificationNotFoundError,
   NotificationContextNotFoundError,
+  NotificationTypeNotFoundError,
+  NotificationProviderNotConfigurableError,
   InvalidPersonUuidError,
   FunnelNotFoundError,
   LeadNotFoundError,

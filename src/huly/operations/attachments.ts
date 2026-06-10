@@ -7,23 +7,10 @@
  * @module
  */
 import type { Attachment as HulyAttachment } from "@hcengineering/attachment"
-import {
-  type AttachedData,
-  type Class,
-  type Doc,
-  type DocumentUpdate,
-  generateId,
-  type Ref,
-  SortingOrder,
-  type Space
-} from "@hcengineering/core"
-import { Clock, Effect } from "effect"
+import { type Class, type Doc, type DocumentUpdate, SortingOrder, type Space } from "@hcengineering/core"
+import { Effect } from "effect"
 
 import type {
-  AddAttachmentParams,
-  AddAttachmentResult,
-  AddDocumentAttachmentParams,
-  AddIssueAttachmentParams,
   Attachment,
   AttachmentSummary,
   DeleteAttachmentParams,
@@ -38,51 +25,24 @@ import type {
   UpdateAttachmentResult
 } from "../../domain/schemas/attachments.js"
 import { UPDATE_ATTACHMENT_FIELDS } from "../../domain/schemas/attachments.js"
-import { AttachmentId, BlobId } from "../../domain/schemas/shared.js"
+import { AttachmentByteSize, AttachmentDescription, AttachmentFileName } from "../../domain/schemas/domain-values.js"
+import { AttachmentId, MimeType, ObjectClassName, Timestamp, UrlString } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import {
-  AttachmentNotFoundError,
-  type DocumentNotFoundError,
-  type FileFetchError,
-  type FileNotFoundError,
-  type FileTooLargeError,
-  type InvalidContentTypeError,
-  type InvalidFileDataError,
-  type IssueNotFoundError,
-  type NoUpdateFieldsError,
-  type ProjectNotFoundError,
-  type TeamspaceNotFoundError
-} from "../errors.js"
-import {
-  type FileSourceParams,
-  getBufferFromParams,
-  HulyStorageClient,
-  type StorageClientError,
-  validateContentType,
-  validateFileSize
-} from "../storage.js"
-import { findTeamspaceAndDocument } from "./documents.js"
-import { findProjectAndIssue } from "./issues-shared.js"
+import { AttachmentNotFoundError, type NoUpdateFieldsError } from "../errors.js"
+import { HulyStorageClient } from "../storage.js"
 import { clampLimit, findOneOrFail } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
-import { attachment, documentPlugin, tracker } from "../huly-plugins.js"
+import { attachment } from "../huly-plugins.js"
+
+export { addAttachment, addDocumentAttachment, addIssueAttachment } from "./attachments-upload.js"
 
 type ListAttachmentsError = HulyClientError
 
 type GetAttachmentError =
   | HulyClientError
   | AttachmentNotFoundError
-
-type AddAttachmentError =
-  | HulyClientError
-  | StorageClientError
-  | InvalidFileDataError
-  | FileNotFoundError
-  | FileFetchError
-  | FileTooLargeError
-  | InvalidContentTypeError
 
 type UpdateAttachmentError =
   | HulyClientError
@@ -101,124 +61,37 @@ type DownloadAttachmentError =
   | HulyClientError
   | AttachmentNotFoundError
 
-type AddIssueAttachmentError =
-  | HulyClientError
-  | ProjectNotFoundError
-  | IssueNotFoundError
-  | StorageClientError
-  | InvalidFileDataError
-  | FileNotFoundError
-  | FileFetchError
-  | FileTooLargeError
-  | InvalidContentTypeError
-
-type AddDocumentAttachmentError =
-  | HulyClientError
-  | TeamspaceNotFoundError
-  | DocumentNotFoundError
-  | StorageClientError
-  | InvalidFileDataError
-  | FileNotFoundError
-  | FileFetchError
-  | FileTooLargeError
-  | InvalidContentTypeError
-
 // --- Helpers ---
+
+const optionalAttachmentDescription = (description: string | null | undefined) =>
+  description === undefined || description === null ? undefined : AttachmentDescription.make(description)
 
 const toAttachmentSummary = (att: HulyAttachment): AttachmentSummary => ({
   id: AttachmentId.make(att._id),
-  name: att.name,
-  type: att.type,
-  size: att.size,
+  class: ObjectClassName.make(att._class),
+  name: AttachmentFileName.make(att.name),
+  type: MimeType.make(att.type),
+  size: AttachmentByteSize.make(att.size),
   pinned: att.pinned ?? undefined,
-  description: att.description ?? undefined,
-  modifiedOn: att.modifiedOn
+  description: optionalAttachmentDescription(att.description),
+  metadata: att.metadata,
+  modifiedOn: Timestamp.make(att.modifiedOn)
 })
 
 const toAttachment = (att: HulyAttachment, url?: string): Attachment => ({
   id: AttachmentId.make(att._id),
-  name: att.name,
-  type: att.type,
-  size: att.size,
+  class: ObjectClassName.make(att._class),
+  name: AttachmentFileName.make(att.name),
+  type: MimeType.make(att.type),
+  size: AttachmentByteSize.make(att.size),
   pinned: att.pinned ?? undefined,
   readonly: att.readonly ?? undefined,
-  description: att.description ?? undefined,
-  url,
-  modifiedOn: att.modifiedOn,
-  createdOn: att.createdOn
+  description: optionalAttachmentDescription(att.description),
+  metadata: att.metadata,
+  url: url === undefined ? undefined : UrlString.make(url),
+  modifiedOn: Timestamp.make(att.modifiedOn),
+  createdOn: att.createdOn === undefined ? undefined : Timestamp.make(att.createdOn)
 })
-
-interface AttachmentParent {
-  readonly spaceRef: Ref<Space>
-  readonly objectRef: Ref<Doc>
-  readonly objectClassRef: Ref<Class<Doc>>
-}
-
-const uploadAndAttach = (
-  params: {
-    readonly filename: string
-    readonly contentType: string
-    readonly filePath?: string | undefined
-    readonly fileUrl?: string | undefined
-    readonly data?: string | undefined
-    readonly description?: string | undefined
-    readonly pinned?: boolean | undefined
-  },
-  parent: AttachmentParent
-): Effect.Effect<
-  AddAttachmentResult,
-  | HulyClientError
-  | StorageClientError
-  | InvalidFileDataError
-  | FileNotFoundError
-  | FileFetchError
-  | FileTooLargeError
-  | InvalidContentTypeError,
-  HulyClient | HulyStorageClient
-> =>
-  Effect.gen(function*() {
-    const client = yield* HulyClient
-    const storageClient = yield* HulyStorageClient
-
-    const buffer = yield* getBufferFromParams(toFileSourceParams(params))
-    yield* validateFileSize(buffer, params.filename)
-    yield* validateContentType(params.contentType, params.filename)
-
-    const uploadResult = yield* storageClient.uploadFile(
-      params.filename,
-      buffer,
-      params.contentType
-    )
-
-    const attachmentId: Ref<HulyAttachment> = generateId()
-
-    const now = yield* Clock.currentTimeMillis
-    const attachmentData: AttachedData<HulyAttachment> = {
-      name: params.filename,
-      file: uploadResult.blobId,
-      size: uploadResult.size,
-      type: params.contentType,
-      lastModified: now,
-      pinned: params.pinned ?? false,
-      ...(params.description !== undefined ? { description: params.description } : {})
-    }
-
-    yield* client.addCollection(
-      attachment.class.Attachment,
-      parent.spaceRef,
-      parent.objectRef,
-      parent.objectClassRef,
-      "attachments",
-      attachmentData,
-      attachmentId
-    )
-
-    return {
-      attachmentId: AttachmentId.make(attachmentId),
-      blobId: BlobId.make(uploadResult.blobId),
-      url: uploadResult.url
-    }
-  })
 
 // --- Operations ---
 
@@ -270,31 +143,6 @@ export const getAttachment = (
 
     const url = storageClient.getFileUrl(att.file)
     return toAttachment(att, url)
-  })
-
-/**
- * Add an attachment to an object.
- *
- * Uploads file to storage and creates Attachment document linked to parent.
- */
-const toFileSourceParams = (params: {
-  readonly filePath?: string | undefined
-  readonly fileUrl?: string | undefined
-  readonly data?: string | undefined
-}): FileSourceParams => {
-  if (params.filePath !== undefined) return { _tag: "filePath", filePath: params.filePath }
-  if (params.fileUrl !== undefined) return { _tag: "fileUrl", fileUrl: params.fileUrl }
-  if (params.data !== undefined) return { _tag: "base64", data: params.data }
-  throw new Error("Schema validation should guarantee at least one file source (filePath, fileUrl, or data)")
-}
-
-export const addAttachment = (
-  params: AddAttachmentParams
-): Effect.Effect<AddAttachmentResult, AddAttachmentError, HulyClient | HulyStorageClient> =>
-  uploadAndAttach(params, {
-    spaceRef: toRef<Space>(params.space),
-    objectRef: toRef<Doc>(params.objectId),
-    objectClassRef: toRef<Class<Doc>>(params.objectClass)
   })
 
 /**
@@ -419,46 +267,9 @@ export const downloadAttachment = (
 
     return {
       attachmentId: AttachmentId.make(params.attachmentId),
-      url,
-      name: att.name,
-      type: att.type,
-      size: att.size
+      url: UrlString.make(url),
+      name: AttachmentFileName.make(att.name),
+      type: MimeType.make(att.type),
+      size: AttachmentByteSize.make(att.size)
     }
-  })
-
-// --- Convenience Operations ---
-
-/**
- * Add an attachment to an issue.
- */
-export const addIssueAttachment = (
-  params: AddIssueAttachmentParams
-): Effect.Effect<AddAttachmentResult, AddIssueAttachmentError, HulyClient | HulyStorageClient> =>
-  Effect.gen(function*() {
-    const { issue, project } = yield* findProjectAndIssue(params)
-
-    return yield* uploadAndAttach(params, {
-      spaceRef: project._id,
-      objectRef: issue._id,
-      objectClassRef: tracker.class.Issue
-    })
-  })
-
-/**
- * Add an attachment to a document.
- */
-export const addDocumentAttachment = (
-  params: AddDocumentAttachmentParams
-): Effect.Effect<AddAttachmentResult, AddDocumentAttachmentError, HulyClient | HulyStorageClient> =>
-  Effect.gen(function*() {
-    const { doc, teamspace } = yield* findTeamspaceAndDocument({
-      teamspace: params.teamspace,
-      document: params.document
-    })
-
-    return yield* uploadAndAttach(params, {
-      spaceRef: teamspace._id,
-      objectRef: doc._id,
-      objectClassRef: documentPlugin.class.Document
-    })
   })

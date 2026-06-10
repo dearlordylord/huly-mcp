@@ -1,6 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { Count, ListTotal, NotificationTypeId } from "./shared.js"
+import type { Count, ListTotal } from "./shared.js"
 import {
   DEFAULT_INCLUDE_ARCHIVED,
   DEFAULT_LIMIT,
@@ -56,13 +56,6 @@ export interface DocNotifyContextSummary {
 export interface NotificationProviderSetting {
   readonly id: string
   readonly providerId: NotificationProviderId
-  readonly enabled: boolean
-}
-
-export interface NotificationTypeSetting {
-  readonly id: string
-  readonly providerId: NotificationProviderId
-  readonly typeId: NotificationTypeId
   readonly enabled: boolean
 }
 

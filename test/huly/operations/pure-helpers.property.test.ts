@@ -5,7 +5,13 @@ import * as fc from "fast-check"
 import { describe, expect, it } from "vitest"
 
 import { IssuePriorityValues } from "../../../src/domain/schemas/issues.js"
-import { DocId, MAX_LIMIT, NonNegativeNumber, TagReferenceId } from "../../../src/domain/schemas/shared.js"
+import {
+  DocId,
+  MAX_COLOR_INDEX,
+  MAX_LIMIT,
+  NonNegativeNumber,
+  TagReferenceId
+} from "../../../src/domain/schemas/shared.js"
 import { AttachedTagSummarySchema } from "../../../src/domain/schemas/tags.js"
 import {
   TestCasePriorityValues,
@@ -302,13 +308,14 @@ describe("pure Huly operation helper properties", () => {
     )
   })
 
-  it("normalizeColorCode is idempotent and always returns a non-negative integer", () => {
+  it("normalizeColorCode is idempotent and always returns a palette index", () => {
     fc.assert(
       fc.property(fc.double(), (color) => {
         const normalized = normalizeColorCode(color)
 
         expect(Number.isInteger(normalized)).toBe(true)
         expect(normalized).toBeGreaterThanOrEqual(0)
+        expect(normalized).toBeLessThanOrEqual(MAX_COLOR_INDEX)
         expect(normalizeColorCode(normalized)).toBe(normalized)
       }),
       propertyTestParameters

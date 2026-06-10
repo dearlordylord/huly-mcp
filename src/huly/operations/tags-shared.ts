@@ -3,7 +3,7 @@ import { generateId, SortingOrder } from "@hcengineering/core"
 import type { TagCategory as HulyTagCategory, TagElement as HulyTagElement, TagReference } from "@hcengineering/tags"
 import { Effect } from "effect"
 
-import { ColorCode, Count, TagElementId, TagReferenceId } from "../../domain/schemas/shared.js"
+import { ColorCode, Count, MAX_COLOR_INDEX, TagElementId, TagReferenceId } from "../../domain/schemas/shared.js"
 import type { AttachedTagSummary, AttachTagResult, DetachTagResult, TagWeight } from "../../domain/schemas/tags.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { TagCategoryNotFoundError, TagNotFoundError } from "../errors.js"
@@ -70,7 +70,7 @@ export const normalizeColorCode = (color: number): ColorCode => {
     return ColorCode.make(0)
   }
 
-  return ColorCode.make(Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.trunc(color))))
+  return ColorCode.make(Math.min(MAX_COLOR_INDEX, Math.max(0, Math.trunc(color))))
 }
 
 export const toResolvedTagElement = (tag: HulyTagElement, created: boolean): ResolvedTagElement => ({

@@ -1,4 +1,30 @@
 import {
+  createDrawingParamsJsonSchema,
+  CreateDrawingResultSchema,
+  deleteDrawingParamsJsonSchema,
+  DeleteDrawingResultSchema,
+  getDrawingParamsJsonSchema,
+  GetDrawingResultSchema,
+  listDrawingsParamsJsonSchema,
+  ListDrawingsResultSchema,
+  listSavedAttachmentsParamsJsonSchema,
+  ListSavedAttachmentsResultSchema,
+  parseCreateDrawingParams,
+  parseDeleteDrawingParams,
+  parseGetDrawingParams,
+  parseListDrawingsParams,
+  parseListSavedAttachmentsParams,
+  parseSaveAttachmentParams,
+  parseUnsaveAttachmentParams,
+  parseUpdateDrawingParams,
+  saveAttachmentParamsJsonSchema,
+  SaveAttachmentResultSchema,
+  unsaveAttachmentParamsJsonSchema,
+  UnsaveAttachmentResultSchema,
+  updateDrawingParamsJsonSchema,
+  UpdateDrawingResultSchema
+} from "../../domain/schemas/attachment-extras.js"
+import {
   addAttachmentParamsJsonSchema,
   addDocumentAttachmentParamsJsonSchema,
   addIssueAttachmentParamsJsonSchema,
@@ -19,9 +45,17 @@ import {
   updateAttachmentParamsJsonSchema
 } from "../../domain/schemas/attachments.js"
 import {
-  addAttachment,
-  addDocumentAttachment,
-  addIssueAttachment,
+  createDrawing,
+  deleteDrawing,
+  getDrawing,
+  listDrawings,
+  listSavedAttachments,
+  saveAttachment,
+  unsaveAttachment,
+  updateDrawing
+} from "../../huly/operations/attachment-extras.js"
+import { addAttachment, addDocumentAttachment, addIssueAttachment } from "../../huly/operations/attachments-upload.js"
+import {
   deleteAttachment,
   downloadAttachment,
   getAttachment,
@@ -29,7 +63,12 @@ import {
   pinAttachment,
   updateAttachment
 } from "../../huly/operations/attachments.js"
-import { createCombinedToolHandler, createToolHandler, type RegisteredTool } from "./registry.js"
+import {
+  createCombinedToolHandler,
+  createEncodedToolHandler,
+  createToolHandler,
+  type RegisteredTool
+} from "./registry.js"
 
 const CATEGORY = "attachments" as const
 
@@ -135,6 +174,102 @@ export const attachmentTools: ReadonlyArray<RegisteredTool> = [
       "add_document_attachment",
       parseAddDocumentAttachmentParams,
       addDocumentAttachment
+    )
+  },
+  {
+    name: "save_attachment",
+    description: "Save/bookmark an attachment for later reference. Idempotent when already saved.",
+    category: CATEGORY,
+    inputSchema: saveAttachmentParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "save_attachment",
+      parseSaveAttachmentParams,
+      saveAttachment,
+      SaveAttachmentResultSchema
+    )
+  },
+  {
+    name: "unsave_attachment",
+    description: "Remove an attachment from saved/bookmarks.",
+    category: CATEGORY,
+    inputSchema: unsaveAttachmentParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "unsave_attachment",
+      parseUnsaveAttachmentParams,
+      unsaveAttachment,
+      UnsaveAttachmentResultSchema
+    )
+  },
+  {
+    name: "list_saved_attachments",
+    description: "List saved/bookmarked attachments for the current user.",
+    category: CATEGORY,
+    inputSchema: listSavedAttachmentsParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "list_saved_attachments",
+      parseListSavedAttachmentsParams,
+      listSavedAttachments,
+      ListSavedAttachmentsResultSchema
+    )
+  },
+  {
+    name: "list_drawings",
+    description: "List drawings attached to a raw Huly parent object.",
+    category: CATEGORY,
+    inputSchema: listDrawingsParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "list_drawings",
+      parseListDrawingsParams,
+      listDrawings,
+      ListDrawingsResultSchema
+    )
+  },
+  {
+    name: "get_drawing",
+    description: "Get a drawing by ID.",
+    category: CATEGORY,
+    inputSchema: getDrawingParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "get_drawing",
+      parseGetDrawingParams,
+      getDrawing,
+      GetDrawingResultSchema
+    )
+  },
+  {
+    name: "create_drawing",
+    description: "Create a drawing under a raw Huly parent object.",
+    category: CATEGORY,
+    inputSchema: createDrawingParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "create_drawing",
+      parseCreateDrawingParams,
+      createDrawing,
+      CreateDrawingResultSchema
+    )
+  },
+  {
+    name: "update_drawing",
+    description: "Update drawing content. Pass null content to clear it.",
+    category: CATEGORY,
+    inputSchema: updateDrawingParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "update_drawing",
+      parseUpdateDrawingParams,
+      updateDrawing,
+      UpdateDrawingResultSchema
+    )
+  },
+  {
+    name: "delete_drawing",
+    description: "Delete a drawing. This action cannot be undone.",
+    category: CATEGORY,
+    inputSchema: deleteDrawingParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "delete_drawing",
+      parseDeleteDrawingParams,
+      deleteDrawing,
+      DeleteDrawingResultSchema
     )
   }
 ]

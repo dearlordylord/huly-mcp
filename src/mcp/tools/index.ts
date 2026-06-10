@@ -7,6 +7,7 @@ import { attachmentTools } from "./attachments.js"
 import { calendarTools } from "./calendar.js"
 import { cardTools } from "./cards.js"
 import { channelTools } from "./channels.js"
+import { collaboratorTools } from "./collaborators.js"
 import { commentTools } from "./comments.js"
 import { contactTools } from "./contacts.js"
 import { customFieldTools } from "./custom-fields.js"
@@ -52,6 +53,7 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...tagTools,
   ...tagCategoryTools,
   ...commentTools,
+  ...collaboratorTools,
   ...deletionTools,
   ...milestoneTools,
   ...documentTools,

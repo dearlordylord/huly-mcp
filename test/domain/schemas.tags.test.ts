@@ -2,6 +2,7 @@ import { describe, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { expect } from "vitest"
 
+import { MAX_COLOR_INDEX } from "../../src/domain/schemas/shared.js"
 import {
   attachTagParamsJsonSchema,
   createTagParamsJsonSchema,
@@ -64,16 +65,29 @@ describe("tag schemas", () => {
       expect(error._tag).toBe("ParseError")
     }))
 
-  it.effect("does not cap Huly color indexes below the SDK number field", () =>
+  it.effect("accepts the highest Huly palette color index", () =>
     Effect.gen(function*() {
       const parsed = yield* parseCreateTagParams({
-        color: 23,
+        color: MAX_COLOR_INDEX,
         targetClass: "tracker:class:Issue",
         title: "palette-end"
       })
 
-      expect(parsed.color).toBe(23)
-      expect(schemaProperty(createTagParamsJsonSchema, "color").maximum).toBeUndefined()
+      expect(parsed.color).toBe(MAX_COLOR_INDEX)
+      expect(schemaProperty(createTagParamsJsonSchema, "color").maximum).toBe(MAX_COLOR_INDEX)
+    }))
+
+  it.effect("rejects color indexes outside the Huly palette", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(
+        parseCreateTagParams({
+          color: MAX_COLOR_INDEX + 1,
+          targetClass: "tracker:class:Issue",
+          title: "outside-palette"
+        })
+      )
+
+      expect(error._tag).toBe("ParseError")
     }))
 
   it.effect("rejects negative color indexes", () =>

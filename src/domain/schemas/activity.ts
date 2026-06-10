@@ -1,5 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
+import { ActivityMarkdown, ActivityMarkup, MentionContent } from "./domain-values.js"
 import {
   ActivityMessageId,
   ChannelIdentifier,
@@ -8,6 +9,7 @@ import {
   DocId,
   DocumentIdentifier,
   EmojiCode,
+  hasAllDefined,
   IssueIdentifier,
   LimitParam,
   MAX_LIMIT,
@@ -33,6 +35,7 @@ type ActivityAction = Schema.Schema.Type<typeof ActivityAction>
 
 export interface ActivityMessage {
   readonly id: ActivityMessageId
+  readonly messageClass?: ObjectClassName | undefined
   readonly objectId: DocId
   readonly objectClass: ObjectClassName
   readonly modifiedBy?: PersonId | undefined
@@ -42,7 +45,12 @@ export interface ActivityMessage {
   readonly reactions?: ActivityCount | undefined
   readonly editedOn?: Timestamp | null | undefined
   readonly action?: ActivityAction | undefined
-  readonly message?: string | undefined
+  readonly message?: ActivityMarkup | undefined
+  readonly body?: ActivityMarkdown | undefined
+  readonly srcDocId?: DocId | undefined
+  readonly srcDocClass?: ObjectClassName | undefined
+  readonly attachedDocId?: DocId | undefined
+  readonly attachedDocClass?: ObjectClassName | undefined
 }
 
 export interface Reaction {
@@ -61,10 +69,8 @@ export interface Mention {
   readonly id: MentionId
   readonly messageId: ActivityMessageId
   readonly userId: PersonId
-  readonly content?: string | undefined
+  readonly content?: MentionContent | undefined
 }
-
-const hasAll = (...values: ReadonlyArray<unknown>): boolean => values.every(value => value !== undefined)
 
 export const ListActivityParamsSchema = Schema.Struct({
   objectId: Schema.optional(DocId.annotations({
@@ -96,9 +102,9 @@ export const ListActivityParamsSchema = Schema.Struct({
   )
 }).pipe(
   Schema.filter((params) => {
-    const rawObjectMode = hasAll(params.objectId, params.objectClass)
-    const issueMode = hasAll(params.project, params.issueIdentifier)
-    const documentMode = hasAll(params.teamspace, params.document)
+    const rawObjectMode = hasAllDefined(params.objectId, params.objectClass)
+    const issueMode = hasAllDefined(params.project, params.issueIdentifier)
+    const documentMode = hasAllDefined(params.teamspace, params.document)
     const channelMode = params.channel !== undefined
     const modeCount = [rawObjectMode, issueMode, documentMode, channelMode].filter(Boolean).length
 
@@ -318,6 +324,7 @@ export interface UnsaveMessageResult {
 
 export const ActivityMessageWireSchema = Schema.Struct({
   id: ActivityMessageId,
+  messageClass: Schema.optional(ObjectClassName),
   objectId: DocId,
   objectClass: ObjectClassName,
   modifiedBy: Schema.optional(PersonId),
@@ -327,7 +334,12 @@ export const ActivityMessageWireSchema = Schema.Struct({
   reactions: Schema.optional(ActivityCount),
   editedOn: Schema.optional(Schema.NullOr(Timestamp)),
   action: Schema.optional(ActivityAction),
-  message: Schema.optional(Schema.String)
+  message: Schema.optional(ActivityMarkup),
+  body: Schema.optional(ActivityMarkdown),
+  srcDocId: Schema.optional(DocId),
+  srcDocClass: Schema.optional(ObjectClassName),
+  attachedDocId: Schema.optional(DocId),
+  attachedDocClass: Schema.optional(ObjectClassName)
 })
 
 export const ReactionWireSchema = Schema.Struct({
@@ -346,7 +358,7 @@ export const MentionWireSchema = Schema.Struct({
   id: MentionId,
   messageId: ActivityMessageId,
   userId: PersonId,
-  content: Schema.optional(Schema.String)
+  content: Schema.optional(MentionContent)
 })
 
 export const AddReactionResultSchema = Schema.Struct({

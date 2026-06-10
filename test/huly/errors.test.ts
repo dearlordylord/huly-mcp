@@ -35,6 +35,7 @@ import {
   DocumentEditModeError,
   DocumentNotFoundError,
   DocumentReferenceError,
+  DrawingNotFoundError,
   DriveFileNotFoundError,
   DriveFileVersionNotFoundError,
   DriveIdentifierAmbiguousError,
@@ -73,6 +74,8 @@ import {
   MilestoneNotFoundError,
   NotificationContextNotFoundError,
   NotificationNotFoundError,
+  NotificationProviderNotConfigurableError,
+  NotificationTypeNotFoundError,
   NoUpdateFieldsError,
   OrganizationIdentifierAmbiguousError,
   OrganizationNotFoundError,
@@ -89,6 +92,7 @@ import {
   RelationMutationUnsupportedError,
   RelationNotFoundError,
   RoomNotFoundError,
+  SavedAttachmentNotFoundError,
   SavedMessageNotFoundError,
   ScheduleNotFoundError,
   TagCategoryNotFoundError,
@@ -807,6 +811,10 @@ describe("Huly Errors", () => {
               return `saved:${error.messageId}`
             case "AttachmentNotFoundError":
               return `attachment:${error.attachmentId}`
+            case "SavedAttachmentNotFoundError":
+              return `saved-attachment:${error.attachmentId}`
+            case "DrawingNotFoundError":
+              return `drawing:${error.drawingId}`
             case "CardSpaceNotFoundError":
               return `cardspace:${error.identifier}`
             case "CardNotFoundError":
@@ -845,6 +853,10 @@ describe("Huly Errors", () => {
               return `notification:${error.notificationId}`
             case "NotificationContextNotFoundError":
               return `notifctx:${error.contextId}`
+            case "NotificationTypeNotFoundError":
+              return `notiftype:${error.typeId}`
+            case "NotificationProviderNotConfigurableError":
+              return `notif-provider-not-configurable:${error.providerId}:${error.typeId}`
             case "InvalidPersonUuidError":
               return `uuid:${error.uuid}`
             case "FileTooLargeError":
@@ -1014,6 +1026,10 @@ describe("Huly Errors", () => {
         expect(matchError(new ReactionNotFoundError({ messageId: "msg-1", emoji: "heart" }))).toBe("reaction:heart")
         expect(matchError(new SavedMessageNotFoundError({ messageId: "sm-1" }))).toBe("saved:sm-1")
         expect(matchError(new AttachmentNotFoundError({ attachmentId: "att-1" }))).toBe("attachment:att-1")
+        expect(matchError(new SavedAttachmentNotFoundError({ attachmentId: "att-1" }))).toBe(
+          "saved-attachment:att-1"
+        )
+        expect(matchError(new DrawingNotFoundError({ drawingId: "drawing-1" }))).toBe("drawing:drawing-1")
         expect(matchError(new CardSpaceNotFoundError({ identifier: "cs-1" }))).toBe("cardspace:cs-1")
         expect(matchError(new CardNotFoundError({ identifier: "card-1", cardSpace: "cs-1" }))).toBe("card:card-1")
         expect(
@@ -1031,6 +1047,10 @@ describe("Huly Errors", () => {
         ).toBe("templatechild:c-1")
         expect(matchError(new NotificationNotFoundError({ notificationId: "n-1" }))).toBe("notification:n-1")
         expect(matchError(new NotificationContextNotFoundError({ contextId: "nc-1" }))).toBe("notifctx:nc-1")
+        expect(matchError(new NotificationTypeNotFoundError({ typeId: "nt-1" }))).toBe("notiftype:nt-1")
+        expect(
+          matchError(new NotificationProviderNotConfigurableError({ providerId: "np-1", typeId: "nt-1" }))
+        ).toBe("notif-provider-not-configurable:np-1:nt-1")
         expect(matchError(new InvalidPersonUuidError({ uuid: "bad-uuid" }))).toBe("uuid:bad-uuid")
         expect(
           matchError(

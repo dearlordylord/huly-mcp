@@ -1,6 +1,7 @@
 import { Effect } from "effect"
 
 import {
+  archiveNotificationContextParamsJsonSchema,
   archiveNotificationParamsJsonSchema,
   deleteNotificationParamsJsonSchema,
   emptyParamsJsonSchema,
@@ -8,27 +9,49 @@ import {
   getNotificationParamsJsonSchema,
   hideNotificationContextParamsJsonSchema,
   listNotificationContextsParamsJsonSchema,
+  listNotificationProvidersParamsJsonSchema,
   listNotificationSettingsParamsJsonSchema,
   listNotificationsParamsJsonSchema,
+  listNotificationTypesParamsJsonSchema,
   markNotificationReadParamsJsonSchema,
   markNotificationUnreadParamsJsonSchema,
+  parseArchiveNotificationContextParams,
   parseArchiveNotificationParams,
   parseDeleteNotificationParams,
   parseGetNotificationContextParams,
   parseGetNotificationParams,
   parseHideNotificationContextParams,
   parseListNotificationContextsParams,
+  parseListNotificationProvidersParams,
   parseListNotificationSettingsParams,
   parseListNotificationsParams,
+  parseListNotificationTypesParams,
   parseMarkNotificationReadParams,
   parseMarkNotificationUnreadParams,
   parsePinNotificationContextParams,
+  parseSubscribeToObjectNotificationsParams,
+  parseUnarchiveNotificationContextParams,
   parseUnarchiveNotificationParams,
+  parseUnsubscribeFromObjectNotificationsParams,
   parseUpdateNotificationProviderSettingParams,
+  parseUpdateNotificationTypeSettingParams,
   pinNotificationContextParamsJsonSchema,
+  subscribeToObjectNotificationsParamsJsonSchema,
+  unarchiveNotificationContextParamsJsonSchema,
   unarchiveNotificationParamsJsonSchema,
-  updateNotificationProviderSettingParamsJsonSchema
+  unsubscribeFromObjectNotificationsParamsJsonSchema,
+  updateNotificationProviderSettingParamsJsonSchema,
+  updateNotificationTypeSettingParamsJsonSchema
 } from "../../domain/schemas.js"
+import {
+  archiveNotificationContext,
+  listNotificationProviders,
+  listNotificationTypes,
+  subscribeToObjectNotifications,
+  unarchiveNotificationContext,
+  unsubscribeFromObjectNotifications,
+  updateNotificationTypeSetting
+} from "../../huly/operations/notification-preferences.js"
 import {
   archiveAllNotifications,
   archiveNotification,
@@ -52,6 +75,30 @@ import { createToolHandler, type RegisteredTool } from "./registry.js"
 const CATEGORY = "notifications" as const
 
 export const notificationTools: ReadonlyArray<RegisteredTool> = [
+  {
+    name: "list_notification_providers",
+    description:
+      "List notification providers such as inbox, push, and sound. Use provider IDs from this tool when updating provider or type settings.",
+    category: CATEGORY,
+    inputSchema: listNotificationProvidersParamsJsonSchema,
+    handler: createToolHandler(
+      "list_notification_providers",
+      parseListNotificationProvidersParams,
+      listNotificationProviders
+    )
+  },
+  {
+    name: "list_notification_types",
+    description:
+      "List notification types. Use type IDs from this tool when updating provider-specific notification type settings.",
+    category: CATEGORY,
+    inputSchema: listNotificationTypesParamsJsonSchema,
+    handler: createToolHandler(
+      "list_notification_types",
+      parseListNotificationTypesParams,
+      listNotificationTypes
+    )
+  },
   {
     name: "list_notifications",
     description:
@@ -202,6 +249,54 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
     )
   },
   {
+    name: "archive_notification_context",
+    description:
+      "Archive all inbox notifications in a notification context. Idempotent: returns count 0 when no active notifications remain.",
+    category: CATEGORY,
+    inputSchema: archiveNotificationContextParamsJsonSchema,
+    handler: createToolHandler(
+      "archive_notification_context",
+      parseArchiveNotificationContextParams,
+      archiveNotificationContext
+    )
+  },
+  {
+    name: "unarchive_notification_context",
+    description:
+      "Unarchive all archived inbox notifications in a notification context. Idempotent: returns count 0 when no archived notifications remain.",
+    category: CATEGORY,
+    inputSchema: unarchiveNotificationContextParamsJsonSchema,
+    handler: createToolHandler(
+      "unarchive_notification_context",
+      parseUnarchiveNotificationContextParams,
+      unarchiveNotificationContext
+    )
+  },
+  {
+    name: "subscribe_to_object_notifications",
+    description:
+      "Subscribe the authenticated account to notifications for a raw Huly object by adding a core collaborator row. Idempotent when already subscribed.",
+    category: CATEGORY,
+    inputSchema: subscribeToObjectNotificationsParamsJsonSchema,
+    handler: createToolHandler(
+      "subscribe_to_object_notifications",
+      parseSubscribeToObjectNotificationsParams,
+      subscribeToObjectNotifications
+    )
+  },
+  {
+    name: "unsubscribe_from_object_notifications",
+    description:
+      "Unsubscribe the authenticated account from notifications for a raw Huly object by removing its collaborator row. Idempotent when already absent.",
+    category: CATEGORY,
+    inputSchema: unsubscribeFromObjectNotificationsParamsJsonSchema,
+    handler: createToolHandler(
+      "unsubscribe_from_object_notifications",
+      parseUnsubscribeFromObjectNotificationsParams,
+      unsubscribeFromObjectNotifications
+    )
+  },
+  {
     name: "list_notification_settings",
     description: "List notification provider settings. Returns current notification preferences.",
     category: CATEGORY,
@@ -221,6 +316,18 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
       "update_notification_provider_setting",
       parseUpdateNotificationProviderSettingParams,
       updateNotificationProviderSetting
+    )
+  },
+  {
+    name: "update_notification_type_setting",
+    description:
+      "Enable or disable one notification type for one provider. Creates the type setting only when the provider has a configurable setting in this workspace.",
+    category: CATEGORY,
+    inputSchema: updateNotificationTypeSettingParamsJsonSchema,
+    handler: createToolHandler(
+      "update_notification_type_setting",
+      parseUpdateNotificationTypeSettingParams,
+      updateNotificationTypeSetting
     )
   },
   {

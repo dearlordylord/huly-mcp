@@ -23,17 +23,22 @@ import {
   pinAttachment,
   updateAttachment
 } from "../../../src/huly/operations/attachments.js"
-import { HulyStorageClient } from "../../../src/huly/storage.js"
+import { HulyStorageClient, type HulyStorageOperations } from "../../../src/huly/storage.js"
 import {
   attachmentBrandId,
+  attachmentDescription,
+  attachmentFileName,
+  base64FileData,
   docId,
   documentIdentifier,
   issueIdentifier,
+  localFilePath,
   mimeType,
   objectClassName,
   projectIdentifier,
   spaceBrandId,
-  teamspaceIdentifier
+  teamspaceIdentifier,
+  urlString
 } from "../../helpers/brands.js"
 
 // --- Mock Data Builders ---
@@ -143,6 +148,7 @@ interface MockConfig {
   captureUpdateDoc?: { operations?: Record<string, unknown> }
   captureRemoveDoc?: { id?: string }
   captureAddCollection?: { attributes?: Record<string, unknown> }
+  getFileUrl?: HulyStorageOperations["getFileUrl"]
 }
 
 const createTestLayer = (config: MockConfig) => {
@@ -252,7 +258,9 @@ const createTestLayer = (config: MockConfig) => {
     addCollection: addCollectionImpl
   })
 
-  const storageLayer = HulyStorageClient.testLayer({})
+  const storageLayer = HulyStorageClient.testLayer({
+    ...(config.getFileUrl === undefined ? {} : { getFileUrl: config.getFileUrl })
+  })
 
   return Layer.merge(clientLayer, storageLayer)
 }
@@ -368,6 +376,31 @@ describe("getAttachment", () => {
       expect(result.pinned).toBeUndefined()
       expect(result.description).toBeUndefined()
     }))
+
+  it.effect("maps absent optional SDK fields defensively", () =>
+    Effect.gen(function*() {
+      const att = makeAttachment({
+        _id: "att-optional" as Ref<HulyAttachment>,
+        file: "blob-optional" as Ref<Blob>,
+        // eslint-disable-next-line no-restricted-syntax -- undefined doesn't overlap with string
+        description: undefined as unknown as string,
+        // eslint-disable-next-line no-restricted-syntax -- undefined doesn't overlap with number
+        createdOn: undefined as unknown as number
+      })
+      const testLayer = createTestLayer({
+        attachments: [att],
+        // eslint-disable-next-line no-restricted-syntax -- malformed storage port branch coverage
+        getFileUrl: () => undefined as unknown as string
+      })
+
+      const result = yield* getAttachment({ attachmentId: attachmentBrandId("att-optional") }).pipe(
+        Effect.provide(testLayer)
+      )
+
+      expect(result.description).toBeUndefined()
+      expect(result.createdOn).toBeUndefined()
+      expect(result.url).toBeUndefined()
+    }))
 })
 
 describe("addAttachment", () => {
@@ -380,9 +413,9 @@ describe("addAttachment", () => {
         objectId: docId("parent-1"),
         objectClass: objectClassName("tracker:class:Issue"),
         space: spaceBrandId("space-1"),
-        filename: "test.txt",
+        filename: attachmentFileName("test.txt"),
         contentType: mimeType("text/plain"),
-        data: Buffer.from("hello world").toString("base64")
+        data: base64FileData(Buffer.from("hello world").toString("base64"))
       }).pipe(Effect.provide(testLayer))
 
       expect(typeof result.attachmentId).toBe("string")
@@ -404,10 +437,10 @@ describe("addAttachment", () => {
         objectId: docId("parent-1"),
         objectClass: objectClassName("tracker:class:Issue"),
         space: spaceBrandId("space-1"),
-        filename: "test.txt",
+        filename: attachmentFileName("test.txt"),
         contentType: mimeType("text/plain"),
-        data: Buffer.from("hello").toString("base64"),
-        description: "My attachment"
+        data: base64FileData(Buffer.from("hello").toString("base64")),
+        description: attachmentDescription("My attachment")
       }).pipe(Effect.provide(testLayer))
 
       expect(captureAddCollection.attributes?.description).toBe("My attachment")
@@ -423,7 +456,7 @@ describe("addAttachment", () => {
         objectId: docId("parent-1"),
         objectClass: objectClassName("tracker:class:Issue"),
         space: spaceBrandId("space-1"),
-        filename: "test.txt",
+        filename: attachmentFileName("test.txt"),
         contentType: mimeType("text/plain")
       }).pipe(Effect.provide(testLayer), Effect.exit)
 
@@ -444,9 +477,9 @@ describe("addAttachment", () => {
           objectId: docId("parent-1"),
           objectClass: objectClassName("tracker:class:Issue"),
           space: spaceBrandId("space-1"),
-          filename: "test.txt",
+          filename: attachmentFileName("test.txt"),
           contentType: mimeType("text/plain"),
-          fileUrl: "http://localhost/secret.txt"
+          fileUrl: urlString("http://localhost/secret.txt")
         }).pipe(Effect.provide(testLayer))
       )
 
@@ -466,9 +499,9 @@ describe("addAttachment", () => {
           objectId: docId("parent-1"),
           objectClass: objectClassName("tracker:class:Issue"),
           space: spaceBrandId("space-1"),
-          filename: "from-disk.txt",
+          filename: attachmentFileName("from-disk.txt"),
           contentType: mimeType("text/plain"),
-          filePath: tmpFile
+          filePath: localFilePath(tmpFile)
         }).pipe(Effect.provide(testLayer))
 
         expect(result.attachmentId).toBeDefined()
@@ -488,7 +521,7 @@ describe("updateAttachment", () => {
 
       const result = yield* updateAttachment({
         attachmentId: attachmentBrandId("att-1"),
-        description: "Updated description"
+        description: attachmentDescription("Updated description")
       }).pipe(Effect.provide(testLayer))
 
       expect(result.attachmentId).toBe("att-1")
@@ -545,9 +578,10 @@ describe("updateAttachment", () => {
       const testLayer = createTestLayer({})
 
       const error = yield* Effect.flip(
-        updateAttachment({ attachmentId: attachmentBrandId("nonexistent"), description: "x" }).pipe(
-          Effect.provide(testLayer)
-        )
+        updateAttachment({ attachmentId: attachmentBrandId("nonexistent"), description: attachmentDescription("x") })
+          .pipe(
+            Effect.provide(testLayer)
+          )
       )
 
       expect(error._tag).toBe("AttachmentNotFoundError")
@@ -683,9 +717,9 @@ describe("addIssueAttachment", () => {
       const result = yield* addIssueAttachment({
         project: projectIdentifier("TEST"),
         identifier: issueIdentifier("TEST-1"),
-        filename: "screenshot.png",
+        filename: attachmentFileName("screenshot.png"),
         contentType: mimeType("image/png"),
-        data: Buffer.from("fake-png-data").toString("base64")
+        data: base64FileData(Buffer.from("fake-png-data").toString("base64"))
       }).pipe(Effect.provide(testLayer))
 
       expect(typeof result.attachmentId).toBe("string")
@@ -718,9 +752,9 @@ describe("addDocumentAttachment", () => {
       const result = yield* addDocumentAttachment({
         teamspace: teamspaceIdentifier("My Docs"),
         document: documentIdentifier("Test Doc"),
-        filename: "data.csv",
+        filename: attachmentFileName("data.csv"),
         contentType: mimeType("text/csv"),
-        data: Buffer.from("col1,col2\n1,2").toString("base64")
+        data: base64FileData(Buffer.from("col1,col2\n1,2").toString("base64"))
       }).pipe(Effect.provide(testLayer))
 
       expect(typeof result.attachmentId).toBe("string")

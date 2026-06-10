@@ -8,8 +8,15 @@
  */
 /* eslint-disable no-restricted-syntax -- test brand factories: every function here is an intentional type assertion */
 
-// --- Effect Schema brands (src/domain/schemas/shared.ts) ---
+// --- Effect Schema brands (src/domain/schemas/shared.ts and domain-values.ts) ---
 
+import type {
+  AttachmentDescription,
+  AttachmentFileName,
+  Base64FileData,
+  DrawingContent,
+  LocalFilePath
+} from "../../src/domain/schemas/domain-values.js"
 import type { FunnelIdentifier, FunnelReference, LeadIdentifier } from "../../src/domain/schemas/leads.js"
 import type {
   AccountId,
@@ -32,6 +39,7 @@ import type {
   DocId,
   DocumentId,
   DocumentIdentifier,
+  DrawingId,
   Email,
   EmojiCode,
   EventId,
@@ -83,6 +91,7 @@ import type {
   ThreadReplyId,
   TimeSpendReportId,
   TodoId,
+  UrlString,
   WorkspaceUuid
 } from "../../src/domain/schemas/shared.js"
 
@@ -102,6 +111,7 @@ export const messageBrandId = (s: string) => s as MessageId
 export const threadReplyId = (s: string) => s as ThreadReplyId
 export const activityMessageId = (s: string) => s as ActivityMessageId
 export const attachmentBrandId = (s: string) => s as AttachmentId
+export const drawingBrandId = (s: string) => s as DrawingId
 export const blobId = (s: string) => s as BlobId
 export const documentBrandId = (s: string) => s as DocumentId
 export const teamspaceId = (s: string) => s as TeamspaceId
@@ -131,6 +141,12 @@ export const componentLabel = (s: string) => s as ComponentLabel
 export const milestoneLabel = (s: string) => s as MilestoneLabel
 export const channelName = (s: string) => s as ChannelName
 export const mimeType = (s: string) => s as MimeType
+export const attachmentFileName = (s: string) => s as AttachmentFileName
+export const attachmentDescription = (s: string) => s as AttachmentDescription
+export const base64FileData = (s: string) => s as Base64FileData
+export const localFilePath = (s: string) => s as LocalFilePath
+export const drawingContent = (s: string) => s as DrawingContent
+export const urlString = (s: string) => s as UrlString
 export const objectClassName = (s: string) => s as ObjectClassName
 export const emojiCode = (s: string) => s as EmojiCode
 export const contactProvider = (s: string) => s as ContactProvider

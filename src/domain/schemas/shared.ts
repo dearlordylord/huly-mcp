@@ -3,6 +3,7 @@ import { JSONSchema, Schema } from "effect"
 export const MAX_LIMIT = 200
 export const DEFAULT_LIMIT = 50
 export const DEFAULT_COLOR_INDEX = 0
+export const MAX_COLOR_INDEX = 23
 export const DEFAULT_INCLUDE_ARCHIVED = false
 export const DEFAULT_PRIVATE = false
 
@@ -72,6 +73,9 @@ export const hasAtLeastOneDefined = <K extends string>(
   params: { readonly [P in K]?: unknown },
   fields: ReadonlyArray<K>
 ): boolean => fields.some((field) => params[field] !== undefined)
+
+export const hasAllDefined = (...values: ReadonlyArray<unknown>): boolean =>
+  values.every((value) => value !== undefined)
 
 export const atLeastOneUpdateFieldMessage = (fields: ReadonlyArray<string>): string =>
   `At least one update field must be provided: ${fields.join(", ")}.`
@@ -187,8 +191,20 @@ export type SavedMessageId = Schema.Schema.Type<typeof SavedMessageId>
 export const MentionId = HulyRef("MentionId")
 export type MentionId = Schema.Schema.Type<typeof MentionId>
 
+export const ActivityReferenceId = HulyRef("ActivityReferenceId")
+export type ActivityReferenceId = Schema.Schema.Type<typeof ActivityReferenceId>
+
+export const ActivityFilterId = HulyRef("ActivityFilterId")
+export type ActivityFilterId = Schema.Schema.Type<typeof ActivityFilterId>
+
 export const AttachmentId = HulyRef("AttachmentId")
 export type AttachmentId = Schema.Schema.Type<typeof AttachmentId>
+
+export const SavedAttachmentId = HulyRef("SavedAttachmentId")
+export type SavedAttachmentId = Schema.Schema.Type<typeof SavedAttachmentId>
+
+export const DrawingId = HulyRef("DrawingId")
+export type DrawingId = Schema.Schema.Type<typeof DrawingId>
 
 export const BlobId = HulyRef("BlobId")
 export type BlobId = Schema.Schema.Type<typeof BlobId>
@@ -381,6 +397,12 @@ export type NotificationProviderId = Schema.Schema.Type<typeof NotificationProvi
 export const NotificationTypeId = NonEmptyString.pipe(Schema.brand("NotificationTypeId"))
 export type NotificationTypeId = Schema.Schema.Type<typeof NotificationTypeId>
 
+export const NotificationTypeSettingId = HulyRef("NotificationTypeSettingId")
+export type NotificationTypeSettingId = Schema.Schema.Type<typeof NotificationTypeSettingId>
+
+export const CollaboratorId = HulyRef("CollaboratorId")
+export type CollaboratorId = Schema.Schema.Type<typeof CollaboratorId>
+
 export const WorkspaceName = NonEmptyString.pipe(Schema.brand("WorkspaceName"))
 export type WorkspaceName = Schema.Schema.Type<typeof WorkspaceName>
 
@@ -483,10 +505,11 @@ export type MinuteOfDay = Schema.Schema.Type<typeof MinuteOfDay>
 export const ColorCode = Schema.Number.pipe(
   Schema.int(),
   Schema.greaterThanOrEqualTo(0),
+  Schema.lessThanOrEqualTo(MAX_COLOR_INDEX),
   Schema.brand("ColorCode")
 ).annotations({
   title: "ColorCode",
-  description: "Non-negative Huly platform color index. Huly SDK stores tag colors as numbers."
+  description: `Huly platform color palette index, from 0 through ${MAX_COLOR_INDEX}.`
 })
 export type ColorCode = Schema.Schema.Type<typeof ColorCode>
 

@@ -9,7 +9,6 @@ import { generateId, SortingOrder } from "@hcengineering/core"
 import { Effect } from "effect"
 
 import {
-  ActivityCount,
   type ActivityMessage,
   type AddReactionParams,
   type AddReactionResult,
@@ -27,6 +26,7 @@ import {
   type UnsaveMessageParams,
   type UnsaveMessageResult
 } from "../../domain/schemas/activity.js"
+import { MentionContent } from "../../domain/schemas/domain-values.js"
 import {
   ActivityMessageId,
   DocId,
@@ -35,8 +35,7 @@ import {
   ObjectClassName,
   PersonId,
   ReactionId,
-  SavedMessageId,
-  Timestamp
+  SavedMessageId
 } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type {
@@ -47,6 +46,7 @@ import type {
   TeamspaceNotFoundError
 } from "../errors.js"
 import { ActivityMessageNotFoundError, ReactionNotFoundError, SavedMessageNotFoundError } from "../errors.js"
+import { toActivityMessage } from "./activity-shared.js"
 import { findChannel } from "./channels.js"
 import { findTeamspaceAndDocument } from "./documents.js"
 import { findProjectAndIssue } from "./issues-shared.js"
@@ -76,12 +76,6 @@ type UnsaveMessageError = HulyClientError | SavedMessageNotFoundError
 type ListSavedMessagesError = HulyClientError
 
 type ListMentionsError = HulyClientError
-
-const optionalNullableTimestamp = (value: number | null | undefined): Timestamp | null | undefined =>
-  value === undefined || value === null ? value : Timestamp.make(value)
-
-const optionalActivityCount = (value: number | undefined): ActivityCount | undefined =>
-  value === undefined ? undefined : ActivityCount.make(value)
 
 const optionalPersonId = (value: string | undefined): PersonId | undefined =>
   value === undefined || value === "" ? undefined : PersonId.make(value)
@@ -168,18 +162,7 @@ export const listActivity = (
       }
     )
 
-    const result: Array<ActivityMessage> = messages.map((msg) => ({
-      id: ActivityMessageId.make(msg._id),
-      objectId: DocId.make(msg.attachedTo),
-      objectClass: ObjectClassName.make(msg.attachedToClass),
-      modifiedBy: PersonId.make(msg.modifiedBy),
-      // Doc.modifiedOn is always present, so no optional handling is needed.
-      modifiedOn: Timestamp.make(msg.modifiedOn),
-      isPinned: msg.isPinned,
-      replies: optionalActivityCount(msg.replies),
-      reactions: optionalActivityCount(msg.reactions),
-      editedOn: optionalNullableTimestamp(msg.editedOn)
-    }))
+    const result: Array<ActivityMessage> = messages.map((msg) => toActivityMessage(msg, target.client.markupUrlConfig))
 
     return result
   })
@@ -401,7 +384,7 @@ export const listMentions = (
       id: MentionId.make(m._id),
       messageId: ActivityMessageId.make(m.attachedTo),
       userId: PersonId.make(m.user),
-      content: m.content
+      content: MentionContent.make(m.content)
     }))
 
     return result

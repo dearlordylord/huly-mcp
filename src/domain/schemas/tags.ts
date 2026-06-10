@@ -12,6 +12,7 @@ import {
   DocId,
   hasAtLeastOneDefined,
   LimitParam,
+  MAX_COLOR_INDEX,
   NonEmptyString,
   ObjectClassName,
   SpaceId,
@@ -121,7 +122,8 @@ export const CreateTagParamsSchema = Schema.Struct({
   }),
   color: Schema.optional(
     ColorCode.annotations({
-      description: `Non-negative Huly platform color index (default: ${DEFAULT_COLOR_INDEX}).`
+      description:
+        `Huly platform color palette index from 0 through ${MAX_COLOR_INDEX} (default: ${DEFAULT_COLOR_INDEX}).`
     })
   ),
   description: Schema.optional(Schema.String.annotations({
@@ -145,7 +147,7 @@ const updateTagFields = {
   })),
   color: Schema.optional(
     ColorCode.annotations({
-      description: "New non-negative Huly platform color index."
+      description: `New Huly platform color palette index from 0 through ${MAX_COLOR_INDEX}.`
     })
   ),
   description: Schema.optional(clearableText("New tag description.")),
@@ -206,7 +208,7 @@ export const AttachTagParamsSchema = Schema.Struct({
   color: Schema.optional(
     ColorCode.annotations({
       description:
-        `Non-negative Huly platform color index for a newly created tag definition (default: ${DEFAULT_COLOR_INDEX}). Ignored when the tag already exists.`
+        `Huly platform color palette index from 0 through ${MAX_COLOR_INDEX} for a newly created tag definition (default: ${DEFAULT_COLOR_INDEX}). Ignored when the tag already exists.`
     })
   ),
   category: Schema.optional(

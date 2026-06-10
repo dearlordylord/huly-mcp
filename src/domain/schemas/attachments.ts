@@ -1,5 +1,13 @@
 import { JSONSchema, Schema } from "effect"
 
+import {
+  AttachmentByteSize,
+  AttachmentDescription,
+  AttachmentFileName,
+  AttachmentMetadataKey,
+  Base64FileData,
+  LocalFilePath
+} from "./domain-values.js"
 import type { BlobId } from "./shared.js"
 import {
   assertUpdateFields,
@@ -12,38 +20,55 @@ import {
   IssueIdentifier,
   LimitParam,
   MimeType,
-  NonEmptyString,
   ObjectClassName,
   ProjectIdentifier,
   SpaceId,
   TeamspaceIdentifier,
+  Timestamp,
+  UrlString,
   withAtLeastOneRequired
 } from "./shared.js"
 
 const DEFAULT_ATTACHMENT_PINNED = false
 
+export const AttachmentKindSchema = Schema.Literal("attachment", "embedding", "photo").annotations({
+  title: "AttachmentKind",
+  description: "Attachment class to create: attachment, embedding, or photo. Defaults to attachment."
+})
+
+export type AttachmentKind = Schema.Schema.Type<typeof AttachmentKindSchema>
+
+// Attachment metadata is an open SDK-provided record. Keys are branded as open
+// SDK metadata keys; values remain unknown because Huly does not publish a
+// stable typed value space for this bag.
+const AttachmentMetadataSchema = Schema.Record({ key: AttachmentMetadataKey, value: Schema.Unknown })
+
 // No codec needed — internal type, not used for runtime validation
 export interface AttachmentSummary {
   readonly id: AttachmentId
-  readonly name: string
-  readonly type: string
-  readonly size: number
+  readonly class: ObjectClassName
+  readonly name: AttachmentFileName
+  readonly type: MimeType
+  readonly size: AttachmentByteSize
   readonly pinned?: boolean | undefined
-  readonly description?: string | undefined
-  readonly modifiedOn?: number | undefined
+  readonly description?: AttachmentDescription | undefined
+  readonly metadata?: Readonly<Record<string, unknown>> | undefined
+  readonly modifiedOn?: Timestamp | undefined
 }
 
 export interface Attachment {
   readonly id: AttachmentId
-  readonly name: string
-  readonly type: string
-  readonly size: number
+  readonly class: ObjectClassName
+  readonly name: AttachmentFileName
+  readonly type: MimeType
+  readonly size: AttachmentByteSize
   readonly pinned?: boolean | undefined
   readonly readonly?: boolean | undefined
-  readonly description?: string | undefined
-  readonly url?: string | undefined
-  readonly modifiedOn?: number | undefined
-  readonly createdOn?: number | undefined
+  readonly description?: AttachmentDescription | undefined
+  readonly metadata?: Readonly<Record<string, unknown>> | undefined
+  readonly url?: UrlString | undefined
+  readonly modifiedOn?: Timestamp | undefined
+  readonly createdOn?: Timestamp | undefined
 }
 
 export const ListAttachmentsParamsSchema = Schema.Struct({
@@ -77,33 +102,36 @@ export const GetAttachmentParamsSchema = Schema.Struct({
 export type GetAttachmentParams = Schema.Schema.Type<typeof GetAttachmentParamsSchema>
 
 const FileSourceFields = {
-  filename: NonEmptyString.annotations({
+  filename: AttachmentFileName.annotations({
     description: "Name of the file"
   }),
   contentType: MimeType.annotations({
     description: "MIME type of the file (e.g., 'image/png', 'application/pdf')"
   }),
-  filePath: Schema.optional(Schema.String.annotations({
+  filePath: Schema.optional(LocalFilePath.annotations({
     description: "Local file path to upload (preferred - avoids context flooding)"
   })),
-  fileUrl: Schema.optional(Schema.String.annotations({
+  fileUrl: Schema.optional(UrlString.annotations({
     description: "URL to fetch file from (for remote files)"
   })),
-  data: Schema.optional(Schema.String.annotations({
+  data: Schema.optional(Base64FileData.annotations({
     description: "Base64-encoded file data (fallback for small files <10KB)"
   })),
-  description: Schema.optional(Schema.String.annotations({
+  description: Schema.optional(AttachmentDescription.annotations({
     description: "Attachment description"
   })),
   pinned: Schema.optional(Schema.Boolean.annotations({
     description: `Whether to pin the attachment (default: ${DEFAULT_ATTACHMENT_PINNED})`
+  })),
+  kind: Schema.optional(AttachmentKindSchema.annotations({
+    description: "Attachment subclass to create: attachment, embedding, or photo (default: attachment)."
   }))
 }
 
 const hasFileSource = (params: {
-  readonly filePath?: string | undefined
-  readonly fileUrl?: string | undefined
-  readonly data?: string | undefined
+  readonly filePath?: LocalFilePath | undefined
+  readonly fileUrl?: UrlString | undefined
+  readonly data?: Base64FileData | undefined
 }) => {
   const hasSource = params.filePath || params.fileUrl || params.data
   return hasSource ? true : "Must provide filePath, fileUrl, or data"
@@ -140,7 +168,7 @@ export const UpdateAttachmentParamsSchema = Schema.Struct({
     description: "Attachment ID"
   }),
   description: Schema.optional(
-    Schema.NullOr(Schema.String).annotations({
+    Schema.NullOr(AttachmentDescription).annotations({
       description: "New description (null to clear)"
     })
   ),
@@ -262,7 +290,7 @@ export const parseAddDocumentAttachmentParams = Schema.decodeUnknown(AddDocument
 export interface AddAttachmentResult {
   readonly attachmentId: AttachmentId
   readonly blobId: BlobId
-  readonly url: string
+  readonly url: UrlString
 }
 
 export interface UpdateAttachmentResult {
@@ -282,8 +310,38 @@ export interface PinAttachmentResult {
 
 export interface DownloadAttachmentResult {
   readonly attachmentId: AttachmentId
-  readonly url: string
-  readonly name: string
-  readonly type: string
-  readonly size: number
+  readonly url: UrlString
+  readonly name: AttachmentFileName
+  readonly type: MimeType
+  readonly size: AttachmentByteSize
 }
+
+export const AttachmentSummaryWireSchema = Schema.Struct({
+  id: AttachmentId,
+  class: ObjectClassName,
+  name: AttachmentFileName,
+  type: MimeType,
+  size: AttachmentByteSize,
+  pinned: Schema.optional(Schema.Boolean),
+  description: Schema.optional(AttachmentDescription),
+  metadata: Schema.optional(AttachmentMetadataSchema),
+  modifiedOn: Schema.optional(Timestamp)
+})
+
+export const AttachmentWireSchema = Schema.Struct({
+  id: AttachmentId,
+  class: ObjectClassName,
+  name: AttachmentFileName,
+  type: MimeType,
+  size: AttachmentByteSize,
+  pinned: Schema.optional(Schema.Boolean),
+  readonly: Schema.optional(Schema.Boolean),
+  description: Schema.optional(AttachmentDescription),
+  metadata: Schema.optional(AttachmentMetadataSchema),
+  url: Schema.optional(UrlString),
+  modifiedOn: Schema.optional(Timestamp),
+  createdOn: Schema.optional(Timestamp)
+})
+
+export const ListAttachmentsResultSchema = Schema.Array(AttachmentSummaryWireSchema)
+export const GetAttachmentResultSchema = AttachmentWireSchema

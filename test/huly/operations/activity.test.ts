@@ -430,6 +430,7 @@ describe("listActivity", () => {
 
       expect(result[0]).toEqual({
         id: "msg-1",
+        messageClass: "activity:class:ActivityMessage",
         objectId: "obj-1",
         objectClass: "tracker:class:Issue",
         modifiedBy: "person-x",

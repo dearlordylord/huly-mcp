@@ -18,9 +18,10 @@ import type {
   Notification,
   NotificationProviderSetting,
   NotificationSummary,
-  UpdateNotificationProviderSettingParams
-} from "../../domain/schemas.js"
-import type { UnreadCountResult, UpdateNotificationProviderSettingResult } from "../../domain/schemas/notifications.js"
+  UnreadCountResult,
+  UpdateNotificationProviderSettingParams,
+  UpdateNotificationProviderSettingResult
+} from "../../domain/schemas/notifications.js"
 import {
   DocId,
   NotificationContextId,
@@ -29,6 +30,7 @@ import {
   ObjectClassName
 } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
+import { notification } from "../huly-plugins.js"
 import { listTotal } from "./counts.js"
 import {
   findNotification,
@@ -44,8 +46,6 @@ import {
 import { clampLimit, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
-import { notification } from "../huly-plugins.js"
-
 export {
   archiveAllNotifications,
   archiveNotification,
@@ -58,8 +58,6 @@ export {
   unarchiveNotification
 } from "./notifications-state.js"
 
-// --- Operations ---
-
 /**
  * List inbox notifications.
  * Results sorted by modification date descending (newest first).
@@ -69,26 +67,20 @@ export const listNotifications = (
 ): Effect.Effect<Array<NotificationSummary>, ListNotificationsError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-
     const query: StrictDocumentQuery<HulyInboxNotification> = {
       ...(params.includeArchived ? {} : { archived: false }),
       ...(params.unreadOnly ? { isViewed: false } : {})
     }
-
-    const limit = clampLimit(params.limit)
-
     const notifications = yield* client.findAll<HulyInboxNotification>(
       notification.class.InboxNotification,
       hulyQuery<HulyInboxNotification>(query),
       {
-        limit,
-        sort: {
-          modifiedOn: SortingOrder.Descending
-        }
+        limit: clampLimit(params.limit),
+        sort: { modifiedOn: SortingOrder.Descending }
       }
     )
 
-    const summaries: Array<NotificationSummary> = notifications.map((n) => ({
+    return notifications.map((n) => ({
       id: NotificationId.make(n._id),
       isViewed: n.isViewed,
       archived: n.archived,
@@ -99,8 +91,6 @@ export const listNotifications = (
       createdOn: n.createdOn,
       modifiedOn: n.modifiedOn
     }))
-
-    return summaries
   })
 
 /**
@@ -112,7 +102,7 @@ export const getNotification = (
   Effect.gen(function*() {
     const { notification: notif } = yield* findNotification(params.notificationId)
 
-    const result: Notification = {
+    return {
       id: NotificationId.make(notif._id),
       isViewed: notif.isViewed,
       archived: notif.archived,
@@ -125,8 +115,6 @@ export const getNotification = (
       createdOn: notif.createdOn,
       modifiedOn: notif.modifiedOn
     }
-
-    return result
   })
 
 /**
@@ -137,20 +125,15 @@ export const getNotificationContext = (
 ): Effect.Effect<DocNotifyContextSummary | null, GetNotificationContextError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-
     const ctx = yield* client.findOne<HulyDocNotifyContext>(
       notification.class.DocNotifyContext,
-      {
+      hulyQuery<HulyDocNotifyContext>({
         objectId: toRef<Doc>(params.objectId),
         objectClass: toRef<Class<Doc>>(params.objectClass)
-      }
+      })
     )
 
-    if (ctx === undefined) {
-      return null
-    }
-
-    return toDocNotifyContextSummary(ctx)
+    return ctx === undefined ? null : toDocNotifyContextSummary(ctx)
   })
 
 /**
@@ -162,22 +145,16 @@ export const listNotificationContexts = (
 ): Effect.Effect<Array<DocNotifyContextSummary>, ListNotificationContextsError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-
     const query: StrictDocumentQuery<HulyDocNotifyContext> = {
       ...(params.includeHidden ? {} : { hidden: false }),
       ...(params.pinnedOnly ? { isPinned: true } : {})
     }
-
-    const limit = clampLimit(params.limit)
-
     const contexts = yield* client.findAll<HulyDocNotifyContext>(
       notification.class.DocNotifyContext,
       hulyQuery<HulyDocNotifyContext>(query),
       {
-        limit,
-        sort: {
-          lastUpdateTimestamp: SortingOrder.Descending
-        }
+        limit: clampLimit(params.limit),
+        sort: { lastUpdateTimestamp: SortingOrder.Descending }
       }
     )
 
@@ -192,22 +169,17 @@ export const listNotificationSettings = (
 ): Effect.Effect<Array<NotificationProviderSetting>, ListNotificationSettingsError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-
-    const limit = clampLimit(params.limit)
-
     const settings = yield* client.findAll<HulyNotificationProviderSetting>(
       notification.class.NotificationProviderSetting,
-      {},
-      { limit }
+      hulyQuery<HulyNotificationProviderSetting>({}),
+      { limit: clampLimit(params.limit) }
     )
 
-    const summaries: Array<NotificationProviderSetting> = settings.map((s) => ({
+    return settings.map((s) => ({
       id: s._id,
       providerId: NotificationProviderId.make(s.attachedTo),
       enabled: s.enabled
     }))
-
-    return summaries
   })
 
 /**
@@ -218,10 +190,9 @@ export const updateNotificationProviderSetting = (
 ): Effect.Effect<UpdateNotificationProviderSettingResult, UpdateNotificationProviderSettingError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-
     const existingSetting = yield* client.findOne<HulyNotificationProviderSetting>(
       notification.class.NotificationProviderSetting,
-      { attachedTo: toRef<NotificationProvider>(params.providerId) }
+      hulyQuery<HulyNotificationProviderSetting>({ attachedTo: toRef<NotificationProvider>(params.providerId) })
     )
 
     if (existingSetting !== undefined) {
@@ -239,8 +210,6 @@ export const updateNotificationProviderSetting = (
       return { providerId: NotificationProviderId.make(params.providerId), enabled: params.enabled, updated: true }
     }
 
-    // Setting doesn't exist, we can't create it without a proper space
-    // Return not updated since we can't modify what doesn't exist
     return { providerId: params.providerId, enabled: params.enabled, updated: false }
   })
 
@@ -250,10 +219,6 @@ export const updateNotificationProviderSetting = (
 export const getUnreadNotificationCount = (): Effect.Effect<UnreadCountResult, HulyClientError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-
     const unreadNotifications = yield* findUnreadActiveNotifications(client, 1)
-
-    const count = unreadNotifications.total
-
-    return { count: listTotal(count) }
+    return { count: listTotal(unreadNotifications.total) }
   })

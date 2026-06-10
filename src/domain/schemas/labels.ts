@@ -9,6 +9,7 @@ import {
   DEFAULT_LIMIT,
   hasAtLeastOneDefined,
   LimitParam,
+  MAX_COLOR_INDEX,
   NonEmptyString,
   TagCategoryIdentifier,
   TagElementId,
@@ -52,7 +53,8 @@ export const CreateLabelParamsSchema = Schema.Struct({
   }),
   color: Schema.optional(
     ColorCode.annotations({
-      description: `Non-negative Huly platform color index (default: ${DEFAULT_COLOR_INDEX})`
+      description:
+        `Huly platform color palette index from 0 through ${MAX_COLOR_INDEX} (default: ${DEFAULT_COLOR_INDEX})`
     })
   ),
   description: Schema.optional(Schema.String.annotations({
@@ -83,7 +85,7 @@ export const UpdateLabelParamsSchema = Schema.Struct({
   })),
   color: Schema.optional(
     ColorCode.annotations({
-      description: "New non-negative Huly platform color index"
+      description: `New Huly platform color palette index from 0 through ${MAX_COLOR_INDEX}`
     })
   ),
   description: Schema.optional(clearableText("New label description."))

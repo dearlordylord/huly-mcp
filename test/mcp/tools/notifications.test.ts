@@ -59,7 +59,14 @@ describe("notificationTools", () => {
         "hide_notification_context",
         "list_notification_settings",
         "update_notification_provider_setting",
-        "get_unread_notification_count"
+        "get_unread_notification_count",
+        "list_notification_providers",
+        "list_notification_types",
+        "update_notification_type_setting",
+        "archive_notification_context",
+        "unarchive_notification_context",
+        "subscribe_to_object_notifications",
+        "unsubscribe_from_object_notifications"
       ]
 
       const toolNames = notificationTools.map((t) => t.name)

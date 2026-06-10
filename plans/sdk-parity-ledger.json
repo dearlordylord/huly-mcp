@@ -83,8 +83,13 @@
       "package": "@hcengineering/activity",
       "status": "covered",
       "matrixLocation": "Activity gaps",
-      "rationale": "Current activity tools expose reactions, saved messages, and mentions as first-class MCP operations.",
+      "rationale": "Current activity tools expose activity list/get/pin, generic replies, references, filters, reactions, saved messages, and mentions as first-class MCP operations.",
       "exports": [
+        "ActivityInfoMessage",
+        "ActivityMessage",
+        "ActivityMessagesFilter",
+        "ActivityReference",
+        "DocUpdateMessage",
         "Reaction",
         "SavedMessage",
         "UserMentionInfo"
@@ -92,21 +97,16 @@
     },
     {
       "package": "@hcengineering/activity",
-      "status": "gap",
+      "status": "not-mcp-facing",
       "matrixLocation": "Activity gaps",
-      "rationale": "Activity model/configuration exports are only partially exposed; pinning, generic replies, filters, references, and update-message introspection remain matrix gaps.",
+      "rationale": "Remaining activity exports are presenters, viewlets, extension/provider metadata, controls for server-generated activity filtering, or mixin metadata rather than first-class LLM-facing resources.",
       "exports": [
         "ActivityAttributeUpdatesPresenter",
         "ActivityDoc",
         "ActivityExtension",
-        "ActivityInfoMessage",
-        "ActivityMessage",
         "ActivityMessageControl",
         "ActivityMessagePreview",
         "ActivityMessageViewlet",
-        "ActivityMessagesFilter",
-        "ActivityReference",
-        "DocUpdateMessage",
         "DocUpdateMessageViewlet",
         "IgnoreActivity",
         "ReplyProvider"
@@ -116,17 +116,9 @@
       "package": "@hcengineering/attachment",
       "status": "covered",
       "matrixLocation": "Attachments gaps",
-      "rationale": "Generic attachment CRUD/download/pin and issue/document convenience attachment tools cover the base Attachment model.",
+      "rationale": "Generic attachment CRUD/download/pin, class-selecting upload for Attachment/Embedding/Photo, saved attachments, drawing CRUD, and issue/document convenience attachment tools cover the safe attachment models.",
       "exports": [
-        "Attachment"
-      ]
-    },
-    {
-      "package": "@hcengineering/attachment",
-      "status": "gap",
-      "matrixLocation": "Attachments gaps",
-      "rationale": "Class-specific attachment/media preferences and subclasses are represented in the matrix but not yet first-class tools.",
-      "exports": [
+        "Attachment",
         "Drawing",
         "Embedding",
         "Photo",
@@ -290,14 +282,22 @@
     },
     {
       "package": "@hcengineering/core",
+      "status": "covered",
+      "matrixLocation": "Inbox / notification gaps",
+      "rationale": "Generic collaborator tools list/add/remove core.class.Collaborator rows for arbitrary issue/document/raw object notification subscriptions.",
+      "exports": [
+        "Collaborator"
+      ]
+    },
+    {
+      "package": "@hcengineering/core",
       "status": "gap",
       "matrixLocation": "Core classes, attributes, enums; Core spaces, permissions, roles",
-      "rationale": "Remaining core schema/configuration, role assignment writes, role/permission definition writes, generic space creation, collaborators, sequences, statuses, and write-side model management are represented as matrix gaps. Generic space discovery, space type/permission reads, safe existing-space metadata updates, member mutations, and owner replacement are covered by the spaces toolset.",
+      "rationale": "Remaining core schema/configuration, role assignment writes, role/permission definition writes, generic space creation, class collaborator metadata, sequences, statuses, and write-side model management are represented as matrix gaps. Generic space discovery, space type/permission reads, safe existing-space metadata updates, member mutations, owner replacement, and object collaborators are covered.",
       "exports": [
         "AttributePermission",
         "ClassCollaborators",
         "ClassPermission",
-        "Collaborator",
         "Configuration",
         "ConfigurationElement",
         "CustomSequence",
@@ -397,30 +397,30 @@
       "package": "@hcengineering/notification",
       "status": "covered",
       "matrixLocation": "Inbox / notification gaps",
-      "rationale": "Current notification tools cover listing/getting/read/unread/archive/unarchive/delete flows for notifications plus list/get/pin/hide context flows.",
+      "rationale": "Current notification tools cover inbox notifications, doc notify contexts including context archive/unarchive, notification providers/types/settings, and current-account object subscribe/unsubscribe. Generic collaborator tools cover the underlying core collaborator rows.",
       "exports": [
         "ActivityInboxNotification",
         "CommonInboxNotification",
         "DocNotifyContext",
         "InboxNotification",
-        "MentionInboxNotification"
+        "MentionInboxNotification",
+        "Collaborators",
+        "NotificationProvider",
+        "NotificationProviderSetting",
+        "NotificationType",
+        "NotificationTypeSetting"
       ]
     },
     {
       "package": "@hcengineering/notification",
-      "status": "gap",
+      "status": "not-mcp-facing",
       "matrixLocation": "Inbox / notification gaps",
-      "rationale": "Provider defaults, type settings, preferences, collaborators, push/browser records, and mute/unsubscribe behavior remain matrix gaps.",
+      "rationale": "Browser/push records, provider defaults, group/preference UI metadata, and the legacy collaborator array are UI/client preference plumbing or superseded by core.class.Collaborator tools.",
       "exports": [
         "BrowserNotification",
-        "Collaborators",
         "NotificationGroup",
         "NotificationPreferencesGroup",
-        "NotificationProvider",
         "NotificationProviderDefaults",
-        "NotificationProviderSetting",
-        "NotificationType",
-        "NotificationTypeSetting",
         "OldCollaborators",
         "PushSubscription"
       ]

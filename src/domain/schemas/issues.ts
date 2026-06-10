@@ -16,6 +16,7 @@ import {
   IssueId,
   IssueIdentifier,
   LimitParam,
+  MAX_COLOR_INDEX,
   NonEmptyString,
   PersonId,
   PersonName,
@@ -340,7 +341,8 @@ export const AddLabelParamsSchema = Schema.Struct({
   }),
   color: Schema.optional(
     ColorCode.annotations({
-      description: `Non-negative Huly platform color index (default: ${DEFAULT_COLOR_INDEX})`
+      description:
+        `Huly platform color palette index from 0 through ${MAX_COLOR_INDEX} (default: ${DEFAULT_COLOR_INDEX})`
     })
   )
 }).annotations({

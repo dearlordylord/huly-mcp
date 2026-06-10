@@ -13,6 +13,7 @@ import type { TagCategory as HulyTagCategory, TagElement as HulyTagElement, TagR
 import { Effect } from "effect"
 import { expect } from "vitest"
 
+import { MAX_COLOR_INDEX } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { tags, tracker } from "../../../src/huly/huly-plugins.js"
 import { toRef } from "../../../src/huly/operations/sdk-boundary.js"
@@ -42,6 +43,10 @@ const TARGET_CLASS = objectClassName("tracker:class:Issue")
 describe("normalizeColorCode", () => {
   it("normalizes non-finite colors to zero", () => {
     expect(normalizeColorCode(Infinity)).toBe(0)
+  })
+
+  it("clamps colors to the Huly palette range", () => {
+    expect(normalizeColorCode(MAX_COLOR_INDEX + 1)).toBe(MAX_COLOR_INDEX)
   })
 })
 
