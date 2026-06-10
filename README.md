@@ -296,7 +296,7 @@ Planned feature surfaces:
 - Team planner and schedule reporting: team agendas, workload/capacity summaries, and visibility-aware free/busy views across members/projects.
 - Virtual office and meetings: offices, floors, rooms, access/language/default recording/transcription settings, meeting schedules, active participants, room info, meeting notes/transcript records (minutes), recordings, and device preferences.
 - Chat and communication: direct-message send/update/delete, group DMs, channel member mutations, join/leave/request access, archive/unarchive, star/favorite channels, close/reopen conversations, pinned messages, message attachments, translation, applets, in-message polls, and guest communication settings.
-- Notifications and activity: mark unread, unarchive, hide/unhide/mute contexts, unsubscribe per context/type, notification type settings, collaborators, pin/unpin activity messages, generic activity replies, filters, references, mentions, and update-message introspection.
+- Notifications and activity: mute contexts, unsubscribe per context/type, notification type settings, collaborators, pin/unpin activity messages, generic activity replies, filters, references, mentions, and update-message introspection.
 - Attachments and media: saved attachments, photos, drawings, embeddings, previews/preview metadata, and friendly wrappers for additional object types.
 - Core schema and workspace administration: attribute/property create/update/delete/hide, enum CRUD/options, sequence management, role assignment mutations, role/permission definition writes, generic space creation, global space admins, integrations registry, invite settings, role capability settings, and workspace setting metadata.
 - Integrations: GitHub repository/project mappings and sync metadata, Google Calendar connect/configure/sync controls, Bitrix entity/field mappings and sync status, Gmail/email channel messages, Telegram messages, Huly Mail/Mail plugin behavior, AI assistant integration state, and AI bot configuration if server-side APIs expose stable behavior.
@@ -537,14 +537,17 @@ SDK upgrade revisit:
 |------|-------------|
 | `list_notifications` | List inbox notifications. Returns notifications sorted by modification date (newest first). Supports filtering by read/archived status. |
 | `get_notification` | Retrieve full details for a notification. Use this to view notification content and metadata. |
-| `mark_notification_read` | Mark a notification as read. |
+| `mark_notification_read` | Mark a notification as read. Idempotent: returns success when the notification is already read. |
+| `mark_notification_unread` | Mark a notification as unread. Idempotent: returns success when the notification is already unread. |
 | `mark_all_notifications_read` | Mark all unread notifications as read. Returns the count of notifications marked. |
-| `archive_notification` | Archive a notification. Archived notifications are hidden from the main inbox view. |
+| `archive_notification` | Archive a notification. Archived notifications are hidden from the main inbox view. Idempotent when already archived. |
+| `unarchive_notification` | Unarchive a notification so it can appear in active notification lists again. Idempotent when already active. |
 | `archive_all_notifications` | Archive all notifications. Returns the count of notifications archived. |
 | `delete_notification` | Permanently delete a notification. This action cannot be undone. |
 | `get_notification_context` | Get notification context for an entity. Returns tracking information for a specific object. |
-| `list_notification_contexts` | List notification contexts. Returns contexts sorted by last update timestamp (newest first). Supports filtering by pinned status. |
-| `pin_notification_context` | Pin or unpin a notification context. Pinned contexts are highlighted in the inbox. |
+| `list_notification_contexts` | List notification contexts. Returns contexts sorted by last update timestamp (newest first). Supports filtering by pinned status and can include hidden contexts. |
+| `pin_notification_context` | Pin or unpin a notification context. Pinned contexts are highlighted in the inbox. Idempotent when the pin state already matches. |
+| `hide_notification_context` | Hide or unhide a notification context. Hidden contexts are omitted from list_notification_contexts unless includeHidden is true. Idempotent when the hidden state already matches. |
 | `list_notification_settings` | List notification provider settings. Returns current notification preferences. |
 | `update_notification_provider_setting` | Update notification provider setting. Enable or disable notifications for a specific provider. |
 | `get_unread_notification_count` | Get the count of unread notifications. |

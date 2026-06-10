@@ -397,7 +397,7 @@
       "package": "@hcengineering/notification",
       "status": "covered",
       "matrixLocation": "Inbox / notification gaps",
-      "rationale": "Current notification tools cover listing/getting/read/archive/delete flows for notifications and contexts.",
+      "rationale": "Current notification tools cover listing/getting/read/unread/archive/unarchive/delete flows for notifications plus list/get/pin/hide context flows.",
       "exports": [
         "ActivityInboxNotification",
         "CommonInboxNotification",
@@ -410,7 +410,7 @@
       "package": "@hcengineering/notification",
       "status": "gap",
       "matrixLocation": "Inbox / notification gaps",
-      "rationale": "Provider settings, type settings, defaults, preferences, collaborators, push/browser records, and hidden/mute/unsubscribe behavior remain matrix gaps.",
+      "rationale": "Provider defaults, type settings, preferences, collaborators, push/browser records, and mute/unsubscribe behavior remain matrix gaps.",
       "exports": [
         "BrowserNotification",
         "Collaborators",

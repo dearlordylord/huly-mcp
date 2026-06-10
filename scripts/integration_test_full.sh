@@ -1987,35 +1987,100 @@ run_test "get_unread_notification_count" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_unread_notification_count","arguments":{}},"id":2}'
 run_test "list_notification_contexts" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_notification_contexts","arguments":{"limit":3}},"id":2}'
+run_test "list_notification_contexts(includeHidden)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_notification_contexts","arguments":{"limit":3,"includeHidden":true}},"id":2}'
 run_test "list_notification_settings" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_notification_settings","arguments":{}},"id":2}'
-# mark_notification_read, mark_all_notifications_read, archive_notification, archive_all_notifications
-# pin_notification_context, get_notification, get_notification_context, delete_notification
+# mark_all_notifications_read, archive_all_notifications, delete_notification,
 # update_notification_provider_setting — all require existing notifications, skipped if none
 NOTIF_TEXT=$(run_capture_only \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_notifications","arguments":{"limit":1}},"id":2}')
 NOTIF_ID=$(echo "$NOTIF_TEXT" | jq -r '.notifications[0].id // empty' 2>/dev/null)
 if [ -n "$NOTIF_ID" ]; then
-  run_test "get_notification($NOTIF_ID)" \
+  GET_NOTIF_TEXT=$(run_capture "get_notification($NOTIF_ID)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_notification\",\"arguments\":{\"notificationId\":\"$NOTIF_ID\"}},\"id\":2}"
+  )
+  ORIGINAL_VIEWED=$(echo "$GET_NOTIF_TEXT" | jq -r '.isViewed // empty' 2>/dev/null)
+  DOC_CONTEXT_ID=$(echo "$GET_NOTIF_TEXT" | jq -r '.docNotifyContextId // empty' 2>/dev/null)
+  NOTIF_OBJECT_ID=$(echo "$GET_NOTIF_TEXT" | jq -r '.objectId // empty' 2>/dev/null)
+  NOTIF_OBJECT_CLASS=$(echo "$GET_NOTIF_TEXT" | jq -r '.objectClass // empty' 2>/dev/null)
+
+  run_test "mark_notification_unread($NOTIF_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"mark_notification_unread\",\"arguments\":{\"notificationId\":\"$NOTIF_ID\"}},\"id\":2}"
   run_test "mark_notification_read($NOTIF_ID)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"mark_notification_read\",\"arguments\":{\"notificationId\":\"$NOTIF_ID\"}},\"id\":2}"
+  if [ "$ORIGINAL_VIEWED" = "false" ]; then
+    run_test "mark_notification_unread($NOTIF_ID restore)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"mark_notification_unread\",\"arguments\":{\"notificationId\":\"$NOTIF_ID\"}},\"id\":2}"
+  fi
+
+  run_test "archive_notification($NOTIF_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_notification\",\"arguments\":{\"notificationId\":\"$NOTIF_ID\"}},\"id\":2}"
+  run_test "unarchive_notification($NOTIF_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unarchive_notification\",\"arguments\":{\"notificationId\":\"$NOTIF_ID\"}},\"id\":2}"
+
+  if [ -n "$NOTIF_OBJECT_ID" ] && [ -n "$NOTIF_OBJECT_CLASS" ]; then
+    NOTIF_OBJECT_ID_JSON=$(json_string "$NOTIF_OBJECT_ID")
+    NOTIF_OBJECT_CLASS_JSON=$(json_string "$NOTIF_OBJECT_CLASS")
+    CONTEXT_TEXT=$(run_capture "get_notification_context($NOTIF_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_notification_context\",\"arguments\":{\"objectId\":$NOTIF_OBJECT_ID_JSON,\"objectClass\":$NOTIF_OBJECT_CLASS_JSON}},\"id\":2}")
+    CONTEXT_ID=$(echo "$CONTEXT_TEXT" | jq -r '.id // empty' 2>/dev/null)
+    ORIGINAL_PINNED=$(echo "$CONTEXT_TEXT" | jq -r '.isPinned // empty' 2>/dev/null)
+    ORIGINAL_HIDDEN=$(echo "$CONTEXT_TEXT" | jq -r '.hidden // empty' 2>/dev/null)
+    if [ -n "$CONTEXT_ID" ]; then
+      if [ "$ORIGINAL_PINNED" = "true" ]; then
+        run_test "pin_notification_context($CONTEXT_ID unpin)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"pin_notification_context\",\"arguments\":{\"contextId\":\"$CONTEXT_ID\",\"pinned\":false}},\"id\":2}"
+        run_test "pin_notification_context($CONTEXT_ID restore)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"pin_notification_context\",\"arguments\":{\"contextId\":\"$CONTEXT_ID\",\"pinned\":true}},\"id\":2}"
+      else
+        run_test "pin_notification_context($CONTEXT_ID pin)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"pin_notification_context\",\"arguments\":{\"contextId\":\"$CONTEXT_ID\",\"pinned\":true}},\"id\":2}"
+        run_test "pin_notification_context($CONTEXT_ID restore)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"pin_notification_context\",\"arguments\":{\"contextId\":\"$CONTEXT_ID\",\"pinned\":false}},\"id\":2}"
+      fi
+
+      if [ "$ORIGINAL_HIDDEN" = "true" ]; then
+        run_test "hide_notification_context($CONTEXT_ID unhide)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"hide_notification_context\",\"arguments\":{\"contextId\":\"$CONTEXT_ID\",\"hidden\":false}},\"id\":2}"
+        run_test "hide_notification_context($CONTEXT_ID restore)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"hide_notification_context\",\"arguments\":{\"contextId\":\"$CONTEXT_ID\",\"hidden\":true}},\"id\":2}"
+      else
+        run_test "hide_notification_context($CONTEXT_ID hide)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"hide_notification_context\",\"arguments\":{\"contextId\":\"$CONTEXT_ID\",\"hidden\":true}},\"id\":2}"
+        run_test "hide_notification_context($CONTEXT_ID restore)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"hide_notification_context\",\"arguments\":{\"contextId\":\"$CONTEXT_ID\",\"hidden\":false}},\"id\":2}"
+      fi
+    else
+      skip_test "pin_notification_context" "notification context not found"
+      skip_test "hide_notification_context" "notification context not found"
+    fi
+  elif [ -n "$DOC_CONTEXT_ID" ]; then
+    skip_test "get_notification_context" "notification missing object locator"
+    skip_test "pin_notification_context" "notification missing object locator"
+    skip_test "hide_notification_context" "notification missing object locator"
+  else
+    skip_test "get_notification_context" "notification has no context"
+    skip_test "pin_notification_context" "notification has no context"
+    skip_test "hide_notification_context" "notification has no context"
+  fi
+
   skip_test "mark_all_notifications_read" "would clear all notifications"
-  skip_test "archive_notification" "requires notification ID"
   skip_test "archive_all_notifications" "would archive all"
   skip_test "delete_notification" "requires notification ID"
-  skip_test "get_notification_context" "requires context ID"
-  skip_test "pin_notification_context" "requires context ID"
   skip_test "update_notification_provider_setting" "would modify settings"
 else
   skip_test "get_notification" "no notifications"
   skip_test "mark_notification_read" "no notifications"
+  skip_test "mark_notification_unread" "no notifications"
   skip_test "mark_all_notifications_read" "no notifications"
   skip_test "archive_notification" "no notifications"
+  skip_test "unarchive_notification" "no notifications"
   skip_test "archive_all_notifications" "no notifications"
   skip_test "delete_notification" "no notifications"
   skip_test "get_notification_context" "no notifications"
   skip_test "pin_notification_context" "no notifications"
+  skip_test "hide_notification_context" "no notifications"
   skip_test "update_notification_provider_setting" "no notifications"
 fi
 echo ""
