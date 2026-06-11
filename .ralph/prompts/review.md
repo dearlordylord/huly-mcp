@@ -13,6 +13,10 @@ Review the current branch according to:
 - branded/domain values instead of bare primitives where useful
 - Huly MCP review expectations for LLM-first tool design
 
+This Ralph run is production-scoped. Review the actual lane plan, task prompt,
+and branch diff. Do not infer task scope from scripted-mode fallback code in
+`.ralph/run.ts`; scripted mode is only an orchestration smoke path.
+
 # DIFF
 
 !`git diff --stat HEAD~20..HEAD || true`

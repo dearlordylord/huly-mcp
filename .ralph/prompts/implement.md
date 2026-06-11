@@ -8,8 +8,9 @@ You are the implementer for Ralph lane `{{LANE_ID}}`.
 - Do not pick another task.
 - Keep changes tightly scoped to this task.
 - Preserve unrelated work in this worktree.
-- This experiment is intentionally superficial. Prefer a small docs/plans change
-  unless the task explicitly requires production code.
+- This is a production lane. Make production code changes when the task calls for
+  them. Do not substitute a docs-only note for an implementable tool, schema,
+  operation, test, or dependency change.
 - Inspect at most 6 files and use targeted searches only.
 - Do not run broad repository dumps such as `rg --files`, large README reads, or
   full parity-ledger output.

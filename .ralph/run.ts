@@ -20,6 +20,7 @@ import {
   makeRalphTaskLoad,
   makeRalphTaskTitle,
   RalphAgent,
+  type RalphBranchName,
   runRalphLanes,
   type RalphCommitSha,
   type RalphLaneSpec,
@@ -162,7 +163,7 @@ const laneSpecs: ReadonlyArray<RalphLaneSpec> = [
     branch: makeRalphBranchName("ralph/core-role-assignment"),
     planFile: makeRalphPlanFile("core-role-assignment.md"),
     prompt: makeRalphPromptText(
-      "Create a documentation-only spike plan for the next SDK parity slice around typed-space role assignment mutations. Do not request production code in this experiment."
+      "Production lane for issue #91. Implement typed-space role assignment mutations under the spaces toolset: set_space_role_members, add_space_role_members, and remove_space_role_members. Role locators must accept role id or exact role name scoped to the space type. Member locators must reuse existing account UUID, exact email, or exact person display-name resolution. Preserve unrelated role assignments, make add/remove idempotent, reject non-typed spaces and missing or ambiguous roles with typed errors, add focused tests, and run relevant verification."
     )
   },
   {
@@ -170,7 +171,7 @@ const laneSpecs: ReadonlyArray<RalphLaneSpec> = [
     branch: makeRalphBranchName("ralph/chat-message-pin-state"),
     planFile: makeRalphPlanFile("chat-message-pin-state.md"),
     prompt: makeRalphPromptText(
-      "Create a documentation-only spike plan for pinned chat message state and related tests. Do not request production code in this experiment."
+      "Production lane for issue #99. Replace the old pinned-message placeholder with a bounded external communication visibility slice. Implement read-only listing for external Gmail/Telegram channel messages if the SDK packages are compatible with this repository's Huly package set. Prefer one LLM-first channels tool such as list_external_channel_messages with provider gmail|telegram, channel name/id locator, limit, and normalized summaries. If a package is unavailable or incompatible, encode that as explicit unsupported behavior and tests instead of fake coverage. Add focused schemas, operations, tool registration, tests, and relevant verification."
     )
   },
   {
@@ -178,7 +179,7 @@ const laneSpecs: ReadonlyArray<RalphLaneSpec> = [
     branch: makeRalphBranchName("ralph/package-viability-spike"),
     planFile: makeRalphPlanFile("package-viability-spike.md"),
     prompt: makeRalphPromptText(
-      "Create a documentation-only dependency viability spike for package-heavy Huly parity issues. Do not request production code in this experiment."
+      "Production lane for issue #101. Make the package-heavy board/inventory/products parity state actionable. @hcengineering/board and @hcengineering/inventory are published at 0.7.423; @hcengineering/products is not published. Add direct package/dependency or discovery support only where it is compatible with this repo, expose a read-only SDK/package viability surface or sdk-discovery coverage that tells agents which #101 packages/classes are usable and which are blocked, and add tests. Do not invent write tools unless they can be typed safely from SDK declarations."
     )
   }
 ]
@@ -324,13 +325,11 @@ const runCodexExec = (input: {
     return yield* Effect.acquireUseRelease(
       Effect.sync((): ManagedCodexProcess => {
         const baseArgs = input.resumeSession === undefined
-          ? ["exec"]
-          : ["exec", "resume", input.resumeSession]
+          ? ["exec", "-C", input.worktreePath]
+          : ["exec", "resume"]
         const args = [
           ...baseArgs,
           "--json",
-          "-C",
-          input.worktreePath,
           "-o",
           input.finalFile,
           "-m",
@@ -340,6 +339,7 @@ const runCodexExec = (input: {
           ...(input.role.fullAccess ? ["--dangerously-bypass-approvals-and-sandbox"] : ["-s", "read-only"]),
           ...(input.role.ignoreRules ? ["--ignore-rules"] : []),
           ...(input.role.ephemeral ? ["--ephemeral"] : []),
+          ...(input.resumeSession === undefined ? [] : [input.resumeSession]),
           "-"
         ]
         const child = spawn("codex", args, {
@@ -568,12 +568,57 @@ const makeFileObserver = (initialStatus: RalphRunStatus): RalphLoopObserver => {
   }
 }
 
+const existingWorktreePathForBranch = async (
+  branch: RalphBranchName
+): Promise<string | undefined> => {
+  const output = await gitOutput(repoRoot, ["worktree", "list", "--porcelain"])
+  let currentPath: string | undefined
+
+  for (const line of output.split("\n")) {
+    if (line.startsWith("worktree ")) {
+      currentPath = line.slice("worktree ".length)
+      continue
+    }
+
+    if (line === `branch refs/heads/${branch}`) {
+      return currentPath
+    }
+  }
+
+  return undefined
+}
+
+const makeExistingWorktreeHandle = (
+  branch: RalphBranchName,
+  worktreePath: string
+): sandcastle.Worktree => ({
+  branch: String(branch),
+  worktreePath,
+  run: async () => {
+    throw new Error("Ralph uses codex exec directly; Sandcastle worktree.run is not wired for resumed handles.")
+  },
+  interactive: async () => {
+    throw new Error("Ralph uses codex exec directly; Sandcastle worktree.interactive is not wired for resumed handles.")
+  },
+  createSandbox: async () => {
+    throw new Error("Ralph uses codex exec directly; Sandcastle worktree.createSandbox is not wired for resumed handles.")
+  },
+  close: async () => ({}),
+  [Symbol.asyncDispose]: async () => {}
+})
+
 const createWorktrees = async (
   lanes: ReadonlyArray<RalphLaneSpec>
 ): Promise<Map<string, sandcastle.Worktree>> => {
   const worktrees = new Map<string, sandcastle.Worktree>()
 
   for (const lane of lanes) {
+    const existingPath = await existingWorktreePathForBranch(lane.branch)
+    if (existingPath !== undefined) {
+      worktrees.set(String(lane.laneId), makeExistingWorktreeHandle(lane.branch, existingPath))
+      continue
+    }
+
     const worktree = await sandcastle.createWorktree({
       cwd: repoRoot,
       branchStrategy: {
@@ -609,7 +654,7 @@ const createRalphAgentLayer = (worktrees: Map<string, sandcastle.Worktree>): Lay
   const reviewerRole: CodexExecRole = {
     name: "reviewer",
     ephemeral: true,
-    fullAccess: false,
+    fullAccess: true,
     ignoreRules: false,
     workspace: "lane",
     effort: readCodexEffort("RALPH_REVIEWER_EFFORT", "xhigh")
@@ -754,15 +799,15 @@ const scriptedTasks = (lane: RalphLaneSpec): ReadonlyArray<{
 }> => [
   {
     id: "task-1",
-    title: `Draft ${lane.laneId} spike note`,
+    title: `Scripted smoke marker for ${lane.laneId}`,
     load:
-      `Create a documentation-only spike note for ${lane.laneId}. Use the lane prompt as source context: ${lane.prompt}. Keep it under 120 lines, include assumptions, likely files to inspect later, verification expectations, and non-goals.`
+      `Scripted smoke mode must not define product scope. Record that the production lane prompt is: ${lane.prompt}`
   },
   {
     id: "task-2",
-    title: `Review ${lane.laneId} follow-up scope`,
+    title: `Scripted smoke follow-up for ${lane.laneId}`,
     load:
-      "Refine the spike note into a short follow-up checklist. This task should only run after task-1 and remains documentation-only."
+      "Scripted smoke mode follow-up only; Codex mode production lanes use planner output from laneSpecs."
   }
 ]
 
@@ -815,7 +860,7 @@ const createScriptedRalphAgentLayer = (worktrees: Map<string, sandcastle.Worktre
                 "## Scripted Experiment Output",
                 "",
                 "- This file was generated by Ralph scripted mode to validate orchestration.",
-                "- Production implementation is intentionally deferred.",
+                "- Scripted mode is not used to define production task scope.",
                 "- A Codex-backed run can be enabled with `RALPH_AGENT_MODE=codex` after context-budget tuning.",
                 ""
               ].join("\n")
@@ -831,7 +876,7 @@ const createScriptedRalphAgentLayer = (worktrees: Map<string, sandcastle.Worktre
     reviewTask: () =>
       Effect.succeed({
         status: "approved",
-        notes: makeRalphAgentNotes("Scripted review accepted the documentation-only experiment output.")
+        notes: makeRalphAgentNotes("Scripted review accepted the smoke-mode orchestration marker.")
       }),
     cleanupTask: ({ lane, task }) =>
       Effect.gen(function*() {
