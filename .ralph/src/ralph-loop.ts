@@ -115,6 +115,7 @@ export interface RalphLoopObserver {
 
 export interface RalphLoopOptions {
   readonly maxReviewAttempts: number
+  readonly laneConcurrency?: number
   readonly maxTasksPerLane?: number
   readonly observer?: RalphLoopObserver
 }
@@ -405,7 +406,7 @@ export const runRalphLanes = (
           })
         )
       ),
-    { concurrency: 3 }
+    { concurrency: options.laneConcurrency ?? Math.max(1, lanes.length) }
   ).pipe(
     Effect.flatMap((results) => {
       const failures = results.flatMap((result) =>

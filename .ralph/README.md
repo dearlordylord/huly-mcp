@@ -26,6 +26,7 @@ pnpm check
 RALPH_AGENT_MODE=codex \
 RALPH_MAX_TASKS_PER_LANE=1 \
 RALPH_MAX_REVIEW_ATTEMPTS=12 \
+RALPH_LANE_CONCURRENCY=3 \
 RALPH_PLANNER_EFFORT=low \
 RALPH_IMPLEMENTER_EFFORT=medium \
 RALPH_REVIEWER_EFFORT=xhigh \
@@ -44,6 +45,7 @@ RALPH_REVIEWER_EFFORT=xhigh
 RALPH_CLEANUP_EFFORT=low
 RALPH_MAX_TASKS_PER_LANE=1
 RALPH_MAX_REVIEW_ATTEMPTS=12
+RALPH_LANE_CONCURRENCY=3
 ```
 
 `RALPH_AGENT_MODE=scripted` is only a smoke test for orchestration. It must not
@@ -53,6 +55,8 @@ exploration, implementers run in lane worktrees with write access, reviewers run
 with the strongest reasoning setting, and cleanup commits intentional changes.
 If a lane exhausts `RALPH_MAX_REVIEW_ATTEMPTS`, Ralph records that lane as
 failed but lets sibling lanes finish before the process exits non-zero.
+By default, lane concurrency is the number of configured lane specs. Set
+`RALPH_LANE_CONCURRENCY` only to intentionally run fewer lanes at a time.
 
 ## Current Lanes
 

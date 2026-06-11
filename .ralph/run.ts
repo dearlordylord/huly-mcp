@@ -923,6 +923,7 @@ const agentLayer = agentMode === "codex"
   : createScriptedRalphAgentLayer(worktrees)
 
 const program = runRalphLanes(laneSpecs, {
+  laneConcurrency: readPositiveInteger("RALPH_LANE_CONCURRENCY", Math.max(1, laneSpecs.length)),
   maxReviewAttempts: readPositiveInteger("RALPH_MAX_REVIEW_ATTEMPTS", 12),
   maxTasksPerLane: readPositiveInteger("RALPH_MAX_TASKS_PER_LANE", 1),
   observer: makeFileObserver(initialStatus)

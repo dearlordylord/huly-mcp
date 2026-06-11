@@ -167,9 +167,9 @@ describe("Ralph Sandcastle loop", () => {
     })
   )
 
-  it.effect("runs three lanes concurrently", () =>
+  it.effect("runs every configured lane concurrently by default", () =>
     Effect.gen(function*() {
-      const specs = [lane("a"), lane("b"), lane("c")]
+      const specs = [lane("a"), lane("b"), lane("c"), lane("d")]
       const store = yield* makeInspectableStore()
       const active = yield* Ref.make(0)
       const allActive = yield* Deferred.make<void>()
@@ -181,7 +181,7 @@ describe("Ralph Sandcastle loop", () => {
         implementTask: ({ task }) =>
           Effect.gen(function*() {
             const activeCount = yield* Ref.updateAndGet(active, (value) => value + 1)
-            if (activeCount === 3) {
+            if (activeCount === specs.length) {
               yield* Deferred.succeed(allActive, undefined)
             }
             yield* Deferred.await(release)
@@ -200,7 +200,52 @@ describe("Ralph Sandcastle loop", () => {
       yield* Deferred.succeed(release, undefined)
       const result = yield* Fiber.join(fiber)
 
-      expect(result.map((laneResult) => String(laneResult.laneId)).sort()).toEqual(["a", "b", "c"])
+      expect(result.map((laneResult) => String(laneResult.laneId)).sort()).toEqual(["a", "b", "c", "d"])
+    })
+  )
+
+  it.effect("honors a configured lane concurrency limit", () =>
+    Effect.gen(function*() {
+      const specs = [lane("a"), lane("b"), lane("c")]
+      const store = yield* makeInspectableStore()
+      const active = yield* Ref.make(0)
+      const maxActive = yield* Ref.make(0)
+      const started = yield* Ref.make<ReadonlyArray<string>>([])
+      const limitReached = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+
+      const agentLayer = Layer.succeed(RalphAgent, {
+        planLane: (spec) =>
+          Effect.succeed(planFor(spec, [{ id: `${spec.laneId}-task`, title: "Task" }])),
+        implementTask: ({ lane, task }) =>
+          Effect.gen(function*() {
+            yield* Ref.update(started, (current) => [...current, String(lane.laneId)])
+            const activeCount = yield* Ref.updateAndGet(active, (value) => value + 1)
+            yield* Ref.update(maxActive, (value) => Math.max(value, activeCount))
+            if (activeCount === 2) {
+              yield* Deferred.succeed(limitReached, undefined)
+            }
+            yield* Deferred.await(release)
+            yield* Ref.update(active, (value) => value - 1)
+            return { summary: makeRalphAgentNotes(String(task.id)), commits: [makeRalphCommitSha(task.id)] }
+          }),
+        reviewTask: () => Effect.succeed({ status: "approved", notes: makeRalphAgentNotes("Approved") }),
+        cleanupTask: () => Effect.succeed({ commits: [] })
+      })
+
+      const fiber = yield* runRalphLanes(specs, { laneConcurrency: 2, maxReviewAttempts: 1 }).pipe(
+        Effect.provide(Layer.merge(agentLayer, store.layer)),
+        Effect.fork
+      )
+      yield* Deferred.await(limitReached)
+      const startedBeforeRelease = yield* Ref.get(started)
+      yield* Deferred.succeed(release, undefined)
+      const result = yield* Fiber.join(fiber)
+      const observedMaxActive = yield* Ref.get(maxActive)
+
+      expect(startedBeforeRelease).toHaveLength(2)
+      expect(result).toHaveLength(3)
+      expect(observedMaxActive).toBeLessThanOrEqual(2)
     })
   )
 
