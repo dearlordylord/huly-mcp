@@ -923,6 +923,73 @@ describe("spaces operations", () => {
       })
     }))
 
+  it.effect("space role member mutations resolve roles by id and by exact name scoped to the space type", () =>
+    Effect.gen(function*() {
+      const byIdMixin: MockConfig["captureMixin"] = {}
+      const byNameMixin: MockConfig["captureMixin"] = {}
+      const typedSpace = makeSpace({ type: toRef<SpaceType>("space-type-1") })
+      const adminForSpaceType = makeRole()
+      const adminForOtherSpaceType = makeRole({
+        _id: toRef<Role>("role-admin-other"),
+        attachedTo: toRef<SpaceType>("space-type-2")
+      })
+      const viewerForSpaceType = makeRole({ _id: toRef<Role>("role-viewer"), name: "Viewers" })
+
+      const byId = yield* addSpaceRoleMembers({
+        space: spaceIdentifier("space-1"),
+        role: spaceRoleIdentifier("role-viewer"),
+        members: [spaceMemberIdentifier(accountA)]
+      }).pipe(Effect.provide(createTestLayer({
+        spaces: [typedSpace],
+        spaceTypes: [makeSpaceType({ roles: 2 })],
+        roles: [adminForSpaceType, viewerForSpaceType],
+        captureMixin: byIdMixin
+      })))
+      const byNameScopedToSpaceType = yield* addSpaceRoleMembers({
+        space: spaceIdentifier("space-1"),
+        role: spaceRoleIdentifier("Admins"),
+        members: [spaceMemberIdentifier(accountA)]
+      }).pipe(Effect.provide(createTestLayer({
+        spaces: [typedSpace],
+        spaceTypes: [makeSpaceType()],
+        roles: [adminForOtherSpaceType, adminForSpaceType],
+        captureMixin: byNameMixin
+      })))
+
+      expect(byId).toMatchObject({ roleId: "role-viewer", members: [accountA], changed: true })
+      expect(byIdMixin).toMatchObject({ action: "create", attributes: { "role-viewer": [accountA] } })
+      expect(byNameScopedToSpaceType).toMatchObject({ roleId: "role-admin", members: [accountA], changed: true })
+      expect(byNameMixin).toMatchObject({ action: "create", attributes: { "role-admin": [accountA] } })
+    }))
+
+  it.effect("space role member mutations resolve members by account UUID, exact email, and display name", () =>
+    Effect.gen(function*() {
+      const captureMixin: MockConfig["captureMixin"] = {}
+      const result = yield* setSpaceRoleMembers({
+        space: spaceIdentifier("space-1"),
+        role: spaceRoleIdentifier("Admins"),
+        members: [
+          spaceMemberIdentifier(accountA),
+          spaceMemberIdentifier("jane@example.com"),
+          spaceMemberIdentifier("Doe,Jane")
+        ]
+      }).pipe(Effect.provide(createTestLayer({
+        spaces: [makeSpace({ type: toRef<SpaceType>("space-type-1") })],
+        spaceTypes: [makeSpaceType()],
+        roles: [makeRole()],
+        persons: [makePerson()],
+        channels: [makeChannel()],
+        employees: [makeEmployee()],
+        captureMixin
+      })))
+
+      expect(result).toMatchObject({ roleId: "role-admin", members: [accountA, accountB], changed: true })
+      expect(captureMixin).toMatchObject({
+        action: "create",
+        attributes: { "role-admin": [accountA, accountB] }
+      })
+    }))
+
   it.effect("space role add and remove mutations are idempotent", () =>
     Effect.gen(function*() {
       const addMixin: MockConfig["captureMixin"] = {}
@@ -996,16 +1063,16 @@ describe("spaces operations", () => {
       expect(removeNoop.changed).toBe(false)
     }))
 
-  it.effect("space role member mutations reject non-typed spaces and missing or ambiguous roles", () =>
+  it.effect("space role member mutations reject non-typed spaces and missing or ambiguous roles with typed errors", () =>
     Effect.gen(function*() {
-      const nonTyped = yield* Effect.exit(
+      const nonTyped = yield* Effect.flip(
         setSpaceRoleMembers({
           space: spaceIdentifier("space-1"),
           role: spaceRoleIdentifier("Admins"),
           members: []
         }).pipe(Effect.provide(createTestLayer({ spaces: [makeSpace()], roles: [makeRole()] })))
       )
-      const missingRole = yield* Effect.exit(
+      const missingRole = yield* Effect.flip(
         addSpaceRoleMembers({
           space: spaceIdentifier("space-1"),
           role: spaceRoleIdentifier("Missing"),
@@ -1016,7 +1083,7 @@ describe("spaces operations", () => {
           roles: [makeRole()]
         })))
       )
-      const missingSpaceType = yield* Effect.exit(
+      const missingSpaceType = yield* Effect.flip(
         addSpaceRoleMembers({
           space: spaceIdentifier("space-1"),
           role: spaceRoleIdentifier("Admins"),
@@ -1026,7 +1093,7 @@ describe("spaces operations", () => {
           roles: [makeRole()]
         })))
       )
-      const ambiguousRole = yield* Effect.exit(
+      const ambiguousRole = yield* Effect.flip(
         addSpaceRoleMembers({
           space: spaceIdentifier("space-1"),
           role: spaceRoleIdentifier("Admins"),
@@ -1041,10 +1108,14 @@ describe("spaces operations", () => {
         })))
       )
 
-      expect(exitCauseText(nonTyped)).toContain("is not typed")
-      expect(exitCauseText(missingRole)).toContain("SpaceRoleNotFoundError")
-      expect(exitCauseText(missingSpaceType)).toContain("SpaceRoleNotFoundError")
-      expect(exitCauseText(ambiguousRole)).toContain("SpaceRoleIdentifierAmbiguousError")
+      expect(nonTyped).toBeInstanceOf(SpaceNotTypedError)
+      expect(nonTyped._tag).toBe("SpaceNotTypedError")
+      expect(missingRole).toBeInstanceOf(SpaceRoleNotFoundError)
+      expect(missingRole._tag).toBe("SpaceRoleNotFoundError")
+      expect(missingSpaceType).toBeInstanceOf(SpaceRoleNotFoundError)
+      expect(missingSpaceType._tag).toBe("SpaceRoleNotFoundError")
+      expect(ambiguousRole).toBeInstanceOf(SpaceRoleIdentifierAmbiguousError)
+      expect(ambiguousRole._tag).toBe("SpaceRoleIdentifierAmbiguousError")
     }))
 
   it.effect("space role resolution is not truncated by broad role list caps", () =>
