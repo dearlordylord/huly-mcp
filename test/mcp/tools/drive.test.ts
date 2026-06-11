@@ -1,13 +1,27 @@
+/* eslint-disable no-restricted-syntax -- Huly SDK phantom refs are erased at runtime; this test file builds in-memory SDK fixtures. */
 import { describe, it } from "@effect/vitest"
-import type { Class, Data, Doc, DocumentQuery, DocumentUpdate, Ref, Space, SpaceType } from "@hcengineering/core"
+import type { ActivityMessage as HulyActivityMessage } from "@hcengineering/activity"
+import type { ChatMessage } from "@hcengineering/chunter"
+import type {
+  AttachedData,
+  AttachedDoc,
+  Class,
+  Data,
+  Doc,
+  DocumentQuery,
+  DocumentUpdate,
+  Ref,
+  Space,
+  SpaceType
+} from "@hcengineering/core"
 import { toFindResult } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
 
 import type { HulyClientOperations } from "../../../src/huly/client.js"
-import { drive, type DriveSpace, type File, type Folder } from "../../../src/huly/drive-sdk.js"
-import { core } from "../../../src/huly/huly-plugins.js"
-import { testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
+import { drive, type DriveSpace, type File, type FileVersion, type Folder } from "../../../src/huly/drive-sdk.js"
+import { activity, chunter, core } from "../../../src/huly/huly-plugins.js"
+import { markdownToMarkupString, testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
 import { toAccountUuid, toRef } from "../../../src/huly/operations/sdk-boundary.js"
 import type { HulyStorageOperations } from "../../../src/huly/storage.js"
 import { testWorkbenchUrlConfig } from "../../../src/huly/url-builders.js"
@@ -20,6 +34,8 @@ interface DriveToolState {
   readonly drives: Array<DriveSpace>
   readonly folders: Array<Folder>
   readonly files: Array<File>
+  readonly messages?: Array<ChatMessage>
+  readonly activityMessages?: Array<HulyActivityMessage>
   nextId: number
 }
 
@@ -58,6 +74,53 @@ const folder = (id: string, title: string): Folder => ({
   createdOn: 0
 })
 
+const file = (id: string, title: string): File => ({
+  _id: toRef<File>(id),
+  _class: drive.class.File,
+  space: toRef<DriveSpace>("drive-1"),
+  title,
+  parent: drive.ids.Root,
+  path: [],
+  file: toRef<FileVersion>("version-1"),
+  versions: 1,
+  version: 1,
+  modifiedBy: personId,
+  modifiedOn: 0,
+  createdBy: personId,
+  createdOn: 0
+})
+
+const chatMessage = (id: string, body: string): ChatMessage => ({
+  _id: toRef<ChatMessage>(id),
+  _class: chunter.class.ChatMessage,
+  space: toRef<DriveSpace>("drive-1"),
+  attachedTo: toRef<Doc>("file-api"),
+  attachedToClass: toRef<Class<Doc>>(drive.class.File),
+  collection: "comments",
+  message: markdownToMarkupString(body, testMarkupUrlConfig),
+  modifiedBy: personId,
+  modifiedOn: 1,
+  createdBy: personId,
+  createdOn: 1,
+  isPinned: false,
+  replies: 0,
+  reactions: 0
+} as unknown as ChatMessage)
+
+const activityMessage = (): HulyActivityMessage => ({
+  _id: toRef<HulyActivityMessage>("activity-1"),
+  _class: activity.class.ActivityMessage,
+  space: toRef<DriveSpace>("drive-1"),
+  attachedTo: toRef<Doc>("file-api"),
+  attachedToClass: toRef<Class<Doc>>(drive.class.File),
+  collection: "activity",
+  modifiedBy: personId,
+  modifiedOn: 2,
+  isPinned: false,
+  replies: 0,
+  reactions: 0
+})
+
 const matchesQuery = (doc: Doc, query: DocumentQuery<Doc>): boolean =>
   Object.entries(query).every(([key, value]) => Reflect.get(doc, key) === value)
 
@@ -68,6 +131,10 @@ const documentsForClass = (state: DriveToolState, classRef: Ref<Class<Doc>>): Re
     ? state.folders
     : classRef === drive.class.File
     ? state.files
+    : classRef === chunter.class.ChatMessage
+    ? state.messages ?? []
+    : classRef === activity.class.ActivityMessage
+    ? state.activityMessages ?? []
     : []
 
 const makeHulyClient = (state: DriveToolState): HulyClientOperations => ({
@@ -79,7 +146,7 @@ const makeHulyClient = (state: DriveToolState): HulyClientOperations => ({
     const docs = documentsForClass(state, classRef as Ref<Class<Doc>>)
     return Effect.succeed(
       // The class ref selects the fixture array; Huly SDK brands are erased at runtime.
-      // eslint-disable-next-line no-restricted-syntax -- brands erased at runtime; class branch selects T
+
       toFindResult(docs.filter((doc) => matchesQuery(doc, query as DocumentQuery<Doc>)) as unknown as Array<T>)
     )
   },
@@ -94,7 +161,6 @@ const makeHulyClient = (state: DriveToolState): HulyClientOperations => ({
     const next = id ?? toRef<T>(`created-${state.nextId++}`)
     if (classRef === drive.class.Drive) {
       state.drives.push({
-        // eslint-disable-next-line no-restricted-syntax -- brands erased at runtime; Drive class branch selects DriveSpace
         _id: next as unknown as Ref<DriveSpace>,
         _class: drive.class.Drive,
         space,
@@ -102,33 +168,79 @@ const makeHulyClient = (state: DriveToolState): HulyClientOperations => ({
         modifiedOn: 0,
         createdBy: personId,
         createdOn: 0,
-        // eslint-disable-next-line no-restricted-syntax -- brands erased at runtime; Drive class branch selects DriveSpace data
+
         ...(attributes as unknown as Data<DriveSpace>)
       })
     }
     return Effect.succeed(next)
   },
   updateDoc: <T extends Doc>(
-    _classRef: Ref<Class<T>>,
+    classRef: Ref<Class<T>>,
     _space: Ref<Space>,
     objectId: Ref<T>,
     operations: DocumentUpdate<T>
   ) => {
+    if (classRef === chunter.class.ChatMessage) {
+      const index = state.messages?.findIndex((candidate) => String(candidate._id) === String(objectId)) ?? -1
+      if (state.messages !== undefined && index >= 0) {
+        const target = state.messages[index]
+        state.messages[index] = {
+          ...target,
+
+          ...(operations as unknown as Partial<ChatMessage>)
+        }
+      }
+      return Effect.succeed([])
+    }
     const targetIndex = state.drives.findIndex((candidate) => String(candidate._id) === String(objectId))
     const target = state.drives[targetIndex]
     state.drives[targetIndex] = {
       ...target,
-      // eslint-disable-next-line no-restricted-syntax -- brands erased at runtime; test updates only Drive docs
+
       ...(operations as unknown as Partial<DriveSpace>)
     }
     return Effect.succeed([])
   },
-  removeDoc: <T extends Doc>(_classRef: Ref<Class<T>>, _space: Ref<Space>, objectId: Ref<T>) => {
+  removeDoc: <T extends Doc>(classRef: Ref<Class<T>>, _space: Ref<Space>, objectId: Ref<T>) => {
+    if (classRef === chunter.class.ChatMessage) {
+      const index = state.messages?.findIndex((candidate) => String(candidate._id) === String(objectId)) ?? -1
+      if (state.messages !== undefined && index >= 0) state.messages.splice(index, 1)
+      return Effect.succeed([])
+    }
     const index = state.drives.findIndex((candidate) => String(candidate._id) === String(objectId))
     if (index >= 0) state.drives.splice(index, 1)
     return Effect.succeed([])
   },
-  addCollection: () => Effect.die(new Error("not implemented")),
+  addCollection: <T extends Doc, P extends AttachedDoc>(
+    classRef: Ref<Class<P>>,
+    space: Ref<Space>,
+    attachedTo: Ref<T>,
+    attachedToClass: Ref<Class<T>>,
+    collection: string,
+    attributes: AttachedData<P>,
+    id?: Ref<P>
+  ) => {
+    const next = id ?? toRef<P>(`created-${state.nextId++}`)
+    if (classRef === chunter.class.ChatMessage) {
+      state.messages?.push({
+        _id: next as unknown as Ref<ChatMessage>,
+        _class: chunter.class.ChatMessage,
+        space,
+        attachedTo: attachedTo as unknown as Ref<Doc>,
+        attachedToClass: attachedToClass as unknown as Ref<Class<Doc>>,
+        collection,
+        modifiedBy: personId,
+        modifiedOn: 0,
+        createdBy: personId,
+        createdOn: 0,
+        isPinned: false,
+        replies: 0,
+        reactions: 0,
+        ...(attributes as unknown as AttachedData<ChatMessage>)
+      } as unknown as ChatMessage)
+    }
+    return Effect.succeed(next)
+  },
   removeCollection: () => Effect.die(new Error("not implemented")),
   uploadMarkup: () => Effect.die(new Error("not implemented")),
   fetchMarkup: () => Effect.succeed(""),
@@ -163,6 +275,11 @@ describe("driveTools", () => {
         "set_drive_owners",
         "list_drive_items",
         "get_drive_item",
+        "list_drive_file_comments",
+        "add_drive_file_comment",
+        "update_drive_file_comment",
+        "delete_drive_file_comment",
+        "list_drive_file_activity",
         "create_drive_folder",
         "upload_drive_file",
         "upload_drive_file_version",
@@ -192,6 +309,9 @@ describe("driveTools", () => {
       )
       expect(driveTools.find((tool) => tool.name === "delete_drive_item")?.description).toContain(
         "permanent deletion"
+      )
+      expect(driveTools.find((tool) => tool.name === "list_drive_file_comments")?.description).toContain(
+        "filePath or fileId"
       )
     }))
 
@@ -242,6 +362,62 @@ describe("driveTools", () => {
       expect(deleted.structuredContent?.result).toMatchObject({ deleted: true, drive: { name: "Team Drive" } })
     }))
 
+  it.effect("Drive file comment and activity handlers encode successful structured output", () =>
+    Effect.gen(function*() {
+      const state: DriveToolState = {
+        drives: [driveSpace()],
+        folders: [],
+        files: [file("file-api", "API.md")],
+        messages: [chatMessage("comment-1", "Initial")],
+        activityMessages: [activityMessage()],
+        nextId: 1
+      }
+      const hulyClient = makeHulyClient(state)
+
+      const listed = yield* Effect.promise(() =>
+        findTool("list_drive_file_comments").handler({ drive: "Docs", filePath: "/API.md" }, hulyClient, storageClient)
+      )
+      const added = yield* Effect.promise(() =>
+        findTool("add_drive_file_comment").handler(
+          { drive: "Docs", fileId: "file-api", body: "Added" },
+          hulyClient,
+          storageClient
+        )
+      )
+      const updated = yield* Effect.promise(() =>
+        findTool("update_drive_file_comment").handler(
+          { drive: "Docs", fileId: "file-api", commentId: "comment-1", body: "Updated" },
+          hulyClient,
+          storageClient
+        )
+      )
+      const activityResult = yield* Effect.promise(() =>
+        findTool("list_drive_file_activity").handler({ drive: "Docs", fileId: "file-api" }, hulyClient, storageClient)
+      )
+      const deleted = yield* Effect.promise(() =>
+        findTool("delete_drive_file_comment").handler(
+          { drive: "Docs", fileId: "file-api", commentId: "comment-1" },
+          hulyClient,
+          storageClient
+        )
+      )
+
+      expect(listed.isError).toBeUndefined()
+      expect(listed.structuredContent?.result).toMatchObject({
+        file: { id: "file-api" },
+        comments: [{ id: "comment-1", body: "Initial" }],
+        total: 1
+      })
+      expect(added.structuredContent?.result).toMatchObject({ file: { id: "file-api" } })
+      expect(updated.structuredContent?.result).toMatchObject({ commentId: "comment-1", updated: true })
+      expect(activityResult.structuredContent?.result).toMatchObject({
+        file: { id: "file-api" },
+        activity: [{ id: "activity-1", objectId: "file-api" }],
+        total: 1
+      })
+      expect(deleted.structuredContent?.result).toMatchObject({ commentId: "comment-1", deleted: true })
+    }))
+
   it.effect("Drive administration handlers map parse and domain errors", () =>
     Effect.gen(function*() {
       const nonEmptyState: DriveToolState = {
@@ -265,5 +441,39 @@ describe("driveTools", () => {
       expect(domainError.isError).toBe(true)
       expect(domainError._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
       expect(domainError.content[0].text).toContain("Drive 'Docs' is not empty")
+    }))
+
+  it.effect("Drive file comment handlers map parse and domain errors", () =>
+    Effect.gen(function*() {
+      const state: DriveToolState = {
+        drives: [driveSpace()],
+        folders: [],
+        files: [file("file-api", "API.md")],
+        messages: [],
+        nextId: 1
+      }
+      const hulyClient = makeHulyClient(state)
+
+      const parseError = yield* Effect.promise(() =>
+        findTool("list_drive_file_comments").handler(
+          { drive: "Docs", filePath: "/API.md", fileId: "file-api" },
+          hulyClient,
+          storageClient
+        )
+      )
+      const domainError = yield* Effect.promise(() =>
+        findTool("update_drive_file_comment").handler(
+          { drive: "Docs", fileId: "file-api", commentId: "missing-comment", body: "Updated" },
+          hulyClient,
+          storageClient
+        )
+      )
+
+      expect(parseError.isError).toBe(true)
+      expect(parseError._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
+      expect(parseError.content[0].text).toContain("Invalid parameters for list_drive_file_comments")
+      expect(domainError.isError).toBe(true)
+      expect(domainError._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
+      expect(domainError.content[0].text).toContain("Drive file comment 'missing-comment'")
     }))
 })

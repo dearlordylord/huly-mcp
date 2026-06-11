@@ -58,6 +58,13 @@ export {
   setDriveOwners,
   updateDrive
 } from "./drive-admin.js"
+export {
+  addDriveFileComment,
+  deleteDriveFileComment,
+  listDriveFileActivity,
+  listDriveFileComments,
+  updateDriveFileComment
+} from "./drive-comments.js"
 export { deleteDriveItem, moveDriveItem, renameDriveItem, uploadDriveFileVersion } from "./drive-file-operations.js"
 
 export const listDrives = (

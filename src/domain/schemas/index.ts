@@ -2120,6 +2120,40 @@ export {
 } from "./drive-admin.js"
 
 export {
+  type AddDriveFileCommentParams,
+  addDriveFileCommentParamsJsonSchema,
+  AddDriveFileCommentParamsSchema,
+  type AddDriveFileCommentResult,
+  AddDriveFileCommentResultSchema,
+  type DeleteDriveFileCommentParams,
+  deleteDriveFileCommentParamsJsonSchema,
+  DeleteDriveFileCommentParamsSchema,
+  type DeleteDriveFileCommentResult,
+  DeleteDriveFileCommentResultSchema,
+  type ListDriveFileActivityParams,
+  listDriveFileActivityParamsJsonSchema,
+  ListDriveFileActivityParamsSchema,
+  type ListDriveFileActivityResult,
+  ListDriveFileActivityResultSchema,
+  type ListDriveFileCommentsParams,
+  listDriveFileCommentsParamsJsonSchema,
+  ListDriveFileCommentsParamsSchema,
+  type ListDriveFileCommentsResult,
+  ListDriveFileCommentsResultSchema,
+  parseAddDriveFileCommentParams,
+  parseDeleteDriveFileCommentParams,
+  parseDriveFileCommentTarget,
+  parseListDriveFileActivityParams,
+  parseListDriveFileCommentsParams,
+  parseUpdateDriveFileCommentParams,
+  type UpdateDriveFileCommentParams,
+  updateDriveFileCommentParamsJsonSchema,
+  UpdateDriveFileCommentParamsSchema,
+  type UpdateDriveFileCommentResult,
+  UpdateDriveFileCommentResultSchema
+} from "./drive-comments.js"
+
+export {
   type CreateDriveFolderParams,
   createDriveFolderParamsJsonSchema,
   CreateDriveFolderParamsSchema,

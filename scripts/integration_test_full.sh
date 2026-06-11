@@ -3044,6 +3044,8 @@ if [ -n "$DRIVE_ID" ]; then
   DRIVE_TEST_VERSION_DATA=$(printf 'Drive integration version 2 %s' "$RUN_ID" | base64 | tr -d '\n')
   DRIVE_TEST_DATA_JSON=$(json_string "$DRIVE_TEST_DATA")
   DRIVE_TEST_VERSION_DATA_JSON=$(json_string "$DRIVE_TEST_VERSION_DATA")
+  DRIVE_TEST_COMMENT_BODY_JSON=$(json_string "Drive comment $RUN_ID")
+  DRIVE_TEST_COMMENT_UPDATED_BODY_JSON=$(json_string "Drive comment updated $RUN_ID")
   remember_drive_item_cleanup "$DRIVE_ID" "$DRIVE_TEST_RENAMED_FILE"
   remember_drive_item_cleanup "$DRIVE_ID" "$DRIVE_TEST_MOVED_FILE"
   remember_drive_item_cleanup "$DRIVE_ID" "$DRIVE_TEST_FILE"
@@ -3067,6 +3069,28 @@ if [ -n "$DRIVE_ID" ]; then
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_drive_item\",\"arguments\":{\"drive\":$DRIVE_JSON,\"itemId\":$DRIVE_FILE_ID_JSON}},\"id\":2}"
     run_test "list_drive_file_versions($DRIVE_FILE_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_drive_file_versions\",\"arguments\":{\"drive\":$DRIVE_JSON,\"file\":$DRIVE_FILE_ID_JSON}},\"id\":2}"
+    run_capture_to_var DRIVE_ADD_COMMENT_TEXT "add_drive_file_comment($DRIVE_FILE_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_drive_file_comment\",\"arguments\":{\"drive\":$DRIVE_JSON,\"fileId\":$DRIVE_FILE_ID_JSON,\"body\":$DRIVE_TEST_COMMENT_BODY_JSON}},\"id\":2}"
+    DRIVE_COMMENT_ID=$(echo "$DRIVE_ADD_COMMENT_TEXT" | jq -r '.commentId // empty' 2>/dev/null)
+    if [ -n "$DRIVE_COMMENT_ID" ]; then
+      DRIVE_COMMENT_ID_JSON=$(json_string "$DRIVE_COMMENT_ID")
+      run_capture_to_var DRIVE_COMMENTS_TEXT "list_drive_file_comments($DRIVE_FILE_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_drive_file_comments\",\"arguments\":{\"drive\":$DRIVE_JSON,\"fileId\":$DRIVE_FILE_ID_JSON,\"limit\":10}},\"id\":2}"
+      assert_json_field_equals "list_drive_file_comments sees comment" "$DRIVE_COMMENTS_TEXT" ".comments[0].id" "$DRIVE_COMMENT_ID"
+      run_capture_to_var DRIVE_UPDATE_COMMENT_TEXT "update_drive_file_comment($DRIVE_COMMENT_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_drive_file_comment\",\"arguments\":{\"drive\":$DRIVE_JSON,\"fileId\":$DRIVE_FILE_ID_JSON,\"commentId\":$DRIVE_COMMENT_ID_JSON,\"body\":$DRIVE_TEST_COMMENT_UPDATED_BODY_JSON}},\"id\":2}"
+      assert_json_field_equals "update_drive_file_comment updates comment" "$DRIVE_UPDATE_COMMENT_TEXT" ".updated" "true"
+      run_test "list_drive_file_activity($DRIVE_FILE_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_drive_file_activity\",\"arguments\":{\"drive\":$DRIVE_JSON,\"fileId\":$DRIVE_FILE_ID_JSON,\"limit\":10}},\"id\":2}"
+      run_capture_to_var DRIVE_DELETE_COMMENT_TEXT "delete_drive_file_comment($DRIVE_COMMENT_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_drive_file_comment\",\"arguments\":{\"drive\":$DRIVE_JSON,\"fileId\":$DRIVE_FILE_ID_JSON,\"commentId\":$DRIVE_COMMENT_ID_JSON}},\"id\":2}"
+      assert_json_field_equals "delete_drive_file_comment deletes comment" "$DRIVE_DELETE_COMMENT_TEXT" ".deleted" "true"
+    else
+      skip_test "list_drive_file_comments" "add_drive_file_comment did not return a comment id"
+      skip_test "update_drive_file_comment" "add_drive_file_comment did not return a comment id"
+      skip_test "list_drive_file_activity" "add_drive_file_comment did not return a comment id"
+      skip_test "delete_drive_file_comment" "add_drive_file_comment did not return a comment id"
+    fi
     run_capture_to_var DRIVE_VERSION_TEXT "upload_drive_file_version($DRIVE_FILE_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"upload_drive_file_version\",\"arguments\":{\"drive\":$DRIVE_JSON,\"file\":$DRIVE_FILE_ID_JSON,\"contentType\":\"text/plain\",\"data\":$DRIVE_TEST_VERSION_DATA_JSON}},\"id\":2}"
     assert_json_field_equals "upload_drive_file_version increments version" "$DRIVE_VERSION_TEXT" ".currentVersion.version" "2"
@@ -3089,6 +3113,11 @@ if [ -n "$DRIVE_ID" ]; then
   else
     skip_test "get_drive_item(file)" "upload_drive_file did not return a file id"
     skip_test "list_drive_file_versions" "upload_drive_file did not return a file id"
+    skip_test "add_drive_file_comment" "upload_drive_file did not return a file id"
+    skip_test "list_drive_file_comments" "upload_drive_file did not return a file id"
+    skip_test "update_drive_file_comment" "upload_drive_file did not return a file id"
+    skip_test "list_drive_file_activity" "upload_drive_file did not return a file id"
+    skip_test "delete_drive_file_comment" "upload_drive_file did not return a file id"
     skip_test "upload_drive_file_version" "upload_drive_file did not return a file id"
     skip_test "move_drive_item" "upload_drive_file did not return a file id"
     skip_test "rename_drive_item" "upload_drive_file did not return a file id"
@@ -3099,6 +3128,11 @@ else
   skip_test "list_drive_items" "no Drive spaces found in workspace"
   skip_test "create_drive_folder" "no Drive spaces found in workspace"
   skip_test "upload_drive_file" "no Drive spaces found in workspace"
+  skip_test "add_drive_file_comment" "no Drive spaces found in workspace"
+  skip_test "list_drive_file_comments" "no Drive spaces found in workspace"
+  skip_test "update_drive_file_comment" "no Drive spaces found in workspace"
+  skip_test "list_drive_file_activity" "no Drive spaces found in workspace"
+  skip_test "delete_drive_file_comment" "no Drive spaces found in workspace"
   skip_test "upload_drive_file_version" "no Drive spaces found in workspace"
   skip_test "move_drive_item" "no Drive spaces found in workspace"
   skip_test "rename_drive_item" "no Drive spaces found in workspace"

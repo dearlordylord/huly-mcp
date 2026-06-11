@@ -36,6 +36,7 @@ import {
   DocumentNotFoundError,
   DocumentReferenceError,
   DrawingNotFoundError,
+  DriveFileCommentNotFoundError,
   DriveFileNotFoundError,
   DriveFileVersionNotFoundError,
   DriveFolderNotEmptyError,
@@ -953,6 +954,8 @@ describe("Huly Errors", () => {
               return `drive-parent-not-folder:${error.drive}:${error.path}:${error.parentPath}`
             case "DriveFileNotFoundError":
               return `drive-file:${error.drive}:${error.file}`
+            case "DriveFileCommentNotFoundError":
+              return `drive-file-comment:${error.drive}:${error.file}:${error.commentId}`
             case "DriveFileVersionNotFoundError":
               return `drive-version:${error.drive}:${error.file}:${error.version}`
             case "DrivePathConflictError":
@@ -1258,6 +1261,20 @@ describe("Huly Errors", () => {
         expect(new DriveFileNotFoundError({ drive: "Docs", file: "/missing.txt" }).message).toBe(
           "Drive file '/missing.txt' not found in drive 'Docs'"
         )
+        expect(matchError(
+          new DriveFileCommentNotFoundError({
+            drive: "Docs",
+            file: "file-1",
+            commentId: "comment-1"
+          })
+        )).toBe("drive-file-comment:Docs:file-1:comment-1")
+        expect(
+          new DriveFileCommentNotFoundError({
+            drive: "Docs",
+            file: "file-1",
+            commentId: "comment-1"
+          }).message
+        ).toBe("Drive file comment 'comment-1' for file 'file-1' not found in drive 'Docs'")
         expect(matchError(
           new DriveFileVersionNotFoundError({
             drive: "Docs",

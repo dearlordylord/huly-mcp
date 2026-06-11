@@ -1,8 +1,12 @@
 import {
+  addDriveFileCommentParamsJsonSchema,
+  AddDriveFileCommentResultSchema,
   createDriveFolderParamsJsonSchema,
   CreateDriveFolderResultSchema,
   createDriveParamsJsonSchema,
   CreateDriveResultSchema,
+  deleteDriveFileCommentParamsJsonSchema,
+  DeleteDriveFileCommentResultSchema,
   deleteDriveItemParamsJsonSchema,
   DeleteDriveItemResultSchema,
   deleteDriveParamsJsonSchema,
@@ -13,6 +17,10 @@ import {
   DriveSummarySchema,
   getDriveItemParamsJsonSchema,
   getDriveParamsJsonSchema,
+  listDriveFileActivityParamsJsonSchema,
+  ListDriveFileActivityResultSchema,
+  listDriveFileCommentsParamsJsonSchema,
+  ListDriveFileCommentsResultSchema,
   listDriveFileVersionsParamsJsonSchema,
   ListDriveFileVersionsResultSchema,
   listDriveItemsParamsJsonSchema,
@@ -21,13 +29,17 @@ import {
   ListDrivesResultSchema,
   moveDriveItemParamsJsonSchema,
   MoveDriveItemResultSchema,
+  parseAddDriveFileCommentParams,
   parseCreateDriveFolderParams,
   parseCreateDriveParams,
+  parseDeleteDriveFileCommentParams,
   parseDeleteDriveItemParams,
   parseDeleteDriveParams,
   parseDriveMemberMutationParams,
   parseGetDriveItemParams,
   parseGetDriveParams,
+  parseListDriveFileActivityParams,
+  parseListDriveFileCommentsParams,
   parseListDriveFileVersionsParams,
   parseListDriveItemsParams,
   parseListDrivesParams,
@@ -35,6 +47,7 @@ import {
   parseRenameDriveItemParams,
   parseRestoreDriveFileVersionParams,
   parseSetDriveOwnersParams,
+  parseUpdateDriveFileCommentParams,
   parseUpdateDriveParams,
   parseUploadDriveFileParams,
   parseUploadDriveFileVersionParams,
@@ -44,6 +57,8 @@ import {
   RestoreDriveFileVersionResultSchema,
   setDriveOwnersParamsJsonSchema,
   SetDriveOwnersResultSchema,
+  updateDriveFileCommentParamsJsonSchema,
+  UpdateDriveFileCommentResultSchema,
   updateDriveParamsJsonSchema,
   UpdateDriveResultSchema,
   uploadDriveFileParamsJsonSchema,
@@ -53,13 +68,17 @@ import {
 } from "../../domain/schemas.js"
 import { DEFAULT_INCLUDE_ARCHIVED } from "../../domain/schemas/shared.js"
 import {
+  addDriveFileComment,
   addDriveMembers,
   createDrive,
   createDriveFolder,
   deleteDrive,
+  deleteDriveFileComment,
   deleteDriveItem,
   getDrive,
   getDriveItem,
+  listDriveFileActivity,
+  listDriveFileComments,
   listDriveFileVersions,
   listDriveItems,
   listDrives,
@@ -69,6 +88,7 @@ import {
   restoreDriveFileVersion,
   setDriveOwners,
   updateDrive,
+  updateDriveFileComment,
   uploadDriveFile,
   uploadDriveFileVersion
 } from "../../huly/operations/drive.js"
@@ -201,6 +221,74 @@ export const driveTools: ReadonlyArray<RegisteredTool> = [
       parseGetDriveItemParams,
       getDriveItem,
       DriveItemSummarySchema
+    )
+  },
+  {
+    name: "list_drive_file_comments",
+    description:
+      "List comments on a Drive file resolved by filePath or fileId. Provide only one locator. Returns comments sorted by creation date, oldest first.",
+    category: CATEGORY,
+    inputSchema: listDriveFileCommentsParamsJsonSchema,
+    handler: createEncodedCombinedToolHandler(
+      "list_drive_file_comments",
+      parseListDriveFileCommentsParams,
+      listDriveFileComments,
+      ListDriveFileCommentsResultSchema
+    )
+  },
+  {
+    name: "add_drive_file_comment",
+    description:
+      "Add a Markdown comment to a Drive file resolved by filePath or fileId. Provide only one locator. The comment is attached directly to the file.",
+    category: CATEGORY,
+    inputSchema: addDriveFileCommentParamsJsonSchema,
+    annotations: { idempotentHint: false, destructiveHint: false },
+    handler: createEncodedCombinedToolHandler(
+      "add_drive_file_comment",
+      parseAddDriveFileCommentParams,
+      addDriveFileComment,
+      AddDriveFileCommentResultSchema
+    )
+  },
+  {
+    name: "update_drive_file_comment",
+    description:
+      "Update a comment on a Drive file resolved by filePath or fileId. Provide only one locator. Idempotent when the comment body is unchanged.",
+    category: CATEGORY,
+    inputSchema: updateDriveFileCommentParamsJsonSchema,
+    annotations: { idempotentHint: true, destructiveHint: false },
+    handler: createEncodedCombinedToolHandler(
+      "update_drive_file_comment",
+      parseUpdateDriveFileCommentParams,
+      updateDriveFileComment,
+      UpdateDriveFileCommentResultSchema
+    )
+  },
+  {
+    name: "delete_drive_file_comment",
+    description:
+      "Permanently delete a comment from a Drive file resolved by filePath or fileId. Provide only one locator. This deletes the comment, not the file.",
+    category: CATEGORY,
+    inputSchema: deleteDriveFileCommentParamsJsonSchema,
+    annotations: { idempotentHint: false, destructiveHint: true },
+    handler: createEncodedCombinedToolHandler(
+      "delete_drive_file_comment",
+      parseDeleteDriveFileCommentParams,
+      deleteDriveFileComment,
+      DeleteDriveFileCommentResultSchema
+    )
+  },
+  {
+    name: "list_drive_file_activity",
+    description:
+      "List activity messages for a Drive file resolved by filePath or fileId. Provide only one locator. Returns activity sorted by date, newest first.",
+    category: CATEGORY,
+    inputSchema: listDriveFileActivityParamsJsonSchema,
+    handler: createEncodedCombinedToolHandler(
+      "list_drive_file_activity",
+      parseListDriveFileActivityParams,
+      listDriveFileActivity,
+      ListDriveFileActivityResultSchema
     )
   },
   {

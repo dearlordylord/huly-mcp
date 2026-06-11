@@ -640,6 +640,11 @@ SDK upgrade revisit:
 | `set_drive_owners` | Replace owners on an existing Drive. Owners accept account UUIDs, exact emails, or exact person names. By default, each owner is also ensured as a Drive member. Pass owners=[] to clear owners. |
 | `list_drive_items` | List children under a folder path in a Drive. Paths are POSIX-like and normalized to absolute; '/' lists the root. Duplicate same-parent titles fail with candidate ids instead of guessing. |
 | `get_drive_item` | Get one Drive folder or file by either exact itemId or path. Provide only one locator. File results include current version, size, MIME type, and download URL when available. |
+| `list_drive_file_comments` | List comments on a Drive file resolved by filePath or fileId. Provide only one locator. Returns comments sorted by creation date, oldest first. |
+| `add_drive_file_comment` | Add a Markdown comment to a Drive file resolved by filePath or fileId. Provide only one locator. The comment is attached directly to the file. |
+| `update_drive_file_comment` | Update a comment on a Drive file resolved by filePath or fileId. Provide only one locator. Idempotent when the comment body is unchanged. |
+| `delete_drive_file_comment` | Permanently delete a comment from a Drive file resolved by filePath or fileId. Provide only one locator. This deletes the comment, not the file. |
+| `list_drive_file_activity` | List activity messages for a Drive file resolved by filePath or fileId. Provide only one locator. Returns activity sorted by date, newest first. |
 | `create_drive_folder` | Idempotently create a Drive folder path, creating missing parents like mkdir -p. Returns created=false when the full folder path already exists. |
 | `upload_drive_file` | Upload a file into Drive at a full path including filename. Provide exactly one source: filePath, fileUrl, or base64 data. By default createParents=true creates missing parent folders and reports them. |
 | `upload_drive_file_version` | Upload a new version for an existing Drive file resolved by file id or file path. Provide exactly one source: filePath, fileUrl, or base64 data. This increments the file version counter and makes the uploaded version current. |

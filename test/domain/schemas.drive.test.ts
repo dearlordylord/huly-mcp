@@ -3,7 +3,10 @@ import { Effect, Schema } from "effect"
 import { expect } from "vitest"
 
 import {
+  AddDriveFileCommentResultSchema,
+  CommentSchema,
   CreateDriveResultSchema,
+  DeleteDriveFileCommentResultSchema,
   DeleteDriveItemResultSchema,
   DeleteDriveResultSchema,
   DriveFileVersionSummarySchema,
@@ -11,18 +14,26 @@ import {
   DriveItemTitle,
   DriveMemberMutationResultSchema,
   DriveSummarySchema,
+  ListDriveFileActivityResultSchema,
+  ListDriveFileCommentsResultSchema,
   MoveDriveItemResultSchema,
+  parseAddDriveFileCommentParams,
+  parseDeleteDriveFileCommentParams,
   parseDeleteDriveItemParams,
   parseDriveMemberMutationParams,
   parseGetDriveItemParams,
+  parseListDriveFileActivityParams,
+  parseListDriveFileCommentsParams,
   parseMoveDriveItemParams,
   parseRenameDriveItemParams,
   parseSetDriveOwnersParams,
+  parseUpdateDriveFileCommentParams,
   parseUpdateDriveParams,
   parseUploadDriveFileParams,
   parseUploadDriveFileVersionParams,
   RenameDriveItemResultSchema,
   SetDriveOwnersResultSchema,
+  UpdateDriveFileCommentResultSchema,
   UpdateDriveResultSchema,
   uploadDriveFileParamsJsonSchema,
   UploadDriveFileVersionResultSchema
@@ -126,6 +137,48 @@ describe("drive schemas", () => {
       expect(moveAmbiguousLocator._tag).toBe("Left")
       expect(versionMissingSource._tag).toBe("Left")
       expect(versionConflictingSource._tag).toBe("Left")
+    }))
+
+  it.effect("requires exactly one Drive file locator for comments and activity", () =>
+    Effect.gen(function*() {
+      const listAccepted = yield* parseListDriveFileCommentsParams({
+        drive: "Docs",
+        filePath: "/Specs/API.md"
+      })
+      const addAccepted = yield* parseAddDriveFileCommentParams({
+        drive: "Docs",
+        fileId: "file-api",
+        body: "Looks good"
+      })
+      const updateAccepted = yield* parseUpdateDriveFileCommentParams({
+        drive: "Docs",
+        filePath: "/Specs/API.md",
+        commentId: "comment-1",
+        body: "Updated"
+      })
+      const deleteAccepted = yield* parseDeleteDriveFileCommentParams({
+        drive: "Docs",
+        fileId: "file-api",
+        commentId: "comment-1"
+      })
+      const activityAccepted = yield* parseListDriveFileActivityParams({
+        drive: "Docs",
+        filePath: "/Specs/API.md"
+      })
+      const missing = yield* Effect.either(parseListDriveFileCommentsParams({ drive: "Docs" }))
+      const ambiguous = yield* Effect.either(parseListDriveFileActivityParams({
+        drive: "Docs",
+        filePath: "/Specs/API.md",
+        fileId: "file-api"
+      }))
+
+      expect(listAccepted.filePath).toBe("/Specs/API.md")
+      expect(addAccepted.fileId).toBe("file-api")
+      expect(updateAccepted.commentId).toBe("comment-1")
+      expect(deleteAccepted.commentId).toBe("comment-1")
+      expect(activityAccepted.filePath).toBe("/Specs/API.md")
+      expect(missing._tag).toBe("Left")
+      expect(ambiguous._tag).toBe("Left")
     }))
 
   it.effect("validates Drive administration params", () =>
@@ -253,6 +306,71 @@ describe("drive schemas", () => {
       expect(moved.toPath).toBe("/Specs/API.md")
       expect(renamed.renamed).toBe(true)
       expect(deleted.deletedVersions).toBe(2)
+    }))
+
+  it.effect("encodes branded outputs for Drive file comments and activity", () =>
+    Effect.gen(function*() {
+      const file = yield* Schema.decodeUnknown(DriveItemSummarySchema)({
+        id: "file-api",
+        driveId: "drive-1",
+        kind: "file",
+        title: "API.md",
+        path: "/Specs/API.md",
+        url: "https://huly.test/workbench/ws/drive/file/file-api",
+        currentVersionId: "version-2",
+        version: 2,
+        size: 5,
+        contentType: "text/markdown",
+        downloadUrl: "https://files.test/blob-2"
+      })
+      const comment = yield* Schema.decodeUnknown(CommentSchema)({
+        id: "comment-1",
+        body: "Looks good",
+        authorId: "person-1",
+        createdOn: 1,
+        modifiedOn: 1
+      })
+      const decodedListComments = yield* Schema.decodeUnknown(ListDriveFileCommentsResultSchema)({
+        file,
+        comments: [comment],
+        total: 1
+      })
+      const decodedAdded = yield* Schema.decodeUnknown(AddDriveFileCommentResultSchema)({
+        file,
+        commentId: "comment-1"
+      })
+      const decodedUpdated = yield* Schema.decodeUnknown(UpdateDriveFileCommentResultSchema)({
+        file,
+        commentId: "comment-1",
+        updated: true
+      })
+      const decodedDeleted = yield* Schema.decodeUnknown(DeleteDriveFileCommentResultSchema)({
+        file,
+        commentId: "comment-1",
+        deleted: true
+      })
+      const decodedActivity = yield* Schema.decodeUnknown(ListDriveFileActivityResultSchema)({
+        file,
+        activity: [{
+          id: "activity-1",
+          objectId: "file-api",
+          objectClass: "drive:class:File",
+          modifiedBy: "person-1",
+          modifiedOn: 2
+        }],
+        total: 1
+      })
+      const listComments = yield* Schema.encode(ListDriveFileCommentsResultSchema)(decodedListComments)
+      const added = yield* Schema.encode(AddDriveFileCommentResultSchema)(decodedAdded)
+      const updated = yield* Schema.encode(UpdateDriveFileCommentResultSchema)(decodedUpdated)
+      const deleted = yield* Schema.encode(DeleteDriveFileCommentResultSchema)(decodedDeleted)
+      const activity = yield* Schema.encode(ListDriveFileActivityResultSchema)(decodedActivity)
+
+      expect(listComments.comments[0].id).toBe("comment-1")
+      expect(added.commentId).toBe("comment-1")
+      expect(updated.updated).toBe(true)
+      expect(deleted.deleted).toBe(true)
+      expect(activity.activity[0].objectId).toBe("file-api")
     }))
 
   it.effect("encodes branded outputs for Drive administration operations", () =>

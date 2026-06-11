@@ -108,6 +108,19 @@ export class DriveFileVersionNotFoundError extends Schema.TaggedError<DriveFileV
   }
 }
 
+export class DriveFileCommentNotFoundError extends Schema.TaggedError<DriveFileCommentNotFoundError>()(
+  "DriveFileCommentNotFoundError",
+  {
+    drive: NonEmptyString,
+    file: NonEmptyString,
+    commentId: NonEmptyString
+  }
+) {
+  override get message(): string {
+    return `Drive file comment '${this.commentId}' for file '${this.file}' not found in drive '${this.drive}'`
+  }
+}
+
 export class DrivePathConflictError extends Schema.TaggedError<DrivePathConflictError>()(
   "DrivePathConflictError",
   {

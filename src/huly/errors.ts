@@ -47,6 +47,7 @@ import {
   TeamspaceNotFoundError
 } from "./errors-documents.js"
 import {
+  DriveFileCommentNotFoundError,
   DriveFileNotFoundError,
   DriveFileVersionNotFoundError,
   DriveFolderNotEmptyError,
@@ -179,6 +180,7 @@ export {
   DocumentTextMultipleMatchesError,
   DocumentTextNotFoundError,
   DrawingNotFoundError,
+  DriveFileCommentNotFoundError,
   DriveFileNotFoundError,
   DriveFileVersionNotFoundError,
   DriveFolderNotEmptyError,
@@ -386,6 +388,7 @@ export const HulyDomainError = Schema.Union(
   DrivePathNotFoundError,
   DrivePathAmbiguousError,
   DriveParentNotFolderError,
+  DriveFileCommentNotFoundError,
   DriveFileNotFoundError,
   DriveFileVersionNotFoundError,
   DrivePathConflictError,

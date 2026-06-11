@@ -2,6 +2,7 @@ import { NonEmptyString } from "../../domain/schemas/shared.js"
 import type { HulyClientError } from "../client.js"
 import type { DriveSpace, File, Folder } from "../drive-sdk.js"
 import type {
+  DriveFileCommentNotFoundError,
   DriveFileNotFoundError,
   DriveFileVersionNotFoundError,
   DriveFolderNotEmptyError,
@@ -29,6 +30,7 @@ export type DriveOperationError =
   | DrivePathAmbiguousError
   | DriveParentNotFolderError
   | DriveFileNotFoundError
+  | DriveFileCommentNotFoundError
   | DriveFileVersionNotFoundError
   | DrivePathConflictError
   | DriveInvalidMoveError
