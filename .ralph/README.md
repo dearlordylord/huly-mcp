@@ -46,6 +46,7 @@ RALPH_CLEANUP_EFFORT=low
 RALPH_MAX_TASKS_PER_LANE=1
 RALPH_MAX_REVIEW_ATTEMPTS=12
 RALPH_LANE_CONCURRENCY=3
+RALPH_LANES=core-role-assignment,chat-message-pin-state
 ```
 
 `RALPH_AGENT_MODE=scripted` is only a smoke test for orchestration. It must not
@@ -57,6 +58,8 @@ If a lane exhausts `RALPH_MAX_REVIEW_ATTEMPTS`, Ralph records that lane as
 failed but lets sibling lanes finish before the process exits non-zero.
 By default, lane concurrency is the number of configured lane specs. Set
 `RALPH_LANE_CONCURRENCY` only to intentionally run fewer lanes at a time.
+Set `RALPH_LANES` to a comma-separated lane id list to run or retry only those
+lanes without spending agent calls on lanes that are already done.
 
 ## Current Lanes
 

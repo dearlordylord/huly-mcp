@@ -184,6 +184,22 @@ const laneSpecs: ReadonlyArray<RalphLaneSpec> = [
   }
 ]
 
+const selectLaneSpecs = (lanes: ReadonlyArray<RalphLaneSpec>): ReadonlyArray<RalphLaneSpec> => {
+  const value = process.env["RALPH_LANES"]
+  if (value === undefined || value.trim() === "") return lanes
+
+  const requested = value.split(",").map((lane) => lane.trim()).filter((lane) => lane !== "")
+  const requestedSet = new Set(requested)
+  const selected = lanes.filter((lane) => requestedSet.has(String(lane.laneId)))
+  const missing = requested.filter((lane) => !lanes.some((spec) => String(spec.laneId) === lane))
+
+  if (missing.length > 0) {
+    throw new Error(`Unknown RALPH_LANES value(s): ${missing.join(", ")}`)
+  }
+
+  return selected
+}
+
 const logName = (value: string): string => value.replace(/[^a-zA-Z0-9._-]/g, "-")
 
 const readCodexEffort = (name: string, fallback: CodexEffort): CodexEffort => {
@@ -915,15 +931,16 @@ const createScriptedRalphAgentLayer = (worktrees: Map<string, sandcastle.Worktre
 }
 
 await Effect.runPromise(ensureSandcastleRuntimeAnchor())
-const worktrees = await createWorktrees(laneSpecs)
-const initialStatus = await Effect.runPromise(initializeRuntimeFiles(laneSpecs))
+const selectedLaneSpecs = selectLaneSpecs(laneSpecs)
+const worktrees = await createWorktrees(selectedLaneSpecs)
+const initialStatus = await Effect.runPromise(initializeRuntimeFiles(selectedLaneSpecs))
 const agentMode = process.env["RALPH_AGENT_MODE"] ?? "scripted"
 const agentLayer = agentMode === "codex"
   ? createRalphAgentLayer(worktrees)
   : createScriptedRalphAgentLayer(worktrees)
 
-const program = runRalphLanes(laneSpecs, {
-  laneConcurrency: readPositiveInteger("RALPH_LANE_CONCURRENCY", Math.max(1, laneSpecs.length)),
+const program = runRalphLanes(selectedLaneSpecs, {
+  laneConcurrency: readPositiveInteger("RALPH_LANE_CONCURRENCY", Math.max(1, selectedLaneSpecs.length)),
   maxReviewAttempts: readPositiveInteger("RALPH_MAX_REVIEW_ATTEMPTS", 12),
   maxTasksPerLane: readPositiveInteger("RALPH_MAX_TASKS_PER_LANE", 1),
   observer: makeFileObserver(initialStatus)
