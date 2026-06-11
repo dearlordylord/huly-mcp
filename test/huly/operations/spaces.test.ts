@@ -1,7 +1,6 @@
 import { describe, it } from "@effect/vitest"
 import type { Channel, Employee, Person } from "@hcengineering/contact"
 import type {
-  AccountUuid,
   Class,
   Doc,
   DocumentQuery,
@@ -65,9 +64,7 @@ import {
 import { testWorkbenchUrlConfig } from "../../../src/huly/url-builders.js"
 import { corePersonId } from "../../helpers/huly-sdk.js"
 
-type GenericSpace = Space & Partial<Pick<TypedSpace, "type">> & {
-  readonly roles?: Record<string, ReadonlyArray<AccountUuid> | undefined>
-}
+type GenericSpace = Space & Partial<Pick<TypedSpace, "type">>
 
 const personId = corePersonId("person-social-1")
 const accountA = toAccountUuid("00000000-0000-4000-8000-000000000001")

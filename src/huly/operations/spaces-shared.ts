@@ -1,6 +1,9 @@
 import type {
   AccountUuid as HulyAccountUuid,
   DocumentUpdate,
+  Ref,
+  Role,
+  RolesAssignment,
   Space,
   SpaceType as HulySpaceType,
   TypedSpace
@@ -34,13 +37,11 @@ import { core } from "../huly-plugins.js"
 import { resolveEmployeeAccountUuid } from "./contacts-shared.js"
 import { listTotal } from "./counts.js"
 import { hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
-import { toAccountUuid, toClassRef, toRef } from "./sdk-boundary.js"
+import { toAccountUuid, toClassRef, toMixinRef, toRef } from "./sdk-boundary.js"
 
-type RolesAssignment = Readonly<Record<string, ReadonlyArray<HulyAccountUuid> | undefined>>
-
-export type GenericSpace = Space & Partial<Pick<TypedSpace, "type" | "restricted">> & {
-  readonly roles?: RolesAssignment | undefined
-}
+export type GenericSpace = Space & Partial<Pick<TypedSpace, "type" | "restricted">>
+export type SpaceRoleAssignmentsMixin = GenericSpace & RolesAssignment
+export type SpaceRoleAssignments = Readonly<Record<Ref<Role>, ReadonlyArray<HulyAccountUuid>>>
 
 export type SpaceMutationError =
   | HulyClientError
@@ -84,6 +85,37 @@ export const optionalString = (value: string | undefined): string | undefined =>
 
 export const optionalObjectClassName = (value: string | undefined): ObjectClassName | undefined =>
   value === undefined || value === "" ? undefined : ObjectClassName.make(value)
+
+const isObjectRecord = (value: unknown): value is object => typeof value === "object" && value !== null
+
+const spaceRoleAssignmentSource = (space: GenericSpace, spaceType: HulySpaceType): unknown =>
+  Object.entries(space).find(([key]) => key === spaceType.targetClass)?.[1]
+
+export const spaceRoleAssignmentEntries = (
+  space: GenericSpace,
+  spaceType: HulySpaceType
+): ReadonlyArray<readonly [Ref<Role>, ReadonlyArray<HulyAccountUuid>]> => {
+  const source = spaceRoleAssignmentSource(space, spaceType)
+  if (!isObjectRecord(source)) return []
+
+  return Object.entries(source).flatMap(([roleId, members]) =>
+    Array.isArray(members)
+      ? [[
+        toRef<Role>(roleId),
+        sortStrings(members.filter((member): member is string => typeof member === "string")).map(toAccountUuid)
+      ]]
+      : []
+  )
+}
+
+export const spaceRoleAssignments = (space: GenericSpace, spaceType: HulySpaceType): SpaceRoleAssignments =>
+  Object.fromEntries(spaceRoleAssignmentEntries(space, spaceType))
+
+export const hasSpaceRoleAssignmentMixin = (space: GenericSpace, spaceType: HulySpaceType): boolean =>
+  isObjectRecord(spaceRoleAssignmentSource(space, spaceType))
+
+export const spaceRoleAssignmentsMixin = (spaceType: HulySpaceType) =>
+  toMixinRef<SpaceRoleAssignmentsMixin>(spaceType.targetClass)
 
 export const applySpaceFilters = (
   query: StrictDocumentQuery<GenericSpace>,

@@ -19,22 +19,25 @@ import { SpaceNotTypedError, SpaceRoleIdentifierAmbiguousError, SpaceRoleNotFoun
 import { core } from "../huly-plugins.js"
 import { clearTextAsEmptyString } from "./clear-field-updates.js"
 import { hulyQuery } from "./query-helpers.js"
-import { toAccountUuid, toClassRef, toMixinRef, toRef } from "./sdk-boundary.js"
+import { toAccountUuid, toClassRef, toRef } from "./sdk-boundary.js"
 import {
   arraysEqual,
   findSpace,
   type GenericSpace,
+  hasSpaceRoleAssignmentMixin,
   mergeUniqueSortedAccountUuids,
   removeAccountUuids,
   resolveMembers,
   sortStrings,
   type SpaceMemberMutationError,
+  type SpaceRoleAssignments,
+  spaceRoleAssignments,
+  type SpaceRoleAssignmentsMixin,
+  spaceRoleAssignmentsMixin,
   updateSpaceDoc,
   type UpdateSpaceError
 } from "./spaces-shared.js"
 import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
-
-type SpaceRoleAssignmentsMixin = GenericSpace & Readonly<Record<string, ReadonlyArray<HulyAccountUuid> | undefined>>
 
 type SpaceRoleMemberMutationError =
   | SpaceMemberMutationError
@@ -118,53 +121,21 @@ const resolveSpaceRole = (
     return matches[0]
   })
 
-const assignmentValue = (space: GenericSpace, spaceType: SpaceType): unknown =>
-  Object.entries(space).find(([key]) => key === spaceType.targetClass)?.[1]
-
-const isObjectRecord = (value: unknown): value is object => typeof value === "object" && value !== null
-
-const assignmentEntries = (
-  space: GenericSpace,
-  spaceType: SpaceType
-): ReadonlyArray<readonly [string, ReadonlyArray<HulyAccountUuid>]> => {
-  const current = assignmentValue(space, spaceType)
-  if (!isObjectRecord(current)) return []
-
-  return Object.entries(current).flatMap(([roleId, members]) =>
-    Array.isArray(members)
-      ? [[
-        roleId,
-        sortStrings(members.filter((member): member is string => typeof member === "string")).map(
-          toAccountUuid
-        )
-      ]]
-      : []
-  )
-}
-
-const roleAssignments = (
-  space: GenericSpace,
-  spaceType: SpaceType
-): Readonly<Record<string, ReadonlyArray<HulyAccountUuid>>> => Object.fromEntries(assignmentEntries(space, spaceType))
-
-const hasRoleAssignmentMixin = (space: GenericSpace, spaceType: SpaceType): boolean =>
-  isObjectRecord(assignmentValue(space, spaceType))
-
 const writeSpaceRoleMembers = (
   client: HulyClient["Type"],
   space: GenericSpace,
   spaceType: SpaceType,
   role: Role,
-  currentAssignments: Readonly<Record<string, ReadonlyArray<HulyAccountUuid>>>,
+  currentAssignments: SpaceRoleAssignments,
   members: ReadonlyArray<HulyAccountUuid>
 ): Effect.Effect<void, HulyClientError> => {
-  const mixin = toMixinRef<SpaceRoleAssignmentsMixin>(spaceType.targetClass)
+  const mixin = spaceRoleAssignmentsMixin(spaceType)
   const attributes = { ...currentAssignments, [role._id]: members }
   const objectId = toRef<GenericSpace>(space._id)
   const objectClass = toClassRef<GenericSpace>(space._class)
   const objectSpace = toRef<Space>(space.space)
 
-  return hasRoleAssignmentMixin(space, spaceType)
+  return hasSpaceRoleAssignmentMixin(space, spaceType)
     ? client.updateMixin<GenericSpace, SpaceRoleAssignmentsMixin>(objectId, objectClass, objectSpace, mixin, attributes)
       .pipe(Effect.asVoid)
     : client.createMixin<GenericSpace, SpaceRoleAssignmentsMixin>(objectId, objectClass, objectSpace, mixin, attributes)
@@ -187,7 +158,7 @@ const mutateSpaceRoleMembers = (
     const spaceTypeDoc = yield* findSpaceType(client, spaceType)
     const role = yield* resolveSpaceRole(client, spaceType, params.role)
     const resolvedMembers = yield* resolveMembers(client, params.members)
-    const currentAssignments = roleAssignments(space, spaceTypeDoc)
+    const currentAssignments = spaceRoleAssignments(space, spaceTypeDoc)
     const currentMembers = sortStrings(currentAssignments[role._id] ?? []).map(toAccountUuid)
     const nextMembers = mutateMembers(currentMembers, resolvedMembers).map(toAccountUuid)
     const changed = !arraysEqual(currentMembers, nextMembers)

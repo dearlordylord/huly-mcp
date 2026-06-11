@@ -24,7 +24,7 @@ import {
   SpaceTypeId
 } from "../../domain/schemas/shared.js"
 import type { GenericSpace } from "./spaces-shared.js"
-import { optionalObjectClassName, optionalString } from "./spaces-shared.js"
+import { optionalObjectClassName, optionalString, spaceRoleAssignmentEntries } from "./spaces-shared.js"
 
 export const toPermissionSummary = (permission: HulyPermission): SpacePermissionSummary => ({
   id: PermissionId.make(permission._id),
@@ -51,27 +51,18 @@ export const toSpaceSummary = (space: GenericSpace): SpaceSummary => ({
   ownersCount: Count.make(space.owners?.length ?? 0)
 })
 
-const isObjectRecord = (value: unknown): value is object => typeof value === "object" && value !== null
-
-const roleAssignmentSource = (space: GenericSpace, spaceType: HulySpaceType | undefined): unknown =>
-  spaceType === undefined ? undefined : Object.entries(space).find(([key]) => key === spaceType.targetClass)?.[1]
-
 const roleAssignments = (
   space: GenericSpace,
   spaceType: HulySpaceType | undefined
 ): Array<SpaceRoleAssignment> | undefined => {
-  const source = roleAssignmentSource(space, spaceType)
-  if (!isObjectRecord(source)) return undefined
-  return Object.entries(source).flatMap(([roleId, members]) =>
-    Array.isArray(members)
-      ? [{
-        roleId: RoleId.make(roleId),
-        members: members.filter((member): member is string => typeof member === "string").map((member) =>
-          AccountUuid.make(member)
-        )
-      }]
-      : []
-  )
+  if (spaceType === undefined) return undefined
+  const entries = spaceRoleAssignmentEntries(space, spaceType)
+  return entries.length === 0
+    ? undefined
+    : entries.map(([roleId, members]) => ({
+      roleId: RoleId.make(roleId),
+      members: members.map((member) => AccountUuid.make(member))
+    }))
 }
 
 export const toSpaceDetail = (space: GenericSpace, spaceType?: HulySpaceType): SpaceDetail => ({
