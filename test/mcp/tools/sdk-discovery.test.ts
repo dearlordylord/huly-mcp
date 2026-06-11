@@ -110,7 +110,7 @@ describe("sdkDiscoveryTools", () => {
       expect(parsed.classes[0].classId).toBe(tracker.class.Issue)
     }))
 
-  it.effect("describe_huly_package_viability reports published and blocked package status", () =>
+  it.effect("describe_huly_package_viability reports incompatible and blocked package status", () =>
     Effect.gen(function*() {
       const tool = findTool("describe_huly_package_viability")
       const result = yield* Effect.promise(() => tool.handler({}, hulyClient, noopStorageClient))
@@ -125,18 +125,18 @@ describe("sdkDiscoveryTools", () => {
           requestedVersion: "0.7.423",
           publishStatus: "published",
           dependencyStatus: "not_declared",
-          mcpStatus: "blocked",
+          mcpStatus: "incompatible",
           usableClassesOrOperations: [],
-          blockedReason: expect.stringContaining("no local typed SDK declarations")
+          blockedReason: expect.stringContaining("without shipping a types directory")
         }),
         expect.objectContaining({
           packageName: "@hcengineering/inventory",
           requestedVersion: "0.7.423",
           publishStatus: "published",
           dependencyStatus: "not_declared",
-          mcpStatus: "blocked",
+          mcpStatus: "incompatible",
           usableClassesOrOperations: [],
-          blockedReason: expect.stringContaining("no local typed SDK declarations")
+          blockedReason: expect.stringContaining("without shipping a types directory")
         }),
         expect.objectContaining({
           packageName: "@hcengineering/products",
@@ -147,6 +147,14 @@ describe("sdkDiscoveryTools", () => {
           blockedReason: expect.stringContaining("not published")
         })
       ])
+      const products = parsed.packages.find((packageStatus) => packageStatus.packageName === "@hcengineering/products")
+      expect(products).toEqual(expect.objectContaining({
+        dependencyStatus: "not_declared",
+        mcpStatus: "blocked",
+        publishStatus: "not_published",
+        usableClassesOrOperations: []
+      }))
+      expect(parsed.packages.filter((packageStatus) => packageStatus.mcpStatus === "usable_for_discovery")).toEqual([])
       for (const packageStatus of parsed.packages) {
         expect(packageStatus.writeGuidance).toContain("Do not create")
       }

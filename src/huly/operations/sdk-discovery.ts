@@ -49,6 +49,10 @@ const packageWriteGuidance = NonEmptyString.make(
 const packageViabilityGuidance = NonEmptyString.make(
   "Use this report to decide whether package-backed issue #101 discovery work is viable. It does not prove workspace installation and it is not write authorization."
 )
+const missingPublishedTypesReason = (packageName: "@hcengineering/board" | "@hcengineering/inventory") =>
+  NonEmptyString.make(
+    `${packageName} is published at 0.7.423, but the published tarball declares types/index.d.ts without shipping a types directory. Under this repo's strict NodeNext TypeScript build, that is not a typed SDK surface, so the package must not be declared or used for discovery yet.`
+  )
 
 // Huly plugin constants are compatible with Ref<Class<MetadataClassDoc>> at runtime; the SDK type is narrower.
 // eslint-disable-next-line no-restricted-syntax -- SDK boundary cast for class model queries
@@ -242,11 +246,9 @@ export const describeHulyPackageViability = (
         requestedVersion: NonEmptyString.make("0.7.423"),
         publishStatus: "published",
         dependencyStatus: "not_declared",
-        mcpStatus: "blocked",
+        mcpStatus: "incompatible",
         usableClassesOrOperations: [],
-        blockedReason: NonEmptyString.make(
-          "@hcengineering/board is published at 0.7.423, but this MCP package does not declare it and no local typed SDK declarations are available to validate board class IDs or operations."
-        ),
+        blockedReason: missingPublishedTypesReason("@hcengineering/board"),
         writeGuidance: packageWriteGuidance
       },
       {
@@ -254,11 +256,9 @@ export const describeHulyPackageViability = (
         requestedVersion: NonEmptyString.make("0.7.423"),
         publishStatus: "published",
         dependencyStatus: "not_declared",
-        mcpStatus: "blocked",
+        mcpStatus: "incompatible",
         usableClassesOrOperations: [],
-        blockedReason: NonEmptyString.make(
-          "@hcengineering/inventory is published at 0.7.423, but this MCP package does not declare it and no local typed SDK declarations are available to validate inventory class IDs or operations."
-        ),
+        blockedReason: missingPublishedTypesReason("@hcengineering/inventory"),
         writeGuidance: packageWriteGuidance
       },
       {

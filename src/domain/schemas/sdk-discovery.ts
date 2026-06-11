@@ -41,7 +41,7 @@ const HulyIssue101PackageNameValues = [
 ] as const
 const HulyPackagePublishStatusValues = ["published", "not_published"] as const
 const HulyPackageDependencyStatusValues = ["declared", "not_declared"] as const
-const HulyPackageMcpStatusValues = ["usable_for_discovery", "blocked"] as const
+const HulyPackageMcpStatusValues = ["usable_for_discovery", "incompatible", "blocked"] as const
 
 type HulyKnownClassifierKindLiteral = typeof KnownClassifierKindValues[number]
 
@@ -253,6 +253,25 @@ const HulyBlockedPackageViabilitySchema = Schema.Struct({
   })
 })
 
+const HulyIncompatiblePackageViabilitySchema = Schema.Struct({
+  ...HulyPackageViabilityBaseFields,
+  publishStatus: Schema.Literal("published").annotations({
+    description: "Incompatible package rows are published but not consumable by this MCP package"
+  }),
+  dependencyStatus: Schema.Literal("not_declared").annotations({
+    description: "Incompatible package rows must not be declared as MCP package dependencies"
+  }),
+  mcpStatus: Schema.Literal("incompatible").annotations({
+    description: "This package cannot be safely consumed under current build and type constraints"
+  }),
+  usableClassesOrOperations: Schema.Tuple().annotations({
+    description: "Incompatible package rows must not advertise usable classes or operations"
+  }),
+  blockedReason: NonEmptyString.annotations({
+    description: "Concrete compatibility reason an LLM should not attempt implementation against this package yet"
+  })
+})
+
 const HulyUsablePackageViabilitySchema = Schema.Struct({
   ...HulyPackageViabilityBaseFields,
   publishStatus: Schema.Literal("published").annotations({
@@ -275,11 +294,12 @@ const HulyUsablePackageViabilitySchema = Schema.Struct({
 
 export const HulyPackageViabilitySchema = Schema.Union(
   HulyBlockedPackageViabilitySchema,
+  HulyIncompatiblePackageViabilitySchema,
   HulyUsablePackageViabilitySchema
 ).annotations({
   description: `Discriminated package viability. mcpStatus values are ${
     enumValuesDescription(HulyPackageMcpStatusValues)
-  }; blocked rows require blockedReason and no usable exports, while usable rows require published and declared status.`
+  }; blocked and incompatible rows require blockedReason and no usable exports, while usable rows require published and declared status.`
 })
 
 const sdkDiscoveryLimitDescription = (entity: string): string =>

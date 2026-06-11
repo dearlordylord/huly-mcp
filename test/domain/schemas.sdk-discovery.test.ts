@@ -103,6 +103,14 @@ describe("sdk discovery schemas", () => {
     expect(Schema.decodeUnknownSync(HulyPackageViabilitySchema)(usableInventory).mcpStatus).toBe(
       "usable_for_discovery"
     )
+    expect(
+      Schema.decodeUnknownSync(HulyPackageViabilitySchema)({
+        ...blockedBoard,
+        publishStatus: "published",
+        mcpStatus: "incompatible",
+        blockedReason: "Published package omits its declared types directory."
+      }).mcpStatus
+    ).toBe("incompatible")
     expect(() =>
       Schema.decodeUnknownSync(HulyPackageViabilitySchema)({
         ...usableInventory,
@@ -119,6 +127,14 @@ describe("sdk discovery schemas", () => {
       Schema.decodeUnknownSync(HulyPackageViabilitySchema)({
         ...usableInventory,
         blockedReason: "Usable rows must not carry blocked reasons."
+      })
+    ).toThrow()
+    expect(() =>
+      Schema.decodeUnknownSync(HulyPackageViabilitySchema)({
+        ...usableInventory,
+        mcpStatus: "incompatible",
+        usableClassesOrOperations: ["inventory:class:Product"],
+        blockedReason: "Incompatible rows must not advertise usable exports."
       })
     ).toThrow()
     expect(() =>
