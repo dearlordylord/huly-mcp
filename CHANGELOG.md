@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.30.0
+
+### Minor Changes
+
+- 0f2a641: Add first-class person and organization contact channel management tools, including provider discovery, list/add/update/remove workflows, idempotent adds, labeled channel summaries, and channel IDs on contact reads.
+
 ## 0.29.0
 
 ### Minor Changes
