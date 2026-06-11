@@ -1,7 +1,11 @@
 import { Effect } from "effect"
 
-import type { ListExternalChannelMessagesParams } from "../../domain/schemas/external-channel-messages.js"
-import { ExternalChannelProviderUnsupportedError } from "../errors.js"
+import {
+  DEFAULT_EXTERNAL_CHANNEL_MESSAGE_LIMIT,
+  encodeListExternalChannelMessagesResult,
+  type ListExternalChannelMessagesParams,
+  type ListExternalChannelMessagesResult
+} from "../../domain/schemas/external-channel-messages.js"
 
 const EXTERNAL_CHANNEL_PACKAGE_INCOMPATIBLE_REASON =
   "package-incompatible: package.json and pnpm-lock.yaml include @hcengineering/contact provider refs for email/telegram, but no compatible Huly Gmail or Telegram message SDK package/model is installed; local platform-api examples only expose contact.class.Channel provider values, not external message documents"
@@ -14,10 +18,14 @@ const EXTERNAL_CHANNEL_PACKAGE_INCOMPATIBLE_REASON =
  */
 export const listExternalChannelMessages = (
   params: ListExternalChannelMessagesParams
-): Effect.Effect<never, ExternalChannelProviderUnsupportedError> =>
-  Effect.fail(
-    new ExternalChannelProviderUnsupportedError({
+): Effect.Effect<ListExternalChannelMessagesResult> =>
+  Effect.sync(() =>
+    encodeListExternalChannelMessagesResult({
+      supported: false,
       provider: params.provider,
-      reason: EXTERNAL_CHANNEL_PACKAGE_INCOMPATIBLE_REASON
+      channel: params.channel,
+      limit: params.limit ?? DEFAULT_EXTERNAL_CHANNEL_MESSAGE_LIMIT,
+      unsupportedReason: EXTERNAL_CHANNEL_PACKAGE_INCOMPATIBLE_REASON,
+      messages: []
     })
   )

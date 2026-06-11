@@ -1089,6 +1089,25 @@ export {
 } from "./contacts.js"
 
 export {
+  DEFAULT_EXTERNAL_CHANNEL_MESSAGE_LIMIT,
+  encodeListExternalChannelMessagesResult,
+  ExternalChannelMessageId,
+  type ExternalChannelMessageProvider,
+  ExternalChannelMessageProviderSchema,
+  ExternalChannelMessageProviderValues,
+  type ExternalChannelMessageSummary,
+  ExternalChannelMessageSummarySchema,
+  type ListExternalChannelMessagesParams,
+  listExternalChannelMessagesParamsJsonSchema,
+  ListExternalChannelMessagesParamsSchema,
+  type ListExternalChannelMessagesResult,
+  ListExternalChannelMessagesResultSchema,
+  ListExternalChannelMessagesSupportedResultSchema,
+  ListExternalChannelMessagesUnsupportedResultSchema,
+  parseListExternalChannelMessagesParams
+} from "./external-channel-messages.js"
+
+export {
   type AddThreadReplyParams,
   addThreadReplyParamsJsonSchema,
   AddThreadReplyParamsSchema,

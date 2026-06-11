@@ -818,8 +818,6 @@ describe("Huly Errors", () => {
               return `dm:${error.identifier}`
             case "DirectMessageParticipantCountError":
               return `dm-participant-count:${error.requested}:${error.nonSelfParticipants}`
-            case "ExternalChannelProviderUnsupportedError":
-              return `external-provider:${error.provider}:${error.reason}`
             case "MessageNotFoundError":
               return `message:${error.messageId}`
             case "ThreadReplyNotFoundError":

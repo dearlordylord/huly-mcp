@@ -5,7 +5,6 @@
  */
 import { Schema } from "effect"
 
-import { ExternalChannelMessageProviderSchema } from "../domain/schemas/external-channel-messages.js"
 import { Count } from "../domain/schemas/shared.js"
 
 const MIN_AMBIGUOUS_DM_MATCHES = 2
@@ -166,23 +165,6 @@ export class MessageNotFoundError extends Schema.TaggedError<MessageNotFoundErro
 ) {
   override get message(): string {
     return `Message '${this.messageId}' not found in channel '${this.channel}'`
-  }
-}
-
-/**
- * External channel provider message listing is unavailable in this build.
- */
-export class ExternalChannelProviderUnsupportedError
-  extends Schema.TaggedError<ExternalChannelProviderUnsupportedError>()(
-    "ExternalChannelProviderUnsupportedError",
-    {
-      provider: ExternalChannelMessageProviderSchema,
-      reason: Schema.String
-    }
-  )
-{
-  override get message(): string {
-    return `External channel provider '${this.provider}' is unsupported: ${this.reason}`
   }
 }
 

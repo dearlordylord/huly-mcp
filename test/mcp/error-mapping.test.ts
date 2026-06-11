@@ -21,7 +21,6 @@ import {
   DirectMessageIdentifierAmbiguousError,
   DirectMessageNotFoundError,
   DocumentContentCorruptedError,
-  ExternalChannelProviderUnsupportedError,
   FileFetchError,
   FileNotFoundError,
   FileUploadError,
@@ -254,22 +253,6 @@ describe("Error Mapping to MCP", () => {
           expect(response._meta.errorTag).toBeUndefined()
           expect(response.content[0].text).toBe(
             "Direct message 'Kerr,Shannon' is ambiguous (2 matches); use the DM _id"
-          )
-        }))
-
-      it.effect("maps ExternalChannelProviderUnsupportedError as deliberate unsupported params", () =>
-        Effect.gen(function*() {
-          const error = new ExternalChannelProviderUnsupportedError({
-            provider: "gmail",
-            reason: "package-incompatible: missing compatible SDK package"
-          })
-          const response = mapDomainErrorToMcp(error)
-
-          expect(response.isError).toBe(true)
-          expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response._meta.errorTag).toBeUndefined()
-          expect(response.content[0].text).toBe(
-            "External channel provider 'gmail' is unsupported: package-incompatible: missing compatible SDK package"
           )
         }))
 
