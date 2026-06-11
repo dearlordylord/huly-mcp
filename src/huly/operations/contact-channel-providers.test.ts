@@ -17,6 +17,21 @@ import { toRef } from "./sdk-boundary.js"
 const testRef: typeof toRef = toRef
 const sorted = (values: Iterable<string>): Array<string> => Array.from(values).sort()
 
+const expectedProviderRefs = {
+  email: contact.channelProvider.Email,
+  phone: contact.channelProvider.Phone,
+  linkedin: contact.channelProvider.LinkedIn,
+  twitter: contact.channelProvider.Twitter,
+  github: contact.channelProvider.GitHub,
+  facebook: contact.channelProvider.Facebook,
+  telegram: contact.channelProvider.Telegram,
+  homepage: contact.channelProvider.Homepage,
+  whatsapp: contact.channelProvider.Whatsapp,
+  skype: contact.channelProvider.Skype,
+  profile: contact.channelProvider.Profile,
+  viber: contact.channelProvider.Viber
+} satisfies Record<(typeof ContactChannelProviderValues)[number], string>
+
 // Brands are erased at runtime; the SDK PersonId brand is a string in test fixtures.
 const testCorePersonId = (id: string): CorePersonId => id as CorePersonId
 
@@ -55,6 +70,14 @@ describe("Contact Channel Provider Mapping", () => {
 
     for (const provider of ContactChannelProviderValues) {
       expect(fromContactChannelProviderRef(toContactChannelProviderRef(provider))).toBe(provider)
+    }
+  })
+
+  it("maps every public provider label to the matching Huly SDK provider ref", () => {
+    for (const provider of ContactChannelProviderValues) {
+      const providerRef = expectedProviderRefs[provider]
+      expect(toContactChannelProviderRef(provider)).toBe(providerRef)
+      expect(fromContactChannelProviderRef(providerRef)).toBe(provider)
     }
   })
 
