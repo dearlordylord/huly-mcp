@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.29.0
+
+### Minor Changes
+
+- 573b975: Add core chat conversation lifecycle tools for channel members, reversible channel archive state, group direct-message creation, and per-user conversation starred/closed state.
+
 ## 0.28.0
 
 ### Minor Changes
