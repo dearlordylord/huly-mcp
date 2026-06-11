@@ -12,6 +12,7 @@ import {
   makeRalphTaskLoad,
   makeRalphTaskTitle,
   RalphAgent,
+  RalphLanesFailedError,
   RalphPlanNotFoundError,
   RalphPlanStore,
   RalphReviewFailedError,
@@ -200,6 +201,51 @@ describe("Ralph Sandcastle loop", () => {
       const result = yield* Fiber.join(fiber)
 
       expect(result.map((laneResult) => String(laneResult.laneId)).sort()).toEqual(["a", "b", "c"])
+    })
+  )
+
+  it.effect("lets sibling lanes complete before reporting a lane failure", () =>
+    Effect.gen(function*() {
+      const specs = [lane("a"), lane("b"), lane("c")]
+      const store = yield* makeInspectableStore()
+      const agentLayer = Layer.succeed(RalphAgent, {
+        planLane: (spec) =>
+          Effect.succeed(planFor(spec, [{ id: "task-1", title: `Task ${spec.laneId}` }])),
+        implementTask: ({ lane }) =>
+          Effect.succeed({
+            summary: makeRalphAgentNotes(`implemented ${lane.laneId}`),
+            commits: [makeRalphCommitSha(`impl-${lane.laneId}`)]
+          }),
+        reviewTask: ({ lane }): Effect.Effect<RalphReviewDecision, Error> =>
+          Effect.succeed(
+            lane.laneId === makeRalphLaneId("a")
+              ? {
+                status: "changes_requested",
+                notes: makeRalphAgentNotes("Lane a still needs work")
+              }
+              : {
+                status: "approved",
+                notes: makeRalphAgentNotes("Approved")
+              }
+          ),
+        cleanupTask: ({ lane }) =>
+          Effect.succeed({ commits: [makeRalphCommitSha(`cleanup-${lane.laneId}`)] })
+      })
+
+      const result = yield* Effect.either(
+        runRalphLanes(specs, { maxReviewAttempts: 1 }).pipe(
+          Effect.provide(Layer.merge(agentLayer, store.layer))
+        )
+      )
+      const plans = yield* Ref.get(store.plansRef)
+
+      expect(result._tag).toBe("Left")
+      if (result._tag === "Left") {
+        expect(result.left).toBeInstanceOf(RalphLanesFailedError)
+      }
+      expect(taskStatus(plans.get(makeRalphLaneId("a")), "task-1")).toBe("in_progress")
+      expect(taskStatus(plans.get(makeRalphLaneId("b")), "task-1")).toBe("done")
+      expect(taskStatus(plans.get(makeRalphLaneId("c")), "task-1")).toBe("done")
     })
   )
 

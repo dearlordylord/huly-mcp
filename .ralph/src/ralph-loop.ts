@@ -129,6 +129,21 @@ export class RalphReviewFailedError extends Error {
   }
 }
 
+export class RalphLanesFailedError extends Error {
+  constructor(
+    readonly failures: ReadonlyArray<{
+      readonly laneId: RalphLaneId
+      readonly error: Error
+    }>
+  ) {
+    super(
+      `Ralph lane(s) failed after sibling lanes completed or failed: ${
+        failures.map((failure) => `${failure.laneId}: ${failure.error.message}`).join("; ")
+      }`
+    )
+  }
+}
+
 export class RalphPlanNotFoundError extends Error {
   constructor(readonly laneId: RalphLaneId) {
     super(`No Ralph plan found for lane ${laneId}`)
@@ -377,4 +392,30 @@ export const runRalphLanes = (
   lanes: ReadonlyArray<RalphLaneSpec>,
   options: RalphLoopOptions
 ): Effect.Effect<ReadonlyArray<RalphLaneResult>, Error, RalphAgent | RalphPlanStore> =>
-  Effect.forEach(lanes, (lane) => runRalphLane(lane, options), { concurrency: 3 })
+  Effect.forEach(
+    lanes,
+    (lane) =>
+      runRalphLane(lane, options).pipe(
+        Effect.map((result) => ({ _tag: "success" as const, result })),
+        Effect.catchAll((error) =>
+          Effect.succeed({
+            _tag: "failure" as const,
+            laneId: lane.laneId,
+            error
+          })
+        )
+      ),
+    { concurrency: 3 }
+  ).pipe(
+    Effect.flatMap((results) => {
+      const failures = results.flatMap((result) =>
+        result._tag === "failure"
+          ? [{ laneId: result.laneId, error: result.error }]
+          : []
+      )
+
+      return failures.length === 0
+        ? Effect.succeed(results.flatMap((result) => result._tag === "success" ? [result.result] : []))
+        : Effect.fail(new RalphLanesFailedError(failures))
+    })
+  )
