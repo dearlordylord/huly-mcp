@@ -6,10 +6,9 @@ import type {
 } from "@hcengineering/contact"
 import { AvatarType } from "@hcengineering/contact"
 import { type Data, type DocumentUpdate, generateId, type Ref, SortingOrder } from "@hcengineering/core"
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 
 import type {
-  AddOrganizationChannelParams,
   AddOrganizationMemberParams,
   CreateOrganizationParams,
   CreateOrganizationResult,
@@ -30,34 +29,38 @@ import type {
 import { UPDATE_ORGANIZATION_FIELDS } from "../../domain/schemas/contact-organizations.js"
 import { Count, Email, OrganizationId, PersonId, PersonName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import {
-  type NoUpdateFieldsError,
+import type {
+  InvalidContactProviderError,
+  NoUpdateFieldsError,
   OrganizationIdentifierAmbiguousError,
-  OrganizationNotFoundError,
-  PersonNotFoundError
+  OrganizationNotFoundError
 } from "../errors.js"
+import { PersonNotFoundError } from "../errors.js"
 import { contact } from "../huly-plugins.js"
 import { leadClassIds } from "../lead-plugin.js"
 import { buildContactUrlFromConfig } from "../url-builders.js"
+import { listOrganizationChannels } from "./contact-channels.js"
 import { batchGetEmailsForPersons, findPersonByEmail, findPersonById } from "./contacts-shared.js"
-import { toChannelProviderRef } from "./organization-channel-providers.js"
+import { resolveOrganizationByIdentifier } from "./organization-resolvers.js"
 import { clampLimit } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
+export { addOrganizationChannel } from "./contact-channels.js"
+
 type ListOrganizationsError = HulyClientError
 type CreateOrganizationError = HulyClientError | PersonNotFoundError
-type GetOrganizationError = HulyClientError | OrganizationIdentifierAmbiguousError | OrganizationNotFoundError
+type GetOrganizationError =
+  | HulyClientError
+  | OrganizationIdentifierAmbiguousError
+  | OrganizationNotFoundError
+  | InvalidContactProviderError
 type UpdateOrganizationError =
   | HulyClientError
   | NoUpdateFieldsError
   | OrganizationIdentifierAmbiguousError
   | OrganizationNotFoundError
 type DeleteOrganizationError = HulyClientError | OrganizationIdentifierAmbiguousError | OrganizationNotFoundError
-type AddOrganizationChannelError =
-  | HulyClientError
-  | OrganizationIdentifierAmbiguousError
-  | OrganizationNotFoundError
 type AddOrganizationMemberError =
   | HulyClientError
   | OrganizationIdentifierAmbiguousError
@@ -69,52 +72,24 @@ type RemoveOrganizationMemberError =
   | OrganizationNotFoundError
   | PersonNotFoundError
 
-const findOrganizationByIdentifier = (
-  client: HulyClient["Type"],
-  identifier: string
-): Effect.Effect<
-  HulyOrganization | undefined,
-  HulyClientError | OrganizationIdentifierAmbiguousError
-> =>
-  Effect.gen(function*() {
-    const byId = yield* client.findOne<HulyOrganization>(
-      contact.class.Organization,
-      { _id: toRef<HulyOrganization>(identifier) }
-    )
-    if (byId !== undefined) return byId
-
-    const byName = yield* client.findAll<HulyOrganization>(
-      contact.class.Organization,
-      { name: identifier }
-    )
-
-    if (byName.length === 0) {
-      return undefined
-    }
-
-    if (byName.length > 1) {
-      return yield* new OrganizationIdentifierAmbiguousError({
-        identifier,
-        matches: Count.make(byName.length)
-      })
-    }
-
-    return byName[0]
-  })
-
 const resolvePersonIdentifier = (
   client: HulyClient["Type"],
   identifier: string
 ): Effect.Effect<HulyPerson, HulyClientError | PersonNotFoundError> =>
   Effect.gen(function*() {
-    const person = (yield* findPersonById(client, identifier))
-      ?? (yield* findPersonByEmail(client, identifier))
-
-    if (person === undefined) {
-      return yield* new PersonNotFoundError({ identifier })
-    }
-
-    return person
+    const byId = Option.fromNullable(yield* findPersonById(client, identifier))
+    return yield* Option.match(byId, {
+      onNone: () =>
+        Effect.flatMap(
+          Effect.map(findPersonByEmail(client, identifier), Option.fromNullable),
+          (byEmail) =>
+            Option.match(byEmail, {
+              onNone: () => Effect.fail(new PersonNotFoundError({ identifier })),
+              onSome: Effect.succeed
+            })
+        ),
+      onSome: Effect.succeed
+    })
   })
 
 const resolvePersonIdentifiers = (
@@ -216,10 +191,7 @@ export const getOrganization = (
 ): Effect.Effect<GetOrganizationResult, GetOrganizationError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-    const org = yield* findOrganizationByIdentifier(client, params.identifier)
-    if (org === undefined) {
-      return yield* new OrganizationNotFoundError({ identifier: params.identifier })
-    }
+    const org = yield* resolveOrganizationByIdentifier(client, params.identifier)
 
     // description on Organization is a MarkupBlobRef (rich text stored separately).
     /* eslint-disable no-restricted-syntax -- SDK boundary: Huly types Organization.description as MarkupBlobRef, fetchMarkup wants MarkupRef; both are opaque ID strings. */
@@ -235,11 +207,13 @@ export const getOrganization = (
     /* eslint-enable no-restricted-syntax */
 
     const id = OrganizationId.make(org._id)
+    const channelsResult = yield* listOrganizationChannels({ organizationId: org._id })
     return {
       id,
       name: org.name,
       city: org.city || undefined,
       description: descriptionText,
+      channels: channelsResult.channels,
       members: Count.make(org.members),
       url: buildContactUrlFromConfig(client.workbenchUrlConfig, id),
       modifiedOn: org.modifiedOn
@@ -253,10 +227,7 @@ export const updateOrganization = (
     yield* requireUpdateFields("update_organization", params, UPDATE_ORGANIZATION_FIELDS)
 
     const client = yield* HulyClient
-    const org = yield* findOrganizationByIdentifier(client, params.identifier)
-    if (org === undefined) {
-      return yield* new OrganizationNotFoundError({ identifier: params.identifier })
-    }
+    const org = yield* resolveOrganizationByIdentifier(client, params.identifier)
 
     type UpdateOrganizationField = typeof UPDATE_ORGANIZATION_FIELDS[number]
     type UpdateOrganizationEntries = {
@@ -309,10 +280,7 @@ export const deleteOrganization = (
 ): Effect.Effect<DeleteOrganizationResult, DeleteOrganizationError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-    const org = yield* findOrganizationByIdentifier(client, params.identifier)
-    if (org === undefined) {
-      return yield* new OrganizationNotFoundError({ identifier: params.identifier })
-    }
+    const org = yield* resolveOrganizationByIdentifier(client, params.identifier)
 
     yield* client.removeDoc(
       contact.class.Organization,
@@ -332,10 +300,7 @@ export const makeOrganizationCustomer = (
 ): Effect.Effect<{ id: OrganizationId; applied: boolean }, GetOrganizationError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-    const org = yield* findOrganizationByIdentifier(client, params.identifier)
-    if (org === undefined) {
-      return yield* new OrganizationNotFoundError({ identifier: params.identifier })
-    }
+    const org = yield* resolveOrganizationByIdentifier(client, params.identifier)
 
     // eslint-disable-next-line no-restricted-syntax -- SDK boundary: mixin check uses string key lookup
     const alreadyCustomer = (org as unknown as Record<string, unknown>)[leadClassIds.mixin.Customer] !== undefined
@@ -355,39 +320,12 @@ export const makeOrganizationCustomer = (
     return { id: OrganizationId.make(org._id), applied: true }
   })
 
-export const addOrganizationChannel = (
-  params: AddOrganizationChannelParams
-): Effect.Effect<{ id: OrganizationId; added: boolean }, AddOrganizationChannelError, HulyClient> =>
-  Effect.gen(function*() {
-    const client = yield* HulyClient
-    const org = yield* findOrganizationByIdentifier(client, params.organizationId)
-    if (org === undefined) {
-      return yield* new OrganizationNotFoundError({ identifier: params.organizationId })
-    }
-
-    const providerRef = toChannelProviderRef(params.provider)
-
-    yield* client.addCollection(
-      contact.class.Channel,
-      contact.space.Contacts,
-      org._id,
-      contact.class.Organization,
-      "channels",
-      { provider: providerRef, value: params.value }
-    )
-
-    return { id: OrganizationId.make(org._id), added: true }
-  })
-
 export const addOrganizationMember = (
   params: AddOrganizationMemberParams
 ): Effect.Effect<{ id: OrganizationId; added: boolean }, AddOrganizationMemberError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-    const org = yield* findOrganizationByIdentifier(client, params.organizationId)
-    if (org === undefined) {
-      return yield* new OrganizationNotFoundError({ identifier: params.organizationId })
-    }
+    const org = yield* resolveOrganizationByIdentifier(client, params.organizationId)
 
     const person = yield* resolvePersonIdentifier(client, params.personIdentifier)
     const existingMemberships = yield* findOrganizationMemberships(client, org._id, person._id)
@@ -413,10 +351,7 @@ export const listOrganizationMembers = (
 ): Effect.Effect<ListOrganizationMembersResult, GetOrganizationError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-    const org = yield* findOrganizationByIdentifier(client, params.organizationId)
-    if (org === undefined) {
-      return yield* new OrganizationNotFoundError({ identifier: params.organizationId })
-    }
+    const org = yield* resolveOrganizationByIdentifier(client, params.organizationId)
 
     const members = yield* client.findAll<HulyMember>(
       contact.class.Member,
@@ -437,11 +372,14 @@ export const listOrganizationMembers = (
 
     const entries: Array<OrganizationMemberEntry> = persons.map(p => {
       const email = emails.get(p._id)
-      return {
+      const entry = {
         personId: PersonId.make(p._id),
-        name: PersonName.make(p.name),
-        email: email !== undefined ? Email.make(email) : undefined
+        name: PersonName.make(p.name)
       }
+      return Option.match(Option.map(Option.fromNullable(email), Email.make), {
+        onNone: () => entry,
+        onSome: (memberEmail) => ({ ...entry, email: memberEmail })
+      })
     })
 
     return {
@@ -455,10 +393,7 @@ export const removeOrganizationMember = (
 ): Effect.Effect<RemoveOrganizationMemberResult, RemoveOrganizationMemberError, HulyClient> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-    const org = yield* findOrganizationByIdentifier(client, params.organizationId)
-    if (org === undefined) {
-      return yield* new OrganizationNotFoundError({ identifier: params.organizationId })
-    }
+    const org = yield* resolveOrganizationByIdentifier(client, params.organizationId)
 
     const person = yield* resolvePersonIdentifier(client, params.personIdentifier)
 

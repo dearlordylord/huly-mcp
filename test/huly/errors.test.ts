@@ -32,6 +32,9 @@ import {
   ChannelNotFoundError,
   CommentNotFoundError,
   ComponentNotFoundError,
+  ContactChannelConflictError,
+  ContactChannelIdentifierAmbiguousError,
+  ContactChannelNotFoundError,
   DirectMessageIdentifierAmbiguousError,
   DirectMessageNotFoundError,
   DirectMessageParticipantCountError,
@@ -69,6 +72,8 @@ import {
   type HulyDomainError,
   HulyDomainError as HulyDomainErrorSchema,
   HulyError,
+  InvalidContactChannelLocatorError,
+  InvalidContactChannelValueError,
   InvalidContactProviderError,
   InvalidContentTypeError,
   InvalidFileDataError,
@@ -755,6 +760,16 @@ describe("Huly Errors", () => {
               return `organization-ambiguous:${error.identifier}:${error.matches}`
             case "InvalidContactProviderError":
               return `contactprovider:${error.provider}`
+            case "ContactChannelNotFoundError":
+              return `contact-channel:${error.ownerIdentifier}:${error.channelIdentifier}`
+            case "ContactChannelIdentifierAmbiguousError":
+              return `contact-channel-ambiguous:${error.ownerIdentifier}:${error.channelIdentifier}:${error.matches}`
+            case "ContactChannelConflictError":
+              return `contact-channel-conflict:${error.ownerIdentifier}:${error.provider}:${error.value}`
+            case "InvalidContactChannelLocatorError":
+              return `contact-channel-locator:${error.ownerIdentifier}:${error.reason}`
+            case "InvalidContactChannelValueError":
+              return `contact-channel-value:${error.provider}:${error.value}`
             case "FileUploadError":
               return `upload:${error.message}`
             case "InvalidFileDataError":
@@ -1019,6 +1034,38 @@ describe("Huly Errors", () => {
           matchError(new OrganizationIdentifierAmbiguousError({ identifier: "Acme", matches: Count.make(2) }))
         ).toBe("organization-ambiguous:Acme:2")
         expect(matchError(new InvalidContactProviderError({ provider: "fax" }))).toBe("contactprovider:fax")
+        expect(
+          matchError(
+            new ContactChannelNotFoundError({
+              ownerIdentifier: "person-1",
+              channelIdentifier: "email:a@example.com"
+            })
+          )
+        ).toBe("contact-channel:person-1:email:a@example.com")
+        expect(
+          matchError(
+            new ContactChannelIdentifierAmbiguousError({
+              ownerIdentifier: "person-1",
+              channelIdentifier: "phone:+1555",
+              matches: Count.make(2)
+            })
+          )
+        ).toBe("contact-channel-ambiguous:person-1:phone:+1555:2")
+        expect(
+          matchError(
+            new ContactChannelConflictError({
+              ownerIdentifier: "person-1",
+              provider: "email",
+              value: "a@example.com"
+            })
+          )
+        ).toBe("contact-channel-conflict:person-1:email:a@example.com")
+        expect(
+          matchError(new InvalidContactChannelValueError({ provider: "email", value: "not-email" }))
+        ).toBe("contact-channel-value:email:not-email")
+        expect(
+          matchError(new InvalidContactChannelLocatorError({ ownerIdentifier: "person-1", reason: "bad locator" }))
+        ).toBe("contact-channel-locator:person-1:bad locator")
         expect(matchError(new FileUploadError({ message: "quota exceeded" }))).toBe("upload:quota exceeded")
         expect(matchError(new InvalidFileDataError({ message: "bad base64" }))).toBe("data:bad base64")
         expect(matchError(new FileNotFoundError({ filePath: "/path/to/file" }))).toBe("notfound:/path/to/file")

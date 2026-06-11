@@ -1,7 +1,8 @@
 import { JSONSchema, Schema } from "effect"
 
+import type { ContactChannelSummary } from "./contact-channels.js"
 import type { OrganizationMembershipSummary } from "./contact-organizations.js"
-import type { ContactProvider, PersonName, UrlString } from "./shared.js"
+import type { PersonName, UrlString } from "./shared.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
@@ -30,7 +31,7 @@ export interface Person {
   readonly lastName?: string | undefined
   readonly city?: string | undefined
   readonly email?: Email | undefined
-  readonly channels?: ReadonlyArray<{ readonly provider: ContactProvider; readonly value: string }> | undefined
+  readonly channels?: ReadonlyArray<ContactChannelSummary> | undefined
   readonly organizations?: ReadonlyArray<OrganizationMembershipSummary> | undefined
   readonly url: UrlString
   readonly modifiedOn?: number | undefined

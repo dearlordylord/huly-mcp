@@ -1,5 +1,12 @@
 import { JSONSchema, Schema } from "effect"
 
+import {
+  addOrganizationChannelParamsJsonSchema,
+  AddOrganizationChannelParamsSchema,
+  type ContactChannelSummary,
+  ContactChannelSummarySchema,
+  parseAddOrganizationChannelParams
+} from "./contact-channels.js"
 import type { PersonName } from "./shared.js"
 import {
   assertUpdateFields,
@@ -7,7 +14,6 @@ import {
   Count,
   DEFAULT_LIMIT,
   Email,
-  enumValuesDescription,
   hasAtLeastOneDefined,
   LimitParam,
   MemberReference,
@@ -162,23 +168,7 @@ export const ListPersonOrganizationsParamsSchema = Schema.Union(
 
 export type ListPersonOrganizationsParams = Schema.Schema.Type<typeof ListPersonOrganizationsParamsSchema>
 
-// MCP-facing contact channel names backed by Huly SDK contact.channelProvider refs in organization-channel-providers.
-export const OrganizationChannelProviderValues = [
-  "email",
-  "phone",
-  "linkedin",
-  "twitter",
-  "github",
-  "facebook",
-  "telegram",
-  "homepage",
-  "whatsapp",
-  "skype",
-  "profile",
-  "viber"
-] as const
-const OrganizationChannelProviderSchema = Schema.Literal(...OrganizationChannelProviderValues)
-export type OrganizationChannelProvider = Schema.Schema.Type<typeof OrganizationChannelProviderSchema>
+export { addOrganizationChannelParamsJsonSchema, AddOrganizationChannelParamsSchema, parseAddOrganizationChannelParams }
 
 export const RemoveOrganizationMemberParamsSchema = Schema.Struct({
   organizationId: NonEmptyString.annotations({
@@ -193,21 +183,6 @@ export const RemoveOrganizationMemberParamsSchema = Schema.Struct({
 })
 
 export type RemoveOrganizationMemberParams = Schema.Schema.Type<typeof RemoveOrganizationMemberParamsSchema>
-
-export const AddOrganizationChannelParamsSchema = Schema.Struct({
-  organizationId: NonEmptyString.annotations({
-    description: "Organization ID or exact name"
-  }),
-  provider: OrganizationChannelProviderSchema.annotations({
-    description: `Channel type: ${enumValuesDescription(OrganizationChannelProviderValues)}`
-  }),
-  value: NonEmptyString.annotations({
-    description: "Channel value (email address, phone number, URL, username)"
-  })
-}).annotations({
-  title: "AddOrganizationChannelParams",
-  description: "Parameters for adding a contact channel to an organization"
-})
 
 export type AddOrganizationChannelParams = Schema.Schema.Type<typeof AddOrganizationChannelParamsSchema>
 
@@ -225,7 +200,6 @@ export const AddOrganizationMemberParamsSchema = Schema.Struct({
 
 export type AddOrganizationMemberParams = Schema.Schema.Type<typeof AddOrganizationMemberParamsSchema>
 
-export const addOrganizationChannelParamsJsonSchema = JSONSchema.make(AddOrganizationChannelParamsSchema)
 export const addOrganizationMemberParamsJsonSchema = JSONSchema.make(AddOrganizationMemberParamsSchema)
 export const listOrganizationMembersParamsJsonSchema = JSONSchema.make(ListOrganizationMembersParamsSchema)
 export const listPersonOrganizationsParamsJsonSchema = JSONSchema.make(ListPersonOrganizationsParamsSchema)
@@ -239,7 +213,6 @@ export const updateOrganizationParamsJsonSchema = withAtLeastOneRequired(
 )
 export const deleteOrganizationParamsJsonSchema = JSONSchema.make(DeleteOrganizationParamsSchema)
 
-export const parseAddOrganizationChannelParams = Schema.decodeUnknown(AddOrganizationChannelParamsSchema)
 export const parseAddOrganizationMemberParams = Schema.decodeUnknown(AddOrganizationMemberParamsSchema)
 export const parseListOrganizationMembersParams = Schema.decodeUnknown(ListOrganizationMembersParamsSchema)
 export const parseListPersonOrganizationsParams = Schema.decodeUnknown(ListPersonOrganizationsParamsSchema)
@@ -259,6 +232,7 @@ export interface GetOrganizationResult {
   readonly name: string
   readonly city?: string | undefined
   readonly description?: string | undefined
+  readonly channels?: ReadonlyArray<ContactChannelSummary> | undefined
   readonly members: Count
   readonly url: UrlString
   readonly modifiedOn?: number | undefined
@@ -269,6 +243,7 @@ export const GetOrganizationResultSchema = Schema.Struct({
   name: NonEmptyString,
   city: Schema.optional(Schema.String),
   description: Schema.optional(Schema.String),
+  channels: Schema.optional(Schema.Array(ContactChannelSummarySchema)),
   members: Count,
   url: UrlString,
   modifiedOn: Schema.optional(Schema.Number)

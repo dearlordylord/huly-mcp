@@ -1828,11 +1828,17 @@ run_test "list_organizations" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_organizations","arguments":{"limit":3}},"id":2}'
 run_test "get_user_profile" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_user_profile","arguments":{}},"id":2}'
+run_test "list_contact_channel_providers" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_contact_channel_providers","arguments":{}},"id":2}'
 
 PERSON_FIRST_NAME="IntTest-$RUN_ID"
 PERSON_EMAIL="inttest-$RUN_ID@test.local"
 PERSON_FIRST_NAME_JSON=$(json_string "$PERSON_FIRST_NAME")
 PERSON_EMAIL_JSON=$(json_string "$PERSON_EMAIL")
+PERSON_PHONE="+1555$RUN_ID"
+PERSON_PHONE_UPDATED="+1666$RUN_ID"
+PERSON_PHONE_JSON=$(json_string "$PERSON_PHONE")
+PERSON_PHONE_UPDATED_JSON=$(json_string "$PERSON_PHONE_UPDATED")
 PERSON_NAME_REGEX_JSON=$(json_string "%$PERSON_FIRST_NAME%")
 PERSON_NAME_CASE_REGEX_JSON=$(json_string "%inttest-$RUN_ID%")
 PERSON_TEXT=$(run_capture "create_person" \
@@ -1851,10 +1857,35 @@ if [ $? -eq 0 ]; then
   if [ $? -eq 0 ]; then
     assert_json_array_not_contains "list_persons nameRegex is case-sensitive" "$PERSON_REGEX_CASE_TEXT" "map(.id)" "$PERSON_ID"
   fi
-  run_test "update_person($PERSON_ID)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_person\",\"arguments\":{\"personId\":\"$PERSON_ID\",\"city\":\"TestCity\"}},\"id\":2}"
-  run_test "delete_person($PERSON_ID)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":\"$PERSON_ID\"}},\"id\":2}"
+	  run_test "update_person($PERSON_ID)" \
+	    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_person\",\"arguments\":{\"personId\":\"$PERSON_ID\",\"city\":\"TestCity\"}},\"id\":2}"
+	  PERSON_CHANNEL_TEXT=$(run_capture "add_person_channel($PERSON_ID phone)" \
+	    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_person_channel\",\"arguments\":{\"person\":\"$PERSON_ID\",\"provider\":\"phone\",\"value\":$PERSON_PHONE_JSON}},\"id\":2}")
+	  if [ $? -eq 0 ]; then
+	    PERSON_CHANNEL_ID=$(echo "$PERSON_CHANNEL_TEXT" | jq -r '.channel.channelId' 2>/dev/null)
+	    assert_json_field_equals "add_person_channel added" "$PERSON_CHANNEL_TEXT" ".added" "true"
+	    PERSON_CHANNEL_AGAIN_TEXT=$(run_capture "add_person_channel($PERSON_ID phone idempotent)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_person_channel\",\"arguments\":{\"person\":\"$PERSON_ID\",\"provider\":\"phone\",\"value\":$PERSON_PHONE_JSON}},\"id\":2}")
+	    if [ $? -eq 0 ]; then
+	      assert_json_field_equals "add_person_channel idempotent added=false" "$PERSON_CHANNEL_AGAIN_TEXT" ".added" "false"
+	    fi
+	    PERSON_CHANNELS_TEXT=$(run_capture "list_person_channels($PERSON_ID)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_person_channels\",\"arguments\":{\"person\":\"$PERSON_ID\"}},\"id\":2}")
+	    if [ $? -eq 0 ]; then
+	      assert_json_array_contains "list_person_channels includes phone channel" "$PERSON_CHANNELS_TEXT" ".channels | map(.channelId)" "$PERSON_CHANNEL_ID"
+	    fi
+	    PERSON_GET_TEXT=$(run_capture "get_person($PERSON_ID channels)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":\"$PERSON_ID\"}},\"id\":2}")
+	    if [ $? -eq 0 ]; then
+	      assert_json_array_contains "get_person includes channelId" "$PERSON_GET_TEXT" ".channels | map(.channelId)" "$PERSON_CHANNEL_ID"
+	    fi
+	    run_test "update_person_channel($PERSON_CHANNEL_ID)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_person_channel\",\"arguments\":{\"person\":\"$PERSON_ID\",\"channelId\":\"$PERSON_CHANNEL_ID\",\"newValue\":$PERSON_PHONE_UPDATED_JSON}},\"id\":2}"
+	    run_test "remove_person_channel($PERSON_ID provider+value)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_person_channel\",\"arguments\":{\"person\":\"$PERSON_ID\",\"provider\":\"phone\",\"value\":$PERSON_PHONE_UPDATED_JSON}},\"id\":2}"
+	  fi
+	  run_test "delete_person($PERSON_ID)" \
+	    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":\"$PERSON_ID\"}},\"id\":2}"
 fi
 
 skip_test "get_person" "covered by create+update cycle"
@@ -1864,6 +1895,7 @@ ORG_UPDATED_NAME="IntTest Org Updated $ORG_SUFFIX"
 ORG_DESC="Integration org $ORG_SUFFIX"
 ORG_MEMBER_EMAIL="inttest-org-$ORG_SUFFIX@test.local"
 ORG_CHANNEL_EMAIL="org-$ORG_SUFFIX@test.local"
+ORG_CHANNEL_UPDATED_EMAIL="org-updated-$ORG_SUFFIX@test.local"
 
 ORG_PERSON_TEXT=$(run_capture "create_person(for_org)" \
   "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":\"Org\",\"lastName\":\"Member\",\"email\":\"$ORG_MEMBER_EMAIL\"}},\"id\":2}")
@@ -1875,7 +1907,8 @@ if [ $? -eq 0 ]; then
   ORG_UPDATED_NAME_JSON=$(json_string "$ORG_UPDATED_NAME")
   ORG_DESC_JSON=$(json_string "$ORG_DESC")
   ORG_MEMBER_EMAIL_JSON=$(json_string "$ORG_MEMBER_EMAIL")
-  ORG_CHANNEL_EMAIL_JSON=$(json_string "$ORG_CHANNEL_EMAIL")
+	  ORG_CHANNEL_EMAIL_JSON=$(json_string "$ORG_CHANNEL_EMAIL")
+	  ORG_CHANNEL_UPDATED_EMAIL_JSON=$(json_string "$ORG_CHANNEL_UPDATED_EMAIL")
 
   run_expect_error "create_organization(rejects_missing_member)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_organization\",\"arguments\":{\"name\":\"IntTest Missing Member $ORG_SUFFIX\",\"members\":[\"missing-$ORG_SUFFIX@test.local\"]}},\"id\":2}"
@@ -1896,8 +1929,31 @@ if [ $? -eq 0 ]; then
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_person_organizations\",\"arguments\":{\"personId\":\"$ORG_PERSON_ID\"}},\"id\":2}"
     run_test "update_organization($ORG_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_organization\",\"arguments\":{\"identifier\":\"$ORG_ID\",\"name\":$ORG_UPDATED_NAME_JSON,\"city\":\"TestCity\",\"description\":$ORG_DESC_JSON}},\"id\":2}"
-    run_test "add_organization_channel($ORG_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_organization_channel\",\"arguments\":{\"organizationId\":\"$ORG_ID\",\"provider\":\"email\",\"value\":$ORG_CHANNEL_EMAIL_JSON}},\"id\":2}"
+	    ORG_CHANNEL_TEXT=$(run_capture "add_organization_channel($ORG_ID)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_organization_channel\",\"arguments\":{\"organizationId\":\"$ORG_ID\",\"provider\":\"email\",\"value\":$ORG_CHANNEL_EMAIL_JSON}},\"id\":2}")
+	    if [ $? -eq 0 ]; then
+	      ORG_CHANNEL_ID=$(echo "$ORG_CHANNEL_TEXT" | jq -r '.channel.channelId' 2>/dev/null)
+	      assert_json_field_equals "add_organization_channel added" "$ORG_CHANNEL_TEXT" ".added" "true"
+	      ORG_CHANNEL_AGAIN_TEXT=$(run_capture "add_organization_channel($ORG_ID idempotent)" \
+	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_organization_channel\",\"arguments\":{\"organizationId\":\"$ORG_ID\",\"provider\":\"email\",\"value\":$ORG_CHANNEL_EMAIL_JSON}},\"id\":2}")
+	      if [ $? -eq 0 ]; then
+	        assert_json_field_equals "add_organization_channel idempotent added=false" "$ORG_CHANNEL_AGAIN_TEXT" ".added" "false"
+	      fi
+	      ORG_CHANNELS_TEXT=$(run_capture "list_organization_channels($ORG_ID)" \
+	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_organization_channels\",\"arguments\":{\"organizationId\":\"$ORG_ID\"}},\"id\":2}")
+	      if [ $? -eq 0 ]; then
+	        assert_json_array_contains "list_organization_channels includes email channel" "$ORG_CHANNELS_TEXT" ".channels | map(.channelId)" "$ORG_CHANNEL_ID"
+	      fi
+	      ORG_GET_TEXT=$(run_capture "get_organization($ORG_ID channels)" \
+	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_organization\",\"arguments\":{\"identifier\":\"$ORG_ID\"}},\"id\":2}")
+	      if [ $? -eq 0 ]; then
+	        assert_json_array_contains "get_organization includes channelId" "$ORG_GET_TEXT" ".channels | map(.channelId)" "$ORG_CHANNEL_ID"
+	      fi
+	      run_test "update_organization_channel($ORG_CHANNEL_ID)" \
+	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_organization_channel\",\"arguments\":{\"organizationId\":\"$ORG_ID\",\"channelId\":\"$ORG_CHANNEL_ID\",\"newValue\":$ORG_CHANNEL_UPDATED_EMAIL_JSON}},\"id\":2}"
+	      run_test "remove_organization_channel($ORG_ID provider+value)" \
+	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_organization_channel\",\"arguments\":{\"organizationId\":\"$ORG_ID\",\"provider\":\"email\",\"value\":$ORG_CHANNEL_UPDATED_EMAIL_JSON}},\"id\":2}"
+	    fi
     run_test "remove_organization_member($ORG_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_organization_member\",\"arguments\":{\"organizationId\":\"$ORG_ID\",\"personIdentifier\":\"$ORG_PERSON_ID\"}},\"id\":2}"
     run_test "add_organization_member($ORG_ID)" \

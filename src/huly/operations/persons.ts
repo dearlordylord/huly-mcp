@@ -32,11 +32,13 @@ import type {
 import type { ListPersonOrganizationsResult } from "../../domain/schemas/contact-organizations.js"
 import type { CreatePersonResult, DeletePersonResult, UpdatePersonResult } from "../../domain/schemas/contacts.js"
 import { UPDATE_PERSON_FIELDS } from "../../domain/schemas/contacts.js"
-import { ContactProvider, Email, OrganizationId, PersonId, PersonName } from "../../domain/schemas/shared.js"
+import { Email, OrganizationId, PersonId, PersonName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import { type NoUpdateFieldsError, PersonNotFoundError } from "../errors.js"
+import type { InvalidContactProviderError, NoUpdateFieldsError, PersonIdentifierAmbiguousError } from "../errors.js"
+import { PersonNotFoundError } from "../errors.js"
 import { contact } from "../huly-plugins.js"
 import { buildContactUrlFromConfig } from "../url-builders.js"
+import { listPersonChannels } from "./contact-channels.js"
 import { batchGetEmailsForPersons, findPersonByEmail, findPersonById } from "./contacts-shared.js"
 import { clampLimit, escapeLikeWildcards } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
@@ -50,7 +52,11 @@ import {
 } from "./update-guards.js"
 
 type ListPersonsError = HulyClientError
-type GetPersonError = HulyClientError | PersonNotFoundError
+type GetPersonError =
+  | HulyClientError
+  | InvalidContactProviderError
+  | PersonIdentifierAmbiguousError
+  | PersonNotFoundError
 type CreatePersonError = HulyClientError
 type UpdatePersonError = HulyClientError | NoUpdateFieldsError | PersonNotFoundError
 type DeletePersonError = HulyClientError | PersonNotFoundError
@@ -175,18 +181,12 @@ export const getPerson = (
       return yield* new PersonNotFoundError({ identifier })
     }
 
-    const channels = yield* client.findAll<Channel>(
-      contact.class.Channel,
-      {
-        attachedTo: person._id,
-        attachedToClass: contact.class.Person
-      }
-    )
+    const channelsResult = yield* listPersonChannels({ person: person._id })
 
     const organizations = yield* findOrganizationsForPerson(client, person._id)
 
     const { firstName, lastName } = parseName(person.name)
-    const emailChannel = channels.find(c => c.provider === contact.channelProvider.Email)
+    const emailChannel = channelsResult.channels.find(c => c.provider === "email")
     const id = PersonId.make(person._id)
 
     return {
@@ -196,10 +196,7 @@ export const getPerson = (
       lastName,
       city: person.city,
       email: emailChannel?.value !== undefined ? Email.make(emailChannel.value) : undefined,
-      channels: channels.map(c => ({
-        provider: ContactProvider.make(c.provider),
-        value: c.value
-      })),
+      channels: channelsResult.channels,
       organizations: organizations.length > 0 ? organizations : undefined,
       url: buildContactUrlFromConfig(client.workbenchUrlConfig, id),
       modifiedOn: person.modifiedOn,
