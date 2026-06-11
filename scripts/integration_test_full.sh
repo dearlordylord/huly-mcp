@@ -23,6 +23,8 @@ HTTP_SERVER_STDOUT=""
 HTTP_SERVER_STDERR=""
 HTTP_CURL_CONFIG=""
 GENERIC_ASSOCIATION_CLEANUP_IDS=""
+DRIVE_CLEANUP_ITEMS=""
+DRIVE_CLEANUP_DRIVES=""
 TM_TASK_TYPE_NAME=""
 TM_STATUS_NAME=""
 WORKFLOW_CLEANED=false
@@ -115,9 +117,30 @@ cleanup_generic_associations() {
   fi
 }
 
+cleanup_drive_artifacts() {
+  if [ -n "$DRIVE_CLEANUP_ITEMS" ]; then
+    while IFS=$'\t' read -r drive_id item_path; do
+      if [ -n "$drive_id" ] && [ -n "$item_path" ]; then
+        drive_json=$(json_string "$drive_id")
+        item_path_json=$(json_string "$item_path")
+        call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_drive_item\",\"arguments\":{\"drive\":$drive_json,\"path\":$item_path_json}},\"id\":2}" >/dev/null 2>&1 || true
+      fi
+    done <<<"$DRIVE_CLEANUP_ITEMS"
+  fi
+  if [ -n "$DRIVE_CLEANUP_DRIVES" ]; then
+    for drive_id in $DRIVE_CLEANUP_DRIVES; do
+      if [ -n "$drive_id" ]; then
+        drive_json=$(json_string "$drive_id")
+        call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_drive\",\"arguments\":{\"drive\":$drive_json}},\"id\":2}" >/dev/null 2>&1 || true
+      fi
+    done
+  fi
+}
+
 cleanup_all() {
   cleanup_generic_associations
   cleanup_workflow_artifacts || true
+  cleanup_drive_artifacts || true
   cleanup_http_transport
 }
 trap cleanup_all EXIT
@@ -566,6 +589,16 @@ assert_json_activity_contains_object_id() {
 
 json_string() {
   jq -Rn --arg value "$1" '$value'
+}
+
+remember_drive_item_cleanup() {
+  local drive_id="$1" item_path="$2"
+  DRIVE_CLEANUP_ITEMS="${DRIVE_CLEANUP_ITEMS}${drive_id}"$'\t'"${item_path}"$'\n'
+}
+
+remember_drive_cleanup() {
+  local drive_id="$1"
+  DRIVE_CLEANUP_DRIVES="${DRIVE_CLEANUP_DRIVES} ${drive_id}"
 }
 
 url_encode() {
@@ -3000,11 +3033,22 @@ if [ -n "$DRIVE_ID" ]; then
   DRIVE_TEST_FOLDER="/mcp-integration-$RUN_ID"
   DRIVE_TEST_NESTED="$DRIVE_TEST_FOLDER/nested"
   DRIVE_TEST_FILE="$DRIVE_TEST_NESTED/hello.txt"
+  DRIVE_TEST_MOVED_FILE="$DRIVE_TEST_FOLDER/hello.txt"
+  DRIVE_TEST_RENAMED_FILE="$DRIVE_TEST_FOLDER/hello-renamed.txt"
   DRIVE_TEST_FOLDER_JSON=$(json_string "$DRIVE_TEST_FOLDER")
   DRIVE_TEST_NESTED_JSON=$(json_string "$DRIVE_TEST_NESTED")
   DRIVE_TEST_FILE_JSON=$(json_string "$DRIVE_TEST_FILE")
+  DRIVE_TEST_MOVED_FILE_JSON=$(json_string "$DRIVE_TEST_MOVED_FILE")
+  DRIVE_TEST_RENAMED_FILE_JSON=$(json_string "$DRIVE_TEST_RENAMED_FILE")
   DRIVE_TEST_DATA=$(printf 'Drive integration %s' "$RUN_ID" | base64 | tr -d '\n')
+  DRIVE_TEST_VERSION_DATA=$(printf 'Drive integration version 2 %s' "$RUN_ID" | base64 | tr -d '\n')
   DRIVE_TEST_DATA_JSON=$(json_string "$DRIVE_TEST_DATA")
+  DRIVE_TEST_VERSION_DATA_JSON=$(json_string "$DRIVE_TEST_VERSION_DATA")
+  remember_drive_item_cleanup "$DRIVE_ID" "$DRIVE_TEST_RENAMED_FILE"
+  remember_drive_item_cleanup "$DRIVE_ID" "$DRIVE_TEST_MOVED_FILE"
+  remember_drive_item_cleanup "$DRIVE_ID" "$DRIVE_TEST_FILE"
+  remember_drive_item_cleanup "$DRIVE_ID" "$DRIVE_TEST_NESTED"
+  remember_drive_item_cleanup "$DRIVE_ID" "$DRIVE_TEST_FOLDER"
 
   run_test "get_drive($DRIVE_ID)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_drive\",\"arguments\":{\"drive\":$DRIVE_JSON}},\"id\":2}"
@@ -3023,17 +3067,93 @@ if [ -n "$DRIVE_ID" ]; then
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_drive_item\",\"arguments\":{\"drive\":$DRIVE_JSON,\"itemId\":$DRIVE_FILE_ID_JSON}},\"id\":2}"
     run_test "list_drive_file_versions($DRIVE_FILE_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_drive_file_versions\",\"arguments\":{\"drive\":$DRIVE_JSON,\"file\":$DRIVE_FILE_ID_JSON}},\"id\":2}"
+    run_capture_to_var DRIVE_VERSION_TEXT "upload_drive_file_version($DRIVE_FILE_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"upload_drive_file_version\",\"arguments\":{\"drive\":$DRIVE_JSON,\"file\":$DRIVE_FILE_ID_JSON,\"contentType\":\"text/plain\",\"data\":$DRIVE_TEST_VERSION_DATA_JSON}},\"id\":2}"
+    assert_json_field_equals "upload_drive_file_version increments version" "$DRIVE_VERSION_TEXT" ".currentVersion.version" "2"
+    run_capture_to_var DRIVE_VERSIONS_TEXT "list_drive_file_versions($DRIVE_FILE_ID, after version)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_drive_file_versions\",\"arguments\":{\"drive\":$DRIVE_JSON,\"file\":$DRIVE_FILE_ID_JSON}},\"id\":2}"
+    assert_json_field_equals "list_drive_file_versions sees two versions" "$DRIVE_VERSIONS_TEXT" ".total" "2"
+    run_capture_to_var DRIVE_MOVE_TEXT "move_drive_item($DRIVE_FILE_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"move_drive_item\",\"arguments\":{\"drive\":$DRIVE_JSON,\"itemId\":$DRIVE_FILE_ID_JSON,\"targetFolderPath\":$DRIVE_TEST_FOLDER_JSON}},\"id\":2}"
+    assert_json_field_equals "move_drive_item updates path" "$DRIVE_MOVE_TEXT" ".toPath" "$DRIVE_TEST_MOVED_FILE"
+    run_capture_to_var DRIVE_RENAME_TEXT "rename_drive_item($DRIVE_FILE_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"rename_drive_item\",\"arguments\":{\"drive\":$DRIVE_JSON,\"itemId\":$DRIVE_FILE_ID_JSON,\"title\":\"hello-renamed.txt\"}},\"id\":2}"
+    assert_json_field_equals "rename_drive_item updates path" "$DRIVE_RENAME_TEXT" ".toPath" "$DRIVE_TEST_RENAMED_FILE"
+    run_capture_to_var DRIVE_DELETE_TEXT "delete_drive_item($DRIVE_FILE_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_drive_item\",\"arguments\":{\"drive\":$DRIVE_JSON,\"itemId\":$DRIVE_FILE_ID_JSON}},\"id\":2}"
+    assert_json_field_equals "delete_drive_item deletes file" "$DRIVE_DELETE_TEXT" ".deleted" "true"
+    run_test "delete_drive_item(empty nested folder)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_drive_item\",\"arguments\":{\"drive\":$DRIVE_JSON,\"path\":$DRIVE_TEST_NESTED_JSON}},\"id\":2}"
+    run_test "delete_drive_item(empty parent folder)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_drive_item\",\"arguments\":{\"drive\":$DRIVE_JSON,\"path\":$DRIVE_TEST_FOLDER_JSON}},\"id\":2}"
   else
     skip_test "get_drive_item(file)" "upload_drive_file did not return a file id"
     skip_test "list_drive_file_versions" "upload_drive_file did not return a file id"
+    skip_test "upload_drive_file_version" "upload_drive_file did not return a file id"
+    skip_test "move_drive_item" "upload_drive_file did not return a file id"
+    skip_test "rename_drive_item" "upload_drive_file did not return a file id"
+    skip_test "delete_drive_item(file)" "upload_drive_file did not return a file id"
   fi
 else
   skip_test "get_drive" "no Drive spaces found in workspace"
   skip_test "list_drive_items" "no Drive spaces found in workspace"
   skip_test "create_drive_folder" "no Drive spaces found in workspace"
   skip_test "upload_drive_file" "no Drive spaces found in workspace"
+  skip_test "upload_drive_file_version" "no Drive spaces found in workspace"
+  skip_test "move_drive_item" "no Drive spaces found in workspace"
+  skip_test "rename_drive_item" "no Drive spaces found in workspace"
+  skip_test "delete_drive_item" "no Drive spaces found in workspace"
   skip_test "list_drive_file_versions" "no Drive spaces found in workspace"
   skip_test "restore_drive_file_version" "no Drive spaces found in workspace"
+fi
+
+DRIVE_ADMIN_NAME="MCP Integration Drive $RUN_ID"
+DRIVE_ADMIN_UPDATED_NAME="MCP Integration Drive Updated $RUN_ID"
+DRIVE_ADMIN_FOLDER="/non-empty"
+DRIVE_ADMIN_NAME_JSON=$(json_string "$DRIVE_ADMIN_NAME")
+DRIVE_ADMIN_UPDATED_NAME_JSON=$(json_string "$DRIVE_ADMIN_UPDATED_NAME")
+DRIVE_ADMIN_FOLDER_JSON=$(json_string "$DRIVE_ADMIN_FOLDER")
+run_capture_to_var DRIVE_ADMIN_CREATE_TEXT "create_drive($DRIVE_ADMIN_NAME)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_drive\",\"arguments\":{\"name\":$DRIVE_ADMIN_NAME_JSON,\"description\":\"Drive admin integration fixture\",\"private\":true,\"members\":[],\"owners\":[]}},\"id\":2}"
+DRIVE_ADMIN_ID=$(echo "$DRIVE_ADMIN_CREATE_TEXT" | jq -r '.drive.id // empty' 2>/dev/null)
+if [ -n "$DRIVE_ADMIN_ID" ]; then
+  DRIVE_ADMIN_JSON=$(json_string "$DRIVE_ADMIN_ID")
+  remember_drive_cleanup "$DRIVE_ADMIN_ID"
+  remember_drive_item_cleanup "$DRIVE_ADMIN_ID" "$DRIVE_ADMIN_FOLDER"
+  run_capture_to_var DRIVE_ADMIN_UPDATE_TEXT "update_drive($DRIVE_ADMIN_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_drive\",\"arguments\":{\"drive\":$DRIVE_ADMIN_JSON,\"name\":$DRIVE_ADMIN_UPDATED_NAME_JSON,\"description\":\"Drive admin integration updated\",\"autoJoin\":true}},\"id\":2}"
+  assert_json_field_equals "update_drive updates name" "$DRIVE_ADMIN_UPDATE_TEXT" ".drive.name" "$DRIVE_ADMIN_UPDATED_NAME"
+  assert_json_field_equals "update_drive updates autoJoin" "$DRIVE_ADMIN_UPDATE_TEXT" ".drive.autoJoin" "true"
+  if [ -n "${HULY_EMAIL:-}" ]; then
+    HULY_EMAIL_JSON=$(json_string "$HULY_EMAIL")
+    run_test "add_drive_members($DRIVE_ADMIN_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_drive_members\",\"arguments\":{\"drive\":$DRIVE_ADMIN_JSON,\"members\":[$HULY_EMAIL_JSON]}},\"id\":2}"
+    run_test "remove_drive_members($DRIVE_ADMIN_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_drive_members\",\"arguments\":{\"drive\":$DRIVE_ADMIN_JSON,\"members\":[$HULY_EMAIL_JSON]}},\"id\":2}"
+    run_test "set_drive_owners($DRIVE_ADMIN_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_drive_owners\",\"arguments\":{\"drive\":$DRIVE_ADMIN_JSON,\"owners\":[$HULY_EMAIL_JSON]}},\"id\":2}"
+  else
+    skip_test "add_drive_members" "HULY_EMAIL not set"
+    skip_test "remove_drive_members" "HULY_EMAIL not set"
+    skip_test "set_drive_owners" "HULY_EMAIL not set"
+  fi
+  run_test "create_drive_folder($DRIVE_ADMIN_FOLDER in temp Drive)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_drive_folder\",\"arguments\":{\"drive\":$DRIVE_ADMIN_JSON,\"path\":$DRIVE_ADMIN_FOLDER_JSON}},\"id\":2}"
+  run_expect_error_contains "delete_drive(non-empty)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_drive\",\"arguments\":{\"drive\":$DRIVE_ADMIN_JSON}},\"id\":2}" \
+    "is not empty"
+  run_test "delete_drive_item(temp Drive folder)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_drive_item\",\"arguments\":{\"drive\":$DRIVE_ADMIN_JSON,\"path\":$DRIVE_ADMIN_FOLDER_JSON}},\"id\":2}"
+  run_capture_to_var DRIVE_ADMIN_DELETE_TEXT "delete_drive($DRIVE_ADMIN_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_drive\",\"arguments\":{\"drive\":$DRIVE_ADMIN_JSON}},\"id\":2}"
+  assert_json_field_equals "delete_drive deletes empty Drive" "$DRIVE_ADMIN_DELETE_TEXT" ".deleted" "true"
+else
+  skip_test "update_drive" "create_drive did not return a Drive id"
+  skip_test "add_drive_members" "create_drive did not return a Drive id"
+  skip_test "remove_drive_members" "create_drive did not return a Drive id"
+  skip_test "set_drive_owners" "create_drive did not return a Drive id"
+  skip_test "delete_drive(non-empty)" "create_drive did not return a Drive id"
+  skip_test "delete_drive" "create_drive did not return a Drive id"
 fi
 echo ""
 

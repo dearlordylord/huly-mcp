@@ -34,6 +34,24 @@ Run before considering work complete:
 1. `pnpm check-all` (runs build, typecheck, circular, lint, test)
 2. Integration tests against local Huly (Docker) — **required** for any new feature, major change, or pre-release. Do not defer to the user; run them yourself. See `INTEGRATION_TESTING.md` for test patterns and `CLAUDE.local.md` for credentials/setup.
 
+### Local Huly from This Container
+
+This checkout normally runs inside a container. `.env.local` is shared with host-side workflows and may contain `HULY_URL=http://localhost:8087`; inside the container that localhost is the container itself, not the host Huly nginx. In this environment:
+
+- `host.docker.internal` resolves and reaches local Huly.
+- `docker.host.local` does not resolve reliably.
+- `localhost:8087` is not reachable from the container.
+
+When running integration tests from this container, source `.env.local` and override the URL for the command:
+
+```bash
+pnpm build
+set -a && source .env.local && set +a
+HULY_URL="${HULY_URL/localhost/host.docker.internal}" bash scripts/integration_test_full.sh
+```
+
+If the container has instead been attached to the Huly Docker network, the `NODE_OPTIONS="-r ./scripts/container-patch.cjs"` path documented in `INTEGRATION_TESTING.md` is also valid.
+
 ## Type Safety
 
 Type casts (`as T`) are a sin. Avoid them. All data crossing system boundaries (APIs etc.) must be strongly typed with Effect Schema.
