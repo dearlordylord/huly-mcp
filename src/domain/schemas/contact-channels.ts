@@ -266,7 +266,7 @@ export interface UpdatePersonChannelResult {
 export interface RemovePersonChannelResult {
   readonly personId: PersonId
   readonly removed: boolean
-  readonly channelId?: ChannelId | undefined
+  readonly channelId?: ChannelId
 }
 
 export interface AddOrganizationChannelResult {
@@ -289,7 +289,7 @@ export interface UpdateOrganizationChannelResult {
 export interface RemoveOrganizationChannelResult {
   readonly organizationId: OrganizationId
   readonly removed: boolean
-  readonly channelId?: ChannelId | undefined
+  readonly channelId?: ChannelId
 }
 
 export const addPersonChannelParamsJsonSchema = JSONSchema.make(AddPersonChannelParamsSchema)

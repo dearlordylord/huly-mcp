@@ -1,6 +1,6 @@
 import type { Organization as HulyOrganization, Person as HulyPerson } from "@hcengineering/contact"
 import type { Class, Ref } from "@hcengineering/core"
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
 
 import { Email, PersonName } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
@@ -27,16 +27,25 @@ const resolvePerson = (
   identifier: string
 ): Effect.Effect<HulyPerson, HulyClientError | PersonIdentifierAmbiguousError | PersonNotFoundError> =>
   Effect.gen(function*() {
-    const byId = yield* findPersonById(client, identifier)
-    if (byId !== undefined) return byId
-
-    const byEmailOrName = yield* findPersonByExactEmailOrName(
-      client,
-      Schema.is(Email)(identifier) ? identifier : PersonName.make(identifier)
-    )
-    if (byEmailOrName !== undefined) return byEmailOrName
-
-    return yield* new PersonNotFoundError({ identifier })
+    const byId = Option.fromNullable(yield* findPersonById(client, identifier))
+    return yield* Option.match(byId, {
+      onNone: () =>
+        Effect.flatMap(
+          Effect.map(
+            findPersonByExactEmailOrName(
+              client,
+              Schema.is(Email)(identifier) ? identifier : PersonName.make(identifier)
+            ),
+            Option.fromNullable
+          ),
+          (byEmailOrName) =>
+            Option.match(byEmailOrName, {
+              onNone: () => Effect.fail(new PersonNotFoundError({ identifier })),
+              onSome: Effect.succeed
+            })
+        ),
+      onSome: Effect.succeed
+    })
   })
 
 export const resolvePersonOwner = (

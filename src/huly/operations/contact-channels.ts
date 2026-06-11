@@ -1,6 +1,6 @@
 import type { Channel } from "@hcengineering/contact"
 import type { DocumentUpdate, Ref } from "@hcengineering/core"
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
 
 import type {
   AddOrganizationChannelParams,
@@ -109,6 +109,11 @@ type ResolvedChannelLocator =
     readonly value: string
   }
 
+type RemoveOwnerChannelResult =
+  | { readonly removed: true; readonly channelId: ChannelId }
+  | { readonly removed: false; readonly channelId: ChannelId }
+  | { readonly removed: false }
+
 export const listContactChannelProviders = (): Effect.Effect<ReadonlyArray<ContactChannelProvider>> =>
   Effect.succeed(listContactChannelProviderLabels())
 
@@ -186,14 +191,17 @@ const findChannelByIdForOwner = <Owner extends ChannelOwner>(
   client: HulyClient["Type"],
   owner: ResolvedOwner<Owner>,
   channelId: ChannelId
-): Effect.Effect<Channel | undefined, HulyClientError> =>
-  client.findOne<Channel>(
-    contact.class.Channel,
-    hulyQuery<Channel>({
-      _id: toRef<Channel>(channelId),
-      attachedTo: owner.id,
-      attachedToClass: owner.ownerClass
-    })
+): Effect.Effect<Option.Option<Channel>, HulyClientError> =>
+  Effect.map(
+    client.findOne<Channel>(
+      contact.class.Channel,
+      hulyQuery<Channel>({
+        _id: toRef<Channel>(channelId),
+        attachedTo: owner.id,
+        attachedToClass: owner.ownerClass
+      })
+    ),
+    Option.fromNullable
   )
 
 const resolveChannelByLocator = <Owner extends ChannelOwner>(
@@ -203,12 +211,17 @@ const resolveChannelByLocator = <Owner extends ChannelOwner>(
 ): Effect.Effect<Channel, ContactChannelError> =>
   Effect.gen(function*() {
     if (locator._tag === "channelId") {
-      const channel = yield* findChannelByIdForOwner(client, owner, locator.channelId)
-      if (channel !== undefined) return channel
-      return yield* new ContactChannelNotFoundError({
-        ownerIdentifier: owner.identifier,
-        channelIdentifier: locator.channelId
-      })
+      return yield* Effect.flatMap(findChannelByIdForOwner(client, owner, locator.channelId), (channel) =>
+        Option.match(channel, {
+          onNone: () =>
+            Effect.fail(
+              new ContactChannelNotFoundError({
+                ownerIdentifier: owner.identifier,
+                channelIdentifier: locator.channelId
+              })
+            ),
+          onSome: Effect.succeed
+        }))
     }
 
     const matches = yield* findExactChannels(client, owner, locator.provider, locator.value)
@@ -232,7 +245,7 @@ const findRemovableChannel = <Owner extends ChannelOwner>(
   client: HulyClient["Type"],
   owner: ResolvedOwner<Owner>,
   locator: ResolvedChannelLocator
-): Effect.Effect<Channel | undefined, ContactChannelError> =>
+): Effect.Effect<Option.Option<Channel>, ContactChannelError> =>
   Effect.gen(function*() {
     if (locator._tag === "channelId") {
       return yield* findChannelByIdForOwner(client, owner, locator.channelId)
@@ -246,7 +259,7 @@ const findRemovableChannel = <Owner extends ChannelOwner>(
         matches: Count.make(matches.length)
       })
     }
-    return matches[0]
+    return Option.fromNullable(matches[0])
   })
 
 const ensureNoTargetConflict = <Owner extends ChannelOwner>(
@@ -348,19 +361,18 @@ const removeOwnerChannel = <Owner extends ChannelOwner>(
   client: HulyClient["Type"],
   owner: ResolvedOwner<Owner>,
   params: ChannelLocator
-): Effect.Effect<{ readonly removed: boolean; readonly channelId?: ChannelId | undefined }, ContactChannelError> =>
+): Effect.Effect<RemoveOwnerChannelResult, ContactChannelError> =>
   Effect.gen(function*() {
     const locator = yield* validateChannelLocator(owner.identifier, params)
     const channel = yield* findRemovableChannel(client, owner, locator)
-    if (channel === undefined) {
-      return {
-        removed: false,
-        channelId: locator._tag === "channelId" ? locator.channelId : undefined
-      }
+    if (Option.isNone(channel)) {
+      return locator._tag === "channelId"
+        ? { removed: false, channelId: locator.channelId }
+        : { removed: false }
     }
 
-    yield* client.removeDoc(contact.class.Channel, contact.space.Contacts, channel._id)
-    return { removed: true, channelId: ChannelId.make(channel._id) }
+    yield* client.removeDoc(contact.class.Channel, contact.space.Contacts, channel.value._id)
+    return { removed: true, channelId: ChannelId.make(channel.value._id) }
   })
 
 export const listPersonChannels = (
@@ -402,11 +414,10 @@ export const removePersonChannel = (
     const client = yield* HulyClient
     const owner = yield* resolvePersonOwner(client, params.person)
     const result = yield* removeOwnerChannel(client, owner, params)
-    return {
-      personId: PersonId.make(owner.id),
-      removed: result.removed,
-      channelId: result.channelId
-    }
+    const personId = PersonId.make(owner.id)
+    return "channelId" in result
+      ? { personId, removed: result.removed, channelId: result.channelId }
+      : { personId, removed: result.removed }
   })
 
 export const listOrganizationChannels = (
@@ -448,9 +459,8 @@ export const removeOrganizationChannel = (
     const client = yield* HulyClient
     const owner = yield* resolveOrganizationOwner(client, params.organizationId)
     const result = yield* removeOwnerChannel(client, owner, params)
-    return {
-      organizationId: OrganizationId.make(owner.id),
-      removed: result.removed,
-      channelId: result.channelId
-    }
+    const organizationId = OrganizationId.make(owner.id)
+    return "channelId" in result
+      ? { organizationId, removed: result.removed, channelId: result.channelId }
+      : { organizationId, removed: result.removed }
   })
