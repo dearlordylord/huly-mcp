@@ -1,0 +1,28 @@
+{
+  "name": "huly-mcp-ralph-sandcastle-experiment",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.29.3",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test",
+    "run": "tsx run.ts"
+  },
+  "dependencies": {
+    "@ai-hero/sandcastle": "0.8.0",
+    "effect": "^3.19.15"
+  },
+  "devDependencies": {
+    "@effect/vitest": "latest",
+    "@types/node": "^25.1.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

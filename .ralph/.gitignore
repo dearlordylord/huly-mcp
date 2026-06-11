@@ -1,0 +1,8 @@
+node_modules
+plans
+logs
+worktrees
+sandcastle
+status.json
+progress.md
+*.tsbuildinfo

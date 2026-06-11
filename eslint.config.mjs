@@ -116,7 +116,7 @@ const nonPropertyTestRestrictedSyntaxSelectors = [
 
 export default [
   {
-    ignores: ["**/dist", "**/build", "**/*.md", "**/.reference"]
+    ignores: ["**/dist", "**/build", "**/*.md", "**/.reference", ".ralph/**"]
   },
 
   // TypeScript recommended
