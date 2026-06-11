@@ -12,7 +12,10 @@ import {
   MasterTagId,
   NonEmptyString,
   ObjectClassName,
-  RelationId
+  RelationId,
+  RoleId,
+  SpaceId,
+  SpaceTypeId
 } from "../../src/domain/schemas/shared.js"
 import {
   AssociationIdentifierAmbiguousError,
@@ -50,7 +53,10 @@ import {
   RelationEndpointClassMismatchError,
   RelationIdentifierAmbiguousError,
   RelationMutationUnsupportedError,
-  RelationNotFoundError
+  RelationNotFoundError,
+  SpaceNotTypedError,
+  SpaceRoleIdentifierAmbiguousError,
+  SpaceRoleNotFoundError
 } from "../../src/huly/errors.js"
 import {
   createSuccessResponse,
@@ -227,6 +233,37 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
           expect(response.content[0].text).toBe("Calendar 'cal-9' not found or not accessible")
+        }))
+
+      it.effect("maps typed space role lookup errors as invalid params without errorTag", () =>
+        Effect.gen(function*() {
+          const errors = [
+            new SpaceNotTypedError({
+              id: SpaceId.make("space-1"),
+              name: NonEmptyString.make("General")
+            }),
+            new SpaceRoleNotFoundError({
+              identifier: NonEmptyString.make("Admins"),
+              spaceType: SpaceTypeId.make("space-type-1")
+            }),
+            new SpaceRoleIdentifierAmbiguousError({
+              identifier: NonEmptyString.make("Admins"),
+              spaceType: SpaceTypeId.make("space-type-1"),
+              matches: [
+                { id: RoleId.make("role-a"), name: NonEmptyString.make("Admins") },
+                { id: RoleId.make("role-b"), name: NonEmptyString.make("Admins") }
+              ]
+            })
+          ]
+
+          for (const error of errors) {
+            const response = mapDomainErrorToMcp(error)
+
+            expect(response.isError).toBe(true)
+            expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+            expect(response._meta.errorTag).toBeUndefined()
+            expect(response.content[0].text).toBe(error.message)
+          }
         }))
 
       it.effect("maps DirectMessageNotFoundError with descriptive message", () =>
