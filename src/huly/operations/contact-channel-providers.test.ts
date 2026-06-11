@@ -7,6 +7,7 @@ import { ContactChannelProviderValues } from "../../domain/schemas/contact-chann
 import { contact } from "../huly-plugins.js"
 import { channelSummary } from "./contact-channel-mappers.js"
 import {
+  CONTACT_CHANNEL_PROVIDER_BY_SDK_KEY,
   fromContactChannelProviderRef,
   listContactChannelProviderLabels,
   toContactChannelProviderRef
@@ -14,6 +15,7 @@ import {
 import { toRef } from "./sdk-boundary.js"
 
 const testRef: typeof toRef = toRef
+const sorted = (values: Iterable<string>): Array<string> => Array.from(values).sort()
 
 // Brands are erased at runtime; the SDK PersonId brand is a string in test fixtures.
 const testCorePersonId = (id: string): CorePersonId => id as CorePersonId
@@ -37,6 +39,17 @@ const channel = (provider: string): Channel => {
 }
 
 describe("Contact Channel Provider Mapping", () => {
+  it("keeps public provider labels in exact lockstep with Huly SDK providers", () => {
+    const sdkProviderKeys = sorted(Object.keys(contact.channelProvider))
+    const mappedProviderKeys = sorted(Object.keys(CONTACT_CHANNEL_PROVIDER_BY_SDK_KEY))
+    const mappedProviders = Object.values(CONTACT_CHANNEL_PROVIDER_BY_SDK_KEY)
+
+    expect(mappedProviderKeys).toEqual(sdkProviderKeys)
+    expect(mappedProviders).toHaveLength(sdkProviderKeys.length)
+    expect(new Set(mappedProviders).size).toBe(mappedProviders.length)
+    expect(sorted(mappedProviders)).toEqual(sorted(ContactChannelProviderValues))
+  })
+
   it("round-trips every provider label through Huly refs", () => {
     expect(listContactChannelProviderLabels()).toEqual(ContactChannelProviderValues)
 
