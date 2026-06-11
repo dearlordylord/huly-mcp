@@ -58,7 +58,7 @@ export type ListContactChannelProvidersParams = Schema.Schema.Type<typeof ListCo
 
 const providerDescription = `Channel provider label: ${enumValuesDescription(ContactChannelProviderValues)}.`
 
-const validateEmailProviderValue = (provider: ContactChannelProvider, value: string): string | undefined =>
+const validateEmailChannelValue = (provider: ContactChannelProvider, value: string): string | undefined =>
   provider === "email" && !Schema.is(Email)(value)
     ? "email provider values must be valid email addresses."
     : undefined
@@ -68,7 +68,7 @@ const ChannelProviderValueSchema = Schema.Struct({
   value: NonEmptyString.annotations({
     description: "Channel value. Email providers require a valid email address; all other providers require text."
   })
-}).pipe(Schema.filter((params) => validateEmailProviderValue(params.provider, params.value)))
+}).pipe(Schema.filter((params) => validateEmailChannelValue(params.provider, params.value)))
 
 const hasProviderValueLocator = (params: {
   readonly provider?: ContactChannelProvider | undefined
@@ -103,7 +103,7 @@ const validateUpdateTargetValue = (params: {
   const targetProvider = params.newProvider ?? params.provider
   const targetValue = params.newValue ?? params.value
   return targetProvider !== undefined && targetValue !== undefined
-    ? validateEmailProviderValue(targetProvider, targetValue)
+    ? validateEmailChannelValue(targetProvider, targetValue)
     : undefined
 }
 
@@ -118,7 +118,7 @@ const ContactChannelLocatorFieldsSchema = Schema.Struct({
 }).pipe(
   Schema.filter((params) =>
     params.provider !== undefined && params.value !== undefined
-      ? validateEmailProviderValue(params.provider, params.value)
+      ? validateEmailChannelValue(params.provider, params.value)
       : undefined
   ),
   Schema.filter(validateChannelLocator)

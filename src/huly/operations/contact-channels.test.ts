@@ -383,6 +383,28 @@ describe("Contact Channel Operations", () => {
     expect(failureTag(invalid)).toBe("InvalidContactChannelLocatorError")
   })
 
+  it("rejects provider-only updates to email when the existing value is not an email", async () => {
+    const layer = testLayer({
+      persons: [mockPerson()],
+      channels: [
+        mockChannel({
+          provider: contact.channelProvider.Phone,
+          value: "+15551234"
+        })
+      ]
+    })
+
+    const invalid = await Effect.runPromiseExit(
+      updatePersonChannel({
+        person: "person-1",
+        channelId: ChannelId.make("channel-1"),
+        newProvider: "email"
+      }).pipe(Effect.provide(layer))
+    )
+
+    expect(failureTag(invalid)).toBe("InvalidContactChannelValueError")
+  })
+
   it("removes by provider plus value and returns removed=false for absent locators", async () => {
     const channels = [mockChannel()]
     const layer = testLayer({ persons: [mockPerson()], channels })
