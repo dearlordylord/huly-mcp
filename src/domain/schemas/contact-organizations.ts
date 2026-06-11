@@ -1,14 +1,10 @@
 import { JSONSchema, Schema } from "effect"
 
-/* eslint-disable import-x/no-unused-modules -- compatibility aliases are intentionally exported for older imports. */
 import {
   addOrganizationChannelParamsJsonSchema,
   AddOrganizationChannelParamsSchema,
   type ContactChannelSummary,
   ContactChannelSummarySchema,
-  type OrganizationChannelProvider,
-  OrganizationChannelProviderSchema,
-  OrganizationChannelProviderValues,
   parseAddOrganizationChannelParams
 } from "./contact-channels.js"
 import type { PersonName } from "./shared.js"
@@ -172,14 +168,7 @@ export const ListPersonOrganizationsParamsSchema = Schema.Union(
 
 export type ListPersonOrganizationsParams = Schema.Schema.Type<typeof ListPersonOrganizationsParamsSchema>
 
-export {
-  addOrganizationChannelParamsJsonSchema,
-  AddOrganizationChannelParamsSchema,
-  type OrganizationChannelProvider,
-  OrganizationChannelProviderSchema,
-  OrganizationChannelProviderValues,
-  parseAddOrganizationChannelParams
-}
+export { addOrganizationChannelParamsJsonSchema, AddOrganizationChannelParamsSchema, parseAddOrganizationChannelParams }
 
 export const RemoveOrganizationMemberParamsSchema = Schema.Struct({
   organizationId: NonEmptyString.annotations({

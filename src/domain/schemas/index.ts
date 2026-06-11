@@ -972,8 +972,6 @@ export {
   listPersonChannelsParamsJsonSchema,
   ListPersonChannelsParamsSchema,
   type ListPersonChannelsResult,
-  OrganizationChannelProviderSchema,
-  OrganizationChannelProviderValues,
   parseAddPersonChannelParams,
   parseListContactChannelProvidersParams,
   parseListOrganizationChannelsParams,

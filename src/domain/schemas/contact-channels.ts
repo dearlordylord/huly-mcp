@@ -317,7 +317,3 @@ export const parseAddOrganizationChannelParams = Schema.decodeUnknown(AddOrganiz
 export const parseListOrganizationChannelsParams = Schema.decodeUnknown(ListOrganizationChannelsParamsSchema)
 export const parseUpdateOrganizationChannelParams = Schema.decodeUnknown(UpdateOrganizationChannelParamsSchema)
 export const parseRemoveOrganizationChannelParams = Schema.decodeUnknown(RemoveOrganizationChannelParamsSchema)
-
-export const OrganizationChannelProviderValues = ContactChannelProviderValues
-export const OrganizationChannelProviderSchema = ContactChannelProviderSchema
-export type OrganizationChannelProvider = ContactChannelProvider
