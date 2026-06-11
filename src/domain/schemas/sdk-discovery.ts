@@ -34,6 +34,14 @@ const NormalizedAttributeTypeKindValues = [
   "array",
   "collection"
 ] as const
+const HulyIssue101PackageNameValues = [
+  "@hcengineering/board",
+  "@hcengineering/inventory",
+  "@hcengineering/products"
+] as const
+const HulyPackagePublishStatusValues = ["published", "not_published"] as const
+const HulyPackageDependencyStatusValues = ["declared", "not_declared"] as const
+const HulyPackageMcpStatusValues = ["usable_for_discovery", "blocked"] as const
 
 type HulyKnownClassifierKindLiteral = typeof KnownClassifierKindValues[number]
 
@@ -210,6 +218,70 @@ export const HulyEnumSummarySchema = Schema.Struct({
 })
 export type HulyEnumSummary = Schema.Schema.Type<typeof HulyEnumSummarySchema>
 
+const HulyPackageViabilityBaseFields = {
+  packageName: Schema.Literal(...HulyIssue101PackageNameValues).annotations({
+    description: `Exact issue #101 @hcengineering SDK package name: ${
+      enumValuesDescription(HulyIssue101PackageNameValues)
+    }`
+  }),
+  requestedVersion: Schema.optional(NonEmptyString.annotations({
+    description: "Version known to be published or requested for this package, when available"
+  })),
+  publishStatus: Schema.Literal(...HulyPackagePublishStatusValues).annotations({
+    description: `npm package availability: ${enumValuesDescription(HulyPackagePublishStatusValues)}`
+  }),
+  dependencyStatus: Schema.Literal(...HulyPackageDependencyStatusValues).annotations({
+    description: `Whether this MCP server currently declares the package as a dependency: ${
+      enumValuesDescription(HulyPackageDependencyStatusValues)
+    }`
+  }),
+  writeGuidance: NonEmptyString.annotations({
+    description: "Non-goal guidance for writes; this viability surface is read-only and never authorizes write tools"
+  })
+} as const
+
+const HulyBlockedPackageViabilitySchema = Schema.Struct({
+  ...HulyPackageViabilityBaseFields,
+  mcpStatus: Schema.Literal("blocked").annotations({
+    description: "This package is not currently usable for MCP discovery implementation"
+  }),
+  usableClassesOrOperations: Schema.Tuple().annotations({
+    description: "Blocked package rows must not advertise usable classes or operations"
+  }),
+  blockedReason: NonEmptyString.annotations({
+    description: "Explicit reason an LLM should not attempt MCP implementation against this package yet"
+  })
+})
+
+const HulyUsablePackageViabilitySchema = Schema.Struct({
+  ...HulyPackageViabilityBaseFields,
+  publishStatus: Schema.Literal("published").annotations({
+    description: "Usable package rows must be published"
+  }),
+  dependencyStatus: Schema.Literal("declared").annotations({
+    description: "Usable package rows must already be declared as MCP package dependencies"
+  }),
+  mcpStatus: Schema.Literal("usable_for_discovery").annotations({
+    description: "This package has local typed declarations safe for read-only discovery work"
+  }),
+  usableClassesOrOperations: Schema.NonEmptyArray(NonEmptyString).annotations({
+    description:
+      "Class IDs, operations, or typed SDK exports safe to use now because declarations are locally available."
+  }),
+  blockedReason: Schema.optionalWith(Schema.Never, { exact: true }).annotations({
+    description: "Usable package rows must not include a blocked reason"
+  })
+})
+
+export const HulyPackageViabilitySchema = Schema.Union(
+  HulyBlockedPackageViabilitySchema,
+  HulyUsablePackageViabilitySchema
+).annotations({
+  description: `Discriminated package viability. mcpStatus values are ${
+    enumValuesDescription(HulyPackageMcpStatusValues)
+  }; blocked rows require blockedReason and no usable exports, while usable rows require published and declared status.`
+})
+
 const sdkDiscoveryLimitDescription = (entity: string): string =>
   `Maximum number of ${entity} to return after filtering (default: ${SDK_DISCOVERY_DEFAULT_LIMIT}, max: ${MAX_LIMIT})`
 
@@ -305,12 +377,35 @@ export const ListHulyEnumsResultSchema = Schema.Struct({
 })
 export type ListHulyEnumsResult = Schema.Schema.Type<typeof ListHulyEnumsResultSchema>
 
+const DescribeHulyPackageViabilityParamsSchema = Schema.Struct({}).annotations({
+  title: "DescribeHulyPackageViabilityParams",
+  description:
+    "No parameters. Returns static read-only viability for issue #101 board, inventory, and products SDK packages."
+})
+export type DescribeHulyPackageViabilityParams = Schema.Schema.Type<
+  typeof DescribeHulyPackageViabilityParamsSchema
+>
+
+export const DescribeHulyPackageViabilityResultSchema = Schema.Struct({
+  packages: Schema.Array(HulyPackageViabilitySchema),
+  guidance: NonEmptyString.annotations({
+    description:
+      "LLM-first summary of how agents should use this report without inventing write support or package APIs"
+  })
+})
+export type DescribeHulyPackageViabilityResult = Schema.Schema.Type<
+  typeof DescribeHulyPackageViabilityResultSchema
+>
+
 export { HulyDomainName } from "./sdk-discovery-configurations.js"
 
 export const listHulyClassesParamsJsonSchema = JSONSchema.make(ListHulyClassesParamsSchema)
 export const getHulyClassParamsJsonSchema = JSONSchema.make(GetHulyClassParamsSchema)
 export const listHulyAttributesParamsJsonSchema = JSONSchema.make(ListHulyAttributesParamsSchema)
 export const listHulyEnumsParamsJsonSchema = JSONSchema.make(ListHulyEnumsParamsSchema)
+export const describeHulyPackageViabilityParamsJsonSchema = JSONSchema.make(
+  DescribeHulyPackageViabilityParamsSchema
+)
 
 const strictParseOptions = { onExcessProperty: "error" } as const
 
@@ -318,3 +413,7 @@ export const parseListHulyClassesParams = Schema.decodeUnknown(ListHulyClassesPa
 export const parseGetHulyClassParams = Schema.decodeUnknown(GetHulyClassParamsSchema, strictParseOptions)
 export const parseListHulyAttributesParams = Schema.decodeUnknown(ListHulyAttributesParamsSchema, strictParseOptions)
 export const parseListHulyEnumsParams = Schema.decodeUnknown(ListHulyEnumsParamsSchema, strictParseOptions)
+export const parseDescribeHulyPackageViabilityParams = Schema.decodeUnknown(
+  DescribeHulyPackageViabilityParamsSchema,
+  strictParseOptions
+)

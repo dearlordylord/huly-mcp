@@ -3,6 +3,8 @@ import { SortingOrder } from "@hcengineering/core"
 import { Array as Arr, Effect, Either, Option } from "effect"
 
 import type {
+  DescribeHulyPackageViabilityParams,
+  DescribeHulyPackageViabilityResult,
   GetHulyClassParams,
   GetHulyClassResult,
   ListHulyAttributesParams,
@@ -41,6 +43,12 @@ import {
 type SdkDiscoveryError = HulyClientError | HulyClassNotFoundError
 
 const MAX_ANCESTOR_DEPTH = 32
+const packageWriteGuidance = NonEmptyString.make(
+  "Read-only viability only. Do not create board, inventory, or products write tools from this report; first add declared SDK dependencies, typed class discovery, and focused tests."
+)
+const packageViabilityGuidance = NonEmptyString.make(
+  "Use this report to decide whether package-backed issue #101 discovery work is viable. It does not prove workspace installation and it is not write authorization."
+)
 
 // Huly plugin constants are compatible with Ref<Class<MetadataClassDoc>> at runtime; the SDK type is narrower.
 // eslint-disable-next-line no-restricted-syntax -- SDK boundary cast for class model queries
@@ -223,6 +231,50 @@ const attributesForClasses = (
       hulyQuery<AnyAttribute>({ attributeOf: { $in: classIds.map(toRef<Class<Obj>>) } }),
       { sort: { name: SortingOrder.Ascending } }
     )
+
+export const describeHulyPackageViability = (
+  _params: DescribeHulyPackageViabilityParams
+): Effect.Effect<DescribeHulyPackageViabilityResult> =>
+  Effect.succeed({
+    packages: [
+      {
+        packageName: "@hcengineering/board",
+        requestedVersion: NonEmptyString.make("0.7.423"),
+        publishStatus: "published",
+        dependencyStatus: "not_declared",
+        mcpStatus: "blocked",
+        usableClassesOrOperations: [],
+        blockedReason: NonEmptyString.make(
+          "@hcengineering/board is published at 0.7.423, but this MCP package does not declare it and no local typed SDK declarations are available to validate board class IDs or operations."
+        ),
+        writeGuidance: packageWriteGuidance
+      },
+      {
+        packageName: "@hcengineering/inventory",
+        requestedVersion: NonEmptyString.make("0.7.423"),
+        publishStatus: "published",
+        dependencyStatus: "not_declared",
+        mcpStatus: "blocked",
+        usableClassesOrOperations: [],
+        blockedReason: NonEmptyString.make(
+          "@hcengineering/inventory is published at 0.7.423, but this MCP package does not declare it and no local typed SDK declarations are available to validate inventory class IDs or operations."
+        ),
+        writeGuidance: packageWriteGuidance
+      },
+      {
+        packageName: "@hcengineering/products",
+        publishStatus: "not_published",
+        dependencyStatus: "not_declared",
+        mcpStatus: "blocked",
+        usableClassesOrOperations: [],
+        blockedReason: NonEmptyString.make(
+          "@hcengineering/products is not published, so agents must not plan implementation against package imports, class constants, or operations from that package."
+        ),
+        writeGuidance: packageWriteGuidance
+      }
+    ],
+    guidance: packageViabilityGuidance
+  })
 
 export const listHulyClasses = (
   params: ListHulyClassesParams

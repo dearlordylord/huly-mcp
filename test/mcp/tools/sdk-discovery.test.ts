@@ -1,9 +1,10 @@
 import { describe, it } from "@effect/vitest"
 import type { AccountUuid, AnyAttribute, Doc, PersonId, Ref, Space } from "@hcengineering/core"
 import { ClassifierKind, toFindResult } from "@hcengineering/core"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import { expect } from "vitest"
 
+import { DescribeHulyPackageViabilityResultSchema } from "../../../src/domain/schemas/sdk-discovery.js"
 import type { HulyClientOperations } from "../../../src/huly/client.js"
 import { core, tracker } from "../../../src/huly/huly-plugins.js"
 import { testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
@@ -88,6 +89,7 @@ describe("sdkDiscoveryTools", () => {
         "get_huly_class",
         "list_huly_attributes",
         "list_huly_enums",
+        "describe_huly_package_viability",
         "list_huly_plugin_configurations",
         "list_huly_domain_index_configurations",
         "list_huly_sequences",
@@ -106,6 +108,48 @@ describe("sdkDiscoveryTools", () => {
       expect(result.isError).toBeUndefined()
       const parsed = JSON.parse(result.content[0].text) as { classes: Array<{ classId: string }> }
       expect(parsed.classes[0].classId).toBe(tracker.class.Issue)
+    }))
+
+  it.effect("describe_huly_package_viability reports published and blocked package status", () =>
+    Effect.gen(function*() {
+      const tool = findTool("describe_huly_package_viability")
+      const result = yield* Effect.promise(() => tool.handler({}, hulyClient, noopStorageClient))
+
+      expect(result.isError).toBeUndefined()
+      const parsed = yield* Schema.decodeUnknown(DescribeHulyPackageViabilityResultSchema)(
+        JSON.parse(result.content[0].text)
+      )
+      expect(parsed.packages).toEqual([
+        expect.objectContaining({
+          packageName: "@hcengineering/board",
+          requestedVersion: "0.7.423",
+          publishStatus: "published",
+          dependencyStatus: "not_declared",
+          mcpStatus: "blocked",
+          usableClassesOrOperations: [],
+          blockedReason: expect.stringContaining("no local typed SDK declarations")
+        }),
+        expect.objectContaining({
+          packageName: "@hcengineering/inventory",
+          requestedVersion: "0.7.423",
+          publishStatus: "published",
+          dependencyStatus: "not_declared",
+          mcpStatus: "blocked",
+          usableClassesOrOperations: [],
+          blockedReason: expect.stringContaining("no local typed SDK declarations")
+        }),
+        expect.objectContaining({
+          packageName: "@hcengineering/products",
+          publishStatus: "not_published",
+          dependencyStatus: "not_declared",
+          mcpStatus: "blocked",
+          usableClassesOrOperations: [],
+          blockedReason: expect.stringContaining("not published")
+        })
+      ])
+      for (const packageStatus of parsed.packages) {
+        expect(packageStatus.writeGuidance).toContain("Do not create")
+      }
     }))
 
   it.effect("get_huly_class maps schema parse errors", () =>

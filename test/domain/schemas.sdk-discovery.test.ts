@@ -11,8 +11,10 @@ import {
   ListHulySequencesResultSchema
 } from "../../src/domain/schemas/sdk-discovery-configurations.js"
 import {
+  DescribeHulyPackageViabilityResultSchema,
   GetHulyClassParamsSchema,
   GetHulyClassResultSchema,
+  HulyPackageViabilitySchema,
   HulySdkClassifierKindSchema,
   listHulyAttributesParamsJsonSchema,
   ListHulyAttributesParamsSchema,
@@ -73,6 +75,70 @@ describe("sdk discovery schemas", () => {
 
     expect(jsonSchema).toContain(`default: ${SDK_DISCOVERY_DEFAULT_LIMIT}`)
     expect(jsonSchema).toContain(`max: ${MAX_LIMIT}`)
+  })
+
+  it("validates package viability state combinations", () => {
+    const writeGuidance = "Read-only only. Do not add write tools."
+    const blockedBoard = {
+      packageName: "@hcengineering/board",
+      requestedVersion: "0.7.423",
+      publishStatus: "published",
+      dependencyStatus: "not_declared",
+      mcpStatus: "blocked",
+      usableClassesOrOperations: [],
+      blockedReason: "Package is published but not declared locally.",
+      writeGuidance
+    }
+    const usableInventory = {
+      packageName: "@hcengineering/inventory",
+      requestedVersion: "0.7.423",
+      publishStatus: "published",
+      dependencyStatus: "declared",
+      mcpStatus: "usable_for_discovery",
+      usableClassesOrOperations: ["inventory:class:Sku"],
+      writeGuidance
+    }
+
+    expect(Schema.decodeUnknownSync(HulyPackageViabilitySchema)(blockedBoard).mcpStatus).toBe("blocked")
+    expect(Schema.decodeUnknownSync(HulyPackageViabilitySchema)(usableInventory).mcpStatus).toBe(
+      "usable_for_discovery"
+    )
+    expect(() =>
+      Schema.decodeUnknownSync(HulyPackageViabilitySchema)({
+        ...usableInventory,
+        packageName: "@hcengineering/unknown"
+      })
+    ).toThrow()
+    expect(() =>
+      Schema.decodeUnknownSync(HulyPackageViabilitySchema)({
+        ...usableInventory,
+        publishStatus: "not_published"
+      })
+    ).toThrow()
+    expect(() =>
+      Schema.decodeUnknownSync(HulyPackageViabilitySchema)({
+        ...usableInventory,
+        blockedReason: "Usable rows must not carry blocked reasons."
+      })
+    ).toThrow()
+    expect(() =>
+      Schema.decodeUnknownSync(HulyPackageViabilitySchema)({
+        ...blockedBoard,
+        blockedReason: undefined
+      })
+    ).toThrow()
+    expect(() =>
+      Schema.decodeUnknownSync(HulyPackageViabilitySchema)({
+        ...blockedBoard,
+        usableClassesOrOperations: ["board:class:Board"]
+      })
+    ).toThrow()
+    expect(() =>
+      Schema.decodeUnknownSync(DescribeHulyPackageViabilityResultSchema)({
+        packages: [blockedBoard],
+        guidance: "Use this only for read-only package viability."
+      })
+    ).not.toThrow()
   })
 
   it.effect("validates get class, attribute, and enum params", () =>

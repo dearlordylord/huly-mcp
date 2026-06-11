@@ -13,6 +13,8 @@ import {
   parseListHulySequencesParams
 } from "../../domain/schemas/sdk-discovery-configurations.js"
 import {
+  describeHulyPackageViabilityParamsJsonSchema,
+  DescribeHulyPackageViabilityResultSchema,
   getHulyClassParamsJsonSchema,
   GetHulyClassResultSchema,
   listHulyAttributesParamsJsonSchema,
@@ -21,6 +23,7 @@ import {
   ListHulyClassesResultSchema,
   listHulyEnumsParamsJsonSchema,
   ListHulyEnumsResultSchema,
+  parseDescribeHulyPackageViabilityParams,
   parseGetHulyClassParams,
   parseListHulyAttributesParams,
   parseListHulyClassesParams,
@@ -33,6 +36,7 @@ import {
   listHulySequences
 } from "../../huly/operations/sdk-discovery-configurations.js"
 import {
+  describeHulyPackageViability,
   getHulyClass,
   listHulyAttributes,
   listHulyClasses,
@@ -93,6 +97,19 @@ export const sdkDiscoveryTools: ReadonlyArray<RegisteredTool> = [
       parseListHulyEnumsParams,
       listHulyEnums,
       ListHulyEnumsResultSchema
+    )
+  },
+  {
+    name: "describe_huly_package_viability",
+    description:
+      "Read static issue #101 package viability for @hcengineering/board, @hcengineering/inventory, and @hcengineering/products. Returns explicit publish status, current MCP dependency/declaration status, usable class or operation exports when safely discoverable, blocked reasons, and guidance that this read-only report does not authorize write tools.",
+    category: CATEGORY,
+    inputSchema: describeHulyPackageViabilityParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "describe_huly_package_viability",
+      parseDescribeHulyPackageViabilityParams,
+      describeHulyPackageViability,
+      DescribeHulyPackageViabilityResultSchema
     )
   },
   {
