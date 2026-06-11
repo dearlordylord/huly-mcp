@@ -92,6 +92,19 @@ interface TestState {
   readonly channels?: Array<Channel>
 }
 
+type SupportedContactClassTag = "person" | "organization" | "channel"
+
+const assertNever = (value: never): never => {
+  throw new Error(`Unhandled contact class in test fixture: ${String(value)}`)
+}
+
+const supportedContactClassTag = (_class: Ref<Class<Doc>>): SupportedContactClassTag | undefined => {
+  if (_class === contact.class.Person) return "person"
+  if (_class === contact.class.Organization) return "organization"
+  if (_class === contact.class.Channel) return "channel"
+  return undefined
+}
+
 const queryValue = (query: unknown, key: string): unknown =>
   typeof query === "object" && query !== null ? query[key as keyof typeof query] : undefined
 
@@ -120,27 +133,40 @@ const testLayer = (state: TestState) => {
   const nextChannelNumber = { value: 1 }
 
   // HulyClientOperations methods are generic; this fixture only implements the classes exercised here.
+  const findAllSupportedClass = (
+    tag: SupportedContactClassTag,
+    query: unknown
+  ): Effect.Effect<FindResult<Doc>> => {
+    switch (tag) {
+      case "person": {
+        const result = persons.filter((person) =>
+          matchesId(person._id, queryValue(query, "_id"))
+          && (queryValue(query, "name") === undefined || person.name === queryValue(query, "name"))
+        )
+        return Effect.succeed(toFindResult(result.map((doc) => doc as Doc)))
+      }
+      case "organization": {
+        const result = organizations.filter((organization) =>
+          matchesId(organization._id, queryValue(query, "_id"))
+          && (queryValue(query, "name") === undefined || organization.name === queryValue(query, "name"))
+        )
+        return Effect.succeed(toFindResult(result.map((doc) => doc as Doc)))
+      }
+      case "channel":
+        return Effect.succeed(toFindResult(filterChannels(channels, query).map((doc) => doc as Doc)))
+      default:
+        return assertNever(tag)
+    }
+  }
+
   const findAllImpl = ((
     _class: Ref<Class<Doc>>,
     query: unknown,
     _options?: FindOptions<Doc>
   ): Effect.Effect<FindResult<Doc>> => {
-    if (_class === contact.class.Person) {
-      const result = persons.filter((person) =>
-        matchesId(person._id, queryValue(query, "_id"))
-        && (queryValue(query, "name") === undefined || person.name === queryValue(query, "name"))
-      )
-      return Effect.succeed(toFindResult(result.map((doc) => doc as Doc)))
-    }
-    if (_class === contact.class.Organization) {
-      const result = organizations.filter((organization) =>
-        matchesId(organization._id, queryValue(query, "_id"))
-        && (queryValue(query, "name") === undefined || organization.name === queryValue(query, "name"))
-      )
-      return Effect.succeed(toFindResult(result.map((doc) => doc as Doc)))
-    }
-    if (_class === contact.class.Channel) {
-      return Effect.succeed(toFindResult(filterChannels(channels, query).map((doc) => doc as Doc)))
+    const tag = supportedContactClassTag(_class)
+    if (tag !== undefined) {
+      return findAllSupportedClass(tag, query)
     }
     return Effect.succeed(toFindResult<Doc>([]))
   }) as HulyClientOperations["findAll"]
