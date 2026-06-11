@@ -1,5 +1,13 @@
 # @firfi/huly-mcp
 
+## 0.28.0
+
+### Minor Changes
+
+- Add the next SDK parity release with expanded Drive, SDK discovery, tracker document, and planning coverage.
+
+  This release adds Drive administration and file operation tools, Drive file comments and activity coverage, SDK discovery phase two surfaces, tracker document closeout support, and the issue 99 chat/channel integration pre-plan.
+
 ## 0.27.0
 
 ### Minor Changes
