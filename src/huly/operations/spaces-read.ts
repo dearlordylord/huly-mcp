@@ -132,7 +132,14 @@ export const getSpace = (
         core.class.SpaceType,
         hulyQuery<HulySpaceType>({ _id: toRef<HulySpaceType>(space.type) })
       )
-    return toSpaceDetail(space, spaceType)
+    const roles = spaceType === undefined
+      ? []
+      : yield* client.findAll<HulyRole>(
+        core.class.Role,
+        hulyQuery<HulyRole>({ attachedTo: spaceType._id }),
+        { limit: Math.max(spaceType.roles, 1) }
+      )
+    return toSpaceDetail(space, spaceType, new Set(roles.map((role) => role._id)))
   })
 
 export const listSpaceTypes = (

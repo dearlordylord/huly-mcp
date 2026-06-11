@@ -515,10 +515,18 @@ describe("spaces operations", () => {
         [core.class.Space]: {
           "role-admin": [accountA],
           "role-empty": [],
+          customTags: ["custom-a", "custom-b"],
           ignored: "not a member list"
         }
       })
-      const layer = createTestLayer({ spaces: [space], spaceTypes: [makeSpaceType()] })
+      const layer = createTestLayer({
+        spaces: [space],
+        spaceTypes: [makeSpaceType({ roles: 2 })],
+        roles: [
+          makeRole(),
+          makeRole({ _id: toRef<Role>("role-empty"), name: "Empty" })
+        ]
+      })
 
       const result = yield* getSpace({ space: spaceIdentifier("space-1") }).pipe(Effect.provide(layer))
 
@@ -528,6 +536,25 @@ describe("spaces operations", () => {
         { roleId: "role-admin", members: [accountA] },
         { roleId: "role-empty", members: [] }
       ])
+    }))
+
+  it.effect("getSpace hides custom array fields when typed-space role assignments are empty", () =>
+    Effect.gen(function*() {
+      const { owners: _owners, ...space } = makeSpace({
+        type: toRef<SpaceType>("space-type-1"),
+        [core.class.Space]: {
+          customTags: ["custom-a", "custom-b"]
+        }
+      })
+      const layer = createTestLayer({
+        spaces: [space],
+        spaceTypes: [makeSpaceType()],
+        roles: [makeRole()]
+      })
+
+      const result = yield* getSpace({ space: spaceIdentifier("space-1") }).pipe(Effect.provide(layer))
+
+      expect(result.roleAssignments).toBeUndefined()
     }))
 
   it.effect("listSpaces filters by raw class and type", () =>
@@ -864,13 +891,17 @@ describe("spaces operations", () => {
         [core.class.Space]: {
           "role-admin": [accountA],
           "role-viewer": [accountC],
+          customTags: ["custom-a", "custom-b"],
           ignored: "not a role member list"
         }
       })
       const layer = createTestLayer({
         spaces: [space],
-        spaceTypes: [makeSpaceType()],
-        roles: [makeRole({ attachedToClass: toRef<Class<Doc>>("custom:class:SpaceType") })],
+        spaceTypes: [makeSpaceType({ roles: 2 })],
+        roles: [
+          makeRole({ attachedToClass: toRef<Class<Doc>>("custom:class:SpaceType") }),
+          makeRole({ _id: toRef<Role>("role-viewer"), name: "Viewers" })
+        ],
         persons: [makePerson()],
         channels: [makeChannel()],
         employees: [makeEmployee()],

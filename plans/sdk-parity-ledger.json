@@ -301,7 +301,7 @@
       "status": "gap",
       "matrixLocation": "Core classes, attributes, enums; Core spaces, permissions, roles",
       "backlogIssue": 92,
-      "rationale": "Remaining core write-side configuration, role assignment writes, role/permission definition writes, generic space creation, class collaborator metadata, statuses, and write-side model management are represented as matrix gaps. Generic space discovery, space type/permission reads, safe existing-space metadata updates, member mutations, owner replacement, object collaborators, read-only plugin configuration, domain index configuration, and sequence discovery are covered.",
+      "rationale": "Remaining core write-side configuration, role/permission definition writes, generic space creation, class collaborator metadata, statuses, and write-side model management are represented as matrix gaps. Generic space discovery, space type/permission reads, safe existing-space metadata updates, member mutations, owner replacement, typed-space role member mutations, object collaborators, read-only plugin configuration, domain index configuration, and sequence discovery are covered.",
       "exports": [
         "AttributePermission",
         "ClassCollaborators",

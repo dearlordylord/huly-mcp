@@ -53,10 +53,11 @@ export const toSpaceSummary = (space: GenericSpace): SpaceSummary => ({
 
 const roleAssignments = (
   space: GenericSpace,
-  spaceType: HulySpaceType | undefined
+  spaceType: HulySpaceType | undefined,
+  validRoleIds: ReadonlySet<Ref<HulyRole>>
 ): Array<SpaceRoleAssignment> | undefined => {
   if (spaceType === undefined) return undefined
-  const entries = spaceRoleAssignmentEntries(space, spaceType)
+  const entries = spaceRoleAssignmentEntries(space, spaceType, validRoleIds)
   return entries.length === 0
     ? undefined
     : entries.map(([roleId, members]) => ({
@@ -65,7 +66,11 @@ const roleAssignments = (
     }))
 }
 
-export const toSpaceDetail = (space: GenericSpace, spaceType?: HulySpaceType): SpaceDetail => ({
+export const toSpaceDetail = (
+  space: GenericSpace,
+  spaceType?: HulySpaceType,
+  validRoleIds: ReadonlySet<Ref<HulyRole>> = new Set<Ref<HulyRole>>()
+): SpaceDetail => ({
   id: SpaceId.make(space._id),
   name: space.name,
   description: space.description,
@@ -76,7 +81,7 @@ export const toSpaceDetail = (space: GenericSpace, spaceType?: HulySpaceType): S
   autoJoin: space.autoJoin,
   members: space.members.map((member) => AccountUuid.make(member)),
   owners: (space.owners ?? []).map((owner) => AccountUuid.make(owner)),
-  roleAssignments: roleAssignments(space, spaceType)
+  roleAssignments: roleAssignments(space, spaceType, validRoleIds)
 })
 
 export const spaceTypeSummary = (

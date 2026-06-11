@@ -121,6 +121,16 @@ const resolveSpaceRole = (
     return matches[0]
   })
 
+const findSpaceTypeRoles = (
+  client: HulyClient["Type"],
+  spaceType: SpaceType
+): Effect.Effect<Array<Role>, HulyClientError> =>
+  client.findAll<Role>(
+    roleClass,
+    hulyQuery<Role>({ attachedTo: spaceType._id }),
+    { limit: Math.max(spaceType.roles, 1) }
+  )
+
 const writeSpaceRoleMembers = (
   client: HulyClient["Type"],
   space: GenericSpace,
@@ -157,8 +167,13 @@ const mutateSpaceRoleMembers = (
     const spaceType = yield* requireTypedSpaceType(space)
     const spaceTypeDoc = yield* findSpaceType(client, spaceType)
     const role = yield* resolveSpaceRole(client, spaceType, params.role)
+    const validRoles = yield* findSpaceTypeRoles(client, spaceTypeDoc)
     const resolvedMembers = yield* resolveMembers(client, params.members)
-    const currentAssignments = spaceRoleAssignments(space, spaceTypeDoc)
+    const currentAssignments = spaceRoleAssignments(
+      space,
+      spaceTypeDoc,
+      new Set(validRoles.map((validRole) => validRole._id))
+    )
     const currentMembers = sortStrings(currentAssignments[role._id] ?? []).map(toAccountUuid)
     const nextMembers = mutateMembers(currentMembers, resolvedMembers).map(toAccountUuid)
     const changed = !arraysEqual(currentMembers, nextMembers)

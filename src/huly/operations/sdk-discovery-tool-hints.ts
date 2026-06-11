@@ -87,7 +87,7 @@ const chunterCoveredRationale =
 const coreCoveredRationale =
   "Existing tools expose user statuses, full-text search, blobs through storage/download flows, generic association/relation discovery/mutation helpers, class/interface/mixin, attribute, enum, plugin configuration, domain index configuration, sequence, and space type capability discovery."
 const coreGapRationale =
-  "Remaining core write-side configuration, role assignment writes, role/permission definition writes, generic space creation, class collaborator metadata, statuses, and write-side model management are represented as matrix gaps. Generic space discovery, space type/permission reads, safe existing-space metadata updates, member mutations, owner replacement, object collaborators, read-only plugin configuration, domain index configuration, and sequence discovery are covered."
+  "Remaining core write-side configuration, role/permission definition writes, generic space creation, class collaborator metadata, statuses, and write-side model management are represented as matrix gaps. Generic space discovery, space type/permission reads, safe existing-space metadata updates, member mutations, owner replacement, typed-space role member mutations, object collaborators, read-only plugin configuration, domain index configuration, and sequence discovery are covered."
 const coreNotMcpFacingRationale =
   "Core primitive model infrastructure, transaction classes, type wrappers, and versioning internals are not LLM-facing product resources by themselves."
 

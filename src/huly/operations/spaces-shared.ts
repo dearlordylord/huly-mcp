@@ -93,13 +93,14 @@ const spaceRoleAssignmentSource = (space: GenericSpace, spaceType: HulySpaceType
 
 export const spaceRoleAssignmentEntries = (
   space: GenericSpace,
-  spaceType: HulySpaceType
+  spaceType: HulySpaceType,
+  validRoleIds: ReadonlySet<Ref<Role>>
 ): ReadonlyArray<readonly [Ref<Role>, ReadonlyArray<HulyAccountUuid>]> => {
   const source = spaceRoleAssignmentSource(space, spaceType)
   if (!isObjectRecord(source)) return []
 
   return Object.entries(source).flatMap(([roleId, members]) =>
-    Array.isArray(members)
+    validRoleIds.has(toRef<Role>(roleId)) && Array.isArray(members)
       ? [[
         toRef<Role>(roleId),
         sortStrings(members.filter((member): member is string => typeof member === "string")).map(toAccountUuid)
@@ -108,8 +109,11 @@ export const spaceRoleAssignmentEntries = (
   )
 }
 
-export const spaceRoleAssignments = (space: GenericSpace, spaceType: HulySpaceType): SpaceRoleAssignments =>
-  Object.fromEntries(spaceRoleAssignmentEntries(space, spaceType))
+export const spaceRoleAssignments = (
+  space: GenericSpace,
+  spaceType: HulySpaceType,
+  validRoleIds: ReadonlySet<Ref<Role>>
+): SpaceRoleAssignments => Object.fromEntries(spaceRoleAssignmentEntries(space, spaceType, validRoleIds))
 
 export const hasSpaceRoleAssignmentMixin = (space: GenericSpace, spaceType: HulySpaceType): boolean =>
   isObjectRecord(spaceRoleAssignmentSource(space, spaceType))

@@ -269,7 +269,7 @@ The roadmap is driven by SDK parity and the project principle that this server s
 
 Highest-value additions for coding agents:
 
-- Generic space follow-ups: role assignment mutations, role/permission definition writes, generic space creation, and module-specific wrappers above the shared space foundation.
+- Generic space follow-ups: role/permission definition writes, generic space creation, and module-specific wrappers above the shared space foundation. Generic space metadata, member/owner mutations, and typed-space role member mutations are covered by the shared spaces tools.
 - SDK discovery phase 2: space types, roles, permissions, plugin configuration, sequence metadata, and richer tool hints.
 - Drive follow-ups: drive create/update/delete, item move/rename/delete, adding new versions to existing files, permissions, and comments/activity.
 - Planner/ToDos: personal and project ToDo CRUD, scheduling, complete/reopen, priority, privacy/visibility, and document action items.
@@ -298,7 +298,7 @@ Planned feature surfaces:
 - Chat and communication: direct-message send/update/delete, group DMs, channel member mutations, join/leave/request access, archive/unarchive, star/favorite channels, close/reopen conversations, pinned messages, message attachments, translation, applets, in-message polls, and guest communication settings.
 - Notifications and activity: browser/push subscription internals, provider defaults, UI presenter/viewlet metadata, and activity control/extension metadata.
 - Attachments and media: previews/preview metadata and friendly wrappers for additional object types beyond issue/document.
-- Core schema and workspace administration: attribute/property create/update/delete/hide, enum CRUD/options, sequence management, role assignment mutations, role/permission definition writes, generic space creation, global space admins, integrations registry, invite settings, role capability settings, and workspace setting metadata.
+- Core schema and workspace administration: attribute/property create/update/delete/hide, enum CRUD/options, sequence management, role/permission definition writes, generic space creation, global space admins, integrations registry, invite settings, role capability settings, and workspace setting metadata.
 - Integrations: GitHub repository/project mappings and sync metadata (deferred), Google Calendar connect/configure/sync controls, Bitrix entity/field mappings and sync status, Gmail/email channel messages, Telegram messages, Huly Mail/Mail plugin behavior, AI assistant integration state, and AI bot configuration if server-side APIs expose stable behavior.
 - Templates, rating, support, billing, analytics, views, workbench, and preferences: message templates/categories/fields, document/person rating data blocked by unpublished `@hcengineering/rating` SDK package (#90), support conversations, billing tier/status discovery, onboarding channels, saved filtered views, user view preferences, tabs/widgets/apps, and module preference discovery/update.
 - Document-specific gaps: snapshot restore, backlinks, notes, structured action items/tables, PDF/export, advanced document relationships, and document printing/export once SDK support is safe.
