@@ -7,6 +7,7 @@ import { Effect, Schema } from "effect"
 import { expect } from "vitest"
 
 import { DescribeHulyPackageViabilityResultSchema } from "../../../src/domain/schemas/sdk-discovery.js"
+import { NonEmptyString } from "../../../src/domain/schemas/shared.js"
 import type { HulyClientOperations } from "../../../src/huly/client.js"
 import { core, tracker } from "../../../src/huly/huly-plugins.js"
 import { testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
@@ -17,8 +18,8 @@ import { TOOL_DEFINITIONS } from "../../../src/mcp/tools/index.js"
 import { sdkDiscoveryTools } from "../../../src/mcp/tools/sdk-discovery.js"
 
 const PackageDependencySchema = Schema.Struct({
-  dependencies: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
-  devDependencies: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String }))
+  dependencies: Schema.optional(Schema.Record({ key: Schema.NonEmptyString, value: NonEmptyString })),
+  devDependencies: Schema.optional(Schema.Record({ key: Schema.NonEmptyString, value: NonEmptyString }))
 })
 const packageDependencies = Schema.decodeUnknownSync(PackageDependencySchema)(
   JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8"))
