@@ -7,7 +7,12 @@ import { Effect } from "effect"
 import type { IssuePriority as IssuePriorityStr } from "../../domain/schemas/issues.js"
 import type { NonNegativeNumber } from "../../domain/schemas/shared.js"
 import { PositiveNumber } from "../../domain/schemas/shared.js"
-import { StatusCategoryEntries, type StatusCategoryValue } from "../../domain/schemas/task-management.js"
+import {
+  StatusCategoryEntries,
+  type StatusCategoryValue,
+  UnknownStatusCategoryValue
+} from "../../domain/schemas/task-management.js"
+import { StatusMetadataUnresolvedWarningCode } from "../../domain/schemas/tool-warnings.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { Diagnostics } from "../diagnostics.js"
@@ -55,8 +60,8 @@ const statusCategoryValueFromRef = (
   category: Ref<StatusCategory> | undefined
 ): StatusCategoryValue =>
   category === undefined
-    ? "unknown"
-    : StatusCategoryEntries.find((entry) => entry.ref === category)?.key ?? "unknown"
+    ? UnknownStatusCategoryValue
+    : StatusCategoryEntries.find((entry) => entry.ref === category)?.key ?? UnknownStatusCategoryValue
 
 const workflowStatusFromDoc = (doc: Status): WorkflowStatus => {
   return {
@@ -71,7 +76,7 @@ export const workflowStatusFromRef = (statusRef: Ref<Status>): WorkflowStatus =>
   return {
     _id: statusRef,
     name,
-    category: "unknown"
+    category: UnknownStatusCategoryValue
   }
 }
 
@@ -148,9 +153,9 @@ export const findStatusDocs = (
       const remoteError = remoteResult._tag === "Left" ? ` Remote error: ${remoteResult.left.message}` : ""
       const modelError = modelResult._tag === "Left" ? ` Model error: ${modelResult.left.message}` : ""
       yield* diagnostics.warnAgent({
-        code: "status_metadata_unresolved",
+        code: StatusMetadataUnresolvedWarningCode,
         message: `Huly did not return metadata for ${stillUnresolvedRefs.length} workflow status ref(s). `
-          + `The tool result uses ref-derived status names and category "unknown" for those statuses; `
+          + `The tool result uses ref-derived status names and category "${UnknownStatusCategoryValue}" for those statuses; `
           + `do not infer completion or cancellation semantics from those fallback names.${remoteError}${modelError}`
       })
     } else if (remoteResult._tag === "Left") {

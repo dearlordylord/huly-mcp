@@ -59,7 +59,13 @@ export {
   VirtualOfficeDimension
 } from "./shared.js"
 
-export { type ToolWarning, type ToolWarningCode, ToolWarningCodeSchema, ToolWarningSchema } from "./tool-warnings.js"
+export {
+  StatusMetadataUnresolvedWarningCode,
+  type ToolWarning,
+  type ToolWarningCode,
+  ToolWarningCodeSchema,
+  ToolWarningSchema
+} from "./tool-warnings.js"
 
 export {
   MonthDayOrdinal,
@@ -383,7 +389,8 @@ export {
   type TaskTypeRef,
   TaskTypeRefSchema,
   type TaskTypeSummary,
-  TaskTypeSummarySchema
+  TaskTypeSummarySchema,
+  UnknownStatusCategoryValue
 } from "./task-management.js"
 
 export {

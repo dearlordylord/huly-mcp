@@ -6,6 +6,7 @@ export const ToolWarningCodeSchema = Schema.Literal("status_metadata_unresolved"
   description: "Machine-readable code for an agent-visible MCP tool warning."
 })
 export type ToolWarningCode = Schema.Schema.Type<typeof ToolWarningCodeSchema>
+export const StatusMetadataUnresolvedWarningCode = ToolWarningCodeSchema.literals[0]
 
 export const ToolWarningSchema = Schema.Struct({
   code: ToolWarningCodeSchema,

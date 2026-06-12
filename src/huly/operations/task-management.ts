@@ -33,7 +33,8 @@ import {
   ProjectTypeDetailSchema,
   ProjectTypeId,
   StatusCategoryBySdkKey,
-  TaskTypeId
+  TaskTypeId,
+  UnknownStatusCategoryValue
 } from "../../domain/schemas.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError, type HulyClientOperations } from "../client.js"
@@ -89,7 +90,7 @@ const STATUS_CATEGORIES: ReadonlyArray<StatusCategorySummary> = Object.values(ST
 const WORKFLOW_WARNING = "This changes workspace-level tracker configuration for every project using this project type."
 
 const toCategoryValue = (category: Ref<StatusCategory> | undefined): StatusCategoryValue =>
-  category === undefined ? "unknown" : REF_TO_CATEGORY.get(category) ?? "unknown"
+  category === undefined ? UnknownStatusCategoryValue : REF_TO_CATEGORY.get(category) ?? UnknownStatusCategoryValue
 
 const encodeOrConnectionError = <A, I, R>(
   schema: Schema.Schema<A, I, R>,
