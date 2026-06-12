@@ -11,6 +11,7 @@ import {
   listChannelsParamsJsonSchema,
   listDirectMessagesParamsJsonSchema,
   listDmMessagesParamsJsonSchema,
+  listExternalChannelMessagesParamsJsonSchema,
   listThreadRepliesParamsJsonSchema,
   parseAddThreadReplyParams,
   parseCreateChannelParams,
@@ -24,6 +25,7 @@ import {
   parseListChannelsParams,
   parseListDirectMessagesParams,
   parseListDmMessagesParams,
+  parseListExternalChannelMessagesParams,
   parseListThreadRepliesParams,
   parseSendChannelMessageParams,
   parseSendDmMessageParams,
@@ -57,6 +59,7 @@ import {
   sendDirectMessage,
   updateDirectMessage
 } from "../../huly/operations/direct-messages.js"
+import { listExternalChannelMessages } from "../../huly/operations/external-channel-messages.js"
 import {
   addThreadReply,
   deleteThreadReply,
@@ -136,6 +139,18 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
       "list_channel_messages",
       parseListChannelMessagesParams,
       listChannelMessages
+    )
+  },
+  {
+    name: "list_external_channel_messages",
+    description:
+      "List read-only messages for an external Gmail or Telegram channel by channel name or ID. The limit defaults to 50 and is capped at 200. When this build does not include a compatible Huly external-message SDK/model for the requested provider, returns supported=false, an unsupportedReason, and an empty messages array; it never sends, replies, deletes, mutates, or returns fake messages.",
+    category: CATEGORY,
+    inputSchema: listExternalChannelMessagesParamsJsonSchema,
+    handler: createToolHandler(
+      "list_external_channel_messages",
+      parseListExternalChannelMessagesParams,
+      listExternalChannelMessages
     )
   },
   {
