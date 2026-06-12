@@ -17,12 +17,12 @@
     "url": "https://github.com/dearlordylord/huly-mcp",
     "source": "github"
   },
-  "version": "0.30.1",
+  "version": "0.31.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@firfi/huly-mcp",
-      "version": "0.30.1",
+      "version": "0.31.0",
       "transport": {
         "type": "stdio"
       },
