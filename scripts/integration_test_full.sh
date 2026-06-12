@@ -723,8 +723,38 @@ run_test "list_projects" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}'
 run_test "get_project($PROJECT)" \
   "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_project\",\"arguments\":{\"project\":\"$PROJECT\"}},\"id\":2}"
-run_test "list_statuses($PROJECT)" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_statuses\",\"arguments\":{\"project\":\"$PROJECT\"}},\"id\":2}"
+LIST_STATUSES_RESULT=""
+if run_result_to_var LIST_STATUSES_RESULT "list_statuses($PROJECT)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_statuses\",\"arguments\":{\"project\":\"$PROJECT\"}},\"id\":2}"; then
+  LIST_STATUSES_TEXT=$(printf '%s\n' "$LIST_STATUSES_RESULT" | jq -r '.content[0].text' 2>/dev/null)
+  # The server owns metadata-degradation detection via status_metadata_unresolved.
+  # The raw-ref regex below remains defense in depth if an ID format changes.
+  if printf '%s\n' "$LIST_STATUSES_RESULT" | jq -e '
+    (.structuredContent.warnings? // empty) | not
+    and ([.content[]? | select(.text | contains("\"warnings\""))] | length == 0)
+  ' >/dev/null 2>&1; then
+    echo "PASS: list_statuses($PROJECT) emits no degradation warnings"
+    PASSED=$((PASSED + 1))
+  else
+    echo "FAIL: list_statuses($PROJECT) emitted degradation warnings"
+    FAILED=$((FAILED + 1))
+    ERRORS="${ERRORS}\n  - list_statuses($PROJECT): degradation warnings emitted"
+  fi
+  if printf '%s\n' "$LIST_STATUSES_TEXT" | jq -e '
+    (.statuses | length) > 0
+    and all(.statuses[]?; (.name | type == "string")
+      and (.name | length) > 0
+      and ((.name | test("^[0-9a-f]{24}$")) | not)
+      and .category != "unknown")
+  ' >/dev/null 2>&1; then
+    echo "PASS: list_statuses($PROJECT) resolves status metadata"
+    PASSED=$((PASSED + 1))
+  else
+    echo "FAIL: list_statuses($PROJECT) returned raw or incomplete status metadata"
+    FAILED=$((FAILED + 1))
+    ERRORS="${ERRORS}\n  - list_statuses($PROJECT): raw or incomplete status metadata"
+  fi
+fi
 skip_test "create_project" "would pollute workspace"
 skip_test "update_project" "would pollute workspace"
 skip_test "delete_project" "would pollute workspace"

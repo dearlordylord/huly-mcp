@@ -143,6 +143,7 @@ export const ProjectTypeDetailSchema = Schema.Struct({
   descriptor: NonEmptyString,
   classic: Schema.Boolean,
   isDefaultClassic: Schema.Boolean,
+  statusCount: Count,
   taskTypes: Schema.Array(TaskTypeSummarySchema),
   statuses: Schema.Array(IssueStatusSummarySchema),
   statusCategories: Schema.Array(StatusCategorySummarySchema),

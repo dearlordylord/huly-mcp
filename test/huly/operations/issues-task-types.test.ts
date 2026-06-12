@@ -13,6 +13,7 @@ import { expect } from "vitest"
 
 import { TaskTypeRefSchema } from "../../../src/domain/schemas.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import { HulyConnectionError } from "../../../src/huly/errors.js"
 import { core, task, tracker } from "../../../src/huly/huly-plugins.js"
 import { createIssue, updateIssue } from "../../../src/huly/operations/issues.js"
 import { email, issueIdentifier, projectIdentifier, statusName } from "../../helpers/brands.js"
@@ -191,6 +192,8 @@ const createLayer = (config?: {
   readonly projectType?: ProjectType | null
   readonly taskTypes?: ReadonlyArray<TaskType>
   readonly statuses?: ReadonlyArray<Status>
+  readonly failStatusLookup?: boolean
+  readonly modelStatuses?: ReadonlyArray<Status>
   readonly issues?: ReadonlyArray<HulyIssue>
   readonly captures?: Captures
 }) => {
@@ -198,6 +201,7 @@ const createLayer = (config?: {
   const projectType = config?.projectType === null ? undefined : config?.projectType ?? makeProjectType()
   const taskTypes = config?.taskTypes ?? defaultTaskTypes()
   const statuses = config?.statuses ?? defaultStatuses()
+  const modelStatuses = config?.modelStatuses ?? []
   const issues = config?.issues ?? []
 
   const findAllImpl = (<T extends Doc>(_class: Ref<Class<T>>, query: unknown) => {
@@ -211,6 +215,9 @@ const createLayer = (config?: {
       return Effect.succeed(findResult(byParent(byIds(taskTypes))))
     }
     if (_class === core.class.Status) {
+      if (config?.failStatusLookup === true) {
+        return Effect.fail(new HulyConnectionError({ message: "status lookup failed" }))
+      }
       return Effect.succeed(findResult(byIds(statuses)))
     }
     if (_class === tracker.class.Issue) {
@@ -218,6 +225,17 @@ const createLayer = (config?: {
     }
     return Effect.succeed(findResult([]))
   }) as HulyClientOperations["findAll"]
+
+  const findAllInModelImpl = (<T extends Doc>(_class: Ref<Class<T>>, query: unknown) => {
+    const q = query as { _id?: { $in?: ReadonlyArray<unknown> } }
+    const byIds = <D extends { readonly _id: unknown }>(items: ReadonlyArray<D>): ReadonlyArray<D> =>
+      q._id?.$in === undefined ? items : items.filter((item) => q._id?.$in?.includes(item._id) ?? false)
+
+    if (_class === core.class.Status) {
+      return Effect.succeed(findResult(byIds(modelStatuses)))
+    }
+    return Effect.succeed(findResult([]))
+  }) as HulyClientOperations["findAllInModel"]
 
   const findOneImpl = (<T extends Doc>(_class: Ref<Class<T>>, query: unknown, options?: unknown) => {
     if (_class === tracker.class.Project) {
@@ -270,6 +288,7 @@ const createLayer = (config?: {
   return HulyClient.testLayer({
     addCollection: addCollectionImpl,
     findAll: findAllImpl,
+    findAllInModel: findAllInModelImpl,
     findOne: findOneImpl,
     updateDoc: updateDocImpl
   })
@@ -288,6 +307,29 @@ describe("issue write task type support", () => {
       }).pipe(Effect.provide(createLayer({ captures })))
 
       expect(result.identifier).toBe("TEST-2")
+      expect(captures.addCollections[0].attributes.kind).toBe(bugTaskTypeId)
+      expect(captures.addCollections[0].attributes.status).toBe(bugReviewStatusId)
+    }))
+
+  it.effect("uses model-resolved status names for task type status validation when status lookup fails", () =>
+    Effect.gen(function*() {
+      const captures: Captures = { addCollections: [], updates: [] }
+
+      yield* createIssue({
+        project: projectIdentifier("TEST"),
+        title: "Bug from model status metadata",
+        taskType: TaskTypeRefSchema.make("Bug"),
+        status: statusName("Confirm")
+      }).pipe(
+        Effect.provide(
+          createLayer({
+            captures,
+            failStatusLookup: true,
+            modelStatuses: defaultStatuses()
+          })
+        )
+      )
+
       expect(captures.addCollections[0].attributes.kind).toBe(bugTaskTypeId)
       expect(captures.addCollections[0].attributes.status).toBe(bugReviewStatusId)
     }))

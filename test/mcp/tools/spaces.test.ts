@@ -59,6 +59,7 @@ const hulyClient: HulyClientOperations = {
   markupUrlConfig: testMarkupUrlConfig,
   workbenchUrlConfig: testWorkbenchUrlConfig,
   findAll,
+  findAllInModel: findAll,
   findOne,
   createDoc: () => Effect.die(new Error("not implemented")),
   updateDoc: () => Effect.succeed([]),

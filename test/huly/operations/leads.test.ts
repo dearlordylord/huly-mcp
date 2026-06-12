@@ -5,6 +5,7 @@ import { Effect } from "effect"
 import { expect } from "vitest"
 
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import { Diagnostics, makeDiagnosticsScope } from "../../../src/huly/diagnostics.js"
 import { HulyConnectionError } from "../../../src/huly/errors.js"
 import { contact, core, task } from "../../../src/huly/huly-plugins.js"
 import { leadClassIds } from "../../../src/huly/lead-plugin.js"
@@ -150,6 +151,7 @@ interface LeadMockConfig {
   persons?: ReadonlyArray<Person>
   projectType?: ReturnType<typeof makeProjectType>
   statusQueryError?: HulyConnectionError
+  modelStatuses?: ReadonlyArray<MockStatus>
   statuses?: ReadonlyArray<MockStatus>
 }
 
@@ -179,6 +181,7 @@ const createTestLayer = (config: LeadMockConfig) => {
   const organizations = config.organizations ?? []
   const persons = config.persons ?? []
   const statuses = config.statuses ?? [makeStatus("status-1", "Active")]
+  const modelStatuses = config.modelStatuses ?? []
   const projectType = config.projectType ?? makeProjectType(statuses.map((status) => String(status._id)))
 
   const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown, options?: unknown) => {
@@ -223,6 +226,18 @@ const createTestLayer = (config: LeadMockConfig) => {
     return Effect.succeed(findResult([]))
   }) as HulyClientOperations["findAll"]
 
+  const findAllInModelImpl: HulyClientOperations["findAllInModel"] = ((_class: unknown, query: unknown) => {
+    if (_class === core.class.Status) {
+      const q = readQuery(query)
+      const idFilter = q._id
+      const filtered = typeof idFilter === "object" && idFilter !== null && "$in" in idFilter
+        ? modelStatuses.filter((status) => (idFilter.$in as Array<unknown>).includes(status._id))
+        : [...modelStatuses]
+      return Effect.succeed(findResult(filtered))
+    }
+    return Effect.succeed(findResult([]))
+  }) as HulyClientOperations["findAllInModel"]
+
   const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown, query: unknown) => {
     const q = readQuery(query)
 
@@ -263,6 +278,7 @@ const createTestLayer = (config: LeadMockConfig) => {
   return HulyClient.testLayer({
     fetchMarkup: fetchMarkupImpl,
     findAll: findAllImpl,
+    findAllInModel: findAllInModelImpl,
     findOne: findOneImpl
   })
 }
@@ -413,20 +429,45 @@ describe("Lead Operations", () => {
         expect(result).toEqual([])
       }))
 
-    it.effect("fails when funnel status resolution fails", () =>
+    it.effect("resolves funnel status names from the local model when server status lookup fails", () =>
       Effect.gen(function*() {
         const lead = makeLead()
         const testLayer = createTestLayer({
           leads: [lead],
+          modelStatuses: [makeStatus("status-1", "Active")],
+          statusQueryError: new HulyConnectionError({ message: "status lookup failed" })
+        })
+        const diagnostics = yield* makeDiagnosticsScope
+
+        const result = yield* listLeads({ funnel: funnelReference("funnel-1") }).pipe(
+          Effect.provide(testLayer),
+          Effect.provideService(Diagnostics, diagnostics.service)
+        )
+        const warnings = yield* diagnostics.drainWarnings
+
+        expect(result[0].status).toBe("Active")
+        expect(warnings).toEqual([])
+      }))
+
+    it.effect("uses ref-derived lead status names when both status lookups miss", () =>
+      Effect.gen(function*() {
+        const lead = makeLead({ status: statusRef("plainstatus") })
+        const diagnostics = yield* makeDiagnosticsScope
+        const testLayer = createTestLayer({
+          leads: [lead],
+          projectType: makeProjectType(["plainstatus"]),
           statusQueryError: new HulyConnectionError({ message: "status lookup failed" })
         })
 
-        const error = yield* Effect.flip(
-          listLeads({ funnel: funnelReference("funnel-1") }).pipe(Effect.provide(testLayer))
+        const result = yield* listLeads({ funnel: funnelReference("funnel-1") }).pipe(
+          Effect.provide(testLayer),
+          Effect.provideService(Diagnostics, diagnostics.service)
         )
+        const warnings = yield* diagnostics.drainWarnings
 
-        expect(error._tag).toBe("HulyConnectionError")
-        expect(error.message).toContain("status lookup failed")
+        expect(result[0].status).toBe("plainstatus")
+        expect(warnings).toHaveLength(1)
+        expect(warnings[0].code).toBe("status_metadata_unresolved")
       }))
 
     it.effect("fails with FunnelNotFoundError when funnel does not exist", () =>

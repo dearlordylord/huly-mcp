@@ -97,3 +97,11 @@ No `let` for conditional assignment. Use `const` with:
 - `yield* Effect.gen(function* () { ... })` when a branch needs effectful computation
 
 Legitimate mutation (accumulators, state flags) must be justified by context — flag if unclear.
+
+## Agent-Visible Degradation
+
+Any fallback that changes returned payload fidelity must emit `Diagnostics.warnAgent` into the tool result. Examples: synthesized names, sentinel categories, and partial metadata resolution. Silent degradation is a bug.
+
+Operator-only facts use `Diagnostics.trail` inside request scope, or bare `Effect.log*` outside request scope. `warnAgent` is reserved for payload-fidelity degradation, not routine anomalies.
+
+Tests for fallback paths must assert the warning is present, or assert it is absent when the fallback fully repairs the payload.

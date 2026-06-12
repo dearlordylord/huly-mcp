@@ -2,7 +2,7 @@ import type { Ref, Status, StatusCategory, WithLookup } from "@hcengineering/cor
 import type { ProjectType } from "@hcengineering/task"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
 import { IssuePriority } from "@hcengineering/tracker"
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 
 import type { IssuePriority as IssuePriorityStr } from "../../domain/schemas/issues.js"
 import type { NonNegativeNumber } from "../../domain/schemas/shared.js"
@@ -10,6 +10,7 @@ import { PositiveNumber } from "../../domain/schemas/shared.js"
 import { StatusCategoryEntries, type StatusCategoryValue } from "../../domain/schemas/task-management.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError } from "../client.js"
+import { Diagnostics } from "../diagnostics.js"
 import { InvalidStatusError, IssueNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { core, task, tracker } from "../huly-plugins.js"
 import { findOneOrFail, hulyQuery } from "./query-helpers.js"
@@ -65,7 +66,7 @@ const workflowStatusFromDoc = (doc: Status): WorkflowStatus => {
   }
 }
 
-const workflowStatusFromRef = (statusRef: Ref<Status>): WorkflowStatus => {
+export const workflowStatusFromRef = (statusRef: Ref<Status>): WorkflowStatus => {
   const name = statusRef.includes(":") ? statusRef.slice(statusRef.lastIndexOf(":") + 1) : statusRef
   return {
     _id: statusRef,
@@ -89,12 +90,91 @@ export const uniqueStatusDocs = <T extends Pick<Status, "_id">>(statuses: Iterab
 const uniqueProjectTypeStatusRefs = (statuses: ReadonlyArray<{ readonly _id: Ref<Status> }>): Array<Ref<Status>> =>
   uniqueStatusRefs(statuses.map((status) => status._id))
 
+const missingStatusRefs = (
+  statusRefs: ReadonlyArray<Ref<Status>>,
+  statusDocs: ReadonlyArray<Status>
+): Array<Ref<Status>> => statusRefs.filter((statusRef) => !statusDocs.some((statusDoc) => statusDoc._id === statusRef))
+
+const workflowStatusesFromDocsOrRefs = (
+  statusRefs: ReadonlyArray<Ref<Status>>,
+  statusDocs: ReadonlyArray<Status>
+): Array<WorkflowStatus> => {
+  const statusDocsById = new Map(statusDocs.map((statusDoc) => [statusDoc._id, statusDoc]))
+  return statusRefs.map((statusRef) => {
+    const statusDoc = statusDocsById.get(statusRef)
+    return statusDoc === undefined ? workflowStatusFromRef(statusRef) : workflowStatusFromDoc(statusDoc)
+  })
+}
+
+export const findStatusDocs = (
+  client: HulyClient["Type"],
+  statusRefs: ReadonlyArray<Ref<Status>>
+): Effect.Effect<ReadonlyArray<Status>, never> =>
+  Effect.gen(function*() {
+    const diagnostics = yield* Effect.serviceOption(Diagnostics)
+    const warnAgent = (message: string) =>
+      Option.match(diagnostics, {
+        onNone: () => Effect.logWarning(message),
+        onSome: (service) =>
+          service.warnAgent({
+            code: "status_metadata_unresolved",
+            message
+          })
+      })
+    const trail = (message: string) =>
+      Option.match(diagnostics, {
+        onNone: () => Effect.logInfo(message),
+        onSome: (service) => service.trail(message)
+      })
+
+    const remoteResult = yield* Effect.either(
+      client.findAll<Status>(
+        core.class.Status,
+        hulyQuery<Status>({ _id: { $in: [...statusRefs] } })
+      )
+    )
+
+    const remoteDocs = remoteResult._tag === "Right" ? uniqueStatusDocs(remoteResult.right) : []
+    const unresolvedRefs = missingStatusRefs(statusRefs, remoteDocs)
+    if (unresolvedRefs.length === 0) {
+      return remoteDocs
+    }
+
+    const modelResult = yield* Effect.either(
+      client.findAllInModel<Status>(
+        core.class.Status,
+        hulyQuery<Status>({ _id: { $in: unresolvedRefs } })
+      )
+    )
+
+    const modelDocs = modelResult._tag === "Right" ? uniqueStatusDocs(modelResult.right) : []
+    const combinedDocs = uniqueStatusDocs([...remoteDocs, ...modelDocs])
+    const stillUnresolvedRefs = missingStatusRefs(statusRefs, combinedDocs)
+
+    if (stillUnresolvedRefs.length > 0) {
+      const remoteError = remoteResult._tag === "Left" ? ` Remote error: ${remoteResult.left.message}` : ""
+      const modelError = modelResult._tag === "Left" ? ` Model error: ${modelResult.left.message}` : ""
+      yield* warnAgent(
+        `Huly did not return metadata for ${stillUnresolvedRefs.length} workflow status ref(s). `
+          + `The tool result uses ref-derived status names and category "unknown" for those statuses; `
+          + `do not infer completion or cancellation semantics from those fallback names.${remoteError}${modelError}`
+      )
+    } else if (remoteResult._tag === "Left") {
+      yield* trail(
+        `Server status metadata lookup failed, but the local Huly model resolved all requested workflow statuses. `
+          + `Remote error: ${remoteResult.left.message}`
+      )
+    }
+
+    return combinedDocs
+  })
+
 /**
  * Find project with its ProjectType lookup to get status information.
  * This avoids querying IssueStatus directly which can fail on some workspaces.
  *
- * If Status query fails (known bug on some workspaces), falls back to using
- * status refs without resolved names.
+ * If Status query fails or omits project workflow statuses, falls back to the
+ * local client model before using ref-derived names for unresolved statuses.
  */
 export const findProjectWithStatuses = (
   projectIdentifier: string
@@ -128,31 +208,8 @@ export const findProjectWithStatuses = (
           return []
         }
 
-        // Try to query Status documents for names. Historical manual-test proof
-        // is in `git show 31ccf83e^:PROBLEMS.md`: on workspace
-        // `internalai @ huly.app.monadical.io`, querying Status docs failed with
-        // `Cannot read properties of null (reading '#<Object>')`, breaking issue
-        // read/list/update flows. The branch below preserves operation behavior
-        // by using the status refs already present on ProjectType.
-        const statusDocsResult = yield* Effect.either(
-          client.findAll<Status>(
-            core.class.Status,
-            hulyQuery<Status>({ _id: { $in: statusRefs } })
-          )
-        )
-
-        if (statusDocsResult._tag === "Right") {
-          return uniqueStatusDocs(statusDocsResult.right).map(workflowStatusFromDoc)
-        }
-
-        // Fallback: use refs without names if Status query fails
-        // This allows operations to work even with malformed workspace data
-        yield* Effect.logWarning(
-          `Status query failed for project ${projectIdentifier}, using fallback. `
-            + `statusCategory filtering is unavailable until Huly returns status metadata. `
-            + `Error: ${statusDocsResult.left.message}`
-        )
-        return statusRefs.map(workflowStatusFromRef)
+        const statusDocs = yield* findStatusDocs(client, statusRefs)
+        return workflowStatusesFromDocsOrRefs(statusRefs, statusDocs)
       })
       : []
 

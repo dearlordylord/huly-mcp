@@ -16,6 +16,7 @@ const noopHulyClient: HulyClientOperations = {
   markupUrlConfig: testMarkupUrlConfig,
   workbenchUrlConfig: testWorkbenchUrlConfig,
   findAll: (() => Effect.succeed(toFindResult([]))) as HulyClientOperations["findAll"],
+  findAllInModel: (() => Effect.succeed(toFindResult([]))) as HulyClientOperations["findAllInModel"],
   findOne: (() => Effect.succeed(undefined)) as HulyClientOperations["findOne"],
   createDoc: () => Effect.die(new Error("not implemented")),
   updateDoc: () => Effect.die(new Error("not implemented")),

@@ -59,6 +59,8 @@ export {
   VirtualOfficeDimension
 } from "./shared.js"
 
+export { type ToolWarning, type ToolWarningCode, ToolWarningCodeSchema, ToolWarningSchema } from "./tool-warnings.js"
+
 export {
   MonthDayOrdinal,
   MonthIndex,

@@ -32,6 +32,7 @@ const hulyClient: HulyClientOperations = {
     expect(_class).toBe(core.class.UserStatus)
     return Effect.succeed(toFindResult([userStatus] as unknown as Array<T>))
   }) as HulyClientOperations["findAll"],
+  findAllInModel: () => Effect.succeed(toFindResult([])),
   findOne: () => Effect.succeed(undefined),
   createDoc: () => Effect.die(new Error("not implemented")),
   updateDoc: () => Effect.die(new Error("not implemented")),

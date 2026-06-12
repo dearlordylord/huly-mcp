@@ -170,12 +170,14 @@ interface MockConfig {
   channels?: Array<Channel>
   socialIdentities?: Array<SocialIdentity>
   statusQueryFails?: boolean
+  modelStatuses?: Array<Status>
 }
 
 const createTestLayerWithMocks = (config: MockConfig) => {
   const projects = config.projects ?? []
   const issues = config.issues ?? []
   const statuses = config.statuses ?? []
+  const modelStatuses = config.modelStatuses ?? []
   const persons = config.persons ?? []
   const channels = config.channels ?? []
   const socialIdentities = config.socialIdentities ?? []
@@ -215,6 +217,19 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     }
     return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
+
+  const findAllInModelImpl: HulyClientOperations["findAllInModel"] = ((_class: unknown, query: unknown) => {
+    if (String(_class) === String(core.class.Status)) {
+      const q = query as Record<string, unknown>
+      const inQuery = q._id as { $in?: Array<Ref<Status>> } | undefined
+      if (inQuery?.$in) {
+        const filtered = modelStatuses.filter(s => inQuery.$in!.includes(s._id))
+        return Effect.succeed(toFindResult(filtered))
+      }
+      return Effect.succeed(toFindResult(modelStatuses))
+    }
+    return Effect.succeed(toFindResult([]))
+  }) as HulyClientOperations["findAllInModel"]
 
   const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown, query: unknown, options?: unknown) => {
     if (_class === tracker.class.Project) {
@@ -298,6 +313,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 
   return HulyClient.testLayer({
     findAll: findAllImpl,
+    findAllInModel: findAllInModelImpl,
     findOne: findOneImpl
   })
 }
@@ -663,6 +679,30 @@ describe("operations helpers", () => {
         const canceledStatus = result.statuses.find(s => s.name === "canceled-item")
         expect(canceledStatus).toBeDefined()
         expect(canceledStatus!.category).toBe("unknown")
+      }))
+
+    it.effect("uses model status metadata when the server status query fails", () =>
+      Effect.gen(function*() {
+        const statusId = "status-open" as Ref<Status>
+        const project = makeProject({ identifier: "TEST", defaultIssueStatus: statusId })
+        const status = makeStatus({
+          _id: statusId,
+          name: "Open",
+          category: task.statusCategory.Active
+        })
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          statuses: [status],
+          statusQueryFails: true,
+          modelStatuses: [status]
+        })
+
+        const result = yield* findProjectWithStatuses("TEST").pipe(Effect.provide(testLayer))
+
+        expect(result.statuses).toEqual([
+          { _id: statusId, name: "Open", category: "Active" }
+        ])
       }))
 
     it.effect("returns empty statuses when project type has no statuses", () =>

@@ -610,6 +610,27 @@ describe("Error Mapping to MCP", () => {
         expect(response.content[0].text).not.toContain("\n")
         expect(response.content[0].text).toBe(JSON.stringify(result))
       }))
+
+    it.effect("omits warnings fields and content blocks when there are no warnings", () =>
+      Effect.gen(function*() {
+        const response = createSuccessResponse({ ok: true })
+
+        expect(response.content).toHaveLength(1)
+        expect(response.structuredContent).toEqual({ result: { ok: true } })
+      }))
+
+    it.effect("includes warnings in structuredContent and a second text block when present", () =>
+      Effect.gen(function*() {
+        const warning = {
+          code: "status_metadata_unresolved" as const,
+          message: "Status metadata was degraded."
+        }
+        const response = createSuccessResponse({ ok: true }, [warning])
+
+        expect(response.structuredContent).toEqual({ result: { ok: true }, warnings: [warning] })
+        expect(response.content).toHaveLength(2)
+        expect(JSON.parse(response.content[1].text)).toEqual({ warnings: [warning] })
+      }))
   })
 
   describe("createUnknownToolError", () => {

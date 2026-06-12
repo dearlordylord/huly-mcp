@@ -44,6 +44,7 @@ const hulyClient: HulyClientOperations = {
     _class === core.class.Association
       ? Effect.succeed(toFindResult([makeAssociation()]))
       : Effect.succeed(toFindResult([]))) as HulyClientOperations["findAll"],
+  findAllInModel: () => Effect.succeed(toFindResult([])),
   findOne: () => Effect.succeed(undefined),
   createDoc: () => Effect.die(new Error("not implemented")),
   updateDoc: () => Effect.die(new Error("not implemented")),

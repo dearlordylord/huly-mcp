@@ -7,6 +7,7 @@ import { expect } from "vitest"
 
 import { ProjectTypeRefSchema, TaskTypeRefSchema } from "../../../src/domain/schemas.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import { Diagnostics, makeDiagnosticsScope } from "../../../src/huly/diagnostics.js"
 import { HulyConnectionError } from "../../../src/huly/errors.js"
 import { core, task, tracker } from "../../../src/huly/huly-plugins.js"
 import {
@@ -100,6 +101,8 @@ const createLayer = (config?: {
   readonly projectTypes?: ReadonlyArray<ProjectType>
   readonly taskTypes?: ReadonlyArray<TaskType>
   readonly statuses?: ReadonlyArray<Status>
+  readonly failStatusLookup?: boolean
+  readonly modelStatuses?: ReadonlyArray<Status>
   readonly captures?: Captures
   readonly failRecoverableStatusLookup?: boolean
 }) => {
@@ -112,6 +115,7 @@ const createLayer = (config?: {
     makeStatus(),
     makeStatus({ _id: doneStatusId, name: "Done", category: task.statusCategory.Won })
   ]
+  const modelStatuses = config?.modelStatuses ?? []
 
   const findAllImpl = (<T extends Doc>(_class: Ref<Doc>, query: unknown) => {
     const q = query as { _id?: { $in?: ReadonlyArray<unknown> }; ofAttribute?: unknown }
@@ -126,12 +130,30 @@ const createLayer = (config?: {
 
     if (_class === task.class.ProjectType) return findResult(projectTypes)
     if (_class === task.class.TaskType) return findResult(filterByIds(taskTypes))
+    if (_class === core.class.Status && q._id?.$in !== undefined && config?.failStatusLookup === true) {
+      return Effect.fail(new HulyConnectionError({ message: "findAll failed: null status index" }))
+    }
     if (_class === core.class.Status && q.ofAttribute !== undefined && config?.failRecoverableStatusLookup === true) {
       return Effect.fail(new HulyConnectionError({ message: "findAll failed: null status index" }))
     }
     if (_class === core.class.Status || _class === tracker.class.IssueStatus) return findResult(filterByIds(statuses))
     return findResult([])
   }) satisfies HulyClientOperations["findAll"]
+
+  const findAllInModelImpl = (<T extends Doc>(_class: Ref<Doc>, query: unknown) => {
+    const q = query as { _id?: { $in?: ReadonlyArray<unknown> } }
+    const filterByIds = <D extends { readonly _id: unknown }>(items: ReadonlyArray<D>): ReadonlyArray<D> =>
+      q._id?.$in === undefined ? items : items.filter((item) => q._id?.$in?.includes(item._id) ?? false)
+    const findResult = <D extends Doc>(items: ReadonlyArray<D>) =>
+      // HulyClient.findAllInModel is generic by requested class; this fixture mirrors findAll above.
+      // eslint-disable-next-line no-restricted-syntax -- see above
+      Effect.succeed(toFindResult([...items])) as unknown as Effect.Effect<FindResult<T>>
+
+    if (_class === core.class.Status) {
+      return findResult(filterByIds(modelStatuses))
+    }
+    return findResult([])
+  }) satisfies HulyClientOperations["findAllInModel"]
 
   const createDocImpl: HulyClientOperations["createDoc"] =
     ((_class: unknown, _space: unknown, attributes: unknown, id: unknown) => {
@@ -157,6 +179,7 @@ const createLayer = (config?: {
 
   return HulyClient.testLayer({
     findAll: findAllImpl,
+    findAllInModel: findAllInModelImpl,
     createDoc: createDocImpl,
     updateDoc: updateDocImpl,
     createMixin: createMixinImpl
@@ -195,6 +218,60 @@ describe("task management operations", () => {
         { taskTypeId, taskTypeName: "Issue", statusIds: [openStatusId, doneStatusId] },
         { taskTypeId: subTaskTypeId, taskTypeName: "Sub-issue", statusIds: [openStatusId] }
       ])
+    }))
+
+  it.effect("resolves project type status details from the local model when status lookup fails", () =>
+    Effect.gen(function*() {
+      const result = yield* getProjectType({ projectType: ProjectTypeRefSchema.make("classic") }).pipe(
+        Effect.provide(createLayer({
+          failStatusLookup: true,
+          modelStatuses: [
+            makeStatus({ _id: openStatusId, name: "Todo", category: task.statusCategory.ToDo }),
+            makeStatus({ _id: doneStatusId, name: "Done", category: task.statusCategory.Won })
+          ]
+        }))
+      )
+
+      expect(result.statuses.map((status) => [status.name, status.category])).toEqual([
+        ["Todo", "ToDo"],
+        ["Done", "Won"]
+      ])
+    }))
+
+  it.effect("synthesizes unresolved project type statuses without dangling task type status ids", () =>
+    Effect.gen(function*() {
+      const unresolvedStatusId = statusRef("plainstatus")
+      const projectType = makeProjectType({
+        statuses: [
+          { _id: openStatusId, taskType: taskTypeId },
+          { _id: unresolvedStatusId, taskType: taskTypeId }
+        ]
+      })
+      const taskType = makeTaskType({ statuses: [openStatusId, unresolvedStatusId] })
+      const diagnostics = yield* makeDiagnosticsScope
+
+      const result = yield* getProjectType({ projectType: ProjectTypeRefSchema.make("classic") }).pipe(
+        Effect.provide(
+          createLayer({
+            failStatusLookup: true,
+            projectTypes: [projectType],
+            statuses: [],
+            taskTypes: [taskType]
+          })
+        ),
+        Effect.provideService(Diagnostics, diagnostics.service)
+      )
+      const warnings = yield* diagnostics.drainWarnings
+      const statusIds = result.statuses.map((status) => status.id)
+
+      expect(result.statusCount).toBe(2)
+      expect(result.statuses.map((status) => [status.id, status.name, status.category])).toEqual([
+        [openStatusId, "Todo", "unknown"],
+        [unresolvedStatusId, "plainstatus", "unknown"]
+      ])
+      expect(result.taskTypeStatuses[0].statusIds.every((statusId) => statusIds.includes(statusId))).toBe(true)
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0].code).toBe("status_metadata_unresolved")
     }))
 
   it.effect("returns an existing task type by normalized name without writing", () =>

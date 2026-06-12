@@ -37,10 +37,11 @@ import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { FunnelNotFoundError, LeadNotFoundError } from "../errors-leads.js"
 import { HulyConnectionError, InvalidStatusError } from "../errors.js"
-import { contact, core, task } from "../huly-plugins.js"
+import { contact, task } from "../huly-plugins.js"
 import { leadClassIds } from "../lead-plugin.js"
 import { findPersonByEmailOrName } from "./contacts-shared.js"
 import { listTotal } from "./counts.js"
+import { findStatusDocs, uniqueStatusRefs, workflowStatusFromRef } from "./issues-shared.js"
 import { clampLimit, escapeLikeWildcards } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
@@ -72,6 +73,25 @@ type StatusInfo = {
 type HulyCustomer = Contact | HulyOrganization
 
 const funnelAsSpace = (funnel: HulyFunnel): Ref<Space> => toRef<Space>(funnel._id)
+
+const statusInfosWithFallbacks = (
+  statusRefs: ReadonlyArray<Ref<Status>>,
+  statusDocs: ReadonlyArray<Status>
+): ReadonlyArray<StatusInfo> => {
+  const docsById = new Map(statusDocs.map((statusDoc) => [statusDoc._id, statusDoc]))
+  return statusRefs.map((statusRef) => {
+    const statusDoc = docsById.get(statusRef)
+    return statusDoc === undefined
+      ? {
+        _id: statusRef,
+        name: workflowStatusFromRef(statusRef).name
+      }
+      : {
+        _id: statusDoc._id,
+        name: statusDoc.name
+      }
+  })
+}
 
 // Huly lead descriptions are stored as blob-backed markup refs. The client
 // fetch API accepts the wider MarkupRef shape, so this bridge is safe.
@@ -150,7 +170,7 @@ const getFunnelStatuses = (
       )
     }
 
-    const statusRefs = projectType.statuses.map((status) => status._id)
+    const statusRefs = uniqueStatusRefs(projectType.statuses.map((status) => status._id))
     if (statusRefs.length === 0) {
       return yield* Effect.fail(
         new HulyConnectionError({
@@ -159,15 +179,8 @@ const getFunnelStatuses = (
       )
     }
 
-    const statusDocs = yield* client.findAll<Status>(
-      core.class.Status,
-      { _id: { $in: [...statusRefs] } }
-    )
-
-    return statusDocs.map((doc) => ({
-      _id: doc._id,
-      name: doc.name
-    }))
+    const statusDocs = yield* findStatusDocs(client, statusRefs)
+    return statusInfosWithFallbacks(statusRefs, statusDocs)
   })
 
 const resolveStatusName = (

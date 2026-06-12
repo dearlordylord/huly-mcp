@@ -40,7 +40,7 @@ import { HulyClient, type HulyClientError, type HulyClientOperations } from "../
 import { HulyConnectionError, HulyError } from "../errors.js"
 import { core, task, tracker } from "../huly-plugins.js"
 import { listTotal } from "./counts.js"
-import { uniqueStatusDocs, uniqueStatusRefs } from "./issues-shared.js"
+import { findStatusDocs, uniqueStatusRefs, workflowStatusFromRef } from "./issues-shared.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
@@ -126,12 +126,28 @@ const uniqueProjectStatuses = (statuses: ReadonlyArray<ProjectStatus>): Array<Pr
 const getStatusDocs = (
   client: HulyClientOperations,
   statusIds: ReadonlyArray<Ref<Status>>
-): Effect.Effect<ReadonlyArray<Status>, HulyClientError> =>
+): Effect.Effect<ReadonlyArray<Status>, never> =>
   statusIds.length === 0
     ? Effect.succeed([])
-    : client.findAll<Status>(core.class.Status, hulyQuery<Status>({ _id: { $in: [...statusIds] } })).pipe(
-      Effect.map(uniqueStatusDocs)
-    )
+    : findStatusDocs(client, statusIds)
+
+const fallbackStatusDoc = (statusId: Ref<Status>): Status => ({
+  _id: statusId,
+  _class: core.class.Status,
+  space: core.space.Model,
+  modifiedOn: 0,
+  modifiedBy: core.account.System,
+  ofAttribute: tracker.attribute.IssueStatus,
+  name: workflowStatusFromRef(statusId).name
+} satisfies Status)
+
+const statusDocsWithFallbacks = (
+  statusIds: ReadonlyArray<Ref<Status>>,
+  statusDocs: ReadonlyArray<Status>
+): Array<Status> => {
+  const docsById = new Map(statusDocs.map((statusDoc) => [statusDoc._id, statusDoc]))
+  return statusIds.map((statusId) => docsById.get(statusId) ?? fallbackStatusDoc(statusId))
+}
 
 const getTaskTypes = (
   client: HulyClientOperations,
@@ -172,7 +188,9 @@ const loadWorkflowData = (
 ): Effect.Effect<WorkflowData, HulyClientError> =>
   Effect.gen(function*() {
     const taskTypes = yield* getTaskTypes(client, projectType.tasks)
-    const statuses = yield* getStatusDocs(client, uniqueStatusIds(projectType))
+    const statusIds = uniqueStatusIds(projectType)
+    const statusDocs = yield* getStatusDocs(client, statusIds)
+    const statuses = statusDocsWithFallbacks(statusIds, statusDocs)
     return { projectType, taskTypes, statuses }
   })
 

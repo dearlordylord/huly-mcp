@@ -6,13 +6,15 @@ import type { Project as HulyProject } from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
-import type { ProjectNotFoundError } from "../../../src/huly/errors.js"
+import { Diagnostics, makeDiagnosticsScope } from "../../../src/huly/diagnostics.js"
+import { HulyConnectionError, type ProjectNotFoundError } from "../../../src/huly/errors.js"
 import { core, task, tracker } from "../../../src/huly/huly-plugins.js"
 import {
   createProject,
   deleteProject,
   getProject,
   listProjects,
+  listStatuses,
   updateProject
 } from "../../../src/huly/operations/projects.js"
 import { projectIdentifier } from "../../helpers/brands.js"
@@ -21,6 +23,7 @@ import { projectIdentifier } from "../../helpers/brands.js"
 
 const asProject = (v: unknown) => v as HulyProject
 const asProjectType = (v: unknown) => v as ProjectType
+const asStatus = (v: unknown) => v as Status
 // Huly Ref brands are erased at runtime; these tests build fixture refs from stable string ids.
 const statusRef = (value: string): Ref<Status> => value as Ref<Status>
 
@@ -45,6 +48,25 @@ const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
   return result
 }
 
+const makeStatus = (overrides: Pick<Status, "_id" | "name"> & Partial<Status>): Status => {
+  const { _id, name, ...rest } = overrides
+  return (
+    asStatus({
+      _id,
+      _class: core.class.Status,
+      space: core.space.Model,
+      modifiedBy: "user-1" as PersonId,
+      modifiedOn: 0,
+      createdBy: "user-1" as PersonId,
+      createdOn: 0,
+      ofAttribute: tracker.attribute.IssueStatus,
+      name,
+      category: task.statusCategory.ToDo,
+      ...rest
+    })
+  )
+}
+
 // --- Test Helpers ---
 
 interface MockConfig {
@@ -53,14 +75,17 @@ interface MockConfig {
   captureCreateDoc?: { attributes?: Record<string, unknown>; id?: string }
   captureUpdateDoc?: { operations?: Record<string, unknown> }
   captureRemoveDoc?: { called?: boolean }
-  statuses?: Array<{ _id: Ref<Status>; name: string; category?: string }>
+  statuses?: Array<Status>
+  modelStatuses?: Array<Status>
   failStatusLookup?: boolean
+  failModelStatusLookup?: boolean
   projectType?: ProjectType
 }
 
 const createTestLayerWithMocks = (config: MockConfig) => {
   const projects = config.projects ?? []
   const statuses = config.statuses ?? []
+  const modelStatuses = config.modelStatuses ?? []
 
   const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown, options: unknown) => {
     if (_class === tracker.class.Project) {
@@ -85,14 +110,22 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     }
     if (_class === core.class.Status) {
       if (config.failStatusLookup === true) {
-        return Effect.fail(new Error("status lookup failed") as never)
+        return Effect.fail(new HulyConnectionError({ message: "status lookup failed" }))
       }
-      // Status mock objects only need _id, name, and category for our tests.
-      // toFindResult expects Doc[], but mock statuses are partial — cast is safe in tests.
-      return Effect.succeed(toFindResult(statuses as Array<never>))
+      return Effect.succeed(toFindResult(statuses))
     }
     return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
+
+  const findAllInModelImpl: HulyClientOperations["findAllInModel"] = ((_class: unknown) => {
+    if (_class === core.class.Status) {
+      if (config.failModelStatusLookup === true) {
+        return Effect.fail(new HulyConnectionError({ message: "model status lookup failed" }))
+      }
+      return Effect.succeed(toFindResult(modelStatuses))
+    }
+    return Effect.succeed(toFindResult([]))
+  }) as HulyClientOperations["findAllInModel"]
 
   const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown, query: unknown, options?: unknown) => {
     if (_class === tracker.class.Project) {
@@ -147,6 +180,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 
   return HulyClient.testLayer({
     findAll: findAllImpl,
+    findAllInModel: findAllInModelImpl,
     findOne: findOneImpl,
     createDoc: createDocImpl,
     updateDoc: updateDocImpl,
@@ -374,8 +408,8 @@ describe("getProject", () => {
       const testLayer = createTestLayerWithMocks({
         projects: [proj],
         statuses: [
-          { _id: defaultStatusId, name: "Backlog" },
-          { _id: inProgressStatusId, name: "In Progress" }
+          makeStatus({ _id: defaultStatusId, name: "Backlog" }),
+          makeStatus({ _id: inProgressStatusId, name: "In Progress" })
         ],
         projectType: asProjectType({
           statuses: [
@@ -409,10 +443,10 @@ describe("getProject", () => {
       const testLayer = createTestLayerWithMocks({
         projects: [proj],
         statuses: [
-          { _id: defaultStatusId, name: "Backlog" },
-          { _id: defaultStatusId, name: "Backlog" },
-          { _id: inProgressStatusId, name: "In Progress" },
-          { _id: inProgressStatusId, name: "In Progress" }
+          makeStatus({ _id: defaultStatusId, name: "Backlog" }),
+          makeStatus({ _id: defaultStatusId, name: "Backlog" }),
+          makeStatus({ _id: inProgressStatusId, name: "In Progress" }),
+          makeStatus({ _id: inProgressStatusId, name: "In Progress" })
         ],
         projectType: asProjectType({
           statuses: [
@@ -444,7 +478,7 @@ describe("getProject", () => {
 
       const testLayer = createTestLayerWithMocks({
         projects: [proj],
-        statuses: [{ _id: firstStatusId, name: "Backlog" }],
+        statuses: [makeStatus({ _id: firstStatusId, name: "Backlog" })],
         projectType: asProjectType({ statuses: [{ _id: firstStatusId }] })
       })
 
@@ -468,10 +502,133 @@ describe("getProject", () => {
         projectType: asProjectType({ statuses: [{ _id: statusId }] })
       })
 
+      const diagnostics = yield* makeDiagnosticsScope
+      const result = yield* getProject({ project: projectIdentifier("HULY") }).pipe(
+        Effect.provide(testLayer),
+        Effect.provideService(Diagnostics, diagnostics.service)
+      )
+      const warnings = yield* diagnostics.drainWarnings
+
+      expect(result.defaultStatus).toBe("plainstatus")
+      expect(result.statuses).toEqual(["plainstatus"])
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0].code).toBe("status_metadata_unresolved")
+    }))
+
+  it.effect("falls back to raw status refs when status document and model lookups both fail", () =>
+    Effect.gen(function*() {
+      const statusId = statusRef("plainstatus")
+      const proj = makeProject({
+        identifier: "HULY",
+        name: "Huly",
+        defaultIssueStatus: statusId
+      })
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [proj],
+        failStatusLookup: true,
+        failModelStatusLookup: true,
+        projectType: asProjectType({ statuses: [{ _id: statusId }] })
+      })
+
       const result = yield* getProject({ project: projectIdentifier("HULY") }).pipe(Effect.provide(testLayer))
 
       expect(result.defaultStatus).toBe("plainstatus")
       expect(result.statuses).toEqual(["plainstatus"])
+    }))
+
+  it.effect("resolves status metadata from the local model when status document lookup fails", () =>
+    Effect.gen(function*() {
+      const statusId = statusRef("6a156d99dc6d0a547e9ad569")
+      const proj = makeProject({
+        identifier: "HULY",
+        name: "Huly",
+        defaultIssueStatus: statusId
+      })
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [proj],
+        failStatusLookup: true,
+        modelStatuses: [makeStatus({ _id: statusId, name: "Pronto", category: task.statusCategory.Active })],
+        projectType: asProjectType({ statuses: [{ _id: statusId }] })
+      })
+
+      const diagnostics = yield* makeDiagnosticsScope
+      const result = yield* listStatuses({ project: projectIdentifier("HULY") }).pipe(
+        Effect.provide(testLayer),
+        Effect.provideService(Diagnostics, diagnostics.service)
+      )
+      const warnings = yield* diagnostics.drainWarnings
+
+      expect(result.statuses).toEqual([
+        { name: "Pronto", category: "Active", isDefault: true }
+      ])
+      expect(warnings).toEqual([])
+    }))
+
+  it.effect("uses model and ref fallbacks only for statuses missing from a partial status document lookup", () =>
+    Effect.gen(function*() {
+      const resolvedStatusId = statusRef("status-open")
+      const unresolvedStatusId = statusRef("plainstatus")
+      const proj = makeProject({
+        identifier: "HULY",
+        name: "Huly",
+        defaultIssueStatus: resolvedStatusId
+      })
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [proj],
+        statuses: [makeStatus({ _id: resolvedStatusId, name: "Open", category: task.statusCategory.ToDo })],
+        projectType: asProjectType({
+          statuses: [
+            { _id: resolvedStatusId },
+            { _id: unresolvedStatusId }
+          ]
+        })
+      })
+
+      const result = yield* listStatuses({ project: projectIdentifier("HULY") }).pipe(Effect.provide(testLayer))
+
+      expect(result.statuses).toEqual([
+        { name: "Open", category: "ToDo", isDefault: true },
+        { name: "plainstatus", category: "unknown", isDefault: false }
+      ])
+    }))
+
+  it.effect("uses model metadata for statuses missing from a partial status document lookup", () =>
+    Effect.gen(function*() {
+      const resolvedStatusId = statusRef("status-open")
+      const modelStatusId = statusRef("status-model")
+      const proj = makeProject({
+        identifier: "HULY",
+        name: "Huly",
+        defaultIssueStatus: resolvedStatusId
+      })
+      const diagnostics = yield* makeDiagnosticsScope
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [proj],
+        statuses: [makeStatus({ _id: resolvedStatusId, name: "Open", category: task.statusCategory.ToDo })],
+        modelStatuses: [makeStatus({ _id: modelStatusId, name: "Review", category: task.statusCategory.Active })],
+        projectType: asProjectType({
+          statuses: [
+            { _id: resolvedStatusId },
+            { _id: modelStatusId }
+          ]
+        })
+      })
+
+      const result = yield* listStatuses({ project: projectIdentifier("HULY") }).pipe(
+        Effect.provide(testLayer),
+        Effect.provideService(Diagnostics, diagnostics.service)
+      )
+      const warnings = yield* diagnostics.drainWarnings
+
+      expect(result.statuses).toEqual([
+        { name: "Open", category: "ToDo", isDefault: true },
+        { name: "Review", category: "Active", isDefault: false }
+      ])
+      expect(warnings).toEqual([])
     }))
 
   it.effect("fails when project details have invalid SDK data", () =>
