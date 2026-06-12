@@ -13,6 +13,8 @@ import type {
 import type { ThreadMessage as HulyThreadMessage } from "@hcengineering/chunter"
 import type {
   AccountUuid as HulyAccountUuid,
+  AttachedDoc,
+  Class,
   Collaborator as HulyCollaborator,
   Doc,
   FindResult,
@@ -112,7 +114,13 @@ interface Capture {
   readonly createDocs: Array<{ readonly _class: unknown; readonly attributes: unknown; readonly id: unknown }>
   readonly updateDocs: Array<{ readonly _class: unknown; readonly objectId: unknown; readonly operations: unknown }>
   readonly removeDocs: Array<{ readonly _class: unknown; readonly objectId: unknown }>
-  readonly removeCollections: Array<{ readonly _class: unknown; readonly objectId: unknown }>
+  readonly removeCollections: Array<{
+    readonly _class: unknown
+    readonly objectId: unknown
+    readonly attachedTo: unknown
+    readonly attachedToClass: unknown
+    readonly collection: unknown
+  }>
   readonly uploads: Array<{ readonly filename: string; readonly contentType: string; readonly size: number }>
 }
 
@@ -533,11 +541,20 @@ const testLayer = (config: FixtureConfig = {}) => {
     return Effect.succeed({} as never)
   }) as HulyClientOperations["removeDoc"]
 
-  const removeCollection: NonNullable<HulyClientOperations["removeCollection"]> =
-    ((_class: unknown, _space: unknown, objectId: unknown) => {
-      capture.removeCollections.push({ _class, objectId })
-      return Effect.succeed("parent-1" as Ref<Doc>)
-    }) as NonNullable<HulyClientOperations["removeCollection"]>
+  const removeCollection: NonNullable<HulyClientOperations["removeCollection"]> = <
+    T extends Doc,
+    P extends AttachedDoc
+  >(
+    _class: Ref<Class<P>>,
+    _space: Ref<Space>,
+    objectId: Ref<P>,
+    attachedTo: Ref<T>,
+    attachedToClass: Ref<Class<T>>,
+    collection: Extract<keyof T, string> | string
+  ) => {
+    capture.removeCollections.push({ _class, objectId, attachedTo, attachedToClass, collection })
+    return Effect.succeed(attachedTo)
+  }
 
   const uploadFile: HulyStorageOperations["uploadFile"] = ((filename: string, buffer: Buffer, contentType: string) => {
     capture.uploads.push({ filename, contentType, size: buffer.length })
@@ -619,7 +636,12 @@ describe("activity message operations", () => {
 
       const deleted = yield* deleteActivityReply({ replyId: activityMessageId("reply-1") }).pipe(Effect.provide(layer))
       expect(deleted.deleted).toBe(true)
-      expect(capture.removeDocs[0]._class).toBe(chunter.class.ThreadMessage)
+      expect(capture.removeDocs).toHaveLength(0)
+      expect(capture.removeCollections[0]._class).toBe(chunter.class.ThreadMessage)
+      expect(capture.removeCollections[0].objectId).toBe("reply-1")
+      expect(capture.removeCollections[0].attachedTo).toBe("msg-1")
+      expect(capture.removeCollections[0].attachedToClass).toBe(activity.class.ActivityMessage)
+      expect(capture.removeCollections[0].collection).toBe("replies")
     }))
 
   it.effect("returns idempotently when pin state already matches and reports missing replies", () =>

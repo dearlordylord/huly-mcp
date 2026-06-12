@@ -35,12 +35,14 @@ import {
   Timestamp
 } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
+import type { HulyError } from "../errors.js"
 import { ActivityMessageNotFoundError } from "../errors.js"
 import { activity, chunter } from "../huly-plugins.js"
 import { findActivityMessage, toActivityMessage } from "./activity-shared.js"
 import { markdownToMarkupString } from "./markup.js"
 import { clampLimit, findOneOrFail, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
+import { removeThreadReply } from "./thread-replies-shared.js"
 
 type GetActivityMessageError = HulyClientError | ActivityMessageNotFoundError
 type PinActivityMessageError = HulyClientError | ActivityMessageNotFoundError
@@ -49,7 +51,7 @@ type ListActivityReferencesError = HulyClientError
 type ListActivityRepliesError = HulyClientError | ActivityMessageNotFoundError
 type AddActivityReplyError = HulyClientError | ActivityMessageNotFoundError
 type UpdateActivityReplyError = HulyClientError | ActivityMessageNotFoundError
-type DeleteActivityReplyError = HulyClientError | ActivityMessageNotFoundError
+type DeleteActivityReplyError = HulyClientError | HulyError | ActivityMessageNotFoundError
 
 export const getActivityMessage = (
   params: GetActivityMessageParams
@@ -217,6 +219,6 @@ export const deleteActivityReply = (
       () => new ActivityMessageNotFoundError({ messageId: params.replyId })
     )
 
-    yield* client.removeDoc(chunter.class.ThreadMessage, reply.space, reply._id)
+    yield* removeThreadReply(client, reply)
     return { replyId: ActivityMessageId.make(reply._id), deleted: true }
   })

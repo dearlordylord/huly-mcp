@@ -26,13 +26,14 @@ import type {
 } from "../../domain/schemas/channels.js"
 import { ChannelId, MessageId, ThreadReplyId } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
-import type { ChannelNotFoundError, MessageNotFoundError } from "../errors.js"
+import type { ChannelNotFoundError, HulyError, MessageNotFoundError } from "../errors.js"
 import { ThreadReplyNotFoundError } from "../errors.js"
 import { findChannelMessage } from "./channel-messages-shared.js"
 import { buildSocialIdToPersonNameMap } from "./channels.js"
 import { listTotal } from "./counts.js"
 import { markdownToMarkupString, markupToMarkdownString } from "./markup.js"
 import { toRef } from "./sdk-boundary.js"
+import { removeThreadReply } from "./thread-replies-shared.js"
 
 import { chunter } from "../huly-plugins.js"
 
@@ -56,6 +57,7 @@ type UpdateThreadReplyError =
 
 type DeleteThreadReplyError =
   | HulyClientError
+  | HulyError
   | ChannelNotFoundError
   | MessageNotFoundError
   | ThreadReplyNotFoundError
@@ -207,11 +209,7 @@ export const deleteThreadReply = (
     const { channel, client, message } = yield* findChannelMessage(params)
     const reply = yield* findReply(client, channel, message, params.replyId)
 
-    yield* client.removeDoc(
-      chunter.class.ThreadMessage,
-      channel._id,
-      reply._id
-    )
+    yield* removeThreadReply(client, reply)
 
     return { id: ThreadReplyId.make(reply._id), deleted: true }
   })

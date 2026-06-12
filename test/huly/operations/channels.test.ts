@@ -9,6 +9,8 @@ import type {
 import type { Employee as HulyEmployee, Person, SocialIdentity } from "@hcengineering/contact"
 import {
   type AccountUuid,
+  type AttachedDoc,
+  type Class,
   type Doc,
   type PersonId,
   type Ref,
@@ -186,6 +188,15 @@ interface MockConfig {
   captureUpdateDoc?: { operations?: Record<string, unknown> }
   captureAddCollection?: { attributes?: Record<string, unknown>; id?: string }
   captureRemoveDoc?: { called?: boolean }
+  captureRemoveCollection?: {
+    classId?: unknown
+    space?: unknown
+    objectId?: unknown
+    attachedTo?: unknown
+    attachedToClass?: unknown
+    collection?: unknown
+  }
+  removeCollectionAvailable?: boolean
 }
 
 const createTestLayerWithMocks = (config: MockConfig) => {
@@ -353,13 +364,36 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     }
   ) as HulyClientOperations["removeDoc"]
 
+  const removeCollectionImpl: NonNullable<HulyClientOperations["removeCollection"]> = <
+    T extends Doc,
+    P extends AttachedDoc
+  >(
+    classId: Ref<Class<P>>,
+    space: Ref<Space>,
+    objectId: Ref<P>,
+    attachedTo: Ref<T>,
+    attachedToClass: Ref<Class<T>>,
+    collection: Extract<keyof T, string> | string
+  ) => {
+    if (config.captureRemoveCollection) {
+      config.captureRemoveCollection.classId = classId
+      config.captureRemoveCollection.space = space
+      config.captureRemoveCollection.objectId = objectId
+      config.captureRemoveCollection.attachedTo = attachedTo
+      config.captureRemoveCollection.attachedToClass = attachedToClass
+      config.captureRemoveCollection.collection = collection
+    }
+    return Effect.succeed(attachedTo)
+  }
+
   return HulyClient.testLayer({
     findAll: findAllImpl,
     findOne: findOneImpl,
     createDoc: createDocImpl,
     updateDoc: updateDocImpl,
     addCollection: addCollectionImpl,
-    removeDoc: removeDocImpl
+    removeDoc: removeDocImpl,
+    ...(config.removeCollectionAvailable === false ? {} : { removeCollection: removeCollectionImpl })
   })
 }
 
@@ -1242,12 +1276,14 @@ describe("deleteThreadReply", () => {
         attachedTo: "msg-1" as Ref<ActivityMessage>
       })
       const captureRemoveDoc: MockConfig["captureRemoveDoc"] = {}
+      const captureRemoveCollection: MockConfig["captureRemoveCollection"] = {}
 
       const testLayer = createTestLayerWithMocks({
         channels: [channel],
         messages: [parentMsg],
         threadMessages: [reply],
-        captureRemoveDoc
+        captureRemoveDoc,
+        captureRemoveCollection
       })
 
       const result = yield* deleteThreadReply({
@@ -1258,7 +1294,45 @@ describe("deleteThreadReply", () => {
 
       expect(result.id).toBe("reply-1")
       expect(result.deleted).toBe(true)
-      expect(captureRemoveDoc.called).toBe(true)
+      expect(captureRemoveDoc.called).toBeUndefined()
+      expect(captureRemoveCollection.classId).toBe(chunter.class.ThreadMessage)
+      expect(captureRemoveCollection.space).toBe("ch-1")
+      expect(captureRemoveCollection.objectId).toBe("reply-1")
+      expect(captureRemoveCollection.attachedTo).toBe("msg-1")
+      expect(captureRemoveCollection.attachedToClass).toBe(chunter.class.ChatMessage)
+      expect(captureRemoveCollection.collection).toBe("replies")
+    }))
+
+  it.effect("fails when collection deletion is unavailable", () =>
+    Effect.gen(function*() {
+      const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
+      const parentMsg = makeChatMessage({
+        _id: "msg-1" as Ref<ChatMessage>,
+        space: "ch-1" as Ref<Space>
+      })
+      const reply = makeThreadMessage({
+        _id: "reply-1" as Ref<HulyThreadMessage>,
+        space: "ch-1" as Ref<Space>,
+        attachedTo: "msg-1" as Ref<ActivityMessage>
+      })
+
+      const testLayer = createTestLayerWithMocks({
+        channels: [channel],
+        messages: [parentMsg],
+        threadMessages: [reply],
+        removeCollectionAvailable: false
+      })
+
+      const error = yield* Effect.flip(
+        deleteThreadReply({
+          channel: channelIdentifier("general"),
+          messageId: messageBrandId("msg-1"),
+          replyId: threadReplyId("reply-1")
+        }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(error._tag).toBe("HulyError")
+      expect(error.message).toBe("Huly client does not support removeCollection")
     }))
 
   it.effect("returns ThreadReplyNotFoundError when reply doesn't exist", () =>
