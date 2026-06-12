@@ -516,6 +516,8 @@ describe("createMcpProtocolHandlers — tool dispatch", () => {
     expect(response.content).toHaveLength(2)
     expect(JSON.parse(firstText([response.content[1]]))).toEqual({ warnings: [warning] })
     expect(probe.toolCalled[0]).toMatchObject({ toolName: "diagnostic_probe", status: "success" })
+    expect(JSON.stringify(probe.toolCalled[0])).not.toContain(warning.message)
+    expect(probe.toolCalled[0]).not.toHaveProperty("warnings")
   })
 
   it("maps a client-resolution failure to an error", async () => {

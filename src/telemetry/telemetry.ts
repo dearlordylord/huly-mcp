@@ -3,6 +3,8 @@ import { Config, Context, Effect, Layer } from "effect"
 import { createNoopTelemetry } from "./noop.js"
 import { createPostHogTelemetry } from "./posthog.js"
 
+// Telemetry is aggregate usage analytics. It must not include Diagnostics
+// messages, workspace content, returned payload data, or backend error text.
 export type SessionStartProps = {
   readonly transport: "stdio" | "http"
   readonly authMethod: "token" | "password"
