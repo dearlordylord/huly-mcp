@@ -76,7 +76,7 @@ In execution order:
 
 - [x] `task-1` Fix the inverted no-warnings jq guard (BLOCKER)
 - [x] `task-8` Complete the run_capture subshell accounting audit (calibrates the suite)
-- [ ] `task-2` Stop emitting structuredContent on error envelopes (BLOCKER)
+- [x] `task-2` Stop emitting structuredContent on error envelopes (BLOCKER)
 - [ ] `task-3` Derive the warning-code enum from ToolWarningCodeSchema
 - [ ] `task-4` Remove the dead HandlerArgs.diagnostics field
 - [ ] `task-5` Require Diagnostics in R on the warn path (drop serviceOption)
@@ -126,7 +126,14 @@ jq expression with sample JSON via `jq -e` before running the suite).
 
 ## task-2
 
-Status: `pending`
+Status: `done`
+
+Done in this lane. Verification run: focused MCP tests
+(`test/mcp/error-mapping.test.ts`, `test/mcp/registry.test.ts`,
+`test/mcp/protocol-handlers.test.ts`), `pnpm typecheck`, `pnpm check-all`, a live
+stdio `get_project` missing-project error check confirming `isError: true` and no
+`structuredContent`, review-agent pass, and full live integration. Final suite
+evidence: `RESULTS: 559 passed, 0 failed, 27 skipped (of 586)`.
 
 ### Load
 

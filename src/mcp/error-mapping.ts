@@ -43,20 +43,34 @@ interface ErrorMetadata {
  * Compatible with MCP SDK CallToolResult.
  * _meta carries internal error metadata, stripped by toMcpResponse before wire.
  */
-export interface McpToolResponse {
-  content: Array<{ type: "text"; text: string }>
+interface McpToolResponseBase {
+  readonly content: Array<{ type: "text"; text: string }>
+  readonly _meta?: ErrorMetadata
+}
+
+interface McpToolSuccessResponse extends McpToolResponseBase {
   structuredContent?: {
-    readonly result?: unknown
+    readonly result: unknown
     readonly warnings?: ReadonlyArray<ToolWarning>
   }
-  isError?: boolean
-  _meta?: ErrorMetadata
+  readonly isError?: false
 }
+
+interface McpToolErrorResponse extends McpToolResponseBase {
+  readonly structuredContent?: never
+  readonly isError: true
+}
+
+export type McpToolResponse = McpToolSuccessResponse | McpToolErrorResponse
+
+type WithoutMeta<T> = T extends unknown ? Omit<T, "_meta"> : never
+
+type McpWireResponse = WithoutMeta<McpToolResponse>
 
 /**
  * Error response with required metadata for error tracking/testing.
  */
-interface McpErrorResponseWithMeta extends McpToolResponse {
+interface McpErrorResponseWithMeta extends McpToolErrorResponse {
   isError: true
   _meta: ErrorMetadata
 }
@@ -72,7 +86,6 @@ const createErrorResponse = (
     : []
   return {
     content: [{ type: "text" as const, text }, ...warningContent],
-    ...(warnings.length > 0 ? { structuredContent: { warnings } } : {}),
     isError: true,
     _meta: { errorCode, errorTag }
   }
@@ -288,7 +301,14 @@ export const createUnknownToolError = (toolName: string): McpErrorResponseWithMe
 export const createInvalidParamsError = (message: string, errorTag?: string): McpErrorResponseWithMeta =>
   createErrorResponse(message, McpErrorCode.InvalidParams, errorTag)
 
-export const toMcpResponse = (response: McpToolResponse): Omit<McpToolResponse, "_meta"> => {
-  const { _meta: _, ...wire } = response
-  return wire
-}
+export const toMcpResponse = (response: McpToolResponse): McpWireResponse =>
+  response.isError === true
+    ? {
+      content: response.content,
+      isError: true
+    }
+    : {
+      content: response.content,
+      ...(response.structuredContent === undefined ? {} : { structuredContent: response.structuredContent }),
+      ...(response.isError === undefined ? {} : { isError: response.isError })
+    }

@@ -185,12 +185,7 @@ describe("createToolHandler", () => {
       const result = yield* Effect.promise(() => handler({ name: "world" }, noopHulyClient, noopStorageClient))
 
       expect(result.isError).toBe(true)
-      expect(result.structuredContent).toEqual({
-        warnings: [{
-          code: "status_metadata_unresolved",
-          message: "Status metadata was degraded for world."
-        }]
-      })
+      expect(result.structuredContent).toBeUndefined()
       expect(result.content[0].text).toContain("failed after warning")
       expect(JSON.parse(result.content[1].text)).toEqual({
         warnings: [{
