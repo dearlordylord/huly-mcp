@@ -10,6 +10,7 @@ import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.
 import { core, tracker } from "../../../src/huly/huly-plugins.js"
 import { listIssues } from "../../../src/huly/operations/issues.js"
 import { projectIdentifier } from "../../helpers/brands.js"
+import { withDiagnostics } from "../../helpers/diagnostics.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   const result = docs as FindResult<T>
@@ -134,7 +135,10 @@ describe("listIssues filters", () => {
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: projectIdentifier("TEST"), titleRegex: "BUG%" }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST"), titleRegex: "BUG%" }).pipe(
+          Effect.provide(testLayer),
+          withDiagnostics
+        )
 
         expect(captureQuery.query?.title).toEqual({ $regex: "BUG%" })
       }))
@@ -149,7 +153,10 @@ describe("listIssues filters", () => {
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: projectIdentifier("TEST"), titleRegex: "  " }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST"), titleRegex: "  " }).pipe(
+          Effect.provide(testLayer),
+          withDiagnostics
+        )
 
         expect(captureQuery.query?.title).toBeUndefined()
       }))
@@ -166,7 +173,10 @@ describe("listIssues filters", () => {
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: projectIdentifier("TEST"), hasAssignee: true }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST"), hasAssignee: true }).pipe(
+          Effect.provide(testLayer),
+          withDiagnostics
+        )
 
         expect(captureQuery.query?.assignee).toEqual({ $ne: null })
       }))
@@ -181,7 +191,10 @@ describe("listIssues filters", () => {
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: projectIdentifier("TEST"), hasAssignee: false }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST"), hasAssignee: false }).pipe(
+          Effect.provide(testLayer),
+          withDiagnostics
+        )
 
         expect(captureQuery.query?.assignee).toBeNull()
       }))
@@ -198,7 +211,10 @@ describe("listIssues filters", () => {
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: projectIdentifier("TEST"), hasDueDate: true }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST"), hasDueDate: true }).pipe(
+          Effect.provide(testLayer),
+          withDiagnostics
+        )
 
         expect(captureQuery.query?.dueDate).toEqual({ $ne: null })
       }))
@@ -213,7 +229,10 @@ describe("listIssues filters", () => {
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: projectIdentifier("TEST"), hasDueDate: false }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST"), hasDueDate: false }).pipe(
+          Effect.provide(testLayer),
+          withDiagnostics
+        )
 
         expect(captureQuery.query?.dueDate).toBeNull()
       }))
@@ -230,7 +249,10 @@ describe("listIssues filters", () => {
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: projectIdentifier("TEST"), hasComponent: true }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST"), hasComponent: true }).pipe(
+          Effect.provide(testLayer),
+          withDiagnostics
+        )
 
         expect(captureQuery.query?.component).toEqual({ $ne: null })
       }))
@@ -245,7 +267,10 @@ describe("listIssues filters", () => {
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: projectIdentifier("TEST"), hasComponent: false }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST"), hasComponent: false }).pipe(
+          Effect.provide(testLayer),
+          withDiagnostics
+        )
 
         expect(captureQuery.query?.component).toBeNull()
       }))
@@ -262,7 +287,10 @@ describe("listIssues filters", () => {
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: projectIdentifier("TEST"), isTopLevel: true }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST"), isTopLevel: true }).pipe(
+          Effect.provide(testLayer),
+          withDiagnostics
+        )
 
         expect(captureQuery.query?.attachedToClass).toBe(tracker.class.Project)
       }))
@@ -277,7 +305,10 @@ describe("listIssues filters", () => {
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: projectIdentifier("TEST"), isTopLevel: false }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST"), isTopLevel: false }).pipe(
+          Effect.provide(testLayer),
+          withDiagnostics
+        )
 
         expect(captureQuery.query?.attachedToClass).toBeUndefined()
       }))
@@ -292,7 +323,7 @@ describe("listIssues filters", () => {
           captureIssueQuery: captureQuery
         })
 
-        yield* listIssues({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
+        yield* listIssues({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(captureQuery.query?.attachedToClass).toBeUndefined()
       }))

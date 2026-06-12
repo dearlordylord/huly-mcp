@@ -56,6 +56,7 @@ const hulyClient: HulyClientOperations = {
     if (_class === core.class.Attribute) return Effect.succeed(toFindResult([titleAttribute]))
     return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"],
+  findAllInModel: () => Effect.succeed(toFindResult([])),
   findOne:
     ((_class: unknown) =>
       _class === core.class.Class ? Effect.succeed(issueClass) : Effect.succeed(undefined)) as HulyClientOperations[

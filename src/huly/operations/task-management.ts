@@ -33,14 +33,16 @@ import {
   ProjectTypeDetailSchema,
   ProjectTypeId,
   StatusCategoryBySdkKey,
-  TaskTypeId
+  TaskTypeId,
+  UnknownStatusCategoryValue
 } from "../../domain/schemas.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError, type HulyClientOperations } from "../client.js"
+import type { Diagnostics } from "../diagnostics.js"
 import { HulyConnectionError, HulyError } from "../errors.js"
 import { core, task, tracker } from "../huly-plugins.js"
 import { listTotal } from "./counts.js"
-import { uniqueStatusDocs, uniqueStatusRefs } from "./issues-shared.js"
+import { findStatusDocs, resolveByStatusRef, uniqueStatusRefs, workflowStatusFromRef } from "./issues-shared.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
@@ -88,7 +90,7 @@ const STATUS_CATEGORIES: ReadonlyArray<StatusCategorySummary> = Object.values(ST
 const WORKFLOW_WARNING = "This changes workspace-level tracker configuration for every project using this project type."
 
 const toCategoryValue = (category: Ref<StatusCategory> | undefined): StatusCategoryValue =>
-  category === undefined ? "unknown" : REF_TO_CATEGORY.get(category) ?? "unknown"
+  category === undefined ? UnknownStatusCategoryValue : REF_TO_CATEGORY.get(category) ?? UnknownStatusCategoryValue
 
 const encodeOrConnectionError = <A, I, R>(
   schema: Schema.Schema<A, I, R>,
@@ -126,12 +128,25 @@ const uniqueProjectStatuses = (statuses: ReadonlyArray<ProjectStatus>): Array<Pr
 const getStatusDocs = (
   client: HulyClientOperations,
   statusIds: ReadonlyArray<Ref<Status>>
-): Effect.Effect<ReadonlyArray<Status>, HulyClientError> =>
+): Effect.Effect<ReadonlyArray<Status>, never, Diagnostics> =>
   statusIds.length === 0
     ? Effect.succeed([])
-    : client.findAll<Status>(core.class.Status, hulyQuery<Status>({ _id: { $in: [...statusIds] } })).pipe(
-      Effect.map(uniqueStatusDocs)
-    )
+    : findStatusDocs(client, statusIds)
+
+const fallbackStatusDoc = (statusId: Ref<Status>): Status => ({
+  _id: statusId,
+  _class: core.class.Status,
+  space: core.space.Model,
+  modifiedOn: 0,
+  modifiedBy: core.account.System,
+  ofAttribute: tracker.attribute.IssueStatus,
+  name: workflowStatusFromRef(statusId).name
+} satisfies Status)
+
+const statusDocsWithFallbacks = (
+  statusIds: ReadonlyArray<Ref<Status>>,
+  statusDocs: ReadonlyArray<Status>
+): Array<Status> => resolveByStatusRef(statusIds, statusDocs, (statusDoc) => statusDoc, fallbackStatusDoc)
 
 const getTaskTypes = (
   client: HulyClientOperations,
@@ -169,10 +184,12 @@ const getRecoverableStatusesByName = (
 const loadWorkflowData = (
   client: HulyClientOperations,
   projectType: ProjectType
-): Effect.Effect<WorkflowData, HulyClientError> =>
+): Effect.Effect<WorkflowData, HulyClientError, Diagnostics> =>
   Effect.gen(function*() {
     const taskTypes = yield* getTaskTypes(client, projectType.tasks)
-    const statuses = yield* getStatusDocs(client, uniqueStatusIds(projectType))
+    const statusIds = uniqueStatusIds(projectType)
+    const statusDocs = yield* getStatusDocs(client, statusIds)
+    const statuses = statusDocsWithFallbacks(statusIds, statusDocs)
     return { projectType, taskTypes, statuses }
   })
 
@@ -333,7 +350,7 @@ const sameProjectStatusList = (
 
 export const listProjectTypes = (
   _params: ListProjectTypesParams
-): Effect.Effect<ListProjectTypesResult, TaskManagementError, HulyClient> =>
+): Effect.Effect<ListProjectTypesResult, TaskManagementError, HulyClient | Diagnostics> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
     const projectTypes = yield* listAllProjectTypes(client)
@@ -347,7 +364,7 @@ export const listProjectTypes = (
 
 export const getProjectType = (
   params: GetProjectTypeParams
-): Effect.Effect<ProjectTypeDetail, TaskManagementError, HulyClient> =>
+): Effect.Effect<ProjectTypeDetail, TaskManagementError, HulyClient | Diagnostics> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
     const projectType = yield* resolveProjectType(client, params.projectType)
@@ -357,7 +374,7 @@ export const getProjectType = (
 
 export const listTaskTypes = (
   params: ListTaskTypesParams
-): Effect.Effect<ListTaskTypesResult, TaskManagementError, HulyClient> =>
+): Effect.Effect<ListTaskTypesResult, TaskManagementError, HulyClient | Diagnostics> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
     const projectTypes = params.projectType === undefined
@@ -373,7 +390,7 @@ export const listTaskTypes = (
 
 export const createTaskType = (
   params: CreateTaskTypeParams
-): Effect.Effect<CreateTaskTypeResult, TaskManagementError, HulyClient> =>
+): Effect.Effect<CreateTaskTypeResult, TaskManagementError, HulyClient | Diagnostics> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
     const projectType = yield* resolveProjectType(client, params.projectType)
@@ -530,7 +547,7 @@ export const createTaskType = (
 
 export const createIssueStatus = (
   params: CreateIssueStatusParams
-): Effect.Effect<CreateIssueStatusResult, TaskManagementError, HulyClient> =>
+): Effect.Effect<CreateIssueStatusResult, TaskManagementError, HulyClient | Diagnostics> =>
   Effect.gen(function*() {
     const client = yield* HulyClient
     const projectType = yield* resolveProjectType(client, params.projectType)

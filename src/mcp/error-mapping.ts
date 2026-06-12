@@ -11,6 +11,7 @@
  */
 import { Cause, Chunk, ParseResult } from "effect"
 
+import type { ToolWarning } from "../domain/schemas/tool-warnings.js"
 import type { HulyDomainError } from "../huly/errors.js"
 
 /**
@@ -42,19 +43,34 @@ interface ErrorMetadata {
  * Compatible with MCP SDK CallToolResult.
  * _meta carries internal error metadata, stripped by toMcpResponse before wire.
  */
-export interface McpToolResponse {
-  content: Array<{ type: "text"; text: string }>
+interface McpToolResponseBase {
+  readonly content: Array<{ type: "text"; text: string }>
+  readonly _meta?: ErrorMetadata
+}
+
+interface McpToolSuccessResponse extends McpToolResponseBase {
   structuredContent?: {
     readonly result: unknown
+    readonly warnings?: ReadonlyArray<ToolWarning>
   }
-  isError?: boolean
-  _meta?: ErrorMetadata
+  readonly isError?: false
 }
+
+interface McpToolErrorResponse extends McpToolResponseBase {
+  readonly structuredContent?: never
+  readonly isError: true
+}
+
+export type McpToolResponse = McpToolSuccessResponse | McpToolErrorResponse
+
+type WithoutMeta<T> = T extends unknown ? Omit<T, "_meta"> : never
+
+type McpWireResponse = WithoutMeta<McpToolResponse>
 
 /**
  * Error response with required metadata for error tracking/testing.
  */
-interface McpErrorResponseWithMeta extends McpToolResponse {
+interface McpErrorResponseWithMeta extends McpToolErrorResponse {
   isError: true
   _meta: ErrorMetadata
 }
@@ -62,12 +78,18 @@ interface McpErrorResponseWithMeta extends McpToolResponse {
 const createErrorResponse = (
   text: string,
   errorCode: McpErrorCode,
-  errorTag?: string
-): McpErrorResponseWithMeta => ({
-  content: [{ type: "text" as const, text }],
-  isError: true,
-  _meta: { errorCode, errorTag }
-})
+  errorTag?: string,
+  warnings: ReadonlyArray<ToolWarning> = []
+): McpErrorResponseWithMeta => {
+  const warningContent = warnings.length > 0
+    ? [{ type: "text" as const, text: encodeJsonText({ warnings }) }]
+    : []
+  return {
+    content: [{ type: "text" as const, text }, ...warningContent],
+    isError: true,
+    _meta: { errorCode, errorTag }
+  }
+}
 
 // --- Domain Error Mapping ---
 
@@ -185,13 +207,16 @@ const INTERNAL_ERROR_PREFIX: Partial<Record<HulyDomainError["_tag"], string>> = 
   HulyAuthError: "Authentication error"
 }
 
-export const mapDomainErrorToMcp = (error: HulyDomainError): McpErrorResponseWithMeta => {
+export const mapDomainErrorToMcp = (
+  error: HulyDomainError,
+  warnings: ReadonlyArray<ToolWarning> = []
+): McpErrorResponseWithMeta => {
   if (INVALID_PARAMS_TAGS.has(error._tag)) {
-    return createErrorResponse(error.message, McpErrorCode.InvalidParams)
+    return createErrorResponse(error.message, McpErrorCode.InvalidParams, undefined, warnings)
   }
   const prefix = INTERNAL_ERROR_PREFIX[error._tag]
   const message = prefix !== undefined ? `${prefix}: ${error.message}` : error.message
-  return createErrorResponse(message, McpErrorCode.InternalError, error._tag)
+  return createErrorResponse(message, McpErrorCode.InternalError, error._tag, warnings)
 }
 
 // --- Parse Error Mapping ---
@@ -228,22 +253,23 @@ export const mapParseCauseToMcp = (
 }
 
 export const mapDomainCauseToMcp = (
-  cause: Cause.Cause<HulyDomainError>
+  cause: Cause.Cause<HulyDomainError>,
+  warnings: ReadonlyArray<ToolWarning> = []
 ): McpErrorResponseWithMeta => {
   if (Cause.isFailType(cause)) {
-    return mapDomainErrorToMcp(cause.error)
+    return mapDomainErrorToMcp(cause.error, warnings)
   }
 
   if (Cause.isDieType(cause)) {
-    return createErrorResponse("An unexpected error occurred", McpErrorCode.InternalError, "UnexpectedError")
+    return createErrorResponse("An unexpected error occurred", McpErrorCode.InternalError, "UnexpectedError", warnings)
   }
 
   const failures = Chunk.toArray(Cause.failures(cause))
   if (failures.length > 0) {
-    return mapDomainErrorToMcp(failures[0])
+    return mapDomainErrorToMcp(failures[0], warnings)
   }
 
-  return createErrorResponse("An unexpected error occurred", McpErrorCode.InternalError)
+  return createErrorResponse("An unexpected error occurred", McpErrorCode.InternalError, undefined, warnings)
 }
 
 const encodeJsonText = (value: unknown): string => {
@@ -251,11 +277,22 @@ const encodeJsonText = (value: unknown): string => {
   return typeof text === "string" ? text : "null"
 }
 
-export const createSuccessResponse = <T>(result: T): McpToolResponse => ({
-  content: [{ type: "text" as const, text: encodeJsonText(result) }],
-  structuredContent: {
-    result
-  }
+export const createSuccessResponse = <T>(
+  result: T,
+  warnings: ReadonlyArray<ToolWarning> = []
+): McpToolResponse => ({
+  content: [
+    { type: "text" as const, text: encodeJsonText(result) },
+    ...(warnings.length > 0 ? [{ type: "text" as const, text: encodeJsonText({ warnings }) }] : [])
+  ],
+  structuredContent: warnings.length > 0
+    ? {
+      result,
+      warnings
+    }
+    : {
+      result
+    }
 })
 
 export const createUnknownToolError = (toolName: string): McpErrorResponseWithMeta =>
@@ -264,7 +301,14 @@ export const createUnknownToolError = (toolName: string): McpErrorResponseWithMe
 export const createInvalidParamsError = (message: string, errorTag?: string): McpErrorResponseWithMeta =>
   createErrorResponse(message, McpErrorCode.InvalidParams, errorTag)
 
-export const toMcpResponse = (response: McpToolResponse): Omit<McpToolResponse, "_meta"> => {
-  const { _meta: _, ...wire } = response
-  return wire
-}
+export const toMcpResponse = (response: McpToolResponse): McpWireResponse =>
+  response.isError === true
+    ? {
+      content: response.content,
+      isError: true
+    }
+    : {
+      content: response.content,
+      ...(response.structuredContent === undefined ? {} : { structuredContent: response.structuredContent }),
+      ...(response.isError === undefined ? {} : { isError: response.isError })
+    }

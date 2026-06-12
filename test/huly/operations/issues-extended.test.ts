@@ -25,6 +25,7 @@ import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.
 import type { IssueNotFoundError, ProjectNotFoundError } from "../../../src/huly/errors.js"
 import { addLabel, createIssue, deleteIssue, updateIssue } from "../../../src/huly/operations/issues.js"
 import { issueIdentifier, projectIdentifier } from "../../helpers/brands.js"
+import { withDiagnostics } from "../../helpers/diagnostics.js"
 
 import { contact, core, tags, tracker } from "../../../src/huly/huly-plugins.js"
 
@@ -449,7 +450,7 @@ describe("Issues Extended Coverage", () => {
           createIssue({
             project: projectIdentifier("TEST"),
             title: "Missing Sequence"
-          }).pipe(Effect.provide(testLayer))
+          }).pipe(Effect.provide(testLayer), withDiagnostics)
         )
 
         expect(error.message).toContain("did not return the updated sequence")
@@ -475,7 +476,7 @@ describe("Issues Extended Coverage", () => {
         const result = yield* deleteIssue({
           project: projectIdentifier("TEST"),
           identifier: issueIdentifier("TEST-1")
-        }).pipe(Effect.provide(testLayer))
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result.identifier).toBe("TEST-1")
         expect(result.deleted).toBe(true)
@@ -494,7 +495,7 @@ describe("Issues Extended Coverage", () => {
           deleteIssue({
             project: projectIdentifier("NONEXISTENT"),
             identifier: issueIdentifier("1")
-          }).pipe(Effect.provide(testLayer))
+          }).pipe(Effect.provide(testLayer), withDiagnostics)
         )
 
         expect(error._tag).toBe("ProjectNotFoundError")
@@ -516,7 +517,7 @@ describe("Issues Extended Coverage", () => {
           deleteIssue({
             project: projectIdentifier("TEST"),
             identifier: issueIdentifier("TEST-999")
-          }).pipe(Effect.provide(testLayer))
+          }).pipe(Effect.provide(testLayer), withDiagnostics)
         )
 
         expect(error._tag).toBe("IssueNotFoundError")
@@ -540,7 +541,7 @@ describe("Issues Extended Coverage", () => {
         const result = yield* deleteIssue({
           project: projectIdentifier("TEST"),
           identifier: issueIdentifier("42")
-        }).pipe(Effect.provide(testLayer))
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result.identifier).toBe("TEST-42")
         expect(result.deleted).toBe(true)
@@ -568,7 +569,7 @@ describe("Issues Extended Coverage", () => {
           project: projectIdentifier("TEST"),
           identifier: issueIdentifier("TEST-1"),
           label: "NewTag"
-        }).pipe(Effect.provide(testLayer))
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result.identifier).toBe("TEST-1")
         expect(result.labelAdded).toBe(true)
@@ -601,7 +602,7 @@ describe("Issues Extended Coverage", () => {
           project: projectIdentifier("TEST"),
           identifier: issueIdentifier("TEST-1"),
           description: "# Updated Description"
-        }).pipe(Effect.provide(testLayer))
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result.updated).toBe(true)
         expect(captureUpdateMarkup.markup).toBe("# Updated Description")
@@ -631,7 +632,7 @@ describe("Issues Extended Coverage", () => {
           project: projectIdentifier("TEST"),
           identifier: issueIdentifier("TEST-1"),
           description: "# Only desc updated"
-        }).pipe(Effect.provide(testLayer))
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
 
         // Even though updateOps is empty, descriptionUpdatedInPlace should be true
         expect(result.updated).toBe(true)

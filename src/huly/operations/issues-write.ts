@@ -25,6 +25,7 @@ import type { CreateIssueResult, DeleteIssueResult } from "../../domain/schemas/
 import { DEFAULT_ISSUE_PRIORITY } from "../../domain/schemas/issues.js"
 import { IssueId, IssueIdentifier, type ProjectIdentifier } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
+import type { Diagnostics } from "../diagnostics.js"
 import type { IssueNotFoundError, PersonNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { HulyError, InvalidStatusError } from "../errors.js"
 import { tracker } from "../huly-plugins.js"
@@ -92,7 +93,7 @@ const requireUpdatedSequence = (
  */
 export const createIssue = (
   params: CreateIssueParams
-): Effect.Effect<CreateIssueResult, CreateIssueError, HulyClient> =>
+): Effect.Effect<CreateIssueResult, CreateIssueError, HulyClient | Diagnostics> =>
   Effect.gen(function*() {
     const { client, defaultStatusId, project, projectType, statuses } = yield* findProjectWithStatuses(params.project)
 

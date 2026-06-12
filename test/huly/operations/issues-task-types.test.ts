@@ -13,9 +13,12 @@ import { expect } from "vitest"
 
 import { TaskTypeRefSchema } from "../../../src/domain/schemas.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import { Diagnostics, makeDiagnosticsScope } from "../../../src/huly/diagnostics.js"
+import { HulyConnectionError } from "../../../src/huly/errors.js"
 import { core, task, tracker } from "../../../src/huly/huly-plugins.js"
 import { createIssue, updateIssue } from "../../../src/huly/operations/issues.js"
 import { email, issueIdentifier, projectIdentifier, statusName } from "../../helpers/brands.js"
+import { withDiagnostics } from "../../helpers/diagnostics.js"
 
 const projectTypeId = tracker.ids.ClassingProjectType
 const issueTaskTypeId = tracker.taskTypes.Issue
@@ -191,6 +194,8 @@ const createLayer = (config?: {
   readonly projectType?: ProjectType | null
   readonly taskTypes?: ReadonlyArray<TaskType>
   readonly statuses?: ReadonlyArray<Status>
+  readonly failStatusLookup?: boolean
+  readonly modelStatuses?: ReadonlyArray<Status>
   readonly issues?: ReadonlyArray<HulyIssue>
   readonly captures?: Captures
 }) => {
@@ -198,6 +203,7 @@ const createLayer = (config?: {
   const projectType = config?.projectType === null ? undefined : config?.projectType ?? makeProjectType()
   const taskTypes = config?.taskTypes ?? defaultTaskTypes()
   const statuses = config?.statuses ?? defaultStatuses()
+  const modelStatuses = config?.modelStatuses ?? []
   const issues = config?.issues ?? []
 
   const findAllImpl = (<T extends Doc>(_class: Ref<Class<T>>, query: unknown) => {
@@ -211,6 +217,9 @@ const createLayer = (config?: {
       return Effect.succeed(findResult(byParent(byIds(taskTypes))))
     }
     if (_class === core.class.Status) {
+      if (config?.failStatusLookup === true) {
+        return Effect.fail(new HulyConnectionError({ message: "status lookup failed" }))
+      }
       return Effect.succeed(findResult(byIds(statuses)))
     }
     if (_class === tracker.class.Issue) {
@@ -218,6 +227,17 @@ const createLayer = (config?: {
     }
     return Effect.succeed(findResult([]))
   }) as HulyClientOperations["findAll"]
+
+  const findAllInModelImpl = (<T extends Doc>(_class: Ref<Class<T>>, query: unknown) => {
+    const q = query as { _id?: { $in?: ReadonlyArray<unknown> } }
+    const byIds = <D extends { readonly _id: unknown }>(items: ReadonlyArray<D>): ReadonlyArray<D> =>
+      q._id?.$in === undefined ? items : items.filter((item) => q._id?.$in?.includes(item._id) ?? false)
+
+    if (_class === core.class.Status) {
+      return Effect.succeed(findResult(byIds(modelStatuses)))
+    }
+    return Effect.succeed(findResult([]))
+  }) as HulyClientOperations["findAllInModel"]
 
   const findOneImpl = (<T extends Doc>(_class: Ref<Class<T>>, query: unknown, options?: unknown) => {
     if (_class === tracker.class.Project) {
@@ -252,7 +272,7 @@ const createLayer = (config?: {
 
   const updateDocImpl = ((_class: unknown, _space: unknown, _objectId: unknown, operations: unknown) => {
     config?.captures?.updates.push({ classId: String(_class), operations: operations as DocumentUpdate<Doc> })
-    return Effect.succeed({ object: { sequence: 2 } } as never)
+    return Effect.succeed({ object: { sequence: 2 } })
   }) as HulyClientOperations["updateDoc"]
 
   const addCollectionImpl = ((
@@ -270,6 +290,7 @@ const createLayer = (config?: {
   return HulyClient.testLayer({
     addCollection: addCollectionImpl,
     findAll: findAllImpl,
+    findAllInModel: findAllInModelImpl,
     findOne: findOneImpl,
     updateDoc: updateDocImpl
   })
@@ -285,11 +306,38 @@ describe("issue write task type support", () => {
         title: "Custom bug",
         taskType: TaskTypeRefSchema.make("Bug"),
         status: statusName("Confirm")
-      }).pipe(Effect.provide(createLayer({ captures })))
+      }).pipe(Effect.provide(createLayer({ captures })), withDiagnostics)
 
       expect(result.identifier).toBe("TEST-2")
       expect(captures.addCollections[0].attributes.kind).toBe(bugTaskTypeId)
       expect(captures.addCollections[0].attributes.status).toBe(bugReviewStatusId)
+    }))
+
+  it.effect("uses model-resolved status names for task type status validation when status lookup fails", () =>
+    Effect.gen(function*() {
+      const captures: Captures = { addCollections: [], updates: [] }
+      const diagnostics = yield* makeDiagnosticsScope
+
+      yield* createIssue({
+        project: projectIdentifier("TEST"),
+        title: "Bug from model status metadata",
+        taskType: TaskTypeRefSchema.make("Bug"),
+        status: statusName("Confirm")
+      }).pipe(
+        Effect.provide(
+          createLayer({
+            captures,
+            failStatusLookup: true,
+            modelStatuses: defaultStatuses()
+          })
+        ),
+        Effect.provideService(Diagnostics, diagnostics.service)
+      )
+      const warnings = yield* diagnostics.drainWarnings
+
+      expect(captures.addCollections[0].attributes.kind).toBe(bugTaskTypeId)
+      expect(captures.addCollections[0].attributes.status).toBe(bugReviewStatusId)
+      expect(warnings).toEqual([])
     }))
 
   it.effect("resolves a task type linked by project type parent even when missing from the tasks list", () =>
@@ -300,10 +348,13 @@ describe("issue write task type support", () => {
         project: projectIdentifier("TEST"),
         title: "Parent-linked bug",
         taskType: TaskTypeRefSchema.make("Bug")
-      }).pipe(Effect.provide(createLayer({
-        captures,
-        projectType: makeProjectType({ tasks: [issueTaskTypeId] })
-      })))
+      }).pipe(
+        Effect.provide(createLayer({
+          captures,
+          projectType: makeProjectType({ tasks: [issueTaskTypeId] })
+        })),
+        withDiagnostics
+      )
 
       expect(captures.addCollections[0].attributes.kind).toBe(bugTaskTypeId)
       expect(captures.addCollections[0].attributes.status).toBe(bugOpenStatusId)
@@ -317,7 +368,7 @@ describe("issue write task type support", () => {
         project: projectIdentifier("TEST"),
         title: "Bug without explicit status",
         taskType: TaskTypeRefSchema.make("Bug")
-      }).pipe(Effect.provide(createLayer({ captures })))
+      }).pipe(Effect.provide(createLayer({ captures })), withDiagnostics)
 
       expect(captures.addCollections[0].attributes.kind).toBe(bugTaskTypeId)
       expect(captures.addCollections[0].attributes.status).toBe(bugOpenStatusId)
@@ -332,7 +383,7 @@ describe("issue write task type support", () => {
           title: "Bug with issue-only status",
           taskType: TaskTypeRefSchema.make("Bug"),
           status: statusName("Review")
-        }).pipe(Effect.provide(createLayer({ captures })))
+        }).pipe(Effect.provide(createLayer({ captures })), withDiagnostics)
       )
 
       expect(result._tag).toBe("Left")
@@ -352,7 +403,7 @@ describe("issue write task type support", () => {
           project: projectIdentifier("TEST"),
           title: "Unknown task type",
           taskType: TaskTypeRefSchema.make("Story")
-        }).pipe(Effect.provide(createLayer({ captures })))
+        }).pipe(Effect.provide(createLayer({ captures })), withDiagnostics)
       )
 
       expect(result._tag).toBe("Left")
@@ -373,7 +424,7 @@ describe("issue write task type support", () => {
           project: projectIdentifier("TEST"),
           title: "No workflow",
           taskType: TaskTypeRefSchema.make("Bug")
-        }).pipe(Effect.provide(createLayer({ captures, projectType: null })))
+        }).pipe(Effect.provide(createLayer({ captures, projectType: null })), withDiagnostics)
       )
 
       expect(result._tag).toBe("Left")
@@ -398,7 +449,8 @@ describe("issue write task type support", () => {
               captures,
               projectType: makeProjectType({ tasks: [bugTaskTypeId, externalBugTaskTypeId] })
             })
-          )
+          ),
+          withDiagnostics
         )
       )
 
@@ -418,7 +470,10 @@ describe("issue write task type support", () => {
           project: projectIdentifier("TEST"),
           title: "No configured task types",
           taskType: TaskTypeRefSchema.make("Bug")
-        }).pipe(Effect.provide(createLayer({ captures, projectType: makeProjectType({ tasks: [] }), taskTypes: [] })))
+        }).pipe(
+          Effect.provide(createLayer({ captures, projectType: makeProjectType({ tasks: [] }), taskTypes: [] })),
+          withDiagnostics
+        )
       )
 
       expect(result._tag).toBe("Left")
@@ -450,7 +505,8 @@ describe("issue write task type support", () => {
                 })
               ]
             })
-          )
+          ),
+          withDiagnostics
         )
       )
 
@@ -470,7 +526,7 @@ describe("issue write task type support", () => {
           project: projectIdentifier("TEST"),
           title: "Unknown status",
           status: statusName("Not a real status")
-        }).pipe(Effect.provide(createLayer({ captures })))
+        }).pipe(Effect.provide(createLayer({ captures })), withDiagnostics)
       )
 
       expect(result._tag).toBe("Left")
@@ -486,7 +542,7 @@ describe("issue write task type support", () => {
           project: projectIdentifier("TEST"),
           title: "Child issue",
           parentIssue: issueIdentifier("TEST-404")
-        }).pipe(Effect.provide(createLayer({ captures })))
+        }).pipe(Effect.provide(createLayer({ captures })), withDiagnostics)
       )
 
       expect(result._tag).toBe("Left")
@@ -502,7 +558,7 @@ describe("issue write task type support", () => {
           project: projectIdentifier("TEST"),
           title: "Assigned issue",
           assignee: email("missing@example.com")
-        }).pipe(Effect.provide(createLayer({ captures })))
+        }).pipe(Effect.provide(createLayer({ captures })), withDiagnostics)
       )
 
       expect(result._tag).toBe("Left")
@@ -519,7 +575,7 @@ describe("issue write task type support", () => {
         project: projectIdentifier("TEST"),
         identifier: issueIdentifier("TEST-1"),
         taskType: TaskTypeRefSchema.make("Bug")
-      }).pipe(Effect.provide(createLayer({ captures, issues: [issue] })))
+      }).pipe(Effect.provide(createLayer({ captures, issues: [issue] })), withDiagnostics)
 
       const issueUpdate = captures.updates.find((update) => update.classId === String(tracker.class.Issue))
       expect(result.updated).toBe(true)
@@ -535,7 +591,7 @@ describe("issue write task type support", () => {
         project: projectIdentifier("TEST"),
         identifier: issueIdentifier("TEST-1"),
         taskType: TaskTypeRefSchema.make("Bug")
-      }).pipe(Effect.provide(createLayer({ captures, issues: [issue] })))
+      }).pipe(Effect.provide(createLayer({ captures, issues: [issue] })), withDiagnostics)
 
       const issueUpdate = captures.updates.find((update) => update.classId === String(tracker.class.Issue))
       expect(issueUpdate?.operations).toEqual({ kind: bugTaskTypeId, status: bugOpenStatusId })

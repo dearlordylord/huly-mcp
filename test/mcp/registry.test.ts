@@ -7,6 +7,7 @@ import { expect } from "vitest"
 import { IssueIdentifier } from "../../src/domain/schemas/shared.js"
 import type { HulyClientOperations } from "../../src/huly/client.js"
 import { HulyClient } from "../../src/huly/client.js"
+import { Diagnostics } from "../../src/huly/diagnostics.js"
 import { HulyError } from "../../src/huly/errors.js"
 import { testMarkupUrlConfig } from "../../src/huly/operations/markup.js"
 import type { HulyStorageOperations } from "../../src/huly/storage.js"
@@ -17,7 +18,9 @@ import { WorkspaceClient } from "../../src/huly/workspace-client.js"
 import { McpErrorCode } from "../../src/mcp/error-mapping.js"
 import {
   createCombinedToolHandler,
+  createEncodedNoParamsWorkspaceToolHandler,
   createEncodedToolHandler,
+  createEncodedWorkspaceToolHandler,
   createNoParamsWorkspaceToolHandler,
   createStorageToolHandler,
   createToolHandler,
@@ -35,6 +38,7 @@ const noopHulyClient: HulyClientOperations = {
   markupUrlConfig: testMarkupUrlConfig,
   workbenchUrlConfig: testWorkbenchUrlConfig,
   findAll: () => Effect.succeed(toFindResult([])) as Effect.Effect<FindResult<never>>,
+  findAllInModel: () => Effect.succeed(toFindResult([])) as Effect.Effect<FindResult<never>>,
   findOne: () => Effect.succeed(undefined),
   createDoc: () => Effect.die(new Error("not implemented")),
   updateDoc: () => Effect.die(new Error("not implemented")),
@@ -125,6 +129,70 @@ describe("createToolHandler", () => {
       expect(result.isError).toBe(true)
       expect(result._meta?.errorCode).toBe(McpErrorCode.InternalError)
       expect(result.content[0].text).toContain("something broke")
+    }))
+
+  it.effect("adds diagnostics warnings to success envelopes", () =>
+    Effect.gen(function*() {
+      const handler = createToolHandler(
+        "test_tool",
+        parse,
+        (params: Params) =>
+          Effect.gen(function*() {
+            const diagnostics = yield* Diagnostics
+            yield* diagnostics.warnAgent({
+              code: "status_metadata_unresolved",
+              message: `Status metadata was degraded for ${params.name}.`
+            })
+            return { greeting: `hello ${params.name}` }
+          })
+      )
+
+      const result = yield* Effect.promise(() => handler({ name: "world" }, noopHulyClient, noopStorageClient))
+
+      expect(result.isError).toBeUndefined()
+      expect(result.structuredContent).toEqual({
+        result: { greeting: "hello world" },
+        warnings: [{
+          code: "status_metadata_unresolved",
+          message: "Status metadata was degraded for world."
+        }]
+      })
+      expect(result.content).toHaveLength(2)
+      expect(JSON.parse(result.content[1].text)).toEqual({
+        warnings: [{
+          code: "status_metadata_unresolved",
+          message: "Status metadata was degraded for world."
+        }]
+      })
+    }))
+
+  it.effect("adds diagnostics warnings to failure envelopes", () =>
+    Effect.gen(function*() {
+      const handler = createToolHandler(
+        "test_tool",
+        parse,
+        (params: Params) =>
+          Effect.gen(function*() {
+            const diagnostics = yield* Diagnostics
+            yield* diagnostics.warnAgent({
+              code: "status_metadata_unresolved",
+              message: `Status metadata was degraded for ${params.name}.`
+            })
+            return yield* Effect.fail(new HulyError({ message: "failed after warning" }))
+          })
+      )
+
+      const result = yield* Effect.promise(() => handler({ name: "world" }, noopHulyClient, noopStorageClient))
+
+      expect(result.isError).toBe(true)
+      expect(result.structuredContent).toBeUndefined()
+      expect(result.content[0].text).toContain("failed after warning")
+      expect(JSON.parse(result.content[1].text)).toEqual({
+        warnings: [{
+          code: "status_metadata_unresolved",
+          message: "Status metadata was degraded for world."
+        }]
+      })
     }))
 })
 
@@ -286,6 +354,29 @@ describe("createWorkspaceToolHandler", () => {
     }))
 })
 
+describe("createEncodedWorkspaceToolHandler", () => {
+  it.effect("encodes workspace output through the provided schema", () =>
+    Effect.gen(function*() {
+      const Output = Schema.Struct({ ws: Schema.String })
+      const handler = createEncodedWorkspaceToolHandler(
+        "workspace_tool",
+        parse,
+        (params: Params) =>
+          Effect.succeed({ ws: params.name }).pipe(
+            Effect.tap(() => WorkspaceClient)
+          ),
+        Output
+      )
+
+      const result = yield* Effect.promise(() =>
+        handler({ name: "encoded" }, noopHulyClient, noopStorageClient, noopWorkspaceClient)
+      )
+
+      expect(result.isError).toBeUndefined()
+      expect(result.content[0].text).toBe("{\"ws\":\"encoded\"}")
+    }))
+})
+
 describe("createNoParamsWorkspaceToolHandler", () => {
   it.effect("returns success response with no params", () =>
     Effect.gen(function*() {
@@ -334,5 +425,25 @@ describe("createNoParamsWorkspaceToolHandler", () => {
       expect(result.isError).toBe(true)
       expect(result._meta?.errorCode).toBe(McpErrorCode.InternalError)
       expect(result.content[0].text).toContain("ws broke")
+    }))
+})
+
+describe("createEncodedNoParamsWorkspaceToolHandler", () => {
+  it.effect("encodes no-params workspace output through the provided schema", () =>
+    Effect.gen(function*() {
+      const Output = Schema.Struct({ members: Schema.Number })
+      const handler = createEncodedNoParamsWorkspaceToolHandler(
+        "workspace_tool",
+        () =>
+          Effect.succeed({ members: 5 }).pipe(
+            Effect.tap(() => WorkspaceClient)
+          ),
+        Output
+      )
+
+      const result = yield* Effect.promise(() => handler({}, noopHulyClient, noopStorageClient, noopWorkspaceClient))
+
+      expect(result.isError).toBeUndefined()
+      expect(result.content[0].text).toBe("{\"members\":5}")
     }))
 })

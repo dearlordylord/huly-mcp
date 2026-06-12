@@ -28,6 +28,7 @@ import type { InvalidStatusError, PersonNotFoundError } from "../../../src/huly/
 import { contact, core, task, tracker } from "../../../src/huly/huly-plugins.js"
 import { createIssue, getIssue, listIssues, updateIssue } from "../../../src/huly/operations/issues.js"
 import { componentIdentifier, email, issueIdentifier, projectIdentifier, statusName } from "../../helpers/brands.js"
+import { withDiagnostics } from "../../helpers/diagnostics.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   const result = docs as FindResult<T>
@@ -379,7 +380,10 @@ describe("Issues Coverage - resolveStatusName", () => {
         statuses: [openStatus]
       })
 
-      const results = yield* listIssues({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
+      const results = yield* listIssues({ project: projectIdentifier("TEST") }).pipe(
+        Effect.provide(testLayer),
+        withDiagnostics
+      )
 
       expect(results).toHaveLength(1)
       expect(results[0]?.status).toBe("Unknown")
@@ -420,7 +424,8 @@ describe("Issues Coverage - listIssues status filters", () => {
       })
 
       yield* listIssues({ project: projectIdentifier("TEST"), statusCategory: "Active" }).pipe(
-        Effect.provide(testLayer)
+        Effect.provide(testLayer),
+        withDiagnostics
       )
 
       expect(captureQuery.query?.status).toEqual({ $in: ["status-open"] })
@@ -449,7 +454,8 @@ describe("Issues Coverage - listIssues status filters", () => {
       })
 
       yield* listIssues({ project: projectIdentifier("TEST"), statusCategory: "ToDo" }).pipe(
-        Effect.provide(testLayer)
+        Effect.provide(testLayer),
+        withDiagnostics
       )
 
       expect(captureQuery.query?.status).toEqual({ $in: ["status-open"] })
@@ -476,7 +482,8 @@ describe("Issues Coverage - listIssues status filters", () => {
         statusCategory: "Active"
       }).pipe(
         Effect.provide(testLayer),
-        Effect.flip
+        Effect.flip,
+        withDiagnostics
       )
 
       expect(error._tag).toBe("HulyConnectionError")
@@ -511,7 +518,8 @@ describe("Issues Coverage - listIssues status filters", () => {
       })
 
       yield* listIssues({ project: projectIdentifier("TEST"), statusCategory: "Won" }).pipe(
-        Effect.provide(testLayer)
+        Effect.provide(testLayer),
+        withDiagnostics
       )
 
       expect(captureQuery.query?.status).toEqual({
@@ -538,7 +546,8 @@ describe("Issues Coverage - listIssues status filters", () => {
 
       const result = yield* listIssues({ project: projectIdentifier("TEST"), statusCategory: "Won" })
         .pipe(
-          Effect.provide(testLayer)
+          Effect.provide(testLayer),
+          withDiagnostics
         )
 
       expect(result).toEqual([])
@@ -572,7 +581,8 @@ describe("Issues Coverage - listIssues status filters", () => {
       })
 
       yield* listIssues({ project: projectIdentifier("TEST"), statusCategory: "Lost" }).pipe(
-        Effect.provide(testLayer)
+        Effect.provide(testLayer),
+        withDiagnostics
       )
 
       expect(captureQuery.query?.status).toEqual({
@@ -599,7 +609,8 @@ describe("Issues Coverage - listIssues status filters", () => {
 
       const result = yield* listIssues({ project: projectIdentifier("TEST"), statusCategory: "Lost" })
         .pipe(
-          Effect.provide(testLayer)
+          Effect.provide(testLayer),
+          withDiagnostics
         )
 
       expect(result).toEqual([])
@@ -625,7 +636,8 @@ describe("Issues Coverage - listIssues status filters", () => {
       })
 
       yield* listIssues({ project: projectIdentifier("TEST"), status: statusName("In Review") }).pipe(
-        Effect.provide(testLayer)
+        Effect.provide(testLayer),
+        withDiagnostics
       )
 
       expect(captureQuery.query?.status).toBe("status-review")
@@ -646,7 +658,8 @@ describe("Issues Coverage - listIssues status filters", () => {
 
       const error = yield* Effect.flip(
         listIssues({ project: projectIdentifier("TEST"), status: statusName("Nonexistent Status") }).pipe(
-          Effect.provide(testLayer)
+          Effect.provide(testLayer),
+          withDiagnostics
         )
       )
 
@@ -672,7 +685,7 @@ describe("Issues Coverage - listIssues assignee filter", () => {
       const result = yield* listIssues({
         project: projectIdentifier("TEST"),
         assignee: email("nobody@example.com")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result).toEqual([])
     }))
@@ -696,7 +709,8 @@ describe("Issues Coverage - listIssues assignee filter", () => {
       })
 
       yield* listIssues({ project: projectIdentifier("TEST"), assignee: email("john@example.com") }).pipe(
-        Effect.provide(testLayer)
+        Effect.provide(testLayer),
+        withDiagnostics
       )
 
       expect(captureQuery.query?.assignee).toBe("person-1")
@@ -717,7 +731,10 @@ describe("Issues Coverage - listIssues titleSearch", () => {
         captureIssueQuery: captureQuery
       })
 
-      yield* listIssues({ project: projectIdentifier("TEST"), titleSearch: "bug fix" }).pipe(Effect.provide(testLayer))
+      yield* listIssues({ project: projectIdentifier("TEST"), titleSearch: "bug fix" }).pipe(
+        Effect.provide(testLayer),
+        withDiagnostics
+      )
 
       expect(captureQuery.query?.title).toEqual({ $like: "%bug fix%" })
     }))
@@ -735,7 +752,10 @@ describe("Issues Coverage - listIssues titleSearch", () => {
         captureIssueQuery: captureQuery
       })
 
-      yield* listIssues({ project: projectIdentifier("TEST"), titleSearch: "   " }).pipe(Effect.provide(testLayer))
+      yield* listIssues({ project: projectIdentifier("TEST"), titleSearch: "   " }).pipe(
+        Effect.provide(testLayer),
+        withDiagnostics
+      )
 
       expect(captureQuery.query?.title).toBeUndefined()
     }))
@@ -763,7 +783,7 @@ describe("Issues Coverage - listIssues parent and summary branches", () => {
       yield* listIssues({
         project: projectIdentifier("TEST"),
         parentIssue: issueIdentifier("TEST-99")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(captureQuery.query?.attachedTo).toBe("parent-issue")
     }))
@@ -790,7 +810,10 @@ describe("Issues Coverage - listIssues parent and summary branches", () => {
         statuses
       })
 
-      const result = yield* listIssues({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
+      const result = yield* listIssues({ project: projectIdentifier("TEST") }).pipe(
+        Effect.provide(testLayer),
+        withDiagnostics
+      )
 
       expect(result[0].parentIssue).toBe("TEST-1")
       expect(result[0].subIssues).toBe(3)
@@ -809,7 +832,7 @@ describe("Issues Coverage - listIssues parent and summary branches", () => {
       })
 
       const error = yield* Effect.flip(
-        listIssues({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
+        listIssues({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer), withDiagnostics)
       )
 
       expect(error._tag).toBe("HulyConnectionError")
@@ -832,7 +855,8 @@ describe("Issues Coverage - listIssues descriptionSearch", () => {
       })
 
       yield* listIssues({ project: projectIdentifier("TEST"), descriptionSearch: "error handling" }).pipe(
-        Effect.provide(testLayer)
+        Effect.provide(testLayer),
+        withDiagnostics
       )
 
       expect(captureQuery.query?.$search).toBe("error handling")
@@ -851,7 +875,10 @@ describe("Issues Coverage - listIssues descriptionSearch", () => {
         captureIssueQuery: captureQuery
       })
 
-      yield* listIssues({ project: projectIdentifier("TEST"), descriptionSearch: "  " }).pipe(Effect.provide(testLayer))
+      yield* listIssues({ project: projectIdentifier("TEST"), descriptionSearch: "  " }).pipe(
+        Effect.provide(testLayer),
+        withDiagnostics
+      )
 
       expect(captureQuery.query?.$search).toBeUndefined()
     }))
@@ -874,7 +901,8 @@ describe("Issues Coverage - listIssues component filter", () => {
       })
 
       yield* listIssues({ project: projectIdentifier("TEST"), component: componentIdentifier("Frontend") }).pipe(
-        Effect.provide(testLayer)
+        Effect.provide(testLayer),
+        withDiagnostics
       )
 
       expect(captureQuery.query?.component).toBe("comp-1")
@@ -895,7 +923,7 @@ describe("Issues Coverage - listIssues component filter", () => {
       const result = yield* listIssues({
         project: projectIdentifier("TEST"),
         component: componentIdentifier("NonexistentComponent")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result).toEqual([])
     }))
@@ -919,7 +947,7 @@ describe("Issues Coverage - extractUpdatedSequence", () => {
       const result = yield* createIssue({
         project: projectIdentifier("TEST"),
         title: "Sequence Test"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.identifier).toBe("TEST-42")
     }))
@@ -981,7 +1009,7 @@ describe("Issues Coverage - extractUpdatedSequence", () => {
         createIssue({
           project: projectIdentifier("TEST"),
           title: "Missing Sequence"
-        }).pipe(Effect.provide(testLayer))
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
       )
 
       expect(error.message).toContain("did not return the updated sequence")
@@ -1008,7 +1036,7 @@ describe("Issues Coverage - resolveAssignee", () => {
           project: projectIdentifier("TEST"),
           title: "Assignee Test",
           assignee: email("ghost@example.com")
-        }).pipe(Effect.provide(testLayer))
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
       )
 
       expect(error._tag).toBe("PersonNotFoundError")
@@ -1037,7 +1065,7 @@ describe("Issues Coverage - resolveAssignee", () => {
         project: projectIdentifier("TEST"),
         title: "With Assignee",
         assignee: email("jane@example.com")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(captureAddCollection.attributes?.assignee).toBe("person-1")
     }))
@@ -1064,7 +1092,7 @@ describe("Issues Coverage - resolveStatusByName", () => {
         project: projectIdentifier("TEST"),
         title: "Status Test",
         status: statusName("in progress")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(captureAddCollection.attributes?.status).toBe("status-progress")
     }))
@@ -1088,7 +1116,7 @@ describe("Issues Coverage - resolveStatusByName", () => {
           project: projectIdentifier("TEST"),
           title: "Bad Status",
           status: statusName("Nonexistent")
-        }).pipe(Effect.provide(testLayer))
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
       )
 
       expect(error._tag).toBe("InvalidStatusError")
@@ -1128,7 +1156,7 @@ describe("Issues Coverage - createIssue full flow", () => {
         priority: "urgent",
         status: statusName("In Progress"),
         assignee: email("dev@example.com")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.identifier).toBe("TEST-6")
       expect(captureAddCollection.attributes?.title).toBe("Full Issue")
@@ -1160,7 +1188,7 @@ describe("Issues Coverage - createIssue full flow", () => {
       yield* createIssue({
         project: projectIdentifier("TEST"),
         title: "Default Status"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(captureAddCollection.attributes?.status).toBe("status-default")
     }))
@@ -1185,7 +1213,7 @@ describe("Issues Coverage - updateIssue branches", () => {
         project: projectIdentifier("TEST"),
         identifier: issueIdentifier("TEST-1"),
         priority: "low"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(captureUpdateDoc.operations?.priority).toBe(IssuePriority.Low)
     }))
@@ -1208,7 +1236,7 @@ describe("Issues Coverage - updateIssue branches", () => {
         project: projectIdentifier("TEST"),
         identifier: issueIdentifier("TEST-1"),
         dueDate: Timestamp.make(1800000000000)
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(captureUpdateDoc.operations?.dueDate).toBe(1800000000000)
     }))
@@ -1231,7 +1259,7 @@ describe("Issues Coverage - updateIssue branches", () => {
         project: projectIdentifier("TEST"),
         identifier: issueIdentifier("TEST-1"),
         estimation: null
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(captureUpdateDoc.operations?.estimation).toBe(0)
     }))
@@ -1256,7 +1284,7 @@ describe("Issues Coverage - updateIssue branches", () => {
         project: projectIdentifier("TEST"),
         identifier: issueIdentifier("TEST-1"),
         status: statusName("Done")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(captureUpdateDoc.operations?.status).toBe("status-done")
     }))
@@ -1283,7 +1311,7 @@ describe("Issues Coverage - updateIssue branches", () => {
         project: projectIdentifier("TEST"),
         identifier: issueIdentifier("TEST-1"),
         assignee: email("dev@example.com")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(captureUpdateDoc.operations?.assignee).toBe("person-1")
     }))
@@ -1310,7 +1338,7 @@ describe("Issues Coverage - updateIssue branches", () => {
         project: projectIdentifier("TEST"),
         identifier: issueIdentifier("TEST-1"),
         assignee: null
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(captureUpdateDoc.operations?.assignee).toBeNull()
     }))
@@ -1337,7 +1365,7 @@ describe("Issues Coverage - updateIssue branches", () => {
         project: projectIdentifier("TEST"),
         identifier: issueIdentifier("TEST-1"),
         description: ""
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(captureUpdateDoc.operations?.description).toBeNull()
     }))
@@ -1366,7 +1394,7 @@ describe("Issues Coverage - updateIssue branches", () => {
         project: projectIdentifier("TEST"),
         identifier: issueIdentifier("TEST-1"),
         description: "# Updated"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.updated).toBe(true)
       expect(captureUpdateMarkup.markup).toBe("# Updated")
@@ -1397,7 +1425,7 @@ describe("Issues Coverage - updateIssue branches", () => {
         project: projectIdentifier("TEST"),
         identifier: issueIdentifier("TEST-1"),
         description: "# New Desc"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.updated).toBe(true)
       expect(captureUploadMarkup.markup).toBe("# New Desc")
@@ -1420,7 +1448,7 @@ describe("Issues Coverage - updateIssue branches", () => {
         updateIssue({
           project: projectIdentifier("TEST"),
           identifier: issueIdentifier("TEST-1")
-        }).pipe(Effect.provide(testLayer))
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
       )
 
       expect(error._tag).toBe("NoUpdateFieldsError")
@@ -1448,7 +1476,7 @@ describe("Issues Coverage - updateIssue branches", () => {
         project: projectIdentifier("TEST"),
         identifier: issueIdentifier("TEST-1"),
         description: "# Only desc changed"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.updated).toBe(true)
       expect(captureUpdateMarkup.markup).toBe("# Only desc changed")
@@ -1472,7 +1500,7 @@ describe("Issues Coverage - updateIssue branches", () => {
         project: projectIdentifier("TEST"),
         identifier: issueIdentifier("TEST-1"),
         title: "Brand New Title"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.updated).toBe(true)
       expect(captureUpdateDoc.operations?.title).toBe("Brand New Title")
@@ -1497,7 +1525,7 @@ describe("Issues Coverage - updateIssue branches", () => {
           project: projectIdentifier("TEST"),
           identifier: issueIdentifier("TEST-1"),
           assignee: email("unknown@example.com")
-        }).pipe(Effect.provide(testLayer))
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
       )
 
       expect(error._tag).toBe("PersonNotFoundError")
@@ -1526,7 +1554,7 @@ describe("Issues Coverage - getIssue assignee person not found", () => {
       const result = yield* getIssue({
         project: projectIdentifier("TEST"),
         identifier: issueIdentifier("TEST-1")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.assignee).toBeUndefined()
       expect(result.assigneeRef).toBeUndefined()
@@ -1561,7 +1589,7 @@ describe("Issues Coverage - getIssue detail branches", () => {
       const result = yield* getIssue({
         project: projectIdentifier("TEST"),
         identifier: issueIdentifier("TEST-2")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.parentIssue).toBe("TEST-1")
       expect(result.subIssues).toBe(2)
@@ -1583,7 +1611,7 @@ describe("Issues Coverage - getIssue detail branches", () => {
         getIssue({
           project: projectIdentifier("TEST"),
           identifier: issueIdentifier("NOT-A-NUMBER")
-        }).pipe(Effect.provide(testLayer))
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
       )
 
       expect(error._tag).toBe("IssueNotFoundError")
@@ -1608,7 +1636,7 @@ describe("Issues Coverage - getIssue detail branches", () => {
         getIssue({
           project: projectIdentifier("TEST"),
           identifier: issueIdentifier("TEST-1")
-        }).pipe(Effect.provide(testLayer))
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
       )
 
       expect(error._tag).toBe("HulyConnectionError")

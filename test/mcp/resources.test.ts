@@ -30,6 +30,7 @@ import {
   readHulyResource,
   resourceTemplates
 } from "../../src/mcp/resources.js"
+import { withDiagnostics } from "../helpers/diagnostics.js"
 
 const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
   const result = {
@@ -204,7 +205,8 @@ describe("MCP resources", () => {
               archived: true
             })
           ]
-        }))
+        })),
+        withDiagnostics
       )
 
       expect(result).toEqual({
@@ -223,7 +225,8 @@ describe("MCP resources", () => {
       const result = yield* listResources().pipe(
         Effect.provide(createClientLayer({
           projects: [makeProject({ identifier: "NODESC", description: "" })]
-        }))
+        })),
+        withDiagnostics
       )
       expect(result.resources[0]?.description).toBe("Huly project NODESC")
     }))
@@ -240,7 +243,8 @@ describe("MCP resources", () => {
                   message: `Connection failed for ${backendSecret}`
                 })
               )
-          }))
+          })),
+          withDiagnostics
         )
       )
 
@@ -298,7 +302,8 @@ describe("MCP resources", () => {
         Effect.provide(createClientLayer({
           projects: [makeProject()],
           statuses: [makeStatus()]
-        }))
+        })),
+        withDiagnostics
       )
 
       expect(result.contents).toHaveLength(1)
@@ -325,7 +330,8 @@ describe("MCP resources", () => {
         Effect.provide(createClientLayer({
           projects: [makeProject()],
           issues: [makeIssue()]
-        }))
+        })),
+        withDiagnostics
       )
 
       expect(result.contents).toHaveLength(1)
@@ -349,7 +355,8 @@ describe("MCP resources", () => {
     Effect.gen(function*() {
       const error = yield* Effect.flip(
         readHulyResource("huly://projects/MISSING").pipe(
-          Effect.provide(createClientLayer())
+          Effect.provide(createClientLayer()),
+          withDiagnostics
         )
       )
 
@@ -370,7 +377,8 @@ describe("MCP resources", () => {
                   message: `Connection failed for ${backendSecret}`
                 })
               )
-          }))
+          })),
+          withDiagnostics
         )
       )
 
@@ -401,7 +409,8 @@ describe("MCP resources", () => {
         readHulyResource("huly://projects/TEST").pipe(
           Effect.provide(
             HulyClient.testLayer({ findOne: () => Effect.fail(new HulyAuthError({ message: "bad token" })) })
-          )
+          ),
+          withDiagnostics
         )
       )
       expect(error).toBeInstanceOf(McpError)
@@ -412,7 +421,7 @@ describe("MCP resources", () => {
   it.effect("maps an invalid resource URI passed to readHulyResource to an McpError", () =>
     Effect.gen(function*() {
       const error = yield* Effect.flip(
-        readHulyResource("not-a-uri").pipe(Effect.provide(createClientLayer()))
+        readHulyResource("not-a-uri").pipe(Effect.provide(createClientLayer()), withDiagnostics)
       )
       expect(error).toBeInstanceOf(McpError)
       expect(error.message).toContain("Invalid Huly resource URI")
@@ -422,7 +431,8 @@ describe("MCP resources", () => {
     Effect.gen(function*() {
       const error = yield* Effect.flip(
         readHulyResource("huly://issues/TEST-404").pipe(
-          Effect.provide(createClientLayer({ projects: [makeProject()], issues: [] }))
+          Effect.provide(createClientLayer({ projects: [makeProject()], issues: [] })),
+          withDiagnostics
         )
       )
       expect(error).toBeInstanceOf(McpError)

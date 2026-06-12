@@ -9,7 +9,9 @@ import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js"
 import { Cause, Chunk, Clock, Effect, Exit, Schema } from "effect"
 
 import { type GetHulyContextResult, GetHulyContextResultSchema } from "../domain/schemas/index.js"
+import type { ToolWarning } from "../domain/schemas/tool-warnings.js"
 import { HulyClient } from "../huly/client.js"
+import { Diagnostics, makeDiagnosticsScope } from "../huly/diagnostics.js"
 import { HulyError } from "../huly/errors-base.js"
 import type { HulyStorageClient } from "../huly/storage.js"
 import type { WorkspaceClientOperations } from "../huly/workspace-client.js"
@@ -87,6 +89,20 @@ const NPM_PACKAGE_NAME = "@firfi/huly-mcp"
 
 const computeOutputBytes = (response: McpToolResponse): number =>
   response.content.reduce((sum, c) => sum + c.text.length, 0)
+
+const withResourceWarnings = (
+  result: ReadResourceResult,
+  warnings: ReadonlyArray<ToolWarning>
+): ReadResourceResult =>
+  warnings.length === 0
+    ? result
+    : {
+      ...result,
+      _meta: {
+        ...result._meta,
+        warnings
+      }
+    }
 
 export const deriveEditMode = (name: string, args: unknown): string | undefined => {
   if (name !== "edit_document" || args === undefined) return undefined
@@ -393,12 +409,15 @@ export const createMcpProtocolHandlers = (
         resolveClients,
         error => createResourceClientResolutionError(uri, error)
       )
+      const diagnosticsScope = await Effect.runPromise(makeDiagnosticsScope)
       const resourceRead = await Effect.runPromiseExit(
         readHulyResource(uri).pipe(
-          Effect.provideService(HulyClient, clients.hulyClient)
+          Effect.provideService(HulyClient, clients.hulyClient),
+          Effect.provideService(Diagnostics, diagnosticsScope.service)
         )
       )
-      if (Exit.isSuccess(resourceRead)) return resourceRead.value
+      const warnings = await Effect.runPromise(diagnosticsScope.drainWarnings)
+      if (Exit.isSuccess(resourceRead)) return withResourceWarnings(resourceRead.value, warnings)
       return throwResourceReadError(uri, resourceRead.cause)
     } finally {
       leave()

@@ -18,6 +18,7 @@ import type {
 import { IssueSummarySchema, parseIssue } from "../../domain/schemas/issues.js"
 import { IssueId, type ProjectIdentifier } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
+import type { Diagnostics } from "../diagnostics.js"
 import type { ComponentNotFoundError, InvalidStatusError, ProjectNotFoundError } from "../errors.js"
 import { HulyConnectionError, IssueNotFoundError } from "../errors.js"
 import { contact, tracker } from "../huly-plugins.js"
@@ -90,7 +91,7 @@ const statusIdsByCategory = (
  */
 export const listIssues = (
   params: ListIssuesParams
-): Effect.Effect<Array<IssueSummary>, ListIssuesError, HulyClient> =>
+): Effect.Effect<Array<IssueSummary>, ListIssuesError, HulyClient | Diagnostics> =>
   Effect.gen(function*() {
     const { client, project, statuses } = yield* findProjectWithStatuses(params.project)
 
@@ -231,7 +232,7 @@ export const listIssues = (
  */
 export const getIssue = (
   params: GetIssueParams
-): Effect.Effect<Issue, GetIssueError, HulyClient> =>
+): Effect.Effect<Issue, GetIssueError, HulyClient | Diagnostics> =>
   Effect.gen(function*() {
     const { client, project, statuses } = yield* findProjectWithStatuses(params.project)
 

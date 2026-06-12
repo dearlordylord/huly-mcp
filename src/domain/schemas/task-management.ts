@@ -56,7 +56,7 @@ const exactStatusCategoryEntries = <T extends true>(value: T): T => value
 exactStatusCategoryEntries<ExactStatusCategoryEntries>(true)
 
 export const StatusCategoryValues = StatusCategoryKeys
-const UnknownStatusCategoryValue = "unknown"
+export const UnknownStatusCategoryValue = "unknown"
 
 export const StatusCategoryValueSchema = Schema.Literal(...StatusCategoryValues, UnknownStatusCategoryValue)
 export type StatusCategoryValue = Schema.Schema.Type<typeof StatusCategoryValueSchema>
@@ -143,6 +143,7 @@ export const ProjectTypeDetailSchema = Schema.Struct({
   descriptor: NonEmptyString,
   classic: Schema.Boolean,
   isDefaultClassic: Schema.Boolean,
+  statusCount: Count,
   taskTypes: Schema.Array(TaskTypeSummarySchema),
   statuses: Schema.Array(IssueStatusSummarySchema),
   statusCategories: Schema.Array(StatusCategorySummarySchema),

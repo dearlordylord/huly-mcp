@@ -23,6 +23,7 @@ import { chunter, contact, tracker } from "../src/huly/huly-plugins.js"
 import { buildSocialIdToPersonNameMap, listDirectMessages } from "../src/huly/operations/channels.js"
 import { createIssueFromTemplate } from "../src/huly/operations/issue-templates.js"
 import { projectIdentifier, templateIdentifier } from "./helpers/brands.js"
+import { withDiagnostics } from "./helpers/diagnostics.js"
 
 // Test mock cast helpers: hide the single `as` inside a function so
 // the lint rule `consistent-type-assertions` does not fire on object
@@ -188,7 +189,7 @@ describe("buildAccountUuidToNameMap - employee with undefined personUuid (channe
 
       const testLayer = HulyClient.testLayer({ findAll: findAllImpl })
 
-      const result = yield* listDirectMessages({}).pipe(Effect.provide(testLayer))
+      const result = yield* listDirectMessages({}).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.conversations).toHaveLength(1)
       expect(result.conversations[0].participants).toEqual([])
@@ -251,7 +252,7 @@ describe("buildAccountUuidToNameMap - employee with undefined personUuid (channe
 
       const testLayer = HulyClient.testLayer({ findAll: findAllImpl })
 
-      const result = yield* listDirectMessages({}).pipe(Effect.provide(testLayer))
+      const result = yield* listDirectMessages({}).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.conversations[0].participants).toEqual(["Alice"])
     }))
@@ -392,7 +393,7 @@ describe("createIssueFromTemplate - person not found for template assignee (issu
       const result = yield* createIssueFromTemplate({
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.issueId).toBeDefined()
       expect(capturedAttributes?.assignee).toBeNull()
