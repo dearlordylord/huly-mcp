@@ -7,6 +7,7 @@ import type { UpdateIssueResult } from "../../domain/schemas/issues.js"
 import { UPDATE_ISSUE_FIELDS } from "../../domain/schemas/issues.js"
 import { IssueIdentifier } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
+import type { Diagnostics } from "../diagnostics.js"
 import type {
   HulyConnectionError,
   HulyError,
@@ -54,7 +55,7 @@ type UpdateIssueError =
  */
 export const updateIssue = (
   params: UpdateIssueParams
-): Effect.Effect<UpdateIssueResult, UpdateIssueError, HulyClient> =>
+): Effect.Effect<UpdateIssueResult, UpdateIssueError, HulyClient | Diagnostics> =>
   Effect.gen(function*() {
     yield* requireUpdateFields("update_issue", params, UPDATE_ISSUE_FIELDS)
 

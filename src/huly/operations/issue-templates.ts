@@ -59,6 +59,7 @@ import {
   Timestamp
 } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
+import type { Diagnostics } from "../diagnostics.js"
 import type {
   HulyConnectionError,
   HulyError,
@@ -426,7 +427,7 @@ export const createIssueTemplate = (
  */
 export const createIssueFromTemplate = (
   params: CreateIssueFromTemplateParams
-): Effect.Effect<CreateIssueFromTemplateResult, CreateIssueFromTemplateError, HulyClient> =>
+): Effect.Effect<CreateIssueFromTemplateResult, CreateIssueFromTemplateError, HulyClient | Diagnostics> =>
   Effect.gen(function*() {
     const { client, project, template } = yield* findProjectAndTemplate(params)
     const markupUrlConfig = client.markupUrlConfig

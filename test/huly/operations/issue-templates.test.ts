@@ -40,6 +40,7 @@ import {
   projectIdentifier,
   templateIdentifier
 } from "../../helpers/brands.js"
+import { withDiagnostics } from "../../helpers/diagnostics.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   const result = docs as FindResult<T>
@@ -415,7 +416,10 @@ describe("listIssueTemplates", () => {
 
       const testLayer = createTestLayerWithMocks({ projects: [project], templates })
 
-      const result = yield* listIssueTemplates({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
+      const result = yield* listIssueTemplates({ project: projectIdentifier("TEST") }).pipe(
+        Effect.provide(testLayer),
+        withDiagnostics
+      )
 
       expect(result).toHaveLength(2)
       expect(result[0].title).toBe("Template A")
@@ -427,7 +431,10 @@ describe("listIssueTemplates", () => {
       const project = makeProject({ identifier: "TEST" })
       const testLayer = createTestLayerWithMocks({ projects: [project] })
 
-      const result = yield* listIssueTemplates({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
+      const result = yield* listIssueTemplates({ project: projectIdentifier("TEST") }).pipe(
+        Effect.provide(testLayer),
+        withDiagnostics
+      )
 
       expect(result).toHaveLength(0)
     }))
@@ -449,7 +456,10 @@ describe("listIssueTemplates", () => {
 
       const testLayer = createTestLayerWithMocks({ projects: [project], templates })
 
-      const result = yield* listIssueTemplates({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
+      const result = yield* listIssueTemplates({ project: projectIdentifier("TEST") }).pipe(
+        Effect.provide(testLayer),
+        withDiagnostics
+      )
 
       expect(result[0].priority).toBe("urgent")
       expect(result[1].priority).toBe("high")
@@ -464,7 +474,8 @@ describe("listIssueTemplates", () => {
 
       const result = yield* listIssueTemplates({ project: projectIdentifier("NOPE") }).pipe(
         Effect.flip,
-        Effect.provide(testLayer)
+        Effect.provide(testLayer),
+        withDiagnostics
       )
 
       expect((result as ProjectNotFoundError)._tag).toBe("ProjectNotFoundError")
@@ -490,7 +501,8 @@ describe("getIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report")
       }).pipe(
-        Effect.provide(testLayer)
+        Effect.provide(testLayer),
+        withDiagnostics
       )
 
       expect(result.title).toBe("Bug Report")
@@ -516,7 +528,8 @@ describe("getIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("template-abc")
       }).pipe(
-        Effect.provide(testLayer)
+        Effect.provide(testLayer),
+        withDiagnostics
       )
 
       expect(result.title).toBe("Feature Template")
@@ -541,7 +554,8 @@ describe("getIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template")
       }).pipe(
-        Effect.provide(testLayer)
+        Effect.provide(testLayer),
+        withDiagnostics
       )
 
       expect(result.assignee).toBe("Jane Doe")
@@ -558,7 +572,8 @@ describe("getIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template")
       }).pipe(
-        Effect.provide(testLayer)
+        Effect.provide(testLayer),
+        withDiagnostics
       )
 
       expect(result.assignee).toBeUndefined()
@@ -582,7 +597,8 @@ describe("getIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template")
       }).pipe(
-        Effect.provide(testLayer)
+        Effect.provide(testLayer),
+        withDiagnostics
       )
 
       expect(result.component).toBe("Backend")
@@ -599,7 +615,8 @@ describe("getIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template")
       }).pipe(
-        Effect.provide(testLayer)
+        Effect.provide(testLayer),
+        withDiagnostics
       )
 
       expect(result.component).toBeUndefined()
@@ -616,7 +633,8 @@ describe("getIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template")
       }).pipe(
-        Effect.provide(testLayer)
+        Effect.provide(testLayer),
+        withDiagnostics
       )
 
       expect(result.estimation).toBeUndefined()
@@ -632,7 +650,8 @@ describe("getIssueTemplate", () => {
         template: templateIdentifier("nonexistent")
       }).pipe(
         Effect.flip,
-        Effect.provide(testLayer)
+        Effect.provide(testLayer),
+        withDiagnostics
       )
 
       expect((result as IssueTemplateNotFoundError)._tag).toBe("IssueTemplateNotFoundError")
@@ -647,7 +666,8 @@ describe("getIssueTemplate", () => {
         template: templateIdentifier("anything")
       }).pipe(
         Effect.flip,
-        Effect.provide(testLayer)
+        Effect.provide(testLayer),
+        withDiagnostics
       )
 
       expect((result as ProjectNotFoundError)._tag).toBe("ProjectNotFoundError")
@@ -668,7 +688,7 @@ describe("createIssueTemplate", () => {
       const result = yield* createIssueTemplate({
         project: projectIdentifier("TEST"),
         title: "New Template"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.title).toBe("New Template")
       expect(result.id).toBeDefined()
@@ -708,7 +728,7 @@ describe("createIssueTemplate", () => {
         assignee: email("john@example.com"),
         component: componentIdentifier("Frontend"),
         estimation: positiveNumber(120)
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.title).toBe("Full Template")
       expect(capture.attributes).toMatchObject({
@@ -730,7 +750,7 @@ describe("createIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         title: "Template",
         assignee: email("nobody@example.com")
-      }).pipe(Effect.flip, Effect.provide(testLayer))
+      }).pipe(Effect.flip, Effect.provide(testLayer), withDiagnostics)
 
       expect((result as PersonNotFoundError)._tag).toBe("PersonNotFoundError")
     }))
@@ -744,7 +764,7 @@ describe("createIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         title: "Template",
         component: componentIdentifier("NonexistentComponent")
-      }).pipe(Effect.flip, Effect.provide(testLayer))
+      }).pipe(Effect.flip, Effect.provide(testLayer), withDiagnostics)
 
       expect((result as ComponentNotFoundError)._tag).toBe("ComponentNotFoundError")
     }))
@@ -756,7 +776,7 @@ describe("createIssueTemplate", () => {
       const result = yield* createIssueTemplate({
         project: projectIdentifier("NOPE"),
         title: "Template"
-      }).pipe(Effect.flip, Effect.provide(testLayer))
+      }).pipe(Effect.flip, Effect.provide(testLayer), withDiagnostics)
 
       expect((result as ProjectNotFoundError)._tag).toBe("ProjectNotFoundError")
     }))
@@ -790,7 +810,7 @@ describe("createIssueFromTemplate", () => {
       const result = yield* createIssueFromTemplate({
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.identifier).toBeDefined()
       expect(capture.attributes).toMatchObject({
@@ -811,7 +831,7 @@ describe("createIssueFromTemplate", () => {
         title: "Custom Title",
         description: "Custom description",
         priority: "low"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.identifier).toBeDefined()
       expect(capture.attributes).toMatchObject({
@@ -846,7 +866,7 @@ describe("createIssueFromTemplate", () => {
       const result = yield* createIssueFromTemplate({
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Assigned Template")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.identifier).toBeDefined()
       expect(capture.attributes).toMatchObject({
@@ -878,7 +898,7 @@ describe("createIssueFromTemplate", () => {
       const result = yield* createIssueFromTemplate({
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Assigned Template")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.identifier).toBeDefined()
       expect(capture.attributes).toMatchObject({
@@ -914,7 +934,7 @@ describe("createIssueFromTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Assigned Template"),
         assignee: email("bob@example.com")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.identifier).toBeDefined()
       expect(capture.attributes).toMatchObject({
@@ -942,7 +962,7 @@ describe("createIssueFromTemplate", () => {
       yield* createIssueFromTemplate({
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Component Template")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(captureUpdate.operations).toMatchObject({
         component: "comp-1"
@@ -959,7 +979,7 @@ describe("createIssueFromTemplate", () => {
       const result = yield* createIssueFromTemplate({
         project: projectIdentifier("TEST"),
         template: templateIdentifier("nonexistent")
-      }).pipe(Effect.flip, Effect.provide(testLayer))
+      }).pipe(Effect.flip, Effect.provide(testLayer), withDiagnostics)
 
       expect((result as IssueTemplateNotFoundError)._tag).toBe("IssueTemplateNotFoundError")
     }))
@@ -971,7 +991,7 @@ describe("createIssueFromTemplate", () => {
       const result = yield* createIssueFromTemplate({
         project: projectIdentifier("NOPE"),
         template: templateIdentifier("anything")
-      }).pipe(Effect.flip, Effect.provide(testLayer))
+      }).pipe(Effect.flip, Effect.provide(testLayer), withDiagnostics)
 
       expect((result as ProjectNotFoundError)._tag).toBe("ProjectNotFoundError")
     }))
@@ -994,7 +1014,7 @@ describe("updateIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Old Title"),
         title: "New Title"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.updated).toBe(true)
       expect(captureUpdate.operations).toMatchObject({ title: "New Title" })
@@ -1016,7 +1036,7 @@ describe("updateIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template"),
         description: "Updated description"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.updated).toBe(true)
       expect(captureUpdate.operations).toMatchObject({
@@ -1060,7 +1080,7 @@ describe("updateIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template"),
         priority: "urgent"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.updated).toBe(true)
       expect(captureUpdate.operations).toMatchObject({ priority: IssuePriority.Urgent })
@@ -1086,7 +1106,7 @@ describe("updateIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template"),
         assignee: email("john@example.com")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.updated).toBe(true)
       expect(captureUpdate.operations).toMatchObject({ assignee: "person-1" })
@@ -1108,7 +1128,7 @@ describe("updateIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template"),
         assignee: null
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.updated).toBe(true)
       expect(captureUpdate.operations).toMatchObject({ assignee: null })
@@ -1132,7 +1152,7 @@ describe("updateIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template"),
         component: componentIdentifier("Backend")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.updated).toBe(true)
       expect(captureUpdate.operations).toMatchObject({ component: "component-1" })
@@ -1154,7 +1174,7 @@ describe("updateIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template"),
         component: null
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.updated).toBe(true)
       expect(captureUpdate.operations).toMatchObject({ component: null })
@@ -1176,7 +1196,7 @@ describe("updateIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template"),
         estimation: positiveNumber(90)
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.updated).toBe(true)
       expect(captureUpdate.operations).toMatchObject({ estimation: 90 })
@@ -1216,7 +1236,7 @@ describe("updateIssueTemplate", () => {
         updateIssueTemplate({
           project: projectIdentifier("TEST"),
           template: templateIdentifier("Bug Report Template")
-        }).pipe(Effect.provide(testLayer))
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
       )
 
       expect(error._tag).toBe("NoUpdateFieldsError")
@@ -1236,7 +1256,7 @@ describe("updateIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template"),
         assignee: email("nobody@example.com")
-      }).pipe(Effect.flip, Effect.provide(testLayer))
+      }).pipe(Effect.flip, Effect.provide(testLayer), withDiagnostics)
 
       expect((result as PersonNotFoundError)._tag).toBe("PersonNotFoundError")
     }))
@@ -1255,7 +1275,7 @@ describe("updateIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template"),
         component: componentIdentifier("NonexistentComponent")
-      }).pipe(Effect.flip, Effect.provide(testLayer))
+      }).pipe(Effect.flip, Effect.provide(testLayer), withDiagnostics)
 
       expect((result as ComponentNotFoundError)._tag).toBe("ComponentNotFoundError")
     }))
@@ -1269,7 +1289,7 @@ describe("updateIssueTemplate", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("nonexistent"),
         title: "foo"
-      }).pipe(Effect.flip, Effect.provide(testLayer))
+      }).pipe(Effect.flip, Effect.provide(testLayer), withDiagnostics)
 
       expect((result as IssueTemplateNotFoundError)._tag).toBe("IssueTemplateNotFoundError")
     }))
@@ -1282,7 +1302,7 @@ describe("updateIssueTemplate", () => {
         project: projectIdentifier("NOPE"),
         template: templateIdentifier("anything"),
         title: "foo"
-      }).pipe(Effect.flip, Effect.provide(testLayer))
+      }).pipe(Effect.flip, Effect.provide(testLayer), withDiagnostics)
 
       expect((result as ProjectNotFoundError)._tag).toBe("ProjectNotFoundError")
     }))
@@ -1304,7 +1324,7 @@ describe("deleteIssueTemplate", () => {
       const result = yield* deleteIssueTemplate({
         project: projectIdentifier("TEST"),
         template: templateIdentifier("To Delete")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.deleted).toBe(true)
       expect(result.id).toBe("template-1")
@@ -1329,7 +1349,7 @@ describe("deleteIssueTemplate", () => {
       const result = yield* deleteIssueTemplate({
         project: projectIdentifier("TEST"),
         template: templateIdentifier("template-xyz")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.deleted).toBe(true)
       expect(result.id).toBe("template-xyz")
@@ -1345,7 +1365,7 @@ describe("deleteIssueTemplate", () => {
       const result = yield* deleteIssueTemplate({
         project: projectIdentifier("TEST"),
         template: templateIdentifier("nonexistent")
-      }).pipe(Effect.flip, Effect.provide(testLayer))
+      }).pipe(Effect.flip, Effect.provide(testLayer), withDiagnostics)
 
       expect((result as IssueTemplateNotFoundError)._tag).toBe("IssueTemplateNotFoundError")
     }))
@@ -1357,7 +1377,7 @@ describe("deleteIssueTemplate", () => {
       const result = yield* deleteIssueTemplate({
         project: projectIdentifier("NOPE"),
         template: templateIdentifier("anything")
-      }).pipe(Effect.flip, Effect.provide(testLayer))
+      }).pipe(Effect.flip, Effect.provide(testLayer), withDiagnostics)
 
       expect((result as ProjectNotFoundError)._tag).toBe("ProjectNotFoundError")
     }))
@@ -1387,7 +1407,10 @@ describe("listIssueTemplates with children", () => {
 
       const testLayer = createTestLayerWithMocks({ projects: [project], templates })
 
-      const result = yield* listIssueTemplates({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
+      const result = yield* listIssueTemplates({ project: projectIdentifier("TEST") }).pipe(
+        Effect.provide(testLayer),
+        withDiagnostics
+      )
 
       expect(result).toHaveLength(2)
       expect(result[0].childrenCount).toBe(2)
@@ -1431,7 +1454,7 @@ describe("getIssueTemplate with children", () => {
       const result = yield* getIssueTemplate({
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.children).toHaveLength(2)
       const child1 = result.children![0]
@@ -1460,7 +1483,7 @@ describe("getIssueTemplate with children", () => {
       const result = yield* getIssueTemplate({
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.children).toBeUndefined()
     }))
@@ -1484,7 +1507,7 @@ describe("createIssueTemplate with children", () => {
           { title: "Child A", priority: "high" },
           { title: "Child B", description: "desc B" }
         ]
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.title).toBe("Template With Kids")
       const attrs = capture.attributes as Record<string, unknown>
@@ -1509,7 +1532,7 @@ describe("createIssueTemplate with children", () => {
       yield* createIssueTemplate({
         project: projectIdentifier("TEST"),
         title: "No Kids Template"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       const attrs = capture.attributes as Record<string, unknown>
       expect(attrs.children).toEqual([])
@@ -1533,7 +1556,7 @@ describe("addTemplateChild", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template"),
         title: "New Child"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.added).toBe(true)
       expect(result.title).toBe("New Child")
@@ -1563,7 +1586,7 @@ describe("addTemplateChild", () => {
         template: templateIdentifier("Bug Report Template"),
         title: "New Child",
         priority: "urgent"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       const ops = captureUpdate.operations as Record<string, unknown>
       const children = ops.children as Array<Record<string, unknown>>
@@ -1597,7 +1620,7 @@ describe("addTemplateChild", () => {
         title: "With Refs",
         assignee: email("john@example.com"),
         component: componentIdentifier("Frontend")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       const ops = captureUpdate.operations as Record<string, unknown>
       const children = ops.children as Array<Record<string, unknown>>
@@ -1620,7 +1643,7 @@ describe("addTemplateChild", () => {
         template: templateIdentifier("Bug Report Template"),
         title: "Bad Child",
         assignee: email("nobody@example.com")
-      }).pipe(Effect.flip, Effect.provide(testLayer))
+      }).pipe(Effect.flip, Effect.provide(testLayer), withDiagnostics)
 
       expect((result as PersonNotFoundError)._tag).toBe("PersonNotFoundError")
     }))
@@ -1645,7 +1668,7 @@ describe("removeTemplateChild", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template"),
         childId: issueTemplateChildId("child-1")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.removed).toBe(true)
       expect(result.id).toBe("child-1")
@@ -1671,7 +1694,7 @@ describe("removeTemplateChild", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Bug Report Template"),
         childId: issueTemplateChildId("nonexistent")
-      }).pipe(Effect.flip, Effect.provide(testLayer))
+      }).pipe(Effect.flip, Effect.provide(testLayer), withDiagnostics)
 
       expect((result as TemplateChildNotFoundError)._tag).toBe("TemplateChildNotFoundError")
     }))
@@ -1710,7 +1733,7 @@ describe("createIssueFromTemplate with children", () => {
       const result = yield* createIssueFromTemplate({
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Parent Template")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.identifier).toBeDefined()
       // Parent + 2 children all created via addCollection (children as top-level first)
@@ -1759,7 +1782,7 @@ describe("createIssueFromTemplate with children", () => {
         project: projectIdentifier("TEST"),
         template: templateIdentifier("Parent Template"),
         includeChildren: false
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.identifier).toBeDefined()
       // Only parent issue should be created
@@ -1787,7 +1810,7 @@ describe("createIssueFromTemplate with children", () => {
       const result = yield* createIssueFromTemplate({
         project: projectIdentifier("TEST"),
         template: templateIdentifier("No Children Template")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.identifier).toBeDefined()
       // Only parent issue

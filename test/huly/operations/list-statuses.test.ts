@@ -9,6 +9,7 @@ import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.
 import { core, task, tracker } from "../../../src/huly/huly-plugins.js"
 import { listStatuses } from "../../../src/huly/operations/projects.js"
 import { projectIdentifier } from "../../helpers/brands.js"
+import { withDiagnostics } from "../../helpers/diagnostics.js"
 
 const asProject = (v: unknown) => v as HulyProject
 const asProjectType = (v: unknown) => v as ProjectType
@@ -94,7 +95,10 @@ describe("listStatuses", () => {
         projectType
       })
 
-      const result = yield* listStatuses({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
+      const result = yield* listStatuses({ project: projectIdentifier("TEST") }).pipe(
+        Effect.provide(testLayer),
+        withDiagnostics
+      )
 
       expect(result.total).toBe(3)
       expect(result.statuses).toHaveLength(3)
@@ -123,7 +127,10 @@ describe("listStatuses", () => {
         projectType
       })
 
-      const result = yield* listStatuses({ project: projectIdentifier("EMPTY") }).pipe(Effect.provide(testLayer))
+      const result = yield* listStatuses({ project: projectIdentifier("EMPTY") }).pipe(
+        Effect.provide(testLayer),
+        withDiagnostics
+      )
 
       expect(result.total).toBe(0)
       expect(result.statuses).toHaveLength(0)
@@ -135,6 +142,7 @@ describe("listStatuses", () => {
 
       const result = yield* listStatuses({ project: projectIdentifier("NOPE") }).pipe(
         Effect.provide(testLayer),
+        withDiagnostics,
         Effect.flip
       )
 

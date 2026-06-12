@@ -4,6 +4,7 @@ import { Effect, Either, Exit, Schema } from "effect"
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js"
 
 import { HulyClient } from "../../huly/client.js"
+import { Diagnostics, makeDiagnosticsScope } from "../../huly/diagnostics.js"
 import { type HulyDomainError, HulyError } from "../../huly/errors.js"
 import { HulyStorageClient } from "../../huly/storage.js"
 import { WorkspaceClient, type WorkspaceClientOperations } from "../../huly/workspace-client.js"
@@ -175,7 +176,9 @@ interface HandlerArgs {
 
 type ProvideServices<R> = (
   args: HandlerArgs
-) => <A, E>(effect: Effect.Effect<A, E, R>) => Either.Either<Effect.Effect<A, E>, McpToolResponse>
+) => <A, E, Remainder>(
+  effect: Effect.Effect<A, E, R | Remainder>
+) => Either.Either<Effect.Effect<A, E, Remainder>, McpToolResponse>
 
 const provideHulyClient: ProvideServices<HulyClient> = (args) => (effect) =>
   Either.right(effect.pipe(Effect.provideService(HulyClient, args.hulyClient)))
@@ -200,7 +203,7 @@ const createHandler = <P, Svc, R>(
   toolName: string,
   provide: ProvideServices<Svc>,
   parse: (input: unknown) => Effect.Effect<P, ParseResult.ParseError>,
-  operation: (params: P) => Effect.Effect<R, HulyDomainError, Svc>,
+  operation: (params: P) => Effect.Effect<R, HulyDomainError, Svc | Diagnostics>,
   encode?: (result: R) => unknown
 ): RegisteredTool["handler"] =>
 async (args, hulyClient, storageClient, workspaceClient) => {
@@ -210,16 +213,24 @@ async (args, hulyClient, storageClient, workspaceClient) => {
     return mapParseCauseToMcp(parseResult.cause, toolName)
   }
 
-  const provided = provide({ hulyClient, storageClient, workspaceClient })(operation(parseResult.value))
+  const diagnosticsScope = await Effect.runPromise(makeDiagnosticsScope)
+  const provided = provide({
+    hulyClient,
+    storageClient,
+    workspaceClient
+  })(operation(parseResult.value))
 
   if (Either.isLeft(provided)) {
     return provided.left
   }
 
-  const operationResult = await Effect.runPromiseExit(provided.right)
+  const operationResult = await Effect.runPromiseExit(
+    provided.right.pipe(Effect.provideService(Diagnostics, diagnosticsScope.service))
+  )
+  const warnings = await Effect.runPromise(diagnosticsScope.drainWarnings)
 
   if (Exit.isFailure(operationResult)) {
-    return mapDomainCauseToMcp(operationResult.cause)
+    return mapDomainCauseToMcp(operationResult.cause, warnings)
   }
 
   try {
@@ -227,22 +238,22 @@ async (args, hulyClient, storageClient, workspaceClient) => {
       ? encode(operationResult.value)
       : operationResult.value
 
-    return createSuccessResponse(output)
+    return createSuccessResponse(output, warnings)
   } catch {
-    return mapDomainErrorToMcp(new HulyError({ message: `Tool ${toolName} produced invalid output` }))
+    return mapDomainErrorToMcp(new HulyError({ message: `Tool ${toolName} produced invalid output` }), warnings)
   }
 }
 
 export const createToolHandler = <P, R>(
   toolName: string,
   parse: (input: unknown) => Effect.Effect<P, ParseResult.ParseError>,
-  operation: (params: P) => Effect.Effect<R, HulyDomainError, HulyClient>
+  operation: (params: P) => Effect.Effect<R, HulyDomainError, HulyClient | Diagnostics>
 ): RegisteredTool["handler"] => createHandler(toolName, provideHulyClient, parse, operation)
 
 export const createEncodedToolHandler = <P, R>(
   toolName: string,
   parse: (input: unknown) => Effect.Effect<P, ParseResult.ParseError>,
-  operation: (params: P) => Effect.Effect<R, HulyDomainError, HulyClient>,
+  operation: (params: P) => Effect.Effect<R, HulyDomainError, HulyClient | Diagnostics>,
   outputSchema: Schema.Schema.AnyNoContext
 ): RegisteredTool["handler"] =>
   createHandler(
@@ -256,19 +267,19 @@ export const createEncodedToolHandler = <P, R>(
 export const createStorageToolHandler = <P, R>(
   toolName: string,
   parse: (input: unknown) => Effect.Effect<P, ParseResult.ParseError>,
-  operation: (params: P) => Effect.Effect<R, HulyDomainError, HulyStorageClient>
+  operation: (params: P) => Effect.Effect<R, HulyDomainError, HulyStorageClient | Diagnostics>
 ): RegisteredTool["handler"] => createHandler(toolName, provideStorageClient, parse, operation)
 
 export const createCombinedToolHandler = <P, R>(
   toolName: string,
   parse: (input: unknown) => Effect.Effect<P, ParseResult.ParseError>,
-  operation: (params: P) => Effect.Effect<R, HulyDomainError, HulyClient | HulyStorageClient>
+  operation: (params: P) => Effect.Effect<R, HulyDomainError, HulyClient | HulyStorageClient | Diagnostics>
 ): RegisteredTool["handler"] => createHandler(toolName, provideCombinedClient, parse, operation)
 
 export const createEncodedCombinedToolHandler = <P, R>(
   toolName: string,
   parse: (input: unknown) => Effect.Effect<P, ParseResult.ParseError>,
-  operation: (params: P) => Effect.Effect<R, HulyDomainError, HulyClient | HulyStorageClient>,
+  operation: (params: P) => Effect.Effect<R, HulyDomainError, HulyClient | HulyStorageClient | Diagnostics>,
   outputSchema: Schema.Schema.AnyNoContext
 ): RegisteredTool["handler"] =>
   createHandler(
@@ -282,13 +293,13 @@ export const createEncodedCombinedToolHandler = <P, R>(
 export const createWorkspaceToolHandler = <P, R>(
   toolName: string,
   parse: (input: unknown) => Effect.Effect<P, ParseResult.ParseError>,
-  operation: (params: P) => Effect.Effect<R, HulyDomainError, WorkspaceClient>
+  operation: (params: P) => Effect.Effect<R, HulyDomainError, WorkspaceClient | Diagnostics>
 ): RegisteredTool["handler"] => createHandler(toolName, provideWorkspaceClient, parse, operation)
 
 export const createEncodedWorkspaceToolHandler = <P, R>(
   toolName: string,
   parse: (input: unknown) => Effect.Effect<P, ParseResult.ParseError>,
-  operation: (params: P) => Effect.Effect<R, HulyDomainError, WorkspaceClient>,
+  operation: (params: P) => Effect.Effect<R, HulyDomainError, WorkspaceClient | Diagnostics>,
   outputSchema: Schema.Schema.AnyNoContext
 ): RegisteredTool["handler"] =>
   createHandler(
@@ -300,12 +311,12 @@ export const createEncodedWorkspaceToolHandler = <P, R>(
   )
 
 export const createNoParamsWorkspaceToolHandler = <R>(
-  operation: () => Effect.Effect<R, HulyDomainError, WorkspaceClient>
+  operation: () => Effect.Effect<R, HulyDomainError, WorkspaceClient | Diagnostics>
 ): RegisteredTool["handler"] => createHandler("", provideWorkspaceClient, () => Effect.succeed(undefined), operation)
 
 export const createEncodedNoParamsWorkspaceToolHandler = <R>(
   toolName: string,
-  operation: () => Effect.Effect<R, HulyDomainError, WorkspaceClient>,
+  operation: () => Effect.Effect<R, HulyDomainError, WorkspaceClient | Diagnostics>,
   outputSchema: Schema.Schema.AnyNoContext
 ): RegisteredTool["handler"] =>
   createHandler(

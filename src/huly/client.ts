@@ -209,6 +209,17 @@ export interface HulyClientOperations extends HulyClientContext {
     options?: FindOptions<T>
   ) => Effect.Effect<WithLookup<T> | undefined, HulyClientError>
 
+  /**
+   * Query documents from the client-side model instead of the server.
+   * Model-space documents are loaded at connection time, so this can still
+   * resolve metadata when a server-side model document query fails.
+   */
+  readonly findAllInModel: <T extends Doc>(
+    _class: Ref<Class<T>>,
+    query: DocumentQuery<T>,
+    options?: FindOptions<T>
+  ) => Effect.Effect<FindResult<T>, HulyClientError>
+
   readonly createDoc: <T extends Doc>(
     _class: Ref<Class<T>>,
     space: Ref<Space>,
@@ -369,6 +380,16 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
           withClient(
             (client) => client.findOne(_class, query, options),
             "findOne failed"
+          ),
+
+        findAllInModel: <T extends Doc>(
+          _class: Ref<Class<T>>,
+          query: DocumentQuery<T>,
+          options?: FindOptions<T>
+        ) =>
+          withClient(
+            (client) => Promise.resolve(client.getModel().findAllSync(_class, query, options)),
+            "findAllInModel failed"
           ),
 
         createDoc: <T extends Doc>(
@@ -539,6 +560,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       markupUrlConfig: testMarkupUrlConfig,
       workbenchUrlConfig: testWorkbenchUrlConfig,
       findAll: noopFindAll,
+      findAllInModel: noopFindAll,
       findOne: noopFindOne,
       createDoc: notImplemented("createDoc"),
       updateDoc: notImplemented("updateDoc"),

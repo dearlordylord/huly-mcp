@@ -610,6 +610,27 @@ describe("Error Mapping to MCP", () => {
         expect(response.content[0].text).not.toContain("\n")
         expect(response.content[0].text).toBe(JSON.stringify(result))
       }))
+
+    it.effect("omits warnings fields and content blocks when there are no warnings", () =>
+      Effect.gen(function*() {
+        const response = createSuccessResponse({ ok: true })
+
+        expect(response.content).toHaveLength(1)
+        expect(response.structuredContent).toEqual({ result: { ok: true } })
+      }))
+
+    it.effect("includes warnings in structuredContent and a second text block when present", () =>
+      Effect.gen(function*() {
+        const warning = {
+          code: "status_metadata_unresolved" as const,
+          message: "Status metadata was degraded."
+        }
+        const response = createSuccessResponse({ ok: true }, [warning])
+
+        expect(response.structuredContent).toEqual({ result: { ok: true }, warnings: [warning] })
+        expect(response.content).toHaveLength(2)
+        expect(JSON.parse(response.content[1].text)).toEqual({ warnings: [warning] })
+      }))
   })
 
   describe("createUnknownToolError", () => {
@@ -622,6 +643,31 @@ describe("Error Mapping to MCP", () => {
         expect(response._meta.errorTag).toBe("UnknownTool")
         expect(response.content[0].text).toBe("Unknown tool: bogus_tool")
       }))
+
+    it.effect("does not include structuredContent on error responses without warnings", () =>
+      Effect.gen(function*() {
+        const response = createUnknownToolError("bogus_tool")
+
+        expect(response.isError).toBe(true)
+        expect(response.structuredContent).toBeUndefined()
+        expect(response.content).toHaveLength(1)
+      }))
+  })
+
+  describe("error responses with warnings", () => {
+    it.effect("keeps warnings in text content without structuredContent", () =>
+      Effect.gen(function*() {
+        const warning = {
+          code: "status_metadata_unresolved" as const,
+          message: "Status metadata was degraded."
+        }
+        const response = mapDomainErrorToMcp(new HulyError({ message: "failed after warning" }), [warning])
+
+        expect(response.isError).toBe(true)
+        expect(response.structuredContent).toBeUndefined()
+        expect(response.content[0].text).toBe("failed after warning")
+        expect(JSON.parse(response.content[1].text)).toEqual({ warnings: [warning] })
+      }))
   })
 
   describe("toMcpResponse", () => {
@@ -633,6 +679,27 @@ describe("Error Mapping to MCP", () => {
         expect(wire).not.toHaveProperty("_meta")
         expect(wire.isError).toBe(true)
         expect(wire.content[0].text).toBe("Unknown tool: bogus_tool")
+      }))
+
+    it.effect("strips _meta from content-only success response", () =>
+      Effect.gen(function*() {
+        const wire = toMcpResponse({
+          content: [{ type: "text", text: "ok" }],
+          _meta: { errorCode: McpErrorCode.InternalError }
+        })
+
+        expect(wire).toEqual({ content: [{ type: "text", text: "ok" }] })
+      }))
+
+    it.effect("preserves explicit non-error marker while stripping _meta", () =>
+      Effect.gen(function*() {
+        const wire = toMcpResponse({
+          content: [{ type: "text", text: "ok" }],
+          isError: false,
+          _meta: { errorCode: McpErrorCode.InternalError }
+        })
+
+        expect(wire).toEqual({ content: [{ type: "text", text: "ok" }], isError: false })
       }))
 
     it.effect("strips _meta from success response", () =>

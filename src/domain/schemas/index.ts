@@ -60,6 +60,14 @@ export {
 } from "./shared.js"
 
 export {
+  StatusMetadataUnresolvedWarningCode,
+  type ToolWarning,
+  type ToolWarningCode,
+  ToolWarningCodeSchema,
+  ToolWarningSchema
+} from "./tool-warnings.js"
+
+export {
   MonthDayOrdinal,
   MonthIndex,
   RecurrenceCount,
@@ -381,7 +389,8 @@ export {
   type TaskTypeRef,
   TaskTypeRefSchema,
   type TaskTypeSummary,
-  TaskTypeSummarySchema
+  TaskTypeSummarySchema,
+  UnknownStatusCategoryValue
 } from "./task-management.js"
 
 export {

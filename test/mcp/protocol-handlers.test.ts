@@ -9,6 +9,10 @@
  *
  * @module
  */
+import type { Class, Doc, FindResult, PersonId, Ref, Space, Status, WithLookup } from "@hcengineering/core"
+import { toFindResult } from "@hcengineering/core"
+import type { ProjectType } from "@hcengineering/task"
+import { type Project as HulyProject, TimeReportDayType } from "@hcengineering/tracker"
 import { McpError } from "@modelcontextprotocol/sdk/types.js"
 import { Context, Effect, Layer, Schema } from "effect"
 import { describe, expect, it } from "vitest"
@@ -16,7 +20,9 @@ import { describe, expect, it } from "vitest"
 import { sanitizeHulyRuntimeConfigFromEnv } from "../../src/config/config.js"
 import { type GetHulyContextResult, GetHulyContextResultSchema } from "../../src/domain/schemas/index.js"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
+import { Diagnostics } from "../../src/huly/diagnostics.js"
 import { HulyConnectionError } from "../../src/huly/errors.js"
+import { task, tracker } from "../../src/huly/huly-plugins.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import {
   buildHulyContext,
@@ -33,7 +39,7 @@ import {
   type NowClock
 } from "../../src/mcp/protocol-handlers.js"
 import { createFilteredRegistry, type ToolRegistry, toolRegistry } from "../../src/mcp/tools/index.js"
-import { isNoArgumentTool, requiresArgumentsObject } from "../../src/mcp/tools/registry.js"
+import { createToolHandler, isNoArgumentTool, requiresArgumentsObject } from "../../src/mcp/tools/registry.js"
 import { createNoopTelemetry } from "../../src/telemetry/noop.js"
 import type { TelemetryOperations, ToolCalledProps } from "../../src/telemetry/telemetry.js"
 import { VERSION } from "../../src/version.js"
@@ -188,6 +194,70 @@ const buildStubClients = (hulyOps: Partial<HulyClientOperations> = {}): () => Pr
     })
   )
 
+const emptyFindResult = <T extends Doc>(): FindResult<T> => toFindResult([] satisfies Array<T>)
+
+type ProjectWithTypeLookup = WithLookup<HulyProject> & { readonly $lookup: { readonly type: ProjectType } }
+
+// Huly SDK document interfaces include generated/branded fields and plugin metadata
+// that do not have public test constructors. These helpers build the minimal
+// SDK-shaped documents read by getProject; brands are erased at runtime.
+const projectTypeFixture = (statusId: Ref<Status>): ProjectType =>
+  // eslint-disable-next-line no-restricted-syntax -- SDK ProjectType has generated plugin fields and branded refs with no public fixture constructor.
+  ({
+    _id: "project-type-1" as Ref<ProjectType>,
+    _class: task.class.ProjectType,
+    space: "space-1" as Ref<Space>,
+    name: "Classic",
+    descriptor: tracker.descriptors.ProjectType,
+    statuses: [{ _id: statusId }],
+    tasks: [],
+    modifiedBy: "user-1" as PersonId,
+    modifiedOn: 0,
+    createdBy: "user-1" as PersonId,
+    createdOn: 0
+  } as unknown) as ProjectType
+
+const projectWithTypeLookupFixture = (statusId: Ref<Status>, projectType: ProjectType): ProjectWithTypeLookup =>
+  // eslint-disable-next-line no-restricted-syntax -- SDK Project plus lookup metadata has branded refs and generated fields with no public fixture constructor.
+  ({
+    _id: "project-1" as Ref<HulyProject>,
+    _class: tracker.class.Project,
+    space: "space-1" as Ref<Space>,
+    identifier: "TEST",
+    name: "Test Project",
+    description: "Project used by resource warning tests",
+    private: false,
+    members: [],
+    owners: [],
+    archived: false,
+    sequence: 1,
+    defaultIssueStatus: statusId,
+    defaultTimeReportDay: TimeReportDayType.CurrentWorkDay,
+    modifiedBy: "user-1" as PersonId,
+    modifiedOn: 0,
+    createdBy: "user-1" as PersonId,
+    createdOn: 0,
+    $lookup: { type: projectType }
+  } as unknown) as ProjectWithTypeLookup
+
+const buildResourceWarningClients = (): () => Promise<ClientBundle> => {
+  const statusId = "plainstatus" as Ref<Status>
+  const projectType = projectTypeFixture(statusId)
+  const project = projectWithTypeLookupFixture(statusId, projectType)
+
+  // HulyClientOperations.findOne is generic by requested SDK class. This fixture
+  // returns a project only when the class ref is tracker.class.Project and returns
+  // undefined for every other class, so the generic contract is preserved.
+  const findOne =
+    ((_class: Ref<Class<Doc>>) =>
+      Effect.succeed(_class === tracker.class.Project ? project : undefined)) as HulyClientOperations["findOne"]
+
+  const findAll: HulyClientOperations["findAll"] = () => Effect.succeed(emptyFindResult())
+  const findAllInModel: HulyClientOperations["findAllInModel"] = () => Effect.succeed(emptyFindResult())
+
+  return buildStubClients({ findOne, findAll, findAllInModel })
+}
+
 const rejectingResolveClients = (): Promise<ClientBundle> => Promise.reject(new Error("client init boom"))
 const rejectingResolveClientsWithString = (): Promise<ClientBundle> => Promise.reject("client init boom")
 
@@ -215,6 +285,43 @@ const propertylessObjectRegistry: ToolRegistry = {
     }
   ],
   handleToolCall: async () => null
+}
+
+const DiagnosticProbeParams = Schema.Struct({ subject: Schema.String })
+type DiagnosticProbeParams = typeof DiagnosticProbeParams.Type
+
+const diagnosticProbeTool = {
+  name: "diagnostic_probe",
+  description: "Test-only tool that emits an agent-visible diagnostic warning.",
+  inputSchema: {
+    type: "object",
+    properties: { subject: { type: "string" } },
+    required: ["subject"],
+    additionalProperties: false
+  },
+  category: "test",
+  handler: createToolHandler(
+    "diagnostic_probe",
+    Schema.decodeUnknown(DiagnosticProbeParams),
+    (params: DiagnosticProbeParams) =>
+      Effect.gen(function*() {
+        const diagnostics = yield* Diagnostics
+        yield* diagnostics.warnAgent({
+          code: "status_metadata_unresolved",
+          message: `Status metadata was degraded for ${params.subject}.`
+        })
+        return { subject: params.subject, degraded: true }
+      })
+  )
+}
+
+const diagnosticProbeRegistry: ToolRegistry = {
+  tools: new Map([[diagnosticProbeTool.name, diagnosticProbeTool]]),
+  definitions: [diagnosticProbeTool],
+  handleToolCall: async (toolName, args, hulyClient, storageClient, workspaceClient) => {
+    if (toolName !== diagnosticProbeTool.name) return null
+    return diagnosticProbeTool.handler(args ?? {}, hulyClient, storageClient, workspaceClient)
+  }
 }
 
 // Narrow the MCP content union to the text variant (no cast).
@@ -383,6 +490,36 @@ describe("createMcpProtocolHandlers — tool dispatch", () => {
     expect(probe.toolCalled[0]).toMatchObject({ toolName: "list_projects", status: "success" })
   })
 
+  it("carries diagnostics warnings through the MCP callTool response", async () => {
+    const probe = createTelemetryProbe()
+    const handlers = createMcpProtocolHandlers(
+      buildStubClients(),
+      probe.telemetry,
+      diagnosticProbeRegistry,
+      unusedGetHulyContext
+    )
+
+    const response = await handlers.callTool({
+      params: { name: "diagnostic_probe", arguments: { subject: "workflow status refs" } }
+    })
+
+    const warning = {
+      code: "status_metadata_unresolved",
+      message: "Status metadata was degraded for workflow status refs."
+    }
+
+    expect(response.isError).not.toBe(true)
+    expect(response.structuredContent).toEqual({
+      result: { subject: "workflow status refs", degraded: true },
+      warnings: [warning]
+    })
+    expect(response.content).toHaveLength(2)
+    expect(JSON.parse(firstText([response.content[1]]))).toEqual({ warnings: [warning] })
+    expect(probe.toolCalled[0]).toMatchObject({ toolName: "diagnostic_probe", status: "success" })
+    expect(JSON.stringify(probe.toolCalled[0])).not.toContain(warning.message)
+    expect(probe.toolCalled[0]).not.toHaveProperty("warnings")
+  })
+
   it("maps a client-resolution failure to an error", async () => {
     const probe = createTelemetryProbe()
     const handlers = createMcpProtocolHandlers(
@@ -486,6 +623,33 @@ describe("createMcpProtocolHandlers — resource handlers", () => {
     )
     const result = await handlers.listResources()
     expect(Array.isArray(result.resources)).toBe(true)
+  })
+
+  it("attaches Diagnostics warnings to resource read metadata", async () => {
+    const handlers = createMcpProtocolHandlers(
+      buildResourceWarningClients(),
+      createTelemetryProbe().telemetry,
+      emptyRegistry,
+      unusedGetHulyContext
+    )
+
+    const result = await handlers.readResource({ params: { uri: "huly://projects/TEST" } })
+
+    expect(result._meta).toEqual({
+      warnings: [
+        expect.objectContaining({
+          code: "status_metadata_unresolved"
+        })
+      ]
+    })
+    const content = result.contents[0]
+    if (!("text" in content)) throw new Error("expected text resource content")
+    expect(JSON.parse(content.text)).toMatchObject({
+      project: {
+        identifier: "TEST",
+        statuses: ["plainstatus"]
+      }
+    })
   })
 
   it("throws an McpError when client resolution fails while listing resources", async () => {

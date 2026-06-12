@@ -7,6 +7,7 @@ import { expect } from "vitest"
 
 import { ProjectTypeRefSchema, TaskTypeRefSchema } from "../../../src/domain/schemas.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import { Diagnostics, makeDiagnosticsScope } from "../../../src/huly/diagnostics.js"
 import { HulyConnectionError } from "../../../src/huly/errors.js"
 import { core, task, tracker } from "../../../src/huly/huly-plugins.js"
 import {
@@ -16,6 +17,7 @@ import {
   listProjectTypes,
   listTaskTypes
 } from "../../../src/huly/operations/task-management.js"
+import { withDiagnostics } from "../../helpers/diagnostics.js"
 
 const personId = "person-1" as PersonId
 const projectTypeId = tracker.ids.ClassingProjectType
@@ -100,6 +102,8 @@ const createLayer = (config?: {
   readonly projectTypes?: ReadonlyArray<ProjectType>
   readonly taskTypes?: ReadonlyArray<TaskType>
   readonly statuses?: ReadonlyArray<Status>
+  readonly failStatusLookup?: boolean
+  readonly modelStatuses?: ReadonlyArray<Status>
   readonly captures?: Captures
   readonly failRecoverableStatusLookup?: boolean
 }) => {
@@ -112,6 +116,7 @@ const createLayer = (config?: {
     makeStatus(),
     makeStatus({ _id: doneStatusId, name: "Done", category: task.statusCategory.Won })
   ]
+  const modelStatuses = config?.modelStatuses ?? []
 
   const findAllImpl = (<T extends Doc>(_class: Ref<Doc>, query: unknown) => {
     const q = query as { _id?: { $in?: ReadonlyArray<unknown> }; ofAttribute?: unknown }
@@ -126,12 +131,30 @@ const createLayer = (config?: {
 
     if (_class === task.class.ProjectType) return findResult(projectTypes)
     if (_class === task.class.TaskType) return findResult(filterByIds(taskTypes))
+    if (_class === core.class.Status && q._id?.$in !== undefined && config?.failStatusLookup === true) {
+      return Effect.fail(new HulyConnectionError({ message: "findAll failed: null status index" }))
+    }
     if (_class === core.class.Status && q.ofAttribute !== undefined && config?.failRecoverableStatusLookup === true) {
       return Effect.fail(new HulyConnectionError({ message: "findAll failed: null status index" }))
     }
     if (_class === core.class.Status || _class === tracker.class.IssueStatus) return findResult(filterByIds(statuses))
     return findResult([])
   }) satisfies HulyClientOperations["findAll"]
+
+  const findAllInModelImpl = (<T extends Doc>(_class: Ref<Doc>, query: unknown) => {
+    const q = query as { _id?: { $in?: ReadonlyArray<unknown> } }
+    const filterByIds = <D extends { readonly _id: unknown }>(items: ReadonlyArray<D>): ReadonlyArray<D> =>
+      q._id?.$in === undefined ? items : items.filter((item) => q._id?.$in?.includes(item._id) ?? false)
+    const findResult = <D extends Doc>(items: ReadonlyArray<D>) =>
+      // HulyClient.findAllInModel is generic by requested class; this fixture mirrors findAll above.
+      // eslint-disable-next-line no-restricted-syntax -- see above
+      Effect.succeed(toFindResult([...items])) as unknown as Effect.Effect<FindResult<T>>
+
+    if (_class === core.class.Status) {
+      return findResult(filterByIds(modelStatuses))
+    }
+    return findResult([])
+  }) satisfies HulyClientOperations["findAllInModel"]
 
   const createDocImpl: HulyClientOperations["createDoc"] =
     ((_class: unknown, _space: unknown, attributes: unknown, id: unknown) => {
@@ -157,6 +180,7 @@ const createLayer = (config?: {
 
   return HulyClient.testLayer({
     findAll: findAllImpl,
+    findAllInModel: findAllInModelImpl,
     createDoc: createDocImpl,
     updateDoc: updateDocImpl,
     createMixin: createMixinImpl
@@ -166,7 +190,7 @@ const createLayer = (config?: {
 describe("task management operations", () => {
   it.effect("lists project types with concise workflow counts", () =>
     Effect.gen(function*() {
-      const result = yield* listProjectTypes({}).pipe(Effect.provide(createLayer()))
+      const result = yield* listProjectTypes({}).pipe(Effect.provide(createLayer()), withDiagnostics)
 
       expect(result).toEqual({
         projectTypes: [{
@@ -184,7 +208,8 @@ describe("task management operations", () => {
   it.effect("gets project type details with Huly status category keys", () =>
     Effect.gen(function*() {
       const result = yield* getProjectType({ projectType: ProjectTypeRefSchema.make("classic") }).pipe(
-        Effect.provide(createLayer())
+        Effect.provide(createLayer()),
+        withDiagnostics
       )
 
       expect(result.statuses.map((status) => [status.name, status.category])).toEqual([
@@ -197,10 +222,71 @@ describe("task management operations", () => {
       ])
     }))
 
+  it.effect("resolves project type status details from the local model when status lookup fails", () =>
+    Effect.gen(function*() {
+      const diagnostics = yield* makeDiagnosticsScope
+      const result = yield* getProjectType({ projectType: ProjectTypeRefSchema.make("classic") }).pipe(
+        Effect.provide(createLayer({
+          failStatusLookup: true,
+          modelStatuses: [
+            makeStatus({ _id: openStatusId, name: "Todo", category: task.statusCategory.ToDo }),
+            makeStatus({ _id: doneStatusId, name: "Done", category: task.statusCategory.Won })
+          ]
+        })),
+        Effect.provideService(Diagnostics, diagnostics.service)
+      )
+      const warnings = yield* diagnostics.drainWarnings
+
+      expect(result.statuses.map((status) => [status.name, status.category])).toEqual([
+        ["Todo", "ToDo"],
+        ["Done", "Won"]
+      ])
+      expect(warnings).toEqual([])
+    }))
+
+  it.effect("synthesizes unresolved project type statuses without dangling task type status ids", () =>
+    Effect.gen(function*() {
+      const unresolvedStatusId = statusRef("plainstatus")
+      const projectType = makeProjectType({
+        statuses: [
+          { _id: openStatusId, taskType: taskTypeId },
+          { _id: unresolvedStatusId, taskType: taskTypeId }
+        ]
+      })
+      const taskType = makeTaskType({ statuses: [openStatusId, unresolvedStatusId] })
+      const diagnostics = yield* makeDiagnosticsScope
+
+      const result = yield* getProjectType({ projectType: ProjectTypeRefSchema.make("classic") }).pipe(
+        Effect.provide(
+          createLayer({
+            failStatusLookup: true,
+            projectTypes: [projectType],
+            statuses: [],
+            taskTypes: [taskType]
+          })
+        ),
+        Effect.provideService(Diagnostics, diagnostics.service)
+      )
+      const warnings = yield* diagnostics.drainWarnings
+      const statusIds = result.statuses.map((status) => status.id)
+
+      expect(result.statusCount).toBe(2)
+      expect(result.statuses.map((status) => [status.id, status.name, status.category])).toEqual([
+        [openStatusId, "Todo", "unknown"],
+        [unresolvedStatusId, "plainstatus", "unknown"]
+      ])
+      expect(result.taskTypeStatuses[0].statusIds.every((statusId) => statusIds.includes(statusId))).toBe(true)
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0].code).toBe("status_metadata_unresolved")
+    }))
+
   it.effect("returns an existing task type by normalized name without writing", () =>
     Effect.gen(function*() {
       const captures: Captures = { createDocs: [], updates: [], mixins: [] }
-      const result = yield* createTaskType({ name: "issue" }).pipe(Effect.provide(createLayer({ captures })))
+      const result = yield* createTaskType({ name: "issue" }).pipe(
+        Effect.provide(createLayer({ captures })),
+        withDiagnostics
+      )
 
       expect(result.created).toBe(false)
       expect(result.taskType.id).toBe(taskTypeId)
@@ -219,7 +305,8 @@ describe("task management operations", () => {
             makeTaskType({ _id: subTaskTypeId, name: "Sub-issue", kind: "subtask", statuses: [openStatusId] })
           ],
           captures
-        }))
+        })),
+        withDiagnostics
       )
 
       expect(result.created).toBe(true)
@@ -249,7 +336,8 @@ describe("task management operations", () => {
           projectTypes: [projectType],
           taskTypes: [makeTaskType(), makeTaskType({ _id: orphanTaskTypeId, name: "Bug" })],
           captures
-        }))
+        })),
+        withDiagnostics
       )
 
       expect(result.created).toBe(true)
@@ -262,7 +350,8 @@ describe("task management operations", () => {
     Effect.gen(function*() {
       const captures: Captures = { createDocs: [], updates: [], mixins: [] }
       const result = yield* createTaskType({ name: "Bug", templateTaskType: TaskTypeRefSchema.make("Issue") }).pipe(
-        Effect.provide(createLayer({ captures }))
+        Effect.provide(createLayer({ captures })),
+        withDiagnostics
       )
 
       expect(result.created).toBe(true)
@@ -280,7 +369,8 @@ describe("task management operations", () => {
     Effect.gen(function*() {
       const captures: Captures = { createDocs: [], updates: [], mixins: [] }
       const result = yield* createIssueStatus({ name: "QA", category: "Active" }).pipe(
-        Effect.provide(createLayer({ captures }))
+        Effect.provide(createLayer({ captures })),
+        withDiagnostics
       )
 
       expect(result.created).toBe(true)
@@ -309,7 +399,8 @@ describe("task management operations", () => {
       })
 
       const result = yield* createIssueStatus({ name: "QA", category: "Active" }).pipe(
-        Effect.provide(createLayer({ projectTypes: [projectType], captures }))
+        Effect.provide(createLayer({ projectTypes: [projectType], captures })),
+        withDiagnostics
       )
 
       const projectTypeUpdate = captures.updates.find((call) => call.classId === String(task.class.ProjectType))
@@ -352,7 +443,8 @@ describe("task management operations", () => {
             makeStatus({ _id: alternateDoneStatusId, name: "Done", category: task.statusCategory.Won })
           ],
           captures
-        }))
+        })),
+        withDiagnostics
       )
 
       const issueTaskTypeUpdate = captures.updates.find((call) => call.objectId === taskTypeId)
@@ -382,7 +474,8 @@ describe("task management operations", () => {
         category: "ToDo",
         taskType: TaskTypeRefSchema.make("Issue")
       }).pipe(
-        Effect.provide(createLayer({ taskTypes: [duplicatedTaskType], captures }))
+        Effect.provide(createLayer({ taskTypes: [duplicatedTaskType], captures })),
+        withDiagnostics
       )
 
       expect(result.created).toBe(true)
@@ -398,7 +491,8 @@ describe("task management operations", () => {
       const template = makeTaskType({ statuses: [openStatusId, doneStatusId, openStatusId] })
 
       const result = yield* createTaskType({ name: "Bug", templateTaskType: TaskTypeRefSchema.make("Issue") }).pipe(
-        Effect.provide(createLayer({ taskTypes: [template], captures }))
+        Effect.provide(createLayer({ taskTypes: [template], captures })),
+        withDiagnostics
       )
 
       const taskTypeCreate = captures.createDocs.find((call) => call.classId === String(task.class.TaskType))
@@ -421,7 +515,8 @@ describe("task management operations", () => {
     Effect.gen(function*() {
       const captures: Captures = { createDocs: [], updates: [], mixins: [] }
       const result = yield* createIssueStatus({ name: "QA", category: "Active" }).pipe(
-        Effect.provide(createLayer({ captures, failRecoverableStatusLookup: true }))
+        Effect.provide(createLayer({ captures, failRecoverableStatusLookup: true })),
+        withDiagnostics
       )
 
       expect(result.created).toBe(true)
@@ -440,7 +535,8 @@ describe("task management operations", () => {
       const captures: Captures = { createDocs: [], updates: [], mixins: [] }
       const result = yield* Effect.either(
         createIssueStatus({ name: "Todo", category: "Active" }).pipe(
-          Effect.provide(createLayer({ captures }))
+          Effect.provide(createLayer({ captures })),
+          withDiagnostics
         )
       )
 
@@ -464,7 +560,8 @@ describe("task management operations", () => {
             makeStatus({ _id: statusId, name: "QA", category: task.statusCategory.Active })
           ],
           captures
-        }))
+        })),
+        withDiagnostics
       )
 
       expect(result.created).toBe(true)
@@ -485,7 +582,8 @@ describe("task management operations", () => {
         category: "ToDo",
         taskType: TaskTypeRefSchema.make("Issue")
       }).pipe(
-        Effect.provide(createLayer({ captures }))
+        Effect.provide(createLayer({ captures })),
+        withDiagnostics
       )
 
       expect(result.created).toBe(false)
@@ -498,7 +596,7 @@ describe("task management operations", () => {
 describe("listTaskTypes", () => {
   it.effect("lists task types across all project types by default", () =>
     Effect.gen(function*() {
-      const result = yield* listTaskTypes({}).pipe(Effect.provide(createLayer()))
+      const result = yield* listTaskTypes({}).pipe(Effect.provide(createLayer()), withDiagnostics)
       expect(result.total).toBe(result.taskTypes.length)
       expect(result.taskTypes.length).toBeGreaterThan(0)
     }))
@@ -506,7 +604,8 @@ describe("listTaskTypes", () => {
   it.effect("lists task types for a specific project type", () =>
     Effect.gen(function*() {
       const result = yield* listTaskTypes({ projectType: ProjectTypeRefSchema.make("classic") }).pipe(
-        Effect.provide(createLayer())
+        Effect.provide(createLayer()),
+        withDiagnostics
       )
       expect(result.total).toBe(result.taskTypes.length)
     }))
@@ -524,7 +623,8 @@ describe("task management branch coverage", () => {
       })
 
       const result = yield* getProjectType({ projectType: ProjectTypeRefSchema.make("classic") }).pipe(
-        Effect.provide(createLayer({ statuses: [noCategory, unknownCategory] }))
+        Effect.provide(createLayer({ statuses: [noCategory, unknownCategory] })),
+        withDiagnostics
       )
 
       expect(result.statuses.map((status) => status.category)).toEqual(["unknown", "unknown"])
@@ -533,14 +633,20 @@ describe("task management branch coverage", () => {
   it.effect("recognizes a non-default-id classic project type by its classic flag", () =>
     Effect.gen(function*() {
       const projectType = makeProjectType({ _id: "pt-custom" as Ref<ProjectType>, name: "Engineering", classic: true })
-      const result = yield* listProjectTypes({}).pipe(Effect.provide(createLayer({ projectTypes: [projectType] })))
+      const result = yield* listProjectTypes({}).pipe(
+        Effect.provide(createLayer({ projectTypes: [projectType] })),
+        withDiagnostics
+      )
       expect(result.projectTypes[0]?.isDefaultClassic).toBe(true)
     }))
 
   it.effect("recognizes a classic project type by its normalized name", () =>
     Effect.gen(function*() {
       const projectType = makeProjectType({ _id: "pt-named" as Ref<ProjectType>, name: "Classic", classic: false })
-      const result = yield* listProjectTypes({}).pipe(Effect.provide(createLayer({ projectTypes: [projectType] })))
+      const result = yield* listProjectTypes({}).pipe(
+        Effect.provide(createLayer({ projectTypes: [projectType] })),
+        withDiagnostics
+      )
       expect(result.projectTypes[0]?.isDefaultClassic).toBe(true)
     }))
 
@@ -548,7 +654,8 @@ describe("task management branch coverage", () => {
     Effect.gen(function*() {
       const projectType = makeProjectType({ description: "" })
       const result = yield* getProjectType({ projectType: ProjectTypeRefSchema.make("classic") }).pipe(
-        Effect.provide(createLayer({ projectTypes: [projectType] }))
+        Effect.provide(createLayer({ projectTypes: [projectType] })),
+        withDiagnostics
       )
       expect(result.description).toBeUndefined()
     }))
@@ -557,7 +664,8 @@ describe("task management branch coverage", () => {
     Effect.gen(function*() {
       const projectType = makeProjectType({ tasks: [], statuses: [] })
       const result = yield* getProjectType({ projectType: ProjectTypeRefSchema.make("classic") }).pipe(
-        Effect.provide(createLayer({ projectTypes: [projectType], taskTypes: [], statuses: [] }))
+        Effect.provide(createLayer({ projectTypes: [projectType], taskTypes: [], statuses: [] })),
+        withDiagnostics
       )
       expect(result.taskTypes).toEqual([])
       expect(result.statuses).toEqual([])
@@ -567,7 +675,7 @@ describe("task management branch coverage", () => {
     Effect.gen(function*() {
       const projectType = makeProjectType({ _id: "pt-x" as Ref<ProjectType>, name: "Engineering", classic: false })
       const error = yield* Effect.flip(
-        getProjectType({}).pipe(Effect.provide(createLayer({ projectTypes: [projectType] })))
+        getProjectType({}).pipe(Effect.provide(createLayer({ projectTypes: [projectType] })), withDiagnostics)
       )
       expect(error.message).toContain("Could not select a default Classic project type")
     }))
@@ -576,7 +684,8 @@ describe("task management branch coverage", () => {
     Effect.gen(function*() {
       const error = yield* Effect.flip(
         getProjectType({ projectType: ProjectTypeRefSchema.make("nonexistent") }).pipe(
-          Effect.provide(createLayer())
+          Effect.provide(createLayer()),
+          withDiagnostics
         )
       )
       expect(error.message).toContain("did not resolve to exactly one project type")
@@ -586,7 +695,8 @@ describe("task management branch coverage", () => {
     Effect.gen(function*() {
       const error = yield* Effect.flip(
         createTaskType({ name: "Bug", templateTaskType: TaskTypeRefSchema.make("nonexistent") }).pipe(
-          Effect.provide(createLayer())
+          Effect.provide(createLayer()),
+          withDiagnostics
         )
       )
       expect(error.message).toContain("did not resolve to exactly one task type")
@@ -597,7 +707,8 @@ describe("task management branch coverage", () => {
       const projectType = makeProjectType({ tasks: [], statuses: [] })
       const error = yield* Effect.flip(
         createTaskType({ name: "Bug" }).pipe(
-          Effect.provide(createLayer({ projectTypes: [projectType], taskTypes: [] }))
+          Effect.provide(createLayer({ projectTypes: [projectType], taskTypes: [] })),
+          withDiagnostics
         )
       )
       expect(error.message).toContain("has no task type to copy")
@@ -607,7 +718,8 @@ describe("task management branch coverage", () => {
     Effect.gen(function*() {
       const captures: Captures = { createDocs: [], updates: [], mixins: [] }
       const result = yield* createTaskType({ name: "Brand New Type" }).pipe(
-        Effect.provide(createLayer({ captures }))
+        Effect.provide(createLayer({ captures })),
+        withDiagnostics
       )
       expect(result.created).toBe(true)
       expect(result.taskType.name).toBe("Brand New Type")
@@ -623,7 +735,8 @@ describe("task management branch coverage", () => {
         allowedAsChildOf: [subTaskTypeId]
       })
       yield* createTaskType({ name: "Bug", templateTaskType: TaskTypeRefSchema.make("Issue") }).pipe(
-        Effect.provide(createLayer({ taskTypes: [template], captures }))
+        Effect.provide(createLayer({ taskTypes: [template], captures })),
+        withDiagnostics
       )
 
       const mixinCreate = captures.createDocs.find((call) => call.classId === String(core.class.Mixin))
@@ -650,7 +763,8 @@ describe("task management branch coverage", () => {
                 statusClass: core.class.Status
               })
             ]
-          }))
+          })),
+          withDiagnostics
         )
       )
       expect(error.message).toContain("do not share one issue status class")
@@ -660,7 +774,7 @@ describe("task management branch coverage", () => {
     Effect.gen(function*() {
       const projectType = makeProjectType({ name: "" as ProjectType["name"] })
       const error = yield* Effect.flip(
-        listProjectTypes({}).pipe(Effect.provide(createLayer({ projectTypes: [projectType] })))
+        listProjectTypes({}).pipe(Effect.provide(createLayer({ projectTypes: [projectType] })), withDiagnostics)
       )
       expect(error._tag).toBe("HulyConnectionError")
       expect(error.message).toContain("response failed schema validation")

@@ -29,6 +29,7 @@ import type { ListStatusesResult, StatusDetail } from "../../domain/schemas/proj
 import { parseProject, ProjectSummarySchema, UPDATE_PROJECT_FIELDS } from "../../domain/schemas/projects.js"
 import { ProjectIdentifier, StatusName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
+import type { Diagnostics } from "../diagnostics.js"
 import type { NoUpdateFieldsError, ProjectNotFoundError } from "../errors.js"
 import { HulyConnectionError } from "../errors.js"
 import { tracker } from "../huly-plugins.js"
@@ -96,7 +97,7 @@ export const listProjects = (
 
 export const getProject = (
   params: GetProjectParams
-): Effect.Effect<Project, GetProjectError, HulyClient> =>
+): Effect.Effect<Project, GetProjectError, HulyClient | Diagnostics> =>
   Effect.gen(function*() {
     const { defaultStatusId, project, statuses } = yield* findProjectWithStatuses(params.project)
 
@@ -125,7 +126,7 @@ type ListStatusesError = ProjectNotFoundError | HulyClientError | HulyConnection
 
 export const listStatuses = (
   params: ListStatusesParams
-): Effect.Effect<ListStatusesResult, ListStatusesError, HulyClient> =>
+): Effect.Effect<ListStatusesResult, ListStatusesError, HulyClient | Diagnostics> =>
   Effect.gen(function*() {
     const { defaultStatusId, statuses } = yield* findProjectWithStatuses(params.project)
 

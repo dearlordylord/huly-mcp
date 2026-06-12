@@ -13,6 +13,7 @@ import { Effect } from "effect"
 import { expect } from "vitest"
 import { DEFAULT_LIMIT, NonEmptyString, NonNegativeNumber } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import { Diagnostics, makeDiagnosticsScope } from "../../../src/huly/diagnostics.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../../../src/huly/errors.js"
 import { contact, core, task, tracker } from "../../../src/huly/huly-plugins.js"
 import { findPersonByEmailOrName } from "../../../src/huly/operations/contacts-shared.js"
@@ -32,6 +33,7 @@ import {
   findOneOrFail
 } from "../../../src/huly/operations/query-helpers.js"
 import { toRef, validatePersonUuid } from "../../../src/huly/operations/sdk-boundary.js"
+import { withDiagnostics } from "../../helpers/diagnostics.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   const result = docs as FindResult<T>
@@ -170,12 +172,14 @@ interface MockConfig {
   channels?: Array<Channel>
   socialIdentities?: Array<SocialIdentity>
   statusQueryFails?: boolean
+  modelStatuses?: Array<Status>
 }
 
 const createTestLayerWithMocks = (config: MockConfig) => {
   const projects = config.projects ?? []
   const issues = config.issues ?? []
   const statuses = config.statuses ?? []
+  const modelStatuses = config.modelStatuses ?? []
   const persons = config.persons ?? []
   const channels = config.channels ?? []
   const socialIdentities = config.socialIdentities ?? []
@@ -215,6 +219,19 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     }
     return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
+
+  const findAllInModelImpl: HulyClientOperations["findAllInModel"] = ((_class: unknown, query: unknown) => {
+    if (String(_class) === String(core.class.Status)) {
+      const q = query as Record<string, unknown>
+      const inQuery = q._id as { $in?: Array<Ref<Status>> } | undefined
+      if (inQuery?.$in) {
+        const filtered = modelStatuses.filter(s => inQuery.$in!.includes(s._id))
+        return Effect.succeed(toFindResult(filtered))
+      }
+      return Effect.succeed(toFindResult(modelStatuses))
+    }
+    return Effect.succeed(toFindResult([]))
+  }) as HulyClientOperations["findAllInModel"]
 
   const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown, query: unknown, options?: unknown) => {
     if (_class === tracker.class.Project) {
@@ -298,6 +315,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
 
   return HulyClient.testLayer({
     findAll: findAllImpl,
+    findAllInModel: findAllInModelImpl,
     findOne: findOneImpl
   })
 }
@@ -480,7 +498,7 @@ describe("operations helpers", () => {
         const project = makeProject({ identifier: "TEST" })
         const testLayer = createTestLayerWithMocks({ projects: [project] })
 
-        const client = yield* HulyClient.pipe(Effect.provide(testLayer))
+        const client = yield* HulyClient.pipe(Effect.provide(testLayer), withDiagnostics)
         const result = yield* findOneOrFail(
           client,
           tracker.class.Project,
@@ -495,7 +513,7 @@ describe("operations helpers", () => {
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({ projects: [] })
 
-        const client = yield* HulyClient.pipe(Effect.provide(testLayer))
+        const client = yield* HulyClient.pipe(Effect.provide(testLayer), withDiagnostics)
         const error = yield* Effect.flip(
           findOneOrFail(
             client,
@@ -515,7 +533,7 @@ describe("operations helpers", () => {
         const project = makeProject({ identifier: "TEST" })
         const testLayer = createTestLayerWithMocks({ projects: [project] })
 
-        const client = yield* HulyClient.pipe(Effect.provide(testLayer))
+        const client = yield* HulyClient.pipe(Effect.provide(testLayer), withDiagnostics)
         const result = yield* findByNameOrId(
           client,
           tracker.class.Project,
@@ -532,7 +550,7 @@ describe("operations helpers", () => {
         const project = makeProject({ identifier: "FALLBACK" })
         const testLayer = createTestLayerWithMocks({ projects: [project] })
 
-        const client = yield* HulyClient.pipe(Effect.provide(testLayer))
+        const client = yield* HulyClient.pipe(Effect.provide(testLayer), withDiagnostics)
         const result = yield* findByNameOrId(
           client,
           tracker.class.Project,
@@ -548,7 +566,7 @@ describe("operations helpers", () => {
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({ projects: [] })
 
-        const client = yield* HulyClient.pipe(Effect.provide(testLayer))
+        const client = yield* HulyClient.pipe(Effect.provide(testLayer), withDiagnostics)
         const result = yield* findByNameOrId(
           client,
           tracker.class.Project,
@@ -566,7 +584,7 @@ describe("operations helpers", () => {
         const project = makeProject({ identifier: "TEST" })
         const testLayer = createTestLayerWithMocks({ projects: [project] })
 
-        const result = yield* findProject("TEST").pipe(Effect.provide(testLayer))
+        const result = yield* findProject("TEST").pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result.project.identifier).toBe("TEST")
         expect(result.client).toBeDefined()
@@ -578,7 +596,7 @@ describe("operations helpers", () => {
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({ projects: [] })
 
-        const error = yield* Effect.flip(findProject("NONEXISTENT").pipe(Effect.provide(testLayer)))
+        const error = yield* Effect.flip(findProject("NONEXISTENT").pipe(Effect.provide(testLayer), withDiagnostics))
 
         expect(error._tag).toBe("ProjectNotFoundError")
         expect((error as ProjectNotFoundError).identifier).toBe("NONEXISTENT")
@@ -591,7 +609,7 @@ describe("operations helpers", () => {
         const testLayer = createTestLayerWithMocks({ projects: [], statuses: [] })
 
         const error = yield* Effect.flip(
-          findProjectWithStatuses("NONEXISTENT").pipe(Effect.provide(testLayer))
+          findProjectWithStatuses("NONEXISTENT").pipe(Effect.provide(testLayer), withDiagnostics)
         )
 
         expect(error._tag).toBe("ProjectNotFoundError")
@@ -622,7 +640,7 @@ describe("operations helpers", () => {
           statuses: [openStatus, doneStatus, canceledStatus]
         })
 
-        const result = yield* findProjectWithStatuses("TEST").pipe(Effect.provide(testLayer))
+        const result = yield* findProjectWithStatuses("TEST").pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result.project.identifier).toBe("TEST")
         expect(result.statuses).toHaveLength(3)
@@ -651,7 +669,12 @@ describe("operations helpers", () => {
           statusQueryFails: true
         })
 
-        const result = yield* findProjectWithStatuses("TEST").pipe(Effect.provide(testLayer))
+        const diagnostics = yield* makeDiagnosticsScope
+        const result = yield* findProjectWithStatuses("TEST").pipe(
+          Effect.provide(testLayer),
+          Effect.provideService(Diagnostics, diagnostics.service)
+        )
+        const warnings = yield* diagnostics.drainWarnings
 
         expect(result.project.identifier).toBe("TEST")
         expect(result.statuses).toHaveLength(2)
@@ -663,6 +686,32 @@ describe("operations helpers", () => {
         const canceledStatus = result.statuses.find(s => s.name === "canceled-item")
         expect(canceledStatus).toBeDefined()
         expect(canceledStatus!.category).toBe("unknown")
+        expect(warnings).toHaveLength(1)
+        expect(warnings[0].code).toBe("status_metadata_unresolved")
+      }))
+
+    it.effect("uses model status metadata when the server status query fails", () =>
+      Effect.gen(function*() {
+        const statusId = "status-open" as Ref<Status>
+        const project = makeProject({ identifier: "TEST", defaultIssueStatus: statusId })
+        const status = makeStatus({
+          _id: statusId,
+          name: "Open",
+          category: task.statusCategory.Active
+        })
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          statuses: [status],
+          statusQueryFails: true,
+          modelStatuses: [status]
+        })
+
+        const result = yield* findProjectWithStatuses("TEST").pipe(Effect.provide(testLayer), withDiagnostics)
+
+        expect(result.statuses).toEqual([
+          { _id: statusId, name: "Open", category: "Active" }
+        ])
       }))
 
     it.effect("returns empty statuses when project type has no statuses", () =>
@@ -694,7 +743,7 @@ describe("operations helpers", () => {
           findAll: (() => Effect.succeed(toFindResult([]))) as HulyClientOperations["findAll"]
         })
 
-        const result = yield* findProjectWithStatuses("TEST").pipe(Effect.provide(testLayer))
+        const result = yield* findProjectWithStatuses("TEST").pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result.statuses).toEqual([])
       }))
@@ -713,7 +762,7 @@ describe("operations helpers", () => {
           statuses: [statusNoCategory]
         })
 
-        const result = yield* findProjectWithStatuses("TEST").pipe(Effect.provide(testLayer))
+        const result = yield* findProjectWithStatuses("TEST").pipe(Effect.provide(testLayer), withDiagnostics)
 
         const backlog = result.statuses.find(s => s.name === "Backlog")
         expect(backlog?.category).toBe("unknown")
@@ -732,7 +781,8 @@ describe("operations helpers", () => {
         })
 
         const result = yield* findProjectAndIssue({ project: "TEST", identifier: "TEST-1" }).pipe(
-          Effect.provide(testLayer)
+          Effect.provide(testLayer),
+          withDiagnostics
         )
 
         expect(result.project.identifier).toBe("TEST")
@@ -775,7 +825,8 @@ describe("operations helpers", () => {
         })
 
         const result = yield* findProjectAndIssue({ project: "PROJ", identifier: "42" }).pipe(
-          Effect.provide(testLayer)
+          Effect.provide(testLayer),
+          withDiagnostics
         )
 
         expect(result.issue.identifier).toBe("PROJ-042")
@@ -793,7 +844,8 @@ describe("operations helpers", () => {
 
         const error = yield* Effect.flip(
           findProjectAndIssue({ project: "TEST", identifier: "TEST-999" }).pipe(
-            Effect.provide(testLayer)
+            Effect.provide(testLayer),
+            withDiagnostics
           )
         )
 
@@ -807,7 +859,8 @@ describe("operations helpers", () => {
 
         const error = yield* Effect.flip(
           findProjectAndIssue({ project: "NONEXISTENT", identifier: "1" }).pipe(
-            Effect.provide(testLayer)
+            Effect.provide(testLayer),
+            withDiagnostics
           )
         )
 
@@ -849,7 +902,8 @@ describe("operations helpers", () => {
         })
 
         const result = yield* findProjectAndIssue({ project: "TEST", identifier: "10" }).pipe(
-          Effect.provide(testLayer)
+          Effect.provide(testLayer),
+          withDiagnostics
         )
 
         expect(result.issue.number).toBe(10)
@@ -872,7 +926,7 @@ describe("operations helpers", () => {
           channels: [channel]
         })
 
-        const client = yield* HulyClient.pipe(Effect.provide(testLayer))
+        const client = yield* HulyClient.pipe(Effect.provide(testLayer), withDiagnostics)
         const result = yield* findPersonByEmailOrName(client, "john@example.com")
 
         expect(result).toBeDefined()
@@ -888,7 +942,7 @@ describe("operations helpers", () => {
           channels: []
         })
 
-        const client = yield* HulyClient.pipe(Effect.provide(testLayer))
+        const client = yield* HulyClient.pipe(Effect.provide(testLayer), withDiagnostics)
         const result = yield* findPersonByEmailOrName(client, "John Doe")
 
         expect(result).toBeDefined()
@@ -908,7 +962,7 @@ describe("operations helpers", () => {
           channels: [channel]
         })
 
-        const client = yield* HulyClient.pipe(Effect.provide(testLayer))
+        const client = yield* HulyClient.pipe(Effect.provide(testLayer), withDiagnostics)
         // Use a substring that won't match exactly
         const result = yield* findPersonByEmailOrName(client, "john@exam")
 
@@ -925,7 +979,7 @@ describe("operations helpers", () => {
           channels: []
         })
 
-        const client = yield* HulyClient.pipe(Effect.provide(testLayer))
+        const client = yield* HulyClient.pipe(Effect.provide(testLayer), withDiagnostics)
         const result = yield* findPersonByEmailOrName(client, "ohn Do")
 
         expect(result).toBeDefined()
@@ -939,7 +993,7 @@ describe("operations helpers", () => {
           channels: []
         })
 
-        const client = yield* HulyClient.pipe(Effect.provide(testLayer))
+        const client = yield* HulyClient.pipe(Effect.provide(testLayer), withDiagnostics)
         const result = yield* findPersonByEmailOrName(client, "nobody@nowhere.com")
 
         expect(result).toBeUndefined()
@@ -959,7 +1013,7 @@ describe("operations helpers", () => {
           channels: [channel]
         })
 
-        const client = yield* HulyClient.pipe(Effect.provide(testLayer))
+        const client = yield* HulyClient.pipe(Effect.provide(testLayer), withDiagnostics)
         const result = yield* findPersonByEmailOrName(client, "orphan@example.com")
 
         // Should find by exact name match (step 2) after channel person lookup fails
@@ -981,7 +1035,7 @@ describe("operations helpers", () => {
           socialIdentities: [identity]
         })
 
-        const client = yield* HulyClient.pipe(Effect.provide(testLayer))
+        const client = yield* HulyClient.pipe(Effect.provide(testLayer), withDiagnostics)
         const result = yield* findPersonByEmailOrName(client, "ws-member@example.com")
 
         expect(result).toBeDefined()
@@ -1007,7 +1061,7 @@ describe("operations helpers", () => {
           socialIdentities: [identity]
         })
 
-        const client = yield* HulyClient.pipe(Effect.provide(testLayer))
+        const client = yield* HulyClient.pipe(Effect.provide(testLayer), withDiagnostics)
         const result = yield* findPersonByEmailOrName(client, "shared@example.com")
 
         expect(result).toBeDefined()
@@ -1028,7 +1082,7 @@ describe("operations helpers", () => {
           socialIdentities: []
         })
 
-        const client = yield* HulyClient.pipe(Effect.provide(testLayer))
+        const client = yield* HulyClient.pipe(Effect.provide(testLayer), withDiagnostics)
         const result = yield* findPersonByEmailOrName(client, "channel-only@example.com")
 
         expect(result).toBeDefined()

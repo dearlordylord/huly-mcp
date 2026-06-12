@@ -24,6 +24,7 @@ import {
 } from "../domain/schemas.js"
 import { IssueIdentifier, MAX_LIMIT, ProjectIdentifier } from "../domain/schemas/shared.js"
 import type { HulyClient } from "../huly/client.js"
+import type { Diagnostics } from "../huly/diagnostics.js"
 import type { HulyDomainError } from "../huly/errors.js"
 import { getIssue } from "../huly/operations/issues.js"
 import { getProject, listProjects } from "../huly/operations/projects.js"
@@ -356,7 +357,7 @@ const absurdResource = (_resource: never): never => {
 
 const readParsedHulyResource = (
   resource: HulyResource
-): Effect.Effect<ReadResourceResult, McpError, HulyClient> => {
+): Effect.Effect<ReadResourceResult, McpError, HulyClient | Diagnostics> => {
   switch (resource._tag) {
     case "project":
       return parseGetProjectParams({ project: resource.project }).pipe(
@@ -380,7 +381,7 @@ const readParsedHulyResource = (
 
 export const readHulyResource = (
   uri: string
-): Effect.Effect<ReadResourceResult, McpError, HulyClient> =>
+): Effect.Effect<ReadResourceResult, McpError, HulyClient | Diagnostics> =>
   Effect.try({
     try: () => parseHulyResourceUri(uri),
     /* v8 ignore start -- defensive: parseHulyResourceUri only ever throws McpError, so the else branch is unreachable */

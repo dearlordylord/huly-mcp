@@ -150,6 +150,8 @@ const makeHulyClient = (state: DriveToolState): HulyClientOperations => ({
       toFindResult(docs.filter((doc) => matchesQuery(doc, query as DocumentQuery<Doc>)) as unknown as Array<T>)
     )
   },
+  findAllInModel: <T extends Doc>(classRef: Ref<Class<T>>, query: DocumentQuery<T>) =>
+    makeHulyClient(state).findAll(classRef, query),
   findOne: <T extends Doc>(classRef: Ref<Class<T>>, query: DocumentQuery<T>) =>
     Effect.map(makeHulyClient(state).findAll(classRef, query), (docs) => docs[0]),
   createDoc: <T extends Doc>(

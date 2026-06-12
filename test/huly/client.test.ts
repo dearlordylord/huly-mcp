@@ -35,6 +35,7 @@ import { mockFn } from "../helpers/mock-fn.js"
 
 const mockFindAll = mockFn()
 const mockFindOne = mockFn()
+const mockFindAllInModel = mockFn()
 const mockCreateDoc = mockFn()
 const mockUpdateDoc = mockFn()
 const mockAddCollection = mockFn()
@@ -49,6 +50,7 @@ const mockLoadServerConfig = mockFn()
 const mockTxOperations = {
   findAll: mockFindAll,
   findOne: mockFindOne,
+  getModel: () => ({ findAllSync: mockFindAllInModel }),
   createDoc: mockCreateDoc,
   updateDoc: mockUpdateDoc,
   addCollection: mockAddCollection,
@@ -68,6 +70,7 @@ const mockMarkdownToMarkup = mockFn().mockImplementation((md: string) => ({ type
 const clearAllMockFns = () => {
   mockFindAll.mockClear()
   mockFindOne.mockClear()
+  mockFindAllInModel.mockClear()
   mockCreateDoc.mockClear()
   mockUpdateDoc.mockClear()
   mockAddCollection.mockClear()
@@ -170,6 +173,7 @@ describe("HulyClient Service", () => {
     clearAllMockFns()
     mockFindAll.mockResolvedValue(toFindResult([]))
     mockFindOne.mockResolvedValue(undefined)
+    mockFindAllInModel.mockReturnValue(toFindResult([]))
     mockCreateDoc.mockResolvedValue("new-id")
     mockUpdateDoc.mockResolvedValue({})
     mockAddCollection.mockResolvedValue("new-attached-id")
@@ -190,6 +194,7 @@ describe("HulyClient Service", () => {
 
         expect(client.findAll).toBeDefined()
         expect(client.findOne).toBeDefined()
+        expect(client.findAllInModel).toBeDefined()
         expect(client.createDoc).toBeDefined()
         expect(client.updateDoc).toBeDefined()
         expect(client.addCollection).toBeDefined()
@@ -759,6 +764,48 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
 
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toContain("findOne failed")
+      }))
+  })
+
+  describe("findAllInModel", () => {
+    it.effect("delegates to the local model findAllSync", () =>
+      Effect.gen(function*() {
+        const docs = [{ _id: "d1", title: "Model Doc" }]
+        // eslint-disable-next-line no-restricted-syntax -- partial mock objects don't overlap with Doc[]
+        mockFindAllInModel.mockReturnValue(toFindResult(docs as unknown as Array<Doc>))
+
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        const results = yield* client.findAllInModel(
+          "class" as DocRef<Class<TestDoc>>,
+          { title: "Model Doc" } as DocumentQuery<TestDoc>,
+          { limit: 10 } as FindOptions<TestDoc>
+        )
+
+        expect(results).toHaveLength(1)
+        expect(mockFindAllInModel.mock.calls).toContainEqual([
+          "class",
+          { title: "Model Doc" },
+          { limit: 10 }
+        ])
+      }))
+
+    it.effect("wraps local model errors in HulyConnectionError", () =>
+      Effect.gen(function*() {
+        mockFindAllInModel.mockImplementation(() => {
+          throw new Error("model query failure")
+        })
+
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        const error = yield* Effect.flip(
+          client.findAllInModel(
+            "c" as DocRef<Class<TestDoc>>,
+            {} as DocumentQuery<TestDoc>
+          )
+        )
+
+        expect(error._tag).toBe("HulyConnectionError")
+        expect(error.message).toContain("findAllInModel failed")
+        expect(error.message).toContain("model query failure")
       }))
   })
 

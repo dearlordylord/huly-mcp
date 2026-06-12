@@ -6,21 +6,25 @@ import type { Project as HulyProject } from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
-import type { ProjectNotFoundError } from "../../../src/huly/errors.js"
+import { Diagnostics, makeDiagnosticsScope } from "../../../src/huly/diagnostics.js"
+import { HulyConnectionError, type ProjectNotFoundError } from "../../../src/huly/errors.js"
 import { core, task, tracker } from "../../../src/huly/huly-plugins.js"
 import {
   createProject,
   deleteProject,
   getProject,
   listProjects,
+  listStatuses,
   updateProject
 } from "../../../src/huly/operations/projects.js"
 import { projectIdentifier } from "../../helpers/brands.js"
+import { withDiagnostics } from "../../helpers/diagnostics.js"
 
 // --- Mock Data Builders ---
 
 const asProject = (v: unknown) => v as HulyProject
 const asProjectType = (v: unknown) => v as ProjectType
+const asStatus = (v: unknown) => v as Status
 // Huly Ref brands are erased at runtime; these tests build fixture refs from stable string ids.
 const statusRef = (value: string): Ref<Status> => value as Ref<Status>
 
@@ -45,6 +49,25 @@ const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
   return result
 }
 
+const makeStatus = (overrides: Pick<Status, "_id" | "name"> & Partial<Status>): Status => {
+  const { _id, name, ...rest } = overrides
+  return (
+    asStatus({
+      _id,
+      _class: core.class.Status,
+      space: core.space.Model,
+      modifiedBy: "user-1" as PersonId,
+      modifiedOn: 0,
+      createdBy: "user-1" as PersonId,
+      createdOn: 0,
+      ofAttribute: tracker.attribute.IssueStatus,
+      name,
+      category: task.statusCategory.ToDo,
+      ...rest
+    })
+  )
+}
+
 // --- Test Helpers ---
 
 interface MockConfig {
@@ -53,14 +76,17 @@ interface MockConfig {
   captureCreateDoc?: { attributes?: Record<string, unknown>; id?: string }
   captureUpdateDoc?: { operations?: Record<string, unknown> }
   captureRemoveDoc?: { called?: boolean }
-  statuses?: Array<{ _id: Ref<Status>; name: string; category?: string }>
+  statuses?: Array<Status>
+  modelStatuses?: Array<Status>
   failStatusLookup?: boolean
+  failModelStatusLookup?: boolean
   projectType?: ProjectType
 }
 
 const createTestLayerWithMocks = (config: MockConfig) => {
   const projects = config.projects ?? []
   const statuses = config.statuses ?? []
+  const modelStatuses = config.modelStatuses ?? []
 
   const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown, options: unknown) => {
     if (_class === tracker.class.Project) {
@@ -85,14 +111,22 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     }
     if (_class === core.class.Status) {
       if (config.failStatusLookup === true) {
-        return Effect.fail(new Error("status lookup failed") as never)
+        return Effect.fail(new HulyConnectionError({ message: "status lookup failed" }))
       }
-      // Status mock objects only need _id, name, and category for our tests.
-      // toFindResult expects Doc[], but mock statuses are partial — cast is safe in tests.
-      return Effect.succeed(toFindResult(statuses as Array<never>))
+      return Effect.succeed(toFindResult(statuses))
     }
     return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
+
+  const findAllInModelImpl: HulyClientOperations["findAllInModel"] = ((_class: unknown) => {
+    if (_class === core.class.Status) {
+      if (config.failModelStatusLookup === true) {
+        return Effect.fail(new HulyConnectionError({ message: "model status lookup failed" }))
+      }
+      return Effect.succeed(toFindResult(modelStatuses))
+    }
+    return Effect.succeed(toFindResult([]))
+  }) as HulyClientOperations["findAllInModel"]
 
   const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown, query: unknown, options?: unknown) => {
     if (_class === tracker.class.Project) {
@@ -132,7 +166,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       if (config.captureUpdateDoc) {
         config.captureUpdateDoc.operations = operations as Record<string, unknown>
       }
-      return Effect.succeed({} as never)
+      return Effect.succeed({})
     }
   ) as HulyClientOperations["updateDoc"]
 
@@ -141,12 +175,13 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       if (config.captureRemoveDoc) {
         config.captureRemoveDoc.called = true
       }
-      return Effect.succeed({} as never)
+      return Effect.succeed({})
     }
   ) as HulyClientOperations["removeDoc"]
 
   return HulyClient.testLayer({
     findAll: findAllImpl,
+    findAllInModel: findAllInModelImpl,
     findOne: findOneImpl,
     createDoc: createDocImpl,
     updateDoc: updateDocImpl,
@@ -168,7 +203,7 @@ describe("listProjects", () => {
 
         const testLayer = createTestLayerWithMocks({ projects })
 
-        const result = yield* listProjects({}).pipe(Effect.provide(testLayer))
+        const result = yield* listProjects({}).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result.projects).toHaveLength(2)
         expect(result.projects.map(p => p.identifier)).toEqual(["PROJ1", "PROJ2"])
@@ -186,7 +221,7 @@ describe("listProjects", () => {
 
         const testLayer = createTestLayerWithMocks({ projects: [project] })
 
-        const result = yield* listProjects({}).pipe(Effect.provide(testLayer))
+        const result = yield* listProjects({}).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result.projects).toHaveLength(1)
         expect(result.projects[0]).toEqual({
@@ -207,7 +242,7 @@ describe("listProjects", () => {
 
         const testLayer = createTestLayerWithMocks({ projects: [project] })
 
-        const result = yield* listProjects({}).pipe(Effect.provide(testLayer))
+        const result = yield* listProjects({}).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result.projects[0].description).toBeUndefined()
       }))
@@ -221,7 +256,7 @@ describe("listProjects", () => {
         })
         const testLayer = createTestLayerWithMocks({ projects: [project] })
 
-        const error = yield* Effect.flip(listProjects({}).pipe(Effect.provide(testLayer)))
+        const error = yield* Effect.flip(listProjects({}).pipe(Effect.provide(testLayer), withDiagnostics))
 
         expect(error._tag).toBe("HulyConnectionError")
         expect(error.message).toContain("listProjects response failed schema validation")
@@ -231,7 +266,7 @@ describe("listProjects", () => {
       Effect.gen(function*() {
         const testLayer = createTestLayerWithMocks({ projects: [] })
 
-        const result = yield* listProjects({}).pipe(Effect.provide(testLayer))
+        const result = yield* listProjects({}).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result.projects).toHaveLength(0)
         expect(result.total).toBe(0)
@@ -249,7 +284,7 @@ describe("listProjects", () => {
 
         const testLayer = createTestLayerWithMocks({ projects, captureQuery })
 
-        const result = yield* listProjects({}).pipe(Effect.provide(testLayer))
+        const result = yield* listProjects({}).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(captureQuery.query?.archived).toBe(false)
         expect(result.projects).toHaveLength(1)
@@ -266,7 +301,7 @@ describe("listProjects", () => {
 
         const testLayer = createTestLayerWithMocks({ projects, captureQuery })
 
-        const result = yield* listProjects({ includeArchived: true }).pipe(Effect.provide(testLayer))
+        const result = yield* listProjects({ includeArchived: true }).pipe(Effect.provide(testLayer), withDiagnostics)
 
         // When includeArchived=true, no filter applied (shows all)
         expect(captureQuery.query?.archived).toBeUndefined()
@@ -284,7 +319,7 @@ describe("listProjects", () => {
 
         const testLayer = createTestLayerWithMocks({ projects, captureQuery })
 
-        const result = yield* listProjects({ includeArchived: false }).pipe(Effect.provide(testLayer))
+        const result = yield* listProjects({ includeArchived: false }).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(captureQuery.query?.archived).toBe(false)
         expect(result.projects).toHaveLength(1)
@@ -299,7 +334,7 @@ describe("listProjects", () => {
 
         const testLayer = createTestLayerWithMocks({ projects: [], captureQuery })
 
-        yield* listProjects({}).pipe(Effect.provide(testLayer))
+        yield* listProjects({}).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(captureQuery.options?.limit).toBe(50)
       }))
@@ -310,7 +345,7 @@ describe("listProjects", () => {
 
         const testLayer = createTestLayerWithMocks({ projects: [], captureQuery })
 
-        yield* listProjects({ limit: 10 }).pipe(Effect.provide(testLayer))
+        yield* listProjects({ limit: 10 }).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(captureQuery.options?.limit).toBe(10)
       }))
@@ -321,7 +356,7 @@ describe("listProjects", () => {
 
         const testLayer = createTestLayerWithMocks({ projects: [], captureQuery })
 
-        yield* listProjects({ limit: 500 }).pipe(Effect.provide(testLayer))
+        yield* listProjects({ limit: 500 }).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(captureQuery.options?.limit).toBe(200)
       }))
@@ -334,7 +369,7 @@ describe("listProjects", () => {
 
         const testLayer = createTestLayerWithMocks({ projects: [], captureQuery })
 
-        yield* listProjects({}).pipe(Effect.provide(testLayer))
+        yield* listProjects({}).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect((captureQuery.options?.sort as Record<string, number>).name).toBe(SortingOrder.Ascending)
       }))
@@ -351,7 +386,7 @@ describe("listProjects", () => {
 
         const testLayer = createTestLayerWithMocks({ projects })
 
-        const result = yield* listProjects({ limit: 2 }).pipe(Effect.provide(testLayer))
+        const result = yield* listProjects({ limit: 2 }).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result.projects).toHaveLength(2)
         expect(result.total).toBe(3)
@@ -374,8 +409,8 @@ describe("getProject", () => {
       const testLayer = createTestLayerWithMocks({
         projects: [proj],
         statuses: [
-          { _id: defaultStatusId, name: "Backlog" },
-          { _id: inProgressStatusId, name: "In Progress" }
+          makeStatus({ _id: defaultStatusId, name: "Backlog" }),
+          makeStatus({ _id: inProgressStatusId, name: "In Progress" })
         ],
         projectType: asProjectType({
           statuses: [
@@ -387,7 +422,7 @@ describe("getProject", () => {
 
       const result = yield* getProject({
         project: projectIdentifier("HULY")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.identifier).toBe("HULY")
       expect(result.name).toBe("Huly")
@@ -409,10 +444,10 @@ describe("getProject", () => {
       const testLayer = createTestLayerWithMocks({
         projects: [proj],
         statuses: [
-          { _id: defaultStatusId, name: "Backlog" },
-          { _id: defaultStatusId, name: "Backlog" },
-          { _id: inProgressStatusId, name: "In Progress" },
-          { _id: inProgressStatusId, name: "In Progress" }
+          makeStatus({ _id: defaultStatusId, name: "Backlog" }),
+          makeStatus({ _id: defaultStatusId, name: "Backlog" }),
+          makeStatus({ _id: inProgressStatusId, name: "In Progress" }),
+          makeStatus({ _id: inProgressStatusId, name: "In Progress" })
         ],
         projectType: asProjectType({
           statuses: [
@@ -426,7 +461,7 @@ describe("getProject", () => {
 
       const result = yield* getProject({
         project: projectIdentifier("HULY")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.defaultStatus).toBe("Backlog")
       expect(result.statuses).toEqual(["Backlog", "In Progress"])
@@ -444,11 +479,14 @@ describe("getProject", () => {
 
       const testLayer = createTestLayerWithMocks({
         projects: [proj],
-        statuses: [{ _id: firstStatusId, name: "Backlog" }],
+        statuses: [makeStatus({ _id: firstStatusId, name: "Backlog" })],
         projectType: asProjectType({ statuses: [{ _id: firstStatusId }] })
       })
 
-      const result = yield* getProject({ project: projectIdentifier("HULY") }).pipe(Effect.provide(testLayer))
+      const result = yield* getProject({ project: projectIdentifier("HULY") }).pipe(
+        Effect.provide(testLayer),
+        withDiagnostics
+      )
 
       expect(result.defaultStatus).toBe("Backlog")
     }))
@@ -468,10 +506,147 @@ describe("getProject", () => {
         projectType: asProjectType({ statuses: [{ _id: statusId }] })
       })
 
-      const result = yield* getProject({ project: projectIdentifier("HULY") }).pipe(Effect.provide(testLayer))
+      const diagnostics = yield* makeDiagnosticsScope
+      const result = yield* getProject({ project: projectIdentifier("HULY") }).pipe(
+        Effect.provide(testLayer),
+        Effect.provideService(Diagnostics, diagnostics.service)
+      )
+      const warnings = yield* diagnostics.drainWarnings
 
       expect(result.defaultStatus).toBe("plainstatus")
       expect(result.statuses).toEqual(["plainstatus"])
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0].code).toBe("status_metadata_unresolved")
+    }))
+
+  it.effect("falls back to raw status refs when status document and model lookups both fail", () =>
+    Effect.gen(function*() {
+      const statusId = statusRef("plainstatus")
+      const proj = makeProject({
+        identifier: "HULY",
+        name: "Huly",
+        defaultIssueStatus: statusId
+      })
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [proj],
+        failStatusLookup: true,
+        failModelStatusLookup: true,
+        projectType: asProjectType({ statuses: [{ _id: statusId }] })
+      })
+
+      const diagnostics = yield* makeDiagnosticsScope
+      const result = yield* getProject({ project: projectIdentifier("HULY") }).pipe(
+        Effect.provide(testLayer),
+        Effect.provideService(Diagnostics, diagnostics.service)
+      )
+      const warnings = yield* diagnostics.drainWarnings
+
+      expect(result.defaultStatus).toBe("plainstatus")
+      expect(result.statuses).toEqual(["plainstatus"])
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0].code).toBe("status_metadata_unresolved")
+    }))
+
+  it.effect("resolves status metadata from the local model when status document lookup fails", () =>
+    Effect.gen(function*() {
+      const statusId = statusRef("6a156d99dc6d0a547e9ad569")
+      const proj = makeProject({
+        identifier: "HULY",
+        name: "Huly",
+        defaultIssueStatus: statusId
+      })
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [proj],
+        failStatusLookup: true,
+        modelStatuses: [makeStatus({ _id: statusId, name: "Pronto", category: task.statusCategory.Active })],
+        projectType: asProjectType({ statuses: [{ _id: statusId }] })
+      })
+
+      const diagnostics = yield* makeDiagnosticsScope
+      const result = yield* listStatuses({ project: projectIdentifier("HULY") }).pipe(
+        Effect.provide(testLayer),
+        Effect.provideService(Diagnostics, diagnostics.service)
+      )
+      const warnings = yield* diagnostics.drainWarnings
+
+      expect(result.statuses).toEqual([
+        { name: "Pronto", category: "Active", isDefault: true }
+      ])
+      expect(warnings).toEqual([])
+    }))
+
+  it.effect("uses model and ref fallbacks only for statuses missing from a partial status document lookup", () =>
+    Effect.gen(function*() {
+      const resolvedStatusId = statusRef("status-open")
+      const unresolvedStatusId = statusRef("plainstatus")
+      const proj = makeProject({
+        identifier: "HULY",
+        name: "Huly",
+        defaultIssueStatus: resolvedStatusId
+      })
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [proj],
+        statuses: [makeStatus({ _id: resolvedStatusId, name: "Open", category: task.statusCategory.ToDo })],
+        projectType: asProjectType({
+          statuses: [
+            { _id: resolvedStatusId },
+            { _id: unresolvedStatusId }
+          ]
+        })
+      })
+
+      const diagnostics = yield* makeDiagnosticsScope
+      const result = yield* listStatuses({ project: projectIdentifier("HULY") }).pipe(
+        Effect.provide(testLayer),
+        Effect.provideService(Diagnostics, diagnostics.service)
+      )
+      const warnings = yield* diagnostics.drainWarnings
+
+      expect(result.statuses).toEqual([
+        { name: "Open", category: "ToDo", isDefault: true },
+        { name: "plainstatus", category: "unknown", isDefault: false }
+      ])
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0].code).toBe("status_metadata_unresolved")
+    }))
+
+  it.effect("uses model metadata for statuses missing from a partial status document lookup", () =>
+    Effect.gen(function*() {
+      const resolvedStatusId = statusRef("status-open")
+      const modelStatusId = statusRef("status-model")
+      const proj = makeProject({
+        identifier: "HULY",
+        name: "Huly",
+        defaultIssueStatus: resolvedStatusId
+      })
+      const diagnostics = yield* makeDiagnosticsScope
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [proj],
+        statuses: [makeStatus({ _id: resolvedStatusId, name: "Open", category: task.statusCategory.ToDo })],
+        modelStatuses: [makeStatus({ _id: modelStatusId, name: "Review", category: task.statusCategory.Active })],
+        projectType: asProjectType({
+          statuses: [
+            { _id: resolvedStatusId },
+            { _id: modelStatusId }
+          ]
+        })
+      })
+
+      const result = yield* listStatuses({ project: projectIdentifier("HULY") }).pipe(
+        Effect.provide(testLayer),
+        Effect.provideService(Diagnostics, diagnostics.service)
+      )
+      const warnings = yield* diagnostics.drainWarnings
+
+      expect(result.statuses).toEqual([
+        { name: "Open", category: "ToDo", isDefault: true },
+        { name: "Review", category: "Active", isDefault: false }
+      ])
+      expect(warnings).toEqual([])
     }))
 
   it.effect("fails when project details have invalid SDK data", () =>
@@ -488,7 +663,7 @@ describe("getProject", () => {
       })
 
       const error = yield* Effect.flip(
-        getProject({ project: projectIdentifier("HULY") }).pipe(Effect.provide(testLayer))
+        getProject({ project: projectIdentifier("HULY") }).pipe(Effect.provide(testLayer), withDiagnostics)
       )
 
       expect(error._tag).toBe("HulyConnectionError")
@@ -502,7 +677,7 @@ describe("getProject", () => {
       const error = yield* Effect.flip(
         getProject({
           project: projectIdentifier("NOPE")
-        }).pipe(Effect.provide(testLayer))
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
       )
 
       expect(error._tag).toBe("ProjectNotFoundError")
@@ -523,7 +698,7 @@ describe("createProject", () => {
       const result = yield* createProject({
         name: "My Project",
         identifier: "MYPRJ"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.identifier).toBe("MYPRJ")
       expect(result.name).toBe("My Project")
@@ -550,7 +725,7 @@ describe("createProject", () => {
       const result = yield* createProject({
         name: "Existing",
         identifier: "EXIST"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.identifier).toBe("EXIST")
       expect(result.name).toBe("Existing")
@@ -571,7 +746,7 @@ describe("createProject", () => {
         name: "Secret",
         identifier: "SEC",
         private: true
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.created).toBe(true)
       expect(captureCreateDoc.attributes?.private).toBe(true)
@@ -590,7 +765,7 @@ describe("createProject", () => {
         name: "Described",
         identifier: "DESC",
         description: "A nice project"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(captureCreateDoc.attributes?.description).toBe("A nice project")
     }))
@@ -610,7 +785,7 @@ describe("updateProject", () => {
       const result = yield* updateProject({
         project: projectIdentifier("UPD"),
         name: "New Name"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.updated).toBe(true)
       expect(captureUpdateDoc.operations?.name).toBe("New Name")
@@ -629,7 +804,7 @@ describe("updateProject", () => {
       const result = yield* updateProject({
         project: projectIdentifier("UPD"),
         description: "Updated desc"
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.updated).toBe(true)
       expect(captureUpdateDoc.operations?.description).toBe("Updated desc")
@@ -648,7 +823,7 @@ describe("updateProject", () => {
       const result = yield* updateProject({
         project: projectIdentifier("UPD"),
         description: null
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.updated).toBe(true)
       expect(captureUpdateDoc.operations?.description).toBe("")
@@ -663,7 +838,7 @@ describe("updateProject", () => {
       const error = yield* Effect.flip(
         updateProject({
           project: projectIdentifier("UPD")
-        }).pipe(Effect.provide(testLayer))
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
       )
 
       expect(error._tag).toBe("NoUpdateFieldsError")
@@ -677,7 +852,7 @@ describe("updateProject", () => {
         updateProject({
           project: projectIdentifier("NOPE"),
           name: "new"
-        }).pipe(Effect.provide(testLayer))
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
       )
 
       expect(error._tag).toBe("ProjectNotFoundError")
@@ -698,7 +873,7 @@ describe("deleteProject", () => {
 
       const result = yield* deleteProject({
         project: projectIdentifier("DEL")
-      }).pipe(Effect.provide(testLayer))
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.identifier).toBe("DEL")
       expect(result.deleted).toBe(true)
@@ -712,7 +887,7 @@ describe("deleteProject", () => {
       const error = yield* Effect.flip(
         deleteProject({
           project: projectIdentifier("NOPE")
-        }).pipe(Effect.provide(testLayer))
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
       )
 
       expect(error._tag).toBe("ProjectNotFoundError")

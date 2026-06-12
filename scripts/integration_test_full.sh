@@ -723,8 +723,38 @@ run_test "list_projects" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}'
 run_test "get_project($PROJECT)" \
   "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_project\",\"arguments\":{\"project\":\"$PROJECT\"}},\"id\":2}"
-run_test "list_statuses($PROJECT)" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_statuses\",\"arguments\":{\"project\":\"$PROJECT\"}},\"id\":2}"
+LIST_STATUSES_RESULT=""
+if run_result_to_var LIST_STATUSES_RESULT "list_statuses($PROJECT)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_statuses\",\"arguments\":{\"project\":\"$PROJECT\"}},\"id\":2}"; then
+  LIST_STATUSES_TEXT=$(printf '%s\n' "$LIST_STATUSES_RESULT" | jq -r '.content[0].text' 2>/dev/null)
+  # The server owns metadata-degradation detection via status_metadata_unresolved.
+  # The raw-ref regex below remains defense in depth if an ID format changes.
+  if printf '%s\n' "$LIST_STATUSES_RESULT" | jq -e '
+    ((.structuredContent.warnings? // []) | length == 0)
+    and ([.content[]? | select((.text | fromjson? | has("warnings")) == true)] | length == 0)
+  ' >/dev/null 2>&1; then
+    echo "PASS: list_statuses($PROJECT) emits no degradation warnings"
+    PASSED=$((PASSED + 1))
+  else
+    echo "FAIL: list_statuses($PROJECT) emitted degradation warnings"
+    FAILED=$((FAILED + 1))
+    ERRORS="${ERRORS}\n  - list_statuses($PROJECT): degradation warnings emitted"
+  fi
+  if printf '%s\n' "$LIST_STATUSES_TEXT" | jq -e '
+    (.statuses | length) > 0
+    and all(.statuses[]?; (.name | type == "string")
+      and (.name | length) > 0
+      and ((.name | test("^[0-9a-f]{24}$")) | not)
+      and .category != "unknown")
+  ' >/dev/null 2>&1; then
+    echo "PASS: list_statuses($PROJECT) resolves status metadata"
+    PASSED=$((PASSED + 1))
+  else
+    echo "FAIL: list_statuses($PROJECT) returned raw or incomplete status metadata"
+    FAILED=$((FAILED + 1))
+    ERRORS="${ERRORS}\n  - list_statuses($PROJECT): raw or incomplete status metadata"
+  fi
+fi
 skip_test "create_project" "would pollute workspace"
 skip_test "update_project" "would pollute workspace"
 skip_test "delete_project" "would pollute workspace"
@@ -764,12 +794,12 @@ TM_STATUS_NAME_JSON=$(json_string "$TM_STATUS_NAME")
 TM_TASK_TYPE_READY=false
 TM_TASK_TYPE_STATUS_NAME_JSON=""
 
-TASK_TYPE_TEXT=$(run_capture "create_task_type($TM_TASK_TYPE_NAME)" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_task_type\",\"arguments\":{\"name\":$TM_TASK_TYPE_NAME_JSON}},\"id\":2}")
+run_capture_to_var TASK_TYPE_TEXT "create_task_type($TM_TASK_TYPE_NAME)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_task_type\",\"arguments\":{\"name\":$TM_TASK_TYPE_NAME_JSON}},\"id\":2}"
 if [ $? -eq 0 ]; then
   assert_json_field_nonempty "create_task_type returns task type id" "$TASK_TYPE_TEXT" '.taskType.id'
-  TASK_TYPE_TEXT_2=$(run_capture "create_task_type idempotent($TM_TASK_TYPE_NAME)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_task_type\",\"arguments\":{\"name\":$TM_TASK_TYPE_NAME_JSON}},\"id\":2}")
+  run_capture_to_var TASK_TYPE_TEXT_2 "create_task_type idempotent($TM_TASK_TYPE_NAME)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_task_type\",\"arguments\":{\"name\":$TM_TASK_TYPE_NAME_JSON}},\"id\":2}"
   if [ $? -eq 0 ]; then
     CREATED_AGAIN=$(echo "$TASK_TYPE_TEXT_2" | jq -r '.created' 2>/dev/null)
     if [ "$CREATED_AGAIN" = "false" ]; then
@@ -783,12 +813,12 @@ if [ $? -eq 0 ]; then
   fi
 fi
 
-STATUS_TEXT=$(run_capture "create_issue_status($TM_STATUS_NAME)" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue_status\",\"arguments\":{\"name\":$TM_STATUS_NAME_JSON,\"category\":\"active\"}},\"id\":2}")
+run_capture_to_var STATUS_TEXT "create_issue_status($TM_STATUS_NAME)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue_status\",\"arguments\":{\"name\":$TM_STATUS_NAME_JSON,\"category\":\"active\"}},\"id\":2}"
 if [ $? -eq 0 ]; then
   assert_json_field_nonempty "create_issue_status returns status id" "$STATUS_TEXT" '.status.id'
-  STATUS_TEXT_2=$(run_capture "create_issue_status idempotent($TM_STATUS_NAME)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue_status\",\"arguments\":{\"name\":$TM_STATUS_NAME_JSON,\"category\":\"active\"}},\"id\":2}")
+  run_capture_to_var STATUS_TEXT_2 "create_issue_status idempotent($TM_STATUS_NAME)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue_status\",\"arguments\":{\"name\":$TM_STATUS_NAME_JSON,\"category\":\"active\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     CREATED_AGAIN=$(echo "$STATUS_TEXT_2" | jq -r '.created' 2>/dev/null)
     if [ "$CREATED_AGAIN" = "false" ]; then
@@ -803,8 +833,8 @@ if [ $? -eq 0 ]; then
 fi
 
 sleep 2
-PROJECT_TYPE_TEXT=$(run_capture "get_project_type verifies task/status" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_project_type","arguments":{}},"id":2}')
+run_capture_to_var PROJECT_TYPE_TEXT "get_project_type verifies task/status" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_project_type","arguments":{}},"id":2}'
 if [ $? -eq 0 ]; then
   TASK_TYPE_PRESENT=$(echo "$PROJECT_TYPE_TEXT" | jq -r --arg name "$TM_TASK_TYPE_NAME" 'any(.taskTypes[]?; .name == $name)' 2>/dev/null)
   STATUS_PRESENT=$(echo "$PROJECT_TYPE_TEXT" | jq -r --arg name "$TM_STATUS_NAME" 'any(.statuses[]?; .name == $name and .category == "Active")' 2>/dev/null)
@@ -888,8 +918,8 @@ ISSUE_TITLE="IntTest Issue $RUN_ID"
 ISSUE_TITLE_JSON=$(json_string "$ISSUE_TITLE")
 ISSUE_TITLE_REGEX_JSON=$(json_string "%$ISSUE_TITLE%")
 ISSUE_TITLE_CASE_REGEX_JSON=$(json_string "%inttest issue $RUN_ID%")
-ISSUE_TEXT=$(run_capture "create_issue" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":$ISSUE_TITLE_JSON,\"description\":\"Integration test\",\"priority\":\"low\"}},\"id\":2}")
+run_capture_to_var ISSUE_TEXT "create_issue" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":$ISSUE_TITLE_JSON,\"description\":\"Integration test\",\"priority\":\"low\"}},\"id\":2}"
 if [ $? -eq 0 ]; then
   ISSUE_ID=$(echo "$ISSUE_TEXT" | jq -r '.identifier' 2>/dev/null)
   ISSUE_OBJ_ID=$(echo "$ISSUE_TEXT" | jq -r '.issueId' 2>/dev/null)
@@ -926,8 +956,8 @@ if [ $? -eq 0 ]; then
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$ISSUE_ID\",\"title\":\"Updated IntTest\",\"priority\":\"high\"}},\"id\":2}"
 
   if [ "$TM_TASK_TYPE_READY" = "true" ]; then
-    TASK_TYPED_ISSUE_TEXT=$(run_capture "create_issue(taskType=$TM_TASK_TYPE_NAME)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Typed IntTest Issue\",\"taskType\":$TM_TASK_TYPE_NAME_JSON,\"status\":$TM_TASK_TYPE_STATUS_NAME_JSON}},\"id\":2}")
+    run_capture_to_var TASK_TYPED_ISSUE_TEXT "create_issue(taskType=$TM_TASK_TYPE_NAME)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Typed IntTest Issue\",\"taskType\":$TM_TASK_TYPE_NAME_JSON,\"status\":$TM_TASK_TYPE_STATUS_NAME_JSON}},\"id\":2}"
     if [ $? -eq 0 ]; then
       TASK_TYPED_ISSUE_ID=$(echo "$TASK_TYPED_ISSUE_TEXT" | jq -r '.identifier' 2>/dev/null)
       echo "  => typed: $TASK_TYPED_ISSUE_ID"
@@ -946,8 +976,8 @@ if [ $? -eq 0 ]; then
 
   # Sub-issue + move
   SUB_ID=""
-  SUB_TEXT=$(run_capture "create_issue(sub)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Sub Issue\",\"parentIssue\":\"$ISSUE_ID\"}},\"id\":2}")
+  run_capture_to_var SUB_TEXT "create_issue(sub)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Sub Issue\",\"parentIssue\":\"$ISSUE_ID\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     SUB_ID=$(echo "$SUB_TEXT" | jq -r '.identifier' 2>/dev/null)
     echo "  => sub: $SUB_ID"
@@ -960,8 +990,8 @@ if [ $? -eq 0 ]; then
   fi
 
   # Issue relations
-  ISSUE2_TEXT=$(run_capture "create_issue(for_relation)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Relation Target\"}},\"id\":2}")
+  run_capture_to_var ISSUE2_TEXT "create_issue(for_relation)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Relation Target\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     ISSUE2_ID=$(echo "$ISSUE2_TEXT" | jq -r '.identifier' 2>/dev/null)
     echo "  => relation target: $ISSUE2_ID"
@@ -969,8 +999,8 @@ if [ $? -eq 0 ]; then
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_issue_relation\",\"arguments\":{\"project\":\"$PROJECT\",\"issueIdentifier\":\"$ISSUE_ID\",\"targetIssue\":\"$ISSUE2_ID\",\"relationType\":\"is-blocked-by\"}},\"id\":2}"
     run_test "list_issue_relations" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_issue_relations\",\"arguments\":{\"project\":\"$PROJECT\",\"issueIdentifier\":\"$ISSUE_ID\"}},\"id\":2}"
-    REL_BLOCKS_TEXT=$(run_capture "list_issue_relations(blocks:$ISSUE2_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_issue_relations\",\"arguments\":{\"project\":\"$PROJECT\",\"issueIdentifier\":\"$ISSUE2_ID\"}},\"id\":2}")
+    run_capture_to_var REL_BLOCKS_TEXT "list_issue_relations(blocks:$ISSUE2_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_issue_relations\",\"arguments\":{\"project\":\"$PROJECT\",\"issueIdentifier\":\"$ISSUE2_ID\"}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_blocks_contains_identifier "list_issue_relations blocks contains $ISSUE_ID" "$REL_BLOCKS_TEXT" "$ISSUE_ID"
     fi
@@ -981,8 +1011,8 @@ if [ $? -eq 0 ]; then
   fi
 
   # Issue labels
-  LBL_TEXT=$(run_capture "create_label(for_issue)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_label\",\"arguments\":{\"title\":\"inttest-lbl\",\"color\":2}},\"id\":2}")
+  run_capture_to_var LBL_TEXT "create_label(for_issue)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_label\",\"arguments\":{\"title\":\"inttest-lbl\",\"color\":2}},\"id\":2}"
   if [ $? -eq 0 ]; then
     LBL_ID=$(echo "$LBL_TEXT" | jq -r '.id' 2>/dev/null)
     echo "  => label: $LBL_ID"
@@ -995,8 +1025,8 @@ if [ $? -eq 0 ]; then
   fi
 
   # Comments on issue
-  COMMENT_TEXT=$(run_capture "add_comment($ISSUE_ID)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_comment\",\"arguments\":{\"project\":\"$PROJECT\",\"issueIdentifier\":\"$ISSUE_ID\",\"body\":\"IntTest comment\"}},\"id\":2}")
+  run_capture_to_var COMMENT_TEXT "add_comment($ISSUE_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_comment\",\"arguments\":{\"project\":\"$PROJECT\",\"issueIdentifier\":\"$ISSUE_ID\",\"body\":\"IntTest comment\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     COMMENT_ID=$(echo "$COMMENT_TEXT" | jq -r '.commentId' 2>/dev/null)
     echo "  => comment: $COMMENT_ID"
@@ -1009,8 +1039,8 @@ if [ $? -eq 0 ]; then
   fi
 
   # Activity on issue
-  ACTIVITY_TEXT=$(run_capture "list_activity(issue:$ISSUE_ID)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_activity\",\"arguments\":{\"project\":\"$PROJECT\",\"issueIdentifier\":\"$ISSUE_ID\",\"limit\":3}},\"id\":2}")
+  run_capture_to_var ACTIVITY_TEXT "list_activity(issue:$ISSUE_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_activity\",\"arguments\":{\"project\":\"$PROJECT\",\"issueIdentifier\":\"$ISSUE_ID\",\"limit\":3}},\"id\":2}"
   if [ $? -eq 0 ] && [ -n "$ISSUE_OBJ_ID" ]; then
     assert_json_activity_contains_object_id "list_activity friendly target contains $ISSUE_OBJ_ID" "$ACTIVITY_TEXT" "$ISSUE_OBJ_ID"
   fi
@@ -1036,8 +1066,8 @@ echo ""
 # 3. COMPONENTS CRUD + set_issue_component
 ##############################
 echo "=== 3. Components CRUD ==="
-COMP_TEXT=$(run_capture "create_component" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_component\",\"arguments\":{\"project\":\"$PROJECT\",\"label\":\"IntTest Comp\"}},\"id\":2}")
+run_capture_to_var COMP_TEXT "create_component" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_component\",\"arguments\":{\"project\":\"$PROJECT\",\"label\":\"IntTest Comp\"}},\"id\":2}"
 if [ $? -eq 0 ]; then
   COMP_ID=$(echo "$COMP_TEXT" | jq -r '.id' 2>/dev/null)
   echo "  => $COMP_ID"
@@ -1049,8 +1079,8 @@ if [ $? -eq 0 ]; then
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_component\",\"arguments\":{\"project\":\"$PROJECT\",\"component\":\"$COMP_ID\",\"label\":\"Updated Comp\"}},\"id\":2}"
 
   # set_issue_component
-  SET_COMP_TEXT=$(run_capture "create_issue(for_component)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Comp Test Issue\"}},\"id\":2}")
+  run_capture_to_var SET_COMP_TEXT "create_issue(for_component)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Comp Test Issue\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     SET_COMP_ISSUE=$(echo "$SET_COMP_TEXT" | jq -r '.identifier' 2>/dev/null)
     run_test "set_issue_component($SET_COMP_ISSUE)" \
@@ -1068,8 +1098,8 @@ echo ""
 # 4. MILESTONES CRUD + set_issue_milestone
 ##############################
 echo "=== 4. Milestones CRUD ==="
-MS_TEXT=$(run_capture "create_milestone" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_milestone\",\"arguments\":{\"project\":\"$PROJECT\",\"label\":\"IntTest MS\",\"targetDate\":1777000000000}},\"id\":2}")
+run_capture_to_var MS_TEXT "create_milestone" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_milestone\",\"arguments\":{\"project\":\"$PROJECT\",\"label\":\"IntTest MS\",\"targetDate\":1777000000000}},\"id\":2}"
 if [ $? -eq 0 ]; then
   MS_ID=$(echo "$MS_TEXT" | jq -r '.id' 2>/dev/null)
   echo "  => $MS_ID"
@@ -1081,8 +1111,8 @@ if [ $? -eq 0 ]; then
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_milestone\",\"arguments\":{\"project\":\"$PROJECT\",\"milestone\":\"$MS_ID\",\"label\":\"Updated MS\"}},\"id\":2}"
 
   # set_issue_milestone
-  SET_MS_TEXT=$(run_capture "create_issue(for_milestone)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"MS Test Issue\"}},\"id\":2}")
+  run_capture_to_var SET_MS_TEXT "create_issue(for_milestone)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"MS Test Issue\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     SET_MS_ISSUE=$(echo "$SET_MS_TEXT" | jq -r '.identifier' 2>/dev/null)
     run_test "set_issue_milestone($SET_MS_ISSUE)" \
@@ -1100,8 +1130,8 @@ echo ""
 # 5. ISSUE TEMPLATES CRUD + CHILDREN
 ##############################
 echo "=== 5. Issue Templates CRUD ==="
-TMPL_TEXT=$(run_capture "create_issue_template" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue_template\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"IntTest Tmpl\",\"priority\":\"high\"}},\"id\":2}")
+run_capture_to_var TMPL_TEXT "create_issue_template" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue_template\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"IntTest Tmpl\",\"priority\":\"high\"}},\"id\":2}"
 if [ $? -eq 0 ]; then
   TMPL_ID=$(echo "$TMPL_TEXT" | jq -r '.id' 2>/dev/null)
   echo "  => $TMPL_ID"
@@ -1113,8 +1143,8 @@ if [ $? -eq 0 ]; then
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_issue_template\",\"arguments\":{\"project\":\"$PROJECT\",\"template\":\"$TMPL_ID\",\"title\":\"Updated Tmpl\"}},\"id\":2}"
 
   # Template children
-  CHILD_TEXT=$(run_capture "add_template_child($TMPL_ID)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_template_child\",\"arguments\":{\"project\":\"$PROJECT\",\"template\":\"$TMPL_ID\",\"title\":\"Child Task\"}},\"id\":2}")
+  run_capture_to_var CHILD_TEXT "add_template_child($TMPL_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_template_child\",\"arguments\":{\"project\":\"$PROJECT\",\"template\":\"$TMPL_ID\",\"title\":\"Child Task\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     CHILD_ID=$(echo "$CHILD_TEXT" | jq -r '.id' 2>/dev/null)
     echo "  => child: $CHILD_ID"
@@ -1123,8 +1153,8 @@ if [ $? -eq 0 ]; then
   fi
 
   # Create from template (NOTE: may hang due to eventual consistency if template was just modified)
-  TMPL_ISSUE_TEXT=$(run_capture "create_issue_from_template" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue_from_template\",\"arguments\":{\"project\":\"$PROJECT\",\"template\":\"$TMPL_ID\",\"title\":\"From Template\"}},\"id\":2}")
+  run_capture_to_var TMPL_ISSUE_TEXT "create_issue_from_template" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue_from_template\",\"arguments\":{\"project\":\"$PROJECT\",\"template\":\"$TMPL_ID\",\"title\":\"From Template\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     TMPL_ISSUE_ID=$(echo "$TMPL_ISSUE_TEXT" | jq -r '.identifier' 2>/dev/null)
     run_test "delete_issue(from_tmpl:$TMPL_ISSUE_ID)" \
@@ -1140,8 +1170,8 @@ echo ""
 # 6. LABELS & TAG CATEGORIES
 ##############################
 echo "=== 6. Labels & Tag Categories ==="
-TC_TEXT=$(run_capture "create_tag_category" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_tag_category\",\"arguments\":{\"label\":\"IntTest Category\"}},\"id\":2}")
+run_capture_to_var TC_TEXT "create_tag_category" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_tag_category\",\"arguments\":{\"label\":\"IntTest Category\"}},\"id\":2}"
 if [ $? -eq 0 ]; then
   TC_ID=$(echo "$TC_TEXT" | jq -r '.id' 2>/dev/null)
   echo "  => tag_cat: $TC_ID"
@@ -1153,8 +1183,8 @@ if [ $? -eq 0 ]; then
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_tag_category\",\"arguments\":{\"category\":\"$TC_ID\"}},\"id\":2}"
 fi
 
-LBL_TEXT=$(run_capture "create_label" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_label","arguments":{"title":"inttest-label","color":1}},"id":2}')
+run_capture_to_var LBL_TEXT "create_label" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_label","arguments":{"title":"inttest-label","color":1}},"id":2}'
 if [ $? -eq 0 ]; then
   LBL_ID=$(echo "$LBL_TEXT" | jq -r '.id' 2>/dev/null)
   echo "  => label: $LBL_ID"
@@ -1170,8 +1200,8 @@ GENERIC_TAG_TITLE="inttest-generic-tag-$RUN_ID"
 GENERIC_TAG_UPDATED_TITLE="updated-generic-tag-$RUN_ID"
 GENERIC_TAG_TITLE_JSON=$(json_string "$GENERIC_TAG_TITLE")
 GENERIC_TAG_UPDATED_TITLE_JSON=$(json_string "$GENERIC_TAG_UPDATED_TITLE")
-GENERIC_TAG_TEXT=$(run_capture "create_tag(generic)" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_tag\",\"arguments\":{\"targetClass\":\"core:class:Space\",\"title\":$GENERIC_TAG_TITLE_JSON,\"color\":3}},\"id\":2}")
+run_capture_to_var GENERIC_TAG_TEXT "create_tag(generic)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_tag\",\"arguments\":{\"targetClass\":\"core:class:Space\",\"title\":$GENERIC_TAG_TITLE_JSON,\"color\":3}},\"id\":2}"
 if [ $? -eq 0 ]; then
   GENERIC_TAG_ID=$(echo "$GENERIC_TAG_TEXT" | jq -r '.id' 2>/dev/null)
   echo "  => generic_tag: $GENERIC_TAG_ID"
@@ -1180,14 +1210,14 @@ if [ $? -eq 0 ]; then
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_tags\",\"arguments\":{\"targetClass\":\"core:class:Space\",\"titleSearch\":$GENERIC_TAG_TITLE_JSON}},\"id\":2}"
   run_test "update_tag($GENERIC_TAG_ID)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_tag\",\"arguments\":{\"targetClass\":\"core:class:Space\",\"tag\":\"$GENERIC_TAG_ID\",\"title\":$GENERIC_TAG_UPDATED_TITLE_JSON,\"color\":4,\"description\":\"Generic tag integration test\"}},\"id\":2}"
-  ATTACH_TAG_TEXT=$(run_capture "attach_tag($GENERIC_TAG_ID)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"attach_tag\",\"arguments\":{\"targetClass\":\"core:class:Space\",\"tag\":\"$GENERIC_TAG_ID\",\"object\":{\"objectId\":\"core:space:Workspace\",\"objectClass\":\"core:class:Space\",\"space\":\"core:space:Workspace\",\"collection\":\"tags\"},\"weight\":3}},\"id\":2}")
+  run_capture_to_var ATTACH_TAG_TEXT "attach_tag($GENERIC_TAG_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"attach_tag\",\"arguments\":{\"targetClass\":\"core:class:Space\",\"tag\":\"$GENERIC_TAG_ID\",\"object\":{\"objectId\":\"core:space:Workspace\",\"objectClass\":\"core:class:Space\",\"space\":\"core:space:Workspace\",\"collection\":\"tags\"},\"weight\":3}},\"id\":2}"
   if [ $? -eq 0 ]; then
     assert_json_field_equals "attach_tag($GENERIC_TAG_ID) attached" "$ATTACH_TAG_TEXT" '.attached' 'true'
     run_test "list_attached_tags($GENERIC_TAG_ID)" \
       '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_attached_tags","arguments":{"objectId":"core:space:Workspace","objectClass":"core:class:Space","space":"core:space:Workspace","collection":"tags"}},"id":2}'
-    DETACH_TAG_TEXT=$(run_capture "detach_tag($GENERIC_TAG_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"detach_tag\",\"arguments\":{\"targetClass\":\"core:class:Space\",\"tag\":\"$GENERIC_TAG_ID\",\"object\":{\"objectId\":\"core:space:Workspace\",\"objectClass\":\"core:class:Space\",\"space\":\"core:space:Workspace\",\"collection\":\"tags\"}}},\"id\":2}")
+    run_capture_to_var DETACH_TAG_TEXT "detach_tag($GENERIC_TAG_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"detach_tag\",\"arguments\":{\"targetClass\":\"core:class:Space\",\"tag\":\"$GENERIC_TAG_ID\",\"object\":{\"objectId\":\"core:space:Workspace\",\"objectClass\":\"core:class:Space\",\"space\":\"core:space:Workspace\",\"collection\":\"tags\"}}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_equals "detach_tag($GENERIC_TAG_ID) detached" "$DETACH_TAG_TEXT" '.detached' 'true'
     fi
@@ -1222,15 +1252,15 @@ if [ -n "$TS_NAME" ]; then
   DOC_REPAIR_CONTENT_JSON=$(json_string "$DOC_REPAIR_CONTENT")
   DOC_CORRUPT_CONTENT='raw-markdown-that-is-not-a-blob-ref'
 
-  DOC_TEXT=$(run_capture "create_document" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"title\":$DOC_TITLE_JSON,\"content\":$DOC_CONTENT_JSON}},\"id\":2}")
+  run_capture_to_var DOC_TEXT "create_document" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"title\":$DOC_TITLE_JSON,\"content\":$DOC_CONTENT_JSON}},\"id\":2}"
   if [ $? -eq 0 ]; then
     DOC_ID=$(echo "$DOC_TEXT" | jq -r '.id' 2>/dev/null)
     echo "  => doc: $DOC_ID"
     assert_json_field_nonempty "create_document($DOC_ID) returns url" "$DOC_TEXT" '.url'
 
-    GET_DOC_TEXT=$(run_capture "get_document($DOC_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\"}},\"id\":2}")
+    run_capture_to_var GET_DOC_TEXT "get_document($DOC_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\"}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_nonempty "get_document($DOC_ID) returns url" "$GET_DOC_TEXT" '.url'
       assert_json_field_contains "get_document($DOC_ID) round-trips heading" "$GET_DOC_TEXT" '.content' "# Integration Markdown"
@@ -1240,36 +1270,36 @@ if [ -n "$TS_NAME" ]; then
       assert_json_field_contains "get_document($DOC_ID) round-trips list" "$GET_DOC_TEXT" '.content' "- First item"
     fi
 
-    LIST_DOCS_REGEX_TEXT=$(run_capture "list_documents($TS_NAME,titleRegex SIMILAR TO contains)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_documents\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"titleRegex\":$DOC_TITLE_REGEX_JSON,\"limit\":10}},\"id\":2}")
+    run_capture_to_var LIST_DOCS_REGEX_TEXT "list_documents($TS_NAME,titleRegex SIMILAR TO contains)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_documents\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"titleRegex\":$DOC_TITLE_REGEX_JSON,\"limit\":10}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_array_contains "list_documents titleRegex SIMILAR TO contains includes document" "$LIST_DOCS_REGEX_TEXT" ".documents | map(.id)" "$DOC_ID"
     fi
 
-    LIST_DOCS_REGEX_CASE_TEXT=$(run_capture "list_documents($TS_NAME,titleRegex case-sensitive miss)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_documents\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"titleRegex\":$DOC_TITLE_CASE_REGEX_JSON,\"limit\":10}},\"id\":2}")
+    run_capture_to_var LIST_DOCS_REGEX_CASE_TEXT "list_documents($TS_NAME,titleRegex case-sensitive miss)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_documents\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"titleRegex\":$DOC_TITLE_CASE_REGEX_JSON,\"limit\":10}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_array_not_contains "list_documents titleRegex is case-sensitive" "$LIST_DOCS_REGEX_CASE_TEXT" ".documents | map(.id)" "$DOC_ID"
     fi
 
-    EDIT_DOC_TEXT=$(run_capture "edit_document($DOC_ID) title rename" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"edit_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\",\"title\":\"Updated Doc\"}},\"id\":2}")
+    run_capture_to_var EDIT_DOC_TEXT "edit_document($DOC_ID) title rename" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"edit_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\",\"title\":\"Updated Doc\"}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_nonempty "edit_document($DOC_ID) returns url" "$EDIT_DOC_TEXT" '.url'
     fi
 
     run_test "edit_document($DOC_ID) full replace" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"edit_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\",\"content\":$DOC_EDITED_CONTENT_JSON}},\"id\":2}"
-    GET_EDITED_DOC_TEXT=$(run_capture "get_document($DOC_ID) after full replace" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\"}},\"id\":2}")
+    run_capture_to_var GET_EDITED_DOC_TEXT "get_document($DOC_ID) after full replace" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\"}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_contains "get_document($DOC_ID) returns full replacement" "$GET_EDITED_DOC_TEXT" '.content' "# Edited Integration Markdown"
       assert_json_field_contains "get_document($DOC_ID) replacement list" "$GET_EDITED_DOC_TEXT" '.content' "- Repaired item"
     fi
 
     CORRUPT_DOC_ID=""
-    CORRUPT_DOC_TEXT=$(run_capture "create_document(raw corruption fixture)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"title\":\"IntTest Raw Corruption Fixture\"}},\"id\":2}")
+    run_capture_to_var CORRUPT_DOC_TEXT "create_document(raw corruption fixture)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"title\":\"IntTest Raw Corruption Fixture\"}},\"id\":2}"
     if [ $? -eq 0 ]; then
       CORRUPT_DOC_ID=$(echo "$CORRUPT_DOC_TEXT" | jq -r '.id' 2>/dev/null)
       echo "  => corrupt_doc: $CORRUPT_DOC_ID"
@@ -1282,8 +1312,8 @@ if [ -n "$TS_NAME" ]; then
         "Document content is unreadable or corrupted. Use edit_document with the full content field to replace and repair it."
       run_test "edit_document($CORRUPT_DOC_ID) repairs corrupted content" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"edit_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$CORRUPT_DOC_ID\",\"content\":$DOC_REPAIR_CONTENT_JSON}},\"id\":2}"
-      GET_REPAIRED_DOC_TEXT=$(run_capture "get_document($CORRUPT_DOC_ID) after repair" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$CORRUPT_DOC_ID\"}},\"id\":2}")
+      run_capture_to_var GET_REPAIRED_DOC_TEXT "get_document($CORRUPT_DOC_ID) after repair" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$CORRUPT_DOC_ID\"}},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_field_contains "get_document($CORRUPT_DOC_ID) repaired content" "$GET_REPAIRED_DOC_TEXT" '.content' "# Repaired After Corruption"
       fi
@@ -1450,15 +1480,15 @@ echo "=== 7b. Document Edit (Search & Replace) ==="
 SR_CONTENT='# Project Overview\n\nThis document describes the **Project Alpha** architecture. TODO: finalize scope.\n\n## Getting Started\n\nTo set up the project, follow these steps:\n\n- Install dependencies with `pnpm install`\n- Configure the `config.yaml` file\n- Set the `$API_KEY` environment variable\n- TODO: add Docker instructions\n\n## API Reference\n\nThe API exposes the following endpoints:\n\n### GET /users\n\nReturns a list of users. The response includes `id`, `name`, and `email` fields.\nEach user object also contains a `role` field with values like *admin*, *editor*, or *viewer*.\n\n### POST /users\n\nCreates a new user. Required fields: `name` and `email`.\n\n## Code Examples\n\n```typescript\nimport { Client } from \"./sdk\";\n\nconst client = new Client({ baseUrl: \"https://api.example.com\" });\n\nasync function main() {\n  const users = await client.getUsers();\n  console.log(\"Found users:\", users.length);\n  \n  for (const user of users) {\n    console.log(`User: ${user.name} (${user.email})`);\n  }\n}\n\nmain().catch(console.error);\n```\n\n## Configuration\n\nThe system supports the following configuration options:\n\n| Option | Type | Default | Description |\n|--------|------|---------|-------------|\n| port | number | 3000 | Server port |\n| debug | boolean | false | Enable debug mode |\n| logLevel | string | \"info\" | Log verbosity |\n\n## Deployment Notes\n\nThe deployment pipeline uses GitHub Actions. TODO: document rollback procedure.\nMake sure the `$DATABASE_URL` variable is set in the production environment.\nThe health check endpoint is available at `/health` and returns a 200 status code.\n\n## Troubleshooting\n\nCommon issues and solutions:\n\n- **Connection timeout**: Check that the `$API_KEY` is valid and not expired\n- **Rate limiting**: The API allows 100 requests per minute per API key\n- **Data sync**: Allow up to 5 minutes for changes to propagate across regions'
 
 # Create a dedicated teamspace for S&R tests
-SR_TS_TEXT=$(run_capture "create_teamspace(SR)" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_teamspace","arguments":{"name":"SR Test Space","description":"search and replace integration test"}},"id":2}')
+run_capture_to_var SR_TS_TEXT "create_teamspace(SR)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_teamspace","arguments":{"name":"SR Test Space","description":"search and replace integration test"}},"id":2}'
 if [ $? -eq 0 ]; then
   SR_TS_ID=$(echo "$SR_TS_TEXT" | jq -r '.id' 2>/dev/null)
   echo "  => teamspace: $SR_TS_ID"
 
   # Step 1: Create doc with big content
-  SR_DOC_TEXT=$(run_capture "sr: create big doc" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_document\",\"arguments\":{\"teamspace\":\"$SR_TS_ID\",\"title\":\"SR Test Doc\",\"content\":\"$SR_CONTENT\"}},\"id\":2}")
+  run_capture_to_var SR_DOC_TEXT "sr: create big doc" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_document\",\"arguments\":{\"teamspace\":\"$SR_TS_ID\",\"title\":\"SR Test Doc\",\"content\":\"$SR_CONTENT\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     SR_DOC_ID=$(echo "$SR_DOC_TEXT" | jq -r '.id' 2>/dev/null)
     echo "  => doc: $SR_DOC_ID"
@@ -1526,8 +1556,8 @@ echo ""
 # 8. TEAMSPACES
 ##############################
 echo "=== 8. Teamspaces ==="
-NEW_TS_TEXT=$(run_capture "create_teamspace" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_teamspace","arguments":{"name":"IntTest Space","description":"test"}},"id":2}')
+run_capture_to_var NEW_TS_TEXT "create_teamspace" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_teamspace","arguments":{"name":"IntTest Space","description":"test"}},"id":2}'
 if [ $? -eq 0 ]; then
   NEW_TS_ID=$(echo "$NEW_TS_TEXT" | jq -r '.id' 2>/dev/null)
   echo "  => teamspace: $NEW_TS_ID"
@@ -1550,8 +1580,8 @@ run_test "get_channel(general)" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_channel","arguments":{"channel":"general"}},"id":2}'
 run_test "list_channel_messages(general)" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_channel_messages","arguments":{"channel":"general","limit":3}},"id":2}'
-DM_LIST_TEXT=$(run_capture "list_direct_messages" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_direct_messages","arguments":{"limit":3}},"id":2}')
+run_capture_to_var DM_LIST_TEXT "list_direct_messages" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_direct_messages","arguments":{"limit":3}},"id":2}'
 if [ -n "$HULY_EMAIL" ]; then
   SELF_EMAIL_JSON=$(json_string "$HULY_EMAIL")
   run_expect_error "create_direct_message(rejects_self)" \
@@ -1582,8 +1612,8 @@ if [ -n "$SELF_NAME" ]; then
   EXISTING_DM_PERSON_NAME=$(echo "$DM_LIST_TEXT" | jq -r --arg self "$SELF_NAME" '.conversations[]? | select((.participantIds // [] | length) == 2 and (.participants // [] | length) == 2 and ((.participants // []) | index($self) != null)) | .participants[]? | select(. != $self)' 2>/dev/null | head -1)
   if [ -n "$EXISTING_DM_PERSON_NAME" ]; then
     EXISTING_DM_PERSON_JSON=$(json_string "$EXISTING_DM_PERSON_NAME")
-    CREATE_DM_TEXT=$(run_capture "create_direct_message(existing:$EXISTING_DM_PERSON_NAME)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_direct_message\",\"arguments\":{\"person\":$EXISTING_DM_PERSON_JSON}},\"id\":2}")
+    run_capture_to_var CREATE_DM_TEXT "create_direct_message(existing:$EXISTING_DM_PERSON_NAME)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_direct_message\",\"arguments\":{\"person\":$EXISTING_DM_PERSON_JSON}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_equals "create_direct_message existing created=false" "$CREATE_DM_TEXT" ".created" "false"
     fi
@@ -1601,16 +1631,16 @@ if [ -n "$EMPLOYEES_FOR_DM_TEXT" ] && [ -n "$SELF_NAME" ]; then
   GROUP_DM_PEOPLE_JSON=$(echo "$EMPLOYEES_FOR_DM_TEXT" | jq -c --arg self "$SELF_NAME" '[.[]? | select((.name // "") != "" and .name != $self and .active != false) | .name] | sort | group_by(.) | map(select(length == 1) | .[0]) | .[:2]' 2>/dev/null)
 fi
 if [ "$(printf '%s\n' "$GROUP_DM_PEOPLE_JSON" | jq -r 'length // 0' 2>/dev/null)" = "2" ]; then
-  GROUP_DM_TEXT=$(run_capture "create_group_direct_message" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_group_direct_message\",\"arguments\":{\"people\":$GROUP_DM_PEOPLE_JSON}},\"id\":2}")
+  run_capture_to_var GROUP_DM_TEXT "create_group_direct_message" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_group_direct_message\",\"arguments\":{\"people\":$GROUP_DM_PEOPLE_JSON}},\"id\":2}"
   if [ $? -eq 0 ]; then
     GROUP_DM_ID=$(echo "$GROUP_DM_TEXT" | jq -r '.id // empty' 2>/dev/null)
     assert_json_field_nonempty "create_group_direct_message returns id" "$GROUP_DM_TEXT" ".id"
     assert_json_field_count "create_group_direct_message has three members" "$GROUP_DM_TEXT" ".members | length" "3"
 
     GROUP_DM_REVERSED_JSON=$(printf '%s\n' "$GROUP_DM_PEOPLE_JSON" | jq -c 'reverse')
-    GROUP_DM_EXISTING_TEXT=$(run_capture "create_group_direct_message(existing reversed)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_group_direct_message\",\"arguments\":{\"people\":$GROUP_DM_REVERSED_JSON}},\"id\":2}")
+    run_capture_to_var GROUP_DM_EXISTING_TEXT "create_group_direct_message(existing reversed)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_group_direct_message\",\"arguments\":{\"people\":$GROUP_DM_REVERSED_JSON}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_equals "create_group_direct_message existing created=false" "$GROUP_DM_EXISTING_TEXT" ".created" "false"
       if [ -n "$GROUP_DM_ID" ]; then
@@ -1628,8 +1658,8 @@ fi
 if [ -n "$DM_ID" ]; then
   run_test "list_dm_messages($DM_ID)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_dm_messages\",\"arguments\":{\"dm\":\"$DM_ID\",\"limit\":3}},\"id\":2}"
-  DM_MSG_TEXT=$(run_capture "send_dm_message($DM_ID)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"send_dm_message\",\"arguments\":{\"dm\":\"$DM_ID\",\"body\":\"IntTest DM msg $RUN_ID\"}},\"id\":2}")
+  run_capture_to_var DM_MSG_TEXT "send_dm_message($DM_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"send_dm_message\",\"arguments\":{\"dm\":\"$DM_ID\",\"body\":\"IntTest DM msg $RUN_ID\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     DM_MSG_ID=$(echo "$DM_MSG_TEXT" | jq -r '.id // empty' 2>/dev/null)
     if [ -n "$DM_MSG_ID" ]; then
@@ -1654,42 +1684,42 @@ CHANNEL_NAME="inttest-chan-$RUN_ID"
 CHANNEL_NAME_JSON=$(json_string "$CHANNEL_NAME")
 CHANNEL_NAME_REGEX_JSON=$(json_string "%$CHANNEL_NAME%")
 CHANNEL_NAME_CASE_REGEX_JSON=$(json_string "%INTTEST-CHAN-$RUN_ID%")
-CH_TEXT=$(run_capture "create_channel" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_channel\",\"arguments\":{\"name\":$CHANNEL_NAME_JSON,\"topic\":\"test channel\"}},\"id\":2}")
+run_capture_to_var CH_TEXT "create_channel" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_channel\",\"arguments\":{\"name\":$CHANNEL_NAME_JSON,\"topic\":\"test channel\"}},\"id\":2}"
 if [ $? -eq 0 ]; then
   CH_ID=$(echo "$CH_TEXT" | jq -r '.id' 2>/dev/null)
   echo "  => channel: $CH_ID"
 
-  CH_MEMBERS_TEXT=$(run_capture "list_channel_members($CH_ID)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_channel_members\",\"arguments\":{\"channel\":\"$CH_ID\"}},\"id\":2}")
+  run_capture_to_var CH_MEMBERS_TEXT "list_channel_members($CH_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_channel_members\",\"arguments\":{\"channel\":\"$CH_ID\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     assert_json_field_count "list_channel_members sees creator" "$CH_MEMBERS_TEXT" ".members | length" "1"
     assert_json_field_nonempty "list_channel_members returns accountUuid" "$CH_MEMBERS_TEXT" ".members[0].accountUuid"
   fi
 
-  JOIN_TEXT=$(run_capture "join_channel($CH_ID idempotent)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"join_channel\",\"arguments\":{\"channel\":\"$CH_ID\"}},\"id\":2}")
+  run_capture_to_var JOIN_TEXT "join_channel($CH_ID idempotent)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"join_channel\",\"arguments\":{\"channel\":\"$CH_ID\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     assert_json_field_equals "join_channel existing member changed=false" "$JOIN_TEXT" ".changed" "false"
   fi
 
   if [ -n "$CHANNEL_MEMBER_CANDIDATE" ]; then
     CHANNEL_MEMBER_CANDIDATE_JSON=$(json_string "$CHANNEL_MEMBER_CANDIDATE")
-    ADD_MEMBERS_TEXT=$(run_capture "add_channel_members($CH_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_channel_members\",\"arguments\":{\"channel\":\"$CH_ID\",\"members\":[$CHANNEL_MEMBER_CANDIDATE_JSON]}},\"id\":2}")
+    run_capture_to_var ADD_MEMBERS_TEXT "add_channel_members($CH_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_channel_members\",\"arguments\":{\"channel\":\"$CH_ID\",\"members\":[$CHANNEL_MEMBER_CANDIDATE_JSON]}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_equals "add_channel_members changed" "$ADD_MEMBERS_TEXT" ".changed" "true"
       assert_json_field_count "add_channel_members has two members" "$ADD_MEMBERS_TEXT" ".members | length" "2"
     fi
 
-    ADD_MEMBERS_AGAIN_TEXT=$(run_capture "add_channel_members($CH_ID idempotent)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_channel_members\",\"arguments\":{\"channel\":\"$CH_ID\",\"members\":[$CHANNEL_MEMBER_CANDIDATE_JSON]}},\"id\":2}")
+    run_capture_to_var ADD_MEMBERS_AGAIN_TEXT "add_channel_members($CH_ID idempotent)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_channel_members\",\"arguments\":{\"channel\":\"$CH_ID\",\"members\":[$CHANNEL_MEMBER_CANDIDATE_JSON]}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_equals "add_channel_members idempotent changed=false" "$ADD_MEMBERS_AGAIN_TEXT" ".changed" "false"
     fi
 
-    REMOVE_MEMBERS_TEXT=$(run_capture "remove_channel_members($CH_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_channel_members\",\"arguments\":{\"channel\":\"$CH_ID\",\"members\":[$CHANNEL_MEMBER_CANDIDATE_JSON]}},\"id\":2}")
+    run_capture_to_var REMOVE_MEMBERS_TEXT "remove_channel_members($CH_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_channel_members\",\"arguments\":{\"channel\":\"$CH_ID\",\"members\":[$CHANNEL_MEMBER_CANDIDATE_JSON]}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_equals "remove_channel_members changed" "$REMOVE_MEMBERS_TEXT" ".changed" "true"
       assert_json_field_count "remove_channel_members leaves creator" "$REMOVE_MEMBERS_TEXT" ".members | length" "1"
@@ -1701,28 +1731,28 @@ if [ $? -eq 0 ]; then
   run_expect_error "leave_channel($CH_ID rejects last owner)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"leave_channel\",\"arguments\":{\"channel\":\"$CH_ID\"}},\"id\":2}"
 
-  STAR_TEXT=$(run_capture "set_conversation_starred(channel:$CH_ID)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_conversation_starred\",\"arguments\":{\"channel\":\"$CH_ID\",\"starred\":true}},\"id\":2}")
+  run_capture_to_var STAR_TEXT "set_conversation_starred(channel:$CH_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_conversation_starred\",\"arguments\":{\"channel\":\"$CH_ID\",\"starred\":true}},\"id\":2}"
   if [ $? -eq 0 ]; then
     assert_json_field_equals "set_conversation_starred channel kind" "$STAR_TEXT" ".kind" "channel"
     assert_json_field_equals "set_conversation_starred channel starred" "$STAR_TEXT" ".starred" "true"
   fi
 
-  STAR_AGAIN_TEXT=$(run_capture "set_conversation_starred(channel:$CH_ID idempotent)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_conversation_starred\",\"arguments\":{\"channel\":\"$CH_ID\",\"starred\":true}},\"id\":2}")
+  run_capture_to_var STAR_AGAIN_TEXT "set_conversation_starred(channel:$CH_ID idempotent)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_conversation_starred\",\"arguments\":{\"channel\":\"$CH_ID\",\"starred\":true}},\"id\":2}"
   if [ $? -eq 0 ]; then
     assert_json_field_equals "set_conversation_starred idempotent changed=false" "$STAR_AGAIN_TEXT" ".changed" "false"
   fi
 
-  ARCHIVE_TEXT=$(run_capture "archive_channel($CH_ID)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_channel\",\"arguments\":{\"channel\":\"$CH_ID\"}},\"id\":2}")
+  run_capture_to_var ARCHIVE_TEXT "archive_channel($CH_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_channel\",\"arguments\":{\"channel\":\"$CH_ID\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     assert_json_field_equals "archive_channel archived" "$ARCHIVE_TEXT" ".archived" "true"
     assert_json_field_equals "archive_channel changed" "$ARCHIVE_TEXT" ".changed" "true"
   fi
 
-  ARCHIVE_AGAIN_TEXT=$(run_capture "archive_channel($CH_ID idempotent)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_channel\",\"arguments\":{\"channel\":\"$CH_ID\"}},\"id\":2}")
+  run_capture_to_var ARCHIVE_AGAIN_TEXT "archive_channel($CH_ID idempotent)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_channel\",\"arguments\":{\"channel\":\"$CH_ID\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     assert_json_field_equals "archive_channel idempotent changed=false" "$ARCHIVE_AGAIN_TEXT" ".changed" "false"
   fi
@@ -1732,41 +1762,41 @@ if [ $? -eq 0 ]; then
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_channel_members\",\"arguments\":{\"channel\":\"$CH_ID\",\"members\":[$CHANNEL_MEMBER_CANDIDATE_JSON]}},\"id\":2}"
   fi
 
-  UNARCHIVE_TEXT=$(run_capture "unarchive_channel($CH_ID)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unarchive_channel\",\"arguments\":{\"channel\":\"$CH_ID\"}},\"id\":2}")
+  run_capture_to_var UNARCHIVE_TEXT "unarchive_channel($CH_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unarchive_channel\",\"arguments\":{\"channel\":\"$CH_ID\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     assert_json_field_equals "unarchive_channel archived=false" "$UNARCHIVE_TEXT" ".archived" "false"
     assert_json_field_equals "unarchive_channel changed" "$UNARCHIVE_TEXT" ".changed" "true"
   fi
 
-  UNARCHIVE_AGAIN_TEXT=$(run_capture "unarchive_channel($CH_ID idempotent)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unarchive_channel\",\"arguments\":{\"channel\":\"$CH_ID\"}},\"id\":2}")
+  run_capture_to_var UNARCHIVE_AGAIN_TEXT "unarchive_channel($CH_ID idempotent)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unarchive_channel\",\"arguments\":{\"channel\":\"$CH_ID\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     assert_json_field_equals "unarchive_channel idempotent changed=false" "$UNARCHIVE_AGAIN_TEXT" ".changed" "false"
   fi
 
-  CH_REGEX_TEXT=$(run_capture "list_channels(nameRegex SIMILAR TO contains)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_channels\",\"arguments\":{\"nameRegex\":$CHANNEL_NAME_REGEX_JSON,\"limit\":10}},\"id\":2}")
+  run_capture_to_var CH_REGEX_TEXT "list_channels(nameRegex SIMILAR TO contains)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_channels\",\"arguments\":{\"nameRegex\":$CHANNEL_NAME_REGEX_JSON,\"limit\":10}},\"id\":2}"
   if [ $? -eq 0 ]; then
     assert_json_array_contains "list_channels nameRegex SIMILAR TO contains includes channel" "$CH_REGEX_TEXT" "map(.id)" "$CH_ID"
   fi
 
-  CH_REGEX_CASE_TEXT=$(run_capture "list_channels(nameRegex case-sensitive miss)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_channels\",\"arguments\":{\"nameRegex\":$CHANNEL_NAME_CASE_REGEX_JSON,\"limit\":10}},\"id\":2}")
+  run_capture_to_var CH_REGEX_CASE_TEXT "list_channels(nameRegex case-sensitive miss)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_channels\",\"arguments\":{\"nameRegex\":$CHANNEL_NAME_CASE_REGEX_JSON,\"limit\":10}},\"id\":2}"
   if [ $? -eq 0 ]; then
     assert_json_array_not_contains "list_channels nameRegex is case-sensitive" "$CH_REGEX_CASE_TEXT" "map(.id)" "$CH_ID"
   fi
 
   # Send a channel message, then reply + reactions
-  MSG_TEXT=$(run_capture "send_channel_message($CHANNEL_NAME)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"send_channel_message\",\"arguments\":{\"channel\":\"$CH_ID\",\"body\":\"IntTest msg\"}},\"id\":2}")
+  run_capture_to_var MSG_TEXT "send_channel_message($CHANNEL_NAME)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"send_channel_message\",\"arguments\":{\"channel\":\"$CH_ID\",\"body\":\"IntTest msg\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     MSG_ID=$(echo "$MSG_TEXT" | jq -r '.id' 2>/dev/null)
     echo "  => msg: $MSG_ID"
 
     # Thread replies
-    REPLY_TEXT=$(run_capture "add_thread_reply($MSG_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_thread_reply\",\"arguments\":{\"channel\":\"$CH_ID\",\"messageId\":\"$MSG_ID\",\"body\":\"IntTest reply\"}},\"id\":2}")
+    run_capture_to_var REPLY_TEXT "add_thread_reply($MSG_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_thread_reply\",\"arguments\":{\"channel\":\"$CH_ID\",\"messageId\":\"$MSG_ID\",\"body\":\"IntTest reply\"}},\"id\":2}"
     if [ $? -eq 0 ]; then
       REPLY_ID=$(echo "$REPLY_TEXT" | jq -r '.id' 2>/dev/null)
       echo "  => reply: $REPLY_ID"
@@ -1799,15 +1829,15 @@ if [ $? -eq 0 ]; then
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_channel\",\"arguments\":{\"channel\":\"$CH_ID\"}},\"id\":2}"
 fi
 if [ -n "$GROUP_DM_ID" ]; then
-  CLOSE_DM_TEXT=$(run_capture "set_conversation_closed(dm:$GROUP_DM_ID)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_conversation_closed\",\"arguments\":{\"dm\":\"$GROUP_DM_ID\",\"closed\":true}},\"id\":2}")
+  run_capture_to_var CLOSE_DM_TEXT "set_conversation_closed(dm:$GROUP_DM_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_conversation_closed\",\"arguments\":{\"dm\":\"$GROUP_DM_ID\",\"closed\":true}},\"id\":2}"
   if [ $? -eq 0 ]; then
     assert_json_field_equals "set_conversation_closed dm kind" "$CLOSE_DM_TEXT" ".kind" "direct_message"
     assert_json_field_equals "set_conversation_closed dm closed" "$CLOSE_DM_TEXT" ".closed" "true"
   fi
 
-  REOPEN_DM_TEXT=$(run_capture "set_conversation_closed(dm:$GROUP_DM_ID reopen)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_conversation_closed\",\"arguments\":{\"dm\":\"$GROUP_DM_ID\",\"closed\":false}},\"id\":2}")
+  run_capture_to_var REOPEN_DM_TEXT "set_conversation_closed(dm:$GROUP_DM_ID reopen)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_conversation_closed\",\"arguments\":{\"dm\":\"$GROUP_DM_ID\",\"closed\":false}},\"id\":2}"
   if [ $? -eq 0 ]; then
     assert_json_field_equals "set_conversation_closed dm reopened" "$REOPEN_DM_TEXT" ".closed" "false"
   fi
@@ -1841,41 +1871,41 @@ PERSON_PHONE_JSON=$(json_string "$PERSON_PHONE")
 PERSON_PHONE_UPDATED_JSON=$(json_string "$PERSON_PHONE_UPDATED")
 PERSON_NAME_REGEX_JSON=$(json_string "%$PERSON_FIRST_NAME%")
 PERSON_NAME_CASE_REGEX_JSON=$(json_string "%inttest-$RUN_ID%")
-PERSON_TEXT=$(run_capture "create_person" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":$PERSON_FIRST_NAME_JSON,\"lastName\":\"Person\",\"email\":$PERSON_EMAIL_JSON}},\"id\":2}")
+run_capture_to_var PERSON_TEXT "create_person" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":$PERSON_FIRST_NAME_JSON,\"lastName\":\"Person\",\"email\":$PERSON_EMAIL_JSON}},\"id\":2}"
 if [ $? -eq 0 ]; then
   PERSON_ID=$(echo "$PERSON_TEXT" | jq -r '.id' 2>/dev/null)
   echo "  => person: $PERSON_ID"
-  PERSON_REGEX_TEXT=$(run_capture "list_persons(nameRegex SIMILAR TO contains)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_persons\",\"arguments\":{\"nameRegex\":$PERSON_NAME_REGEX_JSON,\"limit\":10}},\"id\":2}")
+  run_capture_to_var PERSON_REGEX_TEXT "list_persons(nameRegex SIMILAR TO contains)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_persons\",\"arguments\":{\"nameRegex\":$PERSON_NAME_REGEX_JSON,\"limit\":10}},\"id\":2}"
   if [ $? -eq 0 ]; then
     assert_json_array_contains "list_persons nameRegex SIMILAR TO contains includes person" "$PERSON_REGEX_TEXT" "map(.id)" "$PERSON_ID"
   fi
 
-  PERSON_REGEX_CASE_TEXT=$(run_capture "list_persons(nameRegex case-sensitive miss)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_persons\",\"arguments\":{\"nameRegex\":$PERSON_NAME_CASE_REGEX_JSON,\"limit\":10}},\"id\":2}")
+  run_capture_to_var PERSON_REGEX_CASE_TEXT "list_persons(nameRegex case-sensitive miss)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_persons\",\"arguments\":{\"nameRegex\":$PERSON_NAME_CASE_REGEX_JSON,\"limit\":10}},\"id\":2}"
   if [ $? -eq 0 ]; then
     assert_json_array_not_contains "list_persons nameRegex is case-sensitive" "$PERSON_REGEX_CASE_TEXT" "map(.id)" "$PERSON_ID"
   fi
 	  run_test "update_person($PERSON_ID)" \
 	    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_person\",\"arguments\":{\"personId\":\"$PERSON_ID\",\"city\":\"TestCity\"}},\"id\":2}"
-	  PERSON_CHANNEL_TEXT=$(run_capture "add_person_channel($PERSON_ID phone)" \
-	    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_person_channel\",\"arguments\":{\"person\":\"$PERSON_ID\",\"provider\":\"phone\",\"value\":$PERSON_PHONE_JSON}},\"id\":2}")
+	  run_capture_to_var PERSON_CHANNEL_TEXT "add_person_channel($PERSON_ID phone)" \
+	    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_person_channel\",\"arguments\":{\"person\":\"$PERSON_ID\",\"provider\":\"phone\",\"value\":$PERSON_PHONE_JSON}},\"id\":2}"
 	  if [ $? -eq 0 ]; then
 	    PERSON_CHANNEL_ID=$(echo "$PERSON_CHANNEL_TEXT" | jq -r '.channel.channelId' 2>/dev/null)
 	    assert_json_field_equals "add_person_channel added" "$PERSON_CHANNEL_TEXT" ".added" "true"
-	    PERSON_CHANNEL_AGAIN_TEXT=$(run_capture "add_person_channel($PERSON_ID phone idempotent)" \
-	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_person_channel\",\"arguments\":{\"person\":\"$PERSON_ID\",\"provider\":\"phone\",\"value\":$PERSON_PHONE_JSON}},\"id\":2}")
+	    run_capture_to_var PERSON_CHANNEL_AGAIN_TEXT "add_person_channel($PERSON_ID phone idempotent)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_person_channel\",\"arguments\":{\"person\":\"$PERSON_ID\",\"provider\":\"phone\",\"value\":$PERSON_PHONE_JSON}},\"id\":2}"
 	    if [ $? -eq 0 ]; then
 	      assert_json_field_equals "add_person_channel idempotent added=false" "$PERSON_CHANNEL_AGAIN_TEXT" ".added" "false"
 	    fi
-	    PERSON_CHANNELS_TEXT=$(run_capture "list_person_channels($PERSON_ID)" \
-	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_person_channels\",\"arguments\":{\"person\":\"$PERSON_ID\"}},\"id\":2}")
+	    run_capture_to_var PERSON_CHANNELS_TEXT "list_person_channels($PERSON_ID)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_person_channels\",\"arguments\":{\"person\":\"$PERSON_ID\"}},\"id\":2}"
 	    if [ $? -eq 0 ]; then
 	      assert_json_array_contains "list_person_channels includes phone channel" "$PERSON_CHANNELS_TEXT" ".channels | map(.channelId)" "$PERSON_CHANNEL_ID"
 	    fi
-	    PERSON_GET_TEXT=$(run_capture "get_person($PERSON_ID channels)" \
-	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":\"$PERSON_ID\"}},\"id\":2}")
+	    run_capture_to_var PERSON_GET_TEXT "get_person($PERSON_ID channels)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":\"$PERSON_ID\"}},\"id\":2}"
 	    if [ $? -eq 0 ]; then
 	      assert_json_array_contains "get_person includes channelId" "$PERSON_GET_TEXT" ".channels | map(.channelId)" "$PERSON_CHANNEL_ID"
 	    fi
@@ -1897,8 +1927,8 @@ ORG_MEMBER_EMAIL="inttest-org-$ORG_SUFFIX@test.local"
 ORG_CHANNEL_EMAIL="org-$ORG_SUFFIX@test.local"
 ORG_CHANNEL_UPDATED_EMAIL="org-updated-$ORG_SUFFIX@test.local"
 
-ORG_PERSON_TEXT=$(run_capture "create_person(for_org)" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":\"Org\",\"lastName\":\"Member\",\"email\":\"$ORG_MEMBER_EMAIL\"}},\"id\":2}")
+run_capture_to_var ORG_PERSON_TEXT "create_person(for_org)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":\"Org\",\"lastName\":\"Member\",\"email\":\"$ORG_MEMBER_EMAIL\"}},\"id\":2}"
 if [ $? -eq 0 ]; then
   ORG_PERSON_ID=$(echo "$ORG_PERSON_TEXT" | jq -r '.id' 2>/dev/null)
   echo "  => org person: $ORG_PERSON_ID"
@@ -1913,8 +1943,8 @@ if [ $? -eq 0 ]; then
   run_expect_error "create_organization(rejects_missing_member)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_organization\",\"arguments\":{\"name\":\"IntTest Missing Member $ORG_SUFFIX\",\"members\":[\"missing-$ORG_SUFFIX@test.local\"]}},\"id\":2}"
 
-  ORG_TEXT=$(run_capture "create_organization" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_organization\",\"arguments\":{\"name\":$ORG_NAME_JSON,\"members\":[$ORG_MEMBER_EMAIL_JSON]}},\"id\":2}")
+  run_capture_to_var ORG_TEXT "create_organization" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_organization\",\"arguments\":{\"name\":$ORG_NAME_JSON,\"members\":[$ORG_MEMBER_EMAIL_JSON]}},\"id\":2}"
   if [ $? -eq 0 ]; then
     ORG_ID=$(echo "$ORG_TEXT" | jq -r '.id' 2>/dev/null)
     echo "  => organization: $ORG_ID"
@@ -1929,23 +1959,23 @@ if [ $? -eq 0 ]; then
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_person_organizations\",\"arguments\":{\"personId\":\"$ORG_PERSON_ID\"}},\"id\":2}"
     run_test "update_organization($ORG_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_organization\",\"arguments\":{\"identifier\":\"$ORG_ID\",\"name\":$ORG_UPDATED_NAME_JSON,\"city\":\"TestCity\",\"description\":$ORG_DESC_JSON}},\"id\":2}"
-	    ORG_CHANNEL_TEXT=$(run_capture "add_organization_channel($ORG_ID)" \
-	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_organization_channel\",\"arguments\":{\"organizationId\":\"$ORG_ID\",\"provider\":\"email\",\"value\":$ORG_CHANNEL_EMAIL_JSON}},\"id\":2}")
+	    run_capture_to_var ORG_CHANNEL_TEXT "add_organization_channel($ORG_ID)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_organization_channel\",\"arguments\":{\"organizationId\":\"$ORG_ID\",\"provider\":\"email\",\"value\":$ORG_CHANNEL_EMAIL_JSON}},\"id\":2}"
 	    if [ $? -eq 0 ]; then
 	      ORG_CHANNEL_ID=$(echo "$ORG_CHANNEL_TEXT" | jq -r '.channel.channelId' 2>/dev/null)
 	      assert_json_field_equals "add_organization_channel added" "$ORG_CHANNEL_TEXT" ".added" "true"
-	      ORG_CHANNEL_AGAIN_TEXT=$(run_capture "add_organization_channel($ORG_ID idempotent)" \
-	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_organization_channel\",\"arguments\":{\"organizationId\":\"$ORG_ID\",\"provider\":\"email\",\"value\":$ORG_CHANNEL_EMAIL_JSON}},\"id\":2}")
+	      run_capture_to_var ORG_CHANNEL_AGAIN_TEXT "add_organization_channel($ORG_ID idempotent)" \
+	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_organization_channel\",\"arguments\":{\"organizationId\":\"$ORG_ID\",\"provider\":\"email\",\"value\":$ORG_CHANNEL_EMAIL_JSON}},\"id\":2}"
 	      if [ $? -eq 0 ]; then
 	        assert_json_field_equals "add_organization_channel idempotent added=false" "$ORG_CHANNEL_AGAIN_TEXT" ".added" "false"
 	      fi
-	      ORG_CHANNELS_TEXT=$(run_capture "list_organization_channels($ORG_ID)" \
-	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_organization_channels\",\"arguments\":{\"organizationId\":\"$ORG_ID\"}},\"id\":2}")
+	      run_capture_to_var ORG_CHANNELS_TEXT "list_organization_channels($ORG_ID)" \
+	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_organization_channels\",\"arguments\":{\"organizationId\":\"$ORG_ID\"}},\"id\":2}"
 	      if [ $? -eq 0 ]; then
 	        assert_json_array_contains "list_organization_channels includes email channel" "$ORG_CHANNELS_TEXT" ".channels | map(.channelId)" "$ORG_CHANNEL_ID"
 	      fi
-	      ORG_GET_TEXT=$(run_capture "get_organization($ORG_ID channels)" \
-	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_organization\",\"arguments\":{\"identifier\":\"$ORG_ID\"}},\"id\":2}")
+	      run_capture_to_var ORG_GET_TEXT "get_organization($ORG_ID channels)" \
+	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_organization\",\"arguments\":{\"identifier\":\"$ORG_ID\"}},\"id\":2}"
 	      if [ $? -eq 0 ]; then
 	        assert_json_array_contains "get_organization includes channelId" "$ORG_GET_TEXT" ".channels | map(.channelId)" "$ORG_CHANNEL_ID"
 	      fi
@@ -1983,8 +2013,8 @@ run_test "list_time_spend_reports" \
   "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_time_spend_reports\",\"arguments\":{\"project\":\"$PROJECT\",\"limit\":3}},\"id\":2}"
 run_test "list_recurring_events" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_recurring_events","arguments":{"limit":3}},"id":2}'
-CALENDARS_TEXT=$(run_capture "list_calendars" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_calendars","arguments":{}},"id":2}')
+run_capture_to_var CALENDARS_TEXT "list_calendars" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_calendars","arguments":{}},"id":2}'
 CALENDAR_ID=""
 if [ $? -eq 0 ]; then
   CALENDAR_ID=$(echo "$CALENDARS_TEXT" | jq -r '((map(select(.isPrimary == true)) | .[0]) // .[0]).calendarId // empty' 2>/dev/null)
@@ -1996,8 +2026,8 @@ if [ $? -eq 0 ]; then
 fi
 
 # Event CRUD
-EVT_TEXT=$(run_capture "create_event" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_event","arguments":{"title":"IntTest Event","date":1777000000000,"dueDate":1777003600000}},"id":2}')
+run_capture_to_var EVT_TEXT "create_event" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_event","arguments":{"title":"IntTest Event","date":1777000000000,"dueDate":1777003600000}},"id":2}'
 if [ $? -eq 0 ]; then
   EVT_ID=$(echo "$EVT_TEXT" | jq -r '.eventId' 2>/dev/null)
   echo "  => event: $EVT_ID"
@@ -2019,13 +2049,13 @@ if [ -n "$CALENDAR_ID" ]; then
   EXPLICIT_EVT_PAYLOAD=$(jq -cn \
     --arg calendarId "$CALENDAR_ID" \
     '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_event","arguments":{"title":"IntTest Explicit Calendar Event","date":1777007200000,"dueDate":1777010800000,"calendarId":$calendarId}},"id":2}')
-  EXPLICIT_EVT_TEXT=$(run_capture "create_event(explicit_calendar)" "$EXPLICIT_EVT_PAYLOAD")
+  run_capture_to_var EXPLICIT_EVT_TEXT "create_event(explicit_calendar)" "$EXPLICIT_EVT_PAYLOAD"
   if [ $? -eq 0 ]; then
     EXPLICIT_EVT_ID=$(echo "$EXPLICIT_EVT_TEXT" | jq -r '.eventId' 2>/dev/null)
     echo "  => explicit calendar event: $EXPLICIT_EVT_ID"
     if [ -n "$EXPLICIT_EVT_ID" ] && [ "$EXPLICIT_EVT_ID" != "null" ]; then
-      GET_EXPLICIT_EVT_TEXT=$(run_capture "get_event(explicit_calendar:$EXPLICIT_EVT_ID)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_event\",\"arguments\":{\"eventId\":\"$EXPLICIT_EVT_ID\"}},\"id\":2}")
+      run_capture_to_var GET_EXPLICIT_EVT_TEXT "get_event(explicit_calendar:$EXPLICIT_EVT_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_event\",\"arguments\":{\"eventId\":\"$EXPLICIT_EVT_ID\"}},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_field_equals "get_event explicit calendarId matches" "$GET_EXPLICIT_EVT_TEXT" ".calendarId" "$CALENDAR_ID"
       fi
@@ -2041,41 +2071,41 @@ fi
 # Planner ToDo lifecycle + work slots
 TODO_TITLE="IntTest Planner Todo $RUN_ID"
 TODO_TITLE_JSON=$(json_string "$TODO_TITLE")
-TODO_TEXT=$(run_capture "create_todo(personal)" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_todo\",\"arguments\":{\"title\":$TODO_TITLE_JSON,\"description\":\"planner integration todo\",\"priority\":\"medium\",\"visibility\":\"private\"}},\"id\":2}")
+run_capture_to_var TODO_TEXT "create_todo(personal)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_todo\",\"arguments\":{\"title\":$TODO_TITLE_JSON,\"description\":\"planner integration todo\",\"priority\":\"medium\",\"visibility\":\"private\"}},\"id\":2}"
 if [ $? -eq 0 ]; then
   TODO_ID=$(echo "$TODO_TEXT" | jq -r '.todoId // empty' 2>/dev/null)
   echo "  => todo: $TODO_ID"
   if [ -n "$TODO_ID" ]; then
-    LIST_TODOS_TEXT=$(run_capture "list_todos($TODO_TITLE)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_todos\",\"arguments\":{\"titleSearch\":$TODO_TITLE_JSON,\"limit\":10}},\"id\":2}")
+    run_capture_to_var LIST_TODOS_TEXT "list_todos($TODO_TITLE)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_todos\",\"arguments\":{\"titleSearch\":$TODO_TITLE_JSON,\"limit\":10}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_array_contains "list_todos includes $TODO_ID" "$LIST_TODOS_TEXT" "map(.id)" "$TODO_ID"
     fi
-    GET_TODO_TEXT=$(run_capture "get_todo($TODO_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}")
+    run_capture_to_var GET_TODO_TEXT "get_todo($TODO_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_equals "get_todo($TODO_ID) returns id" "$GET_TODO_TEXT" ".id" "$TODO_ID"
       assert_json_field_equals "get_todo($TODO_ID) priority before update" "$GET_TODO_TEXT" ".priority" "medium"
     fi
-    UPDATE_TODO_TEXT=$(run_capture "update_todo($TODO_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"priority\":\"high\",\"dueDate\":1777020000000}},\"id\":2}")
+    run_capture_to_var UPDATE_TODO_TEXT "update_todo($TODO_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"priority\":\"high\",\"dueDate\":1777020000000}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_equals "update_todo($TODO_ID) updated" "$UPDATE_TODO_TEXT" ".updated" "true"
-      GET_UPDATED_TODO_TEXT=$(run_capture "get_todo($TODO_ID after update)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}")
+      run_capture_to_var GET_UPDATED_TODO_TEXT "get_todo($TODO_ID after update)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_field_equals "get_todo($TODO_ID) priority after update" "$GET_UPDATED_TODO_TEXT" ".priority" "high"
         assert_json_field_equals "get_todo($TODO_ID) dueDate after update" "$GET_UPDATED_TODO_TEXT" ".dueDate" "1777020000000"
       fi
     fi
 
-    SCHEDULE_TEXT=$(run_capture "schedule_todo($TODO_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"schedule_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"date\":1777020000000,\"dueDate\":1777023600000}},\"id\":2}")
+    run_capture_to_var SCHEDULE_TEXT "schedule_todo($TODO_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"schedule_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"date\":1777020000000,\"dueDate\":1777023600000}},\"id\":2}"
     SCHEDULE_SLOT_ID=$(echo "$SCHEDULE_TEXT" | jq -r '.workSlotId // empty' 2>/dev/null)
     if [ -n "$SCHEDULE_SLOT_ID" ]; then
-      UNSCHEDULE_SLOT_TEXT=$(run_capture "unschedule_todo(workSlotId:$SCHEDULE_SLOT_ID)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unschedule_todo\",\"arguments\":{\"workSlotId\":\"$SCHEDULE_SLOT_ID\"}},\"id\":2}")
+      run_capture_to_var UNSCHEDULE_SLOT_TEXT "unschedule_todo(workSlotId:$SCHEDULE_SLOT_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unschedule_todo\",\"arguments\":{\"workSlotId\":\"$SCHEDULE_SLOT_ID\"}},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_field_equals "unschedule_todo(workSlotId:$SCHEDULE_SLOT_ID) removed one" "$UNSCHEDULE_SLOT_TEXT" ".removed" "1"
       fi
@@ -2083,12 +2113,12 @@ if [ $? -eq 0 ]; then
       skip_test "unschedule_todo(workSlotId)" "schedule_todo did not return a workSlotId"
     fi
 
-    RAW_SLOT_TEXT=$(run_capture "schedule_todo(raw_id:$TODO_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"schedule_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"date\":1777027200000,\"dueDate\":1777030800000}},\"id\":2}")
+    run_capture_to_var RAW_SLOT_TEXT "schedule_todo(raw_id:$TODO_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"schedule_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"date\":1777027200000,\"dueDate\":1777030800000}},\"id\":2}"
     RAW_SLOT_ID=$(echo "$RAW_SLOT_TEXT" | jq -r '.workSlotId // empty' 2>/dev/null)
     if [ -n "$RAW_SLOT_ID" ]; then
-      UNSCHEDULE_RAW_SLOT_TEXT=$(run_capture "unschedule_todo(raw_workSlotId:$RAW_SLOT_ID)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unschedule_todo\",\"arguments\":{\"workSlotId\":\"$RAW_SLOT_ID\"}},\"id\":2}")
+      run_capture_to_var UNSCHEDULE_RAW_SLOT_TEXT "unschedule_todo(raw_workSlotId:$RAW_SLOT_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unschedule_todo\",\"arguments\":{\"workSlotId\":\"$RAW_SLOT_ID\"}},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_field_equals "unschedule_todo(raw_workSlotId:$RAW_SLOT_ID) removed one" "$UNSCHEDULE_RAW_SLOT_TEXT" ".removed" "1"
       fi
@@ -2096,12 +2126,12 @@ if [ $? -eq 0 ]; then
       skip_test "unschedule_todo(raw_workSlotId)" "schedule_todo raw-id locator did not return a workSlotId"
     fi
 
-    SCHEDULE_SCOPE_TEXT=$(run_capture "schedule_todo(scope_cleanup:$TODO_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"schedule_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"date\":1777034400000,\"dueDate\":1777038000000}},\"id\":2}")
+    run_capture_to_var SCHEDULE_SCOPE_TEXT "schedule_todo(scope_cleanup:$TODO_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"schedule_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"date\":1777034400000,\"dueDate\":1777038000000}},\"id\":2}"
     SCHEDULE_SCOPE_SLOT_ID=$(echo "$SCHEDULE_SCOPE_TEXT" | jq -r '.workSlotId // empty' 2>/dev/null)
     if [ -n "$SCHEDULE_SCOPE_SLOT_ID" ]; then
-      UNSCHEDULE_SCOPE_TEXT=$(run_capture "unschedule_todo(scope_all:$TODO_ID)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unschedule_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"scope\":\"all\"}},\"id\":2}")
+      run_capture_to_var UNSCHEDULE_SCOPE_TEXT "unschedule_todo(scope_all:$TODO_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unschedule_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"scope\":\"all\"}},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_field_equals "unschedule_todo(scope_all:$TODO_ID) removed one" "$UNSCHEDULE_SCOPE_TEXT" ".removed" "1"
       fi
@@ -2109,30 +2139,30 @@ if [ $? -eq 0 ]; then
       skip_test "unschedule_todo(scope_all)" "schedule_todo did not return a workSlotId"
     fi
 
-    COMPLETE_TODO_TEXT=$(run_capture "complete_todo($TODO_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"complete_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"doneOn\":1777040000000}},\"id\":2}")
+    run_capture_to_var COMPLETE_TODO_TEXT "complete_todo($TODO_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"complete_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"doneOn\":1777040000000}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_equals "complete_todo($TODO_ID) updated" "$COMPLETE_TODO_TEXT" ".updated" "true"
       sleep 1
-      GET_COMPLETED_TODO_TEXT=$(run_capture "get_todo($TODO_ID completed)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}")
+      run_capture_to_var GET_COMPLETED_TODO_TEXT "get_todo($TODO_ID completed)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_field_equals "get_todo($TODO_ID) doneOn after complete" "$GET_COMPLETED_TODO_TEXT" ".doneOn" "1777040000000"
       fi
     fi
-    REOPEN_TODO_TEXT=$(run_capture "reopen_todo($TODO_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"reopen_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}")
+    run_capture_to_var REOPEN_TODO_TEXT "reopen_todo($TODO_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"reopen_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_equals "reopen_todo($TODO_ID) updated" "$REOPEN_TODO_TEXT" ".updated" "true"
       sleep 1
-      GET_REOPENED_TODO_TEXT=$(run_capture "get_todo($TODO_ID reopened)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}")
+      run_capture_to_var GET_REOPENED_TODO_TEXT "get_todo($TODO_ID reopened)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_field_equals "get_todo($TODO_ID) doneOn after reopen" "$GET_REOPENED_TODO_TEXT" ".doneOn" "null"
       fi
     fi
-    DELETE_TODO_TEXT=$(run_capture "delete_todo($TODO_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}")
+    run_capture_to_var DELETE_TODO_TEXT "delete_todo($TODO_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_equals "delete_todo($TODO_ID) deleted" "$DELETE_TODO_TEXT" ".deleted" "true"
     fi
@@ -2143,26 +2173,26 @@ fi
 
 PLANNER_ISSUE_TITLE="Planner Attached ToDo $RUN_ID"
 PLANNER_ISSUE_TITLE_JSON=$(json_string "$PLANNER_ISSUE_TITLE")
-PLANNER_ISSUE_TEXT=$(run_capture "create_issue(for_planner_todo)" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":$PLANNER_ISSUE_TITLE_JSON}},\"id\":2}")
+run_capture_to_var PLANNER_ISSUE_TEXT "create_issue(for_planner_todo)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":$PLANNER_ISSUE_TITLE_JSON}},\"id\":2}"
 if [ $? -eq 0 ]; then
   PLANNER_ISSUE_ID=$(echo "$PLANNER_ISSUE_TEXT" | jq -r '.identifier // empty' 2>/dev/null)
   if [ -n "$PLANNER_ISSUE_ID" ]; then
     ISSUE_TODO_TITLE="IntTest Issue Planner Todo $RUN_ID"
     ISSUE_TODO_TITLE_JSON=$(json_string "$ISSUE_TODO_TITLE")
-    ISSUE_TODO_TEXT=$(run_capture "create_todo(issue:$PLANNER_ISSUE_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_todo\",\"arguments\":{\"title\":$ISSUE_TODO_TITLE_JSON,\"attachedTo\":{\"type\":\"issue\",\"project\":\"$PROJECT\",\"identifier\":\"$PLANNER_ISSUE_ID\"}}},\"id\":2}")
+    run_capture_to_var ISSUE_TODO_TEXT "create_todo(issue:$PLANNER_ISSUE_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_todo\",\"arguments\":{\"title\":$ISSUE_TODO_TITLE_JSON,\"attachedTo\":{\"type\":\"issue\",\"project\":\"$PROJECT\",\"identifier\":\"$PLANNER_ISSUE_ID\"}}},\"id\":2}"
     ISSUE_TODO_ID=$(echo "$ISSUE_TODO_TEXT" | jq -r '.todoId // empty' 2>/dev/null)
     if [ -n "$ISSUE_TODO_ID" ]; then
-      ISSUE_TODO_GET_TEXT=$(run_capture "get_todo(issue:$ISSUE_TODO_ID)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$ISSUE_TODO_ID\"}}},\"id\":2}")
+      run_capture_to_var ISSUE_TODO_GET_TEXT "get_todo(issue:$ISSUE_TODO_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$ISSUE_TODO_ID\"}}},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_field_equals "get_todo(issue:$ISSUE_TODO_ID) attached type" "$ISSUE_TODO_GET_TEXT" ".attachedTo.type" "issue"
         assert_json_field_equals "get_todo(issue:$ISSUE_TODO_ID) attached identifier" "$ISSUE_TODO_GET_TEXT" ".attachedTo.identifier" "$PLANNER_ISSUE_ID"
         assert_json_field_equals "get_todo(issue:$ISSUE_TODO_ID) default visibility" "$ISSUE_TODO_GET_TEXT" ".visibility" "public"
       fi
-      ISSUE_TODO_LIST_TEXT=$(run_capture "list_todos(issue:$PLANNER_ISSUE_ID)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_todos\",\"arguments\":{\"issue\":{\"project\":\"$PROJECT\",\"identifier\":\"$PLANNER_ISSUE_ID\"},\"limit\":10}},\"id\":2}")
+      run_capture_to_var ISSUE_TODO_LIST_TEXT "list_todos(issue:$PLANNER_ISSUE_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_todos\",\"arguments\":{\"issue\":{\"project\":\"$PROJECT\",\"identifier\":\"$PLANNER_ISSUE_ID\"},\"limit\":10}},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_array_contains "list_todos(issue:$PLANNER_ISSUE_ID) includes issue todo" "$ISSUE_TODO_LIST_TEXT" "map(.id)" "$ISSUE_TODO_ID"
       fi
@@ -2181,8 +2211,8 @@ if [ $? -eq 0 ]; then
 fi
 
 # Timer — requires project + issue identifier
-TIMER_ISSUE_TEXT=$(run_capture "create_issue(for_timer)" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Timer Test\"}},\"id\":2}")
+run_capture_to_var TIMER_ISSUE_TEXT "create_issue(for_timer)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Timer Test\"}},\"id\":2}"
 if [ $? -eq 0 ]; then
   TIMER_ISSUE_ID=$(echo "$TIMER_ISSUE_TEXT" | jq -r '.identifier' 2>/dev/null)
   run_test "start_timer($TIMER_ISSUE_ID)" \
@@ -2218,9 +2248,9 @@ NOTIF_TEXT=$(run_capture_only \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_notifications","arguments":{"limit":1}},"id":2}')
 NOTIF_ID=$(echo "$NOTIF_TEXT" | jq -r '.[0].id // .notifications[0].id // empty' 2>/dev/null)
 if [ -n "$NOTIF_ID" ]; then
-  GET_NOTIF_TEXT=$(run_capture "get_notification($NOTIF_ID)" \
+  run_capture_to_var GET_NOTIF_TEXT "get_notification($NOTIF_ID)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_notification\",\"arguments\":{\"notificationId\":\"$NOTIF_ID\"}},\"id\":2}"
-  )
+
   ORIGINAL_VIEWED=$(echo "$GET_NOTIF_TEXT" | jq -r '.isViewed // empty' 2>/dev/null)
   DOC_CONTEXT_ID=$(echo "$GET_NOTIF_TEXT" | jq -r '.docNotifyContextId // empty' 2>/dev/null)
   NOTIF_OBJECT_ID=$(echo "$GET_NOTIF_TEXT" | jq -r '.objectId // empty' 2>/dev/null)
@@ -2243,8 +2273,8 @@ if [ -n "$NOTIF_ID" ]; then
   if [ -n "$NOTIF_OBJECT_ID" ] && [ -n "$NOTIF_OBJECT_CLASS" ]; then
     NOTIF_OBJECT_ID_JSON=$(json_string "$NOTIF_OBJECT_ID")
     NOTIF_OBJECT_CLASS_JSON=$(json_string "$NOTIF_OBJECT_CLASS")
-    CONTEXT_TEXT=$(run_capture "get_notification_context($NOTIF_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_notification_context\",\"arguments\":{\"objectId\":$NOTIF_OBJECT_ID_JSON,\"objectClass\":$NOTIF_OBJECT_CLASS_JSON}},\"id\":2}")
+    run_capture_to_var CONTEXT_TEXT "get_notification_context($NOTIF_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_notification_context\",\"arguments\":{\"objectId\":$NOTIF_OBJECT_ID_JSON,\"objectClass\":$NOTIF_OBJECT_CLASS_JSON}},\"id\":2}"
     CONTEXT_ID=$(echo "$CONTEXT_TEXT" | jq -r '.id // empty' 2>/dev/null)
     ORIGINAL_PINNED=$(echo "$CONTEXT_TEXT" | jq -r '.isPinned // empty' 2>/dev/null)
     ORIGINAL_HIDDEN=$(echo "$CONTEXT_TEXT" | jq -r '.hidden // empty' 2>/dev/null)
@@ -2318,8 +2348,8 @@ echo ""
 # 13a. SDK DISCOVERY
 ##############################
 echo "=== 13a. SDK Discovery ==="
-SDK_CLASSES_TEXT=$(run_capture "list_huly_classes(issue)" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_huly_classes","arguments":{"query":"Issue","limit":10}},"id":2}')
+run_capture_to_var SDK_CLASSES_TEXT "list_huly_classes(issue)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_huly_classes","arguments":{"query":"Issue","limit":10}},"id":2}'
 if [ $? -eq 0 ]; then
   if printf '%s\n' "$SDK_CLASSES_TEXT" | jq -e 'any(.classes[]?; .classId == "tracker:class:Issue" and .label == "Issue")' >/dev/null 2>&1; then
     echo "PASS: list_huly_classes includes tracker issue"
@@ -2329,8 +2359,8 @@ if [ $? -eq 0 ]; then
   fi
 fi
 
-SDK_CLASS_TEXT=$(run_capture "get_huly_class(tracker:class:Issue)" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_huly_class","arguments":{"class":"tracker:class:Issue"}},"id":2}')
+run_capture_to_var SDK_CLASS_TEXT "get_huly_class(tracker:class:Issue)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_huly_class","arguments":{"class":"tracker:class:Issue"}},"id":2}'
 if [ $? -eq 0 ]; then
   assert_json_field_equals "get_huly_class returns issue class" "$SDK_CLASS_TEXT" ".class.classId" "tracker:class:Issue"
   assert_json_field_nonempty "get_huly_class returns attributes" "$SDK_CLASS_TEXT" ".attributes[0].attributeId"
@@ -2348,14 +2378,14 @@ if [ $? -eq 0 ]; then
   fi
 fi
 
-SDK_ATTRIBUTES_TEXT=$(run_capture "list_huly_attributes(issue)" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_huly_attributes","arguments":{"class":"tracker:class:Issue","limit":5}},"id":2}')
+run_capture_to_var SDK_ATTRIBUTES_TEXT "list_huly_attributes(issue)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_huly_attributes","arguments":{"class":"tracker:class:Issue","limit":5}},"id":2}'
 if [ $? -eq 0 ]; then
   assert_json_field_nonempty "list_huly_attributes returns attribute id" "$SDK_ATTRIBUTES_TEXT" ".attributes[0].attributeId"
 fi
 
-SDK_ENUMS_TEXT=$(run_capture "list_huly_enums" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_huly_enums","arguments":{"limit":5}},"id":2}')
+run_capture_to_var SDK_ENUMS_TEXT "list_huly_enums" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_huly_enums","arguments":{"limit":5}},"id":2}'
 if [ $? -eq 0 ]; then
   assert_json_field_nonempty "list_huly_enums returns total" "$SDK_ENUMS_TEXT" ".total"
 fi
@@ -2365,8 +2395,8 @@ echo ""
 # 13b. SPACES
 ##############################
 echo "=== 13b. Spaces ==="
-SPACES_TEXT=$(run_capture "list_spaces" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_spaces","arguments":{"limit":5}},"id":2}')
+run_capture_to_var SPACES_TEXT "list_spaces" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_spaces","arguments":{"limit":5}},"id":2}'
 if [ $? -eq 0 ]; then
   assert_json_field_nonempty "list_spaces returns total" "$SPACES_TEXT" ".total"
   FIRST_SPACE_ID=$(echo "$SPACES_TEXT" | jq -r '.spaces[0].id // empty' 2>/dev/null)
@@ -2376,8 +2406,8 @@ if [ $? -eq 0 ]; then
   fi
 fi
 
-SPACE_TYPES_TEXT=$(run_capture "list_space_types" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_space_types","arguments":{"limit":5}},"id":2}')
+run_capture_to_var SPACE_TYPES_TEXT "list_space_types" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_space_types","arguments":{"limit":5}},"id":2}'
 if [ $? -eq 0 ]; then
   assert_json_field_nonempty "list_space_types returns total" "$SPACE_TYPES_TEXT" ".total"
   FIRST_SPACE_TYPE_ID=$(echo "$SPACE_TYPES_TEXT" | jq -r '.spaceTypes[0].id // empty' 2>/dev/null)
@@ -2396,8 +2426,8 @@ GENERIC_SPACE_NAME="IntTest Generic Space $RUN_ID"
 GENERIC_SPACE_UPDATED_NAME="IntTest Generic Space Updated $RUN_ID"
 GENERIC_SPACE_NAME_JSON=$(json_string "$GENERIC_SPACE_NAME")
 GENERIC_SPACE_UPDATED_NAME_JSON=$(json_string "$GENERIC_SPACE_UPDATED_NAME")
-GENERIC_SPACE_TEXT=$(run_capture "create_teamspace(for_generic_space)" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_teamspace\",\"arguments\":{\"name\":$GENERIC_SPACE_NAME_JSON,\"description\":\"generic spaces integration fixture\",\"private\":false}},\"id\":2}")
+run_capture_to_var GENERIC_SPACE_TEXT "create_teamspace(for_generic_space)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_teamspace\",\"arguments\":{\"name\":$GENERIC_SPACE_NAME_JSON,\"description\":\"generic spaces integration fixture\",\"private\":false}},\"id\":2}"
 if [ $? -eq 0 ]; then
   GENERIC_SPACE_ID=$(echo "$GENERIC_SPACE_TEXT" | jq -r '.id' 2>/dev/null)
   echo "  => generic_space_fixture: $GENERIC_SPACE_ID"
@@ -2407,8 +2437,8 @@ if [ $? -eq 0 ]; then
   run_test "update_space($GENERIC_SPACE_ID metadata)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_space\",\"arguments\":{\"space\":\"$GENERIC_SPACE_ID\",\"name\":$GENERIC_SPACE_UPDATED_NAME_JSON,\"description\":\"generic spaces integration updated\",\"private\":true}},\"id\":2}"
   sleep 2
-  UPDATED_TEAMSPACE_TEXT=$(run_capture "get_teamspace($GENERIC_SPACE_ID after update_space)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_teamspace\",\"arguments\":{\"teamspace\":\"$GENERIC_SPACE_ID\"}},\"id\":2}")
+  run_capture_to_var UPDATED_TEAMSPACE_TEXT "get_teamspace($GENERIC_SPACE_ID after update_space)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_teamspace\",\"arguments\":{\"teamspace\":\"$GENERIC_SPACE_ID\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     assert_json_field_equals "get_teamspace sees update_space name" "$UPDATED_TEAMSPACE_TEXT" ".name" "$GENERIC_SPACE_UPDATED_NAME"
     assert_json_field_equals "get_teamspace sees update_space private" "$UPDATED_TEAMSPACE_TEXT" ".private" "true"
@@ -2526,8 +2556,8 @@ echo ""
 # 13c. GENERIC ASSOCIATIONS
 ##############################
 echo "=== 13c. Generic Associations ==="
-ASSOCIATIONS_TEXT=$(run_capture "list_associations" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_associations","arguments":{"limit":5}},"id":2}')
+run_capture_to_var ASSOCIATIONS_TEXT "list_associations" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_associations","arguments":{"limit":5}},"id":2}'
 ASSOC_ID=$(echo "$ASSOCIATIONS_TEXT" | jq -r '.associations[0].associationId // empty' 2>/dev/null)
 ASSOC_SOURCE_CLASS=$(echo "$ASSOCIATIONS_TEXT" | jq -r '.associations[0].sourceClass // empty' 2>/dev/null)
 ASSOC_TARGET_CLASS=$(echo "$ASSOCIATIONS_TEXT" | jq -r '.associations[0].targetClass // empty' 2>/dev/null)
@@ -2573,8 +2603,8 @@ else
   skip_test "list_relations" "no visible associations found in workspace"
 fi
 
-WRITABLE_ASSOCIATIONS_TEXT=$(run_capture "list_associations(writableOnly)" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_associations","arguments":{"writableOnly":true,"limit":1}},"id":2}')
+run_capture_to_var WRITABLE_ASSOCIATIONS_TEXT "list_associations(writableOnly)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_associations","arguments":{"writableOnly":true,"limit":1}},"id":2}'
 WRITABLE_ASSOC_ID=$(echo "$WRITABLE_ASSOCIATIONS_TEXT" | jq -r '.associations[0].associationId // empty' 2>/dev/null)
 if [ -n "$WRITABLE_ASSOC_ID" ]; then
   assert_json_field_nonempty "list_associations(writableOnly) has writable id" "$WRITABLE_ASSOCIATIONS_TEXT" ".associations[0].associationId"
@@ -2586,16 +2616,16 @@ GENERIC_ROLE_SOURCE="mcp source $RUN_ID"
 GENERIC_ROLE_TARGET="mcp target $RUN_ID"
 GENERIC_ROLE_SOURCE_JSON=$(json_string "$GENERIC_ROLE_SOURCE")
 GENERIC_ROLE_TARGET_JSON=$(json_string "$GENERIC_ROLE_TARGET")
-CREATED_ASSOC_TEXT=$(run_capture "create_association(generic_issue_one_to_many)" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_association\",\"arguments\":{\"sourceClass\":\"tracker:class:Issue\",\"targetClass\":\"tracker:class:Issue\",\"sourceRole\":$GENERIC_ROLE_SOURCE_JSON,\"targetRole\":$GENERIC_ROLE_TARGET_JSON,\"cardinality\":\"one-to-many\"}},\"id\":2}")
+run_capture_to_var CREATED_ASSOC_TEXT "create_association(generic_issue_one_to_many)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_association\",\"arguments\":{\"sourceClass\":\"tracker:class:Issue\",\"targetClass\":\"tracker:class:Issue\",\"sourceRole\":$GENERIC_ROLE_SOURCE_JSON,\"targetRole\":$GENERIC_ROLE_TARGET_JSON,\"cardinality\":\"one-to-many\"}},\"id\":2}"
 if [ $? -eq 0 ]; then
   CREATED_ASSOC_ID=$(echo "$CREATED_ASSOC_TEXT" | jq -r '.association.associationId // empty' 2>/dev/null)
   if [ -n "$CREATED_ASSOC_ID" ]; then
     GENERIC_ASSOCIATION_CLEANUP_IDS="$GENERIC_ASSOCIATION_CLEANUP_IDS $CREATED_ASSOC_ID"
   fi
   assert_json_field_equals "create_association created" "$CREATED_ASSOC_TEXT" ".created" "true"
-  DUP_ASSOC_TEXT=$(run_capture "create_association(idempotent)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_association\",\"arguments\":{\"sourceClass\":\"tracker:class:Issue\",\"targetClass\":\"tracker:class:Issue\",\"sourceRole\":$GENERIC_ROLE_SOURCE_JSON,\"targetRole\":$GENERIC_ROLE_TARGET_JSON,\"cardinality\":\"one-to-many\"}},\"id\":2}")
+  run_capture_to_var DUP_ASSOC_TEXT "create_association(idempotent)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_association\",\"arguments\":{\"sourceClass\":\"tracker:class:Issue\",\"targetClass\":\"tracker:class:Issue\",\"sourceRole\":$GENERIC_ROLE_SOURCE_JSON,\"targetRole\":$GENERIC_ROLE_TARGET_JSON,\"cardinality\":\"one-to-many\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     assert_json_field_equals "create_association idempotent existing" "$DUP_ASSOC_TEXT" ".existing" "true"
   fi
@@ -2604,21 +2634,21 @@ else
   skip_test "create_association idempotent existing" "create_association failed"
 fi
 
-GENERIC_SOURCE_TEXT=$(run_capture "create_issue(for_generic_associations)" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Generic Associations Source $RUN_ID\"}},\"id\":2}")
+run_capture_to_var GENERIC_SOURCE_TEXT "create_issue(for_generic_associations)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Generic Associations Source $RUN_ID\"}},\"id\":2}"
 if [ $? -eq 0 ]; then
   GENERIC_SOURCE_ID=$(echo "$GENERIC_SOURCE_TEXT" | jq -r '.identifier // empty' 2>/dev/null)
   GENERIC_SOURCE_OBJ_ID=$(echo "$GENERIC_SOURCE_TEXT" | jq -r '.issueId // empty' 2>/dev/null)
   GENERIC_SOURCE_OBJ_ID_JSON=$(json_string "$GENERIC_SOURCE_OBJ_ID")
   if [ -n "$GENERIC_SOURCE_OBJ_ID" ]; then
-    OMITTED_RELATIONS_TEXT=$(run_capture "list_relations(source raw issue)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_relations\",\"arguments\":{\"source\":{\"kind\":\"raw\",\"id\":$GENERIC_SOURCE_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"},\"limit\":3}},\"id\":2}")
+    run_capture_to_var OMITTED_RELATIONS_TEXT "list_relations(source raw issue)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_relations\",\"arguments\":{\"source\":{\"kind\":\"raw\",\"id\":$GENERIC_SOURCE_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"},\"limit\":3}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_nonempty "list_relations(source raw issue) has total" "$OMITTED_RELATIONS_TEXT" ".total"
     fi
 
-    EITHER_RELATIONS_TEXT=$(run_capture "list_relations(source raw issue,either)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_relations\",\"arguments\":{\"source\":{\"kind\":\"raw\",\"id\":$GENERIC_SOURCE_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"},\"direction\":\"either\",\"limit\":3}},\"id\":2}")
+    run_capture_to_var EITHER_RELATIONS_TEXT "list_relations(source raw issue,either)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_relations\",\"arguments\":{\"source\":{\"kind\":\"raw\",\"id\":$GENERIC_SOURCE_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"},\"direction\":\"either\",\"limit\":3}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_nonempty "list_relations(source raw issue,either) has total" "$EITHER_RELATIONS_TEXT" ".total"
     fi
@@ -2626,8 +2656,8 @@ if [ $? -eq 0 ]; then
     skip_test "list_relations(source raw issue)" "generic association source issue did not return issueId"
     skip_test "list_relations(source raw issue,either)" "generic association source issue did not return issueId"
   fi
-  GENERIC_TARGET_TEXT=$(run_capture "create_issue(for_generic_associations_target)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Generic Associations Target $RUN_ID\"}},\"id\":2}")
+  run_capture_to_var GENERIC_TARGET_TEXT "create_issue(for_generic_associations_target)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Generic Associations Target $RUN_ID\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     GENERIC_TARGET_ID=$(echo "$GENERIC_TARGET_TEXT" | jq -r '.identifier // empty' 2>/dev/null)
     GENERIC_TARGET_OBJ_ID=$(echo "$GENERIC_TARGET_TEXT" | jq -r '.issueId // empty' 2>/dev/null)
@@ -2635,8 +2665,8 @@ if [ $? -eq 0 ]; then
     GENERIC_TARGET_ID=""
     GENERIC_TARGET_OBJ_ID=""
   fi
-  GENERIC_SOURCE2_TEXT=$(run_capture "create_issue(for_generic_associations_cardinality)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Generic Associations Cardinality $RUN_ID\"}},\"id\":2}")
+  run_capture_to_var GENERIC_SOURCE2_TEXT "create_issue(for_generic_associations_cardinality)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Generic Associations Cardinality $RUN_ID\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     GENERIC_SOURCE2_ID=$(echo "$GENERIC_SOURCE2_TEXT" | jq -r '.identifier // empty' 2>/dev/null)
     GENERIC_SOURCE2_OBJ_ID=$(echo "$GENERIC_SOURCE2_TEXT" | jq -r '.issueId // empty' 2>/dev/null)
@@ -2649,18 +2679,18 @@ if [ $? -eq 0 ]; then
     GENERIC_TARGET_OBJ_ID_JSON=$(json_string "$GENERIC_TARGET_OBJ_ID")
     GENERIC_SOURCE2_OBJ_ID_JSON=$(json_string "$GENERIC_SOURCE2_OBJ_ID")
     CREATE_RELATION_ARGS="{\"association\":\"$CREATED_ASSOC_ID\",\"source\":{\"kind\":\"raw\",\"id\":$GENERIC_SOURCE_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"},\"target\":{\"kind\":\"raw\",\"id\":$GENERIC_TARGET_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"}}"
-    CREATED_RELATION_TEXT=$(run_capture "create_relation(generic)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_relation\",\"arguments\":$CREATE_RELATION_ARGS},\"id\":2}")
+    run_capture_to_var CREATED_RELATION_TEXT "create_relation(generic)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_relation\",\"arguments\":$CREATE_RELATION_ARGS},\"id\":2}"
     if [ $? -eq 0 ]; then
       CREATED_RELATION_ID=$(echo "$CREATED_RELATION_TEXT" | jq -r '.relationId // empty' 2>/dev/null)
       assert_json_field_equals "create_relation created" "$CREATED_RELATION_TEXT" ".created" "true"
-      EXISTING_RELATION_TEXT=$(run_capture "create_relation(idempotent)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_relation\",\"arguments\":$CREATE_RELATION_ARGS},\"id\":2}")
+      run_capture_to_var EXISTING_RELATION_TEXT "create_relation(idempotent)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_relation\",\"arguments\":$CREATE_RELATION_ARGS},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_field_equals "create_relation idempotent existing" "$EXISTING_RELATION_TEXT" ".existing" "true"
       fi
-      LIST_CREATED_RELATION_TEXT=$(run_capture "list_relations(generic created)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_relations\",\"arguments\":{\"association\":\"$CREATED_ASSOC_ID\",\"source\":{\"kind\":\"raw\",\"id\":$GENERIC_SOURCE_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"},\"target\":{\"kind\":\"raw\",\"id\":$GENERIC_TARGET_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"},\"limit\":3}},\"id\":2}")
+      run_capture_to_var LIST_CREATED_RELATION_TEXT "list_relations(generic created)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_relations\",\"arguments\":{\"association\":\"$CREATED_ASSOC_ID\",\"source\":{\"kind\":\"raw\",\"id\":$GENERIC_SOURCE_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"},\"target\":{\"kind\":\"raw\",\"id\":$GENERIC_TARGET_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"},\"limit\":3}},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_field_equals "list_relations(generic created) total" "$LIST_CREATED_RELATION_TEXT" ".total" "1"
       fi
@@ -2668,41 +2698,41 @@ if [ $? -eq 0 ]; then
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_association\",\"arguments\":{\"association\":\"$CREATED_ASSOC_ID\"}},\"id\":2}"
       run_expect_error "create_relation(cardinality violation)" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_relation\",\"arguments\":{\"association\":\"$CREATED_ASSOC_ID\",\"source\":{\"kind\":\"raw\",\"id\":$GENERIC_SOURCE2_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"},\"target\":{\"kind\":\"raw\",\"id\":$GENERIC_TARGET_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"}}},\"id\":2}"
-      DELETE_TRIPLE_TEXT=$(run_capture "delete_relation(generic triple)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_relation\",\"arguments\":$CREATE_RELATION_ARGS},\"id\":2}")
+      run_capture_to_var DELETE_TRIPLE_TEXT "delete_relation(generic triple)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_relation\",\"arguments\":$CREATE_RELATION_ARGS},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_field_equals "delete_relation triple deleted" "$DELETE_TRIPLE_TEXT" ".deleted" "true"
       fi
-      DELETE_TRIPLE_AGAIN_TEXT=$(run_capture "delete_relation(generic triple idempotent)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_relation\",\"arguments\":$CREATE_RELATION_ARGS},\"id\":2}")
+      run_capture_to_var DELETE_TRIPLE_AGAIN_TEXT "delete_relation(generic triple idempotent)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_relation\",\"arguments\":$CREATE_RELATION_ARGS},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_field_equals "delete_relation triple idempotent" "$DELETE_TRIPLE_AGAIN_TEXT" ".deleted" "false"
       fi
-      CREATED_RELATION_BY_ID_TEXT=$(run_capture "create_relation(generic for id delete)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_relation\",\"arguments\":$CREATE_RELATION_ARGS},\"id\":2}")
+      run_capture_to_var CREATED_RELATION_BY_ID_TEXT "create_relation(generic for id delete)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_relation\",\"arguments\":$CREATE_RELATION_ARGS},\"id\":2}"
       if [ $? -eq 0 ]; then
         RELATION_DELETE_ID=$(echo "$CREATED_RELATION_BY_ID_TEXT" | jq -r '.relationId // empty' 2>/dev/null)
         if [ -n "$RELATION_DELETE_ID" ]; then
-          DELETE_BY_ID_TEXT=$(run_capture "delete_relation(generic id)" \
-            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_relation\",\"arguments\":{\"relation\":\"$RELATION_DELETE_ID\"}},\"id\":2}")
+          run_capture_to_var DELETE_BY_ID_TEXT "delete_relation(generic id)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_relation\",\"arguments\":{\"relation\":\"$RELATION_DELETE_ID\"}},\"id\":2}"
           if [ $? -eq 0 ]; then
             assert_json_field_equals "delete_relation id deleted" "$DELETE_BY_ID_TEXT" ".deleted" "true"
           fi
-          DELETE_BY_ID_AGAIN_TEXT=$(run_capture "delete_relation(generic id idempotent)" \
-            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_relation\",\"arguments\":{\"relation\":\"$RELATION_DELETE_ID\"}},\"id\":2}")
+          run_capture_to_var DELETE_BY_ID_AGAIN_TEXT "delete_relation(generic id idempotent)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_relation\",\"arguments\":{\"relation\":\"$RELATION_DELETE_ID\"}},\"id\":2}"
           if [ $? -eq 0 ]; then
             assert_json_field_equals "delete_relation id idempotent" "$DELETE_BY_ID_AGAIN_TEXT" ".deleted" "false"
           fi
         fi
       fi
-      DELETE_ASSOC_TEXT=$(run_capture "delete_association(unused)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_association\",\"arguments\":{\"association\":\"$CREATED_ASSOC_ID\"}},\"id\":2}")
+      run_capture_to_var DELETE_ASSOC_TEXT "delete_association(unused)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_association\",\"arguments\":{\"association\":\"$CREATED_ASSOC_ID\"}},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_field_equals "delete_association unused deleted" "$DELETE_ASSOC_TEXT" ".deleted" "true"
         assert_json_field_equals "delete_association unused relation count" "$DELETE_ASSOC_TEXT" ".relationCount" "0"
       fi
-      DELETE_ASSOC_AGAIN_TEXT=$(run_capture "delete_association(idempotent missing)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_association\",\"arguments\":{\"association\":\"$CREATED_ASSOC_ID\"}},\"id\":2}")
+      run_capture_to_var DELETE_ASSOC_AGAIN_TEXT "delete_association(idempotent missing)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_association\",\"arguments\":{\"association\":\"$CREATED_ASSOC_ID\"}},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_field_equals "delete_association idempotent missing" "$DELETE_ASSOC_AGAIN_TEXT" ".deleted" "false"
       fi
@@ -2748,23 +2778,23 @@ else
   skip_test "delete_association(idempotent missing)" "could not create disposable source issue"
 fi
 
-CARD_LOCATOR_MASTER_TEXT=$(run_capture "card locator list_master_tags(Default)" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_master_tags","arguments":{"cardSpace":"Default"}},"id":2}')
+run_capture_to_var CARD_LOCATOR_MASTER_TEXT "card locator list_master_tags(Default)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_master_tags","arguments":{"cardSpace":"Default"}},"id":2}'
 CARD_LOCATOR_MASTER_ID=$(echo "$CARD_LOCATOR_MASTER_TEXT" | jq -r '.masterTags[0].id // empty' 2>/dev/null)
 if [ -n "$CARD_LOCATOR_MASTER_ID" ]; then
   CARD_LOCATOR_TITLE="IntTest Generic Association Card $RUN_ID"
   CARD_LOCATOR_TITLE_JSON=$(json_string "$CARD_LOCATOR_TITLE")
   CARD_LOCATOR_MASTER_ID_JSON=$(json_string "$CARD_LOCATOR_MASTER_ID")
-  CARD_LOCATOR_CARD_TEXT=$(run_capture "create_card(for_generic_card_locator)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_card\",\"arguments\":{\"cardSpace\":\"Default\",\"type\":$CARD_LOCATOR_MASTER_ID_JSON,\"title\":$CARD_LOCATOR_TITLE_JSON,\"content\":\"Temporary card for generic association locator integration.\"}},\"id\":2}")
+  run_capture_to_var CARD_LOCATOR_CARD_TEXT "create_card(for_generic_card_locator)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_card\",\"arguments\":{\"cardSpace\":\"Default\",\"type\":$CARD_LOCATOR_MASTER_ID_JSON,\"title\":$CARD_LOCATOR_TITLE_JSON,\"content\":\"Temporary card for generic association locator integration.\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     CARD_LOCATOR_CARD_ID=$(echo "$CARD_LOCATOR_CARD_TEXT" | jq -r '.id // empty' 2>/dev/null)
   else
     CARD_LOCATOR_CARD_ID=""
   fi
 
-  CARD_LOCATOR_ISSUE_TEXT=$(run_capture "create_issue(for_generic_card_locator)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Generic Card Locator Target $RUN_ID\"}},\"id\":2}")
+  run_capture_to_var CARD_LOCATOR_ISSUE_TEXT "create_issue(for_generic_card_locator)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Generic Card Locator Target $RUN_ID\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     CARD_LOCATOR_ISSUE_ID=$(echo "$CARD_LOCATOR_ISSUE_TEXT" | jq -r '.identifier // empty' 2>/dev/null)
     CARD_LOCATOR_ISSUE_OBJ_ID=$(echo "$CARD_LOCATOR_ISSUE_TEXT" | jq -r '.issueId // empty' 2>/dev/null)
@@ -2777,8 +2807,8 @@ if [ -n "$CARD_LOCATOR_MASTER_ID" ]; then
   CARD_LOCATOR_TARGET_ROLE="mcp issue target $RUN_ID"
   CARD_LOCATOR_SOURCE_ROLE_JSON=$(json_string "$CARD_LOCATOR_SOURCE_ROLE")
   CARD_LOCATOR_TARGET_ROLE_JSON=$(json_string "$CARD_LOCATOR_TARGET_ROLE")
-  CARD_LOCATOR_ASSOC_TEXT=$(run_capture "create_association(generic_card_to_issue)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_association\",\"arguments\":{\"sourceClass\":$CARD_LOCATOR_MASTER_ID_JSON,\"targetClass\":\"tracker:class:Issue\",\"sourceRole\":$CARD_LOCATOR_SOURCE_ROLE_JSON,\"targetRole\":$CARD_LOCATOR_TARGET_ROLE_JSON,\"cardinality\":\"many-to-many\"}},\"id\":2}")
+  run_capture_to_var CARD_LOCATOR_ASSOC_TEXT "create_association(generic_card_to_issue)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_association\",\"arguments\":{\"sourceClass\":$CARD_LOCATOR_MASTER_ID_JSON,\"targetClass\":\"tracker:class:Issue\",\"sourceRole\":$CARD_LOCATOR_SOURCE_ROLE_JSON,\"targetRole\":$CARD_LOCATOR_TARGET_ROLE_JSON,\"cardinality\":\"many-to-many\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     CARD_LOCATOR_ASSOC_ID=$(echo "$CARD_LOCATOR_ASSOC_TEXT" | jq -r '.association.associationId // empty' 2>/dev/null)
     if [ -n "$CARD_LOCATOR_ASSOC_ID" ]; then
@@ -2793,17 +2823,17 @@ if [ -n "$CARD_LOCATOR_MASTER_ID" ]; then
     CARD_LOCATOR_ISSUE_OBJ_ID_JSON=$(json_string "$CARD_LOCATOR_ISSUE_OBJ_ID")
     CARD_RELATION_ARGS_BY_ID="{\"association\":\"$CARD_LOCATOR_ASSOC_ID\",\"source\":{\"kind\":\"card\",\"card\":$CARD_LOCATOR_CARD_ID_JSON},\"target\":{\"kind\":\"raw\",\"id\":$CARD_LOCATOR_ISSUE_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"}}"
     CARD_RELATION_ARGS_BY_TITLE="{\"association\":\"$CARD_LOCATOR_ASSOC_ID\",\"source\":{\"kind\":\"card\",\"card\":$CARD_LOCATOR_TITLE_JSON,\"cardSpace\":\"Default\"},\"target\":{\"kind\":\"raw\",\"id\":$CARD_LOCATOR_ISSUE_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"}}"
-    CARD_RELATION_TEXT=$(run_capture "create_relation(card locator by id)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_relation\",\"arguments\":$CARD_RELATION_ARGS_BY_ID},\"id\":2}")
+    run_capture_to_var CARD_RELATION_TEXT "create_relation(card locator by id)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_relation\",\"arguments\":$CARD_RELATION_ARGS_BY_ID},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_equals "create_relation card locator by id created" "$CARD_RELATION_TEXT" ".created" "true"
-      CARD_RELATION_TITLE_TEXT=$(run_capture "create_relation(card locator by title)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_relation\",\"arguments\":$CARD_RELATION_ARGS_BY_TITLE},\"id\":2}")
+      run_capture_to_var CARD_RELATION_TITLE_TEXT "create_relation(card locator by title)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_relation\",\"arguments\":$CARD_RELATION_ARGS_BY_TITLE},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_field_equals "create_relation card locator by title existing" "$CARD_RELATION_TITLE_TEXT" ".existing" "true"
       fi
-      CARD_LIST_RELATIONS_TEXT=$(run_capture "list_relations(card locator by title)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_relations\",\"arguments\":{\"association\":\"$CARD_LOCATOR_ASSOC_ID\",\"source\":{\"kind\":\"card\",\"card\":$CARD_LOCATOR_TITLE_JSON,\"cardSpace\":\"Default\"},\"target\":{\"kind\":\"raw\",\"id\":$CARD_LOCATOR_ISSUE_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"},\"limit\":3}},\"id\":2}")
+      run_capture_to_var CARD_LIST_RELATIONS_TEXT "list_relations(card locator by title)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_relations\",\"arguments\":{\"association\":\"$CARD_LOCATOR_ASSOC_ID\",\"source\":{\"kind\":\"card\",\"card\":$CARD_LOCATOR_TITLE_JSON,\"cardSpace\":\"Default\"},\"target\":{\"kind\":\"raw\",\"id\":$CARD_LOCATOR_ISSUE_OBJ_ID_JSON,\"class\":\"tracker:class:Issue\"},\"limit\":3}},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_field_equals "list_relations card locator by title total" "$CARD_LIST_RELATIONS_TEXT" ".total" "1"
       fi
@@ -2839,8 +2869,8 @@ echo ""
 echo "=== 14. Cards ==="
 run_test "list_card_spaces" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_card_spaces","arguments":{}},"id":2}'
-CARDS_MASTER_TEXT=$(run_capture "list_master_tags(Default)" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_master_tags","arguments":{"cardSpace":"Default"}},"id":2}')
+run_capture_to_var CARDS_MASTER_TEXT "list_master_tags(Default)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_master_tags","arguments":{"cardSpace":"Default"}},"id":2}'
 run_test "list_cards(Default)" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_cards","arguments":{"cardSpace":"Default","limit":3}},"id":2}'
 DERIVED_CARD_TYPE_NAME=$(printf '%s\n' "$CARDS_MASTER_TEXT" | jq -r '.masterTags[0].name // empty' 2>/dev/null)
@@ -2857,8 +2887,8 @@ if [ -n "$DERIVED_CARD_TYPE_ID" ]; then
   DERIVED_CARD_LABEL_PREFIX_REGEX_JSON=$(json_string "$DERIVED_CARD_LABEL_TITLE%")
   DERIVED_CARD_LABEL_CASE_REGEX_JSON=$(json_string "%$DERIVED_CARD_LABEL_TITLE_LOWER%")
 
-  DERIVED_CARD_LABEL_TEXT=$(run_capture "create_card(derived label:$DERIVED_CARD_TYPE_NAME)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_card\",\"arguments\":{\"cardSpace\":\"Default\",\"type\":$DERIVED_CARD_TYPE_NAME_JSON,\"title\":$DERIVED_CARD_LABEL_TITLE_JSON,\"content\":\"Temporary derived card created by label.\"}},\"id\":2}")
+  run_capture_to_var DERIVED_CARD_LABEL_TEXT "create_card(derived label:$DERIVED_CARD_TYPE_NAME)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_card\",\"arguments\":{\"cardSpace\":\"Default\",\"type\":$DERIVED_CARD_TYPE_NAME_JSON,\"title\":$DERIVED_CARD_LABEL_TITLE_JSON,\"content\":\"Temporary derived card created by label.\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     DERIVED_CARD_LABEL_ID=$(printf '%s\n' "$DERIVED_CARD_LABEL_TEXT" | jq -r '.id // empty' 2>/dev/null)
   else
@@ -2866,28 +2896,28 @@ if [ -n "$DERIVED_CARD_TYPE_ID" ]; then
   fi
   if [ -n "$DERIVED_CARD_LABEL_ID" ]; then
     DERIVED_CARD_LABEL_ID_JSON=$(json_string "$DERIVED_CARD_LABEL_ID")
-    DERIVED_CARD_LABEL_GET_TEXT=$(run_capture "get_card(derived label:$DERIVED_CARD_LABEL_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_card\",\"arguments\":{\"cardSpace\":\"Default\",\"card\":$DERIVED_CARD_LABEL_ID_JSON}},\"id\":2}")
+    run_capture_to_var DERIVED_CARD_LABEL_GET_TEXT "get_card(derived label:$DERIVED_CARD_LABEL_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_card\",\"arguments\":{\"cardSpace\":\"Default\",\"card\":$DERIVED_CARD_LABEL_ID_JSON}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_equals "get_card derived label keeps type" "$DERIVED_CARD_LABEL_GET_TEXT" ".type" "$DERIVED_CARD_TYPE_ID"
     fi
-    DERIVED_CARD_LIST_TEXT=$(run_capture "list_cards(Default,type:$DERIVED_CARD_TYPE_NAME)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"type\":$DERIVED_CARD_TYPE_NAME_JSON,\"limit\":10}},\"id\":2}")
+    run_capture_to_var DERIVED_CARD_LIST_TEXT "list_cards(Default,type:$DERIVED_CARD_TYPE_NAME)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"type\":$DERIVED_CARD_TYPE_NAME_JSON,\"limit\":10}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_array_contains "list_cards derived label includes card" "$DERIVED_CARD_LIST_TEXT" ".cards | map(.id)" "$DERIVED_CARD_LABEL_ID"
     fi
-    DERIVED_CARD_REGEX_TEXT=$(run_capture "list_cards(Default,titleRegex SIMILAR TO contains)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"titleRegex\":$DERIVED_CARD_LABEL_REGEX_JSON,\"limit\":10}},\"id\":2}")
+    run_capture_to_var DERIVED_CARD_REGEX_TEXT "list_cards(Default,titleRegex SIMILAR TO contains)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"titleRegex\":$DERIVED_CARD_LABEL_REGEX_JSON,\"limit\":10}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_array_contains "list_cards titleRegex SIMILAR TO contains includes card" "$DERIVED_CARD_REGEX_TEXT" ".cards | map(.id)" "$DERIVED_CARD_LABEL_ID"
     fi
-    DERIVED_CARD_REGEX_PREFIX_TEXT=$(run_capture "list_cards(Default,titleRegex SIMILAR TO prefix)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"titleRegex\":$DERIVED_CARD_LABEL_PREFIX_REGEX_JSON,\"limit\":10}},\"id\":2}")
+    run_capture_to_var DERIVED_CARD_REGEX_PREFIX_TEXT "list_cards(Default,titleRegex SIMILAR TO prefix)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"titleRegex\":$DERIVED_CARD_LABEL_PREFIX_REGEX_JSON,\"limit\":10}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_array_contains "list_cards titleRegex SIMILAR TO prefix includes card" "$DERIVED_CARD_REGEX_PREFIX_TEXT" ".cards | map(.id)" "$DERIVED_CARD_LABEL_ID"
     fi
-    DERIVED_CARD_REGEX_CASE_TEXT=$(run_capture "list_cards(Default,titleRegex case-sensitive miss)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"titleRegex\":$DERIVED_CARD_LABEL_CASE_REGEX_JSON,\"limit\":10}},\"id\":2}")
+    run_capture_to_var DERIVED_CARD_REGEX_CASE_TEXT "list_cards(Default,titleRegex case-sensitive miss)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_cards\",\"arguments\":{\"cardSpace\":\"Default\",\"titleRegex\":$DERIVED_CARD_LABEL_CASE_REGEX_JSON,\"limit\":10}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_array_not_contains "list_cards titleRegex is case-sensitive" "$DERIVED_CARD_REGEX_CASE_TEXT" ".cards | map(.id)" "$DERIVED_CARD_LABEL_ID"
     fi
@@ -2895,8 +2925,8 @@ if [ -n "$DERIVED_CARD_TYPE_ID" ]; then
     fail_test "create_card(derived label:$DERIVED_CARD_TYPE_NAME) returns id" "missing id"
   fi
 
-  DERIVED_CARD_ID_TEXT=$(run_capture "create_card(derived id:$DERIVED_CARD_TYPE_ID)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_card\",\"arguments\":{\"cardSpace\":\"Default\",\"type\":$DERIVED_CARD_TYPE_ID_JSON,\"title\":$DERIVED_CARD_ID_TITLE_JSON,\"content\":\"Temporary derived card created by id.\"}},\"id\":2}")
+  run_capture_to_var DERIVED_CARD_ID_TEXT "create_card(derived id:$DERIVED_CARD_TYPE_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_card\",\"arguments\":{\"cardSpace\":\"Default\",\"type\":$DERIVED_CARD_TYPE_ID_JSON,\"title\":$DERIVED_CARD_ID_TITLE_JSON,\"content\":\"Temporary derived card created by id.\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     DERIVED_CARD_ID_ID=$(printf '%s\n' "$DERIVED_CARD_ID_TEXT" | jq -r '.id // empty' 2>/dev/null)
   else
@@ -2904,8 +2934,8 @@ if [ -n "$DERIVED_CARD_TYPE_ID" ]; then
   fi
   if [ -n "$DERIVED_CARD_ID_ID" ]; then
     DERIVED_CARD_ID_ID_JSON=$(json_string "$DERIVED_CARD_ID_ID")
-    DERIVED_CARD_ID_GET_TEXT=$(run_capture "get_card(derived id:$DERIVED_CARD_ID_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_card\",\"arguments\":{\"cardSpace\":\"Default\",\"card\":$DERIVED_CARD_ID_ID_JSON}},\"id\":2}")
+    run_capture_to_var DERIVED_CARD_ID_GET_TEXT "get_card(derived id:$DERIVED_CARD_ID_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_card\",\"arguments\":{\"cardSpace\":\"Default\",\"card\":$DERIVED_CARD_ID_ID_JSON}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_field_equals "get_card derived id keeps type" "$DERIVED_CARD_ID_GET_TEXT" ".type" "$DERIVED_CARD_TYPE_ID"
     fi
@@ -2970,8 +3000,8 @@ echo ""
 ##############################
 echo "=== 17. Attachments ==="
 # Create a temp issue for attachment tests
-ATT_ISSUE_TEXT=$(run_capture "create_issue(for_attachment)" \
-  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Attachment Test\"}},\"id\":2}")
+run_capture_to_var ATT_ISSUE_TEXT "create_issue(for_attachment)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":\"Attachment Test\"}},\"id\":2}"
 if [ $? -eq 0 ]; then
   ATT_ISSUE_ID=$(echo "$ATT_ISSUE_TEXT" | jq -r '.identifier' 2>/dev/null)
   ATT_ISSUE_OBJ=$(echo "$ATT_ISSUE_TEXT" | jq -r '.issueId' 2>/dev/null)
@@ -2982,8 +3012,8 @@ if [ $? -eq 0 ]; then
   echo "test attachment content" > "$TEST_TMPDIR/inttest_attach.txt"
 
   # add_issue_attachment (also exercises upload internally)
-  ATT_TEXT=$(run_capture "add_issue_attachment($ATT_ISSUE_ID)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_issue_attachment\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$ATT_ISSUE_ID\",\"filePath\":\"$TEST_TMPDIR/inttest_attach.txt\",\"filename\":\"test.txt\",\"contentType\":\"text/plain\"}},\"id\":2}")
+  run_capture_to_var ATT_TEXT "add_issue_attachment($ATT_ISSUE_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_issue_attachment\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$ATT_ISSUE_ID\",\"filePath\":\"$TEST_TMPDIR/inttest_attach.txt\",\"filename\":\"test.txt\",\"contentType\":\"text/plain\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     ATT_ID=$(echo "$ATT_TEXT" | jq -r '.attachmentId' 2>/dev/null)
     echo "  => attachment: $ATT_ID"
@@ -3025,8 +3055,8 @@ if [ -n "$TM_PROJ_ID" ]; then
   echo "  Using TM project: $TM_PROJ_ID"
 
   # Test Suite
-  TS_TEXT=$(run_capture "create_test_suite" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_test_suite\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"name\":\"IntTest Suite\"}},\"id\":2}")
+  run_capture_to_var TS_TEXT "create_test_suite" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_test_suite\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"name\":\"IntTest Suite\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     TSID=$(echo "$TS_TEXT" | jq -r '.id' 2>/dev/null)
     echo "  => suite: $TSID"
@@ -3038,8 +3068,8 @@ if [ -n "$TM_PROJ_ID" ]; then
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_test_suite\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testSuite\":\"$TSID\",\"name\":\"Updated Suite\"}},\"id\":2}"
 
     # Test Case
-    TC_TEXT=$(run_capture "create_test_case" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_test_case\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"name\":\"IntTest Case\",\"testSuite\":\"$TSID\"}},\"id\":2}")
+    run_capture_to_var TC_TEXT "create_test_case" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_test_case\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"name\":\"IntTest Case\",\"testSuite\":\"$TSID\"}},\"id\":2}"
     if [ $? -eq 0 ]; then
       TCID=$(echo "$TC_TEXT" | jq -r '.id' 2>/dev/null)
       echo "  => case: $TCID"
@@ -3051,8 +3081,8 @@ if [ -n "$TM_PROJ_ID" ]; then
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_test_case\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testCase\":\"$TCID\",\"name\":\"Updated Case\"}},\"id\":2}"
 
       # Test Plan
-      TP_TEXT=$(run_capture "create_test_plan" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_test_plan\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"name\":\"IntTest Plan\"}},\"id\":2}")
+      run_capture_to_var TP_TEXT "create_test_plan" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_test_plan\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"name\":\"IntTest Plan\"}},\"id\":2}"
       if [ $? -eq 0 ]; then
         TPID=$(echo "$TP_TEXT" | jq -r '.id' 2>/dev/null)
         echo "  => plan: $TPID"
@@ -3070,8 +3100,8 @@ if [ -n "$TM_PROJ_ID" ]; then
           "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_test_plan_item\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testPlan\":\"$TPID\",\"testCase\":\"$TCID\"}},\"id\":2}"
 
         # Test Run
-        TR_TEXT=$(run_capture "create_test_run" \
-          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_test_run\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"name\":\"IntTest Run\",\"testPlan\":\"$TPID\"}},\"id\":2}")
+        run_capture_to_var TR_TEXT "create_test_run" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_test_run\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"name\":\"IntTest Run\",\"testPlan\":\"$TPID\"}},\"id\":2}"
         if [ $? -eq 0 ]; then
           TRID=$(echo "$TR_TEXT" | jq -r '.id' 2>/dev/null)
           echo "  => run: $TRID"
@@ -3083,8 +3113,8 @@ if [ -n "$TM_PROJ_ID" ]; then
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_test_run\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testRun\":\"$TRID\",\"name\":\"Updated Run\"}},\"id\":2}"
 
           # Test Result
-          RESULT_TEXT=$(run_capture "create_test_result" \
-            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_test_result\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testRun\":\"$TRID\",\"testCase\":\"$TCID\",\"status\":\"passed\"}},\"id\":2}")
+          run_capture_to_var RESULT_TEXT "create_test_result" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_test_result\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testRun\":\"$TRID\",\"testCase\":\"$TCID\",\"status\":\"passed\"}},\"id\":2}"
           if [ $? -eq 0 ]; then
             RESID=$(echo "$RESULT_TEXT" | jq -r '.id' 2>/dev/null)
             echo "  => result: $RESID"
@@ -3099,8 +3129,8 @@ if [ -n "$TM_PROJ_ID" ]; then
           fi
 
           # run_test_plan — creates a new test run; capture and clean up
-          RTP_TEXT=$(run_capture "run_test_plan($TPID)" \
-            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"run_test_plan\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testPlan\":\"$TPID\"}},\"id\":2}")
+          run_capture_to_var RTP_TEXT "run_test_plan($TPID)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"run_test_plan\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testPlan\":\"$TPID\"}},\"id\":2}"
           if [ $? -eq 0 ]; then
             RTP_RUN_ID=$(echo "$RTP_TEXT" | jq -r '.runId // empty' 2>/dev/null)
             if [ -n "$RTP_RUN_ID" ]; then
@@ -3192,8 +3222,8 @@ if [ -n "$PROCESS_ID" ] && [ -n "$PROCESS_INITIAL_STATE" ] && [ -n "$SAFE_CARD_I
   if [ -n "$EXISTING_ACTIVE" ]; then
     skip_test "start_process/cancel_execution" "safe card already has an active execution and process forbids parallel executions"
   else
-    START_TEXT=$(run_capture "start_process($PROCESS_ID,$SAFE_CARD_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"start_process\",\"arguments\":{\"process\":\"$PROCESS_ID\",\"card\":\"$SAFE_CARD_ID\"}},\"id\":2}")
+    run_capture_to_var START_TEXT "start_process($PROCESS_ID,$SAFE_CARD_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"start_process\",\"arguments\":{\"process\":\"$PROCESS_ID\",\"card\":\"$SAFE_CARD_ID\"}},\"id\":2}"
     STARTED_EXECUTION_ID=$(echo "$START_TEXT" | jq -r '.executionId // empty' 2>/dev/null)
     if [ -n "$STARTED_EXECUTION_ID" ]; then
       run_test "cancel_execution($STARTED_EXECUTION_ID)" \

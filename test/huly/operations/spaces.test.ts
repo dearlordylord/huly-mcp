@@ -313,6 +313,7 @@ const createTestLayer = (config: MockConfig) => {
     markupUrlConfig: testMarkupUrlConfig,
     workbenchUrlConfig: testWorkbenchUrlConfig,
     findAll,
+    findAllInModel: findAll,
     findOne,
     createDoc: () => Effect.die(new Error("not implemented")),
     updateDoc: <T extends Doc>(
