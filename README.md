@@ -489,6 +489,7 @@ SDK upgrade revisit:
 | `update_channel` | Update fields on an existing Huly channel. Only provided fields are modified. |
 | `delete_channel` | Permanently delete a Huly channel. This action cannot be undone. For reversible channel lifecycle changes, use archive_channel and unarchive_channel instead. |
 | `list_channel_messages` | List messages in a Huly channel. Returns messages sorted by date (newest first). |
+| `list_external_channel_messages` | List read-only messages for an external Gmail or Telegram channel by channel name or ID. The limit defaults to 50 and is capped at 200. When this build does not include a compatible Huly external-message SDK/model for the requested provider, returns supported=false, an unsupportedReason, and an empty messages array; it never sends, replies, deletes, mutates, or returns fake messages. |
 | `send_channel_message` | Send a message to a Huly channel. Message body supports markdown formatting. |
 | `update_channel_message` | Update a channel message. Only the body can be modified. |
 | `delete_channel_message` | Permanently delete a channel message. This action cannot be undone. |
