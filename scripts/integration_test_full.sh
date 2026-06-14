@@ -518,6 +518,48 @@ assert_json_array_same_set() {
   return 1
 }
 
+assert_json_role_members_same_set() {
+  local name="$1" json="$2" role_id="$3" expected_json="$4"
+  if printf '%s\n' "$json" | jq -e --arg role_id "$role_id" --argjson expected "$expected_json" \
+    '((.roleAssignments // []) | map(select(.roleId == $role_id)) | first | .members // [] | sort) == ($expected | sort)' >/dev/null 2>&1; then
+    echo "PASS: $name"
+    PASSED=$((PASSED + 1))
+    return 0
+  fi
+  echo "FAIL: $name (role $role_id members do not match $expected_json)"
+  FAILED=$((FAILED + 1))
+  ERRORS="${ERRORS}\n  - ${name}: role ${role_id} members do not match ${expected_json}"
+  return 1
+}
+
+assert_json_role_members_contains() {
+  local name="$1" json="$2" role_id="$3" expected="$4"
+  if printf '%s\n' "$json" | jq -e --arg role_id "$role_id" --arg expected "$expected" \
+    '(.roleAssignments // []) | map(select(.roleId == $role_id)) | first | .members // [] | any(. == $expected)' >/dev/null 2>&1; then
+    echo "PASS: $name"
+    PASSED=$((PASSED + 1))
+    return 0
+  fi
+  echo "FAIL: $name (role $role_id members do not contain $expected)"
+  FAILED=$((FAILED + 1))
+  ERRORS="${ERRORS}\n  - ${name}: role ${role_id} members do not contain ${expected}"
+  return 1
+}
+
+assert_json_role_members_not_contains() {
+  local name="$1" json="$2" role_id="$3" expected="$4"
+  if printf '%s\n' "$json" | jq -e --arg role_id "$role_id" --arg expected "$expected" \
+    '(.roleAssignments // []) | map(select(.roleId == $role_id)) | first | .members // [] | all(. != $expected)' >/dev/null 2>&1; then
+    echo "PASS: $name"
+    PASSED=$((PASSED + 1))
+    return 0
+  fi
+  echo "FAIL: $name (role $role_id members contain $expected)"
+  FAILED=$((FAILED + 1))
+  ERRORS="${ERRORS}\n  - ${name}: role ${role_id} members contain ${expected}"
+  return 1
+}
+
 assert_json_field_count() {
   local name="$1" json="$2" jq_expr="$3" expected="$4"
   local value
@@ -2407,7 +2449,7 @@ if [ $? -eq 0 ]; then
 fi
 
 run_capture_to_var SPACE_TYPES_TEXT "list_space_types" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_space_types","arguments":{"limit":5}},"id":2}'
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_space_types","arguments":{"limit":50}},"id":2}'
 if [ $? -eq 0 ]; then
   assert_json_field_nonempty "list_space_types returns total" "$SPACE_TYPES_TEXT" ".total"
   FIRST_SPACE_TYPE_ID=$(echo "$SPACE_TYPES_TEXT" | jq -r '.spaceTypes[0].id // empty' 2>/dev/null)
@@ -2421,6 +2463,97 @@ fi
 
 run_test "list_space_permissions" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_space_permissions","arguments":{"limit":5}},"id":2}'
+
+ROLE_SPACE_FIXTURE=""
+if [ -n "$SPACE_TYPES_TEXT" ]; then
+  while IFS=$'\t' read -r ROLE_SPACE_TYPE_CANDIDATE _role_count; do
+    if [ -z "$ROLE_SPACE_TYPE_CANDIDATE" ]; then
+      continue
+    fi
+    ROLE_SPACE_TYPE_CANDIDATE_JSON=$(json_string "$ROLE_SPACE_TYPE_CANDIDATE")
+    ROLE_SPACE_CANDIDATES_TEXT=$(run_capture_only \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_spaces\",\"arguments\":{\"type\":$ROLE_SPACE_TYPE_CANDIDATE_JSON,\"includeArchived\":true,\"limit\":10}},\"id\":2}")
+    if [ -z "$ROLE_SPACE_CANDIDATES_TEXT" ]; then
+      continue
+    fi
+    ROLE_SPACE_CANDIDATE=$(printf '%s\n' "$ROLE_SPACE_CANDIDATES_TEXT" | jq -r \
+      '.spaces[]? | select(.archived == false and ((.membersCount // 0) > 0)) | .id' 2>/dev/null | head -n 1)
+    if [ -n "$ROLE_SPACE_CANDIDATE" ]; then
+      ROLE_SPACE_FIXTURE="${ROLE_SPACE_TYPE_CANDIDATE}"$'\t'"${ROLE_SPACE_CANDIDATE}"
+      break
+    fi
+  done < <(printf '%s\n' "$SPACE_TYPES_TEXT" | jq -r '.spaceTypes[]? | select((.rolesCount // 0) > 0) | [.id, .rolesCount] | @tsv' 2>/dev/null)
+fi
+
+if [ -n "$ROLE_SPACE_FIXTURE" ]; then
+  ROLE_SPACE_TYPE_ID=$(printf '%s\n' "$ROLE_SPACE_FIXTURE" | cut -f1)
+  ROLE_SPACE_ID=$(printf '%s\n' "$ROLE_SPACE_FIXTURE" | cut -f2)
+  ROLE_SPACE_TYPE_ID_JSON=$(json_string "$ROLE_SPACE_TYPE_ID")
+  ROLE_SPACE_ID_JSON=$(json_string "$ROLE_SPACE_ID")
+
+  if run_capture_to_var ROLE_SPACE_TYPE_TEXT "get_space_type($ROLE_SPACE_TYPE_ID role fixture)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_space_type\",\"arguments\":{\"spaceType\":$ROLE_SPACE_TYPE_ID_JSON}},\"id\":2}" \
+    && run_capture_to_var ROLE_SPACE_DETAIL_TEXT "get_space($ROLE_SPACE_ID role fixture)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_space\",\"arguments\":{\"space\":$ROLE_SPACE_ID_JSON,\"includeArchived\":true}},\"id\":2}"; then
+    ROLE_ID=$(printf '%s\n' "$ROLE_SPACE_TYPE_TEXT" | jq -r '.roles[0].id // empty' 2>/dev/null)
+    ROLE_MEMBER_CANDIDATE=$(printf '%s\n' "$ROLE_SPACE_DETAIL_TEXT" | jq -r '.members[0] // empty' 2>/dev/null)
+    if [ -n "$ROLE_ID" ] && [ -n "$ROLE_MEMBER_CANDIDATE" ]; then
+      ROLE_ID_JSON=$(json_string "$ROLE_ID")
+      ROLE_MEMBER_CANDIDATE_JSON=$(json_string "$ROLE_MEMBER_CANDIDATE")
+      ROLE_MEMBER_SINGLETON_JSON=$(jq -cn --arg member "$ROLE_MEMBER_CANDIDATE" '[$member]')
+      INITIAL_ROLE_MEMBERS_JSON=$(printf '%s\n' "$ROLE_SPACE_DETAIL_TEXT" | jq -c --arg role_id "$ROLE_ID" \
+        '(.roleAssignments // []) | map(select(.roleId == $role_id)) | first | .members // [] | sort' 2>/dev/null)
+      if [ -z "$INITIAL_ROLE_MEMBERS_JSON" ]; then
+        INITIAL_ROLE_MEMBERS_JSON="[]"
+      fi
+
+      if run_capture_to_var SET_ROLE_MEMBERS_TEXT "set_space_role_members($ROLE_SPACE_ID,$ROLE_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_space_role_members\",\"arguments\":{\"space\":$ROLE_SPACE_ID_JSON,\"role\":$ROLE_ID_JSON,\"members\":$ROLE_MEMBER_SINGLETON_JSON}},\"id\":2}"; then
+        assert_json_array_same_set "set_space_role_members returns requested members" "$SET_ROLE_MEMBERS_TEXT" ".members // []" "$ROLE_MEMBER_SINGLETON_JSON"
+        sleep 2
+        if run_capture_to_var SET_ROLE_MEMBERS_PERSISTED_TEXT "get_space($ROLE_SPACE_ID after set_space_role_members)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_space\",\"arguments\":{\"space\":$ROLE_SPACE_ID_JSON,\"includeArchived\":true}},\"id\":2}"; then
+          assert_json_role_members_same_set "get_space sees set_space_role_members persisted" "$SET_ROLE_MEMBERS_PERSISTED_TEXT" "$ROLE_ID" "$ROLE_MEMBER_SINGLETON_JSON"
+        fi
+      fi
+
+      if run_capture_to_var ADD_ROLE_MEMBERS_TEXT "add_space_role_members($ROLE_SPACE_ID,$ROLE_ID idempotent)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_space_role_members\",\"arguments\":{\"space\":$ROLE_SPACE_ID_JSON,\"role\":$ROLE_ID_JSON,\"members\":[$ROLE_MEMBER_CANDIDATE_JSON]}},\"id\":2}"; then
+        assert_json_array_contains "add_space_role_members returns candidate" "$ADD_ROLE_MEMBERS_TEXT" ".members // []" "$ROLE_MEMBER_CANDIDATE"
+        sleep 2
+        if run_capture_to_var ADD_ROLE_MEMBERS_PERSISTED_TEXT "get_space($ROLE_SPACE_ID after add_space_role_members)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_space\",\"arguments\":{\"space\":$ROLE_SPACE_ID_JSON,\"includeArchived\":true}},\"id\":2}"; then
+          assert_json_role_members_contains "get_space sees add_space_role_members persisted" "$ADD_ROLE_MEMBERS_PERSISTED_TEXT" "$ROLE_ID" "$ROLE_MEMBER_CANDIDATE"
+        fi
+      fi
+
+      if run_capture_to_var REMOVE_ROLE_MEMBERS_TEXT "remove_space_role_members($ROLE_SPACE_ID,$ROLE_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_space_role_members\",\"arguments\":{\"space\":$ROLE_SPACE_ID_JSON,\"role\":$ROLE_ID_JSON,\"members\":[$ROLE_MEMBER_CANDIDATE_JSON]}},\"id\":2}"; then
+        assert_json_array_not_contains "remove_space_role_members removes candidate" "$REMOVE_ROLE_MEMBERS_TEXT" ".members // []" "$ROLE_MEMBER_CANDIDATE"
+        sleep 2
+        if run_capture_to_var REMOVE_ROLE_MEMBERS_PERSISTED_TEXT "get_space($ROLE_SPACE_ID after remove_space_role_members)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_space\",\"arguments\":{\"space\":$ROLE_SPACE_ID_JSON,\"includeArchived\":true}},\"id\":2}"; then
+          assert_json_role_members_not_contains "get_space sees remove_space_role_members persisted" "$REMOVE_ROLE_MEMBERS_PERSISTED_TEXT" "$ROLE_ID" "$ROLE_MEMBER_CANDIDATE"
+        fi
+      fi
+
+      if run_test "set_space_role_members($ROLE_SPACE_ID,$ROLE_ID restore)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_space_role_members\",\"arguments\":{\"space\":$ROLE_SPACE_ID_JSON,\"role\":$ROLE_ID_JSON,\"members\":$INITIAL_ROLE_MEMBERS_JSON}},\"id\":2}"; then
+        sleep 2
+        if run_capture_to_var ROLE_MEMBERS_RESTORE_PERSISTED_TEXT "get_space($ROLE_SPACE_ID after role restore)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_space\",\"arguments\":{\"space\":$ROLE_SPACE_ID_JSON,\"includeArchived\":true}},\"id\":2}"; then
+          assert_json_role_members_same_set "get_space sees set_space_role_members restore persisted" "$ROLE_MEMBERS_RESTORE_PERSISTED_TEXT" "$ROLE_ID" "$INITIAL_ROLE_MEMBERS_JSON"
+        fi
+      fi
+    else
+      skip_test "set/add/remove_space_role_members" "role fixture missing role or member candidate"
+    fi
+  else
+    skip_test "set/add/remove_space_role_members" "could not load typed role fixture"
+  fi
+else
+  skip_test "set/add/remove_space_role_members" "no typed space with roles and members found"
+fi
 
 GENERIC_SPACE_NAME="IntTest Generic Space $RUN_ID"
 GENERIC_SPACE_UPDATED_NAME="IntTest Generic Space Updated $RUN_ID"
