@@ -16,6 +16,7 @@
         "core",
         "document",
         "drive",
+        "inventory",
         "notification",
         "process",
         "tags",
@@ -38,7 +39,6 @@
         "controlled-documents",
         "gmail",
         "hr",
-        "inventory",
         "lead",
         "love",
         "preference",
@@ -384,6 +384,17 @@
       "rationale": "Stale installed SDK declaration: current platform source removed the SavedDocument model registration and document-resource star/unstar usage in hcengineering/platform#10124. Current document stars are rating-backed DocReaction / ReactionKind.Star, tracked under the Rating / reputation gap.",
       "exports": [
         "SavedDocument"
+      ]
+    },
+    {
+      "package": "@hcengineering/inventory",
+      "status": "covered",
+      "matrixLocation": "Inventory",
+      "rationale": "Current inventory tools cover Category, Product, and Variant as first-class category hierarchy, product, and variant/SKU CRUD operations. Product photos, attachments, activity, and comments remain generic or follow-up wrapper gaps rather than missing inventory SDK model exports.",
+      "exports": [
+        "Category",
+        "Product",
+        "Variant"
       ]
     },
     {

@@ -16,6 +16,7 @@ import { documentSnapshotTools } from "./document-snapshots.js"
 import { documentTools } from "./documents.js"
 import { driveTools } from "./drive.js"
 import { genericAssociationTools } from "./generic-associations.js"
+import { inventoryTools } from "./inventory.js"
 import { issueTools } from "./issues.js"
 import { labelTools } from "./labels.js"
 import { leadTools } from "./leads.js"
@@ -65,6 +66,7 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...documentSnapshotTools,
   ...driveTools,
   ...genericAssociationTools,
+  ...inventoryTools,
   ...spaceTools,
   ...sdkDiscoveryTools,
   ...storageTools,

@@ -83,6 +83,15 @@ import {
   InvalidFileDataError,
   InvalidPersonUuidError,
   InvalidStatusError,
+  InventoryCategoryIdentifierAmbiguousError,
+  InventoryCategoryNotFoundError,
+  InventoryConflictError,
+  InventoryMutationUnsupportedError,
+  InventoryNotEmptyError,
+  InventoryProductIdentifierAmbiguousError,
+  InventoryProductNotFoundError,
+  InventoryVariantIdentifierAmbiguousError,
+  InventoryVariantNotFoundError,
   IssueNotFoundError,
   IssueTemplateNotFoundError,
   LeadNotFoundError,
@@ -960,6 +969,24 @@ describe("Huly Errors", () => {
               return `generic-object-not-found:${error.field}:${error.identifier}:${error.class ?? ""}`
             case "HulyClassNotFoundError":
               return `huly-class-not-found:${error.classId}`
+            case "InventoryCategoryNotFoundError":
+              return `inventory-category:${error.identifier}`
+            case "InventoryProductNotFoundError":
+              return `inventory-product:${error.identifier}`
+            case "InventoryVariantNotFoundError":
+              return `inventory-variant:${error.identifier}`
+            case "InventoryCategoryIdentifierAmbiguousError":
+              return `inventory-category-ambiguous:${error.identifier}:${error.matches}`
+            case "InventoryProductIdentifierAmbiguousError":
+              return `inventory-product-ambiguous:${error.identifier}:${error.matches}`
+            case "InventoryVariantIdentifierAmbiguousError":
+              return `inventory-variant-ambiguous:${error.identifier}:${error.matches}`
+            case "InventoryConflictError":
+              return `inventory-conflict:${error.message}`
+            case "InventoryNotEmptyError":
+              return `inventory-not-empty:${error.message}`
+            case "InventoryMutationUnsupportedError":
+              return `inventory-mutation-unsupported:${error.message}`
             case "SpaceNotFoundError":
               return `space:${error.identifier}`
             case "SpaceIdentifierAmbiguousError":
@@ -1042,6 +1069,43 @@ describe("Huly Errors", () => {
           "Planner ToDo locator is ambiguous: title:Fix bug matched 2 ToDos"
         )
         expect(matchError(new TodoWorkSlotNotFoundError({ workSlotId: "slot-1" }))).toBe("todo-workslot:slot-1")
+        expect(matchError(new InventoryCategoryNotFoundError({ identifier: "Cat" }))).toBe("inventory-category:Cat")
+        expect(new InventoryCategoryNotFoundError({ identifier: "Cat" }).message).toBe(
+          "Inventory category 'Cat' not found"
+        )
+        expect(matchError(new InventoryProductNotFoundError({ identifier: "Product" }))).toBe(
+          "inventory-product:Product"
+        )
+        expect(new InventoryProductNotFoundError({ identifier: "Product" }).message).toBe(
+          "Inventory product 'Product' not found"
+        )
+        expect(matchError(new InventoryVariantNotFoundError({ identifier: "SKU-1" }))).toBe("inventory-variant:SKU-1")
+        expect(new InventoryVariantNotFoundError({ identifier: "SKU-1" }).message).toBe(
+          "Inventory variant/SKU 'SKU-1' not found"
+        )
+        expect(matchError(new InventoryCategoryIdentifierAmbiguousError({ identifier: "Cat", matches: 2 }))).toBe(
+          "inventory-category-ambiguous:Cat:2"
+        )
+        expect(new InventoryCategoryIdentifierAmbiguousError({ identifier: "Cat", matches: 2 }).message).toBe(
+          "Inventory category 'Cat' matched 2 categories; pass parentCategory or use the category ID"
+        )
+        expect(matchError(new InventoryProductIdentifierAmbiguousError({ identifier: "Product", matches: 2 }))).toBe(
+          "inventory-product-ambiguous:Product:2"
+        )
+        expect(new InventoryProductIdentifierAmbiguousError({ identifier: "Product", matches: 2 }).message).toBe(
+          "Inventory product 'Product' matched 2 products; pass category or use the product ID"
+        )
+        expect(matchError(new InventoryVariantIdentifierAmbiguousError({ identifier: "SKU-1", matches: 2 }))).toBe(
+          "inventory-variant-ambiguous:SKU-1:2"
+        )
+        expect(new InventoryVariantIdentifierAmbiguousError({ identifier: "SKU-1", matches: 2 }).message).toBe(
+          "Inventory variant/SKU 'SKU-1' matched 2 variants; pass product or use the variant ID"
+        )
+        expect(matchError(new InventoryConflictError({ message: "duplicate" }))).toBe("inventory-conflict:duplicate")
+        expect(matchError(new InventoryNotEmptyError({ message: "not empty" }))).toBe("inventory-not-empty:not empty")
+        expect(matchError(new InventoryMutationUnsupportedError({ message: "unsupported" }))).toBe(
+          "inventory-mutation-unsupported:unsupported"
+        )
         expect(new TodoWorkSlotNotFoundError({ workSlotId: "slot-1" }).message).toBe(
           "Planner ToDo work slot 'slot-1' not found"
         )

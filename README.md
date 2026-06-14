@@ -289,7 +289,7 @@ Planned feature surfaces:
 - Surveys and polls: survey CRUD, poll creation/attachment, survey question data, completion status, and results.
 - Generic approval requests: create/list/approve/reject/cancel approval requests, decision comments, required approval counts, request status, and requested/approved/rejected people.
 - Boards: board CRUD, board cards, status workflows, members/assignees, location, cover/archive fields, board labels, and menu/archive views.
-- Inventory: categories, products, variants/SKUs, product photos, attachments, activity/comments, and hierarchy tools.
+- Inventory: category hierarchy CRUD, product CRUD, and variant/SKU CRUD are covered by first-class tools; remaining gaps are product photo, attachment, activity, and comment friendly wrappers.
 - Leads write surface: create/update/delete funnels and leads, status changes, assignment, start dates, customer descriptions, person customer support, and lead comments/attachments/labels/relations.
 - Contacts: person channels, social identities, provider discovery, contact statuses, notes/comments, person attachments, person merge, employee invite/create/kick/reinvite, and inactive employee management.
 - Calendar: calendar CRUD/config, external calendar sync metadata, primary calendar management, schedule objects, participant mutations, and RSVP/status support when stable.
@@ -322,7 +322,7 @@ SDK upgrade revisit:
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
 ## Available Tools
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `collaborators`, `custom-fields`, `drive`, `labels`, `leads`, `planner`, `processes`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `virtual-office`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `planner`, `processes`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `virtual-office`
 
 ### Projects
 
@@ -672,6 +672,26 @@ SDK upgrade revisit:
 | `delete_drive_item` | Permanently delete a Drive item, meaning a file or folder. Files are deleted with their version records. Folders must be empty; non-empty folders fail with child count and child summaries. This is permanent deletion, not archive or trash. |
 | `list_drive_file_versions` | List versions for a Drive file resolved by file id or file path. Marks the current version and includes blob id, size, MIME type, lastModified, and download URL. |
 | `restore_drive_file_version` | Restore an existing Drive file version by version id or numeric version. Idempotent when the requested version is already current and does not increment the file version counter. |
+
+### Inventory
+
+| Tool | Description |
+|------|-------------|
+| `list_inventory_categories` | List inventory categories sorted by name. Omit parentCategory to search all categories, or pass a parent category ID/exact name/root to list direct children. query filters names case-insensitively. |
+| `get_inventory_category` | Get one inventory category by ID or exact name. If the name is duplicated under different parents, pass parentCategory or use the category ID. |
+| `create_inventory_category` | Create an inventory category. Defaults parentCategory to the Inventory root. Rejects duplicate category names under the same parent. |
+| `update_inventory_category` | Rename and/or move an inventory category. category accepts ID or exact name; pass parentCategory when a name may be duplicated. Rejects duplicate names in the destination parent and self/descendant moves. |
+| `delete_inventory_category` | Delete an empty inventory category by ID or exact name. Refuses categories that still contain child categories or products; this action does not cascade. |
+| `list_inventory_products` | List inventory products sorted by name. Optionally scope to category by ID/exact name and filter product names with query. |
+| `get_inventory_product` | Get one inventory product by ID or exact product name. If product names are duplicated, pass category or use the product ID. |
+| `create_inventory_product` | Create an inventory product in a category resolved by ID or exact name. Rejects duplicate product names in the same category. |
+| `update_inventory_product` | Rename and/or move an inventory product. product accepts ID or exact name; pass category when a name may be duplicated. Rejects duplicate names in the destination category. |
+| `delete_inventory_product` | Delete an inventory product by ID or exact name. Refuses products with variants, photos, or attachments; this action does not cascade. |
+| `list_inventory_variants` | List inventory variants/SKUs sorted by name. Optionally scope to product by ID/exact name; category can disambiguate product names. query filters variant names and SKUs. |
+| `get_inventory_variant` | Get one inventory variant by ID, exact variant name, or exact SKU. If the name/SKU is duplicated, pass product or use the variant ID. |
+| `create_inventory_variant` | Create an inventory variant/SKU under a product resolved by ID or exact name. Rejects duplicate variant names or SKUs in the same product. |
+| `update_inventory_variant` | Rename and/or change the SKU of an inventory variant. variant accepts ID, exact name, or exact SKU; pass product when needed. Rejects duplicate names or SKUs in the same product. |
+| `delete_inventory_variant` | Delete one inventory variant/SKU by ID, exact variant name, or exact SKU. This action does not delete its product. |
 
 ### Labels
 

@@ -16,6 +16,8 @@ export const contact = require("@hcengineering/contact").default as typeof impor
 export const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
 export const documentPlugin = require("@hcengineering/document")
   .default as typeof import("@hcengineering/document").default
+export const inventory = require("@hcengineering/inventory")
+  .default as typeof import("@hcengineering/inventory").default
 export const love = require("@hcengineering/love").default as typeof import("@hcengineering/love").default
 export const notification = require("@hcengineering/notification")
   .default as typeof import("@hcengineering/notification").default
