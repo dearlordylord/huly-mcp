@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.31.1
+
+### Patch Changes
+
+- f324916: Add typed-space role member mutation tools for setting, adding, and removing role members.
+
 ## 0.31.0
 
 ### Minor Changes
