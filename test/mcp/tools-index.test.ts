@@ -46,6 +46,7 @@ describe("CATEGORY_NAMES", () => {
       expect(CATEGORY_NAMES.has("associations")).toBe(true)
       expect(CATEGORY_NAMES.has("sdk-discovery")).toBe(true)
       expect(CATEGORY_NAMES.has("user-statuses")).toBe(true)
+      expect(CATEGORY_NAMES.has("inventory")).toBe(true)
       expect(CATEGORY_NAMES.size).toBeGreaterThan(5)
     }))
 

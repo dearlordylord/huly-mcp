@@ -317,6 +317,15 @@ export type TestRunId = Schema.Schema.Type<typeof TestRunId>
 export const TestResultId = HulyRef("TestResultId")
 export type TestResultId = Schema.Schema.Type<typeof TestResultId>
 
+export const InventoryCategoryId = HulyRef("InventoryCategoryId")
+export type InventoryCategoryId = Schema.Schema.Type<typeof InventoryCategoryId>
+
+export const InventoryProductId = HulyRef("InventoryProductId")
+export type InventoryProductId = Schema.Schema.Type<typeof InventoryProductId>
+
+export const InventoryVariantId = HulyRef("InventoryVariantId")
+export type InventoryVariantId = Schema.Schema.Type<typeof InventoryVariantId>
+
 // === Tier 2: Human-Readable Identifiers ===
 
 export const ProjectIdentifier = NonEmptyString.pipe(Schema.brand("ProjectIdentifier"))
@@ -557,6 +566,15 @@ export type TagIdentifier = Schema.Schema.Type<typeof TagIdentifier>
 
 export const TagCategoryIdentifier = NonEmptyString.pipe(Schema.brand("TagCategoryIdentifier"))
 export type TagCategoryIdentifier = Schema.Schema.Type<typeof TagCategoryIdentifier>
+
+export const InventoryCategoryIdentifier = NonEmptyString.pipe(Schema.brand("InventoryCategoryIdentifier"))
+export type InventoryCategoryIdentifier = Schema.Schema.Type<typeof InventoryCategoryIdentifier>
+
+export const InventoryProductIdentifier = NonEmptyString.pipe(Schema.brand("InventoryProductIdentifier"))
+export type InventoryProductIdentifier = Schema.Schema.Type<typeof InventoryProductIdentifier>
+
+export const InventoryVariantIdentifier = NonEmptyString.pipe(Schema.brand("InventoryVariantIdentifier"))
+export type InventoryVariantIdentifier = Schema.Schema.Type<typeof InventoryVariantIdentifier>
 
 export const MemberReference = NonEmptyString.pipe(Schema.brand("MemberReference"))
 export type MemberReference = Schema.Schema.Type<typeof MemberReference>

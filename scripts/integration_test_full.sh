@@ -25,6 +25,10 @@ HTTP_CURL_CONFIG=""
 GENERIC_ASSOCIATION_CLEANUP_IDS=""
 DRIVE_CLEANUP_ITEMS=""
 DRIVE_CLEANUP_DRIVES=""
+INVENTORY_CLEANUP_CATEGORY_ID=""
+INVENTORY_CLEANUP_CHILD_CATEGORY_ID=""
+INVENTORY_CLEANUP_PRODUCT_ID=""
+INVENTORY_CLEANUP_VARIANT_ID=""
 TM_TASK_TYPE_NAME=""
 TM_STATUS_NAME=""
 WORKFLOW_CLEANED=false
@@ -137,9 +141,29 @@ cleanup_drive_artifacts() {
   fi
 }
 
+cleanup_inventory_artifacts() {
+  if [ -n "$INVENTORY_CLEANUP_VARIANT_ID" ]; then
+    variant_json=$(json_string "$INVENTORY_CLEANUP_VARIANT_ID")
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_variant\",\"arguments\":{\"variant\":$variant_json}},\"id\":2}" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$INVENTORY_CLEANUP_PRODUCT_ID" ]; then
+    product_json=$(json_string "$INVENTORY_CLEANUP_PRODUCT_ID")
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_product\",\"arguments\":{\"product\":$product_json}},\"id\":2}" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$INVENTORY_CLEANUP_CHILD_CATEGORY_ID" ]; then
+    child_category_json=$(json_string "$INVENTORY_CLEANUP_CHILD_CATEGORY_ID")
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_category\",\"arguments\":{\"category\":$child_category_json}},\"id\":2}" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$INVENTORY_CLEANUP_CATEGORY_ID" ]; then
+    category_json=$(json_string "$INVENTORY_CLEANUP_CATEGORY_ID")
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_category\",\"arguments\":{\"category\":$category_json}},\"id\":2}" >/dev/null 2>&1 || true
+  fi
+}
+
 cleanup_all() {
   cleanup_generic_associations
   cleanup_workflow_artifacts || true
+  cleanup_inventory_artifacts || true
   cleanup_drive_artifacts || true
   cleanup_http_transport
 }
@@ -947,6 +971,154 @@ if [ $? -eq 0 ]; then
   fi
 else
   skip_test "leads" "list_funnels failed"
+fi
+echo ""
+
+##############################
+# 1c. INVENTORY CRUD
+##############################
+echo "=== 1c. Inventory CRUD ==="
+INVENTORY_PROBE_RESULT=$(call_tool \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_inventory_categories","arguments":{"limit":5}},"id":2}')
+INVENTORY_PROBE_ERROR=$(echo "$INVENTORY_PROBE_RESULT" | jq -r '.result.content[0].text // .error.message // empty' 2>/dev/null)
+INVENTORY_PROBE_IS_ERROR=$(echo "$INVENTORY_PROBE_RESULT" | jq -r '.result.isError // false' 2>/dev/null)
+if [ -z "$INVENTORY_PROBE_RESULT" ]; then
+  fail_test "list_inventory_categories" "no response"
+elif [ "$INVENTORY_PROBE_IS_ERROR" = "true" ] &&
+  printf '%s\n' "$INVENTORY_PROBE_ERROR" | grep -Eiq 'inventory.*(class|model|not found|missing)|class.*inventory'; then
+  for inventory_test in \
+    "list_inventory_categories" \
+    "create_inventory_category" \
+    "get_inventory_category" \
+    "update_inventory_category" \
+    "create_inventory_category(child)" \
+    "list_inventory_categories(parent)" \
+    "create_inventory_product" \
+    "get_inventory_product" \
+    "list_inventory_products" \
+    "update_inventory_product" \
+    "create_inventory_variant" \
+    "get_inventory_variant" \
+    "list_inventory_variants" \
+    "update_inventory_variant" \
+    "delete_inventory_product(non-empty)" \
+    "delete_inventory_variant" \
+    "delete_inventory_product" \
+    "delete_inventory_category(child)" \
+    "delete_inventory_category"; do
+    skip_test "$inventory_test" "server lacks Inventory model"
+  done
+elif [ "$INVENTORY_PROBE_IS_ERROR" = "true" ]; then
+  fail_test "list_inventory_categories" "$INVENTORY_PROBE_ERROR"
+else
+  echo "PASS: list_inventory_categories"
+  PASSED=$((PASSED + 1))
+
+  INV_CATEGORY_NAME="MCP IntTest Inventory $RUN_ID"
+  INV_CATEGORY_UPDATED_NAME="MCP IntTest Inventory Updated $RUN_ID"
+  INV_CHILD_CATEGORY_NAME="MCP IntTest Inventory Child $RUN_ID"
+  INV_PRODUCT_NAME="MCP IntTest Product $RUN_ID"
+  INV_PRODUCT_UPDATED_NAME="MCP IntTest Product Updated $RUN_ID"
+  INV_VARIANT_NAME="MCP IntTest Variant $RUN_ID"
+  INV_VARIANT_UPDATED_NAME="MCP IntTest Variant Updated $RUN_ID"
+  INV_SKU="MCP-$RUN_ID"
+  INV_SKU_UPDATED="MCP-$RUN_ID-U"
+  INV_CATEGORY_NAME_JSON=$(json_string "$INV_CATEGORY_NAME")
+  INV_CATEGORY_UPDATED_NAME_JSON=$(json_string "$INV_CATEGORY_UPDATED_NAME")
+  INV_CHILD_CATEGORY_NAME_JSON=$(json_string "$INV_CHILD_CATEGORY_NAME")
+  INV_PRODUCT_NAME_JSON=$(json_string "$INV_PRODUCT_NAME")
+  INV_PRODUCT_UPDATED_NAME_JSON=$(json_string "$INV_PRODUCT_UPDATED_NAME")
+  INV_VARIANT_NAME_JSON=$(json_string "$INV_VARIANT_NAME")
+  INV_VARIANT_UPDATED_NAME_JSON=$(json_string "$INV_VARIANT_UPDATED_NAME")
+  INV_SKU_JSON=$(json_string "$INV_SKU")
+  INV_SKU_UPDATED_JSON=$(json_string "$INV_SKU_UPDATED")
+
+  run_capture_to_var INV_CATEGORY_TEXT "create_inventory_category($INV_CATEGORY_NAME)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_inventory_category\",\"arguments\":{\"name\":$INV_CATEGORY_NAME_JSON}},\"id\":2}"
+  INVENTORY_CLEANUP_CATEGORY_ID=$(echo "$INV_CATEGORY_TEXT" | jq -r '.id // empty' 2>/dev/null)
+  if [ -n "$INVENTORY_CLEANUP_CATEGORY_ID" ]; then
+    INV_CATEGORY_ID_JSON=$(json_string "$INVENTORY_CLEANUP_CATEGORY_ID")
+    sleep 1
+    run_capture_to_var INV_GET_CATEGORY_TEXT "get_inventory_category($INVENTORY_CLEANUP_CATEGORY_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_inventory_category\",\"arguments\":{\"category\":$INV_CATEGORY_ID_JSON}},\"id\":2}"
+    assert_json_field_equals "get_inventory_category returns name" "$INV_GET_CATEGORY_TEXT" ".name" "$INV_CATEGORY_NAME"
+
+    run_capture_to_var INV_UPDATE_CATEGORY_TEXT "update_inventory_category($INVENTORY_CLEANUP_CATEGORY_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_inventory_category\",\"arguments\":{\"category\":$INV_CATEGORY_ID_JSON,\"name\":$INV_CATEGORY_UPDATED_NAME_JSON}},\"id\":2}"
+    assert_json_field_equals "update_inventory_category updated" "$INV_UPDATE_CATEGORY_TEXT" ".updated" "true"
+
+    run_capture_to_var INV_CHILD_CATEGORY_TEXT "create_inventory_category($INV_CHILD_CATEGORY_NAME)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_inventory_category\",\"arguments\":{\"name\":$INV_CHILD_CATEGORY_NAME_JSON,\"parentCategory\":$INV_CATEGORY_ID_JSON}},\"id\":2}"
+    INVENTORY_CLEANUP_CHILD_CATEGORY_ID=$(echo "$INV_CHILD_CATEGORY_TEXT" | jq -r '.id // empty' 2>/dev/null)
+    INV_CHILD_CATEGORY_ID_JSON=$(json_string "$INVENTORY_CLEANUP_CHILD_CATEGORY_ID")
+    sleep 1
+    run_capture_to_var INV_LIST_CHILDREN_TEXT "list_inventory_categories(parent)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_inventory_categories\",\"arguments\":{\"parentCategory\":$INV_CATEGORY_ID_JSON,\"limit\":20}},\"id\":2}"
+    assert_json_array_contains "list_inventory_categories includes child" "$INV_LIST_CHILDREN_TEXT" ".categories | map(.id)" "$INVENTORY_CLEANUP_CHILD_CATEGORY_ID"
+
+    run_capture_to_var INV_PRODUCT_TEXT "create_inventory_product($INV_PRODUCT_NAME)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_inventory_product\",\"arguments\":{\"name\":$INV_PRODUCT_NAME_JSON,\"category\":$INV_CATEGORY_ID_JSON}},\"id\":2}"
+    INVENTORY_CLEANUP_PRODUCT_ID=$(echo "$INV_PRODUCT_TEXT" | jq -r '.id // empty' 2>/dev/null)
+    if [ -n "$INVENTORY_CLEANUP_PRODUCT_ID" ]; then
+      INV_PRODUCT_ID_JSON=$(json_string "$INVENTORY_CLEANUP_PRODUCT_ID")
+      sleep 1
+      run_capture_to_var INV_GET_PRODUCT_TEXT "get_inventory_product($INVENTORY_CLEANUP_PRODUCT_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_inventory_product\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON}},\"id\":2}"
+      assert_json_field_equals "get_inventory_product returns name" "$INV_GET_PRODUCT_TEXT" ".name" "$INV_PRODUCT_NAME"
+      run_capture_to_var INV_LIST_PRODUCTS_TEXT "list_inventory_products(category)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_inventory_products\",\"arguments\":{\"category\":$INV_CATEGORY_ID_JSON,\"query\":$INV_PRODUCT_NAME_JSON,\"limit\":20}},\"id\":2}"
+      assert_json_array_contains "list_inventory_products includes product" "$INV_LIST_PRODUCTS_TEXT" ".products | map(.id)" "$INVENTORY_CLEANUP_PRODUCT_ID"
+      run_capture_to_var INV_UPDATE_PRODUCT_TEXT "update_inventory_product($INVENTORY_CLEANUP_PRODUCT_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_inventory_product\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"name\":$INV_PRODUCT_UPDATED_NAME_JSON}},\"id\":2}"
+      assert_json_field_equals "update_inventory_product updated" "$INV_UPDATE_PRODUCT_TEXT" ".updated" "true"
+
+      run_capture_to_var INV_VARIANT_TEXT "create_inventory_variant($INV_SKU)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_inventory_variant\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"name\":$INV_VARIANT_NAME_JSON,\"sku\":$INV_SKU_JSON}},\"id\":2}"
+      INVENTORY_CLEANUP_VARIANT_ID=$(echo "$INV_VARIANT_TEXT" | jq -r '.id // empty' 2>/dev/null)
+      if [ -n "$INVENTORY_CLEANUP_VARIANT_ID" ]; then
+        INV_VARIANT_ID_JSON=$(json_string "$INVENTORY_CLEANUP_VARIANT_ID")
+        sleep 1
+        run_capture_to_var INV_GET_VARIANT_TEXT "get_inventory_variant($INV_SKU)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_inventory_variant\",\"arguments\":{\"variant\":$INV_SKU_JSON,\"product\":$INV_PRODUCT_ID_JSON}},\"id\":2}"
+        assert_json_field_equals "get_inventory_variant returns sku" "$INV_GET_VARIANT_TEXT" ".sku" "$INV_SKU"
+        run_capture_to_var INV_LIST_VARIANTS_TEXT "list_inventory_variants(product)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_inventory_variants\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"query\":$INV_SKU_JSON,\"limit\":20}},\"id\":2}"
+        assert_json_array_contains "list_inventory_variants includes variant" "$INV_LIST_VARIANTS_TEXT" ".variants | map(.id)" "$INVENTORY_CLEANUP_VARIANT_ID"
+        run_capture_to_var INV_UPDATE_VARIANT_TEXT "update_inventory_variant($INVENTORY_CLEANUP_VARIANT_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_inventory_variant\",\"arguments\":{\"variant\":$INV_VARIANT_ID_JSON,\"name\":$INV_VARIANT_UPDATED_NAME_JSON,\"sku\":$INV_SKU_UPDATED_JSON}},\"id\":2}"
+        assert_json_field_equals "update_inventory_variant updated" "$INV_UPDATE_VARIANT_TEXT" ".updated" "true"
+        run_expect_error_contains "delete_inventory_product(non-empty)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_product\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON}},\"id\":2}" \
+          "not empty"
+        run_capture_to_var INV_DELETE_VARIANT_TEXT "delete_inventory_variant($INVENTORY_CLEANUP_VARIANT_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_variant\",\"arguments\":{\"variant\":$INV_VARIANT_ID_JSON}},\"id\":2}"
+        assert_json_field_equals "delete_inventory_variant deleted" "$INV_DELETE_VARIANT_TEXT" ".deleted" "true"
+        INVENTORY_CLEANUP_VARIANT_ID=""
+      else
+        skip_test "get/update/delete inventory variant" "create_inventory_variant did not return an id"
+      fi
+
+      run_capture_to_var INV_DELETE_PRODUCT_TEXT "delete_inventory_product($INVENTORY_CLEANUP_PRODUCT_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_product\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON}},\"id\":2}"
+      assert_json_field_equals "delete_inventory_product deleted" "$INV_DELETE_PRODUCT_TEXT" ".deleted" "true"
+      INVENTORY_CLEANUP_PRODUCT_ID=""
+    else
+      skip_test "get/list/update/delete inventory product" "create_inventory_product did not return an id"
+    fi
+
+    if [ -n "$INVENTORY_CLEANUP_CHILD_CATEGORY_ID" ]; then
+      run_capture_to_var INV_DELETE_CHILD_CATEGORY_TEXT "delete_inventory_category($INVENTORY_CLEANUP_CHILD_CATEGORY_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_category\",\"arguments\":{\"category\":$INV_CHILD_CATEGORY_ID_JSON}},\"id\":2}"
+      assert_json_field_equals "delete_inventory_category(child) deleted" "$INV_DELETE_CHILD_CATEGORY_TEXT" ".deleted" "true"
+      INVENTORY_CLEANUP_CHILD_CATEGORY_ID=""
+    fi
+    run_capture_to_var INV_DELETE_CATEGORY_TEXT "delete_inventory_category($INVENTORY_CLEANUP_CATEGORY_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_category\",\"arguments\":{\"category\":$INV_CATEGORY_ID_JSON}},\"id\":2}"
+    assert_json_field_equals "delete_inventory_category deleted" "$INV_DELETE_CATEGORY_TEXT" ".deleted" "true"
+    INVENTORY_CLEANUP_CATEGORY_ID=""
+  else
+    skip_test "get/update/delete inventory category" "create_inventory_category did not return an id"
+  fi
 fi
 echo ""
 

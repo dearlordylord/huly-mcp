@@ -66,6 +66,9 @@ importers:
       '@hcengineering/document':
         specifier: 0.7.0
         version: 0.7.0
+      '@hcengineering/inventory':
+        specifier: 0.7.0
+        version: 0.7.0
       '@hcengineering/love':
         specifier: 0.7.0
         version: 0.7.0
@@ -808,6 +811,9 @@ packages:
 
   '@hcengineering/drive@0.7.423':
     resolution: {integrity: sha512-Mn28w6cQ+S9SCFgP3IOSXUVb/3wlgPPm+vDasZdTSZKFscexiyjjHQM6pz06ux5ytM0CNBgfuNqYRQch4rBIew==}
+
+  '@hcengineering/inventory@0.7.0':
+    resolution: {integrity: sha512-s4zKczZxlingtCmvYxxc+2ZgqFTPbKccJZkOFbI0vUr/7BUs2FBCF0z49cL2BtHNCmuxGQ2czMJCZGjNRHR3/w==}
 
   '@hcengineering/love@0.7.0':
     resolution: {integrity: sha512-oyyMxTv2s1w2usLk4bc429e+V5R1zjaxGDRZzVgsf0DPT5vr3sd1MNi73Nj91ruTPaqmE5bI7fQdG3uRG2MBzg==}
@@ -4966,6 +4972,11 @@ snapshots:
       '@hcengineering/platform': 0.7.423
       '@hcengineering/preference': 0.7.423
       '@hcengineering/ui': 0.7.423
+
+  '@hcengineering/inventory@0.7.0':
+    dependencies:
+      '@hcengineering/core': 0.7.26
+      '@hcengineering/platform': 0.7.20
 
   '@hcengineering/love@0.7.0':
     dependencies:
