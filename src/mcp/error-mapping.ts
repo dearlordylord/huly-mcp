@@ -169,6 +169,7 @@ const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDo
   "ProcessCardNotFoundError",
   "InventoryCategoryNotFoundError",
   "InventoryProductNotFoundError",
+  "InventoryProductCommentNotFoundError",
   "InventoryVariantNotFoundError",
   "InventoryCategoryIdentifierAmbiguousError",
   "InventoryProductIdentifierAmbiguousError",

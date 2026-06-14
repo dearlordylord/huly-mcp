@@ -77,6 +77,8 @@ interface AttachmentParent {
   readonly spaceRef: Ref<Space>
   readonly objectRef: Ref<Doc>
   readonly objectClassRef: Ref<Class<Doc>>
+  readonly attachmentClassRef?: Ref<Class<HulyAttachment>> | undefined
+  readonly collection?: string | undefined
 }
 
 const attachmentClassForKind = (kind: AttachmentKind | undefined): Ref<Class<HulyAttachment>> => {
@@ -101,7 +103,7 @@ const toFileSourceParams = (params: {
   throw new Error("Schema validation should guarantee at least one file source (filePath, fileUrl, or data)")
 }
 
-const uploadAndAttach = (
+export const uploadAndAttach = (
   params: {
     readonly filename: AttachmentFileName
     readonly contentType: MimeType
@@ -145,11 +147,11 @@ const uploadAndAttach = (
     }
 
     yield* client.addCollection(
-      attachmentClassForKind(params.kind),
+      parent.attachmentClassRef ?? attachmentClassForKind(params.kind),
       parent.spaceRef,
       parent.objectRef,
       parent.objectClassRef,
-      "attachments",
+      parent.collection ?? "attachments",
       attachmentData,
       attachmentId
     )

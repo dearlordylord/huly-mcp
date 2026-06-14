@@ -87,3 +87,6 @@ export const findByNameOrIdOrFail = <T extends Doc, E>(
   )
 
 export const clampLimit = (limit?: number): number => Math.min(limit ?? DEFAULT_LIMIT, MAX_LIMIT)
+
+export const findResultTotal = (result: { readonly length: number; readonly total: number }): number =>
+  result.total >= 0 ? result.total : result.length

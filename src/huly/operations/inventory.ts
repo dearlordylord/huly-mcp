@@ -6,6 +6,23 @@ export {
   updateInventoryCategory
 } from "./inventory-categories.js"
 export {
+  addInventoryProductAttachment,
+  addInventoryProductComment,
+  addInventoryProductPhoto,
+  deleteInventoryProductAttachment,
+  deleteInventoryProductComment,
+  deleteInventoryProductPhoto,
+  getInventoryProductAttachment,
+  getInventoryProductPhoto,
+  listInventoryProductActivity,
+  listInventoryProductAttachments,
+  listInventoryProductComments,
+  listInventoryProductPhotos,
+  updateInventoryProductAttachment,
+  updateInventoryProductComment,
+  updateInventoryProductPhoto
+} from "./inventory-media.js"
+export {
   createInventoryProduct,
   deleteInventoryProduct,
   getInventoryProduct,
