@@ -47,6 +47,7 @@ describe("CATEGORY_NAMES", () => {
       expect(CATEGORY_NAMES.has("sdk-discovery")).toBe(true)
       expect(CATEGORY_NAMES.has("user-statuses")).toBe(true)
       expect(CATEGORY_NAMES.has("inventory")).toBe(true)
+      expect(CATEGORY_NAMES.has("recruiting")).toBe(true)
       expect(CATEGORY_NAMES.size).toBeGreaterThan(5)
     }))
 
@@ -176,6 +177,38 @@ describe("createFilteredRegistry", () => {
       expect(toolNames).toEqual(["list_user_statuses"])
       for (const tool of filtered.definitions) {
         expect(tool.category).toBe("user-statuses")
+      }
+    }))
+
+  it.effect("filters to recruiting tools", () =>
+    Effect.gen(function*() {
+      const filtered = createFilteredRegistry(new Set(["recruiting"]))
+      const toolNames = filtered.definitions.map((tool) => tool.name)
+
+      expect(toolNames).toEqual([
+        "list_recruiting_vacancy_types",
+        "list_recruiting_vacancy_statuses",
+        "list_recruiting_vacancies",
+        "get_recruiting_vacancy",
+        "create_recruiting_vacancy",
+        "update_recruiting_vacancy",
+        "archive_recruiting_vacancy",
+        "unarchive_recruiting_vacancy",
+        "list_recruiting_candidates",
+        "get_recruiting_candidate",
+        "set_recruiting_candidate_profile",
+        "list_recruiting_skills",
+        "list_recruiting_candidate_skills",
+        "add_recruiting_candidate_skill",
+        "remove_recruiting_candidate_skill",
+        "list_recruiting_applicants",
+        "get_recruiting_applicant",
+        "create_recruiting_applicant",
+        "update_recruiting_applicant",
+        "delete_recruiting_applicant"
+      ])
+      for (const tool of filtered.definitions) {
+        expect(tool.category).toBe("recruiting")
       }
     }))
 })

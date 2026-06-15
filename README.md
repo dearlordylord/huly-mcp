@@ -322,7 +322,7 @@ SDK upgrade revisit:
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
 ## Available Tools
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `planner`, `processes`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `virtual-office`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `planner`, `processes`, `recruiting`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `virtual-office`
 
 ### Projects
 
@@ -748,6 +748,31 @@ SDK upgrade revisit:
 | `list_process_executions` | List read-only Huly Process workflow executions. Supports filters by process ID/name, card/document ID/title, and status. Rows are enriched with process name, card title, and current state title when available. |
 | `start_process` | Start a new active Huly Process workflow execution on a card/document. Accepts process ID or exact process name, and card/document ID or exact title; ambiguous names or titles fail with candidate IDs. This is not idempotent: each successful call creates a new execution unless the process forbids parallel active executions for the same card, in which case the existing active execution ID is returned in a typed error. |
 | `cancel_execution` | Idempotently cancel one Huly Process execution by execution ID. Active executions are marked cancelled; already-cancelled executions succeed with cancelled=false; completed executions fail without changing history. |
+
+### Recruiting
+
+| Tool | Description |
+|------|-------------|
+| `list_recruiting_vacancy_types` | List Huly Recruiting vacancy workflow types. Use the returned type ID or exact type name in create_recruiting_vacancy. Defaults vacancy creation to Huly's Default vacancy type when omitted. |
+| `list_recruiting_vacancy_statuses` | List applicant workflow statuses for one vacancy. vacancy accepts raw _id, VCN-<number>, bare number, or exact name. Statuses are read from the vacancy's ProjectType; they are workspace data, not hardcoded names. |
+| `list_recruiting_vacancies` | List Recruiting vacancies as stable refs. Supports includeArchived, name query, type ID/name, company organization ID/name, and limit. Vacancy refs include both raw id and derived VCN-<number> identifier. |
+| `get_recruiting_vacancy` | Get one Recruiting vacancy by raw _id, VCN-<number>, bare number, or exact name. Returns descriptions, type, company, location, due date, privacy, archive state, and existing counts. |
+| `create_recruiting_vacancy` | Create a Recruiting vacancy like the Huly UI: increments the vacancy sequence, stores fullDescription as markdown-backed collaborative markup, defaults members/owners to the current account, and creates vacancy type-data mixin {}. |
+| `update_recruiting_vacancy` | Update mutable Recruiting vacancy fields. vacancy accepts raw _id, VCN-<number>, bare number, or exact name. Provide at least one field. Pass null for fullDescription, company, location, or dueTo to clear. |
+| `archive_recruiting_vacancy` | Archive a Recruiting vacancy by raw _id, VCN-<number>, bare number, or exact name. |
+| `unarchive_recruiting_vacancy` | Unarchive a Recruiting vacancy by raw _id, VCN-<number>, bare number, or exact name. |
+| `list_recruiting_candidates` | List persons that already have the Recruiting Candidate mixin. Use set_recruiting_candidate_profile, add_recruiting_candidate_skill, or create_recruiting_applicant to recruit-enable an existing person. |
+| `get_recruiting_candidate` | Get one Recruiting candidate by person _id, email, or exact display name. Returns profile fields, skills, application/review counts, and primary email when available. |
+| `set_recruiting_candidate_profile` | Create or update the Recruiting Candidate profile mixin on an existing person. candidate accepts person _id, email, or exact display name. Provide at least one of title, source, onsite, remote. |
+| `list_recruiting_skills` | List Recruiting skill tag definitions. Skills are Huly tags scoped to targetClass recruit:mixin:Candidate; use returned titles or IDs with candidate skill tools. |
+| `list_recruiting_candidate_skills` | List skill tag references attached to one Recruiting candidate by person _id, email, or exact name. |
+| `add_recruiting_candidate_skill` | Attach a skill to a candidate. candidate accepts person _id, email, or exact name. skill accepts title or tag ID; missing skill titles are created. Optional category/color apply only to newly created skill tags. |
+| `remove_recruiting_candidate_skill` | Detach a Recruiting skill from a candidate by skill title or tag ID. Idempotent when the skill is absent. |
+| `list_recruiting_applicants` | List Recruiting applicants. Optionally filter by vacancy, candidate, and status. vacancy accepts raw _id/VCN-number/number/name; candidate accepts person _id/email/exact name. |
+| `get_recruiting_applicant` | Get one Recruiting applicant by raw _id, APP-<number>, or bare number. Pass vacancy and/or candidate when an APP number could be ambiguous. |
+| `create_recruiting_applicant` | Create an applicant linking one vacancy and candidate. Rejects duplicate vacancy/candidate pairs, increments APP sequence, resolves status from that vacancy workflow, and recruit-enables the person if needed. |
+| `update_recruiting_applicant` | Update applicant status, assignee, startDate, and/or dueDate. applicant accepts raw _id, APP-<number>, or number; vacancy/candidate only disambiguate. Pass null to clear assignee, startDate, or dueDate. |
+| `delete_recruiting_applicant` | Delete an applicant with Huly removeCollection. applicant accepts raw _id, APP-<number>, or number; vacancy/candidate can disambiguate APP numbers. |
 
 ### Sdk-Discovery
 
