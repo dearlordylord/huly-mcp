@@ -201,7 +201,7 @@
       "package": "@hcengineering/chunter",
       "status": "covered",
       "matrixLocation": "Chat channel membership/options",
-      "rationale": "Current channel and direct-message tools cover channels, channel messages, one-to-one DM listing, and thread replies.",
+      "rationale": "Current channel and direct-message tools cover channels, channel messages, one-to-one DM create/list/message list/send/update/delete, thread replies, channel member list/add/remove, join/leave, archive/unarchive, conversation star/closed state, and group direct-message create.",
       "exports": [
         "Channel",
         "ChatMessage",
@@ -214,7 +214,7 @@
       "package": "@hcengineering/chunter",
       "status": "gap",
       "matrixLocation": "Chat channel membership/options",
-      "rationale": "Chat viewlets, sync metadata, object chat panels, DM writes, and membership/options are represented as remaining gaps.",
+      "rationale": "Chat viewlets, sync metadata, object chat panels, request-access flows if modeled, pinned messages, message attachments, and translation remain matrix gaps.",
       "exports": [
         "ChatMessageViewlet",
         "ChatSyncInfo",
@@ -488,8 +488,10 @@
       "package": "@hcengineering/time",
       "status": "covered",
       "matrixLocation": "Planner / ToDos",
-      "rationale": "Current time tools cover work slots and issue time reporting.",
+      "rationale": "Current time and planner tools cover work slots, issue time reporting, Planner ToDo list/get/create/update/delete, complete/reopen, schedule/unschedule, owner, due date, priority, visibility, and personal/issue attachment support.",
       "exports": [
+        "ProjectToDo",
+        "ToDo",
         "WorkSlot"
       ]
     },
@@ -497,10 +499,8 @@
       "package": "@hcengineering/time",
       "status": "gap",
       "matrixLocation": "Planner / ToDos",
-      "rationale": "Personal and project ToDo lifecycle plus automation helper visibility remain matrix gaps.",
+      "rationale": "Document-attached action items, automation helper visibility, and richer team planner/reporting remain matrix gaps.",
       "exports": [
-        "ProjectToDo",
-        "ToDo",
         "TodoAutomationHelper"
       ]
     },

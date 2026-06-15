@@ -83,7 +83,7 @@ const contactCoveredRationale =
   "Current contacts tools expose person, organization, employee/member, and organization-channel operations."
 const cardCoveredRationale = "Current card tools cover card spaces, master tags, and card CRUD."
 const chunterCoveredRationale =
-  "Current channel and direct-message tools cover channels, channel messages, one-to-one DM listing, and thread replies."
+  "Current channel and direct-message tools cover channels, channel messages, one-to-one DM create/list/message list/send/update/delete, thread replies, channel member list/add/remove, join/leave, archive/unarchive, conversation star/closed state, and group direct-message create."
 const coreCoveredRationale =
   "Existing tools expose user statuses, full-text search, blobs through storage/download flows, generic association/relation discovery/mutation helpers, class/interface/mixin, attribute, enum, plugin configuration, domain index configuration, sequence, and space type capability discovery."
 const coreGapRationale =

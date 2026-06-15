@@ -270,9 +270,9 @@ The roadmap is driven by SDK parity and the project principle that this server s
 Highest-value additions for coding agents:
 
 - Generic space follow-ups: role/permission definition writes, generic space creation, and module-specific wrappers above the shared space foundation. Generic space metadata, member/owner mutations, and typed-space role member mutations are covered by the shared spaces tools.
-- SDK discovery phase 2: space types, roles, permissions, plugin configuration, sequence metadata, and richer tool hints.
+- Core schema/admin follow-ups: guarded attribute/enum writes, role/permission definition writes, generic space creation, global space admins, and module-specific wrappers above the shared space foundation.
 - Drive follow-ups: drive create/update/delete, item move/rename/delete, adding new versions to existing files, permissions, and comments/activity.
-- Planner/ToDos: personal and project ToDo CRUD, scheduling, complete/reopen, priority, privacy/visibility, and document action items.
+- Team planner/reporting: team agendas, workload/capacity summaries, visibility-aware free/busy views, document action items, and planner automation diagnostics.
 - Recruiting: vacancies, candidates, applications, application statuses, recruiter assignment, reviews, opinions, skills, and related comments/attachments/activity.
 - Controlled documents and trainings: controlled document spaces/projects, review/approval workflows, templates, categories, snapshots/history, training assignments, attempts, scoring, and results.
 - Module-specific tag wrappers for tag-backed concepts such as recruiting skills, board labels, controlled-document labels, and contact tags.
@@ -295,7 +295,7 @@ Planned feature surfaces:
 - Calendar: calendar CRUD/config, external calendar sync metadata, primary calendar management, schedule objects, participant mutations, and RSVP/status support when stable.
 - Team planner and schedule reporting: team agendas, workload/capacity summaries, and visibility-aware free/busy views across members/projects.
 - Virtual office and meetings: offices, floors, rooms, access/language/default recording/transcription settings, meeting schedules, active participants, room info, meeting notes/transcript records (minutes), recordings, and device preferences.
-- Chat and communication: direct-message send/update/delete, group DMs, channel member mutations, join/leave/request access, archive/unarchive, star/favorite channels, close/reopen conversations, pinned messages, message attachments, translation, applets, in-message polls, and guest communication settings.
+- Chat and communication: request-access flows if Huly exposes a stable model, pinned messages, message attachments, translation, applets, in-message polls, guest communication settings, and external Gmail/Telegram/Huly Mail surfaces once compatible packages/APIs are proven.
 - Notifications and activity: browser/push subscription internals, provider defaults, UI presenter/viewlet metadata, and activity control/extension metadata.
 - Attachments and media: previews/preview metadata and friendly wrappers for additional object types beyond issue/document/inventory product.
 - Core schema and workspace administration: attribute/property create/update/delete/hide, enum CRUD/options, sequence management, role/permission definition writes, generic space creation, global space admins, integrations registry, invite settings, role capability settings, and workspace setting metadata.
