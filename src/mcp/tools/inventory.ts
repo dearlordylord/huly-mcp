@@ -181,7 +181,7 @@ export const inventoryTools: ReadonlyArray<RegisteredTool> = [
   {
     name: "delete_inventory_product",
     description:
-      "Delete an inventory product by ID or exact name. Refuses products with variants, photos, or attachments; this action does not cascade.",
+      "Delete an inventory product by ID or exact name. Refuses products with variants, photos, attachments, or comments; this action does not cascade.",
     category: CATEGORY,
     inputSchema: deleteInventoryProductParamsJsonSchema,
     handler: createEncodedToolHandler(

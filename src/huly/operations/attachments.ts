@@ -6,8 +6,7 @@
  *
  * @module
  */
-import type { Attachment as HulyAttachment } from "@hcengineering/attachment"
-import { type Class, type Doc, type DocumentUpdate, SortingOrder, type Space } from "@hcengineering/core"
+import { type Class, type Doc, type Space } from "@hcengineering/core"
 import { Effect } from "effect"
 
 import type {
@@ -25,14 +24,19 @@ import type {
   UpdateAttachmentResult
 } from "../../domain/schemas/attachments.js"
 import { UPDATE_ATTACHMENT_FIELDS } from "../../domain/schemas/attachments.js"
-import { AttachmentByteSize, AttachmentDescription, AttachmentFileName } from "../../domain/schemas/domain-values.js"
-import { AttachmentId, MimeType, ObjectClassName, Timestamp, UrlString } from "../../domain/schemas/shared.js"
+import { AttachmentByteSize, AttachmentFileName } from "../../domain/schemas/domain-values.js"
+import { AttachmentId, MimeType, UrlString } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import { AttachmentNotFoundError, type NoUpdateFieldsError } from "../errors.js"
+import type { AttachmentNotFoundError, NoUpdateFieldsError } from "../errors.js"
 import { HulyStorageClient } from "../storage.js"
-import { clampLimit, findOneOrFail } from "./query-helpers.js"
+import {
+  findAttachmentForScope,
+  getAttachmentForScope,
+  listAttachmentsForScope,
+  updateAttachmentForScope
+} from "./attachments-shared.js"
 import { toRef } from "./sdk-boundary.js"
-import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
+import { requireUpdateFields } from "./update-guards.js"
 
 import { attachment } from "../huly-plugins.js"
 
@@ -61,38 +65,6 @@ type DownloadAttachmentError =
   | HulyClientError
   | AttachmentNotFoundError
 
-// --- Helpers ---
-
-const optionalAttachmentDescription = (description: string | null | undefined) =>
-  description === undefined || description === null ? undefined : AttachmentDescription.make(description)
-
-const toAttachmentSummary = (att: HulyAttachment): AttachmentSummary => ({
-  id: AttachmentId.make(att._id),
-  class: ObjectClassName.make(att._class),
-  name: AttachmentFileName.make(att.name),
-  type: MimeType.make(att.type),
-  size: AttachmentByteSize.make(att.size),
-  pinned: att.pinned ?? undefined,
-  description: optionalAttachmentDescription(att.description),
-  metadata: att.metadata,
-  modifiedOn: Timestamp.make(att.modifiedOn)
-})
-
-const toAttachment = (att: HulyAttachment, url?: string): Attachment => ({
-  id: AttachmentId.make(att._id),
-  class: ObjectClassName.make(att._class),
-  name: AttachmentFileName.make(att.name),
-  type: MimeType.make(att.type),
-  size: AttachmentByteSize.make(att.size),
-  pinned: att.pinned ?? undefined,
-  readonly: att.readonly ?? undefined,
-  description: optionalAttachmentDescription(att.description),
-  metadata: att.metadata,
-  url: url === undefined ? undefined : UrlString.make(url),
-  modifiedOn: Timestamp.make(att.modifiedOn),
-  createdOn: att.createdOn === undefined ? undefined : Timestamp.make(att.createdOn)
-})
-
 // --- Operations ---
 
 /**
@@ -105,23 +77,12 @@ export const listAttachments = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const limit = clampLimit(params.limit)
-
-    const attachments = yield* client.findAll<HulyAttachment>(
-      attachment.class.Attachment,
-      {
-        attachedTo: toRef<Doc>(params.objectId),
-        attachedToClass: toRef<Class<Doc<Space>>>(params.objectClass)
-      },
-      {
-        limit,
-        sort: {
-          modifiedOn: SortingOrder.Descending
-        }
-      }
-    )
-
-    return attachments.map(toAttachmentSummary)
+    return yield* listAttachmentsForScope(client, {
+      classRef: attachment.class.Attachment,
+      attachedTo: toRef<Doc>(params.objectId),
+      attachedToClass: toRef<Class<Doc<Space>>>(params.objectClass),
+      collection: "attachments"
+    }, params.limit)
   })
 
 /**
@@ -134,15 +95,9 @@ export const getAttachment = (
     const client = yield* HulyClient
     const storageClient = yield* HulyStorageClient
 
-    const att = yield* findOneOrFail(
-      client,
-      attachment.class.Attachment,
-      { _id: toRef<HulyAttachment>(params.attachmentId) },
-      () => new AttachmentNotFoundError({ attachmentId: params.attachmentId })
-    )
-
-    const url = storageClient.getFileUrl(att.file)
-    return toAttachment(att, url)
+    return yield* getAttachmentForScope(client, storageClient, params.attachmentId, {
+      classRef: attachment.class.Attachment
+    })
   })
 
 /**
@@ -156,41 +111,9 @@ export const updateAttachment = (
 
     const client = yield* HulyClient
 
-    const att = yield* findOneOrFail(
-      client,
-      attachment.class.Attachment,
-      { _id: toRef<HulyAttachment>(params.attachmentId) },
-      () => new AttachmentNotFoundError({ attachmentId: params.attachmentId })
-    )
-
-    type UpdateAttachmentField = typeof UPDATE_ATTACHMENT_FIELDS[number]
-    type UpdateAttachmentEntries = {
-      readonly [Field in UpdateAttachmentField]: DirectUpdateEntry<
-        UpdateAttachmentField,
-        DocumentUpdate<HulyAttachment>,
-        Field
-      >
-    }
-    type UpdateAttachmentDescriptionEntry = UpdateAttachmentEntries["description"]
-    // Huly clears attachment descriptions with empty string; the SDK type does not model that path directly.
-    const clearAttachmentDescription = (): UpdateAttachmentDescriptionEntry => Object.assign({}, { description: "" })
-    const descriptionOps: UpdateAttachmentDescriptionEntry = params.description === undefined
-      ? {}
-      : params.description === null
-      ? clearAttachmentDescription()
-      : { description: params.description }
-    const updateEntries = {
-      description: descriptionOps,
-      pinned: params.pinned === undefined ? {} : { pinned: params.pinned }
-    } satisfies UpdateAttachmentEntries
-    const updateOps: DocumentUpdate<HulyAttachment> = mergeUpdateEntries(Object.values(updateEntries))
-
-    yield* client.updateDoc(
-      attachment.class.Attachment,
-      att.space,
-      att._id,
-      updateOps
-    )
+    yield* updateAttachmentForScope(client, params.attachmentId, params, {
+      classRef: attachment.class.Attachment
+    })
 
     return { attachmentId: AttachmentId.make(params.attachmentId), updated: true }
   })
@@ -204,12 +127,9 @@ export const deleteAttachment = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const att = yield* findOneOrFail(
-      client,
-      attachment.class.Attachment,
-      { _id: toRef<HulyAttachment>(params.attachmentId) },
-      () => new AttachmentNotFoundError({ attachmentId: params.attachmentId })
-    )
+    const att = yield* findAttachmentForScope(client, params.attachmentId, {
+      classRef: attachment.class.Attachment
+    })
 
     yield* client.removeDoc(
       attachment.class.Attachment,
@@ -229,12 +149,9 @@ export const pinAttachment = (
   Effect.gen(function*() {
     const client = yield* HulyClient
 
-    const att = yield* findOneOrFail(
-      client,
-      attachment.class.Attachment,
-      { _id: toRef<HulyAttachment>(params.attachmentId) },
-      () => new AttachmentNotFoundError({ attachmentId: params.attachmentId })
-    )
+    const att = yield* findAttachmentForScope(client, params.attachmentId, {
+      classRef: attachment.class.Attachment
+    })
 
     yield* client.updateDoc(
       attachment.class.Attachment,
@@ -256,12 +173,9 @@ export const downloadAttachment = (
     const client = yield* HulyClient
     const storageClient = yield* HulyStorageClient
 
-    const att = yield* findOneOrFail(
-      client,
-      attachment.class.Attachment,
-      { _id: toRef<HulyAttachment>(params.attachmentId) },
-      () => new AttachmentNotFoundError({ attachmentId: params.attachmentId })
-    )
+    const att = yield* findAttachmentForScope(client, params.attachmentId, {
+      classRef: attachment.class.Attachment
+    })
 
     const url = storageClient.getFileUrl(att.file)
 

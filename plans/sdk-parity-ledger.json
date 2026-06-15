@@ -390,7 +390,7 @@
       "package": "@hcengineering/inventory",
       "status": "covered",
       "matrixLocation": "Inventory",
-      "rationale": "Current inventory tools cover Category, Product, and Variant as first-class category hierarchy, product, and variant/SKU CRUD operations. Product photos, attachments, activity, and comments remain generic or follow-up wrapper gaps rather than missing inventory SDK model exports.",
+      "rationale": "Current inventory tools cover Category, Product, and Variant as first-class category hierarchy, product, variant/SKU CRUD operations, plus product-scoped photo, attachment, comment, and activity wrappers. Category/variant discussion wrappers remain out of the product-focused slice rather than missing inventory SDK model exports.",
       "exports": [
         "Category",
         "Product",

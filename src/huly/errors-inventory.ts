@@ -18,6 +18,15 @@ export class InventoryProductNotFoundError extends Schema.TaggedError<InventoryP
   }
 }
 
+export class InventoryProductCommentNotFoundError extends Schema.TaggedError<InventoryProductCommentNotFoundError>()(
+  "InventoryProductCommentNotFoundError",
+  { product: Schema.String, commentId: Schema.String }
+) {
+  override get message(): string {
+    return `Comment '${this.commentId}' not found on inventory product '${this.product}'`
+  }
+}
+
 export class InventoryVariantNotFoundError extends Schema.TaggedError<InventoryVariantNotFoundError>()(
   "InventoryVariantNotFoundError",
   { identifier: Schema.String }

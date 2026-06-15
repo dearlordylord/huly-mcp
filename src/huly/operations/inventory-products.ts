@@ -1,3 +1,5 @@
+import type { Attachment as HulyAttachment } from "@hcengineering/attachment"
+import type { ChatMessage } from "@hcengineering/chunter"
 import type { AttachedData, DocumentUpdate } from "@hcengineering/core"
 import { generateId } from "@hcengineering/core"
 import type { Category as HulyInventoryCategory, Product as HulyInventoryProduct } from "@hcengineering/inventory"
@@ -19,7 +21,7 @@ import {
 import { InventoryProductId } from "../../domain/schemas/shared.js"
 import { HulyClient } from "../client.js"
 import { InventoryMutationUnsupportedError, InventoryNotEmptyError } from "../errors.js"
-import { inventory } from "../huly-plugins.js"
+import { attachment, chunter, inventory } from "../huly-plugins.js"
 import {
   ensureProductNameAvailable,
   findAllProducts,
@@ -36,7 +38,7 @@ import {
   toProductSummary,
   workspace
 } from "./inventory-shared.js"
-import { clampLimit, type StrictDocumentQuery } from "./query-helpers.js"
+import { clampLimit, findResultTotal, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import { mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
@@ -139,12 +141,41 @@ export const deleteInventoryProduct = (
     const client = yield* HulyClient
     const product = yield* resolveProduct(client, params.product, params.category)
     const variants = yield* findAllVariants(client, { attachedTo: product._id })
+    const attachments = yield* client.findAll<HulyAttachment>(
+      attachment.class.Attachment,
+      hulyQuery<HulyAttachment>({
+        attachedTo: product._id,
+        attachedToClass: inventory.class.Product,
+        collection: "attachments"
+      }),
+      { total: true }
+    )
+    const photos = yield* client.findAll<HulyAttachment>(
+      attachment.class.Photo,
+      hulyQuery<HulyAttachment>({
+        attachedTo: product._id,
+        attachedToClass: inventory.class.Product,
+        collection: "photos"
+      }),
+      { total: true }
+    )
+    const comments = yield* client.findAll<ChatMessage>(
+      chunter.class.ChatMessage,
+      hulyQuery<ChatMessage>({
+        attachedTo: product._id,
+        attachedToClass: inventory.class.Product,
+        collection: "comments"
+      }),
+      { total: true }
+    )
     const variantCount = Math.max(product.variants ?? 0, variants.length)
-    if (variantCount > 0 || (product.photos ?? 0) > 0 || (product.attachments ?? 0) > 0) {
+    const attachmentCount = Math.max(product.attachments ?? 0, findResultTotal(attachments))
+    const photoCount = Math.max(product.photos ?? 0, findResultTotal(photos))
+    const commentCount = findResultTotal(comments)
+    if (variantCount > 0 || photoCount > 0 || attachmentCount > 0 || commentCount > 0) {
       return yield* new InventoryNotEmptyError({
-        message: `Inventory product '${product.name}' is not empty: ${variantCount} variants, ${
-          product.photos ?? 0
-        } photos, ${product.attachments ?? 0} attachments`
+        message:
+          `Inventory product '${product.name}' is not empty: ${variantCount} variants, ${photoCount} photos, ${attachmentCount} attachments, ${commentCount} comments`
       })
     }
     const removeCollection = requireRemoveCollection(client)

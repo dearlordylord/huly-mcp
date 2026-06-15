@@ -29,6 +29,9 @@ INVENTORY_CLEANUP_CATEGORY_ID=""
 INVENTORY_CLEANUP_CHILD_CATEGORY_ID=""
 INVENTORY_CLEANUP_PRODUCT_ID=""
 INVENTORY_CLEANUP_VARIANT_ID=""
+INVENTORY_CLEANUP_ATTACHMENT_ID=""
+INVENTORY_CLEANUP_PHOTO_ID=""
+INVENTORY_CLEANUP_COMMENT_ID=""
 TM_TASK_TYPE_NAME=""
 TM_STATUS_NAME=""
 WORKFLOW_CLEANED=false
@@ -142,6 +145,21 @@ cleanup_drive_artifacts() {
 }
 
 cleanup_inventory_artifacts() {
+  if [ -n "$INVENTORY_CLEANUP_COMMENT_ID" ] && [ -n "$INVENTORY_CLEANUP_PRODUCT_ID" ]; then
+    product_json=$(json_string "$INVENTORY_CLEANUP_PRODUCT_ID")
+    comment_json=$(json_string "$INVENTORY_CLEANUP_COMMENT_ID")
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_product_comment\",\"arguments\":{\"product\":$product_json,\"commentId\":$comment_json}},\"id\":2}" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$INVENTORY_CLEANUP_ATTACHMENT_ID" ] && [ -n "$INVENTORY_CLEANUP_PRODUCT_ID" ]; then
+    product_json=$(json_string "$INVENTORY_CLEANUP_PRODUCT_ID")
+    attachment_json=$(json_string "$INVENTORY_CLEANUP_ATTACHMENT_ID")
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_product_attachment\",\"arguments\":{\"product\":$product_json,\"attachmentId\":$attachment_json}},\"id\":2}" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$INVENTORY_CLEANUP_PHOTO_ID" ] && [ -n "$INVENTORY_CLEANUP_PRODUCT_ID" ]; then
+    product_json=$(json_string "$INVENTORY_CLEANUP_PRODUCT_ID")
+    photo_json=$(json_string "$INVENTORY_CLEANUP_PHOTO_ID")
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_product_photo\",\"arguments\":{\"product\":$product_json,\"photoId\":$photo_json}},\"id\":2}" >/dev/null 2>&1 || true
+  fi
   if [ -n "$INVENTORY_CLEANUP_VARIANT_ID" ]; then
     variant_json=$(json_string "$INVENTORY_CLEANUP_VARIANT_ID")
     call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_variant\",\"arguments\":{\"variant\":$variant_json}},\"id\":2}" >/dev/null 2>&1 || true
@@ -513,6 +531,30 @@ assert_json_array_contains() {
   echo "FAIL: $name (array $jq_expr does not contain $expected)"
   FAILED=$((FAILED + 1))
   ERRORS="${ERRORS}\n  - ${name}: array ${jq_expr} does not contain ${expected}"
+  return 1
+}
+
+wait_for_json_array_contains_to_var() {
+  local output_var="$1" name="$2" payload="$3" jq_expr="$4" expected="$5"
+  local attempts="${6:-10}" delay="${7:-1}"
+  local attempt=1 text=""
+  while [ "$attempt" -le "$attempts" ]; do
+    text=$(run_capture_only "$payload" 2>/dev/null || true)
+    if [ -n "$text" ] && printf '%s\n' "$text" | jq -e --arg expected "$expected" "($jq_expr) | any(.[]?; . == \$expected)" >/dev/null 2>&1; then
+      echo "PASS: $name"
+      PASSED=$((PASSED + 1))
+      printf -v "$output_var" '%s' "$text"
+      return 0
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      sleep "$delay"
+    fi
+    attempt=$((attempt + 1))
+  done
+  echo "FAIL: $name (array $jq_expr does not contain $expected after ${attempts} attempts)"
+  FAILED=$((FAILED + 1))
+  ERRORS="${ERRORS}\n  - ${name}: array ${jq_expr} does not contain ${expected} after ${attempts} attempts"
+  printf -v "$output_var" '%s' "$text"
   return 1
 }
 
@@ -997,6 +1039,21 @@ elif [ "$INVENTORY_PROBE_IS_ERROR" = "true" ] &&
     "get_inventory_product" \
     "list_inventory_products" \
     "update_inventory_product" \
+    "add_inventory_product_attachment" \
+    "list_inventory_product_attachments" \
+    "get_inventory_product_attachment" \
+    "update_inventory_product_attachment" \
+    "delete_inventory_product_attachment" \
+    "add_inventory_product_photo" \
+    "list_inventory_product_photos" \
+    "get_inventory_product_photo" \
+    "update_inventory_product_photo" \
+    "delete_inventory_product_photo" \
+    "add_inventory_product_comment" \
+    "list_inventory_product_comments" \
+    "update_inventory_product_comment" \
+    "delete_inventory_product_comment" \
+    "list_inventory_product_activity" \
     "create_inventory_variant" \
     "get_inventory_variant" \
     "list_inventory_variants" \
@@ -1072,6 +1129,92 @@ else
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_inventory_product\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"name\":$INV_PRODUCT_UPDATED_NAME_JSON}},\"id\":2}"
       assert_json_field_equals "update_inventory_product updated" "$INV_UPDATE_PRODUCT_TEXT" ".updated" "true"
 
+      INV_SMALL_TEXT_DATA_JSON=$(json_string "aW52ZW50b3J5IGF0dGFjaG1lbnQ=")
+      INV_SMALL_PHOTO_DATA_JSON=$(json_string "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=")
+      INV_ATTACHMENT_FILENAME_JSON=$(json_string "inventory-attachment.txt")
+      INV_PHOTO_FILENAME_JSON=$(json_string "inventory-photo.png")
+      INV_ATTACHMENT_DESC_JSON=$(json_string "Inventory attachment")
+      INV_ATTACHMENT_DESC_UPDATED_JSON=$(json_string "Updated inventory attachment")
+      INV_PHOTO_DESC_JSON=$(json_string "Inventory photo")
+      INV_PHOTO_DESC_UPDATED_JSON=$(json_string "Updated inventory photo")
+      INV_COMMENT_BODY_JSON=$(json_string "Inventory product integration comment")
+      INV_COMMENT_BODY_UPDATED_JSON=$(json_string "Updated inventory product integration comment")
+
+      run_capture_to_var INV_ATTACHMENT_TEXT "add_inventory_product_attachment($INVENTORY_CLEANUP_PRODUCT_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_inventory_product_attachment\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"filename\":$INV_ATTACHMENT_FILENAME_JSON,\"contentType\":\"text/plain\",\"data\":$INV_SMALL_TEXT_DATA_JSON,\"description\":$INV_ATTACHMENT_DESC_JSON}},\"id\":2}"
+      INVENTORY_CLEANUP_ATTACHMENT_ID=$(echo "$INV_ATTACHMENT_TEXT" | jq -r '.attachmentId // empty' 2>/dev/null)
+      if [ -n "$INVENTORY_CLEANUP_ATTACHMENT_ID" ]; then
+        INV_ATTACHMENT_ID_JSON=$(json_string "$INVENTORY_CLEANUP_ATTACHMENT_ID")
+        wait_for_json_array_contains_to_var INV_LIST_ATTACHMENTS_TEXT "list_inventory_product_attachments includes attachment" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_inventory_product_attachments\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"limit\":20}},\"id\":2}" \
+          ".attachments | map(.id)" "$INVENTORY_CLEANUP_ATTACHMENT_ID"
+        run_capture_to_var INV_GET_ATTACHMENT_TEXT "get_inventory_product_attachment($INVENTORY_CLEANUP_ATTACHMENT_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_inventory_product_attachment\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"attachmentId\":$INV_ATTACHMENT_ID_JSON}},\"id\":2}"
+        assert_json_field_equals "get_inventory_product_attachment returns id" "$INV_GET_ATTACHMENT_TEXT" ".attachment.id" "$INVENTORY_CLEANUP_ATTACHMENT_ID"
+        run_capture_to_var INV_UPDATE_ATTACHMENT_TEXT "update_inventory_product_attachment($INVENTORY_CLEANUP_ATTACHMENT_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_inventory_product_attachment\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"attachmentId\":$INV_ATTACHMENT_ID_JSON,\"description\":$INV_ATTACHMENT_DESC_UPDATED_JSON,\"pinned\":true}},\"id\":2}"
+        assert_json_field_equals "update_inventory_product_attachment updated" "$INV_UPDATE_ATTACHMENT_TEXT" ".updated" "true"
+        run_capture_to_var INV_DELETE_ATTACHMENT_TEXT "delete_inventory_product_attachment($INVENTORY_CLEANUP_ATTACHMENT_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_product_attachment\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"attachmentId\":$INV_ATTACHMENT_ID_JSON}},\"id\":2}"
+        if assert_json_field_equals "delete_inventory_product_attachment deleted" "$INV_DELETE_ATTACHMENT_TEXT" ".deleted" "true"; then
+          INVENTORY_CLEANUP_ATTACHMENT_ID=""
+        fi
+      else
+        skip_test "list/get/update/delete inventory product attachment" "add_inventory_product_attachment did not return an id"
+      fi
+
+      run_capture_to_var INV_PHOTO_TEXT "add_inventory_product_photo($INVENTORY_CLEANUP_PRODUCT_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_inventory_product_photo\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"filename\":$INV_PHOTO_FILENAME_JSON,\"contentType\":\"image/png\",\"data\":$INV_SMALL_PHOTO_DATA_JSON,\"description\":$INV_PHOTO_DESC_JSON}},\"id\":2}"
+      INVENTORY_CLEANUP_PHOTO_ID=$(echo "$INV_PHOTO_TEXT" | jq -r '.photoId // empty' 2>/dev/null)
+      if [ -n "$INVENTORY_CLEANUP_PHOTO_ID" ]; then
+        INV_PHOTO_ID_JSON=$(json_string "$INVENTORY_CLEANUP_PHOTO_ID")
+        wait_for_json_array_contains_to_var INV_LIST_PHOTOS_TEXT "list_inventory_product_photos includes photo" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_inventory_product_photos\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"limit\":20}},\"id\":2}" \
+          ".photos | map(.id)" "$INVENTORY_CLEANUP_PHOTO_ID"
+        run_capture_to_var INV_GET_PHOTO_TEXT "get_inventory_product_photo($INVENTORY_CLEANUP_PHOTO_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_inventory_product_photo\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"photoId\":$INV_PHOTO_ID_JSON}},\"id\":2}"
+        assert_json_field_equals "get_inventory_product_photo returns id" "$INV_GET_PHOTO_TEXT" ".photo.id" "$INVENTORY_CLEANUP_PHOTO_ID"
+        run_capture_to_var INV_UPDATE_PHOTO_TEXT "update_inventory_product_photo($INVENTORY_CLEANUP_PHOTO_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_inventory_product_photo\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"photoId\":$INV_PHOTO_ID_JSON,\"description\":$INV_PHOTO_DESC_UPDATED_JSON,\"pinned\":true}},\"id\":2}"
+        assert_json_field_equals "update_inventory_product_photo updated" "$INV_UPDATE_PHOTO_TEXT" ".updated" "true"
+        run_capture_to_var INV_DELETE_PHOTO_TEXT "delete_inventory_product_photo($INVENTORY_CLEANUP_PHOTO_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_product_photo\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"photoId\":$INV_PHOTO_ID_JSON}},\"id\":2}"
+        if assert_json_field_equals "delete_inventory_product_photo deleted" "$INV_DELETE_PHOTO_TEXT" ".deleted" "true"; then
+          INVENTORY_CLEANUP_PHOTO_ID=""
+        fi
+      else
+        skip_test "list/get/update/delete inventory product photo" "add_inventory_product_photo did not return an id"
+      fi
+
+      run_capture_to_var INV_COMMENT_TEXT "add_inventory_product_comment($INVENTORY_CLEANUP_PRODUCT_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_inventory_product_comment\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"body\":$INV_COMMENT_BODY_JSON}},\"id\":2}"
+      INVENTORY_CLEANUP_COMMENT_ID=$(echo "$INV_COMMENT_TEXT" | jq -r '.commentId // empty' 2>/dev/null)
+      if [ -n "$INVENTORY_CLEANUP_COMMENT_ID" ]; then
+        INV_COMMENT_ID_JSON=$(json_string "$INVENTORY_CLEANUP_COMMENT_ID")
+        wait_for_json_array_contains_to_var INV_LIST_COMMENTS_TEXT "list_inventory_product_comments includes comment" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_inventory_product_comments\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"limit\":20}},\"id\":2}" \
+          ".comments | map(.id)" "$INVENTORY_CLEANUP_COMMENT_ID"
+        run_capture_to_var INV_UPDATE_COMMENT_TEXT "update_inventory_product_comment($INVENTORY_CLEANUP_COMMENT_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_inventory_product_comment\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"commentId\":$INV_COMMENT_ID_JSON,\"body\":$INV_COMMENT_BODY_UPDATED_JSON}},\"id\":2}"
+        assert_json_field_equals "update_inventory_product_comment updated" "$INV_UPDATE_COMMENT_TEXT" ".updated" "true"
+        run_expect_error_contains "delete_inventory_product(comment non-empty)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_product\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON}},\"id\":2}" \
+          "comments"
+        run_capture_to_var INV_ACTIVITY_TEXT "list_inventory_product_activity($INVENTORY_CLEANUP_PRODUCT_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_inventory_product_activity\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"limit\":5}},\"id\":2}"
+        assert_json_field_equals "list_inventory_product_activity returns product" "$INV_ACTIVITY_TEXT" ".product.id" "$INVENTORY_CLEANUP_PRODUCT_ID"
+        run_capture_to_var INV_DELETE_COMMENT_TEXT "delete_inventory_product_comment($INVENTORY_CLEANUP_COMMENT_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_product_comment\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"commentId\":$INV_COMMENT_ID_JSON}},\"id\":2}"
+        if assert_json_field_equals "delete_inventory_product_comment deleted" "$INV_DELETE_COMMENT_TEXT" ".deleted" "true"; then
+          INVENTORY_CLEANUP_COMMENT_ID=""
+        fi
+      else
+        skip_test "list/update/delete inventory product comment" "add_inventory_product_comment did not return an id"
+        run_capture_to_var INV_ACTIVITY_TEXT "list_inventory_product_activity($INVENTORY_CLEANUP_PRODUCT_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_inventory_product_activity\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"limit\":5}},\"id\":2}"
+        assert_json_field_equals "list_inventory_product_activity returns product" "$INV_ACTIVITY_TEXT" ".product.id" "$INVENTORY_CLEANUP_PRODUCT_ID"
+      fi
+
       run_capture_to_var INV_VARIANT_TEXT "create_inventory_variant($INV_SKU)" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_inventory_variant\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON,\"name\":$INV_VARIANT_NAME_JSON,\"sku\":$INV_SKU_JSON}},\"id\":2}"
       INVENTORY_CLEANUP_VARIANT_ID=$(echo "$INV_VARIANT_TEXT" | jq -r '.id // empty' 2>/dev/null)
@@ -1100,8 +1243,9 @@ else
 
       run_capture_to_var INV_DELETE_PRODUCT_TEXT "delete_inventory_product($INVENTORY_CLEANUP_PRODUCT_ID)" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_product\",\"arguments\":{\"product\":$INV_PRODUCT_ID_JSON}},\"id\":2}"
-      assert_json_field_equals "delete_inventory_product deleted" "$INV_DELETE_PRODUCT_TEXT" ".deleted" "true"
-      INVENTORY_CLEANUP_PRODUCT_ID=""
+      if assert_json_field_equals "delete_inventory_product deleted" "$INV_DELETE_PRODUCT_TEXT" ".deleted" "true"; then
+        INVENTORY_CLEANUP_PRODUCT_ID=""
+      fi
     else
       skip_test "get/list/update/delete inventory product" "create_inventory_product did not return an id"
     fi

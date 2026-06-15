@@ -289,7 +289,7 @@ Planned feature surfaces:
 - Surveys and polls: survey CRUD, poll creation/attachment, survey question data, completion status, and results.
 - Generic approval requests: create/list/approve/reject/cancel approval requests, decision comments, required approval counts, request status, and requested/approved/rejected people.
 - Boards: board CRUD, board cards, status workflows, members/assignees, location, cover/archive fields, board labels, and menu/archive views.
-- Inventory: category hierarchy CRUD, product CRUD, and variant/SKU CRUD are covered by first-class tools; remaining gaps are product photo, attachment, activity, and comment friendly wrappers.
+- Inventory: category hierarchy CRUD, product CRUD, variant/SKU CRUD, and product-scoped photo, attachment, comment, and activity wrappers are covered by first-class tools; category/variant discussion wrappers remain outside this slice.
 - Leads write surface: create/update/delete funnels and leads, status changes, assignment, start dates, customer descriptions, person customer support, and lead comments/attachments/labels/relations.
 - Contacts: person channels, social identities, provider discovery, contact statuses, notes/comments, person attachments, person merge, employee invite/create/kick/reinvite, and inactive employee management.
 - Calendar: calendar CRUD/config, external calendar sync metadata, primary calendar management, schedule objects, participant mutations, and RSVP/status support when stable.
@@ -297,7 +297,7 @@ Planned feature surfaces:
 - Virtual office and meetings: offices, floors, rooms, access/language/default recording/transcription settings, meeting schedules, active participants, room info, meeting notes/transcript records (minutes), recordings, and device preferences.
 - Chat and communication: direct-message send/update/delete, group DMs, channel member mutations, join/leave/request access, archive/unarchive, star/favorite channels, close/reopen conversations, pinned messages, message attachments, translation, applets, in-message polls, and guest communication settings.
 - Notifications and activity: browser/push subscription internals, provider defaults, UI presenter/viewlet metadata, and activity control/extension metadata.
-- Attachments and media: previews/preview metadata and friendly wrappers for additional object types beyond issue/document.
+- Attachments and media: previews/preview metadata and friendly wrappers for additional object types beyond issue/document/inventory product.
 - Core schema and workspace administration: attribute/property create/update/delete/hide, enum CRUD/options, sequence management, role/permission definition writes, generic space creation, global space admins, integrations registry, invite settings, role capability settings, and workspace setting metadata.
 - Integrations: GitHub repository/project mappings and sync metadata (deferred), Google Calendar connect/configure/sync controls, Bitrix entity/field mappings and sync status, Gmail/email channel messages, Telegram messages, Huly Mail/Mail plugin behavior, AI assistant integration state, and AI bot configuration if server-side APIs expose stable behavior.
 - Templates, rating, support, billing, analytics, views, workbench, and preferences: message templates/categories/fields, document/person rating data blocked by unpublished `@hcengineering/rating` SDK package (#90), support conversations, billing tier/status discovery, onboarding channels, saved filtered views, user view preferences, tabs/widgets/apps, and module preference discovery/update.
@@ -677,6 +677,21 @@ SDK upgrade revisit:
 
 | Tool | Description |
 |------|-------------|
+| `list_inventory_product_attachments` | List files attached directly to an inventory product resolved by product ID or exact name. Pass category to disambiguate duplicate product names. |
+| `get_inventory_product_attachment` | Get one file attached directly to an inventory product. The attachmentId must belong to the resolved product. |
+| `add_inventory_product_attachment` | Add a file to an inventory product resolved by product ID or exact name. Provide exactly one of filePath, fileUrl, or data. |
+| `update_inventory_product_attachment` | Update description and/or pinned state for a file attached directly to an inventory product. The attachmentId must belong to the resolved product. |
+| `delete_inventory_product_attachment` | Permanently delete a file attached directly to an inventory product. The attachmentId must belong to the resolved product. |
+| `list_inventory_product_photos` | List photos attached directly to an inventory product resolved by product ID or exact name. Pass category to disambiguate duplicate product names. |
+| `get_inventory_product_photo` | Get one photo attached directly to an inventory product. The photoId must belong to the resolved product. |
+| `add_inventory_product_photo` | Add a photo to an inventory product using Huly's product photos collection. Provide exactly one of filePath, fileUrl, or data. |
+| `update_inventory_product_photo` | Update description and/or pinned state for a photo attached directly to an inventory product. The photoId must belong to the resolved product. |
+| `delete_inventory_product_photo` | Permanently delete a photo attached directly to an inventory product. The photoId must belong to the resolved product. |
+| `list_inventory_product_comments` | List comments attached directly to an inventory product resolved by product ID or exact name. Returns comments oldest first. |
+| `add_inventory_product_comment` | Add a Markdown comment directly to an inventory product resolved by product ID or exact name. Pass category to disambiguate duplicate names. |
+| `update_inventory_product_comment` | Update a comment attached directly to an inventory product. The commentId must belong to the resolved product. |
+| `delete_inventory_product_comment` | Permanently delete a comment attached directly to an inventory product. The commentId must belong to the resolved product. |
+| `list_inventory_product_activity` | List activity messages for an inventory product resolved by product ID or exact name. This is read-only audit/activity history, newest first. |
 | `list_inventory_categories` | List inventory categories sorted by name. Omit parentCategory to search all categories, or pass a parent category ID/exact name/root to list direct children. query filters names case-insensitively. |
 | `get_inventory_category` | Get one inventory category by ID or exact name. If the name is duplicated under different parents, pass parentCategory or use the category ID. |
 | `create_inventory_category` | Create an inventory category. Defaults parentCategory to the Inventory root. Rejects duplicate category names under the same parent. |
@@ -686,7 +701,7 @@ SDK upgrade revisit:
 | `get_inventory_product` | Get one inventory product by ID or exact product name. If product names are duplicated, pass category or use the product ID. |
 | `create_inventory_product` | Create an inventory product in a category resolved by ID or exact name. Rejects duplicate product names in the same category. |
 | `update_inventory_product` | Rename and/or move an inventory product. product accepts ID or exact name; pass category when a name may be duplicated. Rejects duplicate names in the destination category. |
-| `delete_inventory_product` | Delete an inventory product by ID or exact name. Refuses products with variants, photos, or attachments; this action does not cascade. |
+| `delete_inventory_product` | Delete an inventory product by ID or exact name. Refuses products with variants, photos, attachments, or comments; this action does not cascade. |
 | `list_inventory_variants` | List inventory variants/SKUs sorted by name. Optionally scope to product by ID/exact name; category can disambiguate product names. query filters variant names and SKUs. |
 | `get_inventory_variant` | Get one inventory variant by ID, exact variant name, or exact SKU. If the name/SKU is duplicated, pass product or use the variant ID. |
 | `create_inventory_variant` | Create an inventory variant/SKU under a product resolved by ID or exact name. Rejects duplicate variant names or SKUs in the same product. |

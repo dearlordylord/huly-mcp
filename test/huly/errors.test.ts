@@ -88,6 +88,7 @@ import {
   InventoryConflictError,
   InventoryMutationUnsupportedError,
   InventoryNotEmptyError,
+  InventoryProductCommentNotFoundError,
   InventoryProductIdentifierAmbiguousError,
   InventoryProductNotFoundError,
   InventoryVariantIdentifierAmbiguousError,
@@ -979,6 +980,8 @@ describe("Huly Errors", () => {
               return `inventory-category-ambiguous:${error.identifier}:${error.matches}`
             case "InventoryProductIdentifierAmbiguousError":
               return `inventory-product-ambiguous:${error.identifier}:${error.matches}`
+            case "InventoryProductCommentNotFoundError":
+              return `inventory-product-comment:${error.product}:${error.commentId}`
             case "InventoryVariantIdentifierAmbiguousError":
               return `inventory-variant-ambiguous:${error.identifier}:${error.matches}`
             case "InventoryConflictError":
@@ -1094,6 +1097,13 @@ describe("Huly Errors", () => {
         )
         expect(new InventoryProductIdentifierAmbiguousError({ identifier: "Product", matches: 2 }).message).toBe(
           "Inventory product 'Product' matched 2 products; pass category or use the product ID"
+        )
+        expect(matchError(new InventoryProductCommentNotFoundError({ product: "Product", commentId: "comment-1" })))
+          .toBe(
+            "inventory-product-comment:Product:comment-1"
+          )
+        expect(new InventoryProductCommentNotFoundError({ product: "Product", commentId: "comment-1" }).message).toBe(
+          "Comment 'comment-1' not found on inventory product 'Product'"
         )
         expect(matchError(new InventoryVariantIdentifierAmbiguousError({ identifier: "SKU-1", matches: 2 }))).toBe(
           "inventory-variant-ambiguous:SKU-1:2"
