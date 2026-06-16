@@ -9,7 +9,7 @@
  * @module
  */
 import type { Class, Doc, Mixin, Ref } from "@hcengineering/core"
-import type { Applicant, Candidate, Vacancy } from "./types/recruiting.js"
+import type { Applicant, ApplicantMatch, Candidate, Opinion, Review, Vacancy } from "./types/recruiting.js"
 
 // eslint-disable-next-line no-restricted-syntax -- SDK boundary: upstream recruit plugin refs are opaque phantom strings without constructors
 const recruitClassRef = <T extends Doc>(identifier: string): Ref<Class<T>> => identifier as Ref<Class<T>>
@@ -21,6 +21,9 @@ const recruitDocRef = <T extends Doc>(identifier: string): Ref<T> => identifier 
 export const recruitIds = {
   class: {
     Applicant: recruitClassRef<Applicant>("recruit:class:Applicant"),
+    ApplicantMatch: recruitClassRef<ApplicantMatch>("recruit:class:ApplicantMatch"),
+    Opinion: recruitClassRef<Opinion>("recruit:class:Opinion"),
+    Review: recruitClassRef<Review>("recruit:class:Review"),
     Vacancy: recruitClassRef<Vacancy>("recruit:class:Vacancy")
   },
   mixin: {

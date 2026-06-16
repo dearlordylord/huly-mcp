@@ -1,7 +1,14 @@
 import { describe, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
-import { ApplicantIdentifier, CandidateIdentifier, VacancyIdentifier } from "../../src/domain/schemas/recruiting.js"
+import {
+  ApplicantIdentifier,
+  ApplicantMatchIdentifier,
+  CandidateIdentifier,
+  OpinionIdentifier,
+  ReviewIdentifier,
+  VacancyIdentifier
+} from "../../src/domain/schemas/recruiting.js"
 import {
   AssociationId,
   Count,
@@ -115,11 +122,16 @@ import {
   ProjectNotFoundError,
   ReactionNotFoundError,
   RecruitingApplicantIdentifierAmbiguousError,
+  RecruitingApplicantMatchNotFoundError,
   RecruitingApplicantNotFoundError,
   RecruitingCandidateNotFoundError,
   RecruitingDuplicateApplicantError,
   RecruitingModelMissingError,
   RecruitingMutationUnsupportedError,
+  RecruitingOpinionIdentifierAmbiguousError,
+  RecruitingOpinionNotFoundError,
+  RecruitingReviewIdentifierAmbiguousError,
+  RecruitingReviewNotFoundError,
   RecruitingVacancyIdentifierAmbiguousError,
   RecruitingVacancyNotFoundError,
   RecruitingVacancyTypeNotFoundError,
@@ -1030,6 +1042,16 @@ describe("Huly Errors", () => {
               return `recruiting-applicant-ambiguous:${error.identifier}:${error.matches}`
             case "RecruitingDuplicateApplicantError":
               return `recruiting-applicant-duplicate:${error.vacancy}:${error.candidate}`
+            case "RecruitingReviewNotFoundError":
+              return `recruiting-review:${error.identifier}`
+            case "RecruitingReviewIdentifierAmbiguousError":
+              return `recruiting-review-ambiguous:${error.identifier}:${error.matches}`
+            case "RecruitingOpinionNotFoundError":
+              return `recruiting-opinion:${error.identifier}`
+            case "RecruitingOpinionIdentifierAmbiguousError":
+              return `recruiting-opinion-ambiguous:${error.identifier}:${error.matches}`
+            case "RecruitingApplicantMatchNotFoundError":
+              return `recruiting-applicant-match:${error.identifier}`
             case "RecruitingModelMissingError":
               return `recruiting-model-missing:${error.message}`
             case "RecruitingMutationUnsupportedError":
@@ -1126,6 +1148,27 @@ describe("Huly Errors", () => {
             candidate: CandidateIdentifier.make("alice@example.com")
           })
         )).toBe("recruiting-applicant-duplicate:VCN-1:alice@example.com")
+        expect(matchError(new RecruitingReviewNotFoundError({ identifier: ReviewIdentifier.make("RVE-1") }))).toBe(
+          "recruiting-review:RVE-1"
+        )
+        expect(matchError(
+          new RecruitingReviewIdentifierAmbiguousError({
+            identifier: ReviewIdentifier.make("Interview"),
+            matches: Count.make(2)
+          })
+        )).toBe("recruiting-review-ambiguous:Interview:2")
+        expect(matchError(new RecruitingOpinionNotFoundError({ identifier: OpinionIdentifier.make("OPE-1") }))).toBe(
+          "recruiting-opinion:OPE-1"
+        )
+        expect(matchError(
+          new RecruitingOpinionIdentifierAmbiguousError({
+            identifier: OpinionIdentifier.make("OPE-1"),
+            matches: Count.make(2)
+          })
+        )).toBe("recruiting-opinion-ambiguous:OPE-1:2")
+        expect(matchError(
+          new RecruitingApplicantMatchNotFoundError({ identifier: ApplicantMatchIdentifier.make("match-1") })
+        )).toBe("recruiting-applicant-match:match-1")
         expect(matchError(new RecruitingModelMissingError({ message: "missing sequence" }))).toBe(
           "recruiting-model-missing:missing sequence"
         )

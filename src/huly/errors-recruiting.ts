@@ -1,6 +1,13 @@
 import { Schema } from "effect"
 
-import { ApplicantIdentifier, CandidateIdentifier, VacancyIdentifier } from "../domain/schemas/recruiting-common.js"
+import {
+  ApplicantIdentifier,
+  ApplicantMatchIdentifier,
+  CandidateIdentifier,
+  OpinionIdentifier,
+  ReviewIdentifier,
+  VacancyIdentifier
+} from "../domain/schemas/recruiting-common.js"
 import { Count, NonEmptyString } from "../domain/schemas/shared.js"
 
 export class RecruitingVacancyNotFoundError extends Schema.TaggedError<RecruitingVacancyNotFoundError>()(
@@ -67,6 +74,55 @@ export class RecruitingDuplicateApplicantError extends Schema.TaggedError<Recrui
 ) {
   override get message(): string {
     return `Recruiting applicant already exists for vacancy '${this.vacancy}' and candidate '${this.candidate}'`
+  }
+}
+
+export class RecruitingReviewNotFoundError extends Schema.TaggedError<RecruitingReviewNotFoundError>()(
+  "RecruitingReviewNotFoundError",
+  { identifier: ReviewIdentifier }
+) {
+  override get message(): string {
+    return `Recruiting review '${this.identifier}' not found`
+  }
+}
+
+export class RecruitingReviewIdentifierAmbiguousError
+  extends Schema.TaggedError<RecruitingReviewIdentifierAmbiguousError>()(
+    "RecruitingReviewIdentifierAmbiguousError",
+    { identifier: ReviewIdentifier, matches: Count }
+  )
+{
+  override get message(): string {
+    return `Recruiting review identifier '${this.identifier}' matched ${this.matches} reviews; use the review ID`
+  }
+}
+
+export class RecruitingOpinionNotFoundError extends Schema.TaggedError<RecruitingOpinionNotFoundError>()(
+  "RecruitingOpinionNotFoundError",
+  { identifier: OpinionIdentifier }
+) {
+  override get message(): string {
+    return `Recruiting opinion '${this.identifier}' not found`
+  }
+}
+
+export class RecruitingOpinionIdentifierAmbiguousError
+  extends Schema.TaggedError<RecruitingOpinionIdentifierAmbiguousError>()(
+    "RecruitingOpinionIdentifierAmbiguousError",
+    { identifier: OpinionIdentifier, matches: Count }
+  )
+{
+  override get message(): string {
+    return `Recruiting opinion identifier '${this.identifier}' matched ${this.matches} opinions; pass review`
+  }
+}
+
+export class RecruitingApplicantMatchNotFoundError extends Schema.TaggedError<RecruitingApplicantMatchNotFoundError>()(
+  "RecruitingApplicantMatchNotFoundError",
+  { identifier: ApplicantMatchIdentifier }
+) {
+  override get message(): string {
+    return `Recruiting applicant match '${this.identifier}' not found`
   }
 }
 

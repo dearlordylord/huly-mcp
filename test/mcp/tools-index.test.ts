@@ -205,7 +205,19 @@ describe("createFilteredRegistry", () => {
         "get_recruiting_applicant",
         "create_recruiting_applicant",
         "update_recruiting_applicant",
-        "delete_recruiting_applicant"
+        "delete_recruiting_applicant",
+        "list_recruiting_applicant_matches",
+        "get_recruiting_applicant_match",
+        "list_recruiting_reviews",
+        "get_recruiting_review",
+        "create_recruiting_review",
+        "update_recruiting_review",
+        "delete_recruiting_review",
+        "list_recruiting_opinions",
+        "get_recruiting_opinion",
+        "create_recruiting_opinion",
+        "update_recruiting_opinion",
+        "delete_recruiting_opinion"
       ])
       for (const tool of filtered.definitions) {
         expect(tool.category).toBe("recruiting")

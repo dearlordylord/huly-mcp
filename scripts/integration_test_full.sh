@@ -34,6 +34,8 @@ INVENTORY_CLEANUP_PHOTO_ID=""
 INVENTORY_CLEANUP_COMMENT_ID=""
 RECRUITING_CLEANUP_VACANCY_ID=""
 RECRUITING_CLEANUP_APPLICANT_ID=""
+RECRUITING_CLEANUP_REVIEW_ID=""
+RECRUITING_CLEANUP_OPINION_ID=""
 RECRUITING_CLEANUP_PERSON_ID=""
 RECRUITING_CLEANUP_PERSON_EMAIL=""
 RECRUITING_CLEANUP_SKILL=""
@@ -184,6 +186,14 @@ cleanup_inventory_artifacts() {
 }
 
 cleanup_recruiting_artifacts() {
+  if [ -n "$RECRUITING_CLEANUP_OPINION_ID" ]; then
+    opinion_json=$(json_string "$RECRUITING_CLEANUP_OPINION_ID")
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_recruiting_opinion\",\"arguments\":{\"opinion\":$opinion_json}},\"id\":2}" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$RECRUITING_CLEANUP_REVIEW_ID" ]; then
+    review_json=$(json_string "$RECRUITING_CLEANUP_REVIEW_ID")
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_recruiting_review\",\"arguments\":{\"review\":$review_json}},\"id\":2}" >/dev/null 2>&1 || true
+  fi
   if [ -n "$RECRUITING_CLEANUP_APPLICANT_ID" ]; then
     applicant_json=$(json_string "$RECRUITING_CLEANUP_APPLICANT_ID")
     call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_recruiting_applicant\",\"arguments\":{\"applicant\":$applicant_json}},\"id\":2}" >/dev/null 2>&1 || true
@@ -1068,6 +1078,17 @@ elif [ "$RECRUITING_PROBE_IS_ERROR" = "true" ] &&
     "list_recruiting_applicants" \
     "get_recruiting_applicant" \
     "update_recruiting_applicant" \
+    "list_recruiting_applicant_matches" \
+    "create_recruiting_review" \
+    "list_recruiting_reviews" \
+    "get_recruiting_review" \
+    "update_recruiting_review" \
+    "create_recruiting_opinion" \
+    "list_recruiting_opinions" \
+    "get_recruiting_opinion" \
+    "update_recruiting_opinion" \
+    "delete_recruiting_opinion" \
+    "delete_recruiting_review" \
     "delete_recruiting_applicant" \
     "remove_recruiting_candidate_skill" \
     "archive_recruiting_vacancy"; do
@@ -1093,6 +1114,17 @@ else
       "list_recruiting_applicants" \
       "get_recruiting_applicant" \
       "update_recruiting_applicant" \
+      "list_recruiting_applicant_matches" \
+      "create_recruiting_review" \
+      "list_recruiting_reviews" \
+      "get_recruiting_review" \
+      "update_recruiting_review" \
+      "create_recruiting_opinion" \
+      "list_recruiting_opinions" \
+      "get_recruiting_opinion" \
+      "update_recruiting_opinion" \
+      "delete_recruiting_opinion" \
+      "delete_recruiting_review" \
       "delete_recruiting_applicant" \
       "remove_recruiting_candidate_skill" \
       "archive_recruiting_vacancy"; do
@@ -1136,6 +1168,17 @@ else
           "list_recruiting_applicants" \
           "get_recruiting_applicant" \
           "update_recruiting_applicant" \
+          "list_recruiting_applicant_matches" \
+          "create_recruiting_review" \
+          "list_recruiting_reviews" \
+          "get_recruiting_review" \
+          "update_recruiting_review" \
+          "create_recruiting_opinion" \
+          "list_recruiting_opinions" \
+          "get_recruiting_opinion" \
+          "update_recruiting_opinion" \
+          "delete_recruiting_opinion" \
+          "delete_recruiting_review" \
           "delete_recruiting_applicant" \
           "remove_recruiting_candidate_skill"; do
           skip_test "$recruiting_test" "Recruiting vacancy type has no applicant statuses"
@@ -1153,6 +1196,9 @@ else
           run_capture_to_var RECRUITING_CANDIDATE_TEXT "get_recruiting_candidate($RECRUITING_PERSON_EMAIL)" \
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_recruiting_candidate\",\"arguments\":{\"candidate\":$RECRUITING_PERSON_EMAIL_JSON}},\"id\":2}"
           assert_json_field_equals "get_recruiting_candidate returns email" "$RECRUITING_CANDIDATE_TEXT" ".email" "$RECRUITING_PERSON_EMAIL"
+
+          run_capture_to_var RECRUITING_MATCHES_TEXT "list_recruiting_applicant_matches(candidate)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_recruiting_applicant_matches\",\"arguments\":{\"candidate\":$RECRUITING_PERSON_EMAIL_JSON,\"limit\":5}},\"id\":2}"
 
           run_capture_to_var RECRUITING_SKILLS_TEXT "list_recruiting_skills" \
             '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_recruiting_skills","arguments":{"limit":5}},"id":2}'
@@ -1183,6 +1229,58 @@ else
             run_capture_to_var RECRUITING_UPDATE_APPLICANT_TEXT "update_recruiting_applicant(status)" \
               "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_recruiting_applicant\",\"arguments\":{\"applicant\":$RECRUITING_APPLICANT_ID_JSON,\"status\":$RECRUITING_UPDATE_STATUS_JSON}},\"id\":2}"
             assert_json_field_equals "update_recruiting_applicant returns status" "$RECRUITING_UPDATE_APPLICANT_TEXT" ".applicant.status" "$RECRUITING_UPDATE_STATUS"
+
+            RECRUITING_REVIEW_TITLE="MCP IntTest Review $RUN_ID"
+            RECRUITING_REVIEW_TITLE_JSON=$(json_string "$RECRUITING_REVIEW_TITLE")
+            RECRUITING_REVIEW_DATE=$((($(date +%s) + 60) * 1000))
+            run_capture_to_var RECRUITING_REVIEW_TEXT "create_recruiting_review" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_recruiting_review\",\"arguments\":{\"candidate\":$RECRUITING_PERSON_EMAIL_JSON,\"title\":$RECRUITING_REVIEW_TITLE_JSON,\"date\":$RECRUITING_REVIEW_DATE,\"description\":\"Integration review\",\"application\":$RECRUITING_APPLICANT_ID_JSON,\"participants\":[$RECRUITING_PERSON_EMAIL_JSON]}},\"id\":2}"
+            RECRUITING_CLEANUP_REVIEW_ID=$(echo "$RECRUITING_REVIEW_TEXT" | jq -r '.review.id // empty' 2>/dev/null)
+            if [ -n "$RECRUITING_CLEANUP_REVIEW_ID" ]; then
+              RECRUITING_REVIEW_ID_JSON=$(json_string "$RECRUITING_CLEANUP_REVIEW_ID")
+              sleep 1
+              run_capture_to_var RECRUITING_LIST_REVIEWS_TEXT "list_recruiting_reviews(candidate)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_recruiting_reviews\",\"arguments\":{\"candidate\":$RECRUITING_PERSON_EMAIL_JSON,\"limit\":20}},\"id\":2}"
+              assert_json_array_contains "list_recruiting_reviews includes review" "$RECRUITING_LIST_REVIEWS_TEXT" ".reviews | map(.id)" "$RECRUITING_CLEANUP_REVIEW_ID"
+              run_capture_to_var RECRUITING_GET_REVIEW_TEXT "get_recruiting_review($RECRUITING_CLEANUP_REVIEW_ID)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_recruiting_review\",\"arguments\":{\"review\":$RECRUITING_REVIEW_ID_JSON}},\"id\":2}"
+              assert_json_field_equals "get_recruiting_review returns id" "$RECRUITING_GET_REVIEW_TEXT" ".id" "$RECRUITING_CLEANUP_REVIEW_ID"
+              run_capture_to_var RECRUITING_UPDATE_REVIEW_TEXT "update_recruiting_review(verdict)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_recruiting_review\",\"arguments\":{\"review\":$RECRUITING_REVIEW_ID_JSON,\"verdict\":\"Integration verdict\"}},\"id\":2}"
+              assert_json_field_equals "update_recruiting_review returns id" "$RECRUITING_UPDATE_REVIEW_TEXT" ".review.id" "$RECRUITING_CLEANUP_REVIEW_ID"
+
+              run_capture_to_var RECRUITING_OPINION_TEXT "create_recruiting_opinion" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_recruiting_opinion\",\"arguments\":{\"review\":$RECRUITING_REVIEW_ID_JSON,\"value\":\"Integration opinion\",\"description\":\"Opinion details\"}},\"id\":2}"
+              RECRUITING_CLEANUP_OPINION_ID=$(echo "$RECRUITING_OPINION_TEXT" | jq -r '.opinion.id // empty' 2>/dev/null)
+              if [ -n "$RECRUITING_CLEANUP_OPINION_ID" ]; then
+                RECRUITING_OPINION_ID_JSON=$(json_string "$RECRUITING_CLEANUP_OPINION_ID")
+                sleep 1
+                run_capture_to_var RECRUITING_LIST_OPINIONS_TEXT "list_recruiting_opinions(review)" \
+                  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_recruiting_opinions\",\"arguments\":{\"review\":$RECRUITING_REVIEW_ID_JSON,\"limit\":20}},\"id\":2}"
+                assert_json_array_contains "list_recruiting_opinions includes opinion" "$RECRUITING_LIST_OPINIONS_TEXT" ".opinions | map(.id)" "$RECRUITING_CLEANUP_OPINION_ID"
+                run_capture_to_var RECRUITING_GET_OPINION_TEXT "get_recruiting_opinion($RECRUITING_CLEANUP_OPINION_ID)" \
+                  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_recruiting_opinion\",\"arguments\":{\"opinion\":$RECRUITING_OPINION_ID_JSON,\"review\":$RECRUITING_REVIEW_ID_JSON}},\"id\":2}"
+                assert_json_field_equals "get_recruiting_opinion returns id" "$RECRUITING_GET_OPINION_TEXT" ".id" "$RECRUITING_CLEANUP_OPINION_ID"
+                run_capture_to_var RECRUITING_UPDATE_OPINION_TEXT "update_recruiting_opinion(value)" \
+                  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_recruiting_opinion\",\"arguments\":{\"opinion\":$RECRUITING_OPINION_ID_JSON,\"review\":$RECRUITING_REVIEW_ID_JSON,\"value\":\"Updated integration opinion\"}},\"id\":2}"
+                assert_json_field_equals "update_recruiting_opinion returns value" "$RECRUITING_UPDATE_OPINION_TEXT" ".opinion.value" "Updated integration opinion"
+                run_capture_to_var RECRUITING_DELETE_OPINION_TEXT "delete_recruiting_opinion($RECRUITING_CLEANUP_OPINION_ID)" \
+                  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_recruiting_opinion\",\"arguments\":{\"opinion\":$RECRUITING_OPINION_ID_JSON,\"review\":$RECRUITING_REVIEW_ID_JSON}},\"id\":2}"
+                if assert_json_field_equals "delete_recruiting_opinion deleted" "$RECRUITING_DELETE_OPINION_TEXT" ".deleted" "true"; then
+                  RECRUITING_CLEANUP_OPINION_ID=""
+                fi
+              else
+                skip_test "list/get/update/delete recruiting opinion" "create_recruiting_opinion did not return an id"
+              fi
+
+              run_capture_to_var RECRUITING_DELETE_REVIEW_TEXT "delete_recruiting_review($RECRUITING_CLEANUP_REVIEW_ID)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_recruiting_review\",\"arguments\":{\"review\":$RECRUITING_REVIEW_ID_JSON}},\"id\":2}"
+              if assert_json_field_equals "delete_recruiting_review deleted" "$RECRUITING_DELETE_REVIEW_TEXT" ".deleted" "true"; then
+                RECRUITING_CLEANUP_REVIEW_ID=""
+              fi
+            else
+              skip_test "list/get/update/delete recruiting review and opinion workflow" "create_recruiting_review did not return an id"
+            fi
 
             run_capture_to_var RECRUITING_DELETE_APPLICANT_TEXT "delete_recruiting_applicant($RECRUITING_CLEANUP_APPLICANT_ID)" \
               "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_recruiting_applicant\",\"arguments\":{\"applicant\":$RECRUITING_APPLICANT_ID_JSON}},\"id\":2}"

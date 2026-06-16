@@ -3,6 +3,12 @@ import { Effect } from "effect"
 import { expect } from "vitest"
 
 import {
+  parseGetRecruitingOpinionParams,
+  parseGetRecruitingReviewParams,
+  parseUpdateRecruitingOpinionParams,
+  parseUpdateRecruitingReviewParams
+} from "../../src/domain/schemas/recruiting-extended.js"
+import {
   parseCreateRecruitingVacancyParams,
   parseGetRecruitingApplicantParams,
   parseGetRecruitingVacancyParams,
@@ -38,6 +44,21 @@ describe("Recruiting Schemas", () => {
 
       expect(bare.applicant).toBe("APP-3")
       expect(prefixed.applicant).toBe("APP-4")
+    }))
+
+  it.effect("normalizes review and opinion numeric locators", () =>
+    Effect.gen(function*() {
+      const bareReview = yield* parseGetRecruitingReviewParams({ review: "5" })
+      const prefixedReview = yield* parseGetRecruitingReviewParams({ review: "rve-6" })
+      const exactTitle = yield* parseGetRecruitingReviewParams({ review: "Technical Interview" })
+      const bareOpinion = yield* parseGetRecruitingOpinionParams({ opinion: "7" })
+      const prefixedOpinion = yield* parseGetRecruitingOpinionParams({ opinion: "ope-8" })
+
+      expect(bareReview.review).toBe("RVE-5")
+      expect(prefixedReview.review).toBe("RVE-6")
+      expect(exactTitle.review).toBe("Technical Interview")
+      expect(bareOpinion.opinion).toBe("OPE-7")
+      expect(prefixedOpinion.opinion).toBe("OPE-8")
     }))
 
   it.effect("rejects vacancy updates with no mutable fields", () =>
@@ -115,6 +136,38 @@ describe("Recruiting Schemas", () => {
     Effect.gen(function*() {
       const error = yield* Effect.flip(parseUpdateRecruitingApplicantParams({ applicant: "APP-1" }))
       expect(error._tag).toBe("ParseError")
+    }))
+
+  it.effect("rejects review and opinion updates with no mutable fields", () =>
+    Effect.gen(function*() {
+      const review = yield* Effect.flip(parseUpdateRecruitingReviewParams({ review: "RVE-1" }))
+      const opinion = yield* Effect.flip(parseUpdateRecruitingOpinionParams({ opinion: "OPE-1" }))
+
+      expect(review._tag).toBe("ParseError")
+      expect(opinion._tag).toBe("ParseError")
+    }))
+
+  it.effect("accepts nullable review and opinion clear fields", () =>
+    Effect.gen(function*() {
+      const review = yield* parseUpdateRecruitingReviewParams({
+        review: "RVE-1",
+        description: null,
+        verdict: null,
+        application: null,
+        company: null,
+        location: null
+      })
+      const opinion = yield* parseUpdateRecruitingOpinionParams({
+        opinion: "OPE-1",
+        description: null
+      })
+
+      expect(review.description).toBeNull()
+      expect(review.verdict).toBeNull()
+      expect(review.application).toBeNull()
+      expect(review.company).toBeNull()
+      expect(review.location).toBeNull()
+      expect(opinion.description).toBeNull()
     }))
 
   it.effect("accepts nullable applicant clear fields", () =>
