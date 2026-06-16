@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.35.0
+
+### Minor Changes
+
+- a2485f1: Extend first-class Recruiting MCP tools with applicant matches, review and opinion workflows, Recruiting comments, attachments, activity, and related issues.
+
 ## 0.34.0
 
 ### Minor Changes
