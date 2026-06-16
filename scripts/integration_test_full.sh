@@ -1079,7 +1079,6 @@ elif [ "$RECRUITING_PROBE_IS_ERROR" = "true" ] &&
     "get_recruiting_applicant" \
     "update_recruiting_applicant" \
     "list_recruiting_applicant_matches" \
-    "get_recruiting_applicant_match" \
     "create_recruiting_review" \
     "list_recruiting_reviews" \
     "get_recruiting_review" \
@@ -1116,7 +1115,6 @@ else
       "get_recruiting_applicant" \
       "update_recruiting_applicant" \
       "list_recruiting_applicant_matches" \
-      "get_recruiting_applicant_match" \
       "create_recruiting_review" \
       "list_recruiting_reviews" \
       "get_recruiting_review" \
@@ -1171,7 +1169,6 @@ else
           "get_recruiting_applicant" \
           "update_recruiting_applicant" \
           "list_recruiting_applicant_matches" \
-          "get_recruiting_applicant_match" \
           "create_recruiting_review" \
           "list_recruiting_reviews" \
           "get_recruiting_review" \
@@ -1202,15 +1199,6 @@ else
 
           run_capture_to_var RECRUITING_MATCHES_TEXT "list_recruiting_applicant_matches(candidate)" \
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_recruiting_applicant_matches\",\"arguments\":{\"candidate\":$RECRUITING_PERSON_EMAIL_JSON,\"limit\":5}},\"id\":2}"
-          RECRUITING_MATCH_ID=$(echo "$RECRUITING_MATCHES_TEXT" | jq -r '.matches[0].id // empty' 2>/dev/null)
-          if [ -n "$RECRUITING_MATCH_ID" ]; then
-            RECRUITING_MATCH_ID_JSON=$(json_string "$RECRUITING_MATCH_ID")
-            run_capture_to_var RECRUITING_GET_MATCH_TEXT "get_recruiting_applicant_match($RECRUITING_MATCH_ID)" \
-              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_recruiting_applicant_match\",\"arguments\":{\"match\":$RECRUITING_MATCH_ID_JSON}},\"id\":2}"
-            assert_json_field_equals "get_recruiting_applicant_match returns id" "$RECRUITING_GET_MATCH_TEXT" ".id" "$RECRUITING_MATCH_ID"
-          else
-            skip_test "get_recruiting_applicant_match" "candidate has no generated applicant matches"
-          fi
 
           run_capture_to_var RECRUITING_SKILLS_TEXT "list_recruiting_skills" \
             '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_recruiting_skills","arguments":{"limit":5}},"id":2}'
