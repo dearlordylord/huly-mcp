@@ -1,6 +1,7 @@
 import { describe, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
+import { ApplicantIdentifier, CandidateIdentifier, VacancyIdentifier } from "../../src/domain/schemas/recruiting.js"
 import {
   AssociationId,
   Count,
@@ -113,6 +114,15 @@ import {
   PersonNotFoundError,
   ProjectNotFoundError,
   ReactionNotFoundError,
+  RecruitingApplicantIdentifierAmbiguousError,
+  RecruitingApplicantNotFoundError,
+  RecruitingCandidateNotFoundError,
+  RecruitingDuplicateApplicantError,
+  RecruitingModelMissingError,
+  RecruitingMutationUnsupportedError,
+  RecruitingVacancyIdentifierAmbiguousError,
+  RecruitingVacancyNotFoundError,
+  RecruitingVacancyTypeNotFoundError,
   RecurringEventNotFoundError,
   RelationCardinalityViolationError,
   RelationDirectionAmbiguousError,
@@ -1006,6 +1016,24 @@ describe("Huly Errors", () => {
               return `space-role-ambiguous:${error.identifier}:${error.spaceType}:${error.matches.length}`
             case "SpaceRoleAssignmentsMalformedError":
               return `space-role-assignments-malformed:${error.space}:${error.spaceType}:${error.targetClass}`
+            case "RecruitingVacancyNotFoundError":
+              return `recruiting-vacancy:${error.identifier}`
+            case "RecruitingVacancyIdentifierAmbiguousError":
+              return `recruiting-vacancy-ambiguous:${error.identifier}:${error.matches}`
+            case "RecruitingVacancyTypeNotFoundError":
+              return `recruiting-vacancy-type:${error.identifier}`
+            case "RecruitingCandidateNotFoundError":
+              return `recruiting-candidate:${error.identifier}`
+            case "RecruitingApplicantNotFoundError":
+              return `recruiting-applicant:${error.identifier}`
+            case "RecruitingApplicantIdentifierAmbiguousError":
+              return `recruiting-applicant-ambiguous:${error.identifier}:${error.matches}`
+            case "RecruitingDuplicateApplicantError":
+              return `recruiting-applicant-duplicate:${error.vacancy}:${error.candidate}`
+            case "RecruitingModelMissingError":
+              return `recruiting-model-missing:${error.message}`
+            case "RecruitingMutationUnsupportedError":
+              return `recruiting-mutation-unsupported:${error.message}`
             case "NoUpdateFieldsError":
               return `no-update-fields:${error.operation}:${error.fields.length}`
             case "CannotDirectMessageSelfError":
@@ -1067,6 +1095,42 @@ describe("Huly Errors", () => {
         )
         expect(matchError(new TodoIdentifierAmbiguousError({ locator: "title:Fix bug", matches: 2 }))).toBe(
           "todo-ambiguous:title:Fix bug:2"
+        )
+        expect(matchError(new RecruitingVacancyNotFoundError({ identifier: VacancyIdentifier.make("VCN-1") }))).toBe(
+          "recruiting-vacancy:VCN-1"
+        )
+        expect(matchError(
+          new RecruitingVacancyIdentifierAmbiguousError({
+            identifier: VacancyIdentifier.make("Engineer"),
+            matches: Count.make(2)
+          })
+        )).toBe("recruiting-vacancy-ambiguous:Engineer:2")
+        expect(matchError(
+          new RecruitingVacancyTypeNotFoundError({ identifier: NonEmptyString.make("Default vacancy") })
+        )).toBe("recruiting-vacancy-type:Default vacancy")
+        expect(matchError(
+          new RecruitingCandidateNotFoundError({ identifier: CandidateIdentifier.make("alice@example.com") })
+        )).toBe("recruiting-candidate:alice@example.com")
+        expect(matchError(
+          new RecruitingApplicantNotFoundError({ identifier: ApplicantIdentifier.make("APP-1") })
+        )).toBe("recruiting-applicant:APP-1")
+        expect(matchError(
+          new RecruitingApplicantIdentifierAmbiguousError({
+            identifier: ApplicantIdentifier.make("APP-1"),
+            matches: Count.make(2)
+          })
+        )).toBe("recruiting-applicant-ambiguous:APP-1:2")
+        expect(matchError(
+          new RecruitingDuplicateApplicantError({
+            vacancy: VacancyIdentifier.make("VCN-1"),
+            candidate: CandidateIdentifier.make("alice@example.com")
+          })
+        )).toBe("recruiting-applicant-duplicate:VCN-1:alice@example.com")
+        expect(matchError(new RecruitingModelMissingError({ message: "missing sequence" }))).toBe(
+          "recruiting-model-missing:missing sequence"
+        )
+        expect(matchError(new RecruitingMutationUnsupportedError({ message: "removeCollection missing" }))).toBe(
+          "recruiting-mutation-unsupported:removeCollection missing"
         )
         expect(new TodoIdentifierAmbiguousError({ locator: "title:Fix bug", matches: 2 }).message).toBe(
           "Planner ToDo locator is ambiguous: title:Fix bug matched 2 ToDos"

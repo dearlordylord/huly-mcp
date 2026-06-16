@@ -27,6 +27,7 @@ import { plannerTools } from "./planner.js"
 import { processTools } from "./processes.js"
 import { projectTargetPreferenceTools } from "./project-target-preferences.js"
 import { projectTools } from "./projects.js"
+import { recruitingTools } from "./recruiting.js"
 import type { RegisteredTool, ToolDefinition } from "./registry.js"
 import {
   createMissingArgumentsError,
@@ -77,6 +78,7 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...channelTools,
   ...cardTools,
   ...leadTools,
+  ...recruitingTools,
   ...customFieldTools,
   ...calendarTools,
   ...timeTools,

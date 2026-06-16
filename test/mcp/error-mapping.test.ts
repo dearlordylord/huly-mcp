@@ -5,6 +5,11 @@ import { expect } from "vitest"
 import { AssociationName } from "../../src/domain/schemas/generic-associations.js"
 import { ProcessId } from "../../src/domain/schemas/processes.js"
 import {
+  ApplicantIdentifier,
+  CandidateIdentifier,
+  VacancyIdentifier
+} from "../../src/domain/schemas/recruiting-common.js"
+import {
   AssociationId,
   CardId,
   Count,
@@ -50,6 +55,15 @@ import {
   ProcessMasterTagNotFoundError,
   ProcessNotFoundError,
   ProjectNotFoundError,
+  RecruitingApplicantIdentifierAmbiguousError,
+  RecruitingApplicantNotFoundError,
+  RecruitingCandidateNotFoundError,
+  RecruitingDuplicateApplicantError,
+  RecruitingModelMissingError,
+  RecruitingMutationUnsupportedError,
+  RecruitingVacancyIdentifierAmbiguousError,
+  RecruitingVacancyNotFoundError,
+  RecruitingVacancyTypeNotFoundError,
   RelationEndpointClassMismatchError,
   RelationIdentifierAmbiguousError,
   RelationMutationUnsupportedError,
@@ -406,6 +420,39 @@ describe("Error Mapping to MCP", () => {
           expect(response.content[0].text).toBe(
             "Document content is unreadable or corrupted. Use edit_document with the full content field to replace and repair it."
           )
+        }))
+
+      it.effect("maps recruiting lookup and model errors as invalid params", () =>
+        Effect.gen(function*() {
+          const errors = [
+            new RecruitingVacancyNotFoundError({ identifier: VacancyIdentifier.make("VCN-1") }),
+            new RecruitingVacancyIdentifierAmbiguousError({
+              identifier: VacancyIdentifier.make("Engineer"),
+              matches: Count.make(2)
+            }),
+            new RecruitingVacancyTypeNotFoundError({ identifier: NonEmptyString.make("Default") }),
+            new RecruitingCandidateNotFoundError({ identifier: CandidateIdentifier.make("ada@example.com") }),
+            new RecruitingApplicantNotFoundError({ identifier: ApplicantIdentifier.make("APP-1") }),
+            new RecruitingApplicantIdentifierAmbiguousError({
+              identifier: ApplicantIdentifier.make("APP-1"),
+              matches: Count.make(2)
+            }),
+            new RecruitingDuplicateApplicantError({
+              vacancy: VacancyIdentifier.make("VCN-1"),
+              candidate: CandidateIdentifier.make("ada@example.com")
+            }),
+            new RecruitingModelMissingError({ message: "Recruiting model missing" }),
+            new RecruitingMutationUnsupportedError({ message: "Recruiting deletion unsupported" })
+          ]
+
+          for (const error of errors) {
+            const response = mapDomainErrorToMcp(error)
+
+            expect(response.isError).toBe(true)
+            expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+            expect(response._meta.errorTag).toBeUndefined()
+            expect(response.content[0].text).toBe(error.message)
+          }
         }))
     })
 

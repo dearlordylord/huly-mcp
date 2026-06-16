@@ -125,6 +125,17 @@ import {
   ProcessNotFoundError,
   ProcessParallelExecutionForbiddenError
 } from "./errors-processes.js"
+import {
+  RecruitingApplicantIdentifierAmbiguousError,
+  RecruitingApplicantNotFoundError,
+  RecruitingCandidateNotFoundError,
+  RecruitingDuplicateApplicantError,
+  RecruitingModelMissingError,
+  RecruitingMutationUnsupportedError,
+  RecruitingVacancyIdentifierAmbiguousError,
+  RecruitingVacancyNotFoundError,
+  RecruitingVacancyTypeNotFoundError
+} from "./errors-recruiting.js"
 import { HulyClassNotFoundError } from "./errors-sdk-discovery.js"
 import {
   SpaceIdentifierAmbiguousError,
@@ -259,6 +270,15 @@ export const HulyDomainError = Schema.Union(
   ProcessParallelExecutionForbiddenError,
   ProcessExecutionNotFoundError,
   ProcessExecutionNotCancellableError,
+  RecruitingApplicantIdentifierAmbiguousError,
+  RecruitingApplicantNotFoundError,
+  RecruitingCandidateNotFoundError,
+  RecruitingDuplicateApplicantError,
+  RecruitingModelMissingError,
+  RecruitingMutationUnsupportedError,
+  RecruitingVacancyIdentifierAmbiguousError,
+  RecruitingVacancyNotFoundError,
+  RecruitingVacancyTypeNotFoundError,
   AssociationNotFoundError,
   AssociationIdentifierAmbiguousError,
   AssociationSystemClassUnsupportedError,

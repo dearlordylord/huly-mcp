@@ -32,6 +32,11 @@ INVENTORY_CLEANUP_VARIANT_ID=""
 INVENTORY_CLEANUP_ATTACHMENT_ID=""
 INVENTORY_CLEANUP_PHOTO_ID=""
 INVENTORY_CLEANUP_COMMENT_ID=""
+RECRUITING_CLEANUP_VACANCY_ID=""
+RECRUITING_CLEANUP_APPLICANT_ID=""
+RECRUITING_CLEANUP_PERSON_ID=""
+RECRUITING_CLEANUP_PERSON_EMAIL=""
+RECRUITING_CLEANUP_SKILL=""
 TM_TASK_TYPE_NAME=""
 TM_STATUS_NAME=""
 WORKFLOW_CLEANED=false
@@ -178,7 +183,28 @@ cleanup_inventory_artifacts() {
   fi
 }
 
+cleanup_recruiting_artifacts() {
+  if [ -n "$RECRUITING_CLEANUP_APPLICANT_ID" ]; then
+    applicant_json=$(json_string "$RECRUITING_CLEANUP_APPLICANT_ID")
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_recruiting_applicant\",\"arguments\":{\"applicant\":$applicant_json}},\"id\":2}" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$RECRUITING_CLEANUP_SKILL" ] && [ -n "$RECRUITING_CLEANUP_PERSON_EMAIL" ]; then
+    skill_json=$(json_string "$RECRUITING_CLEANUP_SKILL")
+    person_json=$(json_string "$RECRUITING_CLEANUP_PERSON_EMAIL")
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_recruiting_candidate_skill\",\"arguments\":{\"candidate\":$person_json,\"skill\":$skill_json}},\"id\":2}" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$RECRUITING_CLEANUP_VACANCY_ID" ]; then
+    vacancy_json=$(json_string "$RECRUITING_CLEANUP_VACANCY_ID")
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_recruiting_vacancy\",\"arguments\":{\"vacancy\":$vacancy_json}},\"id\":2}" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$RECRUITING_CLEANUP_PERSON_ID" ]; then
+    person_json=$(json_string "$RECRUITING_CLEANUP_PERSON_ID")
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" >/dev/null 2>&1 || true
+  fi
+}
+
 cleanup_all() {
+  cleanup_recruiting_artifacts || true
   cleanup_generic_associations
   cleanup_workflow_artifacts || true
   cleanup_inventory_artifacts || true
@@ -1017,9 +1043,187 @@ fi
 echo ""
 
 ##############################
-# 1c. INVENTORY CRUD
+# 1c. RECRUITING CRUD
 ##############################
-echo "=== 1c. Inventory CRUD ==="
+echo "=== 1c. Recruiting CRUD ==="
+RECRUITING_PROBE_RESULT=$(call_tool \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_recruiting_vacancy_types","arguments":{"limit":5}},"id":2}')
+RECRUITING_PROBE_ERROR=$(echo "$RECRUITING_PROBE_RESULT" | jq -r '.result.content[0].text // .error.message // empty' 2>/dev/null)
+RECRUITING_PROBE_IS_ERROR=$(echo "$RECRUITING_PROBE_RESULT" | jq -r '.result.isError // false' 2>/dev/null)
+if [ -z "$RECRUITING_PROBE_RESULT" ]; then
+  fail_test "list_recruiting_vacancy_types" "no response"
+elif [ "$RECRUITING_PROBE_IS_ERROR" = "true" ] &&
+  printf '%s\n' "$RECRUITING_PROBE_ERROR" | grep -Eiq 'recruit|vacancy.*(class|model|missing|not found)|class.*vacancy'; then
+  for recruiting_test in \
+    "list_recruiting_vacancy_types" \
+    "create_recruiting_vacancy" \
+    "get_recruiting_vacancy" \
+    "list_recruiting_vacancy_statuses" \
+    "create_person(recruiting candidate)" \
+    "set_recruiting_candidate_profile" \
+    "get_recruiting_candidate" \
+    "list_recruiting_skills" \
+    "add_recruiting_candidate_skill" \
+    "create_recruiting_applicant" \
+    "list_recruiting_applicants" \
+    "get_recruiting_applicant" \
+    "update_recruiting_applicant" \
+    "delete_recruiting_applicant" \
+    "remove_recruiting_candidate_skill" \
+    "archive_recruiting_vacancy"; do
+    skip_test "$recruiting_test" "server lacks Recruiting model"
+  done
+elif [ "$RECRUITING_PROBE_IS_ERROR" = "true" ]; then
+  fail_test "list_recruiting_vacancy_types" "$RECRUITING_PROBE_ERROR"
+else
+  echo "PASS: list_recruiting_vacancy_types"
+  PASSED=$((PASSED + 1))
+
+  RECRUITING_TYPE_COUNT=$(echo "$RECRUITING_PROBE_RESULT" | jq -r '.result.content[0].text | fromjson | .types | length' 2>/dev/null)
+  if [ -z "$RECRUITING_TYPE_COUNT" ] || [ "$RECRUITING_TYPE_COUNT" -eq 0 ]; then
+    for recruiting_test in \
+      "create_recruiting_vacancy" \
+      "get_recruiting_vacancy" \
+      "list_recruiting_vacancy_statuses" \
+      "set_recruiting_candidate_profile" \
+      "get_recruiting_candidate" \
+      "list_recruiting_skills" \
+      "add_recruiting_candidate_skill" \
+      "create_recruiting_applicant" \
+      "list_recruiting_applicants" \
+      "get_recruiting_applicant" \
+      "update_recruiting_applicant" \
+      "delete_recruiting_applicant" \
+      "remove_recruiting_candidate_skill" \
+      "archive_recruiting_vacancy"; do
+      skip_test "$recruiting_test" "Recruiting model has no vacancy types"
+    done
+  else
+    RECRUITING_VACANCY_NAME="MCP IntTest Vacancy $RUN_ID"
+    RECRUITING_VACANCY_DESCRIPTION="Recruiting integration vacancy $RUN_ID"
+    RECRUITING_PERSON_FIRST_NAME="Recruiting-$RUN_ID"
+    RECRUITING_PERSON_EMAIL="recruiting-$RUN_ID@test.local"
+    RECRUITING_SKILL_FALLBACK="MCP IntTest Skill $RUN_ID"
+    RECRUITING_VACANCY_NAME_JSON=$(json_string "$RECRUITING_VACANCY_NAME")
+    RECRUITING_VACANCY_DESCRIPTION_JSON=$(json_string "$RECRUITING_VACANCY_DESCRIPTION")
+    RECRUITING_PERSON_FIRST_NAME_JSON=$(json_string "$RECRUITING_PERSON_FIRST_NAME")
+    RECRUITING_PERSON_EMAIL_JSON=$(json_string "$RECRUITING_PERSON_EMAIL")
+    RECRUITING_CLEANUP_PERSON_EMAIL="$RECRUITING_PERSON_EMAIL"
+
+    run_capture_to_var RECRUITING_VACANCY_TEXT "create_recruiting_vacancy($RECRUITING_VACANCY_NAME)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_recruiting_vacancy\",\"arguments\":{\"name\":$RECRUITING_VACANCY_NAME_JSON,\"shortDescription\":$RECRUITING_VACANCY_DESCRIPTION_JSON,\"fullDescription\":\"# Integration vacancy\",\"private\":true}},\"id\":2}"
+    RECRUITING_CLEANUP_VACANCY_ID=$(echo "$RECRUITING_VACANCY_TEXT" | jq -r '.vacancy.id // empty' 2>/dev/null)
+    if [ -n "$RECRUITING_CLEANUP_VACANCY_ID" ]; then
+      RECRUITING_VACANCY_ID_JSON=$(json_string "$RECRUITING_CLEANUP_VACANCY_ID")
+      sleep 2
+      run_capture_to_var RECRUITING_GET_VACANCY_TEXT "get_recruiting_vacancy($RECRUITING_CLEANUP_VACANCY_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_recruiting_vacancy\",\"arguments\":{\"vacancy\":$RECRUITING_VACANCY_ID_JSON}},\"id\":2}"
+      assert_json_field_equals "get_recruiting_vacancy returns name" "$RECRUITING_GET_VACANCY_TEXT" ".name" "$RECRUITING_VACANCY_NAME"
+
+      run_capture_to_var RECRUITING_STATUSES_TEXT "list_recruiting_vacancy_statuses($RECRUITING_CLEANUP_VACANCY_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_recruiting_vacancy_statuses\",\"arguments\":{\"vacancy\":$RECRUITING_VACANCY_ID_JSON}},\"id\":2}"
+      RECRUITING_CREATE_STATUS=$(echo "$RECRUITING_STATUSES_TEXT" | jq -r '.statuses[0].name // empty' 2>/dev/null)
+      RECRUITING_UPDATE_STATUS=$(echo "$RECRUITING_STATUSES_TEXT" | jq -r '.statuses[1].name // .statuses[0].name // empty' 2>/dev/null)
+
+      if [ -z "$RECRUITING_CREATE_STATUS" ]; then
+        for recruiting_test in \
+          "create_person(recruiting candidate)" \
+          "set_recruiting_candidate_profile" \
+          "get_recruiting_candidate" \
+          "list_recruiting_skills" \
+          "add_recruiting_candidate_skill" \
+          "create_recruiting_applicant" \
+          "list_recruiting_applicants" \
+          "get_recruiting_applicant" \
+          "update_recruiting_applicant" \
+          "delete_recruiting_applicant" \
+          "remove_recruiting_candidate_skill"; do
+          skip_test "$recruiting_test" "Recruiting vacancy type has no applicant statuses"
+        done
+      else
+        run_capture_to_var RECRUITING_PERSON_TEXT "create_person(recruiting candidate)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":$RECRUITING_PERSON_FIRST_NAME_JSON,\"lastName\":\"Candidate\",\"email\":$RECRUITING_PERSON_EMAIL_JSON}},\"id\":2}"
+        RECRUITING_CLEANUP_PERSON_ID=$(echo "$RECRUITING_PERSON_TEXT" | jq -r '.id // empty' 2>/dev/null)
+        if [ -n "$RECRUITING_CLEANUP_PERSON_ID" ]; then
+          run_capture_to_var RECRUITING_PROFILE_TEXT "set_recruiting_candidate_profile($RECRUITING_PERSON_EMAIL)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_recruiting_candidate_profile\",\"arguments\":{\"candidate\":$RECRUITING_PERSON_EMAIL_JSON,\"title\":\"Integration Candidate\",\"remote\":true}},\"id\":2}"
+          assert_json_field_equals "set_recruiting_candidate_profile created" "$RECRUITING_PROFILE_TEXT" ".created" "true"
+
+          sleep 1
+          run_capture_to_var RECRUITING_CANDIDATE_TEXT "get_recruiting_candidate($RECRUITING_PERSON_EMAIL)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_recruiting_candidate\",\"arguments\":{\"candidate\":$RECRUITING_PERSON_EMAIL_JSON}},\"id\":2}"
+          assert_json_field_equals "get_recruiting_candidate returns email" "$RECRUITING_CANDIDATE_TEXT" ".email" "$RECRUITING_PERSON_EMAIL"
+
+          run_capture_to_var RECRUITING_SKILLS_TEXT "list_recruiting_skills" \
+            '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_recruiting_skills","arguments":{"limit":5}},"id":2}'
+          RECRUITING_CLEANUP_SKILL=$(echo "$RECRUITING_SKILLS_TEXT" | jq -r '.skills[0].title // empty' 2>/dev/null)
+          if [ -z "$RECRUITING_CLEANUP_SKILL" ]; then
+            RECRUITING_CLEANUP_SKILL="$RECRUITING_SKILL_FALLBACK"
+          fi
+          RECRUITING_SKILL_JSON=$(json_string "$RECRUITING_CLEANUP_SKILL")
+          run_capture_to_var RECRUITING_ADD_SKILL_TEXT "add_recruiting_candidate_skill($RECRUITING_CLEANUP_SKILL)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_recruiting_candidate_skill\",\"arguments\":{\"candidate\":$RECRUITING_PERSON_EMAIL_JSON,\"skill\":$RECRUITING_SKILL_JSON,\"weight\":5}},\"id\":2}"
+          assert_json_field_equals "add_recruiting_candidate_skill attached" "$RECRUITING_ADD_SKILL_TEXT" ".attached" "true"
+
+          RECRUITING_CREATE_STATUS_JSON=$(json_string "$RECRUITING_CREATE_STATUS")
+          run_capture_to_var RECRUITING_APPLICANT_TEXT "create_recruiting_applicant" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_recruiting_applicant\",\"arguments\":{\"vacancy\":$RECRUITING_VACANCY_ID_JSON,\"candidate\":$RECRUITING_PERSON_EMAIL_JSON,\"status\":$RECRUITING_CREATE_STATUS_JSON}},\"id\":2}"
+          RECRUITING_CLEANUP_APPLICANT_ID=$(echo "$RECRUITING_APPLICANT_TEXT" | jq -r '.applicant.id // empty' 2>/dev/null)
+          if [ -n "$RECRUITING_CLEANUP_APPLICANT_ID" ]; then
+            RECRUITING_APPLICANT_ID_JSON=$(json_string "$RECRUITING_CLEANUP_APPLICANT_ID")
+            sleep 1
+            run_capture_to_var RECRUITING_LIST_APPLICANTS_TEXT "list_recruiting_applicants(vacancy)" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_recruiting_applicants\",\"arguments\":{\"vacancy\":$RECRUITING_VACANCY_ID_JSON,\"limit\":20}},\"id\":2}"
+            assert_json_array_contains "list_recruiting_applicants includes applicant" "$RECRUITING_LIST_APPLICANTS_TEXT" ".applicants | map(.id)" "$RECRUITING_CLEANUP_APPLICANT_ID"
+            run_capture_to_var RECRUITING_GET_APPLICANT_TEXT "get_recruiting_applicant($RECRUITING_CLEANUP_APPLICANT_ID)" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_recruiting_applicant\",\"arguments\":{\"applicant\":$RECRUITING_APPLICANT_ID_JSON}},\"id\":2}"
+            assert_json_field_equals "get_recruiting_applicant returns id" "$RECRUITING_GET_APPLICANT_TEXT" ".id" "$RECRUITING_CLEANUP_APPLICANT_ID"
+
+            RECRUITING_UPDATE_STATUS_JSON=$(json_string "$RECRUITING_UPDATE_STATUS")
+            run_capture_to_var RECRUITING_UPDATE_APPLICANT_TEXT "update_recruiting_applicant(status)" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_recruiting_applicant\",\"arguments\":{\"applicant\":$RECRUITING_APPLICANT_ID_JSON,\"status\":$RECRUITING_UPDATE_STATUS_JSON}},\"id\":2}"
+            assert_json_field_equals "update_recruiting_applicant returns status" "$RECRUITING_UPDATE_APPLICANT_TEXT" ".applicant.status" "$RECRUITING_UPDATE_STATUS"
+
+            run_capture_to_var RECRUITING_DELETE_APPLICANT_TEXT "delete_recruiting_applicant($RECRUITING_CLEANUP_APPLICANT_ID)" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_recruiting_applicant\",\"arguments\":{\"applicant\":$RECRUITING_APPLICANT_ID_JSON}},\"id\":2}"
+            if assert_json_field_equals "delete_recruiting_applicant deleted" "$RECRUITING_DELETE_APPLICANT_TEXT" ".deleted" "true"; then
+              RECRUITING_CLEANUP_APPLICANT_ID=""
+            fi
+          else
+            skip_test "list/get/update/delete recruiting applicant" "create_recruiting_applicant did not return an id"
+          fi
+
+          run_capture_to_var RECRUITING_REMOVE_SKILL_TEXT "remove_recruiting_candidate_skill($RECRUITING_CLEANUP_SKILL)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_recruiting_candidate_skill\",\"arguments\":{\"candidate\":$RECRUITING_PERSON_EMAIL_JSON,\"skill\":$RECRUITING_SKILL_JSON}},\"id\":2}"
+          if assert_json_field_equals "remove_recruiting_candidate_skill detached" "$RECRUITING_REMOVE_SKILL_TEXT" ".detached" "true"; then
+            RECRUITING_CLEANUP_SKILL=""
+          fi
+        else
+          skip_test "set/get recruiting candidate and applicant workflow" "create_person did not return an id"
+        fi
+      fi
+
+      run_capture_to_var RECRUITING_ARCHIVE_TEXT "archive_recruiting_vacancy($RECRUITING_CLEANUP_VACANCY_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_recruiting_vacancy\",\"arguments\":{\"vacancy\":$RECRUITING_VACANCY_ID_JSON}},\"id\":2}"
+      assert_json_field_equals "archive_recruiting_vacancy archived" "$RECRUITING_ARCHIVE_TEXT" ".vacancy.archived" "true"
+    else
+      skip_test "get/list/update recruiting vacancy workflow" "create_recruiting_vacancy did not return an id"
+    fi
+
+    if [ -n "$RECRUITING_CLEANUP_PERSON_ID" ]; then
+      RECRUITING_PERSON_ID_JSON=$(json_string "$RECRUITING_CLEANUP_PERSON_ID")
+      run_test "delete_person(recruiting:$RECRUITING_CLEANUP_PERSON_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$RECRUITING_PERSON_ID_JSON}},\"id\":2}"
+      RECRUITING_CLEANUP_PERSON_ID=""
+    fi
+  fi
+fi
+echo ""
+
+##############################
+# 1d. INVENTORY CRUD
+##############################
+echo "=== 1d. Inventory CRUD ==="
 INVENTORY_PROBE_RESULT=$(call_tool \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_inventory_categories","arguments":{"limit":5}},"id":2}')
 INVENTORY_PROBE_ERROR=$(echo "$INVENTORY_PROBE_RESULT" | jq -r '.result.content[0].text // .error.message // empty' 2>/dev/null)

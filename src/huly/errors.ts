@@ -149,6 +149,17 @@ import {
   ProcessNotFoundError,
   ProcessParallelExecutionForbiddenError
 } from "./errors-processes.js"
+import {
+  RecruitingApplicantIdentifierAmbiguousError,
+  RecruitingApplicantNotFoundError,
+  RecruitingCandidateNotFoundError,
+  RecruitingDuplicateApplicantError,
+  RecruitingModelMissingError,
+  RecruitingMutationUnsupportedError,
+  RecruitingVacancyIdentifierAmbiguousError,
+  RecruitingVacancyNotFoundError,
+  RecruitingVacancyTypeNotFoundError
+} from "./errors-recruiting.js"
 import { HulyClassNotFoundError } from "./errors-sdk-discovery.js"
 import {
   SpaceIdentifierAmbiguousError,
@@ -294,6 +305,15 @@ export {
   ProcessParallelExecutionForbiddenError,
   ProjectNotFoundError,
   ReactionNotFoundError,
+  RecruitingApplicantIdentifierAmbiguousError,
+  RecruitingApplicantNotFoundError,
+  RecruitingCandidateNotFoundError,
+  RecruitingDuplicateApplicantError,
+  RecruitingModelMissingError,
+  RecruitingMutationUnsupportedError,
+  RecruitingVacancyIdentifierAmbiguousError,
+  RecruitingVacancyNotFoundError,
+  RecruitingVacancyTypeNotFoundError,
   RecurringEventNotFoundError,
   RelationCardinalityViolationError,
   RelationDirectionAmbiguousError,
