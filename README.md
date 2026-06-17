@@ -295,7 +295,7 @@ Planned feature surfaces:
 - Calendar: calendar CRUD/config, external calendar sync metadata, primary calendar management, schedule objects, participant mutations, and RSVP/status support when stable.
 - Team planner and schedule reporting: team agendas, workload/capacity summaries, and visibility-aware free/busy views across members/projects.
 - Virtual office and meetings: offices, floors, rooms, access/language/default recording/transcription settings, meeting schedules, active participants, room info, meeting notes/transcript records (minutes), recordings, and device preferences.
-- Chat and communication: request-access flows if Huly exposes a stable model, pinned messages, message attachments, translation, applets, in-message polls, guest communication settings, and external Gmail/Telegram/Huly Mail surfaces once compatible packages/APIs are proven.
+- Chat and communication: request-access flows if Huly exposes a stable model, pinned messages, translation, applets, in-message polls, guest communication settings, and external Gmail/Telegram/Huly Mail surfaces plus provider-specific attachments once compatible packages/APIs are proven.
 - Notifications and activity: browser/push subscription internals, provider defaults, UI presenter/viewlet metadata, and activity control/extension metadata.
 - Attachments and media: previews/preview metadata and friendly wrappers for additional object types beyond issue/document/inventory product.
 - Core schema and workspace administration: attribute/property create/update/delete/hide, enum CRUD/options, sequence management, role/permission definition writes, generic space creation, global space admins, integrations registry, invite settings, role capability settings, and workspace setting metadata.
@@ -503,6 +503,11 @@ SDK upgrade revisit:
 | `add_thread_reply` | Add a reply to a message thread. Reply body supports markdown formatting. |
 | `update_thread_reply` | Update a thread reply. Only the body can be modified. |
 | `delete_thread_reply` | Permanently delete a thread reply. This action cannot be undone. |
+| `list_chat_message_attachments` | List files attached directly to a Huly chat message target. target.kind supports channel_message, dm_message, and thread_reply; the tool resolves channel names and one-to-one DM participant display names for you. |
+| `get_chat_message_attachment` | Get one file attached directly to a Huly channel message, direct-message message, or thread reply. The attachmentId must belong to the resolved target. |
+| `add_chat_message_attachment` | Attach a file directly to a Huly channel message, direct-message message, or thread reply. Provide filename, contentType, and exactly one of filePath, fileUrl, or data. |
+| `update_chat_message_attachment` | Update description and/or pinned state for a file attached directly to a Huly channel message, direct-message message, or thread reply. The attachmentId must belong to the resolved target. |
+| `delete_chat_message_attachment` | Delete one file attached directly to a Huly channel message, direct-message message, or thread reply. The attachmentId must belong to the resolved target. |
 
 ### Calendar
 

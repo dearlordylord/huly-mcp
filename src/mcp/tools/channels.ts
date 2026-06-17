@@ -1,28 +1,40 @@
 import {
+  addChatMessageAttachmentParamsJsonSchema,
+  AddChatMessageAttachmentResultSchema,
   addThreadReplyParamsJsonSchema,
   createChannelParamsJsonSchema,
   createDirectMessageParamsJsonSchema,
   deleteChannelMessageParamsJsonSchema,
   deleteChannelParamsJsonSchema,
+  deleteChatMessageAttachmentParamsJsonSchema,
+  DeleteChatMessageAttachmentResultSchema,
   deleteDmMessageParamsJsonSchema,
   deleteThreadReplyParamsJsonSchema,
   getChannelParamsJsonSchema,
+  getChatMessageAttachmentParamsJsonSchema,
+  GetChatMessageAttachmentResultSchema,
   listChannelMessagesParamsJsonSchema,
   listChannelsParamsJsonSchema,
+  listChatMessageAttachmentsParamsJsonSchema,
+  ListChatMessageAttachmentsResultSchema,
   listDirectMessagesParamsJsonSchema,
   listDmMessagesParamsJsonSchema,
   listExternalChannelMessagesParamsJsonSchema,
   listThreadRepliesParamsJsonSchema,
+  parseAddChatMessageAttachmentParams,
   parseAddThreadReplyParams,
   parseCreateChannelParams,
   parseCreateDirectMessageParams,
   parseDeleteChannelMessageParams,
   parseDeleteChannelParams,
+  parseDeleteChatMessageAttachmentParams,
   parseDeleteDmMessageParams,
   parseDeleteThreadReplyParams,
   parseGetChannelParams,
+  parseGetChatMessageAttachmentParams,
   parseListChannelMessagesParams,
   parseListChannelsParams,
+  parseListChatMessageAttachmentsParams,
   parseListDirectMessagesParams,
   parseListDmMessagesParams,
   parseListExternalChannelMessagesParams,
@@ -31,12 +43,15 @@ import {
   parseSendDmMessageParams,
   parseUpdateChannelMessageParams,
   parseUpdateChannelParams,
+  parseUpdateChatMessageAttachmentParams,
   parseUpdateDmMessageParams,
   parseUpdateThreadReplyParams,
   sendChannelMessageParamsJsonSchema,
   sendDmMessageParamsJsonSchema,
   updateChannelMessageParamsJsonSchema,
   updateChannelParamsJsonSchema,
+  updateChatMessageAttachmentParamsJsonSchema,
+  UpdateChatMessageAttachmentResultSchema,
   updateDmMessageParamsJsonSchema,
   updateThreadReplyParamsJsonSchema
 } from "../../domain/schemas.js"
@@ -53,6 +68,13 @@ import {
   updateChannelMessage
 } from "../../huly/operations/channels.js"
 import {
+  addChatMessageAttachment,
+  deleteChatMessageAttachment,
+  getChatMessageAttachment,
+  listChatMessageAttachments,
+  updateChatMessageAttachment
+} from "../../huly/operations/chat-message-attachments.js"
+import {
   createDirectMessage,
   deleteDirectMessage,
   listDirectMessageMessages,
@@ -67,7 +89,12 @@ import {
   updateThreadReply
 } from "../../huly/operations/threads.js"
 import { channelConversationTools } from "./channel-conversations.js"
-import { createToolHandler, type RegisteredTool } from "./registry.js"
+import {
+  createEncodedCombinedToolHandler,
+  createEncodedToolHandler,
+  createToolHandler,
+  type RegisteredTool
+} from "./registry.js"
 
 const CATEGORY = "channels" as const
 
@@ -299,6 +326,71 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
       "delete_thread_reply",
       parseDeleteThreadReplyParams,
       deleteThreadReply
+    )
+  },
+  {
+    name: "list_chat_message_attachments",
+    description:
+      "List files attached directly to a Huly chat message target. target.kind supports channel_message, dm_message, and thread_reply; the tool resolves channel names and one-to-one DM participant display names for you.",
+    category: CATEGORY,
+    inputSchema: listChatMessageAttachmentsParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "list_chat_message_attachments",
+      parseListChatMessageAttachmentsParams,
+      listChatMessageAttachments,
+      ListChatMessageAttachmentsResultSchema
+    )
+  },
+  {
+    name: "get_chat_message_attachment",
+    description:
+      "Get one file attached directly to a Huly channel message, direct-message message, or thread reply. The attachmentId must belong to the resolved target.",
+    category: CATEGORY,
+    inputSchema: getChatMessageAttachmentParamsJsonSchema,
+    handler: createEncodedCombinedToolHandler(
+      "get_chat_message_attachment",
+      parseGetChatMessageAttachmentParams,
+      getChatMessageAttachment,
+      GetChatMessageAttachmentResultSchema
+    )
+  },
+  {
+    name: "add_chat_message_attachment",
+    description:
+      "Attach a file directly to a Huly channel message, direct-message message, or thread reply. Provide filename, contentType, and exactly one of filePath, fileUrl, or data.",
+    category: CATEGORY,
+    inputSchema: addChatMessageAttachmentParamsJsonSchema,
+    handler: createEncodedCombinedToolHandler(
+      "add_chat_message_attachment",
+      parseAddChatMessageAttachmentParams,
+      addChatMessageAttachment,
+      AddChatMessageAttachmentResultSchema
+    )
+  },
+  {
+    name: "update_chat_message_attachment",
+    description:
+      "Update description and/or pinned state for a file attached directly to a Huly channel message, direct-message message, or thread reply. The attachmentId must belong to the resolved target.",
+    category: CATEGORY,
+    inputSchema: updateChatMessageAttachmentParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "update_chat_message_attachment",
+      parseUpdateChatMessageAttachmentParams,
+      updateChatMessageAttachment,
+      UpdateChatMessageAttachmentResultSchema
+    )
+  },
+  {
+    name: "delete_chat_message_attachment",
+    description:
+      "Delete one file attached directly to a Huly channel message, direct-message message, or thread reply. The attachmentId must belong to the resolved target.",
+    category: CATEGORY,
+    inputSchema: deleteChatMessageAttachmentParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "delete_chat_message_attachment",
+      parseDeleteChatMessageAttachmentParams,
+      deleteChatMessageAttachment,
+      DeleteChatMessageAttachmentResultSchema
     )
   }
 ]

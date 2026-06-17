@@ -1,5 +1,5 @@
 import type { ActivityMessage } from "@hcengineering/activity"
-import type { Channel as HulyChannel, ChatMessage, ThreadMessage as HulyThreadMessage } from "@hcengineering/chunter"
+import type { ThreadMessage as HulyThreadMessage } from "@hcengineering/chunter"
 import {
   type AttachedData,
   type Class,
@@ -26,14 +26,13 @@ import type {
 } from "../../domain/schemas/channels.js"
 import { ChannelId, MessageId, ThreadReplyId } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
-import type { ChannelNotFoundError, HulyError, MessageNotFoundError } from "../errors.js"
-import { ThreadReplyNotFoundError } from "../errors.js"
+import type { ChannelNotFoundError, HulyError, MessageNotFoundError, ThreadReplyNotFoundError } from "../errors.js"
 import { findChannelMessage } from "./channel-messages-shared.js"
 import { buildSocialIdToPersonNameMap } from "./channels.js"
-import { listTotal } from "./counts.js"
+import { listTotal, optionalCount } from "./counts.js"
 import { markdownToMarkupString, markupToMarkdownString } from "./markup.js"
 import { toRef } from "./sdk-boundary.js"
-import { removeThreadReply } from "./thread-replies-shared.js"
+import { findThreadReply, removeThreadReply } from "./thread-replies-shared.js"
 
 import { chunter } from "../huly-plugins.js"
 
@@ -61,34 +60,6 @@ type DeleteThreadReplyError =
   | ChannelNotFoundError
   | MessageNotFoundError
   | ThreadReplyNotFoundError
-
-// --- Helpers ---
-
-const findReply = (
-  client: HulyClient["Type"],
-  channel: HulyChannel,
-  message: ChatMessage,
-  replyId: string
-): Effect.Effect<HulyThreadMessage, ThreadReplyNotFoundError | HulyClientError> =>
-  Effect.gen(function*() {
-    const reply = yield* client.findOne<HulyThreadMessage>(
-      chunter.class.ThreadMessage,
-      {
-        _id: toRef<HulyThreadMessage>(replyId),
-        attachedTo: toRef<ActivityMessage>(message._id),
-        space: channel._id
-      }
-    )
-
-    if (reply === undefined) {
-      return yield* new ThreadReplyNotFoundError({
-        replyId,
-        messageId: message._id
-      })
-    }
-
-    return reply
-  })
 
 // --- Operations ---
 
@@ -135,7 +106,8 @@ export const listThreadReplies = (
         senderId: msg.modifiedBy,
         createdOn: msg.createdOn,
         modifiedOn: msg.modifiedOn,
-        editedOn: msg.editedOn
+        editedOn: msg.editedOn,
+        attachments: optionalCount(msg.attachments)
       }
     })
 
@@ -181,7 +153,7 @@ export const updateThreadReply = (
 ): Effect.Effect<UpdateThreadReplyResult, UpdateThreadReplyError, HulyClient> =>
   Effect.gen(function*() {
     const { channel, client, message } = yield* findChannelMessage(params)
-    const reply = yield* findReply(client, channel, message, params.replyId)
+    const reply = yield* findThreadReply(client, channel, message, params.replyId)
     const markupUrlConfig = client.markupUrlConfig
 
     const markup = markdownToMarkupString(params.body, markupUrlConfig)
@@ -207,7 +179,7 @@ export const deleteThreadReply = (
 ): Effect.Effect<DeleteThreadReplyResult, DeleteThreadReplyError, HulyClient> =>
   Effect.gen(function*() {
     const { channel, client, message } = yield* findChannelMessage(params)
-    const reply = yield* findReply(client, channel, message, params.replyId)
+    const reply = yield* findThreadReply(client, channel, message, params.replyId)
 
     yield* removeThreadReply(client, reply)
 

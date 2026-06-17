@@ -130,6 +130,7 @@ const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDo
   "PersonNotAnEmployeeError",
   "MessageNotFoundError",
   "ThreadReplyNotFoundError",
+  "ChatMessageAttachmentNotFoundError",
   "CalendarNotAccessibleError",
   "EventNotFoundError",
   "RecurringEventNotFoundError",

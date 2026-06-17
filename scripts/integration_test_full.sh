@@ -757,6 +757,40 @@ json_string() {
   jq -Rn --arg value "$1" '$value'
 }
 
+run_chat_attachment_lifecycle() {
+  local label="$1" target_json="$2"
+  local data_json filename_json desc_json updated_desc_json
+  local CHAT_ATTACHMENT_TEXT CHAT_LIST_ATTACHMENTS_TEXT CHAT_GET_ATTACHMENT_TEXT CHAT_UPDATE_ATTACHMENT_TEXT CHAT_DELETE_ATTACHMENT_TEXT
+  local attachment_id attachment_id_json
+
+  data_json=$(json_string "Y2hhdCBtZXNzYWdlIGF0dGFjaG1lbnQ=")
+  filename_json=$(json_string "chat-message-attachment.txt")
+  desc_json=$(json_string "Chat message attachment")
+  updated_desc_json=$(json_string "Updated chat message attachment")
+
+  run_capture_to_var CHAT_ATTACHMENT_TEXT "add_chat_message_attachment($label)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_chat_message_attachment\",\"arguments\":{\"target\":$target_json,\"filename\":$filename_json,\"contentType\":\"text/plain\",\"data\":$data_json,\"description\":$desc_json}},\"id\":2}"
+  attachment_id=$(echo "$CHAT_ATTACHMENT_TEXT" | jq -r '.attachmentId // empty' 2>/dev/null)
+  if [ -z "$attachment_id" ]; then
+    skip_test "list/get/update/delete chat message attachment ($label)" "add_chat_message_attachment did not return an attachment id"
+    return 0
+  fi
+
+  attachment_id_json=$(json_string "$attachment_id")
+  wait_for_json_array_contains_to_var CHAT_LIST_ATTACHMENTS_TEXT "list_chat_message_attachments includes attachment ($label)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_chat_message_attachments\",\"arguments\":{\"target\":$target_json,\"limit\":20}},\"id\":2}" \
+    ".attachments | map(.id)" "$attachment_id"
+  run_capture_to_var CHAT_GET_ATTACHMENT_TEXT "get_chat_message_attachment($label:$attachment_id)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_chat_message_attachment\",\"arguments\":{\"target\":$target_json,\"attachmentId\":$attachment_id_json}},\"id\":2}"
+  assert_json_field_equals "get_chat_message_attachment $label returns id" "$CHAT_GET_ATTACHMENT_TEXT" ".attachment.id" "$attachment_id"
+  run_capture_to_var CHAT_UPDATE_ATTACHMENT_TEXT "update_chat_message_attachment($label:$attachment_id)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_chat_message_attachment\",\"arguments\":{\"target\":$target_json,\"attachmentId\":$attachment_id_json,\"description\":$updated_desc_json,\"pinned\":true}},\"id\":2}"
+  assert_json_field_equals "update_chat_message_attachment $label updated" "$CHAT_UPDATE_ATTACHMENT_TEXT" ".updated" "true"
+  run_capture_to_var CHAT_DELETE_ATTACHMENT_TEXT "delete_chat_message_attachment($label:$attachment_id)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_chat_message_attachment\",\"arguments\":{\"target\":$target_json,\"attachmentId\":$attachment_id_json}},\"id\":2}"
+  assert_json_field_equals "delete_chat_message_attachment $label deleted" "$CHAT_DELETE_ATTACHMENT_TEXT" ".deleted" "true"
+}
+
 remember_drive_item_cleanup() {
   local drive_id="$1" item_path="$2"
   DRIVE_CLEANUP_ITEMS="${DRIVE_CLEANUP_ITEMS}${drive_id}"$'\t'"${item_path}"$'\n'
@@ -2433,6 +2467,10 @@ if [ -n "$DM_ID" ]; then
   if [ $? -eq 0 ]; then
     DM_MSG_ID=$(echo "$DM_MSG_TEXT" | jq -r '.id // empty' 2>/dev/null)
     if [ -n "$DM_MSG_ID" ]; then
+      DM_ID_JSON=$(json_string "$DM_ID")
+      DM_MSG_ID_JSON=$(json_string "$DM_MSG_ID")
+      DM_MSG_TARGET_JSON="{\"kind\":\"dm_message\",\"dm\":$DM_ID_JSON,\"messageId\":$DM_MSG_ID_JSON}"
+      run_chat_attachment_lifecycle "dm_message" "$DM_MSG_TARGET_JSON"
       run_test "update_dm_message($DM_MSG_ID)" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_dm_message\",\"arguments\":{\"dm\":\"$DM_ID\",\"messageId\":\"$DM_MSG_ID\",\"body\":\"Updated IntTest DM msg $RUN_ID\"}},\"id\":2}"
       run_test "delete_dm_message($DM_MSG_ID)" \
@@ -2563,6 +2601,10 @@ if [ $? -eq 0 ]; then
   if [ $? -eq 0 ]; then
     MSG_ID=$(echo "$MSG_TEXT" | jq -r '.id' 2>/dev/null)
     echo "  => msg: $MSG_ID"
+    CH_ID_JSON=$(json_string "$CH_ID")
+    MSG_ID_JSON=$(json_string "$MSG_ID")
+    CHANNEL_MSG_TARGET_JSON="{\"kind\":\"channel_message\",\"channel\":$CH_ID_JSON,\"messageId\":$MSG_ID_JSON}"
+    run_chat_attachment_lifecycle "channel_message" "$CHANNEL_MSG_TARGET_JSON"
 
     # Thread replies
     run_capture_to_var REPLY_TEXT "add_thread_reply($MSG_ID)" \
@@ -2572,6 +2614,9 @@ if [ $? -eq 0 ]; then
       echo "  => reply: $REPLY_ID"
       run_test "list_thread_replies($MSG_ID)" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_thread_replies\",\"arguments\":{\"channel\":\"$CH_ID\",\"messageId\":\"$MSG_ID\"}},\"id\":2}"
+      REPLY_ID_JSON=$(json_string "$REPLY_ID")
+      THREAD_REPLY_TARGET_JSON="{\"kind\":\"thread_reply\",\"channel\":$CH_ID_JSON,\"messageId\":$MSG_ID_JSON,\"replyId\":$REPLY_ID_JSON}"
+      run_chat_attachment_lifecycle "thread_reply" "$THREAD_REPLY_TARGET_JSON"
       run_test "update_thread_reply($REPLY_ID)" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_thread_reply\",\"arguments\":{\"channel\":\"$CH_ID\",\"messageId\":\"$MSG_ID\",\"replyId\":\"$REPLY_ID\",\"body\":\"Updated reply\"}},\"id\":2}"
       run_test "delete_thread_reply($REPLY_ID)" \
