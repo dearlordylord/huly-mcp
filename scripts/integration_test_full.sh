@@ -1971,6 +1971,42 @@ fi
 echo ""
 
 ##############################
+# 5a. MESSAGE TEMPLATE DISCOVERY (READ-ONLY)
+##############################
+echo "=== 5a. Message Template Discovery ==="
+run_capture_to_var MSG_TEMPLATE_CATEGORIES_TEXT "list_message_template_categories" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_message_template_categories","arguments":{"limit":50}},"id":2}'
+if [ $? -eq 0 ]; then
+  assert_json_field_equals "list_message_template_categories returns array" "$MSG_TEMPLATE_CATEGORIES_TEXT" "type" "array"
+fi
+
+run_capture_to_var MSG_TEMPLATES_TEXT "list_message_templates" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_message_templates","arguments":{"limit":50}},"id":2}'
+if [ $? -eq 0 ]; then
+  assert_json_field_equals "list_message_templates returns array" "$MSG_TEMPLATES_TEXT" "type" "array"
+  MSG_TEMPLATE_ID=$(echo "$MSG_TEMPLATES_TEXT" | jq -r '.[0].id // empty' 2>/dev/null)
+  if [ -n "$MSG_TEMPLATE_ID" ]; then
+    MSG_TEMPLATE_ID_JSON=$(json_string "$MSG_TEMPLATE_ID")
+    run_capture_to_var MSG_TEMPLATE_GET_TEXT "get_message_template($MSG_TEMPLATE_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_message_template\",\"arguments\":{\"template\":$MSG_TEMPLATE_ID_JSON}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "get_message_template returns id" "$MSG_TEMPLATE_GET_TEXT" ".id" "$MSG_TEMPLATE_ID"
+      assert_json_field_equals "get_message_template returns markdown string" "$MSG_TEMPLATE_GET_TEXT" ".message | type" "string"
+      assert_json_field_equals "get_message_template returns placeholderFieldIds array" "$MSG_TEMPLATE_GET_TEXT" ".placeholderFieldIds | type" "array"
+    fi
+  else
+    echo "INFO: get_message_template not exercised (no live message templates in workspace)"
+  fi
+fi
+
+run_capture_to_var MSG_TEMPLATE_FIELDS_TEXT "list_message_template_fields" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_message_template_fields","arguments":{"limit":50}},"id":2}'
+if [ $? -eq 0 ]; then
+  assert_json_field_equals "list_message_template_fields returns array" "$MSG_TEMPLATE_FIELDS_TEXT" "type" "array"
+fi
+echo ""
+
+##############################
 # 6. LABELS & TAG CATEGORIES
 ##############################
 echo "=== 6. Labels & Tag Categories ==="

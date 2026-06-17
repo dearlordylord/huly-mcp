@@ -157,6 +157,14 @@ import {
   SpaceTypeNotFoundError
 } from "./errors-spaces.js"
 import {
+  MessageTemplateCategoryIdentifierAmbiguousError,
+  MessageTemplateCategoryNotFoundError,
+  MessageTemplateIdentifierAmbiguousError,
+  MessageTemplateNotFoundError,
+  TemplateFieldCategoryIdentifierAmbiguousError,
+  TemplateFieldCategoryNotFoundError
+} from "./errors-templates.js"
+import {
   TestCaseNotFoundError,
   TestPlanItemNotFoundError,
   TestPlanNotFoundError,
@@ -335,7 +343,13 @@ export const HulyDomainError = Schema.Union(
   DriveInvalidMoveError,
   DriveInvalidItemOperationError,
   DriveFolderNotEmptyError,
-  DriveNotEmptyError
+  DriveNotEmptyError,
+  MessageTemplateCategoryNotFoundError,
+  MessageTemplateCategoryIdentifierAmbiguousError,
+  MessageTemplateNotFoundError,
+  MessageTemplateIdentifierAmbiguousError,
+  TemplateFieldCategoryNotFoundError,
+  TemplateFieldCategoryIdentifierAmbiguousError
 )
 
 export type HulyDomainError = Schema.Schema.Type<typeof HulyDomainError>

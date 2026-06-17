@@ -2,6 +2,11 @@ import { describe, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
 import {
+  MessageTemplateCategoryIdentifier,
+  MessageTemplateIdentifier,
+  TemplateFieldCategoryIdentifier
+} from "../../src/domain/schemas/message-templates.js"
+import {
   ApplicantIdentifier,
   ApplicantMatchIdentifier,
   CandidateIdentifier,
@@ -111,6 +116,10 @@ import {
   MasterTagNotFoundError,
   MeetingMinutesNotFoundError,
   MessageNotFoundError,
+  MessageTemplateCategoryIdentifierAmbiguousError,
+  MessageTemplateCategoryNotFoundError,
+  MessageTemplateIdentifierAmbiguousError,
+  MessageTemplateNotFoundError,
   MilestoneNotFoundError,
   NotificationContextNotFoundError,
   NotificationNotFoundError,
@@ -161,6 +170,8 @@ import {
   TagNotFoundError,
   TeamspaceNotFoundError,
   TemplateChildNotFoundError,
+  TemplateFieldCategoryIdentifierAmbiguousError,
+  TemplateFieldCategoryNotFoundError,
   TestPlanItemNotFoundError,
   ThreadReplyNotFoundError,
   TodoIdentifierAmbiguousError,
@@ -1109,6 +1120,18 @@ describe("Huly Errors", () => {
               return `drive-folder-not-empty:${error.drive}:${error.path}:${error.childCount}:${error.children.length}`
             case "DriveNotEmptyError":
               return `drive-not-empty:${error.drive}:${error.childCount}:${error.children.length}`
+            case "MessageTemplateCategoryNotFoundError":
+              return `message-template-category:${error.identifier}`
+            case "MessageTemplateCategoryIdentifierAmbiguousError":
+              return `message-template-category-ambiguous:${error.identifier}:${error.matches}`
+            case "MessageTemplateNotFoundError":
+              return `message-template:${error.identifier}:${error.category ?? ""}`
+            case "MessageTemplateIdentifierAmbiguousError":
+              return `message-template-ambiguous:${error.identifier}:${error.matches}`
+            case "TemplateFieldCategoryNotFoundError":
+              return `template-field-category:${error.identifier}`
+            case "TemplateFieldCategoryIdentifierAmbiguousError":
+              return `template-field-category-ambiguous:${error.identifier}:${error.matches}`
             default: {
               const _exhaustive: never = error
               return _exhaustive
@@ -1133,6 +1156,93 @@ describe("Huly Errors", () => {
         expect(matchError(new TodoIdentifierAmbiguousError({ locator: "title:Fix bug", matches: 2 }))).toBe(
           "todo-ambiguous:title:Fix bug:2"
         )
+        expect(matchError(
+          new MessageTemplateCategoryNotFoundError({
+            identifier: MessageTemplateCategoryIdentifier.make("Sales")
+          })
+        )).toBe(
+          "message-template-category:Sales"
+        )
+        expect(
+          new MessageTemplateCategoryNotFoundError({
+            identifier: MessageTemplateCategoryIdentifier.make("Sales")
+          }).message
+        ).toBe(
+          "Message template category 'Sales' not found"
+        )
+        expect(matchError(
+          new MessageTemplateCategoryIdentifierAmbiguousError({
+            identifier: MessageTemplateCategoryIdentifier.make("Sales"),
+            matches: Count.make(2)
+          })
+        ))
+          .toBe("message-template-category-ambiguous:Sales:2")
+        expect(
+          new MessageTemplateCategoryIdentifierAmbiguousError({
+            identifier: MessageTemplateCategoryIdentifier.make("Sales"),
+            matches: Count.make(2)
+          }).message
+        ).toBe("Message template category 'Sales' matched 2 categories; use the category ID")
+        expect(matchError(
+          new MessageTemplateNotFoundError({
+            identifier: MessageTemplateIdentifier.make("Intro"),
+            category: MessageTemplateCategoryIdentifier.make("Sales")
+          })
+        )).toBe(
+          "message-template:Intro:Sales"
+        )
+        expect(new MessageTemplateNotFoundError({ identifier: MessageTemplateIdentifier.make("Intro") }).message).toBe(
+          "Message template 'Intro' not found"
+        )
+        expect(
+          new MessageTemplateNotFoundError({
+            identifier: MessageTemplateIdentifier.make("Intro"),
+            category: MessageTemplateCategoryIdentifier.make("Sales")
+          }).message
+        ).toBe("Message template 'Intro' not found in category 'Sales'")
+        expect(matchError(
+          new MessageTemplateIdentifierAmbiguousError({
+            identifier: MessageTemplateIdentifier.make("Intro"),
+            matches: Count.make(2)
+          })
+        )).toBe(
+          "message-template-ambiguous:Intro:2"
+        )
+        expect(
+          new MessageTemplateIdentifierAmbiguousError({
+            identifier: MessageTemplateIdentifier.make("Intro"),
+            matches: Count.make(2)
+          }).message
+        ).toBe(
+          "Message template 'Intro' matched 2 templates; provide category to disambiguate"
+        )
+        expect(matchError(
+          new TemplateFieldCategoryNotFoundError({
+            identifier: TemplateFieldCategoryIdentifier.make("Contact")
+          })
+        )).toBe(
+          "template-field-category:Contact"
+        )
+        expect(
+          new TemplateFieldCategoryNotFoundError({
+            identifier: TemplateFieldCategoryIdentifier.make("Contact")
+          }).message
+        ).toBe(
+          "Template field category 'Contact' not found"
+        )
+        expect(matchError(
+          new TemplateFieldCategoryIdentifierAmbiguousError({
+            identifier: TemplateFieldCategoryIdentifier.make("Contact"),
+            matches: Count.make(2)
+          })
+        ))
+          .toBe("template-field-category-ambiguous:Contact:2")
+        expect(
+          new TemplateFieldCategoryIdentifierAmbiguousError({
+            identifier: TemplateFieldCategoryIdentifier.make("Contact"),
+            matches: Count.make(2)
+          }).message
+        ).toBe("Template field category 'Contact' matched 2 categories; use the category ID")
         expect(matchError(new RecruitingVacancyNotFoundError({ identifier: VacancyIdentifier.make("VCN-1") }))).toBe(
           "recruiting-vacancy:VCN-1"
         )

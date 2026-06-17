@@ -229,6 +229,12 @@ const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDo
   "DriveInvalidItemOperationError",
   "DriveFolderNotEmptyError",
   "DriveNotEmptyError",
+  "MessageTemplateCategoryNotFoundError",
+  "MessageTemplateCategoryIdentifierAmbiguousError",
+  "MessageTemplateNotFoundError",
+  "MessageTemplateIdentifierAmbiguousError",
+  "TemplateFieldCategoryNotFoundError",
+  "TemplateFieldCategoryIdentifierAmbiguousError",
   "NoUpdateFieldsError"
 ])
 

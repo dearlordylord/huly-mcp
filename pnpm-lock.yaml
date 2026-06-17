@@ -87,6 +87,9 @@ importers:
       '@hcengineering/task':
         specifier: 0.7.0
         version: 0.7.0
+      '@hcengineering/templates':
+        specifier: 0.7.0
+        version: 0.7.0
       '@hcengineering/text':
         specifier: 0.7.19
         version: 0.7.19(prosemirror-inputrules@1.5.1)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.6)
@@ -5066,7 +5069,7 @@ snapshots:
     dependencies:
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/ui': 0.7.0
+      '@hcengineering/ui': 0.7.423
 
   '@hcengineering/text-core@0.7.19':
     dependencies:
