@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.37.0
+
+### Minor Changes
+
+- abf8736: Add read-only global Huly message template discovery tools for categories, templates, template details, and template fields.
+
 ## 0.36.0
 
 ### Minor Changes
