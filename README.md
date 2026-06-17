@@ -300,7 +300,7 @@ Planned feature surfaces:
 - Attachments and media: previews/preview metadata and friendly wrappers for additional object types beyond issue/document/inventory product.
 - Core schema and workspace administration: attribute/property create/update/delete/hide, enum CRUD/options, sequence management, role/permission definition writes, generic space creation, global space admins, integrations registry, invite settings, role capability settings, and workspace setting metadata.
 - Integrations: GitHub repository/project mappings and sync metadata (deferred), Google Calendar connect/configure/sync controls, Bitrix entity/field mappings and sync status, Gmail/email channel messages, Telegram messages, Huly Mail/Mail plugin behavior, AI assistant integration state, and AI bot configuration if server-side APIs expose stable behavior.
-- Templates, rating, support, billing, analytics, views, workbench, and preferences: message templates/categories/fields, document/person rating data blocked by unpublished `@hcengineering/rating` SDK package (#90), support conversations, billing tier/status discovery, onboarding channels, saved filtered views, user view preferences, tabs/widgets/apps, and module preference discovery/update.
+- Templates, rating, support, billing, analytics, views, workbench, and preferences: read-only message template/category/field discovery is covered; message template writes/rendering remain deferred until provider semantics are proven. Document/person rating data is blocked by unpublished `@hcengineering/rating` SDK package (#90); support conversations, billing tier/status discovery, onboarding channels, saved filtered views, user view preferences, tabs/widgets/apps, and module preference discovery/update remain future surfaces.
 - Document-specific gaps: snapshot restore, backlinks, notes, structured action items/tables, PDF/export, advanced document relationships, and document printing/export once SDK support is safe.
 
 MCP resource roadmap:
@@ -322,7 +322,7 @@ SDK upgrade revisit:
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
 ## Available Tools
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `planner`, `processes`, `recruiting`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `virtual-office`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `templates`, `planner`, `processes`, `recruiting`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `virtual-office`
 
 ### Projects
 
@@ -729,6 +729,15 @@ SDK upgrade revisit:
 | `list_funnels` | List all Huly sales funnels (lead pipelines). Returns each funnel's stable ID and display name, sorted by name. Supports filtering by archived status. |
 | `list_leads` | Query Huly leads in a funnel with optional filters. Pass the funnel ID returned by list_funnels, or a funnel name for convenience lookup. Returns leads sorted by modification date (newest first). Supports filtering by status, assignee, and title search. |
 | `get_lead` | Retrieve full details for a Huly lead including markdown description, customer name, funnel ID and funnel name, and status. Lead identifiers follow the upstream Huly format like 'LEAD-1'. |
+
+### Templates
+
+| Tool | Description |
+|------|-------------|
+| `list_message_template_categories` | List global Huly message template categories. Categories group reusable message templates across the workspace. Returns category IDs, names, descriptions, archived/private flags, and timestamps. |
+| `list_message_templates` | List global Huly message templates. Optionally filter by category ID or exact category name, and search template titles by substring. Returns each template ID, title, category summary, timestamps, and placeholderFieldIds parsed from dollar-brace tokens. Match placeholderFieldIds to list_message_template_fields.id for labels and resource IDs. |
+| `get_message_template` | Retrieve one global Huly message template by template ID or exact title. If a title is ambiguous, pass category as category ID or exact category name. Returns the full message converted to Markdown plus placeholderFieldIds parsed from dollar-brace tokens. Match placeholderFieldIds to list_message_template_fields.id for labels and resource IDs. |
+| `list_message_template_fields` | List Huly message template fields/placeholders without executing provider resources or rendering templates. Optionally filter by field category ID or exact raw label string, and search raw field labels by substring. Returns field IDs, labels, category summaries, and provider resource IDs. |
 
 ### Planner
 

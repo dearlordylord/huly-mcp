@@ -181,6 +181,14 @@ import {
   SpaceTypeNotFoundError
 } from "./errors-spaces.js"
 import {
+  MessageTemplateCategoryIdentifierAmbiguousError,
+  MessageTemplateCategoryNotFoundError,
+  MessageTemplateIdentifierAmbiguousError,
+  MessageTemplateNotFoundError,
+  TemplateFieldCategoryIdentifierAmbiguousError,
+  TemplateFieldCategoryNotFoundError
+} from "./errors-templates.js"
+import {
   TestCaseNotFoundError,
   TestPlanItemNotFoundError,
   TestPlanNotFoundError,
@@ -291,6 +299,10 @@ export {
   MAX_FILE_SIZE_MB,
   MeetingMinutesNotFoundError,
   MessageNotFoundError,
+  MessageTemplateCategoryIdentifierAmbiguousError,
+  MessageTemplateCategoryNotFoundError,
+  MessageTemplateIdentifierAmbiguousError,
+  MessageTemplateNotFoundError,
   MilestoneNotFoundError,
   NotificationContextNotFoundError,
   NotificationNotFoundError,
@@ -355,6 +367,8 @@ export {
   TagNotFoundError,
   TeamspaceNotFoundError,
   TemplateChildNotFoundError,
+  TemplateFieldCategoryIdentifierAmbiguousError,
+  TemplateFieldCategoryNotFoundError,
   TestCaseNotFoundError,
   TestPlanItemNotFoundError,
   TestPlanNotFoundError,

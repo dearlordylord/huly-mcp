@@ -452,6 +452,18 @@
       ]
     },
     {
+      "package": "@hcengineering/templates",
+      "status": "covered",
+      "matrixLocation": "Message templates",
+      "rationale": "Read-only message template discovery tools expose global template categories, message template summaries/details, template fields, placeholder field IDs, and field category summaries. Write, render/copy, and provider execution semantics remain tracked in the matrix row.",
+      "exports": [
+        "MessageTemplate",
+        "TemplateCategory",
+        "TemplateField",
+        "TemplateFieldCategory"
+      ]
+    },
+    {
       "package": "@hcengineering/task",
       "status": "covered",
       "matrixLocation": "`@hcengineering/task` package row",

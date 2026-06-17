@@ -66,6 +66,7 @@ export {
 } from "./shared.js"
 
 export {
+  MessageTemplateMetadataDegradedWarningCode,
   SpaceRoleAssignmentsDegradedWarningCode,
   StatusMetadataUnresolvedWarningCode,
   type ToolWarning,
@@ -731,6 +732,53 @@ export {
   UpdateTagCategoryParamsSchema,
   type UpdateTagCategoryResult
 } from "./tag-categories.js"
+
+export {
+  type GetMessageTemplateParams,
+  getMessageTemplateParamsJsonSchema,
+  GetMessageTemplateParamsSchema,
+  type ListMessageTemplateCategoriesParams,
+  listMessageTemplateCategoriesParamsJsonSchema,
+  ListMessageTemplateCategoriesParamsSchema,
+  type ListMessageTemplateFieldsParams,
+  listMessageTemplateFieldsParamsJsonSchema,
+  ListMessageTemplateFieldsParamsSchema,
+  type ListMessageTemplatesParams,
+  listMessageTemplatesParamsJsonSchema,
+  ListMessageTemplatesParamsSchema,
+  type MessageTemplate,
+  MessageTemplateCategoryId,
+  type MessageTemplateCategoryId as MessageTemplateCategoryIdType,
+  MessageTemplateCategoryIdentifier,
+  type MessageTemplateCategoryIdentifier as MessageTemplateCategoryIdentifierType,
+  type MessageTemplateCategoryRef,
+  MessageTemplateCategoryRefSchema,
+  type MessageTemplateCategorySummary,
+  MessageTemplateCategorySummarySchema,
+  type MessageTemplateField,
+  MessageTemplateFieldSchema,
+  MessageTemplateId,
+  type MessageTemplateId as MessageTemplateIdType,
+  MessageTemplateIdentifier,
+  type MessageTemplateIdentifier as MessageTemplateIdentifierType,
+  MessageTemplateMarkdown,
+  type MessageTemplateMarkdown as MessageTemplateMarkdownType,
+  MessageTemplateSchema,
+  type MessageTemplateSummary,
+  MessageTemplateSummarySchema,
+  parseGetMessageTemplateParams,
+  parseListMessageTemplateCategoriesParams,
+  parseListMessageTemplateFieldsParams,
+  parseListMessageTemplatesParams,
+  TemplateFieldCategoryId,
+  type TemplateFieldCategoryId as TemplateFieldCategoryIdType,
+  TemplateFieldCategoryIdentifier,
+  type TemplateFieldCategoryIdentifier as TemplateFieldCategoryIdentifierType,
+  type TemplateFieldCategoryRef,
+  TemplateFieldCategoryRefSchema,
+  TemplateFieldId,
+  type TemplateFieldId as TemplateFieldIdType
+} from "./message-templates.js"
 
 export {
   type CreateLabelParams,

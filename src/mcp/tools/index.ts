@@ -21,6 +21,7 @@ import { inventoryTools } from "./inventory.js"
 import { issueTools } from "./issues.js"
 import { labelTools } from "./labels.js"
 import { leadTools } from "./leads.js"
+import { messageTemplateTools } from "./message-templates.js"
 import { milestoneTools } from "./milestones.js"
 import { notificationTools } from "./notifications.js"
 import { plannerTools } from "./planner.js"
@@ -60,6 +61,7 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...labelTools,
   ...tagTools,
   ...tagCategoryTools,
+  ...messageTemplateTools,
   ...commentTools,
   ...collaboratorTools,
   ...deletionTools,

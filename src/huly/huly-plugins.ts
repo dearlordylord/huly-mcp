@@ -23,6 +23,8 @@ export const notification = require("@hcengineering/notification")
   .default as typeof import("@hcengineering/notification").default
 export const tags = require("@hcengineering/tags").default as typeof import("@hcengineering/tags").default
 export const task = require("@hcengineering/task").default as typeof import("@hcengineering/task").default
+export const templates = require("@hcengineering/templates")
+  .default as typeof import("@hcengineering/templates").default
 export const time = require("@hcengineering/time").default as typeof import("@hcengineering/time").default
 export const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
 
