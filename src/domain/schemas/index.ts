@@ -1211,6 +1211,37 @@ export {
 } from "./channels.js"
 
 export {
+  type AddChatMessageAttachmentParams,
+  addChatMessageAttachmentParamsJsonSchema,
+  type AddChatMessageAttachmentResult,
+  AddChatMessageAttachmentResultSchema,
+  type ChatMessageAttachmentResolvedTarget,
+  ChatMessageAttachmentResolvedTargetSchema,
+  type ChatMessageAttachmentTarget,
+  type DeleteChatMessageAttachmentParams,
+  deleteChatMessageAttachmentParamsJsonSchema,
+  type DeleteChatMessageAttachmentResult,
+  DeleteChatMessageAttachmentResultSchema,
+  type GetChatMessageAttachmentParams,
+  getChatMessageAttachmentParamsJsonSchema,
+  type GetChatMessageAttachmentResult,
+  GetChatMessageAttachmentResultSchema,
+  type ListChatMessageAttachmentsParams,
+  listChatMessageAttachmentsParamsJsonSchema,
+  type ListChatMessageAttachmentsResult,
+  ListChatMessageAttachmentsResultSchema,
+  parseAddChatMessageAttachmentParams,
+  parseDeleteChatMessageAttachmentParams,
+  parseGetChatMessageAttachmentParams,
+  parseListChatMessageAttachmentsParams,
+  parseUpdateChatMessageAttachmentParams,
+  type UpdateChatMessageAttachmentParams,
+  updateChatMessageAttachmentParamsJsonSchema,
+  type UpdateChatMessageAttachmentResult,
+  UpdateChatMessageAttachmentResultSchema
+} from "./chat-message-attachments.js"
+
+export {
   type CreateDirectMessageParams,
   createDirectMessageParamsJsonSchema,
   CreateDirectMessageParamsSchema,

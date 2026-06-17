@@ -5,7 +5,7 @@
  */
 import { Schema } from "effect"
 
-import { Count } from "../domain/schemas/shared.js"
+import { AttachmentId, Count, NonEmptyString } from "../domain/schemas/shared.js"
 
 const MIN_AMBIGUOUS_DM_MATCHES = 2
 const AmbiguousMatchCount = Count.pipe(Schema.greaterThanOrEqualTo(MIN_AMBIGUOUS_DM_MATCHES))
@@ -180,6 +180,21 @@ export class ThreadReplyNotFoundError extends Schema.TaggedError<ThreadReplyNotF
 ) {
   override get message(): string {
     return `Thread reply '${this.replyId}' not found on message '${this.messageId}'`
+  }
+}
+
+/**
+ * Attachment not found on the resolved chat message or thread reply target.
+ */
+export class ChatMessageAttachmentNotFoundError extends Schema.TaggedError<ChatMessageAttachmentNotFoundError>()(
+  "ChatMessageAttachmentNotFoundError",
+  {
+    target: NonEmptyString,
+    attachmentId: AttachmentId
+  }
+) {
+  override get message(): string {
+    return `Attachment '${this.attachmentId}' not found on ${this.target}`
   }
 }
 

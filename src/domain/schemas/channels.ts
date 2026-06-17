@@ -51,6 +51,7 @@ export interface MessageSummary {
   readonly modifiedOn?: number | undefined
   readonly editedOn?: number | undefined
   readonly replies?: Count | undefined
+  readonly attachments?: Count | undefined
 }
 
 export interface DirectMessageSummary {
@@ -264,6 +265,7 @@ export interface ThreadMessage {
   readonly createdOn?: number | undefined
   readonly modifiedOn?: number | undefined
   readonly editedOn?: number | undefined
+  readonly attachments?: Count | undefined
 }
 
 // --- List Thread Replies Params ---

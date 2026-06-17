@@ -416,7 +416,8 @@ export const listChannelMessages = (
         createdOn: msg.createdOn,
         modifiedOn: msg.modifiedOn,
         editedOn: msg.editedOn,
-        replies: optionalCount(msg.replies)
+        replies: optionalCount(msg.replies),
+        attachments: optionalCount(msg.attachments)
       }
     })
 

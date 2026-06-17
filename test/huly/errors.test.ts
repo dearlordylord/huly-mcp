@@ -45,6 +45,7 @@ import {
   ChannelLastMemberRemovalError,
   ChannelLastOwnerRemovalError,
   ChannelNotFoundError,
+  ChatMessageAttachmentNotFoundError,
   CommentNotFoundError,
   ComponentNotFoundError,
   ContactChannelConflictError,
@@ -1068,6 +1069,8 @@ describe("Huly Errors", () => {
               return `recruiting-comment:${error.target}:${error.commentId}`
             case "RecruitingAttachmentNotFoundError":
               return `recruiting-attachment:${error.target}:${error.attachmentId}`
+            case "ChatMessageAttachmentNotFoundError":
+              return `chat-attachment:${error.target}:${error.attachmentId}`
             case "NoUpdateFieldsError":
               return `no-update-fields:${error.operation}:${error.fields.length}`
             case "CannotDirectMessageSelfError":
@@ -1199,6 +1202,12 @@ describe("Huly Errors", () => {
             attachmentId: AttachmentId.make("attachment-1")
           })
         )).toBe("recruiting-attachment:Recruiting vacancy 'Backend Engineer':attachment-1")
+        expect(matchError(
+          new ChatMessageAttachmentNotFoundError({
+            target: NonEmptyString.make("channel message 'msg-1' in channel 'general'"),
+            attachmentId: AttachmentId.make("attachment-1")
+          })
+        )).toBe("chat-attachment:channel message 'msg-1' in channel 'general':attachment-1")
         expect(matchError(
           new RecruitingIssueLocatorInvalidError({
             issue: IssueIdentifier.make("1"),

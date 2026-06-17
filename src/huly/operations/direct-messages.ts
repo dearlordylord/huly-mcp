@@ -77,7 +77,7 @@ type CreateDirectMessageError =
 
 // --- Helpers ---
 
-const findDirectMessageMessage = (
+export const findDirectMessageMessage = (
   params: { dm: DirectMessageIdentifier; messageId: MessageId }
 ): Effect.Effect<
   { client: HulyClient["Type"]; dm: HulyDirectMessage; message: ChatMessage },
@@ -146,7 +146,8 @@ export const listDirectMessageMessages = (
         createdOn: msg.createdOn,
         modifiedOn: msg.modifiedOn,
         editedOn: msg.editedOn,
-        replies: optionalCount(msg.replies)
+        replies: optionalCount(msg.replies),
+        attachments: optionalCount(msg.attachments)
       }
     })
 
