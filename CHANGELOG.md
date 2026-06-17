@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.36.0
+
+### Minor Changes
+
+- 7a35384: Add LLM-first chat message attachment wrappers for channel messages, direct-message messages, and thread replies.
+
 ## 0.35.0
 
 ### Minor Changes
