@@ -41,6 +41,19 @@ import {
   AssociationNotFoundError,
   AssociationSystemClassUnsupportedError,
   AttachmentNotFoundError,
+  BoardArchivedCardDeleteError,
+  BoardCardIdentifierAmbiguousError,
+  BoardCardNotFoundError,
+  BoardIdentifierAmbiguousError,
+  BoardModelSequenceMissingError,
+  BoardMutationUnsupportedError,
+  BoardNotFoundError,
+  BoardProjectTypeIdentifierAmbiguousError,
+  BoardProjectTypeNotFoundError,
+  BoardStatusIdentifierAmbiguousError,
+  BoardStatusNotFoundError,
+  BoardTaskTypeIdentifierAmbiguousError,
+  BoardTaskTypeNotFoundError,
   BYTES_PER_MB,
   CalendarNotAccessibleError,
   CannotDirectMessageSelfError,
@@ -219,6 +232,49 @@ describe("Huly Errors", () => {
         const error = new HulyAuthError({ message: "Invalid credentials" })
         expect(error._tag).toBe("HulyAuthError")
         expect(error.message).toBe("Invalid credentials")
+      }))
+  })
+
+  describe("Board errors", () => {
+    it.effect("generates board-specific messages", () =>
+      Effect.gen(function*() {
+        expect(new BoardNotFoundError({ identifier: "Roadmap" }).message).toBe("Board 'Roadmap' not found")
+        expect(new BoardIdentifierAmbiguousError({ identifier: "Roadmap", matches: 2 }).message).toBe(
+          "Board 'Roadmap' matched 2 boards; pass a board _id instead"
+        )
+        expect(new BoardCardNotFoundError({ board: "Roadmap", identifier: "CARD-1" }).message).toBe(
+          "Board card 'CARD-1' not found on board 'Roadmap'"
+        )
+        expect(
+          new BoardCardIdentifierAmbiguousError({ board: "Roadmap", identifier: "Planning", matches: 2 }).message
+        ).toBe("Board card 'Planning' matched 2 cards on board 'Roadmap'; pass a card _id")
+        expect(new BoardProjectTypeNotFoundError({ identifier: "Kanban" }).message).toBe(
+          "Board project type 'Kanban' not found"
+        )
+        expect(new BoardProjectTypeIdentifierAmbiguousError({ identifier: "Kanban", matches: 2 }).message).toBe(
+          "Board project type 'Kanban' matched 2 project types; pass a project type _id"
+        )
+        expect(new BoardTaskTypeNotFoundError({ board: "Roadmap", identifier: "Card" }).message).toBe(
+          "Board task type 'Card' not found for board 'Roadmap'"
+        )
+        expect(
+          new BoardTaskTypeIdentifierAmbiguousError({ board: "Roadmap", identifier: "Card", matches: 2 }).message
+        ).toBe("Board task type 'Card' matched 2 task types for board 'Roadmap'; pass a task type _id")
+        expect(new BoardStatusNotFoundError({ board: "Roadmap", identifier: "Todo" }).message).toBe(
+          "Board status 'Todo' not found for board 'Roadmap'"
+        )
+        expect(
+          new BoardStatusIdentifierAmbiguousError({ board: "Roadmap", identifier: "Todo", matches: 2 }).message
+        ).toBe("Board status 'Todo' matched 2 statuses for board 'Roadmap'; pass a status _id")
+        expect(new BoardModelSequenceMissingError({ cardClass: "board:class:Card" }).message).toBe(
+          "Board model sequence for 'board:class:Card' is missing"
+        )
+        expect(new BoardArchivedCardDeleteError({ board: "Roadmap", identifier: "CARD-1" }).message).toBe(
+          "Board card 'CARD-1' on board 'Roadmap' must be archived before delete_board_card"
+        )
+        expect(new BoardMutationUnsupportedError({ message: "removeCollection missing" }).message).toBe(
+          "removeCollection missing"
+        )
       }))
   })
 
@@ -1082,6 +1138,32 @@ describe("Huly Errors", () => {
               return `recruiting-attachment:${error.target}:${error.attachmentId}`
             case "ChatMessageAttachmentNotFoundError":
               return `chat-attachment:${error.target}:${error.attachmentId}`
+            case "BoardNotFoundError":
+              return `board:${error.identifier}`
+            case "BoardIdentifierAmbiguousError":
+              return `board-ambiguous:${error.identifier}:${error.matches}`
+            case "BoardCardNotFoundError":
+              return `board-card:${error.board}:${error.identifier}`
+            case "BoardCardIdentifierAmbiguousError":
+              return `board-card-ambiguous:${error.board}:${error.identifier}:${error.matches}`
+            case "BoardProjectTypeNotFoundError":
+              return `board-project-type:${error.identifier}`
+            case "BoardProjectTypeIdentifierAmbiguousError":
+              return `board-project-type-ambiguous:${error.identifier}:${error.matches}`
+            case "BoardTaskTypeNotFoundError":
+              return `board-task-type:${error.board}:${error.identifier}`
+            case "BoardTaskTypeIdentifierAmbiguousError":
+              return `board-task-type-ambiguous:${error.board}:${error.identifier}:${error.matches}`
+            case "BoardStatusNotFoundError":
+              return `board-status:${error.board}:${error.identifier}`
+            case "BoardStatusIdentifierAmbiguousError":
+              return `board-status-ambiguous:${error.board}:${error.identifier}:${error.matches}`
+            case "BoardArchivedCardDeleteError":
+              return `board-card-delete-active:${error.board}:${error.identifier}`
+            case "BoardModelSequenceMissingError":
+              return `board-sequence:${error.cardClass}`
+            case "BoardMutationUnsupportedError":
+              return `board-mutation-unsupported:${error.message}`
             case "NoUpdateFieldsError":
               return `no-update-fields:${error.operation}:${error.fields.length}`
             case "CannotDirectMessageSelfError":
@@ -1318,6 +1400,55 @@ describe("Huly Errors", () => {
             attachmentId: AttachmentId.make("attachment-1")
           })
         )).toBe("chat-attachment:channel message 'msg-1' in channel 'general':attachment-1")
+        expect(matchError(new BoardNotFoundError({ identifier: "Roadmap" }))).toBe("board:Roadmap")
+        expect(matchError(new BoardIdentifierAmbiguousError({ identifier: "Roadmap", matches: 2 }))).toBe(
+          "board-ambiguous:Roadmap:2"
+        )
+        expect(matchError(new BoardCardNotFoundError({ board: "Roadmap", identifier: "CARD-1" }))).toBe(
+          "board-card:Roadmap:CARD-1"
+        )
+        expect(matchError(
+          new BoardCardIdentifierAmbiguousError({
+            board: "Roadmap",
+            identifier: "Planning",
+            matches: 2
+          })
+        )).toBe("board-card-ambiguous:Roadmap:Planning:2")
+        expect(matchError(new BoardProjectTypeNotFoundError({ identifier: "Kanban" }))).toBe(
+          "board-project-type:Kanban"
+        )
+        expect(matchError(new BoardProjectTypeIdentifierAmbiguousError({ identifier: "Kanban", matches: 2 }))).toBe(
+          "board-project-type-ambiguous:Kanban:2"
+        )
+        expect(matchError(new BoardTaskTypeNotFoundError({ board: "Roadmap", identifier: "Card" }))).toBe(
+          "board-task-type:Roadmap:Card"
+        )
+        expect(matchError(
+          new BoardTaskTypeIdentifierAmbiguousError({
+            board: "Roadmap",
+            identifier: "Card",
+            matches: 2
+          })
+        )).toBe("board-task-type-ambiguous:Roadmap:Card:2")
+        expect(matchError(new BoardStatusNotFoundError({ board: "Roadmap", identifier: "Todo" }))).toBe(
+          "board-status:Roadmap:Todo"
+        )
+        expect(matchError(
+          new BoardStatusIdentifierAmbiguousError({
+            board: "Roadmap",
+            identifier: "Todo",
+            matches: 2
+          })
+        )).toBe("board-status-ambiguous:Roadmap:Todo:2")
+        expect(matchError(new BoardArchivedCardDeleteError({ board: "Roadmap", identifier: "CARD-1" }))).toBe(
+          "board-card-delete-active:Roadmap:CARD-1"
+        )
+        expect(matchError(new BoardModelSequenceMissingError({ cardClass: "board:class:Card" }))).toBe(
+          "board-sequence:board:class:Card"
+        )
+        expect(matchError(new BoardMutationUnsupportedError({ message: "removeCollection missing" }))).toBe(
+          "board-mutation-unsupported:removeCollection missing"
+        )
         expect(matchError(
           new RecruitingIssueLocatorInvalidError({
             issue: IssueIdentifier.make("1"),

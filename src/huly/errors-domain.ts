@@ -2,6 +2,21 @@ import { Schema } from "effect"
 
 import { HulyAuthError, HulyConnectionError, HulyError, NoUpdateFieldsError } from "./errors-base.js"
 import {
+  BoardArchivedCardDeleteError,
+  BoardCardIdentifierAmbiguousError,
+  BoardCardNotFoundError,
+  BoardIdentifierAmbiguousError,
+  BoardModelSequenceMissingError,
+  BoardMutationUnsupportedError,
+  BoardNotFoundError,
+  BoardProjectTypeIdentifierAmbiguousError,
+  BoardProjectTypeNotFoundError,
+  BoardStatusIdentifierAmbiguousError,
+  BoardStatusNotFoundError,
+  BoardTaskTypeIdentifierAmbiguousError,
+  BoardTaskTypeNotFoundError
+} from "./errors-boards.js"
+import {
   CalendarNotAccessibleError,
   EventNotFoundError,
   RecurringEventNotFoundError,
@@ -189,6 +204,19 @@ export const HulyDomainError = Schema.Union(
   NoUpdateFieldsError,
   HulyConnectionError,
   HulyAuthError,
+  BoardNotFoundError,
+  BoardIdentifierAmbiguousError,
+  BoardCardNotFoundError,
+  BoardCardIdentifierAmbiguousError,
+  BoardProjectTypeNotFoundError,
+  BoardProjectTypeIdentifierAmbiguousError,
+  BoardTaskTypeNotFoundError,
+  BoardTaskTypeIdentifierAmbiguousError,
+  BoardStatusNotFoundError,
+  BoardStatusIdentifierAmbiguousError,
+  BoardArchivedCardDeleteError,
+  BoardModelSequenceMissingError,
+  BoardMutationUnsupportedError,
   IssueNotFoundError,
   ProjectNotFoundError,
   InvalidStatusError,

@@ -19,6 +19,21 @@
  */
 import { HulyAuthError, HulyConnectionError, HulyError, NoUpdateFieldsError } from "./errors-base.js"
 import {
+  BoardArchivedCardDeleteError,
+  BoardCardIdentifierAmbiguousError,
+  BoardCardNotFoundError,
+  BoardIdentifierAmbiguousError,
+  BoardModelSequenceMissingError,
+  BoardMutationUnsupportedError,
+  BoardNotFoundError,
+  BoardProjectTypeIdentifierAmbiguousError,
+  BoardProjectTypeNotFoundError,
+  BoardStatusIdentifierAmbiguousError,
+  BoardStatusNotFoundError,
+  BoardTaskTypeIdentifierAmbiguousError,
+  BoardTaskTypeNotFoundError
+} from "./errors-boards.js"
+import {
   CalendarNotAccessibleError,
   EventNotFoundError,
   RecurringEventNotFoundError,
@@ -219,6 +234,19 @@ export {
   AssociationNotFoundError,
   AssociationSystemClassUnsupportedError,
   AttachmentNotFoundError,
+  BoardArchivedCardDeleteError,
+  BoardCardIdentifierAmbiguousError,
+  BoardCardNotFoundError,
+  BoardIdentifierAmbiguousError,
+  BoardModelSequenceMissingError,
+  BoardMutationUnsupportedError,
+  BoardNotFoundError,
+  BoardProjectTypeIdentifierAmbiguousError,
+  BoardProjectTypeNotFoundError,
+  BoardStatusIdentifierAmbiguousError,
+  BoardStatusNotFoundError,
+  BoardTaskTypeIdentifierAmbiguousError,
+  BoardTaskTypeNotFoundError,
   BYTES_PER_MB,
   CalendarNotAccessibleError,
   CannotDirectMessageSelfError,

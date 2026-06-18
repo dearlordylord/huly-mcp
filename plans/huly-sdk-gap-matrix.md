@@ -12,7 +12,7 @@ Local evidence sources:
 
 Current high-level MCP categories:
 
-`projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `spaces`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `planner`, `processes`, `sdk-discovery`, `tags`, `tag-categories`, `templates`, `task-management`, `test-management`, `user-statuses`, `virtual-office`.
+`projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `spaces`, `cards`, `boards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `planner`, `processes`, `sdk-discovery`, `tags`, `tag-categories`, `templates`, `task-management`, `test-management`, `user-statuses`, `virtual-office`.
 
 ## Missing Or Partially Missing SDK Surfaces
 
@@ -27,7 +27,7 @@ Current high-level MCP categories:
 | Recruiting | `.reference/platform/models/recruit/src/types.ts`: `Vacancy`, `Candidate`, `VacancyList`, `Applicant`, `ApplicantMatch`, `Review`, `Opinion`; statuses in `.reference/platform/models/recruit/src/spaceType.ts` | No recruiting tools | Vacancies, talents/candidates, applications, application statuses, recruiter assignment, candidate skills, reviews, review verdicts/opinions, applicant matches, vacancy-company lists, recruiting-specific comments/attachments/activity/relations/custom fields |
 | Surveys / polls | `.reference/platform/models/survey/src/types.ts`: `Survey`, `Poll` | No survey tools | Survey CRUD, poll creation/attachment, survey question data, poll completion/status, survey results |
 | Generic approval requests | `.reference/platform/models/request/src/index.ts`: `Request`, `RequestDecisionComment`, request presenters | No generic request tools; controlled docs consume it internally | Create/list/approve/reject/cancel approval requests, decision comments, required approval counts, request status and requested/approved/rejected people |
-| Boards | `.reference/platform/models/board/src/index.ts`: `Board`, board `Card`, card cover, board preferences, menu pages | No board-specific tools; unrelated `cards` category covers Huly Card module, not board plugin | Board CRUD, board cards, board status workflow, board card members/assignee/location/cover/archive, board labels/menu/archive views |
+| Boards | Installed `@hcengineering/board`; `.reference/platform/models/board/src/index.ts`: `Board`, board `Card`, card cover, board preferences, menu pages | First-class `boards` tools cover board discovery, create/update/archive/unarchive, board card list/get/create/update, workflow status/type resolution, assignees, members, location, cover, dates, archive/unarchive, and archived-card deletion. The unrelated `cards` category covers the Huly Card module, not board plugin. | Board labels, saved board views, board menu pages, preference-backed board UI state, provider integrations, board deletion |
 | Inventory | `.reference/platform/models/inventory/src/index.ts`: inventory `Category`, `Product`, `Variant`; installed `@hcengineering/inventory@0.7.0` | Category hierarchy CRUD, product CRUD, variant/SKU CRUD, and product-scoped photo, attachment, comment, and activity wrappers as first-class `inventory` tools, using exact write-side resolution and non-empty delete guards | Category/variant discussion wrappers remain out of the current product-focused slice |
 | Leads write surface | `.reference/platform/models/lead/src/types.ts`: `Funnel`, `Lead`, `Customer`, `DefaultFunnelTypeData`, `LeadTypeData` | Read-only: list funnels, list leads, get lead; contacts has `make_organization_customer` | Create/update/delete funnels, create/update/delete leads, change lead status, assign lead, start date, customer description, person customer support, lead comments/attachments/labels/relations |
 | Contact channels and identities | `.reference/platform/models/contact/src/index.ts`: `Channel`, `SocialIdentity`, `ChannelProvider`, `SocialIdentityProvider`, `Status`, `PersonSpace`, `WorkspaceMemberStatus`, `Employee` mixin | Persons/orgs/employees read, basic person/org CRUD, org channels/members | Add/update/remove person channels, social identities, channel provider discovery, contact statuses, contact notes/comments as first-class target, person attachments, person merge, employee invite/create, kick/reinvite employee, inactive employee management |
@@ -70,6 +70,7 @@ Current high-level MCP categories:
 | `@hcengineering/attachment` | Partial | Saved attachments, photos, drawings, embeddings, more friendly object targets |
 | `@hcengineering/calendar` | Partial | Calendar/external-calendar config, primary-calendar preferences, RSVP/invite response state if added upstream |
 | `@hcengineering/love` | Partial read-only | Room/floor/office CRUD, meeting schedule room writes, live meeting session mutations, transcripts/recordings as first-class artifacts, deeper office settings |
+| `@hcengineering/board` | Board/card core covered | Board labels, saved board views, menu pages, preference-backed board UI state, provider integrations, board deletion |
 | `@hcengineering/card` | Mostly basic CRUD | Card roles/permissions, favorites, export extensions, advanced master tag schema management |
 | `@hcengineering/chunter` | Partial | Request-access flows if modeled, pinned messages, message attachments/translation, viewlet/sync/object-chat metadata |
 | `@hcengineering/contact` | Partial | Person channels/social identities, employee invite/kick/reinvite, merge contacts, contact statuses |
@@ -77,10 +78,12 @@ Current high-level MCP categories:
 | `@hcengineering/document` | Partial | Snapshot restore, backlinks, notes, structured action items/tables, PDF/export, advanced document relationships |
 | `@hcengineering/inventory` | Model CRUD plus product media/discussion wrappers covered; wrappers partial | Category/variant discussion wrappers if they prove user-visible |
 | `@hcengineering/notification` | Partial | Mute contexts, notification type settings, collaborators |
+| `@hcengineering/preference` | No first-class generic tools | Generic user/space preference discovery and safe updates |
 | `@hcengineering/tags` | SDK-level covered; module wrappers partial | Module-specific wrappers for tag-backed concepts such as recruiting skills, board labels, controlled-doc labels, and contact tags |
 | `@hcengineering/task` | Partial | Generic task/project abstractions beyond tracker, reusable task workflows |
 | `@hcengineering/time` | Partial | Document-attached action items, automation helper visibility, team planner/schedule reports |
 | `@hcengineering/tracker` | Strong but partial | GitHub pull-request task type/sync details, PDF export, saved views beyond ProjectTargetPreference, tracker-local Document support type, and broader workflow automation behavior |
+| `@hcengineering/view` | No saved-view tools | Saved filtered views, user view preferences, viewlet descriptors, reusable filters/sorts/groups |
 
 ## Highest-Value Additions For LLM Agents
 

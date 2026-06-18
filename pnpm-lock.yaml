@@ -39,10 +39,16 @@ importers:
       '@hcengineering/activity':
         specifier: 0.7.0
         version: 0.7.0
+      '@hcengineering/analytics':
+        specifier: 0.7.3
+        version: 0.7.3
       '@hcengineering/api-client':
         specifier: 0.7.19
         version: 0.7.19(prosemirror-inputrules@1.5.1)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.6)
       '@hcengineering/attachment':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/board':
         specifier: 0.7.0
         version: 0.7.0
       '@hcengineering/calendar':
@@ -78,6 +84,9 @@ importers:
       '@hcengineering/platform':
         specifier: 0.7.20
         version: 0.7.20
+      '@hcengineering/preference':
+        specifier: 0.7.0
+        version: 0.7.0
       '@hcengineering/rank':
         specifier: 0.7.18
         version: 0.7.18
@@ -96,10 +105,19 @@ importers:
       '@hcengineering/text-markdown':
         specifier: 0.7.21
         version: 0.7.21
+      '@hcengineering/theme':
+        specifier: 0.7.0
+        version: 0.7.0
       '@hcengineering/time':
         specifier: 0.7.0
         version: 0.7.0
       '@hcengineering/tracker':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/ui':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/view':
         specifier: 0.7.0
         version: 0.7.0
       '@modelcontextprotocol/sdk':
@@ -770,8 +788,8 @@ packages:
   '@hcengineering/activity@0.7.0':
     resolution: {integrity: sha512-7dNGUV7JBnxAuHs01ArvbpCJxsSAs4b0r+SS64W9R3YHtYp+9RN/UzjNhRL2EME0l+HjtxQwLuGbmkMvAzqWQw==}
 
-  '@hcengineering/analytics@0.7.19':
-    resolution: {integrity: sha512-fdsNGs/OlFqBrE/byUXWWZoTwfKXLR8sg07JHgZAEumuI19W1BnJM3tb0Eih4lFQl16DEjT7zxtXaWcU797u3Q==}
+  '@hcengineering/analytics@0.7.3':
+    resolution: {integrity: sha512-6/P3MDwZpVuYAwZxppSF7Q3wyoNBg2P0rEUKf4FNZvOVQwlUpNwr21igujKnk6jfWW7mNhuTRe0i8OE0ipU8Ww==}
 
   '@hcengineering/analytics@0.7.423':
     resolution: {integrity: sha512-ZsY4sfoQCjl66QdpVQ8O4ZsurcdN/rL8nyLZWeprYtXWIvmnfLt9D810YNQIjrQHMXAAeVQTshWUa1b73NLmgw==}
@@ -781,6 +799,9 @@ packages:
 
   '@hcengineering/attachment@0.7.0':
     resolution: {integrity: sha512-6GVR9dbI4WNeUzkyRBRzodnVh1shN4pRdRx4icAYDpjGrHjgGE+lHLe7qctHWeILYA6xrM6p8gqHI2niNYDFbg==}
+
+  '@hcengineering/board@0.7.0':
+    resolution: {integrity: sha512-Y8FBX4XKSHLXpM43BeqNBDI4/5dXdUCJTlWGX7odahHqLih96iFsnp0kxr4WcUdCJgqDd6hvxaPQnu3oNeRZNA==}
 
   '@hcengineering/calendar@0.7.0':
     resolution: {integrity: sha512-TL4lUWo8zWN7iRgVC2occ0e7wJ44fb6GPEfM8yXlyoux4I43s+2bk7+qcMv6/FhFrmgUYF6+fj/GplBkmw+sqQ==}
@@ -4845,11 +4866,11 @@ snapshots:
       '@hcengineering/contact': 0.7.0
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.0
-      '@hcengineering/ui': 0.7.0
+      '@hcengineering/preference': 0.7.423
+      '@hcengineering/ui': 0.7.423
       '@hcengineering/view': 0.7.0
 
-  '@hcengineering/analytics@0.7.19':
+  '@hcengineering/analytics@0.7.3':
     dependencies:
       '@hcengineering/platform': 0.7.20
 
@@ -4882,9 +4903,20 @@ snapshots:
     dependencies:
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.0
-      '@hcengineering/ui': 0.7.0
+      '@hcengineering/preference': 0.7.423
+      '@hcengineering/ui': 0.7.423
       '@hcengineering/workbench': 0.7.0
+
+  '@hcengineering/board@0.7.0':
+    dependencies:
+      '@hcengineering/contact': 0.7.0
+      '@hcengineering/core': 0.7.26
+      '@hcengineering/platform': 0.7.20
+      '@hcengineering/preference': 0.7.423
+      '@hcengineering/tags': 0.7.0
+      '@hcengineering/task': 0.7.0
+      '@hcengineering/ui': 0.7.423
+      '@hcengineering/view': 0.7.0
 
   '@hcengineering/calendar@0.7.0':
     dependencies:
@@ -4892,16 +4924,16 @@ snapshots:
       '@hcengineering/core': 0.7.26
       '@hcengineering/notification': 0.7.0
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.0
+      '@hcengineering/preference': 0.7.423
       '@hcengineering/setting': 0.7.0
-      '@hcengineering/ui': 0.7.0
+      '@hcengineering/ui': 0.7.423
 
   '@hcengineering/card@0.7.0':
     dependencies:
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.0
-      '@hcengineering/ui': 0.7.0
+      '@hcengineering/preference': 0.7.423
+      '@hcengineering/ui': 0.7.423
       '@hcengineering/view': 0.7.0
 
   '@hcengineering/chunter@0.7.0':
@@ -4911,14 +4943,14 @@ snapshots:
       '@hcengineering/core': 0.7.26
       '@hcengineering/notification': 0.7.0
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/ui': 0.7.0
+      '@hcengineering/ui': 0.7.423
       '@hcengineering/view': 0.7.0
       '@hcengineering/workbench': 0.7.0
       fast-equals: 5.4.0
 
   '@hcengineering/client-resources@0.7.19':
     dependencies:
-      '@hcengineering/analytics': 0.7.19
+      '@hcengineering/analytics': 0.7.423
       '@hcengineering/client': 0.7.19
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
@@ -4939,14 +4971,14 @@ snapshots:
       '@hcengineering/card': 0.7.0
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.0
+      '@hcengineering/preference': 0.7.423
       '@hcengineering/templates': 0.7.0
-      '@hcengineering/ui': 0.7.0
+      '@hcengineering/ui': 0.7.423
       '@hcengineering/view': 0.7.0
 
   '@hcengineering/core@0.7.26':
     dependencies:
-      '@hcengineering/analytics': 0.7.19
+      '@hcengineering/analytics': 0.7.423
       '@hcengineering/measurements': 0.7.19
       '@hcengineering/platform': 0.7.20
       fast-equals: 5.4.0
@@ -4965,8 +4997,8 @@ snapshots:
       '@hcengineering/core': 0.7.26
       '@hcengineering/notification': 0.7.0
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.0
-      '@hcengineering/ui': 0.7.0
+      '@hcengineering/preference': 0.7.423
+      '@hcengineering/ui': 0.7.423
       '@hcengineering/view': 0.7.0
 
   '@hcengineering/drive@0.7.423':
@@ -4989,8 +5021,8 @@ snapshots:
       '@hcengineering/drive': 0.7.423
       '@hcengineering/notification': 0.7.0
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.0
-      '@hcengineering/ui': 0.7.0
+      '@hcengineering/preference': 0.7.423
+      '@hcengineering/ui': 0.7.423
       '@hcengineering/view': 0.7.0
       '@hcengineering/workbench': 0.7.0
 
@@ -5004,9 +5036,9 @@ snapshots:
       '@hcengineering/contact': 0.7.0
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.0
+      '@hcengineering/preference': 0.7.423
       '@hcengineering/setting': 0.7.0
-      '@hcengineering/ui': 0.7.0
+      '@hcengineering/ui': 0.7.423
       '@hcengineering/view': 0.7.0
 
   '@hcengineering/platform@0.7.20':
@@ -5021,7 +5053,7 @@ snapshots:
     dependencies:
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/ui': 0.7.0
+      '@hcengineering/ui': 0.7.423
 
   '@hcengineering/preference@0.7.423':
     dependencies:
@@ -5046,13 +5078,13 @@ snapshots:
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
       '@hcengineering/templates': 0.7.0
-      '@hcengineering/ui': 0.7.0
+      '@hcengineering/ui': 0.7.423
 
   '@hcengineering/tags@0.7.0':
     dependencies:
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/ui': 0.7.0
+      '@hcengineering/ui': 0.7.423
       '@hcengineering/view': 0.7.0
 
   '@hcengineering/task@0.7.0':
@@ -5062,7 +5094,7 @@ snapshots:
       '@hcengineering/notification': 0.7.0
       '@hcengineering/platform': 0.7.20
       '@hcengineering/rank': 0.7.18
-      '@hcengineering/ui': 0.7.0
+      '@hcengineering/ui': 0.7.423
       '@hcengineering/view': 0.7.0
 
   '@hcengineering/templates@0.7.0':
@@ -5139,7 +5171,7 @@ snapshots:
 
   '@hcengineering/theme@0.7.0':
     dependencies:
-      '@hcengineering/analytics': 0.7.19
+      '@hcengineering/analytics': 0.7.3
       '@hcengineering/platform': 0.7.20
       svelte: 4.2.20
 
@@ -5157,7 +5189,7 @@ snapshots:
       '@hcengineering/platform': 0.7.20
       '@hcengineering/rank': 0.7.18
       '@hcengineering/task': 0.7.0
-      '@hcengineering/ui': 0.7.0
+      '@hcengineering/ui': 0.7.423
 
   '@hcengineering/tracker@0.7.0':
     dependencies:
@@ -5166,20 +5198,20 @@ snapshots:
       '@hcengineering/contact': 0.7.0
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.0
+      '@hcengineering/preference': 0.7.423
       '@hcengineering/tags': 0.7.0
       '@hcengineering/task': 0.7.0
       '@hcengineering/time': 0.7.0
-      '@hcengineering/ui': 0.7.0
+      '@hcengineering/ui': 0.7.423
       '@hcengineering/view': 0.7.0
       lexorank: 1.0.5
 
   '@hcengineering/ui@0.7.0':
     dependencies:
-      '@hcengineering/analytics': 0.7.19
+      '@hcengineering/analytics': 0.7.3
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/theme': 0.7.0
+      '@hcengineering/theme': 0.7.423
       autolinker: 4.0.0
       blurhash: 2.0.5
       date-fns: 2.30.0
@@ -5210,16 +5242,16 @@ snapshots:
     dependencies:
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.0
-      '@hcengineering/ui': 0.7.0
+      '@hcengineering/preference': 0.7.423
+      '@hcengineering/ui': 0.7.423
 
   '@hcengineering/workbench@0.7.0':
     dependencies:
       '@hcengineering/core': 0.7.26
       '@hcengineering/notification': 0.7.0
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.0
-      '@hcengineering/ui': 0.7.0
+      '@hcengineering/preference': 0.7.423
+      '@hcengineering/ui': 0.7.423
       '@hcengineering/view': 0.7.0
 
   '@hono/node-server@1.19.14(hono@4.12.23)':
@@ -6321,7 +6353,7 @@ snapshots:
   code-red@1.0.4:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
-      '@types/estree': 1.0.8
+      '@types/estree': 1.0.9
       acorn: 8.15.0
       estree-walker: 3.0.3
       periscopic: 3.1.0
@@ -7421,7 +7453,7 @@ snapshots:
 
   is-reference@3.0.3:
     dependencies:
-      '@types/estree': 1.0.8
+      '@types/estree': 1.0.9
 
   is-regex@1.2.1:
     dependencies:
@@ -7934,7 +7966,7 @@ snapshots:
 
   periscopic@3.1.0:
     dependencies:
-      '@types/estree': 1.0.8
+      '@types/estree': 1.0.9
       estree-walker: 3.0.3
       is-reference: 3.0.3
 
@@ -8619,7 +8651,7 @@ snapshots:
       '@ampproject/remapping': 2.3.0
       '@jridgewell/sourcemap-codec': 1.5.5
       '@jridgewell/trace-mapping': 0.3.31
-      '@types/estree': 1.0.8
+      '@types/estree': 1.0.9
       acorn: 8.15.0
       aria-query: 5.3.2
       axobject-query: 4.1.0

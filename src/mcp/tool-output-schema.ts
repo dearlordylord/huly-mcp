@@ -1,7 +1,8 @@
 import { getHulyContextResultJsonSchema } from "../domain/schemas/index.js"
 import { ToolWarningCodeSchema } from "../domain/schemas/tool-warnings.js"
 
-interface McpOutputSchema {
+// eslint-disable-next-line import-x/no-unused-modules -- exported to give output schema constants a stable declaration name
+export interface McpOutputSchema {
   readonly type: "object"
   readonly properties?: Record<string, unknown>
   readonly required?: Array<string>

@@ -5,7 +5,7 @@ import {
 } from "../../domain/schemas/sdk-discovery-configurations.js"
 import type { HulyClassToolHint } from "../../domain/schemas/sdk-discovery.js"
 import { NonEmptyString, ObjectClassName } from "../../domain/schemas/shared.js"
-import { cardPlugin, chunter, contact, core, documentPlugin, tracker } from "../huly-plugins.js"
+import { board, cardPlugin, chunter, contact, core, documentPlugin, tracker } from "../huly-plugins.js"
 
 const toolHint = (category: string, exampleTools: ReadonlyArray<string>): HulyClassToolHint => ({
   category: NonEmptyString.make(category),
@@ -34,6 +34,8 @@ export const firstClassToolHints = new Map<string, ReadonlyArray<HulyClassToolHi
   ],
   [String(cardPlugin.class.Card), [toolHint("cards", ["list_cards", "get_card", "create_card"])]],
   [String(cardPlugin.class.CardSpace), [toolHint("cards", ["list_card_spaces"])]],
+  [String(board.class.Board), [toolHint("boards", ["list_boards", "get_board", "create_board"])]],
+  [String(board.class.Card), [toolHint("boards", ["list_board_cards", "get_board_card", "create_board_card"])]],
   [String(chunter.class.ChatMessage), [toolHint("channels", ["list_channel_messages", "send_channel_message"])]],
   [
     String(tracker.class.ProjectTargetPreference),
@@ -82,6 +84,12 @@ const documentCoveredRationale =
 const contactCoveredRationale =
   "Current contacts tools expose person, organization, employee/member, and organization-channel operations."
 const cardCoveredRationale = "Current card tools cover card spaces, master tags, and card CRUD."
+const boardCoveredRationale =
+  "Current board tools cover board discovery, board create/update/archive, board card list/get/create/update, workflow status/type resolution, assignees, members, location, cover, dates, and archived-card deletion. Board labels, saved views, preferences/menu pages, provider integrations, and board deletion remain deferred."
+const boardGapRationale =
+  "Board labels, saved views, board menu pages, preference-backed board UI state, provider integrations, and board deletion remain matrix gaps outside the safe board/card write slice."
+const boardNotMcpFacingRationale =
+  "Board card cover values are exposed through board card create/update fields. The CardCover SDK export is the underlying type metadata rather than a separate LLM-facing resource."
 const chunterCoveredRationale =
   "Current channel and direct-message tools cover channels, channel messages, one-to-one DM create/list/message list/send/update/delete, thread replies, channel member list/add/remove, join/leave, archive/unarchive, conversation star/closed state, and group direct-message create."
 const coreCoveredRationale =
@@ -157,6 +165,31 @@ export const runtimeParityRoutingRows: ReadonlyArray<RuntimeParityRoutingRow> = 
     "@hcengineering/card",
     "CardSpace",
     covered(["list_card_spaces"], cardCoveredRationale)
+  ),
+  routingRow(
+    String(board.class.Board),
+    "@hcengineering/board",
+    "Board",
+    covered(["list_boards", "get_board", "create_board"], boardCoveredRationale)
+  ),
+  routingRow(
+    String(board.class.Card),
+    "@hcengineering/board",
+    "Card",
+    covered(["list_board_cards", "get_board_card", "create_board_card"], boardCoveredRationale)
+  ),
+  routingRow(
+    String(board.class.CommonBoardPreference),
+    "@hcengineering/board",
+    "CommonBoardPreference",
+    gap(boardGapRationale)
+  ),
+  routingRow(String(board.class.MenuPage), "@hcengineering/board", "MenuPage", gap(boardGapRationale)),
+  routingRow(
+    String(board.class.CardCover),
+    "@hcengineering/board",
+    "CardCover",
+    notMcpFacing(boardNotMcpFacingRationale)
   ),
   routingRow(
     String(chunter.class.ChatMessage),

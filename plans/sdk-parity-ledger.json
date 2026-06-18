@@ -126,6 +126,34 @@
       ]
     },
     {
+      "package": "@hcengineering/board",
+      "status": "covered",
+      "matrixLocation": "Boards",
+      "rationale": "Current board tools cover board discovery, board create/update/archive, board card list/get/create/update, workflow status/type resolution, assignees, members, location, cover, dates, and archived-card deletion. Board labels, saved views, preferences/menu pages, provider integrations, and board deletion remain deferred.",
+      "exports": [
+        "Board",
+        "Card"
+      ]
+    },
+    {
+      "package": "@hcengineering/board",
+      "status": "gap",
+      "matrixLocation": "Boards",
+      "rationale": "Board labels, saved views, board menu pages, preference-backed board UI state, provider integrations, and board deletion remain matrix gaps outside the safe board/card write slice.",
+      "exports": [
+        "CommonBoardPreference",
+        "MenuPage"
+      ]
+    },
+    {
+      "package": "@hcengineering/board",
+      "status": "not-mcp-facing",
+      "rationale": "Board card cover values are exposed through board card create/update fields. The CardCover SDK export is the underlying type metadata rather than a separate LLM-facing resource.",
+      "exports": [
+        "CardCover"
+      ]
+    },
+    {
       "package": "@hcengineering/calendar",
       "status": "covered",
       "matrixLocation": "Calendar schedules and integrations",
@@ -441,6 +469,16 @@
       ]
     },
     {
+      "package": "@hcengineering/preference",
+      "status": "gap",
+      "matrixLocation": "Preference model",
+      "rationale": "Generic user and space preference discovery/update remains a matrix gap. Board-specific preference state is also deferred outside the safe board/card write slice.",
+      "exports": [
+        "Preference",
+        "SpacePreference"
+      ]
+    },
+    {
       "package": "@hcengineering/tags",
       "status": "covered",
       "matrixLocation": "Tags/labels beyond tracker issues",
@@ -523,6 +561,67 @@
       "exports": [
         "ItemPresenter",
         "TypeToDoPriority"
+      ]
+    },
+    {
+      "package": "@hcengineering/view",
+      "status": "gap",
+      "matrixLocation": "View / saved filtered views",
+      "rationale": "Saved filtered views, user view preferences, viewlet descriptors, action metadata, reusable filters, reusable sorts, and reusable grouping/aggregation configuration remain matrix gaps.",
+      "exports": [
+        "Action",
+        "ActionCategory",
+        "Aggregation",
+        "AllValuesFunc",
+        "AttributeFilter",
+        "ClassFilters",
+        "ClassSortFuncs",
+        "FilteredView",
+        "FilterMode",
+        "Groupping",
+        "IgnoreActions",
+        "Viewlet",
+        "ViewletDescriptor",
+        "ViewletPreference"
+      ]
+    },
+    {
+      "package": "@hcengineering/view",
+      "status": "not-mcp-facing",
+      "rationale": "View presenters, editors, validators, link providers, object factories, headers, tooltips, and list/panel UI extension points are client presentation metadata rather than first-class LLM-facing resources.",
+      "exports": [
+        "ActivityAttributePresenter",
+        "ArrayEditor",
+        "AttrPresenter",
+        "AttributeEditor",
+        "AttributeFilterPresenter",
+        "AttributePresenter",
+        "CollectionEditor",
+        "CollectionPresenter",
+        "CustomObjectLinkProvider",
+        "InlineAttributEditor",
+        "LinkIdProvider",
+        "LinkPresenter",
+        "LinkProvider",
+        "ListHeaderExtra",
+        "ListItemPresenter",
+        "ObjectEditor",
+        "ObjectEditorFooter",
+        "ObjectEditorHeader",
+        "ObjectFactory",
+        "ObjectIcon",
+        "ObjectIdentifier",
+        "ObjectPanel",
+        "ObjectPanelFooter",
+        "ObjectPresenter",
+        "ObjectTitle",
+        "ObjectTooltip",
+        "ObjectValidator",
+        "PreviewPresenter",
+        "ReferenceObjectProvider",
+        "SpaceHeader",
+        "SpaceName",
+        "SpacePresenter"
       ]
     },
     {

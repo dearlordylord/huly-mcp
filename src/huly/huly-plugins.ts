@@ -7,6 +7,7 @@
 export const activity = require("@hcengineering/activity").default as typeof import("@hcengineering/activity").default
 export const attachment = require("@hcengineering/attachment")
   .default as typeof import("@hcengineering/attachment").default
+export const board = require("@hcengineering/board").default as typeof import("@hcengineering/board").default
 export const calendar = require("@hcengineering/calendar")
   .default as typeof import("@hcengineering/calendar").default
 export const cardPlugin = require("@hcengineering/card")

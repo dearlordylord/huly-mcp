@@ -42,6 +42,7 @@ RECRUITING_CLEANUP_RELATED_ISSUE_ID=""
 RECRUITING_CLEANUP_PERSON_ID=""
 RECRUITING_CLEANUP_PERSON_EMAIL=""
 RECRUITING_CLEANUP_SKILL=""
+BOARD_CLEANUP_BOARD_ID=""
 TM_TASK_TYPE_NAME=""
 TM_STATUS_NAME=""
 WORKFLOW_CLEANED=false
@@ -235,7 +236,15 @@ cleanup_recruiting_artifacts() {
   fi
 }
 
+cleanup_board_artifacts() {
+  if [ -n "$BOARD_CLEANUP_BOARD_ID" ]; then
+    board_json=$(json_string "$BOARD_CLEANUP_BOARD_ID")
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_board\",\"arguments\":{\"board\":$board_json}},\"id\":2}" >/dev/null 2>&1 || true
+  fi
+}
+
 cleanup_all() {
+  cleanup_board_artifacts || true
   cleanup_recruiting_artifacts || true
   cleanup_generic_associations
   cleanup_workflow_artifacts || true
@@ -316,6 +325,16 @@ start_http_transport() {
   echo "ERROR: HTTP integration transport did not start"
   cat "$HTTP_SERVER_STDERR"
   return 1
+}
+
+restart_http_transport_if_needed() {
+  local reason="$1"
+  if [ "$INTEGRATION_TRANSPORT" != "http" ]; then
+    return 0
+  fi
+  echo "Restarting HTTP integration transport ($reason)"
+  cleanup_http_transport
+  start_http_transport
 }
 
 extract_http_json_response() {
@@ -3902,6 +3921,178 @@ else
   skip_test "delete_card(derived cards)" "Default card space has no master tags"
 fi
 skip_test "update_card" "requires card"
+echo ""
+
+##############################
+# 14b. BOARDS
+##############################
+echo "=== 14b. Boards ==="
+run_test "list_boards" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_boards","arguments":{"limit":3}},"id":2}'
+
+BOARD_NAME="IntTest Board $RUN_ID"
+BOARD_UPDATED_NAME="IntTest Board Updated $RUN_ID"
+BOARD_CARD_TITLE="IntTest Board Card $RUN_ID"
+BOARD_CARD_UPDATED_TITLE="IntTest Board Card Updated $RUN_ID"
+BOARD_NAME_JSON=$(json_string "$BOARD_NAME")
+BOARD_UPDATED_NAME_JSON=$(json_string "$BOARD_UPDATED_NAME")
+BOARD_CARD_TITLE_JSON=$(json_string "$BOARD_CARD_TITLE")
+BOARD_CARD_UPDATED_TITLE_JSON=$(json_string "$BOARD_CARD_UPDATED_TITLE")
+
+run_capture_to_var BOARD_PROJECT_TYPES_TEXT "list_project_types(board model probe)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_project_types","arguments":{}},"id":2}'
+if [ $? -eq 0 ]; then
+  BOARD_PROJECT_TYPE_ID=$(printf '%s\n' "$BOARD_PROJECT_TYPES_TEXT" | jq -r '.projectTypes[]? | select(.descriptor == "board:descriptors:BoardType") | .id' 2>/dev/null | head -n1)
+else
+  BOARD_PROJECT_TYPE_ID=""
+fi
+
+if [ -z "$BOARD_PROJECT_TYPE_ID" ]; then
+  run_expect_error_contains "create_board($BOARD_NAME missing board model)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_board\",\"arguments\":{\"name\":$BOARD_NAME_JSON,\"description\":\"Temporary integration board\",\"private\":true}},\"id\":2}" \
+    "Board project type 'board:descriptors:BoardType' not found"
+  echo "INFO: board write and card CRUD checks require a board project type model in the workspace"
+else
+run_capture_to_var BOARD_CREATE_TEXT "create_board($BOARD_NAME)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_board\",\"arguments\":{\"name\":$BOARD_NAME_JSON,\"description\":\"Temporary integration board\",\"private\":true,\"projectType\":\"$BOARD_PROJECT_TYPE_ID\"}},\"id\":2}"
+if [ $? -eq 0 ]; then
+  BOARD_CLEANUP_BOARD_ID=$(printf '%s\n' "$BOARD_CREATE_TEXT" | jq -r '.id // empty' 2>/dev/null)
+else
+  BOARD_CLEANUP_BOARD_ID=""
+fi
+
+if [ -n "$BOARD_CLEANUP_BOARD_ID" ]; then
+  restart_http_transport_if_needed "after create_board" || exit 1
+  sleep 2
+  BOARD_ID_JSON=$(json_string "$BOARD_CLEANUP_BOARD_ID")
+  assert_json_field_equals "create_board returns created true" "$BOARD_CREATE_TEXT" ".created" "true"
+  run_capture_to_var BOARD_GET_TEXT "get_board($BOARD_CLEANUP_BOARD_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_board\",\"arguments\":{\"board\":$BOARD_ID_JSON}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    assert_json_field_equals "get_board returns created board" "$BOARD_GET_TEXT" ".id" "$BOARD_CLEANUP_BOARD_ID"
+  fi
+
+  run_capture_to_var BOARD_UPDATE_TEXT "update_board($BOARD_CLEANUP_BOARD_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_board\",\"arguments\":{\"board\":$BOARD_ID_JSON,\"name\":$BOARD_UPDATED_NAME_JSON,\"description\":\"Updated integration board\",\"private\":false}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    assert_json_field_equals "update_board reports updated" "$BOARD_UPDATE_TEXT" ".updated" "true"
+  fi
+  restart_http_transport_if_needed "after update_board" || exit 1
+
+  run_capture_to_var BOARD_GET_BY_NAME_TEXT "get_board($BOARD_UPDATED_NAME)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_board\",\"arguments\":{\"board\":$BOARD_UPDATED_NAME_JSON}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    assert_json_field_equals "get_board by updated name returns id" "$BOARD_GET_BY_NAME_TEXT" ".id" "$BOARD_CLEANUP_BOARD_ID"
+  fi
+
+  run_capture_to_var BOARD_ARCHIVE_TEXT "archive_board($BOARD_CLEANUP_BOARD_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_board\",\"arguments\":{\"board\":$BOARD_ID_JSON}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    assert_json_field_equals "archive_board reports updated" "$BOARD_ARCHIVE_TEXT" ".updated" "true"
+  fi
+  restart_http_transport_if_needed "after archive_board" || exit 1
+  run_capture_to_var BOARD_UNARCHIVE_TEXT "unarchive_board($BOARD_CLEANUP_BOARD_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unarchive_board\",\"arguments\":{\"board\":$BOARD_ID_JSON}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    assert_json_field_equals "unarchive_board reports updated" "$BOARD_UNARCHIVE_TEXT" ".updated" "true"
+  fi
+  restart_http_transport_if_needed "after unarchive_board" || exit 1
+
+  run_capture_to_var BOARD_CARD_CREATE_TEXT "create_board_card($BOARD_CARD_TITLE)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_board_card\",\"arguments\":{\"board\":$BOARD_ID_JSON,\"title\":$BOARD_CARD_TITLE_JSON,\"description\":\"Temporary **board** card\",\"location\":\"Integration lab\",\"cover\":{\"color\":2,\"size\":\"small\"},\"startDate\":1700000000000,\"dueDate\":1700086400000}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    BOARD_CARD_ID=$(printf '%s\n' "$BOARD_CARD_CREATE_TEXT" | jq -r '.id // empty' 2>/dev/null)
+    BOARD_CARD_IDENTIFIER=$(printf '%s\n' "$BOARD_CARD_CREATE_TEXT" | jq -r '.identifier // empty' 2>/dev/null)
+    BOARD_CARD_NUMBER=$(printf '%s\n' "$BOARD_CARD_CREATE_TEXT" | jq -r '.number // empty' 2>/dev/null)
+  else
+    BOARD_CARD_ID=""
+    BOARD_CARD_IDENTIFIER=""
+    BOARD_CARD_NUMBER=""
+  fi
+
+  if [ -n "$BOARD_CARD_ID" ]; then
+    restart_http_transport_if_needed "after create_board_card" || exit 1
+    sleep 2
+    BOARD_CARD_ID_JSON=$(json_string "$BOARD_CARD_ID")
+    BOARD_CARD_IDENTIFIER_JSON=$(json_string "$BOARD_CARD_IDENTIFIER")
+    BOARD_CARD_NUMBER_JSON=$(json_string "$BOARD_CARD_NUMBER")
+    run_capture_to_var BOARD_CARD_GET_TEXT "get_board_card(id:$BOARD_CARD_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_board_card\",\"arguments\":{\"board\":$BOARD_ID_JSON,\"card\":$BOARD_CARD_ID_JSON}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "get_board_card by id returns title" "$BOARD_CARD_GET_TEXT" ".title" "$BOARD_CARD_TITLE"
+    fi
+    run_capture_to_var BOARD_CARD_GET_IDENTIFIER_TEXT "get_board_card(identifier:$BOARD_CARD_IDENTIFIER)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_board_card\",\"arguments\":{\"board\":$BOARD_ID_JSON,\"card\":$BOARD_CARD_IDENTIFIER_JSON}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "get_board_card by identifier returns id" "$BOARD_CARD_GET_IDENTIFIER_TEXT" ".id" "$BOARD_CARD_ID"
+    fi
+    run_capture_to_var BOARD_CARD_GET_NUMBER_TEXT "get_board_card(number:$BOARD_CARD_NUMBER)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_board_card\",\"arguments\":{\"board\":$BOARD_ID_JSON,\"card\":$BOARD_CARD_NUMBER_JSON}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "get_board_card by bare number returns id" "$BOARD_CARD_GET_NUMBER_TEXT" ".id" "$BOARD_CARD_ID"
+    fi
+    run_capture_to_var BOARD_CARD_LIST_TEXT "list_board_cards($BOARD_CLEANUP_BOARD_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_board_cards\",\"arguments\":{\"board\":$BOARD_ID_JSON,\"titleSearch\":\"IntTest Board Card\",\"limit\":10}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      assert_json_array_contains "list_board_cards includes created card" "$BOARD_CARD_LIST_TEXT" ".cards | map(.id)" "$BOARD_CARD_ID"
+    fi
+
+    run_capture_to_var BOARD_CARD_UPDATE_TEXT "update_board_card($BOARD_CARD_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_board_card\",\"arguments\":{\"board\":$BOARD_ID_JSON,\"card\":$BOARD_CARD_ID_JSON,\"title\":$BOARD_CARD_UPDATED_TITLE_JSON,\"description\":\"Updated board card\",\"location\":null,\"cover\":null,\"startDate\":null,\"dueDate\":null}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "update_board_card reports updated" "$BOARD_CARD_UPDATE_TEXT" ".updated" "true"
+    fi
+    restart_http_transport_if_needed "after update_board_card" || exit 1
+    sleep 2
+    run_capture_to_var BOARD_CARD_GET_UPDATED_TEXT "get_board_card(updated title)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_board_card\",\"arguments\":{\"board\":$BOARD_ID_JSON,\"card\":$BOARD_CARD_UPDATED_TITLE_JSON}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "get_board_card by updated title returns id" "$BOARD_CARD_GET_UPDATED_TEXT" ".id" "$BOARD_CARD_ID"
+    fi
+
+    run_expect_error_contains "delete_board_card(active rejected)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_board_card\",\"arguments\":{\"board\":$BOARD_ID_JSON,\"card\":$BOARD_CARD_ID_JSON}},\"id\":2}" \
+      "must be archived before delete_board_card"
+    run_capture_to_var BOARD_CARD_ARCHIVE_TEXT "archive_board_card($BOARD_CARD_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_board_card\",\"arguments\":{\"board\":$BOARD_ID_JSON,\"card\":$BOARD_CARD_ID_JSON}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "archive_board_card reports updated" "$BOARD_CARD_ARCHIVE_TEXT" ".updated" "true"
+    fi
+    restart_http_transport_if_needed "after archive_board_card" || exit 1
+    run_capture_to_var BOARD_CARD_UNARCHIVE_TEXT "unarchive_board_card($BOARD_CARD_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unarchive_board_card\",\"arguments\":{\"board\":$BOARD_ID_JSON,\"card\":$BOARD_CARD_ID_JSON}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "unarchive_board_card reports updated" "$BOARD_CARD_UNARCHIVE_TEXT" ".updated" "true"
+    fi
+    restart_http_transport_if_needed "after unarchive_board_card" || exit 1
+    run_capture_to_var BOARD_CARD_ARCHIVE_DELETE_TEXT "archive_board_card(before delete:$BOARD_CARD_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_board_card\",\"arguments\":{\"board\":$BOARD_ID_JSON,\"card\":$BOARD_CARD_ID_JSON}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "archive_board_card before delete reports updated" "$BOARD_CARD_ARCHIVE_DELETE_TEXT" ".updated" "true"
+    fi
+    restart_http_transport_if_needed "after archive_board_card before delete" || exit 1
+    run_capture_to_var BOARD_CARD_DELETE_TEXT "delete_board_card($BOARD_CARD_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_board_card\",\"arguments\":{\"board\":$BOARD_ID_JSON,\"card\":$BOARD_CARD_ID_JSON}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "delete_board_card deletes archived card" "$BOARD_CARD_DELETE_TEXT" ".deleted" "true"
+    fi
+  else
+    fail_test "create_board_card($BOARD_CARD_TITLE) returns id" "missing id"
+    skip_test "get/list/update/archive/delete board card" "create_board_card did not return a card id"
+  fi
+
+  run_capture_to_var BOARD_FINAL_ARCHIVE_TEXT "archive_board(cleanup:$BOARD_CLEANUP_BOARD_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_board\",\"arguments\":{\"board\":$BOARD_ID_JSON}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    assert_json_field_equals "archive_board cleanup reports updated" "$BOARD_FINAL_ARCHIVE_TEXT" ".updated" "true"
+    BOARD_CLEANUP_BOARD_ID=""
+  fi
+else
+  fail_test "create_board($BOARD_NAME) returns id" "missing id"
+  skip_test "get/update/archive/unarchive board" "create_board did not return a board id"
+  skip_test "create/get/update/archive/delete board card" "create_board did not return a board id"
+fi
+fi
 echo ""
 
 ##############################

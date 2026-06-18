@@ -4,6 +4,7 @@ import type { WorkspaceClientOperations } from "../../huly/workspace-client.js"
 import type { McpToolResponse } from "../error-mapping.js"
 import { activityTools } from "./activity.js"
 import { attachmentTools } from "./attachments.js"
+import { boardTools } from "./boards.js"
 import { calendarTools } from "./calendar.js"
 import { cardTools } from "./cards.js"
 import { channelTools } from "./channels.js"
@@ -78,6 +79,7 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...attachmentTools,
   ...contactTools,
   ...channelTools,
+  ...boardTools,
   ...cardTools,
   ...leadTools,
   ...recruitingTools,

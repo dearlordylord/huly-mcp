@@ -10,6 +10,12 @@
     "module": "NodeNext",
     "moduleDetection": "force",
     "moduleResolution": "NodeNext",
+    "baseUrl": ".",
+    "paths": {
+      "@hcengineering/theme": ["node_modules/@hcengineering/theme/types/index.d.ts"],
+      "@hcengineering/ui": ["node_modules/@hcengineering/ui/types/index.d.ts"],
+      "@hcengineering/ui/src/types": ["node_modules/@hcengineering/ui/types/types.d.ts"]
+    },
 
     // Import Handling
     "verbatimModuleSyntax": true,

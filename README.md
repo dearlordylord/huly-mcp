@@ -322,7 +322,7 @@ SDK upgrade revisit:
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
 ## Available Tools
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `templates`, `planner`, `processes`, `recruiting`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `virtual-office`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `boards`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `templates`, `planner`, `processes`, `recruiting`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `virtual-office`
 
 ### Projects
 
@@ -621,6 +621,24 @@ SDK upgrade revisit:
 | `update_guest_settings` | Update workspace guest settings. Control read-only guest access and guest sign-up permissions. |
 | `create_access_link` | Create a Huly workspace access link. When role is omitted, role=GUEST. Supports anonymous reusable guest links by setting personalized=false with notBefore and expiration, and can restrict access to specific Huly space IDs via spaces. |
 | `get_regions` | Get available regions for workspace creation. Returns region codes and display names. |
+
+### Boards
+
+| Tool | Description |
+|------|-------------|
+| `list_boards` | List Huly boards from @hcengineering/board, sorted by name. Boards are task.Project-backed spaces; this is not the separate Huly Card module. |
+| `get_board` | Get one Huly board by board _id or exact board name. Returns board metadata, project type, and card count. |
+| `create_board` | Create a Huly board. Idempotent by exact active board name; pass projectType by _id or exact name only when the default board project type is ambiguous. |
+| `update_board` | Update a Huly board's name, description, or privacy. board accepts board _id or exact board name. |
+| `archive_board` | Archive a Huly board by board _id or exact board name. This hides the board but does not delete cards. |
+| `unarchive_board` | Unarchive a Huly board by board _id or exact board name. |
+| `list_board_cards` | List cards on one @hcengineering/board board. board accepts board _id or exact board name; cards are sorted newest modified first. |
+| `get_board_card` | Get one board card. board accepts board _id or exact board name; card accepts card _id, CARD-123, bare number 123, or exact title scoped to the board. |
+| `create_board_card` | Create a board card with safe defaults. Resolves kind/status from the board project type, increments the CARD-number sequence, and stores markdown description as inline Huly Markup. |
+| `update_board_card` | Update board card fields: title, markdown description, status, assignee, members, location, cover, startDate, and dueDate. Use null to clear clearable fields. |
+| `archive_board_card` | Archive a board card. card accepts _id, CARD-123, bare number, or exact title scoped to the board. |
+| `unarchive_board_card` | Unarchive a board card. card accepts _id, CARD-123, bare number, or exact title scoped to the board. |
+| `delete_board_card` | Permanently delete an already archived board card using Huly removeCollection. Active cards are rejected; call archive_board_card first. |
 
 ### Cards
 
