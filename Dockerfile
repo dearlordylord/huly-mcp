@@ -20,6 +20,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV MCP_TRANSPORT=http
 ENV MCP_HTTP_HOST=0.0.0.0
+ENV PORT=8080
+
+EXPOSE 8080
 
 COPY package.json pnpm-lock.yaml ./
 RUN corepack enable \

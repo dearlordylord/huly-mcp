@@ -37,6 +37,7 @@
     "verify-version": "node -e \"const v=require('./package.json').version; const d=require('fs').readFileSync('dist/index.cjs','utf8'); if(!d.includes('\\\"'+v+'\\\"'))throw new Error('dist version mismatch: expected '+v)\"",
     "verify-registry-metadata": "node scripts/sync-registry-metadata.mjs --check",
     "verify-sdk-parity": "node scripts/audit-sdk-parity.mjs",
+    "smoke:http-no-config": "node scripts/smoke-http-no-config.mjs",
     "sync-registry-metadata": "node scripts/sync-registry-metadata.mjs",
     "prepack": "pnpm build && pnpm verify-version",
     "prepublishOnly": "pnpm check-all && pnpm verify-version",

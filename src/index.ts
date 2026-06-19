@@ -184,26 +184,24 @@ const createHttpClientResolver = (
     const existing = requestClients.get(req)
     if (existing !== undefined) return existing
 
-    const clients = Effect.runPromise(
-      hulyConfigProviderFromHeaders(req.headers).pipe(
-        Effect.flatMap((configProvider) => {
-          if (configProvider === undefined) return Effect.promise(resolveEnvClients)
+    const clients = Effect.runPromise(hulyConfigProviderFromHeaders(req.headers)).then((configProvider) => {
+      if (configProvider === undefined) return resolveEnvClients()
 
-          return buildScopedClientBundle(combinedClientLayer).pipe(
-            Effect.withConfigProvider(configProvider),
-            Effect.map(({ bundle, close }) => {
-              let closed = false
-              req.on("close", () => {
-                if (closed) return
-                closed = true
-                close()
-              })
-              return bundle
+      return Effect.runPromise(
+        buildScopedClientBundle(combinedClientLayer).pipe(
+          Effect.withConfigProvider(configProvider),
+          Effect.map(({ bundle, close }) => {
+            let closed = false
+            req.on("close", () => {
+              if (closed) return
+              closed = true
+              close()
             })
-          )
-        })
+            return bundle
+          })
+        )
       )
-    )
+    })
     requestClients.set(req, clients)
     return clients
   }
