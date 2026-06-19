@@ -1,5 +1,16 @@
 # @firfi/huly-mcp
 
+## 0.39.0
+
+### Minor Changes
+
+- 6c95da4: Lead with "Huly MCP" branding in the README, website, and registry metadata.
+
+### Patch Changes
+
+- ff26b6c: Hoist nested JSON Schema definitions when advertising MCP tool schemas so strict clients can resolve all local `$ref` values from the schema root.
+- 748fd1c: Enable stricter indexed-access type checking across the TypeScript harness, replacing unchecked array/object reads with explicit assertions or domain error branches while preserving ambiguous-entity errors in Huly resolvers.
+
 ## 0.38.0
 
 ### Minor Changes
