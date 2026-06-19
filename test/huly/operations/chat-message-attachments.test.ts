@@ -1,3 +1,4 @@
+import { assertAt } from "../../../src/utils/assertions.js"
 /* eslint-disable no-restricted-syntax -- test fixtures bridge Huly SDK phantom refs and generic fake-client signatures */
 import { describe, it } from "@effect/vitest"
 import type { ActivityMessage } from "@hcengineering/activity"
@@ -245,7 +246,7 @@ const layerFor = (state: State): Layer.Layer<HulyClient | HulyStorageClient> => 
   const findOne: HulyClientOperations["findOne"] = <T extends Doc>(
     classRef: Ref<Class<T>>,
     query: DocumentQuery<T>
-  ) => Effect.map(findAll(classRef, query), (docs) => docs[0])
+  ) => Effect.map(findAll(classRef, query), (docs) => docs.at(0))
 
   const addCollection: HulyClientOperations["addCollection"] = <T extends Doc, P extends AttachedDoc>(
     classRef: Ref<Class<P>>,
@@ -280,7 +281,12 @@ const layerFor = (state: State): Layer.Layer<HulyClient | HulyStorageClient> => 
   ) => {
     if (classRef === attachment.class.Attachment) {
       const index = state.attachments.findIndex((candidate) => String(candidate._id) === String(objectId))
-      if (index >= 0) state.attachments[index] = { ...state.attachments[index], ...operations }
+      if (index >= 0) {
+        state.attachments[index] = {
+          ...assertAt(state.attachments, index),
+          ...(operations as unknown as Partial<HulyAttachment>)
+        }
+      }
       state.updateCalls.push({
         objectId: String(objectId),
         operations: operations as unknown as DocumentUpdate<HulyAttachment>

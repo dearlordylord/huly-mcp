@@ -132,7 +132,7 @@ const httpStatusForErrorCode = (code: number): number => {
 const acceptsModernResponseTypes = (req: Request): boolean => {
   const accept = firstHeader(req.headers.accept)
   if (accept === undefined) return false
-  const parts = accept.split(",").map(part => part.split(";")[0].trim().toLowerCase())
+  const parts = accept.split(",").map(part => (part.split(";")[0] ?? "").trim().toLowerCase())
   return parts.includes("application/json") && parts.includes("text/event-stream")
 }
 

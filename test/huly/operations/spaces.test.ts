@@ -18,6 +18,7 @@ import type {
 import { toFindResult } from "@hcengineering/core"
 import { Effect, Exit, Layer } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import {
   NonEmptyString,
@@ -320,7 +321,7 @@ const createTestLayer = (config: MockConfig) => {
   }
 
   const findOne: HulyClientOperations["findOne"] = <T extends Doc>(_class: Ref<Class<T>>, query: DocumentQuery<T>) =>
-    findAll(_class, query).pipe(Effect.map((result) => result[0]))
+    findAll(_class, query).pipe(Effect.map((result) => result.at(0)))
 
   const client: HulyClientOperations = {
     getAccountUuid: () => accountA,
@@ -615,10 +616,10 @@ describe("spaces operations", () => {
 
       expect(result.roleAssignments).toEqual([{ roleId: "role-admin", members: [accountA] }])
       expect(warnings).toHaveLength(1)
-      expect(warnings[0].code).toBe("space_role_assignments_degraded")
-      expect(warnings[0].message).toContain("role-viewer")
-      expect(warnings[0].message).toContain("role-unknown")
-      expect(warnings[0].message).toContain("malformed account UUID")
+      expect(assertAt(warnings, 0).code).toBe("space_role_assignments_degraded")
+      expect(assertAt(warnings, 0).message).toContain("role-viewer")
+      expect(assertAt(warnings, 0).message).toContain("role-unknown")
+      expect(assertAt(warnings, 0).message).toContain("malformed account UUID")
     }))
 
   it.effect("getSpace drops a non-object role assignment mixin and warns the agent", () =>
@@ -642,8 +643,8 @@ describe("spaces operations", () => {
 
       expect(result.roleAssignments).toBeUndefined()
       expect(warnings).toHaveLength(1)
-      expect(warnings[0].code).toBe("space_role_assignments_degraded")
-      expect(warnings[0].message).toContain("role assignment mixin core:class:Space is not an object")
+      expect(assertAt(warnings, 0).code).toBe("space_role_assignments_degraded")
+      expect(assertAt(warnings, 0).message).toContain("role assignment mixin core:class:Space is not an object")
     }))
 
   it.effect("listSpaces filters by raw class and type", () =>
@@ -660,7 +661,7 @@ describe("spaces operations", () => {
       }).pipe(Effect.provide(layer))
 
       expect(result.spaces.map((space) => space.id)).toEqual(["space-b"])
-      expect(result.spaces[0].type).toBe("space-type-b")
+      expect(assertAt(result.spaces, 0).type).toBe("space-type-b")
     }))
 
   it.effect("listSpaces requests and returns a counted SDK total", () =>
@@ -672,7 +673,7 @@ describe("spaces operations", () => {
 
       expect(result.spaces).toHaveLength(1)
       expect(result.total).toBe(7)
-      expect(captureFindOptions[0]).toMatchObject({ total: true })
+      expect(assertAt(captureFindOptions, 0)).toMatchObject({ total: true })
     }))
 
   it.effect("listSpaceTypes and getSpaceType include descriptors, roles, and permissions", () =>
@@ -691,21 +692,21 @@ describe("spaces operations", () => {
       const listed = yield* listSpaceTypes({}).pipe(Effect.provide(layer))
       const detail = yield* getSpaceType({ spaceType: spaceTypeIdentifier("space-type-1") }).pipe(Effect.provide(layer))
 
-      expect(listed.spaceTypes[0]).toMatchObject({
+      expect(assertAt(listed.spaceTypes, 0)).toMatchObject({
         id: "space-type-1",
         descriptor: "descriptor-1",
         baseClass: core.class.Space,
         targetClass: core.class.Space,
         rolesCount: 1
       })
-      expect(detail.roles[0]).toMatchObject({
+      expect(assertAt(detail.roles, 0)).toMatchObject({
         id: "role-admin",
         name: "Admins",
         permissions: ["permission-update"],
         permissionLabels: ["Update space"]
       })
       expect(detail.shortDescription).toBe("Short type")
-      expect(detail.availablePermissions[0].id).toBe("permission-update")
+      expect(assertAt(detail.availablePermissions, 0).id).toBe("permission-update")
     }))
 
   it.effect("listSpaceTypes filters targetClass and handles missing descriptors", () =>
@@ -719,7 +720,7 @@ describe("spaces operations", () => {
       )
 
       expect(result.spaceTypes).toHaveLength(1)
-      expect(result.spaceTypes[0]).toMatchObject({
+      expect(assertAt(result.spaceTypes, 0)).toMatchObject({
         id: "space-type-a",
         baseClass: undefined,
         targetClass: "module:class:A"
@@ -807,7 +808,7 @@ describe("spaces operations", () => {
         Effect.provide(createTestLayer({ permissions: [permission] }))
       )
 
-      expect(result.permissions[0]).toMatchObject({
+      expect(assertAt(result.permissions, 0)).toMatchObject({
         id: "permission-update",
         description: undefined,
         objectClass: undefined

@@ -59,6 +59,7 @@ import {
   updateUserProfileParamsJsonSchema
 } from "../../src/domain/schemas.js"
 import { PersonRefSchema } from "../../src/domain/schemas/issues.js"
+import { assertExists } from "../../src/utils/assertions.js"
 
 // Helper type for JSON Schema assertions
 type JsonSchemaObject = {
@@ -1007,7 +1008,7 @@ describe("Domain Schemas", () => {
         expect(properties).toHaveProperty("new_text")
         expect(properties).toHaveProperty("replace_all")
         expect(properties).toHaveProperty("content")
-        expect(properties.old_text.pattern).toBe("\\S")
+        expect(assertExists(properties.old_text).pattern).toBe("\\S")
       }))
 
     it.effect("generates JSON Schema for DeleteDocumentParams", () =>

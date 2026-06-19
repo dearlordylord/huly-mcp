@@ -4,6 +4,7 @@ import { type AccountUuid as HulyAccountUuid, type Data, generateId, type Ref, t
 import { Effect } from "effect"
 
 import { Count, type DirectMessageIdentifier } from "../../domain/schemas/shared.js"
+import { isSingle } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { DirectMessageIdentifierAmbiguousError, DirectMessageNotFoundError } from "../errors.js"
 import { chunter, contact, core } from "../huly-plugins.js"
@@ -88,7 +89,8 @@ export const findDirectMessage = (
       return yield* new DirectMessageIdentifierAmbiguousError({ identifier, matches: Count.make(matches.length) })
     }
 
-    return { client, dm: matches[0] }
+    if (isSingle(matches)) return { client, dm: matches[0] }
+    return yield* new DirectMessageNotFoundError({ identifier })
   })
 
 export const createDirectMessageSpace = (

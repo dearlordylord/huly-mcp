@@ -21,6 +21,7 @@ import {
   setIssueMilestone,
   updateMilestone
 } from "../../../src/huly/operations/milestones.js"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import { tracker } from "../../../src/huly/huly-plugins.js"
 import { markdownToMarkupString, testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
@@ -236,8 +237,8 @@ describe("listMilestones", () => {
         const result = yield* listMilestones({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(2)
-        expect(result[0].label).toBe("Sprint 1")
-        expect(result[1].label).toBe("Sprint 2")
+        expect(assertAt(result, 0).label).toBe("Sprint 1")
+        expect(assertAt(result, 1).label).toBe("Sprint 2")
       }))
 
     it.effect("transforms status correctly", () =>
@@ -257,10 +258,10 @@ describe("listMilestones", () => {
 
         const result = yield* listMilestones({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
 
-        expect(result[0].status).toBe("planned")
-        expect(result[1].status).toBe("in-progress")
-        expect(result[2].status).toBe("completed")
-        expect(result[3].status).toBe("canceled")
+        expect(assertAt(result, 0).status).toBe("planned")
+        expect(assertAt(result, 1).status).toBe("in-progress")
+        expect(assertAt(result, 2).status).toBe("completed")
+        expect(assertAt(result, 3).status).toBe("canceled")
       }))
 
     it.effect("returns empty array when no milestones", () =>

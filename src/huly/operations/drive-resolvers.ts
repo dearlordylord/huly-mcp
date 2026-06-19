@@ -2,6 +2,7 @@ import type { Class, Doc, PersonId, Ref } from "@hcengineering/core"
 import { Clock, Effect } from "effect"
 
 import type { DriveItemId } from "../../domain/schemas/drive.js"
+import { isSingle } from "../../utils/assertions.js"
 import type { HulyClientError, HulyClientOperations } from "../client.js"
 import {
   computeChildPath,
@@ -47,7 +48,7 @@ export const resolveDrive = (
     if (byId !== undefined) return byId
 
     const byName = yield* client.findAll<DriveSpace>(drive.class.Drive, hulyQuery<DriveSpace>({ name: identifier }))
-    if (byName.length === 1) return byName[0]
+    if (isSingle(byName)) return byName[0]
     if (byName.length > 1) {
       return yield* Effect.fail(
         new DriveIdentifierAmbiguousError({
@@ -92,10 +93,16 @@ export const resolvePath = (
           })
         )
       }
-      current = candidates[0]
-      currentPath = childPath(currentPath, current.title)
+      if (!isSingle(candidates)) {
+        return yield* Effect.fail(
+          new DrivePathNotFoundError({ drive: driveSpace.name, path: childPath(currentPath, segment) })
+        )
+      }
+      const currentItem = candidates[0]
+      current = currentItem
+      currentPath = childPath(currentPath, currentItem.title)
       if (segment !== lastSegment) {
-        if (!isFolder(current)) {
+        if (!isFolder(currentItem)) {
           return yield* Effect.fail(
             new DriveParentNotFolderError({
               drive: driveSpace.name,
@@ -104,7 +111,7 @@ export const resolvePath = (
             })
           )
         }
-        parent = current._id
+        parent = currentItem._id
       }
     }
 
@@ -246,7 +253,7 @@ export const ensureFolderPath = (
           })
         )
       }
-      if (matches.length === 1) {
+      if (isSingle(matches)) {
         const existing = matches[0]
         if (!isFolder(existing)) {
           return yield* Effect.fail(

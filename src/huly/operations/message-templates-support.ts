@@ -28,6 +28,7 @@ import {
 } from "../../domain/schemas/message-templates.js"
 import { Count, type NonEmptyString, Timestamp } from "../../domain/schemas/shared.js"
 import { MessageTemplateMetadataDegradedWarningCode } from "../../domain/schemas/tool-warnings.js"
+import { assertAt } from "../../utils/assertions.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import { Diagnostics } from "../diagnostics.js"
 import {
@@ -133,7 +134,10 @@ export const categorySummaryFor = (category: HulyTemplateCategory): MessageTempl
 const placeholderFieldIds = (markdown: string): Array<TemplateFieldId> => {
   const regexp = new RegExp(templateFieldRegexp.source, templateFieldRegexp.flags)
   const ids = [...markdown.matchAll(regexp)]
-    .map((match) => match[1])
+    .flatMap((match) => {
+      const id = assertAt(match, 1)
+      return [id]
+    })
     .filter((id, index, allIds) => id.length > 0 && allIds.indexOf(id) === index)
 
   return ids.map((id) => TemplateFieldId.make(id))
@@ -222,7 +226,7 @@ export const resolveCategory = (
         matches: Count.make(matches.length)
       })
     }
-    return matches[0]
+    return assertAt(matches, 0)
   })
 
 export const categoryMapFor = (
@@ -328,7 +332,7 @@ export const resolveTemplate = (
         matches: Count.make(matches.length)
       })
     }
-    return matches[0]
+    return assertAt(matches, 0)
   })
 
 export const resolveFieldCategory = (
@@ -360,7 +364,7 @@ export const resolveFieldCategory = (
         matches: Count.make(matches.length)
       })
     }
-    return matches[0]
+    return assertAt(matches, 0)
   })
 
 export const fieldCategoryMapFor = (

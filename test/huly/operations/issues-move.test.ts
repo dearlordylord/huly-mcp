@@ -1,3 +1,4 @@
+import { assertAt } from "../../../src/utils/assertions.js"
 /* eslint-disable no-restricted-syntax -- test fixtures build Huly SDK tracker docs whose nominal types are not structurally compatible with plain object literals, and branded refs have no runtime constructors */
 import { describe, it } from "@effect/vitest"
 import { type Ref, toFindResult } from "@hcengineering/core"
@@ -111,19 +112,19 @@ describe("moveIssue — to a new parent", () => {
       expect(result).toEqual({ identifier: "TEST-1", moved: true, newParent: "TEST-9" })
 
       // main move
-      expect(updates[0].id).toBe("issue-1")
-      expect(updates[0].ops).toEqual({
+      expect(assertAt(updates, 0).id).toBe("issue-1")
+      expect(assertAt(updates, 0).ops).toEqual({
         attachedTo: "issue-9",
         attachedToClass: tracker.class.Issue,
         collection: "subIssues",
         parents: [{ parentId: "issue-9", identifier: "TEST-9", parentTitle: "Issue TEST-9", space: PROJECT_ID }]
       })
       // decrement old parent, increment new parent
-      expect(updates[1]).toEqual({ id: "old-parent", ops: { $inc: { subIssues: -1 } } })
-      expect(updates[2]).toEqual({ id: "issue-9", ops: { $inc: { subIssues: 1 } } })
+      expect(assertAt(updates, 1)).toEqual({ id: "old-parent", ops: { $inc: { subIssues: -1 } } })
+      expect(assertAt(updates, 2)).toEqual({ id: "issue-9", ops: { $inc: { subIssues: 1 } } })
       // descendant re-thread (no recursion since the child has no sub-issues)
-      expect(updates[3].id).toBe("issue-2")
-      expect(updates[3].ops).toEqual({
+      expect(assertAt(updates, 3).id).toBe("issue-2")
+      expect(assertAt(updates, 3).ops).toEqual({
         parents: [
           { parentId: "issue-9", identifier: "TEST-9", parentTitle: "Issue TEST-9", space: PROJECT_ID },
           { parentId: "issue-1", identifier: "TEST-1", parentTitle: "Issue TEST-1", space: PROJECT_ID }
@@ -180,14 +181,14 @@ describe("moveIssue — to top-level", () => {
 
       expect(result).toEqual({ identifier: "TEST-1", moved: true })
       expect(result).not.toHaveProperty("newParent")
-      expect(updates[0].ops).toEqual({
+      expect(assertAt(updates, 0).ops).toEqual({
         attachedTo: PROJECT_ID,
         attachedToClass: tracker.class.Project,
         collection: "issues",
         parents: []
       })
       // decrement the old issue parent; no increment because it is now top-level
-      expect(updates[1]).toEqual({ id: "old-parent", ops: { $inc: { subIssues: -1 } } })
+      expect(assertAt(updates, 1)).toEqual({ id: "old-parent", ops: { $inc: { subIssues: -1 } } })
       expect(updates).toHaveLength(2)
     }))
 

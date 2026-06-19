@@ -1,3 +1,4 @@
+import { assertAt } from "../../../src/utils/assertions.js"
 /* eslint-disable no-restricted-syntax -- Huly SDK phantom refs are erased at runtime; this test file builds in-memory SDK fixtures. */
 import { describe, it } from "@effect/vitest"
 import type { ActivityMessage as HulyActivityMessage } from "@hcengineering/activity"
@@ -153,7 +154,7 @@ const makeHulyClient = (state: DriveToolState): HulyClientOperations => ({
   findAllInModel: <T extends Doc>(classRef: Ref<Class<T>>, query: DocumentQuery<T>) =>
     makeHulyClient(state).findAll(classRef, query),
   findOne: <T extends Doc>(classRef: Ref<Class<T>>, query: DocumentQuery<T>) =>
-    Effect.map(makeHulyClient(state).findAll(classRef, query), (docs) => docs[0]),
+    Effect.map(makeHulyClient(state).findAll(classRef, query), (docs) => docs.at(0)),
   createDoc: <T extends Doc>(
     classRef: Ref<Class<T>>,
     space: Ref<Space>,
@@ -185,7 +186,7 @@ const makeHulyClient = (state: DriveToolState): HulyClientOperations => ({
     if (classRef === chunter.class.ChatMessage) {
       const index = state.messages?.findIndex((candidate) => String(candidate._id) === String(objectId)) ?? -1
       if (state.messages !== undefined && index >= 0) {
-        const target = state.messages[index]
+        const target = assertAt(state.messages, index)
         state.messages[index] = {
           ...target,
 
@@ -195,7 +196,7 @@ const makeHulyClient = (state: DriveToolState): HulyClientOperations => ({
       return Effect.succeed([])
     }
     const targetIndex = state.drives.findIndex((candidate) => String(candidate._id) === String(objectId))
-    const target = state.drives[targetIndex]
+    const target = assertAt(state.drives, targetIndex)
     state.drives[targetIndex] = {
       ...target,
 
@@ -352,7 +353,7 @@ describe("driveTools", () => {
 
       expect(created.isError).toBeUndefined()
       expect(created.structuredContent?.result).toMatchObject({ created: true, drive: { name: "Team Drive" } })
-      expect(JSON.parse(created.content[0].text)).toMatchObject({ created: true })
+      expect(JSON.parse(assertAt(created.content, 0).text)).toMatchObject({ created: true })
       expect(updated.structuredContent?.result).toMatchObject({ updated: true, drive: { autoJoin: true } })
       expect(added.structuredContent?.result).toMatchObject({ changed: true, members: [accountA, accountB] })
       expect(removed.structuredContent?.result).toMatchObject({ changed: true, members: [accountB] })
@@ -439,10 +440,10 @@ describe("driveTools", () => {
 
       expect(parseError.isError).toBe(true)
       expect(parseError._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
-      expect(parseError.content[0].text).toContain("Invalid parameters for update_drive")
+      expect(assertAt(parseError.content, 0).text).toContain("Invalid parameters for update_drive")
       expect(domainError.isError).toBe(true)
       expect(domainError._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
-      expect(domainError.content[0].text).toContain("Drive 'Docs' is not empty")
+      expect(assertAt(domainError.content, 0).text).toContain("Drive 'Docs' is not empty")
     }))
 
   it.effect("Drive file comment handlers map parse and domain errors", () =>
@@ -473,9 +474,9 @@ describe("driveTools", () => {
 
       expect(parseError.isError).toBe(true)
       expect(parseError._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
-      expect(parseError.content[0].text).toContain("Invalid parameters for list_drive_file_comments")
+      expect(assertAt(parseError.content, 0).text).toContain("Invalid parameters for list_drive_file_comments")
       expect(domainError.isError).toBe(true)
       expect(domainError._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
-      expect(domainError.content[0].text).toContain("Drive file comment 'missing-comment'")
+      expect(assertAt(domainError.content, 0).text).toContain("Drive file comment 'missing-comment'")
     }))
 })

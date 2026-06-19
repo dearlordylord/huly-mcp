@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest"
 import { createPostHogTelemetry, type PostHogTelemetryDependencies } from "../../src/telemetry/posthog.js"
+import { assertAt } from "../../src/utils/assertions.js"
 import { mockFn } from "../helpers/mock-fn.js"
 
 const mockCapture = mockFn()
@@ -42,7 +43,7 @@ describe("createPostHogTelemetry", () => {
       })
 
       expect(mockCapture.mock.calls).toHaveLength(1)
-      const call = mockCapture.mock.calls[0][0]
+      const call = assertAt(mockCapture.mock.calls, 0)[0]
       expect(call.event).toBe("session_start")
       expect(call.properties).toMatchObject({
         transport: "stdio",
@@ -63,7 +64,7 @@ describe("createPostHogTelemetry", () => {
         toolsets: null
       })
 
-      const call = mockCapture.mock.calls[0][0]
+      const call = assertAt(mockCapture.mock.calls, 0)[0]
       expect(call.properties.transport).toBe("http")
       expect(call.properties.auth_method).toBe("password")
       expect(call.properties.tool_count).toBe(0)
@@ -80,7 +81,7 @@ describe("createPostHogTelemetry", () => {
       telemetry.firstListTools()
 
       const calls = mockCapture.mock.calls.filter(
-        (c) => c[0].event === "first_list_tools"
+        (c) => assertAt(c, 0).event === "first_list_tools"
       )
       expect(calls).toHaveLength(1)
     })
@@ -89,7 +90,7 @@ describe("createPostHogTelemetry", () => {
       const telemetry = createTelemetry(false)
       telemetry.firstListTools()
 
-      const call = mockCapture.mock.calls[0][0]
+      const call = assertAt(mockCapture.mock.calls, 0)[0]
       expect(call.event).toBe("first_list_tools")
       expect(call.properties.session_id).toBeTypeOf("string")
       expect(call.properties.version).toBeTypeOf("string")
@@ -106,7 +107,7 @@ describe("createPostHogTelemetry", () => {
       })
 
       expect(mockCapture.mock.calls).toHaveLength(1)
-      const call = mockCapture.mock.calls[0][0]
+      const call = assertAt(mockCapture.mock.calls, 0)[0]
       expect(call.event).toBe("tool_called")
       expect(call.properties).toMatchObject({
         tool_name: "list_issues",
@@ -123,7 +124,7 @@ describe("createPostHogTelemetry", () => {
         durationMs: 10
       })
 
-      const call = mockCapture.mock.calls[0][0]
+      const call = assertAt(mockCapture.mock.calls, 0)[0]
       expect(call.properties).not.toHaveProperty("error_tag")
     })
 
@@ -136,7 +137,7 @@ describe("createPostHogTelemetry", () => {
         durationMs: 150
       })
 
-      const call = mockCapture.mock.calls[0][0]
+      const call = assertAt(mockCapture.mock.calls, 0)[0]
       expect(call.properties.error_tag).toBe("HulyConnectionError")
       expect(call.properties.status).toBe("error")
     })
@@ -151,7 +152,7 @@ describe("createPostHogTelemetry", () => {
         outputBytes: 567
       })
 
-      const call = mockCapture.mock.calls[0][0]
+      const call = assertAt(mockCapture.mock.calls, 0)[0]
       expect(call.properties.input_bytes).toBe(1234)
       expect(call.properties.output_bytes).toBe(567)
     })
@@ -164,7 +165,7 @@ describe("createPostHogTelemetry", () => {
         durationMs: 10
       })
 
-      const call = mockCapture.mock.calls[0][0]
+      const call = assertAt(mockCapture.mock.calls, 0)[0]
       expect(call.properties).not.toHaveProperty("input_bytes")
       expect(call.properties).not.toHaveProperty("output_bytes")
     })
@@ -178,7 +179,7 @@ describe("createPostHogTelemetry", () => {
         editMode: "search_and_replace"
       })
 
-      const call = mockCapture.mock.calls[0][0]
+      const call = assertAt(mockCapture.mock.calls, 0)[0]
       expect(call.properties.edit_mode).toBe("search_and_replace")
     })
 
@@ -190,7 +191,7 @@ describe("createPostHogTelemetry", () => {
         durationMs: 10
       })
 
-      const call = mockCapture.mock.calls[0][0]
+      const call = assertAt(mockCapture.mock.calls, 0)[0]
       expect(call.properties).not.toHaveProperty("edit_mode")
     })
   })
@@ -201,7 +202,7 @@ describe("createPostHogTelemetry", () => {
       await telemetry.shutdown()
 
       const endCalls = mockCapture.mock.calls.filter(
-        (c) => c[0].event === "session_end"
+        (c) => assertAt(c, 0).event === "session_end"
       )
       expect(endCalls).toHaveLength(1)
       expect(mockShutdown.mock.calls).toHaveLength(1)
@@ -215,7 +216,7 @@ describe("createPostHogTelemetry", () => {
 
       // session_end should still have been captured before the rejection
       const endCalls = mockCapture.mock.calls.filter(
-        (c) => c[0].event === "session_end"
+        (c) => assertAt(c, 0).event === "session_end"
       )
       expect(endCalls).toHaveLength(1)
       expect(mockShutdown.mock.calls).toHaveLength(1)
@@ -321,10 +322,10 @@ describe("createPostHogTelemetry", () => {
       })
 
       expect(mockCapture.mock.calls).toHaveLength(3)
-      const ids = mockCapture.mock.calls.map((c) => c[0].distinctId)
-      expect(ids[0]).toBe(ids[1])
-      expect(ids[1]).toBe(ids[2])
-      expect(ids[0]).toMatch(/^[0-9a-f-]{36}$/)
+      const ids = mockCapture.mock.calls.map((c) => assertAt(c, 0).distinctId)
+      expect(assertAt(ids, 0)).toBe(assertAt(ids, 1))
+      expect(assertAt(ids, 1)).toBe(assertAt(ids, 2))
+      expect(assertAt(ids, 0)).toMatch(/^[0-9a-f-]{36}$/)
     })
 
     it("different instances get different session ids", () => {
@@ -335,8 +336,8 @@ describe("createPostHogTelemetry", () => {
 
       // Both capture but with different distinctIds
       expect(mockCapture.mock.calls).toHaveLength(2)
-      const id1 = mockCapture.mock.calls[0][0].distinctId
-      const id2 = mockCapture.mock.calls[1][0].distinctId
+      const id1 = assertAt(mockCapture.mock.calls, 0)[0].distinctId
+      const id2 = assertAt(mockCapture.mock.calls, 1)[0].distinctId
       expect(id1).not.toBe(id2)
     })
   })

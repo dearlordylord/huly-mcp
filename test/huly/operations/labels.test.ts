@@ -15,6 +15,7 @@ import {
   removeIssueLabel,
   updateLabel
 } from "../../../src/huly/operations/labels.js"
+import { assertAt } from "../../../src/utils/assertions.js"
 import { colorCode, issueIdentifier, projectIdentifier, tagIdentifier } from "../../helpers/brands.js"
 
 const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
@@ -222,8 +223,8 @@ describe("listLabels", () => {
       const result = yield* listLabels({}).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
-      expect(result[0].title).toBe("bug")
-      expect(result[1].title).toBe("feature")
+      expect(assertAt(result, 0).title).toBe("bug")
+      expect(assertAt(result, 1).title).toBe("feature")
     }))
 
   it.effect("returns empty array when no labels", () =>

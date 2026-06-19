@@ -6,6 +6,7 @@ import * as http from "node:http"
 import * as os from "node:os"
 import * as path from "node:path"
 import { expect } from "vitest"
+import { assertAt } from "../../src/utils/assertions.js"
 
 import { HulyConfigService } from "../../src/config/config.js"
 import { FileUploadError, HulyConnectionError, InvalidFileDataError } from "../../src/huly/errors.js"
@@ -245,10 +246,10 @@ describe("HulyStorageClient Service", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(uploads).toHaveLength(2)
-        expect(uploads[0].filename).toBe("image1.png")
-        expect(uploads[0].contentType).toBe("image/png")
-        expect(uploads[1].filename).toBe("image2.jpg")
-        expect(uploads[1].contentType).toBe("image/jpeg")
+        expect(assertAt(uploads, 0).filename).toBe("image1.png")
+        expect(assertAt(uploads, 0).contentType).toBe("image/png")
+        expect(assertAt(uploads, 1).filename).toBe("image2.jpg")
+        expect(assertAt(uploads, 1).contentType).toBe("image/jpeg")
       }))
   })
 })

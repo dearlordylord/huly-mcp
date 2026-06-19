@@ -4,6 +4,7 @@ import type { AccountUuid, Class, Doc, FindResult, PersonId, Ref } from "@hcengi
 import { toFindResult } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 
 import type { HulyClientOperations } from "../../../src/huly/client.js"
 import { board, core } from "../../../src/huly/huly-plugins.js"
@@ -13,6 +14,8 @@ import { testWorkbenchUrlConfig } from "../../../src/huly/url-builders.js"
 import { McpErrorCode } from "../../../src/mcp/error-mapping.js"
 import { boardTools } from "../../../src/mcp/tools/boards.js"
 import { createFilteredRegistry, TOOL_DEFINITIONS } from "../../../src/mcp/tools/index.js"
+
+const toolDefinition = (name: string) => assertExists(TOOL_DEFINITIONS[name], `Expected tool definition for ${name}`)
 
 const boardDoc: HulyBoard = {
   _id: "board-1" as Ref<HulyBoard>,
@@ -76,7 +79,7 @@ describe("board MCP tools", () => {
         "unarchive_board_card",
         "delete_board_card"
       ])
-      expect(TOOL_DEFINITIONS.list_boards.category).toBe("boards")
+      expect(toolDefinition("list_boards").category).toBe("boards")
     }))
 
   it.effect("serializes successful board responses as structured content", () =>
@@ -107,7 +110,7 @@ describe("board MCP tools", () => {
 
       expect(result?.isError).toBe(true)
       expect(result?._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
-      expect(result?.content[0].text).toContain("Board 'Missing' not found")
+      expect(assertAt(assertExists(result).content, 0).text).toContain("Board 'Missing' not found")
     }))
 
   it.effect("rejects invalid board output before returning structured content", () =>
@@ -121,7 +124,7 @@ describe("board MCP tools", () => {
 
       expect(result?.isError).toBe(true)
       expect(result?._meta?.errorCode).toBe(McpErrorCode.InternalError)
-      expect(result?.content[0].text).toContain("invalid output")
+      expect(assertAt(assertExists(result).content, 0).text).toContain("invalid output")
     }))
 })
 

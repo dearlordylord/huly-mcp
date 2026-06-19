@@ -3,6 +3,7 @@ import type { TagElement, TagReference } from "@hcengineering/tags"
 import { IssuePriority } from "@hcengineering/tracker"
 import * as fc from "fast-check"
 import { describe, expect, it } from "vitest"
+import { assertExists } from "../../../src/utils/assertions.js"
 
 import { IssuePriorityValues } from "../../../src/domain/schemas/issues.js"
 import {
@@ -83,7 +84,7 @@ const isEscapedLikePattern = (value: string): boolean => {
       if (index + 1 >= value.length) {
         return false
       }
-      const escaped = value[index + 1]
+      const escaped = assertExists(value[index + 1])
       if (!escapedCharacterSet.has(escaped)) {
         return false
       }

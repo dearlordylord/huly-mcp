@@ -3,6 +3,7 @@ import type { AccountUuid, Class, Doc, DocumentQuery, PersonId, Ref, UserStatus 
 import { toFindResult } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import type { HulyClientOperations } from "../../../src/huly/client.js"
 import { core } from "../../../src/huly/huly-plugins.js"
@@ -71,7 +72,7 @@ describe("userStatusTools", () => {
       const result = yield* Effect.promise(() => tool.handler({ limit: 5 }, hulyClient, storageClient))
 
       expect(result.isError).toBeUndefined()
-      const parsed = JSON.parse(result.content[0].text) as {
+      const parsed = JSON.parse(assertAt(result.content, 0).text) as {
         statuses: ReadonlyArray<{ id: string; user: string; online: boolean; modifiedOn: number }>
         total: number
       }

@@ -1,3 +1,4 @@
+import { assertAt } from "../../../src/utils/assertions.js"
 /**
  * Branch coverage tests for milestones.ts.
  *
@@ -99,10 +100,10 @@ describe("milestones - status mapping exhaustiveness", () => {
       const result = yield* listMilestones({ project: projectIdentifier("TEST") }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(4)
-      expect(result[0].status).toBe("planned")
-      expect(result[1].status).toBe("in-progress")
-      expect(result[2].status).toBe("completed")
-      expect(result[3].status).toBe("canceled")
+      expect(assertAt(result, 0).status).toBe("planned")
+      expect(assertAt(result, 1).status).toBe("in-progress")
+      expect(assertAt(result, 2).status).toBe("completed")
+      expect(assertAt(result, 3).status).toBe("canceled")
     }))
 })
 
@@ -156,7 +157,7 @@ describe("updateMilestone - description dual-write", () => {
 
       expect(result).toEqual({ id: "m-1", updated: true })
       expect(uploads).toEqual([{ attr: "description", value: "Updated milestone notes" }])
-      expect(updates[0]).toHaveProperty("description")
+      expect(assertAt(updates, 0)).toHaveProperty("description")
     }))
 
   it.effect("skips markup upload when the description is blank", () =>

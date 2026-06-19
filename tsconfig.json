@@ -24,8 +24,10 @@
     // Type Safety
     "strict": true,
     "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
     "types": ["node"],
 
     // Development

@@ -1,6 +1,7 @@
 import { describe, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../src/utils/assertions.js"
 
 import {
   AddDriveFileCommentResultSchema,
@@ -366,11 +367,11 @@ describe("drive schemas", () => {
       const deleted = yield* Schema.encode(DeleteDriveFileCommentResultSchema)(decodedDeleted)
       const activity = yield* Schema.encode(ListDriveFileActivityResultSchema)(decodedActivity)
 
-      expect(listComments.comments[0].id).toBe("comment-1")
+      expect(assertAt(listComments.comments, 0).id).toBe("comment-1")
       expect(added.commentId).toBe("comment-1")
       expect(updated.updated).toBe(true)
       expect(deleted.deleted).toBe(true)
-      expect(activity.activity[0].objectId).toBe("file-api")
+      expect(assertAt(activity.activity, 0).objectId).toBe("file-api")
     }))
 
   it.effect("encodes branded outputs for Drive administration operations", () =>

@@ -13,6 +13,7 @@ import type { Document as HulyDocument, Teamspace as HulyTeamspace } from "@hcen
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import {
@@ -353,7 +354,7 @@ describe("listTeamspaces", () => {
         const result = yield* listTeamspaces({}).pipe(Effect.provide(testLayer))
 
         expect(result.teamspaces).toHaveLength(1)
-        expect(result.teamspaces[0].name).toBe("Active")
+        expect(assertAt(result.teamspaces, 0).name).toBe("Active")
       }))
     it.effect("includes archived when includeArchived=true", () =>
       Effect.gen(function*() {
@@ -399,8 +400,8 @@ describe("listDocuments", () => {
 
         expect(result.documents).toHaveLength(2)
         // Sorted by modifiedOn descending
-        expect(result.documents[0].title).toBe("Doc 1")
-        expect(result.documents[1].title).toBe("Doc 2")
+        expect(assertAt(result.documents, 0).title).toBe("Doc 1")
+        expect(assertAt(result.documents, 1).title).toBe("Doc 2")
       }))
     it.effect("returns TeamspaceNotFoundError when teamspace doesn't exist", () =>
       Effect.gen(function*() {
@@ -428,7 +429,7 @@ describe("listDocuments", () => {
         )
 
         expect(result.documents).toHaveLength(1)
-        expect(result.documents[0].teamspace).toBe("My Docs")
+        expect(assertAt(result.documents, 0).teamspace).toBe("My Docs")
       }))
   })
 

@@ -38,6 +38,7 @@ import {
   listEvents,
   updateEvent
 } from "../../../src/huly/operations/calendar.js"
+import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import { email, eventBrandId } from "../../helpers/brands.js"
 
 import { calendar, contact } from "../../../src/huly/huly-plugins.js"
@@ -179,7 +180,7 @@ const createTestLayer = (config: MockConfig) => {
     if (query.user !== undefined && cal.user !== query.user) return false
     if (query.hidden !== undefined && cal.hidden !== query.hidden) return false
     if (query.access && typeof query.access === "object" && "$in" in (query.access as Record<string, unknown>)) {
-      const allowed = (query.access as Record<string, Array<string>>).$in
+      const allowed = assertExists((query.access as { readonly $in?: ReadonlyArray<string> }).$in)
       if (!allowed.includes(cal.access)) return false
     }
     return true
@@ -203,7 +204,7 @@ const createTestLayer = (config: MockConfig) => {
     if (_class === contact.class.Person) {
       const q = query as Record<string, unknown>
       if (q._id && typeof q._id === "object" && "$in" in (q._id as Record<string, unknown>)) {
-        const ids = (q._id as Record<string, Array<string>>).$in
+        const ids = assertExists((q._id as { readonly $in?: ReadonlyArray<string> }).$in)
         const matched = persons.filter(p => ids.includes(p._id))
         return Effect.succeed(toFindResult(matched))
       }
@@ -212,7 +213,7 @@ const createTestLayer = (config: MockConfig) => {
     if (_class === contact.class.Channel) {
       const q = query as Record<string, unknown>
       if (q.value && typeof q.value === "object" && "$in" in (q.value as Record<string, unknown>)) {
-        const emails = (q.value as Record<string, Array<string>>).$in
+        const emails = assertExists((q.value as { readonly $in?: ReadonlyArray<string> }).$in)
         const matched = channels.filter(c => emails.includes(c.value))
         return Effect.succeed(toFindResult(matched))
       }
@@ -319,10 +320,10 @@ describe("createRecurringEvent - ruleToHulyRule with all optional fields", () =>
 
       const rules = captureAddCollection.attributes?.rules as Array<Record<string, unknown>>
       expect(rules).toHaveLength(1)
-      expect(rules[0].freq).toBe("WEEKLY")
-      expect(rules[0].endDate).toBe(1710000000000)
-      expect(rules[0].count).toBe(10)
-      expect(rules[0].interval).toBe(2)
+      expect(assertAt(rules, 0).freq).toBe("WEEKLY")
+      expect(assertAt(rules, 0).endDate).toBe(1710000000000)
+      expect(assertAt(rules, 0).count).toBe(10)
+      expect(assertAt(rules, 0).interval).toBe(2)
     }))
 
   it.effect("converts rule with byDay, byMonthDay, byMonth, bySetPos, wkst", () =>
@@ -345,12 +346,12 @@ describe("createRecurringEvent - ruleToHulyRule with all optional fields", () =>
 
       const rules = captureAddCollection.attributes?.rules as Array<Record<string, unknown>>
       expect(rules).toHaveLength(1)
-      expect(rules[0].freq).toBe("MONTHLY")
-      expect(rules[0].byDay).toEqual(["MO", "WE", "FR"])
-      expect(rules[0].byMonthDay).toEqual([1, 15])
-      expect(rules[0].byMonth).toEqual([0, 5, 11])
-      expect(rules[0].bySetPos).toEqual([-1])
-      expect(rules[0].wkst).toBe("MO")
+      expect(assertAt(rules, 0).freq).toBe("MONTHLY")
+      expect(assertAt(rules, 0).byDay).toEqual(["MO", "WE", "FR"])
+      expect(assertAt(rules, 0).byMonthDay).toEqual([1, 15])
+      expect(assertAt(rules, 0).byMonth).toEqual([0, 5, 11])
+      expect(assertAt(rules, 0).bySetPos).toEqual([-1])
+      expect(assertAt(rules, 0).wkst).toBe("MO")
     }))
 
   it.effect("copies arrays (byDay, byMonthDay, byMonth, bySetPos) without shared references", () =>
@@ -369,7 +370,7 @@ describe("createRecurringEvent - ruleToHulyRule with all optional fields", () =>
       }).pipe(Effect.provide(testLayer))
 
       const rules = captureAddCollection.attributes?.rules as Array<Record<string, unknown>>
-      const resultByDay = rules[0].byDay as Array<string>
+      const resultByDay = assertAt(rules, 0).byDay as Array<string>
       expect(resultByDay).toEqual(["TU", "TH"])
       expect(resultByDay).not.toBe(originalByDay)
     }))
@@ -470,7 +471,7 @@ describe("createEvent - description and participants", () => {
       expect(result.eventId).toBeDefined()
       const participants = captureAddCollection.attributes?.participants as Array<string>
       expect(participants).toHaveLength(1)
-      expect(participants[0]).toBe("person-1")
+      expect(assertAt(participants, 0)).toBe("person-1")
     }))
 
   it.effect("creates event with participants resolved from object email locators", () =>
@@ -614,12 +615,12 @@ describe("listCalendars", () => {
       const result = yield* listCalendars({}).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
-      expect(result[0]).toMatchObject({
+      expect(assertAt(result, 0)).toMatchObject({
         calendarId: "00000000-0000-4000-8000-000000000000_calendar",
         name: "Personal",
         isPrimary: true
       })
-      expect(result[1]).toMatchObject({
+      expect(assertAt(result, 1)).toMatchObject({
         calendarId: "team-calendar",
         name: "Team",
         isPrimary: false
@@ -638,7 +639,7 @@ describe("listCalendars", () => {
       const result = yield* listCalendars({}).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].visibility).toBe("private")
+      expect(assertAt(result, 0).visibility).toBe("private")
     }))
 
   it.effect("drops a malformed writable calendar with unmapped access", () =>
@@ -961,6 +962,6 @@ describe("listEventInstances - participantMap fallback", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].participants).toEqual([])
+      expect(assertAt(result, 0).participants).toEqual([])
     }))
 })

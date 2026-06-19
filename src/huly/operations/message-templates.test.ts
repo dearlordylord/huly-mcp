@@ -11,6 +11,7 @@ import type {
 } from "@hcengineering/templates"
 import { Effect, Exit } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../utils/assertions.js"
 
 import {
   MessageTemplateCategoryIdentifier,
@@ -181,7 +182,7 @@ const createLayer = (store: Store) => {
 
   const findOne: HulyClientOperations["findOne"] =
     ((_class: Ref<Class<Doc>>, query: Parameters<HulyClientOperations["findAll"]>[1], options?: FindOptions<Doc>) =>
-      Effect.map(findAll(_class, query, options), (result) => result[0])) as HulyClientOperations["findOne"]
+      Effect.map(findAll(_class, query, options), (result) => result.at(0))) as HulyClientOperations["findOne"]
 
   return HulyClient.testLayer({ findAll, findOne })
 }
@@ -248,7 +249,7 @@ describe("message template operations", () => {
       const result = yield* runOperation(listMessageTemplateCategories({}))
 
       expect(result.map((item) => item.name)).toEqual(["Sales", "Support"])
-      expect(result[0]).toMatchObject({
+      expect(result.at(0)).toMatchObject({
         id: "cat-sales",
         description: "Sales templates",
         archived: false,
@@ -278,7 +279,7 @@ describe("message template operations", () => {
         }
       ])
       expect(warnings).toHaveLength(1)
-      expect(warnings[0].code).toBe("message_template_metadata_degraded")
+      expect(assertAt(warnings, 0).code).toBe("message_template_metadata_degraded")
     }))
 
   it.effect("lists templates by category and title search with placeholders", () =>
@@ -289,7 +290,7 @@ describe("message template operations", () => {
       }))
 
       expect(result).toHaveLength(1)
-      expect(result[0]).toMatchObject({
+      expect(result.at(0)).toMatchObject({
         id: "tmpl-sales-welcome",
         title: "Welcome",
         category: { id: "cat-sales", name: "Sales" },
@@ -324,7 +325,7 @@ describe("message template operations", () => {
         name: "cat-orphan"
       })
       expect(withFallback.warnings).toHaveLength(1)
-      expect(withFallback.warnings[0].code).toBe("message_template_metadata_degraded")
+      expect(assertAt(withFallback.warnings, 0).code).toBe("message_template_metadata_degraded")
     }))
 
   it.effect("uses template ID fallback values for blank template titles", () =>
@@ -334,14 +335,14 @@ describe("message template operations", () => {
         listMessageTemplates({}),
         {
           ...store,
-          templates: [messageTemplate("tmpl-blank-title", "", store.categories[0], "Hello ${field-owner}.")]
+          templates: [messageTemplate("tmpl-blank-title", "", assertAt(store.categories, 0), "Hello ${field-owner}.")]
         }
       )
 
       expect(result).toHaveLength(1)
-      expect(result[0].title).toBe("tmpl-blank-title")
+      expect(assertAt(result, 0).title).toBe("tmpl-blank-title")
       expect(warnings).toHaveLength(1)
-      expect(warnings[0].code).toBe("message_template_metadata_degraded")
+      expect(assertAt(warnings, 0).code).toBe("message_template_metadata_degraded")
     }))
 
   it.effect("does not emit metadata warnings when template search matches no rows", () =>
@@ -398,14 +399,14 @@ describe("message template operations", () => {
         getMessageTemplate({ template: templateIdentifier("tmpl-blank-title") }),
         {
           ...store,
-          templates: [messageTemplate("tmpl-blank-title", "", store.categories[0], "Hello ${field-owner}.")]
+          templates: [messageTemplate("tmpl-blank-title", "", assertAt(store.categories, 0), "Hello ${field-owner}.")]
         }
       )
 
       expect(result.title).toBe("tmpl-blank-title")
       expect(result.placeholderFieldIds).toEqual(["field-owner"])
       expect(warnings).toHaveLength(1)
-      expect(warnings[0].code).toBe("message_template_metadata_degraded")
+      expect(assertAt(warnings, 0).code).toBe("message_template_metadata_degraded")
     }))
 
   it.effect("rejects ambiguous template titles unless category is provided", () =>
@@ -432,8 +433,15 @@ describe("message template operations", () => {
       const missing = yield* Effect.exit(
         runOperation(getMessageTemplate({ template: templateIdentifier("missing") }))
       )
+      const missingInCategory = yield* Effect.exit(
+        runOperation(getMessageTemplate({
+          template: templateIdentifier("missing"),
+          category: templateCategoryIdentifier("Sales")
+        }))
+      )
 
       expect(failureTag(missing)).toBe("MessageTemplateNotFoundError")
+      expect(failureTag(missingInCategory)).toBe("MessageTemplateNotFoundError")
       expect(missing).toSatisfy((exit: Exit.Exit<unknown, unknown>) =>
         Exit.isFailure(exit)
         && exit.cause._tag === "Fail"
@@ -480,13 +488,13 @@ describe("message template operations", () => {
         label: "field-cat-orphan"
       })
       expect(withFallback.warnings).toHaveLength(1)
-      expect(withFallback.warnings[0].code).toBe("message_template_metadata_degraded")
-      expect(withBlankLabelFallback.result[0].category).toEqual({
+      expect(assertAt(withFallback.warnings, 0).code).toBe("message_template_metadata_degraded")
+      expect(assertAt(withBlankLabelFallback.result, 0).category).toEqual({
         id: "field-cat-blank",
         label: "field-cat-blank"
       })
       expect(withBlankLabelFallback.warnings).toHaveLength(1)
-      expect(withBlankLabelFallback.warnings[0].code).toBe("message_template_metadata_degraded")
+      expect(assertAt(withBlankLabelFallback.warnings, 0).code).toBe("message_template_metadata_degraded")
     }))
 
   it.effect("uses field ID fallback values for blank template field labels", () =>
@@ -496,7 +504,7 @@ describe("message template operations", () => {
         listMessageTemplateFields({ search: "   " }),
         {
           ...store,
-          fields: [field("field-blank-label", "", store.fieldCategories[0], "contact:template-field:Blank")]
+          fields: [field("field-blank-label", "", assertAt(store.fieldCategories, 0), "contact:template-field:Blank")]
         }
       )
 
@@ -509,7 +517,7 @@ describe("message template operations", () => {
         }
       ])
       expect(warnings).toHaveLength(1)
-      expect(warnings[0].code).toBe("message_template_metadata_degraded")
+      expect(assertAt(warnings, 0).code).toBe("message_template_metadata_degraded")
     }))
 
   it.effect("does not emit metadata warnings when field search matches no rows", () =>

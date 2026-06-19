@@ -1,3 +1,4 @@
+import { assertAt } from "../../../src/utils/assertions.js"
 /* eslint-disable no-restricted-syntax -- test mocks require double assertion since local interfaces extend SDK base types not structurally compatible with object literals */
 import { describe, it } from "@effect/vitest"
 import { type Doc, type PersonId, type Ref, toFindResult } from "@hcengineering/core"
@@ -215,7 +216,7 @@ describe("listTestPlans", () => {
         project: testProjectIdentifier("QA Project")
       }).pipe(Effect.provide(buildLayer({ plans })))
       expect(result.plans).toHaveLength(2)
-      expect(result.plans[0].name).toBe("Sprint Plan")
+      expect(assertAt(result.plans, 0).name).toBe("Sprint Plan")
     }))
 })
 
@@ -389,8 +390,8 @@ describe("test-management-plans — optional field branches", () => {
         plan: testPlanIdentifier("Sprint Plan")
       }).pipe(Effect.provide(buildLayer({ plans: [planWithDesc], items: [item] })))
       expect(result.description).toBe("fetched description")
-      expect(result.items[0].testSuite).toBe("ts-1")
-      expect(result.items[0].assignee).toBe("person-1")
+      expect(assertAt(result.items, 0).testSuite).toBe("ts-1")
+      expect(assertAt(result.items, 0).assignee).toBe("person-1")
     }))
 
   it.effect("createTestPlan returns the existing plan when one already exists", () =>

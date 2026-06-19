@@ -25,6 +25,7 @@ import {
   startTimer,
   stopTimer
 } from "../../../src/huly/operations/time.js"
+import { assertAt } from "../../../src/utils/assertions.js"
 import { issueIdentifier, projectIdentifier } from "../../helpers/brands.js"
 
 import { contact, time, tracker } from "../../../src/huly/huly-plugins.js"
@@ -606,7 +607,7 @@ describe("getTimeReport", () => {
           identifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
 
-        expect(result.reports[0].employee).toBe("Jane Developer")
+        expect(assertAt(result.reports, 0).employee).toBe("Jane Developer")
       }))
 
     it.effect("returns undefined employee when person not found in map", () =>
@@ -630,7 +631,7 @@ describe("getTimeReport", () => {
           identifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
 
-        expect(result.reports[0].employee).toBeUndefined()
+        expect(assertAt(result.reports, 0).employee).toBeUndefined()
       }))
 
     it.effect("returns undefined employee when report has no employee", () =>
@@ -653,7 +654,7 @@ describe("getTimeReport", () => {
           identifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
 
-        expect(result.reports[0].employee).toBeUndefined()
+        expect(assertAt(result.reports, 0).employee).toBeUndefined()
       }))
   })
 
@@ -741,7 +742,7 @@ describe("listTimeSpendReports", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
-        expect(result[0].id).toBe("report-1")
+        expect(assertAt(result, 0).id).toBe("report-1")
       }))
 
     it.effect("returns ProjectNotFoundError for invalid project filter", () =>
@@ -777,7 +778,7 @@ describe("listTimeSpendReports", () => {
 
         const result = yield* listTimeSpendReports({}).pipe(Effect.provide(testLayer))
 
-        expect(result[0].identifier).toBe("TEST-42")
+        expect(assertAt(result, 0).identifier).toBe("TEST-42")
       }))
   })
 
@@ -802,7 +803,7 @@ describe("listTimeSpendReports", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
-        expect(result[0].id).toBe("report-2")
+        expect(assertAt(result, 0).id).toBe("report-2")
       }))
 
     it.effect("filters by to date only", () =>
@@ -825,7 +826,7 @@ describe("listTimeSpendReports", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
-        expect(result[0].id).toBe("report-1")
+        expect(assertAt(result, 0).id).toBe("report-1")
       }))
 
     it.effect("filters by both from and to", () =>
@@ -853,7 +854,7 @@ describe("listTimeSpendReports", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
-        expect(result[0].id).toBe("report-2")
+        expect(assertAt(result, 0).id).toBe("report-2")
       }))
   })
 
@@ -875,7 +876,7 @@ describe("listTimeSpendReports", () => {
 
         const result = yield* listTimeSpendReports({}).pipe(Effect.provide(testLayer))
 
-        expect(result[0].employee).toBe("Alice Smith")
+        expect(assertAt(result, 0).employee).toBe("Alice Smith")
       }))
 
     it.effect("returns undefined employee when no lookup match", () =>
@@ -890,7 +891,7 @@ describe("listTimeSpendReports", () => {
 
         const result = yield* listTimeSpendReports({}).pipe(Effect.provide(testLayer))
 
-        expect(result[0].employee).toBeUndefined()
+        expect(assertAt(result, 0).employee).toBeUndefined()
       }))
 
     it.effect("returns undefined identifier when issue not in lookup", () =>
@@ -906,7 +907,7 @@ describe("listTimeSpendReports", () => {
 
         const result = yield* listTimeSpendReports({}).pipe(Effect.provide(testLayer))
 
-        expect(result[0].identifier).toBeUndefined()
+        expect(assertAt(result, 0).identifier).toBeUndefined()
       }))
   })
 })
@@ -1026,8 +1027,8 @@ describe("getDetailedTimeReport", () => {
 
         expect(result.totalTime).toBe(20)
         expect(result.byIssue).toHaveLength(1)
-        expect(result.byIssue[0].identifier).toBeUndefined()
-        expect(result.byIssue[0].issueTitle).toBe("Unknown")
+        expect(assertAt(result.byIssue, 0).identifier).toBeUndefined()
+        expect(assertAt(result.byIssue, 0).issueTitle).toBe("Unknown")
       }))
   })
 
@@ -1178,8 +1179,8 @@ describe("getDetailedTimeReport", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(result.byIssue).toHaveLength(1)
-        expect(result.byIssue[0].totalTime).toBe(35)
-        expect(result.byIssue[0].reports).toHaveLength(2)
+        expect(assertAt(result.byIssue, 0).totalTime).toBe(35)
+        expect(assertAt(result.byIssue, 0).reports).toHaveLength(2)
       }))
 
     it.effect("aggregates multiple reports for same employee", () =>
@@ -1216,8 +1217,8 @@ describe("getDetailedTimeReport", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(result.byEmployee).toHaveLength(1)
-        expect(result.byEmployee[0].employeeName).toBe("Bob")
-        expect(result.byEmployee[0].totalTime).toBe(90)
+        expect(assertAt(result.byEmployee, 0).employeeName).toBe("Bob")
+        expect(assertAt(result.byEmployee, 0).totalTime).toBe(90)
       }))
   })
 })
@@ -1295,11 +1296,11 @@ describe("listWorkSlots", () => {
         const result = yield* listWorkSlots({}).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(2)
-        expect(result[0].id).toBe("slot-1")
-        expect(result[0].todoId).toBe("todo-1")
-        expect(result[0].date).toBe(1000)
-        expect(result[0].dueDate).toBe(2000)
-        expect(result[0].title).toBe("Morning work")
+        expect(assertAt(result, 0).id).toBe("slot-1")
+        expect(assertAt(result, 0).todoId).toBe("todo-1")
+        expect(assertAt(result, 0).date).toBe(1000)
+        expect(assertAt(result, 0).dueDate).toBe(2000)
+        expect(assertAt(result, 0).title).toBe("Morning work")
       }))
 
     it.effect("returns empty when no slots", () =>
@@ -1340,7 +1341,7 @@ describe("listWorkSlots", () => {
         const result = yield* listWorkSlots({ employeeId: "person-1" }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
-        expect(result[0].id).toBe("slot-1")
+        expect(assertAt(result, 0).id).toBe("slot-1")
       }))
 
     it.effect("filters by employee email via channel lookup", () =>
@@ -1376,7 +1377,7 @@ describe("listWorkSlots", () => {
         const result = yield* listWorkSlots({ employeeId: "alice@example.com" }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
-        expect(result[0].id).toBe("slot-1")
+        expect(assertAt(result, 0).id).toBe("slot-1")
       }))
 
     it.effect("returns all slots when employee not found by ID or channel", () =>
@@ -1425,7 +1426,7 @@ describe("listWorkSlots", () => {
         const result = yield* listWorkSlots({ from: Timestamp.make(2000) }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
-        expect(result[0].id).toBe("slot-2")
+        expect(assertAt(result, 0).id).toBe("slot-2")
       }))
 
     it.effect("filters by to date", () =>
@@ -1452,7 +1453,7 @@ describe("listWorkSlots", () => {
         const result = yield* listWorkSlots({ to: Timestamp.make(2000) }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
-        expect(result[0].id).toBe("slot-1")
+        expect(assertAt(result, 0).id).toBe("slot-1")
       }))
 
     it.effect("filters by both from and to", () =>
@@ -1488,7 +1489,7 @@ describe("listWorkSlots", () => {
         )
 
         expect(result).toHaveLength(1)
-        expect(result[0].id).toBe("slot-2")
+        expect(assertAt(result, 0).id).toBe("slot-2")
       }))
   })
 })

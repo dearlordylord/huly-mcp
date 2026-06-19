@@ -4,6 +4,7 @@ import { toFindResult } from "@hcengineering/core"
 import type { ProjectType, TaskType } from "@hcengineering/task"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import { ProjectTypeRefSchema, TaskTypeRefSchema } from "../../../src/domain/schemas.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
@@ -275,9 +276,11 @@ describe("task management operations", () => {
         [openStatusId, "Todo", "unknown"],
         [unresolvedStatusId, "plainstatus", "unknown"]
       ])
-      expect(result.taskTypeStatuses[0].statusIds.every((statusId) => statusIds.includes(statusId))).toBe(true)
+      expect(assertAt(result.taskTypeStatuses, 0).statusIds.every((statusId) => statusIds.includes(statusId))).toBe(
+        true
+      )
       expect(warnings).toHaveLength(1)
-      expect(warnings[0].code).toBe("status_metadata_unresolved")
+      expect(assertAt(warnings, 0).code).toBe("status_metadata_unresolved")
     }))
 
   it.effect("returns an existing task type by normalized name without writing", () =>
@@ -362,7 +365,7 @@ describe("task management operations", () => {
       ])
       expect(captures.mixins).toHaveLength(1)
       expect(captures.updates).toHaveLength(1)
-      expect(captures.updates[0].classId).toBe(String(task.class.ProjectType))
+      expect(assertAt(captures.updates, 0).classId).toBe(String(task.class.ProjectType))
     }))
 
   it.effect("creates an issue status and attaches it to all task types", () =>
@@ -377,7 +380,7 @@ describe("task management operations", () => {
       expect(result.status.name).toBe("QA")
       expect(result.status.category).toBe("Active")
       expect(result.affectedTaskTypeIds).toEqual([taskTypeId, subTaskTypeId])
-      expect(captures.createDocs[0].classId).toBe(String(tracker.class.IssueStatus))
+      expect(assertAt(captures.createDocs, 0).classId).toBe(String(tracker.class.IssueStatus))
       expect(captures.updates.map((call) => call.classId)).toEqual([
         String(task.class.TaskType),
         String(task.class.TaskType),
@@ -481,8 +484,8 @@ describe("task management operations", () => {
       expect(result.created).toBe(true)
       expect(captures.createDocs).toEqual([])
       expect(captures.updates).toHaveLength(1)
-      expect(captures.updates[0].classId).toBe(String(task.class.TaskType))
-      expect(captures.updates[0].operations).toEqual({ statuses: [openStatusId, doneStatusId] })
+      expect(assertAt(captures.updates, 0).classId).toBe(String(task.class.TaskType))
+      expect(assertAt(captures.updates, 0).operations).toEqual({ statuses: [openStatusId, doneStatusId] })
     }))
 
   it.effect("deduplicates template statuses when creating a task type", () =>
@@ -522,7 +525,7 @@ describe("task management operations", () => {
       expect(result.created).toBe(true)
       expect(result.status.name).toBe("QA")
       expect(result.status.category).toBe("Active")
-      expect(captures.createDocs[0].classId).toBe(String(tracker.class.IssueStatus))
+      expect(assertAt(captures.createDocs, 0).classId).toBe(String(tracker.class.IssueStatus))
       expect(captures.updates.map((call) => call.classId)).toEqual([
         String(task.class.TaskType),
         String(task.class.TaskType),

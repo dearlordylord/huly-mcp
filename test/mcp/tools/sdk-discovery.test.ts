@@ -3,6 +3,7 @@ import type { AccountUuid, AnyAttribute, Doc, PersonId, Ref, Space } from "@hcen
 import { ClassifierKind, toFindResult } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import type { HulyClientOperations } from "../../../src/huly/client.js"
 import { core, tracker } from "../../../src/huly/huly-plugins.js"
@@ -104,8 +105,8 @@ describe("sdkDiscoveryTools", () => {
       const result = yield* Effect.promise(() => tool.handler({}, hulyClient, noopStorageClient))
 
       expect(result.isError).toBeUndefined()
-      const parsed = JSON.parse(result.content[0].text) as { classes: Array<{ classId: string }> }
-      expect(parsed.classes[0].classId).toBe(tracker.class.Issue)
+      const parsed = JSON.parse(assertAt(result.content, 0).text) as { classes: Array<{ classId: string }> }
+      expect(assertAt(parsed.classes, 0).classId).toBe(tracker.class.Issue)
     }))
 
   it.effect("get_huly_class maps schema parse errors", () =>

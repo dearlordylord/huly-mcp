@@ -31,6 +31,7 @@ import {
   saveMessage,
   unsaveMessage
 } from "../../../src/huly/operations/activity.js"
+import { assertAt } from "../../../src/utils/assertions.js"
 import {
   activityMessageId,
   channelIdentifier,
@@ -391,8 +392,8 @@ describe("listActivity", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
-      expect(result[0].id).toBe("msg-1")
-      expect(result[1].id).toBe("msg-2")
+      expect(assertAt(result, 0).id).toBe("msg-1")
+      expect(assertAt(result, 1).id).toBe("msg-2")
     }))
 
   it.effect("returns empty array when no activity exists", () =>
@@ -428,7 +429,7 @@ describe("listActivity", () => {
         objectClass: objectClassName("tracker:class:Issue")
       }).pipe(Effect.provide(testLayer))
 
-      expect(result[0]).toEqual({
+      expect(assertAt(result, 0)).toEqual({
         id: "msg-1",
         messageClass: "activity:class:ActivityMessage",
         objectId: "obj-1",
@@ -464,9 +465,9 @@ describe("listActivity", () => {
         objectClass: objectClassName("tracker:class:Issue")
       }).pipe(Effect.provide(testLayer))
 
-      expect(result[0].replies).toBeUndefined()
-      expect(result[0].reactions).toBeUndefined()
-      expect(result[0].editedOn).toBeUndefined()
+      expect(assertAt(result, 0).replies).toBeUndefined()
+      expect(assertAt(result, 0).reactions).toBeUndefined()
+      expect(assertAt(result, 0).editedOn).toBeUndefined()
     }))
 
   it.effect("dies when no activity target mode is provided", () =>
@@ -506,7 +507,7 @@ describe("listActivity", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("msg-1")
+      expect(assertAt(result, 0).id).toBe("msg-1")
     }))
 
   it.effect("resolves issue identifiers before listing activity", () =>
@@ -530,8 +531,8 @@ describe("listActivity", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("msg-issue")
-      expect(result[0].objectClass).toBe(String(tracker.class.Issue))
+      expect(assertAt(result, 0).id).toBe("msg-issue")
+      expect(assertAt(result, 0).objectClass).toBe(String(tracker.class.Issue))
     }))
 
   it.effect("resolves document identifiers before listing activity", () =>
@@ -555,8 +556,8 @@ describe("listActivity", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("msg-doc")
-      expect(result[0].objectClass).toBe(String(documentPlugin.class.Document))
+      expect(assertAt(result, 0).id).toBe("msg-doc")
+      expect(assertAt(result, 0).objectClass).toBe(String(documentPlugin.class.Document))
     }))
 
   it.effect("resolves channel identifiers before listing activity", () =>
@@ -577,8 +578,8 @@ describe("listActivity", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("msg-channel")
-      expect(result[0].objectClass).toBe(String(chunter.class.Channel))
+      expect(assertAt(result, 0).id).toBe("msg-channel")
+      expect(assertAt(result, 0).objectClass).toBe(String(chunter.class.Channel))
     }))
 })
 
@@ -724,13 +725,13 @@ describe("listReactions", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
-      expect(result[0]).toEqual({
+      expect(assertAt(result, 0)).toEqual({
         id: "reaction-1",
         messageId: "msg-1",
         emoji: ":thumbsup:",
         createdBy: "person-a"
       })
-      expect(result[1]).toEqual({
+      expect(assertAt(result, 1)).toEqual({
         id: "reaction-2",
         messageId: "msg-1",
         emoji: ":heart:",
@@ -793,7 +794,7 @@ describe("listReactions", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("reaction-1")
+      expect(assertAt(result, 0).id).toBe("reaction-1")
     }))
 })
 
@@ -891,8 +892,8 @@ describe("listSavedMessages", () => {
       const result = yield* listSavedMessages({}).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
-      expect(result[0]).toEqual({ id: "saved-1", messageId: "msg-1" })
-      expect(result[1]).toEqual({ id: "saved-2", messageId: "msg-2" })
+      expect(assertAt(result, 0)).toEqual({ id: "saved-1", messageId: "msg-1" })
+      expect(assertAt(result, 1)).toEqual({ id: "saved-2", messageId: "msg-2" })
     }))
 
   it.effect("returns empty array when no saved messages exist", () =>
@@ -928,13 +929,13 @@ describe("listMentions", () => {
       const result = yield* listMentions({}).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
-      expect(result[0]).toEqual({
+      expect(assertAt(result, 0)).toEqual({
         id: "mention-1",
         messageId: "msg-1",
         userId: "person-1",
         content: "Hey @alice check this"
       })
-      expect(result[1]).toEqual({
+      expect(assertAt(result, 1)).toEqual({
         id: "mention-2",
         messageId: "msg-2",
         userId: "person-2",

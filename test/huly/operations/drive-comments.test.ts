@@ -1,3 +1,4 @@
+import { assertAt } from "../../../src/utils/assertions.js"
 /* eslint-disable no-restricted-syntax -- Huly SDK phantom refs are erased at runtime; these tests centralize fixture casts. */
 import { describe, it } from "@effect/vitest"
 import type { ActivityMessage as HulyActivityMessage } from "@hcengineering/activity"
@@ -161,7 +162,7 @@ const makeLayer = (state: DriveCommentState): Layer.Layer<HulyClient | HulyStora
   const findOne: HulyClientOperations["findOne"] = <T extends Doc>(
     classRef: Ref<Class<T>>,
     query: DocumentQuery<T>
-  ) => Effect.map(findAll(classRef, query), (docs) => docs[0])
+  ) => Effect.map(findAll(classRef, query), (docs) => docs.at(0))
 
   const addCollection: HulyClientOperations["addCollection"] = <T extends Doc, P extends AttachedDoc>(
     classRef: Ref<Class<P>>,
@@ -207,7 +208,7 @@ const makeLayer = (state: DriveCommentState): Layer.Layer<HulyClient | HulyStora
         operations: operations as unknown as DocumentUpdate<ChatMessage>
       })
       const index = state.messages.findIndex((message) => String(message._id) === String(objectId))
-      const message = state.messages[index]
+      const message = assertAt(state.messages, index)
       state.messages[index] = {
         ...message,
         ...(operations as unknown as Partial<ChatMessage>)
@@ -298,7 +299,7 @@ describe("drive file comment operations", () => {
       const deleted = yield* deleteDriveFileComment(deleteParams).pipe(Effect.provide(layer))
 
       expect(listed).toMatchObject({ file: { id: "file-api" }, total: 1 })
-      expect(listed.comments[0]).toMatchObject({ id: "comment-1", body: "Initial" })
+      expect(assertAt(listed.comments, 0)).toMatchObject({ id: "comment-1", body: "Initial" })
       expect(added.file.id).toBe("file-api")
       expect(added.commentId).toBeDefined()
       expect(noop.updated).toBe(false)
@@ -316,7 +317,7 @@ describe("drive file comment operations", () => {
 
       expect(result.file.id).toBe("file-api")
       expect(result.total).toBe(1)
-      expect(result.activity[0]).toMatchObject({
+      expect(assertAt(result.activity, 0)).toMatchObject({
         id: "activity-1",
         objectId: "file-api",
         objectClass: drive.class.File

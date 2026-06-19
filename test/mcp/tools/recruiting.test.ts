@@ -156,7 +156,7 @@ describe("Recruiting MCP Tools", () => {
       const response = yield* Effect.promise(() => tool.handler({}, noopHulyClient, noopStorageClient))
 
       expect(response.isError).toBeUndefined()
-      expect(response.content[0]?.text).toBe("{\"vacancies\":[],\"total\":0}")
+      expect(response.content[0].text).toBe("{\"vacancies\":[],\"total\":0}")
     }))
 
   it.effect("encodes list recruiting comments success responses", () =>
@@ -174,8 +174,8 @@ describe("Recruiting MCP Tools", () => {
       )
 
       expect(response.isError).toBeUndefined()
-      expect(response.content[0]?.text).toContain("\"target\":{\"kind\":\"vacancy\"")
-      expect(response.content[0]?.text).toContain("\"comments\":[]")
+      expect(response.content[0].text).toContain("\"target\":{\"kind\":\"vacancy\"")
+      expect(response.content[0].text).toContain("\"comments\":[]")
       expect(response.structuredContent?.result).toBeDefined()
     }))
 
@@ -199,7 +199,7 @@ describe("Recruiting MCP Tools", () => {
 
       expect(response.isError).toBe(true)
       expect(response._meta?.errorCode).toBe(-32602)
-      expect(response.content[0]?.text).toContain("Comment 'comment-missing' not found")
-      expect(response.content[0]?.text).toContain("Recruiting vacancy")
+      expect(response.content[0].text).toContain("Comment 'comment-missing' not found")
+      expect(response.content[0].text).toContain("Recruiting vacancy")
     }))
 })

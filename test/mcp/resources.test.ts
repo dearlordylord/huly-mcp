@@ -18,6 +18,7 @@ import {
 import { McpError } from "@modelcontextprotocol/sdk/types.js"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../src/utils/assertions.js"
 
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyAuthError, HulyConnectionError } from "../../src/huly/errors.js"
@@ -307,11 +308,11 @@ describe("MCP resources", () => {
       )
 
       expect(result.contents).toHaveLength(1)
-      expect(result.contents[0]).toMatchObject({
+      expect(assertAt(result.contents, 0)).toMatchObject({
         uri: "huly://projects/TEST",
         mimeType: HULY_RESOURCE_MIME_TYPE
       })
-      expect(readJson(textContent(result.contents[0]))).toEqual({
+      expect(readJson(textContent(assertAt(result.contents, 0)))).toEqual({
         type: "huly.project",
         uri: "huly://projects/TEST",
         project: {
@@ -335,11 +336,11 @@ describe("MCP resources", () => {
       )
 
       expect(result.contents).toHaveLength(1)
-      expect(result.contents[0]).toMatchObject({
+      expect(assertAt(result.contents, 0)).toMatchObject({
         uri: "huly://issues/TEST-1",
         mimeType: HULY_RESOURCE_MIME_TYPE
       })
-      expect(readJson(textContent(result.contents[0]))).toMatchObject({
+      expect(readJson(textContent(assertAt(result.contents, 0)))).toMatchObject({
         type: "huly.issue",
         uri: "huly://issues/TEST-1",
         issue: {

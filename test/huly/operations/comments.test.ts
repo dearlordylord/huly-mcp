@@ -13,6 +13,7 @@ import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type { CommentNotFoundError, IssueNotFoundError, ProjectNotFoundError } from "../../../src/huly/errors.js"
 import { addComment, deleteComment, listComments, updateComment } from "../../../src/huly/operations/comments.js"
+import { assertAt } from "../../../src/utils/assertions.js"
 import { commentBrandId, issueIdentifier, projectIdentifier } from "../../helpers/brands.js"
 
 import { chunter, tracker } from "../../../src/huly/huly-plugins.js"
@@ -241,8 +242,8 @@ describe("listComments", () => {
 
         expect(result).toHaveLength(2)
         // Sorted by createdOn ascending (oldest first)
-        expect(result[0].body).toBe("First comment")
-        expect(result[1].body).toBe("Second comment")
+        expect(assertAt(result, 0).body).toBe("First comment")
+        expect(assertAt(result, 1).body).toBe("Second comment")
       }))
 
     it.effect("returns empty array when issue has no comments", () =>
@@ -291,12 +292,12 @@ describe("listComments", () => {
           issueIdentifier: issueIdentifier("TEST-1")
         }).pipe(Effect.provide(testLayer))
 
-        expect(result[0].id).toBe("msg-abc")
-        expect(result[0].body).toBe("Comment body here")
-        expect(result[0].authorId).toBe("person-123")
-        expect(result[0].createdOn).toBe(1706500000000)
-        expect(result[0].modifiedOn).toBe(1706600000000)
-        expect(result[0].editedOn).toBe(1706550000000)
+        expect(assertAt(result, 0).id).toBe("msg-abc")
+        expect(assertAt(result, 0).body).toBe("Comment body here")
+        expect(assertAt(result, 0).authorId).toBe("person-123")
+        expect(assertAt(result, 0).createdOn).toBe(1706500000000)
+        expect(assertAt(result, 0).modifiedOn).toBe(1706600000000)
+        expect(assertAt(result, 0).editedOn).toBe(1706550000000)
       }))
   })
 
@@ -360,8 +361,8 @@ describe("listComments", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
-        expect(result[0].id).toBe("msg-42")
-        expect(result[0].body).toBe("Found by number")
+        expect(assertAt(result, 0).id).toBe("msg-42")
+        expect(assertAt(result, 0).body).toBe("Found by number")
       }))
 
     it.effect("handles lowercase identifier test-5", () =>

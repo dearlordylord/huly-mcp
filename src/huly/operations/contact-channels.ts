@@ -1,6 +1,6 @@
 import type { Channel } from "@hcengineering/contact"
 import type { DocumentUpdate, Ref } from "@hcengineering/core"
-import { Effect, Option, Schema } from "effect"
+import { Effect, Option } from "effect"
 
 import type {
   AddOrganizationChannelParams,
@@ -22,10 +22,13 @@ import type {
   UpdatePersonChannelParams,
   UpdatePersonChannelResult
 } from "../../domain/schemas/contact-channels.js"
-import { ChannelId, Count, Email, OrganizationId, PersonId } from "../../domain/schemas/shared.js"
+import { ChannelId, Count, OrganizationId, PersonId } from "../../domain/schemas/shared.js"
+import { assertAt, isNonEmpty } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import { NoUpdateFieldsError } from "../errors-base.js"
+import type { NoUpdateFieldsError } from "../errors-base.js"
 import type {
+  InvalidContactChannelLocatorError,
+  InvalidContactChannelValueError,
   OrganizationIdentifierAmbiguousError,
   OrganizationNotFoundError,
   PersonIdentifierAmbiguousError,
@@ -35,11 +38,18 @@ import {
   ContactChannelConflictError,
   ContactChannelIdentifierAmbiguousError,
   ContactChannelNotFoundError,
-  InvalidContactChannelLocatorError,
-  InvalidContactChannelValueError,
   InvalidContactProviderError
 } from "../errors.js"
 import { contact } from "../huly-plugins.js"
+import {
+  channelIdentifier,
+  type ChannelLocator,
+  type ChannelMutationParams,
+  requireChannelUpdateFields,
+  type ResolvedChannelLocator,
+  validateChannelLocator,
+  validateProviderValue
+} from "./contact-channel-locators.js"
 import { channelSummary, channelSummaryWithValue } from "./contact-channel-mappers.js"
 import {
   type ChannelOwner,
@@ -52,8 +62,7 @@ import {
   listContactChannelProviderLabels,
   toContactChannelProviderRef
 } from "./contact-channel-providers.js"
-import { hulyQuery } from "./query-helpers.js"
-import { toRef } from "./sdk-boundary.js"
+import { findChannelByIdForOwner, findChannelsForOwner, findExactChannels } from "./contact-channel-queries.js"
 
 type ContactChannelError =
   | HulyClientError
@@ -87,28 +96,6 @@ type ListOrganizationChannelError =
   | OrganizationIdentifierAmbiguousError
   | OrganizationNotFoundError
 
-interface ChannelLocator {
-  readonly channelId?: string | undefined
-  readonly provider?: ContactChannelProvider | undefined
-  readonly value?: string | undefined
-}
-
-interface ChannelMutationParams extends ChannelLocator {
-  readonly newProvider?: ContactChannelProvider | undefined
-  readonly newValue?: string | undefined
-}
-
-type ResolvedChannelLocator =
-  | {
-    readonly _tag: "channelId"
-    readonly channelId: ChannelId
-  }
-  | {
-    readonly _tag: "providerValue"
-    readonly provider: ContactChannelProvider
-    readonly value: string
-  }
-
 type RemoveOwnerChannelResult =
   | { readonly removed: true; readonly channelId: ChannelId }
   | { readonly removed: false; readonly channelId: ChannelId }
@@ -116,93 +103,6 @@ type RemoveOwnerChannelResult =
 
 export const listContactChannelProviders = (): Effect.Effect<ReadonlyArray<ContactChannelProvider>> =>
   Effect.succeed(listContactChannelProviderLabels())
-
-const channelIdentifier = (locator: ResolvedChannelLocator): string =>
-  locator._tag === "channelId" ? locator.channelId : `${locator.provider}:${locator.value}`
-
-const INVALID_CHANNEL_LOCATOR_REASON = "provide exactly one channel locator: channelId, or provider plus value"
-
-const validateProviderValue = (
-  provider: ContactChannelProvider,
-  value: string
-): Effect.Effect<void, InvalidContactChannelValueError> =>
-  value.length === 0 || (provider === "email" && !Schema.is(Email)(value))
-    ? Effect.fail(new InvalidContactChannelValueError({ provider, value }))
-    : Effect.void
-
-const validateChannelLocator = (
-  ownerIdentifier: string,
-  locator: ChannelLocator
-): Effect.Effect<ResolvedChannelLocator, InvalidContactChannelLocatorError | InvalidContactChannelValueError> =>
-  Effect.gen(function*() {
-    const hasChannelId = locator.channelId !== undefined
-    const hasProvider = locator.provider !== undefined
-    const hasValue = locator.value !== undefined
-
-    if (hasChannelId && !hasProvider && !hasValue) {
-      return { _tag: "channelId", channelId: ChannelId.make(locator.channelId) }
-    }
-    if (!hasChannelId && hasProvider && hasValue) {
-      yield* validateProviderValue(locator.provider, locator.value)
-      return { _tag: "providerValue", provider: locator.provider, value: locator.value }
-    }
-    return yield* new InvalidContactChannelLocatorError({
-      ownerIdentifier,
-      reason: INVALID_CHANNEL_LOCATOR_REASON
-    })
-  })
-
-const requireChannelUpdateFields = (
-  params: ChannelMutationParams
-): Effect.Effect<void, NoUpdateFieldsError> =>
-  params.newProvider === undefined && params.newValue === undefined
-    ? Effect.fail(new NoUpdateFieldsError({ operation: "update_contact_channel", fields: ["newProvider", "newValue"] }))
-    : Effect.void
-
-const findChannelsForOwner = <Owner extends ChannelOwner>(
-  client: HulyClient["Type"],
-  owner: ResolvedOwner<Owner>
-): Effect.Effect<Array<Channel>, HulyClientError> =>
-  client.findAll<Channel>(
-    contact.class.Channel,
-    hulyQuery<Channel>({
-      attachedTo: owner.id,
-      attachedToClass: owner.ownerClass
-    })
-  )
-
-const findExactChannels = <Owner extends ChannelOwner>(
-  client: HulyClient["Type"],
-  owner: ResolvedOwner<Owner>,
-  provider: ContactChannelProvider,
-  value: string
-): Effect.Effect<Array<Channel>, HulyClientError> =>
-  client.findAll<Channel>(
-    contact.class.Channel,
-    hulyQuery<Channel>({
-      attachedTo: owner.id,
-      attachedToClass: owner.ownerClass,
-      provider: toContactChannelProviderRef(provider),
-      value
-    })
-  )
-
-const findChannelByIdForOwner = <Owner extends ChannelOwner>(
-  client: HulyClient["Type"],
-  owner: ResolvedOwner<Owner>,
-  channelId: ChannelId
-): Effect.Effect<Option.Option<Channel>, HulyClientError> =>
-  Effect.map(
-    client.findOne<Channel>(
-      contact.class.Channel,
-      hulyQuery<Channel>({
-        _id: toRef<Channel>(channelId),
-        attachedTo: owner.id,
-        attachedToClass: owner.ownerClass
-      })
-    ),
-    Option.fromNullable
-  )
 
 const resolveChannelByLocator = <Owner extends ChannelOwner>(
   client: HulyClient["Type"],
@@ -238,7 +138,7 @@ const resolveChannelByLocator = <Owner extends ChannelOwner>(
         matches: Count.make(matches.length)
       })
     }
-    return matches[0]
+    return assertAt(matches, 0)
   })
 
 const findRemovableChannel = <Owner extends ChannelOwner>(
@@ -299,7 +199,7 @@ const addOwnerChannel = <Owner extends ChannelOwner>(
     yield* validateProviderValue(params.provider, params.value)
 
     const existing = yield* findExactChannels(client, owner, params.provider, params.value)
-    if (existing.length > 0) {
+    if (isNonEmpty(existing)) {
       return { added: false, channel: yield* channelSummary(existing[0]) }
     }
 

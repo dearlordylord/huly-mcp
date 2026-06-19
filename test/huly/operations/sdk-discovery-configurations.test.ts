@@ -20,6 +20,7 @@ import { toFindResult } from "@hcengineering/core"
 import type { Plugin } from "@hcengineering/platform"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import {
   HulySpaceTypeCapabilitiesSchema,
@@ -238,7 +239,7 @@ const createTestLayer = (data: ConfigLayerData) => {
   }
 
   const findOne: HulyClientOperations["findOne"] = <T extends Doc>(_class: Ref<Class<T>>, query: DocumentQuery<T>) =>
-    findAll(_class, query).pipe(Effect.map((docs) => docs[0]))
+    findAll(_class, query).pipe(Effect.map((docs) => docs.at(0)))
 
   return HulyClient.testLayer({ findAll, findOne })
 }
@@ -307,11 +308,11 @@ describe("sdk discovery configuration operations", () => {
       const encodedPlugin = yield* Schema.encodeUnknown(ListHulyPluginConfigurationsResultSchema)(pluginResult)
       const encodedDomain = yield* Schema.encodeUnknown(ListHulyDomainIndexConfigurationsResultSchema)(domainResult)
 
-      expect(encodedPlugin.pluginConfigurations[0]).toMatchObject({
+      expect(assertAt(encodedPlugin.pluginConfigurations, 0)).toMatchObject({
         pluginId: "bare-plugin",
         label: "bare-plugin"
       })
-      expect(encodedDomain.domainIndexConfigurations[0]).toEqual({
+      expect(assertAt(encodedDomain.domainIndexConfigurations, 0)).toEqual({
         domain: "tracker",
         disabled: [],
         indexes: [],

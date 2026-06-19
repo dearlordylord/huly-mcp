@@ -84,6 +84,7 @@ import {
   McpErrorCode,
   toMcpResponse
 } from "../../src/mcp/error-mapping.js"
+import { assertAt } from "../../src/utils/assertions.js"
 import { funnelIdentifier, funnelReference, leadIdentifier } from "../helpers/brands.js"
 
 describe("Error Mapping to MCP", () => {
@@ -100,7 +101,7 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
           expect(response._meta.errorTag).toBeUndefined()
-          expect(response.content[0].text).toBe(
+          expect(assertAt(response.content, 0).text).toBe(
             "Issue 'HULY-123' not found in project 'HULY'"
           )
         }))
@@ -112,7 +113,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response.content[0].text).toBe("Project 'MISSING' not found")
+          expect(assertAt(response.content, 0).text).toBe("Project 'MISSING' not found")
         }))
 
       it.effect("maps InvalidStatusError with descriptive message", () =>
@@ -125,7 +126,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response.content[0].text).toBe(
+          expect(assertAt(response.content, 0).text).toBe(
             "Invalid status 'bogus' for project 'HULY'"
           )
         }))
@@ -139,7 +140,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response.content[0].text).toBe(
+          expect(assertAt(response.content, 0).text).toBe(
             "Person 'john@example.com' not found"
           )
         }))
@@ -154,7 +155,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response.content[0].text).toBe(
+          expect(assertAt(response.content, 0).text).toBe(
             "Person identifier 'Smith,Bill' matched 2 people; use an exact email address instead"
           )
         }))
@@ -166,7 +167,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response.content[0].text).toBe("Organization 'Acme' not found")
+          expect(assertAt(response.content, 0).text).toBe("Organization 'Acme' not found")
         }))
 
       it.effect("maps OrganizationIdentifierAmbiguousError with descriptive message", () =>
@@ -179,7 +180,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response.content[0].text).toBe(
+          expect(assertAt(response.content, 0).text).toBe(
             "Organization identifier 'Acme' matched 2 organizations; use the organization ID instead"
           )
         }))
@@ -191,7 +192,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response.content[0].text).toBe("Invalid contact provider: 'fax'")
+          expect(assertAt(response.content, 0).text).toBe("Invalid contact provider: 'fax'")
         }))
 
       it.effect("maps InvalidFileDataError with descriptive message", () =>
@@ -203,7 +204,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response.content[0].text).toBe("Invalid base64 encoding")
+          expect(assertAt(response.content, 0).text).toBe("Invalid base64 encoding")
         }))
 
       it.effect("maps FileNotFoundError with descriptive message", () =>
@@ -215,7 +216,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response.content[0].text).toContain("/path/to/missing.txt")
+          expect(assertAt(response.content, 0).text).toContain("/path/to/missing.txt")
         }))
 
       it.effect("maps FunnelNotFoundError with descriptive message", () =>
@@ -225,7 +226,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response.content[0].text).toBe("Funnel 'sales' not found")
+          expect(assertAt(response.content, 0).text).toBe("Funnel 'sales' not found")
         }))
 
       it.effect("maps LeadNotFoundError with descriptive message", () =>
@@ -238,7 +239,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response.content[0].text).toBe("Lead 'LEAD-9' not found in funnel 'funnel-1'")
+          expect(assertAt(response.content, 0).text).toBe("Lead 'LEAD-9' not found in funnel 'funnel-1'")
         }))
 
       it.effect("maps CalendarNotAccessibleError with descriptive message", () =>
@@ -248,7 +249,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response.content[0].text).toBe("Calendar 'cal-9' not found or not accessible")
+          expect(assertAt(response.content, 0).text).toBe("Calendar 'cal-9' not found or not accessible")
         }))
 
       it.effect("maps typed space role lookup errors as invalid params without errorTag", () =>
@@ -278,7 +279,7 @@ describe("Error Mapping to MCP", () => {
             expect(response.isError).toBe(true)
             expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
             expect(response._meta.errorTag).toBeUndefined()
-            expect(response.content[0].text).toBe(error.message)
+            expect(assertAt(response.content, 0).text).toBe(error.message)
           }
         }))
 
@@ -290,7 +291,7 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
           expect(response._meta.errorTag).toBeUndefined()
-          expect(response.content[0].text).toBe("Direct message 'Kerr,Shannon' not found")
+          expect(assertAt(response.content, 0).text).toBe("Direct message 'Kerr,Shannon' not found")
         }))
 
       it.effect("maps DirectMessageIdentifierAmbiguousError with descriptive message", () =>
@@ -304,7 +305,7 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
           expect(response._meta.errorTag).toBeUndefined()
-          expect(response.content[0].text).toBe(
+          expect(assertAt(response.content, 0).text).toBe(
             "Direct message 'Kerr,Shannon' is ambiguous (2 matches); use the DM _id"
           )
         }))
@@ -352,7 +353,7 @@ describe("Error Mapping to MCP", () => {
             expect(response.isError).toBe(true)
             expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
             expect(response._meta.errorTag).toBeUndefined()
-            expect(response.content[0].text).toBe(error.message)
+            expect(assertAt(response.content, 0).text).toBe(error.message)
           }
         }))
 
@@ -404,7 +405,7 @@ describe("Error Mapping to MCP", () => {
             expect(response.isError).toBe(true)
             expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
             expect(response._meta.errorTag).toBeUndefined()
-            expect(response.content[0].text).toBe(error.message)
+            expect(assertAt(response.content, 0).text).toBe(error.message)
           }
         }))
 
@@ -419,7 +420,7 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
           expect(response._meta.errorTag).toBeUndefined()
-          expect(response.content[0].text).toBe(
+          expect(assertAt(response.content, 0).text).toBe(
             "Document content is unreadable or corrupted. Use edit_document with the full content field to replace and repair it."
           )
         }))
@@ -457,7 +458,7 @@ describe("Error Mapping to MCP", () => {
             expect(response.isError).toBe(true)
             expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
             expect(response._meta.errorTag).toBeUndefined()
-            expect(response.content[0].text).toBe(error.message)
+            expect(assertAt(response.content, 0).text).toBe(error.message)
           }
         }))
     })
@@ -471,7 +472,7 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
           expect(response._meta.errorTag).toBe("HulyConnectionError")
-          expect(response.content[0].text).toBe("Connection error: Network timeout")
+          expect(assertAt(response.content, 0).text).toBe("Connection error: Network timeout")
         }))
 
       it.effect("maps HulyAuthError with errorTag", () =>
@@ -482,7 +483,7 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
           expect(response._meta.errorTag).toBe("HulyAuthError")
-          expect(response.content[0].text).toBe("Authentication error: Login failed")
+          expect(assertAt(response.content, 0).text).toBe("Authentication error: Login failed")
         }))
 
       it.effect("maps HulyError with errorTag", () =>
@@ -493,7 +494,7 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
           expect(response._meta.errorTag).toBe("HulyError")
-          expect(response.content[0].text).toBe("Something went wrong")
+          expect(assertAt(response.content, 0).text).toBe("Something went wrong")
         }))
 
       it.effect("maps FileUploadError with errorTag", () =>
@@ -506,7 +507,7 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
           expect(response._meta.errorTag).toBe("FileUploadError")
-          expect(response.content[0].text).toBe(
+          expect(assertAt(response.content, 0).text).toBe(
             "File upload error: Storage quota exceeded"
           )
         }))
@@ -522,8 +523,8 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
           expect(response._meta.errorTag).toBe("FileFetchError")
-          expect(response.content[0].text).toContain("https://example.com/file.png")
-          expect(response.content[0].text).toContain("404 Not Found")
+          expect(assertAt(response.content, 0).text).toContain("https://example.com/file.png")
+          expect(assertAt(response.content, 0).text).toContain("404 Not Found")
         }))
     })
   })
@@ -547,7 +548,7 @@ describe("Error Mapping to MCP", () => {
 
         expect(response.isError).toBe(true)
         expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-        expect(response.content[0].text).toContain(
+        expect(assertAt(response.content, 0).text).toContain(
           "Invalid parameters for create_issue"
         )
       }))
@@ -568,7 +569,7 @@ describe("Error Mapping to MCP", () => {
 
         expect(response.isError).toBe(true)
         expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-        expect(response.content[0].text).toContain("Invalid parameters:")
+        expect(assertAt(response.content, 0).text).toContain("Invalid parameters:")
       }))
   })
 
@@ -585,7 +586,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response.content[0].text).toBe(
+          expect(assertAt(response.content, 0).text).toBe(
             "Issue 'TEST-1' not found in project 'TEST'"
           )
         }))
@@ -600,7 +601,7 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
           expect(response._meta.errorTag).toBe("UnexpectedError")
-          expect(response.content[0].text).toBe("An unexpected error occurred")
+          expect(assertAt(response.content, 0).text).toBe("An unexpected error occurred")
         }))
     })
 
@@ -612,7 +613,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
-          expect(response.content[0].text).toBe("An unexpected error occurred")
+          expect(assertAt(response.content, 0).text).toBe("An unexpected error occurred")
         }))
     })
 
@@ -629,7 +630,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response.content[0].text).toBe("Project 'PROJ' not found")
+          expect(assertAt(response.content, 0).text).toBe("Project 'PROJ' not found")
         }))
     })
 
@@ -643,7 +644,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response.content[0].text).toBe(
+          expect(assertAt(response.content, 0).text).toBe(
             "Invalid status 'bad' for project 'P'"
           )
         }))
@@ -664,7 +665,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response.content[0].text).toContain("Invalid parameters")
+          expect(assertAt(response.content, 0).text).toContain("Invalid parameters")
         }))
     })
 
@@ -676,7 +677,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
-          expect(response.content[0].text).toBe("An unexpected error occurred")
+          expect(assertAt(response.content, 0).text).toBe("An unexpected error occurred")
         }))
     })
   })
@@ -688,8 +689,8 @@ describe("Error Mapping to MCP", () => {
         const response = createSuccessResponse(result)
 
         expect(response.isError).toBeUndefined()
-        expect(response.content[0].type).toBe("text")
-        expect(JSON.parse(response.content[0].text)).toEqual(result)
+        expect(assertAt(response.content, 0).type).toBe("text")
+        expect(JSON.parse(assertAt(response.content, 0).text)).toEqual(result)
       }))
 
     it.effect("formats JSON as compact single-line", () =>
@@ -697,8 +698,8 @@ describe("Error Mapping to MCP", () => {
         const result = { a: 1, b: 2 }
         const response = createSuccessResponse(result)
 
-        expect(response.content[0].text).not.toContain("\n")
-        expect(response.content[0].text).toBe(JSON.stringify(result))
+        expect(assertAt(response.content, 0).text).not.toContain("\n")
+        expect(assertAt(response.content, 0).text).toBe(JSON.stringify(result))
       }))
 
     it.effect("omits warnings fields and content blocks when there are no warnings", () =>
@@ -719,7 +720,7 @@ describe("Error Mapping to MCP", () => {
 
         expect(response.structuredContent).toEqual({ result: { ok: true }, warnings: [warning] })
         expect(response.content).toHaveLength(2)
-        expect(JSON.parse(response.content[1].text)).toEqual({ warnings: [warning] })
+        expect(JSON.parse(assertAt(response.content, 1).text)).toEqual({ warnings: [warning] })
       }))
   })
 
@@ -731,7 +732,7 @@ describe("Error Mapping to MCP", () => {
         expect(response.isError).toBe(true)
         expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
         expect(response._meta.errorTag).toBe("UnknownTool")
-        expect(response.content[0].text).toBe("Unknown tool: bogus_tool")
+        expect(assertAt(response.content, 0).text).toBe("Unknown tool: bogus_tool")
       }))
 
     it.effect("does not include structuredContent on error responses without warnings", () =>
@@ -755,8 +756,8 @@ describe("Error Mapping to MCP", () => {
 
         expect(response.isError).toBe(true)
         expect(response.structuredContent).toBeUndefined()
-        expect(response.content[0].text).toBe("failed after warning")
-        expect(JSON.parse(response.content[1].text)).toEqual({ warnings: [warning] })
+        expect(assertAt(response.content, 0).text).toBe("failed after warning")
+        expect(JSON.parse(assertAt(response.content, 1).text)).toEqual({ warnings: [warning] })
       }))
   })
 
@@ -768,7 +769,7 @@ describe("Error Mapping to MCP", () => {
 
         expect(wire).not.toHaveProperty("_meta")
         expect(wire.isError).toBe(true)
-        expect(wire.content[0].text).toBe("Unknown tool: bogus_tool")
+        expect(assertAt(wire.content, 0).text).toBe("Unknown tool: bogus_tool")
       }))
 
     it.effect("strips _meta from content-only success response", () =>

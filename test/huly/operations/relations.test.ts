@@ -9,6 +9,7 @@ import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { documentPlugin, tracker } from "../../../src/huly/huly-plugins.js"
 import { addIssueRelation, listIssueRelations, removeIssueRelation } from "../../../src/huly/operations/relations.js"
+import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import { issueIdentifier, projectIdentifier } from "../../helpers/brands.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
@@ -286,8 +287,8 @@ describe("addIssueRelation", () => {
       expect(result.targetIssue).toBe("TEST-2")
       expect(result.relationType).toBe("blocks")
       expect(captured).toHaveLength(1)
-      const ops = captured[0].operations as DocumentUpdate<HulyIssue>
-      expect(captured[0].objectId).toBe("issue-2")
+      const ops = assertAt(captured, 0).operations as DocumentUpdate<HulyIssue>
+      expect(assertAt(captured, 0).objectId).toBe("issue-2")
       expect(ops.$push).toBeDefined()
       const pushOps = ops.$push as Record<string, unknown>
       expect(pushOps.blockedBy).toBeDefined()
@@ -326,8 +327,8 @@ describe("addIssueRelation", () => {
 
       expect(result.added).toBe(true)
       expect(captured).toHaveLength(1)
-      expect(captured[0].objectId).toBe("issue-1")
-      const ops = captured[0].operations as DocumentUpdate<HulyIssue>
+      expect(assertAt(captured, 0).objectId).toBe("issue-1")
+      const ops = assertAt(captured, 0).operations as DocumentUpdate<HulyIssue>
       const pushOps = ops.$push as Record<string, unknown>
       const pushed = pushOps.blockedBy as { _id: string }
       expect(pushed._id).toBe("issue-2")
@@ -365,13 +366,13 @@ describe("addIssueRelation", () => {
       expect(result.added).toBe(true)
       expect(captured).toHaveLength(2)
       // First call: push target ref into source's relations
-      expect(captured[0].objectId).toBe("issue-1")
-      const ops0 = captured[0].operations as DocumentUpdate<HulyIssue>
-      expect((ops0.$push as Record<string, { _id: string }>).relations._id).toBe("issue-2")
+      expect(assertAt(captured, 0).objectId).toBe("issue-1")
+      const ops0 = assertAt(captured, 0).operations as DocumentUpdate<HulyIssue>
+      expect(assertExists((ops0.$push as Record<string, { _id: string }>).relations)._id).toBe("issue-2")
       // Second call: push source ref into target's relations
-      expect(captured[1].objectId).toBe("issue-2")
-      const ops1 = captured[1].operations as DocumentUpdate<HulyIssue>
-      expect((ops1.$push as Record<string, { _id: string }>).relations._id).toBe("issue-1")
+      expect(assertAt(captured, 1).objectId).toBe("issue-2")
+      const ops1 = assertAt(captured, 1).operations as DocumentUpdate<HulyIssue>
+      expect(assertExists((ops1.$push as Record<string, { _id: string }>).relations)._id).toBe("issue-1")
     }))
 
   it.effect("returns added=false when 'blocks' relation already exists", () =>
@@ -482,7 +483,7 @@ describe("addIssueRelation", () => {
       expect(result.added).toBe(true)
       expect(result.targetIssue).toBe("TGT-5")
       expect(captured).toHaveLength(1)
-      expect(captured[0].objectId).toBe("issue-2")
+      expect(assertAt(captured, 0).objectId).toBe("issue-2")
     }))
 })
 
@@ -519,8 +520,8 @@ describe("removeIssueRelation", () => {
 
       expect(result.removed).toBe(true)
       expect(captured).toHaveLength(1)
-      expect(captured[0].objectId).toBe("issue-2")
-      const ops = captured[0].operations as DocumentUpdate<HulyIssue>
+      expect(assertAt(captured, 0).objectId).toBe("issue-2")
+      const ops = assertAt(captured, 0).operations as DocumentUpdate<HulyIssue>
       expect(ops.$pull).toBeDefined()
       const pullOps = ops.$pull as Record<string, unknown>
       expect(pullOps.blockedBy).toBeDefined()
@@ -560,8 +561,8 @@ describe("removeIssueRelation", () => {
 
       expect(result.removed).toBe(true)
       expect(captured).toHaveLength(1)
-      expect(captured[0].objectId).toBe("issue-1")
-      const ops = captured[0].operations as DocumentUpdate<HulyIssue>
+      expect(assertAt(captured, 0).objectId).toBe("issue-1")
+      const ops = assertAt(captured, 0).operations as DocumentUpdate<HulyIssue>
       const pullOps = ops.$pull as Record<string, unknown>
       const pulled = pullOps.blockedBy as { _id: string }
       expect(pulled._id).toBe("issue-2")
@@ -601,13 +602,13 @@ describe("removeIssueRelation", () => {
       expect(result.removed).toBe(true)
       expect(captured).toHaveLength(2)
       // First pull: from source's relations
-      expect(captured[0].objectId).toBe("issue-1")
-      const ops0 = captured[0].operations as DocumentUpdate<HulyIssue>
-      expect((ops0.$pull as Record<string, { _id: string }>).relations._id).toBe("issue-2")
+      expect(assertAt(captured, 0).objectId).toBe("issue-1")
+      const ops0 = assertAt(captured, 0).operations as DocumentUpdate<HulyIssue>
+      expect(assertExists((ops0.$pull as Record<string, { _id: string }>).relations)._id).toBe("issue-2")
       // Second pull: from target's relations
-      expect(captured[1].objectId).toBe("issue-2")
-      const ops1 = captured[1].operations as DocumentUpdate<HulyIssue>
-      expect((ops1.$pull as Record<string, { _id: string }>).relations._id).toBe("issue-1")
+      expect(assertAt(captured, 1).objectId).toBe("issue-2")
+      const ops1 = assertAt(captured, 1).operations as DocumentUpdate<HulyIssue>
+      expect(assertExists((ops1.$pull as Record<string, { _id: string }>).relations)._id).toBe("issue-1")
     }))
 
   it.effect("returns removed=false when relation doesn't exist", () =>
@@ -679,12 +680,12 @@ describe("listIssueRelations", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result.blockedBy).toHaveLength(1)
-      expect(result.blockedBy[0].identifier).toBe("TEST-2")
-      expect(result.blockedBy[0]._id).toBe("issue-2")
+      expect(assertAt(result.blockedBy, 0).identifier).toBe("TEST-2")
+      expect(assertAt(result.blockedBy, 0)._id).toBe("issue-2")
       expect(result.blocks).toHaveLength(0)
       expect(result.relations).toHaveLength(1)
-      expect(result.relations[0].identifier).toBe("TEST-3")
-      expect(result.relations[0]._id).toBe("issue-3")
+      expect(assertAt(result.relations, 0).identifier).toBe("TEST-3")
+      expect(assertAt(result.relations, 0)._id).toBe("issue-3")
       expect(result.documents).toHaveLength(0)
     }))
 
@@ -721,13 +722,13 @@ describe("listIssueRelations", () => {
 
       expect(result.documents).toHaveLength(2)
       // Resolvable document: title + teamspace name come from the resolved docs.
-      expect(result.documents[0]).toMatchObject({
+      expect(assertAt(result.documents, 0)).toMatchObject({
         _id: "doc-1",
         title: "Design Spec",
         teamspace: "Engineering Docs"
       })
       // Missing document: both title and teamspace fall back to the raw _id.
-      expect(result.documents[1]).toMatchObject({
+      expect(assertAt(result.documents, 1)).toMatchObject({
         _id: "doc-missing",
         title: "doc-missing",
         teamspace: "doc-missing"
@@ -753,7 +754,7 @@ describe("listIssueRelations", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result.documents).toHaveLength(1)
-      expect(result.documents[0]).toMatchObject({ _id: "doc-gone", title: "doc-gone", teamspace: "doc-gone" })
+      expect(assertAt(result.documents, 0)).toMatchObject({ _id: "doc-gone", title: "doc-gone", teamspace: "doc-gone" })
     }))
 
   it.effect("returns issues blocked by the current issue", () =>
@@ -786,8 +787,8 @@ describe("listIssueRelations", () => {
 
       expect(result.blockedBy).toHaveLength(0)
       expect(result.blocks).toHaveLength(1)
-      expect(result.blocks[0].identifier).toBe("TEST-4")
-      expect(result.blocks[0]._id).toBe("issue-4")
+      expect(assertAt(result.blocks, 0).identifier).toBe("TEST-4")
+      expect(assertAt(result.blocks, 0)._id).toBe("issue-4")
       expect(result.relations).toHaveLength(0)
       expect(result.documents).toHaveLength(0)
       expect(capturedFindAllQueries.some(({ query }) => hasBlockedByRelatedDocQuery(query, "issue-1"))).toBe(true)
@@ -845,8 +846,8 @@ describe("listIssueRelations", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result.blockedBy).toHaveLength(1)
-      expect(result.blockedBy[0].identifier).toBe("deleted-issue")
-      expect(result.blockedBy[0]._id).toBe("deleted-issue")
+      expect(assertAt(result.blockedBy, 0).identifier).toBe("deleted-issue")
+      expect(assertAt(result.blockedBy, 0)._id).toBe("deleted-issue")
       expect(result.documents).toHaveLength(0)
     }))
 
@@ -894,11 +895,11 @@ describe("listIssueRelations", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result.relations).toHaveLength(1)
-      expect(result.relations[0].identifier).toBe("TEST-2")
+      expect(assertAt(result.relations, 0).identifier).toBe("TEST-2")
       expect(result.documents).toHaveLength(1)
-      expect(result.documents[0].title).toBe("My Spec")
-      expect(result.documents[0]._id).toBe("doc-1")
-      expect(result.documents[0]._class).toBe(String(documentPlugin.class.Document))
+      expect(assertAt(result.documents, 0).title).toBe("My Spec")
+      expect(assertAt(result.documents, 0)._id).toBe("doc-1")
+      expect(assertAt(result.documents, 0)._class).toBe(String(documentPlugin.class.Document))
     }))
 })
 

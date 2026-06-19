@@ -3,6 +3,7 @@ import type { AccountUuid, FindResult, PersonId } from "@hcengineering/core"
 import { toFindResult } from "@hcengineering/core"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../src/utils/assertions.js"
 
 import { IssueIdentifier } from "../../src/domain/schemas/shared.js"
 import type { HulyClientOperations } from "../../src/huly/client.js"
@@ -89,7 +90,7 @@ describe("createToolHandler", () => {
 
       expect(result.isError).toBeUndefined()
       expect(result.structuredContent).toEqual({ result: { greeting: "hello world" } })
-      expect(result.content[0].text).toContain("hello world")
+      expect(assertAt(result.content, 0).text).toContain("hello world")
     }))
 
   it.effect("returns parse error on invalid input", () =>
@@ -108,7 +109,7 @@ describe("createToolHandler", () => {
       expect(result.isError).toBe(true)
       expect(result.structuredContent).toBeUndefined()
       expect(result._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
-      expect(result.content[0].text).toContain("Invalid parameters")
+      expect(assertAt(result.content, 0).text).toContain("Invalid parameters")
     }))
 
   it.effect("returns domain error on operation failure", () =>
@@ -128,7 +129,7 @@ describe("createToolHandler", () => {
 
       expect(result.isError).toBe(true)
       expect(result._meta?.errorCode).toBe(McpErrorCode.InternalError)
-      expect(result.content[0].text).toContain("something broke")
+      expect(assertAt(result.content, 0).text).toContain("something broke")
     }))
 
   it.effect("adds diagnostics warnings to success envelopes", () =>
@@ -158,7 +159,7 @@ describe("createToolHandler", () => {
         }]
       })
       expect(result.content).toHaveLength(2)
-      expect(JSON.parse(result.content[1].text)).toEqual({
+      expect(JSON.parse(assertAt(result.content, 1).text)).toEqual({
         warnings: [{
           code: "status_metadata_unresolved",
           message: "Status metadata was degraded for world."
@@ -186,8 +187,8 @@ describe("createToolHandler", () => {
 
       expect(result.isError).toBe(true)
       expect(result.structuredContent).toBeUndefined()
-      expect(result.content[0].text).toContain("failed after warning")
-      expect(JSON.parse(result.content[1].text)).toEqual({
+      expect(assertAt(result.content, 0).text).toContain("failed after warning")
+      expect(JSON.parse(assertAt(result.content, 1).text)).toEqual({
         warnings: [{
           code: "status_metadata_unresolved",
           message: "Status metadata was degraded for world."
@@ -213,7 +214,7 @@ describe("createEncodedToolHandler", () => {
       const result = yield* Effect.promise(() => handler({ name: "world" }, noopHulyClient, noopStorageClient))
 
       expect(result.isError).toBeUndefined()
-      expect(result.content[0].text).toBe("{\"identifier\":\"HULY-1\"}")
+      expect(assertAt(result.content, 0).text).toBe("{\"identifier\":\"HULY-1\"}")
     }))
 
   it.effect("returns internal error when output encoding fails", () =>
@@ -233,7 +234,7 @@ describe("createEncodedToolHandler", () => {
 
       expect(result.isError).toBe(true)
       expect(result._meta?.errorCode).toBe(McpErrorCode.InternalError)
-      expect(result.content[0].text).toContain("invalid output")
+      expect(assertAt(result.content, 0).text).toContain("invalid output")
     }))
 })
 
@@ -252,7 +253,7 @@ describe("createStorageToolHandler", () => {
       const result = yield* Effect.promise(() => handler({ name: "doc.pdf" }, noopHulyClient, noopStorageClient))
 
       expect(result.isError).toBeUndefined()
-      expect(result.content[0].text).toContain("file://doc.pdf")
+      expect(assertAt(result.content, 0).text).toContain("file://doc.pdf")
     }))
 
   it.effect("returns parse error on invalid input", () =>
@@ -290,7 +291,7 @@ describe("createCombinedToolHandler", () => {
       const result = yield* Effect.promise(() => handler({ name: "both" }, noopHulyClient, noopStorageClient))
 
       expect(result.isError).toBeUndefined()
-      expect(result.content[0].text).toContain("both")
+      expect(assertAt(result.content, 0).text).toContain("both")
     }))
 })
 
@@ -311,7 +312,7 @@ describe("createWorkspaceToolHandler", () => {
       )
 
       expect(result.isError).toBeUndefined()
-      expect(result.content[0].text).toContain("myws")
+      expect(assertAt(result.content, 0).text).toContain("myws")
     }))
 
   it.effect("returns error when workspace client is undefined", () =>
@@ -331,7 +332,7 @@ describe("createWorkspaceToolHandler", () => {
 
       expect(result.isError).toBe(true)
       expect(result._meta?.errorCode).toBe(McpErrorCode.InternalError)
-      expect(result.content[0].text).toContain("WorkspaceClient not available")
+      expect(assertAt(result.content, 0).text).toContain("WorkspaceClient not available")
     }))
 
   it.effect("returns parse error on invalid input", () =>
@@ -373,7 +374,7 @@ describe("createEncodedWorkspaceToolHandler", () => {
       )
 
       expect(result.isError).toBeUndefined()
-      expect(result.content[0].text).toBe("{\"ws\":\"encoded\"}")
+      expect(assertAt(result.content, 0).text).toBe("{\"ws\":\"encoded\"}")
     }))
 })
 
@@ -390,7 +391,7 @@ describe("createNoParamsWorkspaceToolHandler", () => {
       const result = yield* Effect.promise(() => handler({}, noopHulyClient, noopStorageClient, noopWorkspaceClient))
 
       expect(result.isError).toBeUndefined()
-      expect(result.content[0].text).toContain("5")
+      expect(assertAt(result.content, 0).text).toContain("5")
     }))
 
   it.effect("returns error when workspace client is undefined", () =>
@@ -406,7 +407,7 @@ describe("createNoParamsWorkspaceToolHandler", () => {
 
       expect(result.isError).toBe(true)
       expect(result._meta?.errorCode).toBe(McpErrorCode.InternalError)
-      expect(result.content[0].text).toContain("WorkspaceClient not available")
+      expect(assertAt(result.content, 0).text).toContain("WorkspaceClient not available")
     }))
 
   it.effect("returns domain error on operation failure", () =>
@@ -424,7 +425,7 @@ describe("createNoParamsWorkspaceToolHandler", () => {
 
       expect(result.isError).toBe(true)
       expect(result._meta?.errorCode).toBe(McpErrorCode.InternalError)
-      expect(result.content[0].text).toContain("ws broke")
+      expect(assertAt(result.content, 0).text).toContain("ws broke")
     }))
 })
 
@@ -444,6 +445,6 @@ describe("createEncodedNoParamsWorkspaceToolHandler", () => {
       const result = yield* Effect.promise(() => handler({}, noopHulyClient, noopStorageClient, noopWorkspaceClient))
 
       expect(result.isError).toBeUndefined()
-      expect(result.content[0].text).toBe("{\"members\":5}")
+      expect(assertAt(result.content, 0).text).toBe("{\"members\":5}")
     }))
 })

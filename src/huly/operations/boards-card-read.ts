@@ -5,6 +5,7 @@ import type { ProjectType, TaskType } from "@hcengineering/task"
 import { Effect } from "effect"
 
 import type { BoardCardDetail, BoardCardRef } from "../../domain/schemas.js"
+import { isNonEmpty, isSingle } from "../../utils/assertions.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
 import { BoardCardIdentifierAmbiguousError, BoardCardNotFoundError } from "../errors.js"
@@ -48,7 +49,7 @@ export const resolveBoardCard = (
       board.class.Card,
       hulyQuery<HulyBoardCard>({ space, _id: toRef<HulyBoardCard>(identifier) })
     )
-    if (idMatches.length > 0) return idMatches[0]
+    if (isNonEmpty(idMatches)) return idMatches[0]
 
     const number = boardCardNumber(identifier)
     if (number !== undefined) {
@@ -56,7 +57,7 @@ export const resolveBoardCard = (
         board.class.Card,
         hulyQuery<HulyBoardCard>({ space, number })
       )
-      if (numberMatches.length === 1) return numberMatches[0]
+      if (isSingle(numberMatches)) return numberMatches[0]
       if (numberMatches.length > 1) {
         return yield* new BoardCardIdentifierAmbiguousError({
           identifier,
@@ -70,7 +71,7 @@ export const resolveBoardCard = (
       board.class.Card,
       hulyQuery<HulyBoardCard>({ space, title: identifier })
     )
-    if (titleMatches.length === 1) return titleMatches[0]
+    if (isSingle(titleMatches)) return titleMatches[0]
     if (titleMatches.length > 1) {
       return yield* new BoardCardIdentifierAmbiguousError({
         identifier,

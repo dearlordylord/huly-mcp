@@ -1,3 +1,4 @@
+import { assertAt } from "../../../src/utils/assertions.js"
 /* eslint-disable no-restricted-syntax -- Huly SDK phantom refs are erased at runtime; these tests centralize fixture casts. */
 import { describe, it } from "@effect/vitest"
 import type {
@@ -198,7 +199,7 @@ const makeLayer = (state: DriveState): Layer.Layer<HulyClient | HulyStorageClien
   const findOne: HulyClientOperations["findOne"] = <T extends Doc>(
     classRef: Ref<Class<T>>,
     query: DocumentQuery<T>
-  ) => Effect.map(findAll(classRef, query), (docs) => docs[0])
+  ) => Effect.map(findAll(classRef, query), (docs) => docs.at(0))
 
   const createDoc: HulyClientOperations["createDoc"] = <T extends Doc>(
     classRef: Ref<Class<T>>,
@@ -274,19 +275,19 @@ const makeLayer = (state: DriveState): Layer.Layer<HulyClient | HulyStorageClien
         operations: operations as unknown as DocumentUpdate<DriveSpace>
       })
       const targetIndex = state.drives.findIndex((candidate) => String(candidate._id) === String(objectId))
-      const target = state.drives[targetIndex]
+      const target = assertAt(state.drives, targetIndex)
       state.drives[targetIndex] = { ...target, ...(operations as unknown as Partial<DriveSpace>) }
     }
     if (classRef === drive.class.File) {
       state.updatedFiles?.push({ id: String(objectId), operations: operations as unknown as DocumentUpdate<File> })
       const targetIndex = state.files.findIndex((candidate) => String(candidate._id) === String(objectId))
-      const target = state.files[targetIndex]
+      const target = assertAt(state.files, targetIndex)
       state.files[targetIndex] = { ...target, ...(operations as unknown as Partial<File>) }
     }
     if (classRef === drive.class.Folder) {
       state.updatedFolders?.push({ id: String(objectId), operations: operations as unknown as DocumentUpdate<Folder> })
       const targetIndex = state.folders.findIndex((candidate) => String(candidate._id) === String(objectId))
-      const target = state.folders[targetIndex]
+      const target = assertAt(state.folders, targetIndex)
       state.folders[targetIndex] = { ...target, ...(operations as unknown as Partial<Folder>) }
     }
     return Effect.succeed([])
@@ -419,8 +420,8 @@ describe("drive operations", () => {
       expect(created.drive).toMatchObject({ name: "Specs", private: true, autoJoin: true, membersCount: 1 })
       expect(repeated.created).toBe(false)
       expect(state.drives).toHaveLength(1)
-      expect(state.drives[0].members).toEqual(["00000000-0000-4000-8000-000000000000"])
-      expect(state.drives[0].owners).toEqual(["00000000-0000-4000-8000-000000000000"])
+      expect(assertAt(state.drives, 0).members).toEqual(["00000000-0000-4000-8000-000000000000"])
+      expect(assertAt(state.drives, 0).owners).toEqual(["00000000-0000-4000-8000-000000000000"])
     }))
 
   it.effect("creates a Drive with explicit initial members and owners", () =>
@@ -442,8 +443,8 @@ describe("drive operations", () => {
 
       expect(created.created).toBe(true)
       expect(created.drive).toMatchObject({ name: "Team Drive", membersCount: 2, ownersCount: 1 })
-      expect(state.drives[0].members).toEqual([accountA, accountB])
-      expect(state.drives[0].owners).toEqual([accountB])
+      expect(assertAt(state.drives, 0).members).toEqual([accountA, accountB])
+      expect(assertAt(state.drives, 0).owners).toEqual([accountB])
     }))
 
   it.effect("updates Drive metadata with clearable description", () =>
@@ -530,7 +531,7 @@ describe("drive operations", () => {
       expect(addedAgain.changed).toBe(false)
       expect(owners).toMatchObject({ owners: [accountB], members: [accountA, accountB], changed: true })
       expect(removed.members).toEqual([accountB])
-      expect(state.drives[0]).toMatchObject({ members: [accountB], owners: [accountB] })
+      expect(assertAt(state.drives, 0)).toMatchObject({ members: [accountB], owners: [accountB] })
     }))
 
   it.effect("adds replacement Drive owners to members when required", () =>
@@ -971,7 +972,7 @@ describe("drive operations", () => {
       expect(result.currentVersion.version).toBe(2)
       expect(result.currentVersion.lastModified).toBe(321)
       expect(result.file.currentVersionId).toBe(result.currentVersion.id)
-      expect(state.files[0]).toMatchObject({ version: 2, file: result.currentVersion.id })
+      expect(assertAt(state.files, 0)).toMatchObject({ version: 2, file: result.currentVersion.id })
       expect(state.versions.map((item) => item.version)).toEqual([1, 2])
       expect(state.updatedFiles?.map((update) => update.operations)).toMatchObject([
         { version: 2 },
@@ -1051,7 +1052,7 @@ describe("drive operations", () => {
       const moved = yield* moveDriveItem(params).pipe(Effect.provide(makeLayer(state)))
 
       expect(moved).toMatchObject({ moved: true, fromPath: "/Specs/API.md", toPath: "/API.md" })
-      expect(state.files[0]).toMatchObject({ parent: drive.ids.Root, path: [] })
+      expect(assertAt(state.files, 0)).toMatchObject({ parent: drive.ids.Root, path: [] })
     }))
 
   it.effect("rejects move collisions and descendant folder moves", () =>

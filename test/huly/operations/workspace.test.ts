@@ -3,6 +3,7 @@ import type { RegionInfo as HulyRegionInfo, WorkspaceLoginInfo } from "@hcengine
 import { AccountRole, type AccountUuid, type PersonUuid, type WorkspaceInfoWithStatus } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import type { InvalidPersonUuidError } from "../../../src/huly/errors.js"
 import {
@@ -69,15 +70,15 @@ describe("listWorkspaceMembers", () => {
       const result = yield* listWorkspaceMembers({}).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
-      expect(result[0].personId).toBe("person-1")
-      expect(result[0].role).toBe(AccountRole.Owner)
-      expect(result[0].name).toBe("Alice")
-      expect(result[0].email).toBe("alice@test.com")
+      expect(assertAt(result, 0).personId).toBe("person-1")
+      expect(assertAt(result, 0).role).toBe(AccountRole.Owner)
+      expect(assertAt(result, 0).name).toBe("Alice")
+      expect(assertAt(result, 0).email).toBe("alice@test.com")
 
-      expect(result[1].personId).toBe("person-2")
-      expect(result[1].role).toBe(AccountRole.User)
-      expect(result[1].name).toBe("Bob")
-      expect(result[1].email).toBeUndefined()
+      expect(assertAt(result, 1).personId).toBe("person-2")
+      expect(assertAt(result, 1).role).toBe(AccountRole.User)
+      expect(assertAt(result, 1).name).toBe("Bob")
+      expect(assertAt(result, 1).email).toBeUndefined()
     }))
 
   it.effect("handles person info failure gracefully via Effect.option", () =>
@@ -93,9 +94,9 @@ describe("listWorkspaceMembers", () => {
       const result = yield* listWorkspaceMembers({}).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].personId).toBe("person-1")
-      expect(result[0].name).toBeUndefined()
-      expect(result[0].email).toBeUndefined()
+      expect(assertAt(result, 0).personId).toBe("person-1")
+      expect(assertAt(result, 0).name).toBeUndefined()
+      expect(assertAt(result, 0).email).toBeUndefined()
     }))
 
   it.effect("respects limit", () =>
@@ -194,10 +195,10 @@ describe("listWorkspaces", () => {
       const result = yield* listWorkspaces({}).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
-      expect(result[0].uuid).toBe("ws-1")
-      expect(result[0].name).toBe("WS 1")
-      expect(result[0].lastVisit).toBe(1700000001000)
-      expect(result[1].uuid).toBe("ws-2")
+      expect(assertAt(result, 0).uuid).toBe("ws-1")
+      expect(assertAt(result, 0).name).toBe("WS 1")
+      expect(assertAt(result, 0).lastVisit).toBe(1700000001000)
+      expect(assertAt(result, 1).uuid).toBe("ws-2")
     }))
 
   it.effect("respects limit", () =>
@@ -614,10 +615,10 @@ describe("getRegions", () => {
       const result = yield* getRegions().pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
-      expect(result[0].region).toBe("us-east")
-      expect(result[0].name).toBe("US East")
-      expect(result[1].region).toBe("eu-west")
-      expect(result[1].name).toBe("EU West")
+      expect(assertAt(result, 0).region).toBe("us-east")
+      expect(assertAt(result, 0).name).toBe("US East")
+      expect(assertAt(result, 1).region).toBe("eu-west")
+      expect(assertAt(result, 1).name).toBe("EU West")
     }))
 
   it.effect("returns empty array when no regions", () =>

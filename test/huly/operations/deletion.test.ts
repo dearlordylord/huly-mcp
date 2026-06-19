@@ -24,6 +24,7 @@ import type {
 } from "../../../src/huly/errors.js"
 import { tracker } from "../../../src/huly/huly-plugins.js"
 import { previewDeletion } from "../../../src/huly/operations/deletion.js"
+import { assertAt } from "../../../src/utils/assertions.js"
 import { projectIdentifier } from "../../helpers/brands.js"
 
 // --- Mock Data Builders ---
@@ -700,7 +701,7 @@ describe("previewDeletion - pluralization branches", () => {
         })]
       })))
       expect(result.impact.issues).toBe(1)
-      expect(result.warnings[0]).toContain("1 issue uses this component")
+      expect(assertAt(result.warnings, 0)).toContain("1 issue uses this component")
     }))
 
   it.effect("uses singular verb forms for a milestone with one issue", () =>
@@ -725,6 +726,6 @@ describe("previewDeletion - pluralization branches", () => {
         })]
       })))
       expect(result.impact.issues).toBe(1)
-      expect(result.warnings[0]).toContain("1 issue is in this milestone")
+      expect(assertAt(result.warnings, 0)).toContain("1 issue is in this milestone")
     }))
 })

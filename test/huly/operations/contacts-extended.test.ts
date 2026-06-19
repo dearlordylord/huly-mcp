@@ -19,6 +19,7 @@ import { findPersonByExactEmailOrName } from "../../../src/huly/operations/conta
 import { createOrganization, listOrganizations } from "../../../src/huly/operations/organizations.js"
 import { getPerson, listEmployees, listPersons, updatePerson } from "../../../src/huly/operations/persons.js"
 import { resolveAssignee } from "../../../src/huly/operations/test-management-shared.js"
+import { assertAt } from "../../../src/utils/assertions.js"
 import { memberReference } from "../../helpers/brands.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
@@ -494,7 +495,7 @@ describe("Contacts Extended Coverage", () => {
         const result = yield* listPersons({ limit: 10 }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
-        expect(result[0].email).toBe("first@example.com")
+        expect(assertAt(result, 0).email).toBe("first@example.com")
       }))
 
     it.effect("omits invalid Huly email channel values from summaries", () =>
@@ -516,7 +517,7 @@ describe("Contacts Extended Coverage", () => {
         const result = yield* listPersons({ limit: 10 }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
-        expect(result[0].email).toBeUndefined()
+        expect(assertAt(result, 0).email).toBeUndefined()
       }))
 
     it.effect("uses the first valid email when an earlier Huly channel value is invalid", () =>
@@ -544,7 +545,7 @@ describe("Contacts Extended Coverage", () => {
         const result = yield* listPersons({ limit: 10 }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
-        expect(result[0].email).toBe("later@example.com")
+        expect(assertAt(result, 0).email).toBe("later@example.com")
       }))
   })
 
@@ -570,8 +571,8 @@ describe("Contacts Extended Coverage", () => {
         )
 
         expect(result).toHaveLength(1)
-        expect(result[0].id).toBe("person-1")
-        expect(result[0].name).toBe("Doe,John")
+        expect(assertAt(result, 0).id).toBe("person-1")
+        expect(assertAt(result, 0).name).toBe("Doe,John")
       }))
 
     it.effect("ignores empty nameSearch", () =>
@@ -672,10 +673,10 @@ describe("Contacts Extended Coverage", () => {
         const result = yield* listEmployees({ limit: 10 }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
-        expect(result[0].name).toBe("Smith,Jane")
-        expect(result[0].email).toBe("jane@company.com")
-        expect(result[0].active).toBe(true)
-        expect(result[0].position).toBe("Developer")
+        expect(assertAt(result, 0).name).toBe("Smith,Jane")
+        expect(assertAt(result, 0).email).toBe("jane@company.com")
+        expect(assertAt(result, 0).active).toBe(true)
+        expect(assertAt(result, 0).position).toBe("Developer")
       }))
 
     it.effect("returns employees without email when no channel exists", () =>
@@ -694,8 +695,8 @@ describe("Contacts Extended Coverage", () => {
         const result = yield* listEmployees({ limit: 10 }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
-        expect(result[0].email).toBeUndefined()
-        expect(result[0].active).toBe(false)
+        expect(assertAt(result, 0).email).toBeUndefined()
+        expect(assertAt(result, 0).active).toBe(false)
       }))
 
     it.effect("returns employees with position undefined when not set", () =>
@@ -714,7 +715,7 @@ describe("Contacts Extended Coverage", () => {
         const result = yield* listEmployees({ limit: 10 }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
-        expect(result[0].position).toBeUndefined()
+        expect(assertAt(result, 0).position).toBeUndefined()
       }))
 
     it.effect("returns empty array when no employees", () =>
@@ -744,9 +745,9 @@ describe("Contacts Extended Coverage", () => {
         const result = yield* listOrganizations({ limit: 10 }).pipe(Effect.provide(testLayer))
 
         expect(result).toHaveLength(1)
-        expect(result[0].name).toBe("Acme Corp")
-        expect(result[0].city).toBe("SF")
-        expect(result[0].members).toBe(10)
+        expect(assertAt(result, 0).name).toBe("Acme Corp")
+        expect(assertAt(result, 0).city).toBe("SF")
+        expect(assertAt(result, 0).members).toBe(10)
       }))
 
     it.effect("returns empty array when no organizations", () =>

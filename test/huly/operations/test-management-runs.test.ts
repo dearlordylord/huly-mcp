@@ -1,3 +1,4 @@
+import { assertAt } from "../../../src/utils/assertions.js"
 /* eslint-disable no-restricted-syntax -- test mocks require double assertion since local interfaces extend SDK base types not structurally compatible with object literals */
 import { describe, it } from "@effect/vitest"
 import { type Doc, type MarkupBlobRef, type PersonId, type Ref, toFindResult } from "@hcengineering/core"
@@ -389,7 +390,7 @@ describe("createTestResult", () => {
       }).pipe(Effect.provide(buildLayer({ runs: [makeRun()], testCases: [tc], captureAddCollection: cap })))
       expect(result.created).toBe(true)
       expect(result.name).toBe("Login Test")
-      expect(cap[0].testCase).toBe("tc-1")
+      expect(assertAt(cap, 0).testCase).toBe("tc-1")
     }))
 })
 
@@ -469,9 +470,9 @@ describe("runTestPlan", () => {
       expect(result.resultsCreated).toBe(2)
       expect(createCap.attributes?.name).toBe("My Plan - Run")
       expect(cap).toHaveLength(2)
-      expect(cap[0].name).toBe("Login")
-      expect(cap[1].name).toBe("Logout")
-      expect(cap[0].status).toBe(TestRunStatus.Untested)
+      expect(assertAt(cap, 0).name).toBe("Login")
+      expect(assertAt(cap, 1).name).toBe("Logout")
+      expect(assertAt(cap, 0).status).toBe(TestRunStatus.Untested)
     }))
 
   it.effect("uses custom run name", () =>
@@ -613,7 +614,7 @@ describe("test run summary optional fields", () => {
         run: testRunIdentifier("Nightly Run")
       }).pipe(Effect.provide(buildLayer({ runs: [makeRun()], results: [r] })))
       expect(listed.results[0]?.assignee).toBe("emp-1")
-      expect(listed.results[0]).not.toHaveProperty("status")
+      expect(assertAt(listed.results, 0)).not.toHaveProperty("status")
     }))
 
   it.effect("includes a testSuite in the result detail", () =>

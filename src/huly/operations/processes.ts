@@ -32,6 +32,7 @@ import {
   StartProcessResultSchema
 } from "../../domain/schemas.js"
 import { CardId, Count, MasterTagId, Timestamp } from "../../domain/schemas/shared.js"
+import { isSingle } from "../../utils/assertions.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError, type HulyClientOperations } from "../client.js"
 import {
@@ -242,7 +243,7 @@ const resolveProcess = (
       normalizeForComparison(process.name) === normalizeForComparison(identifier)
     )
 
-    if (matches.length === 1) return matches[0]
+    if (isSingle(matches)) return matches[0]
 
     const data = yield* loadProcessDefinitionData(client, matches.length === 0 ? [...allProcesses] : matches)
     const candidates = data.map(processCandidate)
@@ -267,7 +268,7 @@ const resolveMasterTag = (
     const matches = allTags.filter((tag) =>
       normalizeForComparison(masterTagLabel(tag) ?? "") === normalizeForComparison(identifier)
     )
-    if (matches.length === 1) return matches[0]._id
+    if (isSingle(matches)) return matches[0]._id
 
     if (matches.length === 0) {
       return yield* (looksLikeMasterTagId(identifier)
@@ -295,7 +296,7 @@ const resolveCardFilter = (
     if (byId !== undefined) return byId._id
 
     const byTitle = yield* client.findAll<Card>(cardPlugin.class.Card, { title: identifier })
-    if (byTitle.length === 1) return byTitle[0]._id
+    if (isSingle(byTitle)) return byTitle[0]._id
     if (byTitle.length > 1) {
       return yield* Effect.fail(
         new ProcessCardIdentifierAmbiguousError({
@@ -415,8 +416,8 @@ export const getProcess = (
   Effect.gen(function*() {
     const client = yield* HulyClient
     const process = yield* resolveProcess(client, params.process)
-    const [data] = yield* loadProcessDefinitionData(client, [process])
-    const [states, transitions] = yield* Effect.all([
+    const [masterTags, states, transitions] = yield* Effect.all([
+      findMasterTagsByIds(client, [process.masterTag]),
       client.findAll<HulyProcessState>(
         processPlugin.class.State,
         { process: process._id },
@@ -429,7 +430,14 @@ export const getProcess = (
       )
     ])
 
-    const result = processDetail({ ...data, states: [...states], transitions: [...transitions] })
+    const result = processDetail({
+      process,
+      masterTagName: masterTags.get(process.masterTag)?.name,
+      stateCount: states.length,
+      transitionCount: transitions.length,
+      states: [...states],
+      transitions: [...transitions]
+    })
     return yield* encodeOrConnectionError(ProcessDetailSchema, result, "getProcess")
   })
 

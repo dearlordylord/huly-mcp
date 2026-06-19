@@ -29,6 +29,7 @@ import { HulyAuthError, HulyConnectionError } from "../../src/huly/errors.js"
 import { INLINE_COMMENT_MARK_TYPE } from "../../src/huly/operations/inline-comment-mark.js"
 import { MARKDOWN_INPUT_REF_URL } from "../../src/huly/operations/markup.js"
 import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
+import { assertAt } from "../../src/utils/assertions.js"
 import { mockFn } from "../helpers/mock-fn.js"
 
 // --- Mock setup ---
@@ -1096,7 +1097,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         expect(result).toBe("ref-123")
         expect(mockCreateMarkup.mock.calls).toHaveLength(1)
         // In markup mode, toInternalMarkup returns the value as-is
-        expect(mockCreateMarkup.mock.calls[0][1]).toBe("raw markup value")
+        expect(assertAt(mockCreateMarkup.mock.calls, 0)[1]).toBe("raw markup value")
       }))
 
     it.effect("uploads with html format (converts via htmlToJSON + jsonToMarkup)", () =>
@@ -1115,7 +1116,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         expect(result).toBe("ref-html")
         expect(mockCreateMarkup.mock.calls).toHaveLength(1)
         // htmlToJSON returns json object, jsonToMarkup converts to string
-        const uploadedValue = mockCreateMarkup.mock.calls[0][1] as string
+        const uploadedValue = assertAt(mockCreateMarkup.mock.calls, 0)[1] as string
         expect(uploadedValue).toContain("html-parsed")
       }))
 
@@ -1134,11 +1135,11 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
 
         expect(result).toBe("ref-md")
         expect(mockCreateMarkup.mock.calls).toHaveLength(1)
-        expect(mockMarkdownToMarkup.mock.calls[0][1]).toEqual({
+        expect(assertAt(mockMarkdownToMarkup.mock.calls, 0)[1]).toEqual({
           refUrl: MARKDOWN_INPUT_REF_URL,
           imageUrl: "http://localhost:8080/files?workspace=ws-123&file="
         })
-        const uploadedValue = mockCreateMarkup.mock.calls[0][1] as string
+        const uploadedValue = assertAt(mockCreateMarkup.mock.calls, 0)[1] as string
         expect(uploadedValue).toContain("md-parsed")
       }))
 
@@ -1276,7 +1277,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         )
 
         expect(mockUpdateMarkup.mock.calls).toHaveLength(1)
-        expect(mockUpdateMarkup.mock.calls[0][1]).toBe("updated markup")
+        expect(assertAt(mockUpdateMarkup.mock.calls, 0)[1]).toBe("updated markup")
       }))
 
     it.effect("updates with html format", () =>
@@ -1291,7 +1292,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         )
 
         expect(mockUpdateMarkup.mock.calls).toHaveLength(1)
-        const uploadedValue = mockUpdateMarkup.mock.calls[0][1] as string
+        const uploadedValue = assertAt(mockUpdateMarkup.mock.calls, 0)[1] as string
         expect(uploadedValue).toContain("html-parsed")
       }))
 
@@ -1307,11 +1308,11 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         )
 
         expect(mockUpdateMarkup.mock.calls).toHaveLength(1)
-        expect(mockMarkdownToMarkup.mock.calls[0][1]).toEqual({
+        expect(assertAt(mockMarkdownToMarkup.mock.calls, 0)[1]).toEqual({
           refUrl: MARKDOWN_INPUT_REF_URL,
           imageUrl: "http://localhost:8080/files?workspace=ws-123&file="
         })
-        const uploadedValue = mockUpdateMarkup.mock.calls[0][1] as string
+        const uploadedValue = assertAt(mockUpdateMarkup.mock.calls, 0)[1] as string
         expect(uploadedValue).toContain("md-parsed")
       }))
 

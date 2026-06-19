@@ -9,6 +9,7 @@ import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { documentPlugin, tracker } from "../../../src/huly/huly-plugins.js"
 import { linkDocumentToIssue, unlinkDocumentFromIssue } from "../../../src/huly/operations/document-relations.js"
+import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import { documentIdentifier, issueIdentifier, projectIdentifier, teamspaceIdentifier } from "../../helpers/brands.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
@@ -211,10 +212,11 @@ describe("linkDocumentToIssue", () => {
       expect(result.document).toBe("doc-1")
       expect(result.documentTitle).toBe("Design Spec")
       expect(captured).toHaveLength(1)
-      const ops = captured[0].operations as DocumentUpdate<HulyIssue>
+      const ops = assertAt(captured, 0).operations as DocumentUpdate<HulyIssue>
       const pushOps = ops.$push as Record<string, { _id: string; _class: unknown }>
-      expect(pushOps.relations._id).toBe("doc-1")
-      expect(String(pushOps.relations._class)).toBe(String(documentPlugin.class.Document))
+      const relation = assertExists(pushOps.relations)
+      expect(relation._id).toBe("doc-1")
+      expect(String(relation._class)).toBe(String(documentPlugin.class.Document))
     }))
 
   it.effect("returns linked=false when document is already linked", () =>
@@ -292,9 +294,9 @@ describe("unlinkDocumentFromIssue", () => {
       expect(result.document).toBe("doc-1")
       expect(result.documentTitle).toBe("Design Spec")
       expect(captured).toHaveLength(1)
-      const ops = captured[0].operations as DocumentUpdate<HulyIssue>
+      const ops = assertAt(captured, 0).operations as DocumentUpdate<HulyIssue>
       const pullOps = ops.$pull as Record<string, { _id: string }>
-      expect(pullOps.relations._id).toBe("doc-1")
+      expect(assertExists(pullOps.relations)._id).toBe("doc-1")
     }))
 
   it.effect("returns unlinked=false when document is not linked", () =>

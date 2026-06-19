@@ -20,6 +20,7 @@ import { expect } from "vitest"
 import { HulyClient } from "../../src/huly/client.js"
 import { HulyConnectionError } from "../../src/huly/errors.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
+import { assertAt } from "../../src/utils/assertions.js"
 
 interface TestDoc extends Doc {
   title: string
@@ -368,7 +369,7 @@ describe("WorkspaceClient.testLayer with custom operations", () => {
       const client = yield* WorkspaceClient.pipe(Effect.provide(layer))
       const members = yield* client.getWorkspaceMembers()
       expect(members).toHaveLength(1)
-      expect(members[0].person).toBe("p1")
+      expect(assertAt(members, 0).person).toBe("p1")
     }))
 
   it.effect("custom operation can return error", () =>

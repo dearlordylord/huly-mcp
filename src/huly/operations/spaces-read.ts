@@ -24,6 +24,7 @@ import type {
 import type { SpaceTypeIdentifier } from "../../domain/schemas/shared.js"
 import { AccountUuid, NonEmptyString, ObjectClassName, SpaceTypeId } from "../../domain/schemas/shared.js"
 import { SpaceRoleAssignmentsDegradedWarningCode } from "../../domain/schemas/tool-warnings.js"
+import { isSingle } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { Diagnostics } from "../diagnostics.js"
 import type { SpaceTypeIdentifierAmbiguousError, SpaceTypeNotFoundError } from "../errors.js"
@@ -86,7 +87,8 @@ const findSpaceType = (
         }))
       })
     }
-    return byName[0]
+    if (isSingle(byName)) return byName[0]
+    return yield* new SpaceTypeNotFound({ identifier: NonEmptyString.make(identifier) })
   })
 
 const permissionsByIds = (

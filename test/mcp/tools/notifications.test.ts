@@ -3,6 +3,7 @@ import type { AccountUuid, FindResult, PersonId } from "@hcengineering/core"
 import { toFindResult } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import type { HulyClientOperations } from "../../../src/huly/client.js"
 import { testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
@@ -100,7 +101,7 @@ describe("notification tool handlers", () => {
       const result = yield* Effect.promise(() => tool.handler({}, noopHulyClient, noopStorageClient))
 
       expect(result.isError).toBeUndefined()
-      const parsed = JSON.parse(result.content[0].text) as { count: number }
+      const parsed = JSON.parse(assertAt(result.content, 0).text) as { count: number }
       expect(parsed.count).toBe(0)
     }))
 
@@ -110,7 +111,7 @@ describe("notification tool handlers", () => {
       const result = yield* Effect.promise(() => tool.handler({}, noopHulyClient, noopStorageClient))
 
       expect(result.isError).toBeUndefined()
-      const parsed = JSON.parse(result.content[0].text) as { count: number }
+      const parsed = JSON.parse(assertAt(result.content, 0).text) as { count: number }
       expect(parsed.count).toBe(0)
     }))
 
@@ -120,7 +121,7 @@ describe("notification tool handlers", () => {
       const result = yield* Effect.promise(() => tool.handler({}, noopHulyClient, noopStorageClient))
 
       expect(result.isError).toBeUndefined()
-      const parsed = JSON.parse(result.content[0].text) as { count: number }
+      const parsed = JSON.parse(assertAt(result.content, 0).text) as { count: number }
       expect(parsed.count).toBe(0)
     }))
 
@@ -130,7 +131,7 @@ describe("notification tool handlers", () => {
       const result = yield* Effect.promise(() => tool.handler({}, noopHulyClient, noopStorageClient))
 
       expect(result.isError).toBeUndefined()
-      const parsed = JSON.parse(result.content[0].text)
+      const parsed = JSON.parse(assertAt(result.content, 0).text)
       expect(parsed).toEqual([])
     }))
 
@@ -206,7 +207,7 @@ describe("notification tool handlers", () => {
       )
 
       expect(result.isError).toBeUndefined()
-      const parsed = JSON.parse(result.content[0].text)
+      const parsed = JSON.parse(assertAt(result.content, 0).text)
       expect(parsed).toBeNull()
     }))
 
@@ -216,7 +217,7 @@ describe("notification tool handlers", () => {
       const result = yield* Effect.promise(() => tool.handler({}, noopHulyClient, noopStorageClient))
 
       expect(result.isError).toBeUndefined()
-      const parsed = JSON.parse(result.content[0].text)
+      const parsed = JSON.parse(assertAt(result.content, 0).text)
       expect(parsed).toEqual([])
     }))
 
@@ -254,7 +255,7 @@ describe("notification tool handlers", () => {
       const result = yield* Effect.promise(() => tool.handler({}, noopHulyClient, noopStorageClient))
 
       expect(result.isError).toBeUndefined()
-      const parsed = JSON.parse(result.content[0].text)
+      const parsed = JSON.parse(assertAt(result.content, 0).text)
       expect(parsed).toEqual([])
     }))
 
@@ -270,7 +271,7 @@ describe("notification tool handlers", () => {
       )
 
       expect(result.isError).toBeUndefined()
-      const parsed = JSON.parse(result.content[0].text) as { providerId: string; updated: boolean }
+      const parsed = JSON.parse(assertAt(result.content, 0).text) as { providerId: string; updated: boolean }
       expect(parsed.providerId).toBe("some-provider")
       // With noop client (findOne returns undefined), no setting exists to update
       expect(parsed.updated).toBe(false)
@@ -282,6 +283,6 @@ describe("notification tool handlers", () => {
       const result = yield* Effect.promise(() => tool.handler({ wrong: "params" }, noopHulyClient, noopStorageClient))
 
       expect(result.isError).toBe(true)
-      expect(result.content[0].text).toContain("Invalid parameters")
+      expect(assertAt(result.content, 0).text).toContain("Invalid parameters")
     }))
 })

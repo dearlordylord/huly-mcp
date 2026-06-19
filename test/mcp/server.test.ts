@@ -40,6 +40,7 @@ import { TOOL_DEFINITIONS } from "../../src/mcp/tools/index.js"
 import type { ToolDefinition } from "../../src/mcp/tools/registry.js"
 import type { SessionStartProps, TelemetryOperations, ToolCalledProps } from "../../src/telemetry/telemetry.js"
 import { TelemetryService } from "../../src/telemetry/telemetry.js"
+import { assertAt, assertExists } from "../../src/utils/assertions.js"
 
 import { tracker } from "../../src/huly/huly-plugins.js"
 
@@ -208,6 +209,9 @@ const makeStatus = (overrides?: Partial<Status>): Status => {
 }
 
 const schemaProperty = (schema: object, key: string): unknown => Object.getOwnPropertyDescriptor(schema, key)?.value
+
+const toolDefinition = (name: string): ToolDefinition =>
+  assertExists(TOOL_DEFINITIONS[name], `Expected tool definition for ${name}`)
 
 const requiredList = (schema: unknown): ReadonlyArray<string> | undefined => {
   if (typeof schema !== "object" || schema === null) return undefined
@@ -395,7 +399,7 @@ describe("TOOL_DEFINITIONS", () => {
   describe("inputSchema format", () => {
     it.effect("list_issues schema has correct structure", () =>
       Effect.gen(function*() {
-        const schema = TOOL_DEFINITIONS.list_issues.inputSchema
+        const schema = toolDefinition("list_issues").inputSchema
         expect(schema).toHaveProperty("type", "object")
         expect(schema).toHaveProperty("properties")
         const props = (schema as { properties: Record<string, unknown> }).properties
@@ -407,7 +411,7 @@ describe("TOOL_DEFINITIONS", () => {
 
     it.effect("get_issue schema has correct structure", () =>
       Effect.gen(function*() {
-        const schema = TOOL_DEFINITIONS.get_issue.inputSchema
+        const schema = toolDefinition("get_issue").inputSchema
         expect(schema).toHaveProperty("type", "object")
         expect(schema).toHaveProperty("properties")
         expect((schema as { properties: Record<string, unknown> }).properties).toHaveProperty("project")
@@ -416,7 +420,7 @@ describe("TOOL_DEFINITIONS", () => {
 
     it.effect("create_issue schema has correct structure", () =>
       Effect.gen(function*() {
-        const schema = TOOL_DEFINITIONS.create_issue.inputSchema
+        const schema = toolDefinition("create_issue").inputSchema
         expect(schema).toHaveProperty("type", "object")
         expect(schema).toHaveProperty("properties")
         expect((schema as { properties: Record<string, unknown> }).properties).toHaveProperty("project")
@@ -425,7 +429,7 @@ describe("TOOL_DEFINITIONS", () => {
 
     it.effect("update_issue schema has correct structure", () =>
       Effect.gen(function*() {
-        const schema = TOOL_DEFINITIONS.update_issue.inputSchema
+        const schema = toolDefinition("update_issue").inputSchema
         expect(schema).toHaveProperty("type", "object")
         expect(schema).toHaveProperty("properties")
         const props = (schema as { properties: Record<string, unknown> }).properties
@@ -440,7 +444,7 @@ describe("TOOL_DEFINITIONS", () => {
 
     it.effect("add_issue_label schema has correct structure", () =>
       Effect.gen(function*() {
-        const schema = TOOL_DEFINITIONS.add_issue_label.inputSchema
+        const schema = toolDefinition("add_issue_label").inputSchema
         expect(schema).toHaveProperty("type", "object")
         expect(schema).toHaveProperty("properties")
         const props = (schema as { properties: Record<string, unknown> }).properties
@@ -452,7 +456,7 @@ describe("TOOL_DEFINITIONS", () => {
 
     it.effect("delete_issue schema has correct structure", () =>
       Effect.gen(function*() {
-        const schema = TOOL_DEFINITIONS.delete_issue.inputSchema
+        const schema = toolDefinition("delete_issue").inputSchema
         expect(schema).toHaveProperty("type", "object")
         expect(schema).toHaveProperty("properties")
         const props = (schema as { properties: Record<string, unknown> }).properties
@@ -462,7 +466,7 @@ describe("TOOL_DEFINITIONS", () => {
 
     it.effect("list_teamspaces schema has correct structure", () =>
       Effect.gen(function*() {
-        const schema = TOOL_DEFINITIONS.list_teamspaces.inputSchema
+        const schema = toolDefinition("list_teamspaces").inputSchema
         expect(schema).toHaveProperty("type", "object")
         expect(schema).toHaveProperty("properties")
         const props = (schema as { properties: Record<string, unknown> }).properties
@@ -472,7 +476,7 @@ describe("TOOL_DEFINITIONS", () => {
 
     it.effect("get_document schema has correct structure", () =>
       Effect.gen(function*() {
-        const schema = TOOL_DEFINITIONS.get_document.inputSchema
+        const schema = toolDefinition("get_document").inputSchema
         expect(schema).toHaveProperty("type", "object")
         expect(schema).toHaveProperty("properties")
         const props = (schema as { properties: Record<string, unknown> }).properties
@@ -482,7 +486,7 @@ describe("TOOL_DEFINITIONS", () => {
 
     it.effect("create_document schema has correct structure", () =>
       Effect.gen(function*() {
-        const schema = TOOL_DEFINITIONS.create_document.inputSchema
+        const schema = toolDefinition("create_document").inputSchema
         expect(schema).toHaveProperty("type", "object")
         expect(schema).toHaveProperty("properties")
         const props = (schema as { properties: Record<string, unknown> }).properties
@@ -493,11 +497,11 @@ describe("TOOL_DEFINITIONS", () => {
 
     it.effect("list_activity schema exposes explicit target modes", () =>
       Effect.gen(function*() {
-        const schema = TOOL_DEFINITIONS.list_activity.inputSchema
+        const schema = toolDefinition("list_activity").inputSchema
         expect(schema).toHaveProperty("type", "object")
         expect(Array.isArray(schemaProperty(schema, "oneOf"))).toBe(true)
 
-        const requiredSets = requiredModeSets(TOOL_DEFINITIONS.list_activity)
+        const requiredSets = requiredModeSets(toolDefinition("list_activity"))
         expect(requiredSets).toContain("project+issueIdentifier")
         expect(requiredSets).toContain("teamspace+document")
         expect(requiredSets).toContain("channel")
@@ -677,42 +681,42 @@ describe("McpServerError", () => {
 describe("Tool definition descriptions", () => {
   it.effect("list_issues has helpful description", () =>
     Effect.gen(function*() {
-      expect(TOOL_DEFINITIONS.list_issues.description).toContain("Query")
-      expect(TOOL_DEFINITIONS.list_issues.description).toContain("issues")
-      expect(TOOL_DEFINITIONS.list_issues.description).toContain("filter")
+      expect(toolDefinition("list_issues").description).toContain("Query")
+      expect(toolDefinition("list_issues").description).toContain("issues")
+      expect(toolDefinition("list_issues").description).toContain("filter")
     }))
 
   it.effect("get_issue has helpful description", () =>
     Effect.gen(function*() {
-      expect(TOOL_DEFINITIONS.get_issue.description).toContain("Retrieve")
-      expect(TOOL_DEFINITIONS.get_issue.description).toContain("full details")
-      expect(TOOL_DEFINITIONS.get_issue.description).toContain("markdown")
+      expect(toolDefinition("get_issue").description).toContain("Retrieve")
+      expect(toolDefinition("get_issue").description).toContain("full details")
+      expect(toolDefinition("get_issue").description).toContain("markdown")
     }))
 
   it.effect("create_issue has helpful description", () =>
     Effect.gen(function*() {
-      expect(TOOL_DEFINITIONS.create_issue.description).toContain("Create")
-      expect(TOOL_DEFINITIONS.create_issue.description).toContain("issue")
-      expect(TOOL_DEFINITIONS.create_issue.description).toContain("markdown")
+      expect(toolDefinition("create_issue").description).toContain("Create")
+      expect(toolDefinition("create_issue").description).toContain("issue")
+      expect(toolDefinition("create_issue").description).toContain("markdown")
     }))
 
   it.effect("update_issue has helpful description", () =>
     Effect.gen(function*() {
-      expect(TOOL_DEFINITIONS.update_issue.description).toContain("Update")
-      expect(TOOL_DEFINITIONS.update_issue.description).toContain("modified")
-      expect(TOOL_DEFINITIONS.update_issue.description.length).toBeGreaterThan(30)
+      expect(toolDefinition("update_issue").description).toContain("Update")
+      expect(toolDefinition("update_issue").description).toContain("modified")
+      expect(toolDefinition("update_issue").description.length).toBeGreaterThan(30)
     }))
 
   it.effect("add_issue_label has helpful description", () =>
     Effect.gen(function*() {
-      expect(TOOL_DEFINITIONS.add_issue_label.description).toContain("label")
-      expect(TOOL_DEFINITIONS.add_issue_label.description).toContain("tag")
+      expect(toolDefinition("add_issue_label").description).toContain("label")
+      expect(toolDefinition("add_issue_label").description).toContain("tag")
     }))
 
   it.effect("delete_issue has helpful description", () =>
     Effect.gen(function*() {
-      expect(TOOL_DEFINITIONS.delete_issue.description).toContain("delete")
-      expect(TOOL_DEFINITIONS.delete_issue.description).toContain("cannot be undone")
+      expect(toolDefinition("delete_issue").description).toContain("delete")
+      expect(toolDefinition("delete_issue").description).toContain("cannot be undone")
     }))
 })
 
@@ -1316,7 +1320,7 @@ describe("McpServerService.layer operations", () => {
         yield* Effect.promise(() => new Promise((r) => setTimeout(r, 100)))
         expect(postHandlers).toHaveLength(1)
 
-        const handler = postHandlers[0]
+        const handler = assertAt(postHandlers, 0)
         const response = {
           headersSent: false,
           status: () => ({ json: () => {} }),
@@ -1443,11 +1447,11 @@ describe("McpServerService.layer operations", () => {
             on: () => {}
           }
 
-          const handler = postHandlers[0]
+          const handler = assertAt(postHandlers, 0)
           yield* Effect.promise(() => handler(firstRequest, response))
           yield* Effect.promise(() => handler(secondRequest, response))
 
-          const first = responses[0] as {
+          const first = assertAt(responses, 0) as {
             structuredContent?: {
               result?: {
                 huly?: { url?: { origin?: string }; workspace?: { value?: string } }
@@ -1456,7 +1460,7 @@ describe("McpServerService.layer operations", () => {
               }
             }
           }
-          const second = responses[1] as {
+          const second = assertAt(responses, 1) as {
             structuredContent?: {
               result?: {
                 huly?: { url?: { origin?: string }; workspace?: { value?: string } }
@@ -1564,7 +1568,7 @@ describe("McpServerService.layer operations", () => {
         yield* Effect.promise(() => new Promise((r) => setTimeout(r, 100)))
         expect(postHandlers).toHaveLength(1)
 
-        const handler = postHandlers[0]
+        const handler = assertAt(postHandlers, 0)
         const response = {
           headersSent: false,
           status: () => ({ json: () => {} }),
@@ -1970,14 +1974,14 @@ describe("McpServerService.layer operations", () => {
 
         const result = yield* Effect.promise(() => listToolsHandler!())
         expect(result.tools.length).toBeGreaterThan(0)
-        expect(result.tools[0]).toHaveProperty("name")
-        expect(result.tools[0]).toHaveProperty("description")
-        expect(result.tools[0]).toHaveProperty("inputSchema")
-        expect(result.tools[0]).toHaveProperty("outputSchema")
+        expect(assertAt(result.tools, 0)).toHaveProperty("name")
+        expect(assertAt(result.tools, 0)).toHaveProperty("description")
+        expect(assertAt(result.tools, 0)).toHaveProperty("inputSchema")
+        expect(assertAt(result.tools, 0)).toHaveProperty("outputSchema")
         expect(result.tools.every((tool) => "outputSchema" in tool)).toBe(true)
         expect(result.tools[0]?.name).toBe("get_version")
         expect(result.tools[1]?.name).toBe("get_huly_context")
-        expect(result.tools[1]).toMatchObject({
+        expect(assertAt(result.tools, 1)).toMatchObject({
           inputSchema: { type: "object", properties: {}, additionalProperties: false },
           annotations: {
             readOnlyHint: true,

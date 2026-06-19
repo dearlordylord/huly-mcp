@@ -2,6 +2,7 @@ import type { Channel, Person as HulyPerson } from "@hcengineering/contact"
 import type { Doc, FindResult, PersonId as CorePersonId, Ref } from "@hcengineering/core"
 import { Effect, Exit } from "effect"
 import { describe, expect, it } from "vitest"
+import { assertAt } from "../../utils/assertions.js"
 
 import { Email, PersonId } from "../../domain/schemas/shared.js"
 import type { HulyClientOperations } from "../client.js"
@@ -207,7 +208,7 @@ describe("Contacts Operations", () => {
       )
 
       expect(result).toHaveLength(1)
-      expect(result[0]).toMatchObject({
+      expect(assertAt(result, 0)).toMatchObject({
         id: "person-123",
         name: "Doe,John",
         city: "NYC",
@@ -228,7 +229,7 @@ describe("Contacts Operations", () => {
       )
 
       expect(result).toHaveLength(1)
-      expect(result[0].email).toBeUndefined()
+      expect(assertAt(result, 0).email).toBeUndefined()
     })
 
     it("handles persons without city", async () => {
@@ -248,7 +249,7 @@ describe("Contacts Operations", () => {
       )
 
       expect(result).toHaveLength(1)
-      expect(result[0].city).toBeUndefined()
+      expect(assertAt(result, 0).city).toBeUndefined()
     })
 
     it("correctly associates emails with multiple persons", async () => {
@@ -328,8 +329,8 @@ describe("Contacts Operations", () => {
       )
 
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("person-1")
-      expect(result[0].email).toBe("john@example.com")
+      expect(assertAt(result, 0).id).toBe("person-1")
+      expect(assertAt(result, 0).email).toBe("john@example.com")
     })
 
     it("returns empty when emailSearch matches no channels", async () => {

@@ -23,6 +23,7 @@ import {
   updateOrganization
 } from "../../../src/huly/operations/organizations.js"
 import { listPersonOrganizations } from "../../../src/huly/operations/persons.js"
+import { assertAt } from "../../../src/utils/assertions.js"
 import { email, memberReference, organizationId, personId } from "../../helpers/brands.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
@@ -929,9 +930,9 @@ describe("Organization CRUD, Customer Mixin, Channels, and Membership", () => {
 
         expect(result.organizationId).toBe("org-1")
         expect(result.members).toHaveLength(1)
-        expect(result.members[0].personId).toBe("person-123")
-        expect(result.members[0].name).toBe("Doe,John")
-        expect(result.members[0].email).toBe("john@example.com")
+        expect(assertAt(result.members, 0).personId).toBe("person-123")
+        expect(assertAt(result.members, 0).name).toBe("Doe,John")
+        expect(assertAt(result.members, 0).email).toBe("john@example.com")
       }))
 
     it.effect("returns empty members array when no members exist", () =>
@@ -985,8 +986,8 @@ describe("Organization CRUD, Customer Mixin, Channels, and Membership", () => {
 
         expect(result.personId).toBe("person-123")
         expect(result.organizations).toHaveLength(1)
-        expect(result.organizations[0].id).toBe("org-1")
-        expect(result.organizations[0].name).toBe("Test Corp")
+        expect(assertAt(result.organizations, 0).id).toBe("org-1")
+        expect(assertAt(result.organizations, 0).name).toBe("Test Corp")
       }))
 
     it.effect("returns empty organizations when person has no memberships", () =>

@@ -1,3 +1,4 @@
+import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 /* eslint-disable @typescript-eslint/consistent-type-assertions -- tests build SDK-branded fixture values */
 import { describe, it } from "@effect/vitest"
 import type { Calendar as HulyCalendar, Schedule as HulySchedule } from "@hcengineering/calendar"
@@ -170,9 +171,9 @@ describe("calendar schedules", () => {
       const result = yield* listSchedules({}).pipe(Effect.provide(createLayer({ schedules: [makeSchedule()] })))
 
       expect(result).toHaveLength(1)
-      expect(result[0].scheduleId).toBe("schedule-1")
-      expect(result[0].owner.name).toBe("Alice")
-      expect(result[0].calendarId).toBe("cal-1")
+      expect(assertAt(result, 0).scheduleId).toBe("schedule-1")
+      expect(assertAt(result, 0).owner.name).toBe("Alice")
+      expect(assertAt(result, 0).calendarId).toBe("cal-1")
     }))
 
   it.effect("lists owner-filtered room-aware schedules", () =>
@@ -186,9 +187,9 @@ describe("calendar schedules", () => {
         }))
       )
 
-      expect(result[0].owner.name).toBe("Alice")
-      expect(result[0].calendarId).toBeUndefined()
-      expect(result[0].meetingRoom).toEqual({ roomId: "room-1", name: "Focus" })
+      expect(assertAt(result, 0).owner.name).toBe("Alice")
+      expect(assertAt(result, 0).calendarId).toBeUndefined()
+      expect(assertAt(result, 0).meetingRoom).toEqual({ roomId: "room-1", name: "Focus" })
     }))
 
   it.effect("lists no schedules without querying room details", () =>
@@ -204,7 +205,7 @@ describe("calendar schedules", () => {
         Effect.provide(createLayer({ schedules: [makeSchedule()], meetingSchedules: [] }))
       )
 
-      expect(result[0].meetingRoom).toBeUndefined()
+      expect(assertAt(result, 0).meetingRoom).toBeUndefined()
     }))
 
   it.effect("keeps missing room names absent in room-aware schedules", () =>
@@ -218,7 +219,7 @@ describe("calendar schedules", () => {
         }))
       )
 
-      expect(result[0].meetingRoom).toEqual({ roomId: "room-1", name: undefined })
+      expect(assertAt(result, 0).meetingRoom).toEqual({ roomId: "room-1", name: undefined })
     }))
 
   it.effect("falls back to owner id when participant hydration misses", () =>
@@ -227,8 +228,8 @@ describe("calendar schedules", () => {
         Effect.provide(createLayer({ schedules: [makeSchedule()], persons: [] }))
       )
 
-      expect(result[0].owner.id).toBe("person-1")
-      expect(result[0].owner.name).toBeUndefined()
+      expect(assertAt(result, 0).owner.id).toBe("person-1")
+      expect(assertAt(result, 0).owner.name).toBeUndefined()
     }))
 
   it.effect("gets schedule details with availability", () =>
@@ -328,7 +329,8 @@ describe("calendar schedules", () => {
 
       expect(result.scheduleId).toBe("schedule-new")
       expect(captureCreate.attributes?.calendar).toBe("cal-1")
-      expect(captureCreate.attributes?.availability[2][0]?.end).toBe(900)
+      const createdAvailability = assertExists(assertExists(captureCreate.attributes).availability)
+      expect(assertAt(assertExists(createdAvailability[2]), 0).end).toBe(900)
     }))
 
   it.effect("creates schedule with description and no calendar target", () =>
@@ -345,7 +347,8 @@ describe("calendar schedules", () => {
 
       expect(captureCreate.attributes?.description).toBe("Public booking page")
       expect(captureCreate.attributes?.calendar).toBeUndefined()
-      expect(captureCreate.attributes?.availability[5]).toEqual([])
+      const createdAvailability = assertExists(assertExists(captureCreate.attributes).availability)
+      expect(assertExists(createdAvailability[5])).toEqual([])
     }))
 
   it.effect("updates schedule calendar target and clears description", () =>

@@ -227,9 +227,13 @@ export const parseIssueIdentifier = (
 
   const match = idStr.match(/^([A-Z]+)-(\d+)$/i)
   if (match) {
+    const [, projectPrefix, issueNumber] = match
+    if (projectPrefix === undefined || issueNumber === undefined) {
+      return { fullIdentifier: `${projectIdentifier}-${idStr}`, number: null }
+    }
     return {
-      fullIdentifier: `${match[1].toUpperCase()}-${match[2]}`,
-      number: parseInt(match[2], 10)
+      fullIdentifier: `${projectPrefix.toUpperCase()}-${issueNumber}`,
+      number: parseInt(issueNumber, 10)
     }
   }
 

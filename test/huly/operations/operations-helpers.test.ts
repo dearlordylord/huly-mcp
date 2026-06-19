@@ -33,6 +33,7 @@ import {
   findOneOrFail
 } from "../../../src/huly/operations/query-helpers.js"
 import { toRef, validatePersonUuid } from "../../../src/huly/operations/sdk-boundary.js"
+import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import { withDiagnostics } from "../../helpers/diagnostics.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
@@ -295,7 +296,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
           return Effect.succeed(found)
         }
         if (typeof q.name === "object" && "$like" in (q.name as Record<string, unknown>)) {
-          const pattern = (q.name as Record<string, string>).$like.replace(/%/g, "")
+          const pattern = assertExists((q.name as { readonly $like?: string }).$like).replace(/%/g, "")
           const found = persons.find(p => p.name.includes(pattern))
           return Effect.succeed(found)
         }
@@ -687,7 +688,7 @@ describe("operations helpers", () => {
         expect(canceledStatus).toBeDefined()
         expect(canceledStatus!.category).toBe("unknown")
         expect(warnings).toHaveLength(1)
-        expect(warnings[0].code).toBe("status_metadata_unresolved")
+        expect(assertAt(warnings, 0).code).toBe("status_metadata_unresolved")
       }))
 
     it.effect("uses model status metadata when the server status query fails", () =>

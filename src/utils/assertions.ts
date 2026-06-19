@@ -43,7 +43,7 @@ export const getOnlyOne = <T>(
   arr: ReadonlyArray<T>,
   message?: string | ((arr: ReadonlyArray<T>) => string)
 ): T => {
-  if (arr.length !== 1) {
+  if (!isSingle(arr)) {
     const msg = typeof message === "function"
       ? message(arr)
       : message ?? `Expected exactly 1 element, got ${arr.length}`
@@ -56,10 +56,14 @@ export const getOnlyOne = <T>(
  * Asserts array is non-empty and returns its first element. Throws if empty.
  */
 export const assertFirst = <T>(arr: ReadonlyArray<T>, message?: string): T => {
-  if (arr.length === 0) {
-    throw new AssertionError(message ?? "Expected non-empty array")
-  }
-  return arr[0]
+  return assertNonEmpty(arr, message)[0]
+}
+
+/**
+ * Asserts array has a defined item at the index. Returns the item or throws.
+ */
+export const assertAt = <T>(arr: ReadonlyArray<T>, index: number, message?: string): T => {
+  return assertExists(arr[index], message ?? `Expected array item at index ${index}`)
 }
 
 /**
@@ -81,6 +85,16 @@ export const assertNonEmpty = <T>(
 export const isNonEmpty = <T>(arr: ReadonlyArray<T>): arr is readonly [T, ...Array<T>] => arr.length > 0
 
 /**
+ * Type guard for arrays with exactly one element.
+ */
+export const isSingle = <T>(arr: ReadonlyArray<T>): arr is readonly [T] => arr.length === 1
+
+/**
+ * Type guard for arrays with exactly two elements.
+ */
+export const isPair = <T>(arr: ReadonlyArray<T>): arr is readonly [T, T] => arr.length === 2
+
+/**
  * Gets the single element if array has exactly 0 or 1 elements.
  * Returns Option.none() for empty, Option.some(element) for single.
  * Throws if array has 2+ elements.
@@ -92,7 +106,7 @@ export const getOneOrNone = <T>(
   if (arr.length === 0) {
     return Option.none()
   }
-  if (arr.length === 1) {
+  if (isSingle(arr)) {
     return Option.some(arr[0])
   }
   throw new AssertionError(
@@ -117,7 +131,7 @@ export const assertExistsEffect = <T, E>(
 export const getOnlyOneEffect = <T, E>(
   arr: ReadonlyArray<T>,
   onError: (arr: ReadonlyArray<T>) => E
-): Effect.Effect<T, E> => arr.length === 1 ? Effect.succeed(arr[0]) : Effect.fail(onError(arr))
+): Effect.Effect<T, E> => isSingle(arr) ? Effect.succeed(arr[0]) : Effect.fail(onError(arr))
 
 /**
  * Effect version: gets first element, fails with custom error if empty.
@@ -125,7 +139,7 @@ export const getOnlyOneEffect = <T, E>(
 export const getFirstEffect = <T, E>(
   arr: ReadonlyArray<T>,
   onEmpty: () => E
-): Effect.Effect<T, E> => arr.length > 0 ? Effect.succeed(arr[0]) : Effect.fail(onEmpty())
+): Effect.Effect<T, E> => isNonEmpty(arr) ? Effect.succeed(arr[0]) : Effect.fail(onEmpty())
 
 /**
  * Effect version: gets 0 or 1 elements as Option, fails if 2+.
@@ -135,6 +149,6 @@ export const getOneOrNoneEffect = <T, E>(
   onTooMany: (arr: ReadonlyArray<T>) => E
 ): Effect.Effect<Option.Option<T>, E> => {
   if (arr.length === 0) return Effect.succeed(Option.none())
-  if (arr.length === 1) return Effect.succeed(Option.some(arr[0]))
+  if (isSingle(arr)) return Effect.succeed(Option.some(arr[0]))
   return Effect.fail(onTooMany(arr))
 }

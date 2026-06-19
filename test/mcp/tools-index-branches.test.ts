@@ -3,6 +3,7 @@ import type { AccountUuid, PersonId } from "@hcengineering/core"
 import { toFindResult } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../src/utils/assertions.js"
 
 import type { HulyClientOperations } from "../../src/huly/client.js"
 import { testMarkupUrlConfig } from "../../src/huly/operations/markup.js"
@@ -39,8 +40,7 @@ describe("handleToolCall - known tool execution (line 71)", () => {
   it.effect("returns a response when tool is found in registry", () =>
     Effect.gen(function*() {
       // Pick a tool that we know exists - list_projects is simple and just needs findAll
-      const firstTool = toolRegistry.definitions[0]
-      expect(firstTool).toBeDefined()
+      const firstTool = assertAt(toolRegistry.definitions, 0)
 
       const result = yield* Effect.promise(() =>
         toolRegistry.handleToolCall(
@@ -57,7 +57,7 @@ describe("handleToolCall - known tool execution (line 71)", () => {
       // Verify MCP response structure: must have content array with text entries
       expect(result!.content).toBeInstanceOf(Array)
       expect(result!.content.length).toBeGreaterThan(0)
-      expect(result!.content[0].type).toBe("text")
-      expect(typeof result!.content[0].text).toBe("string")
+      expect(assertAt(result!.content, 0).type).toBe("text")
+      expect(typeof assertAt(result!.content, 0).text).toBe("string")
     }))
 })

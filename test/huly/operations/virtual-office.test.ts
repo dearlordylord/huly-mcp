@@ -14,6 +14,7 @@ import type {
 import { MeetingStatus, RoomAccess, RoomType } from "@hcengineering/love"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import { DocId, FloorId, type MeetingMinutesId, type RoomId, Timestamp } from "../../../src/domain/schemas/shared.js"
 import type { HulyClientOperations } from "../../../src/huly/client.js"
@@ -174,9 +175,9 @@ describe("virtual office operations", () => {
       const floors = yield* listOfficeFloors({}).pipe(Effect.provide(makeLayer()))
       const rooms = yield* listOfficeRooms({}).pipe(Effect.provide(makeLayer()))
 
-      expect(floors[0].name).toBe("Main")
-      expect(rooms[0].type).toBe("video")
-      expect(rooms[0].access).toBe("open")
+      expect(assertAt(floors, 0).name).toBe("Main")
+      expect(assertAt(rooms, 0).type).toBe("video")
+      expect(assertAt(rooms, 0).access).toBe("open")
     }))
 
   it.effect("omits optional floor and room counters when Huly leaves them unset", () =>
@@ -190,10 +191,10 @@ describe("virtual office operations", () => {
         }))
       )
 
-      expect(floors[0].modifiedOn).toBeUndefined()
-      expect(rooms[0].meetings).toBeUndefined()
-      expect(rooms[0].messages).toBeUndefined()
-      expect(rooms[0].modifiedOn).toBeUndefined()
+      expect(assertAt(floors, 0).modifiedOn).toBeUndefined()
+      expect(assertAt(rooms, 0).meetings).toBeUndefined()
+      expect(assertAt(rooms, 0).messages).toBeUndefined()
+      expect(assertAt(rooms, 0).modifiedOn).toBeUndefined()
     }))
 
   it.effect("gets a floor and maps alternate room enum values", () =>
@@ -246,8 +247,8 @@ describe("virtual office operations", () => {
     Effect.gen(function*() {
       const offices = yield* listOffices({}).pipe(Effect.provide(makeLayer()))
 
-      expect(offices[0].personId).toBe("person-1")
-      expect(offices[0].personName).toBe("Alice")
+      expect(assertAt(offices, 0).personId).toBe("person-1")
+      expect(assertAt(offices, 0).personName).toBe("Alice")
     }))
 
   it.effect("gets offices and handles unassigned offices", () =>
@@ -270,12 +271,12 @@ describe("virtual office operations", () => {
       )
 
       expect(assigned.description).toBe("Room description")
-      expect(unassignedList[0].personId).toBeUndefined()
-      expect(unassignedList[0].personName).toBeUndefined()
+      expect(assertAt(unassignedList, 0).personId).toBeUndefined()
+      expect(assertAt(unassignedList, 0).personName).toBeUndefined()
       expect(unassignedDetails.description).toBeUndefined()
-      expect(unresolvedPersonList[0].personId).toBe("person-1")
-      expect(unresolvedPersonList[0].personName).toBeUndefined()
-      expect(unnamedList[0].name).toBeUndefined()
+      expect(assertAt(unresolvedPersonList, 0).personId).toBe("person-1")
+      expect(assertAt(unresolvedPersonList, 0).personName).toBeUndefined()
+      expect(assertAt(unnamedList, 0).name).toBeUndefined()
     }))
 
   it.effect("fails for missing offices", () =>
@@ -390,13 +391,13 @@ describe("virtual office operations", () => {
         }))
       )
 
-      expect(activeRooms[0].roomName).toBe("Focus")
-      expect(participants[0].sessionId).toBe("session-1")
-      expect(participants[0].account).toBe("00000000-0000-4000-8000-000000000001")
-      expect(anonymousParticipants[0].sessionId).toBeUndefined()
-      expect(anonymousParticipants[0].account).toBeUndefined()
-      expect(missingRoomInfo[0].roomName).toBeUndefined()
-      expect(missingRoomParticipants[0].roomName).toBeUndefined()
+      expect(assertAt(activeRooms, 0).roomName).toBe("Focus")
+      expect(assertAt(participants, 0).sessionId).toBe("session-1")
+      expect(assertAt(participants, 0).account).toBe("00000000-0000-4000-8000-000000000001")
+      expect(assertAt(anonymousParticipants, 0).sessionId).toBeUndefined()
+      expect(assertAt(anonymousParticipants, 0).account).toBeUndefined()
+      expect(assertAt(missingRoomInfo, 0).roomName).toBeUndefined()
+      expect(assertAt(missingRoomParticipants, 0).roomName).toBeUndefined()
     }))
 
   it.effect("lists and gets meeting minutes", () =>
@@ -406,7 +407,7 @@ describe("virtual office operations", () => {
         Effect.provide(makeLayer())
       )
 
-      expect(list[0].status).toBe("active")
+      expect(assertAt(list, 0).status).toBe("active")
       expect(details.description).toBe("Meeting notes")
     }))
 
@@ -420,8 +421,8 @@ describe("virtual office operations", () => {
         Effect.provide(makeLayer({ minutes: [makeMinutes({ description: null })] }))
       )
 
-      expect(fromList[0].status).toBe("finished")
-      expect(toList[0].meetingEnd).toBe(200)
+      expect(assertAt(fromList, 0).status).toBe("finished")
+      expect(assertAt(toList, 0).meetingEnd).toBe(200)
       expect(details.description).toBeUndefined()
     }))
 
@@ -457,7 +458,7 @@ describe("virtual office operations", () => {
       )
       const defaults = yield* listOfficeDefaults({}).pipe(Effect.provide(makeLayer()))
 
-      expect(preferences[0].noiseCancellation).toBe(true)
-      expect(defaults[0].startWithTranscription).toBe(true)
+      expect(assertAt(preferences, 0).noiseCancellation).toBe(true)
+      expect(assertAt(defaults, 0).startWithTranscription).toBe(true)
     }))
 })

@@ -24,6 +24,7 @@ import { expect } from "vitest"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../../../src/huly/errors.js"
 import { addLabel, createIssue, deleteIssue, updateIssue } from "../../../src/huly/operations/issues.js"
+import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import { issueIdentifier, projectIdentifier } from "../../helpers/brands.js"
 import { withDiagnostics } from "../../helpers/diagnostics.js"
 
@@ -254,7 +255,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
           return Effect.succeed(found)
         }
         if (typeof q.name === "object" && "$like" in (q.name as Record<string, unknown>)) {
-          const pattern = (q.name as Record<string, string>).$like.replace(/%/g, "")
+          const pattern = assertExists((q.name as { readonly $like?: string }).$like).replace(/%/g, "")
           const found = persons.find(p => p.name.includes(pattern))
           return Effect.succeed(found)
         }
@@ -287,7 +288,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       if (config.captureUpdateDoc) {
         config.captureUpdateDoc.operations = operations as Record<string, unknown>
       }
-      const project = projects[0]
+      const project = assertAt(projects, 0)
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- project may be undefined from array access
       const sequence = (config.updateDocResult?.object?.sequence) ?? (project ? project.sequence + 1 : 1)
       return Effect.succeed({ object: { sequence } } as never)

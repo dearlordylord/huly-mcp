@@ -1,3 +1,4 @@
+import { assertAt } from "../../../src/utils/assertions.js"
 /* eslint-disable no-restricted-syntax, @typescript-eslint/consistent-type-assertions, @typescript-eslint/no-unnecessary-type-assertion -- SDK phantom types in fixture builders have no runtime constructors */
 import { describe, it } from "@effect/vitest"
 import type {
@@ -605,43 +606,43 @@ describe("activity message operations", () => {
         pinned: true
       }).pipe(Effect.provide(layer))
       expect(pinResult.pinned).toBe(true)
-      expect(capture.updateDocs[0].operations).toEqual({ isPinned: true })
+      expect(assertAt(capture.updateDocs, 0).operations).toEqual({ isPinned: true })
 
       const filters = yield* listActivityFilters({}).pipe(Effect.provide(layer))
-      expect(filters[0]).toEqual({ id: "filter-1", label: "Updates", position: 1 })
+      expect(assertAt(filters, 0)).toEqual({ id: "filter-1", label: "Updates", position: 1 })
 
       const references = yield* listActivityReferences({
         objectId: docId("issue-1"),
         objectClass: objectClassName("tracker:class:Issue"),
         direction: "both"
       }).pipe(Effect.provide(layer))
-      expect(references[0].message).toBe("linked")
+      expect(assertAt(references, 0).message).toBe("linked")
 
       const replies = yield* listActivityReplies({ messageId: activityMessageId("msg-1") }).pipe(Effect.provide(layer))
-      expect(replies[0].id).toBe("reply-1")
+      expect(assertAt(replies, 0).id).toBe("reply-1")
 
       const added = yield* addActivityReply({
         messageId: activityMessageId("msg-1"),
         body: "hello"
       }).pipe(Effect.provide(layer))
       expect(added.messageId).toBe("msg-1")
-      expect(capture.addCollections[0]._class).toBe(chunter.class.ThreadMessage)
+      expect(assertAt(capture.addCollections, 0)._class).toBe(chunter.class.ThreadMessage)
 
       const updated = yield* updateActivityReply({
         replyId: activityMessageId("reply-1"),
         body: "edited"
       }).pipe(Effect.provide(layer))
       expect(updated.updated).toBe(true)
-      expect(capture.updateDocs[1]._class).toBe(chunter.class.ThreadMessage)
+      expect(assertAt(capture.updateDocs, 1)._class).toBe(chunter.class.ThreadMessage)
 
       const deleted = yield* deleteActivityReply({ replyId: activityMessageId("reply-1") }).pipe(Effect.provide(layer))
       expect(deleted.deleted).toBe(true)
       expect(capture.removeDocs).toHaveLength(0)
-      expect(capture.removeCollections[0]._class).toBe(chunter.class.ThreadMessage)
-      expect(capture.removeCollections[0].objectId).toBe("reply-1")
-      expect(capture.removeCollections[0].attachedTo).toBe("msg-1")
-      expect(capture.removeCollections[0].attachedToClass).toBe(activity.class.ActivityMessage)
-      expect(capture.removeCollections[0].collection).toBe("replies")
+      expect(assertAt(capture.removeCollections, 0)._class).toBe(chunter.class.ThreadMessage)
+      expect(assertAt(capture.removeCollections, 0).objectId).toBe("reply-1")
+      expect(assertAt(capture.removeCollections, 0).attachedTo).toBe("msg-1")
+      expect(assertAt(capture.removeCollections, 0).attachedToClass).toBe(activity.class.ActivityMessage)
+      expect(assertAt(capture.removeCollections, 0).collection).toBe("replies")
     }))
 
   it.effect("returns idempotently when pin state already matches and reports missing replies", () =>
@@ -685,21 +686,21 @@ describe("activity message operations", () => {
       expect(alreadyUnpinned.pinned).toBe(false)
 
       const filters = yield* listActivityFilters({}).pipe(Effect.provide(layer))
-      expect(filters[0].label).toBeUndefined()
+      expect(assertAt(filters, 0).label).toBeUndefined()
 
       const fromRefs = yield* listActivityReferences({
         objectId: docId("issue-1"),
         objectClass: objectClassName("tracker:class:Issue"),
         direction: "from"
       }).pipe(Effect.provide(layer))
-      expect(fromRefs[0].attachedDocId).toBeUndefined()
+      expect(assertAt(fromRefs, 0).attachedDocId).toBeUndefined()
 
       const toRefs = yield* listActivityReferences({
         objectId: docId("doc-1"),
         objectClass: objectClassName("document:class:Document"),
         direction: "to"
       }).pipe(Effect.provide(testLayer({ references: [makeReference()] })))
-      expect(toRefs[0].attachedDocId).toBe("doc-1")
+      expect(assertAt(toRefs, 0).attachedDocId).toBe("doc-1")
 
       const missingMessage = yield* Effect.flip(
         getActivityMessage({ messageId: activityMessageId("missing-message") }).pipe(Effect.provide(layer))
@@ -784,17 +785,17 @@ describe("attachment media, saved attachment, and drawing operations", () => {
       expect(existingSave.saved).toBe(false)
 
       const saved = yield* listSavedAttachments({}).pipe(Effect.provide(layer))
-      expect(saved[0]).toEqual({ id: "saved-att-1", attachmentId: "att-1" })
+      expect(assertAt(saved, 0)).toEqual({ id: "saved-att-1", attachmentId: "att-1" })
 
       const unsaved = yield* unsaveAttachment({ attachmentId: attachmentBrandId("att-1") }).pipe(Effect.provide(layer))
       expect(unsaved.removed).toBe(true)
-      expect(capture.removeDocs[0]._class).toBe(attachment.class.SavedAttachments)
+      expect(assertAt(capture.removeDocs, 0)._class).toBe(attachment.class.SavedAttachments)
 
       const drawings = yield* listDrawings({
         parentId: docId("issue-1"),
         parentClass: objectClassName("tracker:class:Issue")
       }).pipe(Effect.provide(layer))
-      expect(drawings[0].content).toBe("shape-data")
+      expect(assertAt(drawings, 0).content).toBe("shape-data")
 
       const drawing = yield* getDrawing({ drawingId: drawingBrandId("drawing-1") }).pipe(Effect.provide(layer))
       expect(drawing.parentId).toBe("issue-1")
@@ -825,18 +826,18 @@ describe("attachment media, saved attachment, and drawing operations", () => {
         content: drawingContent("new")
       }).pipe(Effect.provide(layer))
       expect(created.drawingId).toBeTruthy()
-      expect(capture.createDocs[0]._class).toBe(attachment.class.Drawing)
+      expect(assertAt(capture.createDocs, 0)._class).toBe(attachment.class.Drawing)
 
       const updated = yield* updateDrawing({
         drawingId: drawingBrandId("drawing-1"),
         content: null
       }).pipe(Effect.provide(layer))
       expect(updated.updated).toBe(true)
-      expect(capture.updateDocs[0].operations).toEqual({ content: "" })
+      expect(assertAt(capture.updateDocs, 0).operations).toEqual({ content: "" })
 
       const deleted = yield* deleteDrawing({ drawingId: drawingBrandId("drawing-1") }).pipe(Effect.provide(layer))
       expect(deleted.deleted).toBe(true)
-      expect(capture.removeDocs[1]._class).toBe(attachment.class.Drawing)
+      expect(assertAt(capture.removeDocs, 1)._class).toBe(attachment.class.Drawing)
     }))
 
   it.effect("creates saved attachments/drawings and reports missing saved attachments or drawings", () =>
@@ -846,7 +847,7 @@ describe("attachment media, saved attachment, and drawing operations", () => {
 
       const saved = yield* saveAttachment({ attachmentId: attachmentBrandId("att-1") }).pipe(Effect.provide(layer))
       expect(saved.saved).toBe(true)
-      expect(capture.createDocs[0]._class).toBe(attachment.class.SavedAttachments)
+      expect(assertAt(capture.createDocs, 0)._class).toBe(attachment.class.SavedAttachments)
 
       const unsaveError = yield* Effect.flip(
         unsaveAttachment({ attachmentId: attachmentBrandId("missing-att") }).pipe(Effect.provide(layer))
@@ -866,7 +867,7 @@ describe("attachment media, saved attachment, and drawing operations", () => {
         space: spaceBrandId("space-1")
       }).pipe(Effect.provide(layer))
       expect(created.drawingId).toBeTruthy()
-      expect(capture.createDocs[1].attributes).toEqual({
+      expect(assertAt(capture.createDocs, 1).attributes).toEqual({
         parent: "issue-1",
         parentClass: "tracker:class:Issue"
       })
@@ -899,7 +900,7 @@ describe("attachment media, saved attachment, and drawing operations", () => {
         content: drawingContent("updated-shape")
       }).pipe(Effect.provide(layer))
       expect(updated.updated).toBe(true)
-      expect(capture.updateDocs[0].operations).toEqual({ content: drawingContent("updated-shape") })
+      expect(assertAt(capture.updateDocs, 0).operations).toEqual({ content: drawingContent("updated-shape") })
     }))
 })
 
@@ -927,13 +928,13 @@ describe("object collaborator operations", () => {
         project: projectIdentifier("TEST"),
         issueIdentifier: issueIdentifier("TEST-1")
       }).pipe(Effect.provide(layer))
-      expect(issueCollaborators[0].accountUuid).toBe(ACCOUNT_UUID)
+      expect(assertAt(issueCollaborators, 0).accountUuid).toBe(ACCOUNT_UUID)
 
       const documentCollaborators = yield* listObjectCollaborators({
         teamspace: teamspaceIdentifier("Engineering"),
         document: documentIdentifier("Spec")
       }).pipe(Effect.provide(layer))
-      expect(documentCollaborators[0].objectId).toBe("doc-1")
+      expect(assertAt(documentCollaborators, 0).objectId).toBe("doc-1")
 
       const added = yield* addObjectCollaborator({
         objectId: docId("issue-1"),
@@ -941,7 +942,7 @@ describe("object collaborator operations", () => {
         member: accountUuid("00000000-0000-4000-8000-000000000009")
       }).pipe(Effect.provide(testLayer({ capture })))
       expect(added.added).toBe(true)
-      expect(capture.addCollections[0]._class).toBe(core.class.Collaborator)
+      expect(assertAt(capture.addCollections, 0)._class).toBe(core.class.Collaborator)
 
       const removed = yield* removeObjectCollaborator({
         objectId: docId("issue-1"),
@@ -949,7 +950,7 @@ describe("object collaborator operations", () => {
         member: accountUuid(ACCOUNT_UUID)
       }).pipe(Effect.provide(layer))
       expect(removed.removed).toBe(true)
-      expect(capture.removeCollections[0]._class).toBe(core.class.Collaborator)
+      expect(assertAt(capture.removeCollections, 0)._class).toBe(core.class.Collaborator)
     }))
 
   it.effect("returns idempotent collaborator results and reports missing removeCollection support", () =>
@@ -1006,12 +1007,12 @@ describe("notification preference operations", () => {
       })
 
       const providers = yield* listNotificationProviders({}).pipe(Effect.provide(layer))
-      expect(providers[0].label).toBe("Inbox")
+      expect(assertAt(providers, 0).label).toBe("Inbox")
 
       const types = yield* listNotificationTypes({
         objectClass: objectClassName("tracker:class:Issue")
       }).pipe(Effect.provide(layer))
-      expect(types[0].group).toBe("group-1")
+      expect(assertAt(types, 0).group).toBe("group-1")
 
       const typeSetting = yield* updateNotificationTypeSetting({
         providerId: notificationProviderId("provider-1"),
@@ -1066,7 +1067,7 @@ describe("notification preference operations", () => {
         enabled: false
       }).pipe(Effect.provide(createLayer))
       expect(created.created).toBe(true)
-      expect(capture.createDocs[0]._class).toBe(notification.class.NotificationTypeSetting)
+      expect(assertAt(capture.createDocs, 0)._class).toBe(notification.class.NotificationTypeSetting)
 
       const missingProvider = yield* Effect.flip(
         updateNotificationTypeSetting({
@@ -1128,7 +1129,7 @@ describe("notification preference operations", () => {
       const allTypes = yield* listNotificationTypes({ includeHidden: true }).pipe(Effect.provide(testLayer({
         notificationTypes: [makeType({ hidden: true })]
       })))
-      expect(allTypes[0].hidden).toBe(true)
+      expect(assertAt(allTypes, 0).hidden).toBe(true)
 
       const resolvedTarget = yield* subscribeToObjectNotifications({
         objectId: docId("issue-1"),
@@ -1169,13 +1170,13 @@ describe("notification preference operations", () => {
       })
 
       const providers = yield* listNotificationProviders({ limit: 1 }).pipe(Effect.provide(layer))
-      expect(providers[0].label).toBeUndefined()
-      expect(providers[0].description).toBeUndefined()
-      expect(providers[0].depends).toBe("provider-1")
+      expect(assertAt(providers, 0).label).toBeUndefined()
+      expect(assertAt(providers, 0).description).toBeUndefined()
+      expect(assertAt(providers, 0).depends).toBe("provider-1")
 
       const types = yield* listNotificationTypes({ limit: 1 }).pipe(Effect.provide(layer))
-      expect(types[0].label).toBeUndefined()
-      expect(types[0].attachedToClass).toBe("document:class:Document")
-      expect(types[0].onlyOwn).toBe(true)
+      expect(assertAt(types, 0).label).toBeUndefined()
+      expect(assertAt(types, 0).attachedToClass).toBe("document:class:Document")
+      expect(assertAt(types, 0).onlyOwn).toBe(true)
     }))
 })

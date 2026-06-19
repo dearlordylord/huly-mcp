@@ -15,6 +15,7 @@ import type { Document as HulyDocument } from "@hcengineering/document"
 import type { Issue as HulyIssue } from "@hcengineering/tracker"
 import { Cause, Effect, Exit } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import {
   AssociationIdentifier,
@@ -330,10 +331,10 @@ describe("listAssociations", () => {
       )
 
       expect(result.associations.map((item) => item.associationId)).toEqual(["assoc-visible"])
-      expect(result.associations[0].sourceClassLabel).toBe("Issue")
-      expect(result.associations[0].targetClassLabel).toBe("Issue")
-      expect(result.associations[0].canListRelations).toBe(true)
-      expect(result.associations[0].canCreateRelation).toBe(true)
+      expect(assertAt(result.associations, 0).sourceClassLabel).toBe("Issue")
+      expect(assertAt(result.associations, 0).targetClassLabel).toBe("Issue")
+      expect(assertAt(result.associations, 0).canListRelations).toBe(true)
+      expect(assertAt(result.associations, 0).canCreateRelation).toBe(true)
     }))
 
   it.effect("applies limit after hiding system associations", () =>
@@ -469,8 +470,8 @@ describe("listAssociations", () => {
       )
 
       expect(result.associations.map((item) => item.associationId)).toEqual(["assoc-target"])
-      expect(result.associations[0].sourceClassLabel).toBe("Document")
-      expect(result.associations[0].targetClassLabel).toBe("Document")
+      expect(assertAt(result.associations, 0).sourceClassLabel).toBe("Document")
+      expect(assertAt(result.associations, 0).targetClassLabel).toBe("Document")
     }))
 
   it.effect("fails on ambiguous association names", () =>
@@ -538,9 +539,9 @@ describe("listRelations", () => {
       )
 
       expect(result.total).toBe(1)
-      expect(result.relations[0].relationId).toBe("rel-1")
-      expect(result.relations[0].source.display).toBe("HULY-1")
-      expect(result.relations[0].target.display).toBe("HULY-2")
+      expect(assertAt(result.relations, 0).relationId).toBe("rel-1")
+      expect(assertAt(result.relations, 0).source.display).toBe("HULY-1")
+      expect(assertAt(result.relations, 0).target.display).toBe("HULY-2")
     }))
 
   it.effect("matches symmetric associations in either direction", () =>
@@ -562,7 +563,7 @@ describe("listRelations", () => {
       )
 
       expect(result.total).toBe(1)
-      expect(result.relations[0].relationId).toBe("rel-1")
+      expect(assertAt(result.relations, 0).relationId).toBe("rel-1")
     }))
 
   it.effect("validates reversed endpoints against asymmetric association classes", () =>
@@ -595,8 +596,8 @@ describe("listRelations", () => {
       )
 
       expect(result.total).toBe(1)
-      expect(result.relations[0].source.display).toBe("HULY-1")
-      expect(result.relations[0].target.display).toBe("Spec")
+      expect(assertAt(result.relations, 0).source.display).toBe("HULY-1")
+      expect(assertAt(result.relations, 0).target.display).toBe("Spec")
     }))
 
   it.effect("matches asymmetric associations in either direction", () =>
@@ -629,9 +630,9 @@ describe("listRelations", () => {
       )
 
       expect(result.total).toBe(1)
-      expect(result.relations[0].relationId).toBe("rel-1")
-      expect(result.relations[0].source.display).toBe("HULY-1")
-      expect(result.relations[0].target.display).toBe("Spec")
+      expect(assertAt(result.relations, 0).relationId).toBe("rel-1")
+      expect(assertAt(result.relations, 0).source.display).toBe("HULY-1")
+      expect(assertAt(result.relations, 0).target.display).toBe("Spec")
     }))
 
   it.effect("matches omitted asymmetric associations in either direction", () =>
@@ -663,9 +664,9 @@ describe("listRelations", () => {
       )
 
       expect(result.total).toBe(1)
-      expect(result.relations[0].relationId).toBe("rel-1")
-      expect(result.relations[0].source.display).toBe("HULY-1")
-      expect(result.relations[0].target.display).toBe("Spec")
+      expect(assertAt(result.relations, 0).relationId).toBe("rel-1")
+      expect(assertAt(result.relations, 0).source.display).toBe("HULY-1")
+      expect(assertAt(result.relations, 0).target.display).toBe("Spec")
     }))
 
   it.effect("deduplicates omitted same-class association discovery in either direction", () =>
@@ -713,7 +714,7 @@ describe("listRelations", () => {
       )
 
       expect(result.total).toBe(1)
-      expect(result.relations[0].associationId).toBe("assoc-1")
+      expect(assertAt(result.relations, 0).associationId).toBe("assoc-1")
     }))
 
   it.effect("does not fan out relation queries by discovered associations when association is omitted", () =>
@@ -786,7 +787,7 @@ describe("listRelations", () => {
       )
 
       expect(result.total).toBe(1)
-      expect(result.relations[0].associationId).toBe("assoc-1")
+      expect(assertAt(result.relations, 0).associationId).toBe("assoc-1")
     }))
 
   it.effect("discovers newest compatible associations before applying the association window", () =>
@@ -814,7 +815,7 @@ describe("listRelations", () => {
       )
 
       expect(result.total).toBe(1)
-      expect(result.relations[0].associationId).toBe("assoc-1")
+      expect(assertAt(result.relations, 0).associationId).toBe("assoc-1")
     }))
 
   it.effect("warns when omitted-association discovery reaches the association cap", () =>
@@ -1012,8 +1013,8 @@ describe("listRelations", () => {
       )
 
       expect(result.total).toBe(1)
-      expect(result.relations[0].source.display).toBe("Contract")
-      expect(result.relations[0].source.class).toBe(cardClass)
+      expect(assertAt(result.relations, 0).source.display).toBe("Contract")
+      expect(assertAt(result.relations, 0).source.class).toBe(cardClass)
     }))
 
   it.effect("resolves card locators by title when card space is provided", () =>
@@ -1050,7 +1051,7 @@ describe("listRelations", () => {
       )
 
       expect(result.total).toBe(1)
-      expect(result.relations[0].source.display).toBe("Contract")
+      expect(assertAt(result.relations, 0).source.display).toBe("Contract")
     }))
 
   it.effect("requires card space for card title lookup", () =>
@@ -1608,7 +1609,7 @@ describe("generic-associations resolver and mutation branch coverage", () => {
         issues: [issue("issue-1", "HULY-1")]
       })))
       expect(result.total).toBe(1)
-      expect(result.relations[0].source.display).toBe("Spec")
+      expect(assertAt(result.relations, 0).source.display).toBe("Spec")
     }))
 
   it.effect("fails on ambiguous document titles without a teamspace", () =>
@@ -1777,7 +1778,7 @@ describe("generic-associations direction and cardinality branch coverage", () =>
         relations: [relation({ docA: "ghost-issue" as Ref<Doc>, docB: "issue-2" as Ref<Doc> })],
         issues: [issue("issue-2", "HULY-2")]
       })))
-      expect(result.relations[0].source.warning).toContain("Could not resolve")
+      expect(assertAt(result.relations, 0).source.warning).toContain("Could not resolve")
     }))
 
   it.effect("fails an issue locator carrying a project the workspace cannot resolve", () =>
@@ -2010,6 +2011,6 @@ describe("generic-associations display fallback", () => {
         relations: [relation({ docA: "bare-1" as Ref<Doc>, docB: "issue-2" as Ref<Doc> })],
         issues: [issue("bare-1", ""), issue("issue-2", "HULY-2")]
       })))
-      expect(result.relations[0].source.display).toBe("bare-1")
+      expect(assertAt(result.relations, 0).source.display).toBe("bare-1")
     }))
 })

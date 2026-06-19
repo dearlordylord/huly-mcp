@@ -33,7 +33,7 @@ import {
   Timestamp,
   TodoId
 } from "../../domain/schemas/shared.js"
-import { isExistent } from "../../utils/assertions.js"
+import { assertAt, isExistent } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type {
   IssueNotFoundError,
@@ -322,7 +322,7 @@ export const findTodo = (
     if (todos.length > 1) {
       return yield* new AmbiguousTodo({ locator: describeLocator(locator), matches: todos.length })
     }
-    return todos[0]
+    return assertAt(todos, 0)
   })
 
 const todoOwnerSummary = (
@@ -343,11 +343,14 @@ const todoAttachmentSummary = (todo: HulyTodoWithLookup): TodoAttachmentSummary 
   if (todo.attachedTo === time.ids.NotAttached) return { type: "none" }
   const issue = todo.$lookup?.attachedTo
   if (todo.attachedToClass === tracker.class.Issue && issue !== undefined) {
+    const identifier = IssueIdentifier.make(issue.identifier)
+    const segments = identifier.split("-")
+    const project = assertAt(segments, 0)
     return {
       type: "issue",
       id: IssueId.make(issue._id),
-      project: ProjectIdentifier.make(IssueIdentifier.make(issue.identifier).split("-")[0]),
-      identifier: IssueIdentifier.make(issue.identifier),
+      project: ProjectIdentifier.make(project),
+      identifier,
       title: attachmentTitleOrFallback(issue.title, issue.identifier)
     }
   }

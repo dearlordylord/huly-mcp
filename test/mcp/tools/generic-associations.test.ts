@@ -3,6 +3,7 @@ import type { AccountUuid, Association as HulyAssociation, PersonId, Ref, Space 
 import { toFindResult } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import type { HulyClientOperations } from "../../../src/huly/client.js"
 import { core, tracker } from "../../../src/huly/huly-plugins.js"
@@ -86,8 +87,8 @@ describe("genericAssociationTools", () => {
       const result = yield* Effect.promise(() => tool.handler({}, hulyClient, noopStorageClient))
 
       expect(result.isError).toBeUndefined()
-      const parsed = JSON.parse(result.content[0].text) as { associations: Array<{ associationId: string }> }
-      expect(parsed.associations[0].associationId).toBe("assoc-1")
+      const parsed = JSON.parse(assertAt(result.content, 0).text) as { associations: Array<{ associationId: string }> }
+      expect(assertAt(parsed.associations, 0).associationId).toBe("assoc-1")
     }))
 
   it.effect("list_relations handler maps schema parse errors", () =>

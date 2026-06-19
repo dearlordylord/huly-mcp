@@ -14,6 +14,7 @@ import type {
 } from "../../domain/schemas.js"
 import { DEFAULT_SPACE_OWNER_ENSURE_MEMBERS, UPDATE_SPACE_FIELDS } from "../../domain/schemas.js"
 import { AccountUuid, NonEmptyString, RoleId, SpaceId, SpaceTypeId } from "../../domain/schemas/shared.js"
+import { assertAt } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { SpaceRoleAssignmentsMalformedError } from "../errors-spaces.js"
 import { SpaceNotTypedError, SpaceRoleIdentifierAmbiguousError, SpaceRoleNotFoundError } from "../errors-spaces.js"
@@ -120,7 +121,7 @@ const resolveSpaceRole = (
         }))
       })
     }
-    return matches[0]
+    return assertAt(matches, 0)
   })
 
 const findSpaceTypeRoles = (

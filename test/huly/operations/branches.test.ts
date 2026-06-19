@@ -1,3 +1,4 @@
+import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 /**
  * Branch coverage tests for small gaps in:
  * - attachments.ts (line 287: toFileSourceParams with no sources)
@@ -94,7 +95,7 @@ const createComponentTestLayer = (config: {
     if (_class === contact.class.Person) {
       const q = query as Record<string, unknown>
       if (q._id && typeof q._id === "object" && "$in" in (q._id as Record<string, unknown>)) {
-        const ids = (q._id as Record<string, Array<string>>).$in
+        const ids = assertExists((q._id as { readonly $in?: ReadonlyArray<string> }).$in)
         const filtered = persons.filter(p => ids.includes(p._id))
         return Effect.succeed(toFindResult(filtered))
       }
@@ -364,8 +365,8 @@ describe("listThreadReplies - sender name resolved (line 133 true branch)", () =
       }).pipe(Effect.provide(testLayer))
 
       expect(result.replies).toHaveLength(1)
-      expect(result.replies[0].sender).toBe("Alice Smith")
-      expect(result.replies[0].senderId).toBe("social-alice")
+      expect(assertAt(result.replies, 0).sender).toBe("Alice Smith")
+      expect(assertAt(result.replies, 0).senderId).toBe("social-alice")
     }))
 })
 

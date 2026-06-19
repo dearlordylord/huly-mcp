@@ -19,6 +19,7 @@ When setting up a new project from this one, ALL of these components must be cop
 6. **Effect testing** (`@effect/vitest`): Effect-aware test runner integration.
 7. **ESLint** (`@effect/eslint-plugin`, `eslint-plugin-functional`, `@effect/dprint`): formatting + lint.
 8. **Property test placement**: fast-check/property-based tests live in `*.property.test.ts` files only. ESLint must reject `fast-check` imports in ordinary `*.test.ts` files so generated tests stay discoverable and reviewable as a distinct test class.
+9. **Strict TypeScript baseline** (`tsconfig.json`): `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noImplicitOverride`, and `noFallthroughCasesInSwitch`.
 
 Missing any of these degrades the quality gate. Coverage and duplication detection are especially easy to forget.
 
@@ -55,6 +56,33 @@ If the container has instead been attached to the Huly Docker network, the `NODE
 ## Type Safety
 
 Type casts (`as T`) are a sin. Avoid them. All data crossing system boundaries (APIs etc.) must be strongly typed with Effect Schema.
+
+### Parse, Don't Validate
+
+Boundary code must turn unknown or less-structured input into domain types as early as practical. Do not validate a raw DTO or primitive and then pass the raw value onward; pass the parsed/refined value so downstream code can rely on what was learned.
+
+Use names that preserve meaning:
+- `parseX(input)` for untrusted or less-structured input that returns a typed value or typed parse error.
+- `makeX(...)` / `createX(...)` for smart constructors from already-typed pieces.
+- `isX(value): boolean` only for true predicates.
+
+Avoid `validateX` when the function returns a refined value. It parsed something.
+
+Effect Schema is the default boundary parser. Use schemas at system edges and MCP tool boundaries; core/application logic should receive parsed domain input instead of repeatedly revalidating the same facts. Expected parse, domain, authorization, integration, and persistence failures must stay in typed Effect error channels. Throwing/rejected promises are only for defects, framework-required behavior, or startup/bootstrap failures.
+
+### Functional Core, Imperative Shell
+
+Keep reusable behavior out of protocol handlers and SDK glue. The functional core contains domain logic, parsers, state transitions, target resolution, projection/mapping decisions, and other deterministic decisions. It should avoid I/O, hidden dependencies, ambient time/randomness, thrown expected failures, and MCP/HTTP/stdin framework concerns.
+
+The imperative shell owns Effect sequencing, Huly SDK calls, storage/network I/O, config loading, telemetry, resource lifetime, and protocol translation. Entrypoints should parse protocol-specific input, call shared modules with parsed domain values, and render protocol-specific output. Do not duplicate business rules in MCP handlers when a shared operation can own them.
+
+### Config and Resource Boundaries
+
+Parse configuration at startup or the earliest request boundary into typed config with redacted secret values. Do not read `process.env` throughout the app. Missing or invalid config is a typed startup/request-boundary failure with useful context.
+
+Secrets such as tokens, passwords, API keys, and credential headers must be wrapped in `Redacted` at the boundary and unwrapped only inside the adapter that needs the raw value. Do not put raw secrets in errors, logs, traces, snapshots, diagnostics, or tool results.
+
+Avoid top-level side effects except in true entrypoint/bootstrap files. Modules must not start servers, open connections, read env, register handlers, or perform I/O at import time. Resource creation and cleanup should be explicit and owned by bootstrap/imperative-shell code or Effect layers/scopes.
 
 ## No Test Mocks
 

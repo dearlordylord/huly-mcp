@@ -1,3 +1,4 @@
+import { assertAt } from "../src/utils/assertions.js"
 /**
  * Targeted tests for remaining coverage gaps across multiple files.
  */
@@ -299,8 +300,8 @@ describe("channels - buildAccountUuidToNameMap emp.personUuid truthy (line 187)"
       const result = yield* listDirectMessages({}).pipe(Effect.provide(testLayer))
 
       expect(result.conversations).toHaveLength(1)
-      expect(result.conversations[0].participants).toContain("Alice")
-      expect(result.conversations[0].participants).toContain("Bob")
+      expect(assertAt(result.conversations, 0).participants).toContain("Alice")
+      expect(assertAt(result.conversations, 0).participants).toContain("Bob")
     }))
 })
 
@@ -348,7 +349,7 @@ describe("listTeamspaces - description || undefined branches (documents.ts line 
 
       const result = yield* listTeamspaces({}).pipe(Effect.provide(testLayer))
 
-      expect(result.teamspaces[0].description).toBe("Has description")
+      expect(assertAt(result.teamspaces, 0).description).toBe("Has description")
     }))
 
   it.effect("maps falsy description to undefined", () =>
@@ -358,7 +359,7 @@ describe("listTeamspaces - description || undefined branches (documents.ts line 
 
       const result = yield* listTeamspaces({}).pipe(Effect.provide(testLayer))
 
-      expect(result.teamspaces[0].description).toBeUndefined()
+      expect(assertAt(result.teamspaces, 0).description).toBeUndefined()
     }))
 })
 
@@ -587,7 +588,7 @@ describe("listWorkspaces - ws.region defined branch (workspace.ts line 143)", ()
       const result = yield* listWorkspaces({}).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].region).toBe("eu-west")
+      expect(assertAt(result, 0).region).toBe("eu-west")
     }))
 
   it.effect("maps ws.region to undefined when not defined", () =>
@@ -602,7 +603,7 @@ describe("listWorkspaces - ws.region defined branch (workspace.ts line 143)", ()
       const result = yield* listWorkspaces({}).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].region).toBeUndefined()
+      expect(assertAt(result, 0).region).toBeUndefined()
     }))
 })
 

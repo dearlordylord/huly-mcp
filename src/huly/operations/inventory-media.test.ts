@@ -1,3 +1,4 @@
+import { assertAt } from "../../utils/assertions.js"
 /* eslint-disable no-restricted-syntax -- Fixture-only casts bridge SDK phantom refs and structurally compatible Huly doc literals into generic fake-client storage. */
 import { describe, it } from "@effect/vitest"
 import type { ActivityMessage as HulyActivityMessage } from "@hcengineering/activity"
@@ -205,7 +206,7 @@ const applyOptions = <T extends Doc>(docs: ReadonlyArray<T>, options: FindOption
 
 const upsertDoc = <T extends Doc>(docs: Array<T>, objectId: Ref<T>, operations: DocumentUpdate<T>): void => {
   const index = docs.findIndex((doc) => doc._id === objectId)
-  if (index >= 0) docs[index] = { ...docs[index], ...operations }
+  if (index >= 0) Object.assign(assertAt(docs, index), operations)
 }
 
 const removeDoc = <T extends Doc>(docs: Array<T>, objectId: Ref<T>): void => {
@@ -257,7 +258,7 @@ const makeLayer = (state: State, includeRemoveCollection = true): Layer.Layer<Hu
   const findOne: HulyClientOperations["findOne"] = <T extends Doc>(
     classRef: Ref<Class<T>>,
     query: DocumentQuery<T>
-  ) => Effect.map(findAll(classRef, query), (docs) => docs[0])
+  ) => Effect.map(findAll(classRef, query), (docs) => docs.at(0))
 
   const addCollection: HulyClientOperations["addCollection"] = <T extends Doc, P extends AttachedDoc>(
     classRef: Ref<Class<P>>,
@@ -639,7 +640,7 @@ describe("inventory product media operations", () => {
       yield* deleteInventoryProductComment(deleteAddedCommentParams).pipe(Effect.provide(layer))
       const deleted = yield* deleteInventoryProduct(deleteProductParams).pipe(Effect.provide(layer))
 
-      expect(listed.comments[0]).toMatchObject({ id: "comment-camera", body: "Initial" })
+      expect(assertAt(listed.comments, 0)).toMatchObject({ id: "comment-camera", body: "Initial" })
       expect(added.product.id).toBe("prod-camera")
       expect(updated.updated).toBe(true)
       expect(blocked).toBeInstanceOf(InventoryNotEmptyError)
@@ -752,7 +753,7 @@ describe("inventory product media operations", () => {
 
       expect(result.product.id).toBe("prod-camera")
       expect(result.activity.map((message) => message.id)).toEqual(["activity-camera"])
-      expect(result.activity[0]).toMatchObject({
+      expect(assertAt(result.activity, 0)).toMatchObject({
         objectId: "prod-camera",
         objectClass: inventory.class.Product
       })

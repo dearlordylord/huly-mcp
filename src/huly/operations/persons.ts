@@ -67,8 +67,9 @@ const formatName = (firstName: string, lastName: string): string => `${lastName}
 const parseName = (name: string): { firstName: string; lastName: string } => {
   const parts = name.split(",")
   const FIRST_LAST_PARTS = 2
-  if (parts.length >= FIRST_LAST_PARTS) {
-    return { lastName: parts[0], firstName: parts.slice(1).join(",") }
+  const [lastName, ...firstNameParts] = parts
+  if (lastName !== undefined && parts.length >= FIRST_LAST_PARTS) {
+    return { lastName, firstName: firstNameParts.join(",") }
   }
   return { firstName: name, lastName: "" }
 }

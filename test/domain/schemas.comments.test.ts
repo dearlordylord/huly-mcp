@@ -12,6 +12,7 @@ import {
   parseUpdateCommentParams,
   updateCommentParamsJsonSchema
 } from "../../src/domain/schemas.js"
+import { assertExists } from "../../src/utils/assertions.js"
 
 type JsonSchemaObject = {
   $schema?: string
@@ -461,9 +462,10 @@ describe("Comment Schemas", () => {
     it.effect("ListCommentsParams has property descriptions", () =>
       Effect.gen(function*() {
         const schema = listCommentsParamsJsonSchema as JsonSchemaObject
-        expect(schema.properties!.project.description).toBeDefined()
-        expect(schema.properties!.issueIdentifier.description).toBeDefined()
-        expect(schema.properties!.limit.description).toBeDefined()
+        const properties = assertExists(schema.properties)
+        expect(assertExists(properties.project).description).toBeDefined()
+        expect(assertExists(properties.issueIdentifier).description).toBeDefined()
+        expect(assertExists(properties.limit).description).toBeDefined()
       }))
   })
 })

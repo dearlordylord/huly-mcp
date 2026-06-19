@@ -58,6 +58,7 @@ import {
   PersonName,
   Timestamp
 } from "../../domain/schemas/shared.js"
+import { assertAt } from "../../utils/assertions.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
 import type {
@@ -658,7 +659,7 @@ export const removeTemplateChild = (
       })
     }
 
-    const removedChild = template.children[childIndex]
+    const removedChild = assertAt(template.children, childIndex)
     const newChildren = template.children.filter((_, i) => i !== childIndex)
 
     yield* client.updateDoc(

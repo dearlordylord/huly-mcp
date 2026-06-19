@@ -14,6 +14,7 @@ import {
   updateTagCategory
 } from "../../../src/huly/operations/tag-categories.js"
 import { resolveTagCategoryRef } from "../../../src/huly/operations/tags-shared.js"
+import { assertAt } from "../../../src/utils/assertions.js"
 import { tagCategoryIdentifier } from "../../helpers/brands.js"
 
 const makeTagCategory = (overrides?: Partial<HulyTagCategory>): HulyTagCategory => {
@@ -119,8 +120,8 @@ describe("listTagCategories", () => {
       const result = yield* listTagCategories({}).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
-      expect(result[0].label).toBe("Priority")
-      expect(result[1].label).toBe("Type")
+      expect(assertAt(result, 0).label).toBe("Priority")
+      expect(assertAt(result, 1).label).toBe("Type")
     }))
 
   it.effect("returns empty array when no categories", () =>
@@ -148,7 +149,7 @@ describe("listTagCategories", () => {
       const result = yield* listTagCategories({ targetClass: "tracker:class:Issue" }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].label).toBe("Issues")
+      expect(assertAt(result, 0).label).toBe("Issues")
     }))
 })
 

@@ -1,3 +1,4 @@
+import { assertAt } from "../../../src/utils/assertions.js"
 /* eslint-disable no-restricted-syntax -- test fixtures build Huly SDK docs whose nominal types are not structurally compatible with plain object literals, and branded refs have no runtime constructors */
 import { describe, it } from "@effect/vitest"
 import type { Card as HulyCard, CardSpace as HulyCardSpace, MasterTag as HulyMasterTag } from "@hcengineering/card"
@@ -245,10 +246,10 @@ describe("listCardSpaces", () => {
       )
 
       expect(result.total).toBe(2)
-      expect(result.cardSpaces[0].name).toBe("Cards")
-      expect(result.cardSpaces[0].description).toBe("Card space")
-      expect(result.cardSpaces[0].types).toEqual(["tag-1"])
-      expect(result.cardSpaces[1].description).toBeUndefined()
+      expect(assertAt(result.cardSpaces, 0).name).toBe("Cards")
+      expect(assertAt(result.cardSpaces, 0).description).toBe("Card space")
+      expect(assertAt(result.cardSpaces, 0).types).toEqual(["tag-1"])
+      expect(assertAt(result.cardSpaces, 1).description).toBeUndefined()
       // default excludes archived
       expect(captures.findAll?.query?.archived).toBe(false)
     }))
@@ -287,7 +288,7 @@ describe("listMasterTags", () => {
         Effect.provide(buildLayer({ spaces: [makeSpace()], masterTags: [makeTag()] }))
       )
       expect(result.total).toBe(1)
-      expect(result.masterTags[0]).toEqual({ id: "tag-1", name: "Document" })
+      expect(assertAt(result.masterTags, 0)).toEqual({ id: "tag-1", name: "Document" })
     }))
 
   it.effect("includes master tags derived from the space's top-level types", () =>
@@ -312,7 +313,7 @@ describe("listMasterTags", () => {
         Effect.provide(buildLayer({ spaces: [makeSpace()], masterTags: [makeTag({ label: tagLabel("") })] }))
       )
 
-      expect(result.masterTags[0]).toEqual({ id: "tag-1", name: "" })
+      expect(assertAt(result.masterTags, 0)).toEqual({ id: "tag-1", name: "" })
     }))
 
   it.effect("excludes classes outside the space type ancestry", () =>
@@ -356,7 +357,7 @@ describe("listCards", () => {
         Effect.provide(buildLayer({ spaces: [makeSpace()], cards: [makeCard()], captures }))
       )
       expect(result.total).toBe(1)
-      expect(result.cards[0]).toEqual({ id: "card-1", title: "Roadmap", type: "tag-1", modifiedOn: 200 })
+      expect(assertAt(result.cards, 0)).toEqual({ id: "card-1", title: "Roadmap", type: "tag-1", modifiedOn: 200 })
       // only the space filter is present
       expect(captures.findAll?.query).toEqual({ space: SPACE_ID })
     }))

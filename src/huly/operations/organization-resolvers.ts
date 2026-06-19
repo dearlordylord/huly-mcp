@@ -2,6 +2,7 @@ import type { Organization as HulyOrganization } from "@hcengineering/contact"
 import { Effect, Option } from "effect"
 
 import { Count } from "../../domain/schemas/shared.js"
+import { isSingle } from "../../utils/assertions.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import { OrganizationIdentifierAmbiguousError, OrganizationNotFoundError } from "../errors.js"
 import { contact } from "../huly-plugins.js"
@@ -16,13 +17,11 @@ const findOrganizationByIdentifier = (
   HulyClientError | OrganizationIdentifierAmbiguousError
 > =>
   Effect.gen(function*() {
-    const byId = Option.fromNullable(
-      yield* client.findOne<HulyOrganization>(
-        contact.class.Organization,
-        hulyQuery<HulyOrganization>({ _id: toRef<HulyOrganization>(identifier) })
-      )
+    const byId = yield* client.findOne<HulyOrganization>(
+      contact.class.Organization,
+      hulyQuery<HulyOrganization>({ _id: toRef<HulyOrganization>(identifier) })
     )
-    if (Option.isSome(byId)) return byId
+    if (byId !== undefined) return Option.some(byId)
 
     const byName = yield* client.findAll<HulyOrganization>(
       contact.class.Organization,
@@ -36,7 +35,8 @@ const findOrganizationByIdentifier = (
         matches: Count.make(byName.length)
       })
     }
-    return Option.some(byName[0])
+    if (isSingle(byName)) return Option.some(byName[0])
+    return Option.none()
   })
 
 export const resolveOrganizationByIdentifier = (

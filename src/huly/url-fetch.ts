@@ -11,6 +11,7 @@ import type { LookupFunction } from "node:net"
 
 import { Effect } from "effect"
 
+import { assertAt } from "../utils/assertions.js"
 import { FileFetchError, MAX_FILE_SIZE } from "./errors.js"
 
 const FETCH_TIMEOUT_MS = 30_000
@@ -80,6 +81,8 @@ interface FetchFromUrlDependencies {
   readonly requestUrl: (url: URL, address: ResolvedAddress) => Promise<Buffer>
 }
 
+type Ipv6Hextets = readonly [number, number, number, number, number, number, number, number]
+
 const parseIpv4Address = (hostname: string): readonly [number, number, number, number] | null => {
   const parts = hostname.split(".")
   if (parts.length !== IPV4_OCTET_COUNT) {
@@ -87,11 +90,15 @@ const parseIpv4Address = (hostname: string): readonly [number, number, number, n
   }
 
   const octets = parts.map(Number)
+  const a = assertAt(octets, 0)
+  const b = assertAt(octets, 1)
+  const c = assertAt(octets, 2)
+  const d = assertAt(octets, 3)
   if (octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > IPV4_MAX_OCTET)) {
     return null
   }
 
-  return [octets[0], octets[1], octets[2], octets[3]]
+  return [a, b, c, d]
 }
 
 const isBlockedIpv4Address = ([a, b, c]: readonly [number, number, number, number]): boolean => {
@@ -128,8 +135,11 @@ const ipv4FromMappedIpv6Hextets = (hostname: string): readonly [number, number, 
   }
 
   // Each capture is 1-4 hex digits, so high/low are bounded by IPV6_HEXTET_MAX by construction.
-  const high = Number.parseInt(match[1], 16)
-  const low = Number.parseInt(match[2], 16)
+  const highText = assertAt(match, 1)
+  const lowText = assertAt(match, 2)
+
+  const high = Number.parseInt(highText, 16)
+  const low = Number.parseInt(lowText, 16)
   return [
     Math.floor(high / BYTE_BASE),
     high % BYTE_BASE,
@@ -160,7 +170,20 @@ const parseIpv6Side = (value: string): ReadonlyArray<number> | null => {
   return hextets.length === parts.length ? hextets : null
 }
 
-const parseIpv6Hextets = (hostname: string): ReadonlyArray<number> | null => {
+const isIpv6Hextets = (hextets: ReadonlyArray<number>): hextets is Ipv6Hextets => hextets.length === IPV6_HEXTET_COUNT
+
+const toIpv6Hextets = (hextets: ReadonlyArray<number>): Ipv6Hextets => [
+  assertAt(hextets, 0),
+  assertAt(hextets, 1),
+  assertAt(hextets, 2),
+  assertAt(hextets, 3),
+  assertAt(hextets, 4),
+  assertAt(hextets, 5),
+  assertAt(hextets, 6),
+  assertAt(hextets, 7)
+]
+
+const parseIpv6Hextets = (hostname: string): Ipv6Hextets | null => {
   if (hostname.includes(".")) {
     return null
   }
@@ -170,14 +193,18 @@ const parseIpv6Hextets = (hostname: string): ReadonlyArray<number> | null => {
     return null
   }
 
-  const left = parseIpv6Side(compressedParts[0])
-  const right = compressedParts.length === 2 ? parseIpv6Side(compressedParts[1]) : []
+  const leftText = assertAt(compressedParts, 0)
+
+  const left = parseIpv6Side(leftText)
+  const right = compressedParts.length === 2
+    ? parseIpv6Side(assertAt(compressedParts, 1))
+    : []
   if (left === null || right === null) {
     return null
   }
 
   if (compressedParts.length === 1) {
-    return left.length === IPV6_HEXTET_COUNT ? left : null
+    return isIpv6Hextets(left) ? left : null
   }
 
   const zeroCount = IPV6_HEXTET_COUNT - left.length - right.length
@@ -185,16 +212,18 @@ const parseIpv6Hextets = (hostname: string): ReadonlyArray<number> | null => {
     return null
   }
 
-  return [...left, ...Array.from({ length: zeroCount }, () => 0), ...right]
+  const hextets = [...left, ...Array.from({ length: zeroCount }, () => 0), ...right]
+  return toIpv6Hextets(hextets)
 }
 
-const isIpv6InPrefix = (hextets: ReadonlyArray<number>, prefix: Ipv6Prefix): boolean => {
+const isIpv6InPrefix = (hextets: Ipv6Hextets, prefix: Ipv6Prefix): boolean => {
   const fullHextetCount = Math.floor(prefix.prefixLength / IPV6_HEXTET_BITS)
   const remainingBits = prefix.prefixLength % IPV6_HEXTET_BITS
 
   let index = 0
   for (const prefixHextet of prefix.hextets.slice(0, fullHextetCount)) {
-    if (hextets[index] !== prefixHextet) {
+    const addressHextet = assertAt(hextets, index)
+    if (addressHextet !== prefixHextet) {
       return false
     }
 
@@ -205,8 +234,8 @@ const isIpv6InPrefix = (hextets: ReadonlyArray<number>, prefix: Ipv6Prefix): boo
     return true
   }
 
-  const prefixHextet = prefix.hextets[fullHextetCount]
-  const addressHextet = hextets[fullHextetCount]
+  const prefixHextet = assertAt(prefix.hextets, fullHextetCount)
+  const addressHextet = assertAt(hextets, fullHextetCount)
   const mask = (IPV6_HEXTET_MAX << (IPV6_HEXTET_BITS - remainingBits)) & IPV6_HEXTET_MAX
   return (addressHextet & mask) === (prefixHextet & mask)
 }
@@ -222,7 +251,7 @@ const requestFirstSuccessfulAddress = async (
     throw new Error(`Request failed for all resolved addresses: ${failures.join("; ")}`)
   }
 
-  const address = addresses[index]
+  const address = assertAt(addresses, index)
   try {
     return await dependencies.requestUrl(url, address)
   } catch (error) {

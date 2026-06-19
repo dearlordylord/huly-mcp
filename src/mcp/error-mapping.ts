@@ -43,8 +43,11 @@ interface ErrorMetadata {
  * Compatible with MCP SDK CallToolResult.
  * _meta carries internal error metadata, stripped by toMcpResponse before wire.
  */
+type McpTextContent = { readonly type: "text"; readonly text: string }
+type McpTextContentList = [McpTextContent, ...Array<McpTextContent>]
+
 interface McpToolResponseBase {
-  readonly content: Array<{ type: "text"; text: string }>
+  readonly content: McpTextContentList
   readonly _meta?: ErrorMetadata
 }
 
@@ -293,8 +296,9 @@ export const mapParseCauseToMcp = (
   }
 
   const failures = Chunk.toArray(Cause.failures(cause))
-  if (failures.length > 0) {
-    return mapParseErrorToMcp(failures[0], toolName)
+  const firstFailure = failures[0]
+  if (firstFailure !== undefined) {
+    return mapParseErrorToMcp(firstFailure, toolName)
   }
 
   return createErrorResponse("An unexpected error occurred", McpErrorCode.InternalError)
@@ -313,8 +317,9 @@ export const mapDomainCauseToMcp = (
   }
 
   const failures = Chunk.toArray(Cause.failures(cause))
-  if (failures.length > 0) {
-    return mapDomainErrorToMcp(failures[0], warnings)
+  const firstFailure = failures[0]
+  if (firstFailure !== undefined) {
+    return mapDomainErrorToMcp(firstFailure, warnings)
   }
 
   return createErrorResponse("An unexpected error occurred", McpErrorCode.InternalError, undefined, warnings)

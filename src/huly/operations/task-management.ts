@@ -36,6 +36,7 @@ import {
   TaskTypeId,
   UnknownStatusCategoryValue
 } from "../../domain/schemas.js"
+import { isSingle } from "../../utils/assertions.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError, type HulyClientOperations } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
@@ -267,7 +268,7 @@ const resolveProjectType = (
         || normalizeForComparison(projectType.name) === normalizeForComparison(projectTypeRef)
       )
 
-    if (selected.length === 1) {
+    if (isSingle(selected)) {
       return selected[0]
     }
 
@@ -286,7 +287,7 @@ const resolveTaskType = (
     || normalizeForComparison(taskType.name) === normalizeForComparison(taskTypeRef)
   )
 
-  return selected.length === 1
+  return isSingle(selected)
     ? Effect.succeed(selected[0])
     : Effect.fail(new HulyError({ message: `Task type '${taskTypeRef}' did not resolve to exactly one task type.` }))
 }
@@ -345,6 +346,7 @@ const sameProjectStatusList = (
 ): boolean =>
   left.length === right.length && left.every((value, index) => {
     const rightValue = right[index]
+    if (rightValue === undefined) return false
     return sameProjectStatus(value, rightValue)
   })
 

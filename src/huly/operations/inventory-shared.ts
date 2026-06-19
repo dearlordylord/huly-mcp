@@ -25,6 +25,7 @@ import {
   type ListTotal,
   Timestamp
 } from "../../domain/schemas/shared.js"
+import { isSingle } from "../../utils/assertions.js"
 import { type HulyClient, type HulyClientError } from "../client.js"
 import type { InventoryNotEmptyError } from "../errors-inventory.js"
 import {
@@ -213,7 +214,7 @@ export const resolveCategory = (
         (parent): StrictDocumentQuery<HulyInventoryCategory> => ({ name: identifier, attachedTo: parent.id })
       )
     const matches = yield* findAllCategories(client, query)
-    if (matches.length === 1) return matches[0]
+    if (isSingle(matches)) return matches[0]
     if (matches.length > 1) {
       return yield* new InventoryCategoryIdentifierAmbiguousError({ identifier, matches: matches.length })
     }
@@ -239,7 +240,7 @@ export const resolveProduct = (
         (category): StrictDocumentQuery<HulyInventoryProduct> => ({ name: identifier, attachedTo: category._id })
       )
     const matches = yield* findAllProducts(client, query)
-    if (matches.length === 1) return matches[0]
+    if (isSingle(matches)) return matches[0]
     if (matches.length > 1) {
       return yield* new InventoryProductIdentifierAmbiguousError({ identifier, matches: matches.length })
     }
@@ -268,7 +269,7 @@ export const resolveVariant = (
 
     const candidates = yield* findAllVariants(client, query)
     const matches = candidates.filter((variant) => variant.name === identifier || variant.sku === identifier)
-    if (matches.length === 1) return matches[0]
+    if (isSingle(matches)) return matches[0]
     if (matches.length > 1) {
       return yield* new InventoryVariantIdentifierAmbiguousError({ identifier, matches: matches.length })
     }

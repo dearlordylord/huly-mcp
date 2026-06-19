@@ -172,7 +172,7 @@ export default [
       // TypeScript best practices - strict type assertion rules
       "@typescript-eslint/consistent-type-imports": "warn",
       "@typescript-eslint/no-explicit-any": "error",
-      "@typescript-eslint/no-non-null-assertion": "warn",
+      "@typescript-eslint/no-non-null-assertion": "error",
       "@typescript-eslint/consistent-type-assertions": ["error", {
         assertionStyle: "as",
         objectLiteralTypeAssertions: "allow-as-parameter"
@@ -274,6 +274,7 @@ export default [
       "max-lines": "off",
       "no-magic-numbers": "off",
       "functional/immutable-data": "off",
+      "@typescript-eslint/no-non-null-assertion": "warn",
       // Override: keep Date, mock and double-assertion bans; drop the general `as T` ban since test drivers need branded casts.
       "no-restricted-syntax": ["error", ...testRestrictedSyntaxSelectors]
     }

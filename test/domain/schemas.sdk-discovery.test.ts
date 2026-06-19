@@ -2,6 +2,7 @@ import { describe, it } from "@effect/vitest"
 import { ClassifierKind } from "@hcengineering/core"
 import { Effect, Either, Schema } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../src/utils/assertions.js"
 
 import {
   DescribeHulySpaceTypeCapabilitiesParamsSchema,
@@ -148,7 +149,7 @@ describe("sdk discovery schemas", () => {
       ).toThrow()
 
       const getClassResult = yield* Schema.decodeUnknown(GetHulyClassResultSchema)({
-        class: classResult.classes[0],
+        class: assertAt(classResult.classes, 0),
         ancestors: [],
         attributes: attributeResult.attributes
       })

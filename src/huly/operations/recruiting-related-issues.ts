@@ -65,7 +65,15 @@ const resolveRelatedIssue = (
       })
     }
 
-    const { client, project } = yield* findProject(match[1].toUpperCase())
+    const [, projectIdentifier] = match
+    if (projectIdentifier === undefined) {
+      return yield* new RecruitingIssueLocatorInvalidError({
+        issue: params.issue,
+        reason: "issue locator without project must use a full project-prefixed identifier like HULY-123"
+      })
+    }
+
+    const { client, project } = yield* findProject(projectIdentifier.toUpperCase())
     const issue = yield* findIssueInProject(client, project, params.issue)
     return { client, issue, project }
   })

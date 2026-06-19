@@ -29,6 +29,7 @@ import type {
   UpdateRecruitingReviewParams
 } from "../../domain/schemas/recruiting-extended.js"
 import { Count, DocId, PersonName, Timestamp } from "../../domain/schemas/shared.js"
+import { assertAt } from "../../utils/assertions.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
@@ -241,7 +242,7 @@ export const findReview = (
     if (reviews.length > 1) {
       return yield* new ReviewAmbiguous({ identifier, matches: Count.make(reviews.length) })
     }
-    return reviews[0]
+    return assertAt(reviews, 0)
   })
 
 export const resolveReviewLocator = (

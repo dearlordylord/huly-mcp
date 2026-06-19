@@ -30,6 +30,7 @@ import {
   updateComponent
 } from "../../../src/huly/operations/components.js"
 import { markdownToMarkupString, testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
+import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import { componentIdentifier, email, issueIdentifier, projectIdentifier } from "../../helpers/brands.js"
 
 // --- Mock Data Builders ---
@@ -181,7 +182,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     if (_class === contact.class.Person) {
       const q = query as Record<string, unknown>
       if (q._id && typeof q._id === "object" && "$in" in (q._id as Record<string, unknown>)) {
-        const ids = (q._id as Record<string, Array<string>>).$in
+        const ids = assertExists((q._id as { readonly $in?: ReadonlyArray<string> }).$in)
         const filtered = persons.filter(p => ids.includes(p._id))
         return Effect.succeed(toFindResult(filtered))
       }
@@ -212,7 +213,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       }
       if (q.name) {
         if (typeof q.name === "object" && "$like" in (q.name as Record<string, unknown>)) {
-          const pattern = (q.name as Record<string, string>).$like.replace(/%/g, "")
+          const pattern = assertExists((q.name as { readonly $like?: string }).$like).replace(/%/g, "")
           const found = persons.find(p => p.name.includes(pattern))
           return Effect.succeed(found)
         }
@@ -228,7 +229,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
         return Effect.succeed(found)
       }
       if (q.value && typeof q.value === "object" && "$like" in (q.value as Record<string, unknown>)) {
-        const pattern = (q.value as Record<string, string>).$like.replace(/%/g, "")
+        const pattern = assertExists((q.value as { readonly $like?: string }).$like).replace(/%/g, "")
         const found = channels.find(ch => ch.value.includes(pattern) && ch.provider === q.provider)
         return Effect.succeed(found)
       }
@@ -354,10 +355,10 @@ describe("listComponents", () => {
       const result = yield* listComponents({ project: projectIdentifier("PROJ") }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
-      expect(result[0].label).toBe("Backend")
-      expect(result[0].lead).toBe("Alice")
-      expect(result[1].label).toBe("Frontend")
-      expect(result[1].lead).toBe("Bob")
+      expect(assertAt(result, 0).label).toBe("Backend")
+      expect(assertAt(result, 0).lead).toBe("Alice")
+      expect(assertAt(result, 1).label).toBe("Frontend")
+      expect(assertAt(result, 1).lead).toBe("Bob")
     }))
 
   it.effect("returns components with no lead", () =>
@@ -375,8 +376,8 @@ describe("listComponents", () => {
       const result = yield* listComponents({ project: projectIdentifier("PROJ") }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].label).toBe("Infra")
-      expect(result[0].lead).toBeUndefined()
+      expect(assertAt(result, 0).label).toBe("Infra")
+      expect(assertAt(result, 0).lead).toBeUndefined()
     }))
 
   it.effect("returns ProjectNotFoundError when project doesn't exist", () =>

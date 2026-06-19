@@ -26,6 +26,7 @@ import {
   listRecurringEvents,
   updateEvent
 } from "../../../src/huly/operations/calendar.js"
+import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import { eventBrandId } from "../../helpers/brands.js"
 
 import { calendar, contact, love } from "../../../src/huly/huly-plugins.js"
@@ -201,7 +202,7 @@ const createTestLayer = (config: MockConfig) => {
     if (_class === contact.class.Person) {
       const q = query as Record<string, unknown>
       if (q._id && typeof q._id === "object" && "$in" in (q._id as Record<string, unknown>)) {
-        const ids = (q._id as Record<string, Array<string>>).$in
+        const ids = assertExists((q._id as { readonly $in?: ReadonlyArray<string> }).$in)
         const matched = persons.filter(p => ids.includes(p._id))
         return Effect.succeed(toFindResult(matched))
       }
@@ -232,7 +233,7 @@ const createTestLayer = (config: MockConfig) => {
       if (q.name !== undefined) {
         return Effect.succeed(calendars.find(c => c.name === q.name))
       }
-      return Effect.succeed(calendars[0])
+      return Effect.succeed(calendars.at(0))
     }
     if (_class === calendar.class.PrimaryCalendar) {
       return Effect.succeed(undefined)
@@ -326,8 +327,8 @@ describe("listEvents", () => {
       const result = yield* listEvents({}).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
-      expect(result[0].title).toBe("Meeting")
-      expect(result[1].title).toBe("Lunch")
+      expect(assertAt(result, 0).title).toBe("Meeting")
+      expect(assertAt(result, 1).title).toBe("Lunch")
     }))
 
   it.effect("returns empty array when no events", () =>
@@ -350,8 +351,8 @@ describe("listEvents", () => {
 
       const result = yield* listEvents({}).pipe(Effect.provide(testLayer))
 
-      expect(result[0].eventId).toBe("legacy-event-doc")
-      expect(result[0].calendarId).toBeUndefined()
+      expect(assertAt(result, 0).eventId).toBe("legacy-event-doc")
+      expect(assertAt(result, 0).calendarId).toBeUndefined()
     }))
 
   it.effect("summarizes meeting rooms from love meeting mixins", () =>
@@ -365,7 +366,7 @@ describe("listEvents", () => {
         }))
       )
 
-      expect(result[0].meetingRoom).toEqual({ roomId: "room-1", name: "Focus Room" })
+      expect(assertAt(result, 0).meetingRoom).toEqual({ roomId: "room-1", name: "Focus Room" })
     }))
 
   it.effect("skips legacy events without any usable id", () =>
@@ -406,7 +407,7 @@ describe("getEvent", () => {
       expect(result.description).toBe("# Meeting notes")
       expect(result.timeZone).toBe("UTC")
       expect(result.participants).toHaveLength(1)
-      expect(result.participants?.[0].name).toBe("Alice")
+      expect(assertAt(assertExists(result.participants), 0).name).toBe("Alice")
     }))
 
   it.effect("returns event without description when not set", () =>
@@ -874,8 +875,8 @@ describe("listRecurringEvents", () => {
       const result = yield* listRecurringEvents({}).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
-      expect(result[0].title).toBe("Weekly Standup")
-      expect(result[0].rules[0].freq).toBe("WEEKLY")
+      expect(assertAt(result, 0).title).toBe("Weekly Standup")
+      expect(assertAt(assertAt(result, 0).rules, 0).freq).toBe("WEEKLY")
     }))
 
   it.effect("returns empty array when no recurring events", () =>
@@ -895,7 +896,7 @@ describe("listRecurringEvents", () => {
         }))
       )
 
-      expect(result[0].timeZone).toBeUndefined()
+      expect(assertAt(result, 0).timeZone).toBeUndefined()
     }))
 
   it.effect("returns recurring events without modified timestamp when Huly omits it", () =>
@@ -907,7 +908,7 @@ describe("listRecurringEvents", () => {
         }))
       )
 
-      expect(result[0].modifiedOn).toBeUndefined()
+      expect(assertAt(result, 0).modifiedOn).toBeUndefined()
     }))
 
   it.effect("brands full SDK recurring rule numeric fields", () =>
@@ -929,7 +930,7 @@ describe("listRecurringEvents", () => {
         }))
       )
 
-      expect(result[0].rules[0]).toMatchObject({
+      expect(assertAt(assertAt(result, 0).rules, 0)).toMatchObject({
         count: 4,
         interval: 2,
         byMonthDay: [1, 31],
@@ -1024,7 +1025,7 @@ describe("listEventInstances", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
-      expect(result[0].recurringEventId).toBe("recur-1")
+      expect(assertAt(result, 0).recurringEventId).toBe("recur-1")
     }))
 
   it.effect("returns instances with participants when requested", () =>
@@ -1050,8 +1051,8 @@ describe("listEventInstances", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].participants).toHaveLength(1)
-      expect(result[0].participants?.[0].name).toBe("Bob")
+      expect(assertAt(result, 0).participants).toHaveLength(1)
+      expect(assertAt(assertExists(assertAt(result, 0).participants), 0).name).toBe("Bob")
     }))
 
   it.effect("returns empty participants when no participants exist", () =>
@@ -1071,7 +1072,7 @@ describe("listEventInstances", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].participants).toEqual([])
+      expect(assertAt(result, 0).participants).toEqual([])
     }))
 
   it.effect("fails with RecurringEventNotFoundError when recurring event does not exist", () =>

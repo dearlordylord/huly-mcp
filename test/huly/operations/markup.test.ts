@@ -201,6 +201,20 @@ describe("markdownToMarkupString", () => {
 
       expect(rendered.malformedReferences).toEqual(["reference missing objectclass, label"])
     }))
+
+  it.effect("reports blank and missing native reference fields precisely", () =>
+    Effect.gen(function*() {
+      const missingId =
+        "Broken [Doc](https://test.invalid/browse?workspace=test&_class=document%3Aclass%3ADocument&label=Doc)."
+      const blankId =
+        "Broken [Doc](https://test.invalid/browse?workspace=test&_id=%20%20&_class=document%3Aclass%3ADocument&label=Doc)."
+
+      const missingIdRendered = markdownToMarkupStringWithHulyLinks(missingId, testMarkupUrlConfig)
+      const blankIdRendered = markdownToMarkupStringWithHulyLinks(blankId, testMarkupUrlConfig)
+
+      expect(missingIdRendered.malformedReferences).toEqual(["reference missing id"])
+      expect(blankIdRendered.malformedReferences).toEqual(["reference missing id"])
+    }))
 })
 
 describe("optionalMarkupToMarkdown", () => {

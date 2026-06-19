@@ -9,6 +9,9 @@ import { testMarkupUrlConfig } from "../../src/huly/operations/markup.js"
 import type { HulyStorageOperations } from "../../src/huly/storage.js"
 import { testWorkbenchUrlConfig } from "../../src/huly/url-builders.js"
 import { CATEGORY_NAMES, createFilteredRegistry, TOOL_DEFINITIONS, toolRegistry } from "../../src/mcp/tools/index.js"
+import { assertExists } from "../../src/utils/assertions.js"
+
+const toolDefinition = (name: string) => assertExists(TOOL_DEFINITIONS[name], `Expected tool definition for ${name}`)
 
 const noopHulyClient: HulyClientOperations = {
   getAccountUuid: () => "00000000-0000-4000-8000-000000000000" as AccountUuid,
@@ -76,13 +79,13 @@ describe("CATEGORY_NAMES", () => {
 
   it.effect("registers issue #102 closeout tools in their owning categories", () =>
     Effect.gen(function*() {
-      expect(TOOL_DEFINITIONS.list_document_snapshots.category).toBe("documents")
-      expect(TOOL_DEFINITIONS.get_document_snapshot.category).toBe("documents")
-      expect(TOOL_DEFINITIONS.list_project_target_preferences.category).toBe("projects")
-      expect(TOOL_DEFINITIONS.upsert_project_target_preference.category).toBe("projects")
-      expect(TOOL_DEFINITIONS.list_related_issue_targets.category).toBe("issues")
-      expect(TOOL_DEFINITIONS.set_related_issue_target.category).toBe("issues")
-      expect(TOOL_DEFINITIONS.delete_related_issue_space_target.category).toBe("issues")
+      expect(toolDefinition("list_document_snapshots").category).toBe("documents")
+      expect(toolDefinition("get_document_snapshot").category).toBe("documents")
+      expect(toolDefinition("list_project_target_preferences").category).toBe("projects")
+      expect(toolDefinition("upsert_project_target_preference").category).toBe("projects")
+      expect(toolDefinition("list_related_issue_targets").category).toBe("issues")
+      expect(toolDefinition("set_related_issue_target").category).toBe("issues")
+      expect(toolDefinition("delete_related_issue_space_target").category).toBe("issues")
     }))
 })
 

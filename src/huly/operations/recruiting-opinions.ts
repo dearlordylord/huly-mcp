@@ -23,6 +23,7 @@ import type {
   UpdateRecruitingOpinionParams
 } from "../../domain/schemas/recruiting-extended.js"
 import { Count, Timestamp } from "../../domain/schemas/shared.js"
+import { assertAt } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type {
   RecruitingModelMissingError,
@@ -132,7 +133,7 @@ export const findOpinion = (
     if (opinions.length > 1) {
       return yield* new OpinionAmbiguous({ identifier, matches: Count.make(opinions.length) })
     }
-    return opinions[0]
+    return assertAt(opinions, 0)
   })
 
 const resolveReview = (client: HulyClient["Type"], review: OpinionReadParams["review"]) =>

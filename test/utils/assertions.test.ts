@@ -2,6 +2,7 @@ import { describe, it } from "@effect/vitest"
 import { Effect, Option } from "effect"
 import { expect } from "vitest"
 import {
+  assertAt,
   assertExists,
   assertExistsEffect,
   assertFirst,
@@ -13,7 +14,9 @@ import {
   getOnlyOne,
   getOnlyOneEffect,
   isExistent,
-  isNonEmpty
+  isNonEmpty,
+  isPair,
+  isSingle
 } from "../../src/utils/assertions.js"
 
 describe("assertions", () => {
@@ -134,6 +137,20 @@ describe("assertions", () => {
     })
   })
 
+  describe("assertAt", () => {
+    it("returns the item at the requested index", () => {
+      expect(assertAt([10, 20, 30], 1)).toBe(20)
+    })
+
+    it("throws for a missing item with the default message", () => {
+      expect(() => assertAt(["a"], 3)).toThrow("Expected array item at index 3")
+    })
+
+    it("throws with a custom message", () => {
+      expect(() => assertAt([], 0, "missing first call")).toThrow("missing first call")
+    })
+  })
+
   describe("assertNonEmpty", () => {
     it("returns the array for non-empty input", () => {
       const result = assertNonEmpty([1, 2, 3])
@@ -162,6 +179,22 @@ describe("assertions", () => {
 
     it("returns false for empty array", () => {
       expect(isNonEmpty([])).toBe(false)
+    })
+  })
+
+  describe("isSingle", () => {
+    it("narrows exactly one element", () => {
+      expect(isSingle([1])).toBe(true)
+      expect(isSingle([])).toBe(false)
+      expect(isSingle([1, 2])).toBe(false)
+    })
+  })
+
+  describe("isPair", () => {
+    it("narrows exactly two elements", () => {
+      expect(isPair([1, 2])).toBe(true)
+      expect(isPair([1])).toBe(false)
+      expect(isPair([1, 2, 3])).toBe(false)
     })
   })
 

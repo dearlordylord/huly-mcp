@@ -9,6 +9,7 @@ import {
   hulyCustomFieldTypeNameFromClass
 } from "../../src/huly/huly-attribute-types.js"
 import { decodeHulyModelLabelTail, hulyModelLabelTail } from "../../src/huly/huly-labels.js"
+import { assertAt } from "../../src/utils/assertions.js"
 import { propertyTestParameters } from "../helpers/property.js"
 
 const labelSegmentArbitrary = fc.stringMatching(/^[A-Za-z][A-Za-z0-9_-]{0,18}$/)
@@ -48,7 +49,7 @@ describe("Huly model label and attribute type properties", () => {
 
         expect(decoded._tag).toBe("Right")
         if (decoded._tag === "Right") {
-          expect(decoded.right).toBe(NonEmptyString.make(segments[segments.length - 1]))
+          expect(decoded.right).toBe(NonEmptyString.make(assertAt(segments, segments.length - 1)))
         }
       }),
       propertyTestParameters

@@ -17,6 +17,7 @@ import type {
 } from "@hcengineering/inventory"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../utils/assertions.js"
 
 import {
   parseCreateInventoryCategoryParams,
@@ -192,7 +193,7 @@ const updateArray = <T extends Doc>(
 ): void => {
   const index = docs.findIndex((doc) => doc._id === id)
   if (index >= 0) {
-    docs[index] = { ...docs[index], ...operations }
+    Object.assign(assertAt(docs, index), operations)
   }
 }
 
@@ -247,7 +248,7 @@ const createLayer = (store: Store, includeRemoveCollection = true, includeUpdate
 
   const findOne: HulyClientOperations["findOne"] =
     ((_class: Ref<Class<Doc>>, query: Record<string, unknown>) =>
-      Effect.map(findAll(_class, query), (results) => results[0])) as HulyClientOperations["findOne"]
+      Effect.map(findAll(_class, query), (results) => results.at(0))) as HulyClientOperations["findOne"]
 
   const addCollection: HulyClientOperations["addCollection"] = ((
     _class: Ref<Class<AttachedDoc>>,
@@ -452,7 +453,7 @@ describe("inventory operations", () => {
           Effect.provide(layer)
         )
       expect(created.created).toBe(true)
-      expect(store.addCalls[0]).toMatchObject({ collection: "categories", attachedTo: "cat-electronics" })
+      expect(assertAt(store.addCalls, 0)).toMatchObject({ collection: "categories", attachedTo: "cat-electronics" })
 
       const updated = yield* updateInventoryCategory({
         category: catIdent("Accessories"),
@@ -490,7 +491,7 @@ describe("inventory operations", () => {
   it.effect("rejects ambiguous, duplicate, descendant, and non-empty category mutations", () =>
     Effect.gen(function*() {
       const store = createStore()
-      store.categories.push(category("cat-dup", "Phones", store.categories[1]._id))
+      store.categories.push(category("cat-dup", "Phones", assertAt(store.categories, 1)._id))
       const layer = createLayer(store)
 
       const ambiguous = yield* Effect.flip(
@@ -596,7 +597,7 @@ describe("inventory operations", () => {
       expect(guarded).toBeInstanceOf(InventoryNotEmptyError)
 
       store.products.push(
-        productWithVariantCountOnly("prod-counted-variant", "Counted Variant", store.categories[0]._id)
+        productWithVariantCountOnly("prod-counted-variant", "Counted Variant", assertAt(store.categories, 0)._id)
       )
       const countedVariant = yield* Effect.flip(
         deleteInventoryProduct({
@@ -606,7 +607,7 @@ describe("inventory operations", () => {
       )
       expect(countedVariant).toBeInstanceOf(InventoryNotEmptyError)
 
-      store.products.push(product("prod-photo", "Photo Product", store.categories[0]._id, { photos: 1 }))
+      store.products.push(product("prod-photo", "Photo Product", assertAt(store.categories, 0)._id, { photos: 1 }))
       const photoGuarded = yield* Effect.flip(
         deleteInventoryProduct({
           product: prodIdent("Photo Product"),
@@ -615,7 +616,9 @@ describe("inventory operations", () => {
       )
       expect(photoGuarded).toBeInstanceOf(InventoryNotEmptyError)
 
-      store.products.push(product("prod-attachment", "Attachment Product", store.categories[0]._id, { attachments: 1 }))
+      store.products.push(
+        product("prod-attachment", "Attachment Product", assertAt(store.categories, 0)._id, { attachments: 1 })
+      )
       const attachmentGuarded = yield* Effect.flip(
         deleteInventoryProduct({
           product: prodIdent("Attachment Product"),
@@ -624,7 +627,7 @@ describe("inventory operations", () => {
       )
       expect(attachmentGuarded).toBeInstanceOf(InventoryNotEmptyError)
 
-      store.products.push(productWithoutCounts("prod-plain", "Plain Product", store.categories[0]._id))
+      store.products.push(productWithoutCounts("prod-plain", "Plain Product", assertAt(store.categories, 0)._id))
       const plain = yield* getInventoryProduct({
         product: prodIdent("Plain Product"),
         category: catIdent("Electronics")
@@ -634,7 +637,7 @@ describe("inventory operations", () => {
       const { createdOn: _productCreatedOn, ...productWithoutCreatedOn } = product(
         "prod-no-created",
         "No Created Product",
-        store.categories[0]._id
+        assertAt(store.categories, 0)._id
       )
       store.products.push(productWithoutCreatedOn)
       const productDetail = yield* getInventoryProduct({
@@ -687,7 +690,7 @@ describe("inventory operations", () => {
       )
       expect(missing).toBeInstanceOf(InventoryVariantNotFoundError)
 
-      store.variants.push(variant("var-other", "Black", "OTHER-BLK", store.products[1]._id))
+      store.variants.push(variant("var-other", "Black", "OTHER-BLK", assertAt(store.products, 1)._id))
       const ambiguous = yield* Effect.flip(
         getInventoryVariant({ variant: variantIdent("Black") }).pipe(Effect.provide(layer))
       )
@@ -749,7 +752,7 @@ describe("inventory operations", () => {
         "var-no-created",
         "No Created Variant",
         "CAM-NC",
-        store.products[0]._id
+        assertAt(store.products, 0)._id
       )
       store.variants.push(variantWithoutCreatedOn)
       const variantDetail = yield* getInventoryVariant({

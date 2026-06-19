@@ -56,6 +56,7 @@ import {
   Timestamp,
   UNKNOWN_TOTAL
 } from "../../domain/schemas/shared.js"
+import { assertAt, isPair, isSingle } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError, type HulyClientOperations } from "../client.js"
 import type {
   DocumentNotFoundError,
@@ -406,14 +407,15 @@ const resolveAssociation = (
     )
 
     const rolePair = identifier.split(" -> ")
-    if (rolePair.length === 2) {
+    if (isPair(rolePair)) {
+      const [nameA, nameB] = rolePair
       addCandidates(
         yield* client.findAll<HulyAssociation>(
           core.class.Association,
           hulyQuery<HulyAssociation>({
             ...associationClassFilterQuery(filters),
-            nameA: rolePair[0],
-            nameB: rolePair[1]
+            nameA,
+            nameB
           }),
           { limit: ASSOCIATION_LOOKUP_AMBIGUITY_LIMIT }
         )
@@ -431,7 +433,7 @@ const resolveAssociation = (
         candidates: candidates.map(toCandidate)
       })
     }
-    return candidates[0]
+    return assertAt(candidates, 0)
   })
 
 const rejectSystemClass = (
@@ -813,7 +815,8 @@ const resolveIssueLocator = (
 
     const match = String(locator.issue).match(/^([A-Z]+)-\d+$/i)
     if (match !== null) {
-      const { client, project } = yield* findProject(match[1].toUpperCase())
+      const projectIdentifier = assertAt(match, 1)
+      const { client, project } = yield* findProject(projectIdentifier.toUpperCase())
       const issue = yield* findIssueInProject(client, project, locator.issue)
       /* v8 ignore next -- success path delegates to issues-tested findProject/findIssueInProject */
       return resolvedSummary(issue, "issue")
@@ -863,7 +866,7 @@ const resolveDocumentWithoutTeamspace = (
         }))
       })
     }
-    return resolvedSummary(byTitle[0], "document")
+    return resolvedSummary(assertAt(byTitle, 0), "document")
   })
 
 const findCardById = (
@@ -912,7 +915,7 @@ const findCardSpace = (
         }))
       })
     }
-    return byName[0]
+    return assertAt(byName, 0)
   })
 
 const resolveCardInSpace = (
@@ -953,7 +956,7 @@ const resolveCardInSpace = (
         }))
       })
     }
-    return resolvedSummary(byTitle[0], "card")
+    return resolvedSummary(assertAt(byTitle, 0), "card")
   })
 
 const resolveCardLocator = (
@@ -1651,9 +1654,17 @@ export const deleteRelation = (
       })
     }
 
-    yield* client.removeDoc<HulyRelation>(core.class.Relation, matches[0].space, matches[0]._id)
+    if (!isSingle(matches)) {
+      return {
+        associationId: AssociationId.make(association._id),
+        deleted: false,
+        reason: "not_found"
+      }
+    }
+    const relation = matches[0]
+    yield* client.removeDoc<HulyRelation>(core.class.Relation, relation.space, relation._id)
     return {
-      relationId: RelationId.make(matches[0]._id),
+      relationId: RelationId.make(relation._id),
       associationId: AssociationId.make(association._id),
       deleted: true,
       reason: "deleted"

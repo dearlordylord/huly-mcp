@@ -43,7 +43,7 @@ import {
   WorkSlotId
 } from "../../domain/schemas/shared.js"
 import type { LogTimeResult, StartTimerResult, StopTimerResult } from "../../domain/schemas/time.js"
-import { isExistent } from "../../utils/assertions.js"
+import { isExistent, isNonEmpty } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { IssueNotFoundError } from "../errors.js"
 import { ProjectNotFoundError } from "../errors.js"
@@ -169,16 +169,17 @@ export const getTimeReport = (
 
     const personMap = new Map(persons.map(p => [p._id, p.name]))
 
-    const timeReports: Array<TimeSpendReport> = reports.map(r => ({
-      id: TimeSpendReportId.make(r._id),
-      identifier: IssueIdentifier.make(issue.identifier),
-      employee: r.employee && personMap.has(r.employee)
-        ? PersonName.make(personMap.get(r.employee)!)
-        : undefined,
-      date: r.date,
-      value: r.value,
-      description: r.description
-    }))
+    const timeReports: Array<TimeSpendReport> = reports.map(r => {
+      const employeeName = r.employee == null ? undefined : personMap.get(r.employee)
+      return {
+        id: TimeSpendReportId.make(r._id),
+        identifier: IssueIdentifier.make(issue.identifier),
+        employee: employeeName === undefined ? undefined : PersonName.make(employeeName),
+        date: r.date,
+        value: r.value,
+        description: r.description
+      }
+    })
 
     return {
       identifier: IssueIdentifier.make(issue.identifier),
@@ -357,7 +358,7 @@ export const listWorkSlots = (
           contact.class.Channel,
           { value: params.employeeId }
         )
-        if (channels.length > 0) {
+        if (isNonEmpty(channels)) {
           const channel = channels[0]
           query.user = refAsPersonId(channel.attachedTo)
         }

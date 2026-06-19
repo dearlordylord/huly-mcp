@@ -19,6 +19,7 @@ import {
 } from "@hcengineering/core"
 import { Effect, Exit } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type {
@@ -627,8 +628,8 @@ describe("listDirectMessageMessages", () => {
       }).pipe(Effect.provide(layer))
 
       expect(result.messages).toHaveLength(1)
-      expect(result.messages[0].body).toBe("hi")
-      expect(result.messages[0].sender).toBe("Kerr,Shannon")
+      expect(assertAt(result.messages, 0).body).toBe("hi")
+      expect(assertAt(result.messages, 0).sender).toBe("Kerr,Shannon")
     }))
 
   it.effect("omits sender when DM members do not cover the message author", () =>
@@ -641,7 +642,7 @@ describe("listDirectMessageMessages", () => {
         dm: directMessageIdentifier("dm-1")
       }).pipe(Effect.provide(layer))
 
-      expect(result.messages[0].sender).toBeUndefined()
+      expect(assertAt(result.messages, 0).sender).toBeUndefined()
     }))
 
   it.effect("propagates DirectMessageNotFoundError for unknown identifier", () =>

@@ -32,6 +32,7 @@ import {
   updateIssueTemplate
 } from "../../../src/huly/operations/issue-templates.js"
 import { markdownToMarkupString, testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
+import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import {
   componentIdentifier,
   email,
@@ -298,7 +299,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
           return Effect.succeed(found)
         }
         if (typeof q.name === "object" && "$like" in (q.name as Record<string, unknown>)) {
-          const pattern = (q.name as Record<string, string>).$like.replace(/%/g, "")
+          const pattern = assertExists((q.name as { readonly $like?: string }).$like).replace(/%/g, "")
           const found = persons.find(p => p.name.includes(pattern))
           return Effect.succeed(found)
         }
@@ -422,8 +423,8 @@ describe("listIssueTemplates", () => {
       )
 
       expect(result).toHaveLength(2)
-      expect(result[0].title).toBe("Template A")
-      expect(result[1].title).toBe("Template B")
+      expect(assertAt(result, 0).title).toBe("Template A")
+      expect(assertAt(result, 1).title).toBe("Template B")
     }))
 
   it.effect("returns empty array when no templates exist", () =>
@@ -461,11 +462,11 @@ describe("listIssueTemplates", () => {
         withDiagnostics
       )
 
-      expect(result[0].priority).toBe("urgent")
-      expect(result[1].priority).toBe("high")
-      expect(result[2].priority).toBe("medium")
-      expect(result[3].priority).toBe("low")
-      expect(result[4].priority).toBe("no-priority")
+      expect(assertAt(result, 0).priority).toBe("urgent")
+      expect(assertAt(result, 1).priority).toBe("high")
+      expect(assertAt(result, 2).priority).toBe("medium")
+      expect(assertAt(result, 3).priority).toBe("low")
+      expect(assertAt(result, 4).priority).toBe("no-priority")
     }))
 
   it.effect("fails with ProjectNotFoundError for unknown project", () =>
@@ -1413,8 +1414,8 @@ describe("listIssueTemplates with children", () => {
       )
 
       expect(result).toHaveLength(2)
-      expect(result[0].childrenCount).toBe(2)
-      expect(result[1].childrenCount).toBeUndefined()
+      expect(assertAt(result, 0).childrenCount).toBe(2)
+      expect(assertAt(result, 1).childrenCount).toBeUndefined()
     }))
 })
 
@@ -1457,7 +1458,8 @@ describe("getIssueTemplate with children", () => {
       }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.children).toHaveLength(2)
-      const child1 = result.children![0]
+      const children = assertExists(result.children)
+      const child1 = assertAt(children, 0)
       expect(child1.id).toBe("child-1")
       expect(child1.title).toBe("Sub-task 1")
       expect(child1.description).toBe("Do the thing")
@@ -1466,7 +1468,7 @@ describe("getIssueTemplate with children", () => {
       expect(child1.component).toBe("Backend")
       expect(child1.estimation).toBe(30)
 
-      const child2 = result.children![1]
+      const child2 = assertAt(children, 1)
       expect(child2.id).toBe("child-2")
       expect(child2.title).toBe("Sub-task 2")
       expect(child2.assignee).toBeUndefined()
@@ -1513,10 +1515,10 @@ describe("createIssueTemplate with children", () => {
       const attrs = capture.attributes as Record<string, unknown>
       const children = attrs.children as Array<Record<string, unknown>>
       expect(children).toHaveLength(2)
-      expect(children[0].title).toBe("Child A")
-      expect(children[0].priority).toBe(IssuePriority.High)
-      expect(children[1].title).toBe("Child B")
-      expect(children[1].description).toBe(markdownToMarkupString("desc B", testMarkupUrlConfig))
+      expect(assertAt(children, 0).title).toBe("Child A")
+      expect(assertAt(children, 0).priority).toBe(IssuePriority.High)
+      expect(assertAt(children, 1).title).toBe("Child B")
+      expect(assertAt(children, 1).description).toBe(markdownToMarkupString("desc B", testMarkupUrlConfig))
     }))
 
   it.effect("creates template with empty children when none provided", () =>
@@ -1565,7 +1567,7 @@ describe("addTemplateChild", () => {
       const ops = captureUpdate.operations as Record<string, unknown>
       const children = ops.children as Array<Record<string, unknown>>
       expect(children).toHaveLength(1)
-      expect(children[0].title).toBe("New Child")
+      expect(assertAt(children, 0).title).toBe("New Child")
     }))
 
   it.effect("appends child to existing children", () =>
@@ -1591,9 +1593,9 @@ describe("addTemplateChild", () => {
       const ops = captureUpdate.operations as Record<string, unknown>
       const children = ops.children as Array<Record<string, unknown>>
       expect(children).toHaveLength(2)
-      expect(children[0].title).toBe("Existing")
-      expect(children[1].title).toBe("New Child")
-      expect(children[1].priority).toBe(IssuePriority.Urgent)
+      expect(assertAt(children, 0).title).toBe("Existing")
+      expect(assertAt(children, 1).title).toBe("New Child")
+      expect(assertAt(children, 1).priority).toBe(IssuePriority.Urgent)
     }))
 
   it.effect("resolves assignee and component for child", () =>
@@ -1624,8 +1626,8 @@ describe("addTemplateChild", () => {
 
       const ops = captureUpdate.operations as Record<string, unknown>
       const children = ops.children as Array<Record<string, unknown>>
-      expect(children[0].assignee).toBe("person-1")
-      expect(children[0].component).toBe("component-1")
+      expect(assertAt(children, 0).assignee).toBe("person-1")
+      expect(assertAt(children, 0).component).toBe("component-1")
     }))
 
   it.effect("fails with PersonNotFoundError for unknown assignee", () =>
@@ -1677,7 +1679,7 @@ describe("removeTemplateChild", () => {
       const ops = captureUpdate.operations as Record<string, unknown>
       const children = ops.children as Array<Record<string, unknown>>
       expect(children).toHaveLength(1)
-      expect(children[0].title).toBe("Second")
+      expect(assertAt(children, 0).title).toBe("Second")
     }))
 
   it.effect("fails with TemplateChildNotFoundError for unknown child ID", () =>
@@ -1708,7 +1710,10 @@ describe("createIssueFromTemplate with children", () => {
       const child1 = makeTemplateChild({
         id: "child-1" as Ref<HulyIssue>,
         title: "Sub-task A",
-        priority: IssuePriority.High
+        priority: IssuePriority.High,
+        assignee: "person-1" as Ref<Person>,
+        component: "component-1" as Ref<HulyComponent>,
+        estimation: 30
       })
       const child2 = makeTemplateChild({
         id: "child-2" as Ref<HulyIssue>,
@@ -1740,22 +1745,27 @@ describe("createIssueFromTemplate with children", () => {
       expect(captureAll).toHaveLength(3)
 
       // Parent issue
-      expect(captureAll[0].attributes.title).toBe("Parent Template")
-      expect(captureAll[0].collection).toBe("issues")
+      expect(assertAt(captureAll, 0).attributes.title).toBe("Parent Template")
+      expect(assertAt(captureAll, 0).collection).toBe("issues")
 
       // Child issues initially created as top-level (attached to project)
-      expect(captureAll[1].attributes.title).toBe("Sub-task A")
-      expect(captureAll[1].collection).toBe("issues")
-      expect((captureAll[1].attributes as { priority: number }).priority).toBe(IssuePriority.High)
+      expect(assertAt(captureAll, 1).attributes.title).toBe("Sub-task A")
+      expect(assertAt(captureAll, 1).collection).toBe("issues")
+      expect((assertAt(captureAll, 1).attributes as { priority: number }).priority).toBe(IssuePriority.High)
 
-      expect(captureAll[2].attributes.title).toBe("Sub-task B")
-      expect(captureAll[2].collection).toBe("issues")
+      expect(assertAt(captureAll, 2).attributes.title).toBe("Sub-task B")
+      expect(assertAt(captureAll, 2).collection).toBe("issues")
 
       // Then reparented via updateDoc
       const reparentUpdates = captureUpdateAll.filter(
         u => u.operations.attachedTo !== undefined
       )
       expect(reparentUpdates).toHaveLength(2)
+      expect(assertAt(reparentUpdates, 0).operations).toMatchObject({
+        assignee: "person-1",
+        component: "component-1",
+        estimation: 30
+      })
 
       // Result should include childrenCreated count
       expect(result.childrenCreated).toBe(2)
@@ -1787,7 +1797,7 @@ describe("createIssueFromTemplate with children", () => {
       expect(result.identifier).toBeDefined()
       // Only parent issue should be created
       expect(captureAll).toHaveLength(1)
-      expect(captureAll[0].attributes.title).toBe("Parent Template")
+      expect(assertAt(captureAll, 0).attributes.title).toBe("Parent Template")
     }))
 
   it.effect("creates no children when template has empty children array", () =>

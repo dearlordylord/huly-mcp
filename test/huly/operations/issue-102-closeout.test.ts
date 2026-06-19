@@ -15,6 +15,7 @@ import type {
 import { TimeReportDayType } from "@hcengineering/tracker"
 import { Effect, Exit, TestClock } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import { DocumentSnapshotIdentifier } from "../../../src/domain/schemas/document-snapshots.js"
 import { TrackerPreferencePropertyKey } from "../../../src/domain/schemas/project-target-preferences.js"
@@ -306,14 +307,14 @@ describe("issue #102 operations", () => {
         document: DocumentIdentifier.make("Spec"),
         teamspace: TeamspaceIdentifier.make("Docs")
       }).pipe(Effect.provide(testLayer()))
-      expect(listed.snapshots[0]).toMatchObject({
+      expect(assertAt(listed.snapshots, 0)).toMatchObject({
         documentId: "doc-1",
         parentDocumentId: "doc-parent",
         snapshotId: "snapshot-1",
         teamspaceId: "teamspace-1",
         title: "Before release"
       })
-      expect("markdown" in listed.snapshots[0]).toBe(false)
+      expect("markdown" in assertAt(listed.snapshots, 0)).toBe(false)
 
       const { createdOn: _createdOn, ...snapshotWithoutCreatedOn } = makeSnapshot()
       const listedWithoutCreatedOn = yield* listDocumentSnapshots({
@@ -388,7 +389,7 @@ describe("issue #102 operations", () => {
       const listed = yield* listProjectTargetPreferences({ project: ProjectIdentifier.make("PRJ") }).pipe(
         Effect.provide(testLayer())
       )
-      expect(listed.preferences[0]).toMatchObject({
+      expect(assertAt(listed.preferences, 0)).toMatchObject({
         attachedTo: "project-1",
         preferenceId: "pref-1",
         project: "PRJ",
@@ -459,7 +460,7 @@ describe("issue #102 operations", () => {
           preference: preferenceWithoutProps
         }))
       )
-      expect(unlinked.preferences[0]).toMatchObject({
+      expect(assertAt(unlinked.preferences, 0)).toMatchObject({
         attachedTo: "missing-project",
         preferenceId: "pref-1",
         props: []
@@ -565,7 +566,7 @@ describe("issue #102 operations", () => {
       const listedSpace = yield* listRelatedIssueTargets({ space: SpaceIdentifier.make("space-1") }).pipe(
         Effect.provide(testLayer({}, { relatedTargets: [spaceTarget, classTarget] }))
       )
-      expect(listedSpace.targets[0]).toMatchObject({
+      expect(assertAt(listedSpace.targets, 0)).toMatchObject({
         rule: { kind: "spaceRule", spaceId: "space-1" },
         targetProject: "PRJ"
       })
@@ -573,7 +574,7 @@ describe("issue #102 operations", () => {
       const listedClass = yield* listRelatedIssueTargets({
         objectClass: ObjectClassName.make("document:class:Document")
       }).pipe(Effect.provide(testLayer({}, { relatedTargets: [spaceTarget, classTarget] })))
-      expect(listedClass.targets[0]).toMatchObject({
+      expect(assertAt(listedClass.targets, 0)).toMatchObject({
         rule: { kind: "classRule", objectClass: "document:class:Document" },
         targetProject: "PRJ"
       })

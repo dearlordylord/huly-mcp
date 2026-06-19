@@ -12,6 +12,7 @@ import type { Asset } from "@hcengineering/platform"
 import type { TagCategory as HulyTagCategory, TagElement as HulyTagElement, TagReference } from "@hcengineering/tags"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import { MAX_COLOR_INDEX } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
@@ -278,7 +279,7 @@ describe("listTags", () => {
       const result = yield* listTags({ targetClass: TARGET_CLASS }).pipe(Effect.provide(testLayer))
 
       expect(result.map((tag) => tag.title)).toEqual(["bug", "feature"])
-      expect(result[0].refCount).toBe(3)
+      expect(assertAt(result, 0).refCount).toBe(3)
     }))
 
   it.effect("resolves category labels before listing", () =>
@@ -357,7 +358,7 @@ describe("createTag", () => {
 
       expect(result.created).toBe(true)
       expect(captures.createDocs).toHaveLength(1)
-      expect(captures.createDocs[0].attributes).toMatchObject({
+      expect(assertAt(captures.createDocs, 0).attributes).toMatchObject({
         category: "cat-default",
         color: 4,
         targetClass: "tracker:class:Issue",
@@ -387,7 +388,7 @@ describe("updateTag", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toEqual({ id: "tag-1", updated: true })
-      expect(captures.updateDocs[0].operations).toMatchObject({
+      expect(assertAt(captures.updateDocs, 0).operations).toMatchObject({
         category: "cat-updated",
         color: 2,
         description: "User-visible defect",
@@ -409,7 +410,7 @@ describe("updateTag", () => {
         description: null
       }).pipe(Effect.provide(testLayer))
 
-      expect(captures.updateDocs[0].operations).toMatchObject({ description: "" })
+      expect(assertAt(captures.updateDocs, 0).operations).toMatchObject({ description: "" })
     }))
 
   it.effect("fails when a requested category does not exist", () =>
@@ -528,19 +529,19 @@ describe("attached tag references", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result.attached).toBe(true)
-      expect(captures.createDocs[0].attributes).toMatchObject({
+      expect(assertAt(captures.createDocs, 0).attributes).toMatchObject({
         category: "cat-skills",
         color: 5,
         targetClass: "recruit:mixin:Candidate",
         title: "TypeScript"
       })
-      expect(captures.addCollections[0]).toMatchObject({
+      expect(assertAt(captures.addCollections, 0)).toMatchObject({
         attachedTo: "candidate-1",
         attachedToClass: "recruit:mixin:Candidate",
         collection: "skills",
         space: "recruit-space"
       })
-      expect(captures.addCollections[0].attributes).toMatchObject({
+      expect(assertAt(captures.addCollections, 0).attributes).toMatchObject({
         color: 5,
         title: "TypeScript",
         weight: 8

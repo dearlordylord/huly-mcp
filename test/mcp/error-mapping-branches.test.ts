@@ -3,6 +3,7 @@ import { Cause, Effect, Schema } from "effect"
 import type { ParseResult } from "effect"
 import { expect } from "vitest"
 import { createSuccessResponse, mapParseCauseToMcp, McpErrorCode } from "../../src/mcp/error-mapping.js"
+import { assertAt } from "../../src/utils/assertions.js"
 
 describe("Error Mapping Branch Coverage", () => {
   describe("mapParseCauseToMcp - Sequential cause with ParseError (line 148)", () => {
@@ -20,12 +21,12 @@ describe("Error Mapping Branch Coverage", () => {
 
         // This is not a simple Fail cause, so isFailType returns false.
         // It falls through to Cause.failures() which finds errors.
-        // This hits line 148: return mapParseErrorToMcp(failures[0], toolName)
+        // This hits line 148: return mapParseErrorToMcp(assertAt(failures, 0), toolName)
         const response = mapParseCauseToMcp(cause, "test_tool")
 
         expect(response.isError).toBe(true)
         expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-        expect(response.content[0].text).toContain("Invalid parameters for test_tool")
+        expect(assertAt(response.content, 0).text).toContain("Invalid parameters for test_tool")
       }))
   })
 
@@ -46,7 +47,7 @@ describe("Error Mapping Branch Coverage", () => {
 
         expect(response.isError).toBe(true)
         expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-        expect(response.content[0].text).toContain("Invalid parameters for parallel_tool")
+        expect(assertAt(response.content, 0).text).toContain("Invalid parameters for parallel_tool")
       }))
   })
 
@@ -58,7 +59,7 @@ describe("Error Mapping Branch Coverage", () => {
 
         expect(response.isError).toBe(true)
         expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
-        expect(response.content[0].text).toBe("An unexpected error occurred")
+        expect(assertAt(response.content, 0).text).toBe("An unexpected error occurred")
       }))
   })
 
@@ -68,7 +69,7 @@ describe("Error Mapping Branch Coverage", () => {
         // JSON.stringify(undefined) returns undefined, exercising the non-string branch.
         const response = createSuccessResponse(undefined)
 
-        expect(response.content[0].text).toBe("null")
+        expect(assertAt(response.content, 0).text).toBe("null")
         expect(response.structuredContent).toEqual({ result: undefined })
       }))
   })

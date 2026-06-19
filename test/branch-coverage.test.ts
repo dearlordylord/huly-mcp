@@ -1,3 +1,4 @@
+import { assertAt } from "../src/utils/assertions.js"
 /**
  * Tests targeting specific uncovered branches for v8 coverage.
  *
@@ -192,7 +193,7 @@ describe("buildAccountUuidToNameMap - employee with undefined personUuid (channe
       const result = yield* listDirectMessages({}).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.conversations).toHaveLength(1)
-      expect(result.conversations[0].participants).toEqual([])
+      expect(assertAt(result.conversations, 0).participants).toEqual([])
     }))
 
   it.effect("resolves employees WITH personUuid but skips those WITHOUT", () =>
@@ -254,7 +255,7 @@ describe("buildAccountUuidToNameMap - employee with undefined personUuid (channe
 
       const result = yield* listDirectMessages({}).pipe(Effect.provide(testLayer), withDiagnostics)
 
-      expect(result.conversations[0].participants).toEqual(["Alice"])
+      expect(assertAt(result.conversations, 0).participants).toEqual(["Alice"])
     }))
 })
 

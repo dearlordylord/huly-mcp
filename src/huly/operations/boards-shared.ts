@@ -7,6 +7,7 @@ import { Effect, Option, Schema } from "effect"
 import type { BoardRef } from "../../domain/schemas/boards.js"
 import type { NonEmptyString } from "../../domain/schemas/shared.js"
 import { PersonRefInput } from "../../domain/schemas/shared.js"
+import { isNonEmpty, isSingle } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
 import type {
@@ -111,13 +112,13 @@ const resolveBoard = (
       board.class.Board,
       hulyQuery<HulyBoard>({ ...baseQuery, _id: toRef<HulyBoard>(identifier) })
     )
-    if (idMatches.length > 0) return idMatches[0]
+    if (isNonEmpty(idMatches)) return idMatches[0]
 
     const nameMatches = yield* client.findAll<HulyBoard>(
       board.class.Board,
       hulyQuery<HulyBoard>({ ...baseQuery, name: identifier })
     )
-    if (nameMatches.length === 1) return nameMatches[0]
+    if (isSingle(nameMatches)) return nameMatches[0]
     if (nameMatches.length > 1) {
       return yield* new BoardIdentifierAmbiguousError({ identifier, matches: nameMatches.length })
     }
@@ -149,7 +150,7 @@ export const resolveBoardProjectType = (
         isBoardProjectType(projectType) && (projectType._id === projectTypeRef || projectType.name === projectTypeRef)
       )
 
-    if (matches.length === 1) return matches[0]
+    if (isSingle(matches)) return matches[0]
     const identifier = projectTypeRef ?? String(board.descriptors.BoardType)
     if (matches.length === 0) return yield* new BoardProjectTypeNotFoundError({ identifier })
     return yield* new BoardProjectTypeIdentifierAmbiguousError({ identifier, matches: matches.length })
@@ -211,7 +212,7 @@ export const resolveBoardTaskType = (
       ? taskTypes
       : matches
 
-    if (fallbackMatches.length === 1) return fallbackMatches[0]
+    if (isSingle(fallbackMatches)) return fallbackMatches[0]
     const identifier = taskTypeRef ?? "default board card task type"
     if (fallbackMatches.length === 0) {
       return yield* new BoardTaskTypeNotFoundError({ identifier, board: resolvedBoard.name })
@@ -261,7 +262,7 @@ export const resolveBoardStatus = (
       ? statuses.slice(0, 1)
       : statuses.filter((status) => status.id === statusRef || status.name === statusRef)
 
-    if (matches.length === 1) return matches[0]
+    if (isSingle(matches)) return matches[0]
     const identifier = statusRef ?? "default board card status"
     if (matches.length === 0) return yield* new BoardStatusNotFoundError({ identifier, board: resolvedBoard.name })
     return yield* new BoardStatusIdentifierAmbiguousError({

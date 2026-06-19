@@ -71,6 +71,28 @@ Do not accept comments as the only fix when the relationship can be encoded in t
 
 All data crossing system boundaries (APIs, etc.) must be strongly typed — both inbound (decoding) and outbound (encoding), with Effect Schema. Flag any `any`, untyped fetch results, or raw JSON access.
 
+## Parse, Don't Validate
+
+Boundary code must pass parsed/refined domain values forward, not raw DTOs that were merely checked. Flag:
+- `validateX` helpers that return a refined/domain value; rename and treat them as parsers
+- repeated validation of facts already proven by a schema/parser
+- core/application functions accepting raw `unknown`, raw JSON, raw IDs, or nullable DTO bags when a parsed domain type exists
+- code that discards parser output and keeps using the original primitive
+
+Expected parse/domain/integration failures must be typed Effect errors. Throws are acceptable only for defects, framework-required behavior, or startup/bootstrap failures.
+
+## Functional Core / Imperative Shell
+
+Review changed MCP handlers, protocol adapters, SDK adapters, and operations for misplaced business logic. Entrypoints should parse protocol input, sequence effects, call shared modules with parsed domain values, and render protocol output. Domain decisions, target resolution, state transitions, and mapping rules belong in shared core/application modules where they can be tested without protocol setup.
+
+Flag hidden I/O, ambient time/randomness, direct SDK calls, or `process.env` reads inside modules that should be pure/domain logic.
+
+## Config and Resources
+
+Configuration must be parsed at startup or the earliest request boundary into typed config with redacted secrets. Flag scattered `process.env` reads outside entrypoint/config modules, raw secret strings crossing module boundaries, and any secret value included in errors, logs, diagnostics, snapshots, or tool results.
+
+Modules should not perform I/O at import time. Flag top-level server startup, connection creation, env reads, handler registration, file/network access, or mutable singleton state outside explicit bootstrap/Effect layer ownership.
+
 ## No Bare Primitives for Domain Values
 
 Function signatures and type definitions must never use bare `string`, `number`, or `boolean` where a domain-specific type (union, branded, alias) exists or should exist. This applies to return types, parameters, map key/value types, schema fields, and struct fields.

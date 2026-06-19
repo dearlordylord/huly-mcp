@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect } from "vitest"
 import { createNoopTelemetry } from "../../src/telemetry/noop.js"
 import { createPostHogTelemetry, type PostHogTelemetryDependencies } from "../../src/telemetry/posthog.js"
 import { TelemetryService } from "../../src/telemetry/telemetry.js"
+import { assertAt } from "../../src/utils/assertions.js"
 import { mockFn } from "../helpers/mock-fn.js"
 
 const mockCapture = mockFn()
@@ -73,7 +74,7 @@ describe("Telemetry", () => {
       })
 
       expect(mockCapture.mock.calls).toHaveLength(1)
-      const call = mockCapture.mock.calls[0][0]
+      const call = assertAt(mockCapture.mock.calls, 0)[0]
       expect(call.event).toBe("session_start")
       expect(call.properties).toMatchObject({
         transport: "stdio",
@@ -94,7 +95,7 @@ describe("Telemetry", () => {
       })
 
       expect(mockCapture.mock.calls).toHaveLength(1)
-      const call = mockCapture.mock.calls[0][0]
+      const call = assertAt(mockCapture.mock.calls, 0)[0]
       expect(call.event).toBe("tool_called")
       expect(call.properties).toMatchObject({
         tool_name: "list_issues",
@@ -114,7 +115,7 @@ describe("Telemetry", () => {
       })
 
       expect(mockCapture.mock.calls).toHaveLength(1)
-      const call = mockCapture.mock.calls[0][0]
+      const call = assertAt(mockCapture.mock.calls, 0)[0]
       expect(call.properties).toMatchObject({
         status: "error",
         error_tag: "HulyConnectionError"
@@ -136,8 +137,8 @@ describe("Telemetry", () => {
       })
 
       expect(mockCapture.mock.calls).toHaveLength(2)
-      const id1 = mockCapture.mock.calls[0][0].distinctId
-      const id2 = mockCapture.mock.calls[1][0].distinctId
+      const id1 = assertAt(mockCapture.mock.calls, 0)[0].distinctId
+      const id2 = assertAt(mockCapture.mock.calls, 1)[0].distinctId
       expect(id1).toBe(id2)
       expect(id1).toMatch(/^[0-9a-f-]{36}$/)
     })
@@ -150,7 +151,7 @@ describe("Telemetry", () => {
       telemetry.firstListTools()
 
       const listToolsCalls = mockCapture.mock.calls.filter(
-        (c) => c[0].event === "first_list_tools"
+        (c) => assertAt(c, 0).event === "first_list_tools"
       )
       expect(listToolsCalls).toHaveLength(1)
     })
@@ -173,7 +174,7 @@ describe("Telemetry", () => {
       await telemetry.shutdown()
 
       const endCalls = mockCapture.mock.calls.filter(
-        (c) => c[0].event === "session_end"
+        (c) => assertAt(c, 0).event === "session_end"
       )
       expect(endCalls).toHaveLength(1)
       expect(mockShutdown.mock.calls).toHaveLength(1)

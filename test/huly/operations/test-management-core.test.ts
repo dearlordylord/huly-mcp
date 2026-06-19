@@ -29,6 +29,7 @@ import {
   type TestProject,
   type TestSuite
 } from "../../../src/huly/test-management-types.js"
+import { assertAt } from "../../../src/utils/assertions.js"
 import { testCaseIdentifier, testProjectIdentifier, testSuiteIdentifier } from "../../helpers/brands.js"
 
 const makeTestProject = (overrides?: Partial<TestProject>): TestProject => {
@@ -250,8 +251,8 @@ describe("listTestProjects", () => {
       const result = yield* listTestProjects({}).pipe(Effect.provide(testLayer))
 
       expect(result.projects).toHaveLength(2)
-      expect(result.projects[0].name).toBe("Alpha")
-      expect(result.projects[1].name).toBe("Beta")
+      expect(assertAt(result.projects, 0).name).toBe("Alpha")
+      expect(assertAt(result.projects, 1).name).toBe("Beta")
     }))
 
   it.effect("returns empty when no projects", () =>
@@ -304,7 +305,7 @@ describe("listTestSuites", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result.suites).toHaveLength(1)
-      expect(result.suites[0].name).toBe("Child")
+      expect(assertAt(result.suites, 0).name).toBe("Child")
     }))
 })
 
@@ -522,7 +523,7 @@ describe("listTestCases", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result.testCases).toHaveLength(1)
-      expect(result.testCases[0].name).toBe("In suite")
+      expect(assertAt(result.testCases, 0).name).toBe("In suite")
     }))
 })
 
@@ -831,7 +832,7 @@ describe("test-management-core summary and filter branches", () => {
       const result = yield* listTestProjects({}).pipe(
         Effect.provide(createTestLayerWithMocks({ projects: [makeTestProject({ description: "" })] }))
       )
-      expect(result.projects[0].description).toBeUndefined()
+      expect(assertAt(result.projects, 0).description).toBeUndefined()
     }))
 
   it.effect("filters test cases by assignee and surfaces it in the summary", () =>
@@ -851,7 +852,7 @@ describe("test-management-core summary and filter branches", () => {
         }))
       )
       expect(result.testCases).toHaveLength(1)
-      expect(result.testCases[0].assignee).toBe("person-2")
+      expect(assertAt(result.testCases, 0).assignee).toBe("person-2")
     }))
 })
 
@@ -898,8 +899,8 @@ describe("test suite summary and createTestSuite parent branches", () => {
       const result = yield* listTestSuites({
         project: testProjectIdentifier("QA Project")
       }).pipe(Effect.provide(createTestLayerWithMocks({ projects: [makeTestProject()], suites: [bare] })))
-      expect(result.suites[0].description).toBeUndefined()
-      expect(result.suites[0].parent).toBeUndefined()
+      expect(assertAt(result.suites, 0).description).toBeUndefined()
+      expect(assertAt(result.suites, 0).parent).toBeUndefined()
     }))
 
   it.effect("creates a child suite under an explicit parent suite", () =>

@@ -34,6 +34,7 @@ import {
   type StatusCategoryValue,
   UnknownStatusCategoryValue
 } from "../../domain/schemas/task-management.js"
+import { assertAt } from "../../utils/assertions.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
@@ -249,7 +250,7 @@ export const resolveVacancy = (
         matches: Count.make(byName.length)
       })
     }
-    return byName[0]
+    return assertAt(byName, 0)
   })
 
 export const findApplicant = (
@@ -289,7 +290,7 @@ export const findApplicant = (
         matches: Count.make(applicants.length)
       })
     }
-    return applicants[0]
+    return assertAt(applicants, 0)
   })
 
 export const applicantRefFromDoc = (

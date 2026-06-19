@@ -16,6 +16,7 @@ import { toFindResult } from "@hcengineering/core"
 import type { ProjectType, TaskType, TaskTypeDescriptor } from "@hcengineering/task"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import {
   BoardCardIdentifier,
@@ -291,7 +292,7 @@ const createLayer = (fixture: BoardFixture = {}) => {
             String((b as Record<string, unknown>).rank).localeCompare(String((a as Record<string, unknown>).rank))
           )[0]
         }
-        return result[0]
+        return result.at(0)
       }),
     createDoc: (_class, _space, attributes, id) => {
       if (String(_class) === String(board.class.Board)) {
@@ -356,7 +357,7 @@ describe("board operations", () => {
     Effect.gen(function*() {
       const fixture = createLayer()
 
-      expect((yield* listBoards({}).pipe(Effect.provide(fixture.layer))).boards[0].name).toBe("Roadmap")
+      expect(assertAt((yield* listBoards({}).pipe(Effect.provide(fixture.layer))).boards, 0).name).toBe("Roadmap")
       expect((yield* getBoard({ board: b("Roadmap") }).pipe(Effect.provide(fixture.layer))).cards).toBe(1)
       expect((yield* createBoard({ name: bn("Roadmap") }).pipe(Effect.provide(fixture.layer))).created).toBe(false)
       expect((yield* createBoard({ name: bn("New Board") }).pipe(Effect.provide(fixture.layer))).created).toBe(true)
@@ -365,16 +366,16 @@ describe("board operations", () => {
       )
         .toBe(true)
       expect((yield* archiveBoard({ board: b("Roadmap") }).pipe(Effect.provide(fixture.layer))).updated).toBe(true)
-      expect(fixture.state.boards[0].archived).toBe(true)
+      expect(assertAt(fixture.state.boards, 0).archived).toBe(true)
       expect((yield* unarchiveBoard({ board: b("Roadmap") }).pipe(Effect.provide(fixture.layer))).updated).toBe(true)
-      expect(fixture.state.boards[0].archived).toBe(false)
+      expect(assertAt(fixture.state.boards, 0).archived).toBe(false)
       expect(
         (yield* updateBoard({ board: b("board-1"), name: bn("Roadmap Next"), private: true }).pipe(
           Effect.provide(fixture.layer)
         )).updated
       ).toBe(true)
-      expect(fixture.state.boards[0].name).toBe("Roadmap Next")
-      expect(fixture.state.boards[0].private).toBe(true)
+      expect(assertAt(fixture.state.boards, 0).name).toBe("Roadmap Next")
+      expect(assertAt(fixture.state.boards, 0).private).toBe(true)
       expect((yield* resolveBoardFromContext(b("Roadmap Next")).pipe(Effect.provide(fixture.layer))).board._id).toBe(
         boardId
       )
@@ -392,7 +393,7 @@ describe("board operations", () => {
       const fixture = createLayer()
 
       const listed = yield* provideDiagnostics(listBoardCards({ board: b("Roadmap") }), fixture.layer)
-      expect(listed.cards[0].identifier).toBe("CARD-1")
+      expect(assertAt(listed.cards, 0).identifier).toBe("CARD-1")
       expect((yield* provideDiagnostics(getBoardCard({ board: b("Roadmap"), card: c("card-1") }), fixture.layer)).id)
         .toBe("card-1")
       expect(
@@ -426,7 +427,7 @@ describe("board operations", () => {
       )
 
       expect(result.identifier).toBe("CARD-2")
-      const created = fixture.captures.createdCards[0]
+      const created = assertAt(fixture.captures.createdCards, 0)
       expect(created.status).toBe(todoStatusId)
       expect(created.kind).toBe(taskTypeId)
       expect(created.assignee).toBe("emp-1")
@@ -456,20 +457,20 @@ describe("board operations", () => {
         fixture.layer
       )
 
-      expect(fixture.state.cards[0].title).toBe("Updated")
-      expect(fixture.state.cards[0].status).toBe(doneStatusId)
-      expect(fixture.state.cards[0].assignee).toBeNull()
-      expect(fixture.state.cards[0].members).toEqual(["emp-1"])
-      expect(fixture.state.cards[0].cover).toBeNull()
+      expect(assertAt(fixture.state.cards, 0).title).toBe("Updated")
+      expect(assertAt(fixture.state.cards, 0).status).toBe(doneStatusId)
+      expect(assertAt(fixture.state.cards, 0).assignee).toBeNull()
+      expect(assertAt(fixture.state.cards, 0).members).toEqual(["emp-1"])
+      expect(assertAt(fixture.state.cards, 0).cover).toBeNull()
 
       const activeDelete = yield* Effect.flip(
         deleteBoardCard({ board: b("Roadmap"), card: c("CARD-1") }).pipe(Effect.provide(fixture.layer))
       )
       expect(activeDelete).toBeInstanceOf(BoardArchivedCardDeleteError)
       yield* archiveBoardCard({ board: b("Roadmap"), card: c("CARD-1") }).pipe(Effect.provide(fixture.layer))
-      expect(fixture.state.cards[0].isArchived).toBe(true)
+      expect(assertAt(fixture.state.cards, 0).isArchived).toBe(true)
       yield* unarchiveBoardCard({ board: b("Roadmap"), card: c("CARD-1") }).pipe(Effect.provide(fixture.layer))
-      expect(fixture.state.cards[0].isArchived).toBe(false)
+      expect(assertAt(fixture.state.cards, 0).isArchived).toBe(false)
       yield* archiveBoardCard({ board: b("Roadmap"), card: c("CARD-1") }).pipe(Effect.provide(fixture.layer))
       expect(
         (yield* deleteBoardCard({ board: b("Roadmap"), card: c("CARD-1") }).pipe(Effect.provide(fixture.layer))).deleted
@@ -548,14 +549,18 @@ describe("board operations", () => {
       expect((yield* provideDiagnostics(listBoardCards({ board: b("Roadmap") }), metadataFixture.layer)).cards)
         .toHaveLength(1)
       expect(
-        (yield* provideDiagnostics(listBoardCards({ board: b("Roadmap") }), metadataFixture.layer)).cards[0].assignee
+        assertAt((yield* provideDiagnostics(listBoardCards({ board: b("Roadmap") }), metadataFixture.layer)).cards, 0)
+          .assignee
       )
         .toBe("Alice")
       expect(
-        (yield* provideDiagnostics(
-          listBoardCards({ board: b("Roadmap"), includeArchived: true, titleSearch: "Archived" }),
-          metadataFixture.layer
-        )).cards[0].identifier
+        assertAt(
+          (yield* provideDiagnostics(
+            listBoardCards({ board: b("Roadmap"), includeArchived: true, titleSearch: "Archived" }),
+            metadataFixture.layer
+          )).cards,
+          0
+        ).identifier
       ).toBe("CARD-2")
 
       const detailFixture = createLayer({
@@ -664,8 +669,8 @@ describe("board operations", () => {
         createBoardCard({ board: b("Roadmap"), title: ct("Parent Kind") }),
         parentTaskFixture.layer
       )
-      expect(parentTaskFixture.captures.createdCards[0].kind).toBe(taskTypeId)
-      expect(parentTaskFixture.captures.createdCards[0].status).toBe(todoStatusId)
+      expect(assertAt(parentTaskFixture.captures.createdCards, 0).kind).toBe(taskTypeId)
+      expect(assertAt(parentTaskFixture.captures.createdCards, 0).status).toBe(todoStatusId)
 
       const fallbackTaskFixture = createLayer({
         cards: [],
@@ -675,7 +680,7 @@ describe("board operations", () => {
         createBoardCard({ board: b("Roadmap"), title: ct("Fallback Kind") }),
         fallbackTaskFixture.layer
       )
-      expect(fallbackTaskFixture.captures.createdCards[0].kind).toBe(taskTypeId)
+      expect(assertAt(fallbackTaskFixture.captures.createdCards, 0).kind).toBe(taskTypeId)
 
       const missingTaskFixture = createLayer({ taskTypes: [] })
       expect(
@@ -742,8 +747,8 @@ describe("board operations", () => {
         updateBoardCard({ board: b("Roadmap"), card: c("CARD-1"), title: ct("Title Only") }),
         fixture.layer
       )
-      expect(fixture.state.cards[0].title).toBe("Title Only")
-      expect(fixture.state.cards[0].members).toEqual(["emp-1", "emp-2"])
+      expect(assertAt(fixture.state.cards, 0).title).toBe("Title Only")
+      expect(assertAt(fixture.state.cards, 0).members).toEqual(["emp-1", "emp-2"])
 
       yield* provideDiagnostics(
         updateBoardCard({
@@ -759,23 +764,23 @@ describe("board operations", () => {
         }),
         fixture.layer
       )
-      expect(fixture.state.cards[0].assignee).toBe("emp-1")
-      expect(fixture.state.cards[0].members).toEqual(["emp-2"])
-      expect(fixture.state.cards[0].location).toBe("HQ")
-      expect(fixture.state.cards[0].cover).toEqual({ color: 1, size: "large" })
+      expect(assertAt(fixture.state.cards, 0).assignee).toBe("emp-1")
+      expect(assertAt(fixture.state.cards, 0).members).toEqual(["emp-2"])
+      expect(assertAt(fixture.state.cards, 0).location).toBe("HQ")
+      expect(assertAt(fixture.state.cards, 0).cover).toEqual({ color: 1, size: "large" })
 
       yield* provideDiagnostics(
         updateBoardCard({ board: b("Roadmap"), card: c("CARD-1"), removeMembers: [n("Bob")] }),
         fixture.layer
       )
-      expect(fixture.state.cards[0].members).toEqual([])
+      expect(assertAt(fixture.state.cards, 0).members).toEqual([])
 
       const noMembersFixture = createLayer({ cards: [makeCardWithoutMembers()] })
       yield* provideDiagnostics(
         updateBoardCard({ board: b("Roadmap"), card: c("CARD-1"), title: ct("No Member Array") }),
         noMembersFixture.layer
       )
-      expect(noMembersFixture.state.cards[0].members).toBeUndefined()
+      expect(assertAt(noMembersFixture.state.cards, 0).members).toBeUndefined()
 
       expect(
         yield* Effect.flip(

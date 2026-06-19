@@ -4,6 +4,8 @@ import { expect, it } from "vitest"
 
 import type { McpInputSchema } from "../../src/mcp/input-schema-compat.js"
 import { toClientCompatibleInputSchema } from "../../src/mcp/input-schema-compat.js"
+import { collectJsonSchemaDefinitions } from "../../src/mcp/json-schema-refs.js"
+import { assertAt } from "../../src/utils/assertions.js"
 import { propertyTestParameters } from "../helpers/property.js"
 
 const ROOT_COMPOSITION_KEYS = ["anyOf", "oneOf", "allOf"] as const
@@ -35,7 +37,7 @@ const compositionNodeArbitrary = (depth: number): fc.Arbitrary<CompositionNode> 
   })
 
 const nodeToSchema = (node: CompositionNode, index: number, origin = `branch-${index}`): Record<string, unknown> => {
-  const compositionKey = ROOT_COMPOSITION_KEYS[index % ROOT_COMPOSITION_KEYS.length]
+  const compositionKey = assertAt(ROOT_COMPOSITION_KEYS, index % ROOT_COMPOSITION_KEYS.length)
 
   return {
     properties: objectFromKeys(node.properties, origin),
@@ -114,7 +116,7 @@ describe("toClientCompatibleInputSchema properties", () => {
         const defs = isRecord(sanitized.$defs) ? sanitized.$defs : {}
 
         expect(properties).toEqual(expectedMergedField(schema, "properties"))
-        expect(defs).toEqual(expectedMergedField(schema, "$defs"))
+        expect(defs).toEqual(collectJsonSchemaDefinitions(schema) ?? {})
       }),
       propertyTestParameters
     )

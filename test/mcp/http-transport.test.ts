@@ -1,3 +1,4 @@
+import { assertAt, assertExists } from "../../src/utils/assertions.js"
 /**
  * Tests for HTTP transport module.
  *
@@ -80,7 +81,11 @@ const createMockTransportDependencies = (): {
 
 // Mock Express app for testing
 const createMockExpressApp = () => {
-  const routes: Record<string, Record<string, (req: Request, res: Response) => Promise<void>>> = {
+  const routes: {
+    get: Record<string, (req: Request, res: Response) => Promise<void>>
+    post: Record<string, (req: Request, res: Response) => Promise<void>>
+    delete: Record<string, (req: Request, res: Response) => Promise<void>>
+  } = {
     get: {},
     post: {},
     delete: {}
@@ -675,9 +680,9 @@ describe("HTTP Transport", () => {
       )
 
       expect(serverInstances).toHaveLength(2)
-      expect(serverInstances[0]).not.toBe(serverInstances[1])
-      expect(getServerCalls(serverInstances[0]).connect).toHaveLength(1)
-      expect(getServerCalls(serverInstances[1]).connect).toHaveLength(1)
+      expect(assertAt(serverInstances, 0)).not.toBe(assertAt(serverInstances, 1))
+      expect(getServerCalls(assertAt(serverInstances, 0)).connect).toHaveLength(1)
+      expect(getServerCalls(assertAt(serverInstances, 1)).connect).toHaveLength(1)
       expect(transport.calls.handleRequest).toHaveLength(2)
     })
 
@@ -1015,12 +1020,14 @@ describe("HTTP Transport", () => {
         )
       )
 
+      const getMcpRoute = assertExists(routes.get["/mcp"], "Expected GET /mcp route")
+
       const unauthorizedRes = createMockResponse()
-      await routes.get["/mcp"](createMockRequest(), unauthorizedRes)
+      await getMcpRoute(createMockRequest(), unauthorizedRes)
       expectUnauthorizedResponse(unauthorizedRes)
 
       const authorizedRes = createMockResponse()
-      await routes.get["/mcp"](
+      await getMcpRoute(
         createMockRequest(undefined, { authorization: "Bearer server-secret" }),
         authorizedRes
       )
@@ -1136,7 +1143,7 @@ describe("HTTP Transport", () => {
 
       expect(closeProbe.calls).toHaveLength(1)
       const closeErrorCall = writeError.calls.find(
-        (call) => call[0].includes("Server close error")
+        (call) => assertAt(call, 0).includes("Server close error")
       )
       expect(closeErrorCall).toBeDefined()
     })
@@ -1216,7 +1223,7 @@ describe("HTTP Transport", () => {
       await handlers.post(req, res)
 
       expect(closeHandlers).toHaveLength(1)
-      closeHandlers[0]()
+      assertAt(closeHandlers, 0)()
 
       // Allow microtasks (transport.close() and server.close() are async)
       await new Promise((resolve) => setTimeout(resolve, 10))
@@ -1268,11 +1275,11 @@ describe("HTTP Transport", () => {
       })
       await handlers.post(req, res)
 
-      closeHandlers[0]()
+      assertAt(closeHandlers, 0)()
       await new Promise((resolve) => setTimeout(resolve, 10))
 
       const transportCleanupCall = writeError.calls.find(
-        (call) => call[0].includes("Transport cleanup error")
+        (call) => assertAt(call, 0).includes("Transport cleanup error")
       )
       expect(transportCleanupCall).toBeDefined()
     })
@@ -1325,11 +1332,11 @@ describe("HTTP Transport", () => {
       })
       await handlers.post(req, res)
 
-      closeHandlers[0]()
+      assertAt(closeHandlers, 0)()
       await new Promise((resolve) => setTimeout(resolve, 10))
 
       const serverCleanupCall = writeError.calls.find(
-        (call) => call[0].includes("Server cleanup error")
+        (call) => assertAt(call, 0).includes("Server cleanup error")
       )
       expect(serverCleanupCall).toBeDefined()
     })

@@ -16,6 +16,7 @@ import type {
 } from "../../domain/schemas/document-snapshots.js"
 import { DocumentMarkdown, DocumentSnapshotId, DocumentSnapshotTitle } from "../../domain/schemas/document-snapshots.js"
 import { DocumentId, TeamspaceId, Timestamp } from "../../domain/schemas/shared.js"
+import { isSingle } from "../../utils/assertions.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { DocumentContentCorruptedError, DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js"
 import { HulyError } from "../errors.js"
@@ -80,7 +81,7 @@ const findSnapshotByIdentifier = (
       hulyQuery<DocumentSnapshotDoc>({ attachedTo: doc._id, title: identifier }),
       { limit: 2 }
     )
-    if (titleMatches.length === 1) return titleMatches[0]
+    if (isSingle(titleMatches)) return titleMatches[0]
     if (titleMatches.length > 1) {
       return yield* new HulyError({
         message:
@@ -96,7 +97,7 @@ const findSnapshotByIdentifier = (
         { limit: 2 }
       )
       : []
-    if (dateMatches.length === 1) return dateMatches[0]
+    if (isSingle(dateMatches)) return dateMatches[0]
     if (dateMatches.length > 1) {
       return yield* new HulyError({
         message:

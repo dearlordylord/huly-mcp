@@ -8,11 +8,13 @@ import type { Class, Doc, FindOptions, FindResult, PersonId as CorePersonId, Ref
 import { toFindResult } from "@hcengineering/core"
 import { Effect, Exit } from "effect"
 import { describe, expect, it } from "vitest"
+import { assertAt } from "../../utils/assertions.js"
 
 import { ChannelId } from "../../domain/schemas/shared.js"
 import type { HulyClientOperations } from "../client.js"
 import { HulyClient } from "../client.js"
 import { contact } from "../huly-plugins.js"
+import { channelIdentifier } from "./contact-channel-locators.js"
 import {
   addOrganizationChannel,
   addPersonChannel,
@@ -176,7 +178,9 @@ const testLayer = (state: TestState) => {
     _class: Ref<Class<Doc>>,
     query: Parameters<HulyClientOperations["findAll"]>[1],
     options?: FindOptions<Doc>
-  ) => Effect.map(findAllImpl(_class, query, options), (result) => result[0])) as HulyClientOperations["findOne"]
+  ) => Effect.map(findAllImpl(_class, query, options), (result) => result.at(0))) as HulyClientOperations[
+    "findOne"
+  ]
 
   const addCollectionImpl = ((
     _class: Ref<Class<Doc>>,
@@ -213,7 +217,7 @@ const testLayer = (state: TestState) => {
     const channelOperations = operations as { readonly provider?: Channel["provider"]; readonly value?: string }
     const index = channels.findIndex((channel) => channel._id === objectId)
     if (index >= 0) {
-      const current = channels[index]
+      const current = assertAt(channels, index)
       channels[index] = mockChannel({
         ...current,
         provider: channelOperations.provider ?? current.provider,
@@ -254,6 +258,10 @@ const failureTag = (exit: Exit.Exit<unknown, unknown>): string | undefined => {
 describe("Contact Channel Operations", () => {
   it("lists supported provider labels through the operation wrapper", async () => {
     await expect(Effect.runPromise(listContactChannelProviders())).resolves.toContain("email")
+  })
+
+  it("formats channelId locators for diagnostics", () => {
+    expect(channelIdentifier({ _tag: "channelId", channelId: ChannelId.make("channel-1") })).toBe("channel-1")
   })
 
   it("lists person and organization channels with labels and metadata", async () => {
@@ -361,8 +369,8 @@ describe("Contact Channel Operations", () => {
     expect(byId.updated).toBe(true)
     expect(byId.channel.value).toBe("jane@new.test")
     expect(byProviderValue.updated).toBe(true)
-    expect(channels[0].provider).toBe(contact.channelProvider.GitHub)
-    expect(channels[0].value).toBe("janehub")
+    expect(assertAt(channels, 0).provider).toBe(contact.channelProvider.GitHub)
+    expect(assertAt(channels, 0).value).toBe("janehub")
   })
 
   it("returns updated=false when target value is unchanged", async () => {
@@ -487,10 +495,16 @@ describe("Contact Channel Operations", () => {
         Effect.provide(layer)
       )
     )
+    const missing = await Effect.runPromise(
+      removeOrganizationChannel({ organizationId: "org-1", provider: "homepage", value: "https://missing.test" }).pipe(
+        Effect.provide(layer)
+      )
+    )
 
     expect(updated.organizationId).toBe("org-1")
     expect(updated.channel.value).toBe("ops@example.com")
     expect(removed).toEqual({ organizationId: "org-1", removed: true, channelId: "org-channel-1" })
+    expect(missing).toEqual({ organizationId: "org-1", removed: false })
   })
 
   it("fails for ambiguous person names, ambiguous channel locators, missing owners, and update conflicts", async () => {

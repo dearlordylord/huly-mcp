@@ -73,6 +73,9 @@ const collectDescendants = (
   let nextIndex = 0
   while (nextIndex < pending.length) {
     const current = pending[nextIndex]
+    if (current === undefined) {
+      break
+    }
     const unvisitedChildren = [...(descendantsByAncestor.get(current) ?? [])].filter((childId) => !visited.has(childId))
     unvisitedChildren.forEach((childId) => {
       // Local traversal state keeps descendant expansion linear; the mutable collections do not escape as mutable types.

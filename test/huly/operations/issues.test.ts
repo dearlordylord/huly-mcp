@@ -30,6 +30,7 @@ import type {
   ProjectNotFoundError
 } from "../../../src/huly/errors.js"
 import { addLabel, createIssue, getIssue, listIssues, updateIssue } from "../../../src/huly/operations/issues.js"
+import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 
 import { contact, core, tags, task, tracker } from "../../../src/huly/huly-plugins.js"
 import { colorCode, email, issueIdentifier, projectIdentifier, statusName } from "../../helpers/brands.js"
@@ -332,10 +333,11 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       // Space-only query (rank queries) - respect sort option
       if (q.space) {
         const matching = issues.filter(i => i.space === q.space)
-        if (opts?.sort?.rank !== undefined) {
-          matching.sort((a, b) => opts.sort!.rank * (a.rank.localeCompare(b.rank)))
+        const rankSort = opts?.sort?.rank
+        if (rankSort !== undefined) {
+          matching.sort((a, b) => rankSort * (a.rank.localeCompare(b.rank)))
         }
-        return Effect.succeed(matching[0])
+        return Effect.succeed(matching.at(0))
       }
       return Effect.succeed(undefined)
     }
@@ -367,7 +369,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
           return Effect.succeed(found)
         }
         if (typeof q.name === "object" && "$like" in (q.name as Record<string, unknown>)) {
-          const pattern = (q.name as Record<string, string>).$like.replace(/%/g, "")
+          const pattern = assertExists((q.name as { readonly $like?: string }).$like).replace(/%/g, "")
           const found = persons.find(p => p.name.includes(pattern))
           return Effect.succeed(found)
         }
@@ -401,7 +403,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
         config.captureUpdateDoc.operations = operations as Record<string, unknown>
       }
       // Return project with incremented sequence
-      const project = projects[0]
+      const project = assertAt(projects, 0)
       const sequence = (config.updateDocResult?.object?.sequence) ?? project.sequence + 1
       return Effect.succeed({ object: { sequence } } as never)
     }
@@ -507,10 +509,10 @@ describe("listIssues", () => {
 
         expect(result).toHaveLength(2)
         // Expect sorted by modifiedOn descending (newer first)
-        expect(result[0].issueId).toBe("issue-1")
-        expect(result[0].identifier).toBe("TEST-1")
-        expect(result[1].issueId).toBe("issue-2")
-        expect(result[1].identifier).toBe("TEST-2")
+        expect(assertAt(result, 0).issueId).toBe("issue-1")
+        expect(assertAt(result, 0).identifier).toBe("TEST-1")
+        expect(assertAt(result, 1).issueId).toBe("issue-2")
+        expect(assertAt(result, 1).identifier).toBe("TEST-2")
       }))
 
     it.effect("transforms priority correctly", () =>
@@ -565,7 +567,7 @@ describe("listIssues", () => {
           withDiagnostics
         )
 
-        expect(result[0].assignee).toBe("Jane Doe")
+        expect(assertAt(result, 0).assignee).toBe("Jane Doe")
       }))
   })
 
@@ -1533,9 +1535,9 @@ describe("createIssue", () => {
           { parentId: string; identifier: string; parentTitle: string }
         >
         expect(parents).toHaveLength(1)
-        expect(parents[0].parentId).toBe("parent-1")
-        expect(parents[0].identifier).toBe("TEST-1")
-        expect(parents[0].parentTitle).toBe("Parent Issue")
+        expect(assertAt(parents, 0).parentId).toBe("parent-1")
+        expect(assertAt(parents, 0).identifier).toBe("TEST-1")
+        expect(assertAt(parents, 0).parentTitle).toBe("Parent Issue")
       }))
 
     it.effect("creates top-level issue when no parentIssue specified", () =>
@@ -1600,11 +1602,11 @@ describe("createIssue", () => {
           { parentId: string; identifier: string; parentTitle: string }
         >
         expect(parents).toHaveLength(2)
-        expect(parents[0].parentId).toBe("grandparent-1")
-        expect(parents[0].identifier).toBe("TEST-1")
-        expect(parents[1].parentId).toBe("parent-2")
-        expect(parents[1].identifier).toBe("TEST-5")
-        expect(parents[1].parentTitle).toBe("Parent Issue")
+        expect(assertAt(parents, 0).parentId).toBe("grandparent-1")
+        expect(assertAt(parents, 0).identifier).toBe("TEST-1")
+        expect(assertAt(parents, 1).parentId).toBe("parent-2")
+        expect(assertAt(parents, 1).identifier).toBe("TEST-5")
+        expect(assertAt(parents, 1).parentTitle).toBe("Parent Issue")
       }))
 
     it.effect("returns IssueNotFoundError when parent doesn't exist", () =>

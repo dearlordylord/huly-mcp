@@ -40,6 +40,7 @@ import {
   listThreadReplies,
   updateThreadReply
 } from "../../../src/huly/operations/threads.js"
+import { assertAt } from "../../../src/utils/assertions.js"
 import { channelIdentifier, messageBrandId, threadReplyId } from "../../helpers/brands.js"
 
 import { chunter, contact } from "../../../src/huly/huly-plugins.js"
@@ -410,8 +411,8 @@ describe("listChannels", () => {
       const result = yield* listChannels({}).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
-      expect(result[0].name).toBe("alpha")
-      expect(result[1].name).toBe("zebra")
+      expect(assertAt(result, 0).name).toBe("alpha")
+      expect(assertAt(result, 1).name).toBe("zebra")
     }))
 
   it.effect("excludes archived channels by default", () =>
@@ -487,7 +488,7 @@ describe("listChannels", () => {
 
       const result = yield* listChannels({}).pipe(Effect.provide(testLayer))
 
-      expect(result[0]).toEqual({
+      expect(assertAt(result, 0)).toEqual({
         id: "ch-1",
         name: "general",
         topic: "General chat",
@@ -749,8 +750,8 @@ describe("listChannelMessages", () => {
       )
 
       expect(result.messages).toHaveLength(2)
-      expect(result.messages[0].id).toBe("msg-2")
-      expect(result.messages[1].id).toBe("msg-1")
+      expect(assertAt(result.messages, 0).id).toBe("msg-2")
+      expect(assertAt(result.messages, 1).id).toBe("msg-1")
     }))
 
   it.effect("resolves sender names via buildSocialIdToPersonNameMap", () =>
@@ -804,12 +805,12 @@ describe("listChannelMessages", () => {
 
       expect(result.messages).toHaveLength(3)
       // Messages sorted by createdOn descending: 3000, 2000, 1000
-      expect(result.messages[0].sender).toBeUndefined()
-      expect(result.messages[0].senderId).toBe("social-unknown")
-      expect(result.messages[1].sender).toBe("Bob Jones")
-      expect(result.messages[1].senderId).toBe("social-bob")
-      expect(result.messages[2].sender).toBe("Alice Smith")
-      expect(result.messages[2].senderId).toBe("social-alice")
+      expect(assertAt(result.messages, 0).sender).toBeUndefined()
+      expect(assertAt(result.messages, 0).senderId).toBe("social-unknown")
+      expect(assertAt(result.messages, 1).sender).toBe("Bob Jones")
+      expect(assertAt(result.messages, 1).senderId).toBe("social-bob")
+      expect(assertAt(result.messages, 2).sender).toBe("Alice Smith")
+      expect(assertAt(result.messages, 2).senderId).toBe("social-alice")
     }))
 
   it.effect("returns ChannelNotFoundError when channel doesn't exist", () =>
@@ -990,8 +991,8 @@ describe("listDirectMessages", () => {
       const result = yield* listDirectMessages({}).pipe(Effect.provide(testLayer))
 
       expect(result.conversations).toHaveLength(2)
-      expect(result.conversations[0].id).toBe("dm-2")
-      expect(result.conversations[1].id).toBe("dm-1")
+      expect(assertAt(result.conversations, 0).id).toBe("dm-2")
+      expect(assertAt(result.conversations, 1).id).toBe("dm-1")
     }))
 
   it.effect("resolves participant names", () =>
@@ -1020,8 +1021,8 @@ describe("listDirectMessages", () => {
 
       const result = yield* listDirectMessages({}).pipe(Effect.provide(testLayer))
 
-      expect(result.conversations[0].participants).toEqual(["Alice", "Bob"])
-      expect(result.conversations[0].participantIds).toEqual([
+      expect(assertAt(result.conversations, 0).participants).toEqual(["Alice", "Bob"])
+      expect(assertAt(result.conversations, 0).participantIds).toEqual([
         "00000000-0000-4000-8000-000000000000",
         "00000000-0000-4000-8000-000000000002"
       ])
@@ -1059,7 +1060,7 @@ describe("listDirectMessages", () => {
       const result = yield* listDirectMessages({}).pipe(Effect.provide(testLayer))
 
       expect(result.conversations).toHaveLength(1)
-      expect(result.conversations[0].id).toBe("dm-own")
+      expect(assertAt(result.conversations, 0).id).toBe("dm-own")
     }))
 })
 
@@ -1104,17 +1105,17 @@ describe("listThreadReplies", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result.replies).toHaveLength(2)
-      expect(result.replies[0].id).toBe("reply-1")
-      expect(result.replies[0].body).toContain("First reply")
-      expect(result.replies[0].senderId).toBe("user-1")
-      expect(result.replies[0].sender).toBeUndefined()
-      expect(result.replies[0].createdOn).toBe(1000)
-      expect(result.replies[0].modifiedOn).toBe(1500)
-      expect(result.replies[1].id).toBe("reply-2")
-      expect(result.replies[1].body).toContain("Second reply")
-      expect(result.replies[1].senderId).toBe("user-2")
-      expect(result.replies[1].createdOn).toBe(2000)
-      expect(result.replies[1].modifiedOn).toBe(2500)
+      expect(assertAt(result.replies, 0).id).toBe("reply-1")
+      expect(assertAt(result.replies, 0).body).toContain("First reply")
+      expect(assertAt(result.replies, 0).senderId).toBe("user-1")
+      expect(assertAt(result.replies, 0).sender).toBeUndefined()
+      expect(assertAt(result.replies, 0).createdOn).toBe(1000)
+      expect(assertAt(result.replies, 0).modifiedOn).toBe(1500)
+      expect(assertAt(result.replies, 1).id).toBe("reply-2")
+      expect(assertAt(result.replies, 1).body).toContain("Second reply")
+      expect(assertAt(result.replies, 1).senderId).toBe("user-2")
+      expect(assertAt(result.replies, 1).createdOn).toBe(2000)
+      expect(assertAt(result.replies, 1).modifiedOn).toBe(2500)
     }))
 
   it.effect("returns MessageNotFoundError when message doesn't exist", () =>

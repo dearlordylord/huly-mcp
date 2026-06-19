@@ -31,6 +31,7 @@ import {
   unarchiveNotification,
   updateNotificationProviderSetting
 } from "../../../src/huly/operations/notifications.js"
+import { assertAt } from "../../../src/utils/assertions.js"
 import {
   docId,
   notificationBrandId,
@@ -225,13 +226,13 @@ describe("listNotifications", () => {
       const result = yield* listNotifications({}).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("notif-1")
-      expect(result[0].isViewed).toBe(false)
-      expect(result[0].archived).toBe(false)
-      expect(result[0].objectId).toBe("obj-1")
-      expect(result[0].objectClass).toBe("tracker.class.Issue")
-      expect(result[0].createdOn).toBe(1706500000000)
-      expect(result[0].modifiedOn).toBe(1706500001000)
+      expect(assertAt(result, 0).id).toBe("notif-1")
+      expect(assertAt(result, 0).isViewed).toBe(false)
+      expect(assertAt(result, 0).archived).toBe(false)
+      expect(assertAt(result, 0).objectId).toBe("obj-1")
+      expect(assertAt(result, 0).objectClass).toBe("tracker.class.Issue")
+      expect(assertAt(result, 0).createdOn).toBe(1706500000000)
+      expect(assertAt(result, 0).modifiedOn).toBe(1706500001000)
     }))
 
   it.effect("excludes archived notifications by default", () =>
@@ -250,7 +251,7 @@ describe("listNotifications", () => {
       const result = yield* listNotifications({}).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("notif-1")
+      expect(assertAt(result, 0).id).toBe("notif-1")
     }))
 
   it.effect("includes archived when requested", () =>
@@ -289,7 +290,7 @@ describe("listNotifications", () => {
       const result = yield* listNotifications({ unreadOnly: true }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("notif-1")
+      expect(assertAt(result, 0).id).toBe("notif-1")
     }))
 
   it.effect("returns empty array when no notifications", () =>
@@ -731,7 +732,7 @@ describe("listNotificationContexts", () => {
       const result = yield* listNotificationContexts({}).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("ctx-1")
+      expect(assertAt(result, 0).id).toBe("ctx-1")
     }))
 
   it.effect("filters pinned only when requested", () =>
@@ -752,7 +753,7 @@ describe("listNotificationContexts", () => {
       const result = yield* listNotificationContexts({ pinnedOnly: true }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("ctx-1")
+      expect(assertAt(result, 0).id).toBe("ctx-1")
     }))
 
   it.effect("returns empty array when no contexts", () =>
@@ -951,9 +952,9 @@ describe("listNotificationSettings", () => {
       const result = yield* listNotificationSettings({}).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("setting-1")
-      expect(result[0].providerId).toBe("provider-inbox")
-      expect(result[0].enabled).toBe(true)
+      expect(assertAt(result, 0).id).toBe("setting-1")
+      expect(assertAt(result, 0).providerId).toBe("provider-inbox")
+      expect(assertAt(result, 0).enabled).toBe(true)
     }))
 
   it.effect("returns empty array when no settings", () =>

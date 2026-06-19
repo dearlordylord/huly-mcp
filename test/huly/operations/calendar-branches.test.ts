@@ -11,6 +11,7 @@ import { expect } from "vitest"
 import { Timestamp } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { listEventInstances } from "../../../src/huly/operations/calendar.js"
+import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import { eventBrandId } from "../../helpers/brands.js"
 
 import { calendar, contact } from "../../../src/huly/huly-plugins.js"
@@ -80,7 +81,7 @@ const createTestLayer = (config: MockConfig) => {
     if (_class === contact.class.Person) {
       const q = query as Record<string, unknown>
       if (q._id && typeof q._id === "object" && "$in" in (q._id as Record<string, unknown>)) {
-        const ids = (q._id as Record<string, Array<string>>).$in
+        const ids = assertExists((q._id as { readonly $in?: ReadonlyArray<string> }).$in)
         const matched = persons.filter(p => ids.includes(p._id))
         return Effect.succeed(toFindResult(matched as Array<Doc>))
       }
@@ -209,7 +210,7 @@ describe("listEventInstances - externalParticipants branch (line 624)", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].externalParticipants).toEqual(["external@example.com", "guest@test.org"])
+      expect(assertAt(result, 0).externalParticipants).toEqual(["external@example.com", "guest@test.org"])
     }))
 
   it.effect("returns undefined externalParticipants when not present", () =>
@@ -231,6 +232,6 @@ describe("listEventInstances - externalParticipants branch (line 624)", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].externalParticipants).toBeUndefined()
+      expect(assertAt(result, 0).externalParticipants).toBeUndefined()
     }))
 })

@@ -17,6 +17,7 @@ import {
   listStatuses,
   updateProject
 } from "../../../src/huly/operations/projects.js"
+import { assertAt } from "../../../src/utils/assertions.js"
 import { projectIdentifier } from "../../helpers/brands.js"
 import { withDiagnostics } from "../../helpers/diagnostics.js"
 
@@ -224,7 +225,7 @@ describe("listProjects", () => {
         const result = yield* listProjects({}).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result.projects).toHaveLength(1)
-        expect(result.projects[0]).toEqual({
+        expect(assertAt(result.projects, 0)).toEqual({
           identifier: "TEST",
           name: "Test Project",
           description: "A description",
@@ -244,7 +245,7 @@ describe("listProjects", () => {
 
         const result = yield* listProjects({}).pipe(Effect.provide(testLayer), withDiagnostics)
 
-        expect(result.projects[0].description).toBeUndefined()
+        expect(assertAt(result.projects, 0).description).toBeUndefined()
       }))
 
     it.effect("fails when a listed project has invalid SDK data", () =>
@@ -288,7 +289,7 @@ describe("listProjects", () => {
 
         expect(captureQuery.query?.archived).toBe(false)
         expect(result.projects).toHaveLength(1)
-        expect(result.projects[0].identifier).toBe("ACTIVE")
+        expect(assertAt(result.projects, 0).identifier).toBe("ACTIVE")
       }))
 
     it.effect("includes archived when includeArchived=true", () =>
@@ -323,7 +324,7 @@ describe("listProjects", () => {
 
         expect(captureQuery.query?.archived).toBe(false)
         expect(result.projects).toHaveLength(1)
-        expect(result.projects[0].identifier).toBe("ACTIVE")
+        expect(assertAt(result.projects, 0).identifier).toBe("ACTIVE")
       }))
   })
 
@@ -516,7 +517,7 @@ describe("getProject", () => {
       expect(result.defaultStatus).toBe("plainstatus")
       expect(result.statuses).toEqual(["plainstatus"])
       expect(warnings).toHaveLength(1)
-      expect(warnings[0].code).toBe("status_metadata_unresolved")
+      expect(assertAt(warnings, 0).code).toBe("status_metadata_unresolved")
     }))
 
   it.effect("falls back to raw status refs when status document and model lookups both fail", () =>
@@ -545,7 +546,7 @@ describe("getProject", () => {
       expect(result.defaultStatus).toBe("plainstatus")
       expect(result.statuses).toEqual(["plainstatus"])
       expect(warnings).toHaveLength(1)
-      expect(warnings[0].code).toBe("status_metadata_unresolved")
+      expect(assertAt(warnings, 0).code).toBe("status_metadata_unresolved")
     }))
 
   it.effect("resolves status metadata from the local model when status document lookup fails", () =>
@@ -610,7 +611,7 @@ describe("getProject", () => {
         { name: "plainstatus", category: "unknown", isDefault: false }
       ])
       expect(warnings).toHaveLength(1)
-      expect(warnings[0].code).toBe("status_metadata_unresolved")
+      expect(assertAt(warnings, 0).code).toBe("status_metadata_unresolved")
     }))
 
   it.effect("uses model metadata for statuses missing from a partial status document lookup", () =>

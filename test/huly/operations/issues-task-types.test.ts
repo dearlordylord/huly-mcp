@@ -10,6 +10,7 @@ import {
 } from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import { TaskTypeRefSchema } from "../../../src/domain/schemas.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
@@ -309,8 +310,8 @@ describe("issue write task type support", () => {
       }).pipe(Effect.provide(createLayer({ captures })), withDiagnostics)
 
       expect(result.identifier).toBe("TEST-2")
-      expect(captures.addCollections[0].attributes.kind).toBe(bugTaskTypeId)
-      expect(captures.addCollections[0].attributes.status).toBe(bugReviewStatusId)
+      expect(assertAt(captures.addCollections, 0).attributes.kind).toBe(bugTaskTypeId)
+      expect(assertAt(captures.addCollections, 0).attributes.status).toBe(bugReviewStatusId)
     }))
 
   it.effect("uses model-resolved status names for task type status validation when status lookup fails", () =>
@@ -335,8 +336,8 @@ describe("issue write task type support", () => {
       )
       const warnings = yield* diagnostics.drainWarnings
 
-      expect(captures.addCollections[0].attributes.kind).toBe(bugTaskTypeId)
-      expect(captures.addCollections[0].attributes.status).toBe(bugReviewStatusId)
+      expect(assertAt(captures.addCollections, 0).attributes.kind).toBe(bugTaskTypeId)
+      expect(assertAt(captures.addCollections, 0).attributes.status).toBe(bugReviewStatusId)
       expect(warnings).toEqual([])
     }))
 
@@ -356,8 +357,8 @@ describe("issue write task type support", () => {
         withDiagnostics
       )
 
-      expect(captures.addCollections[0].attributes.kind).toBe(bugTaskTypeId)
-      expect(captures.addCollections[0].attributes.status).toBe(bugOpenStatusId)
+      expect(assertAt(captures.addCollections, 0).attributes.kind).toBe(bugTaskTypeId)
+      expect(assertAt(captures.addCollections, 0).attributes.status).toBe(bugOpenStatusId)
     }))
 
   it.effect("uses the task type default status when the project default belongs to another task type", () =>
@@ -370,8 +371,8 @@ describe("issue write task type support", () => {
         taskType: TaskTypeRefSchema.make("Bug")
       }).pipe(Effect.provide(createLayer({ captures })), withDiagnostics)
 
-      expect(captures.addCollections[0].attributes.kind).toBe(bugTaskTypeId)
-      expect(captures.addCollections[0].attributes.status).toBe(bugOpenStatusId)
+      expect(assertAt(captures.addCollections, 0).attributes.kind).toBe(bugTaskTypeId)
+      expect(assertAt(captures.addCollections, 0).attributes.status).toBe(bugOpenStatusId)
     }))
 
   it.effect("rejects a status that exists in the project but not on the selected task type", () =>

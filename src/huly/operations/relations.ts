@@ -59,7 +59,7 @@ const resolveTargetIssue = (
   Effect.gen(function*() {
     const { fullIdentifier } = parseIssueIdentifier(targetIssueStr, sourceProject.identifier)
     const match = fullIdentifier.match(/^([A-Z]+)-\d+$/i)
-    const prefix = match ? match[1].toUpperCase() : null
+    const prefix = match?.[1]?.toUpperCase() ?? null
 
     if (prefix !== null && prefix !== sourceProject.identifier.toUpperCase()) {
       const { client: c, project: targetProject } = yield* findProject(prefix)

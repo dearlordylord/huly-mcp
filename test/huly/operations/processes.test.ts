@@ -5,6 +5,7 @@ import { toFindResult } from "@hcengineering/core"
 import type { IntlString } from "@hcengineering/platform"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import {
   ProcessCardIdentifier,
@@ -225,7 +226,7 @@ const createLayer = (config?: {
   const findOneImpl: HulyClientOperations["findOne"] = (<T extends Doc>(
     _class: Ref<Class<T>>,
     query: DocumentQuery<T>
-  ) => findAllImpl<T>(_class, query).pipe(Effect.map((items) => items[0]))) as HulyClientOperations["findOne"]
+  ) => findAllImpl<T>(_class, query).pipe(Effect.map((items) => items.at(0)))) as HulyClientOperations["findOne"]
 
   const createDocImpl: HulyClientOperations["createDoc"] = ((
     _class: unknown,
@@ -432,10 +433,10 @@ describe("process operations", () => {
         ]
       })))
 
-      expect(result.executions[0].errorCount).toBe(1)
-      expect(result.executions[0].hasError).toBe(true)
-      expect(result.executions[0].hasParent).toBe(true)
-      expect(result.executions[0].parentExecutionId).toBe(parentExecutionId)
+      expect(assertAt(result.executions, 0).errorCount).toBe(1)
+      expect(assertAt(result.executions, 0).hasError).toBe(true)
+      expect(assertAt(result.executions, 0).hasParent).toBe(true)
+      expect(assertAt(result.executions, 0).parentExecutionId).toBe(parentExecutionId)
     }))
 
   it.effect("uses returned item count when Huly does not include an execution total", () =>
@@ -512,7 +513,7 @@ describe("process operations", () => {
         currentStateTitle: "Draft",
         status: "active"
       })
-      const [createdExecution] = createDocCalls
+      const createdExecution = assertAt(createDocCalls, 0)
       expect(result.executionId).toBe(createdExecution.id)
       expect(createdExecution.class).toBe(processPlugin.class.Execution)
       expect(createdExecution.space).toBe(core.space.Workspace)
@@ -564,7 +565,7 @@ describe("process operations", () => {
 
       expect(result.currentStateId).toBe(earliestStateId)
       expect(result.currentStateTitle).toBe("Earliest")
-      expect(createDocCalls[0].attributes).toMatchObject({ currentState: earliestStateId })
+      expect(assertAt(createDocCalls, 0).attributes).toMatchObject({ currentState: earliestStateId })
     }))
 
   it.effect("fails start_process when the process has no initial transition", () =>
@@ -652,7 +653,7 @@ describe("process operations", () => {
         status: "cancelled",
         cancelled: true
       })
-      const [updatedExecution] = updateDocCalls
+      const updatedExecution = assertAt(updateDocCalls, 0)
       expect(updatedExecution.class).toBe(processPlugin.class.Execution)
       expect(updatedExecution.objectId).toBe("execution-1")
       expect(updatedExecution.operations).toEqual({ status: "cancelled" })
@@ -727,7 +728,7 @@ describe("process operations branch coverage", () => {
         parallelExecutionForbidden: undefined
       })
       const result = yield* listProcesses({}).pipe(Effect.provide(createLayer({ processes: [bare] })))
-      const summary = result.processes[0]
+      const summary = assertAt(result.processes, 0)
       expect(summary.autoStart).toBe(false)
       expect(summary.automationOnly).toBe(false)
       expect(summary.parallelExecutionForbidden).toBe(false)

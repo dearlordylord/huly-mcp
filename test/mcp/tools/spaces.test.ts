@@ -3,6 +3,7 @@ import type { Class, Doc, DocumentQuery, Ref, Space } from "@hcengineering/core"
 import { toFindResult } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import type { HulyClientOperations } from "../../../src/huly/client.js"
 import { core } from "../../../src/huly/huly-plugins.js"
@@ -117,7 +118,7 @@ describe("spaceTools", () => {
         spaces: [{ id: "space-1", class: core.class.Space, membersCount: 1 }],
         total: 1
       })
-      expect(JSON.parse(result.content[0].text)).toMatchObject({ total: 1 })
+      expect(JSON.parse(assertAt(result.content, 0).text)).toMatchObject({ total: 1 })
     }))
 
   it.effect("update_space handler maps validation errors to invalid params", () =>
@@ -127,7 +128,7 @@ describe("spaceTools", () => {
       )
 
       expect(result.isError).toBe(true)
-      expect(result.content[0].text).toContain("Invalid parameters for update_space")
+      expect(assertAt(result.content, 0).text).toContain("Invalid parameters for update_space")
     }))
 
   it.effect("set_space_role_members handler maps non-typed spaces to invalid params", () =>
@@ -143,7 +144,7 @@ describe("spaceTools", () => {
       expect(result.isError).toBe(true)
       expect(result._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
       expect(result._meta?.errorTag).toBeUndefined()
-      expect(result.content[0].text).toBe(
+      expect(assertAt(result.content, 0).text).toBe(
         "Space 'General' (space-1) is not typed; role members can only be changed on spaces with a SpaceType"
       )
     }))
@@ -160,6 +161,6 @@ describe("spaceTools", () => {
       )
 
       expect(result.isError).toBe(true)
-      expect(result.content[0].text).toContain("Space 'missing' not found")
+      expect(assertAt(result.content, 0).text).toContain("Space 'missing' not found")
     }))
 })

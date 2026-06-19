@@ -10,6 +10,7 @@ import {
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { HulyConnectionError } from "../../../src/huly/errors.js"
 import { fulltextSearch } from "../../../src/huly/operations/search.js"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 const parseSearchResultDoc = Schema.decodeUnknownSync(SearchResultDocSchema)
 
@@ -84,18 +85,18 @@ describe("fulltextSearch", () => {
       expect(result.query).toBe("test")
       expect(result.total).toBe(2)
 
-      expect(result.items[0].id).toBe("doc-1")
-      expect(result.items[0].class).toBe("core:class:Doc")
-      expect(result.items[0].title).toBe("First")
-      expect(result.items[0].score).toBe(10)
-      expect(result.items[0].createdOn).toBe(2000)
+      expect(assertAt(result.items, 0).id).toBe("doc-1")
+      expect(assertAt(result.items, 0).class).toBe("core:class:Doc")
+      expect(assertAt(result.items, 0).title).toBe("First")
+      expect(assertAt(result.items, 0).score).toBe(10)
+      expect(assertAt(result.items, 0).createdOn).toBe(2000)
 
-      expect(result.items[1].id).toBe("doc-2")
-      expect(result.items[1].class).toBe("tracker:class:Issue")
-      expect(result.items[1].title).toBe("Second")
-      expect(result.items[1].description).toBe("desc")
-      expect(result.items[1].score).toBe(5)
-      expect(result.items[1].createdOn).toBe(1000)
+      expect(assertAt(result.items, 1).id).toBe("doc-2")
+      expect(assertAt(result.items, 1).class).toBe("tracker:class:Issue")
+      expect(assertAt(result.items, 1).title).toBe("Second")
+      expect(assertAt(result.items, 1).description).toBe("desc")
+      expect(assertAt(result.items, 1).score).toBe(5)
+      expect(assertAt(result.items, 1).createdOn).toBe(1000)
     }))
 
   it.effect("passes query string to searchFulltext", () =>

@@ -27,6 +27,7 @@ import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.
 import type { InvalidStatusError, PersonNotFoundError } from "../../../src/huly/errors.js"
 import { contact, core, task, tracker } from "../../../src/huly/huly-plugins.js"
 import { createIssue, getIssue, listIssues, updateIssue } from "../../../src/huly/operations/issues.js"
+import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import { componentIdentifier, email, issueIdentifier, projectIdentifier, statusName } from "../../helpers/brands.js"
 import { withDiagnostics } from "../../helpers/diagnostics.js"
 
@@ -277,7 +278,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
           return Effect.succeed(found)
         }
         if (typeof q.name === "object" && "$like" in (q.name as Record<string, unknown>)) {
-          const pattern = (q.name as Record<string, string>).$like.replace(/%/g, "")
+          const pattern = assertExists((q.name as { readonly $like?: string }).$like).replace(/%/g, "")
           const found = persons.find(p => p.name.includes(pattern))
           return Effect.succeed(found)
         }
@@ -299,7 +300,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       if (config.captureUpdateDoc) {
         config.captureUpdateDoc.operations = operations as Record<string, unknown>
       }
-      const project = projects[0]
+      const project = assertAt(projects, 0)
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- project may be undefined from array access
       const sequence = (config.updateDocResult?.object?.sequence) ?? (project ? project.sequence + 1 : 1)
       return Effect.succeed({ object: { sequence } } as never)
@@ -815,8 +816,8 @@ describe("Issues Coverage - listIssues parent and summary branches", () => {
         withDiagnostics
       )
 
-      expect(result[0].parentIssue).toBe("TEST-1")
-      expect(result[0].subIssues).toBe(3)
+      expect(assertAt(result, 0).parentIssue).toBe("TEST-1")
+      expect(assertAt(result, 0).subIssues).toBe(3)
     }))
 
   it.effect("maps invalid listed issue data to HulyConnectionError", () =>

@@ -4,6 +4,7 @@ import { SocialIdType } from "@hcengineering/core"
 import { Effect, Option, Schema } from "effect"
 
 import { Count, Email, type NonEmptyString, PersonName, type PersonRefInput } from "../../domain/schemas/shared.js"
+import { isNonEmpty } from "../../utils/assertions.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import { PersonIdentifierAmbiguousError, PersonNotAnEmployeeError, PersonNotFoundError } from "../errors.js"
 import { contact } from "../huly-plugins.js"
@@ -34,7 +35,7 @@ export const findPersonByEmail = (
       }
     )
 
-    if (channels.length === 0) {
+    if (!isNonEmpty(channels)) {
       return undefined
     }
 

@@ -15,6 +15,7 @@ import {
 import type { DocNotifyContext as HulyDocNotifyContext } from "@hcengineering/notification"
 import { Effect, Exit } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import { AccountUuid } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
@@ -472,7 +473,7 @@ describe("group direct-message creation", () => {
 
       expect(result.created).toBe(true)
       expect(directMessages).toHaveLength(1)
-      expect(directMessages[0].members).toEqual([accountA, accountB, me].sort())
+      expect(assertAt(directMessages, 0).members).toEqual([accountA, accountB, me].sort())
     }))
 
   it.effect("rejects self-only group DM participant sets after de-dupe", () =>
@@ -510,7 +511,7 @@ describe("conversation state", () => {
       expect(result.starred).toBe(true)
       expect(result.closed).toBe(false)
       expect(result.changed).toBe(true)
-      expect(contexts[0].isPinned).toBe(true)
+      expect(assertAt(contexts, 0).isPinned).toBe(true)
     }))
 
   it.effect("creates a missing channel context without an update when target state is false", () =>
@@ -529,7 +530,7 @@ describe("conversation state", () => {
       expect(result.closed).toBe(false)
       expect(result.starred).toBe(false)
       expect(result.changed).toBe(true)
-      expect(contexts[0].hidden).toBe(false)
+      expect(assertAt(contexts, 0).hidden).toBe(false)
     }))
 
   it.effect("does not update an existing context already in the requested starred state", () =>

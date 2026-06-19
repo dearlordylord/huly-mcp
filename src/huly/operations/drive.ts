@@ -26,6 +26,7 @@ import {
   DrivePath
 } from "../../domain/schemas/drive.js"
 import { Count, DEFAULT_INCLUDE_ARCHIVED } from "../../domain/schemas/shared.js"
+import { isNonEmpty } from "../../utils/assertions.js"
 import { HulyClient } from "../client.js"
 import { drive, type DriveSpace, type File, type FileVersion } from "../drive-sdk.js"
 import { DrivePathConflictError, DrivePathNotFoundError } from "../errors-drive.js"
@@ -173,12 +174,17 @@ export const uploadDriveFile = (
     const storage = yield* HulyStorageClient
     const driveSpace = yield* resolveDrive(client, params.drive)
     const normalized = normalizeDrivePath(params.path)
-    if (normalized.segments.length === 0) {
+    if (!isNonEmpty(normalized.segments)) {
       return yield* Effect.fail(
         new DrivePathConflictError({ drive: params.drive, path: normalized.path, existingKind: "folder" })
       )
     }
-    const title = normalized.segments[normalized.segments.length - 1]
+    const title = normalized.segments.at(-1)
+    if (title === undefined) {
+      return yield* Effect.fail(
+        new DrivePathConflictError({ drive: params.drive, path: normalized.path, existingKind: "folder" })
+      )
+    }
 
     const parentPath = parentPathOf(normalized)
     const createParents = params.createParents ?? DEFAULT_DRIVE_CREATE_PARENTS
@@ -187,7 +193,7 @@ export const uploadDriveFile = (
       : yield* resolveExistingParentFolder(client, driveSpace, params.drive, normalized, parentPath)
 
     const existing = yield* findChildrenByTitle(client, driveSpace, parent.folder?._id ?? drive.ids.Root, title)
-    if (existing.length > 0) {
+    if (isNonEmpty(existing)) {
       const existingItem = existing[0]
       return yield* Effect.fail(
         new DrivePathConflictError({

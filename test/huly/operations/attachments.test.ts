@@ -24,6 +24,7 @@ import {
   updateAttachment
 } from "../../../src/huly/operations/attachments.js"
 import { HulyStorageClient, type HulyStorageOperations } from "../../../src/huly/storage.js"
+import { assertAt } from "../../../src/utils/assertions.js"
 import {
   attachmentBrandId,
   attachmentDescription,
@@ -282,8 +283,8 @@ describe("listAttachments", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(2)
-      expect(result[0].name).toBe("file1.pdf")
-      expect(result[1].name).toBe("file2.png")
+      expect(assertAt(result, 0).name).toBe("file1.pdf")
+      expect(assertAt(result, 1).name).toBe("file2.png")
     }))
 
   it.effect("returns empty array when no attachments", () =>
@@ -316,8 +317,8 @@ describe("listAttachments", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toHaveLength(1)
-      expect(result[0].pinned).toBeUndefined()
-      expect(result[0].description).toBeUndefined()
+      expect(assertAt(result, 0).pinned).toBeUndefined()
+      expect(assertAt(result, 0).description).toBeUndefined()
     }))
 })
 

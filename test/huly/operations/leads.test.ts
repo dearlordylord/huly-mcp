@@ -3,6 +3,7 @@ import { AvatarType, type Contact, type Organization as HulyOrganization, type P
 import type { Doc, Ref, Status, WithLookup } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { Diagnostics, makeDiagnosticsScope } from "../../../src/huly/diagnostics.js"
@@ -295,8 +296,8 @@ describe("Lead Operations", () => {
         const result = yield* listFunnels({}).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result.funnels).toHaveLength(1)
-        expect(result.funnels[0].identifier).toBe("f-1")
-        expect(result.funnels[0].name).toBe("Sales")
+        expect(assertAt(result.funnels, 0).identifier).toBe("f-1")
+        expect(assertAt(result.funnels, 0).name).toBe("Sales")
         expect(result.total).toBe(1)
       }))
 
@@ -333,10 +334,10 @@ describe("Lead Operations", () => {
         )
 
         expect(result).toHaveLength(1)
-        expect(result[0].identifier).toBe("LEAD-1")
-        expect(result[0].status).toBe("Active")
-        expect(result[0].assignee).toBe("Smith,Jane")
-        expect(result[0].customer).toBe("Acme,Corp")
+        expect(assertAt(result, 0).identifier).toBe("LEAD-1")
+        expect(assertAt(result, 0).status).toBe("Active")
+        expect(assertAt(result, 0).assignee).toBe("Smith,Jane")
+        expect(assertAt(result, 0).customer).toBe("Acme,Corp")
       }))
 
     it.effect("accepts case-insensitive funnel name lookup as a convenience", () =>
@@ -350,7 +351,7 @@ describe("Lead Operations", () => {
         )
 
         expect(result).toHaveLength(1)
-        expect(result[0].identifier).toBe("LEAD-1")
+        expect(assertAt(result, 0).identifier).toBe("LEAD-1")
       }))
 
     it.effect("prefers the most recently modified non-archived funnel when names collide", () =>
@@ -382,7 +383,7 @@ describe("Lead Operations", () => {
         )
 
         expect(result).toHaveLength(1)
-        expect(result[0].identifier).toBe("LEAD-1")
+        expect(assertAt(result, 0).identifier).toBe("LEAD-1")
       }))
 
     it.effect("lists leads with organization customers resolved through the customer mixin lookup", () =>
@@ -401,7 +402,7 @@ describe("Lead Operations", () => {
         )
 
         expect(result).toHaveLength(1)
-        expect(result[0].customer).toBe("Acme Org")
+        expect(assertAt(result, 0).customer).toBe("Acme Org")
       }))
 
     it.effect("filters leads by status name", () =>
@@ -427,7 +428,7 @@ describe("Lead Operations", () => {
         )
 
         expect(result).toHaveLength(1)
-        expect(result[0].identifier).toBe("LEAD-2")
+        expect(assertAt(result, 0).identifier).toBe("LEAD-2")
       }))
 
     it.effect("returns empty array when assignee is not found", () =>
@@ -459,7 +460,7 @@ describe("Lead Operations", () => {
         )
         const warnings = yield* diagnostics.drainWarnings
 
-        expect(result[0].status).toBe("Active")
+        expect(assertAt(result, 0).status).toBe("Active")
         expect(warnings).toEqual([])
       }))
 
@@ -479,9 +480,9 @@ describe("Lead Operations", () => {
         )
         const warnings = yield* diagnostics.drainWarnings
 
-        expect(result[0].status).toBe("plainstatus")
+        expect(assertAt(result, 0).status).toBe("plainstatus")
         expect(warnings).toHaveLength(1)
-        expect(warnings[0].code).toBe("status_metadata_unresolved")
+        expect(assertAt(warnings, 0).code).toBe("status_metadata_unresolved")
       }))
 
     it.effect("fails with FunnelNotFoundError when funnel does not exist", () =>

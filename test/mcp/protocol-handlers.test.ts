@@ -1,3 +1,4 @@
+import { assertAt } from "../../src/utils/assertions.js"
 /**
  * Tests for the shared MCP protocol handlers (src/mcp/protocol-handlers.ts).
  *
@@ -251,7 +252,7 @@ describe("createMcpProtocolHandlers", () => {
 
       expect(response.isError).toBe(true)
       expect(probe.toolCalled).toHaveLength(1)
-      expect(probe.toolCalled[0]).toMatchObject({
+      expect(assertAt(probe.toolCalled, 0)).toMatchObject({
         toolName: "does_not_exist",
         status: "error",
         durationMs: 42
@@ -425,7 +426,7 @@ const diagnosticProbeRegistry: ToolRegistry = {
 
 // Narrow the MCP content union to the text variant (no cast).
 const firstText = (content: ReadonlyArray<unknown>): string => {
-  const item = content[0]
+  const item = assertAt(content, 0)
   if (typeof item === "object" && item !== null && "text" in item && typeof item.text === "string") {
     return item.text
   }
@@ -489,7 +490,11 @@ describe("createMcpProtocolHandlers — version tool", () => {
     expect(response.isError).not.toBe(true)
     expect(firstText(response.content)).toContain(VERSION)
     expect(firstText(response.content)).toContain("9.9.9")
-    expect(probe.toolCalled[0]).toMatchObject({ toolName: VERSION_TOOL_NAME, status: "success", durationMs: 100 })
+    expect(assertAt(probe.toolCalled, 0)).toMatchObject({
+      toolName: VERSION_TOOL_NAME,
+      status: "success",
+      durationMs: 100
+    })
   })
 
   it("rejects unexpected arguments without fetching", async () => {
@@ -529,7 +534,7 @@ describe("createMcpProtocolHandlers — get_huly_context tool", () => {
 
     expect(response.isError).not.toBe(true)
     expect(firstText(response.content)).toContain("@firfi/huly-mcp")
-    expect(probe.toolCalled[0]).toMatchObject({ toolName: GET_HULY_CONTEXT_TOOL_NAME, status: "success" })
+    expect(assertAt(probe.toolCalled, 0)).toMatchObject({ toolName: GET_HULY_CONTEXT_TOOL_NAME, status: "success" })
   })
 
   it("maps a context that fails validation to an error", async () => {
@@ -586,7 +591,7 @@ describe("createMcpProtocolHandlers — tool dispatch", () => {
     const response = await handlers.callTool({ params: { name: "list_projects", arguments: {} } })
 
     expect(response.isError).not.toBe(true)
-    expect(probe.toolCalled[0]).toMatchObject({ toolName: "list_projects", status: "success" })
+    expect(assertAt(probe.toolCalled, 0)).toMatchObject({ toolName: "list_projects", status: "success" })
   })
 
   it("carries diagnostics warnings through the MCP callTool response", async () => {
@@ -613,10 +618,10 @@ describe("createMcpProtocolHandlers — tool dispatch", () => {
       warnings: [warning]
     })
     expect(response.content).toHaveLength(2)
-    expect(JSON.parse(firstText([response.content[1]]))).toEqual({ warnings: [warning] })
-    expect(probe.toolCalled[0]).toMatchObject({ toolName: "diagnostic_probe", status: "success" })
-    expect(JSON.stringify(probe.toolCalled[0])).not.toContain(warning.message)
-    expect(probe.toolCalled[0]).not.toHaveProperty("warnings")
+    expect(JSON.parse(firstText([assertAt(response.content, 1)]))).toEqual({ warnings: [warning] })
+    expect(assertAt(probe.toolCalled, 0)).toMatchObject({ toolName: "diagnostic_probe", status: "success" })
+    expect(JSON.stringify(assertAt(probe.toolCalled, 0))).not.toContain(warning.message)
+    expect(assertAt(probe.toolCalled, 0)).not.toHaveProperty("warnings")
   })
 
   it("maps a client-resolution failure to an error", async () => {
@@ -662,7 +667,7 @@ describe("createMcpProtocolHandlers — tool dispatch", () => {
 
     expect(response.isError).toBe(true)
     expect(firstText(response.content)).toContain("Unknown tool")
-    expect(probe.toolCalled[0]).toMatchObject({ toolName: "propertyless_tool", status: "error" })
+    expect(assertAt(probe.toolCalled, 0)).toMatchObject({ toolName: "propertyless_tool", status: "error" })
   })
 
   it("threads the derived edit mode into telemetry when client resolution fails", async () => {
@@ -741,7 +746,7 @@ describe("createMcpProtocolHandlers — resource handlers", () => {
         })
       ]
     })
-    const content = result.contents[0]
+    const content = assertAt(result.contents, 0)
     if (!("text" in content)) throw new Error("expected text resource content")
     expect(JSON.parse(content.text)).toMatchObject({
       project: {

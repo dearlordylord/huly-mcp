@@ -20,6 +20,7 @@ import {
   SpaceTypeId as SpaceTypeIdSchema
 } from "../../domain/schemas/shared.js"
 import type { SpaceMemberIdentifier } from "../../domain/schemas/spaces.js"
+import { assertAt } from "../../utils/assertions.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type {
   NoUpdateFieldsError,
@@ -298,7 +299,7 @@ export const findSpace = (
         }))
       })
     }
-    return matches[0]
+    return assertAt(matches, 0)
   })
 
 export const updateSpaceDoc = (

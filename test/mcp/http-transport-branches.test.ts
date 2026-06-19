@@ -1,3 +1,4 @@
+import { assertAt } from "../../src/utils/assertions.js"
 /**
  * Branch coverage tests for http-transport.ts.
  *
@@ -52,7 +53,11 @@ const createProbe = <Args extends Array<unknown>, Result>(
 const createVoidProbe = <Args extends Array<unknown>>(): Probe<Args, void> => createProbe<Args, void>(() => undefined)
 
 const createMockExpressApp = () => {
-  const routes: Record<string, Record<string, (req: Request, res: Response) => Promise<void>>> = {
+  const routes: {
+    get: Record<string, (req: Request, res: Response) => Promise<void>>
+    post: Record<string, (req: Request, res: Response) => Promise<void>>
+    delete: Record<string, (req: Request, res: Response) => Promise<void>>
+  } = {
     get: {},
     post: {},
     delete: {}
@@ -173,7 +178,7 @@ describe("HTTP Transport - Branch Coverage", () => {
       expect(closeProbe.calls).toHaveLength(1)
       // Verify the error was caught and logged to stderr rather than crashing
       const closeErrorCall = writeError.calls.find(
-        (call) => call[0].includes("Server close error")
+        (call) => assertAt(call, 0).includes("Server close error")
       )
       expect(closeErrorCall).toBeDefined()
     })

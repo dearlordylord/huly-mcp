@@ -1,3 +1,4 @@
+import { assertAt } from "../../../src/utils/assertions.js"
 /* eslint-disable no-restricted-syntax -- test fixtures build Huly SDK docs whose nominal types are not structurally compatible with plain object literals, and branded refs have no runtime constructors */
 import { describe, it } from "@effect/vitest"
 import type { ThreadMessage as HulyThreadMessage } from "@hcengineering/chunter"
@@ -192,7 +193,7 @@ describe("listInlineComments", () => {
         Effect.provide(buildLayer({ documents: [makeDocument()], markup: markupWithThread("thread-1", "commented") }))
       )
       expect(result.total).toBe(1)
-      expect(result.comments[0]).toEqual({ threadId: "thread-1", text: "commented" })
+      expect(assertAt(result.comments, 0)).toEqual({ threadId: "thread-1", text: "commented" })
     }))
 
   it.effect("includes replies with resolved and unresolved sender names", () =>
@@ -213,7 +214,7 @@ describe("listInlineComments", () => {
       )
 
       expect(result.total).toBe(1)
-      const comment = result.comments[0]
+      const comment = assertAt(result.comments, 0)
       expect(comment.threadId).toBe("thread-1")
       expect(comment.replies).toHaveLength(2)
       expect(comment.replies?.[0]).toMatchObject({ id: "reply-1", sender: "Alice" })

@@ -1,3 +1,4 @@
+import { assertAt } from "../../../src/utils/assertions.js"
 /* eslint-disable no-restricted-syntax -- Huly SDK phantom refs are erased at runtime; this test builds in-memory SDK fixtures. */
 import { describe, it } from "@effect/vitest"
 import type { Attachment as HulyAttachment } from "@hcengineering/attachment"
@@ -114,7 +115,7 @@ const hulyClient: HulyClientOperations = {
   findAllInModel: <T extends Doc>(classRef: Ref<Class<T>>, query: DocumentQuery<T>, options?: FindOptions<T>) =>
     hulyClient.findAll(classRef, query, options),
   findOne: <T extends Doc>(classRef: Ref<Class<T>>, query: DocumentQuery<T>) =>
-    Effect.map(hulyClient.findAll(classRef, query), (docs) => docs[0]),
+    Effect.map(hulyClient.findAll(classRef, query), (docs) => docs.at(0)),
   createDoc: () => Effect.die(new Error("not implemented")),
   updateDoc: <T extends Doc>(
     classRef: Ref<Class<T>>,
@@ -126,7 +127,7 @@ const hulyClient: HulyClientOperations = {
       const index = attachments.findIndex((candidate) => String(candidate._id) === String(objectId))
       if (index >= 0) {
         attachments[index] = {
-          ...attachments[index],
+          ...assertAt(attachments, index),
           ...(operations as unknown as DocumentUpdate<HulyAttachment>)
         }
       }
@@ -218,9 +219,9 @@ describe("channel MCP tools", () => {
       for (const name of expected) {
         expect(toolRegistry.tools.has(name)).toBe(true)
       }
-      expect(names.indexOf("delete_thread_reply")).toBeLessThan(names.indexOf(expected[0]))
+      expect(names.indexOf("delete_thread_reply")).toBeLessThan(names.indexOf(assertAt(expected, 0)))
       expect(expected.map((name) => names.indexOf(name))).toEqual(
-        expected.map((_name, index) => names.indexOf(expected[0]) + index)
+        expected.map((_name, index) => names.indexOf(assertAt(expected, 0)) + index)
       )
     }))
 
@@ -346,6 +347,6 @@ describe("channel MCP tools", () => {
 
       expect(result.isError).toBe(true)
       expect(result._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
-      expect(result.content[0]?.text).toContain("Attachment 'att-foreign' not found on channel message")
+      expect(result.content[0].text).toContain("Attachment 'att-foreign' not found on channel message")
     }))
 })

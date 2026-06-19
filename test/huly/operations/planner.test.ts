@@ -15,12 +15,17 @@ import type { Issue as HulyIssue, IssueStatus, Project as HulyProject } from "@h
 import { IssuePriority, TimeReportDayType } from "@hcengineering/tracker"
 import { Effect, TestClock } from "effect"
 import { expect } from "vitest"
+import { assertAt } from "../../../src/utils/assertions.js"
 
 import { TodoTitle } from "../../../src/domain/schemas/planner.js"
 import { Email, Timestamp, WorkSlotId } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { contact, time, tracker } from "../../../src/huly/huly-plugins.js"
-import { queryFromListFilters, todoSummary } from "../../../src/huly/operations/planner-shared.js"
+import {
+  markupRefAsTodoDescription,
+  queryFromListFilters,
+  todoSummary
+} from "../../../src/huly/operations/planner-shared.js"
 import {
   completeTodo,
   createTodo,
@@ -407,6 +412,10 @@ const createLayer = (config: TestConfig) => {
 }
 
 describe("planner operations", () => {
+  it("maps null markup refs to empty todo descriptions", () => {
+    expect(markupRefAsTodoDescription(null)).toBe("")
+  })
+
   it.effect("lists ToDos with stable priority and owner fields", () =>
     Effect.gen(function*() {
       const captures: Captures = {}
@@ -415,8 +424,8 @@ describe("planner operations", () => {
       )
 
       expect(result).toHaveLength(1)
-      expect(result[0].priority).toBe("high")
-      expect(result[0].owner.id).toBe("employee-1")
+      expect(assertAt(result, 0).priority).toBe("high")
+      expect(assertAt(result, 0).owner.id).toBe("employee-1")
     }))
 
   it.effect("lists with owner, issue, due, priority, visibility, and title filters", () =>
@@ -455,9 +464,9 @@ describe("planner operations", () => {
       )
 
       expect(result).toHaveLength(1)
-      expect(result[0].title).toBe("Needle task")
-      expect(result[0].priority).toBe("medium")
-      expect(result[0].visibility).toBe("freeBusy")
+      expect(assertAt(result, 0).title).toBe("Needle task")
+      expect(assertAt(result, 0).priority).toBe("medium")
+      expect(assertAt(result, 0).visibility).toBe("freeBusy")
     }))
 
   it("builds one-sided due date list filters", () => {
@@ -705,8 +714,8 @@ describe("planner operations", () => {
         }))
       )
 
-      expect(result[0].attachedTo.type).toBe("unknown")
-      expect(result[0].doneOn).toBe(100)
+      expect(assertAt(result, 0).attachedTo.type).toBe("unknown")
+      expect(assertAt(result, 0).doneOn).toBe(100)
     }))
 
   it.effect("uses non-empty output fallbacks for legacy blank titles", () =>
@@ -726,8 +735,8 @@ describe("planner operations", () => {
         }))
       )
 
-      expect(result[0].title).toBe("Untitled ToDo")
-      expect(result[0].attachedTo).toMatchObject({ type: "issue", title: todoTitle("HULY-94") })
+      expect(assertAt(result, 0).title).toBe("Untitled ToDo")
+      expect(assertAt(result, 0).attachedTo).toMatchObject({ type: "issue", title: todoTitle("HULY-94") })
     }))
 
   it.effect("returns an ambiguous locator error for duplicate title matches", () =>

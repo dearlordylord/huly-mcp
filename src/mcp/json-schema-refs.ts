@@ -5,7 +5,7 @@ const mergeDefinitionRecords = (
   definitions: ReadonlyArray<Record<string, unknown> | undefined>
 ): Record<string, unknown> | undefined => {
   const merged = definitions.reduce<Record<string, unknown>>(
-    (acc, definition) => definition === undefined ? acc : { ...definition, ...acc },
+    (acc, definition) => definition === undefined ? acc : { ...acc, ...definition },
     {}
   )
   return Object.keys(merged).length > 0 ? merged : undefined
@@ -22,7 +22,7 @@ export const collectJsonSchemaDefinitions = (value: unknown): Record<string, unk
     .filter(([key]) => key !== "$defs")
     .map(([, nested]) => collectJsonSchemaDefinitions(nested))
 
-  return mergeDefinitionRecords([ownDefinitions, ...nestedDefinitions])
+  return mergeDefinitionRecords([...nestedDefinitions, ownDefinitions])
 }
 
 export const omitJsonSchemaDocumentMetadata = (schema: object): Record<string, unknown> =>

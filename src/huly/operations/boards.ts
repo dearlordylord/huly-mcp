@@ -34,6 +34,7 @@ import type {
   UpdateBoardParams
 } from "../../domain/schemas.js"
 import { BoardCardId, BoardCardSequenceIdentifier, BoardId, BoardName, Count } from "../../domain/schemas.js"
+import { isSingle } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
 import {
@@ -121,8 +122,9 @@ export const createBoard = (
       board.class.Board,
       hulyQuery<HulyBoard>({ name: params.name, archived: false })
     )
-    if (existing.length === 1) {
-      return { id: BoardId.make(existing[0]._id), name: BoardName.make(existing[0].name), created: false }
+    if (isSingle(existing)) {
+      const boardDoc = existing[0]
+      return { id: BoardId.make(boardDoc._id), name: BoardName.make(boardDoc.name), created: false }
     }
     if (existing.length > 1) {
       return yield* new BoardIdentifierAmbiguousError({ identifier: params.name, matches: existing.length })

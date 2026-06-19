@@ -1,3 +1,4 @@
+import { assertAt } from "../../../src/utils/assertions.js"
 /* eslint-disable no-restricted-syntax -- test fixtures bridge Huly SDK phantom refs and generic client operation signatures */
 import { describe, it } from "@effect/vitest"
 import type { ActivityMessage } from "@hcengineering/activity"
@@ -1268,7 +1269,7 @@ describe("Recruiting Operations", () => {
         members: [accountUuid],
         owners: [accountUuid]
       })
-      expect(captures.createdMixins[0]).toMatchObject({
+      expect(assertAt(captures.createdMixins, 0)).toMatchObject({
         mixin: String(vacancyTypeDataRef),
         attributes: {}
       })
@@ -1315,7 +1316,7 @@ describe("Recruiting Operations", () => {
       }).pipe(Effect.provide(created.layer))
 
       expect(createResult.created).toBe(true)
-      expect(created.captures.createdMixins[0]).toMatchObject({
+      expect(assertAt(created.captures.createdMixins, 0)).toMatchObject({
         id: "person-2",
         mixin: String(recruitIds.mixin.Candidate),
         attributes: { title: "Compiler Engineer", remote: true }
@@ -1329,7 +1330,7 @@ describe("Recruiting Operations", () => {
       }).pipe(Effect.provide(updated.layer))
 
       expect(updateResult.created).toBe(false)
-      expect(updated.captures.updatedMixins[0]).toMatchObject({
+      expect(assertAt(updated.captures.updatedMixins, 0)).toMatchObject({
         id: "person-1",
         attributes: { source: "Inbound", onsite: true }
       })
@@ -1511,7 +1512,7 @@ describe("Recruiting Operations", () => {
 
       expect(added.attached).toBe(true)
       expect(captures.createdDocs[0]?.class).toBe(String(tags.class.TagElement))
-      expect(captures.addedCollections[0]).toMatchObject({
+      expect(assertAt(captures.addedCollections, 0)).toMatchObject({
         class: String(tags.class.TagReference),
         attachedTo: "person-1",
         collection: "skills"
@@ -1602,7 +1603,7 @@ describe("Recruiting Operations", () => {
 
       expect(result.applicant.identifier).toBe("APP-7")
       expect(result.applicant.status).toBe("Interview")
-      expect(captures.addedCollections[0]).toMatchObject({
+      expect(assertAt(captures.addedCollections, 0)).toMatchObject({
         class: String(recruitIds.class.Applicant),
         space: "vacancy-1",
         attachedTo: "person-1",
@@ -1860,7 +1861,7 @@ describe("Recruiting Operations", () => {
       }).pipe(Effect.provide(layer), withDiagnostics)
 
       expect(deleted.deleted).toBe(true)
-      expect(captures.removedCollections[0]).toMatchObject({
+      expect(assertAt(captures.removedCollections, 0)).toMatchObject({
         class: String(recruitIds.class.Applicant),
         id: "applicant-1",
         attachedTo: "person-1",
