@@ -4,7 +4,7 @@ import { expect } from "vitest"
 import { HulyClient } from "../src/huly/client.js"
 import { HulyStorageClient } from "../src/huly/storage.js"
 import { WorkspaceClient } from "../src/huly/workspace-client.js"
-import { getHttpPort, getMcpAuthToken, main } from "../src/index.js"
+import { getHttpPort, getLazyEnvs, getMcpAuthToken, main } from "../src/index.js"
 import { DEFAULT_HTTP_PORT, HttpServerFactoryService } from "../src/mcp/http-transport.js"
 import { type ClientBundle, McpServerError, McpServerService } from "../src/mcp/server.js"
 import { TelemetryService } from "../src/telemetry/telemetry.js"
@@ -48,7 +48,9 @@ describe("Main Entry Point", () => {
     "MCP_TRANSPORT",
     "MCP_HTTP_PORT",
     "MCP_AUTH_TOKEN",
-    "PORT"
+    "PORT",
+    "LAZY_ENVS",
+    "GLAMA_VERSION"
   ]
 
   beforeEach(() => {
@@ -129,6 +131,34 @@ describe("Main Entry Point", () => {
           expect(Redacted.value(token.value)).toBe("mcp-endpoint-secret")
           expect(`${token.value}`).toBe("<redacted>")
         }
+      }))
+  })
+
+  describe("lazy Huly config startup", () => {
+    it.effect("defaults to eager stdio config validation outside registry inspection", () =>
+      Effect.gen(function*() {
+        const lazyEnvs = yield* getLazyEnvs
+
+        expect(lazyEnvs).toBe(false)
+      }))
+
+    it.effect("defaults to lazy config validation during Glama registry inspection", () =>
+      Effect.gen(function*() {
+        process.env["GLAMA_VERSION"] = "1.0.0"
+
+        const lazyEnvs = yield* getLazyEnvs
+
+        expect(lazyEnvs).toBe(true)
+      }))
+
+    it.effect("lets explicit LAZY_ENVS override Glama registry inspection", () =>
+      Effect.gen(function*() {
+        process.env["GLAMA_VERSION"] = "1.0.0"
+        process.env["LAZY_ENVS"] = "false"
+
+        const lazyEnvs = yield* getLazyEnvs
+
+        expect(lazyEnvs).toBe(false)
       }))
   })
 

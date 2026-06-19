@@ -62,9 +62,18 @@ const getAutoExit = Config.boolean("MCP_AUTO_EXIT").pipe(
   Config.withDefault(false)
 )
 
-const getLazyEnvs = Config.string("LAZY_ENVS").pipe(
-  Config.withDefault("false"),
-  Effect.map((v) => v.toLowerCase() === "true")
+const isGlamaRegistryInspection = (): boolean => process.env["GLAMA_VERSION"] !== undefined
+
+const parseBooleanEnvFlag = (value: string): boolean => value.toLowerCase() === "true"
+
+export const getLazyEnvs = Config.string("LAZY_ENVS").pipe(
+  Config.option,
+  Effect.map((value) =>
+    Option.match(value, {
+      onNone: isGlamaRegistryInspection,
+      onSome: parseBooleanEnvFlag
+    })
+  )
 )
 
 const restoreConsoleRedirect = (redirect: ConsoleRedirectHandle | undefined): Effect.Effect<void> =>
