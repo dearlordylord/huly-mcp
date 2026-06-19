@@ -45,15 +45,23 @@ import {
   BoardCardIdentifierAmbiguousError,
   BoardCardNotFoundError,
   BoardIdentifierAmbiguousError,
+  BoardLabelIdentifierAmbiguousError,
+  BoardLabelNotFoundError,
+  BoardMenuPageIdentifierAmbiguousError,
+  BoardMenuPageNotFoundError,
   BoardModelSequenceMissingError,
   BoardMutationUnsupportedError,
   BoardNotFoundError,
   BoardProjectTypeIdentifierAmbiguousError,
   BoardProjectTypeNotFoundError,
+  BoardSavedViewIdentifierAmbiguousError,
+  BoardSavedViewNotFoundError,
   BoardStatusIdentifierAmbiguousError,
   BoardStatusNotFoundError,
   BoardTaskTypeIdentifierAmbiguousError,
   BoardTaskTypeNotFoundError,
+  BoardViewletIdentifierAmbiguousError,
+  BoardViewletNotFoundError,
   BYTES_PER_MB,
   CalendarNotAccessibleError,
   CannotDirectMessageSelfError,
@@ -274,6 +282,28 @@ describe("Huly Errors", () => {
         )
         expect(new BoardMutationUnsupportedError({ message: "removeCollection missing" }).message).toBe(
           "removeCollection missing"
+        )
+        expect(new BoardLabelNotFoundError({ identifier: "Urgent" }).message).toBe("Board label 'Urgent' not found")
+        expect(new BoardLabelIdentifierAmbiguousError({ identifier: "Urgent", matches: 2 }).message).toBe(
+          "Board label 'Urgent' matched 2 labels; pass a label _id"
+        )
+        expect(new BoardSavedViewNotFoundError({ identifier: "Mine" }).message).toBe(
+          "Board saved view 'Mine' not found"
+        )
+        expect(new BoardSavedViewIdentifierAmbiguousError({ identifier: "Mine", matches: 2 }).message).toBe(
+          "Board saved view 'Mine' matched 2 saved views; pass a saved view _id"
+        )
+        expect(new BoardMenuPageNotFoundError({ identifier: "main" }).message).toBe(
+          "Board menu page 'main' not found"
+        )
+        expect(new BoardMenuPageIdentifierAmbiguousError({ identifier: "main", matches: 2 }).message).toBe(
+          "Board menu page 'main' matched 2 menu pages; pass a menu page _id"
+        )
+        expect(new BoardViewletNotFoundError({ identifier: "Table" }).message).toBe(
+          "Board viewlet 'Table' not found"
+        )
+        expect(new BoardViewletIdentifierAmbiguousError({ identifier: "Table", matches: 2 }).message).toBe(
+          "Board viewlet 'Table' matched 2 viewlets; pass a viewlet _id"
         )
       }))
   })
@@ -1164,6 +1194,22 @@ describe("Huly Errors", () => {
               return `board-sequence:${error.cardClass}`
             case "BoardMutationUnsupportedError":
               return `board-mutation-unsupported:${error.message}`
+            case "BoardLabelNotFoundError":
+              return `board-label:${error.identifier}`
+            case "BoardLabelIdentifierAmbiguousError":
+              return `board-label-ambiguous:${error.identifier}:${error.matches}`
+            case "BoardSavedViewNotFoundError":
+              return `board-saved-view:${error.identifier}`
+            case "BoardSavedViewIdentifierAmbiguousError":
+              return `board-saved-view-ambiguous:${error.identifier}:${error.matches}`
+            case "BoardMenuPageNotFoundError":
+              return `board-menu-page:${error.identifier}`
+            case "BoardMenuPageIdentifierAmbiguousError":
+              return `board-menu-page-ambiguous:${error.identifier}:${error.matches}`
+            case "BoardViewletNotFoundError":
+              return `board-viewlet:${error.identifier}`
+            case "BoardViewletIdentifierAmbiguousError":
+              return `board-viewlet-ambiguous:${error.identifier}:${error.matches}`
             case "NoUpdateFieldsError":
               return `no-update-fields:${error.operation}:${error.fields.length}`
             case "CannotDirectMessageSelfError":

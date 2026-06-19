@@ -152,3 +152,97 @@ export class BoardMutationUnsupportedError extends Schema.TaggedError<BoardMutat
     message: Schema.String
   }
 ) {}
+
+export class BoardLabelNotFoundError extends Schema.TaggedError<BoardLabelNotFoundError>()(
+  "BoardLabelNotFoundError",
+  {
+    identifier: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Board label '${this.identifier}' not found`
+  }
+}
+
+export class BoardLabelIdentifierAmbiguousError extends Schema.TaggedError<BoardLabelIdentifierAmbiguousError>()(
+  "BoardLabelIdentifierAmbiguousError",
+  {
+    identifier: Schema.String,
+    matches: Schema.Number
+  }
+) {
+  override get message(): string {
+    return `Board label '${this.identifier}' matched ${this.matches} labels; pass a label _id`
+  }
+}
+
+export class BoardSavedViewNotFoundError extends Schema.TaggedError<BoardSavedViewNotFoundError>()(
+  "BoardSavedViewNotFoundError",
+  {
+    identifier: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Board saved view '${this.identifier}' not found`
+  }
+}
+
+export class BoardSavedViewIdentifierAmbiguousError
+  extends Schema.TaggedError<BoardSavedViewIdentifierAmbiguousError>()(
+    "BoardSavedViewIdentifierAmbiguousError",
+    {
+      identifier: Schema.String,
+      matches: Schema.Number
+    }
+  )
+{
+  override get message(): string {
+    return `Board saved view '${this.identifier}' matched ${this.matches} saved views; pass a saved view _id`
+  }
+}
+
+export class BoardMenuPageNotFoundError extends Schema.TaggedError<BoardMenuPageNotFoundError>()(
+  "BoardMenuPageNotFoundError",
+  {
+    identifier: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Board menu page '${this.identifier}' not found`
+  }
+}
+
+export class BoardMenuPageIdentifierAmbiguousError extends Schema.TaggedError<BoardMenuPageIdentifierAmbiguousError>()(
+  "BoardMenuPageIdentifierAmbiguousError",
+  {
+    identifier: Schema.String,
+    matches: Schema.Number
+  }
+) {
+  override get message(): string {
+    return `Board menu page '${this.identifier}' matched ${this.matches} menu pages; pass a menu page _id`
+  }
+}
+
+export class BoardViewletNotFoundError extends Schema.TaggedError<BoardViewletNotFoundError>()(
+  "BoardViewletNotFoundError",
+  {
+    identifier: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Board viewlet '${this.identifier}' not found`
+  }
+}
+
+export class BoardViewletIdentifierAmbiguousError extends Schema.TaggedError<BoardViewletIdentifierAmbiguousError>()(
+  "BoardViewletIdentifierAmbiguousError",
+  {
+    identifier: Schema.String,
+    matches: Schema.Number
+  }
+) {
+  override get message(): string {
+    return `Board viewlet '${this.identifier}' matched ${this.matches} viewlets; pass a viewlet _id`
+  }
+}

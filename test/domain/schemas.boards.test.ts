@@ -4,19 +4,39 @@ import { expect } from "vitest"
 
 import {
   BoardCardSummarySchema,
+  BoardCommonPreferenceResultSchema,
+  BoardLabelMutationResultSchema,
+  BoardLabelSummarySchema,
+  BoardSavedViewDetailSchema,
   createBoardCardParamsJsonSchema,
   CreateBoardCardResultSchema,
+  getBoardSavedViewParamsJsonSchema,
+  listBoardLabelsParamsJsonSchema,
+  parseAddBoardCardLabelParams,
+  parseBoardCardLabelParams,
   parseBoardCardMutationParams,
   parseBoardMutationParams,
   parseCreateBoardCardParams,
+  parseCreateBoardLabelParams,
+  parseDeleteBoardLabelParams,
   parseGetBoardCardParams,
   parseGetBoardParams,
+  parseGetBoardSavedViewParams,
+  parseListBoardLabelsParams,
+  parseListBoardMenuPagesParams,
+  parseListBoardSavedViewsParams,
+  parseListBoardViewletsParams,
+  parseRemoveBoardCardLabelParams,
   parseUpdateBoardCardParams,
+  parseUpdateBoardLabelParams,
   parseUpdateBoardParams,
-  updateBoardCardParamsJsonSchema
+  updateBoardCardParamsJsonSchema,
+  updateBoardLabelParamsJsonSchema
 } from "../../src/domain/schemas.js"
 
 describe("board schemas", () => {
+  const strictParseOptions = { onExcessProperty: "error" } as const
+
   it.effect("accepts board and board card locator forms", () =>
     Effect.gen(function*() {
       expect((yield* parseGetBoardParams({ board: "Roadmap" })).board).toBe("Roadmap")
@@ -25,6 +45,26 @@ describe("board schemas", () => {
       expect((yield* parseGetBoardCardParams({ board: "Roadmap", card: "CARD-123" })).card).toBe("CARD-123")
       expect((yield* parseGetBoardCardParams({ board: "Roadmap", card: "123" })).card).toBe("123")
       expect((yield* parseBoardCardMutationParams({ board: "Roadmap", card: "Planning" })).card).toBe("Planning")
+      expect((yield* parseDeleteBoardLabelParams({ label: "Urgent" })).label).toBe("Urgent")
+      expect((yield* parseBoardCardLabelParams({ board: "Roadmap", card: "CARD-1" })).card).toBe("CARD-1")
+      expect((yield* parseGetBoardSavedViewParams({ savedView: "Mine" })).savedView).toBe("Mine")
+    }))
+
+  it.effect("accepts board label and view discovery params", () =>
+    Effect.gen(function*() {
+      expect((yield* parseListBoardLabelsParams({ titleSearch: "Urg", category: "Other", limit: 5 })).category)
+        .toBe("Other")
+      expect((yield* parseCreateBoardLabelParams({ title: "Urgent", color: 3 })).title).toBe("Urgent")
+      expect((yield* parseUpdateBoardLabelParams({ label: "Urgent", description: null })).description).toBeNull()
+      expect((yield* parseAddBoardCardLabelParams({ board: "Roadmap", card: "CARD-1", label: "Urgent" })).label)
+        .toBe("Urgent")
+      expect((yield* parseRemoveBoardCardLabelParams({ board: "Roadmap", card: "CARD-1", label: "Urgent" })).card)
+        .toBe("CARD-1")
+      expect((yield* parseListBoardMenuPagesParams({ page: "main" })).page).toBe("main")
+      expect((yield* parseListBoardSavedViewsParams({ visibility: "own", nameSearch: "Mine" })).visibility).toBe(
+        "own"
+      )
+      expect((yield* parseListBoardViewletsParams({ viewlet: "table" })).viewlet).toBe("table")
     }))
 
   it.effect("accepts clearable update fields and member mutation fields", () =>
@@ -62,9 +102,15 @@ describe("board schemas", () => {
     Effect.gen(function*() {
       const emptyBoard = yield* Effect.either(parseGetBoardParams({ board: "" }))
       const emptyCard = yield* Effect.either(parseGetBoardCardParams({ board: "Roadmap", card: "" }))
+      const emptyLabel = yield* Effect.either(parseDeleteBoardLabelParams({ label: "" }))
+      const emptySavedView = yield* Effect.either(parseGetBoardSavedViewParams({ savedView: "" }))
+      const emptyViewlet = yield* Effect.either(parseListBoardViewletsParams({ viewlet: "" }))
 
       expect(emptyBoard._tag).toBe("Left")
       expect(emptyCard._tag).toBe("Left")
+      expect(emptyLabel._tag).toBe("Left")
+      expect(emptySavedView._tag).toBe("Left")
+      expect(emptyViewlet._tag).toBe("Left")
     }))
 
   it.effect("rejects invalid cover size and color", () =>
@@ -79,9 +125,11 @@ describe("board schemas", () => {
         title: "Plan",
         cover: { color: 24, size: "small" }
       }))
+      const badLabelColor = yield* Effect.either(parseCreateBoardLabelParams({ title: "Urgent", color: 24 }))
 
       expect(badSize._tag).toBe("Left")
       expect(badColor._tag).toBe("Left")
+      expect(badLabelColor._tag).toBe("Left")
     }))
 
   it.effect("rejects replacing members while adding or removing members", () =>
@@ -107,20 +155,28 @@ describe("board schemas", () => {
     Effect.gen(function*() {
       const boardResult = yield* Effect.either(parseUpdateBoardParams({ board: "Roadmap" }))
       const cardResult = yield* Effect.either(parseUpdateBoardCardParams({ board: "Roadmap", card: "CARD-1" }))
+      const labelResult = yield* Effect.either(parseUpdateBoardLabelParams({ label: "Urgent" }))
 
       expect(boardResult._tag).toBe("Left")
       expect(cardResult._tag).toBe("Left")
+      expect(labelResult._tag).toBe("Left")
     }))
 
   it.effect("exposes useful JSON schema descriptions for LLM single-call use", () =>
     Effect.gen(function*() {
       const createSchemaText = JSON.stringify(createBoardCardParamsJsonSchema)
       const updateSchemaText = JSON.stringify(updateBoardCardParamsJsonSchema)
+      const labelsSchemaText = JSON.stringify(listBoardLabelsParamsJsonSchema)
+      const updateLabelSchemaText = JSON.stringify(updateBoardLabelParamsJsonSchema)
+      const savedViewSchemaText = JSON.stringify(getBoardSavedViewParamsJsonSchema)
 
       expect(createSchemaText).toContain("CARD-number sequence")
       expect(createSchemaText).toContain("exact email")
       expect(updateSchemaText).toContain("null clears")
       expect(updateSchemaText).toContain("Cannot be combined with addMembers")
+      expect(labelsSchemaText).toContain("board-card tags")
+      expect(updateLabelSchemaText).toContain("title, color, description, category")
+      expect(savedViewSchemaText).toContain("attachedTo = board.app.Board")
     }))
 
   it.effect("validates board card output identifiers and semantic text fields", () =>
@@ -158,5 +214,68 @@ describe("board schemas", () => {
       expect(malformedIdentifier._tag).toBe("Left")
       expect(emptyTitle._tag).toBe("Left")
       expect(emptyBoard._tag).toBe("Left")
+    }))
+
+  it.effect("validates saved-view output while preserving SDK-open payloads", () =>
+    Effect.gen(function*() {
+      const decoded = yield* Schema.decodeUnknown(BoardSavedViewDetailSchema)({
+        id: "saved-view-1",
+        name: "Mine",
+        visibility: "own",
+        attachedTo: "board:app:Board",
+        location: { path: ["board"] },
+        filters: "[{\"key\":\"status\"}]",
+        viewOptions: { groupBy: ["status"], orderBy: { key: "modifiedOn", order: "desc" } },
+        viewletId: "viewlet-1",
+        users: 1,
+        createdBy: "person-1"
+      })
+
+      expect(decoded.filters).toBe("[{\"key\":\"status\"}]")
+      expect(decoded.viewOptions).toEqual({ groupBy: ["status"], orderBy: { key: "modifiedOn", order: "desc" } })
+    }))
+
+  it.effect("validates board label output category as a resolved tag category id", () =>
+    Effect.gen(function*() {
+      const payload = {
+        id: "label-1",
+        title: "Urgent",
+        description: "",
+        color: 3,
+        category: "board:category:Other"
+      }
+
+      expect((yield* Schema.decodeUnknown(BoardLabelSummarySchema)(payload)).category).toBe("board:category:Other")
+      expect((yield* Effect.either(Schema.decodeUnknown(BoardLabelSummarySchema)({ ...payload, category: "" })))._tag)
+        .toBe("Left")
+    }))
+
+  it.effect("rejects impossible board label and common preference result states", () =>
+    Effect.gen(function*() {
+      const labelWithMultipleFlags = yield* Effect.either(
+        Schema.decodeUnknown(BoardLabelMutationResultSchema, strictParseOptions)({
+          id: "label-1",
+          title: "Urgent",
+          created: true,
+          updated: true
+        })
+      )
+      const missingPresentPreferenceFields = yield* Effect.either(
+        Schema.decodeUnknown(BoardCommonPreferenceResultSchema)({
+          present: true,
+          attachedTo: "board:app:Board"
+        })
+      )
+      const absentPreferenceWithRaw = yield* Effect.either(
+        Schema.decodeUnknown(BoardCommonPreferenceResultSchema, strictParseOptions)({
+          present: false,
+          attachedTo: "board:app:Board",
+          raw: {}
+        })
+      )
+
+      expect(labelWithMultipleFlags._tag).toBe("Left")
+      expect(missingPresentPreferenceFields._tag).toBe("Left")
+      expect(absentPreferenceWithRaw._tag).toBe("Left")
     }))
 })

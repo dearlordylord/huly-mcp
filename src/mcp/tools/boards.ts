@@ -1,34 +1,84 @@
 import {
+  addBoardCardLabelParamsJsonSchema,
+  AddBoardCardLabelResultSchema,
   BoardCardDetailSchema,
+  boardCardLabelParamsJsonSchema,
   boardCardMutationParamsJsonSchema,
   BoardCardMutationResultSchema,
+  BoardCommonPreferenceResultSchema,
   BoardDetailSchema,
+  BoardLabelMutationResultSchema,
   boardMutationParamsJsonSchema,
   BoardMutationResultSchema,
+  BoardSavedViewDetailSchema,
   createBoardCardParamsJsonSchema,
   CreateBoardCardResultSchema,
+  createBoardLabelParamsJsonSchema,
   createBoardParamsJsonSchema,
   CreateBoardResultSchema,
   DeleteBoardCardResultSchema,
+  deleteBoardLabelParamsJsonSchema,
   getBoardCardParamsJsonSchema,
+  getBoardCommonPreferenceParamsJsonSchema,
   getBoardParamsJsonSchema,
+  getBoardSavedViewParamsJsonSchema,
+  ListBoardCardLabelsResultSchema,
   listBoardCardsParamsJsonSchema,
   ListBoardCardsResultSchema,
+  listBoardLabelsParamsJsonSchema,
+  ListBoardLabelsResultSchema,
+  listBoardMenuPagesParamsJsonSchema,
+  ListBoardMenuPagesResultSchema,
+  listBoardSavedViewsParamsJsonSchema,
+  ListBoardSavedViewsResultSchema,
   listBoardsParamsJsonSchema,
   ListBoardsResultSchema,
+  listBoardViewletsParamsJsonSchema,
+  ListBoardViewletsResultSchema,
+  parseAddBoardCardLabelParams,
+  parseBoardCardLabelParams,
   parseBoardCardMutationParams,
   parseBoardMutationParams,
   parseCreateBoardCardParams,
+  parseCreateBoardLabelParams,
   parseCreateBoardParams,
+  parseDeleteBoardLabelParams,
   parseGetBoardCardParams,
+  parseGetBoardCommonPreferenceParams,
   parseGetBoardParams,
+  parseGetBoardSavedViewParams,
   parseListBoardCardsParams,
+  parseListBoardLabelsParams,
+  parseListBoardMenuPagesParams,
+  parseListBoardSavedViewsParams,
   parseListBoardsParams,
+  parseListBoardViewletsParams,
+  parseRemoveBoardCardLabelParams,
   parseUpdateBoardCardParams,
+  parseUpdateBoardLabelParams,
   parseUpdateBoardParams,
+  removeBoardCardLabelParamsJsonSchema,
+  RemoveBoardCardLabelResultSchema,
   updateBoardCardParamsJsonSchema,
+  updateBoardLabelParamsJsonSchema,
   updateBoardParamsJsonSchema
 } from "../../domain/schemas.js"
+import {
+  addBoardCardLabel,
+  createBoardLabel,
+  deleteBoardLabel,
+  listBoardCardLabels,
+  listBoardLabels,
+  removeBoardCardLabel,
+  updateBoardLabel
+} from "../../huly/operations/board-labels.js"
+import {
+  getBoardCommonPreference,
+  getBoardSavedView,
+  listBoardMenuPages,
+  listBoardSavedViews,
+  listBoardViewlets
+} from "../../huly/operations/board-views.js"
 import {
   archiveBoard,
   archiveBoardCard,
@@ -187,6 +237,162 @@ export const boardTools: ReadonlyArray<RegisteredTool> = [
       parseBoardCardMutationParams,
       deleteBoardCard,
       DeleteBoardCardResultSchema
+    )
+  },
+  {
+    name: "list_board_labels",
+    description:
+      "List board label definitions. Board labels are @hcengineering/tags TagElement rows for board cards, with targetClass = @hcengineering/board Card.",
+    category: CATEGORY,
+    inputSchema: listBoardLabelsParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "list_board_labels",
+      parseListBoardLabelsParams,
+      listBoardLabels,
+      ListBoardLabelsResultSchema
+    )
+  },
+  {
+    name: "create_board_label",
+    description:
+      "Create a board label definition for board cards. Idempotent by exact title when one label matches; uses board.category.Other when no default category exists.",
+    category: CATEGORY,
+    inputSchema: createBoardLabelParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "create_board_label",
+      parseCreateBoardLabelParams,
+      createBoardLabel,
+      BoardLabelMutationResultSchema
+    )
+  },
+  {
+    name: "update_board_label",
+    description:
+      "Update a board label definition by TagElement _id or exact title. At least one of title, color, description, or category is required.",
+    category: CATEGORY,
+    inputSchema: updateBoardLabelParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "update_board_label",
+      parseUpdateBoardLabelParams,
+      updateBoardLabel,
+      BoardLabelMutationResultSchema
+    )
+  },
+  {
+    name: "delete_board_label",
+    description:
+      "Delete one board label definition by TagElement _id or exact title. This removes the label definition, not a board card.",
+    category: CATEGORY,
+    inputSchema: deleteBoardLabelParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "delete_board_label",
+      parseDeleteBoardLabelParams,
+      deleteBoardLabel,
+      BoardLabelMutationResultSchema
+    )
+  },
+  {
+    name: "list_board_card_labels",
+    description:
+      "List board labels attached to one board card. Resolves board by _id/name and card by _id, CARD-123, bare number, or exact title.",
+    category: CATEGORY,
+    inputSchema: boardCardLabelParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "list_board_card_labels",
+      parseBoardCardLabelParams,
+      listBoardCardLabels,
+      ListBoardCardLabelsResultSchema
+    )
+  },
+  {
+    name: "add_board_card_label",
+    description:
+      "Attach a board label to a board card. If label is a new title, creates the board-card label definition first; repeated calls are idempotent.",
+    category: CATEGORY,
+    inputSchema: addBoardCardLabelParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "add_board_card_label",
+      parseAddBoardCardLabelParams,
+      addBoardCardLabel,
+      AddBoardCardLabelResultSchema
+    )
+  },
+  {
+    name: "remove_board_card_label",
+    description:
+      "Detach a board label from one board card. Returns detached=false when the label exists but is not attached to that card.",
+    category: CATEGORY,
+    inputSchema: removeBoardCardLabelParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "remove_board_card_label",
+      parseRemoveBoardCardLabelParams,
+      removeBoardCardLabel,
+      RemoveBoardCardLabelResultSchema
+    )
+  },
+  {
+    name: "list_board_menu_pages",
+    description:
+      "Read-only list of board menu page model docs. Optional page filters by MenuPage _id, raw pageId, main/archive alias, or exact label.",
+    category: CATEGORY,
+    inputSchema: listBoardMenuPagesParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "list_board_menu_pages",
+      parseListBoardMenuPagesParams,
+      listBoardMenuPages,
+      ListBoardMenuPagesResultSchema
+    )
+  },
+  {
+    name: "list_board_saved_views",
+    description:
+      "Read-only list of board saved filtered views. Queries view.class.FilteredView where attachedTo = board.app.Board and reports own/shared visibility.",
+    category: CATEGORY,
+    inputSchema: listBoardSavedViewsParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "list_board_saved_views",
+      parseListBoardSavedViewsParams,
+      listBoardSavedViews,
+      ListBoardSavedViewsResultSchema
+    )
+  },
+  {
+    name: "get_board_saved_view",
+    description:
+      "Read one board saved filtered view by FilteredView _id or exact name, scoped to attachedTo = board.app.Board. No saved-view writes are performed.",
+    category: CATEGORY,
+    inputSchema: getBoardSavedViewParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "get_board_saved_view",
+      parseGetBoardSavedViewParams,
+      getBoardSavedView,
+      BoardSavedViewDetailSchema
+    )
+  },
+  {
+    name: "list_board_viewlets",
+    description:
+      "Read-only list of board card viewlets. Queries view.class.Viewlet with attachTo = board.class.Card and includes descriptor metadata plus matching ViewletPreference configs.",
+    category: CATEGORY,
+    inputSchema: listBoardViewletsParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "list_board_viewlets",
+      parseListBoardViewletsParams,
+      listBoardViewlets,
+      ListBoardViewletsResultSchema
+    )
+  },
+  {
+    name: "get_board_common_preference",
+    description:
+      "Read the CommonBoardPreference row attached to board.app.Board. Returns present=false when the preference row is absent and never creates it.",
+    category: CATEGORY,
+    inputSchema: getBoardCommonPreferenceParamsJsonSchema,
+    handler: createEncodedToolHandler(
+      "get_board_common_preference",
+      parseGetBoardCommonPreferenceParams,
+      getBoardCommonPreference,
+      BoardCommonPreferenceResultSchema
     )
   }
 ]

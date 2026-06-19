@@ -276,7 +276,7 @@ Highest-value additions for coding agents:
 - Team planner/reporting: team agendas, workload/capacity summaries, visibility-aware free/busy views, document action items, and planner automation diagnostics.
 - Recruiting: vacancies, candidates, applications, application statuses, recruiter assignment, reviews, opinions, skills, and related comments/attachments/activity.
 - Controlled documents and trainings: controlled document spaces/projects, review/approval workflows, templates, categories, snapshots/history, training assignments, attempts, scoring, and results.
-- Module-specific tag wrappers for tag-backed concepts such as recruiting skills, board labels, controlled-document labels, and contact tags.
+- Module-specific tag wrappers for tag-backed concepts such as recruiting skills, controlled-document labels, and contact tags. Board-label definitions and board-card label attachment are covered by the `boards` tools.
 
 Planned feature surfaces:
 
@@ -289,7 +289,7 @@ Planned feature surfaces:
 - Recruiting: vacancies, talents/candidates, applications, matches, reviews, verdicts/opinions, vacancy-company lists, skills, and recruiting-specific custom fields/relations.
 - Surveys and polls: survey CRUD, poll creation/attachment, survey question data, completion status, and results.
 - Generic approval requests: create/list/approve/reject/cancel approval requests, decision comments, required approval counts, request status, and requested/approved/rejected people.
-- Boards: board CRUD, board cards, status workflows, members/assignees, location, cover/archive fields, board labels, and menu/archive views.
+- Boards: board CRUD, board cards, status workflows, members/assignees, location, cover/archive fields, board labels, menu/archive views, saved views, viewlets, and common board preference reads.
 - Inventory: category hierarchy CRUD, product CRUD, variant/SKU CRUD, and product-scoped photo, attachment, comment, and activity wrappers are covered by first-class tools; category/variant discussion wrappers remain outside this slice.
 - Leads write surface: create/update/delete funnels and leads, status changes, assignment, start dates, customer descriptions, person customer support, and lead comments/attachments/labels/relations.
 - Contacts: person channels, social identities, provider discovery, contact statuses, notes/comments, person attachments, person merge, employee invite/create/kick/reinvite, and inactive employee management.
@@ -301,7 +301,7 @@ Planned feature surfaces:
 - Attachments and media: previews/preview metadata and friendly wrappers for additional object types beyond issue/document/inventory product.
 - Core schema and workspace administration: attribute/property create/update/delete/hide, enum CRUD/options, sequence management, role/permission definition writes, generic space creation, global space admins, integrations registry, invite settings, role capability settings, and workspace setting metadata.
 - Integrations: GitHub repository/project mappings and sync metadata (deferred), Google Calendar connect/configure/sync controls, Bitrix entity/field mappings and sync status, Gmail/email channel messages, Telegram messages, Huly Mail/Mail plugin behavior, AI assistant integration state, and AI bot configuration if server-side APIs expose stable behavior.
-- Templates, rating, support, billing, analytics, views, workbench, and preferences: read-only message template/category/field discovery is covered; message template writes/rendering remain deferred until provider semantics are proven. Document/person rating data is blocked by unpublished `@hcengineering/rating` SDK package (#90); support conversations, billing tier/status discovery, onboarding channels, saved filtered views, user view preferences, tabs/widgets/apps, and module preference discovery/update remain future surfaces.
+- Templates, rating, support, billing, analytics, views, workbench, and preferences: read-only message template/category/field discovery is covered; message template writes/rendering remain deferred until provider semantics are proven. Board saved filtered views, viewlets, and common board preference reads are covered by `boards` tools. Document/person rating data is blocked by unpublished `@hcengineering/rating` SDK package (#90); support conversations, billing tier/status discovery, onboarding channels, non-board saved filtered views, user view preferences, tabs/widgets/apps, and non-board module preference discovery/update remain future surfaces.
 - Document-specific gaps: snapshot restore, backlinks, notes, structured action items/tables, PDF/export, advanced document relationships, and document printing/export once SDK support is safe.
 
 MCP resource roadmap:
@@ -640,6 +640,18 @@ SDK upgrade revisit:
 | `archive_board_card` | Archive a board card. card accepts _id, CARD-123, bare number, or exact title scoped to the board. |
 | `unarchive_board_card` | Unarchive a board card. card accepts _id, CARD-123, bare number, or exact title scoped to the board. |
 | `delete_board_card` | Permanently delete an already archived board card using Huly removeCollection. Active cards are rejected; call archive_board_card first. |
+| `list_board_labels` | List board label definitions. Board labels are @hcengineering/tags TagElement rows for board cards, with targetClass = @hcengineering/board Card. |
+| `create_board_label` | Create a board label definition for board cards. Idempotent by exact title when one label matches; uses board.category.Other when no default category exists. |
+| `update_board_label` | Update a board label definition by TagElement _id or exact title. At least one of title, color, description, or category is required. |
+| `delete_board_label` | Delete one board label definition by TagElement _id or exact title. This removes the label definition, not a board card. |
+| `list_board_card_labels` | List board labels attached to one board card. Resolves board by _id/name and card by _id, CARD-123, bare number, or exact title. |
+| `add_board_card_label` | Attach a board label to a board card. If label is a new title, creates the board-card label definition first; repeated calls are idempotent. |
+| `remove_board_card_label` | Detach a board label from one board card. Returns detached=false when the label exists but is not attached to that card. |
+| `list_board_menu_pages` | Read-only list of board menu page model docs. Optional page filters by MenuPage _id, raw pageId, main/archive alias, or exact label. |
+| `list_board_saved_views` | Read-only list of board saved filtered views. Queries view.class.FilteredView where attachedTo = board.app.Board and reports own/shared visibility. |
+| `get_board_saved_view` | Read one board saved filtered view by FilteredView _id or exact name, scoped to attachedTo = board.app.Board. No saved-view writes are performed. |
+| `list_board_viewlets` | Read-only list of board card viewlets. Queries view.class.Viewlet with attachTo = board.class.Card and includes descriptor metadata plus matching ViewletPreference configs. |
+| `get_board_common_preference` | Read the CommonBoardPreference row attached to board.app.Board. Returns present=false when the preference row is absent and never creates it. |
 
 ### Cards
 
