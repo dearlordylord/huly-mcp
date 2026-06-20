@@ -1,5 +1,15 @@
 # @firfi/huly-mcp
 
+## 0.40.0
+
+### Minor Changes
+
+- 4bf0ec8: Add board label management plus read-only board menu page, saved view, viewlet, and common preference discovery tools.
+
+### Patch Changes
+
+- 7aed739: Allow Glama registry stdio inspection to start without Huly configuration by defaulting lazy environment validation when `GLAMA_VERSION` is present.
+
 ## 0.39.3
 
 ### Patch Changes
