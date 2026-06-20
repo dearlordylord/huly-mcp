@@ -272,7 +272,12 @@ describe("listAttachments", () => {
   it.effect("returns attachment summaries", () =>
     Effect.gen(function*() {
       const attachments = [
-        makeAttachment({ _id: "att-1" as Ref<HulyAttachment>, name: "file1.pdf", attachedTo: "parent-1" as Ref<Doc> }),
+        makeAttachment({
+          _id: "att-1" as Ref<HulyAttachment>,
+          name: "file1.pdf",
+          attachedTo: "parent-1" as Ref<Doc>,
+          metadata: { source: "summary" }
+        }),
         makeAttachment({ _id: "att-2" as Ref<HulyAttachment>, name: "file2.png", attachedTo: "parent-1" as Ref<Doc> })
       ]
       const testLayer = createTestLayer({ attachments })
@@ -284,6 +289,7 @@ describe("listAttachments", () => {
 
       expect(result).toHaveLength(2)
       expect(assertAt(result, 0).name).toBe("file1.pdf")
+      expect(assertAt(result, 0).metadata).toEqual({ source: "summary" })
       expect(assertAt(result, 1).name).toBe("file2.png")
     }))
 
@@ -330,7 +336,9 @@ describe("getAttachment", () => {
         name: "report.pdf",
         type: "application/pdf",
         size: 2048,
-        file: "blob-123" as Ref<Blob>
+        file: "blob-123" as Ref<Blob>,
+        readonly: true,
+        metadata: { source: "detail" }
       })
       const testLayer = createTestLayer({ attachments: [att] })
 
@@ -340,6 +348,8 @@ describe("getAttachment", () => {
       expect(result.name).toBe("report.pdf")
       expect(result.type).toBe("application/pdf")
       expect(result.size).toBe(2048)
+      expect(result.readonly).toBe(true)
+      expect(result.metadata).toEqual({ source: "detail" })
       expect(result.url).toContain("blob-123")
     }))
 

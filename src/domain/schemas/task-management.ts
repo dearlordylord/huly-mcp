@@ -240,3 +240,5 @@ export const parseGetProjectTypeParams = Schema.decodeUnknown(GetProjectTypePara
 export const parseListTaskTypesParams = Schema.decodeUnknown(ListTaskTypesParamsSchema)
 export const parseCreateTaskTypeParams = Schema.decodeUnknown(CreateTaskTypeParamsSchema)
 export const parseCreateIssueStatusParams = Schema.decodeUnknown(CreateIssueStatusParamsSchema)
+
+export const GetProjectTypeResultSchema = ProjectTypeDetailSchema

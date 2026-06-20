@@ -1,12 +1,12 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { ListTotal } from "./shared.js"
 import {
   DEFAULT_LIMIT,
   DocId,
   DocumentId,
   DocumentIdentifier,
   LimitParam,
+  ListTotal,
   NonEmptyString,
   TeamspaceId,
   TeamspaceIdentifier,
@@ -86,13 +86,14 @@ export const DocumentSnapshotSchema = Schema.Struct({
   description: "Point-in-time document history snapshot metadata with markdown content."
 })
 export type DocumentSnapshot = Schema.Schema.Type<typeof DocumentSnapshotSchema>
+export const ListDocumentSnapshotsResultSchema = Schema.Struct({
+  snapshots: Schema.Array(DocumentSnapshotSummarySchema),
+  total: ListTotal
+})
+export type ListDocumentSnapshotsResult = Schema.Schema.Type<typeof ListDocumentSnapshotsResultSchema>
 
-export interface ListDocumentSnapshotsResult {
-  readonly snapshots: ReadonlyArray<DocumentSnapshotSummary>
-  readonly total: ListTotal
-}
-
-export type GetDocumentSnapshotResult = DocumentSnapshot
+export const GetDocumentSnapshotResultSchema = DocumentSnapshotSchema
+export type GetDocumentSnapshotResult = Schema.Schema.Type<typeof GetDocumentSnapshotResultSchema>
 
 export const listDocumentSnapshotsParamsJsonSchema = JSONSchema.make(ListDocumentSnapshotsParamsSchema)
 export const getDocumentSnapshotParamsJsonSchema = JSONSchema.make(GetDocumentSnapshotParamsSchema)

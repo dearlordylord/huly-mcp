@@ -21,7 +21,7 @@ import { type Issue as HulyIssue, type IssueParentInfo, type Project as HulyProj
 import { Effect, Schema } from "effect"
 
 import type { CreateIssueParams, DeleteIssueParams } from "../../domain/schemas.js"
-import type { CreateIssueResult, DeleteIssueResult } from "../../domain/schemas/issues.js"
+import type { CreateIssueResult, DeleteIssueResult } from "../../domain/schemas/issues-results.js"
 import { DEFAULT_ISSUE_PRIORITY } from "../../domain/schemas/issues.js"
 import { IssueId, IssueIdentifier, type ProjectIdentifier } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"

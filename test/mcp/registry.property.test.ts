@@ -1,7 +1,9 @@
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js"
+import { Schema } from "effect"
 import * as fc from "fast-check"
 import { describe, expect, it } from "vitest"
 
+import { createToolOutputSchema } from "../../src/mcp/tool-output-schema.js"
 import { CATEGORY_NAMES, createFilteredRegistry, toolRegistry } from "../../src/mcp/tools/index.js"
 import {
   isNoArgumentTool,
@@ -81,6 +83,7 @@ const toolDefinition = (name: string, inputSchema: object, annotations?: ToolAnn
   name,
   description: "generated test tool",
   inputSchema,
+  outputSchema: createToolOutputSchema(Schema.Struct({ generated: Schema.Boolean })),
   category: "generated",
   ...(annotations !== undefined && { annotations })
 })

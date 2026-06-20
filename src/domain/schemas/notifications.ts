@@ -1,11 +1,12 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { Count, ListTotal } from "./shared.js"
 import {
+  Count,
   DEFAULT_INCLUDE_ARCHIVED,
   DEFAULT_LIMIT,
   DocId,
   LimitParam,
+  ListTotal,
   NotificationContextId,
   NotificationId,
   NotificationProviderId,
@@ -15,49 +16,48 @@ import {
 const DEFAULT_UNREAD_ONLY = false
 const DEFAULT_PINNED_CONTEXTS_ONLY = false
 const DEFAULT_INCLUDE_HIDDEN_CONTEXTS = false
-
-// No codec needed — internal type, not used for runtime validation
-export interface NotificationSummary {
-  readonly id: NotificationId
-  readonly isViewed: boolean
-  readonly archived: boolean
-  readonly objectId?: DocId | undefined
-  readonly objectClass?: ObjectClassName | undefined
-  readonly title?: string | undefined
-  readonly body?: string | undefined
-  readonly createdOn?: number | undefined
-  readonly modifiedOn?: number | undefined
-}
-
-export interface Notification {
-  readonly id: NotificationId
-  readonly isViewed: boolean
-  readonly archived: boolean
-  readonly objectId?: DocId | undefined
-  readonly objectClass?: ObjectClassName | undefined
-  readonly docNotifyContextId?: NotificationContextId | undefined
-  readonly title?: string | undefined
-  readonly body?: string | undefined
-  readonly data?: string | undefined
-  readonly createdOn?: number | undefined
-  readonly modifiedOn?: number | undefined
-}
-
-export interface DocNotifyContextSummary {
-  readonly id: NotificationContextId
-  readonly objectId: DocId
-  readonly objectClass: ObjectClassName
-  readonly isPinned: boolean
-  readonly hidden: boolean
-  readonly lastViewedTimestamp?: number | undefined
-  readonly lastUpdateTimestamp?: number | undefined
-}
-
-export interface NotificationProviderSetting {
-  readonly id: string
-  readonly providerId: NotificationProviderId
-  readonly enabled: boolean
-}
+export const NotificationSummarySchema = Schema.Struct({
+  id: NotificationId,
+  isViewed: Schema.Boolean,
+  archived: Schema.Boolean,
+  objectId: Schema.optional(DocId),
+  objectClass: Schema.optional(ObjectClassName),
+  title: Schema.optional(Schema.String),
+  body: Schema.optional(Schema.String),
+  createdOn: Schema.optional(Schema.Number),
+  modifiedOn: Schema.optional(Schema.Number)
+})
+export type NotificationSummary = Schema.Schema.Type<typeof NotificationSummarySchema>
+export const NotificationSchema = Schema.Struct({
+  id: NotificationId,
+  isViewed: Schema.Boolean,
+  archived: Schema.Boolean,
+  objectId: Schema.optional(DocId),
+  objectClass: Schema.optional(ObjectClassName),
+  docNotifyContextId: Schema.optional(NotificationContextId),
+  title: Schema.optional(Schema.String),
+  body: Schema.optional(Schema.String),
+  data: Schema.optional(Schema.String),
+  createdOn: Schema.optional(Schema.Number),
+  modifiedOn: Schema.optional(Schema.Number)
+})
+export type Notification = Schema.Schema.Type<typeof NotificationSchema>
+export const DocNotifyContextSummarySchema = Schema.Struct({
+  id: NotificationContextId,
+  objectId: DocId,
+  objectClass: ObjectClassName,
+  isPinned: Schema.Boolean,
+  hidden: Schema.Boolean,
+  lastViewedTimestamp: Schema.optional(Schema.Number),
+  lastUpdateTimestamp: Schema.optional(Schema.Number)
+})
+export type DocNotifyContextSummary = Schema.Schema.Type<typeof DocNotifyContextSummarySchema>
+export const NotificationProviderSettingSchema = Schema.Struct({
+  id: Schema.String,
+  providerId: NotificationProviderId,
+  enabled: Schema.Boolean
+})
+export type NotificationProviderSetting = Schema.Schema.Type<typeof NotificationProviderSettingSchema>
 
 // --- List Notifications Params ---
 
@@ -303,57 +303,65 @@ export const parseListNotificationSettingsParams = Schema.decodeUnknown(ListNoti
 export const parseUpdateNotificationProviderSettingParams = Schema.decodeUnknown(
   UpdateNotificationProviderSettingParamsSchema
 )
+export const MarkNotificationReadResultSchema = Schema.Struct({
+  id: NotificationId,
+  marked: Schema.Boolean
+})
+export type MarkNotificationReadResult = Schema.Schema.Type<typeof MarkNotificationReadResultSchema>
+export const MarkNotificationUnreadResultSchema = Schema.Struct({
+  id: NotificationId,
+  marked: Schema.Boolean
+})
+export type MarkNotificationUnreadResult = Schema.Schema.Type<typeof MarkNotificationUnreadResultSchema>
+export const MarkAllNotificationsReadResultSchema = Schema.Struct({
+  count: Count
+})
+export type MarkAllNotificationsReadResult = Schema.Schema.Type<typeof MarkAllNotificationsReadResultSchema>
+export const ArchiveNotificationResultSchema = Schema.Struct({
+  id: NotificationId,
+  archived: Schema.Boolean
+})
+export type ArchiveNotificationResult = Schema.Schema.Type<typeof ArchiveNotificationResultSchema>
+export const UnarchiveNotificationResultSchema = Schema.Struct({
+  id: NotificationId,
+  archived: Schema.Boolean
+})
+export type UnarchiveNotificationResult = Schema.Schema.Type<typeof UnarchiveNotificationResultSchema>
+export const ArchiveAllNotificationsResultSchema = Schema.Struct({
+  count: Count
+})
+export type ArchiveAllNotificationsResult = Schema.Schema.Type<typeof ArchiveAllNotificationsResultSchema>
+export const DeleteNotificationResultSchema = Schema.Struct({
+  id: NotificationId,
+  deleted: Schema.Boolean
+})
+export type DeleteNotificationResult = Schema.Schema.Type<typeof DeleteNotificationResultSchema>
+export const PinNotificationContextResultSchema = Schema.Struct({
+  id: NotificationContextId,
+  isPinned: Schema.Boolean
+})
+export type PinNotificationContextResult = Schema.Schema.Type<typeof PinNotificationContextResultSchema>
+export const HideNotificationContextResultSchema = Schema.Struct({
+  id: NotificationContextId,
+  hidden: Schema.Boolean
+})
+export type HideNotificationContextResult = Schema.Schema.Type<typeof HideNotificationContextResultSchema>
+export const UpdateNotificationProviderSettingResultSchema = Schema.Struct({
+  providerId: NotificationProviderId,
+  enabled: Schema.Boolean,
+  updated: Schema.Boolean
+})
+export type UpdateNotificationProviderSettingResult = Schema.Schema.Type<
+  typeof UpdateNotificationProviderSettingResultSchema
+>
+export const UnreadCountResultSchema = Schema.Struct({
+  count: ListTotal
+})
+export type UnreadCountResult = Schema.Schema.Type<typeof UnreadCountResultSchema>
 
-// No codec needed — internal type, not used for runtime validation
-export interface MarkNotificationReadResult {
-  readonly id: NotificationId
-  readonly marked: boolean
-}
-
-export interface MarkNotificationUnreadResult {
-  readonly id: NotificationId
-  readonly marked: boolean
-}
-
-export interface MarkAllNotificationsReadResult {
-  readonly count: Count
-}
-
-export interface ArchiveNotificationResult {
-  readonly id: NotificationId
-  readonly archived: boolean
-}
-
-export interface UnarchiveNotificationResult {
-  readonly id: NotificationId
-  readonly archived: boolean
-}
-
-export interface ArchiveAllNotificationsResult {
-  readonly count: Count
-}
-
-export interface DeleteNotificationResult {
-  readonly id: NotificationId
-  readonly deleted: boolean
-}
-
-export interface PinNotificationContextResult {
-  readonly id: NotificationContextId
-  readonly isPinned: boolean
-}
-
-export interface HideNotificationContextResult {
-  readonly id: NotificationContextId
-  readonly hidden: boolean
-}
-
-export interface UpdateNotificationProviderSettingResult {
-  readonly providerId: NotificationProviderId
-  readonly enabled: boolean
-  readonly updated: boolean
-}
-
-export interface UnreadCountResult {
-  readonly count: ListTotal
-}
+export const ListNotificationsResultSchema = Schema.Array(NotificationSummarySchema)
+export const GetNotificationResultSchema = NotificationSchema
+export const GetNotificationContextResultSchema = Schema.NullOr(DocNotifyContextSummarySchema)
+export const ListNotificationContextsResultSchema = Schema.Array(DocNotifyContextSummarySchema)
+export const ListNotificationSettingsResultSchema = Schema.Array(NotificationProviderSettingSchema)
+export const GetUnreadNotificationCountResultSchema = UnreadCountResultSchema

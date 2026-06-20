@@ -305,3 +305,6 @@ export const parseDeleteTagParams = Schema.decodeUnknown(DeleteTagParamsSchema)
 export const parseListAttachedTagsParams = Schema.decodeUnknown(ListAttachedTagsParamsSchema)
 export const parseAttachTagParams = Schema.decodeUnknown(AttachTagParamsSchema)
 export const parseDetachTagParams = Schema.decodeUnknown(DetachTagParamsSchema)
+
+export const ListTagsResultSchema = Schema.Array(TagSummarySchema)
+export const ListAttachedTagsResultSchema = Schema.Array(AttachedTagSummarySchema)

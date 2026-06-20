@@ -1,6 +1,5 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { OrganizationId, PersonId } from "./shared.js"
 import {
   ChannelId,
   Count,
@@ -9,6 +8,8 @@ import {
   enumValuesDescription,
   hasAtLeastOneDefined,
   NonEmptyString,
+  OrganizationId,
+  PersonId,
   Timestamp,
   withAtLeastOneRequired
 } from "./shared.js"
@@ -49,14 +50,6 @@ export const ContactChannelProviderSdkKeys = {
 
 export const ContactChannelProviderSchema = Schema.Literal(...ContactChannelProviderValues)
 
-export interface ContactChannelSummary {
-  readonly channelId: ChannelId
-  readonly provider: ContactChannelProvider
-  readonly value: string
-  readonly items?: Count | undefined
-  readonly lastMessage?: Timestamp | undefined
-}
-
 export const ContactChannelSummarySchema = Schema.Struct({
   channelId: ChannelId,
   provider: ContactChannelProviderSchema,
@@ -64,6 +57,7 @@ export const ContactChannelSummarySchema = Schema.Struct({
   items: Schema.optional(Count),
   lastMessage: Schema.optional(Timestamp)
 })
+export type ContactChannelSummary = Schema.Schema.Type<typeof ContactChannelSummarySchema>
 
 export const ListContactChannelProvidersParamsSchema = EmptyParamsSchema.annotations({
   title: "ListContactChannelProvidersParams",
@@ -245,52 +239,52 @@ export const RemoveOrganizationChannelParamsSchema = ContactChannelLocatorFields
 })
 
 export type RemoveOrganizationChannelParams = Schema.Schema.Type<typeof RemoveOrganizationChannelParamsSchema>
-
-export interface AddPersonChannelResult {
-  readonly personId: PersonId
-  readonly added: boolean
-  readonly channel: ContactChannelSummary
-}
-
-export interface ListPersonChannelsResult {
-  readonly personId: PersonId
-  readonly channels: ReadonlyArray<ContactChannelSummary>
-}
-
-export interface UpdatePersonChannelResult {
-  readonly personId: PersonId
-  readonly updated: boolean
-  readonly channel: ContactChannelSummary
-}
-
-export interface RemovePersonChannelResult {
-  readonly personId: PersonId
-  readonly removed: boolean
-  readonly channelId?: ChannelId
-}
-
-export interface AddOrganizationChannelResult {
-  readonly id: OrganizationId
-  readonly added: boolean
-  readonly channel: ContactChannelSummary
-}
-
-export interface ListOrganizationChannelsResult {
-  readonly organizationId: OrganizationId
-  readonly channels: ReadonlyArray<ContactChannelSummary>
-}
-
-export interface UpdateOrganizationChannelResult {
-  readonly organizationId: OrganizationId
-  readonly updated: boolean
-  readonly channel: ContactChannelSummary
-}
-
-export interface RemoveOrganizationChannelResult {
-  readonly organizationId: OrganizationId
-  readonly removed: boolean
-  readonly channelId?: ChannelId
-}
+export const AddPersonChannelResultSchema = Schema.Struct({
+  personId: PersonId,
+  added: Schema.Boolean,
+  channel: ContactChannelSummarySchema
+})
+export type AddPersonChannelResult = Schema.Schema.Type<typeof AddPersonChannelResultSchema>
+export const ListPersonChannelsResultSchema = Schema.Struct({
+  personId: PersonId,
+  channels: Schema.Array(ContactChannelSummarySchema)
+})
+export type ListPersonChannelsResult = Schema.Schema.Type<typeof ListPersonChannelsResultSchema>
+export const UpdatePersonChannelResultSchema = Schema.Struct({
+  personId: PersonId,
+  updated: Schema.Boolean,
+  channel: ContactChannelSummarySchema
+})
+export type UpdatePersonChannelResult = Schema.Schema.Type<typeof UpdatePersonChannelResultSchema>
+export const RemovePersonChannelResultSchema = Schema.Struct({
+  personId: PersonId,
+  removed: Schema.Boolean,
+  channelId: Schema.optional(ChannelId)
+})
+export type RemovePersonChannelResult = Schema.Schema.Type<typeof RemovePersonChannelResultSchema>
+export const AddOrganizationChannelResultSchema = Schema.Struct({
+  id: OrganizationId,
+  added: Schema.Boolean,
+  channel: ContactChannelSummarySchema
+})
+export type AddOrganizationChannelResult = Schema.Schema.Type<typeof AddOrganizationChannelResultSchema>
+export const ListOrganizationChannelsResultSchema = Schema.Struct({
+  organizationId: OrganizationId,
+  channels: Schema.Array(ContactChannelSummarySchema)
+})
+export type ListOrganizationChannelsResult = Schema.Schema.Type<typeof ListOrganizationChannelsResultSchema>
+export const UpdateOrganizationChannelResultSchema = Schema.Struct({
+  organizationId: OrganizationId,
+  updated: Schema.Boolean,
+  channel: ContactChannelSummarySchema
+})
+export type UpdateOrganizationChannelResult = Schema.Schema.Type<typeof UpdateOrganizationChannelResultSchema>
+export const RemoveOrganizationChannelResultSchema = Schema.Struct({
+  organizationId: OrganizationId,
+  removed: Schema.Boolean,
+  channelId: Schema.optional(ChannelId)
+})
+export type RemoveOrganizationChannelResult = Schema.Schema.Type<typeof RemoveOrganizationChannelResultSchema>
 
 export const addPersonChannelParamsJsonSchema = JSONSchema.make(AddPersonChannelParamsSchema)
 export const listContactChannelProvidersParamsJsonSchema = JSONSchema.make(ListContactChannelProvidersParamsSchema)
@@ -317,3 +311,5 @@ export const parseAddOrganizationChannelParams = Schema.decodeUnknown(AddOrganiz
 export const parseListOrganizationChannelsParams = Schema.decodeUnknown(ListOrganizationChannelsParamsSchema)
 export const parseUpdateOrganizationChannelParams = Schema.decodeUnknown(UpdateOrganizationChannelParamsSchema)
 export const parseRemoveOrganizationChannelParams = Schema.decodeUnknown(RemoveOrganizationChannelParamsSchema)
+
+export const ListContactChannelProvidersResultSchema = Schema.Array(ContactChannelProviderSchema)

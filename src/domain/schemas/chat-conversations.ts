@@ -4,11 +4,13 @@
  */
 import { JSONSchema, Schema } from "effect"
 
-import type { ChannelId, NotificationContextId, PersonName } from "./shared.js"
 import {
   AccountUuid,
+  ChannelId,
   ChannelIdentifier,
   DirectMessageIdentifier,
+  NotificationContextId,
+  PersonName,
   PersonRefInput,
   withAtLeastOneRequired,
   withMutuallyExclusiveFields
@@ -21,45 +23,45 @@ export const ChannelMemberIdentifier = Schema.Union(AccountUuid, PersonRefInput)
     "Workspace channel member to resolve. Accepts a Huly account UUID directly, an exact email address, or an exact person display name."
 })
 export type ChannelMemberIdentifier = Schema.Schema.Type<typeof ChannelMemberIdentifier>
-
-export interface ChannelMemberSummary {
-  readonly accountUuid: AccountUuid
-  readonly name?: PersonName | undefined
-}
-
-export interface ListChannelMembersResult {
-  readonly channelId: ChannelId
-  readonly members: ReadonlyArray<ChannelMemberSummary>
-}
-
-export interface ChannelMemberMutationResult {
-  readonly channelId: ChannelId
-  readonly members: ReadonlyArray<AccountUuid>
-  readonly changed: boolean
-}
-
-export interface ChannelArchiveResult {
-  readonly channelId: ChannelId
-  readonly archived: boolean
-  readonly changed: boolean
-}
-
-export interface CreateGroupDirectMessageResult {
-  readonly id: ChannelId
-  readonly created: boolean
-  readonly members: ReadonlyArray<AccountUuid>
-}
+export const ChannelMemberSummarySchema = Schema.Struct({
+  accountUuid: AccountUuid,
+  name: Schema.optional(PersonName)
+})
+export type ChannelMemberSummary = Schema.Schema.Type<typeof ChannelMemberSummarySchema>
+export const ListChannelMembersResultSchema = Schema.Struct({
+  channelId: ChannelId,
+  members: Schema.Array(ChannelMemberSummarySchema)
+})
+export type ListChannelMembersResult = Schema.Schema.Type<typeof ListChannelMembersResultSchema>
+export const ChannelMemberMutationResultSchema = Schema.Struct({
+  channelId: ChannelId,
+  members: Schema.Array(AccountUuid),
+  changed: Schema.Boolean
+})
+export type ChannelMemberMutationResult = Schema.Schema.Type<typeof ChannelMemberMutationResultSchema>
+export const ChannelArchiveResultSchema = Schema.Struct({
+  channelId: ChannelId,
+  archived: Schema.Boolean,
+  changed: Schema.Boolean
+})
+export type ChannelArchiveResult = Schema.Schema.Type<typeof ChannelArchiveResultSchema>
+export const CreateGroupDirectMessageResultSchema = Schema.Struct({
+  id: ChannelId,
+  created: Schema.Boolean,
+  members: Schema.Array(AccountUuid)
+})
+export type CreateGroupDirectMessageResult = Schema.Schema.Type<typeof CreateGroupDirectMessageResultSchema>
 
 export type ConversationKind = "channel" | "direct_message"
-
-export interface ConversationStateResult {
-  readonly kind: ConversationKind
-  readonly objectId: ChannelId
-  readonly contextId: NotificationContextId
-  readonly starred: boolean
-  readonly closed: boolean
-  readonly changed: boolean
-}
+export const ConversationStateResultSchema = Schema.Struct({
+  kind: Schema.Literal("channel", "direct_message"),
+  objectId: ChannelId,
+  contextId: NotificationContextId,
+  starred: Schema.Boolean,
+  closed: Schema.Boolean,
+  changed: Schema.Boolean
+})
+export type ConversationStateResult = Schema.Schema.Type<typeof ConversationStateResultSchema>
 
 export const ListChannelMembersParamsSchema = Schema.Struct({
   channel: ChannelIdentifier.annotations({
@@ -175,3 +177,12 @@ export const parseChannelLifecycleParams = Schema.decodeUnknown(ChannelLifecycle
 export const parseCreateGroupDirectMessageParams = Schema.decodeUnknown(CreateGroupDirectMessageParamsSchema)
 export const parseSetConversationStarredParams = Schema.decodeUnknown(SetConversationStarredParamsSchema)
 export const parseSetConversationClosedParams = Schema.decodeUnknown(SetConversationClosedParamsSchema)
+
+export const AddChannelMembersResultSchema = ChannelMemberMutationResultSchema
+export const RemoveChannelMembersResultSchema = ChannelMemberMutationResultSchema
+export const JoinChannelResultSchema = ChannelMemberMutationResultSchema
+export const LeaveChannelResultSchema = ChannelMemberMutationResultSchema
+export const ArchiveChannelResultSchema = ChannelArchiveResultSchema
+export const UnarchiveChannelResultSchema = ChannelArchiveResultSchema
+export const SetConversationStarredResultSchema = ConversationStateResultSchema
+export const SetConversationClosedResultSchema = ConversationStateResultSchema

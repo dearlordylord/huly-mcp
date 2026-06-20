@@ -422,35 +422,3 @@ export const parseAddLabelParams = Schema.decodeUnknown(AddLabelParamsSchema)
 export const parseRemoveLabelParams = Schema.decodeUnknown(RemoveLabelParamsSchema)
 export const parseDeleteIssueParams = Schema.decodeUnknown(DeleteIssueParamsSchema)
 export const parseMoveIssueParams = Schema.decodeUnknown(MoveIssueParamsSchema)
-
-// No codec needed — internal type, not used for runtime validation
-export interface CreateIssueResult {
-  readonly identifier: IssueIdentifier
-  readonly issueId: IssueId
-}
-
-export interface UpdateIssueResult {
-  readonly identifier: IssueIdentifier
-  readonly updated: boolean
-}
-
-export interface AddLabelResult {
-  readonly identifier: IssueIdentifier
-  readonly labelAdded: boolean
-}
-
-export interface RemoveLabelResult {
-  readonly identifier: IssueIdentifier
-  readonly labelRemoved: boolean
-}
-
-export interface DeleteIssueResult {
-  readonly identifier: IssueIdentifier
-  readonly deleted: boolean
-}
-
-export interface MoveIssueResult {
-  readonly identifier: IssueIdentifier
-  readonly moved: boolean
-  readonly newParent?: IssueIdentifier
-}

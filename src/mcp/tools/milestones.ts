@@ -13,6 +13,14 @@ import {
   updateMilestoneParamsJsonSchema
 } from "../../domain/schemas.js"
 import {
+  CreateMilestoneResultSchema,
+  DeleteMilestoneResultSchema,
+  GetMilestoneResultSchema,
+  ListMilestonesResultSchema,
+  SetIssueMilestoneResultSchema,
+  UpdateMilestoneResultSchema
+} from "../../domain/schemas/milestones.js"
+import {
   createMilestone,
   deleteMilestone,
   getMilestone,
@@ -20,75 +28,75 @@ import {
   setIssueMilestone,
   updateMilestone
 } from "../../huly/operations/milestones.js"
-import { createToolHandler, type RegisteredTool } from "./registry.js"
+import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "milestones" as const
 
 export const milestoneTools: ReadonlyArray<RegisteredTool> = [
-  {
-    name: "list_milestones",
-    description: "List milestones in a Huly project. Returns milestones sorted by modification date (newest first).",
-    category: CATEGORY,
-    inputSchema: listMilestonesParamsJsonSchema,
-    handler: createToolHandler(
-      "list_milestones",
-      parseListMilestonesParams,
-      listMilestones
-    )
-  },
-  {
-    name: "get_milestone",
-    description: "Retrieve full details for a Huly milestone. Use this to view milestone content and metadata.",
-    category: CATEGORY,
-    inputSchema: getMilestoneParamsJsonSchema,
-    handler: createToolHandler(
-      "get_milestone",
-      parseGetMilestoneParams,
-      getMilestone
-    )
-  },
-  {
-    name: "create_milestone",
-    description: "Create a new milestone in a Huly project. Returns the created milestone ID and label.",
-    category: CATEGORY,
-    inputSchema: createMilestoneParamsJsonSchema,
-    handler: createToolHandler(
-      "create_milestone",
-      parseCreateMilestoneParams,
-      createMilestone
-    )
-  },
-  {
-    name: "update_milestone",
-    description: "Update fields on an existing Huly milestone. Only provided fields are modified.",
-    category: CATEGORY,
-    inputSchema: updateMilestoneParamsJsonSchema,
-    handler: createToolHandler(
-      "update_milestone",
-      parseUpdateMilestoneParams,
-      updateMilestone
-    )
-  },
-  {
-    name: "set_issue_milestone",
-    description: "Set or clear the milestone on a Huly issue. Pass null for milestone to clear it.",
-    category: CATEGORY,
-    inputSchema: setIssueMilestoneParamsJsonSchema,
-    handler: createToolHandler(
-      "set_issue_milestone",
-      parseSetIssueMilestoneParams,
-      setIssueMilestone
-    )
-  },
-  {
-    name: "delete_milestone",
-    description: "Permanently delete a Huly milestone. This action cannot be undone.",
-    category: CATEGORY,
-    inputSchema: deleteMilestoneParamsJsonSchema,
-    handler: createToolHandler(
-      "delete_milestone",
-      parseDeleteMilestoneParams,
-      deleteMilestone
-    )
-  }
+  defineTool(
+    {
+      name: "list_milestones",
+      description: "List milestones in a Huly project. Returns milestones sorted by modification date (newest first).",
+      category: CATEGORY,
+      inputSchema: listMilestonesParamsJsonSchema,
+      resultSchema: ListMilestonesResultSchema
+    },
+    parseListMilestonesParams,
+    listMilestones
+  ),
+  defineTool(
+    {
+      name: "get_milestone",
+      description: "Retrieve full details for a Huly milestone. Use this to view milestone content and metadata.",
+      category: CATEGORY,
+      inputSchema: getMilestoneParamsJsonSchema,
+      resultSchema: GetMilestoneResultSchema
+    },
+    parseGetMilestoneParams,
+    getMilestone
+  ),
+  defineTool(
+    {
+      name: "create_milestone",
+      description: "Create a new milestone in a Huly project. Returns the created milestone ID and label.",
+      category: CATEGORY,
+      inputSchema: createMilestoneParamsJsonSchema,
+      resultSchema: CreateMilestoneResultSchema
+    },
+    parseCreateMilestoneParams,
+    createMilestone
+  ),
+  defineTool(
+    {
+      name: "update_milestone",
+      description: "Update fields on an existing Huly milestone. Only provided fields are modified.",
+      category: CATEGORY,
+      inputSchema: updateMilestoneParamsJsonSchema,
+      resultSchema: UpdateMilestoneResultSchema
+    },
+    parseUpdateMilestoneParams,
+    updateMilestone
+  ),
+  defineTool(
+    {
+      name: "set_issue_milestone",
+      description: "Set or clear the milestone on a Huly issue. Pass null for milestone to clear it.",
+      category: CATEGORY,
+      inputSchema: setIssueMilestoneParamsJsonSchema,
+      resultSchema: SetIssueMilestoneResultSchema
+    },
+    parseSetIssueMilestoneParams,
+    setIssueMilestone
+  ),
+  defineTool(
+    {
+      name: "delete_milestone",
+      description: "Permanently delete a Huly milestone. This action cannot be undone.",
+      category: CATEGORY,
+      inputSchema: deleteMilestoneParamsJsonSchema,
+      resultSchema: DeleteMilestoneResultSchema
+    },
+    parseDeleteMilestoneParams,
+    deleteMilestone
+  )
 ]

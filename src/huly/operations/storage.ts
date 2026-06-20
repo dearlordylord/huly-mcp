@@ -10,17 +10,11 @@
  */
 import { Effect } from "effect"
 
-import type { UploadFileParams } from "../../domain/schemas.js"
+import { BlobId } from "../../domain/schemas/shared.js"
+import type { UploadFileParams, UploadFileResult } from "../../domain/schemas/storage.js"
 import { assertExists } from "../../utils/assertions.js"
 import { type FileFetchError, type FileNotFoundError, type InvalidFileDataError } from "../errors.js"
-import {
-  decodeBase64,
-  fetchFromUrl,
-  HulyStorageClient,
-  readFromFilePath,
-  type StorageClientError,
-  type UploadFileResult
-} from "../storage.js"
+import { decodeBase64, fetchFromUrl, HulyStorageClient, readFromFilePath, type StorageClientError } from "../storage.js"
 
 type UploadFileError = StorageClientError | InvalidFileDataError | FileNotFoundError | FileFetchError
 
@@ -56,7 +50,10 @@ export const uploadFile = (
       params.contentType
     )
 
-    return result
+    return {
+      ...result,
+      blobId: BlobId.make(result.blobId)
+    }
   })
 
 /**

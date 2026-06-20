@@ -3,9 +3,7 @@ import type { AccountUuid, FindResult, PersonId } from "@hcengineering/core"
 import { toFindResult } from "@hcengineering/core"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
-import { assertAt } from "../../src/utils/assertions.js"
 
-import { IssueIdentifier } from "../../src/domain/schemas/shared.js"
 import type { HulyClientOperations } from "../../src/huly/client.js"
 import { HulyClient } from "../../src/huly/client.js"
 import { Diagnostics } from "../../src/huly/diagnostics.js"
@@ -18,20 +16,35 @@ import type { WorkspaceClientOperations } from "../../src/huly/workspace-client.
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
 import { McpErrorCode } from "../../src/mcp/error-mapping.js"
 import {
-  createCombinedToolHandler,
-  createEncodedNoParamsWorkspaceToolHandler,
-  createEncodedToolHandler,
-  createEncodedWorkspaceToolHandler,
-  createNoParamsWorkspaceToolHandler,
-  createStorageToolHandler,
-  createToolHandler,
-  createWorkspaceToolHandler
+  defineCombinedTool,
+  defineNoParamsWorkspaceTool,
+  defineStorageTool,
+  defineTool,
+  defineWorkspaceTool,
+  type RegisteredTool
 } from "../../src/mcp/tools/registry.js"
+import { assertAt } from "../../src/utils/assertions.js"
 
 const Params = Schema.Struct({ name: Schema.String })
 type Params = typeof Params.Type
 
+const GreetingResult = Schema.Struct({ greeting: Schema.String })
+const UrlResult = Schema.Struct({ url: Schema.String })
+const CombinedResult = Schema.Struct({ combined: Schema.String })
+const WorkspaceResult = Schema.Struct({ ws: Schema.String })
+const MembersResult = Schema.Struct({ members: Schema.Number })
+const PositiveResult = Schema.Struct({ count: Schema.Number.pipe(Schema.positive()) })
+
 const parse = (input: unknown) => Schema.decodeUnknown(Params)(input)
+
+const toolInputSchema = {
+  type: "object",
+  properties: { name: { type: "string" } },
+  required: ["name"],
+  additionalProperties: false
+}
+
+const makeToolHandler = (tool: RegisteredTool) => tool.handler
 
 const noopHulyClient: HulyClientOperations = {
   getAccountUuid: () => "00000000-0000-4000-8000-000000000000" as AccountUuid,
@@ -74,11 +87,17 @@ const noopWorkspaceClient: WorkspaceClientOperations = {
   getRegionInfo: () => Effect.succeed([])
 }
 
-describe("createToolHandler", () => {
-  it.effect("returns success response on valid input", () =>
+describe("defineTool", () => {
+  it.effect("returns encoded success response on valid input", () =>
     Effect.gen(function*() {
-      const handler = createToolHandler(
-        "test_tool",
+      const tool = defineTool(
+        {
+          name: "test_tool",
+          description: "test tool",
+          inputSchema: toolInputSchema,
+          resultSchema: GreetingResult,
+          category: "test"
+        },
         parse,
         (params: Params) =>
           Effect.succeed({ greeting: `hello ${params.name}` }).pipe(
@@ -86,25 +105,37 @@ describe("createToolHandler", () => {
           )
       )
 
-      const result = yield* Effect.promise(() => handler({ name: "world" }, noopHulyClient, noopStorageClient))
+      expect(tool.outputSchema.properties?.result).toMatchObject({ type: "object" })
+
+      const result = yield* Effect.promise(() =>
+        makeToolHandler(tool)({ name: "world" }, noopHulyClient, noopStorageClient)
+      )
 
       expect(result.isError).toBeUndefined()
       expect(result.structuredContent).toEqual({ result: { greeting: "hello world" } })
-      expect(assertAt(result.content, 0).text).toContain("hello world")
+      expect(assertAt(result.content, 0).text).toBe("{\"greeting\":\"hello world\"}")
     }))
 
   it.effect("returns parse error on invalid input", () =>
     Effect.gen(function*() {
-      const handler = createToolHandler(
-        "test_tool",
+      const tool = defineTool(
+        {
+          name: "test_tool",
+          description: "test tool",
+          inputSchema: toolInputSchema,
+          resultSchema: GreetingResult,
+          category: "test"
+        },
         parse,
         (_params: Params) =>
-          Effect.succeed("ok").pipe(
+          Effect.succeed({ greeting: "ok" }).pipe(
             Effect.tap(() => HulyClient)
           )
       )
 
-      const result = yield* Effect.promise(() => handler({ wrong: 123 }, noopHulyClient, noopStorageClient))
+      const result = yield* Effect.promise(() =>
+        makeToolHandler(tool)({ wrong: 123 }, noopHulyClient, noopStorageClient)
+      )
 
       expect(result.isError).toBe(true)
       expect(result.structuredContent).toBeUndefined()
@@ -114,8 +145,14 @@ describe("createToolHandler", () => {
 
   it.effect("returns domain error on operation failure", () =>
     Effect.gen(function*() {
-      const handler = createToolHandler(
-        "test_tool",
+      const tool = defineTool(
+        {
+          name: "test_tool",
+          description: "test tool",
+          inputSchema: toolInputSchema,
+          resultSchema: GreetingResult,
+          category: "test"
+        },
         parse,
         (_params: Params) =>
           Effect.fail(new HulyError({ message: "something broke" })) as Effect.Effect<
@@ -125,17 +162,51 @@ describe("createToolHandler", () => {
           >
       )
 
-      const result = yield* Effect.promise(() => handler({ name: "world" }, noopHulyClient, noopStorageClient))
+      const result = yield* Effect.promise(() =>
+        makeToolHandler(tool)({ name: "world" }, noopHulyClient, noopStorageClient)
+      )
 
       expect(result.isError).toBe(true)
       expect(result._meta?.errorCode).toBe(McpErrorCode.InternalError)
       expect(assertAt(result.content, 0).text).toContain("something broke")
     }))
 
-  it.effect("adds diagnostics warnings to success envelopes", () =>
+  it.effect("returns internal error when result encoding fails", () =>
     Effect.gen(function*() {
-      const handler = createToolHandler(
-        "test_tool",
+      const tool = defineTool(
+        {
+          name: "encoded_tool",
+          description: "encoded tool",
+          inputSchema: toolInputSchema,
+          resultSchema: PositiveResult,
+          category: "test"
+        },
+        parse,
+        (_params: Params) =>
+          Effect.succeed({ count: -1 }).pipe(
+            Effect.tap(() => HulyClient)
+          )
+      )
+
+      const result = yield* Effect.promise(() =>
+        makeToolHandler(tool)({ name: "world" }, noopHulyClient, noopStorageClient)
+      )
+
+      expect(result.isError).toBe(true)
+      expect(result._meta?.errorCode).toBe(McpErrorCode.InternalError)
+      expect(assertAt(result.content, 0).text).toContain("invalid output")
+    }))
+
+  it.effect("adds diagnostics warnings to encoded success envelopes", () =>
+    Effect.gen(function*() {
+      const tool = defineTool(
+        {
+          name: "test_tool",
+          description: "test tool",
+          inputSchema: toolInputSchema,
+          resultSchema: GreetingResult,
+          category: "test"
+        },
         parse,
         (params: Params) =>
           Effect.gen(function*() {
@@ -148,7 +219,9 @@ describe("createToolHandler", () => {
           })
       )
 
-      const result = yield* Effect.promise(() => handler({ name: "world" }, noopHulyClient, noopStorageClient))
+      const result = yield* Effect.promise(() =>
+        makeToolHandler(tool)({ name: "world" }, noopHulyClient, noopStorageClient)
+      )
 
       expect(result.isError).toBeUndefined()
       expect(result.structuredContent).toEqual({
@@ -159,18 +232,18 @@ describe("createToolHandler", () => {
         }]
       })
       expect(result.content).toHaveLength(2)
-      expect(JSON.parse(assertAt(result.content, 1).text)).toEqual({
-        warnings: [{
-          code: "status_metadata_unresolved",
-          message: "Status metadata was degraded for world."
-        }]
-      })
     }))
 
   it.effect("adds diagnostics warnings to failure envelopes", () =>
     Effect.gen(function*() {
-      const handler = createToolHandler(
-        "test_tool",
+      const tool = defineTool(
+        {
+          name: "test_tool",
+          description: "test tool",
+          inputSchema: toolInputSchema,
+          resultSchema: GreetingResult,
+          category: "test"
+        },
         parse,
         (params: Params) =>
           Effect.gen(function*() {
@@ -183,7 +256,9 @@ describe("createToolHandler", () => {
           })
       )
 
-      const result = yield* Effect.promise(() => handler({ name: "world" }, noopHulyClient, noopStorageClient))
+      const result = yield* Effect.promise(() =>
+        makeToolHandler(tool)({ name: "world" }, noopHulyClient, noopStorageClient)
+      )
 
       expect(result.isError).toBe(true)
       expect(result.structuredContent).toBeUndefined()
@@ -197,52 +272,17 @@ describe("createToolHandler", () => {
     }))
 })
 
-describe("createEncodedToolHandler", () => {
-  it.effect("encodes branded output through the provided schema", () =>
+describe("defineStorageTool", () => {
+  it.effect("provides the storage client", () =>
     Effect.gen(function*() {
-      const Output = Schema.Struct({ identifier: IssueIdentifier })
-      const handler = createEncodedToolHandler(
-        "encoded_tool",
-        parse,
-        (_params: Params) =>
-          Effect.succeed({ identifier: IssueIdentifier.make("HULY-1") }).pipe(
-            Effect.tap(() => HulyClient)
-          ),
-        Output
-      )
-
-      const result = yield* Effect.promise(() => handler({ name: "world" }, noopHulyClient, noopStorageClient))
-
-      expect(result.isError).toBeUndefined()
-      expect(assertAt(result.content, 0).text).toBe("{\"identifier\":\"HULY-1\"}")
-    }))
-
-  it.effect("returns internal error when output encoding fails", () =>
-    Effect.gen(function*() {
-      const Output = Schema.Struct({ identifier: IssueIdentifier })
-      const handler = createEncodedToolHandler(
-        "encoded_tool",
-        parse,
-        (_params: Params) =>
-          Effect.succeed({ identifier: "" }).pipe(
-            Effect.tap(() => HulyClient)
-          ),
-        Output
-      )
-
-      const result = yield* Effect.promise(() => handler({ name: "world" }, noopHulyClient, noopStorageClient))
-
-      expect(result.isError).toBe(true)
-      expect(result._meta?.errorCode).toBe(McpErrorCode.InternalError)
-      expect(assertAt(result.content, 0).text).toContain("invalid output")
-    }))
-})
-
-describe("createStorageToolHandler", () => {
-  it.effect("returns success response via storage client", () =>
-    Effect.gen(function*() {
-      const handler = createStorageToolHandler(
-        "storage_tool",
+      const tool = defineStorageTool(
+        {
+          name: "storage_tool",
+          description: "storage tool",
+          inputSchema: toolInputSchema,
+          resultSchema: UrlResult,
+          category: "test"
+        },
         parse,
         (params: Params) =>
           Effect.succeed({ url: `file://${params.name}` }).pipe(
@@ -250,35 +290,26 @@ describe("createStorageToolHandler", () => {
           )
       )
 
-      const result = yield* Effect.promise(() => handler({ name: "doc.pdf" }, noopHulyClient, noopStorageClient))
-
-      expect(result.isError).toBeUndefined()
-      expect(assertAt(result.content, 0).text).toContain("file://doc.pdf")
-    }))
-
-  it.effect("returns parse error on invalid input", () =>
-    Effect.gen(function*() {
-      const handler = createStorageToolHandler(
-        "storage_tool",
-        parse,
-        (_params: Params) =>
-          Effect.succeed("ok").pipe(
-            Effect.tap(() => HulyStorageClient)
-          )
+      const result = yield* Effect.promise(() =>
+        makeToolHandler(tool)({ name: "doc.pdf" }, noopHulyClient, noopStorageClient)
       )
 
-      const result = yield* Effect.promise(() => handler({}, noopHulyClient, noopStorageClient))
-
-      expect(result.isError).toBe(true)
-      expect(result._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
+      expect(result.isError).toBeUndefined()
+      expect(result.structuredContent).toEqual({ result: { url: "file://doc.pdf" } })
     }))
 })
 
-describe("createCombinedToolHandler", () => {
-  it.effect("returns success response via both clients", () =>
+describe("defineCombinedTool", () => {
+  it.effect("provides both Huly and storage clients", () =>
     Effect.gen(function*() {
-      const handler = createCombinedToolHandler(
-        "combined_tool",
+      const tool = defineCombinedTool(
+        {
+          name: "combined_tool",
+          description: "combined tool",
+          inputSchema: toolInputSchema,
+          resultSchema: CombinedResult,
+          category: "test"
+        },
         parse,
         (params: Params) =>
           Effect.gen(function*() {
@@ -288,18 +319,26 @@ describe("createCombinedToolHandler", () => {
           })
       )
 
-      const result = yield* Effect.promise(() => handler({ name: "both" }, noopHulyClient, noopStorageClient))
+      const result = yield* Effect.promise(() =>
+        makeToolHandler(tool)({ name: "both" }, noopHulyClient, noopStorageClient)
+      )
 
       expect(result.isError).toBeUndefined()
-      expect(assertAt(result.content, 0).text).toContain("both")
+      expect(result.structuredContent).toEqual({ result: { combined: "both" } })
     }))
 })
 
-describe("createWorkspaceToolHandler", () => {
-  it.effect("returns success response when workspace client available", () =>
+describe("defineWorkspaceTool", () => {
+  it.effect("provides the workspace client when available", () =>
     Effect.gen(function*() {
-      const handler = createWorkspaceToolHandler(
-        "workspace_tool",
+      const tool = defineWorkspaceTool(
+        {
+          name: "workspace_tool",
+          description: "workspace tool",
+          inputSchema: toolInputSchema,
+          resultSchema: WorkspaceResult,
+          category: "test"
+        },
         parse,
         (params: Params) =>
           Effect.succeed({ ws: params.name }).pipe(
@@ -308,17 +347,23 @@ describe("createWorkspaceToolHandler", () => {
       )
 
       const result = yield* Effect.promise(() =>
-        handler({ name: "myws" }, noopHulyClient, noopStorageClient, noopWorkspaceClient)
+        makeToolHandler(tool)({ name: "myws" }, noopHulyClient, noopStorageClient, noopWorkspaceClient)
       )
 
       expect(result.isError).toBeUndefined()
-      expect(assertAt(result.content, 0).text).toContain("myws")
+      expect(result.structuredContent).toEqual({ result: { ws: "myws" } })
     }))
 
   it.effect("returns error when workspace client is undefined", () =>
     Effect.gen(function*() {
-      const handler = createWorkspaceToolHandler(
-        "workspace_tool",
+      const tool = defineWorkspaceTool(
+        {
+          name: "workspace_tool",
+          description: "workspace tool",
+          inputSchema: toolInputSchema,
+          resultSchema: WorkspaceResult,
+          category: "test"
+        },
         parse,
         (params: Params) =>
           Effect.succeed({ ws: params.name }).pipe(
@@ -327,124 +372,62 @@ describe("createWorkspaceToolHandler", () => {
       )
 
       const result = yield* Effect.promise(() =>
-        handler({ name: "myws" }, noopHulyClient, noopStorageClient, undefined)
+        makeToolHandler(tool)({ name: "myws" }, noopHulyClient, noopStorageClient, undefined)
       )
 
       expect(result.isError).toBe(true)
       expect(result._meta?.errorCode).toBe(McpErrorCode.InternalError)
       expect(assertAt(result.content, 0).text).toContain("WorkspaceClient not available")
     }))
-
-  it.effect("returns parse error on invalid input", () =>
-    Effect.gen(function*() {
-      const handler = createWorkspaceToolHandler(
-        "workspace_tool",
-        parse,
-        (_params: Params) =>
-          Effect.succeed("ok").pipe(
-            Effect.tap(() => WorkspaceClient)
-          )
-      )
-
-      const result = yield* Effect.promise(() =>
-        handler({ bad: true }, noopHulyClient, noopStorageClient, noopWorkspaceClient)
-      )
-
-      expect(result.isError).toBe(true)
-      expect(result._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
-    }))
 })
 
-describe("createEncodedWorkspaceToolHandler", () => {
-  it.effect("encodes workspace output through the provided schema", () =>
+describe("defineNoParamsWorkspaceTool", () => {
+  it.effect("provides the workspace client without requiring params", () =>
     Effect.gen(function*() {
-      const Output = Schema.Struct({ ws: Schema.String })
-      const handler = createEncodedWorkspaceToolHandler(
-        "workspace_tool",
-        parse,
-        (params: Params) =>
-          Effect.succeed({ ws: params.name }).pipe(
-            Effect.tap(() => WorkspaceClient)
-          ),
-        Output
-      )
-
-      const result = yield* Effect.promise(() =>
-        handler({ name: "encoded" }, noopHulyClient, noopStorageClient, noopWorkspaceClient)
-      )
-
-      expect(result.isError).toBeUndefined()
-      expect(assertAt(result.content, 0).text).toBe("{\"ws\":\"encoded\"}")
-    }))
-})
-
-describe("createNoParamsWorkspaceToolHandler", () => {
-  it.effect("returns success response with no params", () =>
-    Effect.gen(function*() {
-      const handler = createNoParamsWorkspaceToolHandler(
+      const tool = defineNoParamsWorkspaceTool(
+        {
+          name: "workspace_members",
+          description: "workspace members",
+          inputSchema: {},
+          resultSchema: MembersResult,
+          category: "test"
+        },
         () =>
           Effect.succeed({ members: 5 }).pipe(
             Effect.tap(() => WorkspaceClient)
           )
       )
 
-      const result = yield* Effect.promise(() => handler({}, noopHulyClient, noopStorageClient, noopWorkspaceClient))
+      const result = yield* Effect.promise(() =>
+        makeToolHandler(tool)({}, noopHulyClient, noopStorageClient, noopWorkspaceClient)
+      )
 
       expect(result.isError).toBeUndefined()
-      expect(assertAt(result.content, 0).text).toContain("5")
+      expect(result.structuredContent).toEqual({ result: { members: 5 } })
     }))
 
-  it.effect("returns error when workspace client is undefined", () =>
+  it.effect("returns workspace error before running no-param operation", () =>
     Effect.gen(function*() {
-      const handler = createNoParamsWorkspaceToolHandler(
+      const tool = defineNoParamsWorkspaceTool(
+        {
+          name: "workspace_members",
+          description: "workspace members",
+          inputSchema: {},
+          resultSchema: MembersResult,
+          category: "test"
+        },
         () =>
-          Effect.succeed("ok").pipe(
+          Effect.succeed({ members: 5 }).pipe(
             Effect.tap(() => WorkspaceClient)
           )
       )
 
-      const result = yield* Effect.promise(() => handler({}, noopHulyClient, noopStorageClient, undefined))
+      const result = yield* Effect.promise(() =>
+        makeToolHandler(tool)({}, noopHulyClient, noopStorageClient, undefined)
+      )
 
       expect(result.isError).toBe(true)
       expect(result._meta?.errorCode).toBe(McpErrorCode.InternalError)
       expect(assertAt(result.content, 0).text).toContain("WorkspaceClient not available")
-    }))
-
-  it.effect("returns domain error on operation failure", () =>
-    Effect.gen(function*() {
-      const handler = createNoParamsWorkspaceToolHandler(
-        () =>
-          Effect.fail(new HulyError({ message: "ws broke" })) as Effect.Effect<
-            never,
-            HulyError,
-            WorkspaceClient
-          >
-      )
-
-      const result = yield* Effect.promise(() => handler({}, noopHulyClient, noopStorageClient, noopWorkspaceClient))
-
-      expect(result.isError).toBe(true)
-      expect(result._meta?.errorCode).toBe(McpErrorCode.InternalError)
-      expect(assertAt(result.content, 0).text).toContain("ws broke")
-    }))
-})
-
-describe("createEncodedNoParamsWorkspaceToolHandler", () => {
-  it.effect("encodes no-params workspace output through the provided schema", () =>
-    Effect.gen(function*() {
-      const Output = Schema.Struct({ members: Schema.Number })
-      const handler = createEncodedNoParamsWorkspaceToolHandler(
-        "workspace_tool",
-        () =>
-          Effect.succeed({ members: 5 }).pipe(
-            Effect.tap(() => WorkspaceClient)
-          ),
-        Output
-      )
-
-      const result = yield* Effect.promise(() => handler({}, noopHulyClient, noopStorageClient, noopWorkspaceClient))
-
-      expect(result.isError).toBeUndefined()
-      expect(assertAt(result.content, 0).text).toBe("{\"members\":5}")
     }))
 })

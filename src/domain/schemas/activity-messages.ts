@@ -12,23 +12,23 @@ import {
   ObjectClassName,
   Timestamp
 } from "./shared.js"
-
-export interface ActivityFilter {
-  readonly id: ActivityFilterId
-  readonly label?: DisplayText | undefined
-  readonly position: ActivityFilterPosition
-}
-
-export interface ActivityReference {
-  readonly id: ActivityReferenceId
-  readonly messageId: ActivityMessageId
-  readonly srcDocId: DocId
-  readonly srcDocClass: ObjectClassName
-  readonly attachedDocId?: DocId | undefined
-  readonly attachedDocClass?: ObjectClassName | undefined
-  readonly message: ActivityMarkup
-  readonly modifiedOn?: Timestamp | undefined
-}
+export const ActivityFilterSchema = Schema.Struct({
+  id: ActivityFilterId,
+  label: Schema.optional(DisplayText),
+  position: ActivityFilterPosition
+})
+export type ActivityFilter = Schema.Schema.Type<typeof ActivityFilterSchema>
+export const ActivityReferenceSchema = Schema.Struct({
+  id: ActivityReferenceId,
+  messageId: ActivityMessageId,
+  srcDocId: DocId,
+  srcDocClass: ObjectClassName,
+  attachedDocId: Schema.optional(DocId),
+  attachedDocClass: Schema.optional(ObjectClassName),
+  message: ActivityMarkup,
+  modifiedOn: Schema.optional(Timestamp)
+})
+export type ActivityReference = Schema.Schema.Type<typeof ActivityReferenceSchema>
 
 export const GetActivityMessageParamsSchema = Schema.Struct({
   messageId: ActivityMessageId.annotations({
@@ -169,26 +169,6 @@ export const parseAddActivityReplyParams = Schema.decodeUnknown(AddActivityReply
 export const parseUpdateActivityReplyParams = Schema.decodeUnknown(UpdateActivityReplyParamsSchema)
 export const parseDeleteActivityReplyParams = Schema.decodeUnknown(DeleteActivityReplyParamsSchema)
 
-export interface PinActivityMessageResult {
-  readonly messageId: ActivityMessageId
-  readonly pinned: boolean
-}
-
-export interface AddActivityReplyResult {
-  readonly replyId: ActivityMessageId
-  readonly messageId: ActivityMessageId
-}
-
-export interface UpdateActivityReplyResult {
-  readonly replyId: ActivityMessageId
-  readonly updated: boolean
-}
-
-export interface DeleteActivityReplyResult {
-  readonly replyId: ActivityMessageId
-  readonly deleted: boolean
-}
-
 export const ActivityFilterWireSchema = Schema.Struct({
   id: ActivityFilterId,
   label: Schema.optional(DisplayText),
@@ -210,21 +190,25 @@ export const PinActivityMessageResultSchema = Schema.Struct({
   messageId: ActivityMessageId,
   pinned: Schema.Boolean
 })
+export type PinActivityMessageResult = Schema.Schema.Type<typeof PinActivityMessageResultSchema>
 
 export const AddActivityReplyResultSchema = Schema.Struct({
   replyId: ActivityMessageId,
   messageId: ActivityMessageId
 })
+export type AddActivityReplyResult = Schema.Schema.Type<typeof AddActivityReplyResultSchema>
 
 export const UpdateActivityReplyResultSchema = Schema.Struct({
   replyId: ActivityMessageId,
   updated: Schema.Boolean
 })
+export type UpdateActivityReplyResult = Schema.Schema.Type<typeof UpdateActivityReplyResultSchema>
 
 export const DeleteActivityReplyResultSchema = Schema.Struct({
   replyId: ActivityMessageId,
   deleted: Schema.Boolean
 })
+export type DeleteActivityReplyResult = Schema.Schema.Type<typeof DeleteActivityReplyResultSchema>
 
 export const GetActivityMessageResultSchema = ActivityMessageWireSchema
 export const ListActivityFiltersResultSchema = Schema.Array(ActivityFilterWireSchema)

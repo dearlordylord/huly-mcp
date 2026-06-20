@@ -8,7 +8,7 @@ import { type Issue as HulyIssue, type IssueParentInfo, type Project as HulyProj
 import { Effect } from "effect"
 
 import type { AddLabelParams, MoveIssueParams } from "../../domain/schemas.js"
-import type { AddLabelResult, MoveIssueResult } from "../../domain/schemas/issues.js"
+import type { AddLabelResult, MoveIssueResult } from "../../domain/schemas/issues-results.js"
 import { IssueIdentifier } from "../../domain/schemas/shared.js"
 import { TagTargetClass } from "../../domain/schemas/tags.js"
 import type { HulyClient, HulyClientError } from "../client.js"

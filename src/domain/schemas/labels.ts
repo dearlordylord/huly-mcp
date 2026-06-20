@@ -124,19 +124,21 @@ export const parseListLabelsParams = Schema.decodeUnknown(ListLabelsParamsSchema
 export const parseCreateLabelParams = Schema.decodeUnknown(CreateLabelParamsSchema)
 export const parseUpdateLabelParams = Schema.decodeUnknown(UpdateLabelParamsSchema)
 export const parseDeleteLabelParams = Schema.decodeUnknown(DeleteLabelParamsSchema)
+export const CreateLabelResultSchema = Schema.Struct({
+  id: TagElementId,
+  title: Schema.String,
+  created: Schema.Boolean
+})
+export type CreateLabelResult = Schema.Schema.Type<typeof CreateLabelResultSchema>
+export const UpdateLabelResultSchema = Schema.Struct({
+  id: TagElementId,
+  updated: Schema.Boolean
+})
+export type UpdateLabelResult = Schema.Schema.Type<typeof UpdateLabelResultSchema>
+export const DeleteLabelResultSchema = Schema.Struct({
+  id: TagElementId,
+  deleted: Schema.Boolean
+})
+export type DeleteLabelResult = Schema.Schema.Type<typeof DeleteLabelResultSchema>
 
-export interface CreateLabelResult {
-  readonly id: TagElementId
-  readonly title: string
-  readonly created: boolean
-}
-
-export interface UpdateLabelResult {
-  readonly id: TagElementId
-  readonly updated: boolean
-}
-
-export interface DeleteLabelResult {
-  readonly id: TagElementId
-  readonly deleted: boolean
-}
+export const ListLabelsResultSchema = Schema.Array(TagElementSummarySchema)

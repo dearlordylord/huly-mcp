@@ -1,7 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { Count, ListTotal } from "./shared.js"
-import { enumValuesDescription, ProjectIdentifier } from "./shared.js"
+import { Count, enumValuesDescription, ListTotal, ProjectIdentifier } from "./shared.js"
 
 const EntityTypeValues = ["issue", "project", "component", "milestone"] as const
 
@@ -39,25 +38,26 @@ export const PreviewDeletionParamsSchema = Schema.Struct({
 })
 
 export type PreviewDeletionParams = Schema.Schema.Type<typeof PreviewDeletionParamsSchema>
-
-// No codec needed — internal type, not used for runtime validation
-export interface DeletionImpact {
-  readonly entityType: EntityType
-  readonly identifier: string
-  readonly impact: {
-    readonly subIssues?: Count | undefined
-    readonly comments?: Count | undefined
-    readonly attachments?: Count | undefined
-    readonly blockedBy?: Count | undefined
-    readonly relations?: Count | undefined
-    readonly issues?: ListTotal | undefined
-    readonly components?: ListTotal | undefined
-    readonly milestones?: ListTotal | undefined
-    readonly templates?: ListTotal | undefined
-  }
-  readonly warnings: ReadonlyArray<string>
-  readonly totalAffected: ListTotal
-}
+export const DeletionImpactSchema = Schema.Struct({
+  entityType: EntityTypeSchema,
+  identifier: Schema.String,
+  impact: Schema.Struct({
+    subIssues: Schema.optional(Count),
+    comments: Schema.optional(Count),
+    attachments: Schema.optional(Count),
+    blockedBy: Schema.optional(Count),
+    relations: Schema.optional(Count),
+    issues: Schema.optional(ListTotal),
+    components: Schema.optional(ListTotal),
+    milestones: Schema.optional(ListTotal),
+    templates: Schema.optional(ListTotal)
+  }),
+  warnings: Schema.Array(Schema.String),
+  totalAffected: ListTotal
+})
+export type DeletionImpact = Schema.Schema.Type<typeof DeletionImpactSchema>
 
 export const previewDeletionParamsJsonSchema = JSONSchema.make(PreviewDeletionParamsSchema)
 export const parsePreviewDeletionParams = Schema.decodeUnknown(PreviewDeletionParamsSchema)
+
+export const PreviewDeletionResultSchema = DeletionImpactSchema

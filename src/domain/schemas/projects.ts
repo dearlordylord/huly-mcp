@@ -1,6 +1,5 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { ListTotal } from "./shared.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
@@ -9,6 +8,7 @@ import {
   DEFAULT_PRIVATE,
   hasAtLeastOneDefined,
   LimitParam,
+  ListTotal,
   NonEmptyString,
   ProjectIdentifier,
   StatusName,
@@ -43,11 +43,11 @@ export const ListProjectsParamsSchema = Schema.Struct({
 })
 
 export type ListProjectsParams = Schema.Schema.Type<typeof ListProjectsParamsSchema>
-
-export interface ListProjectsResult {
-  readonly projects: ReadonlyArray<ProjectSummary>
-  readonly total: ListTotal
-}
+export const ListProjectsResultSchema = Schema.Struct({
+  projects: Schema.Array(ProjectSummarySchema),
+  total: ListTotal
+})
+export type ListProjectsResult = Schema.Schema.Type<typeof ListProjectsResultSchema>
 
 export const ProjectSchema = Schema.Struct({
   identifier: ProjectIdentifier,
@@ -62,6 +62,8 @@ export const ProjectSchema = Schema.Struct({
 })
 
 export type Project = Schema.Schema.Type<typeof ProjectSchema>
+export const GetProjectResultSchema = ProjectSchema
+export type GetProjectResult = Schema.Schema.Type<typeof GetProjectResultSchema>
 
 export const GetProjectParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotations({ description: "Project identifier (e.g., 'HULY')" })
@@ -122,11 +124,11 @@ export const StatusDetailSchema = Schema.Struct({
   description: "Issue status with workflow category and default info"
 })
 export type StatusDetail = Schema.Schema.Type<typeof StatusDetailSchema>
-
-export interface ListStatusesResult {
-  readonly statuses: ReadonlyArray<StatusDetail>
-  readonly total: ListTotal
-}
+export const ListStatusesResultSchema = Schema.Struct({
+  statuses: Schema.Array(StatusDetailSchema),
+  total: ListTotal
+})
+export type ListStatusesResult = Schema.Schema.Type<typeof ListStatusesResultSchema>
 
 export const listProjectsParamsJsonSchema = JSONSchema.make(ListProjectsParamsSchema)
 export const listStatusesParamsJsonSchema = JSONSchema.make(ListStatusesParamsSchema)
@@ -146,20 +148,19 @@ export const parseUpdateProjectParams = Schema.decodeUnknown(UpdateProjectParams
 export const parseDeleteProjectParams = Schema.decodeUnknown(DeleteProjectParamsSchema)
 export const parseProject = Schema.decodeUnknown(ProjectSchema)
 
-export type GetProjectResult = Project
-
-export interface CreateProjectResult {
-  readonly identifier: ProjectIdentifier
-  readonly name: string
-  readonly created: boolean
-}
-
-export interface UpdateProjectResult {
-  readonly identifier: ProjectIdentifier
-  readonly updated: boolean
-}
-
-export interface DeleteProjectResult {
-  readonly identifier: ProjectIdentifier
-  readonly deleted: boolean
-}
+export const CreateProjectResultSchema = Schema.Struct({
+  identifier: ProjectIdentifier,
+  name: Schema.String,
+  created: Schema.Boolean
+})
+export type CreateProjectResult = Schema.Schema.Type<typeof CreateProjectResultSchema>
+export const UpdateProjectResultSchema = Schema.Struct({
+  identifier: ProjectIdentifier,
+  updated: Schema.Boolean
+})
+export type UpdateProjectResult = Schema.Schema.Type<typeof UpdateProjectResultSchema>
+export const DeleteProjectResultSchema = Schema.Struct({
+  identifier: ProjectIdentifier,
+  deleted: Schema.Boolean
+})
+export type DeleteProjectResult = Schema.Schema.Type<typeof DeleteProjectResultSchema>

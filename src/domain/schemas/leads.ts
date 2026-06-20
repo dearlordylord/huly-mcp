@@ -1,11 +1,11 @@
 import { JSONSchema, ParseResult, Schema } from "effect"
 
-import type { ListTotal } from "./shared.js"
 import {
   DEFAULT_INCLUDE_ARCHIVED,
   DEFAULT_LIMIT,
   DocId,
   LimitParam,
+  ListTotal,
   NonEmptyString,
   PersonName,
   PersonRefInput,
@@ -176,10 +176,11 @@ export const parseListLeadsParams = Schema.decodeUnknown(ListLeadsParamsSchema)
 export const parseGetLeadParams = Schema.decodeUnknown(GetLeadParamsSchema)
 export const parseLeadDetail = Schema.decodeUnknown(LeadDetailSchema)
 export const parseLeadSummary = Schema.decodeUnknown(LeadSummarySchema)
+export const ListFunnelsResultSchema = Schema.Struct({
+  funnels: Schema.Array(FunnelSummarySchema),
+  total: ListTotal
+})
+export type ListFunnelsResult = Schema.Schema.Type<typeof ListFunnelsResultSchema>
 
-// --- Result Types ---
-
-export interface ListFunnelsResult {
-  readonly funnels: ReadonlyArray<FunnelSummary>
-  readonly total: ListTotal
-}
+export const ListLeadsResultSchema = Schema.Array(LeadSummarySchema)
+export const GetLeadResultSchema = LeadDetailSchema

@@ -180,25 +180,26 @@ export const parseCreateComponentParams = Schema.decodeUnknown(CreateComponentPa
 export const parseUpdateComponentParams = Schema.decodeUnknown(UpdateComponentParamsSchema)
 export const parseSetIssueComponentParams = Schema.decodeUnknown(SetIssueComponentParamsSchema)
 export const parseDeleteComponentParams = Schema.decodeUnknown(DeleteComponentParamsSchema)
+export const CreateComponentResultSchema = Schema.Struct({
+  id: ComponentId,
+  label: ComponentLabel
+})
+export type CreateComponentResult = Schema.Schema.Type<typeof CreateComponentResultSchema>
+export const UpdateComponentResultSchema = Schema.Struct({
+  id: ComponentId,
+  updated: Schema.Boolean
+})
+export type UpdateComponentResult = Schema.Schema.Type<typeof UpdateComponentResultSchema>
+export const SetIssueComponentResultSchema = Schema.Struct({
+  identifier: IssueIdentifier,
+  componentSet: Schema.Boolean
+})
+export type SetIssueComponentResult = Schema.Schema.Type<typeof SetIssueComponentResultSchema>
+export const DeleteComponentResultSchema = Schema.Struct({
+  id: ComponentId,
+  deleted: Schema.Boolean
+})
+export type DeleteComponentResult = Schema.Schema.Type<typeof DeleteComponentResultSchema>
 
-// No codec needed — internal type, not used for runtime validation
-
-export interface CreateComponentResult {
-  readonly id: ComponentId
-  readonly label: ComponentLabel
-}
-
-export interface UpdateComponentResult {
-  readonly id: ComponentId
-  readonly updated: boolean
-}
-
-export interface SetIssueComponentResult {
-  readonly identifier: IssueIdentifier
-  readonly componentSet: boolean
-}
-
-export interface DeleteComponentResult {
-  readonly id: ComponentId
-  readonly deleted: boolean
-}
+export const ListComponentsResultSchema = Schema.Array(ComponentSummarySchema)
+export const GetComponentResultSchema = ComponentSchema

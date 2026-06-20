@@ -1,22 +1,12 @@
 import type { RoomLanguage as HulyRoomLanguage } from "@hcengineering/love"
 import { JSONSchema, Schema } from "effect"
 
-import type {
+import {
   AccountUuid,
   BlurRadius,
   Count,
-  DevicePreferenceId,
-  ParticipantInfoId,
-  PersonId,
-  PersonName,
-  RoomName,
-  SessionId,
-  Timestamp as TimestampType,
-  VirtualOfficeCoordinate,
-  VirtualOfficeDimension
-} from "./shared.js"
-import {
   DEFAULT_LIMIT,
+  DevicePreferenceId,
   DocId,
   EmptyParamsSchema,
   enumValuesDescription,
@@ -24,8 +14,16 @@ import {
   LimitParam,
   MeetingMinutesId,
   NonEmptyString,
+  ParticipantInfoId,
+  PersonId,
+  PersonName,
   RoomId,
-  Timestamp
+  RoomName,
+  SessionId,
+  Timestamp,
+  Timestamp as TimestampType,
+  VirtualOfficeCoordinate,
+  VirtualOfficeDimension
 } from "./shared.js"
 
 export const FloorName = NonEmptyString.pipe(Schema.brand("FloorName")).annotations({
@@ -124,93 +122,101 @@ export const RoomTypeSchema = Schema.Literal(...RoomTypeValues).annotations({
   title: "RoomType",
   description: `Virtual office room type: ${enumValuesDescription(RoomTypeValues)}`
 })
-
-export interface FloorSummary {
-  readonly floorId: FloorId
-  readonly name: FloorName
-  readonly modifiedOn?: TimestampType | undefined
-}
-
-export interface RoomSummary {
-  readonly roomId: RoomId
-  readonly name?: RoomName | undefined
-  readonly type: RoomType
-  readonly access: RoomAccess
-  readonly floorId: FloorId
-  readonly position: {
-    readonly x: VirtualOfficeCoordinate
-    readonly y: VirtualOfficeCoordinate
-    readonly width: VirtualOfficeDimension
-    readonly height: VirtualOfficeDimension
-  }
-  readonly language: RoomLanguage
-  /** Durable room defaults, not live recording/transcription state. */
-  readonly startWithTranscription: boolean
-  readonly startWithRecording: boolean
-  readonly meetings?: Count | undefined
-  readonly messages?: Count | undefined
-  readonly modifiedOn?: TimestampType | undefined
-}
-
-export interface RoomDetails extends RoomSummary {
-  readonly description?: string | undefined
-}
-
-export interface OfficeSummary extends RoomSummary {
-  readonly personId?: PersonId | undefined
-  readonly personName?: PersonName | undefined
-}
-
-export interface ActiveRoomInfo {
-  readonly roomId: RoomId
-  readonly roomName?: RoomName | undefined
-  readonly isOffice: boolean
-  readonly personIds: ReadonlyArray<PersonId>
-}
-
-export interface ActiveParticipantInfo {
-  readonly participantInfoId: ParticipantInfoId
-  readonly name: PersonName
-  readonly personId: PersonId
-  readonly roomId: RoomId
-  readonly roomName?: RoomName | undefined
-  readonly x: VirtualOfficeCoordinate
-  readonly y: VirtualOfficeCoordinate
-  readonly sessionId?: SessionId | undefined
-  readonly account?: AccountUuid | undefined
-}
-
-export interface MeetingMinutesSummary {
-  readonly meetingMinutesId: MeetingMinutesId
-  readonly title: MeetingMinutesTitle
-  readonly attachedToId: DocId
-  readonly status: MeetingStatus
-  readonly createdOn?: TimestampType | undefined
-  readonly meetingEnd?: TimestampType | undefined
-  readonly transcription?: Count | undefined
-  readonly messages?: Count | undefined
-  readonly attachments?: Count | undefined
-}
-
-export interface MeetingMinutesDetails extends MeetingMinutesSummary {
-  readonly description?: string | undefined
-}
-
-export interface DevicePreferenceSummary {
-  readonly devicePreferenceId: DevicePreferenceId
-  readonly micEnabled: boolean
-  readonly camEnabled: boolean
-  readonly noiseCancellation: boolean
-  readonly blurRadius: BlurRadius
-}
-
-export interface OfficeDefaultsSummary {
-  readonly roomId: RoomId
-  readonly name?: RoomName | undefined
-  readonly language: RoomLanguage
-  readonly startWithTranscription: boolean
-  readonly startWithRecording: boolean
-}
+export const FloorSummarySchema = Schema.Struct({
+  floorId: FloorId,
+  name: FloorName,
+  modifiedOn: Schema.optional(TimestampType)
+})
+export type FloorSummary = Schema.Schema.Type<typeof FloorSummarySchema>
+export const RoomSummarySchema = Schema.Struct({
+  roomId: RoomId,
+  name: Schema.optional(RoomName),
+  type: RoomTypeSchema,
+  access: RoomAccessSchema,
+  floorId: FloorId,
+  position: Schema.Struct({
+    x: VirtualOfficeCoordinate,
+    y: VirtualOfficeCoordinate,
+    width: VirtualOfficeDimension,
+    height: VirtualOfficeDimension
+  }),
+  language: RoomLanguageSchema,
+  startWithTranscription: Schema.Boolean,
+  startWithRecording: Schema.Boolean,
+  meetings: Schema.optional(Count),
+  messages: Schema.optional(Count),
+  modifiedOn: Schema.optional(TimestampType)
+})
+export type RoomSummary = Schema.Schema.Type<typeof RoomSummarySchema>
+export const RoomDetailsSchema = Schema.Struct({
+  ...RoomSummarySchema.fields,
+  description: Schema.optional(Schema.String)
+})
+export type RoomDetails = Schema.Schema.Type<typeof RoomDetailsSchema>
+export const OfficeSummarySchema = Schema.Struct({
+  ...RoomSummarySchema.fields,
+  personId: Schema.optional(PersonId),
+  personName: Schema.optional(PersonName)
+})
+export type OfficeSummary = Schema.Schema.Type<typeof OfficeSummarySchema>
+export const OfficeDetailsSchema = Schema.Struct({
+  ...RoomDetailsSchema.fields,
+  personId: Schema.optional(PersonId),
+  personName: Schema.optional(PersonName)
+})
+export type OfficeDetails = Schema.Schema.Type<typeof OfficeDetailsSchema>
+export const ActiveRoomInfoSchema = Schema.Struct({
+  roomId: RoomId,
+  roomName: Schema.optional(RoomName),
+  isOffice: Schema.Boolean,
+  personIds: Schema.Array(PersonId)
+})
+export type ActiveRoomInfo = Schema.Schema.Type<typeof ActiveRoomInfoSchema>
+export const ActiveParticipantInfoSchema = Schema.Struct({
+  participantInfoId: ParticipantInfoId,
+  name: PersonName,
+  personId: PersonId,
+  roomId: RoomId,
+  roomName: Schema.optional(RoomName),
+  x: VirtualOfficeCoordinate,
+  y: VirtualOfficeCoordinate,
+  sessionId: Schema.optional(SessionId),
+  account: Schema.optional(AccountUuid)
+})
+export type ActiveParticipantInfo = Schema.Schema.Type<typeof ActiveParticipantInfoSchema>
+export const MeetingMinutesSummarySchema = Schema.Struct({
+  meetingMinutesId: MeetingMinutesId,
+  title: MeetingMinutesTitle,
+  attachedToId: DocId,
+  status: Schema.Literal("active", "finished"),
+  createdOn: Schema.optional(TimestampType),
+  meetingEnd: Schema.optional(TimestampType),
+  transcription: Schema.optional(Count),
+  messages: Schema.optional(Count),
+  attachments: Schema.optional(Count)
+})
+export type MeetingMinutesSummary = Schema.Schema.Type<typeof MeetingMinutesSummarySchema>
+export const MeetingMinutesDetailsSchema = Schema.Struct({
+  ...MeetingMinutesSummarySchema.fields,
+  description: Schema.optional(Schema.String)
+})
+export type MeetingMinutesDetails = Schema.Schema.Type<typeof MeetingMinutesDetailsSchema>
+export const DevicePreferenceSummarySchema = Schema.Struct({
+  devicePreferenceId: DevicePreferenceId,
+  micEnabled: Schema.Boolean,
+  camEnabled: Schema.Boolean,
+  noiseCancellation: Schema.Boolean,
+  blurRadius: BlurRadius
+})
+export type DevicePreferenceSummary = Schema.Schema.Type<typeof DevicePreferenceSummarySchema>
+export const OfficeDefaultsSummarySchema = Schema.Struct({
+  roomId: RoomId,
+  name: Schema.optional(RoomName),
+  language: RoomLanguageSchema,
+  startWithTranscription: Schema.Boolean,
+  startWithRecording: Schema.Boolean
+})
+export type OfficeDefaultsSummary = Schema.Schema.Type<typeof OfficeDefaultsSummarySchema>
 
 const ListOfficeFloorsParamsSchema = Schema.Struct({
   limit: Schema.optional(LimitParam.annotations({
@@ -350,3 +356,16 @@ export const parseListMeetingMinutesParams = Schema.decodeUnknown(ListMeetingMin
 export const parseGetMeetingMinutesParams = Schema.decodeUnknown(GetMeetingMinutesParamsSchema)
 export const parseListDevicePreferencesParams = Schema.decodeUnknown(ListDevicePreferencesParamsSchema)
 export const parseListOfficeDefaultsParams = Schema.decodeUnknown(ListOfficeDefaultsParamsSchema)
+
+export const ListOfficeFloorsResultSchema = Schema.Array(FloorSummarySchema)
+export const GetOfficeFloorResultSchema = FloorSummarySchema
+export const ListOfficeRoomsResultSchema = Schema.Array(RoomSummarySchema)
+export const GetOfficeRoomResultSchema = RoomDetailsSchema
+export const ListOfficesResultSchema = Schema.Array(OfficeSummarySchema)
+export const GetOfficeResultSchema = OfficeDetailsSchema
+export const ListActiveRoomInfoResultSchema = Schema.Array(ActiveRoomInfoSchema)
+export const ListActiveRoomParticipantsResultSchema = Schema.Array(ActiveParticipantInfoSchema)
+export const ListMeetingMinutesResultSchema = Schema.Array(MeetingMinutesSummarySchema)
+export const GetMeetingMinutesResultSchema = MeetingMinutesDetailsSchema
+export const ListDevicePreferencesResultSchema = Schema.Array(DevicePreferenceSummarySchema)
+export const ListOfficeDefaultsResultSchema = Schema.Array(OfficeDefaultsSummarySchema)

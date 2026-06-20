@@ -1,8 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { ContactChannelSummary } from "./contact-channels.js"
-import type { OrganizationMembershipSummary } from "./contact-organizations.js"
-import type { PersonName, UrlString } from "./shared.js"
+import { ContactChannelSummarySchema } from "./contact-channels.js"
+import { OrganizationMembershipSummarySchema } from "./contact-organizations.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
@@ -12,41 +11,43 @@ import {
   LimitParam,
   NonEmptyString,
   PersonId,
+  PersonName,
+  UrlString,
   withAtLeastOneRequired
 } from "./shared.js"
-
-export interface PersonSummary {
-  readonly id: PersonId
-  readonly name: PersonName
-  readonly city?: string | undefined
-  readonly email?: Email | undefined
-  readonly url: UrlString
-  readonly modifiedOn?: number | undefined
-}
-
-export interface Person {
-  readonly id: PersonId
-  readonly name: PersonName
-  readonly firstName?: string | undefined
-  readonly lastName?: string | undefined
-  readonly city?: string | undefined
-  readonly email?: Email | undefined
-  readonly channels?: ReadonlyArray<ContactChannelSummary> | undefined
-  readonly organizations?: ReadonlyArray<OrganizationMembershipSummary> | undefined
-  readonly url: UrlString
-  readonly modifiedOn?: number | undefined
-  readonly createdOn?: number | undefined
-}
-
-export interface EmployeeSummary {
-  readonly id: PersonId
-  readonly name: PersonName
-  readonly email?: Email | undefined
-  readonly position?: string | undefined
-  readonly active: boolean
-  readonly url: UrlString
-  readonly modifiedOn?: number | undefined
-}
+export const PersonSummarySchema = Schema.Struct({
+  id: PersonId,
+  name: PersonName,
+  city: Schema.optional(Schema.String),
+  email: Schema.optional(Email),
+  url: UrlString,
+  modifiedOn: Schema.optional(Schema.Number)
+})
+export type PersonSummary = Schema.Schema.Type<typeof PersonSummarySchema>
+export const PersonSchema = Schema.Struct({
+  id: PersonId,
+  name: PersonName,
+  firstName: Schema.optional(Schema.String),
+  lastName: Schema.optional(Schema.String),
+  city: Schema.optional(Schema.String),
+  email: Schema.optional(Email),
+  channels: Schema.optional(Schema.Array(ContactChannelSummarySchema)),
+  organizations: Schema.optional(Schema.Array(OrganizationMembershipSummarySchema)),
+  url: UrlString,
+  modifiedOn: Schema.optional(Schema.Number),
+  createdOn: Schema.optional(Schema.Number)
+})
+export type Person = Schema.Schema.Type<typeof PersonSchema>
+export const EmployeeSummarySchema = Schema.Struct({
+  id: PersonId,
+  name: PersonName,
+  email: Schema.optional(Email),
+  position: Schema.optional(Schema.String),
+  active: Schema.Boolean,
+  url: UrlString,
+  modifiedOn: Schema.optional(Schema.Number)
+})
+export type EmployeeSummary = Schema.Schema.Type<typeof EmployeeSummarySchema>
 
 const ListPersonsParamsBase = Schema.Struct({
   nameSearch: Schema.optional(Schema.String.annotations({
@@ -200,18 +201,21 @@ export const parseCreatePersonParams = Schema.decodeUnknown(CreatePersonParamsSc
 export const parseUpdatePersonParams = Schema.decodeUnknown(UpdatePersonParamsSchema)
 export const parseDeletePersonParams = Schema.decodeUnknown(DeletePersonParamsSchema)
 export const parseListEmployeesParams = Schema.decodeUnknown(ListEmployeesParamsSchema)
+export const CreatePersonResultSchema = Schema.Struct({
+  id: PersonId
+})
+export type CreatePersonResult = Schema.Schema.Type<typeof CreatePersonResultSchema>
+export const UpdatePersonResultSchema = Schema.Struct({
+  id: PersonId,
+  updated: Schema.Boolean
+})
+export type UpdatePersonResult = Schema.Schema.Type<typeof UpdatePersonResultSchema>
+export const DeletePersonResultSchema = Schema.Struct({
+  id: PersonId,
+  deleted: Schema.Boolean
+})
+export type DeletePersonResult = Schema.Schema.Type<typeof DeletePersonResultSchema>
 
-// No codec needed — internal type, not used for runtime validation
-export interface CreatePersonResult {
-  readonly id: PersonId
-}
-
-export interface UpdatePersonResult {
-  readonly id: PersonId
-  readonly updated: boolean
-}
-
-export interface DeletePersonResult {
-  readonly id: PersonId
-  readonly deleted: boolean
-}
+export const ListPersonsResultSchema = Schema.Array(PersonSummarySchema)
+export const GetPersonResultSchema = PersonSchema
+export const ListEmployeesResultSchema = Schema.Array(EmployeeSummarySchema)

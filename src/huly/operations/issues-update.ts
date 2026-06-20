@@ -3,7 +3,7 @@ import type { Issue as HulyIssue } from "@hcengineering/tracker"
 import { Effect } from "effect"
 
 import type { UpdateIssueParams } from "../../domain/schemas.js"
-import type { UpdateIssueResult } from "../../domain/schemas/issues.js"
+import type { UpdateIssueResult } from "../../domain/schemas/issues-results.js"
 import { UPDATE_ISSUE_FIELDS } from "../../domain/schemas/issues.js"
 import { IssueIdentifier } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"

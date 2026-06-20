@@ -24,11 +24,11 @@ import {
   GET_HULY_CONTEXT_TOOL_NAME,
   getHulyContextToolDefinition,
   VERSION_TOOL_NAME,
-  versionToolDefinition
+  versionToolDefinition,
+  VersionToolResultSchema
 } from "./huly-context-tool.js"
 import { toClientCompatibleInputSchema } from "./input-schema-compat.js"
 import { listResources, listResourceTemplates, readHulyResource } from "./resources.js"
-import { defaultToolOutputSchema } from "./tool-output-schema.js"
 import type { ToolRegistry } from "./tools/index.js"
 import { resolveAnnotations } from "./tools/index.js"
 import {
@@ -115,6 +115,9 @@ export const deriveEditMode = (name: string, args: unknown): string | undefined 
 
 const validateHulyContextResult = (value: unknown): GetHulyContextResult =>
   Schema.decodeUnknownSync(GetHulyContextResultSchema)(value)
+
+const validateVersionToolResult = (value: unknown): Schema.Schema.Type<typeof VersionToolResultSchema> =>
+  Schema.decodeUnknownSync(VersionToolResultSchema)(value)
 
 /**
  * Injected wall-clock reader for telemetry timing and the drain-timeout loop. The live
@@ -277,7 +280,7 @@ export const createMcpProtocolHandlers = (
           name: tool.name,
           description: tool.description,
           inputSchema: toClientCompatibleInputSchema(tool.inputSchema),
-          outputSchema: defaultToolOutputSchema,
+          outputSchema: tool.outputSchema,
           annotations: resolveAnnotations(tool)
         }))
       ].map(tool => ({
@@ -314,7 +317,13 @@ export const createMcpProtocolHandlers = (
         if (!isEmptyArgumentsObject(args)) return returnError(createUnexpectedArgumentsError(name))
 
         const latest = await fetchLatestVersion()
-        const versionResponse = createSuccessResponse({ current: VERSION, latest })
+        let versionResult: Schema.Schema.Type<typeof VersionToolResultSchema>
+        try {
+          versionResult = validateVersionToolResult({ current: VERSION, latest })
+        } catch {
+          return returnError(mapDomainErrorToMcp(new HulyError({ message: "Failed to build version result" })))
+        }
+        const versionResponse = createSuccessResponse(versionResult)
         const durationMs = clock.currentTimeMillis() - start
         telemetry.toolCalled({
           toolName: name,

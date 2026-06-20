@@ -2,7 +2,6 @@ import { JSONSchema, Schema } from "effect"
 
 import { clearableText } from "./clearable.js"
 import { IssuePrioritySchema } from "./issues.js"
-import type { IssueId, IssueIdentifier } from "./shared.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
@@ -11,6 +10,8 @@ import {
   Count,
   DEFAULT_LIMIT,
   hasAtLeastOneDefined,
+  IssueId,
+  IssueIdentifier,
   IssueTemplateChildId,
   IssueTemplateId,
   LimitParam,
@@ -335,38 +336,39 @@ export const parseUpdateIssueTemplateParams = Schema.decodeUnknown(UpdateIssueTe
 export const parseDeleteIssueTemplateParams = Schema.decodeUnknown(DeleteIssueTemplateParamsSchema)
 export const parseAddTemplateChildParams = Schema.decodeUnknown(AddTemplateChildParamsSchema)
 export const parseRemoveTemplateChildParams = Schema.decodeUnknown(RemoveTemplateChildParamsSchema)
+export const CreateIssueTemplateResultSchema = Schema.Struct({
+  id: IssueTemplateId,
+  title: Schema.String
+})
+export type CreateIssueTemplateResult = Schema.Schema.Type<typeof CreateIssueTemplateResultSchema>
+export const UpdateIssueTemplateResultSchema = Schema.Struct({
+  id: IssueTemplateId,
+  updated: Schema.Boolean
+})
+export type UpdateIssueTemplateResult = Schema.Schema.Type<typeof UpdateIssueTemplateResultSchema>
+export const DeleteIssueTemplateResultSchema = Schema.Struct({
+  id: IssueTemplateId,
+  deleted: Schema.Boolean
+})
+export type DeleteIssueTemplateResult = Schema.Schema.Type<typeof DeleteIssueTemplateResultSchema>
+export const CreateIssueFromTemplateResultSchema = Schema.Struct({
+  identifier: IssueIdentifier,
+  issueId: IssueId,
+  childrenCreated: Schema.optional(Count)
+})
+export type CreateIssueFromTemplateResult = Schema.Schema.Type<typeof CreateIssueFromTemplateResultSchema>
+export const AddTemplateChildResultSchema = Schema.Struct({
+  id: IssueTemplateChildId,
+  title: Schema.String,
+  added: Schema.Boolean
+})
+export type AddTemplateChildResult = Schema.Schema.Type<typeof AddTemplateChildResultSchema>
+export const RemoveTemplateChildResultSchema = Schema.Struct({
+  id: IssueTemplateChildId,
+  title: Schema.String,
+  removed: Schema.Boolean
+})
+export type RemoveTemplateChildResult = Schema.Schema.Type<typeof RemoveTemplateChildResultSchema>
 
-// No codec needed — internal type, not used for runtime validation
-
-export interface CreateIssueTemplateResult {
-  readonly id: IssueTemplateId
-  readonly title: string
-}
-
-export interface UpdateIssueTemplateResult {
-  readonly id: IssueTemplateId
-  readonly updated: boolean
-}
-
-export interface DeleteIssueTemplateResult {
-  readonly id: IssueTemplateId
-  readonly deleted: boolean
-}
-
-export interface CreateIssueFromTemplateResult {
-  readonly identifier: IssueIdentifier
-  readonly issueId: IssueId
-  readonly childrenCreated?: Count
-}
-
-export interface AddTemplateChildResult {
-  readonly id: IssueTemplateChildId
-  readonly title: string
-  readonly added: boolean
-}
-
-export interface RemoveTemplateChildResult {
-  readonly id: IssueTemplateChildId
-  readonly title: string
-  readonly removed: boolean
-}
+export const ListIssueTemplatesResultSchema = Schema.Array(IssueTemplateSummarySchema)
+export const GetIssueTemplateResultSchema = IssueTemplateSchema

@@ -106,7 +106,7 @@ export const ListExternalChannelMessagesResultSchema = Schema.Union(
   description: "Read-only external channel message listing result."
 })
 
-export type ListExternalChannelMessagesResult = Schema.Schema.Encoded<typeof ListExternalChannelMessagesResultSchema>
+export type ListExternalChannelMessagesResult = Schema.Schema.Type<typeof ListExternalChannelMessagesResultSchema>
 
 export const listExternalChannelMessagesParamsJsonSchema = JSONSchema.make(ListExternalChannelMessagesParamsSchema)
 export const parseListExternalChannelMessagesParams = Schema.decodeUnknown(ListExternalChannelMessagesParamsSchema)

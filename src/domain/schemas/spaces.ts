@@ -1,7 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
 import { clearableText } from "./clearable.js"
-import type { ListTotal } from "./shared.js"
 import {
   AccountUuid,
   assertUpdateFields,
@@ -11,6 +10,7 @@ import {
   DEFAULT_LIMIT,
   hasAtLeastOneDefined,
   LimitParam,
+  ListTotal,
   NonEmptyString,
   ObjectClassName,
   PermissionId,
@@ -44,6 +44,10 @@ const SpaceRoleIdentifierSchema = SpaceRoleIdentifier.annotations({
     "Role to resolve within the space's SpaceType. Accepts a raw Huly role _id or an exact role name from get_space_type."
 })
 
+const HulyOutputName = Schema.String.annotations({
+  description: "Display name as stored by Huly; system records can use an empty string."
+})
+
 export const SpaceRoleAssignmentSchema = Schema.Struct({
   roleId: RoleId,
   members: Schema.Array(AccountUuid)
@@ -53,7 +57,7 @@ export const DEFAULT_SPACE_OWNER_ENSURE_MEMBERS = true
 
 export const SpaceSummarySchema = Schema.Struct({
   id: SpaceId,
-  name: NonEmptyString,
+  name: HulyOutputName,
   description: Schema.optional(Schema.String),
   class: ObjectClassName,
   type: Schema.optional(SpaceTypeId),
@@ -67,7 +71,7 @@ export type SpaceSummary = Schema.Schema.Type<typeof SpaceSummarySchema>
 
 export const SpaceDetailSchema = Schema.Struct({
   id: SpaceId,
-  name: NonEmptyString,
+  name: HulyOutputName,
   description: Schema.String,
   class: ObjectClassName,
   type: Schema.optional(SpaceTypeId),
@@ -82,7 +86,7 @@ export type SpaceDetail = Schema.Schema.Type<typeof SpaceDetailSchema>
 
 export const SpaceTypeSummarySchema = Schema.Struct({
   id: SpaceTypeId,
-  name: NonEmptyString,
+  name: HulyOutputName,
   shortDescription: Schema.optional(Schema.String),
   descriptor: NonEmptyString,
   baseClass: Schema.optional(ObjectClassName),
@@ -114,7 +118,7 @@ export type SpaceRoleSummary = Schema.Schema.Type<typeof SpaceRoleSummarySchema>
 
 export const SpaceTypeDetailSchema = Schema.Struct({
   id: SpaceTypeId,
-  name: NonEmptyString,
+  name: HulyOutputName,
   shortDescription: Schema.optional(Schema.String),
   descriptor: NonEmptyString,
   descriptorName: Schema.optional(NonEmptyString),
@@ -143,11 +147,11 @@ export const ListSpacesParamsSchema = Schema.Struct({
   limit: Schema.optional(LimitParam.annotations({ description: limitDescription("spaces") }))
 })
 export type ListSpacesParams = Schema.Schema.Type<typeof ListSpacesParamsSchema>
-
-export interface ListSpacesResult {
-  readonly spaces: ReadonlyArray<SpaceSummary>
-  readonly total: ListTotal
-}
+export const ListSpacesResultSchema = Schema.Struct({
+  spaces: Schema.Array(SpaceSummarySchema),
+  total: ListTotal
+})
+export type ListSpacesResult = Schema.Schema.Type<typeof ListSpacesResultSchema>
 
 export const GetSpaceParamsSchema = Schema.Struct({
   space: SpaceIdentifier.annotations({
@@ -174,11 +178,11 @@ export const ListSpaceTypesParamsSchema = Schema.Struct({
   limit: Schema.optional(LimitParam.annotations({ description: limitDescription("space types") }))
 })
 export type ListSpaceTypesParams = Schema.Schema.Type<typeof ListSpaceTypesParamsSchema>
-
-export interface ListSpaceTypesResult {
-  readonly spaceTypes: ReadonlyArray<SpaceTypeSummary>
-  readonly total: ListTotal
-}
+export const ListSpaceTypesResultSchema = Schema.Struct({
+  spaceTypes: Schema.Array(SpaceTypeSummarySchema),
+  total: ListTotal
+})
+export type ListSpaceTypesResult = Schema.Schema.Type<typeof ListSpaceTypesResultSchema>
 
 export const GetSpaceTypeParamsSchema = Schema.Struct({
   spaceType: SpaceTypeIdentifier.annotations({
@@ -200,11 +204,11 @@ export const ListSpacePermissionsParamsSchema = Schema.Struct({
   limit: Schema.optional(LimitParam.annotations({ description: limitDescription("permissions") }))
 })
 export type ListSpacePermissionsParams = Schema.Schema.Type<typeof ListSpacePermissionsParamsSchema>
-
-export interface ListSpacePermissionsResult {
-  readonly permissions: ReadonlyArray<SpacePermissionSummary>
-  readonly total: ListTotal
-}
+export const ListSpacePermissionsResultSchema = Schema.Struct({
+  permissions: Schema.Array(SpacePermissionSummarySchema),
+  total: ListTotal
+})
+export type ListSpacePermissionsResult = Schema.Schema.Type<typeof ListSpacePermissionsResultSchema>
 
 export const UPDATE_SPACE_FIELDS = ["name", "description", "private", "archived", "autoJoin"] as const
 
@@ -235,11 +239,11 @@ export const UpdateSpaceParamsSchema = Schema.Struct({
 )
 export type UpdateSpaceParams = Schema.Schema.Type<typeof UpdateSpaceParamsSchema>
 assertUpdateFields<UpdateSpaceParams>()(["space", "class", "type"], UPDATE_SPACE_FIELDS)
-
-export interface UpdateSpaceResult {
-  readonly id: SpaceId
-  readonly updated: boolean
-}
+export const UpdateSpaceResultSchema = Schema.Struct({
+  id: SpaceId,
+  updated: Schema.Boolean
+})
+export type UpdateSpaceResult = Schema.Schema.Type<typeof UpdateSpaceResultSchema>
 
 export const SpaceMemberMutationParamsSchema = Schema.Struct({
   space: SpaceIdentifier.annotations({
@@ -258,12 +262,12 @@ export const SpaceMemberMutationParamsSchema = Schema.Struct({
   })
 })
 export type SpaceMemberMutationParams = Schema.Schema.Type<typeof SpaceMemberMutationParamsSchema>
-
-export interface SpaceMemberMutationResult {
-  readonly id: SpaceId
-  readonly members: ReadonlyArray<AccountUuid>
-  readonly changed: boolean
-}
+export const SpaceMemberMutationResultSchema = Schema.Struct({
+  id: SpaceId,
+  members: Schema.Array(AccountUuid),
+  changed: Schema.Boolean
+})
+export type SpaceMemberMutationResult = Schema.Schema.Type<typeof SpaceMemberMutationResultSchema>
 
 export const SetSpaceOwnersParamsSchema = Schema.Struct({
   space: SpaceIdentifier.annotations({
@@ -285,13 +289,13 @@ export const SetSpaceOwnersParamsSchema = Schema.Struct({
   }))
 })
 export type SetSpaceOwnersParams = Schema.Schema.Type<typeof SetSpaceOwnersParamsSchema>
-
-export interface SetSpaceOwnersResult {
-  readonly id: SpaceId
-  readonly owners: ReadonlyArray<AccountUuid>
-  readonly members: ReadonlyArray<AccountUuid>
-  readonly changed: boolean
-}
+export const SetSpaceOwnersResultSchema = Schema.Struct({
+  id: SpaceId,
+  owners: Schema.Array(AccountUuid),
+  members: Schema.Array(AccountUuid),
+  changed: Schema.Boolean
+})
+export type SetSpaceOwnersResult = Schema.Schema.Type<typeof SetSpaceOwnersResultSchema>
 
 const SpaceRoleMemberMutationFields = {
   space: SpaceIdentifier.annotations({
@@ -322,13 +326,19 @@ export const SetSpaceRoleMembersParamsSchema = Schema.Struct({
   })
 })
 export type SetSpaceRoleMembersParams = Schema.Schema.Type<typeof SetSpaceRoleMembersParamsSchema>
-
-export interface SpaceRoleMembersResult {
-  readonly id: SpaceId
-  readonly roleId: RoleId
-  readonly members: ReadonlyArray<AccountUuid>
-  readonly changed: boolean
-}
+export const SpaceRoleMembersResultSchema = Schema.Struct({
+  id: SpaceId,
+  roleId: RoleId,
+  members: Schema.Array(AccountUuid),
+  changed: Schema.Boolean
+})
+export type SpaceRoleMembersResult = Schema.Schema.Type<typeof SpaceRoleMembersResultSchema>
+export const SetSpaceRoleMembersResultSchema = SpaceRoleMembersResultSchema
+export type SetSpaceRoleMembersResult = Schema.Schema.Type<typeof SetSpaceRoleMembersResultSchema>
+export const AddSpaceRoleMembersResultSchema = SpaceRoleMembersResultSchema
+export type AddSpaceRoleMembersResult = Schema.Schema.Type<typeof AddSpaceRoleMembersResultSchema>
+export const RemoveSpaceRoleMembersResultSchema = SpaceRoleMembersResultSchema
+export type RemoveSpaceRoleMembersResult = Schema.Schema.Type<typeof RemoveSpaceRoleMembersResultSchema>
 
 export const listSpacesParamsJsonSchema = JSONSchema.make(ListSpacesParamsSchema)
 export const getSpaceParamsJsonSchema = JSONSchema.make(GetSpaceParamsSchema)
@@ -354,3 +364,8 @@ export const parseSpaceMemberMutationParams = Schema.decodeUnknown(SpaceMemberMu
 export const parseSetSpaceOwnersParams = Schema.decodeUnknown(SetSpaceOwnersParamsSchema)
 export const parseSpaceRoleMemberMutationParams = Schema.decodeUnknown(SpaceRoleMemberMutationParamsSchema)
 export const parseSetSpaceRoleMembersParams = Schema.decodeUnknown(SetSpaceRoleMembersParamsSchema)
+
+export const GetSpaceResultSchema = SpaceDetailSchema
+export const GetSpaceTypeResultSchema = SpaceTypeDetailSchema
+export const AddSpaceMembersResultSchema = SpaceMemberMutationResultSchema
+export const RemoveSpaceMembersResultSchema = SpaceMemberMutationResultSchema

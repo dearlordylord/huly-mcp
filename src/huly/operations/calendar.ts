@@ -13,19 +13,17 @@ import type { AttachedData, Class, Doc, DocumentQuery, DocumentUpdate, Space } f
 import { SortingOrder } from "@hcengineering/core"
 import { Effect } from "effect"
 
+import type { CreateEventResult, DeleteEventResult, UpdateEventResult } from "../../domain/schemas/calendar-results.js"
 import type {
   CalendarSummary,
   CreateEventParams,
-  CreateEventResult,
   DeleteEventParams,
-  DeleteEventResult,
   Event,
   EventSummary,
   GetEventParams,
   ListCalendarsParams,
   ListEventsParams,
-  UpdateEventParams,
-  UpdateEventResult
+  UpdateEventParams
 } from "../../domain/schemas/calendar.js"
 import {
   CalendarEventTitle,

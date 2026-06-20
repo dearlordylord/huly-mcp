@@ -1,6 +1,5 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { PersonName, PositiveNumber, Timestamp as TimestampBrand } from "./shared.js"
 import {
   DEFAULT_LIMIT,
   IssueIdentifier,
@@ -9,35 +8,27 @@ import {
   ProjectIdentifier,
   TimeSpendReportId,
   Timestamp,
+  Timestamp as TimestampBrand,
   TodoId,
   WorkSlotId
 } from "./shared.js"
-
-// No codec needed — internal type, not used for runtime validation
-export interface TimeSpendReport {
-  readonly id: TimeSpendReportId
-  readonly identifier?: IssueIdentifier | undefined
-  readonly employee?: PersonName | undefined
-  readonly date?: number | null | undefined
-  readonly value: number
-  readonly description: string
-}
-
-export interface TimeReportSummary {
-  readonly identifier?: IssueIdentifier | undefined
-  readonly totalTime: number
-  readonly estimation?: PositiveNumber | undefined
-  readonly remainingTime?: PositiveNumber | undefined
-  readonly reports: ReadonlyArray<TimeSpendReport>
-}
-
-export interface WorkSlot {
-  readonly id: WorkSlotId
-  readonly todoId: TodoId
-  readonly date: TimestampBrand
-  readonly dueDate: TimestampBrand
-  readonly title?: string | undefined
-}
+export const TimeSpendReportSchema = Schema.Struct({
+  id: TimeSpendReportId,
+  identifier: Schema.optional(IssueIdentifier),
+  employee: Schema.optional(NonEmptyString),
+  date: Schema.optional(Schema.NullOr(Timestamp)),
+  value: Schema.Number,
+  description: Schema.String
+})
+export type TimeSpendReport = Schema.Schema.Type<typeof TimeSpendReportSchema>
+export const WorkSlotSchema = Schema.Struct({
+  id: WorkSlotId,
+  todoId: TodoId,
+  date: TimestampBrand,
+  dueDate: TimestampBrand,
+  title: Schema.optional(Schema.String)
+})
+export type WorkSlot = Schema.Schema.Type<typeof WorkSlotSchema>
 export const LogTimeParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotations({
     description: "Project identifier (e.g., 'HULY')"
@@ -162,22 +153,6 @@ export const StopTimerParamsSchema = Schema.Struct({
 })
 
 export type StopTimerParams = Schema.Schema.Type<typeof StopTimerParamsSchema>
-
-// No codec needed — internal type, not used for runtime validation
-export interface DetailedTimeReport {
-  readonly project: ProjectIdentifier
-  readonly totalTime: number
-  readonly byIssue: ReadonlyArray<{
-    readonly identifier: IssueIdentifier | undefined
-    readonly issueTitle: string
-    readonly totalTime: number
-    readonly reports: ReadonlyArray<TimeSpendReport>
-  }>
-  readonly byEmployee: ReadonlyArray<{
-    readonly employeeName: PersonName | undefined
-    readonly totalTime: number
-  }>
-}
 export const logTimeParamsJsonSchema = JSONSchema.make(LogTimeParamsSchema)
 export const getTimeReportParamsJsonSchema = JSONSchema.make(GetTimeReportParamsSchema)
 export const listTimeSpendReportsParamsJsonSchema = JSONSchema.make(ListTimeSpendReportsParamsSchema)
@@ -194,31 +169,7 @@ export const parseListWorkSlotsParams = Schema.decodeUnknown(ListWorkSlotsParams
 export const parseStartTimerParams = Schema.decodeUnknown(StartTimerParamsSchema)
 export const parseStopTimerParams = Schema.decodeUnknown(StopTimerParamsSchema)
 
-// No codec needed — internal type, not used for runtime validation
-export interface LogTimeResult {
-  readonly reportId: TimeSpendReportId
-  readonly identifier: IssueIdentifier
-}
-
-export interface StartTimerResult {
-  readonly identifier: IssueIdentifier
-  readonly startedAt: TimestampBrand
-}
-
-export interface StopTimerResult {
-  readonly identifier: IssueIdentifier
-  readonly stoppedAt: TimestampBrand
-  readonly reportId?: TimeSpendReportId | undefined
-}
-
-export const TimeSpendReportWireSchema = Schema.Struct({
-  id: TimeSpendReportId,
-  identifier: Schema.optional(IssueIdentifier),
-  employee: Schema.optional(NonEmptyString),
-  date: Schema.optional(Schema.NullOr(Timestamp)),
-  value: Schema.Number,
-  description: Schema.String
-})
+export const TimeSpendReportWireSchema = TimeSpendReportSchema
 
 export const TimeReportSummarySchema = Schema.Struct({
   identifier: Schema.optional(IssueIdentifier),
@@ -227,6 +178,7 @@ export const TimeReportSummarySchema = Schema.Struct({
   remainingTime: Schema.optional(Schema.Number.pipe(Schema.positive())),
   reports: Schema.Array(TimeSpendReportWireSchema)
 })
+export type TimeReportSummary = Schema.Schema.Type<typeof TimeReportSummarySchema>
 
 export const WorkSlotWireSchema = Schema.Struct({
   id: WorkSlotId,
@@ -254,22 +206,26 @@ export const DetailedTimeReportSchema = Schema.Struct({
     })
   )
 })
+export type DetailedTimeReport = Schema.Schema.Type<typeof DetailedTimeReportSchema>
 
 export const LogTimeResultSchema = Schema.Struct({
   reportId: TimeSpendReportId,
   identifier: IssueIdentifier
 })
+export type LogTimeResult = Schema.Schema.Type<typeof LogTimeResultSchema>
 
 export const StartTimerResultSchema = Schema.Struct({
   identifier: IssueIdentifier,
   startedAt: Timestamp
 })
+export type StartTimerResult = Schema.Schema.Type<typeof StartTimerResultSchema>
 
 export const StopTimerResultSchema = Schema.Struct({
   identifier: IssueIdentifier,
   stoppedAt: Timestamp,
   reportId: Schema.optional(TimeSpendReportId)
 })
+export type StopTimerResult = Schema.Schema.Type<typeof StopTimerResultSchema>
 
-export const ListTimeSpendReportsResultSchema = Schema.Array(TimeSpendReportWireSchema)
+export const ListTimeSpendReportsResultSchema = Schema.Array(TimeSpendReportSchema)
 export const ListWorkSlotsResultSchema = Schema.Array(WorkSlotWireSchema)

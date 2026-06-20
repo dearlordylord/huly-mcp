@@ -1,6 +1,5 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { ListTotal, TestCaseId, TestProjectId, TestSuiteId } from "./shared.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
@@ -8,9 +7,13 @@ import {
   enumValuesDescription,
   hasAtLeastOneDefined,
   LimitParam,
+  ListTotal,
   NonEmptyString,
+  TestCaseId,
   TestCaseIdentifier,
+  TestProjectId,
   TestProjectIdentifier,
+  TestSuiteId,
   TestSuiteIdentifier,
   withAtLeastOneRequired
 } from "./shared.js"
@@ -49,31 +52,29 @@ export type TestRunStatusStr = (typeof TestRunStatusValues)[number]
 export const TestRunStatusSchema = Schema.Literal(...TestRunStatusValues).annotations({
   description: `Test run result status: ${enumValuesDescription(TestRunStatusValues)}`
 })
-
-// --- Summary types ---
-
-export interface TestProjectSummary {
-  readonly id: TestProjectId
-  readonly name: string
-  readonly description?: string
-  readonly archived: boolean
-}
-
-export interface TestSuiteSummary {
-  readonly id: TestSuiteId
-  readonly name: string
-  readonly description?: string
-  readonly parent?: string
-}
-
-export interface TestCaseSummary {
-  readonly id: TestCaseId
-  readonly name: string
-  readonly type: TestCaseTypeStr
-  readonly priority: TestCasePriorityStr
-  readonly status: TestCaseStatusStr
-  readonly assignee?: string
-}
+export const TestProjectSummarySchema = Schema.Struct({
+  id: TestProjectId,
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  archived: Schema.Boolean
+})
+export type TestProjectSummary = Schema.Schema.Type<typeof TestProjectSummarySchema>
+export const TestSuiteSummarySchema = Schema.Struct({
+  id: TestSuiteId,
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  parent: Schema.optional(Schema.String)
+})
+export type TestSuiteSummary = Schema.Schema.Type<typeof TestSuiteSummarySchema>
+export const TestCaseSummarySchema = Schema.Struct({
+  id: TestCaseId,
+  name: Schema.String,
+  type: TestCaseTypeSchema,
+  priority: TestCasePrioritySchema,
+  status: TestCaseStatusSchema,
+  assignee: Schema.optional(Schema.String)
+})
+export type TestCaseSummary = Schema.Schema.Type<typeof TestCaseSummarySchema>
 
 // --- Params schemas ---
 
@@ -392,61 +393,61 @@ export const parseGetTestCaseParams = Schema.decodeUnknown(GetTestCaseParamsSche
 export const parseCreateTestCaseParams = Schema.decodeUnknown(CreateTestCaseParamsSchema)
 export const parseUpdateTestCaseParams = Schema.decodeUnknown(UpdateTestCaseParamsSchema)
 export const parseDeleteTestCaseParams = Schema.decodeUnknown(DeleteTestCaseParamsSchema)
-
-// --- Result interfaces ---
-
-export interface ListTestProjectsResult {
-  readonly projects: ReadonlyArray<TestProjectSummary>
-  readonly total: ListTotal
-}
-
-export interface ListTestSuitesResult {
-  readonly suites: ReadonlyArray<TestSuiteSummary>
-  readonly total: ListTotal
-}
-
-export interface GetTestSuiteResult extends TestSuiteSummary {
-  readonly testCases: ListTotal
-}
-
-export interface CreateTestSuiteResult {
-  readonly id: TestSuiteId
-  readonly name: string
-  readonly created: boolean
-}
-
-export interface UpdateTestSuiteResult {
-  readonly id: TestSuiteId
-  readonly updated: boolean
-}
-
-export interface DeleteTestSuiteResult {
-  readonly id: TestSuiteId
-  readonly deleted: boolean
-}
-
-export interface ListTestCasesResult {
-  readonly testCases: ReadonlyArray<TestCaseSummary>
-  readonly total: ListTotal
-}
-
-export interface GetTestCaseResult extends TestCaseSummary {
-  readonly description?: string
-  readonly suite?: string
-}
-
-export interface CreateTestCaseResult {
-  readonly id: TestCaseId
-  readonly name: string
-  readonly created: boolean
-}
-
-export interface UpdateTestCaseResult {
-  readonly id: TestCaseId
-  readonly updated: boolean
-}
-
-export interface DeleteTestCaseResult {
-  readonly id: TestCaseId
-  readonly deleted: boolean
-}
+export const ListTestProjectsResultSchema = Schema.Struct({
+  projects: Schema.Array(TestProjectSummarySchema),
+  total: ListTotal
+})
+export type ListTestProjectsResult = Schema.Schema.Type<typeof ListTestProjectsResultSchema>
+export const ListTestSuitesResultSchema = Schema.Struct({
+  suites: Schema.Array(TestSuiteSummarySchema),
+  total: ListTotal
+})
+export type ListTestSuitesResult = Schema.Schema.Type<typeof ListTestSuitesResultSchema>
+export const GetTestSuiteResultSchema = Schema.Struct({
+  ...TestSuiteSummarySchema.fields,
+  testCases: ListTotal
+})
+export type GetTestSuiteResult = Schema.Schema.Type<typeof GetTestSuiteResultSchema>
+export const CreateTestSuiteResultSchema = Schema.Struct({
+  id: TestSuiteId,
+  name: Schema.String,
+  created: Schema.Boolean
+})
+export type CreateTestSuiteResult = Schema.Schema.Type<typeof CreateTestSuiteResultSchema>
+export const UpdateTestSuiteResultSchema = Schema.Struct({
+  id: TestSuiteId,
+  updated: Schema.Boolean
+})
+export type UpdateTestSuiteResult = Schema.Schema.Type<typeof UpdateTestSuiteResultSchema>
+export const DeleteTestSuiteResultSchema = Schema.Struct({
+  id: TestSuiteId,
+  deleted: Schema.Boolean
+})
+export type DeleteTestSuiteResult = Schema.Schema.Type<typeof DeleteTestSuiteResultSchema>
+export const ListTestCasesResultSchema = Schema.Struct({
+  testCases: Schema.Array(TestCaseSummarySchema),
+  total: ListTotal
+})
+export type ListTestCasesResult = Schema.Schema.Type<typeof ListTestCasesResultSchema>
+export const GetTestCaseResultSchema = Schema.Struct({
+  ...TestCaseSummarySchema.fields,
+  description: Schema.optional(Schema.String),
+  suite: Schema.optional(Schema.String)
+})
+export type GetTestCaseResult = Schema.Schema.Type<typeof GetTestCaseResultSchema>
+export const CreateTestCaseResultSchema = Schema.Struct({
+  id: TestCaseId,
+  name: Schema.String,
+  created: Schema.Boolean
+})
+export type CreateTestCaseResult = Schema.Schema.Type<typeof CreateTestCaseResultSchema>
+export const UpdateTestCaseResultSchema = Schema.Struct({
+  id: TestCaseId,
+  updated: Schema.Boolean
+})
+export type UpdateTestCaseResult = Schema.Schema.Type<typeof UpdateTestCaseResultSchema>
+export const DeleteTestCaseResultSchema = Schema.Struct({
+  id: TestCaseId,
+  deleted: Schema.Boolean
+})
+export type DeleteTestCaseResult = Schema.Schema.Type<typeof DeleteTestCaseResultSchema>

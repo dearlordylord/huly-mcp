@@ -1,6 +1,5 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { PersonName, SpaceId as SpaceIdType, UrlString } from "./shared.js"
 import {
   AccountId,
   assertUpdateFields,
@@ -39,52 +38,6 @@ export const AccountRoleSchema = Schema.Literal(...AccountRoleValues).annotation
 })
 
 export type AccountRole = Schema.Schema.Type<typeof AccountRoleSchema>
-
-// No codec needed — internal type, not used for runtime validation
-export interface WorkspaceMember {
-  readonly personId: PersonUuid
-  readonly role: AccountRole
-  readonly name?: PersonName | undefined
-  readonly email?: Email | undefined
-}
-
-export interface WorkspaceInfo {
-  readonly uuid: WorkspaceUuid
-  readonly name: WorkspaceName
-  readonly url: UrlString
-  readonly region?: RegionId | undefined
-  readonly createdOn: number
-  readonly allowReadOnlyGuest?: boolean | undefined
-  readonly allowGuestSignUp?: boolean | undefined
-  readonly version?: WorkspaceVersion | undefined
-  readonly mode?: WorkspaceMode | undefined
-}
-
-export interface WorkspaceSummary {
-  readonly uuid: WorkspaceUuid
-  readonly name: WorkspaceName
-  readonly url: UrlString
-  readonly region?: RegionId | undefined
-  readonly createdOn: number
-  readonly lastVisit?: number | undefined
-}
-
-export interface RegionInfo {
-  readonly region: RegionId
-  readonly name: string
-}
-
-export interface UserProfile {
-  readonly personUuid: PersonUuid
-  readonly firstName: string
-  readonly lastName: string
-  readonly bio?: string | undefined
-  readonly city?: string | undefined
-  readonly country?: string | undefined
-  readonly website?: string | undefined
-  readonly socialLinks?: { readonly [x: string]: string } | undefined
-  readonly isPublic: boolean
-}
 
 export const ListWorkspaceMembersParamsSchema = Schema.Struct({
   limit: Schema.optional(
@@ -345,46 +298,13 @@ export const parseUpdateGuestSettingsParams = Schema.decodeUnknown(UpdateGuestSe
 export const parseCreateAccessLinkParams = Schema.decodeUnknown(CreateAccessLinkParamsSchema)
 export const parseGetRegionsParams = Schema.decodeUnknown(GetRegionsParamsSchema)
 
-// No codec needed — internal type, not used for runtime validation
-export interface UpdateMemberRoleResult {
-  readonly accountId: AccountId
-  readonly role: AccountRole
-  readonly updated: boolean
-}
-
-export interface CreateWorkspaceResult {
-  readonly uuid: WorkspaceUuid
-  readonly url: UrlString
-  readonly name: WorkspaceName
-}
-
-export interface DeleteWorkspaceResult {
-  readonly deleted: boolean
-}
-
-export interface UpdateUserProfileResult {
-  readonly updated: boolean
-}
-
-export interface UpdateGuestSettingsResult {
-  readonly updated: boolean
-  readonly allowReadOnly?: boolean | undefined
-  readonly allowSignUp?: boolean | undefined
-}
-
-export interface CreateAccessLinkResult {
-  readonly link: UrlString
-  readonly role: AccountRole
-  readonly spaces?: ReadonlyArray<SpaceIdType> | undefined
-  readonly personalized?: boolean | undefined
-}
-
 export const WorkspaceMemberSchema = Schema.Struct({
   personId: PersonUuid,
   role: AccountRoleSchema,
   name: Schema.optional(NonEmptyString),
   email: Schema.optional(Email)
 })
+export type WorkspaceMember = Schema.Schema.Type<typeof WorkspaceMemberSchema>
 
 export const WorkspaceInfoSchema = Schema.Struct({
   uuid: WorkspaceUuid,
@@ -397,6 +317,7 @@ export const WorkspaceInfoSchema = Schema.Struct({
   version: Schema.optional(WorkspaceVersion),
   mode: Schema.optional(WorkspaceMode)
 })
+export type WorkspaceInfo = Schema.Schema.Type<typeof WorkspaceInfoSchema>
 
 export const WorkspaceSummarySchema = Schema.Struct({
   uuid: WorkspaceUuid,
@@ -406,11 +327,13 @@ export const WorkspaceSummarySchema = Schema.Struct({
   createdOn: Schema.Number,
   lastVisit: Schema.optional(Schema.Number)
 })
+export type WorkspaceSummary = Schema.Schema.Type<typeof WorkspaceSummarySchema>
 
 export const RegionInfoSchema = Schema.Struct({
   region: RegionId,
   name: Schema.String
 })
+export type RegionInfo = Schema.Schema.Type<typeof RegionInfoSchema>
 
 export const UserProfileSchema = Schema.Struct({
   personUuid: PersonUuid,
@@ -423,32 +346,38 @@ export const UserProfileSchema = Schema.Struct({
   socialLinks: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
   isPublic: Schema.Boolean
 })
+export type UserProfile = Schema.Schema.Type<typeof UserProfileSchema>
 
 export const UpdateMemberRoleResultSchema = Schema.Struct({
   accountId: AccountId,
   role: AccountRoleSchema,
   updated: Schema.Boolean
 })
+export type UpdateMemberRoleResult = Schema.Schema.Type<typeof UpdateMemberRoleResultSchema>
 
 export const CreateWorkspaceResultSchema = Schema.Struct({
   uuid: WorkspaceUuid,
   url: UrlStringSchema,
   name: WorkspaceName
 })
+export type CreateWorkspaceResult = Schema.Schema.Type<typeof CreateWorkspaceResultSchema>
 
 export const DeleteWorkspaceResultSchema = Schema.Struct({
   deleted: Schema.Boolean
 })
+export type DeleteWorkspaceResult = Schema.Schema.Type<typeof DeleteWorkspaceResultSchema>
 
 export const UpdateUserProfileResultSchema = Schema.Struct({
   updated: Schema.Boolean
 })
+export type UpdateUserProfileResult = Schema.Schema.Type<typeof UpdateUserProfileResultSchema>
 
 export const UpdateGuestSettingsResultSchema = Schema.Struct({
   updated: Schema.Boolean,
   allowReadOnly: Schema.optional(Schema.Boolean),
   allowSignUp: Schema.optional(Schema.Boolean)
 })
+export type UpdateGuestSettingsResult = Schema.Schema.Type<typeof UpdateGuestSettingsResultSchema>
 
 export const CreateAccessLinkResultSchema = Schema.Struct({
   link: UrlStringSchema,
@@ -456,6 +385,7 @@ export const CreateAccessLinkResultSchema = Schema.Struct({
   spaces: Schema.optional(Schema.Array(SpaceId)),
   personalized: Schema.optional(Schema.Boolean)
 })
+export type CreateAccessLinkResult = Schema.Schema.Type<typeof CreateAccessLinkResultSchema>
 
 export const ListWorkspaceMembersResultSchema = Schema.Array(WorkspaceMemberSchema)
 export const ListWorkspacesResultSchema = Schema.Array(WorkspaceSummarySchema)

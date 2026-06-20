@@ -343,6 +343,12 @@ SDK upgrade revisit:
 | Tool | Description |
 |------|-------------|
 | `preview_deletion` | Preview the impact of deleting a Huly entity before actually deleting it. Shows affected sub-entities, relations, and warnings. Supports issues, projects, components, and milestones. Use this to understand cascade effects before calling a delete operation. |
+| `list_components` | List components in a Huly project. Components organize issues by area/feature. Returns components sorted by modification date (newest first). |
+| `get_component` | Retrieve full details for a Huly component. Use this to view component content and metadata. |
+| `create_component` | Create a new component in a Huly project. Components help organize issues by area/feature. Returns the created component ID and label. |
+| `update_component` | Update fields on an existing Huly component. Only provided fields are modified. |
+| `set_issue_component` | Set or clear the component on a Huly issue. Pass null for component to clear it. |
+| `delete_component` | Permanently delete a Huly component. This action cannot be undone. |
 | `list_issues` | Query Huly issues with optional filters. Returns issues sorted by modification date (newest first). Supports filtering by project, exact workflow status name (status), Huly SDK task.statusCategory key (statusCategory: UnStarted, ToDo, Active, Won, Lost), assignee, component, and parentIssue (to list children of a specific issue). Supports searching by title substring (titleSearch) and description content (descriptionSearch). |
 | `get_issue` | Retrieve full details for a Huly issue including markdown description. Use this to view issue content, comments, or full metadata. |
 | `create_issue` | Create a new issue in a Huly project. Optionally set taskType by ID or display name; it is resolved within the target project's project type, and status is validated against that task type's workflow. Use list_task_types or get_project_type to discover valid task types and statuses. Optionally create as a sub-issue by specifying parentIssue. Description supports markdown formatting. Returns the created issue identifier. |
@@ -351,12 +357,6 @@ SDK upgrade revisit:
 | `remove_issue_label` | Remove a tag/label from a Huly issue. Detaches the label reference; does not delete the label definition. |
 | `delete_issue` | Permanently delete a Huly issue. This action cannot be undone. |
 | `move_issue` | Move an issue to a new parent (making it a sub-issue) or to top-level (null). Updates parent/child relationships and sub-issue counts. |
-| `list_components` | List components in a Huly project. Components organize issues by area/feature. Returns components sorted by modification date (newest first). |
-| `get_component` | Retrieve full details for a Huly component. Use this to view component content and metadata. |
-| `create_component` | Create a new component in a Huly project. Components help organize issues by area/feature. Returns the created component ID and label. |
-| `update_component` | Update fields on an existing Huly component. Only provided fields are modified. |
-| `set_issue_component` | Set or clear the component on a Huly issue. Pass null for component to clear it. |
-| `delete_component` | Permanently delete a Huly component. This action cannot be undone. |
 | `list_issue_templates` | List issue templates in a Huly project. Templates define reusable issue configurations. Returns templates sorted by modification date (newest first). |
 | `get_issue_template` | Retrieve full details for a Huly issue template including children (sub-task templates). Use this to view template content, default values, and child template IDs. |
 | `create_issue_template` | Create a new issue template in a Huly project. Templates define default values for new issues. Optionally include children (sub-task templates) that will become sub-issues when creating issues from this template. Returns the created template ID and title. |

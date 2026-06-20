@@ -269,6 +269,15 @@ export default [
   },
 
   {
+    files: ["src/domain/schemas/**/*.ts"],
+    rules: {
+      // Schema modules define boundary contracts that are re-exported through the
+      // barrel and consumed by generated JSON schemas, tool builders, and tests.
+      "import-x/no-unused-modules": "off"
+    }
+  },
+
+  {
     files: ["**/*.test.ts", "**/*.spec.ts"],
     rules: {
       "max-lines": "off",

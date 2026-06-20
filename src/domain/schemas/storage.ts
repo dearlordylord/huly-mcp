@@ -1,7 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { BlobId } from "./shared.js"
-import { MimeType, NonEmptyString } from "./shared.js"
+import { BlobId, MimeType, NonEmptyString } from "./shared.js"
 
 const UploadFileParamsBase = Schema.Struct({
   filename: NonEmptyString.annotations({
@@ -33,14 +32,13 @@ export const UploadFileParamsSchema = UploadFileParamsBase.pipe(
 })
 
 export type UploadFileParams = Schema.Schema.Type<typeof UploadFileParamsSchema>
-
-// No codec needed — internal type, not used for runtime validation
-export interface UploadFileResult {
-  readonly blobId: BlobId
-  readonly contentType: string
-  readonly size: number
-  readonly url: string
-}
+export const UploadFileResultSchema = Schema.Struct({
+  blobId: BlobId,
+  contentType: Schema.String,
+  size: Schema.Number,
+  url: Schema.String
+})
+export type UploadFileResult = Schema.Schema.Type<typeof UploadFileResultSchema>
 
 export const uploadFileParamsJsonSchema = JSONSchema.make(UploadFileParamsSchema)
 

@@ -3,11 +3,9 @@ import { JSONSchema, Schema } from "effect"
 import {
   addOrganizationChannelParamsJsonSchema,
   AddOrganizationChannelParamsSchema,
-  type ContactChannelSummary,
   ContactChannelSummarySchema,
   parseAddOrganizationChannelParams
 } from "./contact-channels.js"
-import type { PersonName } from "./shared.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
@@ -20,23 +18,15 @@ import {
   NonEmptyString,
   OrganizationId,
   PersonId,
+  PersonName,
   UrlString,
   withAtLeastOneRequired
 } from "./shared.js"
-
-export interface OrganizationMembershipSummary {
-  readonly id: OrganizationId
-  readonly name: string
-}
-
-export interface OrganizationSummary {
-  readonly id: OrganizationId
-  readonly name: string
-  readonly city?: string | undefined
-  readonly members: Count
-  readonly url: UrlString
-  readonly modifiedOn?: number | undefined
-}
+export const OrganizationMembershipSummarySchema = Schema.Struct({
+  id: OrganizationId,
+  name: Schema.String
+})
+export type OrganizationMembershipSummary = Schema.Schema.Type<typeof OrganizationMembershipSummarySchema>
 
 export const OrganizationSummarySchema = Schema.Struct({
   id: OrganizationId,
@@ -46,6 +36,7 @@ export const OrganizationSummarySchema = Schema.Struct({
   url: UrlString,
   modifiedOn: Schema.optional(Schema.Number)
 })
+export type OrganizationSummary = Schema.Schema.Type<typeof OrganizationSummarySchema>
 
 export const ListOrganizationsParamsSchema = Schema.Struct({
   limit: Schema.optional(
@@ -222,21 +213,10 @@ export const parseCreateOrganizationParams = Schema.decodeUnknown(CreateOrganiza
 export const parseGetOrganizationParams = Schema.decodeUnknown(GetOrganizationParamsSchema)
 export const parseUpdateOrganizationParams = Schema.decodeUnknown(UpdateOrganizationParamsSchema)
 export const parseDeleteOrganizationParams = Schema.decodeUnknown(DeleteOrganizationParamsSchema)
-
-export interface CreateOrganizationResult {
-  readonly id: OrganizationId
-}
-
-export interface GetOrganizationResult {
-  readonly id: OrganizationId
-  readonly name: string
-  readonly city?: string | undefined
-  readonly description?: string | undefined
-  readonly channels?: ReadonlyArray<ContactChannelSummary> | undefined
-  readonly members: Count
-  readonly url: UrlString
-  readonly modifiedOn?: number | undefined
-}
+export const CreateOrganizationResultSchema = Schema.Struct({
+  id: OrganizationId
+})
+export type CreateOrganizationResult = Schema.Schema.Type<typeof CreateOrganizationResultSchema>
 
 export const GetOrganizationResultSchema = Schema.Struct({
   id: OrganizationId,
@@ -248,34 +228,47 @@ export const GetOrganizationResultSchema = Schema.Struct({
   url: UrlString,
   modifiedOn: Schema.optional(Schema.Number)
 })
+export type GetOrganizationResult = Schema.Schema.Type<typeof GetOrganizationResultSchema>
+export const UpdateOrganizationResultSchema = Schema.Struct({
+  id: OrganizationId,
+  updated: Schema.Boolean
+})
+export type UpdateOrganizationResult = Schema.Schema.Type<typeof UpdateOrganizationResultSchema>
+export const DeleteOrganizationResultSchema = Schema.Struct({
+  id: OrganizationId,
+  deleted: Schema.Boolean
+})
+export type DeleteOrganizationResult = Schema.Schema.Type<typeof DeleteOrganizationResultSchema>
+export const OrganizationMemberEntrySchema = Schema.Struct({
+  personId: PersonId,
+  name: PersonName,
+  email: Schema.optional(Email)
+})
+export type OrganizationMemberEntry = Schema.Schema.Type<typeof OrganizationMemberEntrySchema>
+export const ListOrganizationMembersResultSchema = Schema.Struct({
+  organizationId: OrganizationId,
+  members: Schema.Array(OrganizationMemberEntrySchema)
+})
+export type ListOrganizationMembersResult = Schema.Schema.Type<typeof ListOrganizationMembersResultSchema>
+export const ListPersonOrganizationsResultSchema = Schema.Struct({
+  personId: PersonId,
+  organizations: Schema.Array(OrganizationMembershipSummarySchema)
+})
+export type ListPersonOrganizationsResult = Schema.Schema.Type<typeof ListPersonOrganizationsResultSchema>
+export const RemoveOrganizationMemberResultSchema = Schema.Struct({
+  id: OrganizationId,
+  removed: Schema.Boolean
+})
+export type RemoveOrganizationMemberResult = Schema.Schema.Type<typeof RemoveOrganizationMemberResultSchema>
 
-export interface UpdateOrganizationResult {
-  readonly id: OrganizationId
-  readonly updated: boolean
-}
-
-export interface DeleteOrganizationResult {
-  readonly id: OrganizationId
-  readonly deleted: boolean
-}
-
-export interface OrganizationMemberEntry {
-  readonly personId: PersonId
-  readonly name: PersonName
-  readonly email?: Email | undefined
-}
-
-export interface ListOrganizationMembersResult {
-  readonly organizationId: OrganizationId
-  readonly members: ReadonlyArray<OrganizationMemberEntry>
-}
-
-export interface ListPersonOrganizationsResult {
-  readonly personId: PersonId
-  readonly organizations: ReadonlyArray<OrganizationMembershipSummary>
-}
-
-export interface RemoveOrganizationMemberResult {
-  readonly id: OrganizationId
-  readonly removed: boolean
-}
+export const ListOrganizationsResultSchema = Schema.Array(OrganizationSummarySchema)
+export const MakeOrganizationCustomerResultSchema = Schema.Struct({
+  id: OrganizationId,
+  applied: Schema.Boolean
+})
+export type MakeOrganizationCustomerResult = Schema.Schema.Type<typeof MakeOrganizationCustomerResultSchema>
+export const AddOrganizationMemberResultSchema = Schema.Struct({
+  id: OrganizationId,
+  added: Schema.Boolean
+})
+export type AddOrganizationMemberResult = Schema.Schema.Type<typeof AddOrganizationMemberResultSchema>

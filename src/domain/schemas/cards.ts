@@ -1,27 +1,31 @@
 import { JSONSchema, Schema } from "effect"
 
 import { clearableText } from "./clearable.js"
-import type { CardId, CardSpaceId, Count, ListTotal, MasterTagId } from "./shared.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
+  CardId,
   CardIdentifier,
+  CardSpaceId,
   CardSpaceIdentifier,
+  Count,
   DEFAULT_INCLUDE_ARCHIVED,
   DEFAULT_LIMIT,
   hasAtLeastOneDefined,
   LimitParam,
+  ListTotal,
+  MasterTagId,
   MasterTagIdentifier,
   NonEmptyString,
   withAtLeastOneRequired
 } from "./shared.js"
-
-export interface CardSpaceSummary {
-  readonly id: CardSpaceId
-  readonly name: string
-  readonly description?: string | undefined
-  readonly types: ReadonlyArray<string>
-}
+export const CardSpaceSummarySchema = Schema.Struct({
+  id: CardSpaceId,
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  types: Schema.Array(Schema.String)
+})
+export type CardSpaceSummary = Schema.Schema.Type<typeof CardSpaceSummarySchema>
 
 export const ListCardSpacesParamsSchema = Schema.Struct({
   includeArchived: Schema.optional(Schema.Boolean.annotations({
@@ -38,16 +42,16 @@ export const ListCardSpacesParamsSchema = Schema.Struct({
 })
 
 export type ListCardSpacesParams = Schema.Schema.Type<typeof ListCardSpacesParamsSchema>
-
-export interface ListCardSpacesResult {
-  readonly cardSpaces: ReadonlyArray<CardSpaceSummary>
-  readonly total: ListTotal
-}
-
-export interface MasterTagSummary {
-  readonly id: MasterTagId
-  readonly name: string
-}
+export const ListCardSpacesResultSchema = Schema.Struct({
+  cardSpaces: Schema.Array(CardSpaceSummarySchema),
+  total: ListTotal
+})
+export type ListCardSpacesResult = Schema.Schema.Type<typeof ListCardSpacesResultSchema>
+export const MasterTagSummarySchema = Schema.Struct({
+  id: MasterTagId,
+  name: Schema.String
+})
+export type MasterTagSummary = Schema.Schema.Type<typeof MasterTagSummarySchema>
 
 export const ListMasterTagsParamsSchema = Schema.Struct({
   cardSpace: CardSpaceIdentifier.annotations({
@@ -59,18 +63,18 @@ export const ListMasterTagsParamsSchema = Schema.Struct({
 })
 
 export type ListMasterTagsParams = Schema.Schema.Type<typeof ListMasterTagsParamsSchema>
-
-export interface ListMasterTagsResult {
-  readonly masterTags: ReadonlyArray<MasterTagSummary>
-  readonly total: ListTotal
-}
-
-export interface CardSummary {
-  readonly id: CardId
-  readonly title: string
-  readonly type: string
-  readonly modifiedOn?: number | undefined
-}
+export const ListMasterTagsResultSchema = Schema.Struct({
+  masterTags: Schema.Array(MasterTagSummarySchema),
+  total: ListTotal
+})
+export type ListMasterTagsResult = Schema.Schema.Type<typeof ListMasterTagsResultSchema>
+export const CardSummarySchema = Schema.Struct({
+  id: CardId,
+  title: Schema.String,
+  type: Schema.String,
+  modifiedOn: Schema.optional(Schema.Number)
+})
+export type CardSummary = Schema.Schema.Type<typeof CardSummarySchema>
 
 const ListCardsParamsBase = Schema.Struct({
   cardSpace: CardSpaceIdentifier.annotations({
@@ -109,23 +113,23 @@ export const ListCardsParamsSchema = ListCardsParamsBase.pipe(
 })
 
 export type ListCardsParams = Schema.Schema.Type<typeof ListCardsParamsSchema>
-
-export interface ListCardsResult {
-  readonly cards: ReadonlyArray<CardSummary>
-  readonly total: ListTotal
-}
-
-export interface CardDetail {
-  readonly id: CardId
-  readonly title: string
-  readonly content?: string | undefined
-  readonly type: string
-  readonly parent?: string | undefined
-  readonly children?: Count | undefined
-  readonly cardSpace: string
-  readonly modifiedOn?: number | undefined
-  readonly createdOn?: number | undefined
-}
+export const ListCardsResultSchema = Schema.Struct({
+  cards: Schema.Array(CardSummarySchema),
+  total: ListTotal
+})
+export type ListCardsResult = Schema.Schema.Type<typeof ListCardsResultSchema>
+export const CardDetailSchema = Schema.Struct({
+  id: CardId,
+  title: Schema.String,
+  content: Schema.optional(Schema.String),
+  type: Schema.String,
+  parent: Schema.optional(Schema.String),
+  children: Schema.optional(Count),
+  cardSpace: Schema.String,
+  modifiedOn: Schema.optional(Schema.Number),
+  createdOn: Schema.optional(Schema.Number)
+})
+export type CardDetail = Schema.Schema.Type<typeof CardDetailSchema>
 
 export const GetCardParamsSchema = Schema.Struct({
   cardSpace: CardSpaceIdentifier.annotations({
@@ -221,18 +225,20 @@ export const parseGetCardParams = Schema.decodeUnknown(GetCardParamsSchema)
 export const parseCreateCardParams = Schema.decodeUnknown(CreateCardParamsSchema)
 export const parseUpdateCardParams = Schema.decodeUnknown(UpdateCardParamsSchema)
 export const parseDeleteCardParams = Schema.decodeUnknown(DeleteCardParamsSchema)
+export const CreateCardResultSchema = Schema.Struct({
+  id: CardId,
+  title: Schema.String
+})
+export type CreateCardResult = Schema.Schema.Type<typeof CreateCardResultSchema>
+export const UpdateCardResultSchema = Schema.Struct({
+  id: CardId,
+  updated: Schema.Boolean
+})
+export type UpdateCardResult = Schema.Schema.Type<typeof UpdateCardResultSchema>
+export const DeleteCardResultSchema = Schema.Struct({
+  id: CardId,
+  deleted: Schema.Boolean
+})
+export type DeleteCardResult = Schema.Schema.Type<typeof DeleteCardResultSchema>
 
-export interface CreateCardResult {
-  readonly id: CardId
-  readonly title: string
-}
-
-export interface UpdateCardResult {
-  readonly id: CardId
-  readonly updated: boolean
-}
-
-export interface DeleteCardResult {
-  readonly id: CardId
-  readonly deleted: boolean
-}
+export const GetCardResultSchema = CardDetailSchema

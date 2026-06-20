@@ -1,9 +1,10 @@
+import { Schema } from "effect"
 import type { SanitizedHulyRuntimeConfigContext } from "../config/config.js"
 import type { GetHulyContextResult } from "../domain/schemas/index.js"
-import { Count } from "../domain/schemas/index.js"
+import { Count, NonEmptyString } from "../domain/schemas/index.js"
 import { VERSION } from "../version.js"
 import { DEFAULT_HTTP_PORT } from "./http-transport.js"
-import { hulyContextToolOutputSchema, versionToolOutputSchema } from "./tool-output-schema.js"
+import { createToolOutputSchema, hulyContextToolOutputSchema } from "./tool-output-schema.js"
 import { CATEGORY_NAMES, type ToolRegistry, toolRegistry } from "./tools/index.js"
 
 const NPM_PACKAGE_NAME = "@firfi/huly-mcp"
@@ -18,11 +19,16 @@ const emptyInputSchema: {
   readonly additionalProperties: false
 } = { type: "object", properties: {}, additionalProperties: false }
 
+export const VersionToolResultSchema = Schema.Struct({
+  current: NonEmptyString,
+  latest: NonEmptyString
+})
+
 export const versionToolDefinition = {
   name: VERSION_TOOL_NAME,
   description: "Returns the current version of this Huly MCP server and the latest version available on npm.",
   inputSchema: emptyInputSchema,
-  outputSchema: versionToolOutputSchema,
+  outputSchema: createToolOutputSchema(VersionToolResultSchema),
   annotations: {
     title: "Get Version",
     readOnlyHint: true,

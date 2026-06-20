@@ -58,178 +58,163 @@ import {
   listRecruitingRelatedIssues,
   removeRecruitingRelatedIssue
 } from "../../huly/operations/recruiting-related-issues.js"
-import { createEncodedCombinedToolHandler, createEncodedToolHandler, type RegisteredTool } from "./registry.js"
-
+import { defineCombinedTool, defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "recruiting" as const
-
 export const recruitingMediaTools: ReadonlyArray<RegisteredTool> = [
-  {
-    name: "list_recruiting_comments",
-    description:
-      "List comments attached directly to a Recruiting vacancy, candidate, applicant, review, or opinion target. The target locator resolves friendly Recruiting identifiers and returns the resolved target ref.",
-    category: CATEGORY,
-    inputSchema: listRecruitingCommentsParamsJsonSchema,
-    handler: createEncodedToolHandler(
-      "list_recruiting_comments",
-      parseListRecruitingCommentsParams,
-      listRecruitingComments,
-      ListRecruitingCommentsResultSchema
-    )
-  },
-  {
-    name: "add_recruiting_comment",
-    description:
-      "Add a Markdown comment directly to a Recruiting vacancy, candidate, applicant, review, or opinion target resolved by the shared target locator.",
-    category: CATEGORY,
-    inputSchema: addRecruitingCommentParamsJsonSchema,
-    handler: createEncodedToolHandler(
-      "add_recruiting_comment",
-      parseAddRecruitingCommentParams,
-      addRecruitingComment,
-      AddRecruitingCommentResultSchema
-    )
-  },
-  {
-    name: "update_recruiting_comment",
-    description:
-      "Update one comment attached directly to a Recruiting vacancy, candidate, applicant, review, or opinion. The commentId must belong to the resolved target.",
-    category: CATEGORY,
-    inputSchema: updateRecruitingCommentParamsJsonSchema,
-    handler: createEncodedToolHandler(
-      "update_recruiting_comment",
-      parseUpdateRecruitingCommentParams,
-      updateRecruitingComment,
-      UpdateRecruitingCommentResultSchema
-    )
-  },
-  {
-    name: "delete_recruiting_comment",
-    description:
-      "Delete one comment attached directly to a Recruiting vacancy, candidate, applicant, review, or opinion. The commentId must belong to the resolved target.",
-    category: CATEGORY,
-    inputSchema: deleteRecruitingCommentParamsJsonSchema,
-    handler: createEncodedToolHandler(
-      "delete_recruiting_comment",
-      parseDeleteRecruitingCommentParams,
-      deleteRecruitingComment,
-      DeleteRecruitingCommentResultSchema
-    )
-  },
-  {
-    name: "list_recruiting_attachments",
-    description:
-      "List files attached directly to a Recruiting vacancy, candidate, applicant, or opinion target. Review attachments are intentionally unsupported unless the model exposes that collection.",
-    category: CATEGORY,
-    inputSchema: listRecruitingAttachmentsParamsJsonSchema,
-    handler: createEncodedToolHandler(
-      "list_recruiting_attachments",
-      parseListRecruitingAttachmentsParams,
-      listRecruitingAttachments,
-      ListRecruitingAttachmentsResultSchema
-    )
-  },
-  {
-    name: "get_recruiting_attachment",
-    description:
-      "Get one file attached directly to a Recruiting vacancy, candidate, applicant, or opinion. The attachmentId must belong to the resolved target.",
-    category: CATEGORY,
-    inputSchema: getRecruitingAttachmentParamsJsonSchema,
-    handler: createEncodedCombinedToolHandler(
-      "get_recruiting_attachment",
-      parseGetRecruitingAttachmentParams,
-      getRecruitingAttachment,
-      GetRecruitingAttachmentResultSchema
-    )
-  },
-  {
-    name: "add_recruiting_attachment",
-    description:
-      "Attach a file to a Recruiting vacancy, candidate, applicant, or opinion target. Provide exactly one of filePath, fileUrl, or data, plus filename and contentType.",
-    category: CATEGORY,
-    inputSchema: addRecruitingAttachmentParamsJsonSchema,
-    handler: createEncodedCombinedToolHandler(
-      "add_recruiting_attachment",
-      parseAddRecruitingAttachmentParams,
-      addRecruitingAttachment,
-      AddRecruitingAttachmentResultSchema
-    )
-  },
-  {
-    name: "update_recruiting_attachment",
-    description:
-      "Update description and/or pinned state for a file attached directly to a Recruiting vacancy, candidate, applicant, or opinion. The attachmentId must belong to the resolved target.",
-    category: CATEGORY,
-    inputSchema: updateRecruitingAttachmentParamsJsonSchema,
-    handler: createEncodedToolHandler(
-      "update_recruiting_attachment",
-      parseUpdateRecruitingAttachmentParams,
-      updateRecruitingAttachment,
-      UpdateRecruitingAttachmentResultSchema
-    )
-  },
-  {
-    name: "delete_recruiting_attachment",
-    description:
-      "Delete one file attached directly to a Recruiting vacancy, candidate, applicant, or opinion. The attachmentId must belong to the resolved target.",
-    category: CATEGORY,
-    inputSchema: deleteRecruitingAttachmentParamsJsonSchema,
-    handler: createEncodedToolHandler(
-      "delete_recruiting_attachment",
-      parseDeleteRecruitingAttachmentParams,
-      deleteRecruitingAttachment,
-      DeleteRecruitingAttachmentResultSchema
-    )
-  },
-  {
-    name: "list_recruiting_activity",
-    description:
-      "List read-only activity messages for a Recruiting vacancy, candidate, applicant, or review target resolved by friendly Recruiting identifiers. Opinions are intentionally unsupported.",
-    category: CATEGORY,
-    inputSchema: listRecruitingActivityParamsJsonSchema,
-    handler: createEncodedToolHandler(
-      "list_recruiting_activity",
-      parseListRecruitingActivityParams,
-      listRecruitingActivity,
-      ListRecruitingActivityResultSchema
-    )
-  },
-  {
-    name: "list_recruiting_related_issues",
-    description:
-      "List tracker issues whose Huly Related Issues entries (`Issue.relations`) point at a Recruiting vacancy, candidate, or applicant target.",
-    category: CATEGORY,
-    inputSchema: listRecruitingRelatedIssuesParamsJsonSchema,
-    handler: createEncodedToolHandler(
-      "list_recruiting_related_issues",
-      parseListRecruitingRelatedIssuesParams,
-      listRecruitingRelatedIssues,
-      ListRecruitingRelatedIssuesResultSchema
-    )
-  },
-  {
-    name: "add_recruiting_related_issue",
-    description:
-      "Idempotently add a Huly Related Issues entry (`Issue.relations`) from a tracker issue to a Recruiting vacancy, candidate, or applicant target.",
-    category: CATEGORY,
-    inputSchema: addRecruitingRelatedIssueParamsJsonSchema,
-    handler: createEncodedToolHandler(
-      "add_recruiting_related_issue",
-      parseAddRecruitingRelatedIssueParams,
-      addRecruitingRelatedIssue,
-      AddRecruitingRelatedIssueResultSchema
-    )
-  },
-  {
-    name: "remove_recruiting_related_issue",
-    description:
-      "Idempotently remove a Huly Related Issues entry (`Issue.relations`) from a tracker issue to a Recruiting vacancy, candidate, or applicant target.",
-    category: CATEGORY,
-    inputSchema: removeRecruitingRelatedIssueParamsJsonSchema,
-    handler: createEncodedToolHandler(
-      "remove_recruiting_related_issue",
-      parseRemoveRecruitingRelatedIssueParams,
-      removeRecruitingRelatedIssue,
-      RemoveRecruitingRelatedIssueResultSchema
-    )
-  }
+  defineTool(
+    {
+      name: "list_recruiting_comments",
+      description:
+        "List comments attached directly to a Recruiting vacancy, candidate, applicant, review, or opinion target. The target locator resolves friendly Recruiting identifiers and returns the resolved target ref.",
+      category: CATEGORY,
+      inputSchema: listRecruitingCommentsParamsJsonSchema,
+      resultSchema: ListRecruitingCommentsResultSchema
+    },
+    parseListRecruitingCommentsParams,
+    listRecruitingComments
+  ),
+  defineTool(
+    {
+      name: "add_recruiting_comment",
+      description:
+        "Add a Markdown comment directly to a Recruiting vacancy, candidate, applicant, review, or opinion target resolved by the shared target locator.",
+      category: CATEGORY,
+      inputSchema: addRecruitingCommentParamsJsonSchema,
+      resultSchema: AddRecruitingCommentResultSchema
+    },
+    parseAddRecruitingCommentParams,
+    addRecruitingComment
+  ),
+  defineTool(
+    {
+      name: "update_recruiting_comment",
+      description:
+        "Update one comment attached directly to a Recruiting vacancy, candidate, applicant, review, or opinion. The commentId must belong to the resolved target.",
+      category: CATEGORY,
+      inputSchema: updateRecruitingCommentParamsJsonSchema,
+      resultSchema: UpdateRecruitingCommentResultSchema
+    },
+    parseUpdateRecruitingCommentParams,
+    updateRecruitingComment
+  ),
+  defineTool(
+    {
+      name: "delete_recruiting_comment",
+      description:
+        "Delete one comment attached directly to a Recruiting vacancy, candidate, applicant, review, or opinion. The commentId must belong to the resolved target.",
+      category: CATEGORY,
+      inputSchema: deleteRecruitingCommentParamsJsonSchema,
+      resultSchema: DeleteRecruitingCommentResultSchema
+    },
+    parseDeleteRecruitingCommentParams,
+    deleteRecruitingComment
+  ),
+  defineTool(
+    {
+      name: "list_recruiting_attachments",
+      description:
+        "List files attached directly to a Recruiting vacancy, candidate, applicant, or opinion target. Review attachments are intentionally unsupported unless the model exposes that collection.",
+      category: CATEGORY,
+      inputSchema: listRecruitingAttachmentsParamsJsonSchema,
+      resultSchema: ListRecruitingAttachmentsResultSchema
+    },
+    parseListRecruitingAttachmentsParams,
+    listRecruitingAttachments
+  ),
+  defineCombinedTool(
+    {
+      name: "get_recruiting_attachment",
+      description:
+        "Get one file attached directly to a Recruiting vacancy, candidate, applicant, or opinion. The attachmentId must belong to the resolved target.",
+      category: CATEGORY,
+      inputSchema: getRecruitingAttachmentParamsJsonSchema,
+      resultSchema: GetRecruitingAttachmentResultSchema
+    },
+    parseGetRecruitingAttachmentParams,
+    getRecruitingAttachment
+  ),
+  defineCombinedTool(
+    {
+      name: "add_recruiting_attachment",
+      description:
+        "Attach a file to a Recruiting vacancy, candidate, applicant, or opinion target. Provide exactly one of filePath, fileUrl, or data, plus filename and contentType.",
+      category: CATEGORY,
+      inputSchema: addRecruitingAttachmentParamsJsonSchema,
+      resultSchema: AddRecruitingAttachmentResultSchema
+    },
+    parseAddRecruitingAttachmentParams,
+    addRecruitingAttachment
+  ),
+  defineTool(
+    {
+      name: "update_recruiting_attachment",
+      description:
+        "Update description and/or pinned state for a file attached directly to a Recruiting vacancy, candidate, applicant, or opinion. The attachmentId must belong to the resolved target.",
+      category: CATEGORY,
+      inputSchema: updateRecruitingAttachmentParamsJsonSchema,
+      resultSchema: UpdateRecruitingAttachmentResultSchema
+    },
+    parseUpdateRecruitingAttachmentParams,
+    updateRecruitingAttachment
+  ),
+  defineTool(
+    {
+      name: "delete_recruiting_attachment",
+      description:
+        "Delete one file attached directly to a Recruiting vacancy, candidate, applicant, or opinion. The attachmentId must belong to the resolved target.",
+      category: CATEGORY,
+      inputSchema: deleteRecruitingAttachmentParamsJsonSchema,
+      resultSchema: DeleteRecruitingAttachmentResultSchema
+    },
+    parseDeleteRecruitingAttachmentParams,
+    deleteRecruitingAttachment
+  ),
+  defineTool(
+    {
+      name: "list_recruiting_activity",
+      description:
+        "List read-only activity messages for a Recruiting vacancy, candidate, applicant, or review target resolved by friendly Recruiting identifiers. Opinions are intentionally unsupported.",
+      category: CATEGORY,
+      inputSchema: listRecruitingActivityParamsJsonSchema,
+      resultSchema: ListRecruitingActivityResultSchema
+    },
+    parseListRecruitingActivityParams,
+    listRecruitingActivity
+  ),
+  defineTool(
+    {
+      name: "list_recruiting_related_issues",
+      description:
+        "List tracker issues whose Huly Related Issues entries (`Issue.relations`) point at a Recruiting vacancy, candidate, or applicant target.",
+      category: CATEGORY,
+      inputSchema: listRecruitingRelatedIssuesParamsJsonSchema,
+      resultSchema: ListRecruitingRelatedIssuesResultSchema
+    },
+    parseListRecruitingRelatedIssuesParams,
+    listRecruitingRelatedIssues
+  ),
+  defineTool(
+    {
+      name: "add_recruiting_related_issue",
+      description:
+        "Idempotently add a Huly Related Issues entry (`Issue.relations`) from a tracker issue to a Recruiting vacancy, candidate, or applicant target.",
+      category: CATEGORY,
+      inputSchema: addRecruitingRelatedIssueParamsJsonSchema,
+      resultSchema: AddRecruitingRelatedIssueResultSchema
+    },
+    parseAddRecruitingRelatedIssueParams,
+    addRecruitingRelatedIssue
+  ),
+  defineTool(
+    {
+      name: "remove_recruiting_related_issue",
+      description:
+        "Idempotently remove a Huly Related Issues entry (`Issue.relations`) from a tracker issue to a Recruiting vacancy, candidate, or applicant target.",
+      category: CATEGORY,
+      inputSchema: removeRecruitingRelatedIssueParamsJsonSchema,
+      resultSchema: RemoveRecruitingRelatedIssueResultSchema
+    },
+    parseRemoveRecruitingRelatedIssueParams,
+    removeRecruitingRelatedIssue
+  )
 ]

@@ -3,7 +3,8 @@ import type { TagReference } from "@hcengineering/tags"
 import { Effect } from "effect"
 
 import type { CreateLabelParams, DeleteLabelParams, ListLabelsParams, UpdateLabelParams } from "../../domain/schemas.js"
-import type { RemoveLabelParams, RemoveLabelResult } from "../../domain/schemas/issues.js"
+import type { RemoveLabelResult } from "../../domain/schemas/issues-results.js"
+import type { RemoveLabelParams } from "../../domain/schemas/issues.js"
 import type {
   CreateLabelResult,
   DeleteLabelResult,

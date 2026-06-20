@@ -79,40 +79,19 @@ export const listIssueRelationsParamsJsonSchema = JSONSchema.make(ListIssueRelat
 export const parseAddIssueRelationParams = Schema.decodeUnknown(AddIssueRelationParamsSchema)
 export const parseRemoveIssueRelationParams = Schema.decodeUnknown(RemoveIssueRelationParamsSchema)
 export const parseListIssueRelationsParams = Schema.decodeUnknown(ListIssueRelationsParamsSchema)
-
-export interface RelationEntry {
-  readonly identifier: IssueIdentifier
-  readonly _id: IssueId
-  readonly _class: ObjectClassName
-}
-
-export interface DocumentRelationEntry {
-  readonly title: string
-  readonly teamspace: TeamspaceIdentifier
-  readonly _id: DocumentId
-  readonly _class: ObjectClassName
-}
-
-export interface AddIssueRelationResult {
-  readonly sourceIssue: IssueIdentifier
-  readonly targetIssue: IssueIdentifier
-  readonly relationType: RelationType
-  readonly added: boolean
-}
-
-export interface RemoveIssueRelationResult {
-  readonly sourceIssue: IssueIdentifier
-  readonly targetIssue: IssueIdentifier
-  readonly relationType: RelationType
-  readonly removed: boolean
-}
-
-export interface ListIssueRelationsResult {
-  readonly blockedBy: ReadonlyArray<RelationEntry>
-  readonly blocks: ReadonlyArray<RelationEntry>
-  readonly relations: ReadonlyArray<RelationEntry>
-  readonly documents: ReadonlyArray<DocumentRelationEntry>
-}
+export const RelationEntrySchema = Schema.Struct({
+  identifier: IssueIdentifier,
+  _id: IssueId,
+  _class: ObjectClassName
+})
+export type RelationEntry = Schema.Schema.Type<typeof RelationEntrySchema>
+export const DocumentRelationEntrySchema = Schema.Struct({
+  title: Schema.String,
+  teamspace: TeamspaceIdentifier,
+  _id: DocumentId,
+  _class: ObjectClassName
+})
+export type DocumentRelationEntry = Schema.Schema.Type<typeof DocumentRelationEntrySchema>
 
 export const RelationEntryWireSchema = Schema.Struct({
   identifier: IssueIdentifier,
@@ -133,6 +112,7 @@ export const AddIssueRelationResultSchema = Schema.Struct({
   relationType: RelationTypeSchema,
   added: Schema.Boolean
 })
+export type AddIssueRelationResult = Schema.Schema.Type<typeof AddIssueRelationResultSchema>
 
 export const RemoveIssueRelationResultSchema = Schema.Struct({
   sourceIssue: IssueIdentifier,
@@ -140,6 +120,7 @@ export const RemoveIssueRelationResultSchema = Schema.Struct({
   relationType: RelationTypeSchema,
   removed: Schema.Boolean
 })
+export type RemoveIssueRelationResult = Schema.Schema.Type<typeof RemoveIssueRelationResultSchema>
 
 export const ListIssueRelationsResultSchema = Schema.Struct({
   blockedBy: Schema.Array(RelationEntryWireSchema),
@@ -147,3 +128,4 @@ export const ListIssueRelationsResultSchema = Schema.Struct({
   relations: Schema.Array(RelationEntryWireSchema),
   documents: Schema.Array(DocumentRelationEntryWireSchema)
 })
+export type ListIssueRelationsResult = Schema.Schema.Type<typeof ListIssueRelationsResultSchema>

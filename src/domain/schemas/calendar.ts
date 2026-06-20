@@ -18,12 +18,14 @@ import {
   NonEmptyString,
   PersonId,
   PersonName,
+  RoomId,
+  RoomName,
   Timestamp,
   TimeZoneId,
   withAtLeastOneRequired,
   withMutuallyExclusiveFields
 } from "./shared.js"
-import type { PersonId as PersonIdType, RoomId, RoomName, Timestamp as TimestampType } from "./shared.js"
+import type { PersonId as PersonIdType } from "./shared.js"
 
 export const CalendarEventTitle = NonEmptyString.pipe(Schema.brand("CalendarEventTitle")).annotations({
   identifier: "CalendarEventTitle",
@@ -117,62 +119,68 @@ export const EventParticipantLocatorSchema = Schema.Union(Email, EventParticipan
 
 export type EventParticipantLocator = Schema.Schema.Type<typeof EventParticipantLocatorSchema>
 
-// No codec needed — internal type, not used for runtime validation
-export interface Participant {
-  readonly id: PersonIdType
-  readonly name?: PersonName | undefined
-  readonly email?: Email | undefined
-}
+export const ParticipantSchema = Schema.Struct({
+  id: PersonId,
+  name: Schema.optional(PersonName),
+  email: Schema.optional(Email)
+})
+export type Participant = Schema.Schema.Type<typeof ParticipantSchema>
 
-export interface EventSummary {
-  readonly eventId: EventId
-  readonly title: CalendarEventTitle
-  readonly date: TimestampType
-  readonly dueDate: TimestampType
-  readonly allDay: boolean
-  readonly location?: string | undefined
-  readonly calendarId?: CalendarId | undefined
-  readonly timeZone?: TimeZoneId | undefined
-  readonly blockTime?: boolean | undefined
-  readonly meetingRoom?: RoomReference | undefined
-  readonly modifiedOn?: TimestampType | undefined
-}
+export const RoomReferenceSchema = Schema.Struct({
+  roomId: RoomId,
+  name: Schema.optional(RoomName)
+})
+export type RoomReference = Schema.Schema.Type<typeof RoomReferenceSchema>
 
-export interface CalendarSummary {
-  readonly calendarId: CalendarId
-  readonly name: CalendarName
-  readonly hidden: boolean
-  readonly visibility: Visibility
-  readonly user: PersonId
-  readonly access: WritableCalendarAccess
-  readonly isPrimary: boolean
-}
+const WritableCalendarAccessSchema = Schema.Literal("writer", "owner")
 
-export interface Event {
-  readonly eventId: EventId
-  readonly title: CalendarEventTitle
-  readonly description?: string | undefined
-  readonly date: TimestampType
-  readonly dueDate: TimestampType
-  readonly allDay: boolean
-  readonly location?: string | undefined
-  readonly visibility?: Visibility | undefined
-  readonly participants?: ReadonlyArray<Participant> | undefined
-  readonly externalParticipants?: ReadonlyArray<Email> | undefined
-  readonly reminders?: ReadonlyArray<TimestampType> | undefined
-  readonly access?: CalendarAccess | undefined
-  readonly timeZone?: TimeZoneId | undefined
-  readonly blockTime?: boolean | undefined
-  readonly calendarId?: CalendarId | undefined
-  readonly meetingRoom?: RoomReference | undefined
-  readonly modifiedOn?: TimestampType | undefined
-  readonly createdOn?: TimestampType | undefined
-}
+export const EventSummarySchema = Schema.Struct({
+  eventId: EventId,
+  title: CalendarEventTitle,
+  date: Timestamp,
+  dueDate: Timestamp,
+  allDay: Schema.Boolean,
+  location: Schema.optional(Schema.String),
+  calendarId: Schema.optional(CalendarId),
+  timeZone: Schema.optional(TimeZoneId),
+  blockTime: Schema.optional(Schema.Boolean),
+  meetingRoom: Schema.optional(RoomReferenceSchema),
+  modifiedOn: Schema.optional(Timestamp)
+})
+export type EventSummary = Schema.Schema.Type<typeof EventSummarySchema>
 
-export interface RoomReference {
-  readonly roomId: RoomId
-  readonly name?: RoomName | undefined
-}
+export const CalendarSummarySchema = Schema.Struct({
+  calendarId: CalendarId,
+  name: CalendarName,
+  hidden: Schema.Boolean,
+  visibility: VisibilitySchema,
+  user: PersonId,
+  access: WritableCalendarAccessSchema,
+  isPrimary: Schema.Boolean
+})
+export type CalendarSummary = Schema.Schema.Type<typeof CalendarSummarySchema>
+
+export const EventSchema = Schema.Struct({
+  eventId: EventId,
+  title: CalendarEventTitle,
+  description: Schema.optional(Schema.String),
+  date: Timestamp,
+  dueDate: Timestamp,
+  allDay: Schema.Boolean,
+  location: Schema.optional(Schema.String),
+  visibility: Schema.optional(VisibilitySchema),
+  participants: Schema.optional(Schema.Array(ParticipantSchema)),
+  externalParticipants: Schema.optional(Schema.Array(Email)),
+  reminders: Schema.optional(Schema.Array(Timestamp)),
+  access: Schema.optional(CalendarAccessSchema),
+  timeZone: Schema.optional(TimeZoneId),
+  blockTime: Schema.optional(Schema.Boolean),
+  calendarId: Schema.optional(CalendarId),
+  meetingRoom: Schema.optional(RoomReferenceSchema),
+  modifiedOn: Schema.optional(Timestamp),
+  createdOn: Schema.optional(Timestamp)
+})
+export type Event = Schema.Schema.Type<typeof EventSchema>
 
 // --- Params schemas ---
 
@@ -440,18 +448,3 @@ export const parseListCalendarsParams = Schema.decodeUnknown(ListCalendarsParams
 export const parseCreateEventParams = Schema.decodeUnknown(CreateEventParamsSchema)
 export const parseUpdateEventParams = Schema.decodeUnknown(UpdateEventParamsSchema)
 export const parseDeleteEventParams = Schema.decodeUnknown(DeleteEventParamsSchema)
-
-// No codec needed — internal type, not used for runtime validation
-export interface CreateEventResult {
-  readonly eventId: EventId
-}
-
-export interface UpdateEventResult {
-  readonly eventId: EventId
-  readonly updated: boolean
-}
-
-export interface DeleteEventResult {
-  readonly eventId: EventId
-  readonly deleted: boolean
-}

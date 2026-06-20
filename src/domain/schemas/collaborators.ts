@@ -15,13 +15,6 @@ import {
   TeamspaceIdentifier
 } from "./shared.js"
 
-export interface ObjectCollaborator {
-  readonly id: CollaboratorId
-  readonly objectId: DocId
-  readonly objectClass: ObjectClassName
-  readonly accountUuid: AccountUuid
-}
-
 const ObjectTargetFields = {
   objectId: Schema.optional(DocId.annotations({
     description:
@@ -128,27 +121,13 @@ export const parseListObjectCollaboratorsParams = Schema.decodeUnknown(ListObjec
 export const parseAddObjectCollaboratorParams = Schema.decodeUnknown(AddObjectCollaboratorParamsSchema)
 export const parseRemoveObjectCollaboratorParams = Schema.decodeUnknown(RemoveObjectCollaboratorParamsSchema)
 
-export interface AddObjectCollaboratorResult {
-  readonly collaboratorId: CollaboratorId
-  readonly objectId: DocId
-  readonly objectClass: ObjectClassName
-  readonly accountUuid: AccountUuid
-  readonly added: boolean
-}
-
-export interface RemoveObjectCollaboratorResult {
-  readonly objectId: DocId
-  readonly objectClass: ObjectClassName
-  readonly accountUuid: AccountUuid
-  readonly removed: boolean
-}
-
 export const ObjectCollaboratorSchema = Schema.Struct({
   id: CollaboratorId,
   objectId: DocId,
   objectClass: ObjectClassName,
   accountUuid: AccountUuid
 })
+export type ObjectCollaborator = Schema.Schema.Type<typeof ObjectCollaboratorSchema>
 
 export const AddObjectCollaboratorResultSchema = Schema.Struct({
   collaboratorId: CollaboratorId,
@@ -157,6 +136,7 @@ export const AddObjectCollaboratorResultSchema = Schema.Struct({
   accountUuid: AccountUuid,
   added: Schema.Boolean
 })
+export type AddObjectCollaboratorResult = Schema.Schema.Type<typeof AddObjectCollaboratorResultSchema>
 
 export const RemoveObjectCollaboratorResultSchema = Schema.Struct({
   objectId: DocId,
@@ -164,5 +144,6 @@ export const RemoveObjectCollaboratorResultSchema = Schema.Struct({
   accountUuid: AccountUuid,
   removed: Schema.Boolean
 })
+export type RemoveObjectCollaboratorResult = Schema.Schema.Type<typeof RemoveObjectCollaboratorResultSchema>
 
 export const ListObjectCollaboratorsResultSchema = Schema.Array(ObjectCollaboratorSchema)

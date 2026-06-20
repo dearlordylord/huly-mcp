@@ -39,8 +39,9 @@ import {
   liveNowClock,
   type NowClock
 } from "../../src/mcp/protocol-handlers.js"
+import { createToolOutputSchema } from "../../src/mcp/tool-output-schema.js"
 import { createFilteredRegistry, type ToolRegistry, toolRegistry } from "../../src/mcp/tools/index.js"
-import { createToolHandler, isNoArgumentTool, requiresArgumentsObject } from "../../src/mcp/tools/registry.js"
+import { defineTool, isNoArgumentTool, requiresArgumentsObject } from "../../src/mcp/tools/registry.js"
 import { createNoopTelemetry } from "../../src/telemetry/noop.js"
 import type { TelemetryOperations, ToolCalledProps } from "../../src/telemetry/telemetry.js"
 import { VERSION } from "../../src/version.js"
@@ -377,6 +378,8 @@ const makeContextFromEnv = (env: Record<string, string>): GetHulyContextResult =
     sanitizeHulyRuntimeConfigFromEnv(env)
   )
 
+const propertylessToolOutputSchema = createToolOutputSchema(Schema.Struct({ ok: Schema.String }))
+
 const propertylessObjectRegistry: ToolRegistry = {
   tools: new Map([
     [
@@ -385,6 +388,7 @@ const propertylessObjectRegistry: ToolRegistry = {
         name: "propertyless_tool",
         description: "Tool with an object schema that does not declare properties.",
         inputSchema: { type: "object" },
+        outputSchema: propertylessToolOutputSchema,
         category: "test",
         handler: async () => ({
           content: [{ type: "text", text: "ok" }]
@@ -397,6 +401,7 @@ const propertylessObjectRegistry: ToolRegistry = {
       name: "propertyless_tool",
       description: "Tool with an object schema that does not declare properties.",
       inputSchema: { type: "object" },
+      outputSchema: propertylessToolOutputSchema,
       category: "test"
     }
   ],
@@ -405,31 +410,32 @@ const propertylessObjectRegistry: ToolRegistry = {
 
 const DiagnosticProbeParams = Schema.Struct({ subject: Schema.String })
 type DiagnosticProbeParams = typeof DiagnosticProbeParams.Type
+const DiagnosticProbeResult = Schema.Struct({ subject: Schema.String, degraded: Schema.Boolean })
 
-const diagnosticProbeTool = {
-  name: "diagnostic_probe",
-  description: "Test-only tool that emits an agent-visible diagnostic warning.",
-  inputSchema: {
-    type: "object",
-    properties: { subject: { type: "string" } },
-    required: ["subject"],
-    additionalProperties: false
+const diagnosticProbeTool = defineTool(
+  {
+    name: "diagnostic_probe",
+    description: "Test-only tool that emits an agent-visible diagnostic warning.",
+    inputSchema: {
+      type: "object",
+      properties: { subject: { type: "string" } },
+      required: ["subject"],
+      additionalProperties: false
+    },
+    resultSchema: DiagnosticProbeResult,
+    category: "test"
   },
-  category: "test",
-  handler: createToolHandler(
-    "diagnostic_probe",
-    Schema.decodeUnknown(DiagnosticProbeParams),
-    (params: DiagnosticProbeParams) =>
-      Effect.gen(function*() {
-        const diagnostics = yield* Diagnostics
-        yield* diagnostics.warnAgent({
-          code: "status_metadata_unresolved",
-          message: `Status metadata was degraded for ${params.subject}.`
-        })
-        return { subject: params.subject, degraded: true }
+  Schema.decodeUnknown(DiagnosticProbeParams),
+  (params: DiagnosticProbeParams) =>
+    Effect.gen(function*() {
+      const diagnostics = yield* Diagnostics
+      yield* diagnostics.warnAgent({
+        code: "status_metadata_unresolved",
+        message: `Status metadata was degraded for ${params.subject}.`
       })
-  )
-}
+      return { subject: params.subject, degraded: true }
+    })
+)
 
 const diagnosticProbeRegistry: ToolRegistry = {
   tools: new Map([[diagnosticProbeTool.name, diagnosticProbeTool]]),

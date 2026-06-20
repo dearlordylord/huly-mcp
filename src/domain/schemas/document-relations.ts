@@ -36,17 +36,17 @@ export const unlinkDocumentFromIssueParamsJsonSchema = JSONSchema.make(UnlinkDoc
 
 export const parseLinkDocumentToIssueParams = Schema.decodeUnknown(LinkDocumentToIssueParamsSchema)
 export const parseUnlinkDocumentFromIssueParams = Schema.decodeUnknown(UnlinkDocumentFromIssueParamsSchema)
-
-export interface LinkDocumentToIssueResult {
-  readonly issue: string
-  readonly document: string
-  readonly documentTitle: string
-  readonly linked: boolean
-}
-
-export interface UnlinkDocumentFromIssueResult {
-  readonly issue: string
-  readonly document: string
-  readonly documentTitle: string
-  readonly unlinked: boolean
-}
+export const LinkDocumentToIssueResultSchema = Schema.Struct({
+  issue: Schema.String,
+  document: Schema.String,
+  documentTitle: Schema.String,
+  linked: Schema.Boolean
+})
+export type LinkDocumentToIssueResult = Schema.Schema.Type<typeof LinkDocumentToIssueResultSchema>
+export const UnlinkDocumentFromIssueResultSchema = Schema.Struct({
+  issue: Schema.String,
+  document: Schema.String,
+  documentTitle: Schema.String,
+  unlinked: Schema.Boolean
+})
+export type UnlinkDocumentFromIssueResult = Schema.Schema.Type<typeof UnlinkDocumentFromIssueResultSchema>

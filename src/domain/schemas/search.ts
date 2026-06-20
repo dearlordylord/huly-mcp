@@ -1,7 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { Count } from "./shared.js"
-import { DEFAULT_LIMIT, DocId, LimitParam, NonEmptyString, ObjectClassName, UNKNOWN_TOTAL } from "./shared.js"
+import { Count, DEFAULT_LIMIT, DocId, LimitParam, NonEmptyString, ObjectClassName, UNKNOWN_TOTAL } from "./shared.js"
 
 export const FulltextSearchParamsSchema = Schema.Struct({
   query: NonEmptyString.annotations({
@@ -43,25 +42,23 @@ const SearchResultSchema = Schema.Struct({
 })
 
 export const parseSearchResult = Schema.decodeUnknown(SearchResultSchema)
-
-// --- Output types (internal, post-mapping) ---
-
-export interface SearchResultItem {
-  readonly id: DocId
-  readonly class: ObjectClassName
-  readonly title?: string | undefined
-  readonly description?: string | undefined
-  readonly score?: number | undefined
-  readonly createdOn?: number | undefined
-}
+export const SearchResultItemSchema = Schema.Struct({
+  id: DocId,
+  class: ObjectClassName,
+  title: Schema.optional(Schema.String),
+  description: Schema.optional(Schema.String),
+  score: Schema.optional(Schema.Number),
+  createdOn: Schema.optional(Schema.Number)
+})
+export type SearchResultItem = Schema.Schema.Type<typeof SearchResultItemSchema>
 
 export const UNKNOWN_SEARCH_TOTAL = UNKNOWN_TOTAL
-
-export interface FulltextSearchResult {
-  readonly items: ReadonlyArray<SearchResultItem>
-  readonly total: Count | typeof UNKNOWN_SEARCH_TOTAL
-  readonly query: string
-}
+export const FulltextSearchResultSchema = Schema.Struct({
+  items: Schema.Array(SearchResultItemSchema),
+  total: Schema.Union(Count, Schema.Literal(UNKNOWN_SEARCH_TOTAL)),
+  query: Schema.String
+})
+export type FulltextSearchResult = Schema.Schema.Type<typeof FulltextSearchResultSchema>
 
 export const fulltextSearchParamsJsonSchema = JSONSchema.make(FulltextSearchParamsSchema)
 

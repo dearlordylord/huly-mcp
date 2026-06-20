@@ -32,45 +32,45 @@ export type ActivityCount = Schema.Schema.Type<typeof ActivityCount>
 
 const ActivityAction = Schema.Literal("create", "update", "remove")
 type ActivityAction = Schema.Schema.Type<typeof ActivityAction>
-
-export interface ActivityMessage {
-  readonly id: ActivityMessageId
-  readonly messageClass?: ObjectClassName | undefined
-  readonly objectId: DocId
-  readonly objectClass: ObjectClassName
-  readonly modifiedBy?: PersonId | undefined
-  readonly modifiedOn?: Timestamp | undefined
-  readonly isPinned?: boolean | undefined
-  readonly replies?: ActivityCount | undefined
-  readonly reactions?: ActivityCount | undefined
-  readonly editedOn?: Timestamp | null | undefined
-  readonly action?: ActivityAction | undefined
-  readonly message?: ActivityMarkup | undefined
-  readonly body?: ActivityMarkdown | undefined
-  readonly srcDocId?: DocId | undefined
-  readonly srcDocClass?: ObjectClassName | undefined
-  readonly attachedDocId?: DocId | undefined
-  readonly attachedDocClass?: ObjectClassName | undefined
-}
-
-export interface Reaction {
-  readonly id: ReactionId
-  readonly messageId: ActivityMessageId
-  readonly emoji: EmojiCode
-  readonly createdBy?: PersonId | undefined
-}
-
-export interface SavedMessage {
-  readonly id: SavedMessageId
-  readonly messageId: ActivityMessageId
-}
-
-export interface Mention {
-  readonly id: MentionId
-  readonly messageId: ActivityMessageId
-  readonly userId: PersonId
-  readonly content?: MentionContent | undefined
-}
+export const ActivityMessageSchema = Schema.Struct({
+  id: ActivityMessageId,
+  messageClass: Schema.optional(ObjectClassName),
+  objectId: DocId,
+  objectClass: ObjectClassName,
+  modifiedBy: Schema.optional(PersonId),
+  modifiedOn: Schema.optional(Timestamp),
+  isPinned: Schema.optional(Schema.Boolean),
+  replies: Schema.optional(ActivityCount),
+  reactions: Schema.optional(ActivityCount),
+  editedOn: Schema.optional(Schema.Union(Timestamp, Schema.Null)),
+  action: Schema.optional(ActivityAction),
+  message: Schema.optional(ActivityMarkup),
+  body: Schema.optional(ActivityMarkdown),
+  srcDocId: Schema.optional(DocId),
+  srcDocClass: Schema.optional(ObjectClassName),
+  attachedDocId: Schema.optional(DocId),
+  attachedDocClass: Schema.optional(ObjectClassName)
+})
+export type ActivityMessage = Schema.Schema.Type<typeof ActivityMessageSchema>
+export const ReactionSchema = Schema.Struct({
+  id: ReactionId,
+  messageId: ActivityMessageId,
+  emoji: EmojiCode,
+  createdBy: Schema.optional(PersonId)
+})
+export type Reaction = Schema.Schema.Type<typeof ReactionSchema>
+export const SavedMessageSchema = Schema.Struct({
+  id: SavedMessageId,
+  messageId: ActivityMessageId
+})
+export type SavedMessage = Schema.Schema.Type<typeof SavedMessageSchema>
+export const MentionSchema = Schema.Struct({
+  id: MentionId,
+  messageId: ActivityMessageId,
+  userId: PersonId,
+  content: Schema.optional(MentionContent)
+})
+export type Mention = Schema.Schema.Type<typeof MentionSchema>
 
 export const ListActivityParamsSchema = Schema.Struct({
   objectId: Schema.optional(DocId.annotations({
@@ -302,26 +302,6 @@ export const parseUnsaveMessageParams = Schema.decodeUnknown(UnsaveMessageParams
 export const parseListSavedMessagesParams = Schema.decodeUnknown(ListSavedMessagesParamsSchema)
 export const parseListMentionsParams = Schema.decodeUnknown(ListMentionsParamsSchema)
 
-export interface AddReactionResult {
-  readonly reactionId: ReactionId
-  readonly messageId: ActivityMessageId
-}
-
-export interface RemoveReactionResult {
-  readonly messageId: ActivityMessageId
-  readonly removed: boolean
-}
-
-export interface SaveMessageResult {
-  readonly savedId: SavedMessageId
-  readonly messageId: ActivityMessageId
-}
-
-export interface UnsaveMessageResult {
-  readonly messageId: ActivityMessageId
-  readonly removed: boolean
-}
-
 export const ActivityMessageWireSchema = Schema.Struct({
   id: ActivityMessageId,
   messageClass: Schema.optional(ObjectClassName),
@@ -365,21 +345,25 @@ export const AddReactionResultSchema = Schema.Struct({
   reactionId: ReactionId,
   messageId: ActivityMessageId
 })
+export type AddReactionResult = Schema.Schema.Type<typeof AddReactionResultSchema>
 
 export const RemoveReactionResultSchema = Schema.Struct({
   messageId: ActivityMessageId,
   removed: Schema.Boolean
 })
+export type RemoveReactionResult = Schema.Schema.Type<typeof RemoveReactionResultSchema>
 
 export const SaveMessageResultSchema = Schema.Struct({
   savedId: SavedMessageId,
   messageId: ActivityMessageId
 })
+export type SaveMessageResult = Schema.Schema.Type<typeof SaveMessageResultSchema>
 
 export const UnsaveMessageResultSchema = Schema.Struct({
   messageId: ActivityMessageId,
   removed: Schema.Boolean
 })
+export type UnsaveMessageResult = Schema.Schema.Type<typeof UnsaveMessageResultSchema>
 
 export const ListActivityResultSchema = Schema.Array(ActivityMessageWireSchema)
 export const ListReactionsResultSchema = Schema.Array(ReactionWireSchema)

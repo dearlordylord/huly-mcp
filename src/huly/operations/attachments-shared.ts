@@ -47,32 +47,40 @@ interface AttachmentScopeList {
 const optionalAttachmentDescription = (description: string | null | undefined) =>
   description === undefined || description === null ? undefined : AttachmentDescription.make(description)
 
-const toAttachmentSummary = (att: HulyAttachment): AttachmentSummary => ({
-  id: AttachmentId.make(att._id),
-  class: ObjectClassName.make(att._class),
-  name: AttachmentFileName.make(att.name),
-  type: MimeType.make(att.type),
-  size: AttachmentByteSize.make(att.size),
-  pinned: att.pinned ?? undefined,
-  description: optionalAttachmentDescription(att.description),
-  metadata: att.metadata,
-  modifiedOn: Timestamp.make(att.modifiedOn)
-})
+const toAttachmentSummary = (att: HulyAttachment): AttachmentSummary => {
+  const description = optionalAttachmentDescription(att.description)
 
-const toAttachment = (att: HulyAttachment, url?: string): Attachment => ({
-  id: AttachmentId.make(att._id),
-  class: ObjectClassName.make(att._class),
-  name: AttachmentFileName.make(att.name),
-  type: MimeType.make(att.type),
-  size: AttachmentByteSize.make(att.size),
-  pinned: att.pinned ?? undefined,
-  readonly: att.readonly ?? undefined,
-  description: optionalAttachmentDescription(att.description),
-  metadata: att.metadata,
-  url: url === undefined ? undefined : UrlString.make(url),
-  modifiedOn: Timestamp.make(att.modifiedOn),
-  createdOn: att.createdOn === undefined ? undefined : Timestamp.make(att.createdOn)
-})
+  return {
+    id: AttachmentId.make(att._id),
+    class: ObjectClassName.make(att._class),
+    name: AttachmentFileName.make(att.name),
+    type: MimeType.make(att.type),
+    size: AttachmentByteSize.make(att.size),
+    ...(att.pinned === undefined ? {} : { pinned: att.pinned }),
+    ...(description === undefined ? {} : { description }),
+    ...(att.metadata === undefined ? {} : { metadata: att.metadata }),
+    modifiedOn: Timestamp.make(att.modifiedOn)
+  }
+}
+
+const toAttachment = (att: HulyAttachment, url?: string): Attachment => {
+  const description = optionalAttachmentDescription(att.description)
+
+  return {
+    id: AttachmentId.make(att._id),
+    class: ObjectClassName.make(att._class),
+    name: AttachmentFileName.make(att.name),
+    type: MimeType.make(att.type),
+    size: AttachmentByteSize.make(att.size),
+    ...(att.pinned === undefined ? {} : { pinned: att.pinned }),
+    ...(att.readonly === undefined ? {} : { readonly: att.readonly }),
+    ...(description === undefined ? {} : { description }),
+    ...(att.metadata === undefined ? {} : { metadata: att.metadata }),
+    ...(url === undefined ? {} : { url: UrlString.make(url) }),
+    modifiedOn: Timestamp.make(att.modifiedOn),
+    ...(att.createdOn === undefined ? {} : { createdOn: Timestamp.make(att.createdOn) })
+  }
+}
 
 const attachmentScopeQuery = (
   attachmentId: AttachmentIdType | undefined,

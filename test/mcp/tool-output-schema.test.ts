@@ -1,11 +1,12 @@
+import { Schema } from "effect"
 import { describe, expect, it } from "vitest"
 
 import { ToolWarningCodeSchema } from "../../src/domain/schemas/tool-warnings.js"
-import { defaultToolOutputSchema, hulyContextToolOutputSchema } from "../../src/mcp/tool-output-schema.js"
+import { createToolOutputSchema, hulyContextToolOutputSchema } from "../../src/mcp/tool-output-schema.js"
 
-describe("defaultToolOutputSchema", () => {
+describe("createToolOutputSchema", () => {
   it("derives the warning code enum from ToolWarningCodeSchema", () => {
-    expect(defaultToolOutputSchema).toMatchObject({
+    expect(createToolOutputSchema(Schema.String)).toMatchObject({
       properties: {
         warnings: {
           items: {

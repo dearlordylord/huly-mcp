@@ -64,6 +64,8 @@ const serverPopulatedPersonId: CorePersonId = "" as CorePersonId
 // eslint-disable-next-line no-restricted-syntax -- Ref<Doc> and PersonId are incompatible branded types, no single-step cast exists
 const refAsPersonId = (ref: Ref<Doc>): CorePersonId => ref as unknown as CorePersonId
 
+const toTimeReportDate = (date: HulyTimeSpendReport["date"]) => date === null ? null : Timestamp.make(date)
+
 type LogTimeError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
 type GetTimeReportError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
 type ListTimeSpendReportsError = HulyClientError | ProjectNotFoundError
@@ -171,21 +173,26 @@ export const getTimeReport = (
 
     const timeReports: Array<TimeSpendReport> = reports.map(r => {
       const employeeName = r.employee == null ? undefined : personMap.get(r.employee)
+      const employee = employeeName === undefined ? undefined : PersonName.make(employeeName)
+      const date = toTimeReportDate(r.date)
       return {
         id: TimeSpendReportId.make(r._id),
         identifier: IssueIdentifier.make(issue.identifier),
-        employee: employeeName === undefined ? undefined : PersonName.make(employeeName),
-        date: r.date,
+        ...(employee === undefined ? {} : { employee }),
+        date,
         value: r.value,
         description: r.description
       }
     })
 
+    const estimation = zeroAsUnset(NonNegativeNumber.make(issue.estimation))
+    const remainingTime = zeroAsUnset(NonNegativeNumber.make(issue.remainingTime))
+
     return {
       identifier: IssueIdentifier.make(issue.identifier),
       totalTime: issue.reportedTime,
-      estimation: zeroAsUnset(NonNegativeNumber.make(issue.estimation)),
-      remainingTime: zeroAsUnset(NonNegativeNumber.make(issue.remainingTime)),
+      ...(estimation === undefined ? {} : { estimation }),
+      ...(remainingTime === undefined ? {} : { remainingTime }),
       reports: timeReports
     }
   })
@@ -237,16 +244,22 @@ export const listTimeSpendReports = (
       )
     )
 
-    return reports.map(r => ({
-      id: TimeSpendReportId.make(r._id),
-      identifier: r.$lookup?.attachedTo?.identifier !== undefined
+    return reports.map(r => {
+      const identifier = r.$lookup?.attachedTo?.identifier !== undefined
         ? IssueIdentifier.make(r.$lookup.attachedTo.identifier)
-        : undefined,
-      employee: r.$lookup?.employee?.name !== undefined ? PersonName.make(r.$lookup.employee.name) : undefined,
-      date: r.date,
-      value: r.value,
-      description: r.description
-    }))
+        : undefined
+      const employee = r.$lookup?.employee?.name !== undefined ? PersonName.make(r.$lookup.employee.name) : undefined
+      const date = toTimeReportDate(r.date)
+
+      return {
+        id: TimeSpendReportId.make(r._id),
+        ...(identifier === undefined ? {} : { identifier }),
+        ...(employee === undefined ? {} : { employee }),
+        date,
+        value: r.value,
+        description: r.description
+      }
+    })
   })
 
 export const getDetailedTimeReport = (
@@ -284,13 +297,13 @@ export const getDetailedTimeReport = (
     )
 
     const byIssueMap = new Map<string, {
-      identifier: IssueIdentifier | undefined
+      identifier?: IssueIdentifier
       issueTitle: string
       totalTime: number
       reports: Array<TimeSpendReport>
     }>()
 
-    const byEmployeeMap = new Map<string, { employeeName: PersonName | undefined; totalTime: number }>()
+    const byEmployeeMap = new Map<string, { employeeName?: PersonName; totalTime: number }>()
 
     let totalTime = 0
 
@@ -299,26 +312,32 @@ export const getDetailedTimeReport = (
 
       const issueKey = r.attachedTo
       const issue = r.$lookup?.attachedTo
+      const identifier = issue?.identifier === undefined ? undefined : IssueIdentifier.make(issue.identifier)
       const existing = byIssueMap.get(issueKey) ?? {
-        identifier: issue?.identifier !== undefined ? IssueIdentifier.make(issue.identifier) : undefined,
+        ...(identifier === undefined ? {} : { identifier }),
         issueTitle: issue?.title ?? "Unknown",
         totalTime: 0,
         reports: []
       }
       existing.totalTime += r.value
+      const employee = r.$lookup?.employee?.name === undefined ? undefined : PersonName.make(r.$lookup.employee.name)
+      const date = toTimeReportDate(r.date)
       existing.reports.push({
         id: TimeSpendReportId.make(r._id),
-        identifier: issue?.identifier !== undefined ? IssueIdentifier.make(issue.identifier) : undefined,
-        employee: r.$lookup?.employee?.name !== undefined ? PersonName.make(r.$lookup.employee.name) : undefined,
-        date: r.date,
+        ...(identifier === undefined ? {} : { identifier }),
+        ...(employee === undefined ? {} : { employee }),
+        date,
         value: r.value,
         description: r.description
       })
       byIssueMap.set(issueKey, existing)
 
       const empKey = r.employee ? r.employee : "__unassigned__"
+      const employeeName = r.$lookup?.employee?.name === undefined
+        ? undefined
+        : PersonName.make(r.$lookup.employee.name)
       const empExisting = byEmployeeMap.get(empKey) ?? {
-        employeeName: r.$lookup?.employee?.name !== undefined ? PersonName.make(r.$lookup.employee.name) : undefined,
+        ...(employeeName === undefined ? {} : { employeeName }),
         totalTime: 0
       }
       empExisting.totalTime += r.value

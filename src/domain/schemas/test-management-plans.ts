@@ -1,25 +1,30 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { Count, ListTotal, TestPlanId, TestPlanItemId, TestResultId, TestRunId } from "./shared.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
+  Count,
   DEFAULT_LIMIT,
   enumValuesDescription,
   hasAtLeastOneDefined,
   LimitParam,
+  ListTotal,
   NonEmptyString,
   TestCaseIdentifier,
+  TestPlanId,
   TestPlanIdentifier,
+  TestPlanItemId,
   TestPlanItemId as TestPlanItemIdSchema,
   TestProjectIdentifier,
+  TestResultId,
   TestResultIdentifier,
+  TestRunId,
   TestRunIdentifier,
   Timestamp,
   withAtLeastOneRequired
 } from "./shared.js"
 
-import { TestRunStatusSchema, type TestRunStatusStr, TestRunStatusValues } from "./test-management-core.js"
+import { TestRunStatusSchema, TestRunStatusValues } from "./test-management-core.js"
 
 const projectField = TestProjectIdentifier.annotations({ description: "Test project ID or name" })
 const limitField = LimitParam.annotations({ description: `Max items to return (default: ${DEFAULT_LIMIT})` })
@@ -30,51 +35,56 @@ const nameField = NonEmptyString.annotations({ description: "Name" })
 const descField = Schema.String.annotations({ description: "Description" })
 const descNullField = Schema.NullOr(Schema.String).annotations({ description: "Description, or null to clear" })
 const assigneeField = NonEmptyString.annotations({ description: "Assignee email or name" })
-
-export interface TestPlanSummary {
-  readonly id: TestPlanId
-  readonly name: string
-}
-export interface TestPlanItemSummary {
-  readonly id: TestPlanItemId
-  readonly testCase: string
-  readonly testSuite?: string
-  readonly assignee?: string
-}
-export interface TestRunSummary {
-  readonly id: TestRunId
-  readonly name: string
-  readonly dueDate?: number
-}
-export interface TestResultSummary {
-  readonly id: TestResultId
-  readonly name: string
-  readonly testCase: string
-  readonly status?: TestRunStatusStr
-  readonly assignee?: string
-}
+export const TestPlanSummarySchema = Schema.Struct({
+  id: TestPlanId,
+  name: Schema.String
+})
+export type TestPlanSummary = Schema.Schema.Type<typeof TestPlanSummarySchema>
+export const TestPlanItemSummarySchema = Schema.Struct({
+  id: TestPlanItemId,
+  testCase: Schema.String,
+  testSuite: Schema.optional(Schema.String),
+  assignee: Schema.optional(Schema.String)
+})
+export type TestPlanItemSummary = Schema.Schema.Type<typeof TestPlanItemSummarySchema>
+export const TestRunSummarySchema = Schema.Struct({
+  id: TestRunId,
+  name: Schema.String,
+  dueDate: Schema.optional(Schema.Number)
+})
+export type TestRunSummary = Schema.Schema.Type<typeof TestRunSummarySchema>
+export const TestResultSummarySchema = Schema.Struct({
+  id: TestResultId,
+  name: Schema.String,
+  testCase: Schema.String,
+  status: Schema.optional(TestRunStatusSchema),
+  assignee: Schema.optional(Schema.String)
+})
+export type TestResultSummary = Schema.Schema.Type<typeof TestResultSummarySchema>
 
 export const ListTestPlansParamsSchema = Schema.Struct({
   project: projectField,
   limit: Schema.optional(limitField)
 }).annotations({ title: "ListTestPlansParams", description: "List test plans in a project" })
 export type ListTestPlansParams = Schema.Schema.Type<typeof ListTestPlansParamsSchema>
-export interface ListTestPlansResult {
-  readonly plans: ReadonlyArray<TestPlanSummary>
-  readonly total: ListTotal
-}
+export const ListTestPlansResultSchema = Schema.Struct({
+  plans: Schema.Array(TestPlanSummarySchema),
+  total: ListTotal
+})
+export type ListTestPlansResult = Schema.Schema.Type<typeof ListTestPlansResultSchema>
 
 export const GetTestPlanParamsSchema = Schema.Struct({
   project: projectField,
   plan: planField
 }).annotations({ title: "GetTestPlanParams", description: "Get test plan details including items" })
 export type GetTestPlanParams = Schema.Schema.Type<typeof GetTestPlanParamsSchema>
-export interface GetTestPlanResult {
-  readonly id: TestPlanId
-  readonly name: string
-  readonly description?: string
-  readonly items: ReadonlyArray<TestPlanItemSummary>
-}
+export const GetTestPlanResultSchema = Schema.Struct({
+  id: TestPlanId,
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  items: Schema.Array(TestPlanItemSummarySchema)
+})
+export type GetTestPlanResult = Schema.Schema.Type<typeof GetTestPlanResultSchema>
 
 export const CreateTestPlanParamsSchema = Schema.Struct({
   project: projectField,
@@ -82,11 +92,12 @@ export const CreateTestPlanParamsSchema = Schema.Struct({
   description: Schema.optional(descField)
 }).annotations({ title: "CreateTestPlanParams", description: "Create a test plan" })
 export type CreateTestPlanParams = Schema.Schema.Type<typeof CreateTestPlanParamsSchema>
-export interface CreateTestPlanResult {
-  readonly id: TestPlanId
-  readonly name: string
-  readonly created: boolean
-}
+export const CreateTestPlanResultSchema = Schema.Struct({
+  id: TestPlanId,
+  name: Schema.String,
+  created: Schema.Boolean
+})
+export type CreateTestPlanResult = Schema.Schema.Type<typeof CreateTestPlanResultSchema>
 
 export const UPDATE_TEST_PLAN_FIELDS = ["name", "description"] as const satisfies ReadonlyArray<
   "name" | "description"
@@ -109,20 +120,22 @@ export const UpdateTestPlanParamsSchema = Schema.Struct({
 })
 export type UpdateTestPlanParams = Schema.Schema.Type<typeof UpdateTestPlanParamsSchema>
 assertUpdateFields<UpdateTestPlanParams>()(["project", "plan"], UPDATE_TEST_PLAN_FIELDS)
-export interface UpdateTestPlanResult {
-  readonly id: TestPlanId
-  readonly updated: boolean
-}
+export const UpdateTestPlanResultSchema = Schema.Struct({
+  id: TestPlanId,
+  updated: Schema.Boolean
+})
+export type UpdateTestPlanResult = Schema.Schema.Type<typeof UpdateTestPlanResultSchema>
 
 export const DeleteTestPlanParamsSchema = Schema.Struct({
   project: projectField,
   plan: planField
 }).annotations({ title: "DeleteTestPlanParams", description: "Delete a test plan" })
 export type DeleteTestPlanParams = Schema.Schema.Type<typeof DeleteTestPlanParamsSchema>
-export interface DeleteTestPlanResult {
-  readonly id: TestPlanId
-  readonly deleted: boolean
-}
+export const DeleteTestPlanResultSchema = Schema.Struct({
+  id: TestPlanId,
+  deleted: Schema.Boolean
+})
+export type DeleteTestPlanResult = Schema.Schema.Type<typeof DeleteTestPlanResultSchema>
 
 export const AddTestPlanItemParamsSchema = Schema.Struct({
   project: projectField,
@@ -131,10 +144,11 @@ export const AddTestPlanItemParamsSchema = Schema.Struct({
   assignee: Schema.optional(assigneeField)
 }).annotations({ title: "AddTestPlanItemParams", description: "Add a test case to a test plan" })
 export type AddTestPlanItemParams = Schema.Schema.Type<typeof AddTestPlanItemParamsSchema>
-export interface AddTestPlanItemResult {
-  readonly id: TestPlanItemId
-  readonly added: boolean
-}
+export const AddTestPlanItemResultSchema = Schema.Struct({
+  id: TestPlanItemId,
+  added: Schema.Boolean
+})
+export type AddTestPlanItemResult = Schema.Schema.Type<typeof AddTestPlanItemResultSchema>
 
 export const RemoveTestPlanItemParamsSchema = Schema.Struct({
   project: projectField,
@@ -142,33 +156,36 @@ export const RemoveTestPlanItemParamsSchema = Schema.Struct({
   item: TestPlanItemIdSchema.annotations({ description: "Test plan item ID to remove" })
 }).annotations({ title: "RemoveTestPlanItemParams", description: "Remove a test case from a test plan" })
 export type RemoveTestPlanItemParams = Schema.Schema.Type<typeof RemoveTestPlanItemParamsSchema>
-export interface RemoveTestPlanItemResult {
-  readonly id: TestPlanItemId
-  readonly removed: boolean
-}
+export const RemoveTestPlanItemResultSchema = Schema.Struct({
+  id: TestPlanItemId,
+  removed: Schema.Boolean
+})
+export type RemoveTestPlanItemResult = Schema.Schema.Type<typeof RemoveTestPlanItemResultSchema>
 
 export const ListTestRunsParamsSchema = Schema.Struct({
   project: projectField,
   limit: Schema.optional(limitField)
 }).annotations({ title: "ListTestRunsParams", description: "List test runs in a project" })
 export type ListTestRunsParams = Schema.Schema.Type<typeof ListTestRunsParamsSchema>
-export interface ListTestRunsResult {
-  readonly runs: ReadonlyArray<TestRunSummary>
-  readonly total: ListTotal
-}
+export const ListTestRunsResultSchema = Schema.Struct({
+  runs: Schema.Array(TestRunSummarySchema),
+  total: ListTotal
+})
+export type ListTestRunsResult = Schema.Schema.Type<typeof ListTestRunsResultSchema>
 
 export const GetTestRunParamsSchema = Schema.Struct({
   project: projectField,
   run: runField
 }).annotations({ title: "GetTestRunParams", description: "Get test run details including results" })
 export type GetTestRunParams = Schema.Schema.Type<typeof GetTestRunParamsSchema>
-export interface GetTestRunResult {
-  readonly id: TestRunId
-  readonly name: string
-  readonly description?: string
-  readonly dueDate?: number
-  readonly results: ReadonlyArray<TestResultSummary>
-}
+export const GetTestRunResultSchema = Schema.Struct({
+  id: TestRunId,
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  dueDate: Schema.optional(Schema.Number),
+  results: Schema.Array(TestResultSummarySchema)
+})
+export type GetTestRunResult = Schema.Schema.Type<typeof GetTestRunResultSchema>
 
 const dueDateField = Timestamp.annotations({ description: "Due date as Unix timestamp in milliseconds" })
 
@@ -179,11 +196,12 @@ export const CreateTestRunParamsSchema = Schema.Struct({
   dueDate: Schema.optional(dueDateField)
 }).annotations({ title: "CreateTestRunParams", description: "Create a test run" })
 export type CreateTestRunParams = Schema.Schema.Type<typeof CreateTestRunParamsSchema>
-export interface CreateTestRunResult {
-  readonly id: TestRunId
-  readonly name: string
-  readonly created: boolean
-}
+export const CreateTestRunResultSchema = Schema.Struct({
+  id: TestRunId,
+  name: Schema.String,
+  created: Schema.Boolean
+})
+export type CreateTestRunResult = Schema.Schema.Type<typeof CreateTestRunResultSchema>
 
 export const UPDATE_TEST_RUN_FIELDS = [
   "name",
@@ -213,20 +231,22 @@ export const UpdateTestRunParamsSchema = Schema.Struct({
 })
 export type UpdateTestRunParams = Schema.Schema.Type<typeof UpdateTestRunParamsSchema>
 assertUpdateFields<UpdateTestRunParams>()(["project", "run"], UPDATE_TEST_RUN_FIELDS)
-export interface UpdateTestRunResult {
-  readonly id: TestRunId
-  readonly updated: boolean
-}
+export const UpdateTestRunResultSchema = Schema.Struct({
+  id: TestRunId,
+  updated: Schema.Boolean
+})
+export type UpdateTestRunResult = Schema.Schema.Type<typeof UpdateTestRunResultSchema>
 
 export const DeleteTestRunParamsSchema = Schema.Struct({
   project: projectField,
   run: runField
 }).annotations({ title: "DeleteTestRunParams", description: "Delete a test run" })
 export type DeleteTestRunParams = Schema.Schema.Type<typeof DeleteTestRunParamsSchema>
-export interface DeleteTestRunResult {
-  readonly id: TestRunId
-  readonly deleted: boolean
-}
+export const DeleteTestRunResultSchema = Schema.Struct({
+  id: TestRunId,
+  deleted: Schema.Boolean
+})
+export type DeleteTestRunResult = Schema.Schema.Type<typeof DeleteTestRunResultSchema>
 
 export const ListTestResultsParamsSchema = Schema.Struct({
   project: projectField,
@@ -234,25 +254,27 @@ export const ListTestResultsParamsSchema = Schema.Struct({
   limit: Schema.optional(limitField)
 }).annotations({ title: "ListTestResultsParams", description: "List test results in a run" })
 export type ListTestResultsParams = Schema.Schema.Type<typeof ListTestResultsParamsSchema>
-export interface ListTestResultsResult {
-  readonly results: ReadonlyArray<TestResultSummary>
-  readonly total: ListTotal
-}
+export const ListTestResultsResultSchema = Schema.Struct({
+  results: Schema.Array(TestResultSummarySchema),
+  total: ListTotal
+})
+export type ListTestResultsResult = Schema.Schema.Type<typeof ListTestResultsResultSchema>
 
 export const GetTestResultParamsSchema = Schema.Struct({
   project: projectField,
   result: resultField
 }).annotations({ title: "GetTestResultParams", description: "Get test result details" })
 export type GetTestResultParams = Schema.Schema.Type<typeof GetTestResultParamsSchema>
-export interface GetTestResultDetail {
-  readonly id: TestResultId
-  readonly name: string
-  readonly testCase: string
-  readonly testSuite?: string
-  readonly status?: TestRunStatusStr
-  readonly assignee?: string
-  readonly description?: string
-}
+export const GetTestResultDetailSchema = Schema.Struct({
+  id: TestResultId,
+  name: Schema.String,
+  testCase: Schema.String,
+  testSuite: Schema.optional(Schema.String),
+  status: Schema.optional(TestRunStatusSchema),
+  assignee: Schema.optional(Schema.String),
+  description: Schema.optional(Schema.String)
+})
+export type GetTestResultDetail = Schema.Schema.Type<typeof GetTestResultDetailSchema>
 
 const statusField = TestRunStatusSchema.annotations({
   description: `Status: ${enumValuesDescription(TestRunStatusValues)}`
@@ -267,11 +289,12 @@ export const CreateTestResultParamsSchema = Schema.Struct({
   assignee: Schema.optional(assigneeField)
 }).annotations({ title: "CreateTestResultParams", description: "Create a test result in a run" })
 export type CreateTestResultParams = Schema.Schema.Type<typeof CreateTestResultParamsSchema>
-export interface CreateTestResultResult {
-  readonly id: TestResultId
-  readonly name: string
-  readonly created: boolean
-}
+export const CreateTestResultResultSchema = Schema.Struct({
+  id: TestResultId,
+  name: Schema.String,
+  created: Schema.Boolean
+})
+export type CreateTestResultResult = Schema.Schema.Type<typeof CreateTestResultResultSchema>
 
 export const UPDATE_TEST_RESULT_FIELDS = [
   "status",
@@ -299,20 +322,22 @@ export const UpdateTestResultParamsSchema = Schema.Struct({
 })
 export type UpdateTestResultParams = Schema.Schema.Type<typeof UpdateTestResultParamsSchema>
 assertUpdateFields<UpdateTestResultParams>()(["project", "result"], UPDATE_TEST_RESULT_FIELDS)
-export interface UpdateTestResultResult {
-  readonly id: TestResultId
-  readonly updated: boolean
-}
+export const UpdateTestResultResultSchema = Schema.Struct({
+  id: TestResultId,
+  updated: Schema.Boolean
+})
+export type UpdateTestResultResult = Schema.Schema.Type<typeof UpdateTestResultResultSchema>
 
 export const DeleteTestResultParamsSchema = Schema.Struct({
   project: projectField,
   result: resultField
 }).annotations({ title: "DeleteTestResultParams", description: "Delete a test result" })
 export type DeleteTestResultParams = Schema.Schema.Type<typeof DeleteTestResultParamsSchema>
-export interface DeleteTestResultResult {
-  readonly id: TestResultId
-  readonly deleted: boolean
-}
+export const DeleteTestResultResultSchema = Schema.Struct({
+  id: TestResultId,
+  deleted: Schema.Boolean
+})
+export type DeleteTestResultResult = Schema.Schema.Type<typeof DeleteTestResultResultSchema>
 
 export const RunTestPlanParamsSchema = Schema.Struct({
   project: projectField,
@@ -321,11 +346,12 @@ export const RunTestPlanParamsSchema = Schema.Struct({
   dueDate: Schema.optional(dueDateField)
 }).annotations({ title: "RunTestPlanParams", description: "Execute a test plan by creating a run with results" })
 export type RunTestPlanParams = Schema.Schema.Type<typeof RunTestPlanParamsSchema>
-export interface RunTestPlanResult {
-  readonly runId: TestRunId
-  readonly name: string
-  readonly resultsCreated: Count
-}
+export const RunTestPlanResultSchema = Schema.Struct({
+  runId: TestRunId,
+  name: Schema.String,
+  resultsCreated: Count
+})
+export type RunTestPlanResult = Schema.Schema.Type<typeof RunTestPlanResultSchema>
 
 export const listTestPlansParamsJsonSchema = JSONSchema.make(ListTestPlansParamsSchema)
 export const getTestPlanParamsJsonSchema = JSONSchema.make(GetTestPlanParamsSchema)
@@ -373,3 +399,5 @@ export const parseCreateTestResultParams = Schema.decodeUnknown(CreateTestResult
 export const parseUpdateTestResultParams = Schema.decodeUnknown(UpdateTestResultParamsSchema)
 export const parseDeleteTestResultParams = Schema.decodeUnknown(DeleteTestResultParamsSchema)
 export const parseRunTestPlanParams = Schema.decodeUnknown(RunTestPlanParamsSchema)
+
+export const GetTestResultResultSchema = GetTestResultDetailSchema

@@ -114,7 +114,9 @@ export type StorageClientError =
   | FileFetchError
 
 /**
- * Result of a file upload operation.
+ * Internal storage-adapter payload. This is not a serialized/tool boundary DTO:
+ * downstream Huly operations need the SDK's Ref<Blob> type before mapping to
+ * their own schema-owned MCP payloads.
  */
 export interface UploadFileResult {
   /** The blob reference for attaching to documents */

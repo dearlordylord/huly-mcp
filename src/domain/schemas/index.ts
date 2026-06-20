@@ -65,6 +65,8 @@ export {
   VirtualOfficeDimension
 } from "./shared.js"
 
+export { optionalOutput } from "./output-helpers.js"
+
 export {
   MessageTemplateMetadataDegradedWarningCode,
   SpaceRoleAssignmentsDegradedWarningCode,
@@ -729,15 +731,12 @@ export {
   type AddLabelParams,
   addLabelParamsJsonSchema,
   AddLabelParamsSchema,
-  type AddLabelResult,
   type CreateIssueParams,
   createIssueParamsJsonSchema,
   CreateIssueParamsSchema,
-  type CreateIssueResult,
   type DeleteIssueParams,
   deleteIssueParamsJsonSchema,
   DeleteIssueParamsSchema,
-  type DeleteIssueResult,
   type GetIssueParams,
   getIssueParamsJsonSchema,
   GetIssueParamsSchema,
@@ -757,7 +756,6 @@ export {
   type MoveIssueParams,
   moveIssueParamsJsonSchema,
   MoveIssueParamsSchema,
-  type MoveIssueResult,
   parseAddLabelParams,
   parseCreateIssueParams,
   parseDeleteIssueParams,
@@ -773,12 +771,29 @@ export {
   type RemoveLabelParams,
   removeLabelParamsJsonSchema,
   RemoveLabelParamsSchema,
-  type RemoveLabelResult,
   type UpdateIssueParams,
   updateIssueParamsJsonSchema,
-  UpdateIssueParamsSchema,
-  type UpdateIssueResult
+  UpdateIssueParamsSchema
 } from "./issues.js"
+
+export {
+  AddIssueLabelResultSchema,
+  type AddLabelResult,
+  AddLabelResultSchema,
+  type CreateIssueResult,
+  CreateIssueResultSchema,
+  type DeleteIssueResult,
+  DeleteIssueResultSchema,
+  GetIssueResultSchema,
+  ListIssuesResultSchema,
+  type MoveIssueResult,
+  MoveIssueResultSchema,
+  RemoveIssueLabelResultSchema,
+  type RemoveLabelResult,
+  RemoveLabelResultSchema,
+  type UpdateIssueResult,
+  UpdateIssueResultSchema
+} from "./issues-results.js"
 
 export {
   type DeleteRelatedIssueSpaceTargetParams,
@@ -1540,11 +1555,9 @@ export {
   type CreateEventParams,
   createEventParamsJsonSchema,
   CreateEventParamsSchema,
-  type CreateEventResult,
   type DeleteEventParams,
   deleteEventParamsJsonSchema,
   DeleteEventParamsSchema,
-  type DeleteEventResult,
   type Event,
   type EventSummary,
   type GetEventParams,
@@ -1562,11 +1575,22 @@ export {
   type UpdateEventParams,
   updateEventParamsJsonSchema,
   UpdateEventParamsSchema,
-  type UpdateEventResult,
   type Visibility,
   VisibilitySchema,
   VisibilityValues
 } from "./calendar.js"
+
+export {
+  type CreateEventResult,
+  CreateEventResultSchema,
+  type DeleteEventResult,
+  DeleteEventResultSchema,
+  GetEventResultSchema,
+  ListCalendarsResultSchema,
+  ListEventsResultSchema,
+  type UpdateEventResult,
+  UpdateEventResultSchema
+} from "./calendar-results.js"
 
 export {
   type CreatableRecurringFrequency,
@@ -1941,6 +1965,7 @@ export {
   addAttachmentParamsJsonSchema,
   AddAttachmentParamsSchema,
   type AddAttachmentResult,
+  AddAttachmentResultSchema,
   type AddDocumentAttachmentParams,
   addDocumentAttachmentParamsJsonSchema,
   AddDocumentAttachmentParamsSchema,
@@ -1957,10 +1982,12 @@ export {
   deleteAttachmentParamsJsonSchema,
   DeleteAttachmentParamsSchema,
   type DeleteAttachmentResult,
+  DeleteAttachmentResultSchema,
   type DownloadAttachmentParams,
   downloadAttachmentParamsJsonSchema,
   DownloadAttachmentParamsSchema,
   type DownloadAttachmentResult,
+  DownloadAttachmentResultSchema,
   type GetAttachmentParams,
   getAttachmentParamsJsonSchema,
   GetAttachmentParamsSchema,
@@ -1982,10 +2009,12 @@ export {
   pinAttachmentParamsJsonSchema,
   PinAttachmentParamsSchema,
   type PinAttachmentResult,
+  PinAttachmentResultSchema,
   type UpdateAttachmentParams,
   updateAttachmentParamsJsonSchema,
   UpdateAttachmentParamsSchema,
-  type UpdateAttachmentResult
+  type UpdateAttachmentResult,
+  UpdateAttachmentResultSchema
 } from "./attachments.js"
 
 export {
@@ -2631,3 +2660,96 @@ export {
   type UploadDriveFileVersionResult,
   UploadDriveFileVersionResultSchema
 } from "./drive.js"
+
+export { GetCardResultSchema } from "./cards.js"
+
+export {
+  AddChannelMembersResultSchema,
+  ArchiveChannelResultSchema,
+  JoinChannelResultSchema,
+  LeaveChannelResultSchema,
+  RemoveChannelMembersResultSchema,
+  SetConversationClosedResultSchema,
+  SetConversationStarredResultSchema,
+  UnarchiveChannelResultSchema
+} from "./chat-conversations.js"
+
+export { ListChannelsResultSchema } from "./channels.js"
+
+export { ListCommentsResultSchema } from "./comments.js"
+
+export { GetPersonResultSchema, ListEmployeesResultSchema, ListPersonsResultSchema } from "./contacts.js"
+
+export { ListContactChannelProvidersResultSchema } from "./contact-channels.js"
+
+export {
+  AddOrganizationMemberResultSchema,
+  ListOrganizationsResultSchema,
+  MakeOrganizationCustomerResultSchema
+} from "./contact-organizations.js"
+
+export { PreviewDeletionResultSchema } from "./deletion.js"
+
+export { GetComponentResultSchema, ListComponentsResultSchema } from "./components.js"
+
+export { GetIssueTemplateResultSchema, ListIssueTemplatesResultSchema } from "./issue-templates.js"
+
+export { ListLabelsResultSchema } from "./labels.js"
+
+export { GetLeadResultSchema, ListLeadsResultSchema } from "./leads.js"
+
+export {
+  GetMessageTemplateResultSchema,
+  ListMessageTemplateCategoriesResultSchema,
+  ListMessageTemplateFieldsResultSchema,
+  ListMessageTemplatesResultSchema
+} from "./message-templates.js"
+
+export { GetMilestoneResultSchema, ListMilestonesResultSchema } from "./milestones.js"
+
+export {
+  GetNotificationContextResultSchema,
+  GetNotificationResultSchema,
+  GetUnreadNotificationCountResultSchema,
+  ListNotificationContextsResultSchema,
+  ListNotificationSettingsResultSchema,
+  ListNotificationsResultSchema
+} from "./notifications.js"
+
+export {
+  ListNotificationProvidersResultSchema,
+  ListNotificationTypesResultSchema,
+  SubscribeToObjectNotificationsResultSchema,
+  UnarchiveNotificationContextResultSchema,
+  UnsubscribeFromObjectNotificationsResultSchema
+} from "./notification-preferences.js"
+
+export {
+  AddSpaceMembersResultSchema,
+  GetSpaceResultSchema,
+  GetSpaceTypeResultSchema,
+  RemoveSpaceMembersResultSchema
+} from "./spaces.js"
+
+export { ListTagCategoriesResultSchema } from "./tag-categories.js"
+
+export { ListAttachedTagsResultSchema, ListTagsResultSchema } from "./tags.js"
+
+export { GetProjectTypeResultSchema } from "./task-management.js"
+
+export { GetTestResultResultSchema } from "./test-management-plans.js"
+
+export {
+  GetMeetingMinutesResultSchema,
+  GetOfficeFloorResultSchema,
+  GetOfficeResultSchema,
+  GetOfficeRoomResultSchema,
+  ListActiveRoomInfoResultSchema,
+  ListActiveRoomParticipantsResultSchema,
+  ListDevicePreferencesResultSchema,
+  ListMeetingMinutesResultSchema,
+  ListOfficeDefaultsResultSchema,
+  ListOfficeFloorsResultSchema,
+  ListOfficeRoomsResultSchema,
+  ListOfficesResultSchema
+} from "./virtual-office.js"

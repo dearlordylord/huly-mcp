@@ -1,7 +1,6 @@
 import type { RecurringRule as HulyRecurringRule } from "@hcengineering/calendar"
 import { JSONSchema, Schema } from "effect"
 
-import type { Participant, Visibility } from "./calendar.js"
 import {
   CalendarAccessSchema,
   CalendarEventTitle,
@@ -9,6 +8,7 @@ import {
   DEFAULT_EVENT_ALL_DAY,
   DEFAULT_EVENT_DURATION_DESCRIPTION,
   EventParticipantLocatorSchema,
+  ParticipantSchema,
   VisibilitySchema
 } from "./calendar.js"
 import {
@@ -31,7 +31,6 @@ import {
   TimeZoneId,
   withMutuallyExclusiveFields
 } from "./shared.js"
-import type { Timestamp as TimestampType } from "./shared.js"
 
 const DEFAULT_RECURRING_INSTANCE_PARTICIPANTS_INCLUDED = false
 
@@ -168,51 +167,54 @@ export const CreatableRecurringRuleSchema = Schema.Struct({
 
 export type CreatableRecurringRule = Schema.Schema.Type<typeof CreatableRecurringRuleSchema>
 
-export interface RecurringEventSummary {
-  readonly eventId: EventId
-  readonly title: CalendarEventTitle
-  readonly originalStartTime: TimestampType
-  readonly rules: ReadonlyArray<RecurringRule>
-  readonly timeZone?: TimeZoneId | undefined
-  readonly modifiedOn?: TimestampType | undefined
-}
+export const RecurringEventSummarySchema = Schema.Struct({
+  eventId: EventId,
+  title: CalendarEventTitle,
+  originalStartTime: Timestamp,
+  rules: Schema.Array(RecurringRuleSchema),
+  timeZone: Schema.optional(TimeZoneId),
+  modifiedOn: Schema.optional(Timestamp)
+})
+export type RecurringEventSummary = Schema.Schema.Type<typeof RecurringEventSummarySchema>
 
-export interface RecurringEvent {
-  readonly eventId: EventId
-  readonly title: CalendarEventTitle
-  readonly description?: string | undefined
-  readonly originalStartTime: TimestampType
-  readonly rules: ReadonlyArray<RecurringRule>
-  readonly exdate?: ReadonlyArray<TimestampType> | undefined
-  readonly rdate?: ReadonlyArray<TimestampType> | undefined
-  readonly timeZone?: TimeZoneId | undefined
-  readonly dueDate: TimestampType
-  readonly allDay: boolean
-  readonly location?: string | undefined
-  readonly visibility?: Visibility | undefined
-  readonly participants?: ReadonlyArray<Participant> | undefined
-  readonly externalParticipants?: ReadonlyArray<Email> | undefined
-  readonly calendarId?: CalendarId | undefined
-  readonly modifiedOn?: TimestampType | undefined
-  readonly createdOn?: TimestampType | undefined
-}
+export const RecurringEventSchema = Schema.Struct({
+  eventId: EventId,
+  title: CalendarEventTitle,
+  description: Schema.optional(Schema.String),
+  originalStartTime: Timestamp,
+  rules: Schema.Array(RecurringRuleSchema),
+  exdate: Schema.optional(Schema.Array(Timestamp)),
+  rdate: Schema.optional(Schema.Array(Timestamp)),
+  timeZone: Schema.optional(TimeZoneId),
+  dueDate: Timestamp,
+  allDay: Schema.Boolean,
+  location: Schema.optional(Schema.String),
+  visibility: Schema.optional(VisibilitySchema),
+  participants: Schema.optional(Schema.Array(ParticipantSchema)),
+  externalParticipants: Schema.optional(Schema.Array(Email)),
+  calendarId: Schema.optional(CalendarId),
+  modifiedOn: Schema.optional(Timestamp),
+  createdOn: Schema.optional(Timestamp)
+})
+export type RecurringEvent = Schema.Schema.Type<typeof RecurringEventSchema>
 
-export interface EventInstance {
-  readonly eventId: EventId
-  readonly recurringEventId: EventId
-  readonly title: CalendarEventTitle
-  readonly description?: string | undefined
-  readonly date: TimestampType
-  readonly dueDate: TimestampType
-  readonly originalStartTime: TimestampType
-  readonly allDay: boolean
-  readonly location?: string | undefined
-  readonly visibility?: Visibility | undefined
-  readonly isCancelled?: boolean | undefined
-  readonly isVirtual?: boolean | undefined
-  readonly participants?: ReadonlyArray<Participant> | undefined
-  readonly externalParticipants?: ReadonlyArray<Email> | undefined
-}
+export const EventInstanceSchema = Schema.Struct({
+  eventId: EventId,
+  recurringEventId: EventId,
+  title: CalendarEventTitle,
+  description: Schema.optional(Schema.String),
+  date: Timestamp,
+  dueDate: Timestamp,
+  originalStartTime: Timestamp,
+  allDay: Schema.Boolean,
+  location: Schema.optional(Schema.String),
+  visibility: Schema.optional(VisibilitySchema),
+  isCancelled: Schema.optional(Schema.Boolean),
+  isVirtual: Schema.optional(Schema.Boolean),
+  participants: Schema.optional(Schema.Array(ParticipantSchema)),
+  externalParticipants: Schema.optional(Schema.Array(Email))
+})
+export type EventInstance = Schema.Schema.Type<typeof EventInstanceSchema>
 
 export const ListRecurringEventsParamsSchema = Schema.Struct({
   limit: Schema.optional(
@@ -332,6 +334,10 @@ export const parseListRecurringEventsParams = Schema.decodeUnknown(ListRecurring
 export const parseCreateRecurringEventParams = Schema.decodeUnknown(CreateRecurringEventParamsSchema)
 export const parseListEventInstancesParams = Schema.decodeUnknown(ListEventInstancesParamsSchema)
 
-export interface CreateRecurringEventResult {
-  readonly eventId: EventId
-}
+export const CreateRecurringEventResultSchema = Schema.Struct({
+  eventId: EventId
+})
+export type CreateRecurringEventResult = Schema.Schema.Type<typeof CreateRecurringEventResultSchema>
+
+export const ListRecurringEventsResultSchema = Schema.Array(RecurringEventSummarySchema)
+export const ListEventInstancesResultSchema = Schema.Array(EventInstanceSchema)

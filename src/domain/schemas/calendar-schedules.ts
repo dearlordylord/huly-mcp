@@ -1,7 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { Participant, RoomReference } from "./calendar.js"
-import { CalendarName as CalendarNameSchema } from "./calendar.js"
+import { CalendarName as CalendarNameSchema, ParticipantSchema, RoomReferenceSchema } from "./calendar.js"
 import { clearableText } from "./clearable.js"
 import {
   assertUpdateFields,
@@ -17,11 +16,11 @@ import {
   NonEmptyString,
   PositiveDurationMinutes,
   ScheduleId,
+  Timestamp,
   TimeZoneId,
   withAtLeastOneRequired,
   withMutuallyExclusiveFields
 } from "./shared.js"
-import type { Timestamp as TimestampType } from "./shared.js"
 
 export const ScheduleTitle = NonEmptyString.pipe(Schema.brand("ScheduleTitle")).annotations({
   identifier: "ScheduleTitle",
@@ -29,11 +28,6 @@ export const ScheduleTitle = NonEmptyString.pipe(Schema.brand("ScheduleTitle")).
   description: "Non-empty calendar schedule title."
 })
 export type ScheduleTitle = Schema.Schema.Type<typeof ScheduleTitle>
-
-export interface ScheduleAvailabilitySlot {
-  readonly start: MinuteOfDay
-  readonly end: MinuteOfDay
-}
 
 export const ScheduleWeekdayValues = [
   "sunday",
@@ -70,25 +64,7 @@ const hasCalendarTargetConflict = (params: {
   readonly calendarName?: unknown
 }): boolean => hasMutuallyExclusiveFields(params, CALENDAR_TARGET_FIELDS)
 
-export interface ScheduleSummary {
-  readonly scheduleId: ScheduleId
-  readonly title: ScheduleTitle
-  readonly owner: Participant
-  readonly meetingDuration: PositiveDurationMinutes
-  readonly meetingInterval: DurationMinutes
-  readonly timeZone: TimeZoneId
-  readonly calendarId?: CalendarId | undefined
-  readonly meetingRoom?: RoomReference | undefined
-  readonly modifiedOn?: TimestampType | undefined
-}
-
-export interface ScheduleDetails extends ScheduleSummary {
-  readonly description?: string | undefined
-  readonly availability: ScheduleAvailability
-  readonly createdOn?: TimestampType | undefined
-}
-
-const ScheduleAvailabilitySlotSchema = Schema.Struct({
+export const ScheduleAvailabilitySlotSchema = Schema.Struct({
   start: MinuteOfDay.annotations({
     description: "Start minute within the day."
   }),
@@ -101,6 +77,7 @@ const ScheduleAvailabilitySlotSchema = Schema.Struct({
   title: "ScheduleAvailabilitySlot",
   description: "Availability window expressed as minutes within a weekday."
 })
+export type ScheduleAvailabilitySlot = Schema.Schema.Type<typeof ScheduleAvailabilitySlotSchema>
 
 const ScheduleAvailabilityValueSchema = Schema.Array(ScheduleAvailabilitySlotSchema)
 
@@ -122,6 +99,35 @@ const ScheduleAvailabilitySchema = Schema.Record({
     additionalProperties: JSONSchema.make(ScheduleAvailabilityValueSchema)
   }
 })
+
+export const ScheduleSummarySchema = Schema.Struct({
+  scheduleId: ScheduleId,
+  title: ScheduleTitle,
+  owner: ParticipantSchema,
+  meetingDuration: PositiveDurationMinutes,
+  meetingInterval: DurationMinutes,
+  timeZone: TimeZoneId,
+  calendarId: Schema.optional(CalendarId),
+  meetingRoom: Schema.optional(RoomReferenceSchema),
+  modifiedOn: Schema.optional(Timestamp)
+})
+export type ScheduleSummary = Schema.Schema.Type<typeof ScheduleSummarySchema>
+
+export const ScheduleDetailsSchema = Schema.Struct({
+  scheduleId: ScheduleId,
+  title: ScheduleTitle,
+  owner: ParticipantSchema,
+  meetingDuration: PositiveDurationMinutes,
+  meetingInterval: DurationMinutes,
+  timeZone: TimeZoneId,
+  calendarId: Schema.optional(CalendarId),
+  meetingRoom: Schema.optional(RoomReferenceSchema),
+  modifiedOn: Schema.optional(Timestamp),
+  description: Schema.optional(Schema.String),
+  availability: ScheduleAvailabilitySchema,
+  createdOn: Schema.optional(Timestamp)
+})
+export type ScheduleDetails = Schema.Schema.Type<typeof ScheduleDetailsSchema>
 
 const HulyScheduleAvailabilitySchema = Schema.Record({
   key: Schema.String,
@@ -304,16 +310,22 @@ export const parseHulyScheduleAvailability = Schema.decodeUnknown(HulyScheduleAv
   onExcessProperty: "error"
 })
 
-export interface CreateScheduleResult {
-  readonly scheduleId: ScheduleId
-}
+export const CreateScheduleResultSchema = Schema.Struct({
+  scheduleId: ScheduleId
+})
+export type CreateScheduleResult = Schema.Schema.Type<typeof CreateScheduleResultSchema>
 
-export interface UpdateScheduleResult {
-  readonly scheduleId: ScheduleId
-  readonly updated: boolean
-}
+export const UpdateScheduleResultSchema = Schema.Struct({
+  scheduleId: ScheduleId,
+  updated: Schema.Boolean
+})
+export type UpdateScheduleResult = Schema.Schema.Type<typeof UpdateScheduleResultSchema>
 
-export interface DeleteScheduleResult {
-  readonly scheduleId: ScheduleId
-  readonly deleted: boolean
-}
+export const DeleteScheduleResultSchema = Schema.Struct({
+  scheduleId: ScheduleId,
+  deleted: Schema.Boolean
+})
+export type DeleteScheduleResult = Schema.Schema.Type<typeof DeleteScheduleResultSchema>
+
+export const ListSchedulesResultSchema = Schema.Array(ScheduleSummarySchema)
+export const GetScheduleResultSchema = ScheduleDetailsSchema

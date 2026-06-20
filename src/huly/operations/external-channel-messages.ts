@@ -2,7 +2,6 @@ import { Effect } from "effect"
 
 import {
   DEFAULT_EXTERNAL_CHANNEL_MESSAGE_LIMIT,
-  encodeListExternalChannelMessagesResult,
   type ListExternalChannelMessagesParams,
   type ListExternalChannelMessagesResult
 } from "../../domain/schemas/external-channel-messages.js"
@@ -19,13 +18,11 @@ const EXTERNAL_CHANNEL_PACKAGE_INCOMPATIBLE_REASON =
 export const listExternalChannelMessages = (
   params: ListExternalChannelMessagesParams
 ): Effect.Effect<ListExternalChannelMessagesResult> =>
-  Effect.sync(() =>
-    encodeListExternalChannelMessagesResult({
-      supported: false,
-      provider: params.provider,
-      channel: params.channel,
-      limit: params.limit ?? DEFAULT_EXTERNAL_CHANNEL_MESSAGE_LIMIT,
-      unsupportedReason: EXTERNAL_CHANNEL_PACKAGE_INCOMPATIBLE_REASON,
-      messages: []
-    })
-  )
+  Effect.sync(() => ({
+    supported: false,
+    provider: params.provider,
+    channel: params.channel,
+    limit: params.limit ?? DEFAULT_EXTERNAL_CHANNEL_MESSAGE_LIMIT,
+    unsupportedReason: EXTERNAL_CHANNEL_PACKAGE_INCOMPATIBLE_REASON,
+    messages: []
+  }))

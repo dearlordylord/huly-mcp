@@ -1,31 +1,33 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { DocumentId, ListTotal, TeamspaceId, UrlString } from "./shared.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
   DEFAULT_INCLUDE_ARCHIVED,
   DEFAULT_LIMIT,
   DEFAULT_PRIVATE,
+  DocumentId,
   DocumentIdentifier,
   hasAtLeastOneDefined,
   LimitParam,
+  ListTotal,
   NonEmptyString,
+  TeamspaceId,
   TeamspaceIdentifier,
+  UrlString,
   withAtLeastOneRequired
 } from "./shared.js"
 
 const DEFAULT_REPLACE_ALL = false
 const DEFAULT_INCLUDE_COMMENT_REPLIES = false
-
-// No codec needed — internal type, not used for runtime validation
-export interface TeamspaceSummary {
-  readonly id: TeamspaceId
-  readonly name: string
-  readonly description?: string | undefined
-  readonly archived: boolean
-  readonly private: boolean
-}
+export const TeamspaceSummarySchema = Schema.Struct({
+  id: TeamspaceId,
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  archived: Schema.Boolean,
+  private: Schema.Boolean
+})
+export type TeamspaceSummary = Schema.Schema.Type<typeof TeamspaceSummarySchema>
 
 export const ListTeamspacesParamsSchema = Schema.Struct({
   includeArchived: Schema.optional(Schema.Boolean.annotations({
@@ -42,19 +44,19 @@ export const ListTeamspacesParamsSchema = Schema.Struct({
 })
 
 export type ListTeamspacesParams = Schema.Schema.Type<typeof ListTeamspacesParamsSchema>
-
-export interface ListTeamspacesResult {
-  readonly teamspaces: ReadonlyArray<TeamspaceSummary>
-  readonly total: ListTotal
-}
-
-export interface DocumentSummary {
-  readonly id: DocumentId
-  readonly title: string
-  readonly teamspace: string
-  readonly url: UrlString
-  readonly modifiedOn?: number | undefined
-}
+export const ListTeamspacesResultSchema = Schema.Struct({
+  teamspaces: Schema.Array(TeamspaceSummarySchema),
+  total: ListTotal
+})
+export type ListTeamspacesResult = Schema.Schema.Type<typeof ListTeamspacesResultSchema>
+export const DocumentSummarySchema = Schema.Struct({
+  id: DocumentId,
+  title: Schema.String,
+  teamspace: Schema.String,
+  url: UrlString,
+  modifiedOn: Schema.optional(Schema.Number)
+})
+export type DocumentSummary = Schema.Schema.Type<typeof DocumentSummarySchema>
 
 const ListDocumentsParamsBase = Schema.Struct({
   teamspace: TeamspaceIdentifier.annotations({
@@ -90,21 +92,23 @@ export const ListDocumentsParamsSchema = ListDocumentsParamsBase.pipe(
 })
 
 export type ListDocumentsParams = Schema.Schema.Type<typeof ListDocumentsParamsSchema>
-
-export interface ListDocumentsResult {
-  readonly documents: ReadonlyArray<DocumentSummary>
-  readonly total: ListTotal
-}
-
-export interface Document {
-  readonly id: DocumentId
-  readonly title: string
-  readonly content?: string | undefined
-  readonly teamspace: string
-  readonly url: UrlString
-  readonly modifiedOn?: number | undefined
-  readonly createdOn?: number | undefined
-}
+export const ListDocumentsResultSchema = Schema.Struct({
+  documents: Schema.Array(DocumentSummarySchema),
+  total: ListTotal
+})
+export type ListDocumentsResult = Schema.Schema.Type<typeof ListDocumentsResultSchema>
+export const DocumentSchema = Schema.Struct({
+  id: DocumentId,
+  title: Schema.String,
+  content: Schema.optional(Schema.String),
+  teamspace: Schema.String,
+  url: UrlString,
+  modifiedOn: Schema.optional(Schema.Number),
+  createdOn: Schema.optional(Schema.Number)
+})
+export type Document = Schema.Schema.Type<typeof DocumentSchema>
+export const GetDocumentResultSchema = DocumentSchema
+export type GetDocumentResult = Schema.Schema.Type<typeof GetDocumentResultSchema>
 
 export const GetDocumentParamsSchema = Schema.Struct({
   teamspace: TeamspaceIdentifier.annotations({
@@ -317,26 +321,27 @@ export const DeleteTeamspaceParamsSchema = Schema.Struct({
 })
 
 export type DeleteTeamspaceParams = Schema.Schema.Type<typeof DeleteTeamspaceParamsSchema>
-
-export interface GetTeamspaceResult extends TeamspaceSummary {
-  readonly documents: ListTotal
-}
-
-export interface CreateTeamspaceResult {
-  readonly id: TeamspaceId
-  readonly name: string
-  readonly created: boolean
-}
-
-export interface UpdateTeamspaceResult {
-  readonly id: TeamspaceId
-  readonly updated: boolean
-}
-
-export interface DeleteTeamspaceResult {
-  readonly id: TeamspaceId
-  readonly deleted: boolean
-}
+export const GetTeamspaceResultSchema = Schema.Struct({
+  ...TeamspaceSummarySchema.fields,
+  documents: ListTotal
+})
+export type GetTeamspaceResult = Schema.Schema.Type<typeof GetTeamspaceResultSchema>
+export const CreateTeamspaceResultSchema = Schema.Struct({
+  id: TeamspaceId,
+  name: Schema.String,
+  created: Schema.Boolean
+})
+export type CreateTeamspaceResult = Schema.Schema.Type<typeof CreateTeamspaceResultSchema>
+export const UpdateTeamspaceResultSchema = Schema.Struct({
+  id: TeamspaceId,
+  updated: Schema.Boolean
+})
+export type UpdateTeamspaceResult = Schema.Schema.Type<typeof UpdateTeamspaceResultSchema>
+export const DeleteTeamspaceResultSchema = Schema.Struct({
+  id: TeamspaceId,
+  deleted: Schema.Boolean
+})
+export type DeleteTeamspaceResult = Schema.Schema.Type<typeof DeleteTeamspaceResultSchema>
 
 // --- Inline Comments ---
 
@@ -356,24 +361,24 @@ export const ListInlineCommentsParamsSchema = Schema.Struct({
 })
 
 export type ListInlineCommentsParams = Schema.Schema.Type<typeof ListInlineCommentsParamsSchema>
-
-export interface InlineCommentReply {
-  readonly id: string
-  readonly body: string
-  readonly sender?: string | undefined
-  readonly createdOn?: number | undefined
-}
-
-export interface InlineCommentThread {
-  readonly threadId: string
-  readonly text: string
-  readonly replies?: ReadonlyArray<InlineCommentReply> | undefined
-}
-
-export interface ListInlineCommentsResult {
-  readonly comments: ReadonlyArray<InlineCommentThread>
-  readonly total: ListTotal
-}
+export const InlineCommentReplySchema = Schema.Struct({
+  id: Schema.String,
+  body: Schema.String,
+  sender: Schema.optional(Schema.String),
+  createdOn: Schema.optional(Schema.Number)
+})
+export type InlineCommentReply = Schema.Schema.Type<typeof InlineCommentReplySchema>
+export const InlineCommentThreadSchema = Schema.Struct({
+  threadId: Schema.String,
+  text: Schema.String,
+  replies: Schema.optional(Schema.Array(InlineCommentReplySchema))
+})
+export type InlineCommentThread = Schema.Schema.Type<typeof InlineCommentThreadSchema>
+export const ListInlineCommentsResultSchema = Schema.Struct({
+  comments: Schema.Array(InlineCommentThreadSchema),
+  total: ListTotal
+})
+export type ListInlineCommentsResult = Schema.Schema.Type<typeof ListInlineCommentsResultSchema>
 
 // --- JSON Schemas & Parsers ---
 
@@ -447,21 +452,20 @@ export const parseCreateDocumentParams = Schema.decodeUnknown(CreateDocumentPara
 export const parseEditDocumentParams = Schema.decodeUnknown(EditDocumentParamsSchema)
 export const parseListInlineCommentsParams = Schema.decodeUnknown(ListInlineCommentsParamsSchema)
 export const parseDeleteDocumentParams = Schema.decodeUnknown(DeleteDocumentParamsSchema)
-
-// No codec needed — internal type, not used for runtime validation
-export interface CreateDocumentResult {
-  readonly id: DocumentId
-  readonly title: string
-  readonly url: UrlString
-}
-
-export interface EditDocumentResult {
-  readonly id: DocumentId
-  readonly updated: boolean
-  readonly url: UrlString
-}
-
-export interface DeleteDocumentResult {
-  readonly id: DocumentId
-  readonly deleted: boolean
-}
+export const CreateDocumentResultSchema = Schema.Struct({
+  id: DocumentId,
+  title: Schema.String,
+  url: UrlString
+})
+export type CreateDocumentResult = Schema.Schema.Type<typeof CreateDocumentResultSchema>
+export const EditDocumentResultSchema = Schema.Struct({
+  id: DocumentId,
+  updated: Schema.Boolean,
+  url: UrlString
+})
+export type EditDocumentResult = Schema.Schema.Type<typeof EditDocumentResultSchema>
+export const DeleteDocumentResultSchema = Schema.Struct({
+  id: DocumentId,
+  deleted: Schema.Boolean
+})
+export type DeleteDocumentResult = Schema.Schema.Type<typeof DeleteDocumentResultSchema>

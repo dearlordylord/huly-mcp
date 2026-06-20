@@ -238,3 +238,8 @@ export const parseListMessageTemplateCategoriesParams = Schema.decodeUnknown(
 export const parseListMessageTemplatesParams = Schema.decodeUnknown(ListMessageTemplatesParamsSchema)
 export const parseGetMessageTemplateParams = Schema.decodeUnknown(GetMessageTemplateParamsSchema)
 export const parseListMessageTemplateFieldsParams = Schema.decodeUnknown(ListMessageTemplateFieldsParamsSchema)
+
+export const ListMessageTemplateCategoriesResultSchema = Schema.Array(MessageTemplateCategorySummarySchema)
+export const ListMessageTemplatesResultSchema = Schema.Array(MessageTemplateSummarySchema)
+export const GetMessageTemplateResultSchema = MessageTemplateSchema
+export const ListMessageTemplateFieldsResultSchema = Schema.Array(MessageTemplateFieldSchema)

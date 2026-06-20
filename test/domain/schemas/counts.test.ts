@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest"
 
 import { OrganizationSummarySchema } from "../../../src/domain/schemas/contact-organizations.js"
 import { Count, ListTotal, UNKNOWN_TOTAL } from "../../../src/domain/schemas/shared.js"
-import { SpaceSummarySchema, SpaceTypeSummarySchema } from "../../../src/domain/schemas/spaces.js"
+import {
+  SpaceDetailSchema,
+  SpaceSummarySchema,
+  SpaceTypeDetailSchema,
+  SpaceTypeSummarySchema
+} from "../../../src/domain/schemas/spaces.js"
 
 describe("Count schemas", () => {
   it("accepts non-negative integers", () => {
@@ -66,5 +71,35 @@ describe("Count schemas", () => {
     expect(Schema.decodeUnknownSync(SpaceTypeSummarySchema)(spaceType).rolesCount).toBe(0)
     expect(() => Schema.decodeUnknownSync(SpaceTypeSummarySchema)({ ...spaceType, rolesCount: -1 })).toThrow()
     expect(() => Schema.decodeUnknownSync(SpaceTypeSummarySchema)({ ...spaceType, rolesCount: 1.25 })).toThrow()
+  })
+
+  it("accepts empty names for Huly system space outputs", () => {
+    const unnamedSpace = {
+      id: "space-1",
+      name: "",
+      description: "",
+      class: "chunter:class:DirectMessage",
+      private: true,
+      archived: false,
+      membersCount: 0,
+      ownersCount: 0,
+      members: [],
+      owners: []
+    }
+    const unnamedSpaceType = {
+      id: "card:spaceType:SpaceType",
+      name: "",
+      descriptor: "core:descriptor:SpacesType",
+      targetClass: "core:mixin:SpacesTypeData",
+      defaultMembers: [],
+      rolesCount: 0,
+      roles: [],
+      availablePermissions: []
+    }
+
+    expect(Schema.decodeUnknownSync(SpaceSummarySchema)(unnamedSpace).name).toBe("")
+    expect(Schema.decodeUnknownSync(SpaceDetailSchema)(unnamedSpace).name).toBe("")
+    expect(Schema.decodeUnknownSync(SpaceTypeSummarySchema)(unnamedSpaceType).name).toBe("")
+    expect(Schema.decodeUnknownSync(SpaceTypeDetailSchema)(unnamedSpaceType).name).toBe("")
   })
 })

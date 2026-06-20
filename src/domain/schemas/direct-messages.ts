@@ -5,12 +5,13 @@
  */
 import { JSONSchema, Schema } from "effect"
 
-import type { MessageSummary } from "./channels.js"
-import type { ChannelId, ListTotal } from "./shared.js"
+import { MessageSummarySchema } from "./channels.js"
 import {
+  ChannelId,
   DEFAULT_LIMIT,
   DirectMessageIdentifier,
   LimitParam,
+  ListTotal,
   MessageId,
   NonEmptyString,
   PersonRefInput
@@ -119,35 +120,28 @@ export const parseSendDmMessageParams = Schema.decodeUnknown(SendDmMessageParams
 export const parseUpdateDmMessageParams = Schema.decodeUnknown(UpdateDmMessageParamsSchema)
 export const parseDeleteDmMessageParams = Schema.decodeUnknown(DeleteDmMessageParamsSchema)
 export const parseCreateDirectMessageParams = Schema.decodeUnknown(CreateDirectMessageParamsSchema)
-
-// --- Result Types ---
-
-export interface ListDmMessagesResult {
-  readonly messages: ReadonlyArray<MessageSummary>
-  readonly total: ListTotal
-}
-
-export interface SendDmMessageResult {
-  readonly id: MessageId
-  readonly dmId: ChannelId
-}
-
-export interface UpdateDmMessageResult {
-  readonly id: MessageId
-  readonly updated: boolean
-}
-
-export interface DeleteDmMessageResult {
-  readonly id: MessageId
-  readonly deleted: boolean
-}
-
-/**
- * `created` distinguishes a newly created DM from a pre-existing one that was
- * returned because a one-to-one conversation already existed. Callers can use
- * it to avoid sending duplicate "hello" messages on reconnects/retries.
- */
-export interface CreateDirectMessageResult {
-  readonly id: ChannelId
-  readonly created: boolean
-}
+export const ListDmMessagesResultSchema = Schema.Struct({
+  messages: Schema.Array(MessageSummarySchema),
+  total: ListTotal
+})
+export type ListDmMessagesResult = Schema.Schema.Type<typeof ListDmMessagesResultSchema>
+export const SendDmMessageResultSchema = Schema.Struct({
+  id: MessageId,
+  dmId: ChannelId
+})
+export type SendDmMessageResult = Schema.Schema.Type<typeof SendDmMessageResultSchema>
+export const UpdateDmMessageResultSchema = Schema.Struct({
+  id: MessageId,
+  updated: Schema.Boolean
+})
+export type UpdateDmMessageResult = Schema.Schema.Type<typeof UpdateDmMessageResultSchema>
+export const DeleteDmMessageResultSchema = Schema.Struct({
+  id: MessageId,
+  deleted: Schema.Boolean
+})
+export type DeleteDmMessageResult = Schema.Schema.Type<typeof DeleteDmMessageResultSchema>
+export const CreateDirectMessageResultSchema = Schema.Struct({
+  id: ChannelId,
+  created: Schema.Boolean
+})
+export type CreateDirectMessageResult = Schema.Schema.Type<typeof CreateDirectMessageResultSchema>

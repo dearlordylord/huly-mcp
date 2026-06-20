@@ -109,13 +109,14 @@ const HulyCollectionAttributeTypeSchema = Schema.Struct({
 // scalar, ref, enum, collection, or (rarely) another array. Encoded and decoded forms differ because
 // branded identifiers (classId, refTo, ...) erase to plain strings when encoded, so both type
 // parameters are supplied explicitly.
-interface HulyArrayAttributeType {
+type HulyArrayAttributeType = {
   readonly kind: "array"
   readonly classId?: ObjectClassName | undefined
   readonly raw?: { readonly [key: string]: unknown } | undefined
   readonly arrayOf: HulyAttributeType
 }
-interface HulyArrayAttributeTypeEncoded {
+
+type HulyArrayAttributeTypeEncoded = {
   readonly kind: "array"
   readonly classId?: string | undefined
   readonly raw?: { readonly [key: string]: unknown } | undefined
@@ -141,6 +142,7 @@ const HulyArrayAttributeTypeSchema = Schema.Struct({
   ...HulyAttributeTypeBaseFields,
   arrayOf: Schema.suspend((): Schema.Schema<HulyAttributeType, HulyAttributeTypeEncoded> => HulyAttributeTypeSchema)
     .annotations({
+      identifier: "HulyAttributeType",
       description: "Decoded element type when kind is array, recursively shaped like any attribute type"
     })
 })
@@ -151,7 +153,10 @@ export const HulyAttributeTypeSchema: Schema.Schema<HulyAttributeType, HulyAttri
   HulyEnumAttributeTypeSchema,
   HulyCollectionAttributeTypeSchema,
   HulyArrayAttributeTypeSchema
-)
+).annotations({
+  identifier: "HulyAttributeType",
+  description: "Decoded Huly model attribute type descriptor."
+})
 
 export const HulyClassToolHintSchema = Schema.Struct({
   category: NonEmptyString,

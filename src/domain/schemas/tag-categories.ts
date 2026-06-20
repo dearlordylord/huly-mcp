@@ -118,19 +118,21 @@ export const parseListTagCategoriesParams = Schema.decodeUnknown(ListTagCategori
 export const parseCreateTagCategoryParams = Schema.decodeUnknown(CreateTagCategoryParamsSchema)
 export const parseUpdateTagCategoryParams = Schema.decodeUnknown(UpdateTagCategoryParamsSchema)
 export const parseDeleteTagCategoryParams = Schema.decodeUnknown(DeleteTagCategoryParamsSchema)
+export const CreateTagCategoryResultSchema = Schema.Struct({
+  id: TagCategoryId,
+  label: Schema.String,
+  created: Schema.Boolean
+})
+export type CreateTagCategoryResult = Schema.Schema.Type<typeof CreateTagCategoryResultSchema>
+export const UpdateTagCategoryResultSchema = Schema.Struct({
+  id: TagCategoryId,
+  updated: Schema.Boolean
+})
+export type UpdateTagCategoryResult = Schema.Schema.Type<typeof UpdateTagCategoryResultSchema>
+export const DeleteTagCategoryResultSchema = Schema.Struct({
+  id: TagCategoryId,
+  deleted: Schema.Boolean
+})
+export type DeleteTagCategoryResult = Schema.Schema.Type<typeof DeleteTagCategoryResultSchema>
 
-export interface CreateTagCategoryResult {
-  readonly id: TagCategoryId
-  readonly label: string
-  readonly created: boolean
-}
-
-export interface UpdateTagCategoryResult {
-  readonly id: TagCategoryId
-  readonly updated: boolean
-}
-
-export interface DeleteTagCategoryResult {
-  readonly id: TagCategoryId
-  readonly deleted: boolean
-}
+export const ListTagCategoriesResultSchema = Schema.Array(TagCategorySummarySchema)

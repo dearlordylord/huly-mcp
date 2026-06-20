@@ -1,5 +1,7 @@
-import type { TodoAttachmentTitle, TodoPriority, TodoTitle, TodoVisibility } from "./planner.js"
-import type {
+import { Schema } from "effect"
+
+import { TodoAttachmentTitle, TodoPrioritySchema, TodoTitle, TodoVisibilitySchema } from "./planner.js"
+import {
   Count,
   DocId,
   Email,
@@ -15,70 +17,72 @@ import type {
   WorkSlotId
 } from "./shared.js"
 
-export type TodoAttachmentSummary =
-  | { readonly type: "none" }
-  | {
-    readonly type: "issue"
-    readonly id: IssueId
-    readonly project: ProjectIdentifier
-    readonly identifier: IssueIdentifier
-    readonly title: TodoAttachmentTitle
-  }
-  | {
-    readonly type: "unknown"
-    /** Huly object ID for an unsupported attachment target. */
-    readonly id: DocId
-    /** Huly class name for an unsupported attachment target. */
-    readonly class: ObjectClassName
-  }
-
-export interface TodoOwnerSummary {
-  readonly id: PersonId
-  readonly name?: PersonName | undefined
-  readonly email?: Email | undefined
-}
-
-export interface TodoSummary {
-  readonly id: TodoId
-  readonly title: TodoTitle
-  readonly dueDate?: Timestamp | null | undefined
-  readonly priority: TodoPriority
-  readonly visibility: TodoVisibility
-  readonly doneOn?: Timestamp | null | undefined
-  readonly owner: TodoOwnerSummary
-  readonly attachedTo: TodoAttachmentSummary
-  readonly workslots: Count
-  readonly labels?: Count | undefined
-}
-
-export interface TodoDetail extends TodoSummary {
-  /** Markdown description. Empty string is valid when the ToDo has an intentionally blank body. */
-  readonly description?: string | undefined
-  readonly attachedSpace?: SpaceId | undefined
-  readonly createdOn?: Timestamp | undefined
-  readonly modifiedOn?: Timestamp | undefined
-}
-
-export interface CreateTodoResult {
-  readonly todoId: TodoId
-}
-
-export interface TodoMutationResult {
-  readonly todoId: TodoId
-  readonly updated: boolean
-}
-
-export interface DeleteTodoResult {
-  readonly todoId: TodoId
-  readonly deleted: boolean
-}
-
-export interface ScheduleTodoResult {
-  readonly todoId: TodoId
-  readonly workSlotId: WorkSlotId
-}
-
-export interface UnscheduleTodoResult {
-  readonly todoId?: TodoId | undefined
-  readonly removed: Count
-}
+export const TodoAttachmentSummarySchema = Schema.Union(
+  Schema.Struct({
+    type: Schema.Literal("none")
+  }),
+  Schema.Struct({
+    type: Schema.Literal("issue"),
+    id: IssueId,
+    project: ProjectIdentifier,
+    identifier: IssueIdentifier,
+    title: TodoAttachmentTitle
+  }),
+  Schema.Struct({
+    type: Schema.Literal("unknown"),
+    id: DocId,
+    class: ObjectClassName
+  })
+)
+export type TodoAttachmentSummary = Schema.Schema.Type<typeof TodoAttachmentSummarySchema>
+export const TodoOwnerSummarySchema = Schema.Struct({
+  id: PersonId,
+  name: Schema.optional(PersonName),
+  email: Schema.optional(Email)
+})
+export type TodoOwnerSummary = Schema.Schema.Type<typeof TodoOwnerSummarySchema>
+export const TodoSummarySchema = Schema.Struct({
+  id: TodoId,
+  title: TodoTitle,
+  dueDate: Schema.optional(Schema.Union(Timestamp, Schema.Null)),
+  priority: TodoPrioritySchema,
+  visibility: TodoVisibilitySchema,
+  doneOn: Schema.optional(Schema.Union(Timestamp, Schema.Null)),
+  owner: TodoOwnerSummarySchema,
+  attachedTo: TodoAttachmentSummarySchema,
+  workslots: Count,
+  labels: Schema.optional(Count)
+})
+export type TodoSummary = Schema.Schema.Type<typeof TodoSummarySchema>
+export const TodoDetailSchema = Schema.Struct({
+  ...TodoSummarySchema.fields,
+  description: Schema.optional(Schema.String),
+  attachedSpace: Schema.optional(SpaceId),
+  createdOn: Schema.optional(Timestamp),
+  modifiedOn: Schema.optional(Timestamp)
+})
+export type TodoDetail = Schema.Schema.Type<typeof TodoDetailSchema>
+export const CreateTodoResultSchema = Schema.Struct({
+  todoId: TodoId
+})
+export type CreateTodoResult = Schema.Schema.Type<typeof CreateTodoResultSchema>
+export const TodoMutationResultSchema = Schema.Struct({
+  todoId: TodoId,
+  updated: Schema.Boolean
+})
+export type TodoMutationResult = Schema.Schema.Type<typeof TodoMutationResultSchema>
+export const DeleteTodoResultSchema = Schema.Struct({
+  todoId: TodoId,
+  deleted: Schema.Boolean
+})
+export type DeleteTodoResult = Schema.Schema.Type<typeof DeleteTodoResultSchema>
+export const ScheduleTodoResultSchema = Schema.Struct({
+  todoId: TodoId,
+  workSlotId: WorkSlotId
+})
+export type ScheduleTodoResult = Schema.Schema.Type<typeof ScheduleTodoResultSchema>
+export const UnscheduleTodoResultSchema = Schema.Struct({
+  todoId: Schema.optional(TodoId),
+  removed: Count
+})
+export type UnscheduleTodoResult = Schema.Schema.Type<typeof UnscheduleTodoResultSchema>

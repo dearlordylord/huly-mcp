@@ -12,20 +12,20 @@ import {
   SpaceId,
   Timestamp
 } from "./shared.js"
-
-export interface SavedAttachment {
-  readonly id: SavedAttachmentId
-  readonly attachmentId: AttachmentId
-}
-
-export interface Drawing {
-  readonly id: DrawingId
-  readonly parentId: DocId
-  readonly parentClass: ObjectClassName
-  readonly content?: DrawingContent | undefined
-  readonly modifiedOn?: Timestamp | undefined
-  readonly createdOn?: Timestamp | undefined
-}
+export const SavedAttachmentSchema = Schema.Struct({
+  id: SavedAttachmentId,
+  attachmentId: AttachmentId
+})
+export type SavedAttachment = Schema.Schema.Type<typeof SavedAttachmentSchema>
+export const DrawingSchema = Schema.Struct({
+  id: DrawingId,
+  parentId: DocId,
+  parentClass: ObjectClassName,
+  content: Schema.optional(DrawingContent),
+  modifiedOn: Schema.optional(Timestamp),
+  createdOn: Schema.optional(Timestamp)
+})
+export type Drawing = Schema.Schema.Type<typeof DrawingSchema>
 
 export const SaveAttachmentParamsSchema = Schema.Struct({
   attachmentId: AttachmentId.annotations({
@@ -149,31 +149,6 @@ export const parseCreateDrawingParams = Schema.decodeUnknown(CreateDrawingParams
 export const parseUpdateDrawingParams = Schema.decodeUnknown(UpdateDrawingParamsSchema)
 export const parseDeleteDrawingParams = Schema.decodeUnknown(DeleteDrawingParamsSchema)
 
-export interface SaveAttachmentResult {
-  readonly savedId: SavedAttachmentId
-  readonly attachmentId: AttachmentId
-  readonly saved: boolean
-}
-
-export interface UnsaveAttachmentResult {
-  readonly attachmentId: AttachmentId
-  readonly removed: boolean
-}
-
-export interface CreateDrawingResult {
-  readonly drawingId: DrawingId
-}
-
-export interface UpdateDrawingResult {
-  readonly drawingId: DrawingId
-  readonly updated: boolean
-}
-
-export interface DeleteDrawingResult {
-  readonly drawingId: DrawingId
-  readonly deleted: boolean
-}
-
 export const SavedAttachmentWireSchema = Schema.Struct({
   id: SavedAttachmentId,
   attachmentId: AttachmentId
@@ -193,25 +168,30 @@ export const SaveAttachmentResultSchema = Schema.Struct({
   attachmentId: AttachmentId,
   saved: Schema.Boolean
 })
+export type SaveAttachmentResult = Schema.Schema.Type<typeof SaveAttachmentResultSchema>
 
 export const UnsaveAttachmentResultSchema = Schema.Struct({
   attachmentId: AttachmentId,
   removed: Schema.Boolean
 })
+export type UnsaveAttachmentResult = Schema.Schema.Type<typeof UnsaveAttachmentResultSchema>
 
 export const CreateDrawingResultSchema = Schema.Struct({
   drawingId: DrawingId
 })
+export type CreateDrawingResult = Schema.Schema.Type<typeof CreateDrawingResultSchema>
 
 export const UpdateDrawingResultSchema = Schema.Struct({
   drawingId: DrawingId,
   updated: Schema.Boolean
 })
+export type UpdateDrawingResult = Schema.Schema.Type<typeof UpdateDrawingResultSchema>
 
 export const DeleteDrawingResultSchema = Schema.Struct({
   drawingId: DrawingId,
   deleted: Schema.Boolean
 })
+export type DeleteDrawingResult = Schema.Schema.Type<typeof DeleteDrawingResultSchema>
 
 export const ListSavedAttachmentsResultSchema = Schema.Array(SavedAttachmentWireSchema)
 export const ListDrawingsResultSchema = Schema.Array(DrawingWireSchema)

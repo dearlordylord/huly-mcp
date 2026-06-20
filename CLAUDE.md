@@ -57,6 +57,27 @@ If the container has instead been attached to the Huly Docker network, the `NODE
 
 Type casts (`as T`) are a sin. Avoid them. All data crossing system boundaries (APIs etc.) must be strongly typed with Effect Schema.
 
+### Schema as Source of Truth at I/O Boundaries
+
+At every I/O boundary, Effect Schema owns the payload contract. Examples include MCP tool input/output, HTTP requests and responses, database records, SDK DTOs, files, environment/config, and serialized cache/storage data.
+
+For boundary payloads, define the schema first and derive the TypeScript type from it:
+
+```ts
+export const FooSchema = Schema.Struct({ ... })
+export type Foo = Schema.Schema.Type<typeof FooSchema>
+```
+
+This keeps the runtime codec, JSON schema, parser/encoder, and TypeScript type tied to one source of truth.
+
+Hand-written interfaces are reserved for internal-only ports, services, and implementation details that are not parsed, encoded, serialized, or exposed across an I/O boundary. When a boundary-adjacent type is intentionally not schema-derived, leave a short comment explaining why the schema is not the owner of that shape.
+
+### Optional Boundary Fields
+
+With `exactOptionalPropertyTypes`, handwritten `field?: T | undefined` usually means the code is modeling Effect Schema's default `Schema.optional(T)` behavior manually.
+
+For schema-owned payloads, let the schema derive that type. Mappers should usually omit absent output fields rather than materialize explicit `undefined` values. When explicit `undefined` is not part of the accepted contract, prefer an exact optional schema such as `Schema.optionalWith(T, { exact: true })`.
+
 ### Parse, Don't Validate
 
 Boundary code must turn unknown or less-structured input into domain types as early as practical. Do not validate a raw DTO or primitive and then pass the raw value onward; pass the parsed/refined value so downstream code can rely on what was learned.

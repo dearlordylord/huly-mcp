@@ -1,7 +1,15 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { ListTotal } from "./shared.js"
-import { DEFAULT_LIMIT, DocId, LimitParam, NonEmptyString, ProjectIdentifier, SpaceId, Timestamp } from "./shared.js"
+import {
+  DEFAULT_LIMIT,
+  DocId,
+  LimitParam,
+  ListTotal,
+  NonEmptyString,
+  ProjectIdentifier,
+  SpaceId,
+  Timestamp
+} from "./shared.js"
 
 export const ProjectTargetPreferenceId = DocId.pipe(Schema.brand("ProjectTargetPreferenceId"))
 export type ProjectTargetPreferenceId = Schema.Schema.Type<typeof ProjectTargetPreferenceId>
@@ -81,16 +89,16 @@ export const ProjectTargetPreferenceSchema = Schema.Struct({
     "Low-level Huly tracker ProjectTargetPreference record used by tracker UI/workflows to remember target-related preference props."
 })
 export type ProjectTargetPreference = Schema.Schema.Type<typeof ProjectTargetPreferenceSchema>
-
-export interface ListProjectTargetPreferencesResult {
-  readonly preferences: ReadonlyArray<ProjectTargetPreference>
-  readonly total: ListTotal
-}
-
-export interface UpsertProjectTargetPreferenceResult {
-  readonly preference: ProjectTargetPreference
-  readonly created: boolean
-}
+export const ListProjectTargetPreferencesResultSchema = Schema.Struct({
+  preferences: Schema.Array(ProjectTargetPreferenceSchema),
+  total: ListTotal
+})
+export type ListProjectTargetPreferencesResult = Schema.Schema.Type<typeof ListProjectTargetPreferencesResultSchema>
+export const UpsertProjectTargetPreferenceResultSchema = Schema.Struct({
+  preference: ProjectTargetPreferenceSchema,
+  created: Schema.Boolean
+})
+export type UpsertProjectTargetPreferenceResult = Schema.Schema.Type<typeof UpsertProjectTargetPreferenceResultSchema>
 
 export const listProjectTargetPreferencesParamsJsonSchema = JSONSchema.make(ListProjectTargetPreferencesParamsSchema)
 export const upsertProjectTargetPreferenceParamsJsonSchema = JSONSchema.make(UpsertProjectTargetPreferenceParamsSchema)

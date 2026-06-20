@@ -1,12 +1,12 @@
 import { JSONSchema, Schema } from "effect"
 
-import type { ListTotal } from "./shared.js"
 import {
   DEFAULT_LIMIT,
   DocId,
   hasAtLeastOneDefined,
   hasMutuallyExclusiveFields,
   LimitParam,
+  ListTotal,
   ObjectClassName,
   ProjectIdentifier,
   SpaceId,
@@ -119,21 +119,21 @@ export const DeleteRelatedIssueSpaceTargetParamsSchema = Schema.Struct({
     "Delete a spaceRule that chooses the default destination project for related issues from one space. Class rules cannot be deleted by this tool."
 })
 export type DeleteRelatedIssueSpaceTargetParams = Schema.Schema.Type<typeof DeleteRelatedIssueSpaceTargetParamsSchema>
-
-export interface ListRelatedIssueTargetsResult {
-  readonly targets: ReadonlyArray<RelatedIssueTarget>
-  readonly total: ListTotal
-}
-
-export interface SetRelatedIssueTargetResult {
-  readonly target: RelatedIssueTarget
-  readonly created: boolean
-}
-
-export interface DeleteRelatedIssueSpaceTargetResult {
-  readonly targetId: RelatedIssueTargetId
-  readonly deleted: boolean
-}
+export const ListRelatedIssueTargetsResultSchema = Schema.Struct({
+  targets: Schema.Array(RelatedIssueTargetSchema),
+  total: ListTotal
+})
+export type ListRelatedIssueTargetsResult = Schema.Schema.Type<typeof ListRelatedIssueTargetsResultSchema>
+export const SetRelatedIssueTargetResultSchema = Schema.Struct({
+  target: RelatedIssueTargetSchema,
+  created: Schema.Boolean
+})
+export type SetRelatedIssueTargetResult = Schema.Schema.Type<typeof SetRelatedIssueTargetResultSchema>
+export const DeleteRelatedIssueSpaceTargetResultSchema = Schema.Struct({
+  targetId: RelatedIssueTargetId,
+  deleted: Schema.Boolean
+})
+export type DeleteRelatedIssueSpaceTargetResult = Schema.Schema.Type<typeof DeleteRelatedIssueSpaceTargetResultSchema>
 
 export const listRelatedIssueTargetsParamsJsonSchema = JSONSchema.make(ListRelatedIssueTargetsParamsSchema)
 export const setRelatedIssueTargetParamsJsonSchema = JSONSchema.make(SetRelatedIssueTargetParamsSchema)

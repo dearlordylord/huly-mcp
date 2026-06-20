@@ -84,89 +84,45 @@ export const CustomFieldTypeNameSchema = Schema.Literal(...CUSTOM_FIELD_TYPE_NAM
 })
 
 export type CustomFieldTypeName = typeof CUSTOM_FIELD_TYPE_NAMES[number]
+export const CustomFieldValueSchema = Schema.Struct({
+  fieldId: CustomFieldId,
+  label: Schema.String,
+  value: Schema.Unknown,
+  type: CustomFieldTypeNameSchema
+})
+export type CustomFieldValue = Schema.Schema.Type<typeof CustomFieldValueSchema>
+export const SetCustomFieldResultSchema = Schema.Struct({
+  objectId: DocId,
+  fieldId: CustomFieldId,
+  label: Schema.String,
+  value: Schema.Unknown,
+  updated: Schema.Boolean
+})
+export type SetCustomFieldResult = Schema.Schema.Type<typeof SetCustomFieldResultSchema>
 
-export type EmptyCustomFieldTypeDetails = Readonly<Record<string, never>>
+export const EmptyCustomFieldTypeDetailsSchema = Schema.Record({ key: Schema.String, value: Schema.Never })
+export type EmptyCustomFieldTypeDetails = Schema.Schema.Type<typeof EmptyCustomFieldTypeDetailsSchema>
 
-export interface EnumCustomFieldTypeDetails {
-  readonly [key: string]: unknown
-  readonly enumRef: unknown
-}
-
-export interface ArrayCustomFieldTypeDetails {
-  readonly [key: string]: unknown
-  readonly of: unknown
-}
-
-export interface RefCustomFieldTypeDetails {
-  readonly [key: string]: unknown
-  readonly to: unknown
-}
-
-export type UnknownCustomFieldTypeDetails = Readonly<Record<string, unknown>>
-
-interface CustomFieldInfoBase {
-  readonly id: CustomFieldId
-  readonly name: string
-  readonly label: string
-  readonly ownerClassId: ObjectClassName
-  readonly ownerLabel: string
-}
-
-export type CustomFieldInfo =
-  | (CustomFieldInfoBase & {
-    readonly type: PrimitiveCustomFieldTypeName
-    readonly typeDetails: EmptyCustomFieldTypeDetails
-  })
-  | (CustomFieldInfoBase & {
-    readonly type: "enum"
-    readonly typeDetails: EnumCustomFieldTypeDetails
-  })
-  | (CustomFieldInfoBase & {
-    readonly type: "array"
-    readonly typeDetails: ArrayCustomFieldTypeDetails
-  })
-  | (CustomFieldInfoBase & {
-    readonly type: "ref"
-    readonly typeDetails: RefCustomFieldTypeDetails
-  })
-  | (CustomFieldInfoBase & {
-    readonly type: "unknown"
-    readonly typeDetails: UnknownCustomFieldTypeDetails
-  })
-
-export interface CustomFieldValue {
-  readonly fieldId: CustomFieldId
-  readonly label: string
-  readonly value: unknown
-  readonly type: CustomFieldTypeName
-}
-
-export interface SetCustomFieldResult {
-  readonly objectId: DocId
-  readonly fieldId: CustomFieldId
-  readonly label: string
-  readonly value: unknown
-  readonly updated: boolean
-}
-
-const EmptyCustomFieldTypeDetailsSchema = Schema.Record({ key: Schema.String, value: Schema.Never })
 const CustomFieldTypeDetailsRecordSchema = Schema.Record({ key: Schema.String, value: Schema.Unknown })
-const EnumCustomFieldTypeDetailsSchema = CustomFieldTypeDetailsRecordSchema.pipe(
-  Schema.filter((details): details is EnumCustomFieldTypeDetails => "enumRef" in details, {
-    message: () => "enum custom field typeDetails must include enumRef"
-  })
+
+export const EnumCustomFieldTypeDetailsSchema = CustomFieldTypeDetailsRecordSchema.pipe(
+  Schema.filter((details) =>
+    Object.hasOwn(details, "enumRef") ? undefined : "enum custom field typeDetails must include enumRef"
+  )
 )
-const ArrayCustomFieldTypeDetailsSchema = CustomFieldTypeDetailsRecordSchema.pipe(
-  Schema.filter((details): details is ArrayCustomFieldTypeDetails => "of" in details, {
-    message: () => "array custom field typeDetails must include of"
-  })
+export type EnumCustomFieldTypeDetails = Schema.Schema.Type<typeof EnumCustomFieldTypeDetailsSchema>
+export const ArrayCustomFieldTypeDetailsSchema = CustomFieldTypeDetailsRecordSchema.pipe(
+  Schema.filter((details) =>
+    Object.hasOwn(details, "of") ? undefined : "array custom field typeDetails must include of"
+  )
 )
-const RefCustomFieldTypeDetailsSchema = CustomFieldTypeDetailsRecordSchema.pipe(
-  Schema.filter((details): details is RefCustomFieldTypeDetails => "to" in details, {
-    message: () => "ref custom field typeDetails must include to"
-  })
+export type ArrayCustomFieldTypeDetails = Schema.Schema.Type<typeof ArrayCustomFieldTypeDetailsSchema>
+export const RefCustomFieldTypeDetailsSchema = CustomFieldTypeDetailsRecordSchema.pipe(
+  Schema.filter((details) => Object.hasOwn(details, "to") ? undefined : "ref custom field typeDetails must include to")
 )
-const UnknownCustomFieldTypeDetailsSchema = CustomFieldTypeDetailsRecordSchema
+export type RefCustomFieldTypeDetails = Schema.Schema.Type<typeof RefCustomFieldTypeDetailsSchema>
+export const UnknownCustomFieldTypeDetailsSchema = CustomFieldTypeDetailsRecordSchema
+export type UnknownCustomFieldTypeDetails = Schema.Schema.Type<typeof UnknownCustomFieldTypeDetailsSchema>
 
 const CustomFieldInfoBaseWireFields = {
   id: CustomFieldId,
@@ -203,6 +159,7 @@ export const CustomFieldInfoWireSchema = Schema.Union(
     typeDetails: UnknownCustomFieldTypeDetailsSchema
   })
 )
+export type CustomFieldInfo = Schema.Schema.Type<typeof CustomFieldInfoWireSchema>
 
 export const CustomFieldValueWireSchema = Schema.Struct({
   fieldId: CustomFieldId,

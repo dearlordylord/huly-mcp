@@ -192,24 +192,26 @@ export const parseCreateMilestoneParams = Schema.decodeUnknown(CreateMilestonePa
 export const parseUpdateMilestoneParams = Schema.decodeUnknown(UpdateMilestoneParamsSchema)
 export const parseSetIssueMilestoneParams = Schema.decodeUnknown(SetIssueMilestoneParamsSchema)
 export const parseDeleteMilestoneParams = Schema.decodeUnknown(DeleteMilestoneParamsSchema)
+export const CreateMilestoneResultSchema = Schema.Struct({
+  id: MilestoneId,
+  label: MilestoneLabel
+})
+export type CreateMilestoneResult = Schema.Schema.Type<typeof CreateMilestoneResultSchema>
+export const UpdateMilestoneResultSchema = Schema.Struct({
+  id: MilestoneId,
+  updated: Schema.Boolean
+})
+export type UpdateMilestoneResult = Schema.Schema.Type<typeof UpdateMilestoneResultSchema>
+export const SetIssueMilestoneResultSchema = Schema.Struct({
+  identifier: IssueIdentifier,
+  milestoneSet: Schema.Boolean
+})
+export type SetIssueMilestoneResult = Schema.Schema.Type<typeof SetIssueMilestoneResultSchema>
+export const DeleteMilestoneResultSchema = Schema.Struct({
+  id: MilestoneId,
+  deleted: Schema.Boolean
+})
+export type DeleteMilestoneResult = Schema.Schema.Type<typeof DeleteMilestoneResultSchema>
 
-// No codec needed — internal type, not used for runtime validation
-export interface CreateMilestoneResult {
-  readonly id: MilestoneId
-  readonly label: MilestoneLabel
-}
-
-export interface UpdateMilestoneResult {
-  readonly id: MilestoneId
-  readonly updated: boolean
-}
-
-export interface SetIssueMilestoneResult {
-  readonly identifier: IssueIdentifier
-  readonly milestoneSet: boolean
-}
-
-export interface DeleteMilestoneResult {
-  readonly id: MilestoneId
-  readonly deleted: boolean
-}
+export const ListMilestonesResultSchema = Schema.Array(MilestoneSummarySchema)
+export const GetMilestoneResultSchema = MilestoneSchema
