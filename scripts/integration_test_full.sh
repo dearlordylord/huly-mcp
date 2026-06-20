@@ -43,6 +43,8 @@ RECRUITING_CLEANUP_PERSON_ID=""
 RECRUITING_CLEANUP_PERSON_EMAIL=""
 RECRUITING_CLEANUP_SKILL=""
 BOARD_CLEANUP_BOARD_ID=""
+BOARD_CLEANUP_LABEL_ID=""
+BOARD_CLEANUP_CARD_LABEL_ID=""
 TM_TASK_TYPE_NAME=""
 TM_STATUS_NAME=""
 WORKFLOW_CLEANED=false
@@ -237,6 +239,14 @@ cleanup_recruiting_artifacts() {
 }
 
 cleanup_board_artifacts() {
+  if [ -n "$BOARD_CLEANUP_CARD_LABEL_ID" ]; then
+    card_label_json=$(json_string "$BOARD_CLEANUP_CARD_LABEL_ID")
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_board_label\",\"arguments\":{\"label\":$card_label_json}},\"id\":2}" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$BOARD_CLEANUP_LABEL_ID" ]; then
+    label_json=$(json_string "$BOARD_CLEANUP_LABEL_ID")
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_board_label\",\"arguments\":{\"label\":$label_json}},\"id\":2}" >/dev/null 2>&1 || true
+  fi
   if [ -n "$BOARD_CLEANUP_BOARD_ID" ]; then
     board_json=$(json_string "$BOARD_CLEANUP_BOARD_ID")
     call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_board\",\"arguments\":{\"board\":$board_json}},\"id\":2}" >/dev/null 2>&1 || true
@@ -3929,15 +3939,75 @@ echo ""
 echo "=== 14b. Boards ==="
 run_test "list_boards" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_boards","arguments":{"limit":3}},"id":2}'
+run_test "list_board_menu_pages" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_board_menu_pages","arguments":{}},"id":2}'
+run_test "list_board_saved_views" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_board_saved_views","arguments":{"limit":3}},"id":2}'
+run_capture_to_var BOARD_SAVED_VIEWS_TEXT "list_board_saved_views(get probe)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_board_saved_views","arguments":{"limit":1}},"id":2}'
+if [ $? -eq 0 ]; then
+  BOARD_SAVED_VIEW_ID=$(printf '%s\n' "$BOARD_SAVED_VIEWS_TEXT" | jq -r '.savedViews[0].id // empty' 2>/dev/null)
+else
+  BOARD_SAVED_VIEW_ID=""
+fi
+if [ -n "$BOARD_SAVED_VIEW_ID" ]; then
+  BOARD_SAVED_VIEW_ID_JSON=$(json_string "$BOARD_SAVED_VIEW_ID")
+  run_test "get_board_saved_view($BOARD_SAVED_VIEW_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_board_saved_view\",\"arguments\":{\"savedView\":$BOARD_SAVED_VIEW_ID_JSON}},\"id\":2}"
+else
+  run_expect_error_contains "get_board_saved_view(missing probe)" \
+    '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_board_saved_view","arguments":{"savedView":"IntTest Missing Saved View"}},"id":2}' \
+    "Board saved view 'IntTest Missing Saved View' not found"
+fi
+run_test "list_board_viewlets" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_board_viewlets","arguments":{}},"id":2}'
+run_test "get_board_common_preference" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_board_common_preference","arguments":{}},"id":2}'
 
 BOARD_NAME="IntTest Board $RUN_ID"
 BOARD_UPDATED_NAME="IntTest Board Updated $RUN_ID"
 BOARD_CARD_TITLE="IntTest Board Card $RUN_ID"
 BOARD_CARD_UPDATED_TITLE="IntTest Board Card Updated $RUN_ID"
+BOARD_LABEL_TITLE="IntTest Board Label $RUN_ID"
+BOARD_LABEL_UPDATED_TITLE="IntTest Board Label Updated $RUN_ID"
+BOARD_CARD_LABEL_TITLE="IntTest Board Card Label $RUN_ID"
 BOARD_NAME_JSON=$(json_string "$BOARD_NAME")
 BOARD_UPDATED_NAME_JSON=$(json_string "$BOARD_UPDATED_NAME")
 BOARD_CARD_TITLE_JSON=$(json_string "$BOARD_CARD_TITLE")
 BOARD_CARD_UPDATED_TITLE_JSON=$(json_string "$BOARD_CARD_UPDATED_TITLE")
+BOARD_LABEL_TITLE_JSON=$(json_string "$BOARD_LABEL_TITLE")
+BOARD_LABEL_UPDATED_TITLE_JSON=$(json_string "$BOARD_LABEL_UPDATED_TITLE")
+BOARD_CARD_LABEL_TITLE_JSON=$(json_string "$BOARD_CARD_LABEL_TITLE")
+
+run_capture_to_var BOARD_LABEL_CREATE_TEXT "create_board_label($BOARD_LABEL_TITLE)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_board_label\",\"arguments\":{\"title\":$BOARD_LABEL_TITLE_JSON,\"color\":2,\"description\":\"Temporary integration board label\"}},\"id\":2}"
+if [ $? -eq 0 ]; then
+  BOARD_CLEANUP_LABEL_ID=$(printf '%s\n' "$BOARD_LABEL_CREATE_TEXT" | jq -r '.id // empty' 2>/dev/null)
+  assert_json_field_equals "create_board_label reports created" "$BOARD_LABEL_CREATE_TEXT" ".created" "true"
+  restart_http_transport_if_needed "after create_board_label" || exit 1
+  sleep 2
+  run_capture_to_var BOARD_LABEL_LIST_TEXT "list_board_labels($BOARD_LABEL_TITLE)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_board_labels\",\"arguments\":{\"titleSearch\":$BOARD_LABEL_TITLE_JSON,\"limit\":10}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    assert_json_array_contains "list_board_labels includes created label" "$BOARD_LABEL_LIST_TEXT" ".labels | map(.title)" "$BOARD_LABEL_TITLE"
+  fi
+  run_capture_to_var BOARD_LABEL_UPDATE_TEXT "update_board_label($BOARD_LABEL_TITLE)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_board_label\",\"arguments\":{\"label\":$BOARD_LABEL_TITLE_JSON,\"title\":$BOARD_LABEL_UPDATED_TITLE_JSON,\"description\":\"Updated integration board label\",\"color\":3}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    assert_json_field_equals "update_board_label reports updated" "$BOARD_LABEL_UPDATE_TEXT" ".updated" "true"
+  fi
+  restart_http_transport_if_needed "after update_board_label" || exit 1
+  sleep 2
+  BOARD_LABEL_DELETE_JSON=$(json_string "${BOARD_CLEANUP_LABEL_ID:-$BOARD_LABEL_UPDATED_TITLE}")
+  run_capture_to_var BOARD_LABEL_DELETE_TEXT "delete_board_label(${BOARD_CLEANUP_LABEL_ID:-$BOARD_LABEL_UPDATED_TITLE})" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_board_label\",\"arguments\":{\"label\":$BOARD_LABEL_DELETE_JSON}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    assert_json_field_equals "delete_board_label reports deleted" "$BOARD_LABEL_DELETE_TEXT" ".deleted" "true"
+    BOARD_CLEANUP_LABEL_ID=""
+  fi
+else
+  skip_test "list/update/delete board label" "create_board_label failed"
+fi
 
 run_capture_to_var BOARD_PROJECT_TYPES_TEXT "list_project_types(board model probe)" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_project_types","arguments":{}},"id":2}'
@@ -3952,6 +4022,7 @@ if [ -z "$BOARD_PROJECT_TYPE_ID" ]; then
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_board\",\"arguments\":{\"name\":$BOARD_NAME_JSON,\"description\":\"Temporary integration board\",\"private\":true}},\"id\":2}" \
     "Board project type 'board:descriptors:BoardType' not found"
   echo "INFO: board write and card CRUD checks require a board project type model in the workspace"
+  echo "INFO: add/list/remove board card labels require the board project type model"
 else
 run_capture_to_var BOARD_CREATE_TEXT "create_board($BOARD_NAME)" \
   "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_board\",\"arguments\":{\"name\":$BOARD_NAME_JSON,\"description\":\"Temporary integration board\",\"private\":true,\"projectType\":\"$BOARD_PROJECT_TYPE_ID\"}},\"id\":2}"
@@ -4037,6 +4108,35 @@ if [ -n "$BOARD_CLEANUP_BOARD_ID" ]; then
       assert_json_array_contains "list_board_cards includes created card" "$BOARD_CARD_LIST_TEXT" ".cards | map(.id)" "$BOARD_CARD_ID"
     fi
 
+    run_capture_to_var BOARD_CARD_LABEL_ADD_TEXT "add_board_card_label($BOARD_CARD_LABEL_TITLE)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_board_card_label\",\"arguments\":{\"board\":$BOARD_ID_JSON,\"card\":$BOARD_CARD_ID_JSON,\"label\":$BOARD_CARD_LABEL_TITLE_JSON,\"color\":4}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      BOARD_CLEANUP_CARD_LABEL_ID=$(printf '%s\n' "$BOARD_CARD_LABEL_ADD_TEXT" | jq -r '.label // empty' 2>/dev/null)
+      assert_json_field_equals "add_board_card_label attaches label" "$BOARD_CARD_LABEL_ADD_TEXT" ".attached" "true"
+      assert_json_field_equals "add_board_card_label creates definition" "$BOARD_CARD_LABEL_ADD_TEXT" ".labelCreated" "true"
+      restart_http_transport_if_needed "after add_board_card_label" || exit 1
+      sleep 2
+      run_capture_to_var BOARD_CARD_LABEL_LIST_TEXT "list_board_card_labels($BOARD_CARD_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_board_card_labels\",\"arguments\":{\"board\":$BOARD_ID_JSON,\"card\":$BOARD_CARD_ID_JSON}},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        assert_json_array_contains "list_board_card_labels includes attached label" "$BOARD_CARD_LABEL_LIST_TEXT" ".labels | map(.title)" "$BOARD_CARD_LABEL_TITLE"
+      fi
+      run_capture_to_var BOARD_CARD_LABEL_REMOVE_TEXT "remove_board_card_label($BOARD_CARD_LABEL_TITLE)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_board_card_label\",\"arguments\":{\"board\":$BOARD_ID_JSON,\"card\":$BOARD_CARD_ID_JSON,\"label\":$BOARD_CARD_LABEL_TITLE_JSON}},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "remove_board_card_label detaches label" "$BOARD_CARD_LABEL_REMOVE_TEXT" ".detached" "true"
+      fi
+      BOARD_CARD_LABEL_DELETE_JSON=$(json_string "${BOARD_CLEANUP_CARD_LABEL_ID:-$BOARD_CARD_LABEL_TITLE}")
+      run_capture_to_var BOARD_CARD_LABEL_DELETE_TEXT "delete_board_label(${BOARD_CLEANUP_CARD_LABEL_ID:-$BOARD_CARD_LABEL_TITLE})" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_board_label\",\"arguments\":{\"label\":$BOARD_CARD_LABEL_DELETE_JSON}},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "delete_board_label removes card label definition" "$BOARD_CARD_LABEL_DELETE_TEXT" ".deleted" "true"
+        BOARD_CLEANUP_CARD_LABEL_ID=""
+      fi
+    else
+      echo "INFO: list/remove board card labels require add_board_card_label to succeed"
+    fi
+
     run_capture_to_var BOARD_CARD_UPDATE_TEXT "update_board_card($BOARD_CARD_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_board_card\",\"arguments\":{\"board\":$BOARD_ID_JSON,\"card\":$BOARD_CARD_ID_JSON,\"title\":$BOARD_CARD_UPDATED_TITLE_JSON,\"description\":\"Updated board card\",\"location\":null,\"cover\":null,\"startDate\":null,\"dueDate\":null}},\"id\":2}"
     if [ $? -eq 0 ]; then
@@ -4079,6 +4179,7 @@ if [ -n "$BOARD_CLEANUP_BOARD_ID" ]; then
   else
     fail_test "create_board_card($BOARD_CARD_TITLE) returns id" "missing id"
     skip_test "get/list/update/archive/delete board card" "create_board_card did not return a card id"
+    echo "INFO: add/list/remove board card labels require create_board_card to return a card id"
   fi
 
   run_capture_to_var BOARD_FINAL_ARCHIVE_TEXT "archive_board(cleanup:$BOARD_CLEANUP_BOARD_ID)" \
@@ -4091,6 +4192,7 @@ else
   fail_test "create_board($BOARD_NAME) returns id" "missing id"
   skip_test "get/update/archive/unarchive board" "create_board did not return a board id"
   skip_test "create/get/update/archive/delete board card" "create_board did not return a board id"
+  echo "INFO: add/list/remove board card labels require create_board to return a board id"
 fi
 fi
 echo ""

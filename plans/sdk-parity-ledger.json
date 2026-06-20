@@ -129,18 +129,10 @@
       "package": "@hcengineering/board",
       "status": "covered",
       "matrixLocation": "Boards",
-      "rationale": "Current board tools cover board discovery, board create/update/archive, board card list/get/create/update, workflow status/type resolution, assignees, members, location, cover, dates, and archived-card deletion. Board labels, saved views, preferences/menu pages, provider integrations, and board deletion remain deferred.",
+      "rationale": "Current board tools cover board discovery, board create/update/archive, board card list/get/create/update, workflow status/type resolution, assignees, members, location, cover, dates, archived-card deletion, board labels, saved views, menu pages, viewlets, and common board preference reads. Provider integrations and board deletion remain deferred.",
       "exports": [
         "Board",
-        "Card"
-      ]
-    },
-    {
-      "package": "@hcengineering/board",
-      "status": "gap",
-      "matrixLocation": "Boards",
-      "rationale": "Board labels, saved views, board menu pages, preference-backed board UI state, provider integrations, and board deletion remain matrix gaps outside the safe board/card write slice.",
-      "exports": [
+        "Card",
         "CommonBoardPreference",
         "MenuPage"
       ]
@@ -472,10 +464,17 @@
       "package": "@hcengineering/preference",
       "status": "gap",
       "matrixLocation": "Preference model",
-      "rationale": "Generic user and space preference discovery/update remains a matrix gap. Board-specific preference state is also deferred outside the safe board/card write slice.",
+      "rationale": "Generic space preference discovery/update remains a matrix gap.",
       "exports": [
-        "Preference",
         "SpacePreference"
+      ]
+    },
+    {
+      "package": "@hcengineering/preference",
+      "status": "not-mcp-facing",
+      "rationale": "Use module-specific preference wrappers such as get_board_common_preference.",
+      "exports": [
+        "Preference"
       ]
     },
     {
@@ -565,9 +564,20 @@
     },
     {
       "package": "@hcengineering/view",
+      "status": "covered",
+      "matrixLocation": "View / saved filtered views",
+      "rationale": "Current board tools cover board discovery, board create/update/archive, board card list/get/create/update, workflow status/type resolution, assignees, members, location, cover, dates, archived-card deletion, board labels, saved views, menu pages, viewlets, and common board preference reads. Provider integrations and board deletion remain deferred.",
+      "exports": [
+        "FilteredView",
+        "Viewlet",
+        "ViewletPreference"
+      ]
+    },
+    {
+      "package": "@hcengineering/view",
       "status": "gap",
       "matrixLocation": "View / saved filtered views",
-      "rationale": "Saved filtered views, user view preferences, viewlet descriptors, action metadata, reusable filters, reusable sorts, and reusable grouping/aggregation configuration remain matrix gaps.",
+      "rationale": "User view preferences, viewlet descriptors, action metadata, reusable filters, reusable sorts, and reusable grouping/aggregation configuration remain matrix gaps.",
       "exports": [
         "Action",
         "ActionCategory",
@@ -576,13 +586,10 @@
         "AttributeFilter",
         "ClassFilters",
         "ClassSortFuncs",
-        "FilteredView",
         "FilterMode",
         "Groupping",
         "IgnoreActions",
-        "Viewlet",
-        "ViewletDescriptor",
-        "ViewletPreference"
+        "ViewletDescriptor"
       ]
     },
     {

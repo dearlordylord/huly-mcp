@@ -5,7 +5,17 @@ import {
 } from "../../domain/schemas/sdk-discovery-configurations.js"
 import type { HulyClassToolHint } from "../../domain/schemas/sdk-discovery.js"
 import { NonEmptyString, ObjectClassName } from "../../domain/schemas/shared.js"
-import { board, cardPlugin, chunter, contact, core, documentPlugin, tracker } from "../huly-plugins.js"
+import {
+  board,
+  cardPlugin,
+  chunter,
+  contact,
+  core,
+  documentPlugin,
+  preference,
+  tracker,
+  view
+} from "../huly-plugins.js"
 
 const toolHint = (category: string, exampleTools: ReadonlyArray<string>): HulyClassToolHint => ({
   category: NonEmptyString.make(category),
@@ -35,7 +45,15 @@ export const firstClassToolHints = new Map<string, ReadonlyArray<HulyClassToolHi
   [String(cardPlugin.class.Card), [toolHint("cards", ["list_cards", "get_card", "create_card"])]],
   [String(cardPlugin.class.CardSpace), [toolHint("cards", ["list_card_spaces"])]],
   [String(board.class.Board), [toolHint("boards", ["list_boards", "get_board", "create_board"])]],
-  [String(board.class.Card), [toolHint("boards", ["list_board_cards", "get_board_card", "create_board_card"])]],
+  [
+    String(board.class.Card),
+    [toolHint("boards", ["list_board_cards", "get_board_card", "create_board_card", "list_board_card_labels"])]
+  ],
+  [String(board.class.MenuPage), [toolHint("boards", ["list_board_menu_pages"])]],
+  [String(board.class.CommonBoardPreference), [toolHint("boards", ["get_board_common_preference"])]],
+  [String(view.class.FilteredView), [toolHint("boards", ["list_board_saved_views", "get_board_saved_view"])]],
+  [String(view.class.Viewlet), [toolHint("boards", ["list_board_viewlets"])]],
+  [String(view.class.ViewletPreference), [toolHint("boards", ["list_board_viewlets"])]],
   [String(chunter.class.ChatMessage), [toolHint("channels", ["list_channel_messages", "send_channel_message"])]],
   [
     String(tracker.class.ProjectTargetPreference),
@@ -85,9 +103,7 @@ const contactCoveredRationale =
   "Current contacts tools expose person, organization, employee/member, and organization-channel operations."
 const cardCoveredRationale = "Current card tools cover card spaces, master tags, and card CRUD."
 const boardCoveredRationale =
-  "Current board tools cover board discovery, board create/update/archive, board card list/get/create/update, workflow status/type resolution, assignees, members, location, cover, dates, and archived-card deletion. Board labels, saved views, preferences/menu pages, provider integrations, and board deletion remain deferred."
-const boardGapRationale =
-  "Board labels, saved views, board menu pages, preference-backed board UI state, provider integrations, and board deletion remain matrix gaps outside the safe board/card write slice."
+  "Current board tools cover board discovery, board create/update/archive, board card list/get/create/update, workflow status/type resolution, assignees, members, location, cover, dates, archived-card deletion, board labels, saved views, menu pages, viewlets, and common board preference reads. Provider integrations and board deletion remain deferred."
 const boardNotMcpFacingRationale =
   "Board card cover values are exposed through board card create/update fields. The CardCover SDK export is the underlying type metadata rather than a separate LLM-facing resource."
 const chunterCoveredRationale =
@@ -176,15 +192,54 @@ export const runtimeParityRoutingRows: ReadonlyArray<RuntimeParityRoutingRow> = 
     String(board.class.Card),
     "@hcengineering/board",
     "Card",
-    covered(["list_board_cards", "get_board_card", "create_board_card"], boardCoveredRationale)
+    covered(
+      [
+        "list_board_cards",
+        "get_board_card",
+        "create_board_card",
+        "list_board_card_labels",
+        "add_board_card_label",
+        "remove_board_card_label"
+      ],
+      boardCoveredRationale
+    )
   ),
   routingRow(
     String(board.class.CommonBoardPreference),
     "@hcengineering/board",
     "CommonBoardPreference",
-    gap(boardGapRationale)
+    covered(["get_board_common_preference"], boardCoveredRationale)
   ),
-  routingRow(String(board.class.MenuPage), "@hcengineering/board", "MenuPage", gap(boardGapRationale)),
+  routingRow(
+    String(preference.class.Preference),
+    "@hcengineering/preference",
+    "Preference",
+    notMcpFacing("Use module-specific preference wrappers such as get_board_common_preference.")
+  ),
+  routingRow(
+    String(board.class.MenuPage),
+    "@hcengineering/board",
+    "MenuPage",
+    covered(["list_board_menu_pages"], boardCoveredRationale)
+  ),
+  routingRow(
+    String(view.class.FilteredView),
+    "@hcengineering/view",
+    "FilteredView",
+    covered(["list_board_saved_views", "get_board_saved_view"], boardCoveredRationale)
+  ),
+  routingRow(
+    String(view.class.Viewlet),
+    "@hcengineering/view",
+    "Viewlet",
+    covered(["list_board_viewlets"], boardCoveredRationale)
+  ),
+  routingRow(
+    String(view.class.ViewletPreference),
+    "@hcengineering/view",
+    "ViewletPreference",
+    covered(["list_board_viewlets"], boardCoveredRationale)
+  ),
   routingRow(
     String(board.class.CardCover),
     "@hcengineering/board",
