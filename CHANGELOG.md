@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.40.1
+
+### Patch Changes
+
+- e8fb789: Update the resolved Effect dependency set to 3.21.4.
+
 ## 0.40.0
 
 ### Minor Changes
