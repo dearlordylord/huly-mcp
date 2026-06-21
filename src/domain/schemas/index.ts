@@ -70,6 +70,7 @@ export { optionalOutput } from "./output-helpers.js"
 
 export {
   MessageTemplateMetadataDegradedWarningCode,
+  SpacePreferenceMetadataDegradedWarningCode,
   SpaceRoleAssignmentsDegradedWarningCode,
   StatusMetadataUnresolvedWarningCode,
   type ToolWarning,
@@ -78,6 +79,24 @@ export {
   ToolWarningSchema,
   ViewletDescriptorMetadataDegradedWarningCode
 } from "./tool-warnings.js"
+
+export {
+  type GetSpacePreferenceParams,
+  getSpacePreferenceParamsJsonSchema,
+  GetSpacePreferenceParamsSchema,
+  type GetSpacePreferenceResult,
+  GetSpacePreferenceResultSchema,
+  type ListSpacePreferencesParams,
+  listSpacePreferencesParamsJsonSchema,
+  ListSpacePreferencesParamsSchema,
+  type ListSpacePreferencesResult,
+  ListSpacePreferencesResultSchema,
+  parseGetSpacePreferenceParams,
+  parseListSpacePreferencesParams,
+  type SpacePreference,
+  SpacePreferenceId,
+  SpacePreferenceSchema
+} from "./preferences.js"
 
 export {
   MonthDayOrdinal,

@@ -59,7 +59,7 @@ Current high-level MCP categories:
 | Analytics collector / onboarding channel | `.reference/platform/models/analytics-collector/src/index.ts`: `OnboardingChannel` | No analytics/onboarding tools | Onboarding channels and analytics collector configuration; likely low priority for MCP |
 | View / saved filtered views | `.reference/platform/models/view/src/index.ts`: `FilteredView`, `Viewlet`, actions, view preferences | No saved-view tools; list tools accept ad hoc filters | Saved filtered views, user view preferences, viewlet descriptors, reusable filters/sorts/groups |
 | Workbench tabs/widgets/apps | `.reference/platform/models/workbench/src/index.ts`: `Application`, `ApplicationNavModel`, `HiddenApplication`, `Widget`, `WidgetPreference`, `WorkbenchTab` | No workbench UI state tools | List/hide apps, tabs, widgets, widget prefs. Mostly UI state, lower MCP priority |
-| Preference model | `.reference/platform/models/preference`; many modules store preferences | No generic preference tools | User preferences discovery/update for modules with preference-backed settings |
+| Preference model | `.reference/platform/models/preference`; many modules store preferences | Read-only generic `SpacePreference` discovery through `list_space_preferences` and `get_space_preference` | Generic preference writes and module-specific preference payloads remain deferred unless the published SDK exposes safe typed fields |
 | Document preferences and history | Installed `@hcengineering/document`; `node_modules/@hcengineering/document/types/types.d.ts` still exposes stale `SavedDocument extends Preference` plus `DocumentSnapshot`. Current platform source removed the `SavedDocument` model in hcengineering/platform#10124 and replaced document stars with rating-backed `DocReaction` / `ReactionKind.Star` | Document tools cover teamspaces, document CRUD, content edit, inline comments, relations, deletion, and read-only snapshot/history list/get. | Snapshot restore remains deferred until restore semantics are proven. Do not implement `SavedDocument` as SDK parity unless the platform model is restored; current document stars belong to the Rating / reputation row |
 
 ## Installed SDK Packages With Partial MCP Coverage
@@ -78,7 +78,7 @@ Current high-level MCP categories:
 | `@hcengineering/document` | Partial | Snapshot restore, backlinks, notes, structured action items/tables, PDF/export, advanced document relationships |
 | `@hcengineering/inventory` | Model CRUD plus product media/discussion wrappers covered; wrappers partial | Category/variant discussion wrappers if they prove user-visible |
 | `@hcengineering/notification` | Partial | Mute contexts, notification type settings, collaborators |
-| `@hcengineering/preference` | No first-class generic tools | Generic user/space preference discovery and safe updates |
+| `@hcengineering/preference` | Read-only `SpacePreference` discovery covered | Generic preference writes and any module-specific preference payloads without published typed fields |
 | `@hcengineering/tags` | SDK-level covered; module wrappers partial | Module-specific wrappers for tag-backed concepts such as recruiting skills, board labels, controlled-doc labels, and contact tags |
 | `@hcengineering/task` | Partial | Generic task/project abstractions beyond tracker, reusable task workflows |
 | `@hcengineering/time` | Partial | Document-attached action items, automation helper visibility, team planner/schedule reports |

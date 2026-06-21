@@ -462,9 +462,9 @@
     },
     {
       "package": "@hcengineering/preference",
-      "status": "gap",
+      "status": "covered",
       "matrixLocation": "Preference model",
-      "rationale": "Generic space preference discovery/update remains a matrix gap.",
+      "rationale": "Read-only generic SpacePreference discovery is covered by list_space_preferences and get_space_preference. Generic preference writes remain deferred because the published SDK model exposes no safe typed writable fields beyond attachedTo.",
       "exports": [
         "SpacePreference"
       ]
