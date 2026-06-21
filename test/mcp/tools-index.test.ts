@@ -52,6 +52,7 @@ describe("CATEGORY_NAMES", () => {
       expect(CATEGORY_NAMES.has("inventory")).toBe(true)
       expect(CATEGORY_NAMES.has("recruiting")).toBe(true)
       expect(CATEGORY_NAMES.has("views")).toBe(true)
+      expect(CATEGORY_NAMES.has("preferences")).toBe(true)
       expect(CATEGORY_NAMES.size).toBeGreaterThan(5)
     }))
 
@@ -87,6 +88,12 @@ describe("CATEGORY_NAMES", () => {
       expect(toolDefinition("list_related_issue_targets").category).toBe("issues")
       expect(toolDefinition("set_related_issue_target").category).toBe("issues")
       expect(toolDefinition("delete_related_issue_space_target").category).toBe("issues")
+    }))
+
+  it.effect("registers preference tools in the preferences category", () =>
+    Effect.gen(function*() {
+      expect(toolDefinition("list_space_preferences").category).toBe("preferences")
+      expect(toolDefinition("get_space_preference").category).toBe("preferences")
     }))
 })
 

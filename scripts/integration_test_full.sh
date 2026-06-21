@@ -3306,6 +3306,32 @@ if [ $? -eq 0 ]; then
   fi
 fi
 
+run_capture_to_var SPACE_PREFS_TEXT "list_space_preferences" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_space_preferences","arguments":{"limit":5}},"id":2}'
+if [ $? -eq 0 ]; then
+  assert_json_field_nonempty "list_space_preferences returns total" "$SPACE_PREFS_TEXT" ".total"
+fi
+if [ -n "$FIRST_SPACE_ID" ]; then
+  FIRST_SPACE_ID_JSON=$(json_string "$FIRST_SPACE_ID")
+  run_capture_to_var SPACE_PREF_TEXT "get_space_preference($FIRST_SPACE_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_space_preference\",\"arguments\":{\"space\":$FIRST_SPACE_ID_JSON,\"includeArchived\":true}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    SPACE_PREF_PRESENT_TYPE=$(printf '%s\n' "$SPACE_PREF_TEXT" | jq -r '.present | type' 2>/dev/null)
+    if [ "$SPACE_PREF_PRESENT_TYPE" = "boolean" ]; then
+      echo "PASS: get_space_preference($FIRST_SPACE_ID) returns presence boolean"
+      PASSED=$((PASSED + 1))
+    else
+      echo "FAIL: get_space_preference($FIRST_SPACE_ID) missing presence boolean"
+      FAILED=$((FAILED + 1))
+      ERRORS="${ERRORS}\n  - get_space_preference($FIRST_SPACE_ID): missing presence boolean"
+    fi
+    assert_json_field_nonempty "get_space_preference($FIRST_SPACE_ID) returns attached space id" "$SPACE_PREF_TEXT" \
+      'if .present then .preference.attachedTo else .attachedTo end'
+  fi
+else
+  skip_test "get_space_preference" "no spaces found"
+fi
+
 run_capture_to_var SPACE_TYPES_TEXT "list_space_types" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_space_types","arguments":{"limit":50}},"id":2}'
 if [ $? -eq 0 ]; then

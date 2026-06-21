@@ -323,7 +323,7 @@ SDK upgrade revisit:
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
 ## Available Tools
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `boards`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `templates`, `planner`, `processes`, `recruiting`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `views`, `virtual-office`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `boards`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `templates`, `planner`, `preferences`, `processes`, `recruiting`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `views`, `virtual-office`
 
 ### Projects
 
@@ -784,6 +784,13 @@ SDK upgrade revisit:
 | `delete_todo` | Delete a Planner ToDo. This is destructive; deleting the last open issue ToDo can cause Huly classic issue status automation. |
 | `schedule_todo` | Schedule a Planner ToDo by raw todoId or human locator, creating a work slot with ToDo title, description, and visibility metadata. |
 | `unschedule_todo` | Remove ToDo work slots. Pass either workSlotId to remove one slot, locator with scope=all, or locator with scope=future and optional from. |
+
+### Preferences
+
+| Tool | Description |
+|------|-------------|
+| `list_space_preferences` | List low-level Huly SpacePreference records. These generic preference rows are attached to spaces and the published SDK exposes only the attached space link, so this tool is read-only discovery. Omit space to list recent rows across spaces, or pass a space _id/exact name with optional class/type narrowing to inspect one space. |
+| `get_space_preference` | Read the low-level Huly SpacePreference record attached to one space. Accepts a space _id or exact name with optional class/type narrowing. Returns present=false when the space exists but no generic SpacePreference row exists; use module-specific preference tools for writable preference payloads. |
 
 ### Processes
 

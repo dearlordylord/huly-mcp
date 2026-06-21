@@ -26,6 +26,7 @@ import { messageTemplateTools } from "./message-templates.js"
 import { milestoneTools } from "./milestones.js"
 import { notificationTools } from "./notifications.js"
 import { plannerTools } from "./planner.js"
+import { preferenceTools } from "./preferences.js"
 import { processTools } from "./processes.js"
 import { projectTargetPreferenceTools } from "./project-target-preferences.js"
 import { projectTools } from "./projects.js"
@@ -89,6 +90,7 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...calendarTools,
   ...timeTools,
   ...plannerTools,
+  ...preferenceTools,
   ...searchTools,
   ...activityTools,
   ...notificationTools,

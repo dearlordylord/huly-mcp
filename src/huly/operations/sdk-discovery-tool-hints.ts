@@ -55,6 +55,10 @@ export const firstClassToolHints = new Map<string, ReadonlyArray<HulyClassToolHi
   [String(view.class.Viewlet), [toolHint("views", ["list_viewlets"])]],
   [String(view.class.ViewletDescriptor), [toolHint("views", ["list_viewlets"])]],
   [String(view.class.ViewletPreference), [toolHint("views", ["list_viewlets"])]],
+  [
+    String(preference.class.SpacePreference),
+    [toolHint("preferences", ["list_space_preferences", "get_space_preference"])]
+  ],
   [String(chunter.class.ChatMessage), [toolHint("channels", ["list_channel_messages", "send_channel_message"])]],
   [
     String(tracker.class.ProjectTargetPreference),
@@ -107,6 +111,8 @@ const boardCoveredRationale =
   "Current board tools cover board discovery, board create/update/archive, board card list/get/create/update, workflow status/type resolution, assignees, members, location, cover, dates, archived-card deletion, board labels, saved views, menu pages, viewlets, and common board preference reads. Provider integrations and board deletion remain deferred."
 const viewCoveredRationale =
   "Current view tools cover read-only saved filtered view discovery/get operations across modules plus viewlet descriptor and ViewletPreference configuration discovery. View and preference writes remain deferred."
+const preferenceCoveredRationale =
+  "Read-only generic SpacePreference discovery is covered by list_space_preferences and get_space_preference. Generic preference writes remain deferred because the published SDK model exposes no safe typed writable fields beyond attachedTo."
 const boardNotMcpFacingRationale =
   "Board card cover values are exposed through board card create/update fields. The CardCover SDK export is the underlying type metadata rather than a separate LLM-facing resource."
 const chunterCoveredRationale =
@@ -212,6 +218,12 @@ export const runtimeParityRoutingRows: ReadonlyArray<RuntimeParityRoutingRow> = 
     "@hcengineering/board",
     "CommonBoardPreference",
     covered(["get_board_common_preference"], boardCoveredRationale)
+  ),
+  routingRow(
+    String(preference.class.SpacePreference),
+    "@hcengineering/preference",
+    "SpacePreference",
+    covered(["list_space_preferences", "get_space_preference"], preferenceCoveredRationale)
   ),
   routingRow(
     String(preference.class.Preference),
