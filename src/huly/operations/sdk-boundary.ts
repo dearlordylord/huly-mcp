@@ -1,4 +1,5 @@
-import type { AccountUuid, Class, Doc, Mixin, PersonUuid, Ref } from "@hcengineering/core"
+import type { SocialIdentity } from "@hcengineering/contact"
+import type { AccountUuid, Class, Doc, Mixin, PersonId as HulyPersonId, PersonUuid, Ref, Tx } from "@hcengineering/core"
 import { Effect } from "effect"
 
 import type { NonEmptyString } from "../../domain/schemas/shared.js"
@@ -20,10 +21,19 @@ export const toClassRef = <T extends Doc>(id: string | Ref<Class<T>>): Ref<Class
 // eslint-disable-next-line no-restricted-syntax -- see above
 export const toMixinRef = <T extends Doc>(id: string | Ref<Mixin<T>>): Ref<Mixin<T>> => id as Ref<Mixin<T>>
 
+// Approval request tx/rejectedTx payloads are owned by the Huly SDK and are
+// deliberately exposed as open payloads at the MCP boundary.
+// eslint-disable-next-line no-restricted-syntax -- centralized SDK boundary for opaque Huly Tx payloads
+export const toTx = (payload: unknown): Tx => payload as Tx
+
 // Brands are erased at runtime; the domain value and SDK AccountUuid are both
 // non-empty strings, so this is the final boundary conversion into the SDK type.
 // eslint-disable-next-line no-restricted-syntax -- see above
 export const toAccountUuid = (uuid: NonEmptyString | AccountUuid): AccountUuid => uuid as AccountUuid
+
+// SocialIdentity ids are branded as both a document ref and a core PersonId.
+// eslint-disable-next-line no-restricted-syntax -- see above
+export const toSocialIdentityRef = (id: HulyPersonId): SocialIdentity["_id"] => id as SocialIdentity["_id"]
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 

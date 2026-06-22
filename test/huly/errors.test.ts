@@ -35,6 +35,13 @@ import {
 } from "../../src/domain/schemas/shared.js"
 import {
   ActivityMessageNotFoundError,
+  ApprovalRequestApproverNotRequestedError,
+  ApprovalRequestCancelUnauthorizedError,
+  ApprovalRequestInvalidApprovalThresholdError,
+  ApprovalRequestMutationUnsupportedError,
+  ApprovalRequestNotActiveError,
+  ApprovalRequestNotFoundError,
+  ApprovalRequestTargetNotFoundError,
   AssociationConflictError,
   AssociationIdentifierAmbiguousError,
   AssociationInUseError,
@@ -904,6 +911,20 @@ describe("Huly Errors", () => {
           switch (error._tag) {
             case "IssueNotFoundError":
               return `issue:${error.identifier}`
+            case "ApprovalRequestNotFoundError":
+              return `approval-request:${error.request}`
+            case "ApprovalRequestTargetNotFoundError":
+              return `approval-request-target:${error.attachedTo}:${error.attachedToClass}`
+            case "ApprovalRequestInvalidApprovalThresholdError":
+              return `approval-request-threshold:${error.requiredApprovesCount}:${error.requestedCount}`
+            case "ApprovalRequestMutationUnsupportedError":
+              return `approval-request-unsupported:${error.operation}:${error.capability}`
+            case "ApprovalRequestNotActiveError":
+              return `approval-request-not-active:${error.request}:${error.status}`
+            case "ApprovalRequestApproverNotRequestedError":
+              return `approval-request-approver:${error.request}:${error.person}`
+            case "ApprovalRequestCancelUnauthorizedError":
+              return `approval-request-cancel:${error.request}:${error.actor}:${error.creator ?? ""}`
             case "ProjectNotFoundError":
               return `project:${error.identifier}`
             case "InvalidStatusError":
@@ -1290,6 +1311,58 @@ describe("Huly Errors", () => {
         }
 
         expect(matchError(new IssueNotFoundError({ identifier: "X", project: "Y" }))).toBe("issue:X")
+        expect(matchError(new ApprovalRequestNotFoundError({ request: "request-1" }))).toBe(
+          "approval-request:request-1"
+        )
+        expect(
+          matchError(
+            new ApprovalRequestTargetNotFoundError({
+              attachedTo: "issue-1",
+              attachedToClass: "tracker:class:Issue"
+            })
+          )
+        ).toBe("approval-request-target:issue-1:tracker:class:Issue")
+        expect(
+          matchError(
+            new ApprovalRequestInvalidApprovalThresholdError({
+              requiredApprovesCount: Count.make(3),
+              requestedCount: Count.make(2)
+            })
+          )
+        ).toBe("approval-request-threshold:3:2")
+        expect(
+          matchError(
+            new ApprovalRequestMutationUnsupportedError({
+              operation: "approve_approval_request",
+              capability: "updateCollection"
+            })
+          )
+        ).toBe("approval-request-unsupported:approve_approval_request:updateCollection")
+        expect(
+          matchError(
+            new ApprovalRequestNotActiveError({
+              request: "request-1",
+              status: "Cancelled"
+            })
+          )
+        ).toBe("approval-request-not-active:request-1:Cancelled")
+        expect(
+          matchError(
+            new ApprovalRequestApproverNotRequestedError({
+              request: "request-1",
+              person: "person-1"
+            })
+          )
+        ).toBe("approval-request-approver:request-1:person-1")
+        expect(
+          matchError(
+            new ApprovalRequestCancelUnauthorizedError({
+              request: "request-1",
+              actor: "person-social-1",
+              creator: "person-social-2"
+            })
+          )
+        ).toBe("approval-request-cancel:request-1:person-social-1:person-social-2")
         expect(matchError(new ProjectNotFoundError({ identifier: "Z" }))).toBe("project:Z")
         expect(matchError(new InvalidStatusError({ status: "bad", project: "P" }))).toBe("status:bad")
         expect(matchError(new PersonNotFoundError({ identifier: "john@example.com" }))).toBe("person:john@example.com")

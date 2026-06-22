@@ -3,6 +3,7 @@ import type { HulyStorageClient } from "../../huly/storage.js"
 import type { WorkspaceClientOperations } from "../../huly/workspace-client.js"
 import type { McpToolResponse } from "../error-mapping.js"
 import { activityTools } from "./activity.js"
+import { approvalRequestTools } from "./approval-requests.js"
 import { attachmentTools } from "./attachments.js"
 import { boardTools } from "./boards.js"
 import { calendarTools } from "./calendar.js"
@@ -91,6 +92,7 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...timeTools,
   ...plannerTools,
   ...preferenceTools,
+  ...approvalRequestTools,
   ...searchTools,
   ...activityTools,
   ...notificationTools,

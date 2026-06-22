@@ -478,6 +478,23 @@
       ]
     },
     {
+      "package": "@hcengineering/request",
+      "status": "gap",
+      "matrixLocation": "Generic approval requests",
+      "rationale": "Generic Request documents are now exposed read-only through list_approval_requests and get_approval_request. Approval mutations, cancellation, and decision comments remain tracked as first-class gaps.",
+      "exports": [
+        "Request"
+      ]
+    },
+    {
+      "package": "@hcengineering/request",
+      "status": "not-mcp-facing",
+      "rationale": "RequestPresenter is UI component metadata for rendering request documents, not a first-class LLM-facing resource.",
+      "exports": [
+        "RequestPresenter"
+      ]
+    },
+    {
       "package": "@hcengineering/tags",
       "status": "covered",
       "matrixLocation": "Tags/labels beyond tracker issues",

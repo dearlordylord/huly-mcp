@@ -5,7 +5,9 @@ export const ToolWarningCodeSchema = Schema.Literal(
   "space_role_assignments_degraded",
   "message_template_metadata_degraded",
   "viewlet_descriptor_metadata_degraded",
-  "space_preference_metadata_degraded"
+  "space_preference_metadata_degraded",
+  "approval_request_person_metadata_degraded",
+  "approval_request_count_metadata_degraded"
 ).annotations({
   identifier: "ToolWarningCode",
   title: "ToolWarningCode",
@@ -17,6 +19,8 @@ export const SpaceRoleAssignmentsDegradedWarningCode = ToolWarningCodeSchema.lit
 export const MessageTemplateMetadataDegradedWarningCode = ToolWarningCodeSchema.literals[2]
 export const ViewletDescriptorMetadataDegradedWarningCode = ToolWarningCodeSchema.literals[3]
 export const SpacePreferenceMetadataDegradedWarningCode = ToolWarningCodeSchema.literals[4]
+export const ApprovalRequestPersonMetadataDegradedWarningCode = ToolWarningCodeSchema.literals[5]
+export const ApprovalRequestCountMetadataDegradedWarningCode = ToolWarningCodeSchema.literals[6]
 
 export const ToolWarningSchema = Schema.Struct({
   code: ToolWarningCodeSchema,

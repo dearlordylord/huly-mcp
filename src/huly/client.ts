@@ -196,6 +196,7 @@ interface HulyClientContext {
 export interface HulyClientOperations extends HulyClientContext {
   readonly getAccountUuid: () => AccountUuid
   readonly getPrimarySocialId: () => PersonId
+  readonly getSocialIds?: () => ReadonlyArray<PersonId>
 
   readonly findAll: <T extends Doc>(
     _class: Ref<Class<T>>,
@@ -338,6 +339,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
         markupOps,
         primarySocialId,
         refUrl,
+        socialIds,
         workspaceUrlSlug
       } = yield* connectRestWithRetry({
         url: config.url,
@@ -370,6 +372,7 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
       const operations: HulyClientOperations = {
         getAccountUuid: () => accountUuid,
         getPrimarySocialId: () => primarySocialId,
+        getSocialIds: () => socialIds,
         workbenchUrlConfig,
         markupUrlConfig,
 
@@ -587,12 +590,15 @@ export class HulyClient extends Context.Tag("@hulymcp/HulyClient")<
     const noopFetchMarkup = (): Effect.Effect<string, HulyClientError> => Effect.succeed("")
 
     const defaultOps: HulyClientOperations = {
-      // AccountUuid is a double-branded string type with no public constructor
-      // eslint-disable-next-line no-restricted-syntax -- see above
+      // Brands are erased at runtime; AccountUuid is a string and has no public test constructor.
+      // eslint-disable-next-line no-restricted-syntax -- fixture value exercises test-layer defaults only
       getAccountUuid: () => "00000000-0000-4000-8000-000000000000" as AccountUuid,
-      // PersonId is a branded string type with no public constructor
-      // eslint-disable-next-line no-restricted-syntax -- see above
+      // Brands are erased at runtime; PersonId is a string and has no public test constructor.
+      // eslint-disable-next-line no-restricted-syntax -- fixture value exercises test-layer defaults only
       getPrimarySocialId: () => "test-primary-social-id" as PersonId,
+      // Brands are erased at runtime; PersonId is a string and has no public test constructor.
+      // eslint-disable-next-line no-restricted-syntax -- fixture value exercises test-layer defaults only
+      getSocialIds: () => ["test-primary-social-id" as PersonId],
       markupUrlConfig: testMarkupUrlConfig,
       workbenchUrlConfig: testWorkbenchUrlConfig,
       findAll: noopFindAll,
@@ -642,6 +648,7 @@ interface RestConnection {
   client: TxOperations
   accountUuid: AccountUuid
   primarySocialId: PersonId
+  socialIds: ReadonlyArray<PersonId>
   workspaceUrlSlug: WorkspaceUrlSlug
   markupOps: MarkupOperations
   refUrl: string
@@ -718,6 +725,7 @@ const connectRest = async (
     client,
     accountUuid: account.uuid,
     primarySocialId: account.primarySocialId,
+    socialIds: account.socialIds,
     workspaceUrlSlug: WorkspaceUrlSlug.make(info.workspaceUrl),
     markupOps,
     refUrl,

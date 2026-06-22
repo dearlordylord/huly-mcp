@@ -53,6 +53,7 @@ describe("CATEGORY_NAMES", () => {
       expect(CATEGORY_NAMES.has("recruiting")).toBe(true)
       expect(CATEGORY_NAMES.has("views")).toBe(true)
       expect(CATEGORY_NAMES.has("preferences")).toBe(true)
+      expect(CATEGORY_NAMES.has("approvals")).toBe(true)
       expect(CATEGORY_NAMES.size).toBeGreaterThan(5)
     }))
 
@@ -94,6 +95,17 @@ describe("CATEGORY_NAMES", () => {
     Effect.gen(function*() {
       expect(toolDefinition("list_space_preferences").category).toBe("preferences")
       expect(toolDefinition("get_space_preference").category).toBe("preferences")
+    }))
+
+  it.effect("registers approval request tools in the approvals category", () =>
+    Effect.gen(function*() {
+      expect(toolDefinition("list_approval_requests").category).toBe("approvals")
+      expect(toolDefinition("get_approval_request").category).toBe("approvals")
+      expect(toolDefinition("add_approval_request").category).toBe("approvals")
+      expect(toolDefinition("add_approval_request_comment").category).toBe("approvals")
+      expect(toolDefinition("approve_approval_request").category).toBe("approvals")
+      expect(toolDefinition("reject_approval_request").category).toBe("approvals")
+      expect(toolDefinition("cancel_approval_request").category).toBe("approvals")
     }))
 })
 

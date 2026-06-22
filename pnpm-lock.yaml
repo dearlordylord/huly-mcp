@@ -90,6 +90,9 @@ importers:
       '@hcengineering/rank':
         specifier: 0.7.18
         version: 0.7.18
+      '@hcengineering/request':
+        specifier: 0.7.0
+        version: 0.7.0
       '@hcengineering/tags':
         specifier: 0.7.0
         version: 0.7.0
@@ -865,6 +868,9 @@ packages:
 
   '@hcengineering/rank@0.7.18':
     resolution: {integrity: sha512-JwSXZpB8Xhbd8BXYwxtVi/EHV7ehh+QjY4dmFyhTuCp51mstbZZiquTYL76m6/VJFhBM2wVmfVvHAeaCiRUfkg==}
+
+  '@hcengineering/request@0.7.0':
+    resolution: {integrity: sha512-4nJW4HwOoQPvl0FcJ8mWorZxcFN0WrkWHdunu0LbVCLSKqAomLlgZwc414WP4cqoiqCWW/t39Y96jYo9B1KX2w==}
 
   '@hcengineering/rpc@0.7.18':
     resolution: {integrity: sha512-L393qKhpjttoYl+3fa92BQ6FQswwoLRG9QRzdJ03zJ6r3kIdM4N7+bLkaWEpFaRI31fLGwx0Ao/9jbO2MmB9aQ==}
@@ -5065,6 +5071,14 @@ snapshots:
     dependencies:
       '@hcengineering/core': 0.7.26
       lexorank: 1.0.5
+
+  '@hcengineering/request@0.7.0':
+    dependencies:
+      '@hcengineering/chunter': 0.7.0
+      '@hcengineering/contact': 0.7.0
+      '@hcengineering/core': 0.7.26
+      '@hcengineering/platform': 0.7.20
+      '@hcengineering/ui': 0.7.0
 
   '@hcengineering/rpc@0.7.18':
     dependencies:

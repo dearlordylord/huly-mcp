@@ -3311,6 +3311,156 @@ run_capture_to_var SPACE_PREFS_TEXT "list_space_preferences" \
 if [ $? -eq 0 ]; then
   assert_json_field_nonempty "list_space_preferences returns total" "$SPACE_PREFS_TEXT" ".total"
 fi
+
+run_capture_to_var APPROVAL_REQUESTS_TEXT "list_approval_requests" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_approval_requests","arguments":{"limit":5}},"id":2}'
+if [ $? -eq 0 ]; then
+  assert_json_field_nonempty "list_approval_requests returns total" "$APPROVAL_REQUESTS_TEXT" ".total"
+  FIRST_APPROVAL_REQUEST_ID=$(echo "$APPROVAL_REQUESTS_TEXT" | jq -r '.requests[0].id // empty' 2>/dev/null)
+  if [ -n "$FIRST_APPROVAL_REQUEST_ID" ]; then
+    FIRST_APPROVAL_REQUEST_ID_JSON=$(json_string "$FIRST_APPROVAL_REQUEST_ID")
+    run_capture_to_var APPROVAL_REQUEST_TEXT "get_approval_request($FIRST_APPROVAL_REQUEST_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_approval_request\",\"arguments\":{\"request\":$FIRST_APPROVAL_REQUEST_ID_JSON}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "get_approval_request returns id" "$APPROVAL_REQUEST_TEXT" ".id" "$FIRST_APPROVAL_REQUEST_ID"
+      assert_json_field_nonempty "get_approval_request returns status" "$APPROVAL_REQUEST_TEXT" ".status"
+    fi
+  else
+    echo "INFO: get_approval_request not exercised (no generic approval requests found)"
+  fi
+fi
+run_expect_error_contains "get_approval_request(missing)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_approval_request","arguments":{"request":"missing-approval-request-integration-fixture"}},"id":2}' \
+  "not found"
+
+APPROVAL_REQUESTED_IDENTIFIER="${HULY_EMAIL:-}"
+APPROVAL_PERSON_ID=""
+if [ -z "$APPROVAL_REQUESTED_IDENTIFIER" ]; then
+  APPROVAL_PERSON_FIRST="Approval-$RUN_ID"
+  APPROVAL_PERSON_EMAIL="approval-$RUN_ID@test.local"
+  APPROVAL_PERSON_FIRST_JSON=$(json_string "$APPROVAL_PERSON_FIRST")
+  APPROVAL_PERSON_EMAIL_JSON=$(json_string "$APPROVAL_PERSON_EMAIL")
+  run_capture_to_var APPROVAL_PERSON_TEXT "create_person(for_approval_request)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":$APPROVAL_PERSON_FIRST_JSON,\"lastName\":\"Requested\",\"email\":$APPROVAL_PERSON_EMAIL_JSON}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    APPROVAL_PERSON_ID=$(echo "$APPROVAL_PERSON_TEXT" | jq -r '.id // empty' 2>/dev/null)
+    APPROVAL_REQUESTED_IDENTIFIER="$APPROVAL_PERSON_ID"
+  fi
+fi
+
+if [ -n "$APPROVAL_REQUESTED_IDENTIFIER" ]; then
+  APPROVAL_ISSUE_TITLE="Approval Request IntTest $RUN_ID"
+  APPROVAL_ISSUE_TITLE_JSON=$(json_string "$APPROVAL_ISSUE_TITLE")
+  run_capture_to_var APPROVAL_ISSUE_TEXT "create_issue(for_approval_request)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":$APPROVAL_ISSUE_TITLE_JSON}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    APPROVAL_ISSUE_ID=$(echo "$APPROVAL_ISSUE_TEXT" | jq -r '.identifier // empty' 2>/dev/null)
+    APPROVAL_ISSUE_OBJ_ID=$(echo "$APPROVAL_ISSUE_TEXT" | jq -r '.issueId // empty' 2>/dev/null)
+    APPROVAL_ISSUE_OBJ_JSON=$(json_string "$APPROVAL_ISSUE_OBJ_ID")
+    APPROVAL_REQUESTED_JSON=$(json_string "$APPROVAL_REQUESTED_IDENTIFIER")
+
+    if [ -n "$APPROVAL_ISSUE_ID" ] && [ -n "$APPROVAL_ISSUE_OBJ_ID" ]; then
+      APPROVAL_CANCEL_ARGS=$(jq -nc \
+        --arg attached "$APPROVAL_ISSUE_OBJ_ID" \
+        --arg requested "$APPROVAL_REQUESTED_IDENTIFIER" \
+        --arg txid "approval-cancel-tx-$RUN_ID" \
+        '{attachedTo:$attached, attachedToClass:"tracker:class:Issue", requested:[$requested], tx:{_id:$txid, _class:"core:class:Tx"}}')
+      run_capture_to_var APPROVAL_ADD_TEXT "add_approval_request(cancel fixture)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_approval_request\",\"arguments\":$APPROVAL_CANCEL_ARGS},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        APPROVAL_CANCEL_REQUEST_ID=$(echo "$APPROVAL_ADD_TEXT" | jq -r '.request // empty' 2>/dev/null)
+        assert_json_field_equals "add_approval_request returns created action" "$APPROVAL_ADD_TEXT" ".action" "created"
+        assert_json_field_equals "add_approval_request returns Active status" "$APPROVAL_ADD_TEXT" ".status" "Active"
+
+        restart_http_transport_if_needed "approval request create readback"
+        APPROVAL_LIST_PAYLOAD="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_approval_requests\",\"arguments\":{\"attachedTo\":$APPROVAL_ISSUE_OBJ_JSON,\"attachedToClass\":\"tracker:class:Issue\",\"limit\":10}},\"id\":2}"
+        wait_for_json_array_contains_to_var APPROVAL_CREATED_LIST_TEXT "list_approval_requests includes created request" \
+          "$APPROVAL_LIST_PAYLOAD" ".requests | map(.id)" "$APPROVAL_CANCEL_REQUEST_ID" 8 1
+        run_capture_to_var APPROVAL_CREATED_GET_TEXT "get_approval_request(created)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_approval_request\",\"arguments\":{\"request\":\"$APPROVAL_CANCEL_REQUEST_ID\"}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          assert_json_field_equals "get_approval_request(created) returns attachedTo" "$APPROVAL_CREATED_GET_TEXT" ".attachedTo" "$APPROVAL_ISSUE_OBJ_ID"
+        fi
+
+        run_capture_to_var APPROVAL_COMMENT_TEXT "add_approval_request_comment" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_approval_request_comment\",\"arguments\":{\"request\":\"$APPROVAL_CANCEL_REQUEST_ID\",\"body\":\"Integration approval comment\"}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          assert_json_field_equals "add_approval_request_comment action" "$APPROVAL_COMMENT_TEXT" ".action" "comment_added"
+          assert_json_field_nonempty "add_approval_request_comment returns comment id" "$APPROVAL_COMMENT_TEXT" ".comment"
+        fi
+
+        run_capture_to_var APPROVAL_CANCEL_TEXT "cancel_approval_request" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"cancel_approval_request\",\"arguments\":{\"request\":\"$APPROVAL_CANCEL_REQUEST_ID\"}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          assert_json_field_equals "cancel_approval_request action" "$APPROVAL_CANCEL_TEXT" ".action" "cancelled"
+          assert_json_field_equals "cancel_approval_request status" "$APPROVAL_CANCEL_TEXT" ".status" "Cancelled"
+        fi
+      fi
+
+      APPROVAL_REJECT_ARGS=$(jq -nc \
+        --arg attached "$APPROVAL_ISSUE_OBJ_ID" \
+        --arg requested "$APPROVAL_REQUESTED_IDENTIFIER" \
+        --arg txid "approval-reject-tx-$RUN_ID" \
+        '{attachedTo:$attached, attachedToClass:"tracker:class:Issue", requested:[$requested], tx:{_id:$txid, _class:"core:class:Tx"}}')
+      run_capture_to_var APPROVAL_REJECT_ADD_TEXT "add_approval_request(reject fixture)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_approval_request\",\"arguments\":$APPROVAL_REJECT_ARGS},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        APPROVAL_REJECT_REQUEST_ID=$(echo "$APPROVAL_REJECT_ADD_TEXT" | jq -r '.request // empty' 2>/dev/null)
+        run_capture_to_var APPROVAL_REJECT_TEXT "reject_approval_request" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"reject_approval_request\",\"arguments\":{\"request\":\"$APPROVAL_REJECT_REQUEST_ID\",\"comment\":\"Integration rejection\"}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          assert_json_field_equals "reject_approval_request action" "$APPROVAL_REJECT_TEXT" ".action" "rejected"
+          assert_json_field_equals "reject_approval_request status" "$APPROVAL_REJECT_TEXT" ".status" "Rejected"
+          assert_json_field_nonempty "reject_approval_request returns comment id" "$APPROVAL_REJECT_TEXT" ".comment"
+        fi
+      fi
+
+      if [ -n "${HULY_EMAIL:-}" ]; then
+        APPROVAL_WITNESS_FIRST="ApprovalWitness-$RUN_ID"
+        APPROVAL_WITNESS_EMAIL="approval-witness-$RUN_ID@test.local"
+        APPROVAL_WITNESS_FIRST_JSON=$(json_string "$APPROVAL_WITNESS_FIRST")
+        APPROVAL_WITNESS_EMAIL_JSON=$(json_string "$APPROVAL_WITNESS_EMAIL")
+        run_capture_to_var APPROVAL_WITNESS_TEXT "create_person(for_approval_witness)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":$APPROVAL_WITNESS_FIRST_JSON,\"lastName\":\"Requested\",\"email\":$APPROVAL_WITNESS_EMAIL_JSON}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          APPROVAL_WITNESS_ID=$(echo "$APPROVAL_WITNESS_TEXT" | jq -r '.id // empty' 2>/dev/null)
+          APPROVAL_APPROVE_ARGS=$(jq -nc \
+            --arg attached "$APPROVAL_ISSUE_OBJ_ID" \
+            --arg current "$HULY_EMAIL" \
+            --arg witness "$APPROVAL_WITNESS_ID" \
+            --arg txid "approval-approve-tx-$RUN_ID" \
+            '{attachedTo:$attached, attachedToClass:"tracker:class:Issue", requested:[$current, $witness], requiredApprovesCount:2, tx:{_id:$txid, _class:"core:class:Tx"}}')
+          run_capture_to_var APPROVAL_APPROVE_ADD_TEXT "add_approval_request(approve fixture)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_approval_request\",\"arguments\":$APPROVAL_APPROVE_ARGS},\"id\":2}"
+          if [ $? -eq 0 ]; then
+            APPROVAL_APPROVE_REQUEST_ID=$(echo "$APPROVAL_APPROVE_ADD_TEXT" | jq -r '.request // empty' 2>/dev/null)
+            run_capture_to_var APPROVAL_APPROVE_TEXT "approve_approval_request" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"approve_approval_request\",\"arguments\":{\"request\":\"$APPROVAL_APPROVE_REQUEST_ID\",\"comment\":\"Integration approval\"}},\"id\":2}"
+            if [ $? -eq 0 ]; then
+              assert_json_field_equals "approve_approval_request action" "$APPROVAL_APPROVE_TEXT" ".action" "approved"
+              assert_json_field_equals "approve_approval_request changed" "$APPROVAL_APPROVE_TEXT" ".changed" "true"
+              assert_json_field_nonempty "approve_approval_request returns comment id" "$APPROVAL_APPROVE_TEXT" ".comment"
+              run_test "cancel_approval_request(after approve)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"cancel_approval_request\",\"arguments\":{\"request\":\"$APPROVAL_APPROVE_REQUEST_ID\"}},\"id\":2}"
+            fi
+          fi
+          run_test "delete_person(approval_witness:$APPROVAL_WITNESS_ID)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":\"$APPROVAL_WITNESS_ID\"}},\"id\":2}"
+        fi
+      fi
+
+      run_test "delete_issue(approval_request:$APPROVAL_ISSUE_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$APPROVAL_ISSUE_ID\"}},\"id\":2}"
+    fi
+  fi
+else
+  echo "INFO: approval request write integration not exercised (no requester identifier available)"
+fi
+
+if [ -n "$APPROVAL_PERSON_ID" ]; then
+  run_test "delete_person(approval_request:$APPROVAL_PERSON_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":\"$APPROVAL_PERSON_ID\"}},\"id\":2}"
+fi
 if [ -n "$FIRST_SPACE_ID" ]; then
   FIRST_SPACE_ID_JSON=$(json_string "$FIRST_SPACE_ID")
   run_capture_to_var SPACE_PREF_TEXT "get_space_preference($FIRST_SPACE_ID)" \

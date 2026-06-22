@@ -69,6 +69,8 @@ export {
 export { optionalOutput } from "./output-helpers.js"
 
 export {
+  ApprovalRequestCountMetadataDegradedWarningCode,
+  ApprovalRequestPersonMetadataDegradedWarningCode,
   MessageTemplateMetadataDegradedWarningCode,
   SpacePreferenceMetadataDegradedWarningCode,
   SpaceRoleAssignmentsDegradedWarningCode,
@@ -79,6 +81,55 @@ export {
   ToolWarningSchema,
   ViewletDescriptorMetadataDegradedWarningCode
 } from "./tool-warnings.js"
+
+export {
+  type AddApprovalRequestCommentParams,
+  addApprovalRequestCommentParamsJsonSchema,
+  AddApprovalRequestCommentParamsSchema,
+  type AddApprovalRequestParams,
+  addApprovalRequestParamsJsonSchema,
+  AddApprovalRequestParamsSchema,
+  type ApprovalPersonRef,
+  ApprovalPersonRefSchema,
+  ApprovalRequestCollection,
+  type ApprovalRequestDetail,
+  ApprovalRequestDetailSchema,
+  ApprovalRequestId,
+  type ApprovalRequestMutationAction,
+  ApprovalRequestMutationActionSchema,
+  type ApprovalRequestMutationResult,
+  ApprovalRequestMutationResultSchema,
+  type ApprovalRequestStatus,
+  ApprovalRequestStatusSchema,
+  type ApprovalRequestSummary,
+  ApprovalRequestSummarySchema,
+  type ApproveApprovalRequestParams,
+  approveApprovalRequestParamsJsonSchema,
+  ApproveApprovalRequestParamsSchema,
+  type CancelApprovalRequestParams,
+  cancelApprovalRequestParamsJsonSchema,
+  CancelApprovalRequestParamsSchema,
+  type GetApprovalRequestParams,
+  getApprovalRequestParamsJsonSchema,
+  GetApprovalRequestParamsSchema,
+  type GetApprovalRequestResult,
+  GetApprovalRequestResultSchema,
+  type ListApprovalRequestsParams,
+  listApprovalRequestsParamsJsonSchema,
+  ListApprovalRequestsParamsSchema,
+  type ListApprovalRequestsResult,
+  ListApprovalRequestsResultSchema,
+  parseAddApprovalRequestCommentParams,
+  parseAddApprovalRequestParams,
+  parseApproveApprovalRequestParams,
+  parseCancelApprovalRequestParams,
+  parseGetApprovalRequestParams,
+  parseListApprovalRequestsParams,
+  parseRejectApprovalRequestParams,
+  type RejectApprovalRequestParams,
+  rejectApprovalRequestParamsJsonSchema,
+  RejectApprovalRequestParamsSchema
+} from "./approval-requests.js"
 
 export {
   type GetSpacePreferenceParams,
