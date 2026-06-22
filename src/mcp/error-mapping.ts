@@ -98,6 +98,7 @@ const createErrorResponse = (
 
 const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDomainError["_tag"]>([
   "IssueNotFoundError",
+  "ApprovalRequestNotFoundError",
   "ProjectNotFoundError",
   "InvalidStatusError",
   "BoardNotFoundError",

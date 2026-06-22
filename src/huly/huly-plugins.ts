@@ -24,6 +24,7 @@ export const notification = require("@hcengineering/notification")
   .default as typeof import("@hcengineering/notification").default
 export const preference = require("@hcengineering/preference")
   .default as typeof import("@hcengineering/preference").default
+export const request = require("@hcengineering/request").default as typeof import("@hcengineering/request").default
 export const tags = require("@hcengineering/tags").default as typeof import("@hcengineering/tags").default
 export const task = require("@hcengineering/task").default as typeof import("@hcengineering/task").default
 export const templates = require("@hcengineering/templates")

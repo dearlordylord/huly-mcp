@@ -35,6 +35,7 @@ import {
 } from "../../src/domain/schemas/shared.js"
 import {
   ActivityMessageNotFoundError,
+  ApprovalRequestNotFoundError,
   AssociationConflictError,
   AssociationIdentifierAmbiguousError,
   AssociationInUseError,
@@ -904,6 +905,8 @@ describe("Huly Errors", () => {
           switch (error._tag) {
             case "IssueNotFoundError":
               return `issue:${error.identifier}`
+            case "ApprovalRequestNotFoundError":
+              return `approval-request:${error.request}`
             case "ProjectNotFoundError":
               return `project:${error.identifier}`
             case "InvalidStatusError":
@@ -1290,6 +1293,9 @@ describe("Huly Errors", () => {
         }
 
         expect(matchError(new IssueNotFoundError({ identifier: "X", project: "Y" }))).toBe("issue:X")
+        expect(matchError(new ApprovalRequestNotFoundError({ request: "request-1" }))).toBe(
+          "approval-request:request-1"
+        )
         expect(matchError(new ProjectNotFoundError({ identifier: "Z" }))).toBe("project:Z")
         expect(matchError(new InvalidStatusError({ status: "bad", project: "P" }))).toBe("status:bad")
         expect(matchError(new PersonNotFoundError({ identifier: "john@example.com" }))).toBe("person:john@example.com")

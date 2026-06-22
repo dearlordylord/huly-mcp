@@ -3311,6 +3311,27 @@ run_capture_to_var SPACE_PREFS_TEXT "list_space_preferences" \
 if [ $? -eq 0 ]; then
   assert_json_field_nonempty "list_space_preferences returns total" "$SPACE_PREFS_TEXT" ".total"
 fi
+
+run_capture_to_var APPROVAL_REQUESTS_TEXT "list_approval_requests" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_approval_requests","arguments":{"limit":5}},"id":2}'
+if [ $? -eq 0 ]; then
+  assert_json_field_nonempty "list_approval_requests returns total" "$APPROVAL_REQUESTS_TEXT" ".total"
+  FIRST_APPROVAL_REQUEST_ID=$(echo "$APPROVAL_REQUESTS_TEXT" | jq -r '.requests[0].id // empty' 2>/dev/null)
+  if [ -n "$FIRST_APPROVAL_REQUEST_ID" ]; then
+    FIRST_APPROVAL_REQUEST_ID_JSON=$(json_string "$FIRST_APPROVAL_REQUEST_ID")
+    run_capture_to_var APPROVAL_REQUEST_TEXT "get_approval_request($FIRST_APPROVAL_REQUEST_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_approval_request\",\"arguments\":{\"request\":$FIRST_APPROVAL_REQUEST_ID_JSON}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "get_approval_request returns id" "$APPROVAL_REQUEST_TEXT" ".id" "$FIRST_APPROVAL_REQUEST_ID"
+      assert_json_field_nonempty "get_approval_request returns status" "$APPROVAL_REQUEST_TEXT" ".status"
+    fi
+  else
+    echo "INFO: get_approval_request not exercised (no generic approval requests found)"
+  fi
+fi
+run_expect_error_contains "get_approval_request(missing)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_approval_request","arguments":{"request":"missing-approval-request-integration-fixture"}},"id":2}' \
+  "not found"
 if [ -n "$FIRST_SPACE_ID" ]; then
   FIRST_SPACE_ID_JSON=$(json_string "$FIRST_SPACE_ID")
   run_capture_to_var SPACE_PREF_TEXT "get_space_preference($FIRST_SPACE_ID)" \

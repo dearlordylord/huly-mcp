@@ -323,7 +323,7 @@ SDK upgrade revisit:
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
 ## Available Tools
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `boards`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `templates`, `planner`, `preferences`, `processes`, `recruiting`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `views`, `virtual-office`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `approvals`, `boards`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `templates`, `planner`, `preferences`, `processes`, `recruiting`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `views`, `virtual-office`
 
 ### Projects
 
@@ -622,6 +622,13 @@ SDK upgrade revisit:
 | `update_guest_settings` | Update workspace guest settings. Control read-only guest access and guest sign-up permissions. |
 | `create_access_link` | Create a Huly workspace access link. When role is omitted, role=GUEST. Supports anonymous reusable guest links by setting personalized=false with notBefore and expiration, and can restrict access to specific Huly space IDs via spaces. |
 | `get_regions` | Get available regions for workspace creation. Returns region codes and display names. |
+
+### Approvals
+
+| Tool | Description |
+|------|-------------|
+| `list_approval_requests` | List generic Huly approval Request documents from the published @hcengineering/request SDK package. This is read-only discovery: filter by status, raw attachedTo document id, and/or raw attachedToClass class id when you know the target document. Omit filters to inspect recent approval requests across modules. |
+| `get_approval_request` | Read one generic Huly approval Request document by raw request _id. Returns person refs with best-effort contact metadata plus the opaque SDK tx/rejectedTx payloads for inspection; approval mutations are intentionally not exposed by this read-only tool. |
 
 ### Boards
 

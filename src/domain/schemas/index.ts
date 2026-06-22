@@ -69,6 +69,8 @@ export {
 export { optionalOutput } from "./output-helpers.js"
 
 export {
+  ApprovalRequestCountMetadataDegradedWarningCode,
+  ApprovalRequestPersonMetadataDegradedWarningCode,
   MessageTemplateMetadataDegradedWarningCode,
   SpacePreferenceMetadataDegradedWarningCode,
   SpaceRoleAssignmentsDegradedWarningCode,
@@ -79,6 +81,31 @@ export {
   ToolWarningSchema,
   ViewletDescriptorMetadataDegradedWarningCode
 } from "./tool-warnings.js"
+
+export {
+  type ApprovalPersonRef,
+  ApprovalPersonRefSchema,
+  ApprovalRequestCollection,
+  type ApprovalRequestDetail,
+  ApprovalRequestDetailSchema,
+  ApprovalRequestId,
+  type ApprovalRequestStatus,
+  ApprovalRequestStatusSchema,
+  type ApprovalRequestSummary,
+  ApprovalRequestSummarySchema,
+  type GetApprovalRequestParams,
+  getApprovalRequestParamsJsonSchema,
+  GetApprovalRequestParamsSchema,
+  type GetApprovalRequestResult,
+  GetApprovalRequestResultSchema,
+  type ListApprovalRequestsParams,
+  listApprovalRequestsParamsJsonSchema,
+  ListApprovalRequestsParamsSchema,
+  type ListApprovalRequestsResult,
+  ListApprovalRequestsResultSchema,
+  parseGetApprovalRequestParams,
+  parseListApprovalRequestsParams
+} from "./approval-requests.js"
 
 export {
   type GetSpacePreferenceParams,

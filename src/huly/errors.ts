@@ -17,6 +17,7 @@
  *
  * @module
  */
+import { ApprovalRequestNotFoundError } from "./errors-approval-requests.js"
 import { HulyAuthError, HulyConnectionError, HulyError, NoUpdateFieldsError } from "./errors-base.js"
 import {
   BoardArchivedCardDeleteError,
@@ -242,6 +243,7 @@ export type HulyDomainError = HulyDomainErrorUnion
 
 export {
   ActivityMessageNotFoundError,
+  ApprovalRequestNotFoundError,
   AssociationConflictError,
   AssociationIdentifierAmbiguousError,
   AssociationInUseError,
