@@ -134,6 +134,8 @@ describe("McpServerService.layer with TOOLSETS env", () => {
     Effect.gen(function*() {
       delete process.env.TOOLSETS
       delete process.env.TOOLS
+      delete process.env.HULY_TOOL_MODE
+      delete process.env.PROXY_OUTPUT_STRICT
       const serverLayer = buildTestServerLayer({ transport: "stdio" }, baseLayers)
       yield* Layer.build(serverLayer)
     }))
@@ -142,6 +144,8 @@ describe("McpServerService.layer with TOOLSETS env", () => {
     Effect.gen(function*() {
       process.env.TOOLSETS = "issues"
       delete process.env.TOOLS
+      delete process.env.HULY_TOOL_MODE
+      delete process.env.PROXY_OUTPUT_STRICT
       const serverLayer = buildTestServerLayer({ transport: "stdio" }, baseLayers)
       yield* Layer.build(serverLayer)
       delete process.env.TOOLSETS
@@ -158,6 +162,8 @@ describe("McpServerService.layer with TOOLSETS env", () => {
     return Effect.gen(function*() {
       process.env.TOOLSETS = "issues"
       process.env.TOOLS = "list_documents"
+      delete process.env.HULY_TOOL_MODE
+      delete process.env.PROXY_OUTPUT_STRICT
       const telemetryLayer = TelemetryService.testLayer({
         sessionStart: (props) => {
           capturedToolCount = props.toolCount
@@ -187,6 +193,8 @@ describe("McpServerService.layer with TOOLSETS env", () => {
     return Effect.gen(function*() {
       process.env.TOOLSETS = "nonexistent_category"
       delete process.env.TOOLS
+      delete process.env.HULY_TOOL_MODE
+      delete process.env.PROXY_OUTPUT_STRICT
       const serverLayer = buildTestServerLayer({ transport: "stdio" }, baseLayers, writeError)
       yield* Layer.build(serverLayer)
       expect(writeError.mock.calls).toContainEqual([
@@ -196,11 +204,38 @@ describe("McpServerService.layer with TOOLSETS env", () => {
     })
   })
 
+  it.scoped("uses the default error writer for unknown toolset categories", () => {
+    const originalToolsets = process.env.TOOLSETS
+    const originalTools = process.env.TOOLS
+    return Effect.gen(function*() {
+      process.env.TOOLSETS = "nonexistent_category_default_writer"
+      delete process.env.TOOLS
+      delete process.env.HULY_TOOL_MODE
+      delete process.env.PROXY_OUTPUT_STRICT
+      const serverLayer = buildTestServerLayer({ transport: "stdio" }, baseLayers)
+
+      yield* Layer.build(serverLayer)
+
+      if (originalToolsets === undefined) {
+        delete process.env.TOOLSETS
+      } else {
+        process.env.TOOLSETS = originalToolsets
+      }
+      if (originalTools === undefined) {
+        delete process.env.TOOLS
+      } else {
+        process.env.TOOLS = originalTools
+      }
+    })
+  })
+
   it.scoped("sessionStart is called with correct transport and authMethod", () => {
     let capturedProps: unknown = null
     return Effect.gen(function*() {
       delete process.env.TOOLSETS
       delete process.env.TOOLS
+      delete process.env.HULY_TOOL_MODE
+      delete process.env.PROXY_OUTPUT_STRICT
       const telemetryLayer = TelemetryService.testLayer({
         sessionStart: (props) => {
           capturedProps = props
@@ -223,4 +258,32 @@ describe("McpServerService.layer with TOOLSETS env", () => {
       })
     })
   })
+
+  it.scoped("fails startup when HULY_TOOL_MODE is invalid", () =>
+    Effect.gen(function*() {
+      delete process.env.TOOLSETS
+      delete process.env.TOOLS
+      process.env.HULY_TOOL_MODE = "dynamic"
+      delete process.env.PROXY_OUTPUT_STRICT
+
+      const serverLayer = buildTestServerLayer({ transport: "stdio" }, baseLayers)
+      const exit = yield* Effect.exit(Layer.build(serverLayer))
+
+      expect(exit._tag).toBe("Failure")
+      delete process.env.HULY_TOOL_MODE
+    }))
+
+  it.scoped("fails startup when PROXY_OUTPUT_STRICT is invalid", () =>
+    Effect.gen(function*() {
+      delete process.env.TOOLSETS
+      delete process.env.TOOLS
+      delete process.env.HULY_TOOL_MODE
+      process.env.PROXY_OUTPUT_STRICT = "yes"
+
+      const serverLayer = buildTestServerLayer({ transport: "stdio" }, baseLayers)
+      const exit = yield* Effect.exit(Layer.build(serverLayer))
+
+      expect(exit._tag).toBe("Failure")
+      delete process.env.PROXY_OUTPUT_STRICT
+    }))
 })

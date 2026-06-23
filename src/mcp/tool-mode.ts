@@ -1,5 +1,33 @@
+import { Either, Schema } from "effect"
+
 export type ToolExposureMode = "native" | "proxy"
 export type ToolModeConfig = "auto" | "native" | "proxy"
+
+const ToolModeConfigSchema = Schema.Literal("auto", "native", "proxy")
+const ProxyOutputStrictEnvSchema = Schema.Literal("true", "false")
+
+export interface ToolExposureConfig {
+  readonly configuredMode: ToolModeConfig
+  readonly proxyOutputStrict: boolean
+}
+
+interface ToolExposureEnv {
+  readonly hulyToolMode?: string
+  readonly proxyOutputStrict?: string
+}
+
+type ToolExposureConfigParseResult =
+  | { readonly _tag: "Success"; readonly value: ToolExposureConfig }
+  | { readonly _tag: "Failure"; readonly message: string; readonly field: "HULY_TOOL_MODE" | "PROXY_OUTPUT_STRICT" }
+
+type EnvValueParseResult<T> =
+  | { readonly _tag: "Success"; readonly value: T }
+  | { readonly _tag: "Failure"; readonly message: string; readonly field: "HULY_TOOL_MODE" | "PROXY_OUTPUT_STRICT" }
+
+const DEFAULT_TOOL_EXPOSURE_CONFIG: ToolExposureConfig = {
+  configuredMode: "auto",
+  proxyOutputStrict: false
+}
 
 export type ClientKind =
   | "claude-code"
@@ -29,6 +57,50 @@ export interface McpClientInfoLike {
 export interface ResolveToolExposureModeInput {
   readonly configuredMode: ToolModeConfig
   readonly clientInfo?: McpClientInfoLike
+}
+
+const trimmedLower = (value: string): string => value.trim().toLowerCase()
+
+const parseConfiguredMode = (
+  raw: string | undefined
+): EnvValueParseResult<ToolModeConfig> => {
+  const normalized = raw === undefined ? DEFAULT_TOOL_EXPOSURE_CONFIG.configuredMode : trimmedLower(raw)
+  const decoded = Schema.decodeUnknownEither(ToolModeConfigSchema)(normalized)
+  if (Either.isRight(decoded)) return { _tag: "Success", value: decoded.right }
+  return {
+    _tag: "Failure",
+    field: "HULY_TOOL_MODE",
+    message: `Configuration error: HULY_TOOL_MODE must be one of auto, native, or proxy; received "${raw ?? ""}".`
+  }
+}
+
+const parseProxyOutputStrict = (
+  raw: string | undefined
+): EnvValueParseResult<boolean> => {
+  const normalized = raw === undefined ? "false" : trimmedLower(raw)
+  const decoded = Schema.decodeUnknownEither(ProxyOutputStrictEnvSchema)(normalized)
+  if (Either.isRight(decoded)) return { _tag: "Success", value: decoded.right === "true" }
+  return {
+    _tag: "Failure",
+    field: "PROXY_OUTPUT_STRICT",
+    message: `Configuration error: PROXY_OUTPUT_STRICT must be true or false; received "${raw ?? ""}".`
+  }
+}
+
+export const parseToolExposureConfig = (env: ToolExposureEnv): ToolExposureConfigParseResult => {
+  const configuredMode = parseConfiguredMode(env.hulyToolMode)
+  if (configuredMode._tag === "Failure") return configuredMode
+
+  const proxyOutputStrict = parseProxyOutputStrict(env.proxyOutputStrict)
+  if (proxyOutputStrict._tag === "Failure") return proxyOutputStrict
+
+  return {
+    _tag: "Success",
+    value: {
+      configuredMode: configuredMode.value,
+      proxyOutputStrict: proxyOutputStrict.value
+    }
+  }
 }
 
 const rawClientName = (clientInfo: McpClientInfoLike | undefined): string => {

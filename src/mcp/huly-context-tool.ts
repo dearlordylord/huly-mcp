@@ -4,6 +4,7 @@ import type { GetHulyContextResult } from "../domain/schemas/index.js"
 import { Count, NonEmptyString } from "../domain/schemas/index.js"
 import { VERSION } from "../version.js"
 import { DEFAULT_HTTP_PORT } from "./http-transport.js"
+import type { ClientKind, ToolExposureMode, ToolModeConfig } from "./tool-mode.js"
 import { createToolOutputSchema, hulyContextToolOutputSchema } from "./tool-output-schema.js"
 import { resolveToolScope, type ToolScopeSummary } from "./tool-scope.js"
 import { type ToolRegistry, toolRegistry } from "./tools/index.js"
@@ -42,7 +43,7 @@ export const versionToolDefinition = {
 export const getHulyContextToolDefinition = {
   name: GET_HULY_CONTEXT_TOOL_NAME,
   description:
-    "Returns sanitized runtime and configuration context for this Huly MCP session, including package version, transport, auth mode, Huly URL origin/host, workspace, timeout, and native tool scope filtering. Does not connect to Huly. Secret values such as tokens, passwords, and credential headers are never returned.",
+    "Returns sanitized runtime and configuration context for this Huly MCP session, including package version, transport, auth mode, Huly URL origin/host, workspace, timeout, native tool scope filtering, and resolved native/proxy tool exposure. Does not connect to Huly. Secret values such as tokens, passwords, and credential headers are never returned.",
   inputSchema: emptyInputSchema,
   outputSchema: hulyContextToolOutputSchema,
   annotations: {
@@ -74,6 +75,28 @@ const nonEmptyOrDefault = (value: string | undefined, fallback: string): string 
   return trimmed === undefined || trimmed === "" ? fallback : trimmed
 }
 
+export interface ToolExposureContext {
+  readonly configuredMode: ToolModeConfig
+  readonly resolvedMode: ToolExposureMode
+  readonly clientKind: ClientKind
+  readonly proxyOutputStrict: boolean
+  readonly visibleToolCount: number
+  readonly nativeVisibleToolCount: number
+  readonly proxyCandidateToolCount: number
+  readonly proxyToolNames: ReadonlyArray<string>
+}
+
+const defaultToolExposureContext = (registry: ToolRegistry): ToolExposureContext => ({
+  configuredMode: "auto",
+  resolvedMode: "native",
+  clientKind: "unknown",
+  proxyOutputStrict: false,
+  visibleToolCount: builtinToolNames.length + registry.definitions.length,
+  nativeVisibleToolCount: registry.definitions.length,
+  proxyCandidateToolCount: toolRegistry.definitions.length,
+  proxyToolNames: []
+})
+
 export const buildHulyContext = (
   config: {
     readonly transport: "stdio" | "http"
@@ -82,47 +105,61 @@ export const buildHulyContext = (
   },
   registry: ToolRegistry,
   toolScope: ToolScopeSummary,
-  runtimeConfig: SanitizedHulyRuntimeConfigContext
-): GetHulyContextResult => ({
-  package: {
-    name: NPM_PACKAGE_NAME,
-    version: nonEmptyOrDefault(VERSION, "0.0.0-dev")
-  },
-  transport: {
-    type: config.transport,
-    ...(config.transport === "http"
-      ? {
-        http: {
-          host: nonEmptyOrDefault(config.httpHost, "127.0.0.1"),
-          port: config.httpPort ?? DEFAULT_HTTP_PORT
-        }
-      }
-      : {})
-  },
-  huly: runtimeConfig.huly,
-  auth: runtimeConfig.auth,
-  configSources: runtimeConfig.configSources,
-  toolsets: {
-    filteringActive: toolScope.filteringActive,
-    requestedCategories: toolScope.requestedToolsets,
-    enabledCategories: toolScope.enabledToolsets,
-    ignoredCategories: toolScope.ignoredToolsets,
-    availableCategories: toolScope.availableCategories,
-    visibleRegisteredToolCount: Count.make(registry.definitions.length),
-    totalRegisteredToolCount: Count.make(toolScope.totalRegisteredToolCount),
-    builtinTools: builtinToolNames
-  },
-  toolScope: {
-    active: toolScope.filteringActive,
-    requestedToolsets: toolScope.requestedToolsets,
-    enabledToolsets: toolScope.enabledToolsets,
-    ignoredToolsets: toolScope.ignoredToolsets,
-    requestedTools: toolScope.requestedTools,
-    enabledTools: toolScope.enabledTools,
-    ignoredTools: toolScope.ignoredTools,
-    availableCategories: toolScope.availableCategories,
-    visibleRegisteredToolCount: Count.make(registry.definitions.length),
-    totalRegisteredToolCount: Count.make(toolScope.totalRegisteredToolCount),
-    builtinTools: builtinToolNames
+  runtimeConfig: SanitizedHulyRuntimeConfigContext,
+  exposureContext: ToolExposureContext = defaultToolExposureContext(registry)
+): GetHulyContextResult => {
+  const toolExposure = {
+    configuredMode: exposureContext.configuredMode,
+    resolvedMode: exposureContext.resolvedMode,
+    clientKind: exposureContext.clientKind,
+    proxyOutputStrict: exposureContext.proxyOutputStrict,
+    visibleToolCount: Count.make(exposureContext.visibleToolCount),
+    nativeVisibleToolCount: Count.make(exposureContext.nativeVisibleToolCount),
+    proxyCandidateToolCount: Count.make(exposureContext.proxyCandidateToolCount),
+    proxyToolNames: exposureContext.proxyToolNames
   }
-})
+  return {
+    package: {
+      name: NPM_PACKAGE_NAME,
+      version: nonEmptyOrDefault(VERSION, "0.0.0-dev")
+    },
+    transport: {
+      type: config.transport,
+      ...(config.transport === "http"
+        ? {
+          http: {
+            host: nonEmptyOrDefault(config.httpHost, "127.0.0.1"),
+            port: config.httpPort ?? DEFAULT_HTTP_PORT
+          }
+        }
+        : {})
+    },
+    huly: runtimeConfig.huly,
+    auth: runtimeConfig.auth,
+    configSources: runtimeConfig.configSources,
+    toolsets: {
+      filteringActive: toolScope.filteringActive,
+      requestedCategories: toolScope.requestedToolsets,
+      enabledCategories: toolScope.enabledToolsets,
+      ignoredCategories: toolScope.ignoredToolsets,
+      availableCategories: toolScope.availableCategories,
+      visibleRegisteredToolCount: Count.make(registry.definitions.length),
+      totalRegisteredToolCount: Count.make(toolScope.totalRegisteredToolCount),
+      builtinTools: builtinToolNames
+    },
+    toolScope: {
+      active: toolScope.filteringActive,
+      requestedToolsets: toolScope.requestedToolsets,
+      enabledToolsets: toolScope.enabledToolsets,
+      ignoredToolsets: toolScope.ignoredToolsets,
+      requestedTools: toolScope.requestedTools,
+      enabledTools: toolScope.enabledTools,
+      ignoredTools: toolScope.ignoredTools,
+      availableCategories: toolScope.availableCategories,
+      visibleRegisteredToolCount: Count.make(registry.definitions.length),
+      totalRegisteredToolCount: Count.make(toolScope.totalRegisteredToolCount),
+      builtinTools: builtinToolNames
+    },
+    toolExposure
+  }
+}

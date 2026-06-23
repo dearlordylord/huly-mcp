@@ -239,6 +239,8 @@ For a Smithery publish schema example, see [docs/SMITHERY_URL_PUBLISH.md](docs/S
 | `MCP_HTTP_PORT` | No | HTTP server port (falls back to `PORT`, then 3000) |
 | `MCP_HTTP_HOST` | No | HTTP server host. Omit to bind to the package default loopback host. |
 | `MCP_AUTH_TOKEN` | No | Optional bearer token required by HTTP clients for `/mcp`. This protects the MCP endpoint only; it is not a Huly API token. |
+| `HULY_TOOL_MODE` | No | Tool exposure mode: `auto` (default), `native`, or `proxy`. `auto` keeps exact `claude-code` native and resolves Codex, Cursor, Windsurf, Copilot, opencode, Claude AI, and unknown clients to proxy mode. |
+| `PROXY_OUTPUT_STRICT` | No | Proxy candidate strictness: `false` (default) keeps proxy discovery broad; `true` makes active `TOOLSETS` / `TOOLS` a hard allow-list for proxy search, schema lookup, and invocation. |
 | `TOOLSETS` | No | Comma-separated tool categories to expose. If neither `TOOLSETS` nor `TOOLS` is set, all native Huly tools are exposed. Example: `issues,projects,search` |
 | `TOOLS` | No | Comma-separated exact tool names to expose in addition to selected toolsets. Example: `list_documents,create_issue` |
 
@@ -248,7 +250,7 @@ For a Smithery publish schema example, see [docs/SMITHERY_URL_PUBLISH.md](docs/S
 
 `get_version` returns the current server version and latest npm version.
 
-`get_huly_context` returns sanitized runtime/configuration context for the current MCP session without connecting to Huly. It reports package version, transport, auth mode, sanitized Huly URL origin/host/protocol, workspace, timeout, config sources, and native tool scope filtering. Tokens, passwords, email values, credential headers, URL paths, URL query strings, and URL credentials are never returned.
+`get_huly_context` returns sanitized runtime/configuration context for the current MCP session without connecting to Huly. It reports package version, transport, auth mode, sanitized Huly URL origin/host/protocol, workspace, timeout, config sources, native tool scope filtering, and resolved native/proxy tool exposure. Tokens, passwords, email values, credential headers, URL paths, URL query strings, and URL credentials are never returned.
 
 ## MCP Resources
 
@@ -323,6 +325,17 @@ SDK upgrade revisit:
 <!-- tools:start -->
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
 ## Available Tools
+
+When resolved tool exposure is `proxy`, clients see the built-in tools plus these proxy meta-tools. Native Huly tools are then discovered and invoked through the proxy candidate catalog.
+
+### Proxy Meta-Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_tool_categories` | Lists Huly tool categories available through this proxy. Use this first when you need a broad map of capabilities before searching for a specific Huly tool. |
+| `search_tools` | Searches the current proxy-visible Huly tool catalog by tool name, category, description, and parameter names. Returns exact tool names plus required and optional parameter names for single-call follow-up with get_tool_schema or invoke_tool. |
+| `get_tool_schema` | Returns the exact input and output schema for one proxy-visible Huly tool. Use this before invoke_tool when you are not certain about required argument names or result shape. |
+| `invoke_tool` | Invokes one proxy-visible Huly tool by exact name with its arguments. This tool can call read or write Huly operations; check get_tool_schema and the target tool annotations when safety matters. |
 
 **`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `approvals`, `boards`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `templates`, `planner`, `preferences`, `processes`, `recruiting`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `views`, `virtual-office`
 

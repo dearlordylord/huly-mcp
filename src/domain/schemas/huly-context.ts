@@ -98,6 +98,26 @@ const ToolScopeContextSchema = Schema.Struct({
   builtinTools: Schema.Array(Schema.Literal("get_version", "get_huly_context"))
 })
 
+const ToolExposureContextSchema = Schema.Struct({
+  configuredMode: Schema.Literal("auto", "native", "proxy"),
+  resolvedMode: Schema.Literal("native", "proxy"),
+  clientKind: Schema.Literal(
+    "claude-code",
+    "claude-ai",
+    "cursor",
+    "windsurf",
+    "github-copilot",
+    "codex",
+    "opencode",
+    "unknown"
+  ),
+  proxyOutputStrict: Schema.Boolean,
+  visibleToolCount: Count,
+  nativeVisibleToolCount: Count,
+  proxyCandidateToolCount: Count,
+  proxyToolNames: Schema.Array(NonEmptyTrimmedString)
+})
+
 export const GetHulyContextResultSchema = Schema.Struct({
   package: Schema.Struct({
     name: Schema.Literal("@firfi/huly-mcp"),
@@ -114,7 +134,8 @@ export const GetHulyContextResultSchema = Schema.Struct({
   auth: AuthContextSchema,
   configSources: ConfigSourcesSchema,
   toolsets: ToolsetsContextSchema,
-  toolScope: ToolScopeContextSchema
+  toolScope: ToolScopeContextSchema,
+  toolExposure: ToolExposureContextSchema
 })
 
 export type GetHulyContextResult = Schema.Schema.Type<typeof GetHulyContextResultSchema>

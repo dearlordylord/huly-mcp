@@ -1,6 +1,7 @@
 #!/bin/bash
 # Full integration test suite for Huly MCP server.
 # Usage: set -a && source .env.local && set +a && bash scripts/integration_test_full.sh
+# This suite defaults HULY_TOOL_MODE to native because it calls native Huly tools directly.
 # Requires: jq, node, HULY_URL/HULY_WORKSPACE/HULY_EMAIL+HULY_PASSWORD env vars
 set -o pipefail
 
@@ -51,6 +52,18 @@ WORKFLOW_CLEANED=false
 
 if [ -z "$HULY_URL" ]; then
   echo "ERROR: HULY_URL not set. Run: set -a && source .env.local && set +a"
+  exit 1
+fi
+
+# This suite calls native Huly tools directly. In auto mode, generic integration
+# client identities intentionally resolve to proxy mode, where those tools are
+# reachable only through invoke_tool. Keep proxy/auto surface checks in
+# scripts/integration_test_tool_scope.sh and force this suite to native mode.
+if [ -z "${HULY_TOOL_MODE+x}" ]; then
+  export HULY_TOOL_MODE=native
+elif [ "$HULY_TOOL_MODE" != "native" ]; then
+  echo "ERROR: integration_test_full.sh requires HULY_TOOL_MODE=native because it calls native Huly tools directly."
+  echo "Unset HULY_TOOL_MODE to let the script select native mode automatically."
   exit 1
 fi
 

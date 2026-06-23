@@ -25,6 +25,8 @@ import { Diagnostics } from "../../src/huly/diagnostics.js"
 import { HulyConnectionError } from "../../src/huly/errors.js"
 import { task, tracker } from "../../src/huly/huly-plugins.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
+import { WorkspaceClient } from "../../src/huly/workspace-client.js"
+import { createInvalidParamsError } from "../../src/mcp/error-mapping.js"
 import {
   buildHulyContext,
   GET_HULY_CONTEXT_TOOL_NAME,
@@ -39,6 +41,8 @@ import {
   liveNowClock,
   type NowClock
 } from "../../src/mcp/protocol-handlers.js"
+import { resolveProtocolExposure, toListedTool } from "../../src/mcp/protocol-tool-exposure.js"
+import { handleProxyToolCall } from "../../src/mcp/proxy-tools.js"
 import { createToolOutputSchema } from "../../src/mcp/tool-output-schema.js"
 import { createFilteredRegistry, type ToolRegistry, toolRegistry } from "../../src/mcp/tools/index.js"
 import { defineTool, isNoArgumentTool, requiresArgumentsObject } from "../../src/mcp/tools/registry.js"
@@ -190,6 +194,26 @@ describe("createMcpProtocolHandlers", () => {
       expect(listed?.inputSchema).not.toHaveProperty("properties")
     })
 
+    it("omits optional output schema and annotations when converting a bare listed tool", () => {
+      const listed = toListedTool({
+        name: "bare_tool",
+        description: "Tool used to exercise protocol schema conversion.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            valid: { type: "string" },
+            ignored: "not an object"
+          },
+          required: ["valid"],
+          additionalProperties: false
+        }
+      })
+
+      expect(listed.outputSchema).toBeUndefined()
+      expect(listed.annotations).toBeUndefined()
+      expect(listed.inputSchema.properties).toEqual({ valid: { type: "string" } })
+    })
+
     it("lists every registered category tool after schema compatibility conversion", async () => {
       const handlers = createMcpProtocolHandlers(
         unusedResolveClients,
@@ -292,6 +316,20 @@ const buildStubClients = (hulyOps: Partial<HulyClientOperations> = {}): () => Pr
         Layer.merge(HulyClient.testLayer(hulyOps), HulyStorageClient.testLayer({}))
       ).pipe(Effect.scoped)
       return { hulyClient: Context.get(ctx, HulyClient), storageClient: Context.get(ctx, HulyStorageClient) }
+    })
+  )
+
+const buildStubClientsWithWorkspace = (): () => Promise<ClientBundle> => () =>
+  Effect.runPromise(
+    Effect.gen(function*() {
+      const ctx = yield* Layer.build(
+        Layer.mergeAll(HulyClient.testLayer({}), HulyStorageClient.testLayer({}), WorkspaceClient.testLayer({}))
+      ).pipe(Effect.scoped)
+      return {
+        hulyClient: Context.get(ctx, HulyClient),
+        storageClient: Context.get(ctx, HulyStorageClient),
+        workspaceClient: Context.get(ctx, WorkspaceClient)
+      }
     })
   )
 
@@ -437,6 +475,18 @@ const diagnosticProbeTool = defineTool(
     })
 )
 
+const arraySchemaProbeTool = defineTool(
+  {
+    name: "array_schema_probe",
+    description: "array schema probe tool",
+    inputSchema: [],
+    resultSchema: Schema.Struct({ ok: Schema.Boolean }),
+    category: "test"
+  },
+  Schema.decodeUnknown(Schema.Unknown),
+  () => Effect.succeed({ ok: true })
+)
+
 const diagnosticProbeRegistry: ToolRegistry = {
   tools: new Map([[diagnosticProbeTool.name, diagnosticProbeTool]]),
   definitions: [diagnosticProbeTool],
@@ -445,6 +495,47 @@ const diagnosticProbeRegistry: ToolRegistry = {
     return diagnosticProbeTool.handler(args ?? {}, hulyClient, storageClient, workspaceClient)
   }
 }
+
+const contentOnlyProxyRegistry: ToolRegistry = {
+  ...diagnosticProbeRegistry,
+  handleToolCall: async () => ({
+    content: [{ type: "text", text: "plain target output" }]
+  })
+}
+
+const errorProxyRegistry: ToolRegistry = {
+  ...diagnosticProbeRegistry,
+  handleToolCall: async () => createInvalidParamsError("target rejected arguments", "TargetRejected")
+}
+
+const nullDispatchProxyRegistry: ToolRegistry = {
+  ...diagnosticProbeRegistry,
+  handleToolCall: async () => null
+}
+
+const arraySchemaProbeRegistry: ToolRegistry = {
+  tools: new Map([[arraySchemaProbeTool.name, arraySchemaProbeTool]]),
+  definitions: [arraySchemaProbeTool],
+  handleToolCall: async () => null
+}
+
+const protocolRegistries = (fullRegistry: ToolRegistry, scopedNativeRegistry: ToolRegistry = fullRegistry) => ({
+  fullRegistry,
+  scopedNativeRegistry
+})
+
+const proxyExposureOptions = (config?: {
+  proxyOutputStrict?: boolean
+  toolScopeFilteringActive?: boolean
+  clientName?: string
+}) => ({
+  exposureConfig: {
+    configuredMode: "proxy" as const,
+    proxyOutputStrict: config?.proxyOutputStrict ?? false
+  },
+  toolScopeFilteringActive: config?.toolScopeFilteringActive ?? false,
+  currentClientInfo: () => (config?.clientName === undefined ? undefined : { name: config.clientName })
+})
 
 // Narrow the MCP content union to the text variant (no cast).
 const firstText = (content: ReadonlyArray<unknown>): string => {
@@ -505,6 +596,16 @@ const makeValidContext = (): GetHulyContextResult =>
       visibleRegisteredToolCount: 1,
       totalRegisteredToolCount: 1,
       builtinTools: ["get_version", "get_huly_context"]
+    },
+    toolExposure: {
+      configuredMode: "auto",
+      resolvedMode: "native",
+      clientKind: "unknown",
+      proxyOutputStrict: false,
+      visibleToolCount: 3,
+      nativeVisibleToolCount: 1,
+      proxyCandidateToolCount: 1,
+      proxyToolNames: []
     }
   })
 
@@ -600,6 +701,36 @@ describe("createMcpProtocolHandlers — get_huly_context tool", () => {
     const response = await handlers.callTool({ params: { name: GET_HULY_CONTEXT_TOOL_NAME, arguments: { x: 1 } } })
 
     expect(response.isError).toBe(true)
+  })
+
+  it("passes resolved proxy exposure into the context result", async () => {
+    const handlers = createMcpProtocolHandlers(
+      unusedResolveClients,
+      createTelemetryProbe().telemetry,
+      protocolRegistries(toolRegistry),
+      (toolExposure) =>
+        buildHulyContext(
+          { transport: "stdio" },
+          toolRegistry,
+          parseToolsets(undefined, () => {}),
+          sanitizeHulyRuntimeConfigFromEnv({}),
+          toolExposure
+        ),
+      liveNowClock,
+      () => Promise.resolve("0.0.0"),
+      proxyExposureOptions({ clientName: "codex-cli" })
+    )
+
+    const response = await handlers.callTool({ params: { name: GET_HULY_CONTEXT_TOOL_NAME, arguments: {} } })
+
+    expect(response.structuredContent?.result).toMatchObject({
+      toolExposure: {
+        configuredMode: "proxy",
+        resolvedMode: "proxy",
+        clientKind: "codex",
+        proxyToolNames: ["list_tool_categories", "search_tools", "get_tool_schema", "invoke_tool"]
+      }
+    })
   })
 })
 
@@ -749,6 +880,436 @@ describe("createMcpProtocolHandlers — tool dispatch", () => {
     const response = await handlers.callTool({ params: { name: argsTool.name } })
 
     expect(response.isError).toBe(true)
+  })
+})
+
+describe("createMcpProtocolHandlers — proxy mode", () => {
+  it("uses an empty visible native registry for unscoped proxy mode", async () => {
+    const exposure = resolveProtocolExposure(
+      protocolRegistries(toolRegistry),
+      proxyExposureOptions()
+    )
+    const clients = await buildStubClients()()
+
+    const response = await exposure.visibleNativeRegistry.handleToolCall(
+      "list_projects",
+      {},
+      clients.hulyClient,
+      clients.storageClient
+    )
+
+    expect(exposure.visibleNativeRegistry.definitions).toEqual([])
+    expect(response).toBeNull()
+  })
+
+  it("lists builtins and proxy meta-tools while hiding native tools when unscoped", async () => {
+    const handlers = createMcpProtocolHandlers(
+      unusedResolveClients,
+      createTelemetryProbe().telemetry,
+      protocolRegistries(toolRegistry),
+      makeValidContext,
+      liveNowClock,
+      () => Promise.resolve("0.0.0"),
+      proxyExposureOptions()
+    )
+
+    const listed = await handlers.listTools()
+    const names = listed.tools.map((tool) => tool.name)
+
+    expect(names).toEqual([
+      "get_version",
+      "get_huly_context",
+      "list_tool_categories",
+      "search_tools",
+      "get_tool_schema",
+      "invoke_tool"
+    ])
+    expect(names).not.toContain("list_projects")
+  })
+
+  it("lists proxy categories from the active candidate registry", async () => {
+    const handlers = createMcpProtocolHandlers(
+      unusedResolveClients,
+      createTelemetryProbe().telemetry,
+      protocolRegistries(diagnosticProbeRegistry),
+      makeValidContext,
+      liveNowClock,
+      () => Promise.resolve("0.0.0"),
+      proxyExposureOptions()
+    )
+
+    const response = await handlers.callTool({ params: { name: "list_tool_categories", arguments: {} } })
+
+    expect(response.isError).not.toBe(true)
+    expect(response.structuredContent?.result).toEqual({
+      categories: [{ name: "test", description: "Huly test tools.", toolCount: 1 }]
+    })
+  })
+
+  it("rejects direct calls to hidden native tools but exposes them through proxy search and schema lookup", async () => {
+    const handlers = createMcpProtocolHandlers(
+      unusedResolveClients,
+      createTelemetryProbe().telemetry,
+      protocolRegistries(toolRegistry),
+      makeValidContext,
+      liveNowClock,
+      () => Promise.resolve("0.0.0"),
+      proxyExposureOptions()
+    )
+
+    const direct = await handlers.callTool({ params: { name: "list_projects", arguments: {} } })
+    const search = await handlers.callTool({ params: { name: "search_tools", arguments: { query: "list projects" } } })
+    const schema = await handlers.callTool({
+      params: { name: "get_tool_schema", arguments: { toolName: "list_projects" } }
+    })
+
+    expect(direct.isError).toBe(true)
+    expect(firstText(direct.content)).toContain("Unknown tool")
+    expect(firstText(search.content)).toContain("list_projects")
+    expect(schema.isError).not.toBe(true)
+    expect(firstText(schema.content)).toContain("\"name\":\"list_projects\"")
+  })
+
+  it("keeps search param summaries root-required only and returns exact schemas for proxy lookup", async () => {
+    const handlers = createMcpProtocolHandlers(
+      unusedResolveClients,
+      createTelemetryProbe().telemetry,
+      protocolRegistries(toolRegistry),
+      makeValidContext,
+      liveNowClock,
+      () => Promise.resolve("0.0.0"),
+      proxyExposureOptions()
+    )
+
+    const search = await handlers.callTool({ params: { name: "search_tools", arguments: { query: "edit_document" } } })
+    const schema = await handlers.callTool({
+      params: { name: "get_tool_schema", arguments: { toolName: "edit_document" } }
+    })
+    const searchResult = search.structuredContent?.result
+    const schemaResult = schema.structuredContent?.result
+
+    if (!isJsonObject(searchResult) || !Array.isArray(searchResult.matches)) {
+      throw new Error("expected search result matches")
+    }
+    const editMatch = searchResult.matches.find((match) => isJsonObject(match) && match.name === "edit_document")
+    if (!isJsonObject(editMatch)) throw new Error("expected edit_document search match")
+    expect(editMatch.requiredParams).toEqual(["teamspace", "document"])
+    expect(editMatch.optionalParams).toEqual(
+      expect.arrayContaining(["title", "content", "old_text", "new_text"])
+    )
+
+    if (!isJsonObject(schemaResult) || !isJsonObject(schemaResult.inputSchema)) {
+      throw new Error("expected schema lookup result")
+    }
+    expect(schemaResult.inputSchema.anyOf).toEqual([
+      { required: ["title"] },
+      { required: ["content"] },
+      { required: ["old_text", "new_text"] }
+    ])
+    expect(schemaResult.inputSchema).toHaveProperty("allOf")
+  })
+
+  it("ranks exact tool-name matches first and handles non-record input schemas in summaries", async () => {
+    const handlers = createMcpProtocolHandlers(
+      unusedResolveClients,
+      createTelemetryProbe().telemetry,
+      protocolRegistries(arraySchemaProbeRegistry),
+      makeValidContext,
+      liveNowClock,
+      () => Promise.resolve("0.0.0"),
+      proxyExposureOptions()
+    )
+
+    const response = await handlers.callTool({
+      params: { name: "search_tools", arguments: { query: "array_schema_probe" } }
+    })
+
+    expect(response.isError).not.toBe(true)
+    expect(response.structuredContent?.result).toEqual({
+      matches: [{
+        name: "array_schema_probe",
+        category: "test",
+        description: "array schema probe tool",
+        requiredParams: [],
+        optionalParams: []
+      }]
+    })
+  })
+
+  it("rejects proxy meta-tools directly in native mode", async () => {
+    const handlers = createMcpProtocolHandlers(
+      unusedResolveClients,
+      createTelemetryProbe().telemetry,
+      protocolRegistries(toolRegistry),
+      makeValidContext
+    )
+
+    const response = await handlers.callTool({ params: { name: "search_tools", arguments: { query: "projects" } } })
+
+    expect(response.isError).toBe(true)
+    expect(firstText(response.content)).toContain("Unknown tool")
+  })
+
+  it("validates proxy meta-tool arguments before returning catalog data", async () => {
+    const handlers = createMcpProtocolHandlers(
+      buildStubClients(),
+      createTelemetryProbe().telemetry,
+      protocolRegistries(toolRegistry),
+      makeValidContext,
+      liveNowClock,
+      () => Promise.resolve("0.0.0"),
+      proxyExposureOptions()
+    )
+
+    const search = await handlers.callTool({ params: { name: "search_tools" } })
+    const schema = await handlers.callTool({ params: { name: "get_tool_schema", arguments: { toolName: "   " } } })
+    const invoked = await handlers.callTool({ params: { name: "invoke_tool", arguments: { toolName: "   " } } })
+
+    expect(search.isError).toBe(true)
+    expect(schema.isError).toBe(true)
+    expect(invoked.isError).toBe(true)
+  })
+
+  it("invokes a proxy candidate and wraps the target result with warnings", async () => {
+    const handlers = createMcpProtocolHandlers(
+      buildStubClients(),
+      createTelemetryProbe().telemetry,
+      protocolRegistries(diagnosticProbeRegistry),
+      makeValidContext,
+      liveNowClock,
+      () => Promise.resolve("0.0.0"),
+      proxyExposureOptions()
+    )
+
+    const response = await handlers.callTool({
+      params: {
+        name: "invoke_tool",
+        arguments: {
+          toolName: "diagnostic_probe",
+          arguments: { subject: "proxy invoke" }
+        }
+      }
+    })
+
+    expect(response.isError).not.toBe(true)
+    expect(response.structuredContent?.result).toEqual({
+      toolName: "diagnostic_probe",
+      result: { subject: "proxy invoke", degraded: true },
+      warnings: [{
+        code: "status_metadata_unresolved",
+        message: "Status metadata was degraded for proxy invoke."
+      }]
+    })
+  })
+
+  it("passes workspace clients into proxy invocation when available", async () => {
+    const handlers = createMcpProtocolHandlers(
+      buildStubClientsWithWorkspace(),
+      createTelemetryProbe().telemetry,
+      protocolRegistries(diagnosticProbeRegistry),
+      makeValidContext,
+      liveNowClock,
+      () => Promise.resolve("0.0.0"),
+      proxyExposureOptions()
+    )
+
+    const response = await handlers.callTool({
+      params: {
+        name: "invoke_tool",
+        arguments: {
+          toolName: "diagnostic_probe",
+          arguments: { subject: "with workspace" }
+        }
+      }
+    })
+
+    expect(response.isError).not.toBe(true)
+    expect(response.structuredContent?.result).toMatchObject({
+      toolName: "diagnostic_probe",
+      result: { subject: "with workspace", degraded: true }
+    })
+  })
+
+  it("maps proxy invoke client-resolution failures to tool errors", async () => {
+    const probe = createTelemetryProbe()
+    const errorHandlers = createMcpProtocolHandlers(
+      rejectingResolveClients,
+      probe.telemetry,
+      protocolRegistries(diagnosticProbeRegistry),
+      makeValidContext,
+      liveNowClock,
+      () => Promise.resolve("0.0.0"),
+      proxyExposureOptions()
+    )
+    const nonErrorHandlers = createMcpProtocolHandlers(
+      rejectingResolveClientsWithString,
+      probe.telemetry,
+      protocolRegistries(diagnosticProbeRegistry),
+      makeValidContext,
+      liveNowClock,
+      () => Promise.resolve("0.0.0"),
+      proxyExposureOptions()
+    )
+
+    const errorResponse = await errorHandlers.callTool({
+      params: {
+        name: "invoke_tool",
+        arguments: {
+          toolName: "diagnostic_probe",
+          arguments: { subject: "client failure" }
+        }
+      }
+    })
+    const nonErrorResponse = await nonErrorHandlers.callTool({
+      params: {
+        name: "invoke_tool",
+        arguments: {
+          toolName: "diagnostic_probe",
+          arguments: { subject: "client failure" }
+        }
+      }
+    })
+
+    expect(errorResponse.isError).toBe(true)
+    expect(firstText(errorResponse.content)).toContain("client init boom")
+    expect(nonErrorResponse.isError).toBe(true)
+    expect(firstText(nonErrorResponse.content)).toContain("client init boom")
+    expect(probe.toolCalled.map(call => call.status)).toEqual(["error", "error"])
+  })
+
+  it("wraps content-only proxy target output without warnings", async () => {
+    const handlers = createMcpProtocolHandlers(
+      buildStubClients(),
+      createTelemetryProbe().telemetry,
+      protocolRegistries(contentOnlyProxyRegistry),
+      makeValidContext,
+      liveNowClock,
+      () => Promise.resolve("0.0.0"),
+      proxyExposureOptions()
+    )
+
+    const response = await handlers.callTool({
+      params: { name: "invoke_tool", arguments: { toolName: "diagnostic_probe", arguments: {} } }
+    })
+
+    expect(response.isError).not.toBe(true)
+    expect(response.structuredContent?.result).toEqual({
+      toolName: "diagnostic_probe",
+      result: [{ type: "text", text: "plain target output" }]
+    })
+  })
+
+  it("returns target proxy errors and null dispatches without wrapping them as successes", async () => {
+    const clients = await buildStubClients()()
+    const errorResponse = await handleProxyToolCall({
+      toolName: "invoke_tool",
+      args: { toolName: "diagnostic_probe", arguments: {} },
+      proxyCandidateRegistry: errorProxyRegistry,
+      clients
+    })
+    const nullResponse = await handleProxyToolCall({
+      toolName: "invoke_tool",
+      args: { toolName: "diagnostic_probe", arguments: {} },
+      proxyCandidateRegistry: nullDispatchProxyRegistry,
+      clients
+    })
+
+    expect(errorResponse.isError).toBe(true)
+    expect(firstText(errorResponse.content)).toContain("target rejected arguments")
+    expect(nullResponse.isError).toBe(true)
+    expect(firstText(nullResponse.content)).toContain("Unknown tool")
+  })
+
+  it("reports missing proxy clients and unknown proxy meta-tool names", async () => {
+    const invalidListCategories = await handleProxyToolCall({
+      toolName: "list_tool_categories",
+      args: "not an object",
+      proxyCandidateRegistry: diagnosticProbeRegistry
+    })
+    const missingClients = await handleProxyToolCall({
+      toolName: "invoke_tool",
+      args: { toolName: "diagnostic_probe", arguments: {} },
+      proxyCandidateRegistry: diagnosticProbeRegistry
+    })
+    const unknown = await handleProxyToolCall({
+      toolName: "missing_proxy_meta_tool",
+      args: {},
+      proxyCandidateRegistry: diagnosticProbeRegistry
+    })
+
+    expect(invalidListCategories.isError).toBe(true)
+    expect(missingClients.isError).toBe(true)
+    expect(firstText(missingClients.content)).toContain("requires initialized Huly clients")
+    expect(unknown.isError).toBe(true)
+    expect(firstText(unknown.content)).toContain("Unknown tool")
+  })
+
+  it("lists scoped native pins in non-strict proxy mode while keeping full proxy discovery", async () => {
+    const scopedIssuesRegistry = createFilteredRegistry(new Set(["issues"]))
+    const handlers = createMcpProtocolHandlers(
+      unusedResolveClients,
+      createTelemetryProbe().telemetry,
+      protocolRegistries(toolRegistry, scopedIssuesRegistry),
+      makeValidContext,
+      liveNowClock,
+      () => Promise.resolve("0.0.0"),
+      proxyExposureOptions({ toolScopeFilteringActive: true })
+    )
+
+    const listed = await handlers.listTools()
+    const search = await handlers.callTool({ params: { name: "search_tools", arguments: { query: "documents" } } })
+
+    expect(listed.tools.map((tool) => tool.name)).toContain("list_issues")
+    expect(listed.tools.map((tool) => tool.name)).not.toContain("list_documents")
+    expect(firstText(search.content)).toContain("list_documents")
+  })
+
+  it("uses active scope as a hard allow-list when proxy output strict is true", async () => {
+    const scopedIssuesRegistry = createFilteredRegistry(new Set(["issues"]))
+    const handlers = createMcpProtocolHandlers(
+      unusedResolveClients,
+      createTelemetryProbe().telemetry,
+      protocolRegistries(toolRegistry, scopedIssuesRegistry),
+      makeValidContext,
+      liveNowClock,
+      () => Promise.resolve("0.0.0"),
+      proxyExposureOptions({ proxyOutputStrict: true, toolScopeFilteringActive: true })
+    )
+
+    const listed = await handlers.listTools()
+    const search = await handlers.callTool({ params: { name: "search_tools", arguments: { query: "documents" } } })
+    const schema = await handlers.callTool({
+      params: { name: "get_tool_schema", arguments: { toolName: "list_documents" } }
+    })
+
+    expect(listed.tools.map((tool) => tool.name)).not.toContain("list_issues")
+    expect(firstText(search.content)).not.toContain("list_documents")
+    expect(firstText(search.content)).toContain("\"category\":\"issues\"")
+    expect(schema.isError).toBe(true)
+  })
+
+  it("blocks search, schema, and invocation candidates when strict active scope resolves to no tools", async () => {
+    const handlers = createMcpProtocolHandlers(
+      buildStubClients(),
+      createTelemetryProbe().telemetry,
+      protocolRegistries(diagnosticProbeRegistry, createFilteredRegistry(new Set(["missing_category"]))),
+      makeValidContext,
+      liveNowClock,
+      () => Promise.resolve("0.0.0"),
+      proxyExposureOptions({ proxyOutputStrict: true, toolScopeFilteringActive: true })
+    )
+
+    const search = await handlers.callTool({ params: { name: "search_tools", arguments: { query: "diagnostic" } } })
+    const schema = await handlers.callTool({
+      params: { name: "get_tool_schema", arguments: { toolName: "diagnostic_probe" } }
+    })
+    const invoked = await handlers.callTool({
+      params: { name: "invoke_tool", arguments: { toolName: "diagnostic_probe", arguments: { subject: "x" } } }
+    })
+
+    expect(firstText(search.content)).toBe("{\"matches\":[]}")
+    expect(schema.isError).toBe(true)
+    expect(invoked.isError).toBe(true)
   })
 })
 

@@ -63,6 +63,20 @@
           "isSecret": false
         },
         {
+          "name": "HULY_TOOL_MODE",
+          "description": "Tool exposure mode: auto (default), native, or proxy. Auto keeps exact claude-code native and resolves Codex, Cursor, Windsurf, Copilot, opencode, Claude AI, and unknown clients to proxy mode.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "PROXY_OUTPUT_STRICT",
+          "description": "Set true to make active TOOLSETS / TOOLS a hard allow-list for proxy search, schema lookup, and invocation. Defaults to false.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
           "name": "TOOLSETS",
           "description": "Comma-separated native Huly tool categories to expose, such as issues,projects,search. If unset with TOOLS, all native tools are exposed.",
           "isRequired": false,

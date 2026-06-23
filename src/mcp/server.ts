@@ -11,12 +11,14 @@ import type { Request } from "express"
 import { type ClientBundle, createMcpServer } from "./create-mcp-server.js"
 import type { HttpServerFactoryService, HttpTransportDependencies, HttpTransportError } from "./http-transport.js"
 import { DEFAULT_HTTP_PORT, startHttpTransport } from "./http-transport.js"
-import { buildHulyContext } from "./huly-context-tool.js"
+import { buildHulyContext, type ToolExposureContext } from "./huly-context-tool.js"
 import { createMcpProtocolHandlers } from "./protocol-handlers.js"
+import type { ProtocolExposureOptions } from "./protocol-tool-exposure.js"
 
 import { type SanitizedHulyRuntimeConfigContext, sanitizeHulyRuntimeConfigFromEnv } from "../config/config.js"
 import type { GetHulyContextResult } from "../domain/schemas/index.js"
 import { TelemetryService } from "../telemetry/telemetry.js"
+import { type McpClientInfoLike, parseToolExposureConfig, type ToolExposureConfig } from "./tool-mode.js"
 import { resolveToolScope } from "./tool-scope.js"
 import { createScopedRegistry, toolRegistry } from "./tools/index.js"
 
@@ -58,6 +60,33 @@ const defaultWriteError = (message: string): void => {
   console.error(message)
 }
 
+const parseToolExposureConfigEffect = (
+  env: Parameters<typeof parseToolExposureConfig>[0]
+): Effect.Effect<ToolExposureConfig, McpServerError> => {
+  const parsed = parseToolExposureConfig(env)
+  if (parsed._tag === "Success") return Effect.succeed(parsed.value)
+  return Effect.fail(new McpServerError({ message: parsed.message }))
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+const clientInfoFromRecord = (value: unknown): McpClientInfoLike | undefined =>
+  isRecord(value) && typeof value.name === "string" ? { name: value.name } : undefined
+
+const clientInfoFromMcp2026Request = (req: Request): McpClientInfoLike | undefined => {
+  const body = req.body
+  if (!isRecord(body) || !isRecord(body.params) || !isRecord(body.params._meta)) return undefined
+  const clientInfo = body.params._meta["io.modelcontextprotocol/clientInfo"]
+  return clientInfoFromRecord(clientInfo)
+}
+
+const clientInfoFromLegacyHttpRequest = (req: Request): McpClientInfoLike | undefined => {
+  const body = req.body
+  if (!isRecord(body) || !isRecord(body.params)) return undefined
+  return clientInfoFromRecord(body.params.clientInfo) ?? clientInfoFromMcp2026Request(req)
+}
+
 interface McpServerOperations {
   readonly run: () => Effect.Effect<void, McpServerError, HttpServerFactoryService>
   readonly stop: () => Effect.Effect<void, McpServerError>
@@ -69,7 +98,7 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 >() {
   static layer(
     config: McpServerConfig
-  ): Layer.Layer<McpServerService, never, TelemetryService> {
+  ): Layer.Layer<McpServerService, McpServerError, TelemetryService> {
     return Layer.effect(
       McpServerService,
       Effect.gen(function*() {
@@ -78,6 +107,18 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
 
         const toolsetsRaw = yield* Effect.orElseSucceed(Config.string("TOOLSETS"), () => "")
         const toolsRaw = yield* Effect.orElseSucceed(Config.string("TOOLS"), () => "")
+        const hulyToolModeRaw = yield* Effect.orElseSucceed(
+          Config.string("HULY_TOOL_MODE"),
+          (): string | undefined => undefined
+        )
+        const proxyOutputStrictRaw = yield* Effect.orElseSucceed(
+          Config.string("PROXY_OUTPUT_STRICT"),
+          (): string | undefined => undefined
+        )
+        const exposureConfig = yield* parseToolExposureConfigEffect({
+          ...(hulyToolModeRaw === undefined ? {} : { hulyToolMode: hulyToolModeRaw }),
+          ...(proxyOutputStrictRaw === undefined ? {} : { proxyOutputStrict: proxyOutputStrictRaw })
+        })
         const toolScope = resolveToolScope(
           {
             toolsets: toolsetsRaw,
@@ -87,20 +128,37 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
           writeError
         )
         const toolsets = toolScope.filteringActive ? toolScope.enabledToolsets : null
-        const registry = createScopedRegistry({
+        const scopedNativeRegistry = createScopedRegistry({
           filteringActive: toolScope.filteringActive,
           categories: toolScope.enabledCategories,
           toolNames: toolScope.enabledToolNames
         })
+        const registries = {
+          fullRegistry: toolRegistry,
+          scopedNativeRegistry
+        }
         const getRuntimeConfigContext = config.getRuntimeConfigContext
           ?? (() => sanitizeHulyRuntimeConfigFromEnv(process.env))
-        const getHulyContext = (runtimeConfig: SanitizedHulyRuntimeConfigContext): GetHulyContextResult =>
-          buildHulyContext(config, registry, toolScope, runtimeConfig)
+        const getHulyContext = (
+          runtimeConfig: SanitizedHulyRuntimeConfigContext,
+          toolExposure: ToolExposureContext
+        ): GetHulyContextResult =>
+          buildHulyContext(config, scopedNativeRegistry, toolScope, runtimeConfig, toolExposure)
+        const sdkExposureOptions: Partial<ProtocolExposureOptions> = {
+          exposureConfig,
+          toolScopeFilteringActive: toolScope.filteringActive
+        }
+        const requestExposureOptions = (
+          currentClientInfo: () => McpClientInfoLike | undefined
+        ): Partial<ProtocolExposureOptions> => ({
+          ...sdkExposureOptions,
+          currentClientInfo
+        })
 
         telemetry.sessionStart({
           transport: config.transport,
           authMethod: config.authMethod ?? "password",
-          toolCount: registry.definitions.length,
+          toolCount: scopedNativeRegistry.definitions.length,
           toolsets
         })
 
@@ -126,9 +184,10 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                 const [stdioServer, drainInflight] = createMcpServer(
                   config.resolveClients,
                   telemetry,
-                  registry,
-                  () => getHulyContext(getRuntimeConfigContext()),
-                  config.createServer
+                  registries,
+                  (toolExposure) => getHulyContext(getRuntimeConfigContext(), toolExposure),
+                  config.createServer,
+                  sdkExposureOptions
                 )
                 yield* Ref.set(serverRef, stdioServer)
                 const transport = config.createStdioTransport?.() ?? new StdioServerTransport()
@@ -199,9 +258,10 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                     return createMcpServer(
                       requestResolveClients,
                       telemetry,
-                      registry,
-                      () => getHulyContext(requestRuntimeConfig),
-                      config.createServer
+                      registries,
+                      (toolExposure) => getHulyContext(requestRuntimeConfig, toolExposure),
+                      config.createServer,
+                      requestExposureOptions(() => clientInfoFromLegacyHttpRequest(req))
                     )[0]
                   },
                   config.httpTransportDependencies,
@@ -210,8 +270,11 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                     return createMcpProtocolHandlers(
                       requestResolveClients,
                       telemetry,
-                      registry,
-                      () => getHulyContext(requestRuntimeConfig)
+                      registries,
+                      (toolExposure) => getHulyContext(requestRuntimeConfig, toolExposure),
+                      undefined,
+                      undefined,
+                      requestExposureOptions(() => clientInfoFromMcp2026Request(req))
                     )
                   }
                 ).pipe(

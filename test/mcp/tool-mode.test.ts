@@ -5,6 +5,7 @@ import {
   type ClientKind,
   DEFAULT_MODE_BY_CLIENT_KIND,
   type McpClientInfoLike,
+  parseToolExposureConfig,
   resolveToolExposureMode,
   type ResolveToolExposureModeInput,
   type ToolExposureMode,
@@ -76,5 +77,42 @@ describe("resolveToolExposureMode", () => {
     expect(resolveToolExposureMode(input)).toBe("native")
     expect(resolveToolExposureMode({ configuredMode: "auto", clientInfo: { name: "claude-ai" } })).toBe("proxy")
     expect(resolveToolExposureMode({ configuredMode: "auto" })).toBe("proxy")
+  })
+})
+
+describe("parseToolExposureConfig", () => {
+  it("defaults to auto mode and non-strict proxy output", () => {
+    expect(parseToolExposureConfig({})).toEqual({
+      _tag: "Success",
+      value: { configuredMode: "auto", proxyOutputStrict: false }
+    })
+  })
+
+  it("parses supported mode and strict values after trimming and case normalization", () => {
+    expect(parseToolExposureConfig({ hulyToolMode: " PROXY ", proxyOutputStrict: " TRUE " })).toEqual({
+      _tag: "Success",
+      value: { configuredMode: "proxy", proxyOutputStrict: true }
+    })
+    expect(parseToolExposureConfig({ hulyToolMode: "native", proxyOutputStrict: "false" })).toEqual({
+      _tag: "Success",
+      value: { configuredMode: "native", proxyOutputStrict: false }
+    })
+  })
+
+  it("rejects invalid exposure env values with field-specific messages", () => {
+    expect(parseToolExposureConfig({ hulyToolMode: "dynamic" })).toMatchObject({
+      _tag: "Failure",
+      field: "HULY_TOOL_MODE",
+      message: expect.stringContaining("auto, native, or proxy")
+    })
+    expect(parseToolExposureConfig({ proxyOutputStrict: "yes" })).toMatchObject({
+      _tag: "Failure",
+      field: "PROXY_OUTPUT_STRICT",
+      message: expect.stringContaining("true or false")
+    })
+    expect(parseToolExposureConfig({ hulyToolMode: " " })).toMatchObject({
+      _tag: "Failure",
+      field: "HULY_TOOL_MODE"
+    })
   })
 })

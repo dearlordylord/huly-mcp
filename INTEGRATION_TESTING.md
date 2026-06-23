@@ -111,7 +111,7 @@ Manual setup for the second group-DM participant:
    printf '%s\n%s\n' \
    '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}' \
    '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_workspace_members","arguments":{}},"id":2}' \
-     | MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep '"id":2'
+     | HULY_TOOL_MODE=native MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep '"id":2'
    ```
 
 5. Confirm `list_employees` shows the owner plus two non-self employees with
@@ -157,7 +157,9 @@ set -a && source .env.local && set +a
 HULY_URL="${HULY_URL/localhost/host.docker.internal}" pnpm integration:tool-scope
 ```
 
-The matrix exercises stdio discovery with multiple representative clients and env permutations: default unscoped, `TOOLSETS` only, `TOOLS` only, union scope, and all-invalid active scope. It asserts visible and hidden tools through both `tools/list`, `get_huly_context`, and representative `tools/call` results.
+The matrix exercises stdio discovery with multiple representative clients and env permutations: default `auto` proxy exposure for Codex, exact `claude-code` native exposure, explicit `HULY_TOOL_MODE` overrides, `TOOLSETS` / `TOOLS` scoped native pins in non-strict proxy mode, `PROXY_OUTPUT_STRICT=true` allow-listing, and all-invalid active strict scope. It asserts visible and hidden tools through `tools/list`, `get_huly_context`, proxy meta-tools, and representative `tools/call` results.
+
+The full integration suite below exercises direct native Huly tools. `scripts/integration_test_full.sh` therefore exports `HULY_TOOL_MODE=native` when the variable is unset and exits early if it is explicitly set to `auto` or `proxy`. Keep proxy exposure assertions in this dedicated tool-scope matrix.
 
 ### Running the full suite over HTTP
 
@@ -205,7 +207,7 @@ INTEGRATION_TRANSPORT=http \
 ```bash
 printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}
 {"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}
-' | MCP_AUTO_EXIT=true node dist/index.cjs 2>&1 | grep '"id":2'
+' | HULY_TOOL_MODE=native MCP_AUTO_EXIT=true node dist/index.cjs 2>&1 | grep '"id":2'
 ```
 
 Expected: JSON with `"projects": [...]`
@@ -242,6 +244,8 @@ bash scripts/integration_test_full.sh
 ```
 
 The script requires `jq` for JSON parsing.
+
+The script is a native-tool lifecycle suite, not a proxy exposure suite. It selects `HULY_TOOL_MODE=native` by default so the documented command works with the new `auto` default, where unknown or generic clients resolve to proxy mode.
 
 ### What It Tests
 
@@ -343,7 +347,7 @@ INIT='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-1
 
 printf '%s\n%s\n' "$INIT" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"TOOL_NAME","arguments":ARGS},"id":2}' \
-  | MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep '"id":2'
+  | HULY_TOOL_MODE=native MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep '"id":2'
 ```
 
 ## Checking Results
