@@ -8,12 +8,12 @@ CHANGES_VERSION="2.30.0"
 
 current_branch="$(git branch --show-current)"
 if [[ "$current_branch" != "$RELEASE_BRANCH" ]]; then
-  echo "Refusing next release from branch '$current_branch'; expected '$RELEASE_BRANCH'." >&2
+  echo "Refusing production release from branch '$current_branch'; expected '$RELEASE_BRANCH'." >&2
   exit 1
 fi
 
 if [[ -n "$(git status --porcelain)" ]]; then
-  echo "Refusing next release with a dirty worktree." >&2
+  echo "Refusing production release with a dirty worktree." >&2
   git status --short
   exit 1
 fi
@@ -39,10 +39,11 @@ set +a
 HULY_URL="${HULY_URL/localhost/host.docker.internal}" pnpm integration:tool-scope
 HULY_URL="${HULY_URL/localhost/host.docker.internal}" bash scripts/integration_test_full.sh
 
-npm_config_ignore_scripts=true pnpm dlx "@changesets/cli@$CHANGES_VERSION" publish --tag next
+npm_config_ignore_scripts=true pnpm dlx "@changesets/cli@$CHANGES_VERSION" publish
 
 git push origin "$RELEASE_BRANCH"
 git push origin "v$package_version"
-gh release create "v$package_version" --generate-notes --prerelease --verify-tag
+gh release create "v$package_version" --generate-notes --latest --verify-tag
+npm dist-tag ls "$PACKAGE_NAME"
 
-echo "Published $PACKAGE_NAME@$package_version under the npm 'next' dist-tag."
+echo "Published $PACKAGE_NAME@$package_version under the npm 'latest' dist-tag."
