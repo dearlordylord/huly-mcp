@@ -31,6 +31,12 @@ The standard configuration works with most MCP clients:
 }
 ```
 
+## Tool Exposure Defaults
+
+By default (`HULY_TOOL_MODE=auto`), Huly MCP optimizes for current MCP clients by avoiding a 470-tool eager list. Exact `claude-code` sessions receive native Huly tools. Codex, Cursor, Windsurf, Copilot, OpenCode, Claude AI/Desktop-style clients, and unknown clients receive a small proxy surface: `list_tool_categories`, `search_tools`, `get_tool_schema`, and `invoke_tool`.
+
+Exact native tool names still dispatch when a client calls them directly, but many clients only call tools returned by `tools/list`. Set `HULY_TOOL_MODE=native` to make every Huly tool appear first-class, or use `TOOLSETS` / `TOOLS` to pin frequently used native tools while keeping proxy discovery available.
+
 <details>
 <summary>Codex</summary>
 
@@ -239,7 +245,10 @@ For a Smithery publish schema example, see [docs/SMITHERY_URL_PUBLISH.md](docs/S
 | `MCP_HTTP_PORT` | No | HTTP server port (falls back to `PORT`, then 3000) |
 | `MCP_HTTP_HOST` | No | HTTP server host. Omit to bind to the package default loopback host. |
 | `MCP_AUTH_TOKEN` | No | Optional bearer token required by HTTP clients for `/mcp`. This protects the MCP endpoint only; it is not a Huly API token. |
-| `TOOLSETS` | No | Comma-separated tool categories to expose. If unset, all tools are exposed. Example: `issues,projects,search` |
+| `HULY_TOOL_MODE` | No | Tool exposure mode: `auto` (default), `native`, or `proxy`. `auto` keeps exact `claude-code` native and resolves Codex, Cursor, Windsurf, Copilot, opencode, Claude AI, and unknown clients to proxy mode. |
+| `PROXY_OUTPUT_STRICT` | No | Proxy candidate strictness: `false` (default) keeps proxy discovery broad; `true` makes active `TOOLSETS` / `TOOLS` a hard allow-list for proxy search, schema lookup, and invocation. |
+| `TOOLSETS` | No | Comma-separated tool categories to expose. If neither `TOOLSETS` nor `TOOLS` is set, all native Huly tools are exposed. Example: `issues,projects,search` |
+| `TOOLS` | No | Comma-separated exact tool names to expose in addition to selected toolsets. Example: `list_documents,create_issue` |
 
 *Auth: Provide either `HULY_EMAIL` + `HULY_PASSWORD` or `HULY_TOKEN`.
 
@@ -247,7 +256,7 @@ For a Smithery publish schema example, see [docs/SMITHERY_URL_PUBLISH.md](docs/S
 
 `get_version` returns the current server version and latest npm version.
 
-`get_huly_context` returns sanitized runtime/configuration context for the current MCP session without connecting to Huly. It reports package version, transport, auth mode, sanitized Huly URL origin/host/protocol, workspace, timeout, config sources, and toolset filtering. Tokens, passwords, email values, credential headers, URL paths, URL query strings, and URL credentials are never returned.
+`get_huly_context` returns sanitized runtime/configuration context for the current MCP session without connecting to Huly. It reports package version, transport, auth mode, sanitized Huly URL origin/host/protocol, workspace, timeout, config sources, native tool scope filtering, and resolved native/proxy tool exposure. Tokens, passwords, email values, credential headers, URL paths, URL query strings, and URL credentials are never returned.
 
 ## MCP Resources
 
@@ -264,64 +273,24 @@ The server exposes read-only MCP Resources as JSON context for clients that supp
 
 `resources/list` returns concrete active project resources. Issue resources are template-based: use `resources/templates/list` to discover supported issue URI templates, then read a known issue URI.
 
-## Roadmap
+## Backlog
 
-The roadmap is driven by SDK parity and the project principle that this server should expose LLM-first tools: clear names, self-contained parameters, automatic identifier resolution, and single-call correctness. The audited source of truth lives in [plans/huly-sdk-gap-matrix.md](plans/huly-sdk-gap-matrix.md), with machine-checkable classifications in [plans/sdk-parity-ledger.json](plans/sdk-parity-ledger.json).
-
-Highest-value additions for coding agents:
-
-- Generic space follow-ups: role/permission definition writes, generic space creation, and module-specific wrappers above the shared space foundation. Generic space metadata, member/owner mutations, and typed-space role member mutations are covered by the shared spaces tools.
-- Core schema/admin follow-ups: guarded attribute/enum writes, role/permission definition writes, generic space creation, global space admins, and module-specific wrappers above the shared space foundation.
-- Drive follow-ups: drive create/update/delete, item move/rename/delete, adding new versions to existing files, permissions, and comments/activity.
-- Team planner/reporting: team agendas, workload/capacity summaries, visibility-aware free/busy views, document action items, and planner automation diagnostics.
-- Recruiting: vacancies, candidates, applications, application statuses, recruiter assignment, reviews, opinions, skills, and related comments/attachments/activity.
-- Controlled documents and trainings: controlled document spaces/projects, review/approval workflows, templates, categories, snapshots/history, training assignments, attempts, scoring, and results.
-- Module-specific tag wrappers for tag-backed concepts such as recruiting skills, controlled-document labels, and contact tags. Board-label definitions and board-card label attachment are covered by the `boards` tools.
-
-Planned feature surfaces:
-
-- Implemented foundation: generic space discovery and safe existing-space administration are covered by `spaces` tools for listing/getting spaces, listing/getting space types, reading permissions, updating common metadata, adding/removing members, and replacing owners.
-- Controlled Documents / TraceX documents: controlled spaces/projects, controlled document CRUD, quality/technical docs, co-authors/reviewers/approvers, e-signature workflows, release/effective-date metadata, change control, training linkage, controlled-document comments, and snapshots/history.
-- Products and product versions: product spaces, members, descriptions, attachments, versions, version state transitions, and change-control links.
-- Trainings, questions, and assessments: training revisions, releases, requests, due dates, max attempts, question banks, answer options, correct-answer data, submissions, scoring, and reporting.
-- Drive: first slice covers listing/getting drives, path traversal/list/get items, idempotent folder creation, uploads with parent creation, version listing, and restoring existing versions. Remaining gaps are drive create/update/delete, item move/rename/delete, adding new versions to existing files, comments/activity, and permissions/members.
-- HR: departments, nested departments, staff mixins, managers, subscribers, team leads, request types, PTO/sick/overtime/remote requests, public holidays, and schedule/table reports.
-- Recruiting: vacancies, talents/candidates, applications, matches, reviews, verdicts/opinions, vacancy-company lists, skills, and recruiting-specific custom fields/relations.
-- Surveys and polls: survey CRUD, poll creation/attachment, survey question data, completion status, and results.
-- Generic approval requests: create/list/approve/reject/cancel approval requests, decision comments, required approval counts, request status, and requested/approved/rejected people.
-- Boards: board CRUD, board cards, status workflows, members/assignees, location, cover/archive fields, board labels, menu/archive views, saved views, viewlets, and common board preference reads.
-- Inventory: category hierarchy CRUD, product CRUD, variant/SKU CRUD, and product-scoped photo, attachment, comment, and activity wrappers are covered by first-class tools; category/variant discussion wrappers remain outside this slice.
-- Leads write surface: create/update/delete funnels and leads, status changes, assignment, start dates, customer descriptions, person customer support, and lead comments/attachments/labels/relations.
-- Contacts: person channels, social identities, provider discovery, contact statuses, notes/comments, person attachments, person merge, employee invite/create/kick/reinvite, and inactive employee management.
-- Calendar: calendar CRUD/config, external calendar sync metadata, primary calendar management, schedule objects, participant mutations, and RSVP/status support when stable.
-- Team planner and schedule reporting: team agendas, workload/capacity summaries, and visibility-aware free/busy views across members/projects.
-- Virtual office and meetings: offices, floors, rooms, access/language/default recording/transcription settings, meeting schedules, active participants, room info, meeting notes/transcript records (minutes), recordings, and device preferences.
-- Chat and communication: request-access flows if Huly exposes a stable model, pinned messages, translation, applets, in-message polls, guest communication settings, and external Gmail/Telegram/Huly Mail surfaces plus provider-specific attachments once compatible packages/APIs are proven.
-- Notifications and activity: browser/push subscription internals, provider defaults, UI presenter/viewlet metadata, and activity control/extension metadata.
-- Attachments and media: previews/preview metadata and friendly wrappers for additional object types beyond issue/document/inventory product.
-- Core schema and workspace administration: attribute/property create/update/delete/hide, enum CRUD/options, sequence management, role/permission definition writes, generic space creation, global space admins, integrations registry, invite settings, role capability settings, and workspace setting metadata.
-- Integrations: GitHub repository/project mappings and sync metadata (deferred), Google Calendar connect/configure/sync controls, Bitrix entity/field mappings and sync status, Gmail/email channel messages, Telegram messages, Huly Mail/Mail plugin behavior, AI assistant integration state, and AI bot configuration if server-side APIs expose stable behavior.
-- Templates, rating, support, billing, analytics, views, workbench, and preferences: read-only message template/category/field discovery is covered; message template writes/rendering remain deferred until provider semantics are proven. Generic saved filtered view discovery, filtered-view detail reads, viewlet metadata, and viewlet preference config discovery are covered by `views` tools; board-specific saved views, viewlets, and common board preference reads remain covered by `boards` tools. Document/person rating data is blocked by unpublished `@hcengineering/rating` SDK package (#90); support conversations, billing tier/status discovery, onboarding channels, tabs/widgets/apps, broader workbench state, and non-view module preference discovery/update remain future surfaces.
-- Document-specific gaps: snapshot restore, backlinks, notes, structured action items/tables, PDF/export, advanced document relationships, and document printing/export once SDK support is safe.
-
-MCP resource roadmap:
-
-- Return resource links from list/search tool results for direct `resources/read` follow-up.
-- Add document resources when document reads have a stable URI shape and context-friendly payload.
-- Consider scoped/paginated issue listing only when filters prevent very large `resources/list` responses.
-- Consider resource `subscribe` and `listChanged` support after stateful sessions and a Huly change source are available.
-
-SDK upgrade revisit:
-
-- Revisit `@hcengineering/*` upgrades when a newer release is available after `0.7.423`.
-- Verify published tarballs, not only npm metadata, before accepting SDK upgrades.
-- Require valid published declaration files for direct Huly dependencies.
-- Upgrade direct Huly package declarations coherently in `package.json`; do not accept lockfile-only transitive rewrites.
-- Run `pnpm check-all` and local Huly integration tests before treating an SDK upgrade as viable.
+Feature backlog and SDK parity notes live in [docs/BACKLOG.md](docs/BACKLOG.md).
 
 <!-- tools:start -->
 <!-- AUTO-GENERATED from src/mcp/tools/ descriptions. Do not edit manually. Run `pnpm update-readme` to regenerate. -->
 ## Available Tools
+
+When resolved tool exposure is `proxy`, clients see the built-in tools plus these proxy meta-tools. Native Huly tools are then discovered and invoked through the proxy candidate catalog. Exact native tool names also dispatch when a client calls them directly, subject to `PROXY_OUTPUT_STRICT` scope rules, but hidden native tools are not advertised through `tools/list`.
+
+### Proxy Meta-Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_tool_categories` | Lists Huly tool categories available through this proxy. Use this first when you need a broad map of capabilities before searching for a specific Huly tool. |
+| `search_tools` | Searches the current proxy-visible Huly tool catalog by tool name, category, description, and parameter names. Returns exact tool names plus required and optional parameter names for single-call follow-up with get_tool_schema or invoke_tool. |
+| `get_tool_schema` | Returns the exact input and output schema for one proxy-visible Huly tool. Use this before invoke_tool when you are not certain about required argument names or result shape. |
+| `invoke_tool` | Invokes one proxy-visible Huly tool by exact name with its arguments. This tool can call read or write Huly operations; check get_tool_schema and the target tool annotations when safety matters. |
 
 **`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `approvals`, `boards`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `templates`, `planner`, `preferences`, `processes`, `recruiting`, `sdk-discovery`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `views`, `virtual-office`
 

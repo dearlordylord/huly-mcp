@@ -16,10 +16,12 @@ import type { HulyStorageOperations } from "../../../src/huly/storage.js"
 import { testWorkbenchUrlConfig } from "../../../src/huly/url-builders.js"
 import { McpErrorCode } from "../../../src/mcp/error-mapping.js"
 import { createFilteredRegistry, TOOL_DEFINITIONS } from "../../../src/mcp/tools/index.js"
+import { makeToolCategory, makeToolName } from "../../../src/mcp/tools/registry.js"
 import { viewTools } from "../../../src/mcp/tools/views.js"
 import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 
 const toolDefinition = (name: string) => assertExists(TOOL_DEFINITIONS[name], `Expected tool definition for ${name}`)
+const viewRegistry = () => createFilteredRegistry(new Set([makeToolCategory("views")]))
 
 // Huly SDK brands, intl ids, and component handles are erased at runtime; these fixture casts restore
 // compile-time brands for stable literals that match the SDK shapes used by the fake client.
@@ -135,7 +137,7 @@ const toTypedDocs = <T extends Doc>(docs: ReadonlyArray<Doc>): Array<T> => {
 describe("view MCP tools", () => {
   it.effect("registers view tools in order", () =>
     Effect.gen(function*() {
-      const filtered = createFilteredRegistry(new Set(["views"]))
+      const filtered = viewRegistry()
 
       expect(filtered.definitions.map((tool) => tool.name)).toEqual([
         "list_filtered_views",
@@ -147,10 +149,10 @@ describe("view MCP tools", () => {
 
   it.effect("serializes filtered view responses as structured content", () =>
     Effect.gen(function*() {
-      const registry = createFilteredRegistry(new Set(["views"]))
+      const registry = viewRegistry()
       const result = yield* Effect.promise(() =>
         registry.handleToolCall(
-          "list_filtered_views",
+          makeToolName("list_filtered_views"),
           { attachedTo: String(board.app.Board) },
           makeClient({ filteredViews: [filteredViewDoc] }),
           storageClient
@@ -174,10 +176,10 @@ describe("view MCP tools", () => {
 
   it.effect("serializes viewlet responses with descriptors and preferences", () =>
     Effect.gen(function*() {
-      const registry = createFilteredRegistry(new Set(["views"]))
+      const registry = viewRegistry()
       const result = yield* Effect.promise(() =>
         registry.handleToolCall(
-          "list_viewlets",
+          makeToolName("list_viewlets"),
           { attachTo: String(board.class.Card) },
           makeClient({
             viewlets: [viewletDoc],
@@ -214,10 +216,10 @@ describe("view MCP tools", () => {
 
   it.effect("surfaces descriptor metadata warnings in the MCP envelope", () =>
     Effect.gen(function*() {
-      const registry = createFilteredRegistry(new Set(["views"]))
+      const registry = viewRegistry()
       const result = yield* Effect.promise(() =>
         registry.handleToolCall(
-          "list_viewlets",
+          makeToolName("list_viewlets"),
           { attachTo: String(board.class.Card) },
           makeClient({
             viewlets: [viewletDoc],
@@ -241,10 +243,10 @@ describe("view MCP tools", () => {
 
   it.effect("maps generic view domain errors to invalid params", () =>
     Effect.gen(function*() {
-      const registry = createFilteredRegistry(new Set(["views"]))
+      const registry = viewRegistry()
       const result = yield* Effect.promise(() =>
         registry.handleToolCall(
-          "get_filtered_view",
+          makeToolName("get_filtered_view"),
           { filteredView: "Missing" },
           makeClient({ filteredViews: [] }),
           storageClient

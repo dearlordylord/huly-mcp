@@ -95,6 +95,18 @@ describe("createPostHogTelemetry", () => {
       expect(call.properties.session_id).toBeTypeOf("string")
       expect(call.properties.version).toBeTypeOf("string")
     })
+
+    it("captures client classification when provided", () => {
+      const telemetry = createTelemetry(false)
+      telemetry.firstListTools({ clientKind: "codex", resolvedMode: "proxy" })
+
+      const call = assertAt(mockCapture.mock.calls, 0)[0]
+      expect(call.event).toBe("first_list_tools")
+      expect(call.properties).toMatchObject({
+        client_kind: "codex",
+        resolved_mode: "proxy"
+      })
+    })
   })
 
   describe("toolCalled", () => {
@@ -113,6 +125,24 @@ describe("createPostHogTelemetry", () => {
         tool_name: "list_issues",
         status: "success",
         duration_ms: 42
+      })
+    })
+
+    it("captures client classification when provided", () => {
+      const telemetry = createTelemetry(false)
+      telemetry.toolCalled({
+        toolName: "list_issues",
+        status: "success",
+        durationMs: 42,
+        clientKind: "codex",
+        resolvedMode: "proxy"
+      })
+
+      const call = assertAt(mockCapture.mock.calls, 0)[0]
+      expect(call.event).toBe("tool_called")
+      expect(call.properties).toMatchObject({
+        client_kind: "codex",
+        resolved_mode: "proxy"
       })
     })
 
@@ -251,7 +281,7 @@ describe("createPostHogTelemetry", () => {
 
       telemetry.firstListTools()
 
-      expect(debugMessages).toContain("[telemetry] first_list_tools")
+      expect(debugMessages).toContainEqual(expect.stringContaining("[telemetry] first_list_tools"))
     })
 
     it("logs toolCalled to console.error", () => {

@@ -4,9 +4,17 @@ import * as fc from "fast-check"
 import { describe, expect, it } from "vitest"
 
 import { createToolOutputSchema } from "../../src/mcp/tool-output-schema.js"
-import { CATEGORY_NAMES, createFilteredRegistry, toolRegistry } from "../../src/mcp/tools/index.js"
 import {
+  CATEGORY_NAMES,
+  createFilteredRegistry,
+  createScopedRegistry,
+  toolRegistry
+} from "../../src/mcp/tools/index.js"
+import {
+  createToolDefinition,
   isNoArgumentTool,
+  makeToolCategory,
+  makeToolName,
   requiresArgumentsObject,
   resolveAnnotations,
   type ToolDefinition
@@ -14,9 +22,14 @@ import {
 import { propertyTestParameters } from "../helpers/property.js"
 
 const knownCategories = [...CATEGORY_NAMES]
+const knownToolNames = toolRegistry.definitions.map((tool) => tool.name)
 const knownCategoryArbitrary = fc.constantFrom(...knownCategories)
-const unknownCategoryArbitrary = fc.stringMatching(/^[a-z][a-z0-9_-]{1,24}$/).filter(
+const knownToolNameArbitrary = fc.constantFrom(...knownToolNames)
+const unknownCategoryArbitrary = fc.stringMatching(/^[a-z][a-z0-9_-]{1,24}$/).map(makeToolCategory).filter(
   (category) => !CATEGORY_NAMES.has(category)
+)
+const unknownToolNameArbitrary = fc.stringMatching(/^[a-z][a-z0-9_]{1,32}$/).map(makeToolName).filter(
+  (name) => !toolRegistry.tools.has(name)
 )
 
 const wordArbitrary = fc.stringMatching(/^[a-z][a-z0-9]{0,10}$/)
@@ -80,11 +93,13 @@ const prefixCaseArbitrary = fc.constantFrom(
 )
 
 const toolDefinition = (name: string, inputSchema: object, annotations?: ToolAnnotations): ToolDefinition => ({
-  name,
-  description: "generated test tool",
-  inputSchema,
-  outputSchema: createToolOutputSchema(Schema.Struct({ generated: Schema.Boolean })),
-  category: "generated",
+  ...createToolDefinition({
+    name,
+    description: "generated test tool",
+    inputSchema,
+    outputSchema: createToolOutputSchema(Schema.Struct({ generated: Schema.Boolean })),
+    category: "generated"
+  }),
   ...(annotations !== undefined && { annotations })
 })
 
@@ -118,6 +133,55 @@ describe("createFilteredRegistry properties", () => {
         expect(filtered.definitions).toEqual([])
         expect(filtered.tools.size).toBe(0)
       }),
+      propertyTestParameters
+    )
+  })
+})
+
+describe("createScopedRegistry properties", () => {
+  it("returns the full registry when filtering is inactive", () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.oneof(knownCategoryArbitrary, unknownCategoryArbitrary), { maxLength: 12 }),
+        fc.array(fc.oneof(knownToolNameArbitrary, unknownToolNameArbitrary), { maxLength: 12 }),
+        (categories, toolNames) => {
+          const scoped = createScopedRegistry({
+            filteringActive: false,
+            categories: new Set(categories),
+            toolNames: new Set(toolNames)
+          })
+
+          expect(scoped).toBe(toolRegistry)
+        }
+      ),
+      propertyTestParameters
+    )
+  })
+
+  it("preserves registry order and always returns a subset when filtering is active", () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.oneof(knownCategoryArbitrary, unknownCategoryArbitrary), { maxLength: 12 }),
+        fc.array(fc.oneof(knownToolNameArbitrary, unknownToolNameArbitrary), { maxLength: 12 }),
+        (categories, toolNames) => {
+          const requestedCategories = new Set(categories)
+          const requestedToolNames = new Set(toolNames)
+          const scoped = createScopedRegistry({
+            filteringActive: true,
+            categories: requestedCategories,
+            toolNames: requestedToolNames
+          })
+          const expected = toolRegistry.definitions.filter((tool) =>
+            requestedCategories.has(tool.category) || requestedToolNames.has(tool.name)
+          )
+
+          expect(scoped.definitions).toEqual(expected)
+          expect([...scoped.tools.keys()]).toEqual(expected.map((tool) => tool.name))
+          for (const tool of scoped.definitions) {
+            expect(toolRegistry.tools.get(tool.name)).toBe(tool)
+          }
+        }
+      ),
       propertyTestParameters
     )
   })
@@ -176,7 +240,7 @@ describe("tool argument schema properties", () => {
       propertyTestParameters
     )
 
-    const listProjectTypes = toolRegistry.tools.get("list_project_types")
+    const listProjectTypes = toolRegistry.tools.get(makeToolName("list_project_types"))
 
     expect(listProjectTypes).toBeDefined()
     if (listProjectTypes !== undefined) {

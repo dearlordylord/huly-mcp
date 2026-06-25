@@ -122,6 +122,9 @@ const createMockServer = () =>
     setRequestHandler(schema: unknown, handler: (...args: Array<unknown>) => unknown) {
       capturedHandlers.set(schema, handler)
     },
+    getClientVersion() {
+      return { name: "claude-code", version: "1.0.0" }
+    },
     async connect() {
       if (mockConnectBehavior) return mockConnectBehavior()
     },
@@ -821,6 +824,40 @@ describe("McpServerService.layer operations", () => {
         yield* Fiber.join(fiber)
       }), { timeout: 5000 })
 
+    it.scoped("uses the default stdio transport when no factory is provided", () =>
+      Effect.gen(function*() {
+        const layers = Layer.mergeAll(
+          HulyClient.testLayer({}),
+          HulyStorageClient.testLayer({}),
+          WorkspaceClient.testLayer({}),
+          TelemetryService.testLayer()
+        )
+        const serverLayer = McpServerService.layer({
+          transport: "stdio",
+          autoExit: true,
+          createServer: createMockServer,
+          resolveClients: resolveClientsFromLayer(layers)
+        }).pipe(Layer.provide(layers))
+        const ctx = yield* Layer.build(serverLayer)
+        const ops = yield* McpServerService.pipe(
+          Effect.provide(Layer.succeedContext(ctx))
+        )
+
+        const fiber = yield* Effect.fork(
+          ops.run().pipe(
+            Effect.provideService(
+              HttpServerFactoryService,
+              // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- mock stub
+              { createApp: () => ({}) as never, listen: () => Effect.void as never }
+            )
+          )
+        )
+
+        yield* Effect.promise(() => new Promise((r) => setTimeout(r, 50)))
+        process.stdin.emit("end")
+        yield* Fiber.join(fiber)
+      }), { timeout: 5000 })
+
     it.scoped("run fails with already-running error on second call", () =>
       Effect.gen(function*() {
         const serverLayer = buildStdioService({ autoExit: true })
@@ -1496,6 +1533,279 @@ describe("McpServerService.layer operations", () => {
         }),
       { timeout: 5000 }
     )
+
+    it.scoped(
+      "http 2026 requests resolve tool exposure from per-request clientInfo metadata",
+      () =>
+        Effect.gen(function*() {
+          const originalMode = process.env.HULY_TOOL_MODE
+          const originalStrict = process.env.PROXY_OUTPUT_STRICT
+          delete process.env.HULY_TOOL_MODE
+          delete process.env.PROXY_OUTPUT_STRICT
+
+          const layers = Layer.mergeAll(
+            HulyClient.testLayer({}),
+            HulyStorageClient.testLayer({}),
+            WorkspaceClient.testLayer({}),
+            TelemetryService.testLayer()
+          )
+          const serverLayer = buildTestServerLayer({
+            transport: "http",
+            httpPort: 19881,
+            httpHost: "127.0.0.1",
+            httpTransportDependencies: quietHttpTransportDependencies
+          }, layers)
+          const ctx = yield* Layer.build(serverLayer)
+          const ops = yield* McpServerService.pipe(
+            Effect.provide(Layer.succeedContext(ctx))
+          )
+
+          const postHandlers: Array<(req: unknown, res: unknown) => Promise<void>> = []
+          const mockHttpFactory: HttpServerFactoryService["Type"] = {
+            createApp: () =>
+              // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test fake implements the Express methods used by startHttpTransport
+              ({
+                post: (_path: string, handler: (req: unknown, res: unknown) => Promise<void>) => {
+                  postHandlers.push(handler)
+                },
+                get: () => {},
+                delete: () => {}
+              }) as never,
+            listen: () =>
+              Effect.succeed({
+                close: (cb: (err?: Error) => void) => cb()
+              } as never)
+          }
+
+          const fiber = yield* Effect.fork(
+            ops.run().pipe(
+              Effect.provideService(HttpServerFactoryService, mockHttpFactory)
+            )
+          )
+
+          yield* Effect.promise(() => new Promise((r) => setTimeout(r, 100)))
+          const handler = assertAt(postHandlers, 0)
+          const responses: Array<{ readonly code: number; readonly body: unknown }> = []
+          const makeResponse = () => ({
+            headersSent: false,
+            setHeader: () => undefined,
+            status: (code: number) => ({
+              json: (body: unknown) => {
+                responses.push({ code, body })
+                return body
+              }
+            }),
+            on: () => undefined
+          })
+          const makeRequest = (id: string, clientInfo: Record<string, unknown>) => ({
+            body: {
+              jsonrpc: "2.0",
+              method: "tools/list",
+              id,
+              params: {
+                _meta: {
+                  "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                  "io.modelcontextprotocol/clientInfo": clientInfo,
+                  "io.modelcontextprotocol/clientCapabilities": {}
+                }
+              }
+            },
+            headers: {
+              accept: "application/json, text/event-stream",
+              "mcp-protocol-version": "2026-07-28",
+              "mcp-method": "tools/list"
+            },
+            on: () => undefined
+          })
+          const resultAt = (index: number): unknown => {
+            const body = assertAt(responses, index).body
+            if (!isRecord(body) || !("result" in body)) {
+              throw new Error("Expected JSON-RPC success response")
+            }
+            return body.result
+          }
+
+          yield* Effect.promise(() =>
+            handler(makeRequest("codex", { name: "codex-cli", version: "1.0.0" }), makeResponse())
+          )
+          yield* Effect.promise(() =>
+            handler(makeRequest("claude", { name: "claude-code", version: "1.0.0" }), makeResponse())
+          )
+          yield* Effect.promise(() => handler(makeRequest("missing-name", { version: "1.0.0" }), makeResponse()))
+
+          const codexToolNames = assertListToolsResponse(resultAt(0)).tools.map(tool => tool.name)
+          const claudeToolNames = assertListToolsResponse(resultAt(1)).tools.map(tool => tool.name)
+          const unknownToolNames = assertListToolsResponse(resultAt(2)).tools.map(tool => tool.name)
+          expect(responses.map(response => response.code)).toEqual([200, 200, 200])
+          expect(codexToolNames).toContain("search_tools")
+          expect(codexToolNames).not.toContain("list_projects")
+          expect(claudeToolNames).toContain("list_projects")
+          expect(claudeToolNames).not.toContain("search_tools")
+          expect(unknownToolNames).toContain("search_tools")
+          expect(unknownToolNames).not.toContain("list_projects")
+
+          if (originalMode === undefined) {
+            delete process.env.HULY_TOOL_MODE
+          } else {
+            process.env.HULY_TOOL_MODE = originalMode
+          }
+          if (originalStrict === undefined) {
+            delete process.env.PROXY_OUTPUT_STRICT
+          } else {
+            process.env.PROXY_OUTPUT_STRICT = originalStrict
+          }
+          yield* Fiber.interrupt(fiber)
+        }),
+      { timeout: 5000 }
+    )
+
+    it.scoped(
+      "legacy http requests prefer request clientInfo and fall back to SDK client version",
+      () =>
+        Effect.gen(function*() {
+          const originalMode = process.env.HULY_TOOL_MODE
+          delete process.env.HULY_TOOL_MODE
+          capturedHandlers.clear()
+
+          let sdkClientInfo: { readonly name: string; readonly version: string } | undefined = {
+            name: "claude-code",
+            version: "1.0.0"
+          }
+          const createServerWithClientVersion = () =>
+            // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test fake implements only methods used by McpServerService
+            ({
+              setRequestHandler(schema: unknown, handler: (...args: Array<unknown>) => unknown) {
+                capturedHandlers.set(schema, handler)
+              },
+              getClientVersion() {
+                return sdkClientInfo
+              },
+              async connect() {},
+              async close() {}
+            }) as never
+          const clientLayer = Layer.mergeAll(
+            HulyClient.testLayer({}),
+            HulyStorageClient.testLayer({}),
+            WorkspaceClient.testLayer({})
+          )
+          const responses: Array<{ readonly code: number; readonly body: unknown }> = []
+          const transportDependencies: Partial<HttpTransportDependencies> = {
+            createTransport: () =>
+              // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test fake invokes the captured list-tools handler directly
+              ({
+                async close() {},
+                async handleRequest(
+                  _req: unknown,
+                  res: { status: (code: number) => { json: (body: unknown) => unknown } },
+                  body: unknown
+                ) {
+                  const handler = capturedHandlers.get(ListToolsRequestSchema)
+                  if (handler === undefined) throw new Error("expected list tools handler")
+                  const result = await handler()
+                  const id = isRecord(body) && (typeof body.id === "string" || typeof body.id === "number")
+                    ? body.id
+                    : null
+                  res.status(200).json({ jsonrpc: "2.0", id, result })
+                }
+              }) as never,
+            writeError: () => {}
+          }
+          const serverLayer = McpServerService.layer({
+            transport: "http",
+            httpPort: 19882,
+            httpHost: "127.0.0.1",
+            createServer: createServerWithClientVersion,
+            resolveClients: resolveClientsFromLayer(clientLayer),
+            httpTransportDependencies: transportDependencies
+          }).pipe(Layer.provide(Layer.mergeAll(clientLayer, TelemetryService.testLayer())))
+          const ctx = yield* Layer.build(serverLayer)
+          const ops = yield* McpServerService.pipe(
+            Effect.provide(Layer.succeedContext(ctx))
+          )
+          const postHandlers: Array<(req: unknown, res: unknown) => Promise<void>> = []
+          const mockHttpFactory: HttpServerFactoryService["Type"] = {
+            createApp: () =>
+              // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test fake implements Express routing used by startHttpTransport
+              ({
+                post: (_path: string, handler: (req: unknown, res: unknown) => Promise<void>) => {
+                  postHandlers.push(handler)
+                },
+                get: () => {},
+                delete: () => {}
+              }) as never,
+            listen: () =>
+              Effect.succeed({
+                close: (cb: (err?: Error) => void) => cb()
+              } as never)
+          }
+          const makeResponse = () => ({
+            headersSent: false,
+            setHeader: () => undefined,
+            status: (code: number) => ({
+              json: (body: unknown) => {
+                responses.push({ code, body })
+                return body
+              }
+            }),
+            on: () => undefined
+          })
+          const makeLegacyListRequest = (
+            id: string,
+            clientInfo?: { readonly name: string; readonly version: string }
+          ) => ({
+            body: {
+              jsonrpc: "2.0",
+              method: "tools/list",
+              id,
+              params: clientInfo === undefined ? {} : { clientInfo }
+            },
+            headers: { accept: "application/json, text/event-stream" },
+            on: () => undefined
+          })
+          const resultAt = (index: number): unknown => {
+            const body = assertAt(responses, index).body
+            if (!isRecord(body) || !("result" in body)) {
+              throw new Error("Expected JSON-RPC success response")
+            }
+            return body.result
+          }
+
+          const fiber = yield* Effect.fork(
+            ops.run().pipe(
+              Effect.provideService(HttpServerFactoryService, mockHttpFactory)
+            )
+          )
+
+          yield* Effect.promise(() => new Promise((r) => setTimeout(r, 100)))
+          const handler = assertAt(postHandlers, 0)
+          yield* Effect.promise(() => handler(makeLegacyListRequest("sdk-fallback"), makeResponse()))
+          yield* Effect.promise(() =>
+            handler(makeLegacyListRequest("request-client", { name: "codex-cli", version: "1.0.0" }), makeResponse())
+          )
+          sdkClientInfo = undefined
+          yield* Effect.promise(() => handler(makeLegacyListRequest("unknown"), makeResponse()))
+
+          const sdkFallbackNames = assertListToolsResponse(resultAt(0)).tools.map(tool => tool.name)
+          const requestClientNames = assertListToolsResponse(resultAt(1)).tools.map(tool => tool.name)
+          const unknownNames = assertListToolsResponse(resultAt(2)).tools.map(tool => tool.name)
+          expect(responses.map(response => response.code)).toEqual([200, 200, 200])
+          expect(sdkFallbackNames).toContain("list_projects")
+          expect(sdkFallbackNames).not.toContain("search_tools")
+          expect(requestClientNames).toContain("search_tools")
+          expect(requestClientNames).not.toContain("list_projects")
+          expect(unknownNames).toContain("search_tools")
+          expect(unknownNames).not.toContain("list_projects")
+
+          if (originalMode === undefined) {
+            delete process.env.HULY_TOOL_MODE
+          } else {
+            process.env.HULY_TOOL_MODE = originalMode
+          }
+          yield* Fiber.interrupt(fiber)
+        }),
+      { timeout: 5000 }
+    )
+
     it.scoped("http transport resolves request-scoped clients for resource reads", () =>
       Effect.gen(function*() {
         capturedHandlers.clear()
@@ -1805,7 +2115,9 @@ describe("McpServerService.layer operations", () => {
     it.scoped("sessionStart includes toolsets when TOOLSETS env is set", () => {
       let capturedProps: SessionStartProps | null = null
       return Effect.gen(function*() {
+        const originalTools = process.env.TOOLS
         process.env.TOOLSETS = "issues,documents"
+        delete process.env.TOOLS
         const telemetryLayer = TelemetryService.testLayer({
           sessionStart: (props) => {
             capturedProps = props
@@ -1824,13 +2136,20 @@ describe("McpServerService.layer operations", () => {
         expect(capturedProps).not.toBeNull()
         expect(capturedProps!.toolsets).toEqual(expect.arrayContaining(["issues", "documents"]))
         delete process.env.TOOLSETS
+        if (originalTools === undefined) {
+          delete process.env.TOOLS
+        } else {
+          process.env.TOOLS = originalTools
+        }
       })
     })
 
     it.scoped("sessionStart toolsets is null when no TOOLSETS env", () => {
       let capturedProps: SessionStartProps | null = null
       return Effect.gen(function*() {
+        const originalTools = process.env.TOOLS
         delete process.env.TOOLSETS
+        delete process.env.TOOLS
         const telemetryLayer = TelemetryService.testLayer({
           sessionStart: (props) => {
             capturedProps = props
@@ -1848,6 +2167,11 @@ describe("McpServerService.layer operations", () => {
         yield* Layer.build(serverLayer)
         expect(capturedProps).not.toBeNull()
         expect(capturedProps!.toolsets).toBeNull()
+        if (originalTools === undefined) {
+          delete process.env.TOOLS
+        } else {
+          process.env.TOOLS = originalTools
+        }
       })
     })
 
@@ -2060,7 +2384,9 @@ describe("McpServerService.layer operations", () => {
       Effect.gen(function*() {
         capturedHandlers.clear()
         const originalToolsets = process.env.TOOLSETS
+        const originalTools = process.env.TOOLS
         process.env.TOOLSETS = "issues"
+        delete process.env.TOOLS
         const fiber = yield* buildAndRunWithResolveClients(
           async () => {
             throw new Error("client resolution should be skipped")
@@ -2114,6 +2440,11 @@ describe("McpServerService.layer operations", () => {
           delete process.env.TOOLSETS
         } else {
           process.env.TOOLSETS = originalToolsets
+        }
+        if (originalTools === undefined) {
+          delete process.env.TOOLS
+        } else {
+          process.env.TOOLS = originalTools
         }
         yield* cleanup(fiber)
       }), { timeout: 5000 })

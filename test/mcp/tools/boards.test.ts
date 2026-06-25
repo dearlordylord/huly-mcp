@@ -19,8 +19,10 @@ import { testWorkbenchUrlConfig } from "../../../src/huly/url-builders.js"
 import { McpErrorCode } from "../../../src/mcp/error-mapping.js"
 import { boardTools } from "../../../src/mcp/tools/boards.js"
 import { createFilteredRegistry, TOOL_DEFINITIONS } from "../../../src/mcp/tools/index.js"
+import { makeToolCategory, makeToolName } from "../../../src/mcp/tools/registry.js"
 
 const toolDefinition = (name: string) => assertExists(TOOL_DEFINITIONS[name], `Expected tool definition for ${name}`)
+const boardRegistry = () => createFilteredRegistry(new Set([makeToolCategory("boards")]))
 
 // Huly SDK refs, account UUIDs, intl strings, and component handles are erased string brands at runtime.
 const accountUuid = (value: string): AccountUuid => value as AccountUuid
@@ -103,7 +105,7 @@ const toTypedDocs = <T extends Doc>(docs: ReadonlyArray<Doc>): Array<T> => {
 describe("board MCP tools", () => {
   it.effect("registers board tools in order", () =>
     Effect.gen(function*() {
-      const filtered = createFilteredRegistry(new Set(["boards"]))
+      const filtered = boardRegistry()
 
       expect(filtered.definitions.map((tool) => tool.name)).toEqual([
         "list_boards",
@@ -137,9 +139,9 @@ describe("board MCP tools", () => {
 
   it.effect("serializes successful board responses as structured content", () =>
     Effect.gen(function*() {
-      const registry = createFilteredRegistry(new Set(["boards"]))
+      const registry = boardRegistry()
       const result = yield* Effect.promise(() =>
-        registry.handleToolCall("list_boards", {}, makeClient({ boards: [boardDoc] }), storageClient)
+        registry.handleToolCall(makeToolName("list_boards"), {}, makeClient({ boards: [boardDoc] }), storageClient)
       )
 
       expect(result?.isError).toBeUndefined()
@@ -156,9 +158,14 @@ describe("board MCP tools", () => {
 
   it.effect("serializes successful board menu page responses as structured content", () =>
     Effect.gen(function*() {
-      const registry = createFilteredRegistry(new Set(["boards"]))
+      const registry = boardRegistry()
       const result = yield* Effect.promise(() =>
-        registry.handleToolCall("list_board_menu_pages", {}, makeClient({ menuPages: [menuPageDoc] }), storageClient)
+        registry.handleToolCall(
+          makeToolName("list_board_menu_pages"),
+          {},
+          makeClient({ menuPages: [menuPageDoc] }),
+          storageClient
+        )
       )
 
       expect(result?.isError).toBeUndefined()
@@ -175,9 +182,14 @@ describe("board MCP tools", () => {
 
   it.effect("maps board domain errors to invalid params", () =>
     Effect.gen(function*() {
-      const registry = createFilteredRegistry(new Set(["boards"]))
+      const registry = boardRegistry()
       const result = yield* Effect.promise(() =>
-        registry.handleToolCall("get_board", { board: "Missing" }, makeClient({ boards: [] }), storageClient)
+        registry.handleToolCall(
+          makeToolName("get_board"),
+          { board: "Missing" },
+          makeClient({ boards: [] }),
+          storageClient
+        )
       )
 
       expect(result?.isError).toBe(true)
@@ -187,9 +199,14 @@ describe("board MCP tools", () => {
 
   it.effect("maps board saved-view domain errors to invalid params", () =>
     Effect.gen(function*() {
-      const registry = createFilteredRegistry(new Set(["boards"]))
+      const registry = boardRegistry()
       const result = yield* Effect.promise(() =>
-        registry.handleToolCall("get_board_saved_view", { savedView: "Missing" }, makeClient({}), storageClient)
+        registry.handleToolCall(
+          makeToolName("get_board_saved_view"),
+          { savedView: "Missing" },
+          makeClient({}),
+          storageClient
+        )
       )
 
       expect(result?.isError).toBe(true)

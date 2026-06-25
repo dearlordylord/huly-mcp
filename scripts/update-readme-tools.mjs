@@ -32,7 +32,7 @@ const sourceFor = (filePath) => {
 }
 
 const resolveModulePath = (fromFile, specifier) => {
-  if (!specifier.startsWith(".")) return specifier
+  if (!specifier.startsWith(".")) return undefined
 
   const basePath = resolve(dirname(fromFile), specifier)
   if (basePath.endsWith(".js")) {
@@ -75,6 +75,7 @@ const moduleBindingsFor = (filePath) => {
   for (const statement of source.statements) {
     if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
       const modulePath = resolveModulePath(resolved, statement.moduleSpecifier.text)
+      if (modulePath === undefined) continue
       const namedBindings = statement.importClause?.namedBindings
       if (namedBindings !== undefined && ts.isNamedImports(namedBindings)) {
         for (const element of namedBindings.elements) {
@@ -226,6 +227,13 @@ const expressionValue = (node, filePath, localBindings = new Map()) => {
       return Array.isArray(values) ? values.join(", ") : undefined
     }
 
+    if (
+      ["makeToolCategory", "makeToolDescription", "makeToolName"].includes(node.expression.text)
+      && node.arguments.length === 1
+    ) {
+      return expressionValue(node.arguments[0], filePath, localBindings)
+    }
+
     const fn = functionValue(node.expression, filePath, localBindings)
     if (fn !== undefined) {
       return fn(...node.arguments.map((argument) => expressionValue(argument, filePath, localBindings)))
@@ -235,6 +243,15 @@ const expressionValue = (node, filePath, localBindings = new Map()) => {
   if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
     const target = expressionValue(node.expression.expression, filePath, localBindings)
     const method = node.expression.name.text
+
+    if (
+      method === "make"
+      && node.arguments.length === 1
+      && ts.isIdentifier(node.expression.expression)
+      && ["ToolCategory", "ToolDescription", "ToolName"].includes(node.expression.expression.text)
+    ) {
+      return expressionValue(node.arguments[0], filePath, localBindings)
+    }
 
     if (method === "join" && Array.isArray(target)) {
       const separator = node.arguments.length > 0
@@ -293,10 +310,16 @@ const toolFiles = readdirSync(toolsDir)
   .filter((file) => file.endsWith(".ts") && file !== "index.ts" && file !== "registry.ts")
 
 const allTools = toolFiles.flatMap((file) => parseToolsFromFile(join(toolsDir, file)))
+const proxyTools = parseToolsFromFile(join(process.cwd(), "src/mcp/proxy-tools.ts"))
+  .filter((tool) => tool.category === "proxy")
 const resourceTemplates = parseResourceTemplatesFromFile(join(process.cwd(), "src/mcp/resources.ts"))
 
 if (allTools.length === 0) {
   throw new Error("README tool generation found no tools")
+}
+
+if (proxyTools.length === 0) {
+  throw new Error("README proxy tool generation found no proxy meta-tools")
 }
 
 if (resourceTemplates.length === 0) {
@@ -373,6 +396,15 @@ const generateToolsSection = () => {
     ...[...toolsByCategory.keys()].filter((category) => !categoryOrder.includes(category))
   ]
   let output = "## Available Tools\n\n"
+  output +=
+    "When resolved tool exposure is `proxy`, clients see the built-in tools plus these proxy meta-tools. Native Huly tools are then discovered and invoked through the proxy candidate catalog. Exact native tool names also dispatch when a client calls them directly, subject to `PROXY_OUTPUT_STRICT` scope rules, but hidden native tools are not advertised through `tools/list`.\n\n"
+  output += "### Proxy Meta-Tools\n\n"
+  output += "| Tool | Description |\n"
+  output += "|------|-------------|\n"
+  for (const tool of proxyTools) {
+    output += `| \`${tool.name}\` | ${escapeTableCell(tool.description)} |\n`
+  }
+  output += "\n"
   output += `**\`TOOLSETS\` categories:** ${categories.map((category) => `\`${category}\``).join(", ")}\n\n`
 
   for (const categoryName of categoryOrder) {
@@ -446,12 +478,12 @@ if (checkMode) {
   }
 
   console.log(
-    `✅ README.md is up to date with ${allTools.length} tools in ${toolsByCategory.size} categories and ${resourceTemplates.length} resource templates`
+    `✅ README.md is up to date with ${allTools.length} native tools, ${proxyTools.length} proxy tools, ${toolsByCategory.size} categories, and ${resourceTemplates.length} resource templates`
   )
   process.exit(0)
 }
 
 writeFileSync(readmePath, content, "utf-8")
 console.log(
-  `✅ README.md updated with ${allTools.length} tools in ${toolsByCategory.size} categories and ${resourceTemplates.length} resource templates`
+  `✅ README.md updated with ${allTools.length} native tools, ${proxyTools.length} proxy tools, ${toolsByCategory.size} categories, and ${resourceTemplates.length} resource templates`
 )

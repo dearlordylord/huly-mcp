@@ -12,6 +12,7 @@ import type { HulyStorageOperations } from "../../../src/huly/storage.js"
 import { testWorkbenchUrlConfig } from "../../../src/huly/url-builders.js"
 import { McpErrorCode } from "../../../src/mcp/error-mapping.js"
 import { toolRegistry } from "../../../src/mcp/tools/index.js"
+import { makeToolName } from "../../../src/mcp/tools/registry.js"
 import { corePersonId, docRef, spaceRef } from "../../helpers/huly-sdk.js"
 
 // AccountUuid is a branded SDK string; integration-test fixtures use literal strings at runtime.
@@ -162,7 +163,7 @@ describe("inventory MCP tools", () => {
   it.effect("returns encoded structured inventory list responses", () =>
     Effect.gen(function*() {
       const result = yield* Effect.promise(() =>
-        toolRegistry.handleToolCall("list_inventory_categories", {}, hulyClient, storageClient)
+        toolRegistry.handleToolCall(makeToolName("list_inventory_categories"), {}, hulyClient, storageClient)
       )
 
       expect(result?.isError).toBeUndefined()
@@ -173,7 +174,7 @@ describe("inventory MCP tools", () => {
     Effect.gen(function*() {
       const result = yield* Effect.promise(() =>
         toolRegistry.handleToolCall(
-          "list_inventory_product_attachments",
+          makeToolName("list_inventory_product_attachments"),
           { product: "prod-camera" },
           hulyClientWithInventoryProduct,
           storageClient
@@ -190,7 +191,7 @@ describe("inventory MCP tools", () => {
     Effect.gen(function*() {
       const result = yield* Effect.promise(() =>
         toolRegistry.handleToolCall(
-          "get_inventory_category",
+          makeToolName("get_inventory_category"),
           { category: "Missing" },
           hulyClient,
           storageClient
@@ -206,7 +207,7 @@ describe("inventory MCP tools", () => {
     Effect.gen(function*() {
       const attachmentResult = yield* Effect.promise(() =>
         toolRegistry.handleToolCall(
-          "get_inventory_product_attachment",
+          makeToolName("get_inventory_product_attachment"),
           { product: "prod-camera", attachmentId: "missing-attachment" },
           hulyClientWithInventoryProduct,
           storageClient
@@ -214,7 +215,7 @@ describe("inventory MCP tools", () => {
       )
       const commentResult = yield* Effect.promise(() =>
         toolRegistry.handleToolCall(
-          "update_inventory_product_comment",
+          makeToolName("update_inventory_product_comment"),
           { product: "prod-camera", commentId: "missing-comment", body: "Updated" },
           hulyClientWithInventoryProduct,
           storageClient
@@ -222,7 +223,7 @@ describe("inventory MCP tools", () => {
       )
       const ambiguousResult = yield* Effect.promise(() =>
         toolRegistry.handleToolCall(
-          "list_inventory_product_activity",
+          makeToolName("list_inventory_product_activity"),
           { product: "Camera" },
           hulyClientWithInventoryProduct,
           storageClient

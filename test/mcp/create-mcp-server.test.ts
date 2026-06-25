@@ -76,6 +76,19 @@ describe("createMcpServer", () => {
             visibleRegisteredToolCount: 1,
             totalRegisteredToolCount: 1,
             builtinTools: ["get_version", "get_huly_context"]
+          },
+          toolScope: {
+            active: false,
+            requestedToolsets: [],
+            enabledToolsets: [],
+            ignoredToolsets: [],
+            requestedTools: [],
+            enabledTools: [],
+            ignoredTools: [],
+            availableCategories: ["issues"],
+            visibleRegisteredToolCount: 1,
+            totalRegisteredToolCount: 1,
+            builtinTools: ["get_version", "get_huly_context"]
           }
         }) as never,
       () => createCapturingServer(handlers)

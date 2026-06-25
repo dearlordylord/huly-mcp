@@ -4,8 +4,8 @@ import { expect, it } from "vitest"
 
 import { sanitizeHulyRuntimeConfigFromEnv, sanitizeHulyRuntimeConfigFromHeaders } from "../../src/config/config.js"
 import { DEFAULT_HULY_CONNECTION_TIMEOUT } from "../../src/config/huly-config-constants.js"
-import { parseToolsets } from "../../src/mcp/huly-context-tool.js"
-import { CATEGORY_NAMES } from "../../src/mcp/tools/index.js"
+import { resolveToolScope } from "../../src/mcp/tool-scope.js"
+import { CATEGORY_NAMES, toolRegistry } from "../../src/mcp/tools/index.js"
 import { propertyTestParameters } from "../helpers/property.js"
 
 const secretArbitrary = fc.uuid().map((value) => `secret-${value}`)
@@ -166,32 +166,89 @@ describe("sanitized runtime context properties", () => {
   })
 })
 
-describe("parseToolsets properties", () => {
-  it("normalizes known categories and reports unknown categories", () => {
+const knownCategories = [...CATEGORY_NAMES]
+const knownToolNames = toolRegistry.definitions.map((tool) => tool.name)
+const knownCategoryArbitrary = fc.constantFrom(...knownCategories)
+const knownToolNameArbitrary = fc.constantFrom(...knownToolNames)
+const unknownCategoryArbitrary = fc.stringMatching(/^[a-z][a-z0-9_-]{1,20}$/).filter(
+  (name) => !CATEGORY_NAMES.has(name)
+)
+const unknownToolNameArbitrary = fc.stringMatching(/^[a-z][a-z0-9_]{1,30}$/).filter(
+  (name) => !toolRegistry.tools.has(name)
+)
+
+const decoratedCsv = (values: ReadonlyArray<string>): string =>
+  values.map((value, index) => index % 2 === 0 ? value.toUpperCase() : ` ${value} `).join(",")
+
+const uniqueLower = (
+  values: ReadonlyArray<string>
+): ReadonlyArray<string> => [...new Set(values.map((value) => value.toLowerCase()))]
+
+describe("tool scope parser properties", () => {
+  it("normalizes and de-duplicates known and unknown toolsets and tools", () => {
     fc.assert(
       fc.property(
-        fc.array(fc.constantFrom(...CATEGORY_NAMES), { maxLength: 8 }),
-        fc.array(fc.stringMatching(/^[a-z][a-z0-9_-]{1,20}$/).filter((name) => !CATEGORY_NAMES.has(name)), {
-          maxLength: 8
-        }),
-        (knownCategories, unknownCategories) => {
-          const requested = [...knownCategories, ...unknownCategories]
-          const raw = requested.map((category, index) => index % 2 === 0 ? category.toUpperCase() : ` ${category} `)
-            .join(",")
+        fc.array(fc.oneof(knownCategoryArbitrary, unknownCategoryArbitrary), { maxLength: 12 }),
+        fc.array(fc.oneof(knownToolNameArbitrary, unknownToolNameArbitrary), { maxLength: 12 }),
+        (requestedCategories, requestedTools) => {
           const warnings: Array<string> = []
-          const result = parseToolsets(raw, (message) => {
-            warnings.push(message)
-          })
+          const result = resolveToolScope(
+            {
+              toolsets: decoratedCsv(requestedCategories),
+              tools: decoratedCsv(requestedTools)
+            },
+            toolRegistry.definitions,
+            (message) => {
+              warnings.push(message)
+            }
+          )
+          const normalizedCategories = uniqueLower(requestedCategories)
+          const normalizedTools = uniqueLower(requestedTools)
+          const ignoredCategories = normalizedCategories.filter((category) => !CATEGORY_NAMES.has(category))
+          const ignoredTools = normalizedTools.filter((tool) => !toolRegistry.tools.has(tool))
 
-          expect(result.requestedCategories).toEqual(requested.map((category) => category.toLowerCase()))
-          expect(result.ignoredCategories).toEqual(unknownCategories)
-          expect(warnings).toHaveLength(unknownCategories.length)
+          expect(result.requestedToolsets).toEqual(normalizedCategories)
+          expect(result.requestedTools).toEqual(normalizedTools)
+          expect(result.ignoredToolsets).toEqual(ignoredCategories)
+          expect(result.ignoredTools).toEqual(ignoredTools)
+          expect(result.enabledToolsets.every((category) => CATEGORY_NAMES.has(category))).toBe(true)
+          expect(result.enabledTools.every((tool) => toolRegistry.tools.has(tool))).toBe(true)
+          expect(warnings).toHaveLength(ignoredCategories.length + ignoredTools.length)
+        }
+      ),
+      propertyTestParameters
+    )
+  })
 
-          if (knownCategories.length === 0) {
-            expect(result.enabledCategories).toBeUndefined()
-          } else {
-            expect(result.enabledCategories).toEqual(new Set(knownCategories))
-          }
+  it("preserves inactive versus active-all-invalid semantics", () => {
+    fc.assert(
+      fc.property(
+        fc.array(unknownCategoryArbitrary, { minLength: 1, maxLength: 8 }),
+        fc.array(unknownToolNameArbitrary, { maxLength: 8 }),
+        (unknownCategories, unknownTools) => {
+          const inactive = resolveToolScope(
+            {
+              toolsets: "",
+              tools: ""
+            },
+            toolRegistry.definitions,
+            () => {}
+          )
+          const activeInvalid = resolveToolScope(
+            {
+              toolsets: decoratedCsv(unknownCategories),
+              tools: decoratedCsv(unknownTools)
+            },
+            toolRegistry.definitions,
+            () => {}
+          )
+
+          expect(inactive.filteringActive).toBe(false)
+          expect(inactive.visibleRegisteredToolCount).toBe(toolRegistry.definitions.length)
+          expect(activeInvalid.filteringActive).toBe(true)
+          expect(activeInvalid.enabledToolsets).toEqual([])
+          expect(activeInvalid.enabledTools).toEqual([])
+          expect(activeInvalid.visibleRegisteredToolCount).toBe(0)
         }
       ),
       propertyTestParameters

@@ -227,7 +227,7 @@ const buildAppLayer = (
   resolveClientsForHttpRequest: (req: Request) => Promise<ClientBundle>
 ): Layer.Layer<
   McpServerService | HttpServerFactoryService,
-  never,
+  McpServerError,
   never
 > => {
   const mcpServerConfig = {

@@ -9,9 +9,12 @@ import { testMarkupUrlConfig } from "../../src/huly/operations/markup.js"
 import type { HulyStorageOperations } from "../../src/huly/storage.js"
 import { testWorkbenchUrlConfig } from "../../src/huly/url-builders.js"
 import { CATEGORY_NAMES, createFilteredRegistry, TOOL_DEFINITIONS, toolRegistry } from "../../src/mcp/tools/index.js"
+import { makeToolCategory, makeToolName } from "../../src/mcp/tools/registry.js"
 import { assertExists } from "../../src/utils/assertions.js"
 
 const toolDefinition = (name: string) => assertExists(TOOL_DEFINITIONS[name], `Expected tool definition for ${name}`)
+const categorySet = (...categories: ReadonlyArray<string>) => new Set(categories.map(makeToolCategory))
+const toolName = makeToolName
 
 const noopHulyClient: HulyClientOperations = {
   getAccountUuid: () => "00000000-0000-4000-8000-000000000000" as AccountUuid,
@@ -41,19 +44,19 @@ const noopStorageClient: HulyStorageOperations = {
 describe("CATEGORY_NAMES", () => {
   it.effect("contains expected categories", () =>
     Effect.gen(function*() {
-      expect(CATEGORY_NAMES.has("projects")).toBe(true)
-      expect(CATEGORY_NAMES.has("issues")).toBe(true)
-      expect(CATEGORY_NAMES.has("documents")).toBe(true)
-      expect(CATEGORY_NAMES.has("comments")).toBe(true)
-      expect(CATEGORY_NAMES.has("task-management")).toBe(true)
-      expect(CATEGORY_NAMES.has("associations")).toBe(true)
-      expect(CATEGORY_NAMES.has("sdk-discovery")).toBe(true)
-      expect(CATEGORY_NAMES.has("user-statuses")).toBe(true)
-      expect(CATEGORY_NAMES.has("inventory")).toBe(true)
-      expect(CATEGORY_NAMES.has("recruiting")).toBe(true)
-      expect(CATEGORY_NAMES.has("views")).toBe(true)
-      expect(CATEGORY_NAMES.has("preferences")).toBe(true)
-      expect(CATEGORY_NAMES.has("approvals")).toBe(true)
+      expect(CATEGORY_NAMES.has(makeToolCategory("projects"))).toBe(true)
+      expect(CATEGORY_NAMES.has(makeToolCategory("issues"))).toBe(true)
+      expect(CATEGORY_NAMES.has(makeToolCategory("documents"))).toBe(true)
+      expect(CATEGORY_NAMES.has(makeToolCategory("comments"))).toBe(true)
+      expect(CATEGORY_NAMES.has(makeToolCategory("task-management"))).toBe(true)
+      expect(CATEGORY_NAMES.has(makeToolCategory("associations"))).toBe(true)
+      expect(CATEGORY_NAMES.has(makeToolCategory("sdk-discovery"))).toBe(true)
+      expect(CATEGORY_NAMES.has(makeToolCategory("user-statuses"))).toBe(true)
+      expect(CATEGORY_NAMES.has(makeToolCategory("inventory"))).toBe(true)
+      expect(CATEGORY_NAMES.has(makeToolCategory("recruiting"))).toBe(true)
+      expect(CATEGORY_NAMES.has(makeToolCategory("views"))).toBe(true)
+      expect(CATEGORY_NAMES.has(makeToolCategory("preferences"))).toBe(true)
+      expect(CATEGORY_NAMES.has(makeToolCategory("approvals"))).toBe(true)
       expect(CATEGORY_NAMES.size).toBeGreaterThan(5)
     }))
 
@@ -61,23 +64,23 @@ describe("CATEGORY_NAMES", () => {
     Effect.gen(function*() {
       const names = new Set(toolRegistry.definitions.map((tool) => tool.name))
 
-      expect(names.has("list_schedules")).toBe(true)
-      expect(names.has("get_schedule")).toBe(true)
-      expect(names.has("create_schedule")).toBe(true)
-      expect(names.has("update_schedule")).toBe(true)
-      expect(names.has("delete_schedule")).toBe(true)
-      expect(names.has("list_office_floors")).toBe(true)
-      expect(names.has("get_office_floor")).toBe(true)
-      expect(names.has("list_office_rooms")).toBe(true)
-      expect(names.has("get_office_room")).toBe(true)
-      expect(names.has("list_offices")).toBe(true)
-      expect(names.has("get_office")).toBe(true)
-      expect(names.has("list_active_room_info")).toBe(true)
-      expect(names.has("list_active_room_participants")).toBe(true)
-      expect(names.has("list_meeting_minutes")).toBe(true)
-      expect(names.has("get_meeting_minutes")).toBe(true)
-      expect(names.has("list_device_preferences")).toBe(true)
-      expect(names.has("list_office_defaults")).toBe(true)
+      expect(names.has(toolName("list_schedules"))).toBe(true)
+      expect(names.has(toolName("get_schedule"))).toBe(true)
+      expect(names.has(toolName("create_schedule"))).toBe(true)
+      expect(names.has(toolName("update_schedule"))).toBe(true)
+      expect(names.has(toolName("delete_schedule"))).toBe(true)
+      expect(names.has(toolName("list_office_floors"))).toBe(true)
+      expect(names.has(toolName("get_office_floor"))).toBe(true)
+      expect(names.has(toolName("list_office_rooms"))).toBe(true)
+      expect(names.has(toolName("get_office_room"))).toBe(true)
+      expect(names.has(toolName("list_offices"))).toBe(true)
+      expect(names.has(toolName("get_office"))).toBe(true)
+      expect(names.has(toolName("list_active_room_info"))).toBe(true)
+      expect(names.has(toolName("list_active_room_participants"))).toBe(true)
+      expect(names.has(toolName("list_meeting_minutes"))).toBe(true)
+      expect(names.has(toolName("get_meeting_minutes"))).toBe(true)
+      expect(names.has(toolName("list_device_preferences"))).toBe(true)
+      expect(names.has(toolName("list_office_defaults"))).toBe(true)
     }))
 
   it.effect("registers issue #102 closeout tools in their owning categories", () =>
@@ -128,7 +131,7 @@ describe("toolRegistry", () => {
 describe("createFilteredRegistry", () => {
   it.effect("filters to only requested categories", () =>
     Effect.gen(function*() {
-      const filtered = createFilteredRegistry(new Set(["issues"]))
+      const filtered = createFilteredRegistry(categorySet("issues"))
 
       expect(filtered.definitions.length).toBeGreaterThan(0)
       expect(filtered.definitions.length).toBeLessThan(toolRegistry.definitions.length)
@@ -140,14 +143,14 @@ describe("createFilteredRegistry", () => {
 
   it.effect("returns empty registry for unknown category", () =>
     Effect.gen(function*() {
-      const filtered = createFilteredRegistry(new Set(["nonexistent_category"]))
+      const filtered = createFilteredRegistry(categorySet("nonexistent_category"))
       expect(filtered.definitions.length).toBe(0)
       expect(filtered.tools.size).toBe(0)
     }))
 
   it.effect("combines multiple categories", () =>
     Effect.gen(function*() {
-      const filtered = createFilteredRegistry(new Set(["issues", "projects"]))
+      const filtered = createFilteredRegistry(categorySet("issues", "projects"))
 
       const categories = new Set(filtered.definitions.map((t) => t.category))
       expect(categories.size).toBeLessThanOrEqual(2)
@@ -159,7 +162,7 @@ describe("createFilteredRegistry", () => {
 
   it.effect("filters to task-management tools", () =>
     Effect.gen(function*() {
-      const filtered = createFilteredRegistry(new Set(["task-management"]))
+      const filtered = createFilteredRegistry(categorySet("task-management"))
       const toolNames = filtered.definitions.map((tool) => tool.name)
 
       expect(toolNames).toEqual([
@@ -176,7 +179,7 @@ describe("createFilteredRegistry", () => {
 
   it.effect("filters to association tools", () =>
     Effect.gen(function*() {
-      const filtered = createFilteredRegistry(new Set(["associations"]))
+      const filtered = createFilteredRegistry(categorySet("associations"))
       const toolNames = filtered.definitions.map((tool) => tool.name)
 
       expect(toolNames).toEqual([
@@ -194,7 +197,7 @@ describe("createFilteredRegistry", () => {
 
   it.effect("filters to user status tools", () =>
     Effect.gen(function*() {
-      const filtered = createFilteredRegistry(new Set(["user-statuses"]))
+      const filtered = createFilteredRegistry(categorySet("user-statuses"))
       const toolNames = filtered.definitions.map((tool) => tool.name)
 
       expect(toolNames).toEqual(["list_user_statuses"])
@@ -205,7 +208,7 @@ describe("createFilteredRegistry", () => {
 
   it.effect("filters to recruiting tools", () =>
     Effect.gen(function*() {
-      const filtered = createFilteredRegistry(new Set(["recruiting"]))
+      const filtered = createFilteredRegistry(categorySet("recruiting"))
       const toolNames = filtered.definitions.map((tool) => tool.name)
 
       expect(toolNames).toEqual([
@@ -266,7 +269,7 @@ describe("handleToolCall", () => {
     Effect.gen(function*() {
       const result = yield* Effect.promise(() =>
         toolRegistry.handleToolCall(
-          "totally_nonexistent_tool_xyz",
+          toolName("totally_nonexistent_tool_xyz"),
           {},
           noopHulyClient,
           noopStorageClient
@@ -280,7 +283,7 @@ describe("handleToolCall", () => {
     Effect.gen(function*() {
       const result = yield* Effect.promise(() =>
         toolRegistry.handleToolCall(
-          "list_projects",
+          toolName("list_projects"),
           undefined,
           noopHulyClient,
           noopStorageClient
@@ -295,7 +298,7 @@ describe("handleToolCall", () => {
     Effect.gen(function*() {
       const result = yield* Effect.promise(() =>
         toolRegistry.handleToolCall(
-          "get_unread_notification_count",
+          toolName("get_unread_notification_count"),
           undefined,
           noopHulyClient,
           noopStorageClient
@@ -310,7 +313,7 @@ describe("handleToolCall", () => {
     Effect.gen(function*() {
       const result = yield* Effect.promise(() =>
         toolRegistry.handleToolCall(
-          "get_issue",
+          toolName("get_issue"),
           undefined,
           noopHulyClient,
           noopStorageClient
@@ -326,7 +329,7 @@ describe("handleToolCall", () => {
     Effect.gen(function*() {
       const result = yield* Effect.promise(() =>
         toolRegistry.handleToolCall(
-          "get_unread_notification_count",
+          toolName("get_unread_notification_count"),
           { junk: true },
           noopHulyClient,
           noopStorageClient
@@ -354,7 +357,7 @@ describe("TOOL_DEFINITIONS", () => {
     Effect.gen(function*() {
       for (const [name, tool] of Object.entries(TOOL_DEFINITIONS)) {
         expect(tool.name).toBe(name)
-        expect(toolRegistry.tools.has(name)).toBe(true)
+        expect(toolRegistry.tools.has(toolName(name))).toBe(true)
       }
     }))
 })

@@ -18,7 +18,48 @@ import {
 } from "../error-mapping.js"
 import { createToolOutputSchema, type McpOutputSchema } from "../tool-output-schema.js"
 
+export const ToolName = Schema.NonEmptyTrimmedString.pipe(Schema.brand("ToolName")).annotations({
+  identifier: "ToolName",
+  title: "ToolName",
+  description: "Exact MCP tool name registered by this server."
+})
+export type ToolName = Schema.Schema.Type<typeof ToolName>
+
+export const ToolDescription = Schema.NonEmptyTrimmedString.pipe(Schema.brand("ToolDescription")).annotations({
+  identifier: "ToolDescription",
+  title: "ToolDescription",
+  description: "Human-readable MCP tool description."
+})
+export type ToolDescription = Schema.Schema.Type<typeof ToolDescription>
+
+export const ToolCategory = Schema.NonEmptyTrimmedString.pipe(Schema.brand("ToolCategory")).annotations({
+  identifier: "ToolCategory",
+  title: "ToolCategory",
+  description: "MCP tool category used for toolset filtering and proxy discovery."
+})
+export type ToolCategory = Schema.Schema.Type<typeof ToolCategory>
+
+export const makeToolName = (value: string): ToolName => ToolName.make(value)
+export const makeToolDescription = (value: string): ToolDescription => ToolDescription.make(value)
+export const makeToolCategory = (value: string): ToolCategory => ToolCategory.make(value)
+
+export const parseToolName = (input: unknown): ToolName | undefined => {
+  const decoded = Schema.decodeUnknownEither(ToolName)(input)
+  return Either.isRight(decoded) ? decoded.right : undefined
+}
+
 export interface ToolDefinition {
+  readonly name: ToolName
+  readonly description: ToolDescription
+  readonly inputSchema: object
+  readonly outputSchema: McpOutputSchema
+  readonly category: ToolCategory
+  readonly annotations?: ToolAnnotations
+}
+
+// Raw static declaration input. createToolDefinition parses these literals into
+// branded ToolDefinition metadata before any registry/listing/call path sees them.
+interface ToolDefinitionSpec {
   readonly name: string
   readonly description: string
   readonly inputSchema: object
@@ -27,7 +68,16 @@ export interface ToolDefinition {
   readonly annotations?: ToolAnnotations
 }
 
-const deriveTitle = (name: string): string =>
+export const createToolDefinition = (spec: ToolDefinitionSpec): ToolDefinition => ({
+  name: makeToolName(spec.name),
+  description: makeToolDescription(spec.description),
+  inputSchema: spec.inputSchema,
+  outputSchema: spec.outputSchema,
+  category: makeToolCategory(spec.category),
+  ...(spec.annotations === undefined ? {} : { annotations: spec.annotations })
+})
+
+const deriveTitle = (name: ToolName): string =>
   name.split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
 
 const READ_PREFIXES = ["list_", "get_", "describe_", "search_", "fulltext_", "download_", "preview_"]
@@ -52,10 +102,10 @@ const UPDATE_PREFIXES = [
 ]
 const DELETE_PREFIXES = ["delete_"]
 
-const matchesPrefix = (name: string, prefixes: ReadonlyArray<string>): boolean =>
+const matchesPrefix = (name: ToolName, prefixes: ReadonlyArray<string>): boolean =>
   prefixes.some((p) => name.startsWith(p))
 
-const deriveAnnotations = (name: string): ToolAnnotations => {
+const deriveAnnotations = (name: ToolName): ToolAnnotations => {
   const title = deriveTitle(name)
 
   if (matchesPrefix(name, READ_PREFIXES)) {
@@ -87,13 +137,13 @@ export interface RegisteredTool extends ToolDefinition {
   ) => Promise<McpToolResponse>
 }
 
-export const createMissingArgumentsError = (toolName: string): McpToolResponse =>
+export const createMissingArgumentsError = (toolName: ToolName): McpToolResponse =>
   createInvalidParamsError(
     `Invalid parameters for ${toolName}: missing arguments object. Pass an arguments object; use {} when you want defaults for optional parameters.`,
     "MissingArguments"
   )
 
-export const createUnexpectedArgumentsError = (toolName: string): McpToolResponse =>
+export const createUnexpectedArgumentsError = (toolName: ToolName): McpToolResponse =>
   createInvalidParamsError(
     `Invalid parameters for ${toolName}: this tool does not accept arguments. Pass {} or omit arguments.`,
     "UnexpectedArguments"
@@ -177,6 +227,8 @@ type ResultSchema = Schema.Schema.AnyNoContext
 
 type SchemaResult<S extends ResultSchema> = Schema.Schema.Type<S>
 
+// Authoring shape for static tool declarations. The registry parses this into
+// branded ToolDefinition metadata once, before tools can be listed or invoked.
 interface ToolSpec<S extends ResultSchema> {
   readonly name: string
   readonly description: string
@@ -188,14 +240,15 @@ interface ToolSpec<S extends ResultSchema> {
 
 const stripResultSchema = <S extends ResultSchema>(
   spec: ToolSpec<S>
-): ToolDefinition => ({
-  name: spec.name,
-  description: spec.description,
-  inputSchema: spec.inputSchema,
-  outputSchema: createToolOutputSchema(spec.resultSchema),
-  category: spec.category,
-  ...(spec.annotations === undefined ? {} : { annotations: spec.annotations })
-})
+): ToolDefinition =>
+  createToolDefinition({
+    name: spec.name,
+    description: spec.description,
+    inputSchema: spec.inputSchema,
+    outputSchema: createToolOutputSchema(spec.resultSchema),
+    category: spec.category,
+    ...(spec.annotations === undefined ? {} : { annotations: spec.annotations })
+  })
 
 interface HandlerArgs {
   readonly hulyClient: HulyClient["Type"]

@@ -2,6 +2,7 @@
 # Benchmark: edit_document search-and-replace vs full replace context savings.
 # Measures input payload sizes and validates correctness against local Huly.
 # Usage: pnpm build && set -a && source .env.local && set +a && bash scripts/benchmark_edit_context.sh
+# Defaults HULY_TOOL_MODE to native because it calls native Huly tools directly.
 # Requires: jq, node, HULY_URL/HULY_WORKSPACE/HULY_EMAIL+HULY_PASSWORD env vars
 set -o pipefail
 
@@ -15,6 +16,14 @@ fi
 
 if [ -z "$HULY_URL" ]; then
   echo "ERROR: HULY_URL not set. Run: set -a && source .env.local && set +a"
+  exit 1
+fi
+
+if [ -z "${HULY_TOOL_MODE+x}" ]; then
+  export HULY_TOOL_MODE=native
+elif [ "$HULY_TOOL_MODE" != "native" ]; then
+  echo "ERROR: benchmark_edit_context.sh requires HULY_TOOL_MODE=native because it calls native Huly tools directly."
+  echo "Unset HULY_TOOL_MODE to let the script select native mode automatically."
   exit 1
 fi
 

@@ -15,6 +15,7 @@ import { HulyStorageClient } from "../../src/huly/storage.js"
 import { McpErrorCode } from "../../src/mcp/error-mapping.js"
 import { createMcpProtocolHandlers } from "../../src/mcp/protocol-handlers.js"
 import { toolRegistry } from "../../src/mcp/tools/index.js"
+import { makeToolName } from "../../src/mcp/tools/registry.js"
 import { createNoopTelemetry } from "../../src/telemetry/noop.js"
 import type { TelemetryOperations } from "../../src/telemetry/telemetry.js"
 
@@ -136,7 +137,7 @@ describe("message template MCP tools", () => {
       const clients = yield* buildClients([category("cat-sales", "Sales")])
       const result = yield* Effect.promise(() =>
         toolRegistry.handleToolCall(
-          "list_message_template_categories",
+          makeToolName("list_message_template_categories"),
           {},
           clients.hulyClient,
           clients.storageClient
@@ -168,7 +169,7 @@ describe("message template MCP tools", () => {
       ])
       const result = yield* Effect.promise(() =>
         toolRegistry.handleToolCall(
-          "render_message_template",
+          makeToolName("render_message_template"),
           {
             template: "tmpl-sales-welcome",
             values: [
@@ -198,7 +199,7 @@ describe("message template MCP tools", () => {
       const clients = yield* buildClients([])
       const result = yield* Effect.promise(() =>
         toolRegistry.handleToolCall(
-          "get_message_template",
+          makeToolName("get_message_template"),
           { template: "missing" },
           clients.hulyClient,
           clients.storageClient

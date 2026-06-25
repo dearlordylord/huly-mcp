@@ -71,6 +71,29 @@ const validContext = {
     visibleRegisteredToolCount: 12,
     totalRegisteredToolCount: 120,
     builtinTools: ["get_version", "get_huly_context"]
+  },
+  toolScope: {
+    active: true,
+    requestedToolsets: ["issues"],
+    enabledToolsets: ["issues"],
+    ignoredToolsets: [],
+    requestedTools: ["list_documents"],
+    enabledTools: ["list_documents"],
+    ignoredTools: [],
+    availableCategories: ["issues", "projects"],
+    visibleRegisteredToolCount: 13,
+    totalRegisteredToolCount: 120,
+    builtinTools: ["get_version", "get_huly_context"]
+  },
+  toolExposure: {
+    configuredMode: "auto",
+    resolvedMode: "proxy",
+    clientKind: "codex",
+    proxyOutputStrict: false,
+    visibleToolCount: 6,
+    nativeVisibleToolCount: 0,
+    proxyCandidateToolCount: 120,
+    proxyToolNames: ["list_tool_categories", "search_tools", "get_tool_schema", "invoke_tool"]
   }
 }
 
@@ -81,6 +104,8 @@ describe("GetHulyContextResultSchema", () => {
       expect(decoded.package.name).toBe("@firfi/huly-mcp")
       expect(decoded.transport.type).toBe("http")
       expect(decoded.toolsets.builtinTools).toEqual(["get_version", "get_huly_context"])
+      expect(decoded.toolScope.enabledTools).toEqual(["list_documents"])
+      expect(decoded.toolExposure.resolvedMode).toBe("proxy")
     }))
 
   it.effect("rejects non-sanitized URL origin values", () =>
@@ -134,9 +159,9 @@ describe("GetHulyContextResultSchema", () => {
           },
           {
             ...validContext,
-            toolsets: {
-              ...validContext.toolsets,
-              requestedCategories: [""]
+            toolScope: {
+              ...validContext.toolScope,
+              requestedTools: [""]
             }
           }
         ]
@@ -155,7 +180,9 @@ describe("GetHulyContextResultSchema", () => {
           huly: expect.any(Object),
           auth: expect.any(Object),
           configSources: expect.any(Object),
-          toolsets: expect.any(Object)
+          toolsets: expect.any(Object),
+          toolScope: expect.any(Object),
+          toolExposure: expect.any(Object)
         }
       })
     }))

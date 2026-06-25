@@ -1,18 +1,16 @@
 import type {
+  CallToolRequestParams,
   CallToolResult,
   ListResourcesResult,
   ListResourceTemplatesResult,
   ListToolsResult,
+  ReadResourceRequestParams,
   ReadResourceResult
 } from "@modelcontextprotocol/sdk/types.js"
-import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js"
-import { Cause, Chunk, Clock, Effect, Exit, Runtime, Schema } from "effect"
+import { Clock, Effect, Schema } from "effect"
 
-import { ConfigValidationError } from "../config/config.js"
 import { type GetHulyContextResult, GetHulyContextResultSchema } from "../domain/schemas/index.js"
-import type { ToolWarning } from "../domain/schemas/tool-warnings.js"
-import { HulyClient } from "../huly/client.js"
-import { Diagnostics, makeDiagnosticsScope } from "../huly/diagnostics.js"
+import type { HulyClient } from "../huly/client.js"
 import { HulyError } from "../huly/errors-base.js"
 import type { HulyStorageClient } from "../huly/storage.js"
 import type { WorkspaceClientOperations } from "../huly/workspace-client.js"
@@ -23,19 +21,30 @@ import { createSuccessResponse, createUnknownToolError, mapDomainErrorToMcp, toM
 import {
   GET_HULY_CONTEXT_TOOL_NAME,
   getHulyContextToolDefinition,
+  type ToolExposureContext,
   VERSION_TOOL_NAME,
   versionToolDefinition,
   VersionToolResultSchema
 } from "./huly-context-tool.js"
-import { toClientCompatibleInputSchema } from "./input-schema-compat.js"
-import { listResources, listResourceTemplates, readHulyResource } from "./resources.js"
+import { createResourceProtocolHandlers } from "./protocol-resource-handlers.js"
+import {
+  defaultExposureOptions,
+  normalizeRegistries,
+  type ProtocolExposureOptions,
+  type ProtocolToolRegistries,
+  resolveProtocolExposure,
+  toListedHulyTool,
+  toListedTool
+} from "./protocol-tool-exposure.js"
+import { handleProxyToolCall, INVOKE_TOOL_TOOL_NAME, isProxyToolName, proxyToolDefinitions } from "./proxy-tools.js"
+import { listResourceTemplates } from "./resources.js"
 import type { ToolRegistry } from "./tools/index.js"
-import { resolveAnnotations } from "./tools/index.js"
 import {
   createMissingArgumentsError,
   createUnexpectedArgumentsError,
   isEmptyArgumentsObject,
   isNoArgumentTool,
+  parseToolName,
   requiresArgumentsObject
 } from "./tools/registry.js"
 
@@ -47,18 +56,18 @@ export interface ClientBundle {
 
 interface ToolCallRequest {
   readonly params: {
-    readonly name: string
+    readonly name: CallToolRequestParams["name"]
     readonly arguments?: unknown
   }
 }
 
 interface ResourceReadRequest {
-  readonly params: {
-    readonly uri: string
-  }
+  readonly params: ReadResourceRequestParams
 }
 
 type ListToolsProtocolResult = ListToolsResult
+
+type HulyContextProvider = (toolExposure: ToolExposureContext) => GetHulyContextResult
 
 export interface McpProtocolHandlers {
   readonly listTools: () => Promise<ListToolsProtocolResult>
@@ -90,20 +99,6 @@ const NPM_PACKAGE_NAME = "@firfi/huly-mcp"
 
 const computeOutputBytes = (response: McpToolResponse): number =>
   response.content.reduce((sum, c) => sum + c.text.length, 0)
-
-const withResourceWarnings = (
-  result: ReadResourceResult,
-  warnings: ReadonlyArray<ToolWarning>
-): ReadResourceResult =>
-  warnings.length === 0
-    ? result
-    : {
-      ...result,
-      _meta: {
-        ...result._meta,
-        warnings
-      }
-    }
 
 export const deriveEditMode = (name: string, args: unknown): string | undefined => {
   if (name !== "edit_document" || args === undefined) return undefined
@@ -168,99 +163,25 @@ export const fetchLatestNpmVersion = async (fetchImpl: typeof fetch = fetch): Pr
   }
 }
 
-interface ProtocolObjectSchemaSource {
-  readonly type: "object"
-  readonly properties?: Record<string, unknown> | undefined
-  readonly required?: ReadonlyArray<string> | undefined
-  readonly [key: string]: unknown
-}
-
-type ProtocolObjectSchema = ListToolsResult["tools"][number]["inputSchema"]
-
-const isObjectPropertyEntry = (entry: [string, unknown]): entry is [string, object] => {
-  const value = entry[1]
-  return typeof value === "object" && value !== null
-}
-
-const objectProperties = (properties: Record<string, unknown> | undefined): Record<string, object> | undefined => {
-  if (properties === undefined) return undefined
-
-  return Object.entries(properties).filter(isObjectPropertyEntry).reduce<Record<string, object>>(
-    (acc, [key, value]) => ({ ...acc, [key]: value }),
-    {}
-  )
-}
-
-const toProtocolObjectSchema = (schema: ProtocolObjectSchemaSource): ProtocolObjectSchema => {
-  const { properties, required, ...rest } = schema
-  const convertedProperties = objectProperties(properties)
-  return {
-    ...rest,
-    type: "object",
-    ...(convertedProperties === undefined ? {} : { properties: convertedProperties }),
-    ...(required === undefined ? {} : { required: [...required] })
-  }
-}
-
-const createResourceClientResolutionError = (uri: string, _error: unknown): McpError =>
-  new McpError(
-    ErrorCode.InternalError,
-    `Failed to initialize Huly clients while reading resource "${uri}". Verify Huly URL, workspace, and authentication configuration.`
-  )
-
-const createResourceListClientResolutionError = (_error: unknown): McpError =>
-  new McpError(
-    ErrorCode.InternalError,
-    "Failed to initialize Huly clients while listing resources. Verify Huly URL, workspace, and authentication configuration."
-  )
-
-const isConfigValidationFailure = (error: unknown): boolean => {
-  if (error instanceof ConfigValidationError) return true
-  if (!Runtime.isFiberFailure(error)) return false
-
-  return Chunk.toArray(Cause.failures(error[Runtime.FiberFailureCauseId])).some(
-    (failure) => failure instanceof ConfigValidationError
-  )
-}
-
-const shouldReturnEmptyResourceListOnClientResolutionFailure = (
-  error: unknown,
-  _getHulyContext: () => GetHulyContextResult
-): boolean => isConfigValidationFailure(error)
-
-const resolveResourceClientsOrThrow = async (
-  resolveClients: () => Promise<ClientBundle>,
-  mapError: (error: unknown) => McpError
-): Promise<ClientBundle> => {
-  try {
-    return await resolveClients()
-  } catch (e) {
-    throw mapError(e)
-  }
-}
-
-const throwResourceReadError = (uri: string, cause: Cause.Cause<McpError>): never => {
-  const failures = Chunk.toArray(Cause.failures(cause))
-  const failure = failures[0]
-  if (failure instanceof McpError) throw failure
-  throw new McpError(ErrorCode.InternalError, `Failed to read Huly resource "${uri}"`)
-}
-
-const throwResourceListError = (cause: Cause.Cause<McpError>): never => {
-  const failures = Chunk.toArray(Cause.failures(cause))
-  const failure = failures[0]
-  if (failure instanceof McpError) throw failure
-  throw new McpError(ErrorCode.InternalError, "Failed to list Huly resources")
-}
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
 
 export const createMcpProtocolHandlers = (
   resolveClients: () => Promise<ClientBundle>,
   telemetry: TelemetryOperations,
-  registry: ToolRegistry,
-  getHulyContext: () => GetHulyContextResult,
+  registry: ToolRegistry | ProtocolToolRegistries,
+  getHulyContext: HulyContextProvider,
   clock: NowClock = liveNowClock,
-  fetchLatestVersion: () => Promise<string> = fetchLatestNpmVersion
+  fetchLatestVersion: () => Promise<string> = fetchLatestNpmVersion,
+  exposureOptions: Partial<ProtocolExposureOptions> = {}
 ): McpProtocolHandlers => {
+  const registries = normalizeRegistries(registry)
+  const defaults = defaultExposureOptions()
+  const protocolExposureOptions: ProtocolExposureOptions = {
+    exposureConfig: exposureOptions.exposureConfig ?? defaults.exposureConfig,
+    currentClientInfo: exposureOptions.currentClientInfo ?? defaults.currentClientInfo,
+    toolScopeFilteringActive: exposureOptions.toolScopeFilteringActive ?? defaults.toolScopeFilteringActive
+  }
   let inflight = 0
   const drainInflight = createDrainInflight(() => inflight, clock)
   const enter = () => {
@@ -271,23 +192,17 @@ export const createMcpProtocolHandlers = (
   }
 
   const listTools = async (): Promise<ListToolsProtocolResult> => {
-    telemetry.firstListTools()
+    const exposure = resolveProtocolExposure(registries, protocolExposureOptions)
+    telemetry.firstListTools({
+      clientKind: exposure.context.clientKind,
+      resolvedMode: exposure.context.resolvedMode
+    })
     return {
       tools: [
-        versionToolDefinition,
-        getHulyContextToolDefinition,
-        ...registry.definitions.map((tool) => ({
-          name: tool.name,
-          description: tool.description,
-          inputSchema: toClientCompatibleInputSchema(tool.inputSchema),
-          outputSchema: tool.outputSchema,
-          annotations: resolveAnnotations(tool)
-        }))
-      ].map(tool => ({
-        ...tool,
-        inputSchema: toProtocolObjectSchema(tool.inputSchema),
-        outputSchema: toProtocolObjectSchema(tool.outputSchema)
-      }))
+        ...[versionToolDefinition, getHulyContextToolDefinition].map(toListedTool),
+        ...(exposure.context.resolvedMode === "proxy" ? proxyToolDefinitions.map(toListedHulyTool) : []),
+        ...exposure.visibleNativeRegistry.definitions.map(toListedHulyTool)
+      ]
     }
   }
 
@@ -295,6 +210,7 @@ export const createMcpProtocolHandlers = (
     enter()
     try {
       const { arguments: args, name } = request.params
+      const exposure = resolveProtocolExposure(registries, protocolExposureOptions)
 
       const start = clock.currentTimeMillis()
       const inputBytes = JSON.stringify(args ?? {}).length
@@ -304,6 +220,8 @@ export const createMcpProtocolHandlers = (
         telemetry.toolCalled({
           toolName: name,
           status: "error",
+          clientKind: exposure.context.clientKind,
+          resolvedMode: exposure.context.resolvedMode,
           errorTag: errorResponse._meta?.errorTag,
           durationMs,
           inputBytes,
@@ -314,7 +232,7 @@ export const createMcpProtocolHandlers = (
       }
 
       if (name === VERSION_TOOL_NAME) {
-        if (!isEmptyArgumentsObject(args)) return returnError(createUnexpectedArgumentsError(name))
+        if (!isEmptyArgumentsObject(args)) return returnError(createUnexpectedArgumentsError(VERSION_TOOL_NAME))
 
         const latest = await fetchLatestVersion()
         let versionResult: Schema.Schema.Type<typeof VersionToolResultSchema>
@@ -328,6 +246,8 @@ export const createMcpProtocolHandlers = (
         telemetry.toolCalled({
           toolName: name,
           status: "success",
+          clientKind: exposure.context.clientKind,
+          resolvedMode: exposure.context.resolvedMode,
           durationMs,
           inputBytes,
           outputBytes: computeOutputBytes(versionResponse)
@@ -336,11 +256,13 @@ export const createMcpProtocolHandlers = (
       }
 
       if (name === GET_HULY_CONTEXT_TOOL_NAME) {
-        if (!isEmptyArgumentsObject(args)) return returnError(createUnexpectedArgumentsError(name))
+        if (!isEmptyArgumentsObject(args)) {
+          return returnError(createUnexpectedArgumentsError(GET_HULY_CONTEXT_TOOL_NAME))
+        }
 
         let context: GetHulyContextResult
         try {
-          context = validateHulyContextResult(getHulyContext())
+          context = validateHulyContextResult(getHulyContext(exposure.context))
         } catch {
           return returnError(mapDomainErrorToMcp(new HulyError({ message: "Failed to build Huly context" })))
         }
@@ -350,6 +272,8 @@ export const createMcpProtocolHandlers = (
         telemetry.toolCalled({
           toolName: name,
           status: "success",
+          clientKind: exposure.context.clientKind,
+          resolvedMode: exposure.context.resolvedMode,
           durationMs,
           inputBytes,
           outputBytes: computeOutputBytes(contextResponse)
@@ -357,18 +281,76 @@ export const createMcpProtocolHandlers = (
         return toMcpResponse(contextResponse)
       }
 
-      const tool = registry.tools.get(name)
+      if (isProxyToolName(name)) {
+        if (exposure.context.resolvedMode !== "proxy") return returnError(createUnknownToolError(name))
+
+        const editMode = name === INVOKE_TOOL_TOOL_NAME && isRecord(args) && typeof args.toolName === "string"
+          ? deriveEditMode(args.toolName, args.arguments)
+          : undefined
+
+        let clients: ClientBundle | undefined
+        if (name === INVOKE_TOOL_TOOL_NAME) {
+          try {
+            clients = await resolveClients()
+          } catch (e) {
+            const errorResponse = mapDomainErrorToMcp(
+              new HulyError({
+                message: `Failed to initialize Huly clients: ${e instanceof Error ? e.message : String(e)}`
+              })
+            )
+            return returnError(errorResponse, editMode)
+          }
+        }
+
+        const response = await handleProxyToolCall({
+          toolName: name,
+          args,
+          proxyCandidateRegistry: exposure.proxyCandidateRegistry,
+          ...(clients === undefined
+            ? {}
+            : {
+              clients: {
+                hulyClient: clients.hulyClient,
+                storageClient: clients.storageClient,
+                ...(clients.workspaceClient === undefined ? {} : { workspaceClient: clients.workspaceClient })
+              }
+            })
+        })
+        const durationMs = clock.currentTimeMillis() - start
+        telemetry.toolCalled({
+          toolName: name,
+          status: response.isError === true ? "error" : "success",
+          clientKind: exposure.context.clientKind,
+          resolvedMode: exposure.context.resolvedMode,
+          errorTag: response._meta?.errorTag,
+          durationMs,
+          inputBytes,
+          outputBytes: computeOutputBytes(response),
+          editMode
+        })
+        return toMcpResponse(response)
+      }
+
+      const hulyToolName = parseToolName(name)
+      if (hulyToolName === undefined) return returnError(createUnknownToolError(name))
+
+      const nativeCallRegistry = exposure.visibleNativeRegistry.tools.has(hulyToolName)
+        ? exposure.visibleNativeRegistry
+        : exposure.context.resolvedMode === "proxy"
+        ? exposure.proxyCandidateRegistry
+        : exposure.visibleNativeRegistry
+      const tool = nativeCallRegistry.tools.get(hulyToolName)
       if (tool === undefined) return returnError(createUnknownToolError(name))
 
       if (isNoArgumentTool(tool) && !isEmptyArgumentsObject(args)) {
-        return returnError(createUnexpectedArgumentsError(name))
+        return returnError(createUnexpectedArgumentsError(hulyToolName))
       }
 
       if (args === undefined && requiresArgumentsObject(tool)) {
-        return returnError(createMissingArgumentsError(name))
+        return returnError(createMissingArgumentsError(hulyToolName))
       }
 
-      const editMode = deriveEditMode(name, args)
+      const editMode = deriveEditMode(hulyToolName, args)
 
       let clients: ClientBundle
       try {
@@ -380,8 +362,8 @@ export const createMcpProtocolHandlers = (
         return returnError(errorResponse, editMode)
       }
 
-      const response = await registry.handleToolCall(
-        name,
+      const response = await nativeCallRegistry.handleToolCall(
+        hulyToolName,
         args,
         clients.hulyClient,
         clients.storageClient,
@@ -391,8 +373,10 @@ export const createMcpProtocolHandlers = (
       if (response === null) return returnError(createUnknownToolError(name), editMode)
 
       telemetry.toolCalled({
-        toolName: name,
+        toolName: hulyToolName,
         status: response.isError === true ? "error" : "success",
+        clientKind: exposure.context.clientKind,
+        resolvedMode: exposure.context.resolvedMode,
         errorTag: response._meta?.errorTag,
         durationMs,
         inputBytes,
@@ -406,58 +390,14 @@ export const createMcpProtocolHandlers = (
     }
   }
 
-  const listResourcesHandler = async (): Promise<ListResourcesResult> => {
-    enter()
-    try {
-      let clients: ClientBundle
-      try {
-        clients = await resolveClients()
-      } catch (e) {
-        if (shouldReturnEmptyResourceListOnClientResolutionFailure(e, getHulyContext)) return { resources: [] }
-        throw createResourceListClientResolutionError(e)
-      }
-
-      const resourceList = await Effect.runPromiseExit(
-        listResources().pipe(
-          Effect.provideService(HulyClient, clients.hulyClient)
-        )
-      )
-      if (Exit.isSuccess(resourceList)) return resourceList.value
-      return throwResourceListError(resourceList.cause)
-    } finally {
-      leave()
-    }
-  }
-
-  const readResource = async (request: ResourceReadRequest): Promise<ReadResourceResult> => {
-    enter()
-    try {
-      const { uri } = request.params
-      const clients = await resolveResourceClientsOrThrow(
-        resolveClients,
-        error => createResourceClientResolutionError(uri, error)
-      )
-      const diagnosticsScope = await Effect.runPromise(makeDiagnosticsScope)
-      const resourceRead = await Effect.runPromiseExit(
-        readHulyResource(uri).pipe(
-          Effect.provideService(HulyClient, clients.hulyClient),
-          Effect.provideService(Diagnostics, diagnosticsScope.service)
-        )
-      )
-      const warnings = await Effect.runPromise(diagnosticsScope.drainWarnings)
-      if (Exit.isSuccess(resourceRead)) return withResourceWarnings(resourceRead.value, warnings)
-      return throwResourceReadError(uri, resourceRead.cause)
-    } finally {
-      leave()
-    }
-  }
+  const resourceHandlers = createResourceProtocolHandlers({ resolveClients, enter, leave })
 
   return {
     listTools,
     callTool,
-    listResources: listResourcesHandler,
+    listResources: resourceHandlers.listResources,
     listResourceTemplates,
-    readResource,
+    readResource: resourceHandlers.readResource,
     serverDiscover: () => ({
       resultType: "complete",
       supportedVersions: ["2026-07-28"],

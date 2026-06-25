@@ -1,6 +1,6 @@
 {
   "name": "@firfi/huly-mcp",
-  "version": "0.42.0",
+  "version": "0.43.0",
   "description": "Huly MCP: feature-complete MCP server for Huly integration",
   "mcpName": "io.github.dearlordylord/huly-mcp",
   "type": "module",
@@ -39,6 +39,7 @@
     "verify-schema-boundaries": "node scripts/verify-schema-boundaries.mjs",
     "verify-sdk-parity": "node scripts/audit-sdk-parity.mjs",
     "smoke:http-no-config": "node scripts/smoke-http-no-config.mjs",
+    "integration:tool-scope": "bash scripts/integration_test_tool_scope.sh",
     "sync-registry-metadata": "node scripts/sync-registry-metadata.mjs",
     "prepack": "pnpm build && pnpm verify-version",
     "prepublishOnly": "pnpm check-all && pnpm verify-version",

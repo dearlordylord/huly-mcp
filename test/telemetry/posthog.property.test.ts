@@ -29,11 +29,22 @@ const sessionStartArbitrary = fc.record({
 
 const toolCalledArbitrary = fc.record(
   {
+    clientKind: fc.constantFrom(
+      "claude-code",
+      "claude-ai",
+      "cursor",
+      "windsurf",
+      "github-copilot",
+      "codex",
+      "opencode",
+      "unknown"
+    ),
     durationMs: fc.integer({ min: 0, max: 3_600_000 }),
     editMode: fc.string({ maxLength: 24 }),
     errorTag: fc.string({ maxLength: 48 }),
     inputBytes: fc.integer({ min: 0, max: 10_000_000 }),
     outputBytes: fc.integer({ min: 0, max: 10_000_000 }),
+    resolvedMode: fc.constantFrom("native", "proxy"),
     status: fc.constantFrom("success", "error"),
     toolName: fc.stringMatching(/^[a-z][a-z0-9_]{0,40}$/)
   },
@@ -136,10 +147,12 @@ const expectedEventProperties = (
           duration_ms: operation.props.durationMs,
           status: operation.props.status,
           tool_name: operation.props.toolName,
+          ...(operation.props.clientKind === undefined ? {} : { client_kind: operation.props.clientKind }),
           ...(operation.props.editMode === undefined ? {} : { edit_mode: operation.props.editMode }),
           ...(operation.props.errorTag === undefined ? {} : { error_tag: operation.props.errorTag }),
           ...(operation.props.inputBytes === undefined ? {} : { input_bytes: operation.props.inputBytes }),
-          ...(operation.props.outputBytes === undefined ? {} : { output_bytes: operation.props.outputBytes })
+          ...(operation.props.outputBytes === undefined ? {} : { output_bytes: operation.props.outputBytes }),
+          ...(operation.props.resolvedMode === undefined ? {} : { resolved_mode: operation.props.resolvedMode })
         })
         break
     }
