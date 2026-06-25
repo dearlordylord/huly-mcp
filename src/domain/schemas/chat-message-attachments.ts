@@ -1,8 +1,8 @@
-import { JSONSchema, Predicate, Schema } from "effect"
+import { JSONSchema, Schema } from "effect"
 
 import { UPDATE_ATTACHMENT_FIELDS } from "./attachments.js"
 import { AttachmentDescription, AttachmentFileName, Base64FileData, LocalFilePath } from "./domain-values.js"
-import { withExactlyOneRequired, withJsonSchemaPropertyDescriptions } from "./json-schema.js"
+import { parseJsonSchemaRecord, withExactlyOneRequired, withJsonSchemaPropertyDescriptions } from "./json-schema.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
@@ -176,7 +176,15 @@ export type DeleteChatMessageAttachmentParams = Schema.Schema.Type<
   typeof DeleteChatMessageAttachmentParamsSchema
 >
 
-const CHAT_MESSAGE_ATTACHMENT_FIELD_DESCRIPTIONS: Readonly<Partial<Record<string, string>>> = {
+type PropertyKeyOfUnion<T> = T extends T ? keyof T : never
+
+type ChatMessageAttachmentDescriptionField =
+  | keyof AddChatMessageAttachmentParams
+  | keyof GetChatMessageAttachmentParams
+  | keyof ListChatMessageAttachmentsParams
+  | keyof UpdateChatMessageAttachmentParams
+
+const CHAT_MESSAGE_ATTACHMENT_FIELD_DESCRIPTIONS = {
   target:
     "Chat attachment target. Use channel_message for a channel message, dm_message for a direct-message message, or thread_reply for a thread reply.",
   limit: `Maximum number of matching attachments to return (default: ${DEFAULT_LIMIT}).`,
@@ -188,14 +196,23 @@ const CHAT_MESSAGE_ATTACHMENT_FIELD_DESCRIPTIONS: Readonly<Partial<Record<string
   data: "Base64-encoded file data. Mutually exclusive with filePath and fileUrl.",
   description: "Optional attachment description. Use null on update to clear it.",
   pinned: "Whether the attachment should be pinned."
-}
+} satisfies Readonly<Record<ChatMessageAttachmentDescriptionField, string>>
 
-const CHAT_MESSAGE_ATTACHMENT_TARGET_FIELD_DESCRIPTIONS: Readonly<Partial<Record<string, string>>> = {
+type ChatMessageAttachmentTargetDescriptionField = PropertyKeyOfUnion<ChatMessageAttachmentTarget>
+
+const CHAT_MESSAGE_ATTACHMENT_TARGET_FIELD_DESCRIPTIONS = {
   kind: "Target kind: channel_message, dm_message, or thread_reply.",
   channel: "Channel name or ID. Required for channel_message and thread_reply targets.",
   dm: "Direct-message conversation ID or one-to-one participant display name.",
   messageId: "Existing message ID. For thread_reply, this is the parent channel message ID.",
   replyId: "Existing thread reply ID."
+} satisfies Readonly<Record<ChatMessageAttachmentTargetDescriptionField, string>>
+
+const JsonSchemaArraySchema = Schema.Array(Schema.Unknown)
+
+const parseJsonSchemaArray = (value: unknown): ReadonlyArray<unknown> | undefined => {
+  const decoded = Schema.decodeUnknownEither(JsonSchemaArraySchema)(value)
+  return decoded._tag === "Right" ? decoded.right : undefined
 }
 
 const withRootSchemaMetadata = (schema: object, title: string, description: string): object => ({
@@ -204,32 +221,32 @@ const withRootSchemaMetadata = (schema: object, title: string, description: stri
   description
 })
 
-export const withChatMessageAttachmentTargetVariantDescriptions = (schema: object): object => {
-  const properties = Predicate.isRecord(schema) ? schema.properties : undefined
-  if (!Predicate.isRecord(properties)) return schema
-  const target = properties.target
-  if (!Predicate.isRecord(target) || !Array.isArray(target.anyOf)) return schema
+const chatMessageAttachmentJsonSchema = <A, I, R>(schema: Schema.Schema<A, I, R>): object => {
+  const jsonSchema = withJsonSchemaPropertyDescriptions(
+    JSONSchema.make(schema),
+    CHAT_MESSAGE_ATTACHMENT_FIELD_DESCRIPTIONS
+  )
+  const properties = parseJsonSchemaRecord(parseJsonSchemaRecord(jsonSchema)?.properties)
+  const target = parseJsonSchemaRecord(properties?.target)
+  const anyOf = parseJsonSchemaArray(target?.anyOf)
+  if (properties === undefined || target === undefined || anyOf === undefined) return jsonSchema
 
   return {
-    ...schema,
+    ...jsonSchema,
     properties: {
       ...properties,
       target: {
         ...target,
-        anyOf: target.anyOf.map((variant) =>
-          Predicate.isRecord(variant)
-            ? withJsonSchemaPropertyDescriptions(variant, CHAT_MESSAGE_ATTACHMENT_TARGET_FIELD_DESCRIPTIONS)
-            : variant
-        )
+        anyOf: anyOf.map((variant) => {
+          const variantRecord = parseJsonSchemaRecord(variant)
+          return variantRecord === undefined
+            ? variant
+            : withJsonSchemaPropertyDescriptions(variantRecord, CHAT_MESSAGE_ATTACHMENT_TARGET_FIELD_DESCRIPTIONS)
+        })
       }
     }
   }
 }
-
-const chatMessageAttachmentJsonSchema = <A, I, R>(schema: Schema.Schema<A, I, R>): object =>
-  withChatMessageAttachmentTargetVariantDescriptions(
-    withJsonSchemaPropertyDescriptions(JSONSchema.make(schema), CHAT_MESSAGE_ATTACHMENT_FIELD_DESCRIPTIONS)
-  )
 
 const withExactlyOneChatMessageAttachmentFileSource = (schema: object): object =>
   withExactlyOneRequired(schema, CHAT_MESSAGE_ATTACHMENT_FILE_SOURCE_FIELDS)

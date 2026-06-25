@@ -23,9 +23,10 @@ import {
   McpError,
   ReadResourceRequestSchema
 } from "@modelcontextprotocol/sdk/types.js"
-import { Context, Effect, Fiber, Layer } from "effect"
+import { Context, Effect, Fiber, Layer, Schema } from "effect"
 import { expect } from "vitest"
 import { sanitizeHulyRuntimeConfigFromEnv, sanitizeHulyRuntimeConfigFromHeaders } from "../../src/config/config.js"
+import { parseJsonSchemaRecord } from "../../src/domain/schemas/json-schema.js"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
@@ -229,35 +230,55 @@ const requiredModeSets = (tool: ToolDefinition): ReadonlyArray<string> => {
     : []
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-
 const assertSchemaObject = (value: unknown): Record<string, unknown> => {
-  if (!isRecord(value)) {
+  const record = parseJsonSchemaRecord(value)
+  if (record === undefined) {
     throw new Error("Expected schema object")
   }
-  return value
+  return record
 }
 
-interface ListedToolForTest {
-  readonly name: string
-  readonly inputSchema: unknown
+const JsonRpcSuccessResponseForTestSchema = Schema.Struct({
+  jsonrpc: Schema.Literal("2.0"),
+  id: Schema.NullOr(Schema.Union(Schema.String, Schema.Number)),
+  result: Schema.Unknown,
+  error: Schema.optionalWith(Schema.Never, { exact: true })
+})
+const JsonRpcRequestIdForTestSchema = Schema.Struct({
+  id: Schema.optionalWith(Schema.Unknown, { exact: true })
+})
+
+const assertJsonRpcSuccessResult = (value: unknown): unknown => {
+  const decoded = Schema.decodeUnknownEither(JsonRpcSuccessResponseForTestSchema)(value)
+  if (decoded._tag === "Left") {
+    throw new Error("Expected JSON-RPC success response")
+  }
+  return decoded.right.result
 }
 
-const isListedToolForTest = (value: unknown): value is ListedToolForTest =>
-  isRecord(value) && typeof value.name === "string" && "inputSchema" in value
+const jsonRpcIdFromBody = (value: unknown): string | number | null => {
+  const decoded = Schema.decodeUnknownEither(JsonRpcRequestIdForTestSchema)(value)
+  if (decoded._tag === "Left") return null
+  const id = decoded.right.id
+  return typeof id === "string" || typeof id === "number" ? id : null
+}
+
+const ListedToolForTestSchema = Schema.Struct({
+  name: Schema.String,
+  inputSchema: Schema.Unknown
+})
+type ListedToolForTest = Schema.Schema.Type<typeof ListedToolForTestSchema>
+
+const ListToolsResponseForTestSchema = Schema.Struct({
+  tools: Schema.Array(ListedToolForTestSchema)
+})
 
 const assertListToolsResponse = (value: unknown): { readonly tools: ReadonlyArray<ListedToolForTest> } => {
-  if (!isRecord(value)) {
-    throw new Error("Expected ListTools response object")
-  }
-
-  const tools = value.tools
-  if (!Array.isArray(tools) || !tools.every(isListedToolForTest)) {
+  try {
+    return Schema.decodeUnknownSync(ListToolsResponseForTestSchema)(value)
+  } catch {
     throw new Error("Expected ListTools response with tool definitions")
   }
-
-  return { tools }
 }
 
 // --- Test Helpers ---
@@ -1617,13 +1638,7 @@ describe("McpServerService.layer operations", () => {
             },
             on: () => undefined
           })
-          const resultAt = (index: number): unknown => {
-            const body = assertAt(responses, index).body
-            if (!isRecord(body) || !("result" in body)) {
-              throw new Error("Expected JSON-RPC success response")
-            }
-            return body.result
-          }
+          const resultAt = (index: number): unknown => assertJsonRpcSuccessResult(assertAt(responses, index).body)
 
           yield* Effect.promise(() =>
             handler(makeRequest("codex", { name: "codex-cli", version: "1.0.0" }), makeResponse())
@@ -1702,9 +1717,7 @@ describe("McpServerService.layer operations", () => {
                   const handler = capturedHandlers.get(ListToolsRequestSchema)
                   if (handler === undefined) throw new Error("expected list tools handler")
                   const result = await handler()
-                  const id = isRecord(body) && (typeof body.id === "string" || typeof body.id === "number")
-                    ? body.id
-                    : null
+                  const id = jsonRpcIdFromBody(body)
                   res.status(200).json({ jsonrpc: "2.0", id, result })
                 }
               }) as never,
@@ -1762,13 +1775,7 @@ describe("McpServerService.layer operations", () => {
             headers: { accept: "application/json, text/event-stream" },
             on: () => undefined
           })
-          const resultAt = (index: number): unknown => {
-            const body = assertAt(responses, index).body
-            if (!isRecord(body) || !("result" in body)) {
-              throw new Error("Expected JSON-RPC success response")
-            }
-            return body.result
-          }
+          const resultAt = (index: number): unknown => assertJsonRpcSuccessResult(assertAt(responses, index).body)
 
           const fiber = yield* Effect.fork(
             ops.run().pipe(

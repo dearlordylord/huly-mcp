@@ -1,5 +1,5 @@
 import { describe, it } from "@effect/vitest"
-import { Effect, Exit, Predicate } from "effect"
+import { Effect, Exit } from "effect"
 import { expect } from "vitest"
 
 import {
@@ -8,6 +8,7 @@ import {
   parseUpsertProjectTargetPreferenceParams,
   upsertProjectTargetPreferenceParamsJsonSchema
 } from "../../src/domain/schemas.js"
+import { parseJsonSchemaRecord } from "../../src/domain/schemas/json-schema.js"
 
 describe("issue #102 schemas", () => {
   it.effect("accepts document snapshot lookup by teamspace, document, and snapshot identifier", () =>
@@ -36,19 +37,21 @@ describe("issue #102 schemas", () => {
     }))
 
   it("emits client-safe JSON Schema for ProjectTargetPreference prop values", () => {
-    if (!Predicate.isRecord(upsertProjectTargetPreferenceParamsJsonSchema)) {
+    const rootSchema = parseJsonSchemaRecord(upsertProjectTargetPreferenceParamsJsonSchema)
+    if (rootSchema === undefined) {
       throw new Error("Expected root schema object")
     }
-    const rootProperties = upsertProjectTargetPreferenceParamsJsonSchema.properties
-    if (!Predicate.isRecord(rootProperties)) {
+    const rootProperties = parseJsonSchemaRecord(rootSchema.properties)
+    if (rootProperties === undefined) {
       throw new Error("Expected root schema properties")
     }
-    const props = rootProperties.props
-    if (!Predicate.isRecord(props) || !Predicate.isRecord(props.items)) {
+    const props = parseJsonSchemaRecord(rootProperties.props)
+    const propsItems = parseJsonSchemaRecord(props?.items)
+    if (props === undefined || propsItems === undefined) {
       throw new Error("Expected props array schema")
     }
-    const itemProperties = props.items.properties
-    if (!Predicate.isRecord(itemProperties)) {
+    const itemProperties = parseJsonSchemaRecord(propsItems.properties)
+    if (itemProperties === undefined) {
       throw new Error("Expected props item properties")
     }
 

@@ -1,16 +1,16 @@
-import { Predicate, Schema } from "effect"
+import { Schema } from "effect"
 import { describe, expect, it } from "vitest"
 
 import { inventoryMediaJsonSchema, withExactlyOneInventoryMediaFileSource } from "./inventory-media-json-schema.js"
+import { parseJsonSchemaRecord } from "./json-schema.js"
 
 const getProperty = (schema: unknown, property: string): unknown => {
-  if (!Predicate.isRecord(schema) || !Predicate.isRecord(schema.properties)) return undefined
-  return schema.properties[property]
+  return parseJsonSchemaRecord(parseJsonSchemaRecord(schema)?.properties)?.[property]
 }
 
 const getDescription = (schema: unknown, property: string): unknown => {
   const field = getProperty(schema, property)
-  return Predicate.isRecord(field) ? field.description : undefined
+  return parseJsonSchemaRecord(field)?.description
 }
 
 describe("Inventory media JSON schema helpers", () => {
@@ -27,7 +27,7 @@ describe("Inventory media JSON schema helpers", () => {
   it("adds oneOf requirements for exactly one media file source", () => {
     const jsonSchema = withExactlyOneInventoryMediaFileSource({ type: "object" })
 
-    expect(Predicate.isRecord(jsonSchema) ? jsonSchema.oneOf : undefined).toEqual([
+    expect(parseJsonSchemaRecord(jsonSchema)?.oneOf).toEqual([
       { required: ["filePath"] },
       { required: ["fileUrl"] },
       { required: ["data"] }

@@ -2,6 +2,7 @@ import { describe } from "@effect/vitest"
 import * as fc from "fast-check"
 import { expect, it } from "vitest"
 
+import { parseJsonSchemaRecord } from "../../src/domain/schemas/json-schema.js"
 import type { McpInputSchema } from "../../src/mcp/input-schema-compat.js"
 import { toClientCompatibleInputSchema } from "../../src/mcp/input-schema-compat.js"
 import { collectJsonSchemaDefinitions } from "../../src/mcp/json-schema-refs.js"
@@ -73,13 +74,13 @@ const generatedSchemaArbitrary: fc.Arbitrary<McpInputSchema> = fc.record({
   allOf: branches.slice(3).map((branch, index) => nodeToSchema(branch, index))
 }))
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-
 const compositionBranches = (schema: Record<string, unknown>): ReadonlyArray<Record<string, unknown>> =>
   ROOT_COMPOSITION_KEYS.flatMap((key) => {
     const value = schema[key]
-    return Array.isArray(value) ? value.filter(isRecord) : []
+    return (Array.isArray(value) ? value : []).flatMap((item) => {
+      const record = parseJsonSchemaRecord(item)
+      return record === undefined ? [] : [record]
+    })
   })
 
 const descendants = (schema: Record<string, unknown>): ReadonlyArray<Record<string, unknown>> => [
@@ -91,7 +92,10 @@ const expectedMergedField = (schema: McpInputSchema, field: "properties" | "$def
   descendants(schema)
     .map((descendant) => descendant[field])
     .reduce<Record<string, unknown>>(
-      (merged, value) => isRecord(value) ? { ...value, ...merged } : merged,
+      (merged, value) => {
+        const record = parseJsonSchemaRecord(value)
+        return record === undefined ? merged : { ...record, ...merged }
+      },
       {}
     )
 
@@ -112,8 +116,8 @@ describe("toClientCompatibleInputSchema properties", () => {
         expect(sanitized.required).toEqual(schema.required)
         expect(sanitizedAgain).toEqual(sanitized)
 
-        const properties = isRecord(sanitized.properties) ? sanitized.properties : {}
-        const defs = isRecord(sanitized.$defs) ? sanitized.$defs : {}
+        const properties = parseJsonSchemaRecord(sanitized.properties) ?? {}
+        const defs = parseJsonSchemaRecord(sanitized.$defs) ?? {}
 
         expect(properties).toEqual(expectedMergedField(schema, "properties"))
         expect(defs).toEqual(collectJsonSchemaDefinitions(schema) ?? {})

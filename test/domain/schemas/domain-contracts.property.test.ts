@@ -58,6 +58,7 @@ import {
   updateIssueParamsJsonSchema,
   UpdateIssueParamsSchema
 } from "../../../src/domain/schemas/issues.js"
+import { parseJsonSchemaRecord } from "../../../src/domain/schemas/json-schema.js"
 import {
   UPDATE_LABEL_FIELDS,
   updateLabelParamsJsonSchema,
@@ -136,9 +137,6 @@ interface UpdateSchemaCase {
   readonly values: Readonly<Record<string, unknown>>
   readonly mutuallyExclusiveFieldSets?: ReadonlyArray<ReadonlyArray<string>>
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
 
 const decodeSucceeds = (schema: Schema.Schema.AnyNoContext, input: unknown): boolean =>
   Schema.decodeUnknownEither(schema)(input)._tag === "Right"
@@ -606,10 +604,8 @@ describe("access-link and document state-machine properties", () => {
       { if: { required: ["replace_all"] }, then: { required: ["old_text", "new_text"] } }
     ]))
 
-    const properties: Record<string, unknown> = isRecord(editDocumentParamsJsonSchema.properties)
-      ? editDocumentParamsJsonSchema.properties
-      : {}
-    const oldText = isRecord(properties.old_text) ? properties.old_text : {}
+    const properties = parseJsonSchemaRecord(editDocumentParamsJsonSchema.properties) ?? {}
+    const oldText = parseJsonSchemaRecord(properties.old_text) ?? {}
     expect(oldText.pattern).toBe("\\S")
     expect(EDIT_DOCUMENT_UPDATE_FIELD_GROUPS).toEqual(["title", "content", "old_text/new_text"])
   })
@@ -620,7 +616,7 @@ describe("update schema runtime and JSON Schema agreement", () => {
     for (const testCase of updateSchemaCases) {
       expectDecodeFailure(testCase.schema, testCase.base)
       expect(jsonSchemaRequiredFields(testCase.jsonSchema)).toEqual(testCase.fields)
-      const properties = isRecord(testCase.jsonSchema.properties) ? testCase.jsonSchema.properties : {}
+      const properties = parseJsonSchemaRecord(testCase.jsonSchema.properties) ?? {}
 
       for (const field of testCase.fields) {
         expect(properties).toHaveProperty(field)

@@ -1436,14 +1436,15 @@ describe("2026 dispatcher validation errors", () => {
 
   const post = async (body: unknown, headers: Request["headers"]): Promise<{
     status: number | undefined
+    id: unknown
     error: { code: number; message: string } | undefined
   }> => {
     const handlers = createMcpHandlers(createMockMcpServer, undefined, undefined, modernHandlerFactory)
     const res = createMockResponse()
     await handlers.post(createMockRequest(body, headers), res)
     const calls = getResponseCalls(res)
-    const json = calls.json[0]?.[0] as { error?: { code: number; message: string } } | undefined
-    return { status: calls.status[0]?.[0], error: json?.error }
+    const json = calls.json[0]?.[0] as { id?: unknown; error?: { code: number; message: string } } | undefined
+    return { status: calls.status[0]?.[0], id: json?.id, error: json?.error }
   }
 
   const cases: ReadonlyArray<{
@@ -1471,8 +1472,20 @@ describe("2026 dispatcher validation errors", () => {
       message: "jsonrpc"
     },
     {
+      name: "rejects a missing jsonrpc version",
+      body: { method: "tools/list", id: 1, params: { _meta: meta } },
+      headers: modernHeaders("tools/list"),
+      message: "jsonrpc"
+    },
+    {
       name: "rejects an empty method",
       body: { ...validBody("tools/list"), method: "" },
+      headers: modernHeaders("tools/list"),
+      message: "non-empty method"
+    },
+    {
+      name: "rejects a missing method",
+      body: { jsonrpc: "2.0", id: 1, params: { _meta: meta } },
       headers: modernHeaders("tools/list"),
       message: "non-empty method"
     },
@@ -1534,6 +1547,23 @@ describe("2026 dispatcher validation errors", () => {
       message: "clientInfo metadata is required"
     },
     {
+      name: "rejects a non-object clientInfo in _meta",
+      body: {
+        jsonrpc: "2.0",
+        method: "tools/list",
+        id: 1,
+        params: {
+          _meta: {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientInfo": "test",
+            "io.modelcontextprotocol/clientCapabilities": {}
+          }
+        }
+      },
+      headers: modernHeaders("tools/list"),
+      message: "clientInfo metadata is required"
+    },
+    {
       name: "rejects a missing clientCapabilities in _meta",
       body: {
         jsonrpc: "2.0",
@@ -1543,6 +1573,23 @@ describe("2026 dispatcher validation errors", () => {
           _meta: {
             "io.modelcontextprotocol/protocolVersion": "2026-07-28",
             "io.modelcontextprotocol/clientInfo": { name: "t", version: "1" }
+          }
+        }
+      },
+      headers: modernHeaders("tools/list"),
+      message: "clientCapabilities metadata is required"
+    },
+    {
+      name: "rejects a non-object clientCapabilities in _meta",
+      body: {
+        jsonrpc: "2.0",
+        method: "tools/list",
+        id: 1,
+        params: {
+          _meta: {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientInfo": { name: "t", version: "1" },
+            "io.modelcontextprotocol/clientCapabilities": null
           }
         }
       },
@@ -1558,6 +1605,24 @@ describe("2026 dispatcher validation errors", () => {
     })
   }
 
+  it("preserves a valid request id when rejecting a malformed JSON-RPC envelope", async () => {
+    const result = await post(
+      { ...validBody("tools/list"), jsonrpc: "1.0", id: 123 },
+      modernHeaders("tools/list")
+    )
+    expect(result.id).toBe(123)
+    expect(result.error?.message).toContain("jsonrpc")
+  })
+
+  it("returns null id when rejecting a malformed JSON-RPC envelope with an invalid id", async () => {
+    const result = await post(
+      { ...validBody("tools/list"), jsonrpc: "1.0", id: { nested: true } },
+      modernHeaders("tools/list")
+    )
+    expect(result.id).toBeNull()
+    expect(result.error?.message).toContain("jsonrpc")
+  })
+
   it("returns Method not found (404) for an unknown 2026 method", async () => {
     const result = await post(validBody("does/not/exist"), modernHeaders("does/not/exist"))
     expect(result.status).toBe(404)
@@ -1572,9 +1637,33 @@ describe("2026 dispatcher validation errors", () => {
     expect(result.error?.message).toContain("tools/call requires params.name")
   })
 
+  it("rejects tools/call whose body has an empty params.name", async () => {
+    const result = await post(
+      { jsonrpc: "2.0", method: "tools/call", id: 1, params: { name: "", _meta: meta } },
+      modernHeaders("tools/call", "some_tool")
+    )
+    expect(result.error?.message).toContain("tools/call requires params.name")
+  })
+
+  it("rejects tools/call whose Mcp-Name header does not match params.name", async () => {
+    const result = await post(
+      { jsonrpc: "2.0", method: "tools/call", id: 1, params: { name: "actual_tool", _meta: meta } },
+      modernHeaders("tools/call", "other_tool")
+    )
+    expect(result.error?.message).toContain("does not match body value 'actual_tool'")
+  })
+
   it("rejects resources/read whose body omits params.uri", async () => {
     const result = await post(
       { jsonrpc: "2.0", method: "resources/read", id: 1, params: { _meta: meta } },
+      modernHeaders("resources/read", "huly://projects/HULY")
+    )
+    expect(result.error?.message).toContain("resources/read requires params.uri")
+  })
+
+  it("rejects resources/read whose body has an empty params.uri", async () => {
+    const result = await post(
+      { jsonrpc: "2.0", method: "resources/read", id: 1, params: { uri: "", _meta: meta } },
       modernHeaders("resources/read", "huly://projects/HULY")
     )
     expect(result.error?.message).toContain("resources/read requires params.uri")
@@ -1670,6 +1759,33 @@ describe("2026 dispatcher null-id and routing branches", () => {
   it("returns a null id on a successful id-less dispatch", async () => {
     const { json } = await postRaw(noId("tools/list"), modernHeaders("tools/list"))
     expect(json?.id).toBeNull()
+    expect(json?.error).toBeUndefined()
+  })
+
+  it("returns a null id on a successful id-less tools/call dispatch", async () => {
+    const { json } = await postRaw(
+      noId("tools/call", { name: "get_huly_context", _meta: modernMeta }),
+      modernHeaders("tools/call", "get_huly_context")
+    )
+    expect(json?.id).toBeNull()
+    expect(json?.error).toBeUndefined()
+  })
+
+  it("returns a null id on a successful id-less resources/read dispatch", async () => {
+    const { json } = await postRaw(
+      noId("resources/read", { uri: "huly://projects/HULY", _meta: modernMeta }),
+      modernHeaders("resources/read", "huly://projects/HULY")
+    )
+    expect(json?.id).toBeNull()
+    expect(json?.error).toBeUndefined()
+  })
+
+  it("accepts modern Accept header entries with media type parameters", async () => {
+    const headers = {
+      ...modernHeaders("tools/list"),
+      accept: "application/json; charset=utf-8, text/event-stream; boundary=events"
+    }
+    const { json } = await postRaw(noId("tools/list"), headers)
     expect(json?.error).toBeUndefined()
   })
 

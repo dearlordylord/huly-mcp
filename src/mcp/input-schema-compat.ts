@@ -1,3 +1,5 @@
+import { Schema } from "effect"
+
 import { collectJsonSchemaDefinitions } from "./json-schema-refs.js"
 
 export interface McpInputSchema {
@@ -11,15 +13,37 @@ export interface McpInputSchema {
 type ObjectSchemaField = "properties" | "$defs"
 
 const ROOT_COMPOSITION_KEYS = new Set(["anyOf", "oneOf", "allOf"])
+const UnknownRecordSchema = Schema.Record({ key: Schema.String, value: Schema.Unknown })
+const UnknownArraySchema = Schema.Array(Schema.Unknown)
+type UnknownRecord = Schema.Schema.Type<typeof UnknownRecordSchema>
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
+const parseUnknownRecord = (value: unknown): UnknownRecord | undefined => {
+  try {
+    return Schema.decodeUnknownSync(UnknownRecordSchema)(value)
+  } catch {
+    return undefined
+  }
+}
+
+const parseUnknownRecordArray = (value: unknown): ReadonlyArray<UnknownRecord> => {
+  try {
+    return Schema.decodeUnknownSync(UnknownArraySchema)(value).flatMap((item) => {
+      const record = parseUnknownRecord(item)
+      return record === undefined ? [] : [record]
+    })
+  } catch {
+    return []
+  }
+}
 
 const mergeObjectFields = (
   sources: ReadonlyArray<unknown>
 ): Record<string, unknown> | undefined => {
   const merged = sources.reduce<Record<string, unknown>>(
-    (acc, source) => isRecord(source) ? { ...source, ...acc } : acc,
+    (acc, source) => {
+      const record = parseUnknownRecord(source)
+      return record === undefined ? acc : { ...record, ...acc }
+    },
     {}
   )
   return Object.keys(merged).length > 0 ? merged : undefined
@@ -28,7 +52,7 @@ const mergeObjectFields = (
 const rootCompositionBranches = (schema: object): ReadonlyArray<Record<string, unknown>> =>
   [...ROOT_COMPOSITION_KEYS].flatMap((key) => {
     const branches = Reflect.get(schema, key)
-    return Array.isArray(branches) ? branches.filter(isRecord) : []
+    return parseUnknownRecordArray(branches)
   })
 
 const schemaAndCompositionDescendants = (

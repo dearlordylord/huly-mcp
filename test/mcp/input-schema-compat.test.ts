@@ -1,17 +1,16 @@
 import { describe } from "@effect/vitest"
 import { expect, it } from "vitest"
 
+import { parseJsonSchemaRecord } from "../../src/domain/schemas/json-schema.js"
 import type { McpInputSchema } from "../../src/mcp/input-schema-compat.js"
 import { toClientCompatibleInputSchema } from "../../src/mcp/input-schema-compat.js"
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-
 const expectRecord = (value: unknown): Record<string, unknown> => {
-  if (!isRecord(value)) {
+  const record = parseJsonSchemaRecord(value)
+  if (record === undefined) {
     throw new Error("Expected record")
   }
-  return value
+  return record
 }
 
 describe("toClientCompatibleInputSchema", () => {
@@ -105,5 +104,26 @@ describe("toClientCompatibleInputSchema", () => {
     expect(sanitized.description).toBe("Provide personId or email.")
     expect(properties.personId).toBeDefined()
     expect(properties.email).toBeDefined()
+  })
+
+  it("ignores non-object composition branches", () => {
+    const schema = {
+      anyOf: [
+        {
+          type: "object",
+          properties: {
+            project: { type: "string" }
+          }
+        },
+        "not-a-schema",
+        null
+      ]
+    }
+
+    const sanitized = toClientCompatibleInputSchema(schema)
+    const properties = expectRecord(sanitized.properties)
+
+    expect(properties.project).toBeDefined()
+    expect(sanitized.anyOf).toBeUndefined()
   })
 })

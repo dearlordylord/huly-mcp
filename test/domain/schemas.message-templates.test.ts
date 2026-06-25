@@ -1,7 +1,8 @@
 import { describe, it } from "@effect/vitest"
-import { Effect, Either, Predicate } from "effect"
+import { Effect, Either } from "effect"
 import { expect } from "vitest"
 
+import { parseJsonSchemaRecord } from "../../src/domain/schemas/json-schema.js"
 import {
   getMessageTemplateParamsJsonSchema,
   listMessageTemplateFieldsParamsJsonSchema,
@@ -15,9 +16,9 @@ import {
 } from "../../src/domain/schemas/message-templates.js"
 
 const schemaPropertyDescription = (schema: unknown, name: string): string | undefined => {
-  const properties = Predicate.isRecord(schema) ? schema.properties : undefined
-  const property = Predicate.isRecord(properties) ? properties[name] : undefined
-  if (!Predicate.isRecord(property)) {
+  const properties = parseJsonSchemaRecord(parseJsonSchemaRecord(schema)?.properties)
+  const property = parseJsonSchemaRecord(properties?.[name])
+  if (property === undefined) {
     throw new Error(`Missing JSON Schema property: ${name}`)
   }
   return typeof property.description === "string" ? property.description : undefined
