@@ -8,7 +8,7 @@ The one-command flow is:
 pnpm local-release
 ```
 
-That command versions the package from the pending changeset, validates the release, publishes to npm with the default `latest` dist-tag, pushes the release commit and git tag, and creates a latest GitHub release. It fails before changing files if npm auth is not available.
+That command versions the package from the pending changeset when one exists, builds the npm bundle with `pnpm dlx esbuild` so host-local native binaries are not required, verifies the bundled version, publishes to npm with the default `latest` dist-tag, pushes the release commit and git tag, and creates a latest GitHub release. It fails before changing files if npm auth is not available.
 
 ## Preflight
 
@@ -40,13 +40,13 @@ The script runs:
 - `changeset version`
 - registry metadata sync
 - release metadata commit
-- `pnpm check-all`
+- host-safe bundle build through `pnpm dlx esbuild`
 - `pnpm verify-version`
-- tool-scope integration against local Huly
-- full integration against local Huly
 - `changeset publish` without a prerelease tag, so npm `latest` moves
 - release commit/tag push
 - latest GitHub release creation
+
+Run `pnpm check-all` and the local Huly integration suites before starting the production release. The publish script intentionally does not run them because host machines may have platform-specific `node_modules` binaries from a different environment.
 
 ## Verify After Publish
 

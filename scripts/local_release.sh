@@ -5,6 +5,7 @@ PACKAGE_NAME="@firfi/huly-mcp"
 RELEASE_BRANCH="master"
 CHANGES_DIR=".changeset"
 CHANGES_VERSION="2.30.0"
+ESBUILD_VERSION="0.27.2"
 
 current_branch="$(git branch --show-current)"
 if [[ "$current_branch" != "$RELEASE_BRANCH" ]]; then
@@ -21,23 +22,20 @@ fi
 npm whoami >/dev/null
 npm dist-tag ls "$PACKAGE_NAME"
 
-pnpm dlx "@changesets/cli@$CHANGES_VERSION" version
-pnpm sync-registry-metadata
-git add package.json CHANGELOG.md server.json "$CHANGES_DIR"
-if ! git diff --cached --quiet; then
-  HUSKY=0 git commit -m "RELEASING: Releasing 1 package(s)"
+pending_changeset="$(find "$CHANGES_DIR" -maxdepth 1 -type f -name "*.md" ! -name "README.md" -print -quit)"
+if [[ -n "$pending_changeset" ]]; then
+  pnpm dlx "@changesets/cli@$CHANGES_VERSION" version
+  pnpm sync-registry-metadata
+  git add package.json CHANGELOG.md server.json "$CHANGES_DIR"
+  if ! git diff --cached --quiet; then
+    HUSKY=0 git commit -m "RELEASING: Releasing 1 package(s)"
+  fi
 fi
 
 package_version="$(node -p "require('./package.json').version")"
 
-pnpm check-all
+pnpm dlx "esbuild@$ESBUILD_VERSION" src/index.ts --bundle --platform=node --format=cjs --outfile=dist/index.cjs --external:ws "--define:PKG_VERSION=\"$package_version\""
 pnpm verify-version
-
-set -a
-source .env.local
-set +a
-HULY_URL="${HULY_URL/localhost/host.docker.internal}" pnpm integration:tool-scope
-HULY_URL="${HULY_URL/localhost/host.docker.internal}" bash scripts/integration_test_full.sh
 
 npm_config_ignore_scripts=true pnpm dlx "@changesets/cli@$CHANGES_VERSION" publish
 
