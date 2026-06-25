@@ -192,8 +192,11 @@ export const createMcpProtocolHandlers = (
   }
 
   const listTools = async (): Promise<ListToolsProtocolResult> => {
-    telemetry.firstListTools()
     const exposure = resolveProtocolExposure(registries, protocolExposureOptions)
+    telemetry.firstListTools({
+      clientKind: exposure.context.clientKind,
+      resolvedMode: exposure.context.resolvedMode
+    })
     return {
       tools: [
         ...[versionToolDefinition, getHulyContextToolDefinition].map(toListedTool),
@@ -217,6 +220,8 @@ export const createMcpProtocolHandlers = (
         telemetry.toolCalled({
           toolName: name,
           status: "error",
+          clientKind: exposure.context.clientKind,
+          resolvedMode: exposure.context.resolvedMode,
           errorTag: errorResponse._meta?.errorTag,
           durationMs,
           inputBytes,
@@ -241,6 +246,8 @@ export const createMcpProtocolHandlers = (
         telemetry.toolCalled({
           toolName: name,
           status: "success",
+          clientKind: exposure.context.clientKind,
+          resolvedMode: exposure.context.resolvedMode,
           durationMs,
           inputBytes,
           outputBytes: computeOutputBytes(versionResponse)
@@ -265,6 +272,8 @@ export const createMcpProtocolHandlers = (
         telemetry.toolCalled({
           toolName: name,
           status: "success",
+          clientKind: exposure.context.clientKind,
+          resolvedMode: exposure.context.resolvedMode,
           durationMs,
           inputBytes,
           outputBytes: computeOutputBytes(contextResponse)
@@ -311,6 +320,8 @@ export const createMcpProtocolHandlers = (
         telemetry.toolCalled({
           toolName: name,
           status: response.isError === true ? "error" : "success",
+          clientKind: exposure.context.clientKind,
+          resolvedMode: exposure.context.resolvedMode,
           errorTag: response._meta?.errorTag,
           durationMs,
           inputBytes,
@@ -364,6 +375,8 @@ export const createMcpProtocolHandlers = (
       telemetry.toolCalled({
         toolName: hulyToolName,
         status: response.isError === true ? "error" : "success",
+        clientKind: exposure.context.clientKind,
+        resolvedMode: exposure.context.resolvedMode,
         errorTag: response._meta?.errorTag,
         durationMs,
         inputBytes,

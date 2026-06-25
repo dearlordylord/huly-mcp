@@ -1,5 +1,6 @@
 import { Config, Context, Effect, Layer } from "effect"
 
+import type { ClientKind, ToolExposureMode } from "../mcp/tool-mode.js"
 import { createNoopTelemetry } from "./noop.js"
 import { createPostHogTelemetry } from "./posthog.js"
 
@@ -15,6 +16,8 @@ export type SessionStartProps = {
 export type ToolCalledProps = {
   readonly toolName: string
   readonly status: "success" | "error"
+  readonly clientKind?: ClientKind | undefined
+  readonly resolvedMode?: ToolExposureMode | undefined
   readonly errorTag?: string | undefined
   readonly durationMs: number
   readonly inputBytes?: number | undefined
@@ -22,9 +25,14 @@ export type ToolCalledProps = {
   readonly editMode?: string | undefined
 }
 
+export type FirstListToolsProps = {
+  readonly clientKind: ClientKind
+  readonly resolvedMode: ToolExposureMode
+}
+
 export interface TelemetryOperations {
   readonly sessionStart: (props: SessionStartProps) => void
-  readonly firstListTools: () => void
+  readonly firstListTools: (props?: FirstListToolsProps) => void
   readonly toolCalled: (props: ToolCalledProps) => void
   readonly shutdown: () => Promise<void>
 }

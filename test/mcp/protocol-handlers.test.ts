@@ -57,7 +57,7 @@ import {
   requiresArgumentsObject
 } from "../../src/mcp/tools/registry.js"
 import { createNoopTelemetry } from "../../src/telemetry/noop.js"
-import type { TelemetryOperations, ToolCalledProps } from "../../src/telemetry/telemetry.js"
+import type { FirstListToolsProps, TelemetryOperations, ToolCalledProps } from "../../src/telemetry/telemetry.js"
 import { VERSION } from "../../src/version.js"
 
 // A real, empty tool registry (no category tools) — used for the builtin-only paths.
@@ -75,14 +75,14 @@ const unusedGetHulyContext = (): GetHulyContextResult => {
 const createTelemetryProbe = (): {
   telemetry: TelemetryOperations
   toolCalled: Array<ToolCalledProps>
-  firstListTools: Array<true>
+  firstListTools: Array<FirstListToolsProps | undefined>
 } => {
   const toolCalled: Array<ToolCalledProps> = []
-  const firstListTools: Array<true> = []
+  const firstListTools: Array<FirstListToolsProps | undefined> = []
   const telemetry: TelemetryOperations = {
     ...createNoopTelemetry(),
-    firstListTools: () => {
-      firstListTools.push(true)
+    firstListTools: (props) => {
+      firstListTools.push(props)
     },
     toolCalled: (props) => {
       toolCalled.push(props)
@@ -188,6 +188,30 @@ describe("createMcpProtocolHandlers", () => {
       expect(contextTool?.outputSchema).toHaveProperty(["$defs", "NonEmptyTrimmedString"])
       expect(contextTool?.outputSchema?.properties?.result).not.toHaveProperty("$defs")
       expect(probe.firstListTools).toHaveLength(1)
+      expect(assertAt(probe.firstListTools, 0)).toMatchObject({
+        clientKind: "unknown",
+        resolvedMode: "native"
+      })
+    })
+
+    it("records resolved client classification on first listTools", async () => {
+      const probe = createTelemetryProbe()
+      const handlers = createMcpProtocolHandlers(
+        unusedResolveClients,
+        probe.telemetry,
+        emptyRegistry,
+        unusedGetHulyContext,
+        liveNowClock,
+        () => Promise.resolve("0.0.0"),
+        proxyExposureOptions({ clientName: "codex-cli" })
+      )
+
+      await handlers.listTools()
+
+      expect(assertAt(probe.firstListTools, 0)).toMatchObject({
+        clientKind: "codex",
+        resolvedMode: "proxy"
+      })
     })
 
     it("omits properties when a registered object schema does not declare them", async () => {
@@ -620,7 +644,8 @@ describe("createMcpProtocolHandlers — version tool", () => {
       emptyRegistry,
       unusedGetHulyContext,
       queuedClock([1000, 1100]),
-      () => Promise.resolve("9.9.9")
+      () => Promise.resolve("9.9.9"),
+      proxyExposureOptions({ clientName: "codex-cli" })
     )
 
     const response = await handlers.callTool({ params: { name: VERSION_TOOL_NAME, arguments: {} } })
@@ -631,6 +656,8 @@ describe("createMcpProtocolHandlers — version tool", () => {
     expect(assertAt(probe.toolCalled, 0)).toMatchObject({
       toolName: VERSION_TOOL_NAME,
       status: "success",
+      clientKind: "codex",
+      resolvedMode: "proxy",
       durationMs: 100
     })
   })
@@ -655,6 +682,54 @@ describe("createMcpProtocolHandlers — version tool", () => {
     expect(response.isError).toBe(true)
     expect(fetched).toBe(false)
     expect(probe.toolCalled[0]?.status).toBe("error")
+  })
+
+  it("rejects malformed tool names before native registry lookup", async () => {
+    const probe = createTelemetryProbe()
+    const handlers = createMcpProtocolHandlers(
+      unusedResolveClients,
+      probe.telemetry,
+      emptyRegistry,
+      unusedGetHulyContext,
+      liveNowClock,
+      () => Promise.resolve("0.0.0"),
+      proxyExposureOptions({ clientName: "codex-cli" })
+    )
+
+    const response = await handlers.callTool({ params: { name: " ", arguments: {} } })
+
+    expect(response.isError).toBe(true)
+    expect(firstText(response.content)).toContain("Unknown tool")
+    expect(assertAt(probe.toolCalled, 0)).toMatchObject({
+      toolName: " ",
+      status: "error",
+      clientKind: "codex",
+      resolvedMode: "proxy"
+    })
+  })
+
+  it("maps an invalid fetched latest version to an error", async () => {
+    const probe = createTelemetryProbe()
+    const handlers = createMcpProtocolHandlers(
+      unusedResolveClients,
+      probe.telemetry,
+      emptyRegistry,
+      unusedGetHulyContext,
+      queuedClock([1000, 1100]),
+      () => Promise.resolve(""),
+      proxyExposureOptions({ clientName: "codex-cli" })
+    )
+
+    const response = await handlers.callTool({ params: { name: VERSION_TOOL_NAME, arguments: {} } })
+
+    expect(response.isError).toBe(true)
+    expect(firstText(response.content)).toBe("Failed to build version result")
+    expect(assertAt(probe.toolCalled, 0)).toMatchObject({
+      toolName: VERSION_TOOL_NAME,
+      status: "error",
+      clientKind: "codex",
+      resolvedMode: "proxy"
+    })
   })
 })
 

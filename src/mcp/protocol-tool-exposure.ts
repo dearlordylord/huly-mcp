@@ -83,7 +83,9 @@ const toProtocolObjectSchema = (schema: ProtocolObjectSchemaSource): ProtocolObj
   return {
     ...stripCollidingSchemaIdsRecord(rest),
     type: "object",
-    ...(convertedProperties === undefined ? {} : { properties: stripCollidingSchemaIdsProperties(convertedProperties) }),
+    ...(convertedProperties === undefined
+      ? {}
+      : { properties: stripCollidingSchemaIdsProperties(convertedProperties) }),
     ...(required === undefined ? {} : { required: [...required] })
   }
 }

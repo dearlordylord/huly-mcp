@@ -17,15 +17,22 @@ type ToolCalledProperties = {
   readonly tool_name: string
   readonly status: "success" | "error"
   readonly duration_ms: number
+  readonly client_kind?: string
+  readonly resolved_mode?: string
   readonly error_tag?: string
   readonly input_bytes?: number
   readonly output_bytes?: number
   readonly edit_mode?: string
 }
 
+type FirstListToolsProperties = {
+  readonly client_kind?: string
+  readonly resolved_mode?: string
+}
+
 type TelemetryEvent =
   | { readonly event: "session_start"; readonly properties: SessionStartProperties }
-  | { readonly event: "first_list_tools"; readonly properties?: undefined }
+  | { readonly event: "first_list_tools"; readonly properties?: FirstListToolsProperties }
   | { readonly event: "tool_called"; readonly properties: ToolCalledProperties }
   | { readonly event: "session_end"; readonly properties?: undefined }
 
@@ -102,11 +109,21 @@ export const createPostHogTelemetry = (
       })
     },
 
-    firstListTools: () => {
+    firstListTools: (props) => {
       if (listToolsSent) return
       listToolsSent = true
-      debugLog("[telemetry] first_list_tools")
-      capture({ event: "first_list_tools" })
+      debugLog(`[telemetry] first_list_tools: ${JSON.stringify(props ?? {})}`)
+      capture(
+        props === undefined
+          ? { event: "first_list_tools" }
+          : {
+            event: "first_list_tools",
+            properties: {
+              client_kind: props.clientKind,
+              resolved_mode: props.resolvedMode
+            }
+          }
+      )
     },
 
     toolCalled: (props) => {
@@ -117,6 +134,8 @@ export const createPostHogTelemetry = (
           tool_name: props.toolName,
           status: props.status,
           duration_ms: props.durationMs,
+          ...(props.clientKind !== undefined && { client_kind: props.clientKind }),
+          ...(props.resolvedMode !== undefined && { resolved_mode: props.resolvedMode }),
           ...(props.errorTag !== undefined && { error_tag: props.errorTag }),
           ...(props.inputBytes !== undefined && { input_bytes: props.inputBytes }),
           ...(props.outputBytes !== undefined && { output_bytes: props.outputBytes }),
