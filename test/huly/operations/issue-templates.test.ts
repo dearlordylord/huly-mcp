@@ -31,7 +31,11 @@ import {
   removeTemplateChild,
   updateIssueTemplate
 } from "../../../src/huly/operations/issue-templates.js"
-import { markdownToMarkupString, testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
+import {
+  markdownToMarkupString,
+  markdownToMarkupStringWithHulyLinks,
+  testMarkupUrlConfig
+} from "../../../src/huly/operations/markup.js"
 import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import {
   componentIdentifier,
@@ -42,6 +46,7 @@ import {
   templateIdentifier
 } from "../../helpers/brands.js"
 import { withDiagnostics } from "../../helpers/diagnostics.js"
+import { capturedMarkupChildNodes, capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   const result = docs as FindResult<T>
@@ -179,7 +184,7 @@ interface MockConfig {
     attachedTo: string
     collection: string
   }>
-  captureUploadMarkup?: { markup?: string }
+  captureUploadMarkup?: { markup?: string; format?: string }
   updateDocResult?: { object?: { sequence?: number } }
 }
 
@@ -385,10 +390,12 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     _objectClass: unknown,
     _objectId: unknown,
     _objectAttr: unknown,
-    markup: unknown
+    markup: unknown,
+    format: unknown
   ) => {
     if (config.captureUploadMarkup) {
       config.captureUploadMarkup.markup = markup as string
+      config.captureUploadMarkup.format = format as string
     }
     return Effect.succeed("markup-ref-123")
   }) as unknown as HulyClientOperations["uploadMarkup"]
@@ -839,7 +846,43 @@ describe("createIssueFromTemplate", () => {
         title: "Custom Title",
         priority: IssuePriority.Low
       })
-      expect(captureUploadMarkup.markup).toBe("Custom description")
+      expect(captureUploadMarkup.format).toBe("markup")
+      expect(capturedMarkupChildNodes(captureUploadMarkup.markup)).toContainEqual({
+        type: "text",
+        text: "Custom description",
+        marks: []
+      })
+    }))
+
+  it.effect("preserves native references from template descriptions", () =>
+    Effect.gen(function*() {
+      const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+      const template = makeIssueTemplate({
+        title: "Linked Template",
+        description: markdownToMarkupStringWithHulyLinks(
+          "See [TEST-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=TEST-1).",
+          testMarkupUrlConfig
+        ).markup
+      })
+      const testLayer = setupForCreateFromTemplate({
+        templates: [template],
+        captureUploadMarkup
+      })
+
+      yield* createIssueFromTemplate({
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Linked Template")
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+      expect(captureUploadMarkup.format).toBe("markup")
+      expect(capturedMarkupReferenceNodes(captureUploadMarkup.markup)).toContainEqual({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "TEST-1"
+        }
+      })
     }))
 
   it.effect("resolves template assignee from person email", () =>

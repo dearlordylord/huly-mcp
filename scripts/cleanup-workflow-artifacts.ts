@@ -1,11 +1,12 @@
-import type { Class, Doc, DocumentUpdate, Ref, Status, TxOperations } from "@hcengineering/core"
+import type { Class, Doc, DocumentQuery, DocumentUpdate, FindOptions, FindResult, Ref, Status, TxOperations } from "@hcengineering/core"
 import type { ProjectStatus, ProjectType, TaskType } from "@hcengineering/task"
 import type { Issue as HulyIssue } from "@hcengineering/tracker"
 import { createRequire } from "node:module"
 
 const require = createRequire(import.meta.url)
 const apiClient = require("@hcengineering/api-client") as typeof import("@hcengineering/api-client")
-const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
+const coreModule = require("@hcengineering/core") as typeof import("@hcengineering/core")
+const core = coreModule.default
 const task = require("@hcengineering/task").default as typeof import("@hcengineering/task").default
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
 
@@ -26,6 +27,17 @@ interface WorkflowArtifacts {
   readonly projectType: ProjectType
   readonly taskTypes: ReadonlyArray<TaskType>
   readonly statuses: ReadonlyArray<Status>
+}
+
+interface CleanupConnection {
+  readonly tx: TxOperations
+  readonly rest: RestReadClient
+}
+
+interface RestReadClient {
+  readonly endpoint: string
+  readonly token: string
+  readonly workspaceId: string
 }
 
 const usage = `Usage:
@@ -129,7 +141,7 @@ const requiredEnv = (name: string): string => {
   return value
 }
 
-const connect = async (): Promise<TxOperations> => {
+const connect = async (): Promise<CleanupConnection> => {
   const url = requiredEnv("HULY_URL")
   const workspace = requiredEnv("HULY_WORKSPACE")
   const serverConfig = await apiClient.loadServerConfig(url)
@@ -140,9 +152,69 @@ const connect = async (): Promise<TxOperations> => {
       email: requiredEnv("HULY_EMAIL"),
       password: requiredEnv("HULY_PASSWORD"),
       workspace
-    }
+  }
   const { endpoint, token: workspaceToken, workspaceId } = await apiClient.getWorkspaceToken(url, auth, serverConfig)
-  return await apiClient.createRestTxOperations(endpoint, workspaceId, workspaceToken)
+  return {
+    rest: { endpoint: endpoint.replace("ws", "http"), token: workspaceToken, workspaceId },
+    tx: await apiClient.createRestTxOperations(endpoint, workspaceId, workspaceToken)
+  }
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+const isTotalArrayPayload = (
+  value: unknown
+): value is { readonly value: ReadonlyArray<unknown>; readonly total?: unknown; readonly lookupMap?: unknown } =>
+  isRecord(value) && value["dataType"] === "TotalArray" && Array.isArray(value["value"])
+
+const toOptionalLookupMap = (value: unknown): Record<string, Doc> | undefined =>
+  isRecord(value) ? value as Record<string, Doc> : undefined
+
+const totalArrayReviver = (_key: string, value: unknown): unknown => {
+  if (!isTotalArrayPayload(value)) return value
+  return Object.assign([...value.value], {
+    lookupMap: toOptionalLookupMap(value.lookupMap),
+    total: typeof value.total === "number" ? value.total : value.value.length
+  })
+}
+
+const fetchJson = async <T>(response: Response): Promise<T> => {
+  const json = await response.text()
+  return JSON.parse(json, totalArrayReviver) as T
+}
+
+const rawFindAll = async <T extends Doc>(
+  rest: RestReadClient,
+  _class: Ref<Class<T>>,
+  query: DocumentQuery<T>,
+  options?: FindOptions<T>
+): Promise<FindResult<T>> => {
+  const params = new URLSearchParams()
+  params.append("class", _class)
+  if (Object.keys(query).length > 0) {
+    params.append("query", JSON.stringify(query))
+  }
+  if (options !== undefined && Object.keys(options).length > 0) {
+    params.append("options", JSON.stringify(options))
+  }
+
+  const requestUrl = coreModule.concatLink(rest.endpoint, `/api/v1/find-all/${rest.workspaceId}?${params.toString()}`)
+  const response = await fetch(requestUrl, {
+    headers: {
+      Authorization: `Bearer ${rest.token}`,
+      "Content-Type": "application/json"
+    },
+    method: "GET"
+  })
+  if (!response.ok) {
+    throw new Error(`find-all ${_class} failed: ${response.status} ${response.statusText}`)
+  }
+  const result = await fetchJson<FindResult<T> & { readonly error?: unknown }>(response)
+  if (result.error !== undefined) {
+    throw new Error(`find-all ${_class} failed: ${JSON.stringify(result.error)}`)
+  }
+  return result
 }
 
 const normalize = (value: string): string => value.trim().toLowerCase()
@@ -199,21 +271,23 @@ const titleMatches = (issue: HulyIssue, prefixes: ReadonlyArray<string>): boolea
 }
 
 const findIssues = async (
-  client: TxOperations,
+  rest: RestReadClient,
   taskTypeIds: ReadonlyArray<Ref<TaskType>>,
   statusIds: ReadonlyArray<Ref<Status>>,
   titlePrefixes: ReadonlyArray<string>
 ): Promise<ReadonlyArray<HulyIssue>> => {
   const byTaskType = taskTypeIds.length === 0
     ? []
-    : await client.findAll<HulyIssue>(
+    : await rawFindAll<HulyIssue>(
+      rest,
       tracker.class.Issue,
       { kind: { $in: [...taskTypeIds] } },
       { limit: 1000 }
     )
   const byStatus = statusIds.length === 0
     ? []
-    : await client.findAll<HulyIssue>(
+    : await rawFindAll<HulyIssue>(
+      rest,
       tracker.class.Issue,
       { status: { $in: [...statusIds] } },
       { limit: 1000 }
@@ -228,13 +302,14 @@ const findIssues = async (
 }
 
 const loadArtifacts = async (
-  client: TxOperations,
+  rest: RestReadClient,
   args: Args
 ): Promise<WorkflowArtifacts> => {
-  const projectTypes = await client.findAll<ProjectType>(task.class.ProjectType, {})
+  const projectTypes = await rawFindAll<ProjectType>(rest, task.class.ProjectType, {})
   const projectType = resolveProjectType([...projectTypes], args.projectType)
 
-  const projectTypeTaskTypes = await client.findAll<TaskType>(
+  const projectTypeTaskTypes = await rawFindAll<TaskType>(
+    rest,
     task.class.TaskType,
     { parent: projectType._id },
     { limit: 1000 }
@@ -246,7 +321,8 @@ const loadArtifacts = async (
 
   const taskTypeIds = uniqueRefs(projectType.tasks)
   if (taskTypeIds.length > 0) {
-    const referencedTaskTypes = await client.findAll<TaskType>(
+    const referencedTaskTypes = await rawFindAll<TaskType>(
+      rest,
       task.class.TaskType,
       { _id: { $in: taskTypeIds } },
       { limit: 1000 }
@@ -259,7 +335,8 @@ const loadArtifacts = async (
   const statusIds = uniqueRefs(projectType.statuses.map((status) => status._id))
   const statuses = statusIds.length === 0
     ? []
-    : await client.findAll<Status>(
+    : await rawFindAll<Status>(
+      rest,
       core.class.Status,
       { _id: { $in: statusIds } },
       { limit: 1000 }
@@ -302,10 +379,11 @@ const maybeRemoveDoc = async <T extends Doc>(
 }
 
 const removeWorkflowArtifacts = async (
-  client: TxOperations,
+  connection: CleanupConnection,
   args: Args
 ): Promise<void> => {
-  const artifacts = await loadArtifacts(client, args)
+  const { rest, tx } = connection
+  const artifacts = await loadArtifacts(rest, args)
   const taskTypeIds = uniqueRefs(artifacts.taskTypes.map((taskType) => taskType._id))
   const statusIds = uniqueRefs(artifacts.statuses.map((status) => status._id))
 
@@ -313,7 +391,7 @@ const removeWorkflowArtifacts = async (
   console.log(`Matched task types: ${artifacts.taskTypes.map((taskType) => `${taskType.name} (${taskType._id})`).join(", ") || "none"}`)
   console.log(`Matched statuses: ${artifacts.statuses.map((status) => `${status.name} (${status._id})`).join(", ") || "none"}`)
 
-  const issues = await findIssues(client, taskTypeIds, statusIds, args.issueTitlePrefixes)
+  const issues = await findIssues(rest, taskTypeIds, statusIds, args.issueTitlePrefixes)
   if (issues.length > 0 && !args.deleteTestIssues) {
     throw new Error(
       `Refusing to remove workflow artifacts while ${issues.length} matching issues still use them. Re-run with --delete-test-issues after confirming they are test artifacts.`
@@ -322,11 +400,11 @@ const removeWorkflowArtifacts = async (
 
   for (const issue of issues) {
     console.log(`${args.dryRun ? "Would delete" : "Deleting"} issue ${issue.identifier}: ${issue.title}`)
-    await maybeRemoveDoc(client, args.dryRun, tracker.class.Issue, issue.space, issue._id)
+    await maybeRemoveDoc(tx, args.dryRun, tracker.class.Issue, issue.space, issue._id)
   }
 
   if (!args.dryRun && args.issueTitlePrefixes.length > 0) {
-    const remainingIssues = await findIssues(client, taskTypeIds, statusIds, [])
+    const remainingIssues = await findIssues(rest, taskTypeIds, statusIds, [])
     if (remainingIssues.length > 0) {
       const sample = remainingIssues.slice(0, 10).map((issue) => `${issue.identifier}: ${issue.title}`).join(", ")
       throw new Error(
@@ -347,7 +425,7 @@ const removeWorkflowArtifacts = async (
   ) {
     console.log(`${args.dryRun ? "Would update" : "Updating"} project type refs`)
     await maybeUpdateDoc(
-      client,
+      tx,
       args.dryRun,
       task.class.ProjectType,
       core.space.Model,
@@ -356,7 +434,8 @@ const removeWorkflowArtifacts = async (
     )
   }
 
-  const taskTypesToNormalize = await client.findAll<TaskType>(
+  const taskTypesToNormalize = await rawFindAll<TaskType>(
+    rest,
     task.class.TaskType,
     { parent: artifacts.projectType._id },
     { limit: 1000 }
@@ -367,7 +446,7 @@ const removeWorkflowArtifacts = async (
     if (updatedStatuses.length !== taskType.statuses.length) {
       console.log(`${args.dryRun ? "Would update" : "Updating"} task type refs ${taskType.name}`)
       await maybeUpdateDoc(
-        client,
+        tx,
         args.dryRun,
         task.class.TaskType,
         core.space.Model,
@@ -379,26 +458,26 @@ const removeWorkflowArtifacts = async (
 
   for (const taskType of artifacts.taskTypes) {
     console.log(`${args.dryRun ? "Would delete" : "Deleting"} task type ${taskType.name} (${taskType._id})`)
-    await maybeRemoveDoc(client, args.dryRun, task.class.TaskType, core.space.Model, taskType._id)
+    await maybeRemoveDoc(tx, args.dryRun, task.class.TaskType, core.space.Model, taskType._id)
     if (taskType.targetClass !== undefined) {
       console.log(`${args.dryRun ? "Would delete" : "Deleting"} task type target class ${taskType.targetClass}`)
-      await maybeRemoveDoc(client, args.dryRun, core.class.Mixin, core.space.Model, taskType.targetClass)
+      await maybeRemoveDoc(tx, args.dryRun, core.class.Mixin, core.space.Model, taskType.targetClass)
     }
   }
 
   for (const status of artifacts.statuses) {
     console.log(`${args.dryRun ? "Would delete" : "Deleting"} status ${status.name} (${status._id})`)
-    await maybeRemoveDoc(client, args.dryRun, status._class, core.space.Model, status._id)
+    await maybeRemoveDoc(tx, args.dryRun, status._class, core.space.Model, status._id)
   }
 }
 
 const main = async (): Promise<void> => {
   const args = parseArgs(process.argv.slice(2))
-  const client = await connect()
-  await removeWorkflowArtifacts(client, args)
+  const connection = await connect()
+  await removeWorkflowArtifacts(connection, args)
 }
 
 main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : String(error))
+  console.error(error instanceof Error ? (error.stack ?? error.message) : String(error))
   process.exit(1)
 })

@@ -11,15 +11,12 @@ import { Effect } from "effect"
 
 import { HulyClient } from "../client.js"
 import { DocumentReferenceError } from "../errors.js"
-import { markdownToMarkupStringWithHulyLinks } from "./markup.js"
+import { renderMarkdownWithNativeReferencesForWrite } from "./native-reference-markup.js"
 
 interface RenderedDocumentContent {
   readonly markup: string
   readonly format: MarkupFormat
 }
-
-const malformedReferenceList = (entries: ReadonlyArray<string>): string =>
-  entries.map((entry) => `'${entry}'`).join(", ")
 
 export const renderDocumentContentForWrite = (content: string): Effect.Effect<
   RenderedDocumentContent,
@@ -28,14 +25,10 @@ export const renderDocumentContentForWrite = (content: string): Effect.Effect<
 > =>
   Effect.gen(function*() {
     const client = yield* HulyClient
-    const rendered = markdownToMarkupStringWithHulyLinks(content, client.markupUrlConfig)
-    if (rendered.malformedReferences.length > 0) {
-      return yield* new DocumentReferenceError({
-        reason: `malformed Huly native reference links in content: ${
-          malformedReferenceList(rendered.malformedReferences)
-        }`
-      })
+    const rendered = renderMarkdownWithNativeReferencesForWrite(content, client.markupUrlConfig, "content")
+    if (rendered._tag === "malformed") {
+      return yield* new DocumentReferenceError({ reason: rendered.reason })
     }
 
-    return { markup: rendered.markup, format: "markup" }
+    return rendered.rendered
   })

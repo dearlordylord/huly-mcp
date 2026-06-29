@@ -235,7 +235,8 @@ export const CreateIssueParamsSchema = Schema.Struct({
     description: "Issue title"
   }),
   description: Schema.optional(Schema.String.annotations({
-    description: "Issue description (markdown supported)"
+    description:
+      "Issue description in markdown. Markdown links to current-workspace Huly browse URLs with _class, _id, and label become native Huly references. External URLs and other-workspace browse URLs stay normal links."
   })),
   priority: Schema.optional(IssuePrioritySchema.annotations({
     description: "Issue priority (urgent, high, medium, low, no-priority)"
@@ -291,7 +292,9 @@ export const UpdateIssueParamsSchema = Schema.Struct({
   title: Schema.optional(NonEmptyString.annotations({
     description: "New issue title"
   })),
-  description: Schema.optional(clearableText("New issue description (markdown supported).")),
+  description: Schema.optional(clearableText(
+    "New issue description in markdown. Markdown links to current-workspace Huly browse URLs with _class, _id, and label become native Huly references. External URLs and other-workspace browse URLs stay normal links."
+  )),
   priority: Schema.optional(IssuePrioritySchema.annotations({
     description: "New issue priority"
   })),

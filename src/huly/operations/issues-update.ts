@@ -6,19 +6,21 @@ import type { UpdateIssueParams } from "../../domain/schemas.js"
 import type { UpdateIssueResult } from "../../domain/schemas/issues-results.js"
 import { UPDATE_ISSUE_FIELDS } from "../../domain/schemas/issues.js"
 import { IssueIdentifier } from "../../domain/schemas/shared.js"
-import type { HulyClient, HulyClientError } from "../client.js"
+import type { ConnectionError, HulyClient, HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
 import type {
   HulyConnectionError,
   HulyError,
   InvalidStatusError,
   IssueNotFoundError,
+  IssueReferenceError,
   NoUpdateFieldsError,
   PersonNotFoundError,
   ProjectNotFoundError
 } from "../errors.js"
 import { tracker } from "../huly-plugins.js"
 import { textContentOrClear } from "./clear-field-updates.js"
+import { renderIssueDescriptionForWrite } from "./issue-native-references.js"
 import { findProjectAndIssue, findProjectWithStatuses, resolveStatusByName, stringToPriority } from "./issues-shared.js"
 import { chooseStatusForTaskType, resolveAssignee, resolveTaskTypeWorkflow } from "./issues-write-shared.js"
 import {
@@ -39,6 +41,7 @@ type UpdateIssueError =
   | InvalidStatusError
   | HulyError
   | PersonNotFoundError
+  | IssueReferenceError
 
 /**
  * Update an existing issue in a project.
@@ -82,12 +85,19 @@ export const updateIssue = (
     type UpdateIssueField = typeof UPDATE_ISSUE_FIELDS[number]
     type UpdateIssueDirectEffect<Field extends UpdateIssueField & keyof DocumentUpdate<HulyIssue>> = Effect.Effect<
       CoveredUpdateEntry<Field, DirectUpdateEntry<UpdateIssueField, DocumentUpdate<HulyIssue>, Field>>,
-      HulyClientError | HulyError | InvalidStatusError | PersonNotFoundError
+      ConnectionError | HulyError | InvalidStatusError | PersonNotFoundError | IssueReferenceError
     >
     type IssueTaskTypeUpdateEntry = DirectUpdateSubsetEntry<"kind" | "status", DocumentUpdate<HulyIssue>>
+    type IssueDescriptionUpdateEntry = DirectUpdateEntry<UpdateIssueField, DocumentUpdate<HulyIssue>, "description">
+    const descriptionUpdateEntry = (operations: IssueDescriptionUpdateEntry) =>
+      coveredUpdateEntry("description", operations)
     type UpdateIssueEntries = {
       readonly title: UpdateIssueDirectEffect<"title">
-      readonly description: UpdateIssueDirectEffect<"description">
+      readonly description: Effect.Effect<
+        CoveredUpdateEntry<"description", IssueDescriptionUpdateEntry>,
+        ConnectionError | IssueReferenceError,
+        HulyClient
+      >
       readonly priority: UpdateIssueDirectEffect<"priority">
       readonly assignee: UpdateIssueDirectEffect<"assignee">
       readonly status: UpdateIssueDirectEffect<"status">
@@ -101,21 +111,28 @@ export const updateIssue = (
     const updateEntries = {
       title: Effect.succeed(coveredUpdateEntry("title", params.title === undefined ? {} : { title: params.title })),
       description: Effect.gen(function*() {
-        if (params.description === undefined) return coveredUpdateEntry("description", {})
+        if (params.description === undefined) return descriptionUpdateEntry({})
         const description = textContentOrClear(params.description)
-        if (description === undefined) return coveredUpdateEntry("description", { description: null })
+        if (description === undefined) return descriptionUpdateEntry({ description: null })
+        const renderedDescription = yield* renderIssueDescriptionForWrite(description)
         if (issue.description) {
-          yield* client.updateMarkup(tracker.class.Issue, issue._id, "description", description, "markdown")
-          return coveredUpdateEntry("description", {})
+          yield* client.updateMarkup(
+            tracker.class.Issue,
+            issue._id,
+            "description",
+            renderedDescription.markup,
+            renderedDescription.format
+          )
+          return descriptionUpdateEntry({})
         }
         const descriptionMarkupRef = yield* client.uploadMarkup(
           tracker.class.Issue,
           issue._id,
           "description",
-          description,
-          "markdown"
+          renderedDescription.markup,
+          renderedDescription.format
         )
-        return coveredUpdateEntry("description", { description: descriptionMarkupRef })
+        return descriptionUpdateEntry({ description: descriptionMarkupRef })
       }),
       priority: Effect.succeed(
         coveredUpdateEntry(

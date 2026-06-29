@@ -26,9 +26,10 @@ import { DEFAULT_ISSUE_PRIORITY } from "../../domain/schemas/issues.js"
 import { IssueId, IssueIdentifier, type ProjectIdentifier } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
-import type { IssueNotFoundError, PersonNotFoundError, ProjectNotFoundError } from "../errors.js"
+import type { IssueNotFoundError, IssueReferenceError, PersonNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { HulyError, InvalidStatusError } from "../errors.js"
 import { tracker } from "../huly-plugins.js"
+import { renderIssueDescriptionForWrite } from "./issue-native-references.js"
 import {
   findIssueInProject,
   findProjectAndIssue,
@@ -47,6 +48,7 @@ type CreateIssueError =
   | InvalidStatusError
   | HulyError
   | PersonNotFoundError
+  | IssueReferenceError
 
 type DeleteIssueError =
   | HulyClientError
@@ -117,6 +119,10 @@ export const createIssue = (
       ? (yield* resolveAssignee(client, params.assignee))._id
       : null
 
+    const renderedDescription = params.description !== undefined && params.description.trim() !== ""
+      ? yield* renderIssueDescriptionForWrite(params.description)
+      : undefined
+
     type ParentData = {
       attachedTo: Ref<Doc>
       attachedToClass: Ref<Class<Doc>>
@@ -166,16 +172,15 @@ export const createIssue = (
     )
     const rank = makeRank(lastIssue?.rank, undefined)
 
-    const descriptionMarkupRef: MarkupBlobRef | null =
-      params.description !== undefined && params.description.trim() !== ""
-        ? yield* client.uploadMarkup(
-          tracker.class.Issue,
-          issueId,
-          "description",
-          params.description,
-          "markdown"
-        )
-        : null
+    const descriptionMarkupRef: MarkupBlobRef | null = renderedDescription === undefined
+      ? null
+      : yield* client.uploadMarkup(
+        tracker.class.Issue,
+        issueId,
+        "description",
+        renderedDescription.markup,
+        renderedDescription.format
+      )
 
     const priority = stringToPriority(params.priority ?? DEFAULT_ISSUE_PRIORITY)
     const identifier = `${project.identifier}-${sequence}`

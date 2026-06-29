@@ -161,8 +161,8 @@ interface MockConfig {
   markupContent?: Record<string, string>
   captureUpdateDoc?: { operations?: Record<string, unknown> }
   captureAddCollection?: { attributes?: Record<string, unknown>; id?: string; class?: unknown }
-  captureUploadMarkup?: { markup?: string }
-  captureUpdateMarkup?: { markup?: string }
+  captureUploadMarkup?: { markup?: string; format?: string }
+  captureUpdateMarkup?: { markup?: string; format?: string }
   updateDocResult?: { object?: { sequence?: number } }
 }
 
@@ -329,10 +329,12 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     _objectClass: unknown,
     _objectId: unknown,
     _objectAttr: unknown,
-    markup: unknown
+    markup: unknown,
+    format: unknown
   ) => {
     if (config.captureUploadMarkup) {
       config.captureUploadMarkup.markup = markup as string
+      config.captureUploadMarkup.format = format as string
     }
     return Effect.succeed("markup-ref-123")
   }) as unknown as HulyClientOperations["uploadMarkup"]
@@ -341,10 +343,12 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     _objectClass: unknown,
     _objectId: unknown,
     _objectAttr: unknown,
-    markup: unknown
+    markup: unknown,
+    format: unknown
   ) => {
     if (config.captureUpdateMarkup) {
       config.captureUpdateMarkup.markup = markup as string
+      config.captureUpdateMarkup.format = format as string
     }
     return Effect.succeed(undefined)
   }) as HulyClientOperations["updateMarkup"]
@@ -1165,7 +1169,8 @@ describe("Issues Coverage - createIssue full flow", () => {
       expect(captureAddCollection.attributes?.status).toBe("status-progress")
       expect(captureAddCollection.attributes?.assignee).toBe("person-1")
       expect(captureAddCollection.attributes?.description).toBe("markup-ref-123")
-      expect(captureUploadMarkup.markup).toBe("# Details")
+      expect(captureUploadMarkup.format).toBe("markup")
+      expect(captureUploadMarkup.markup).not.toBe("# Details")
     }))
 
   it.effect("skips status lookup when status not provided (uses findProject instead)", () =>
@@ -1398,7 +1403,8 @@ describe("Issues Coverage - updateIssue branches", () => {
       }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.updated).toBe(true)
-      expect(captureUpdateMarkup.markup).toBe("# Updated")
+      expect(captureUpdateMarkup.format).toBe("markup")
+      expect(captureUpdateMarkup.markup).not.toBe("# Updated")
       expect(captureUpdateDoc.operations?.description).toBeUndefined()
     }))
 
@@ -1429,7 +1435,8 @@ describe("Issues Coverage - updateIssue branches", () => {
       }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.updated).toBe(true)
-      expect(captureUploadMarkup.markup).toBe("# New Desc")
+      expect(captureUploadMarkup.format).toBe("markup")
+      expect(captureUploadMarkup.markup).not.toBe("# New Desc")
       expect(captureUpdateDoc.operations?.description).toBe("markup-ref-123")
     }))
 
@@ -1480,7 +1487,8 @@ describe("Issues Coverage - updateIssue branches", () => {
       }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.updated).toBe(true)
-      expect(captureUpdateMarkup.markup).toBe("# Only desc changed")
+      expect(captureUpdateMarkup.format).toBe("markup")
+      expect(captureUpdateMarkup.markup).not.toBe("# Only desc changed")
     }))
 
   it.effect("updates title field", () =>

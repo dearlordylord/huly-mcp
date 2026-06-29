@@ -911,6 +911,8 @@ describe("Huly Errors", () => {
           switch (error._tag) {
             case "IssueNotFoundError":
               return `issue:${error.identifier}`
+            case "IssueReferenceError":
+              return `issue-reference:${error.reason}`
             case "ApprovalRequestNotFoundError":
               return `approval-request:${error.request}`
             case "ApprovalRequestTargetNotFoundError":
