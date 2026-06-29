@@ -1,7 +1,8 @@
 import { describe, it } from "@effect/vitest"
-import { Effect, Exit, Predicate, Schema } from "effect"
+import { Effect, Exit, Schema } from "effect"
 import { expect } from "vitest"
 
+import { parseJsonSchemaRecord } from "../../src/domain/schemas/json-schema.js"
 import {
   getSpacePreferenceParamsJsonSchema,
   GetSpacePreferenceResultSchema,
@@ -48,8 +49,8 @@ describe("preference schemas", () => {
     }))
 
   it("emits client-safe JSON Schema for SpacePreference tool inputs", () => {
-    expect(Predicate.isRecord(listSpacePreferencesParamsJsonSchema)).toBe(true)
-    expect(Predicate.isRecord(getSpacePreferenceParamsJsonSchema)).toBe(true)
+    expect(parseJsonSchemaRecord(listSpacePreferencesParamsJsonSchema)).toBeDefined()
+    expect(parseJsonSchemaRecord(getSpacePreferenceParamsJsonSchema)).toBeDefined()
     expect(listSpacePreferencesParamsJsonSchema).toMatchObject({
       type: "object",
       properties: {

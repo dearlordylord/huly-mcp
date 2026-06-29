@@ -5,6 +5,7 @@ import type { Category as HulyInventoryCategory, Product as HulyInventoryProduct
 import { Effect } from "effect"
 import { expect } from "vitest"
 
+import { parseJsonSchemaRecord } from "../../../src/domain/schemas/json-schema.js"
 import type { HulyClientOperations } from "../../../src/huly/client.js"
 import { inventory } from "../../../src/huly/huly-plugins.js"
 import { testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
@@ -94,17 +95,12 @@ const storageClient: HulyStorageOperations = {
   getFileUrl: (blobId: string) => `https://test.huly.io/files?file=${blobId}`
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-
 const toolInputPropertyDescription = (toolName: string, propertyName: string): string | undefined => {
   const tool = toolRegistry.definitions.find((definition) => definition.name === toolName)
-  const inputSchema = tool?.inputSchema
-  if (!isRecord(inputSchema)) return undefined
-  const properties = inputSchema.properties
-  if (!isRecord(properties)) return undefined
-  const property = properties[propertyName]
-  if (!isRecord(property)) return undefined
+  const inputSchema = parseJsonSchemaRecord(tool?.inputSchema)
+  const properties = parseJsonSchemaRecord(inputSchema?.properties)
+  const property = parseJsonSchemaRecord(properties?.[propertyName])
+  if (property === undefined) return undefined
   return typeof property.description === "string" ? property.description : undefined
 }
 

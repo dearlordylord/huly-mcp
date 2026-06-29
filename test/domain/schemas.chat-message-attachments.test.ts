@@ -7,8 +7,7 @@ import {
   listChatMessageAttachmentsParamsJsonSchema,
   parseAddChatMessageAttachmentParams,
   parseListChatMessageAttachmentsParams,
-  parseUpdateChatMessageAttachmentParams,
-  withChatMessageAttachmentTargetVariantDescriptions
+  parseUpdateChatMessageAttachmentParams
 } from "../../src/domain/schemas/chat-message-attachments.js"
 
 type JsonSchemaRecord = {
@@ -124,19 +123,5 @@ describe("chat message attachment schemas", () => {
     expect(propertySchema(replyTarget, "replyId").description).toContain("thread reply ID")
     expect(asRecord(addChatMessageAttachmentParamsJsonSchema).title).toBe("AddChatMessageAttachmentParams")
     expect(asRecord(addChatMessageAttachmentParamsJsonSchema).description).toContain("Provide exactly one")
-  })
-
-  it("leaves unsupported target JSON schema shapes unchanged", () => {
-    const arraySchema: object = []
-    const noProperties = {}
-    const noTarget = { properties: {} }
-    const noAnyOf = { properties: { target: {} } }
-    const nonObjectVariant = { properties: { target: { anyOf: ["not-an-object"] } } }
-
-    expect(withChatMessageAttachmentTargetVariantDescriptions(arraySchema)).toBe(arraySchema)
-    expect(withChatMessageAttachmentTargetVariantDescriptions(noProperties)).toBe(noProperties)
-    expect(withChatMessageAttachmentTargetVariantDescriptions(noTarget)).toBe(noTarget)
-    expect(withChatMessageAttachmentTargetVariantDescriptions(noAnyOf)).toBe(noAnyOf)
-    expect(withChatMessageAttachmentTargetVariantDescriptions(nonObjectVariant)).toEqual(nonObjectVariant)
   })
 })

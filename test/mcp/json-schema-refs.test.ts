@@ -1,18 +1,17 @@
 import { describe } from "@effect/vitest"
 import { expect, it } from "vitest"
 
+import { parseJsonSchemaRecord } from "../../src/domain/schemas/json-schema.js"
 import {
   stripCollidingSchemaIds,
   stripCollidingSchemaIdsProperties,
   stripCollidingSchemaIdsRecord
 } from "../../src/mcp/json-schema-refs.js"
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-
 const expectRecord = (value: unknown): Record<string, unknown> => {
-  if (!isRecord(value)) throw new Error("Expected record")
-  return value
+  const record = parseJsonSchemaRecord(value)
+  if (record === undefined) throw new Error("Expected record")
+  return record
 }
 
 describe("stripCollidingSchemaIds", () => {

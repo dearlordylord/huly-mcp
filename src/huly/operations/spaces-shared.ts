@@ -89,6 +89,7 @@ export const optionalObjectClassName = (value: string | undefined): ObjectClassN
   value === undefined || value === "" ? undefined : ObjectClassName.make(value)
 
 const RoleAssignmentStorageSchema = Schema.Record({ key: Schema.String, value: Schema.Array(AccountUuid) })
+const RoleAssignmentStorageObjectSchema = Schema.Record({ key: Schema.String, value: Schema.Unknown })
 
 type SpaceRoleAssignmentEntry = readonly [Ref<Role>, ReadonlyArray<HulyAccountUuid>]
 
@@ -102,8 +103,10 @@ interface SpaceRoleAssignmentReadResult {
   readonly degradationReasons: ReadonlyArray<string>
 }
 
-const isRecordObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
+const parseRoleAssignmentStorageObject = (value: unknown): Readonly<Record<string, unknown>> | undefined => {
+  const decoded = Schema.decodeUnknownEither(RoleAssignmentStorageObjectSchema)(value)
+  return decoded._tag === "Right" ? decoded.right : undefined
+}
 
 const validStoredAccountUuid = (value: unknown): HulyAccountUuid | undefined => {
   const decoded = Schema.decodeUnknownEither(AccountUuid)(value)
@@ -149,14 +152,15 @@ export const readSpaceRoleAssignmentEntries = (
 ): SpaceRoleAssignmentReadResult => {
   const source = spaceRoleAssignmentSource(space, spaceType)
   if (!source.present) return { entries: [], degradationReasons: [] }
-  if (!isRecordObject(source.value)) {
+  const storedAssignments = parseRoleAssignmentStorageObject(source.value)
+  if (storedAssignments === undefined) {
     return {
       entries: [],
       degradationReasons: [`role assignment mixin ${spaceType.targetClass} is not an object`]
     }
   }
 
-  const parsed = Object.entries(source.value).flatMap(([roleId, members]) => {
+  const parsed = Object.entries(storedAssignments).flatMap(([roleId, members]) => {
     if (!validRoleIds.has(toRef<Role>(roleId))) {
       return [{
         _tag: "dropped" as const,

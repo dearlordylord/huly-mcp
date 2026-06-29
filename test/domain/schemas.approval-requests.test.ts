@@ -1,5 +1,5 @@
 import { describe, it } from "@effect/vitest"
-import { Effect, Exit, Predicate, Schema } from "effect"
+import { Effect, Exit, Schema } from "effect"
 import { expect } from "vitest"
 
 import {
@@ -18,6 +18,7 @@ import {
   parseRejectApprovalRequestParams,
   rejectApprovalRequestParamsJsonSchema
 } from "../../src/domain/schemas/approval-requests.js"
+import { parseJsonSchemaRecord } from "../../src/domain/schemas/json-schema.js"
 
 describe("approval request schemas", () => {
   it.effect("parses list/get approval request params", () =>
@@ -83,9 +84,9 @@ describe("approval request schemas", () => {
     }))
 
   it("emits client-safe JSON Schema for approval request tool inputs", () => {
-    expect(Predicate.isRecord(listApprovalRequestsParamsJsonSchema)).toBe(true)
-    expect(Predicate.isRecord(getApprovalRequestParamsJsonSchema)).toBe(true)
-    expect(Predicate.isRecord(addApprovalRequestParamsJsonSchema)).toBe(true)
+    expect(parseJsonSchemaRecord(listApprovalRequestsParamsJsonSchema)).toBeDefined()
+    expect(parseJsonSchemaRecord(getApprovalRequestParamsJsonSchema)).toBeDefined()
+    expect(parseJsonSchemaRecord(addApprovalRequestParamsJsonSchema)).toBeDefined()
     expect(listApprovalRequestsParamsJsonSchema).toMatchObject({
       type: "object",
       properties: {

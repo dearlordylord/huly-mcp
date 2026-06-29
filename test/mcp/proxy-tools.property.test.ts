@@ -55,6 +55,10 @@ const registryFromDefinitions = (definitions: ReadonlyArray<RegisteredTool>): To
 })
 
 describe("proxy tool search properties", () => {
+  it("returns no matches for non-empty queries with no searchable tokens", () => {
+    expect(searchToolDefinitions(toolRegistry, makeToolSearchQuery("-"), makeSearchToolLimit(50))).toEqual([])
+  })
+
   it("returns only tools from the searched candidate registry", () => {
     fc.assert(
       fc.property(queryArbitrary, searchLimitArbitrary, (query, limit) => {

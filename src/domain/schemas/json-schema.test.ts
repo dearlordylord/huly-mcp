@@ -1,13 +1,13 @@
-import { Predicate } from "effect"
 import { describe, expect, it } from "vitest"
 
-import { withExactlyOneRequired, withJsonSchemaPropertyDescriptions } from "./json-schema.js"
+import { parseJsonSchemaRecord, withExactlyOneRequired, withJsonSchemaPropertyDescriptions } from "./json-schema.js"
 
 const expectRecord = (value: unknown): { readonly [x: string | symbol]: unknown } => {
-  if (!Predicate.isRecord(value)) {
+  const record = parseJsonSchemaRecord(value)
+  if (record === undefined) {
     throw new Error("Expected record")
   }
-  return value
+  return record
 }
 
 const getProperty = (schema: unknown, property: string): unknown => {
@@ -18,7 +18,7 @@ const getProperty = (schema: unknown, property: string): unknown => {
 
 const getDescription = (schema: unknown, property: string): unknown => {
   const field = getProperty(schema, property)
-  return Predicate.isRecord(field) ? field.description : undefined
+  return parseJsonSchemaRecord(field)?.description
 }
 
 describe("JSON schema helpers", () => {

@@ -73,20 +73,30 @@ const parseToolExposureConfigEffect = (
   return Effect.fail(new McpServerError({ message: parsed.message }))
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
+const CLIENT_INFO_META_KEY = "io.modelcontextprotocol/clientInfo"
+const Mcp2026ClientInfoRequestSchema = Schema.Struct({
+  params: Schema.Struct({
+    _meta: Schema.Struct({
+      [CLIENT_INFO_META_KEY]: Schema.Unknown
+    })
+  })
+})
+const LegacyClientInfoRequestSchema = Schema.Struct({
+  params: Schema.Struct({
+    clientInfo: Schema.optionalWith(Schema.Unknown, { exact: true })
+  })
+})
 
 const clientInfoFromMcp2026Request = (req: Request): McpClientInfoLike | undefined => {
-  const body = req.body
-  if (!isRecord(body) || !isRecord(body.params) || !isRecord(body.params._meta)) return undefined
-  const clientInfo = body.params._meta["io.modelcontextprotocol/clientInfo"]
-  return parseMcpClientInfo(clientInfo)
+  const decoded = Schema.decodeUnknownEither(Mcp2026ClientInfoRequestSchema)(req.body)
+  if (decoded._tag === "Left") return undefined
+  return parseMcpClientInfo(decoded.right.params._meta[CLIENT_INFO_META_KEY])
 }
 
 const clientInfoFromLegacyHttpRequest = (req: Request): McpClientInfoLike | undefined => {
-  const body = req.body
-  if (!isRecord(body) || !isRecord(body.params)) return undefined
-  return parseMcpClientInfo(body.params.clientInfo) ?? clientInfoFromMcp2026Request(req)
+  const decoded = Schema.decodeUnknownEither(LegacyClientInfoRequestSchema)(req.body)
+  if (decoded._tag === "Left") return clientInfoFromMcp2026Request(req)
+  return parseMcpClientInfo(decoded.right.params.clientInfo) ?? clientInfoFromMcp2026Request(req)
 }
 
 interface McpServerOperations {

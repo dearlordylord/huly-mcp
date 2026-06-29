@@ -27,37 +27,103 @@ export const makeToolSearchQuery = (value: string): ToolSearchQuery => ToolSearc
 export const makeSearchToolLimit = (value: number): SearchToolLimit => SearchToolLimit.make(value)
 export const SEARCH_DEFAULT_LIMIT_VALUE = makeSearchToolLimit(SEARCH_DEFAULT_LIMIT)
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
+const UnknownRecordSchema = Schema.Record({ key: Schema.String, value: Schema.Unknown })
+const ToolInputSummarySchema = UnknownRecordSchema.pipe(
+  Schema.extend(
+    Schema.Struct({
+      properties: Schema.optionalWith(UnknownRecordSchema, { exact: true }),
+      required: Schema.optionalWith(Schema.Array(Schema.String), { exact: true })
+    })
+  )
+)
+type ToolInputSummary = Schema.Schema.Type<typeof ToolInputSummarySchema>
 
-const stringArray = (value: unknown): ReadonlyArray<string> =>
-  Array.isArray(value) && value.every((item) => typeof item === "string") ? value : []
+type ToolInputSummaryParseResult =
+  | { readonly _tag: "success"; readonly summary: ToolInputSummary }
+  | { readonly _tag: "invalid"; readonly issue: string }
+type ToolParameterNamesParseResult =
+  | { readonly _tag: "names"; readonly names: ReadonlyArray<ToolParameterName> }
+  | { readonly _tag: "invalid"; readonly issue: string }
 
-const parseToolParameterName = (value: string): ToolParameterName | undefined => {
-  const decoded = Schema.decodeUnknownEither(ToolParameterName)(value)
-  return Either.isRight(decoded) ? decoded.right : undefined
+const INVALID_INPUT_SCHEMA_SUMMARY_ISSUE =
+  "inputSchema summary must expose object properties keyed by non-empty strings and an optional string required array"
+
+const parseToolInputSummary = (value: unknown): ToolInputSummaryParseResult => {
+  const decoded = Schema.decodeUnknownEither(ToolInputSummarySchema)(value)
+  return Either.isRight(decoded)
+    ? { _tag: "success", summary: decoded.right }
+    : { _tag: "invalid", issue: INVALID_INPUT_SCHEMA_SUMMARY_ISSUE }
 }
 
-const schemaProperties = (schema: object): ReadonlyArray<ToolParameterName> => {
-  const properties = isRecord(schema) ? schema.properties : undefined
-  return isRecord(properties)
-    ? Object.keys(properties).map(parseToolParameterName).filter((name) => name !== undefined)
-    : []
+const parseToolParameterNames = (values: ReadonlyArray<string>): ToolParameterNamesParseResult => {
+  const names = values.map((value) => {
+    const decoded = Schema.decodeUnknownEither(ToolParameterName)(value)
+    return decoded._tag === "Right" ? decoded.right : undefined
+  })
+  const parsedNames = names.filter((name): name is ToolParameterName => name !== undefined)
+  if (parsedNames.length !== names.length) return { _tag: "invalid", issue: INVALID_INPUT_SCHEMA_SUMMARY_ISSUE }
+  return { _tag: "names", names: parsedNames }
 }
 
-const schemaRequired = (schema: unknown): ReadonlyArray<string> => isRecord(schema) ? stringArray(schema.required) : []
+const schemaProperties = (summary: ToolInputSummary): ToolParameterNamesParseResult =>
+  parseToolParameterNames(Object.keys(summary.properties ?? {}))
+
+const schemaRequired = (summary: ToolInputSummary): ToolParameterNamesParseResult =>
+  parseToolParameterNames(summary.required ?? [])
+
+type ToolParamSummaryStatus = "available" | "empty" | "invalid_input_schema"
 
 export const toolParamSummary = (
   tool: ToolDefinition
 ): {
   readonly requiredParams: ReadonlyArray<ToolParameterName>
   readonly optionalParams: ReadonlyArray<ToolParameterName>
+  readonly parameterSummaryStatus: ToolParamSummaryStatus
+  readonly parameterSummaryIssue?: string
 } => {
-  const required = new Set(schemaRequired(tool.inputSchema))
-  const properties = schemaProperties(tool.inputSchema)
+  const parsed = parseToolInputSummary(tool.inputSchema)
+  if (parsed._tag === "invalid") {
+    return {
+      requiredParams: [],
+      optionalParams: [],
+      parameterSummaryStatus: "invalid_input_schema",
+      parameterSummaryIssue: parsed.issue
+    }
+  }
+  const summary = parsed.summary
+  const requiredResult = schemaRequired(summary)
+  if (requiredResult._tag === "invalid") {
+    return {
+      requiredParams: [],
+      optionalParams: [],
+      parameterSummaryStatus: "invalid_input_schema",
+      parameterSummaryIssue: requiredResult.issue
+    }
+  }
+  const propertiesResult = schemaProperties(summary)
+  if (propertiesResult._tag === "invalid") {
+    return {
+      requiredParams: [],
+      optionalParams: [],
+      parameterSummaryStatus: "invalid_input_schema",
+      parameterSummaryIssue: propertiesResult.issue
+    }
+  }
+  const required = new Set(requiredResult.names)
+  const properties = propertiesResult.names
+  const requiredWithoutProperty = [...required].filter((name) => !properties.includes(name))
+  if (requiredWithoutProperty.length > 0) {
+    return {
+      requiredParams: [],
+      optionalParams: [],
+      parameterSummaryStatus: "invalid_input_schema",
+      parameterSummaryIssue: "inputSchema required entries must refer to declared properties"
+    }
+  }
   return {
     requiredParams: properties.filter((name) => required.has(name)),
-    optionalParams: properties.filter((name) => !required.has(name))
+    optionalParams: properties.filter((name) => !required.has(name)),
+    parameterSummaryStatus: properties.length === 0 ? "empty" : "available"
   }
 }
 

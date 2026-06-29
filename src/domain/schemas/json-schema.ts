@@ -1,21 +1,34 @@
-import { Predicate } from "effect"
+import { Schema } from "effect"
 
 type JsonSchemaPropertyDescriptions = Readonly<Partial<Record<string, string>>>
+
+const JsonSchemaRecordSchema = Schema.Record({ key: Schema.String, value: Schema.Unknown })
+
+type JsonSchemaRecord = Schema.Schema.Type<typeof JsonSchemaRecordSchema>
+
+export const parseJsonSchemaRecord = (value: unknown): JsonSchemaRecord | undefined => {
+  try {
+    return Schema.decodeUnknownSync(JsonSchemaRecordSchema)(value)
+  } catch {
+    return undefined
+  }
+}
 
 export const withJsonSchemaPropertyDescriptions = (
   schema: object,
   descriptions: JsonSchemaPropertyDescriptions
 ): object => {
-  const properties = Predicate.isRecord(schema) ? schema.properties : undefined
-  if (!Predicate.isRecord(properties)) return schema
+  const properties = parseJsonSchemaRecord(parseJsonSchemaRecord(schema)?.properties)
+  if (properties === undefined) return schema
   return {
     ...schema,
     properties: Object.fromEntries(
       Object.entries(properties).map(([key, value]) => {
         const description = descriptions[key]
+        const property = parseJsonSchemaRecord(value)
         return [
           key,
-          description === undefined || !Predicate.isRecord(value) ? value : { ...value, description }
+          description === undefined || property === undefined ? value : { ...property, description }
         ]
       })
     )

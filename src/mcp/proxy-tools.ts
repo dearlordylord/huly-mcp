@@ -56,7 +56,7 @@ const SearchToolsParamsSchema = Schema.Struct({
 const ToolNameParamsSchema = Schema.Struct({
   toolName: ToolName
 })
-const InvokeToolParamsSchema = Schema.Struct({
+export const InvokeToolParamsSchema = Schema.Struct({
   toolName: ToolName,
   arguments: Schema.optionalWith(Schema.Unknown, { exact: true })
 })
@@ -69,13 +69,29 @@ const ProxyToolCategorySchema = Schema.Struct({
 const ListToolCategoriesResultSchema = Schema.Struct({
   categories: Schema.Array(ProxyToolCategorySchema)
 })
-const ToolSearchMatchSchema = Schema.Struct({
+const ToolSearchMatchBaseSchema = Schema.Struct({
   name: ToolName,
   category: ToolCategory,
   description: ToolDescription,
   requiredParams: Schema.Array(ToolParameterName),
   optionalParams: Schema.Array(ToolParameterName)
 })
+const ToolSearchMatchSchema = Schema.Union(
+  ToolSearchMatchBaseSchema.pipe(
+    Schema.extend(Schema.Struct({ parameterSummaryStatus: Schema.Literal("available") }))
+  ),
+  ToolSearchMatchBaseSchema.pipe(
+    Schema.extend(Schema.Struct({ parameterSummaryStatus: Schema.Literal("empty") }))
+  ),
+  ToolSearchMatchBaseSchema.pipe(
+    Schema.extend(
+      Schema.Struct({
+        parameterSummaryStatus: Schema.Literal("invalid_input_schema"),
+        parameterSummaryIssue: Schema.String
+      })
+    )
+  )
+)
 const SearchToolsResultSchema = Schema.Struct({
   matches: Schema.Array(ToolSearchMatchSchema)
 })
@@ -210,24 +226,24 @@ export const proxyToolDefinitions: ReadonlyArray<ToolDefinition> = [
 export const isProxyToolName = (name: string): name is ToolName =>
   PROXY_TOOL_NAMES.some((toolName) => toolName === name)
 
+type DecodeOrErrorResult<A> =
+  | { readonly _tag: "success"; readonly params: A }
+  | { readonly _tag: "error"; readonly response: McpToolResponse }
+
 const decodeOrError = <A, I>(
   schema: Schema.Schema<A, I, never>,
   input: unknown,
   toolName: ToolName
-): A | McpToolResponse => {
+): DecodeOrErrorResult<A> => {
   const decoded = Schema.decodeUnknownEither(schema)(input ?? {})
-  if (Either.isRight(decoded)) return decoded.right
-  return mapParseErrorToMcp(decoded.left, toolName)
+  if (Either.isRight(decoded)) return { _tag: "success", params: decoded.right }
+  return { _tag: "error", response: mapParseErrorToMcp(decoded.left, toolName) }
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-
-const isMcpToolResponse = (value: unknown): value is McpToolResponse => isRecord(value) && Array.isArray(value.content)
-
 const searchTools = (registry: ToolRegistry, args: unknown): McpToolResponse => {
-  const params = decodeOrError(SearchToolsParamsSchema, args, SEARCH_TOOLS_TOOL_NAME)
-  if (isMcpToolResponse(params)) return params
+  const decoded = decodeOrError(SearchToolsParamsSchema, args, SEARCH_TOOLS_TOOL_NAME)
+  if (decoded._tag === "error") return decoded.response
+  const params = decoded.params
   const limit = params.limit ?? SEARCH_DEFAULT_LIMIT_VALUE
   const matches = searchToolDefinitions(registry, params.query, limit).map((tool) => {
     const paramSummary = toolParamSummary(tool)
@@ -236,15 +252,20 @@ const searchTools = (registry: ToolRegistry, args: unknown): McpToolResponse => 
       category: tool.category,
       description: tool.description,
       requiredParams: paramSummary.requiredParams,
-      optionalParams: paramSummary.optionalParams
+      optionalParams: paramSummary.optionalParams,
+      parameterSummaryStatus: paramSummary.parameterSummaryStatus,
+      ...(paramSummary.parameterSummaryIssue === undefined
+        ? {}
+        : { parameterSummaryIssue: paramSummary.parameterSummaryIssue })
     }
   })
   return createSuccessResponse({ matches })
 }
 
 const getToolSchema = (registry: ToolRegistry, args: unknown): McpToolResponse => {
-  const params = decodeOrError(ToolNameParamsSchema, args, GET_TOOL_SCHEMA_TOOL_NAME)
-  if (isMcpToolResponse(params)) return params
+  const decoded = decodeOrError(ToolNameParamsSchema, args, GET_TOOL_SCHEMA_TOOL_NAME)
+  if (decoded._tag === "error") return decoded.response
+  const params = decoded.params
 
   const tool = registry.tools.get(params.toolName)
   if (tool === undefined) return createUnknownToolError(params.toolName)
@@ -269,8 +290,9 @@ const invokeTool = async (
   args: unknown,
   clients: InvokeToolClients
 ): Promise<McpToolResponse> => {
-  const params = decodeOrError(InvokeToolParamsSchema, args, INVOKE_TOOL_TOOL_NAME)
-  if (isMcpToolResponse(params)) return params
+  const decoded = decodeOrError(InvokeToolParamsSchema, args, INVOKE_TOOL_TOOL_NAME)
+  if (decoded._tag === "error") return decoded.response
+  const params = decoded.params
 
   if (!registry.tools.has(params.toolName)) return createUnknownToolError(params.toolName)
 
@@ -305,8 +327,8 @@ interface ProxyToolCallInput {
 export const handleProxyToolCall = async (input: ProxyToolCallInput): Promise<McpToolResponse> => {
   switch (input.toolName) {
     case LIST_TOOL_CATEGORIES_TOOL_NAME: {
-      const params = decodeOrError(EmptyProxyParamsSchema, input.args, LIST_TOOL_CATEGORIES_TOOL_NAME)
-      if (isMcpToolResponse(params)) return params
+      const decoded = decodeOrError(EmptyProxyParamsSchema, input.args, LIST_TOOL_CATEGORIES_TOOL_NAME)
+      if (decoded._tag === "error") return decoded.response
       return listCategories(input.proxyCandidateRegistry)
     }
     case SEARCH_TOOLS_TOOL_NAME:

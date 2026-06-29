@@ -36,7 +36,13 @@ import {
   toListedHulyTool,
   toListedTool
 } from "./protocol-tool-exposure.js"
-import { handleProxyToolCall, INVOKE_TOOL_TOOL_NAME, isProxyToolName, proxyToolDefinitions } from "./proxy-tools.js"
+import {
+  handleProxyToolCall,
+  INVOKE_TOOL_TOOL_NAME,
+  InvokeToolParamsSchema,
+  isProxyToolName,
+  proxyToolDefinitions
+} from "./proxy-tools.js"
 import { listResourceTemplates } from "./resources.js"
 import type { ToolRegistry } from "./tools/index.js"
 import {
@@ -163,8 +169,10 @@ export const fetchLatestNpmVersion = async (fetchImpl: typeof fetch = fetch): Pr
   }
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
+const invokeToolEditMode = (args: unknown): string | undefined => {
+  const decoded = Schema.decodeUnknownEither(InvokeToolParamsSchema)(args)
+  return decoded._tag === "Right" ? deriveEditMode(decoded.right.toolName, decoded.right.arguments) : undefined
+}
 
 export const createMcpProtocolHandlers = (
   resolveClients: () => Promise<ClientBundle>,
@@ -284,9 +292,7 @@ export const createMcpProtocolHandlers = (
       if (isProxyToolName(name)) {
         if (exposure.context.resolvedMode !== "proxy") return returnError(createUnknownToolError(name))
 
-        const editMode = name === INVOKE_TOOL_TOOL_NAME && isRecord(args) && typeof args.toolName === "string"
-          ? deriveEditMode(args.toolName, args.arguments)
-          : undefined
+        const editMode = name === INVOKE_TOOL_TOOL_NAME ? invokeToolEditMode(args) : undefined
 
         let clients: ClientBundle | undefined
         if (name === INVOKE_TOOL_TOOL_NAME) {

@@ -517,6 +517,61 @@ const arraySchemaProbeTool = defineTool(
   () => Effect.succeed({ ok: true })
 )
 
+const malformedSummaryProbeTool = defineTool(
+  {
+    name: "malformed_summary_probe",
+    description: "malformed summary probe tool",
+    inputSchema: {
+      type: "object",
+      properties: {
+        "": { type: "string" },
+        kept: { type: "string" }
+      },
+      required: ["kept"]
+    },
+    resultSchema: Schema.Struct({ ok: Schema.Boolean }),
+    category: "test"
+  },
+  Schema.decodeUnknown(Schema.Unknown),
+  () => Effect.succeed({ ok: true })
+)
+
+const malformedRequiredProbeTool = defineTool(
+  {
+    name: "malformed_required_probe",
+    description: "malformed required probe tool",
+    inputSchema: {
+      type: "object",
+      properties: {
+        kept: { type: "string" }
+      },
+      required: [""]
+    },
+    resultSchema: Schema.Struct({ ok: Schema.Boolean }),
+    category: "test"
+  },
+  Schema.decodeUnknown(Schema.Unknown),
+  () => Effect.succeed({ ok: true })
+)
+
+const undeclaredRequiredProbeTool = defineTool(
+  {
+    name: "undeclared_required_probe",
+    description: "undeclared required probe tool",
+    inputSchema: {
+      type: "object",
+      properties: {
+        kept: { type: "string" }
+      },
+      required: ["missing"]
+    },
+    resultSchema: Schema.Struct({ ok: Schema.Boolean }),
+    category: "test"
+  },
+  Schema.decodeUnknown(Schema.Unknown),
+  () => Effect.succeed({ ok: true })
+)
+
 const diagnosticProbeRegistry: ToolRegistry = {
   tools: new Map([[diagnosticProbeTool.name, diagnosticProbeTool]]),
   definitions: [diagnosticProbeTool],
@@ -546,6 +601,16 @@ const nullDispatchProxyRegistry: ToolRegistry = {
 const arraySchemaProbeRegistry: ToolRegistry = {
   tools: new Map([[arraySchemaProbeTool.name, arraySchemaProbeTool]]),
   definitions: [arraySchemaProbeTool],
+  handleToolCall: async () => null
+}
+
+const malformedSummaryProbeRegistry: ToolRegistry = {
+  tools: new Map([
+    [malformedSummaryProbeTool.name, malformedSummaryProbeTool],
+    [malformedRequiredProbeTool.name, malformedRequiredProbeTool],
+    [undeclaredRequiredProbeTool.name, undeclaredRequiredProbeTool]
+  ]),
+  definitions: [malformedSummaryProbeTool, malformedRequiredProbeTool, undeclaredRequiredProbeTool],
   handleToolCall: async () => null
 }
 
@@ -1109,6 +1174,7 @@ describe("createMcpProtocolHandlers — proxy mode", () => {
     expect(editMatch.optionalParams).toEqual(
       expect.arrayContaining(["title", "content", "old_text", "new_text"])
     )
+    expect(editMatch.parameterSummaryStatus).toBe("available")
 
     if (!isJsonObject(schemaResult) || !isJsonObject(schemaResult.inputSchema)) {
       throw new Error("expected schema lookup result")
@@ -1121,7 +1187,7 @@ describe("createMcpProtocolHandlers — proxy mode", () => {
     expect(schemaResult.inputSchema).toHaveProperty("allOf")
   })
 
-  it("ranks exact tool-name matches first and handles non-record input schemas in summaries", async () => {
+  it("ranks exact tool-name matches first and flags non-record input schema summaries", async () => {
     const handlers = createMcpProtocolHandlers(
       unusedResolveClients,
       createTelemetryProbe().telemetry,
@@ -1143,7 +1209,83 @@ describe("createMcpProtocolHandlers — proxy mode", () => {
         category: "test",
         description: "array schema probe tool",
         requiredParams: [],
-        optionalParams: []
+        optionalParams: [],
+        parameterSummaryStatus: "invalid_input_schema",
+        parameterSummaryIssue:
+          "inputSchema summary must expose object properties keyed by non-empty strings and an optional string required array"
+      }]
+    })
+  })
+
+  it("surfaces invalid proxy search summary schemas instead of dropping parameter names", async () => {
+    const handlers = createMcpProtocolHandlers(
+      unusedResolveClients,
+      createTelemetryProbe().telemetry,
+      protocolRegistries(malformedSummaryProbeRegistry),
+      makeValidContext,
+      liveNowClock,
+      () => Promise.resolve("0.0.0"),
+      proxyExposureOptions()
+    )
+
+    const response = await handlers.callTool({
+      params: { name: "search_tools", arguments: { query: "malformed_summary_probe", limit: 1 } }
+    })
+
+    expect(response.isError).not.toBe(true)
+    expect(response.structuredContent?.result).toEqual({
+      matches: [{
+        name: "malformed_summary_probe",
+        category: "test",
+        description: "malformed summary probe tool",
+        requiredParams: [],
+        optionalParams: [],
+        parameterSummaryStatus: "invalid_input_schema",
+        parameterSummaryIssue:
+          "inputSchema summary must expose object properties keyed by non-empty strings and an optional string required array"
+      }]
+    })
+  })
+
+  it("surfaces invalid proxy search required summaries", async () => {
+    const handlers = createMcpProtocolHandlers(
+      unusedResolveClients,
+      createTelemetryProbe().telemetry,
+      protocolRegistries(malformedSummaryProbeRegistry),
+      makeValidContext,
+      liveNowClock,
+      () => Promise.resolve("0.0.0"),
+      proxyExposureOptions()
+    )
+
+    const malformedRequired = await handlers.callTool({
+      params: { name: "search_tools", arguments: { query: "malformed_required_probe", limit: 1 } }
+    })
+    const undeclaredRequired = await handlers.callTool({
+      params: { name: "search_tools", arguments: { query: "undeclared_required_probe", limit: 1 } }
+    })
+
+    expect(malformedRequired.structuredContent?.result).toEqual({
+      matches: [{
+        name: "malformed_required_probe",
+        category: "test",
+        description: "malformed required probe tool",
+        requiredParams: [],
+        optionalParams: [],
+        parameterSummaryStatus: "invalid_input_schema",
+        parameterSummaryIssue:
+          "inputSchema summary must expose object properties keyed by non-empty strings and an optional string required array"
+      }]
+    })
+    expect(undeclaredRequired.structuredContent?.result).toEqual({
+      matches: [{
+        name: "undeclared_required_probe",
+        category: "test",
+        description: "undeclared required probe tool",
+        requiredParams: [],
+        optionalParams: [],
+        parameterSummaryStatus: "invalid_input_schema",
+        parameterSummaryIssue: "inputSchema required entries must refer to declared properties"
       }]
     })
   })
@@ -1163,9 +1305,10 @@ describe("createMcpProtocolHandlers — proxy mode", () => {
   })
 
   it("validates proxy meta-tool arguments before returning catalog data", async () => {
+    const probe = createTelemetryProbe()
     const handlers = createMcpProtocolHandlers(
       buildStubClients(),
-      createTelemetryProbe().telemetry,
+      probe.telemetry,
       protocolRegistries(toolRegistry),
       makeValidContext,
       liveNowClock,
@@ -1180,6 +1323,7 @@ describe("createMcpProtocolHandlers — proxy mode", () => {
     expect(search.isError).toBe(true)
     expect(schema.isError).toBe(true)
     expect(invoked.isError).toBe(true)
+    expect(assertAt(probe.toolCalled, 2).editMode).toBeUndefined()
   })
 
   it("invokes a proxy candidate and wraps the target result with warnings", async () => {
