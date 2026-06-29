@@ -1,4 +1,15 @@
-import type { Class, Doc, DocumentQuery, DocumentUpdate, FindOptions, FindResult, Ref, Status, TxOperations } from "@hcengineering/core"
+/* eslint-disable max-lines -- Operational cleanup command; splitting it is outside this rebase and would obscure conflict resolution. */
+import type {
+  Class,
+  Doc,
+  DocumentQuery,
+  DocumentUpdate,
+  FindOptions,
+  FindResult,
+  Ref,
+  Status,
+  TxOperations
+} from "@hcengineering/core"
 import type { ProjectStatus, ProjectType, TaskType } from "@hcengineering/task"
 import type { Issue as HulyIssue } from "@hcengineering/tracker"
 import { createRequire } from "node:module"
@@ -6,9 +17,12 @@ import { createRequire } from "node:module"
 const require = createRequire(import.meta.url)
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports, no-restricted-syntax -- CJS interop boundary: api-client does not expose these helpers as ESM runtime named exports under tsx.
 const apiClient = require("@hcengineering/api-client") as typeof import("@hcengineering/api-client")
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports, no-restricted-syntax -- CJS interop boundary: Huly plugin packages expose CommonJS defaults under tsx.
 const coreModule = require("@hcengineering/core") as typeof import("@hcengineering/core")
 const core = coreModule.default
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports, no-restricted-syntax -- CJS interop boundary: Huly plugin packages expose CommonJS defaults under tsx.
 const task = require("@hcengineering/task").default as typeof import("@hcengineering/task").default
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports, no-restricted-syntax -- CJS interop boundary: Huly plugin packages expose CommonJS defaults under tsx.
 const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
 
 const DEFAULT_PROJECT_TYPE_NAME = "Classic"
@@ -153,7 +167,7 @@ const connect = async (): Promise<CleanupConnection> => {
       email: requiredEnv("HULY_EMAIL"),
       password: requiredEnv("HULY_PASSWORD"),
       workspace
-  }
+    }
   const { endpoint, token: workspaceToken, workspaceId } = await apiClient.getWorkspaceToken(url, auth, serverConfig)
   return {
     rest: { endpoint: endpoint.replace("ws", "http"), token: workspaceToken, workspaceId },
@@ -170,6 +184,7 @@ const isTotalArrayPayload = (
   isRecord(value) && value["dataType"] === "TotalArray" && Array.isArray(value["value"])
 
 const toOptionalLookupMap = (value: unknown): Record<string, Doc> | undefined =>
+  // eslint-disable-next-line no-restricted-syntax -- REST TotalArray lookup maps are SDK DTOs revived from JSON.
   isRecord(value) ? value as Record<string, Doc> : undefined
 
 const totalArrayReviver = (_key: string, value: unknown): unknown => {
@@ -182,6 +197,7 @@ const totalArrayReviver = (_key: string, value: unknown): unknown => {
 
 const fetchJson = async <T>(response: Response): Promise<T> => {
   const json = await response.text()
+  // eslint-disable-next-line no-restricted-syntax -- REST endpoint shape is owned by the Huly SDK; callers provide the SDK DTO type.
   return JSON.parse(json, totalArrayReviver) as T
 }
 
@@ -469,10 +485,8 @@ const removeWorkflowArtifacts = async (
   for (const taskType of artifacts.taskTypes) {
     console.log(`${args.dryRun ? "Would delete" : "Deleting"} task type ${taskType.name} (${taskType._id})`)
     await maybeRemoveDoc(tx, args.dryRun, task.class.TaskType, core.space.Model, taskType._id)
-    if (taskType.targetClass !== undefined) {
-      console.log(`${args.dryRun ? "Would delete" : "Deleting"} task type target class ${taskType.targetClass}`)
-      await maybeRemoveDoc(tx, args.dryRun, core.class.Mixin, core.space.Model, taskType.targetClass)
-    }
+    console.log(`${args.dryRun ? "Would delete" : "Deleting"} task type target class ${taskType.targetClass}`)
+    await maybeRemoveDoc(tx, args.dryRun, core.class.Mixin, core.space.Model, taskType.targetClass)
   }
 
   for (const status of artifacts.statuses) {
