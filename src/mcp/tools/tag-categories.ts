@@ -22,7 +22,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "tag-categories" as const
 
-export const tagCategoryTools: ReadonlyArray<RegisteredTool> = [
+export const tagCategoryTools = [
   defineTool(
     {
       name: "list_tag_categories",
@@ -70,4 +70,4 @@ export const tagCategoryTools: ReadonlyArray<RegisteredTool> = [
     parseDeleteTagCategoryParams,
     deleteTagCategory
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

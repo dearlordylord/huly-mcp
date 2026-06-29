@@ -18,7 +18,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "issues" as const
 
-export const relatedIssueTargetTools: ReadonlyArray<RegisteredTool> = [
+export const relatedIssueTargetTools = [
   defineTool(
     {
       name: "list_related_issue_targets",
@@ -55,4 +55,4 @@ export const relatedIssueTargetTools: ReadonlyArray<RegisteredTool> = [
     parseDeleteRelatedIssueSpaceTargetParams,
     deleteRelatedIssueSpaceTarget
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

@@ -2,35 +2,41 @@
 // These packages only expose CommonJS default exports; import() doesn't work at runtime.
 // All requires are collected here so consumers import typed values without eslint suppression.
 
-/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports, no-restricted-syntax -- CJS interop boundary: require().default needs `as typeof import(…).default` */
+import { createRequire } from "node:module"
 
-export const activity = require("@hcengineering/activity").default as typeof import("@hcengineering/activity").default
-export const attachment = require("@hcengineering/attachment")
+/* eslint-disable @typescript-eslint/consistent-type-imports, no-restricted-syntax -- CJS interop boundary: require().default needs `as typeof import(…).default` */
+
+declare const require: NodeJS.Require | undefined
+
+const load = typeof require === "function" ? require : createRequire(`${process.cwd()}/package.json`)
+
+export const activity = load("@hcengineering/activity").default as typeof import("@hcengineering/activity").default
+export const attachment = load("@hcengineering/attachment")
   .default as typeof import("@hcengineering/attachment").default
-export const board = require("@hcengineering/board").default as typeof import("@hcengineering/board").default
-export const calendar = require("@hcengineering/calendar")
+export const board = load("@hcengineering/board").default as typeof import("@hcengineering/board").default
+export const calendar = load("@hcengineering/calendar")
   .default as typeof import("@hcengineering/calendar").default
-export const cardPlugin = require("@hcengineering/card")
+export const cardPlugin = load("@hcengineering/card")
   .default as typeof import("@hcengineering/card").default
-export const chunter = require("@hcengineering/chunter").default as typeof import("@hcengineering/chunter").default
-export const contact = require("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
-export const core = require("@hcengineering/core").default as typeof import("@hcengineering/core").default
-export const documentPlugin = require("@hcengineering/document")
+export const chunter = load("@hcengineering/chunter").default as typeof import("@hcengineering/chunter").default
+export const contact = load("@hcengineering/contact").default as typeof import("@hcengineering/contact").default
+export const core = load("@hcengineering/core").default as typeof import("@hcengineering/core").default
+export const documentPlugin = load("@hcengineering/document")
   .default as typeof import("@hcengineering/document").default
-export const inventory = require("@hcengineering/inventory")
+export const inventory = load("@hcengineering/inventory")
   .default as typeof import("@hcengineering/inventory").default
-export const love = require("@hcengineering/love").default as typeof import("@hcengineering/love").default
-export const notification = require("@hcengineering/notification")
+export const love = load("@hcengineering/love").default as typeof import("@hcengineering/love").default
+export const notification = load("@hcengineering/notification")
   .default as typeof import("@hcengineering/notification").default
-export const preference = require("@hcengineering/preference")
+export const preference = load("@hcengineering/preference")
   .default as typeof import("@hcengineering/preference").default
-export const request = require("@hcengineering/request").default as typeof import("@hcengineering/request").default
-export const tags = require("@hcengineering/tags").default as typeof import("@hcengineering/tags").default
-export const task = require("@hcengineering/task").default as typeof import("@hcengineering/task").default
-export const templates = require("@hcengineering/templates")
+export const request = load("@hcengineering/request").default as typeof import("@hcengineering/request").default
+export const tags = load("@hcengineering/tags").default as typeof import("@hcengineering/tags").default
+export const task = load("@hcengineering/task").default as typeof import("@hcengineering/task").default
+export const templates = load("@hcengineering/templates")
   .default as typeof import("@hcengineering/templates").default
-export const time = require("@hcengineering/time").default as typeof import("@hcengineering/time").default
-export const tracker = require("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
-export const view = require("@hcengineering/view").default as typeof import("@hcengineering/view").default
+export const time = load("@hcengineering/time").default as typeof import("@hcengineering/time").default
+export const tracker = load("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
+export const view = load("@hcengineering/view").default as typeof import("@hcengineering/view").default
 
-/* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports, no-restricted-syntax */
+/* eslint-enable @typescript-eslint/consistent-type-imports, no-restricted-syntax */

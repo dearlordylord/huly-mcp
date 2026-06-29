@@ -67,7 +67,7 @@ import {
 } from "../../huly/operations/inventory.js"
 import { defineCombinedTool, defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "inventory" as const
-export const inventoryMediaTools: ReadonlyArray<RegisteredTool> = [
+export const inventoryMediaTools = [
   defineTool(
     {
       name: "list_inventory_product_attachments",
@@ -250,4 +250,4 @@ export const inventoryMediaTools: ReadonlyArray<RegisteredTool> = [
     parseListInventoryProductActivityParams,
     listInventoryProductActivity
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

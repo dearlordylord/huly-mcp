@@ -30,7 +30,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "task-management" as const
 
-export const taskManagementTools: ReadonlyArray<RegisteredTool> = [
+export const taskManagementTools = [
   defineTool(
     {
       name: "list_project_types",
@@ -95,4 +95,4 @@ export const taskManagementTools: ReadonlyArray<RegisteredTool> = [
     parseCreateIssueStatusParams,
     createIssueStatus
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

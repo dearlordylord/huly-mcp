@@ -4,6 +4,7 @@ import type { Issue as HulyIssue } from "@hcengineering/tracker"
 import { createRequire } from "node:module"
 
 const require = createRequire(import.meta.url)
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports, no-restricted-syntax -- CJS interop boundary: api-client does not expose these helpers as ESM runtime named exports under tsx.
 const apiClient = require("@hcengineering/api-client") as typeof import("@hcengineering/api-client")
 const coreModule = require("@hcengineering/core") as typeof import("@hcengineering/core")
 const core = coreModule.default
@@ -355,7 +356,7 @@ const maybeUpdateDoc = async <T extends Doc>(
   client: TxOperations,
   dryRun: boolean,
   _class: Ref<Class<T>>,
-  space: Ref<Doc["space"]>,
+  space: Doc["space"],
   objectId: Ref<T>,
   operations: DocumentUpdate<T>
 ): Promise<void> => {
@@ -366,14 +367,17 @@ const maybeRemoveDoc = async <T extends Doc>(
   client: TxOperations,
   dryRun: boolean,
   _class: Ref<Class<T>>,
-  space: Ref<Doc["space"]>,
-  objectId: Ref<T>
+  space: Doc["space"],
+  objectId: Ref<T>,
+  warnOnly = false
 ): Promise<void> => {
   if (!dryRun) {
     try {
       await client.removeDoc(_class, space, objectId)
     } catch (error) {
-      console.warn(`Warning: removeDoc failed for ${objectId}: ${error instanceof Error ? error.message : String(error)}`)
+      const message = `removeDoc failed for ${objectId}: ${error instanceof Error ? error.message : String(error)}`
+      if (!warnOnly) throw new Error(message)
+      console.warn(`Warning: ${message}`)
     }
   }
 }
@@ -388,8 +392,14 @@ const removeWorkflowArtifacts = async (
   const statusIds = uniqueRefs(artifacts.statuses.map((status) => status._id))
 
   console.log(`Project type: ${artifacts.projectType.name} (${artifacts.projectType._id})`)
-  console.log(`Matched task types: ${artifacts.taskTypes.map((taskType) => `${taskType.name} (${taskType._id})`).join(", ") || "none"}`)
-  console.log(`Matched statuses: ${artifacts.statuses.map((status) => `${status.name} (${status._id})`).join(", ") || "none"}`)
+  console.log(
+    `Matched task types: ${
+      artifacts.taskTypes.map((taskType) => `${taskType.name} (${taskType._id})`).join(", ") || "none"
+    }`
+  )
+  console.log(
+    `Matched statuses: ${artifacts.statuses.map((status) => `${status.name} (${status._id})`).join(", ") || "none"}`
+  )
 
   const issues = await findIssues(rest, taskTypeIds, statusIds, args.issueTitlePrefixes)
   if (issues.length > 0 && !args.deleteTestIssues) {
@@ -412,7 +422,7 @@ const removeWorkflowArtifacts = async (
       )
     }
   } else {
-    console.log(`${args.dryRun ? "Dry run" : "Full artifact issue cleanup"}: skipping post-delete issue usage check`)
+    console.log("Dry run: skipping post-delete issue usage check")
   }
 
   const updatedProjectTasks = artifacts.projectType.tasks.filter((taskTypeId) => !taskTypeIds.includes(taskTypeId))

@@ -1,7 +1,7 @@
-import type { ToolCategory, ToolName } from "./tools/registry.js"
+import type { ToolCategory } from "./tools/registry.js"
 
 interface ToolScopeToolDefinition {
-  readonly name: ToolName
+  readonly name: string
   readonly category: ToolCategory
 }
 
@@ -17,10 +17,10 @@ export interface ToolScopeSummary {
   readonly enabledToolsets: ReadonlyArray<ToolCategory>
   readonly ignoredToolsets: ReadonlyArray<string>
   readonly requestedTools: ReadonlyArray<string>
-  readonly enabledTools: ReadonlyArray<ToolName>
+  readonly enabledTools: ReadonlyArray<string>
   readonly ignoredTools: ReadonlyArray<string>
   readonly enabledCategories: ReadonlySet<ToolCategory>
-  readonly enabledToolNames: ReadonlySet<ToolName>
+  readonly enabledToolNames: ReadonlySet<string>
   readonly availableCategories: ReadonlyArray<ToolCategory>
   readonly visibleRegisteredToolCount: number
   readonly totalRegisteredToolCount: number

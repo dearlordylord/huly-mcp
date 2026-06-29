@@ -101,7 +101,7 @@ import {
 } from "../../huly/operations/drive.js"
 import { defineCombinedTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "drive" as const
-export const driveTools: ReadonlyArray<RegisteredTool> = [
+export const driveTools = [
   defineCombinedTool(
     {
       name: "list_drives",
@@ -396,4 +396,4 @@ export const driveTools: ReadonlyArray<RegisteredTool> = [
     parseRestoreDriveFileVersionParams,
     restoreDriveFileVersion
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

@@ -452,14 +452,19 @@ const makeContextFromEnv = (env: Record<string, string>): GetHulyContextResult =
   )
 
 const propertylessToolOutputSchema = createToolOutputSchema(Schema.Struct({ ok: Schema.String }))
+const propertylessToolDefinition = createToolDefinition({
+  name: "propertyless_tool",
+  description: "Tool with an object schema that does not declare properties.",
+  inputSchema: { type: "object" },
+  outputSchema: propertylessToolOutputSchema,
+  category: "test"
+})
 const propertylessTool: RegisteredTool = {
-  ...createToolDefinition({
-    name: "propertyless_tool",
-    description: "Tool with an object schema that does not declare properties.",
-    inputSchema: { type: "object" },
-    outputSchema: propertylessToolOutputSchema,
-    category: "test"
-  }),
+  ...propertylessToolDefinition,
+  operation: {
+    ...propertylessToolDefinition,
+    execute: () => Effect.succeed({ result: { ok: "ok" }, warnings: [] })
+  },
   handler: async () => ({
     content: [{ type: "text", text: "ok" }]
   })

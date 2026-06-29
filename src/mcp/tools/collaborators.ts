@@ -16,7 +16,7 @@ import {
 } from "../../huly/operations/collaborators.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "collaborators" as const
-export const collaboratorTools: ReadonlyArray<RegisteredTool> = [
+export const collaboratorTools = [
   defineTool(
     {
       name: "list_object_collaborators",
@@ -53,4 +53,4 @@ export const collaboratorTools: ReadonlyArray<RegisteredTool> = [
     parseRemoveObjectCollaboratorParams,
     removeObjectCollaborator
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

@@ -57,7 +57,7 @@ import {
 } from "../../huly/operations/recruiting-reviews.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "recruiting" as const
-export const recruitingExtendedTools: ReadonlyArray<RegisteredTool> = [
+export const recruitingExtendedTools = [
   defineTool(
     {
       name: "list_recruiting_applicant_matches",
@@ -210,4 +210,4 @@ export const recruitingExtendedTools: ReadonlyArray<RegisteredTool> = [
     parseDeleteRecruitingOpinionParams,
     deleteRecruitingOpinion
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

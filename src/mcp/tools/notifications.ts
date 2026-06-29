@@ -101,7 +101,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "notifications" as const
 
-export const notificationTools: ReadonlyArray<RegisteredTool> = [
+export const notificationTools = [
   defineTool(
     {
       name: "list_notification_providers",
@@ -369,4 +369,4 @@ export const notificationTools: ReadonlyArray<RegisteredTool> = [
     () => Effect.succeed({}),
     getUnreadNotificationCount
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

@@ -26,7 +26,7 @@ import {
 } from "../../huly/operations/processes.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "processes" as const
-export const processTools: ReadonlyArray<RegisteredTool> = [
+export const processTools = [
   defineTool(
     {
       name: "list_processes",
@@ -99,4 +99,4 @@ export const processTools: ReadonlyArray<RegisteredTool> = [
     parseCancelExecutionParams,
     cancelExecution
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

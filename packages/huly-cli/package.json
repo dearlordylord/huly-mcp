@@ -1,0 +1,33 @@
+{
+  "name": "@firfi/huly-cli",
+  "version": "0.43.0",
+  "description": "Huly CLI backed by the huly-mcp operation registry",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "files": [
+    "dist/index.cjs"
+  ],
+  "bin": {
+    "huly": "./dist/index.cjs"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "PKG_VERSION=$(node -p \"require('./package.json').version\") && esbuild src/index.ts --bundle --platform=node --format=cjs --outfile=dist/index.cjs --external:ws \"--define:PKG_VERSION=\\\"$PKG_VERSION\\\"\"",
+    "verify-version": "node -e \"const v=require('./package.json').version; const d=require('fs').readFileSync('dist/index.cjs','utf8'); if(!d.includes('\\\"'+v+'\\\"'))throw new Error('dist version mismatch: expected '+v)\"",
+    "prepack": "pnpm build && pnpm verify-version",
+    "prepublishOnly": "pnpm build && pnpm verify-version"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "keywords": [
+    "huly",
+    "cli",
+    "project-management",
+    "issue-tracker"
+  ],
+  "author": "dearlordylord",
+  "license": "MIT"
+}

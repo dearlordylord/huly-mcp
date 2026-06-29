@@ -89,7 +89,7 @@ import { recruitingExtendedTools } from "./recruiting-extended.js"
 import { recruitingMediaTools } from "./recruiting-media.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "recruiting" as const
-export const recruitingTools: ReadonlyArray<RegisteredTool> = [
+export const recruitingTools = [
   defineTool(
     {
       name: "list_recruiting_vacancy_types",
@@ -334,4 +334,4 @@ export const recruitingTools: ReadonlyArray<RegisteredTool> = [
   ),
   ...recruitingExtendedTools,
   ...recruitingMediaTools
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

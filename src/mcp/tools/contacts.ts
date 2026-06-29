@@ -116,7 +116,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "contacts" as const
 
-export const contactTools: ReadonlyArray<RegisteredTool> = [
+export const contactTools = [
   defineTool(
     {
       name: "list_persons",
@@ -415,4 +415,4 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
     parseRemoveOrganizationMemberParams,
     removeOrganizationMember
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

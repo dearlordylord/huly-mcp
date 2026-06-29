@@ -28,7 +28,7 @@ import {
 } from "../../huly/operations/generic-associations.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "associations" as const
-export const genericAssociationTools: ReadonlyArray<RegisteredTool> = [
+export const genericAssociationTools = [
   defineTool(
     {
       name: "list_associations",
@@ -125,4 +125,4 @@ export const genericAssociationTools: ReadonlyArray<RegisteredTool> = [
     parseDeleteRelationParams,
     deleteRelation
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

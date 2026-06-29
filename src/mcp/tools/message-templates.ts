@@ -26,7 +26,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "templates" as const
 
-export const messageTemplateTools: ReadonlyArray<RegisteredTool> = [
+export const messageTemplateTools = [
   defineTool(
     {
       name: "list_message_template_categories",
@@ -93,4 +93,4 @@ export const messageTemplateTools: ReadonlyArray<RegisteredTool> = [
     parseListMessageTemplateFieldsParams,
     listMessageTemplateFields
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

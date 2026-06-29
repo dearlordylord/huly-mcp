@@ -44,7 +44,7 @@ import {
 } from "../../huly/operations/planner.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "planner" as const
-export const plannerTools: ReadonlyArray<RegisteredTool> = [
+export const plannerTools = [
   defineTool(
     {
       name: "list_todos",
@@ -157,4 +157,4 @@ export const plannerTools: ReadonlyArray<RegisteredTool> = [
     parseUnscheduleTodoParams,
     unscheduleTodo
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

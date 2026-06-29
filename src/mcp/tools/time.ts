@@ -34,7 +34,7 @@ import {
 } from "../../huly/operations/time.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "time tracking" as const
-export const timeTools: ReadonlyArray<RegisteredTool> = [
+export const timeTools = [
   defineTool(
     {
       name: "log_time",
@@ -119,4 +119,4 @@ export const timeTools: ReadonlyArray<RegisteredTool> = [
     parseStopTimerParams,
     stopTimer
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

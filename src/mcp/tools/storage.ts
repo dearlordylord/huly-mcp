@@ -5,7 +5,7 @@ import { defineStorageTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "storage" as const
 
-export const storageTools: ReadonlyArray<RegisteredTool> = [
+export const storageTools = [
   defineStorageTool(
     {
       name: "upload_file",
@@ -18,4 +18,4 @@ export const storageTools: ReadonlyArray<RegisteredTool> = [
     parseUploadFileParams,
     uploadFile
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

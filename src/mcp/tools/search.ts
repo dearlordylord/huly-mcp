@@ -5,7 +5,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "search" as const
 
-export const searchTools: ReadonlyArray<RegisteredTool> = [
+export const searchTools = [
   defineTool(
     {
       name: "fulltext_search",
@@ -18,4 +18,4 @@ export const searchTools: ReadonlyArray<RegisteredTool> = [
     parseFulltextSearchParams,
     fulltextSearch
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

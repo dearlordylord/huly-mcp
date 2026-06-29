@@ -14,7 +14,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "projects" as const
 
-export const projectTargetPreferenceTools: ReadonlyArray<RegisteredTool> = [
+export const projectTargetPreferenceTools = [
   defineTool(
     {
       name: "list_project_target_preferences",
@@ -39,4 +39,4 @@ export const projectTargetPreferenceTools: ReadonlyArray<RegisteredTool> = [
     parseUpsertProjectTargetPreferenceParams,
     upsertProjectTargetPreference
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

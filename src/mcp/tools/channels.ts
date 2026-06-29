@@ -118,7 +118,7 @@ import {
 import { channelConversationTools } from "./channel-conversations.js"
 import { defineCombinedTool, defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "channels" as const
-export const channelTools: ReadonlyArray<RegisteredTool> = [
+export const channelTools = [
   defineTool(
     {
       name: "list_channels",
@@ -414,4 +414,4 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
     parseDeleteChatMessageAttachmentParams,
     deleteChatMessageAttachment
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

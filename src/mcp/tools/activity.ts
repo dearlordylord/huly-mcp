@@ -73,7 +73,7 @@ import {
 } from "../../huly/operations/activity.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "activity" as const
-export const activityTools: ReadonlyArray<RegisteredTool> = [
+export const activityTools = [
   defineTool(
     {
       name: "list_activity",
@@ -253,4 +253,4 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
     parseListMentionsParams,
     listMentions
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

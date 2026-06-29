@@ -30,7 +30,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "approvals" as const
 
-export const approvalRequestTools: ReadonlyArray<RegisteredTool> = [
+export const approvalRequestTools = [
   defineTool(
     {
       name: "list_approval_requests",
@@ -123,4 +123,4 @@ export const approvalRequestTools: ReadonlyArray<RegisteredTool> = [
     parseCancelApprovalRequestParams,
     cancelApprovalRequest
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

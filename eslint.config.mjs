@@ -122,17 +122,17 @@ export default [
   // TypeScript recommended
   ...tseslint.configs.recommended.map(config => ({
     ...config,
-    files: ["src/**/*.ts", "test/**/*.ts"]
+    files: ["src/**/*.ts", "packages/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"]
   })),
 
   // Effect dprint formatting rules
   ...effectEslint.configs.dprint.map(config => ({
     ...config,
-    files: ["src/**/*.ts", "test/**/*.ts"]
+    files: ["src/**/*.ts", "packages/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"]
   })),
 
   {
-    files: ["src/**/*.ts", "test/**/*.ts"],
+    files: ["src/**/*.ts", "packages/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"],
 
     plugins: {
       functional,
@@ -249,7 +249,7 @@ export default [
 
   // Dead export detection (import-x supports flat config, unlike import/no-unused-modules)
   {
-    files: ["src/**/*.ts"],
+    files: ["src/**/*.ts", "packages/**/*.ts", "scripts/**/*.ts"],
     plugins: {
       "import-x": importX
     },

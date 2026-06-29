@@ -53,7 +53,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "documents" as const
 
-export const documentTools: ReadonlyArray<RegisteredTool> = [
+export const documentTools = [
   defineTool(
     {
       name: "list_teamspaces",
@@ -188,4 +188,4 @@ export const documentTools: ReadonlyArray<RegisteredTool> = [
     parseDeleteDocumentParams,
     deleteDocument
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>
