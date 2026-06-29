@@ -96,6 +96,28 @@ build_cli_package() {
   pnpm --filter "$CLI_PACKAGE_NAME" verify-version
 }
 
+huly_env_present() {
+  [[ -n "${HULY_URL:-}" ]] \
+    && [[ -n "${HULY_WORKSPACE:-}" ]] \
+    && { [[ -n "${HULY_TOKEN:-}" ]] || { [[ -n "${HULY_EMAIL:-}" ]] && [[ -n "${HULY_PASSWORD:-}" ]]; }; }
+}
+
+run_cli_integration_gate() (
+  if ! huly_env_present && [[ -f ".env.local" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source ".env.local"
+    set +a
+  fi
+
+  if ! huly_env_present; then
+    echo "CLI release integration requires Huly env. Set HULY_URL, HULY_WORKSPACE, and either HULY_TOKEN or HULY_EMAIL/HULY_PASSWORD, or provide .env.local." >&2
+    exit 1
+  fi
+
+  HULY_CLI_TELEMETRY=0 pnpm integration:cli
+)
+
 current_branch="$(git branch --show-current)"
 if [[ "$current_branch" != "$RELEASE_BRANCH" ]]; then
   echo "Refusing production release from branch '$current_branch'; expected '$RELEASE_BRANCH'." >&2
@@ -155,7 +177,7 @@ fi
 if [[ "$cli_needs_publish" == "true" ]]; then
   build_cli_package "$cli_package_version"
   pnpm dlx "tsx@$TSX_VERSION" scripts/verify-cli-integration-coverage.ts
-  pnpm integration:cli
+  run_cli_integration_gate
 fi
 
 if [[ "$mcp_needs_publish" == "true" || "$cli_needs_publish" == "true" ]]; then

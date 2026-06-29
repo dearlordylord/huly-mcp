@@ -13,7 +13,12 @@ if [[ ! -f packages/huly-cli/dist/index.cjs ]]; then
   pnpm --filter @firfi/huly-cli build
 fi
 
-if [[ "${HULY_URL:-}" == *localhost* ]]; then
+is_container_environment() {
+  [[ -f /.dockerenv ]] && return 0
+  [[ -r /proc/1/cgroup ]] && grep -Eq "(docker|containerd|kubepods)" /proc/1/cgroup
+}
+
+if [[ "${HULY_URL:-}" == *localhost* ]] && is_container_environment; then
   export HULY_URL="${HULY_URL/localhost/host.docker.internal}"
 fi
 

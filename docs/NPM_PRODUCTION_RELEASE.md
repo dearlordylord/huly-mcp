@@ -51,6 +51,8 @@ The script runs:
 
 Run `pnpm check-all` and the local Huly integration suites before starting the production release. The publish script runs the CLI live integration gate only when the CLI package needs publishing. It does not run the full MCP integration suite automatically.
 
+For the CLI live integration gate, `pnpm local-release` uses the current Huly environment when it is already set. If it is not set, it sources `.env.local` inside the integration subprocess. The gate runs with `HULY_CLI_TELEMETRY=0` so release verification does not emit analytics.
+
 ## Rerunning After A Failed Release
 
 `pnpm local-release` is intended to be rerunnable. If it created the changeset release commit and then failed during build, verification, publish, push, or GitHub release creation, fix the underlying problem and run the same command again from clean `master`.
