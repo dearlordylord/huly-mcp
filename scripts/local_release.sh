@@ -249,7 +249,10 @@ if [[ "$mcp_needs_publish" == "true" || "$cli_needs_publish" == "true" ]]; then
 fi
 
 git push origin "$RELEASE_BRANCH"
-mapfile -t release_tags < <(git tag --points-at HEAD)
+release_tags=()
+while IFS= read -r release_tag_at_head; do
+  release_tags[${#release_tags[@]}]="$release_tag_at_head"
+done < <(git tag --points-at HEAD)
 mcp_release_tag="$MCP_PACKAGE_NAME@$mcp_package_version"
 cli_release_tag="$CLI_PACKAGE_NAME@$cli_package_version"
 add_release_tag_if_present "$mcp_release_tag"
