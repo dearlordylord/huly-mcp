@@ -30,6 +30,14 @@ export HULY_PASSWORD=yourpassword
 
 You can use `HULY_TOKEN` instead of `HULY_EMAIL` and `HULY_PASSWORD`. `HULY_CONNECTION_TIMEOUT` is also supported.
 
+Aggregate CLI analytics are enabled by default and can be disabled with:
+
+```bash
+export HULY_CLI_TELEMETRY=0
+```
+
+The CLI uses the same PostHog project as `@firfi/huly-mcp`, but events are tagged with `surface=cli` and `package_name=@firfi/huly-cli` so CLI and MCP usage can be separated. Set `HULY_CLI_TELEMETRY_DEBUG=1` to print telemetry debug logs.
+
 ## Usage
 
 Every command supports `--json`, `--input-json '<object>'`, and `--input-file path/to/input.json`. Explicit command-line flags override JSON/file input.

@@ -3,6 +3,7 @@ import type { NodeContext } from "@effect/platform-node"
 import { Effect } from "effect"
 
 import { operationRegistry } from "../../../src/mcp/tools/index.js"
+import type { TelemetryService } from "../../../src/telemetry/telemetry.js"
 import type { CliCommandSpec } from "./catalog-types.js"
 import { cliCommandCatalog, type CliToolName, isCliToolName } from "./catalog.js"
 import { buildCliCommandConfig, buildGlobalOptionsConfig, parseGlobalCommandLine } from "./cli-options.js"
@@ -17,9 +18,14 @@ interface MutableCommandNode {
   toolName: CliToolName | undefined
 }
 
-// @effect/cli subcommands are intentionally heterogeneous in parsed config.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type HulyCommand = Command.Command<any, NodeContext.NodeContext, CliInputError | CliRuntimeError, any>
+type HulyCommand = Command.Command<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generated subcommands have heterogeneous parsed config.
+  any,
+  NodeContext.NodeContext | TelemetryService,
+  CliInputError | CliRuntimeError,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generated subcommands have heterogeneous parsed config.
+  any
+>
 
 const makeNode = (name: string): MutableCommandNode => ({
   children: new Map(),

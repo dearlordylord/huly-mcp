@@ -5,13 +5,17 @@ import { describe, expect, it } from "vitest"
 
 import { buildRootCommand } from "../../packages/huly-cli/src/command-tree.js"
 import { isRootHelpRequest, renderRootHelp } from "../../packages/huly-cli/src/help.js"
+import { TelemetryService } from "../../src/telemetry/telemetry.js"
 
 const runCommand = (argv: ReadonlyArray<string>): Promise<void> =>
   Effect.runPromise(
     Command.run(buildRootCommand(argv), {
       name: "Huly CLI",
       version: "test"
-    })(["node", "huly", ...argv]).pipe(Effect.provide(NodeContext.layer))
+    })(["node", "huly", ...argv]).pipe(
+      Effect.provide(NodeContext.layer),
+      Effect.provide(TelemetryService.testLayer())
+    )
   )
 
 const rejected = async (promise: Promise<unknown>): Promise<unknown> => {

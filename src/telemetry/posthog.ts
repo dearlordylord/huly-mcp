@@ -1,13 +1,14 @@
 import { PostHog } from "posthog-node"
 
 import { VERSION } from "../version.js"
+import { mcpTelemetryContext, type TelemetryRuntimeContext } from "./context.js"
 import type { TelemetryOperations } from "./telemetry.js"
 
 const POSTHOG_API_KEY = "phc_TGfFqCGdnF0p68wuFzd5WSw1IsBvOJW0YgoMJDyZPjm"
 const SHUTDOWN_TIMEOUT_MS = 2000
 
 type SessionStartProperties = {
-  readonly transport: "stdio" | "http"
+  readonly transport: "stdio" | "http" | "cli"
   readonly auth_method: "token" | "password"
   readonly tool_count: number
   readonly toolsets: ReadonlyArray<string> | null
@@ -66,7 +67,8 @@ const defaultDependencies: PostHogTelemetryDependencies = {
 
 export const createPostHogTelemetry = (
   debug: boolean,
-  dependencies: PostHogTelemetryDependencies = defaultDependencies
+  dependencies: PostHogTelemetryDependencies = defaultDependencies,
+  context: TelemetryRuntimeContext = mcpTelemetryContext
 ): TelemetryOperations => {
   const client = dependencies.createClient()
   const sessionId = dependencies.createSessionId()
@@ -86,6 +88,8 @@ export const createPostHogTelemetry = (
         properties: {
           session_id: sessionId,
           version: VERSION,
+          package_name: context.packageName,
+          surface: context.surface,
           $ip: null,
           ...properties
         }
@@ -155,3 +159,8 @@ export const createPostHogTelemetry = (
     }
   }
 }
+
+export const createPostHogTelemetryWithContext = (
+  debug: boolean,
+  context: TelemetryRuntimeContext
+): TelemetryOperations => createPostHogTelemetry(debug, defaultDependencies, context)

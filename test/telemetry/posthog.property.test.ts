@@ -181,7 +181,14 @@ describe("createPostHogTelemetry properties", () => {
 
         expect(captures.map((entry) => entry.event)).toEqual(expectedEvents(operations))
         expect(captures.map((entry) => {
-          const { $ip: _ip, session_id: _sessionId, version: _version, ...eventProperties } = entry.properties
+          const {
+            $ip: _ip,
+            package_name: _packageName,
+            session_id: _sessionId,
+            surface: _surface,
+            version: _version,
+            ...eventProperties
+          } = entry.properties
           return eventProperties
         })).toEqual(expectedEventProperties(operations))
         expect(captures.filter((entry) => entry.event === "first_list_tools")).toHaveLength(
@@ -191,6 +198,8 @@ describe("createPostHogTelemetry properties", () => {
           expect(entry.distinctId).toBe("00000000-0000-4000-8000-000000000001")
           expect(entry.properties.session_id).toBe("00000000-0000-4000-8000-000000000001")
           expect(entry.properties.version).toBeTypeOf("string")
+          expect(entry.properties.package_name).toBe("@firfi/huly-mcp")
+          expect(entry.properties.surface).toBe("mcp")
           expect(entry.properties.$ip).toBeNull()
         }
       }),

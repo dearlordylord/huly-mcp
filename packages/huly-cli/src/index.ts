@@ -3,6 +3,7 @@ import { Command } from "@effect/cli"
 import { NodeContext, NodeRuntime } from "@effect/platform-node"
 import { Console, Effect, Logger, LogLevel } from "effect"
 
+import { TelemetryService } from "../../../src/telemetry/telemetry.js"
 import { buildRootCommand } from "./command-tree.js"
 import { isRootHelpRequest, renderRootHelp } from "./help.js"
 import { CliInputError } from "./input.js"
@@ -26,6 +27,7 @@ const main = Effect.suspend(() => {
   return isRootHelpRequest(argv) ? Console.log(renderRootHelp(cliVersion)) : makeCli(argv)(process.argv)
 }).pipe(
   Effect.provide(NodeContext.layer),
+  Effect.provide(TelemetryService.cliLayer),
   Effect.provide(Logger.minimumLogLevel(LogLevel.Warning)),
   Effect.catchAll((error) =>
     isKnownCliError(error)

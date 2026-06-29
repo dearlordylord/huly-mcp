@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest"
+import { cliTelemetryContext } from "../../src/telemetry/context.js"
 import { createPostHogTelemetry, type PostHogTelemetryDependencies } from "../../src/telemetry/posthog.js"
 import { assertAt } from "../../src/utils/assertions.js"
 import { mockFn } from "../helpers/mock-fn.js"
@@ -53,6 +54,8 @@ describe("createPostHogTelemetry", () => {
       })
       expect(call.properties.session_id).toBeTypeOf("string")
       expect(call.properties.version).toBeTypeOf("string")
+      expect(call.properties.package_name).toBe("@firfi/huly-mcp")
+      expect(call.properties.surface).toBe("mcp")
     })
 
     it("maps http transport correctly", () => {
@@ -69,6 +72,24 @@ describe("createPostHogTelemetry", () => {
       expect(call.properties.auth_method).toBe("password")
       expect(call.properties.tool_count).toBe(0)
       expect(call.properties.toolsets).toBeNull()
+    })
+
+    it("marks CLI telemetry with a distinct surface and package", () => {
+      const telemetry = createPostHogTelemetry(false, makeDependencies(), cliTelemetryContext)
+      telemetry.sessionStart({
+        transport: "cli",
+        authMethod: "token",
+        toolCount: 399,
+        toolsets: null
+      })
+
+      const call = assertAt(mockCapture.mock.calls, 0)[0]
+      expect(call.event).toBe("session_start")
+      expect(call.properties).toMatchObject({
+        package_name: "@firfi/huly-cli",
+        surface: "cli",
+        transport: "cli"
+      })
     })
   })
 

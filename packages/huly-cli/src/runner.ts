@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises"
 import * as path from "node:path"
 
-import { Effect } from "effect"
+import { Clock, Effect } from "effect"
 
 import { AttachmentId } from "../../../src/domain/schemas/shared.js"
 import { attachment } from "../../../src/huly/huly-plugins.js"
@@ -10,6 +10,7 @@ import type { ClientBundle } from "../../../src/mcp/server.js"
 import { operationRegistry, resolveAnnotations } from "../../../src/mcp/tools/index.js"
 import { formatOperationFailure, type ToolOperationSuccess } from "../../../src/mcp/tools/registry.js"
 import { buildCombinedClientLayer, buildScopedClientBundle } from "../../../src/runtime/huly-clients.js"
+import { TelemetryService } from "../../../src/telemetry/telemetry.js"
 import type { CliCommandSpec } from "./catalog-types.js"
 import { cliCommandCatalog, type CliToolName } from "./catalog.js"
 import type { CliGlobalOptions, ParsedCliCommandLine } from "./cli-options.js"
@@ -36,6 +37,18 @@ export interface CliRunnerPorts {
 }
 
 const errorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error)
+
+const jsonBytes = (value: unknown): number | undefined => {
+  try {
+    return JSON.stringify(value).length
+  } catch {
+    return undefined
+  }
+}
+
+const cliAuthMethodFromEnv = (): "token" | "password" => process.env["HULY_TOKEN"] === undefined ? "password" : "token"
+
+const cliTelemetryErrorTag = (error: CliInputError | CliRuntimeError): string => error._tag
 
 /* c8 ignore start -- production Huly storage adapter is covered by integration tests; unit tests exercise it through CliRunnerPorts. */
 const resultField = (success: ToolOperationSuccess, fieldName: string): unknown =>
@@ -110,45 +123,81 @@ export const runCliToolWithPorts = (
   ports: CliRunnerPorts,
   toolName: CliToolName,
   parsed: ParsedCliCommandLine
-): Effect.Effect<void, CliInputError | CliRuntimeError, never> =>
+): Effect.Effect<void, CliInputError | CliRuntimeError, TelemetryService> =>
   Effect.gen(function*() {
     const spec: CliCommandSpec = cliCommandCatalog[toolName]
     const operation = ports.getOperation(toolName)
+    const telemetry = yield* TelemetryService
+    const startedAt = yield* Clock.currentTimeMillis
+    let inputBytes: number | undefined
+    let outputBytes: number | undefined
 
-    const invocation = yield* buildCliInvocation(operation, spec, parsed)
-    const requiredConfirmationMessage = confirmationMessage(spec, operation)
-    if (requiredConfirmationMessage !== undefined && !invocation.globals.yes) {
-      return yield* new CliRuntimeError({ message: requiredConfirmationMessage })
-    }
-    if (invocation.globals.output !== undefined && spec.behavior?.fileOutput === undefined) {
-      return yield* new CliRuntimeError({ message: `${spec.path.join(" ")} does not support --output.` })
-    }
+    telemetry.sessionStart({
+      authMethod: cliAuthMethodFromEnv(),
+      toolCount: Object.keys(cliCommandCatalog).length,
+      toolsets: null,
+      transport: "cli"
+    })
 
-    const response = yield* ports.useClientBundle((bundle) =>
+    const captureToolCalled = (
+      status: "success" | "error",
+      errorTag?: string
+    ): Effect.Effect<void> =>
       Effect.gen(function*() {
-        const result = yield* operation.execute(
-          invocation.input,
-          bundle.hulyClient,
-          bundle.storageClient,
-          bundle.workspaceClient
-        ).pipe(
-          Effect.mapError((failure) => new CliRuntimeError({ message: formatOperationFailure(failure) }))
-        )
-
-        const fileOutput = spec.behavior?.fileOutput
-        if (fileOutput?.type === "attachment-download" && invocation.globals.output !== undefined) {
-          yield* ports.downloadAttachment(bundle, result, fileOutput.attachmentIdField, invocation.globals.output)
-        }
-
-        return result
+        const finishedAt = yield* Clock.currentTimeMillis
+        telemetry.toolCalled({
+          toolName,
+          status,
+          durationMs: finishedAt - startedAt,
+          ...(errorTag === undefined ? {} : { errorTag }),
+          ...(inputBytes === undefined ? {} : { inputBytes }),
+          ...(outputBytes === undefined ? {} : { outputBytes })
+        })
       })
-    )
 
-    yield* ports.renderSuccess(response, invocation.globals)
+    const command = Effect.gen(function*() {
+      const invocation = yield* buildCliInvocation(operation, spec, parsed)
+      inputBytes = jsonBytes(invocation.input)
+      const requiredConfirmationMessage = confirmationMessage(spec, operation)
+      if (requiredConfirmationMessage !== undefined && !invocation.globals.yes) {
+        return yield* new CliRuntimeError({ message: requiredConfirmationMessage })
+      }
+      if (invocation.globals.output !== undefined && spec.behavior?.fileOutput === undefined) {
+        return yield* new CliRuntimeError({ message: `${spec.path.join(" ")} does not support --output.` })
+      }
+
+      const response = yield* ports.useClientBundle((bundle) =>
+        Effect.gen(function*() {
+          const result = yield* operation.execute(
+            invocation.input,
+            bundle.hulyClient,
+            bundle.storageClient,
+            bundle.workspaceClient
+          ).pipe(
+            Effect.mapError((failure) => new CliRuntimeError({ message: formatOperationFailure(failure) }))
+          )
+
+          const fileOutput = spec.behavior?.fileOutput
+          if (fileOutput?.type === "attachment-download" && invocation.globals.output !== undefined) {
+            yield* ports.downloadAttachment(bundle, result, fileOutput.attachmentIdField, invocation.globals.output)
+          }
+
+          return result
+        })
+      )
+      outputBytes = jsonBytes(response.result)
+      yield* ports.renderSuccess(response, invocation.globals)
+    })
+
+    yield* command.pipe(
+      Effect.tap(() => captureToolCalled("success")),
+      Effect.tapError((error) => captureToolCalled("error", cliTelemetryErrorTag(error))),
+      Effect.ensuring(Effect.ignore(Effect.tryPromise(() => telemetry.shutdown())))
+    )
   })
 
 export const runCliTool = (
   toolName: CliToolName,
   parsed: ParsedCliCommandLine
-): Effect.Effect<void, CliInputError | CliRuntimeError, never> =>
+): Effect.Effect<void, CliInputError | CliRuntimeError, TelemetryService> =>
   runCliToolWithPorts(defaultRunnerPorts, toolName, parsed)
