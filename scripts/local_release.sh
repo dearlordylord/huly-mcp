@@ -7,6 +7,7 @@ RELEASE_BRANCH="master"
 CHANGES_DIR=".changeset"
 CHANGES_VERSION="2.30.0"
 ESBUILD_VERSION="0.27.2"
+TSX_VERSION="4.21.0"
 
 show_dist_tags() {
   local package_name="$1"
@@ -153,7 +154,7 @@ fi
 
 if [[ "$cli_needs_publish" == "true" ]]; then
   build_cli_package "$cli_package_version"
-  pnpm verify-cli-integration-coverage
+  pnpm dlx "tsx@$TSX_VERSION" scripts/verify-cli-integration-coverage.ts
   pnpm integration:cli
 fi
 

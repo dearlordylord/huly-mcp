@@ -38,7 +38,7 @@
     "integration:cli": "bash scripts/integration_test_cli.sh",
     "local-release": "bash scripts/local_release.sh",
     "verify-version": "node -e \"const v=require('./package.json').version; const d=require('fs').readFileSync('dist/index.cjs','utf8'); if(!d.includes('\\\"'+v+'\\\"'))throw new Error('dist version mismatch: expected '+v)\"",
-    "verify-cli-integration-coverage": "tsx scripts/verify-cli-integration-coverage.ts",
+    "verify-cli-integration-coverage": "pnpm dlx tsx@4.21.0 scripts/verify-cli-integration-coverage.ts",
     "verify-registry-metadata": "node scripts/sync-registry-metadata.mjs --check",
     "verify-schema-boundaries": "node scripts/verify-schema-boundaries.mjs",
     "verify-sdk-parity": "node scripts/audit-sdk-parity.mjs",
