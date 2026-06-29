@@ -5,5 +5,5 @@
     "incremental": false,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts", "packages/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"]
 }

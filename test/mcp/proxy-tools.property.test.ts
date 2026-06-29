@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Effect, Schema } from "effect"
 import * as fc from "fast-check"
 import { describe, expect, it } from "vitest"
 
@@ -25,8 +25,8 @@ const searchLimitArbitrary = fc.integer({ min: 1, max: 50 }).map(makeSearchToolL
 
 const generatedOutputSchema = createToolOutputSchema(Schema.Struct({ ok: Schema.Boolean }))
 
-const generatedTool = (name: string): RegisteredTool => ({
-  ...createToolDefinition({
+const generatedTool = (name: string): RegisteredTool => {
+  const definition = createToolDefinition({
     name,
     description: "alpha generated tool",
     inputSchema: {
@@ -36,9 +36,17 @@ const generatedTool = (name: string): RegisteredTool => ({
     },
     outputSchema: generatedOutputSchema,
     category: "generated"
-  }),
-  handler: async () => createSuccessResponse({ ok: true })
-})
+  })
+
+  return {
+    ...definition,
+    operation: {
+      ...definition,
+      execute: () => Effect.succeed({ result: { ok: true }, warnings: [] })
+    },
+    handler: async () => createSuccessResponse({ ok: true })
+  }
+}
 
 const registryFromDefinitions = (definitions: ReadonlyArray<RegisteredTool>): ToolRegistry => ({
   tools: new Map(definitions.map((tool) => [tool.name, tool])),

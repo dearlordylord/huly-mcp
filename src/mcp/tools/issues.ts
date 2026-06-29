@@ -99,7 +99,7 @@ import { addIssueRelation, listIssueRelations, removeIssueRelation } from "../..
 import { issueComponentTools } from "./issue-components.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "issues" as const
-export const issueTools: ReadonlyArray<RegisteredTool> = [
+export const issueTools = [
   defineTool(
     {
       name: "list_issues",
@@ -358,4 +358,4 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     parseUnlinkDocumentFromIssueParams,
     unlinkDocumentFromIssue
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

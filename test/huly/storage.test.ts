@@ -5,6 +5,7 @@ import * as fs from "node:fs/promises"
 import * as http from "node:http"
 import * as os from "node:os"
 import * as path from "node:path"
+import { Readable } from "node:stream"
 import { expect } from "vitest"
 import { assertAt } from "../../src/utils/assertions.js"
 
@@ -32,6 +33,9 @@ const mockPut = mockFn<
   >
 >(
   () => Promise.reject(new Error("mockPut not configured"))
+)
+const mockGet = mockFn<(objectName: string) => Promise<Readable>>(
+  () => Promise.reject(new Error("mockGet not configured"))
 )
 const mockLoadServerConfig = mockFn<HulySdkDependencies["loadServerConfig"]>(
   () => Promise.reject(new Error("mockLoadServerConfig not configured"))
@@ -80,6 +84,12 @@ describe("HulyStorageClient Service", () => {
         const url = client.getFileUrl("some-blob")
         expect(url).toContain("some-blob")
         expect(url).toContain("workspace=test")
+
+        if (client.downloadFile === undefined) {
+          throw new Error("Expected default downloadFile operation")
+        }
+        const bytes = yield* client.downloadFile("some-blob")
+        expect(bytes).toEqual(Buffer.from("test file some-blob"))
       }))
 
     it.effect("default uploadFile returns test blob", () =>
@@ -714,6 +724,7 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
 
   const setupMocksForSuccess = () => {
     mockPut.mockClear()
+    mockGet.mockClear()
     mockLoadServerConfig.mockClear()
     mockGetWorkspaceToken.mockClear()
     mockCreateStorageClient.mockClear()
@@ -740,7 +751,7 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
 
         return mockPut(objectName, data, contentType, size ?? 0) as never
       },
-      get: mockFn(),
+      get: (objectName) => mockGet(objectName) as never,
       stat: mockFn(),
       partial: mockFn(),
       remove: mockFn()
@@ -757,6 +768,7 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
           size: 42
         })
       )
+      mockGet.mockImplementation(() => Promise.resolve(Readable.from([Buffer.from("downloaded bytes")])))
 
       const layer = Layer.fresh(HulyStorageClient.layerWithDependencies).pipe(
         Layer.provide(Layer.merge(configLayer, testSdkLayer))
@@ -775,6 +787,11 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
       expect(result.url).toContain("workspace=ws-uuid-123")
       expect(result.url).toContain("file=uploaded-blob-id")
       expect(result.url).toContain("https://huly.example.com/files")
+      if (client.downloadFile === undefined) {
+        throw new Error("Expected downloadFile operation")
+      }
+      expect(yield* client.downloadFile("uploaded-blob-id")).toEqual(Buffer.from("downloaded bytes"))
+      expect(mockGet.mock.calls).toContainEqual(["uploaded-blob-id"])
 
       expect(mockLoadServerConfig.mock.calls).toContainEqual(["https://huly.example.com"])
       expect(mockGetWorkspaceToken.mock.calls).toContainEqual([
@@ -783,7 +800,7 @@ describe("HulyStorageClient.layer (real layer with mocked api-client)", () => {
         expect.any(Object)
       ])
       expect(mockCreateStorageClient.mock.calls).toContainEqual([
-        "https://huly.example.com/files",
+        "https://huly.example.com/files?workspace=ws-uuid-123&file=:blobId",
         "https://huly.example.com/upload",
         "ws-token-abc",
         "ws-uuid-123"

@@ -8,6 +8,66 @@ importers:
 
   .:
     dependencies:
+      '@hcengineering/activity':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/attachment':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/board':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/calendar':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/card':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/chunter':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/contact':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/core':
+        specifier: 0.7.26
+        version: 0.7.26
+      '@hcengineering/document':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/inventory':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/love':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/notification':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/preference':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/request':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/tags':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/task':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/templates':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/time':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/tracker':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/view':
+        specifier: 0.7.0
+        version: 0.7.0
       ws:
         specifier: ^8.18.0
         version: 8.19.0
@@ -15,6 +75,9 @@ importers:
       '@changesets/cli':
         specifier: ^2.30.0
         version: 2.30.0(@types/node@25.2.0)
+      '@effect/cli':
+        specifier: ^0.73.1
+        version: 0.73.1(@effect/platform@0.94.5(effect@3.21.4))(@effect/printer-ansi@0.49.0(@effect/typeclass@0.40.0(effect@3.21.4))(effect@3.21.4))(@effect/printer@0.49.0(@effect/typeclass@0.40.0(effect@3.21.4))(effect@3.21.4))(effect@3.21.4)
       '@effect/eslint-plugin':
         specifier: ^0.3.2
         version: 0.3.2
@@ -36,72 +99,21 @@ importers:
       '@hcengineering/account-client':
         specifier: 0.7.25
         version: 0.7.25
-      '@hcengineering/activity':
-        specifier: 0.7.0
-        version: 0.7.0
       '@hcengineering/analytics':
         specifier: 0.7.3
         version: 0.7.3
       '@hcengineering/api-client':
         specifier: 0.7.19
         version: 0.7.19(prosemirror-inputrules@1.5.1)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.6)
-      '@hcengineering/attachment':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/board':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/calendar':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/card':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/chunter':
-        specifier: 0.7.0
-        version: 0.7.0
       '@hcengineering/collaborator-client':
         specifier: 0.7.18
         version: 0.7.18
-      '@hcengineering/contact':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/core':
-        specifier: 0.7.26
-        version: 0.7.26
-      '@hcengineering/document':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/inventory':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/love':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/notification':
-        specifier: 0.7.0
-        version: 0.7.0
       '@hcengineering/platform':
         specifier: 0.7.20
         version: 0.7.20
-      '@hcengineering/preference':
-        specifier: 0.7.0
-        version: 0.7.0
       '@hcengineering/rank':
         specifier: 0.7.18
         version: 0.7.18
-      '@hcengineering/request':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/tags':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/task':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/templates':
-        specifier: 0.7.0
-        version: 0.7.0
       '@hcengineering/text':
         specifier: 0.7.19
         version: 0.7.19(prosemirror-inputrules@1.5.1)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.6)
@@ -111,16 +123,7 @@ importers:
       '@hcengineering/theme':
         specifier: 0.7.0
         version: 0.7.0
-      '@hcengineering/time':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/tracker':
-        specifier: 0.7.0
-        version: 0.7.0
       '@hcengineering/ui':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/view':
         specifier: 0.7.0
         version: 0.7.0
       '@modelcontextprotocol/sdk':
@@ -201,6 +204,72 @@ importers:
       vitest:
         specifier: latest
         version: 4.1.9(@types/node@25.2.0)(@vitest/coverage-v8@4.1.9)(vite@7.3.1(@types/node@25.2.0)(tsx@4.21.0)(yaml@2.8.2))
+
+  packages/huly-cli:
+    dependencies:
+      '@hcengineering/activity':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/attachment':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/board':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/calendar':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/card':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/chunter':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/contact':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/core':
+        specifier: 0.7.26
+        version: 0.7.26
+      '@hcengineering/document':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/inventory':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/love':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/notification':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/preference':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/request':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/tags':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/task':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/templates':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/time':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/tracker':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/view':
+        specifier: 0.7.0
+        version: 0.7.0
+      ws:
+        specifier: ^8.18.0
+        version: 8.19.0
 
 packages:
 
@@ -319,6 +388,14 @@ packages:
   '@dprint/typescript@0.91.8':
     resolution: {integrity: sha512-tuKn4leCPItox1O4uunHcQF0QllDCvPWklnNQIh2PiWWVtRAGltJJnM4Cwj5AciplosD1Hiz7vAY3ew3crLb3A==}
 
+  '@effect/cli@0.73.1':
+    resolution: {integrity: sha512-lKDNq1Dwb+f1aPbse+EPORbNhQSJvefkEeFiIdWQJB4YX/D/9cibGGA1rb4A1PHn8qJhrE376DG3d0TlszxR+w==}
+    peerDependencies:
+      '@effect/platform': ^0.94.2
+      '@effect/printer': ^0.47.0
+      '@effect/printer-ansi': ^0.47.0
+      effect: ^3.19.15
+
   '@effect/cluster@0.56.1':
     resolution: {integrity: sha512-gnrsH6kfrUjn+82j/bw1IR4yFqJqV8tc7xZvrbJPRgzANycc6K1hu3LMg548uYbUkTzD8YYyqrSatMO1mkQpzw==}
     peerDependencies:
@@ -371,6 +448,18 @@ packages:
     peerDependencies:
       effect: ^3.19.17
 
+  '@effect/printer-ansi@0.49.0':
+    resolution: {integrity: sha512-N2OyqDTqcGLKeUy2URowThoU5issZQwG/Ihv5qOYWJD0neq9qBIgC57/9BkFpTRPNSMtPHyCOk1TFj297HGLLQ==}
+    peerDependencies:
+      '@effect/typeclass': ^0.40.0
+      effect: ^3.21.0
+
+  '@effect/printer@0.49.0':
+    resolution: {integrity: sha512-hrjTuExF87wuWjOnnND1c2fKcCWhleQBVaoA7JlrU3rC7s+RYPETDOXtpgAK3/uuMCRnDhfVFQMevtKT8MBdKg==}
+    peerDependencies:
+      '@effect/typeclass': ^0.40.0
+      effect: ^3.21.0
+
   '@effect/rpc@0.73.0':
     resolution: {integrity: sha512-iMPf6tTriz8sK0l5x4koFId8Hz5nFptHYg8WqyjHGIIVLTpZxuiSqhmXZG7FnAs5N2n6uCEws4wWGcIgXNUrFg==}
     peerDependencies:
@@ -383,6 +472,11 @@ packages:
       '@effect/experimental': ^0.58.0
       '@effect/platform': ^0.94.0
       effect: ^3.19.13
+
+  '@effect/typeclass@0.40.0':
+    resolution: {integrity: sha512-L/2o2ImeqbemFlqH0b3y2PqQTFc+E0/DUnffCU8bkJUGh0yUZmh2RXuXhR8QOpfNCe718JQjI+mLnpVF2MMmaQ==}
+    peerDependencies:
+      effect: ^3.21.0
 
   '@effect/vitest@0.29.0':
     resolution: {integrity: sha512-DvWr1aeEcaZ8mtu8hNVb4e3rEYvGEwQSr7wsNrW53t6nKYjkmjRICcvVEsXUhjoCblRHSxRsRV0TOt0+UmcvaQ==}
@@ -844,9 +938,6 @@ packages:
 
   '@hcengineering/love@0.7.0':
     resolution: {integrity: sha512-oyyMxTv2s1w2usLk4bc429e+V5R1zjaxGDRZzVgsf0DPT5vr3sd1MNi73Nj91ruTPaqmE5bI7fQdG3uRG2MBzg==}
-
-  '@hcengineering/measurements@0.7.19':
-    resolution: {integrity: sha512-hw/fhqoJfchSBdGbjx+UbuOqf6omp/pjPsaabixcgw1BYO5F4X4G+b07yfZxMNf1PnLfwntCleisuNqLvjD+gw==}
 
   '@hcengineering/measurements@0.7.423':
     resolution: {integrity: sha512-miQGTdEr47ha/3cJX3MFbqbfSgnK277yTSCJ+4evTRlEAM1WvcqxBrHB+vDTJxt3enj9hCGdX39BtpLNvDR2gQ==}
@@ -2863,6 +2954,10 @@ packages:
   ini@1.3.8:
     resolution: {integrity: sha512-JV/yugV2uzW5iMRSiZAyDtQd+nxtUnjeLt0acNdw98kKLrvuRVyB80tsREOE7yvGVgalhZ6RNXCmEHkUKBKxew==}
 
+  ini@4.1.3:
+    resolution: {integrity: sha512-X7rqawQBvfdjS10YU1y1YVreA3SsLrW9dX2CewP2EbBJM4ypVNLDkO5y04gejPwKIY9lR+7r9gn3rFPt/kmWFg==}
+    engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
+
   internal-slot@1.1.0:
     resolution: {integrity: sha512-4gd7VpWNQNB4UKKCFFVcp1AVv+FMOgs9NKzjHKusc8jTMhd5eL1NqQqOpE0KzMds804/yHlglp3uxgluOqAPLw==}
     engines: {node: '>= 0.4'}
@@ -4051,6 +4146,9 @@ packages:
   token-stream@1.0.0:
     resolution: {integrity: sha512-VSsyNPPW74RpHwR8Fc21uubwHY7wMDeJLys2IX5zJNih+OnAnaifKHo+1LHT7DAdloQ7apeaaWg8l7qnf/TnEg==}
 
+  toml@3.0.0:
+    resolution: {integrity: sha512-y/mWCZinnvxjTKYhJ+pYxwD0mRLVvOtdS2Awbgxln6iEnt4rk0yBxeSBHkGJcPucRiG0e55mwWp+g/05rsrd6w==}
+
   ts-api-utils@2.4.0:
     resolution: {integrity: sha512-3TaVTaAv2gTiMB35i3FiGJaRfwb3Pyn/j3m/bfAvGe8FB7CF6u+LMYqYlDh7reQf7UNvoTvdfAqHGmPGOSsPmA==}
     engines: {node: '>=18.12'}
@@ -4524,6 +4622,16 @@ snapshots:
 
   '@dprint/typescript@0.91.8': {}
 
+  '@effect/cli@0.73.1(@effect/platform@0.94.5(effect@3.21.4))(@effect/printer-ansi@0.49.0(@effect/typeclass@0.40.0(effect@3.21.4))(effect@3.21.4))(@effect/printer@0.49.0(@effect/typeclass@0.40.0(effect@3.21.4))(effect@3.21.4))(effect@3.21.4)':
+    dependencies:
+      '@effect/platform': 0.94.5(effect@3.21.4)
+      '@effect/printer': 0.49.0(@effect/typeclass@0.40.0(effect@3.21.4))(effect@3.21.4)
+      '@effect/printer-ansi': 0.49.0(@effect/typeclass@0.40.0(effect@3.21.4))(effect@3.21.4)
+      effect: 3.21.4
+      ini: 4.1.3
+      toml: 3.0.0
+      yaml: 2.8.2
+
   '@effect/cluster@0.56.1(@effect/platform@0.94.5(effect@3.21.4))(@effect/rpc@0.73.0(@effect/platform@0.94.5(effect@3.21.4))(effect@3.21.4))(@effect/sql@0.49.0(@effect/experimental@0.58.0(@effect/platform@0.94.5(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.94.5(effect@3.21.4))(effect@3.21.4))(@effect/workflow@0.16.0(@effect/experimental@0.58.0(@effect/platform@0.94.5(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.94.5(effect@3.21.4))(@effect/rpc@0.73.0(@effect/platform@0.94.5(effect@3.21.4))(effect@3.21.4))(effect@3.21.4))(effect@3.21.4)':
     dependencies:
       '@effect/platform': 0.94.5(effect@3.21.4)
@@ -4583,6 +4691,17 @@ snapshots:
       msgpackr: 1.11.8
       multipasta: 0.2.7
 
+  '@effect/printer-ansi@0.49.0(@effect/typeclass@0.40.0(effect@3.21.4))(effect@3.21.4)':
+    dependencies:
+      '@effect/printer': 0.49.0(@effect/typeclass@0.40.0(effect@3.21.4))(effect@3.21.4)
+      '@effect/typeclass': 0.40.0(effect@3.21.4)
+      effect: 3.21.4
+
+  '@effect/printer@0.49.0(@effect/typeclass@0.40.0(effect@3.21.4))(effect@3.21.4)':
+    dependencies:
+      '@effect/typeclass': 0.40.0(effect@3.21.4)
+      effect: 3.21.4
+
   '@effect/rpc@0.73.0(@effect/platform@0.94.5(effect@3.21.4))(effect@3.21.4)':
     dependencies:
       '@effect/platform': 0.94.5(effect@3.21.4)
@@ -4595,6 +4714,10 @@ snapshots:
       '@effect/platform': 0.94.5(effect@3.21.4)
       effect: 3.21.4
       uuid: 11.1.1
+
+  '@effect/typeclass@0.40.0(effect@3.21.4)':
+    dependencies:
+      effect: 3.21.4
 
   '@effect/vitest@0.29.0(effect@3.21.4)(vitest@4.1.9)':
     dependencies:
@@ -4872,8 +4995,8 @@ snapshots:
       '@hcengineering/contact': 0.7.0
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.423
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/preference': 0.7.0
+      '@hcengineering/ui': 0.7.0
       '@hcengineering/view': 0.7.0
 
   '@hcengineering/analytics@0.7.3':
@@ -4909,8 +5032,8 @@ snapshots:
     dependencies:
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.423
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/preference': 0.7.0
+      '@hcengineering/ui': 0.7.0
       '@hcengineering/workbench': 0.7.0
 
   '@hcengineering/board@0.7.0':
@@ -4918,10 +5041,10 @@ snapshots:
       '@hcengineering/contact': 0.7.0
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.423
+      '@hcengineering/preference': 0.7.0
       '@hcengineering/tags': 0.7.0
       '@hcengineering/task': 0.7.0
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/ui': 0.7.0
       '@hcengineering/view': 0.7.0
 
   '@hcengineering/calendar@0.7.0':
@@ -4930,16 +5053,16 @@ snapshots:
       '@hcengineering/core': 0.7.26
       '@hcengineering/notification': 0.7.0
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.423
+      '@hcengineering/preference': 0.7.0
       '@hcengineering/setting': 0.7.0
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/ui': 0.7.0
 
   '@hcengineering/card@0.7.0':
     dependencies:
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.423
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/preference': 0.7.0
+      '@hcengineering/ui': 0.7.0
       '@hcengineering/view': 0.7.0
 
   '@hcengineering/chunter@0.7.0':
@@ -4949,7 +5072,7 @@ snapshots:
       '@hcengineering/core': 0.7.26
       '@hcengineering/notification': 0.7.0
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/ui': 0.7.0
       '@hcengineering/view': 0.7.0
       '@hcengineering/workbench': 0.7.0
       fast-equals: 5.4.0
@@ -4977,15 +5100,15 @@ snapshots:
       '@hcengineering/card': 0.7.0
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.423
+      '@hcengineering/preference': 0.7.0
       '@hcengineering/templates': 0.7.0
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/ui': 0.7.0
       '@hcengineering/view': 0.7.0
 
   '@hcengineering/core@0.7.26':
     dependencies:
       '@hcengineering/analytics': 0.7.423
-      '@hcengineering/measurements': 0.7.19
+      '@hcengineering/measurements': 0.7.423
       '@hcengineering/platform': 0.7.20
       fast-equals: 5.4.0
 
@@ -5003,8 +5126,8 @@ snapshots:
       '@hcengineering/core': 0.7.26
       '@hcengineering/notification': 0.7.0
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.423
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/preference': 0.7.0
+      '@hcengineering/ui': 0.7.0
       '@hcengineering/view': 0.7.0
 
   '@hcengineering/drive@0.7.423':
@@ -5027,12 +5150,10 @@ snapshots:
       '@hcengineering/drive': 0.7.423
       '@hcengineering/notification': 0.7.0
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.423
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/preference': 0.7.0
+      '@hcengineering/ui': 0.7.0
       '@hcengineering/view': 0.7.0
       '@hcengineering/workbench': 0.7.0
-
-  '@hcengineering/measurements@0.7.19': {}
 
   '@hcengineering/measurements@0.7.423': {}
 
@@ -5042,9 +5163,9 @@ snapshots:
       '@hcengineering/contact': 0.7.0
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.423
+      '@hcengineering/preference': 0.7.0
       '@hcengineering/setting': 0.7.0
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/ui': 0.7.0
       '@hcengineering/view': 0.7.0
 
   '@hcengineering/platform@0.7.20':
@@ -5059,7 +5180,7 @@ snapshots:
     dependencies:
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/ui': 0.7.0
 
   '@hcengineering/preference@0.7.423':
     dependencies:
@@ -5092,13 +5213,13 @@ snapshots:
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
       '@hcengineering/templates': 0.7.0
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/ui': 0.7.0
 
   '@hcengineering/tags@0.7.0':
     dependencies:
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/ui': 0.7.0
       '@hcengineering/view': 0.7.0
 
   '@hcengineering/task@0.7.0':
@@ -5108,14 +5229,14 @@ snapshots:
       '@hcengineering/notification': 0.7.0
       '@hcengineering/platform': 0.7.20
       '@hcengineering/rank': 0.7.18
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/ui': 0.7.0
       '@hcengineering/view': 0.7.0
 
   '@hcengineering/templates@0.7.0':
     dependencies:
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/ui': 0.7.0
 
   '@hcengineering/text-core@0.7.19':
     dependencies:
@@ -5203,7 +5324,7 @@ snapshots:
       '@hcengineering/platform': 0.7.20
       '@hcengineering/rank': 0.7.18
       '@hcengineering/task': 0.7.0
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/ui': 0.7.0
 
   '@hcengineering/tracker@0.7.0':
     dependencies:
@@ -5212,11 +5333,11 @@ snapshots:
       '@hcengineering/contact': 0.7.0
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.423
+      '@hcengineering/preference': 0.7.0
       '@hcengineering/tags': 0.7.0
       '@hcengineering/task': 0.7.0
       '@hcengineering/time': 0.7.0
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/ui': 0.7.0
       '@hcengineering/view': 0.7.0
       lexorank: 1.0.5
 
@@ -5256,16 +5377,16 @@ snapshots:
     dependencies:
       '@hcengineering/core': 0.7.26
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.423
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/preference': 0.7.0
+      '@hcengineering/ui': 0.7.0
 
   '@hcengineering/workbench@0.7.0':
     dependencies:
       '@hcengineering/core': 0.7.26
       '@hcengineering/notification': 0.7.0
       '@hcengineering/platform': 0.7.20
-      '@hcengineering/preference': 0.7.423
-      '@hcengineering/ui': 0.7.423
+      '@hcengineering/preference': 0.7.0
+      '@hcengineering/ui': 0.7.0
       '@hcengineering/view': 0.7.0
 
   '@hono/node-server@1.19.14(hono@4.12.23)':
@@ -7346,6 +7467,8 @@ snapshots:
 
   ini@1.3.8: {}
 
+  ini@4.1.3: {}
+
   internal-slot@1.1.0:
     dependencies:
       es-errors: 1.3.0
@@ -8704,6 +8827,8 @@ snapshots:
   toidentifier@1.0.1: {}
 
   token-stream@1.0.0: {}
+
+  toml@3.0.0: {}
 
   ts-api-utils@2.4.0(typescript@5.9.3):
     dependencies:

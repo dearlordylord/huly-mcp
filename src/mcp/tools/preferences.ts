@@ -11,7 +11,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "preferences" as const
 
-export const preferenceTools: ReadonlyArray<RegisteredTool> = [
+export const preferenceTools = [
   defineTool(
     {
       name: "list_space_preferences",
@@ -36,4 +36,4 @@ export const preferenceTools: ReadonlyArray<RegisteredTool> = [
     parseGetSpacePreferenceParams,
     getSpacePreference
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

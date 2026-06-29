@@ -8,7 +8,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "issues" as const
 
-export const deletionTools: ReadonlyArray<RegisteredTool> = [
+export const deletionTools = [
   defineTool(
     {
       name: "preview_deletion",
@@ -21,4 +21,4 @@ export const deletionTools: ReadonlyArray<RegisteredTool> = [
     parsePreviewDeletionParams,
     previewDeletion
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

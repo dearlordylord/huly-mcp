@@ -58,7 +58,7 @@ import {
 } from "../../huly/operations/inventory.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "inventory" as const
-export const inventoryTools: ReadonlyArray<RegisteredTool> = [
+export const inventoryTools = [
   defineTool(
     {
       name: "list_inventory_categories",
@@ -239,4 +239,4 @@ export const inventoryTools: ReadonlyArray<RegisteredTool> = [
     parseDeleteInventoryVariantParams,
     deleteInventoryVariant
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

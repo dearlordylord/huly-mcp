@@ -54,7 +54,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "virtual-office" as const
 
-export const virtualOfficeTools: ReadonlyArray<RegisteredTool> = [
+export const virtualOfficeTools = [
   defineTool(
     {
       name: "list_office_floors",
@@ -190,4 +190,4 @@ export const virtualOfficeTools: ReadonlyArray<RegisteredTool> = [
     parseListOfficeDefaultsParams,
     listOfficeDefaults
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

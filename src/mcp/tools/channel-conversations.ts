@@ -40,7 +40,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "channels" as const
 
-export const channelConversationTools: ReadonlyArray<RegisteredTool> = [
+export const channelConversationTools = [
   defineTool(
     {
       name: "list_channel_members",
@@ -160,4 +160,4 @@ export const channelConversationTools: ReadonlyArray<RegisteredTool> = [
     parseSetConversationClosedParams,
     setConversationClosed
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

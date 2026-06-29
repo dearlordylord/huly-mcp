@@ -1,0 +1,53 @@
+{
+  "name": "@firfi/huly-cli",
+  "version": "0.43.0",
+  "description": "Huly CLI backed by the huly-mcp operation registry",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "files": [
+    "dist/index.cjs"
+  ],
+  "bin": {
+    "huly": "./dist/index.cjs"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "PKG_VERSION=$(node -p \"require('./package.json').version\") && esbuild src/index.ts --bundle --platform=node --format=cjs --outfile=dist/index.cjs --external:ws \"--define:PKG_VERSION=\\\"$PKG_VERSION\\\"\"",
+    "verify-version": "node -e \"const v=require('./package.json').version; const d=require('fs').readFileSync('dist/index.cjs','utf8'); if(!d.includes('\\\"'+v+'\\\"'))throw new Error('dist version mismatch: expected '+v)\"",
+    "prepack": "pnpm build && pnpm verify-version",
+    "prepublishOnly": "pnpm build && pnpm verify-version"
+  },
+  "dependencies": {
+    "@hcengineering/activity": "0.7.0",
+    "@hcengineering/attachment": "0.7.0",
+    "@hcengineering/board": "0.7.0",
+    "@hcengineering/calendar": "0.7.0",
+    "@hcengineering/card": "0.7.0",
+    "@hcengineering/chunter": "0.7.0",
+    "@hcengineering/contact": "0.7.0",
+    "@hcengineering/core": "0.7.26",
+    "@hcengineering/document": "0.7.0",
+    "@hcengineering/inventory": "0.7.0",
+    "@hcengineering/love": "0.7.0",
+    "@hcengineering/notification": "0.7.0",
+    "@hcengineering/preference": "0.7.0",
+    "@hcengineering/request": "0.7.0",
+    "@hcengineering/tags": "0.7.0",
+    "@hcengineering/task": "0.7.0",
+    "@hcengineering/templates": "0.7.0",
+    "@hcengineering/time": "0.7.0",
+    "@hcengineering/tracker": "0.7.0",
+    "@hcengineering/view": "0.7.0",
+    "ws": "^8.18.0"
+  },
+  "keywords": [
+    "huly",
+    "cli",
+    "project-management",
+    "issue-tracker"
+  ],
+  "author": "dearlordylord",
+  "license": "MIT"
+}

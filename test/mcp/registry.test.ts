@@ -1,7 +1,7 @@
 import { describe, it } from "@effect/vitest"
 import type { AccountUuid, FindResult, PersonId } from "@hcengineering/core"
 import { toFindResult } from "@hcengineering/core"
-import { Effect, Schema } from "effect"
+import { Cause, Effect, Schema } from "effect"
 import { expect } from "vitest"
 
 import type { HulyClientOperations } from "../../src/huly/client.js"
@@ -21,6 +21,7 @@ import {
   defineStorageTool,
   defineTool,
   defineWorkspaceTool,
+  formatOperationFailure,
   type RegisteredTool
 } from "../../src/mcp/tools/registry.js"
 import { assertAt } from "../../src/utils/assertions.js"
@@ -45,6 +46,12 @@ const toolInputSchema = {
 }
 
 const makeToolHandler = (tool: RegisteredTool) => tool.handler
+
+type OperationFailure = Parameters<typeof formatOperationFailure>[0]
+
+const operationFailure = (failure: unknown): OperationFailure => {
+  return failure as OperationFailure
+}
 
 const noopHulyClient: HulyClientOperations = {
   getAccountUuid: () => "00000000-0000-4000-8000-000000000000" as AccountUuid,
@@ -86,6 +93,62 @@ const noopWorkspaceClient: WorkspaceClientOperations = {
   updateAllowGuestSignUp: () => Effect.die(new Error("not implemented")),
   getRegionInfo: () => Effect.succeed([])
 }
+
+describe("formatOperationFailure", () => {
+  it.effect("formats parse, domain, output, and provision failures", () =>
+    Effect.gen(function*() {
+      const parseError = yield* Schema.decodeUnknown(Params)({}).pipe(Effect.flip)
+
+      expect(
+        formatOperationFailure(operationFailure({
+          _tag: "ToolParseFailure",
+          cause: Cause.fail(parseError),
+          toolName: "test_tool"
+        }))
+      ).toContain("Invalid parameters for test_tool")
+      expect(
+        formatOperationFailure(operationFailure({
+          _tag: "ToolParseFailure",
+          cause: Cause.empty,
+          toolName: "test_tool"
+        }))
+      ).toBe("An unexpected error occurred")
+      expect(
+        formatOperationFailure(operationFailure({
+          _tag: "ToolParseFailure",
+          cause: Cause.sequential(Cause.empty, Cause.fail(parseError)),
+          toolName: "test_tool"
+        }))
+      ).toContain("Invalid parameters for test_tool")
+      expect(
+        formatOperationFailure(operationFailure({
+          _tag: "ToolDomainFailure",
+          cause: Cause.fail(new HulyError({ message: "domain failed" })),
+          warnings: []
+        }))
+      ).toBe("domain failed")
+      expect(
+        formatOperationFailure(operationFailure({
+          _tag: "ToolDomainFailure",
+          cause: Cause.empty,
+          warnings: []
+        }))
+      ).toBe("An unexpected error occurred")
+      expect(
+        formatOperationFailure(operationFailure({
+          _tag: "ToolOutputFailure",
+          toolName: "test_tool",
+          warnings: []
+        }))
+      ).toBe("Tool test_tool produced invalid output")
+      expect(
+        formatOperationFailure(operationFailure({
+          _tag: "ToolProvisionFailure",
+          error: new HulyError({ message: "provision failed" })
+        }))
+      ).toBe("provision failed")
+    }))
+})
 
 describe("defineTool", () => {
   it.effect("returns encoded success response on valid input", () =>

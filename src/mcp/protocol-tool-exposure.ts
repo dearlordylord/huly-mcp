@@ -12,7 +12,7 @@ import {
 } from "./tool-mode.js"
 import type { ToolRegistry } from "./tools/index.js"
 import { resolveAnnotations } from "./tools/index.js"
-import type { RegisteredTool, ToolDescription, ToolName } from "./tools/registry.js"
+import type { RegisteredTool } from "./tools/registry.js"
 
 export interface ProtocolToolRegistries {
   readonly fullRegistry: ToolRegistry
@@ -44,8 +44,8 @@ type ProtocolObjectSchema = ListToolsResult["tools"][number]["inputSchema"]
 type ListedTool = ListToolsResult["tools"][number]
 
 interface ListedToolSource {
-  readonly name: ToolName
-  readonly description: ToolDescription
+  readonly name: string
+  readonly description: string
   readonly inputSchema: ProtocolObjectSchemaSource
   readonly outputSchema?: ProtocolObjectSchemaSource
   readonly annotations?: ListedTool["annotations"]
@@ -58,7 +58,7 @@ const DEFAULT_HANDLER_EXPOSURE_CONFIG: ToolExposureConfig = {
 }
 
 const emptyToolRegistry: ToolRegistry = {
-  tools: new Map<ToolName, RegisteredTool>(),
+  tools: new Map<string, RegisteredTool>(),
   definitions: [],
   handleToolCall: async () => null
 }

@@ -231,9 +231,9 @@ For HTTP header mode, send the same JSON-RPC methods to `/mcp` with `x-huly-url`
 
 ## Full Integration Test Suite
 
-**Coverage**: 120+ tool calls across 22 domains. Self-cleaning: all created entities are deleted at the end of each section. Tools that would leak data (no delete counterpart) are skipped. Run time: ~3 minutes.
+**Coverage**: 800+ tool calls across 22 domains. Self-cleaning: all created entities are deleted at the end of each section. Tools that would leak data (no delete counterpart) are skipped. Run time: ~3 minutes.
 
-**Last verified**: 2026-06-07 — 317 passed, 0 failed, 37 skipped (of 354 total).
+**Last verified**: 2026-06-29 — 792 passed, 0 failed, 27 skipped (of 819 total).
 
 ### How to Run
 
@@ -246,6 +246,23 @@ bash scripts/integration_test_full.sh
 The script requires `jq` for JSON parsing.
 
 The script is a native-tool lifecycle suite, not a proxy exposure suite. It selects `HULY_TOOL_MODE=native` by default so the documented command works with the new `auto` default, where unknown or generic clients resolve to proxy mode.
+
+## CLI Integration Test Suite
+
+The standalone CLI has its own live integration suite. This is required before publishing `@firfi/huly-cli`, the same way the MCP full suite is required before publishing MCP changes.
+
+```bash
+pnpm build
+pnpm verify-cli-integration-coverage
+set -a && source .env.local && set +a
+HULY_URL="${HULY_URL/localhost/host.docker.internal}" pnpm integration:cli
+```
+
+`scripts/integration_test_cli.sh` exercises the built CLI binary directly, not MCP JSON-RPC. It verifies JSON output and self-cleaning CLI lifecycles for projects, teamspaces, issues, comments, documents, attachments, and search, plus broad read-only coverage across activity, boards, channels, contacts, notifications, spaces, templates, calendar, cards, drive, inventory, leads, planner, recruiting, tests, office, associations, custom fields, processes, user statuses, and workspace info.
+
+`pnpm verify-cli-integration-coverage` is the drift gate. It parses live tool names from `cover_cli_json` / `capture_cli_json` calls in `scripts/integration_test_cli.sh` and compares them with the CLI catalog plus `scripts/cli-integration-deferred-tools.txt`. Any new CLI command must be added to the live CLI integration suite or explicitly deferred in that ledger. Stale covered/deferred names, duplicate deferred names, and commands listed in both places fail the check.
+
+`scripts/local_release.sh` runs both `pnpm verify-cli-integration-coverage` and `pnpm integration:cli` before `changesets publish`, so a local release cannot publish the CLI package without the live CLI gate passing.
 
 ### What It Tests
 

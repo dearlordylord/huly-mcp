@@ -40,7 +40,7 @@ import {
 } from "../../huly/operations/sdk-discovery.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "sdk-discovery" as const
-export const sdkDiscoveryTools: ReadonlyArray<RegisteredTool> = [
+export const sdkDiscoveryTools = [
   defineTool(
     {
       name: "list_huly_classes",
@@ -137,4 +137,4 @@ export const sdkDiscoveryTools: ReadonlyArray<RegisteredTool> = [
     parseDescribeHulySpaceTypeCapabilitiesParams,
     describeHulySpaceTypeCapabilities
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

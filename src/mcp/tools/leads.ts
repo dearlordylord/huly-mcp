@@ -14,7 +14,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "leads" as const
 
-export const leadTools: ReadonlyArray<RegisteredTool> = [
+export const leadTools = [
   defineTool(
     {
       name: "list_funnels",
@@ -51,4 +51,4 @@ export const leadTools: ReadonlyArray<RegisteredTool> = [
     parseGetLeadParams,
     getLead
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

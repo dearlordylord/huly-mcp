@@ -20,7 +20,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "comments" as const
 
-export const commentTools: ReadonlyArray<RegisteredTool> = [
+export const commentTools = [
   defineTool(
     {
       name: "list_comments",
@@ -67,4 +67,4 @@ export const commentTools: ReadonlyArray<RegisteredTool> = [
     parseDeleteCommentParams,
     deleteComment
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

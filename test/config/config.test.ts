@@ -696,6 +696,38 @@ describe("Config Module", () => {
         })
       }))
 
+    it.effect("reports unsafe integer timeout values as invalid", () =>
+      Effect.gen(function*() {
+        const timeout = String(Number.MAX_SAFE_INTEGER + 1)
+        const envContext = sanitizeHulyRuntimeConfigFromEnv({
+          HULY_CONNECTION_TIMEOUT: timeout
+        })
+        const headerContext = sanitizeHulyRuntimeConfigFromHeaders({
+          "x-huly-connection-timeout": timeout
+        })
+
+        expect(envContext.huly.connectionTimeout).toEqual({
+          configured: true,
+          valid: false,
+          defaultMs: HulyConfigService.DEFAULT_TIMEOUT,
+          source: "invalid"
+        })
+        expect(headerContext.huly.connectionTimeout).toEqual({
+          configured: true,
+          valid: false,
+          defaultMs: HulyConfigService.DEFAULT_TIMEOUT,
+          source: "invalid"
+        })
+      }))
+
+    it.effect("ignores non-record header input during runtime context inspection", () =>
+      Effect.gen(function*() {
+        const context = sanitizeHulyRuntimeConfigFromHeaders("not headers")
+
+        expect(context.configSources.headers).toMatchObject({ present: false })
+        expect(context.auth).toMatchObject({ method: "unknown", source: "none" })
+      }))
+
     it.effect("reports array header values as configured but invalid for URL and timeout", () =>
       Effect.gen(function*() {
         const context = sanitizeHulyRuntimeConfigFromHeaders({

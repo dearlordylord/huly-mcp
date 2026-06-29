@@ -1,12 +1,12 @@
-import type { TxOperations } from "@hcengineering/core"
+import type { MarkupBlobRef, Ref, TxOperations } from "@hcengineering/core"
 import type { Document as HulyDocument } from "@hcengineering/document"
 import { createRequire } from "node:module"
 
+import { documentPlugin } from "../src/huly/huly-plugins.js"
+
 const require = createRequire(import.meta.url)
-// CJS interop boundary: createRequire returns unknown, while this package exposes the same runtime API as its TS import type.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports, no-restricted-syntax -- CJS interop boundary: api-client does not expose these helpers as ESM runtime named exports under tsx.
 const apiClient = require("@hcengineering/api-client") as typeof import("@hcengineering/api-client")
-// CJS interop boundary: createRequire returns unknown, while the document plugin is a CommonJS default export.
-const documentPlugin = require("@hcengineering/document").default as typeof import("@hcengineering/document").default
 
 interface Args {
   readonly content: string
@@ -82,9 +82,14 @@ const connect = async (): Promise<TxOperations> => {
 }
 
 const corruptDocumentContent = async (client: TxOperations, args: Args): Promise<void> => {
+  // Integration corruption helper: CLI strings intentionally become Huly branded refs at this boundary.
+  // eslint-disable-next-line no-restricted-syntax -- SDK boundary: Huly brands document ids as Ref<T>, while script input is a string.
+  const documentId = args.documentId as Ref<HulyDocument>
+  // eslint-disable-next-line no-restricted-syntax -- SDK boundary: this helper deliberately writes raw markdown into a branded markup field.
+  const content = args.content as MarkupBlobRef
   const docs = await client.findAll<HulyDocument>(
     documentPlugin.class.Document,
-    { _id: args.documentId },
+    { _id: documentId },
     { limit: 1 }
   )
   const doc = docs[0]
@@ -96,7 +101,7 @@ const corruptDocumentContent = async (client: TxOperations, args: Args): Promise
     documentPlugin.class.Document,
     doc.space,
     doc._id,
-    { content: args.content }
+    { content }
   )
 }
 

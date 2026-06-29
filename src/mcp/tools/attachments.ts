@@ -72,7 +72,7 @@ import {
 } from "../../huly/operations/attachments.js"
 import { defineCombinedTool, defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "attachments" as const
-export const attachmentTools: ReadonlyArray<RegisteredTool> = [
+export const attachmentTools = [
   defineTool(
     {
       name: "list_attachments",
@@ -264,4 +264,4 @@ export const attachmentTools: ReadonlyArray<RegisteredTool> = [
     parseDeleteDrawingParams,
     deleteDrawing
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

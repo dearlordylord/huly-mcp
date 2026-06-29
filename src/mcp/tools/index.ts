@@ -32,7 +32,7 @@ import { processTools } from "./processes.js"
 import { projectTargetPreferenceTools } from "./project-target-preferences.js"
 import { projectTools } from "./projects.js"
 import { recruitingTools } from "./recruiting.js"
-import type { RegisteredTool, ToolCategory, ToolDefinition, ToolName } from "./registry.js"
+import type { RegisteredTool, ToolCategory, ToolDefinition } from "./registry.js"
 import {
   createMissingArgumentsError,
   createUnexpectedArgumentsError,
@@ -57,7 +57,7 @@ import { viewTools } from "./views.js"
 import { virtualOfficeTools } from "./virtual-office.js"
 import { workspaceTools } from "./workspace.js"
 
-const allTools: ReadonlyArray<RegisteredTool> = [
+export const allTools = [
   ...projectTools,
   ...projectTargetPreferenceTools,
   ...issueTools,
@@ -103,20 +103,33 @@ const allTools: ReadonlyArray<RegisteredTool> = [
   ...taskManagementTools,
   ...testManagementCoreTools,
   ...testManagementPlansTools
-]
+] as const satisfies ReadonlyArray<RegisteredTool>
+
+export type McpToolName = typeof allTools[number]["name"]
 
 export const CATEGORY_NAMES: ReadonlySet<ToolCategory> = new Set(
   allTools.map((t) => t.category)
 )
 
 type ToolRegistryData = {
-  readonly tools: ReadonlyMap<ToolName, RegisteredTool>
+  readonly tools: ReadonlyMap<string, RegisteredTool>
   readonly definitions: ReadonlyArray<ToolDefinition>
 }
 
+type OperationRegistryData = {
+  readonly operations: ReadonlyMap<McpToolName, RegisteredTool<McpToolName>["operation"]>
+  readonly definitions: ReadonlyArray<ToolDefinition>
+}
+
+type OperationRegistryMethods = {
+  readonly getOperation: (name: McpToolName) => RegisteredTool<McpToolName>["operation"]
+}
+
+type OperationRegistry = OperationRegistryData & OperationRegistryMethods
+
 type ToolRegistryMethods = {
   readonly handleToolCall: (
-    toolName: ToolName,
+    toolName: string,
     args: unknown,
     hulyClient: HulyClient["Type"],
     storageClient: HulyStorageClient["Type"],
@@ -129,11 +142,11 @@ export type ToolRegistry = ToolRegistryData & ToolRegistryMethods
 interface ToolRegistryScope {
   readonly filteringActive: boolean
   readonly categories: ReadonlySet<ToolCategory>
-  readonly toolNames: ReadonlySet<ToolName>
+  readonly toolNames: ReadonlySet<string>
 }
 
 const buildRegistry = (tools: ReadonlyArray<RegisteredTool>): ToolRegistry => {
-  const map = new Map<ToolName, RegisteredTool>(
+  const map = new Map<string, RegisteredTool>(
     tools.map((t) => [t.name, t])
   )
   return {
@@ -155,6 +168,25 @@ const buildRegistry = (tools: ReadonlyArray<RegisteredTool>): ToolRegistry => {
 
 export const toolRegistry: ToolRegistry = buildRegistry(allTools)
 
+const buildOperationRegistry = (tools: ReadonlyArray<RegisteredTool<McpToolName>>): OperationRegistry => {
+  const operations = new Map<McpToolName, RegisteredTool<McpToolName>["operation"]>(
+    tools.map((tool) => [tool.name, tool.operation])
+  )
+  return {
+    operations,
+    definitions: tools.map((tool) => tool.operation),
+    getOperation: (name) => {
+      const operation = operations.get(name)
+      if (operation === undefined) {
+        throw new Error(`Operation registry is missing MCP tool: ${name}`)
+      }
+      return operation
+    }
+  }
+}
+
+export const operationRegistry: OperationRegistry = buildOperationRegistry(allTools)
+
 export const createScopedRegistry = (scope: ToolRegistryScope): ToolRegistry => {
   if (!scope.filteringActive) return toolRegistry
 
@@ -167,7 +199,7 @@ export const createFilteredRegistry = (categories: ReadonlySet<ToolCategory>): T
   createScopedRegistry({
     filteringActive: true,
     categories,
-    toolNames: new Set<ToolName>()
+    toolNames: new Set<string>()
   })
 
 export { resolveAnnotations }

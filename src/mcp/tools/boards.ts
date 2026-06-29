@@ -103,7 +103,7 @@ import {
 } from "../../huly/operations/boards.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "boards" as const
-export const boardTools: ReadonlyArray<RegisteredTool> = [
+export const boardTools = [
   defineTool(
     {
       name: "list_boards",
@@ -404,4 +404,4 @@ export const boardTools: ReadonlyArray<RegisteredTool> = [
     parseGetBoardCommonPreferenceParams,
     getBoardCommonPreference
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

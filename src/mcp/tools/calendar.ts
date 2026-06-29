@@ -69,7 +69,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "calendar" as const
 
-export const calendarTools: ReadonlyArray<RegisteredTool> = [
+export const calendarTools = [
   defineTool(
     {
       name: "list_events",
@@ -238,4 +238,4 @@ export const calendarTools: ReadonlyArray<RegisteredTool> = [
     parseListEventInstancesParams,
     listEventInstances
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

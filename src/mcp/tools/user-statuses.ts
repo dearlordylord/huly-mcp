@@ -3,7 +3,7 @@ import { ListUserStatusesResultSchema } from "../../domain/schemas/user-statuses
 import { listUserStatuses } from "../../huly/operations/user-statuses.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "user-statuses" as const
-export const userStatusTools: ReadonlyArray<RegisteredTool> = [
+export const userStatusTools = [
   defineTool(
     {
       name: "list_user_statuses",
@@ -16,4 +16,4 @@ export const userStatusTools: ReadonlyArray<RegisteredTool> = [
     parseListUserStatusesParams,
     listUserStatuses
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

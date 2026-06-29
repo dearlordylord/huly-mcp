@@ -46,7 +46,7 @@ import {
 } from "../../huly/operations/workspace.js"
 import { defineNoParamsWorkspaceTool, defineWorkspaceTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "workspace" as const
-export const workspaceTools: ReadonlyArray<RegisteredTool> = [
+export const workspaceTools = [
   defineWorkspaceTool(
     {
       name: "list_workspace_members",
@@ -161,4 +161,4 @@ export const workspaceTools: ReadonlyArray<RegisteredTool> = [
     parseGetRegionsParams,
     getRegions
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

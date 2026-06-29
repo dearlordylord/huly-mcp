@@ -7,6 +7,7 @@
  */
 import * as fs from "node:fs/promises"
 import * as path from "node:path"
+import type { Readable } from "node:stream"
 
 import { type AuthOptions, type StorageClient } from "@hcengineering/api-client"
 import type { Blob, Ref, WorkspaceUuid } from "@hcengineering/core"
@@ -15,11 +16,13 @@ import { Context, Effect, Layer } from "effect"
 import { HulyConfigService } from "../config/config.js"
 import { concatLink } from "../utils/url.js"
 import { authToOptions, connectWithRetry } from "./client.js"
-import type { FileFetchError, HulyAuthError, HulyConnectionError } from "./errors.js"
 import {
+  FileFetchError,
   FileNotFoundError,
   FileTooLargeError,
   FileUploadError,
+  type HulyAuthError,
+  type HulyConnectionError,
   InvalidContentTypeError,
   InvalidFileDataError,
   MAX_FILE_SIZE
@@ -148,6 +151,11 @@ export interface HulyStorageOperations {
   ) => Effect.Effect<UploadFileResult, StorageClientError>
 
   /**
+   * Download a stored blob using the authenticated storage client.
+   */
+  readonly downloadFile?: (blobId: string) => Effect.Effect<Buffer, StorageClientError>
+
+  /**
    * Construct the URL for accessing a blob.
    *
    * @param blobId - The blob ID
@@ -196,6 +204,16 @@ export class HulyStorageClient extends Context.Tag("@hulymcp/HulyStorageClient")
               })
           }),
 
+        downloadFile: (blobId) =>
+          Effect.tryPromise({
+            try: async () => streamToBuffer(await storageClient.get(blobId)),
+            catch: (e) =>
+              new FileFetchError({
+                fileUrl: blobId,
+                reason: String(e)
+              })
+          }),
+
         getFileUrl: (blobId) => buildFileUrl(baseUrl, workspaceId, blobId)
       }
 
@@ -227,8 +245,11 @@ export class HulyStorageClient extends Context.Tag("@hulymcp/HulyStorageClient")
       })
 
     const noopGetFileUrl = (blobId: string): string => `https://test.huly.io/files?workspace=test&file=${blobId}`
+    const noopDownloadFile = (blobId: string): Effect.Effect<Buffer, StorageClientError> =>
+      Effect.succeed(Buffer.from(`test file ${blobId}`))
 
     const defaultOps: HulyStorageOperations = {
+      downloadFile: noopDownloadFile,
       uploadFile: noopUploadFile,
       getFileUrl: noopGetFileUrl
     }
@@ -256,6 +277,19 @@ const buildFileUrl = (baseUrl: string, workspaceId: WorkspaceUuid, blobId: strin
   return `${concatLink(baseUrl, "/files")}?${params.toString()}`
 }
 
+const buildStorageFileTemplate = (baseUrl: string, workspaceId: WorkspaceUuid): string => {
+  const params = new URLSearchParams({ workspace: workspaceId, file: ":blobId" })
+  return `${concatLink(baseUrl, "/files")}?${params.toString().replace("%3AblobId", ":blobId")}`
+}
+
+const streamToBuffer = async (stream: Readable): Promise<Buffer> => {
+  const chunks: Array<Buffer> = []
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+  }
+  return Buffer.concat(chunks)
+}
+
 const connectStorageClient = async (
   config: StorageConnectionConfig,
   sdk: HulySdkDependencies
@@ -270,7 +304,7 @@ const connectStorageClient = async (
   )
 
   // Construct URLs for file operations
-  const filesUrl = concatLink(url, `/files`)
+  const filesUrl = buildStorageFileTemplate(url, workspaceId)
   const uploadUrl = concatLink(url, serverConfig.UPLOAD_URL)
 
   // Create storage client with proper authentication

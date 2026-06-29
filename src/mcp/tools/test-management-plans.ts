@@ -81,7 +81,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "test-management" as const
 
-export const testManagementPlansTools: ReadonlyArray<RegisteredTool> = [
+export const testManagementPlansTools = [
   // --- Test Plans ---
   defineTool(
     {
@@ -309,4 +309,4 @@ export const testManagementPlansTools: ReadonlyArray<RegisteredTool> = [
     parseRunTestPlanParams,
     runTestPlan
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

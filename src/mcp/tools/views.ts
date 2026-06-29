@@ -14,7 +14,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "views" as const
 
-export const viewTools: ReadonlyArray<RegisteredTool> = [
+export const viewTools = [
   defineTool(
     {
       name: "list_filtered_views",
@@ -51,4 +51,4 @@ export const viewTools: ReadonlyArray<RegisteredTool> = [
     parseListViewletsParams,
     listViewlets
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

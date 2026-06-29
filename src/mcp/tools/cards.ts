@@ -37,7 +37,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "cards" as const
 
-export const cardTools: ReadonlyArray<RegisteredTool> = [
+export const cardTools = [
   defineTool(
     {
       name: "list_card_spaces",
@@ -124,4 +124,4 @@ export const cardTools: ReadonlyArray<RegisteredTool> = [
     parseDeleteCardParams,
     deleteCard
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

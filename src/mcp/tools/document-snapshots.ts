@@ -11,7 +11,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "documents" as const
 
-export const documentSnapshotTools: ReadonlyArray<RegisteredTool> = [
+export const documentSnapshotTools = [
   defineTool(
     {
       name: "list_document_snapshots",
@@ -36,4 +36,4 @@ export const documentSnapshotTools: ReadonlyArray<RegisteredTool> = [
     parseGetDocumentSnapshotParams,
     getDocumentSnapshot
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

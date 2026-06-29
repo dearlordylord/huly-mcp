@@ -12,7 +12,7 @@ import {
 import { getCustomFieldValues, listCustomFields, setCustomField } from "../../huly/operations/custom-fields.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "custom-fields" as const
-export const customFieldTools: ReadonlyArray<RegisteredTool> = [
+export const customFieldTools = [
   defineTool(
     {
       name: "list_custom_fields",
@@ -49,4 +49,4 @@ export const customFieldTools: ReadonlyArray<RegisteredTool> = [
     parseSetCustomFieldParams,
     setCustomField
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>

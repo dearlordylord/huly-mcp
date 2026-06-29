@@ -53,7 +53,7 @@ import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "spaces" as const
 
-export const spaceTools: ReadonlyArray<RegisteredTool> = [
+export const spaceTools = [
   defineTool(
     {
       name: "list_spaces",
@@ -201,4 +201,4 @@ export const spaceTools: ReadonlyArray<RegisteredTool> = [
     parseSpaceRoleMemberMutationParams,
     removeSpaceRoleMembers
   )
-]
+] as const satisfies ReadonlyArray<RegisteredTool>
