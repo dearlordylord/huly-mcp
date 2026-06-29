@@ -44,14 +44,15 @@ The script runs:
 - package publish-plan detection from npm registry versions
 - host-safe bundle build through `pnpm dlx esbuild` for packages that need publishing
 - package bundle version verification
+- full MCP integration when `@firfi/huly-mcp` needs publishing
 - CLI integration coverage verification and live CLI integration when `@firfi/huly-cli` needs publishing
 - `changeset publish` without a prerelease tag, so npm `latest` moves
 - release commit/tag push
-- latest GitHub release creation when `@firfi/huly-mcp` changed
+- latest GitHub release creation from the `@firfi/huly-mcp@<version>` package tag when MCP changed
 
-Run `pnpm check-all` and the local Huly integration suites before starting the production release. The publish script runs the CLI live integration gate only when the CLI package needs publishing. It does not run the full MCP integration suite automatically.
+Run `pnpm check-all` and the local Huly integration suites before starting the production release. The publish script also enforces live integration gates for every package it is about to publish: full MCP integration for `@firfi/huly-mcp`, and CLI coverage plus live CLI integration for `@firfi/huly-cli`.
 
-For the CLI live integration gate, `pnpm local-release` uses the current Huly environment when it is already set. If it is not set, it sources `.env.local` inside the integration subprocess. The gate runs with `HULY_CLI_TELEMETRY=0` so release verification does not emit analytics.
+For live integration gates, `pnpm local-release` uses the current Huly environment when it is already set. If it is not set, it sources `.env.local` inside the integration subprocess. The MCP gate runs with `HULY_MCP_TELEMETRY=0`, and the CLI gate runs with `HULY_CLI_TELEMETRY=0`, so release verification does not emit analytics.
 
 ## Rerunning After A Failed Release
 
@@ -62,7 +63,7 @@ The rerun recomputes local package versions against npm:
 - Packages whose local version is already published are skipped.
 - Packages whose local version is missing from npm are built, verified, and published.
 - A CLI-only release skips MCP build and MCP GitHub release creation.
-- If all package versions are already published, the script still pushes the current `master` and any tags already created at `HEAD`.
+- If all package versions are already published, the script still pushes the current `master`, pushes the current package-version tags when they exist locally, and creates the MCP GitHub release if its package tag exists and the release is missing.
 
 If host-local `node_modules` contains the wrong native binary, the script's release builds still use `pnpm dlx esbuild`. For normal development commands, repair local dependencies with:
 
@@ -87,7 +88,7 @@ npx -y @firfi/huly-cli@latest --help
 Expected result:
 
 - `latest` points to the new package version.
-- The GitHub release for `v<version>` is marked as latest.
+- The GitHub release for `@firfi/huly-mcp@<version>` is marked as latest.
 
 ## If `latest` Points At The Wrong Version
 

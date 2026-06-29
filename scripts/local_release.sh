@@ -97,12 +97,18 @@ build_cli_package() {
 }
 
 huly_env_present() {
-  [[ -n "${HULY_URL:-}" ]] \
-    && [[ -n "${HULY_WORKSPACE:-}" ]] \
-    && { [[ -n "${HULY_TOKEN:-}" ]] || { [[ -n "${HULY_EMAIL:-}" ]] && [[ -n "${HULY_PASSWORD:-}" ]]; }; }
+  if [[ -z "${HULY_URL:-}" || -z "${HULY_WORKSPACE:-}" ]]; then
+    return 1
+  fi
+
+  if [[ -n "${HULY_TOKEN:-}" ]]; then
+    return 0
+  fi
+
+  [[ -n "${HULY_EMAIL:-}" && -n "${HULY_PASSWORD:-}" ]]
 }
 
-run_cli_integration_gate() (
+load_huly_env_for_integration() {
   if ! huly_env_present && [[ -f ".env.local" ]]; then
     set -a
     # shellcheck disable=SC1091
@@ -111,12 +117,69 @@ run_cli_integration_gate() (
   fi
 
   if ! huly_env_present; then
-    echo "CLI release integration requires Huly env. Set HULY_URL, HULY_WORKSPACE, and either HULY_TOKEN or HULY_EMAIL/HULY_PASSWORD, or provide .env.local." >&2
+    echo "Release integration requires Huly env. Set HULY_URL, HULY_WORKSPACE, and either HULY_TOKEN or HULY_EMAIL/HULY_PASSWORD, or provide .env.local." >&2
     exit 1
   fi
+}
+
+is_container_environment() {
+  [[ -f /.dockerenv ]] && return 0
+  [[ -r /proc/1/cgroup ]] && grep -Eq "(docker|containerd|kubepods)" /proc/1/cgroup
+}
+
+rewrite_huly_url_for_container() {
+  if [[ "${HULY_URL:-}" == *localhost* ]] && is_container_environment; then
+    export HULY_URL="${HULY_URL/localhost/host.docker.internal}"
+  fi
+}
+
+run_mcp_integration_gate() (
+  load_huly_env_for_integration
+  rewrite_huly_url_for_container
+
+  HULY_MCP_TELEMETRY=0 bash scripts/integration_test_full.sh
+)
+
+run_cli_integration_gate() (
+  load_huly_env_for_integration
 
   HULY_CLI_TELEMETRY=0 pnpm integration:cli
 )
+
+add_release_tag_if_present() {
+  local tag_name="$1"
+
+  if ! git rev-parse -q --verify "refs/tags/$tag_name" >/dev/null; then
+    return 0
+  fi
+
+  if printf '%s\n' "${release_tags[@]}" | grep -Fxq "$tag_name"; then
+    return 0
+  fi
+
+  release_tags+=("$tag_name")
+}
+
+release_tag_exists_locally() {
+  local tag_name="$1"
+
+  git rev-parse -q --verify "refs/tags/$tag_name" >/dev/null
+}
+
+create_github_release_if_needed() {
+  local release_tag="$1"
+
+  if ! release_tag_exists_locally "$release_tag"; then
+    return 0
+  fi
+
+  if gh release view "$release_tag" >/dev/null 2>&1; then
+    echo "GitHub release $release_tag already exists."
+    return 0
+  fi
+
+  gh release create "$release_tag" --generate-notes --latest --verify-tag
+}
 
 current_branch="$(git branch --show-current)"
 if [[ "$current_branch" != "$RELEASE_BRANCH" ]]; then
@@ -172,6 +235,7 @@ fi
 
 if [[ "$mcp_needs_publish" == "true" ]]; then
   build_mcp_package "$mcp_package_version"
+  run_mcp_integration_gate
 fi
 
 if [[ "$cli_needs_publish" == "true" ]]; then
@@ -186,14 +250,15 @@ fi
 
 git push origin "$RELEASE_BRANCH"
 mapfile -t release_tags < <(git tag --points-at HEAD)
+mcp_release_tag="$MCP_PACKAGE_NAME@$mcp_package_version"
+cli_release_tag="$CLI_PACKAGE_NAME@$cli_package_version"
+add_release_tag_if_present "$mcp_release_tag"
+add_release_tag_if_present "$cli_release_tag"
 if [[ "${#release_tags[@]}" -gt 0 ]]; then
   git push origin "${release_tags[@]}"
 fi
 
-mcp_release_tag="v$mcp_package_version"
-if printf '%s\n' "${release_tags[@]}" | grep -Fxq "$mcp_release_tag"; then
-  gh release create "$mcp_release_tag" --generate-notes --latest --verify-tag
-fi
+create_github_release_if_needed "$mcp_release_tag"
 
 show_dist_tags "$MCP_PACKAGE_NAME" false
 show_dist_tags "$CLI_PACKAGE_NAME" false

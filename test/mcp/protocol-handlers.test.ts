@@ -605,7 +605,7 @@ const arraySchemaProbeRegistry: ToolRegistry = {
 }
 
 const malformedSummaryProbeRegistry: ToolRegistry = {
-  tools: new Map([
+  tools: new Map<string, RegisteredTool>([
     [malformedSummaryProbeTool.name, malformedSummaryProbeTool],
     [malformedRequiredProbeTool.name, malformedRequiredProbeTool],
     [undeclaredRequiredProbeTool.name, undeclaredRequiredProbeTool]
