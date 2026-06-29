@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.44.2
+
+### Patch Changes
+
+- 61e22a1: Preserve native Huly references across rich-text markdown write paths.
+
 ## 0.44.1
 
 ### Patch Changes
