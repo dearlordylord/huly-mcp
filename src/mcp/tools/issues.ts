@@ -9,6 +9,7 @@ import {
   deleteIssueTemplateParamsJsonSchema,
   getIssueParamsJsonSchema,
   getIssueTemplateParamsJsonSchema,
+  HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
   linkDocumentToIssueParamsJsonSchema,
   listIssueRelationsParamsJsonSchema,
   listIssuesParamsJsonSchema,
@@ -224,7 +225,9 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "create_issue_template",
       description:
-        "Create a new issue template in a Huly project. Templates define default values for new issues. Optionally include children (sub-task templates) that will become sub-issues when creating issues from this template. Returns the created template ID and title.",
+        "Create a new issue template in a Huly project. Templates define default values for new issues. Template and child descriptions support markdown. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " Optionally include children (sub-task templates) that will become sub-issues when creating issues from this template. Returns the created template ID and title.",
       category: CATEGORY,
       inputSchema: createIssueTemplateParamsJsonSchema,
       resultSchema: CreateIssueTemplateResultSchema
@@ -236,7 +239,9 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "create_issue_from_template",
       description:
-        "Create a new issue from a template. Applies template defaults, allowing overrides for specific fields. If the template has children (sub-task templates), sub-issues are created automatically unless includeChildren is set to false. Returns the created issue identifier and count of children created.",
+        "Create a new issue from a template. Applies template defaults, allowing overrides for specific fields. Description override supports markdown. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " If the template has children (sub-task templates), sub-issues are created automatically unless includeChildren is set to false. Returns the created issue identifier and count of children created.",
       category: CATEGORY,
       inputSchema: createIssueFromTemplateParamsJsonSchema,
       resultSchema: CreateIssueFromTemplateResultSchema
@@ -247,7 +252,9 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
   defineTool(
     {
       name: "update_issue_template",
-      description: "Update fields on an existing Huly issue template. Only provided fields are modified.",
+      description:
+        "Update fields on an existing Huly issue template. Only provided fields are modified. Description supports markdown. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: updateIssueTemplateParamsJsonSchema,
       resultSchema: UpdateIssueTemplateResultSchema
@@ -270,7 +277,9 @@ export const issueTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "add_template_child",
       description:
-        "Add a child (sub-task) template to an issue template. The child defines default values for sub-issues created when using create_issue_from_template. Returns the child template ID.",
+        "Add a child (sub-task) template to an issue template. The child defines default values for sub-issues created when using create_issue_from_template. Child description supports markdown. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " Returns the child template ID.",
       category: CATEGORY,
       inputSchema: addTemplateChildParamsJsonSchema,
       resultSchema: AddTemplateChildResultSchema

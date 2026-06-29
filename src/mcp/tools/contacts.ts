@@ -8,6 +8,7 @@ import {
   deletePersonParamsJsonSchema,
   getOrganizationParamsJsonSchema,
   getPersonParamsJsonSchema,
+  HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
   listContactChannelProvidersParamsJsonSchema,
   listEmployeesParamsJsonSchema,
   listOrganizationChannelsParamsJsonSchema,
@@ -284,7 +285,9 @@ export const contactTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "update_organization",
       description:
-        "Update fields on an existing organization identified by ID or exact name when that name is unique. Only provided fields are modified. Description supports multi-line plain text and is the right place to store CRM notes / revenue summaries / context. Pass null to clear city or description. If multiple organizations share the same name, use the organization ID.",
+        "Update fields on an existing organization identified by ID or exact name when that name is unique. Only provided fields are modified. Description supports markdown for CRM notes / revenue summaries / context. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " Pass null to clear city or description. If multiple organizations share the same name, use the organization ID.",
       category: CATEGORY,
       inputSchema: updateOrganizationParamsJsonSchema,
       resultSchema: UpdateOrganizationResultSchema

@@ -42,7 +42,8 @@ import {
   findTestCase,
   findTestPlan,
   findTestProject,
-  resolveAssignee
+  resolveAssignee,
+  uploadDescription
 } from "./test-management-shared.js"
 import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
@@ -118,12 +119,11 @@ export const createTestPlan = (
     }
     const planId: Ref<TestPlan> = generateId()
     const descRef: MarkupBlobRef | null = params.description !== undefined && params.description.trim() !== ""
-      ? yield* client.uploadMarkup(
+      ? yield* uploadDescription(
+        client,
         testManagement.class.TestPlan,
         planId,
-        "description",
-        params.description,
-        "markdown"
+        params.description
       )
       : null
     yield* client.createDoc(testManagement.class.TestPlan, project._id, {
@@ -155,12 +155,11 @@ export const updateTestPlan = (
         if (params.description === undefined) return {}
         if (params.description === null) return { description: null }
         return {
-          description: yield* client.uploadMarkup(
+          description: yield* uploadDescription(
+            client,
             testManagement.class.TestPlan,
             plan._id,
-            "description",
-            params.description,
-            "markdown"
+            params.description
           )
         }
       })

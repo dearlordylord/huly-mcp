@@ -42,6 +42,7 @@ import {
 } from "../../../src/huly/operations/threads.js"
 import { assertAt } from "../../../src/utils/assertions.js"
 import { channelIdentifier, messageBrandId, threadReplyId } from "../../helpers/brands.js"
+import { capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 import { chunter, contact } from "../../../src/huly/huly-plugins.js"
 
@@ -842,6 +843,29 @@ describe("sendChannelMessage", () => {
       expect(captureAddCollection.attributes).toBeDefined()
     }))
 
+  it.effect("preserves native references when sending a channel message", () =>
+    Effect.gen(function*() {
+      const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
+      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+      const testLayer = createTestLayerWithMocks({ channels: [channel], captureAddCollection })
+
+      yield* sendChannelMessage({
+        channel: channelIdentifier("general"),
+        body:
+          "See [TEST-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=TEST-1)."
+      }).pipe(Effect.provide(testLayer))
+
+      expect(capturedMarkupReferenceNodes(String(captureAddCollection.attributes?.message))).toContainEqual({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "TEST-1"
+        }
+      })
+    }))
+
   it.effect("returns ChannelNotFoundError when channel doesn't exist", () =>
     Effect.gen(function*() {
       const testLayer = createTestLayerWithMocks({ channels: [] })
@@ -879,6 +903,38 @@ describe("updateChannelMessage", () => {
       expect(result.id).toBe("msg-1")
       expect(result.updated).toBe(true)
       expect(captureUpdateDoc.operations).toBeDefined()
+    }))
+
+  it.effect("preserves native references when updating a channel message", () =>
+    Effect.gen(function*() {
+      const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
+      const message = makeChatMessage({
+        _id: "msg-1" as Ref<ChatMessage>,
+        space: "ch-1" as Ref<Space>
+      })
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+      const testLayer = createTestLayerWithMocks({
+        channels: [channel],
+        messages: [message],
+        captureUpdateDoc
+      })
+
+      yield* updateChannelMessage({
+        channel: channelIdentifier("general"),
+        messageId: messageBrandId("msg-1"),
+        body:
+          "See [TEST-2](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-2&label=TEST-2)."
+      }).pipe(Effect.provide(testLayer))
+
+      expect(capturedMarkupReferenceNodes(String(captureUpdateDoc.operations?.message))).toContainEqual({
+        type: "reference",
+        attrs: {
+          id: "issue-2",
+          objectclass: "tracker:class:Issue",
+          label: "TEST-2"
+        }
+      })
     }))
 
   it.effect("returns MessageNotFoundError when message doesn't exist", () =>
@@ -1180,6 +1236,38 @@ describe("addThreadReply", () => {
       expect(captureAddCollection.attributes).toBeDefined()
     }))
 
+  it.effect("preserves native references when adding a thread reply", () =>
+    Effect.gen(function*() {
+      const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
+      const parentMsg = makeChatMessage({
+        _id: "msg-1" as Ref<ChatMessage>,
+        space: "ch-1" as Ref<Space>
+      })
+      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+      const testLayer = createTestLayerWithMocks({
+        channels: [channel],
+        messages: [parentMsg],
+        captureAddCollection
+      })
+
+      yield* addThreadReply({
+        channel: channelIdentifier("general"),
+        messageId: messageBrandId("msg-1"),
+        body:
+          "See [TEST-3](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-3&label=TEST-3)."
+      }).pipe(Effect.provide(testLayer))
+
+      expect(capturedMarkupReferenceNodes(String(captureAddCollection.attributes?.message))).toContainEqual({
+        type: "reference",
+        attrs: {
+          id: "issue-3",
+          objectclass: "tracker:class:Issue",
+          label: "TEST-3"
+        }
+      })
+    }))
+
   it.effect("returns MessageNotFoundError when message doesn't exist", () =>
     Effect.gen(function*() {
       const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
@@ -1233,6 +1321,45 @@ describe("updateThreadReply", () => {
       expect(result.id).toBe("reply-1")
       expect(result.updated).toBe(true)
       expect(captureUpdateDoc.operations).toBeDefined()
+    }))
+
+  it.effect("preserves native references when updating a thread reply", () =>
+    Effect.gen(function*() {
+      const channel = makeChannel({ _id: "ch-1" as Ref<HulyChannel>, name: "general" })
+      const parentMsg = makeChatMessage({
+        _id: "msg-1" as Ref<ChatMessage>,
+        space: "ch-1" as Ref<Space>
+      })
+      const reply = makeThreadMessage({
+        _id: "reply-1" as Ref<HulyThreadMessage>,
+        space: "ch-1" as Ref<Space>,
+        attachedTo: "msg-1" as Ref<ActivityMessage>
+      })
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+      const testLayer = createTestLayerWithMocks({
+        channels: [channel],
+        messages: [parentMsg],
+        threadMessages: [reply],
+        captureUpdateDoc
+      })
+
+      yield* updateThreadReply({
+        channel: channelIdentifier("general"),
+        messageId: messageBrandId("msg-1"),
+        replyId: threadReplyId("reply-1"),
+        body:
+          "See [TEST-4](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-4&label=TEST-4)."
+      }).pipe(Effect.provide(testLayer))
+
+      expect(capturedMarkupReferenceNodes(String(captureUpdateDoc.operations?.message))).toContainEqual({
+        type: "reference",
+        attrs: {
+          id: "issue-4",
+          objectclass: "tracker:class:Issue",
+          label: "TEST-4"
+        }
+      })
     }))
 
   it.effect("returns ThreadReplyNotFoundError when reply doesn't exist", () =>

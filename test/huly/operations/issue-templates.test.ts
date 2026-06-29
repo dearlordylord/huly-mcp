@@ -749,6 +749,34 @@ describe("createIssueTemplate", () => {
       })
     }))
 
+  it.effect("preserves native references in template description", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ identifier: "TEST" })
+      const capture: MockConfig["captureCreateDoc"] = {}
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        captureCreateDoc: capture
+      })
+
+      yield* createIssueTemplate({
+        project: projectIdentifier("TEST"),
+        title: "Linked Template",
+        description:
+          "See [TEST-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=TEST-1)."
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+      const attrs = capture.attributes as Record<string, unknown>
+      expect(capturedMarkupReferenceNodes(String(attrs.description))).toContainEqual({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "TEST-1"
+        }
+      })
+    }))
+
   it.effect("fails with PersonNotFoundError for unknown assignee", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -1085,6 +1113,37 @@ describe("updateIssueTemplate", () => {
       expect(result.updated).toBe(true)
       expect(captureUpdate.operations).toMatchObject({
         description: markdownToMarkupString("Updated description", testMarkupUrlConfig)
+      })
+    }))
+
+  it.effect("preserves native references when updating template description", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ identifier: "TEST" })
+      const template = makeIssueTemplate()
+      const captureUpdate: MockConfig["captureUpdateDoc"] = {}
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        templates: [template],
+        captureUpdateDoc: captureUpdate
+      })
+
+      const result = yield* updateIssueTemplate({
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report Template"),
+        description:
+          "See [TEST-2](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-2&label=TEST-2)."
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+      expect(result.updated).toBe(true)
+      const ops = captureUpdate.operations as Record<string, unknown>
+      expect(capturedMarkupReferenceNodes(String(ops.description))).toContainEqual({
+        type: "reference",
+        attrs: {
+          id: "issue-2",
+          objectclass: "tracker:class:Issue",
+          label: "TEST-2"
+        }
       })
     }))
 
@@ -1564,6 +1623,40 @@ describe("createIssueTemplate with children", () => {
       expect(assertAt(children, 1).description).toBe(markdownToMarkupString("desc B", testMarkupUrlConfig))
     }))
 
+  it.effect("preserves native references in child descriptions", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ identifier: "TEST" })
+      const capture: MockConfig["captureCreateDoc"] = {}
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        captureCreateDoc: capture
+      })
+
+      yield* createIssueTemplate({
+        project: projectIdentifier("TEST"),
+        title: "Template With Linked Child",
+        children: [
+          {
+            title: "Child With Link",
+            description:
+              "See [TEST-3](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-3&label=TEST-3)."
+          }
+        ]
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+      const attrs = capture.attributes as Record<string, unknown>
+      const children = attrs.children as Array<Record<string, unknown>>
+      expect(capturedMarkupReferenceNodes(String(assertAt(children, 0).description))).toContainEqual({
+        type: "reference",
+        attrs: {
+          id: "issue-3",
+          objectclass: "tracker:class:Issue",
+          label: "TEST-3"
+        }
+      })
+    }))
+
   it.effect("creates template with empty children when none provided", () =>
     Effect.gen(function*() {
       const project = makeProject({ identifier: "TEST" })
@@ -1639,6 +1732,38 @@ describe("addTemplateChild", () => {
       expect(assertAt(children, 0).title).toBe("Existing")
       expect(assertAt(children, 1).title).toBe("New Child")
       expect(assertAt(children, 1).priority).toBe(IssuePriority.Urgent)
+    }))
+
+  it.effect("preserves native references in added child descriptions", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ identifier: "TEST" })
+      const template = makeIssueTemplate({ children: [] })
+      const captureUpdate: MockConfig["captureUpdateDoc"] = {}
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        templates: [template],
+        captureUpdateDoc: captureUpdate
+      })
+
+      yield* addTemplateChild({
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report Template"),
+        title: "Linked Child",
+        description:
+          "See [TEST-4](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-4&label=TEST-4)."
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+      const ops = captureUpdate.operations as Record<string, unknown>
+      const children = ops.children as Array<Record<string, unknown>>
+      expect(capturedMarkupReferenceNodes(String(assertAt(children, 0).description))).toContainEqual({
+        type: "reference",
+        attrs: {
+          id: "issue-4",
+          objectclass: "tracker:class:Issue",
+          label: "TEST-4"
+        }
+      })
     }))
 
   it.effect("resolves assignee and component for child", () =>

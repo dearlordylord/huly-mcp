@@ -38,6 +38,7 @@ import { cardPlugin } from "../huly-plugins.js"
 import { fetchMasterTagsForSpace, findMasterTag, masterTagDisplayName } from "./card-master-tags.js"
 import { clearTextAsEmptyString } from "./clear-field-updates.js"
 import { listTotal, optionalCount } from "./counts.js"
+import { renderMarkdownPreservingNativeReferences } from "./native-reference-markup.js"
 import { clampLimit, escapeLikeWildcards, findByNameOrId } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
@@ -289,12 +290,13 @@ export const createCard = (
     const rank = makeRank(lastCard?.rank, undefined)
 
     // Card.content is non-nullable MarkupBlobRef — always upload content
+    const renderedContent = renderMarkdownPreservingNativeReferences(params.content ?? "", client.markupUrlConfig)
     const contentMarkupRef = yield* client.uploadMarkup(
       masterTag._id,
       cardId,
       "content",
-      params.content ?? "",
-      "markdown"
+      renderedContent.markup,
+      renderedContent.format
     )
 
     type CardParentData = {
@@ -368,18 +370,19 @@ export const updateCard = (
       content: Effect.gen(function*() {
         if (params.content === undefined) return {}
         const content = clearTextAsEmptyString(params.content)
+        const renderedContent = renderMarkdownPreservingNativeReferences(content, client.markupUrlConfig)
         // Card.content is non-nullable MarkupBlobRef (unlike Document.content which can be null).
         // Empty string clears the content blob rather than nulling the field.
         if (card.content) {
-          yield* client.updateMarkup(card._class, card._id, "content", content, "markdown")
+          yield* client.updateMarkup(card._class, card._id, "content", renderedContent.markup, renderedContent.format)
           return {}
         }
         const contentMarkupRef = yield* client.uploadMarkup(
           card._class,
           card._id,
           "content",
-          content,
-          "markdown"
+          renderedContent.markup,
+          renderedContent.format
         )
         return { content: contentMarkupRef }
       })

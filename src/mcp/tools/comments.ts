@@ -1,6 +1,7 @@
 import {
   addCommentParamsJsonSchema,
   deleteCommentParamsJsonSchema,
+  HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
   listCommentsParamsJsonSchema,
   parseAddCommentParams,
   parseDeleteCommentParams,
@@ -34,7 +35,8 @@ export const commentTools: ReadonlyArray<RegisteredTool> = [
   defineTool(
     {
       name: "add_comment",
-      description: "Add a comment to a Huly issue. Comment body supports markdown formatting.",
+      description: "Add a comment to a Huly issue. Comment body supports markdown formatting. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: addCommentParamsJsonSchema,
       resultSchema: AddCommentResultSchema
@@ -45,7 +47,8 @@ export const commentTools: ReadonlyArray<RegisteredTool> = [
   defineTool(
     {
       name: "update_comment",
-      description: "Update an existing comment on a Huly issue. Comment body supports markdown formatting.",
+      description: "Update an existing comment on a Huly issue. Comment body supports markdown formatting. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: updateCommentParamsJsonSchema,
       resultSchema: UpdateCommentResultSchema

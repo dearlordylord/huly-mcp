@@ -21,7 +21,8 @@ import {
   resolveAssignee,
   resolveCasePriority,
   resolveCaseStatus,
-  resolveCaseType
+  resolveCaseType,
+  uploadDescription
 } from "./test-management-shared.js"
 import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
@@ -56,12 +57,11 @@ export const updateTestCase = (
         if (params.description === undefined) return {}
         if (params.description === null) return { description: null }
         return {
-          description: yield* client.uploadMarkup(
+          description: yield* uploadDescription(
+            client,
             testManagement.class.TestCase,
             tc._id,
-            "description",
-            params.description,
-            "markdown"
+            params.description
           )
         }
       }),

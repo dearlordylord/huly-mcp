@@ -33,6 +33,7 @@ import {
   TestRunStatus as RunStatus
 } from "../test-management-types.js"
 import { findPersonByEmailOrName } from "./contacts-shared.js"
+import { renderMarkdownPreservingNativeReferences } from "./native-reference-markup.js"
 import { findByNameOrIdOrFail } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
@@ -168,6 +169,16 @@ export const fetchDescription = (
   description !== null
     ? client.fetchMarkup(_class, docId, "description", description, "markdown")
     : Effect.succeed(undefined)
+
+export const uploadDescription = (
+  client: HulyClientOperations,
+  _class: Ref<Class<Doc>>,
+  docId: Ref<Doc>,
+  description: string
+): Effect.Effect<MarkupRef, HulyClientError> => {
+  const rendered = renderMarkdownPreservingNativeReferences(description, client.markupUrlConfig)
+  return client.uploadMarkup(_class, docId, "description", rendered.markup, rendered.format)
+}
 
 // --- Finder helpers ---
 

@@ -40,6 +40,7 @@ import { toRef } from "../../../src/huly/operations/sdk-boundary.js"
 import { HulyStorageClient, type HulyStorageOperations } from "../../../src/huly/storage.js"
 import { testWorkbenchUrlConfig } from "../../../src/huly/url-builders.js"
 import { corePersonId, findResult } from "../../helpers/huly-sdk.js"
+import { capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 interface DriveCommentState {
   readonly drives: Array<DriveSpace>
@@ -307,6 +308,46 @@ describe("drive file comment operations", () => {
       expect(state.updates).toHaveLength(1)
       expect(deleted.deleted).toBe(true)
       expect(state.removals).toEqual([{ classRef: chunter.class.ChatMessage, id: "comment-1" }])
+    }))
+
+  it.effect("preserves native references when adding and updating Drive file comments", () =>
+    Effect.gen(function*() {
+      const state = baseState()
+      const layer = makeLayer(state)
+      const addParams = yield* parseAddDriveFileCommentParams({
+        drive: "Docs",
+        fileId: "file-api",
+        body:
+          "See [TEST-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=TEST-1)."
+      })
+      const updateParams = yield* parseUpdateDriveFileCommentParams({
+        drive: "Docs",
+        filePath: "/API.md",
+        commentId: "comment-1",
+        body:
+          "See [TEST-2](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-2&label=TEST-2)."
+      })
+
+      yield* addDriveFileComment(addParams).pipe(Effect.provide(layer))
+      yield* updateDriveFileComment(updateParams).pipe(Effect.provide(layer))
+
+      const added = assertAt(state.messages, 1)
+      expect(capturedMarkupReferenceNodes(added.message)).toContainEqual({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "TEST-1"
+        }
+      })
+      expect(capturedMarkupReferenceNodes(String(assertAt(state.updates, 0).operations.message))).toContainEqual({
+        type: "reference",
+        attrs: {
+          id: "issue-2",
+          objectclass: "tracker:class:Issue",
+          label: "TEST-2"
+        }
+      })
     }))
 
   it.effect("lists Drive file activity for a resolved file", () =>

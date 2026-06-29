@@ -1,6 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
 import { clearableText } from "./clearable.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
@@ -83,7 +84,7 @@ export const CreateComponentParamsSchema = Schema.Struct({
     description: "Component name/label"
   }),
   description: Schema.optional(Schema.String.annotations({
-    description: "Component description (markdown supported)"
+    description: `Component description in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })),
   lead: Schema.optional(PersonRefInput.annotations({
     description: "Lead person email address or display name"
@@ -111,7 +112,9 @@ export const UpdateComponentParamsSchema = Schema.Struct({
   label: Schema.optional(ComponentLabel.annotations({
     description: "New component name/label"
   })),
-  description: Schema.optional(clearableText("New component description (markdown supported).")),
+  description: Schema.optional(
+    clearableText(`New component description in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`)
+  ),
   lead: Schema.optional(
     Schema.NullOr(PersonRefInput).annotations({
       description: "New lead person email or display name (null to unassign)"

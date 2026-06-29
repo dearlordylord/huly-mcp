@@ -66,6 +66,7 @@ import {
 import { markdownToMarkupString, testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
 import { toRef } from "../../../src/huly/operations/sdk-boundary.js"
 import { testWorkbenchUrlConfig } from "../../../src/huly/url-builders.js"
+import { capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 const account = "00000000-0000-4000-8000-000000000000" as AccountUuid
 const boardId = toRef<HulyBoard>("board-1")
@@ -435,6 +436,23 @@ describe("board operations", () => {
       expect(created.location).toBe("Remote")
       expect(created.cover).toEqual({ color: 2, size: "large" })
       expect(created.description).toContain("Ship")
+      yield* provideDiagnostics(
+        createBoardCard({
+          board: b("Roadmap"),
+          title: ct("Native Ref"),
+          description:
+            "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+        }),
+        fixture.layer
+      )
+      expect(capturedMarkupReferenceNodes(assertAt(fixture.captures.createdCards, 1).description)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
     }))
 
   it.effect("updates card mutable fields and archives, unarchives, then deletes only after archive", () =>
@@ -768,6 +786,23 @@ describe("board operations", () => {
       expect(assertAt(fixture.state.cards, 0).members).toEqual(["emp-2"])
       expect(assertAt(fixture.state.cards, 0).location).toBe("HQ")
       expect(assertAt(fixture.state.cards, 0).cover).toEqual({ color: 1, size: "large" })
+      yield* provideDiagnostics(
+        updateBoardCard({
+          board: b("Roadmap"),
+          card: c("CARD-1"),
+          description:
+            "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+        }),
+        fixture.layer
+      )
+      expect(capturedMarkupReferenceNodes(assertAt(fixture.state.cards, 0).description)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
 
       yield* provideDiagnostics(
         updateBoardCard({ board: b("Roadmap"), card: c("CARD-1"), removeMembers: [n("Bob")] }),

@@ -32,6 +32,7 @@ import {
 import { markdownToMarkupString, testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
 import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import { componentIdentifier, email, issueIdentifier, projectIdentifier } from "../../helpers/brands.js"
+import { capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 // --- Mock Data Builders ---
 
@@ -563,6 +564,28 @@ describe("createComponent", () => {
       expect(captureCreateDoc.attributes?.lead).toBe("person-1")
     }))
 
+  it.effect("creates component descriptions with native references", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
+      const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
+
+      yield* createComponent({
+        project: projectIdentifier("PROJ"),
+        label: componentLabel("Native Ref"),
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(createTestLayerWithMocks({ projects: [project], captureCreateDoc })))
+
+      expect(capturedMarkupReferenceNodes(String(captureCreateDoc.attributes?.description))[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
+    }))
+
   it.effect("returns PersonNotFoundError when lead not found", () =>
     Effect.gen(function*() {
       const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
@@ -650,6 +673,33 @@ describe("updateComponent", () => {
       expect(captureUpdateDoc.operations?.description).toBe(
         markdownToMarkupString("Updated description", testMarkupUrlConfig)
       )
+    }))
+
+  it.effect("updates component descriptions with native references", () =>
+    Effect.gen(function*() {
+      const project = makeProject({ _id: "proj-1" as Ref<HulyProject>, identifier: "PROJ" })
+      const comp = makeComponent({
+        _id: "comp-1" as Ref<HulyComponent>,
+        label: componentLabel("Backend"),
+        space: "proj-1" as Ref<HulyProject>
+      })
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+      yield* updateComponent({
+        project: projectIdentifier("PROJ"),
+        component: componentIdentifier("Backend"),
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(createTestLayerWithMocks({ projects: [project], components: [comp], captureUpdateDoc })))
+
+      expect(capturedMarkupReferenceNodes(String(captureUpdateDoc.operations?.description))[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
     }))
 
   it.effect("clears component description when set to null", () =>

@@ -18,6 +18,7 @@ import {
   listMasterTags,
   updateCard
 } from "../../../src/huly/operations/cards.js"
+import { capturedMarkupChildNodes, capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 const SPACE_ID = "space-1" as Ref<HulyCardSpace>
 const TAG_ID = "tag-1" as Ref<HulyMasterTag>
@@ -520,7 +521,33 @@ describe("createCard", () => {
       expect(captures.createDoc?.attributes?.title).toBe("New card")
       expect(captures.createDoc?.attributes?.parent).toBeNull()
       expect(captures.createDoc?.attributes?.parentInfo).toEqual([])
-      expect(captures.uploadMarkup?.value).toBe("hello")
+      expect(capturedMarkupChildNodes(captures.uploadMarkup?.value)).toContainEqual({
+        type: "text",
+        text: "hello",
+        marks: []
+      })
+    }))
+
+  it.effect("creates card content with native references", () =>
+    Effect.gen(function*() {
+      const captures: Captures = { createDoc: {}, uploadMarkup: {} }
+      yield* createCard({
+        cardSpace: SPACE,
+        type: MasterTagIdentifier.make("Document"),
+        title: "Native ref card",
+        content:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(buildLayer({ spaces: [makeSpace()], masterTags: [makeTag()], captures })))
+
+      expect(capturedMarkupReferenceNodes(captures.uploadMarkup?.value)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
+      expect(captures.createDoc?.attributes?.content).toBe("markup-ref")
     }))
 
   it.effect("creates a card using a derived master tag id", () =>
@@ -540,7 +567,7 @@ describe("createCard", () => {
       })))
 
       expect(captures.createDoc?.class).toBe(CHILD_TAG_ID)
-      expect(captures.uploadMarkup?.value).toBe("")
+      expect(capturedMarkupChildNodes(captures.uploadMarkup?.value)).toEqual([])
     }))
 
   it.effect("creates a child card under a parent, threading parentInfo", () =>
@@ -607,9 +634,39 @@ describe("updateCard", () => {
           )
         )
 
-      expect(captures.updateMarkup?.value).toBe("new body")
+      expect(capturedMarkupChildNodes(captures.updateMarkup?.value)).toContainEqual({
+        type: "text",
+        text: "new body",
+        marks: []
+      })
       expect(captures.uploadMarkup?.called).toBeUndefined()
       // content edits go through updateMarkup, leaving no DocumentUpdate ops
+      expect(captures.updateDoc?.called).toBeUndefined()
+    }))
+
+  it.effect("updates existing card content with native references", () =>
+    Effect.gen(function*() {
+      const captures: Captures = { updateDoc: {}, updateMarkup: {}, uploadMarkup: {} }
+      yield* updateCard({
+        cardSpace: SPACE,
+        card: CardIdentifier.make("Roadmap"),
+        content:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(
+        Effect.provide(
+          buildLayer({ spaces: [makeSpace()], cards: [makeCard({ content: "existing" as never })], captures })
+        )
+      )
+
+      expect(capturedMarkupReferenceNodes(captures.updateMarkup?.value)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
+      expect(captures.uploadMarkup?.called).toBeUndefined()
       expect(captures.updateDoc?.called).toBeUndefined()
     }))
 
@@ -623,7 +680,7 @@ describe("updateCard", () => {
         )
       )
 
-      expect(captures.updateMarkup?.value).toBe("")
+      expect(capturedMarkupChildNodes(captures.updateMarkup?.value)).toEqual([])
       expect(captures.uploadMarkup?.called).toBeUndefined()
       expect(captures.updateDoc?.called).toBeUndefined()
     }))
@@ -636,7 +693,35 @@ describe("updateCard", () => {
           Effect.provide(buildLayer({ spaces: [makeSpace()], cards: [makeCard({ content: "" as never })], captures }))
         )
 
-      expect(captures.uploadMarkup?.value).toBe("first body")
+      expect(capturedMarkupChildNodes(captures.uploadMarkup?.value)).toContainEqual({
+        type: "text",
+        text: "first body",
+        marks: []
+      })
+      expect(captures.updateMarkup?.called).toBeUndefined()
+      expect(captures.updateDoc?.operations).toEqual({ content: "markup-ref" })
+    }))
+
+  it.effect("uploads new card content with native references when no blob exists", () =>
+    Effect.gen(function*() {
+      const captures: Captures = { updateDoc: {}, updateMarkup: {}, uploadMarkup: {} }
+      yield* updateCard({
+        cardSpace: SPACE,
+        card: CardIdentifier.make("Roadmap"),
+        content:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(
+        Effect.provide(buildLayer({ spaces: [makeSpace()], cards: [makeCard({ content: "" as never })], captures }))
+      )
+
+      expect(capturedMarkupReferenceNodes(captures.uploadMarkup?.value)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
       expect(captures.updateMarkup?.called).toBeUndefined()
       expect(captures.updateDoc?.operations).toEqual({ content: "markup-ref" })
     }))
@@ -649,7 +734,7 @@ describe("updateCard", () => {
         Effect.provide(buildLayer({ spaces: [makeSpace()], cards: [makeCard({ content: "" as never })], captures }))
       )
 
-      expect(captures.uploadMarkup?.value).toBe("")
+      expect(capturedMarkupChildNodes(captures.uploadMarkup?.value)).toEqual([])
       expect(captures.updateMarkup?.called).toBeUndefined()
       expect(captures.updateDoc?.operations).toEqual({ content: "markup-ref" })
     }))

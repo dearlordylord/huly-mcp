@@ -32,6 +32,7 @@ import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from 
 
 import { tracker } from "../huly-plugins.js"
 import { optionalMarkdownToMarkup, optionalMarkupToMarkdown } from "./markup.js"
+import { renderMarkdownPreservingNativeReferences } from "./native-reference-markup.js"
 
 type ListMilestonesError =
   | HulyClientError
@@ -195,12 +196,13 @@ export const createMilestone = (
     // dual-write: the raw Markup field (above, in milestoneData) for API reads,
     // plus the collaborative document (below) for Huly UI rendering.
     if (params.description !== undefined && params.description.trim() !== "") {
+      const rendered = renderMarkdownPreservingNativeReferences(params.description, client.markupUrlConfig)
       yield* client.uploadMarkup(
         tracker.class.Milestone,
         milestoneId,
         "description",
-        params.description,
-        "markdown"
+        rendered.markup,
+        rendered.format
       )
     }
 
@@ -230,12 +232,13 @@ export const updateMilestone = (
         const description = textContentOrClear(params.description)
         // Dual-write: see comment in createMilestone for rationale.
         if (description !== undefined) {
+          const rendered = renderMarkdownPreservingNativeReferences(description, client.markupUrlConfig)
           yield* client.uploadMarkup(
             tracker.class.Milestone,
             milestone._id,
             "description",
-            description,
-            "markdown"
+            rendered.markup,
+            rendered.format
           )
         }
         return {

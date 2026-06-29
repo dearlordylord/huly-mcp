@@ -10,6 +10,7 @@ import {
   DriveSummarySchema,
   getDriveItemParamsJsonSchema,
   getDriveParamsJsonSchema,
+  HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
   listDriveFileActivityParamsJsonSchema,
   listDriveFileCommentsParamsJsonSchema,
   listDriveFileVersionsParamsJsonSchema,
@@ -243,7 +244,8 @@ export const driveTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "add_drive_file_comment",
       description:
-        "Add a Markdown comment to a Drive file resolved by filePath or fileId. Provide only one locator. The comment is attached directly to the file.",
+        "Add a Markdown comment to a Drive file resolved by filePath or fileId. Provide only one locator. The comment is attached directly to the file. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: addDriveFileCommentParamsJsonSchema,
       annotations: { idempotentHint: false, destructiveHint: false },
@@ -256,7 +258,8 @@ export const driveTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "update_drive_file_comment",
       description:
-        "Update a comment on a Drive file resolved by filePath or fileId. Provide only one locator. Idempotent when the comment body is unchanged.",
+        "Update a comment on a Drive file resolved by filePath or fileId. Provide only one locator. Idempotent when the comment body is unchanged. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: updateDriveFileCommentParamsJsonSchema,
       annotations: { idempotentHint: true, destructiveHint: false },

@@ -7,8 +7,7 @@
  * @module
  */
 import type { Markup } from "@hcengineering/core"
-import { jsonToMarkup, type MarkupMark, type MarkupNode, MarkupNodeType, markupToJSON } from "@hcengineering/text"
-import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown"
+import type { MarkupMark, MarkupNode } from "@hcengineering/text"
 
 import {
   DocId,
@@ -20,6 +19,8 @@ import {
   type UrlString,
   UrlString as UrlStringSchema
 } from "../../domain/schemas/shared.js"
+import { markdownToMarkup, markupToMarkdown } from "../huly-text-markdown.js"
+import { jsonToMarkup, MarkupMarkType, MarkupNodeType, markupToJSON } from "../huly-text.js"
 import { isMarkdownSerializableMark } from "./inline-comment-mark.js"
 
 // SDK: jsonToMarkup return type doesn't match Markup; cast contained here.
@@ -52,6 +53,11 @@ interface NativeLinkTransformResult {
   readonly changed: boolean
 }
 
+interface NativeReferenceLinkTransform {
+  readonly node: MarkupNode
+  readonly malformedReferences: ReadonlyArray<string>
+}
+
 interface ParsedUrlPair {
   readonly candidateUrl: URL
   readonly refUrl: URL
@@ -64,7 +70,7 @@ export const MARKDOWN_INPUT_REF_URL = "https://huly-mcp.invalid/no-reference-con
 
 const markdownInputRefUrl = UrlStringSchema.make(MARKDOWN_INPUT_REF_URL)
 
-const markdownInputUrlConfig = (urls: MarkupUrlConfig): MarkupUrlConfig => ({
+export const markdownInputUrlConfig = (urls: MarkupUrlConfig): MarkupUrlConfig => ({
   refUrl: markdownInputRefUrl,
   imageUrl: urls.imageUrl
 })
@@ -146,8 +152,7 @@ export const markupToMarkdownString = (markup: Markup, urls: MarkupUrlConfig): s
 }
 
 export const markdownToMarkupString = (markdown: string, urls: MarkupUrlConfig): Markup => {
-  const json = markdownToMarkup(markdown, markdownInputUrlConfig(urls))
-  return jsonAsMarkup(json)
+  return markdownToMarkupStringWithHulyLinks(markdown, urls).markup
 }
 
 const trimmedQueryValue = (query: URLSearchParams, name: string): string | undefined => {
@@ -242,14 +247,18 @@ const linkHref = (node: MarkupNode): string | undefined => {
 const referenceNodeFromTextNode = (
   node: MarkupNode,
   reference: ParsedBrowseReference
-): MarkupNode => ({
-  type: MarkupNodeType.reference,
-  attrs: {
-    id: reference.id,
-    objectclass: reference.objectClass,
-    label: reference.label
+): MarkupNode => {
+  const nonLinkMarks = node.marks?.filter((mark) => mark.type !== MarkupMarkType.link)
+  return {
+    type: MarkupNodeType.reference,
+    attrs: {
+      id: reference.id,
+      objectclass: reference.objectClass,
+      label: reference.label
+    },
+    ...(nonLinkMarks !== undefined && nonLinkMarks.length > 0 ? { marks: nonLinkMarks } : {})
   }
-})
+}
 
 const transformNativeReferenceLinks = (node: MarkupNode, urls: MarkupUrlConfig): NativeLinkTransformResult => {
   const href = node.type === MarkupNodeType.text ? linkHref(node) : undefined
@@ -267,7 +276,7 @@ const transformNativeReferenceLinks = (node: MarkupNode, urls: MarkupUrlConfig):
     }
   }
 
-  if (node.content === undefined) {
+  if (!Array.isArray(node.content)) {
     return { node, malformedReferences: [], changed: false }
   }
 
@@ -285,9 +294,20 @@ export const markdownToMarkupStringWithHulyLinks = (
   urls: MarkupUrlConfig
 ): MarkdownWithHulyLinksResult => {
   const json = markdownToMarkup(markdown, markdownInputUrlConfig(urls))
-  const transformed = transformNativeReferenceLinks(json, urls)
+  const transformed = transformMarkupNodeNativeReferenceLinks(json, urls)
   return {
     markup: jsonAsMarkup(transformed.node),
+    malformedReferences: transformed.malformedReferences
+  }
+}
+
+export const transformMarkupNodeNativeReferenceLinks = (
+  node: MarkupNode,
+  urls: MarkupUrlConfig
+): NativeReferenceLinkTransform => {
+  const transformed = transformNativeReferenceLinks(node, urls)
+  return {
+    node: transformed.node,
     malformedReferences: transformed.malformedReferences
   }
 }

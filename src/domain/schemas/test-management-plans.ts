@@ -1,5 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
@@ -32,8 +33,12 @@ const planField = TestPlanIdentifier.annotations({ description: "Test plan ID or
 const runField = TestRunIdentifier.annotations({ description: "Test run ID or name" })
 const resultField = TestResultIdentifier.annotations({ description: "Test result ID or name" })
 const nameField = NonEmptyString.annotations({ description: "Name" })
-const descField = Schema.String.annotations({ description: "Description" })
-const descNullField = Schema.NullOr(Schema.String).annotations({ description: "Description, or null to clear" })
+const descField = Schema.String.annotations({
+  description: `Description in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
+})
+const descNullField = Schema.NullOr(Schema.String).annotations({
+  description: `Description in markdown, or null to clear. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
+})
 const assigneeField = NonEmptyString.annotations({ description: "Assignee email or name" })
 export const TestPlanSummarySchema = Schema.Struct({
   id: TestPlanId,

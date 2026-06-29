@@ -1,3 +1,4 @@
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas.js"
 import {
   AddRecruitingAttachmentResultSchema,
   AddRecruitingCommentResultSchema,
@@ -77,7 +78,8 @@ export const recruitingMediaTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "add_recruiting_comment",
       description:
-        "Add a Markdown comment directly to a Recruiting vacancy, candidate, applicant, review, or opinion target resolved by the shared target locator.",
+        "Add a Markdown comment directly to a Recruiting vacancy, candidate, applicant, review, or opinion target resolved by the shared target locator. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: addRecruitingCommentParamsJsonSchema,
       resultSchema: AddRecruitingCommentResultSchema
@@ -89,7 +91,8 @@ export const recruitingMediaTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "update_recruiting_comment",
       description:
-        "Update one comment attached directly to a Recruiting vacancy, candidate, applicant, review, or opinion. The commentId must belong to the resolved target.",
+        "Update one comment attached directly to a Recruiting vacancy, candidate, applicant, review, or opinion. The commentId must belong to the resolved target. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: updateRecruitingCommentParamsJsonSchema,
       resultSchema: UpdateRecruitingCommentResultSchema

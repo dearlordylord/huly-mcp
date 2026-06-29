@@ -25,6 +25,7 @@ import {
 import { listPersonOrganizations } from "../../../src/huly/operations/persons.js"
 import { assertAt } from "../../../src/utils/assertions.js"
 import { email, memberReference, organizationId, personId } from "../../helpers/brands.js"
+import { capturedMarkupChildNodes, capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   const result = docs as FindResult<T>
@@ -114,6 +115,7 @@ interface MockConfig {
   captureRemoveDoc?: { id?: string }
   captureCreateMixin?: { mixin?: unknown; data?: Record<string, unknown>; objectId?: string }
   captureUpdateMarkup?: { markup?: string; objectId?: string; objectAttr?: string }
+  captureUploadMarkup?: { markup?: string; objectId?: string; objectAttr?: string }
   fetchMarkupResult?: string
   uploadMarkupResult?: string
 }
@@ -269,11 +271,16 @@ const createTestLayer = (config: MockConfig) => {
 
   const uploadMarkupImpl: HulyClientOperations["uploadMarkup"] = ((
     _objectClass: unknown,
-    _objectId: unknown,
-    _objectAttr: unknown,
-    _markup: unknown,
+    objectId: unknown,
+    objectAttr: unknown,
+    markup: unknown,
     _format: unknown
   ) => {
+    if (config.captureUploadMarkup) {
+      config.captureUploadMarkup.objectId = String(objectId)
+      config.captureUploadMarkup.objectAttr = String(objectAttr)
+      config.captureUploadMarkup.markup = String(markup)
+    }
     return Effect.succeed((config.uploadMarkupResult ?? "markup-ref-1") as unknown)
   }) as HulyClientOperations["uploadMarkup"]
 
@@ -468,10 +475,12 @@ describe("Organization CRUD, Customer Mixin, Channels, and Membership", () => {
       Effect.gen(function*() {
         const org = createMockOrganization()
         const capture: MockConfig["captureUpdateDoc"] = {}
+        const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
 
         const testLayer = createTestLayer({
           organizations: [org],
           captureUpdateDoc: capture,
+          captureUploadMarkup,
           uploadMarkupResult: "markup-ref-new"
         })
 
@@ -481,7 +490,39 @@ describe("Organization CRUD, Customer Mixin, Channels, and Membership", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(result.updated).toBe(true)
+        expect(capturedMarkupChildNodes(captureUploadMarkup.markup)).toContainEqual({
+          type: "text",
+          text: "New description",
+          marks: []
+        })
         expect(capture.operations?.description).toBe("markup-ref-new")
+      }))
+
+    it.effect("uploads missing organization descriptions with native references", () =>
+      Effect.gen(function*() {
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+
+        yield* updateOrganization({
+          identifier: "org-1",
+          description:
+            "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+        }).pipe(Effect.provide(createTestLayer({
+          organizations: [createMockOrganization()],
+          captureUpdateDoc,
+          captureUploadMarkup,
+          uploadMarkupResult: "markup-ref-new"
+        })))
+
+        expect(capturedMarkupReferenceNodes(captureUploadMarkup.markup)[0]).toMatchObject({
+          type: "reference",
+          attrs: {
+            id: "issue-1",
+            objectclass: "tracker:class:Issue",
+            label: "HULY-1"
+          }
+        })
+        expect(captureUpdateDoc.operations?.description).toBe("markup-ref-new")
       }))
 
     it.effect("updates description in place when organization already has markup", () =>
@@ -505,8 +546,38 @@ describe("Organization CRUD, Customer Mixin, Channels, and Membership", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(result.updated).toBe(true)
-        expect(captureUpdateMarkup.markup).toBe("# Updated")
+        expect(capturedMarkupChildNodes(captureUpdateMarkup.markup)).toContainEqual({
+          type: "text",
+          text: "Updated",
+          marks: []
+        })
         expect(captureUpdateMarkup.objectId).toBe("org-1")
+        expect(captureUpdateDoc.operations?.description).toBeUndefined()
+      }))
+
+    it.effect("updates existing organization descriptions with native references", () =>
+      Effect.gen(function*() {
+        const org = createMockOrganization({
+          // eslint-disable-next-line no-restricted-syntax -- test boundary: description markup ref is stored as an opaque string
+          description: "existing-markup" as unknown as null
+        })
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUpdateMarkup: MockConfig["captureUpdateMarkup"] = {}
+
+        yield* updateOrganization({
+          identifier: "org-1",
+          description:
+            "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+        }).pipe(Effect.provide(createTestLayer({ organizations: [org], captureUpdateDoc, captureUpdateMarkup })))
+
+        expect(capturedMarkupReferenceNodes(captureUpdateMarkup.markup)[0]).toMatchObject({
+          type: "reference",
+          attrs: {
+            id: "issue-1",
+            objectclass: "tracker:class:Issue",
+            label: "HULY-1"
+          }
+        })
         expect(captureUpdateDoc.operations?.description).toBeUndefined()
       }))
 

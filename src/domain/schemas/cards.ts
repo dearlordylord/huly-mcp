@@ -1,6 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
 import { clearableText } from "./clearable.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
@@ -156,7 +157,7 @@ export const CreateCardParamsSchema = Schema.Struct({
     description: "Card title"
   }),
   content: Schema.optional(Schema.String.annotations({
-    description: "Card content (markdown supported)"
+    description: `Card content in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })),
   parent: Schema.optional(CardIdentifier.annotations({
     description: "Parent card title or ID (for creating child cards)"
@@ -180,7 +181,7 @@ export const UpdateCardParamsSchema = Schema.Struct({
   title: Schema.optional(NonEmptyString.annotations({
     description: "New card title"
   })),
-  content: Schema.optional(clearableText("New card content (markdown supported)."))
+  content: Schema.optional(clearableText(`New card content in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`))
 }).pipe(
   Schema.filter((params) =>
     hasAtLeastOneDefined(params, UPDATE_CARD_FIELDS) ? undefined : atLeastOneUpdateFieldMessage(UPDATE_CARD_FIELDS)

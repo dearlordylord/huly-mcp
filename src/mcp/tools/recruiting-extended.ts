@@ -1,3 +1,4 @@
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas.js"
 import {
   ApplicantMatchDetailSchema,
   DeleteRecruitingOpinionResultSchema,
@@ -109,7 +110,8 @@ export const recruitingExtendedTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "create_recruiting_review",
       description:
-        "Create a Recruiting review/interview like the Huly UI: increments RVE sequence, attaches to the candidate reviews collection, stores markdown description as Huly markup, defaults dueDate to 30 minutes after date, and recruit-enables the person if needed.",
+        "Create a Recruiting review/interview like the Huly UI: increments RVE sequence, attaches to the candidate reviews collection, stores markdown description as Huly markup, defaults dueDate to 30 minutes after date, and recruit-enables the person if needed. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: createRecruitingReviewParamsJsonSchema,
       resultSchema: RecruitingReviewMutationResultSchema
@@ -121,7 +123,9 @@ export const recruitingExtendedTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "update_recruiting_review",
       description:
-        "Update a Recruiting review. review accepts raw _id, RVE-<number>, number, or exact title; candidate/applicationContext only disambiguate. Pass null for description, verdict, application, company, or location to clear.",
+        "Update a Recruiting review. review accepts raw _id, RVE-<number>, number, or exact title; candidate/applicationContext only disambiguate. Description supports markdown. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " Pass null for description, verdict, application, company, or location to clear.",
       category: CATEGORY,
       inputSchema: updateRecruitingReviewParamsJsonSchema,
       resultSchema: RecruitingReviewMutationResultSchema
@@ -170,7 +174,8 @@ export const recruitingExtendedTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "create_recruiting_opinion",
       description:
-        "Create a Recruiting opinion on one review. Increments the OPE sequence, attaches to the review opinions collection, and stores markdown description as Huly markup.",
+        "Create a Recruiting opinion on one review. Increments the OPE sequence, attaches to the review opinions collection, and stores markdown description as Huly markup. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: createRecruitingOpinionParamsJsonSchema,
       resultSchema: RecruitingOpinionMutationResultSchema
@@ -182,7 +187,9 @@ export const recruitingExtendedTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "update_recruiting_opinion",
       description:
-        "Update a Recruiting opinion value and/or markdown description. opinion accepts raw _id, OPE-<number>, or number; review can disambiguate. Pass null for description to clear it.",
+        "Update a Recruiting opinion value and/or markdown description. opinion accepts raw _id, OPE-<number>, or number; review can disambiguate. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " Pass null for description to clear it.",
       category: CATEGORY,
       inputSchema: updateRecruitingOpinionParamsJsonSchema,
       resultSchema: RecruitingOpinionMutationResultSchema

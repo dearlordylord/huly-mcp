@@ -55,7 +55,8 @@ import {
   resolveCaseType,
   testCasePriorityToString,
   testCaseStatusToString,
-  testCaseTypeToString
+  testCaseTypeToString,
+  uploadDescription
 } from "./test-management-shared.js"
 
 export { updateTestCase } from "./test-management-case-update.js"
@@ -326,12 +327,11 @@ export const createTestCase = (
     const statusEnum = resolveCaseStatus(params.status ?? DEFAULT_TEST_CASE_STATUS)
 
     const descRef: MarkupBlobRef | null = params.description !== undefined && params.description.trim() !== ""
-      ? yield* client.uploadMarkup(
+      ? yield* uploadDescription(
+        client,
         testManagement.class.TestCase,
         caseId,
-        "description",
-        params.description,
-        "markdown"
+        params.description
       )
       : null
 

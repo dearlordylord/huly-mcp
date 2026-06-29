@@ -2,6 +2,7 @@ import type { Visibility as HulyVisibility } from "@hcengineering/calendar"
 import { JSONSchema, Schema } from "effect"
 
 import { clearableText } from "./clearable.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
@@ -226,7 +227,7 @@ export const CreateEventParamsSchema = Schema.Struct({
     description: "Event title"
   }),
   description: Schema.optional(Schema.String.annotations({
-    description: "Event description (markdown supported)"
+    description: `Event description in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })),
   date: Timestamp.annotations({
     description: "Start date/time (timestamp)"
@@ -334,7 +335,9 @@ export const UpdateEventParamsSchema = Schema.Struct({
   title: Schema.optional(CalendarEventTitle.annotations({
     description: "New event title"
   })),
-  description: Schema.optional(clearableText("New event description (markdown supported).")),
+  description: Schema.optional(
+    clearableText(`New event description in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`)
+  ),
   date: Schema.optional(Timestamp.annotations({
     description: "New start date/time (timestamp)"
   })),

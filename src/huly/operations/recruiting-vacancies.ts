@@ -36,6 +36,7 @@ import type {
 import { contact, core, task } from "../huly-plugins.js"
 import { recruitIds } from "../recruit-plugin.js"
 import type { Vacancy } from "../types/recruiting.js"
+import { renderMarkdownPreservingNativeReferences } from "./native-reference-markup.js"
 import { resolveOrganizationByIdentifier } from "./organization-resolvers.js"
 import { hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
 import {
@@ -100,10 +101,17 @@ const uploadFullDescription = (
 ) =>
   fullDescription === undefined || fullDescription.trim() === ""
     ? Effect.succeed(null)
-    : Effect.map(
-      client.uploadMarkup(recruitIds.class.Vacancy, vacancyId, "fullDescription", fullDescription, "markdown"),
-      markupRefAsBlobRef
-    )
+    : Effect.gen(function*() {
+      const rendered = renderMarkdownPreservingNativeReferences(fullDescription, client.markupUrlConfig)
+      const ref = yield* client.uploadMarkup(
+        recruitIds.class.Vacancy,
+        vacancyId,
+        "fullDescription",
+        rendered.markup,
+        rendered.format
+      )
+      return markupRefAsBlobRef(ref)
+    })
 
 const fetchFullDescription = (
   client: HulyClient["Type"],

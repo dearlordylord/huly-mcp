@@ -19,6 +19,7 @@ import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.
 import { tracker } from "../../../src/huly/huly-plugins.js"
 import { listMilestones, updateMilestone } from "../../../src/huly/operations/milestones.js"
 import { milestoneIdentifier, projectIdentifier } from "../../helpers/brands.js"
+import { capturedMarkupChildNodes } from "../../helpers/markup-capture.js"
 
 const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
   const base = {
@@ -127,8 +128,10 @@ describe("updateMilestone - description dual-write", () => {
         _objectClass: unknown,
         _objectId: unknown,
         objectAttr: unknown,
-        value: unknown
+        value: unknown,
+        format: unknown
       ) => {
+        expect(format).toBe("markup")
         uploads.push({ attr: String(objectAttr), value: String(value) })
         return Effect.succeed("markup-ref")
       }) as unknown as HulyClientOperations["uploadMarkup"]
@@ -156,7 +159,12 @@ describe("updateMilestone - description dual-write", () => {
       }).pipe(Effect.provide(testLayer))
 
       expect(result).toEqual({ id: "m-1", updated: true })
-      expect(uploads).toEqual([{ attr: "description", value: "Updated milestone notes" }])
+      expect(uploads.map(upload => upload.attr)).toEqual(["description"])
+      expect(capturedMarkupChildNodes(assertAt(uploads, 0).value)).toContainEqual({
+        type: "text",
+        text: "Updated milestone notes",
+        marks: []
+      })
       expect(assertAt(updates, 0)).toHaveProperty("description")
     }))
 

@@ -1,6 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
 import { EventParticipantLocatorSchema } from "./calendar.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import {
   ApplicantIdentifier,
   ApplicantMatchIdentifier,
@@ -27,11 +28,12 @@ const RecruitingSearchText = NonEmptyString.annotations({
 })
 
 const RecruitingMarkdownInput = NonEmptyString.annotations({
-  description: "Non-empty markdown text converted to Huly rich-text markup."
+  description: `Non-empty markdown text converted to Huly rich-text markup. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
 })
 
 const RecruitingClearableMarkdownInput = Schema.NullOr(RecruitingMarkdownInput).annotations({
-  description: "Non-empty markdown replacement text, or null to clear this rich-text field."
+  description:
+    `Non-empty markdown replacement text, or null to clear this rich-text field. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
 })
 
 const RecruitingFreeTextInput = NonEmptyString.annotations({

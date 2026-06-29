@@ -1,5 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import { optionalOutput } from "./output-helpers.js"
 import {
   Count,
@@ -29,7 +30,7 @@ const ApprovalRequestPersonIdentifier = NonEmptyString.annotations({
 })
 
 const ApprovalRequestBody = NonEmptyString.annotations({
-  description: "Approval request comment body. Markdown is accepted and converted to Huly markup."
+  description: `Approval request comment body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
 })
 
 export const ApprovalRequestId = DocId.pipe(Schema.brand("ApprovalRequestId")).annotations({

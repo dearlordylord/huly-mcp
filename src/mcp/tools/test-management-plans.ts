@@ -1,3 +1,4 @@
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas.js"
 import {
   addTestPlanItemParamsJsonSchema,
   AddTestPlanItemResultSchema,
@@ -108,8 +109,9 @@ export const testManagementPlansTools: ReadonlyArray<RegisteredTool> = [
   defineTool(
     {
       name: "create_test_plan",
-      description:
-        "Create a test plan in a project. Idempotent: returns existing plan if one with the same name exists (created=false).",
+      description: "Create a test plan in a project. Description supports markdown. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " Idempotent: returns existing plan if one with the same name exists (created=false).",
       category: CATEGORY,
       inputSchema: createTestPlanParamsJsonSchema,
       resultSchema: CreateTestPlanResultSchema
@@ -120,8 +122,9 @@ export const testManagementPlansTools: ReadonlyArray<RegisteredTool> = [
   defineTool(
     {
       name: "update_test_plan",
-      description:
-        "Update a test plan's name or description. Only provided fields are modified. Pass description=null to clear.",
+      description: "Update a test plan's name or description. Description supports markdown. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " Only provided fields are modified. Pass description=null to clear.",
       category: CATEGORY,
       inputSchema: updateTestPlanParamsJsonSchema,
       resultSchema: UpdateTestPlanResultSchema
@@ -192,7 +195,9 @@ export const testManagementPlansTools: ReadonlyArray<RegisteredTool> = [
   defineTool(
     {
       name: "create_test_run",
-      description: "Create a test run in a project. For bulk creation from a plan, use run_test_plan instead.",
+      description: "Create a test run in a project. Description supports markdown. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " For bulk creation from a plan, use run_test_plan instead.",
       category: CATEGORY,
       inputSchema: createTestRunParamsJsonSchema,
       resultSchema: CreateTestRunResultSchema
@@ -203,8 +208,9 @@ export const testManagementPlansTools: ReadonlyArray<RegisteredTool> = [
   defineTool(
     {
       name: "update_test_run",
-      description:
-        "Update a test run's name, description, or due date. Only provided fields are modified. Pass null to clear optional fields.",
+      description: "Update a test run's name, description, or due date. Description supports markdown. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " Only provided fields are modified. Pass null to clear optional fields.",
       category: CATEGORY,
       inputSchema: updateTestRunParamsJsonSchema,
       resultSchema: UpdateTestRunResultSchema
@@ -261,8 +267,9 @@ export const testManagementPlansTools: ReadonlyArray<RegisteredTool> = [
   defineTool(
     {
       name: "update_test_result",
-      description:
-        "Update a test result's status, assignee, or description. Status values: untested, blocked, passed, failed.",
+      description: "Update a test result's status, assignee, or description. Description supports markdown. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " Status values: untested, blocked, passed, failed.",
       category: CATEGORY,
       inputSchema: updateTestResultParamsJsonSchema,
       resultSchema: UpdateTestResultResultSchema

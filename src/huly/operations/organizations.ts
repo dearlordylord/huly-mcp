@@ -41,6 +41,7 @@ import { leadClassIds } from "../lead-plugin.js"
 import { buildContactUrlFromConfig } from "../url-builders.js"
 import { listOrganizationChannels } from "./contact-channels.js"
 import { batchGetEmailsForPersons, findPersonByEmail, findPersonById } from "./contacts-shared.js"
+import { renderMarkdownPreservingNativeReferences } from "./native-reference-markup.js"
 import { resolveOrganizationByIdentifier } from "./organization-resolvers.js"
 import { clampLimit } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
@@ -244,8 +245,15 @@ export const updateOrganization = (
         if (params.description === null || params.description === "") {
           return { description: null }
         }
+        const rendered = renderMarkdownPreservingNativeReferences(params.description, client.markupUrlConfig)
         if (org.description !== null) {
-          yield* client.updateMarkup(contact.class.Organization, org._id, "description", params.description, "markdown")
+          yield* client.updateMarkup(
+            contact.class.Organization,
+            org._id,
+            "description",
+            rendered.markup,
+            rendered.format
+          )
           return {}
         }
         return {
@@ -253,8 +261,8 @@ export const updateOrganization = (
             contact.class.Organization,
             org._id,
             "description",
-            params.description,
-            "markdown"
+            rendered.markup,
+            rendered.format
           )
         }
       })

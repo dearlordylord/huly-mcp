@@ -43,3 +43,11 @@ export const renderMarkdownWithNativeReferencesForWrite = (
     rendered: { markup: rendered.markup, format: "markup" }
   }
 }
+
+export const renderMarkdownPreservingNativeReferences = (
+  content: string,
+  urls: MarkupUrlConfig
+): RenderedNativeReferenceMarkup => ({
+  markup: markdownToMarkupStringWithHulyLinks(content, urls).markup,
+  format: "markup"
+})

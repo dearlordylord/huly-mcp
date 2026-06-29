@@ -56,7 +56,8 @@ import {
   findTestRun,
   resolveAssignee,
   stringToTestRunStatus,
-  testRunStatusToString
+  testRunStatusToString,
+  uploadDescription
 } from "./test-management-shared.js"
 import {
   type CoveredUpdateEntry,
@@ -150,12 +151,11 @@ export const createTestRun = (
     const project = yield* findTestProject(client, params.project)
     const runId: Ref<TestRun> = generateId()
     const descRef: MarkupBlobRef | null = params.description !== undefined && params.description.trim() !== ""
-      ? yield* client.uploadMarkup(
+      ? yield* uploadDescription(
+        client,
         testManagement.class.TestRun,
         runId,
-        "description",
-        params.description,
-        "markdown"
+        params.description
       )
       : null
     yield* client.createDoc(testManagement.class.TestRun, project._id, {
@@ -205,12 +205,11 @@ export const updateTestRun = (
         if (params.description === undefined) return coveredUpdateEntry("description", {})
         if (params.description === null) return coveredUpdateEntry("description", { description: null })
         return coveredUpdateEntry("description", {
-          description: yield* client.uploadMarkup(
+          description: yield* uploadDescription(
+            client,
             testManagement.class.TestRun,
             run._id,
-            "description",
-            params.description,
-            "markdown"
+            params.description
           )
         })
       }),
@@ -366,12 +365,11 @@ export const updateTestResult = (
         if (params.description === undefined) return coveredUpdateEntry("description", {})
         if (params.description === null) return coveredUpdateEntry("description", { description: null })
         return coveredUpdateEntry("description", {
-          description: yield* client.uploadMarkup(
+          description: yield* uploadDescription(
+            client,
             testManagement.class.TestResult,
             result._id,
-            "description",
-            params.description,
-            "markdown"
+            params.description
           )
         })
       })

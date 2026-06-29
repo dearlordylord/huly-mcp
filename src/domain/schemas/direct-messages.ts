@@ -6,6 +6,7 @@
 import { JSONSchema, Schema } from "effect"
 
 import { MessageSummarySchema } from "./channels.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import {
   ChannelId,
   DEFAULT_LIMIT,
@@ -44,7 +45,7 @@ export const SendDmMessageParamsSchema = Schema.Struct({
       "Direct-message conversation: either the DM `_id` or a participant display name (e.g. `Kerr,Shannon`). A participant name resolves only to a one-to-one DM with the authenticated account."
   }),
   body: NonEmptyString.annotations({
-    description: "Message body (markdown supported)"
+    description: `Message body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })
 }).annotations({
   title: "SendDmMessageParams",
@@ -64,7 +65,7 @@ export const UpdateDmMessageParamsSchema = Schema.Struct({
     description: "Message ID to update"
   }),
   body: NonEmptyString.annotations({
-    description: "New message body (markdown supported)"
+    description: `New message body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })
 }).annotations({
   title: "UpdateDmMessageParams",

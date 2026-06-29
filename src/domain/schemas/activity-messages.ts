@@ -1,6 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
 import { ActivityMessageWireSchema } from "./activity.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import { ActivityFilterPosition, ActivityMarkup, DisplayText } from "./domain-values.js"
 import {
   ActivityFilterId,
@@ -117,7 +118,7 @@ export const AddActivityReplyParamsSchema = Schema.Struct({
     description: "ID of the activity message to reply to."
   }),
   body: Schema.NonEmptyString.annotations({
-    description: "Reply body in Markdown."
+    description: `Reply body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })
 }).annotations({
   title: "AddActivityReplyParams",
@@ -131,7 +132,7 @@ export const UpdateActivityReplyParamsSchema = Schema.Struct({
     description: "ID of the reply activity message to update."
   }),
   body: Schema.NonEmptyString.annotations({
-    description: "New reply body in Markdown."
+    description: `New reply body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })
 }).annotations({
   title: "UpdateActivityReplyParams",

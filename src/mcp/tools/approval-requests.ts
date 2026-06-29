@@ -1,3 +1,4 @@
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas.js"
 import {
   addApprovalRequestCommentParamsJsonSchema,
   addApprovalRequestParamsJsonSchema,
@@ -69,8 +70,9 @@ export const approvalRequestTools: ReadonlyArray<RegisteredTool> = [
   defineTool(
     {
       name: "add_approval_request_comment",
-      description:
-        "Add a plain markdown comment to an approval Request by request _id. This does not approve, reject, cancel, or create a decision comment mixin.",
+      description: "Add a plain markdown comment to an approval Request by request _id. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " This does not approve, reject, cancel, or create a decision comment mixin.",
       category: CATEGORY,
       inputSchema: addApprovalRequestCommentParamsJsonSchema,
       resultSchema: ApprovalRequestMutationResultSchema
@@ -82,7 +84,9 @@ export const approvalRequestTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "approve_approval_request",
       description:
-        "Approve an active approval Request as the current Huly user. The current user's Employee/Person ref must be in the request's requested list. Optionally attach a markdown decision comment before approval. If the current user already approved it, returns changed=false.",
+        "Approve an active approval Request as the current Huly user. The current user's Employee/Person ref must be in the request's requested list. Optionally attach a markdown decision comment before approval. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " If the current user already approved it, returns changed=false.",
       category: CATEGORY,
       inputSchema: approveApprovalRequestParamsJsonSchema,
       resultSchema: ApprovalRequestMutationResultSchema,
@@ -95,7 +99,9 @@ export const approvalRequestTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "reject_approval_request",
       description:
-        "Reject an active approval Request as the current Huly user and attach the required markdown rejection decision comment. Huly applies rejectedTx when present.",
+        "Reject an active approval Request as the current Huly user and attach the required markdown rejection decision comment. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " Huly applies rejectedTx when present.",
       category: CATEGORY,
       inputSchema: rejectApprovalRequestParamsJsonSchema,
       resultSchema: ApprovalRequestMutationResultSchema,
