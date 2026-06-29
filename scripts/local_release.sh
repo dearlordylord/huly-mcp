@@ -6,6 +6,7 @@ CLI_PACKAGE_NAME="@firfi/huly-cli"
 RELEASE_BRANCH="master"
 CHANGES_DIR=".changeset"
 CHANGES_VERSION="2.30.0"
+ESBUILD_VERSION="0.27.2"
 
 show_dist_tags() {
   local package_name="$1"
@@ -26,6 +27,39 @@ show_dist_tags() {
   return 1
 }
 
+published_version() {
+  local package_name="$1"
+  local allow_missing="$2"
+  local output
+  local error_file
+  error_file="$(mktemp)"
+
+  if output="$(npm view "$package_name" version --json 2>"$error_file")"; then
+    rm -f "$error_file"
+    printf '%s\n' "$output" | tr -d '"'
+    return 0
+  fi
+
+  if [[ "$allow_missing" == "true" ]] && grep -q "E404" "$error_file"; then
+    rm -f "$error_file"
+    return 0
+  fi
+
+  cat "$error_file" >&2
+  rm -f "$error_file"
+  return 1
+}
+
+package_needs_publish() {
+  local package_name="$1"
+  local local_version="$2"
+  local allow_missing="$3"
+  local registry_version
+
+  registry_version="$(published_version "$package_name" "$allow_missing")"
+  [[ "$registry_version" != "$local_version" ]]
+}
+
 stage_if_exists() {
   local path
   for path in "$@"; do
@@ -33,6 +67,32 @@ stage_if_exists() {
       git add "$path"
     fi
   done
+}
+
+build_mcp_package() {
+  local package_version="$1"
+
+  pnpm dlx "esbuild@$ESBUILD_VERSION" src/index.ts \
+    --bundle \
+    --platform=node \
+    --format=cjs \
+    --outfile=dist/index.cjs \
+    --external:ws \
+    "--define:PKG_VERSION=\"$package_version\""
+  pnpm verify-version
+}
+
+build_cli_package() {
+  local package_version="$1"
+
+  pnpm dlx "esbuild@$ESBUILD_VERSION" packages/huly-cli/src/index.ts \
+    --bundle \
+    --platform=node \
+    --format=cjs \
+    --outfile=packages/huly-cli/dist/index.cjs \
+    --external:ws \
+    "--define:PKG_VERSION=\"$package_version\""
+  pnpm --filter "$CLI_PACKAGE_NAME" verify-version
 }
 
 current_branch="$(git branch --show-current)"
@@ -64,14 +124,42 @@ fi
 
 mcp_package_version="$(node -p "require('./package.json').version")"
 cli_package_version="$(node -p "require('./packages/huly-cli/package.json').version")"
+mcp_needs_publish=false
+cli_needs_publish=false
 
-pnpm build
-pnpm verify-version
-pnpm --filter "$CLI_PACKAGE_NAME" verify-version
-pnpm verify-cli-integration-coverage
-pnpm integration:cli
+if package_needs_publish "$MCP_PACKAGE_NAME" "$mcp_package_version" false; then
+  mcp_needs_publish=true
+fi
 
-npm_config_ignore_scripts=true pnpm dlx "@changesets/cli@$CHANGES_VERSION" publish
+if package_needs_publish "$CLI_PACKAGE_NAME" "$cli_package_version" true; then
+  cli_needs_publish=true
+fi
+
+if [[ "$mcp_needs_publish" == "false" && "$cli_needs_publish" == "false" ]]; then
+  echo "No package versions need publishing; pushing any existing release commit/tags."
+else
+  echo "Publish plan:"
+  if [[ "$mcp_needs_publish" == "true" ]]; then
+    echo "  - $MCP_PACKAGE_NAME@$mcp_package_version"
+  fi
+  if [[ "$cli_needs_publish" == "true" ]]; then
+    echo "  - $CLI_PACKAGE_NAME@$cli_package_version"
+  fi
+fi
+
+if [[ "$mcp_needs_publish" == "true" ]]; then
+  build_mcp_package "$mcp_package_version"
+fi
+
+if [[ "$cli_needs_publish" == "true" ]]; then
+  build_cli_package "$cli_package_version"
+  pnpm verify-cli-integration-coverage
+  pnpm integration:cli
+fi
+
+if [[ "$mcp_needs_publish" == "true" || "$cli_needs_publish" == "true" ]]; then
+  npm_config_ignore_scripts=true pnpm dlx "@changesets/cli@$CHANGES_VERSION" publish
+fi
 
 git push origin "$RELEASE_BRANCH"
 mapfile -t release_tags < <(git tag --points-at HEAD)
@@ -87,4 +175,4 @@ fi
 show_dist_tags "$MCP_PACKAGE_NAME" false
 show_dist_tags "$CLI_PACKAGE_NAME" false
 
-echo "Published $MCP_PACKAGE_NAME@$mcp_package_version and $CLI_PACKAGE_NAME@$cli_package_version when changed."
+echo "Release finished for changed packages."
