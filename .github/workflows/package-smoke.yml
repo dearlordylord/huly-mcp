@@ -139,6 +139,50 @@ jobs:
           }
           NODE
 
+      - name: Pack CLI package
+        run: |
+          mkdir -p .package-smoke-cli
+          npm_config_ignore_scripts=true pnpm --dir packages/huly-cli pack --pack-destination ../../.package-smoke-cli
+
+      - name: Install and inspect packed CLI package
+        run: |
+          set -euo pipefail
+
+          tarball="$(realpath "$(ls .package-smoke-cli/*.tgz | head -n 1)")"
+          expected_version="$(node -p "require('./packages/huly-cli/package.json').version")"
+          smoke_dir="$(mktemp -d)"
+
+          cd "$smoke_dir"
+          printf '{"private":true,"type":"module"}\n' > package.json
+          pnpm add "$tarball"
+
+          node - "$expected_version" <<'NODE'
+          const { readFileSync } = require("node:fs")
+
+          const expectedVersion = process.argv[2]
+          const packageJson = JSON.parse(readFileSync("node_modules/@firfi/huly-cli/package.json", "utf8"))
+          const expectedBin = { huly: "./dist/index.cjs" }
+
+          if (packageJson.version !== expectedVersion) {
+            throw new Error(`Unexpected CLI package version: ${packageJson.version}`)
+          }
+
+          if (JSON.stringify(packageJson.bin) !== JSON.stringify(expectedBin)) {
+            throw new Error(`Unexpected CLI package bin metadata: ${JSON.stringify(packageJson.bin)}`)
+          }
+          NODE
+
+          pnpm exec huly --help > help.log
+          grep -q "Huly CLI" help.log
+
+          npm_smoke_dir="$(mktemp -d)"
+          cd "$npm_smoke_dir"
+          printf '{"private":true,"type":"module"}\n' > package.json
+          npm install "$tarball"
+
+          ./node_modules/.bin/huly --help > help.log
+          grep -q "Huly CLI" help.log
+
   docker-image:
     name: Docker image
     runs-on: ubuntu-latest

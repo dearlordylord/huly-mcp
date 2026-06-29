@@ -100,6 +100,16 @@ describe("CLI input merging", () => {
     })
   })
 
+  it("coerces generated positional values with their schema fields", async () => {
+    const pinned = await invoke("pin_attachment", ["attachment-1", "true"])
+    const members = await invoke("add_channel_members", ["channel-1", "[\"person@example.com\"]"])
+    const malformedMembers = await rejected(invoke("add_channel_members", ["channel-1", "person@example.com"]))
+
+    expect(pinned.input).toEqual({ attachmentId: "attachment-1", pinned: true })
+    expect(members.input).toEqual({ channel: "channel-1", members: ["person@example.com"] })
+    expect(errorMessage(malformedMembers)).toContain("has invalid JSON")
+  })
+
   it("reads JSON input files before explicit options", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "huly-cli-json-"))
     const inputPath = path.join(dir, "input.json")
@@ -344,6 +354,15 @@ describe("CLI input merging", () => {
       positionals: [],
       raw: []
     }))
+    const positionalWithoutSchemaField = await runCliEffect(buildCliInvocation(tool, {
+      path: ["fixture"],
+      positional: ["notInSchema"],
+      description: "Fixture"
+    }, {
+      options: [],
+      positionals: ["raw-value"],
+      raw: ["raw-value"]
+    }))
     const manualBoolean = await runCliEffect(buildCliInvocation(tool, cliCommandCatalog.list_issues, {
       options: [{
         _tag: "FieldOption",
@@ -374,8 +393,39 @@ describe("CLI input merging", () => {
     }))
 
     expect(noPositionalInput.input).toEqual({})
+    expect(positionalWithoutSchemaField.input).toEqual({ notInSchema: "raw-value" })
     expect(manualBoolean.input).toEqual({ hasAssignee: true })
     expect(unknownOptions.input).toEqual({})
+  })
+
+  it("reports invalid boolean-only positional values", async () => {
+    const booleanTool = {
+      ...getTool("list_issues"),
+      inputSchema: {
+        type: "object",
+        properties: {
+          enabled: { type: "boolean" }
+        }
+      }
+    }
+    const error = await rejected(
+      runCliEffect(
+        Effect.gen(function*() {
+          const parsed = yield* parseCliCommandLine(booleanTool, {
+            path: ["fixture"],
+            positional: ["enabled"],
+            description: "Fixture"
+          }, ["maybe"])
+          return yield* buildCliInvocation(booleanTool, {
+            path: ["fixture"],
+            positional: ["enabled"],
+            description: "Fixture"
+          }, parsed)
+        })
+      )
+    )
+
+    expect(errorMessage(error)).toContain("Option enabled expects true or false")
   })
 
   it("reports invalid JSON for JSON-only schema fields", async () => {

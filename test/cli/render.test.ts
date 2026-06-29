@@ -82,6 +82,26 @@ describe("CLI rendering", () => {
     expect(output).toBe("{\n  \"ok\": true\n}")
   })
 
+  it("renders warnings in human and JSON output", () => {
+    const success = {
+      result: { ok: true },
+      warnings: [{
+        code: "status_metadata_unresolved" as const,
+        message: "Status metadata was degraded."
+      }]
+    }
+
+    const human = renderOperationResult(success, globals)
+    const json = JSON.parse(renderOperationResult(success, { json: true, yes: false }))
+
+    expect(human).toContain("Warnings:")
+    expect(human).toContain("status_metadata_unresolved")
+    expect(json).toEqual({
+      result: { ok: true },
+      warnings: success.warnings
+    })
+  })
+
   it("logs rendered output through the Effect console service", async () => {
     const logs: Array<unknown> = []
     const consoleService = await Effect.runPromise(Effect.console)

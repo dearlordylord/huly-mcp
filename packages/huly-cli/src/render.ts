@@ -93,10 +93,23 @@ const renderHuman = (result: unknown): string => {
   return scalarText(result)
 }
 
+const renderWarnings = (warnings: ToolOperationSuccess["warnings"]): string =>
+  warnings.map((warning) => `- ${warning.code}: ${warning.message}`).join("\n")
+
 export const renderOperationResult = (
   success: ToolOperationSuccess,
   globals: CliGlobalOptions
-): string => globals.json ? JSON.stringify(success.result, null, 2) : renderHuman(success.result)
+): string => {
+  if (globals.json) {
+    return JSON.stringify(
+      success.warnings.length === 0 ? success.result : { result: success.result, warnings: success.warnings },
+      null,
+      2
+    )
+  }
+  const output = renderHuman(success.result)
+  return success.warnings.length === 0 ? output : `${output}\n\nWarnings:\n${renderWarnings(success.warnings)}`
+}
 
 export const renderOperationSuccess = (
   success: ToolOperationSuccess,

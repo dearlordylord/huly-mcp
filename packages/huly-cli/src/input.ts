@@ -127,29 +127,35 @@ const collectSourceInput = (
 
 const collectPositionals = (
   spec: CliCommandSpec,
-  positionals: ReadonlyArray<string>
-): Effect.Effect<Record<string, unknown>, CliInputError> => {
-  const unknownOption = positionals.find((value) => value.startsWith("--"))
-  if (unknownOption !== undefined) {
-    return Effect.fail(new CliInputError({ message: `Unknown option ${unknownOption}.` }))
-  }
-  if (positionals.length > spec.positional.length) {
-    return Effect.fail(
-      new CliInputError({
+  positionals: ReadonlyArray<string>,
+  rootSchema: object,
+  fields: ReadonlyMap<string, FieldSpec>
+): Effect.Effect<Record<string, unknown>, CliInputError> =>
+  Effect.gen(function*() {
+    const unknownOption = positionals.find((value) => value.startsWith("--"))
+    if (unknownOption !== undefined) {
+      return yield* new CliInputError({ message: `Unknown option ${unknownOption}.` })
+    }
+    if (positionals.length > spec.positional.length) {
+      return yield* new CliInputError({
         message: `Too many positional arguments. Expected ${spec.positional.length}, received ${positionals.length}.`
       })
-    )
-  }
-
-  const input: Record<string, unknown> = {}
-  for (const [index, fieldName] of spec.positional.entries()) {
-    const value = positionals[index]
-    if (value !== undefined) {
-      input[fieldName] = value
     }
-  }
-  return Effect.succeed(input)
-}
+
+    const input: Record<string, unknown> = {}
+    for (const [index, fieldName] of spec.positional.entries()) {
+      const value = positionals[index]
+      if (value !== undefined) {
+        const optionName = fieldName
+          .replaceAll("_", "-")
+          .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+          .toLowerCase()
+        const field = fields.get(optionName)
+        input[fieldName] = field === undefined ? value : yield* parseFieldValue(rootSchema, field, value)
+      }
+    }
+    return input
+  })
 
 const collectExplicitOptions = (
   parsed: ParsedCliCommandLine,
@@ -220,7 +226,7 @@ export const buildCliInvocation = (
     const fields = collectFieldSpecs(tool.inputSchema)
     const sourceInput = yield* collectSourceInput(parsed.options)
     const explicitInput = yield* collectExplicitOptions(parsed, tool.inputSchema, fields)
-    const positionalInput = yield* collectPositionals(spec, parsed.positionals)
+    const positionalInput = yield* collectPositionals(spec, parsed.positionals, tool.inputSchema, fields)
     const globals = yield* collectGlobalOptions(parsed.options, parsed.raw)
 
     return {

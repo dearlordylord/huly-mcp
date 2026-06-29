@@ -303,7 +303,7 @@ export const collaborationReadOnlyCliCommandCatalog = {
     description: "List Tag Categories"
   },
   list_tags: {
-    path: ["tags", "tags", "list"],
+    path: ["tags", "list"],
     positional: ["targetClass"],
     description: "List Tags"
   },

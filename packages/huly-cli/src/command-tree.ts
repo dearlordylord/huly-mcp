@@ -109,7 +109,7 @@ const makeGroupCommand = (
   }
   /* c8 ignore stop */
 
-  return Command.make(node.name).pipe(
+  return Command.make(node.name, buildGlobalOptionsConfig()).pipe(
     Command.withDescription(node.name === "huly" ? "Huly CLI" : `${node.name} commands`),
     Command.withSubcommands([first, ...subcommands.slice(1)])
   )

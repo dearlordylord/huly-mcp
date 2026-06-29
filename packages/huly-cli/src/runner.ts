@@ -7,7 +7,7 @@ import { AttachmentId } from "../../../src/domain/schemas/shared.js"
 import { attachment } from "../../../src/huly/huly-plugins.js"
 import { findAttachmentForScope } from "../../../src/huly/operations/attachments-shared.js"
 import type { ClientBundle } from "../../../src/mcp/server.js"
-import { operationRegistry } from "../../../src/mcp/tools/index.js"
+import { operationRegistry, resolveAnnotations } from "../../../src/mcp/tools/index.js"
 import { formatOperationFailure, type ToolOperationSuccess } from "../../../src/mcp/tools/registry.js"
 import { buildCombinedClientLayer, buildScopedClientBundle } from "../../../src/runtime/huly-clients.js"
 import type { CliCommandSpec } from "./catalog-types.js"
@@ -97,6 +97,15 @@ const defaultRunnerPorts: CliRunnerPorts = {
 }
 /* c8 ignore stop */
 
+const confirmationMessage = (
+  spec: CliCommandSpec,
+  operation: CliOperation
+): string | undefined => {
+  const catalogConfirmation = spec.behavior?.confirmation
+  if (catalogConfirmation?.type === "requires-yes") return catalogConfirmation.message
+  return resolveAnnotations(operation).destructiveHint === true ? `${spec.path.join(" ")} requires --yes.` : undefined
+}
+
 export const runCliToolWithPorts = (
   ports: CliRunnerPorts,
   toolName: CliToolName,
@@ -107,8 +116,9 @@ export const runCliToolWithPorts = (
     const operation = ports.getOperation(toolName)
 
     const invocation = yield* buildCliInvocation(operation, spec, parsed)
-    if (spec.behavior?.confirmation?.type === "requires-yes" && !invocation.globals.yes) {
-      return yield* new CliRuntimeError({ message: spec.behavior.confirmation.message })
+    const requiredConfirmationMessage = confirmationMessage(spec, operation)
+    if (requiredConfirmationMessage !== undefined && !invocation.globals.yes) {
+      return yield* new CliRuntimeError({ message: requiredConfirmationMessage })
     }
     if (invocation.globals.output !== undefined && spec.behavior?.fileOutput === undefined) {
       return yield* new CliRuntimeError({ message: `${spec.path.join(" ")} does not support --output.` })

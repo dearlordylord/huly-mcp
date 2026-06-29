@@ -96,6 +96,28 @@ describe("CLI runner", () => {
     expect(observation.rendered).toEqual([])
   })
 
+  it("enforces destructive operation annotations before opening clients", async () => {
+    const result = { result: { deleted: true }, warnings: [] }
+    const observation = { downloads: [], rendered: [] }
+    const error = await rejected(run("unschedule_todo", [], makePorts(result, observation)))
+
+    expect(errorMessage(error)).toContain("planner todos unschedule requires --yes")
+    expect(observation.rendered).toEqual([])
+
+    await run("unschedule_todo", ["--yes"], makePorts(result, observation))
+
+    expect(observation.rendered).toEqual([result])
+  })
+
+  it("does not require confirmation for non-destructive operation annotations", async () => {
+    const result = { result: { ok: true }, warnings: [] }
+    const observation = { downloads: [], rendered: [] }
+
+    await run("pin_attachment", ["attachment-1", "true"], makePorts(result, observation))
+
+    expect(observation.rendered).toEqual([result])
+  })
+
   it("rejects unsupported --output before opening clients", async () => {
     const result = { result: { issues: [] }, warnings: [] }
     const observation = { downloads: [], rendered: [] }

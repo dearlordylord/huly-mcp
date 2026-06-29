@@ -32,6 +32,12 @@ describe("CLI command tree", () => {
     expect(errorMessage(error)).toContain("issues list does not support --output")
   })
 
+  it("accepts global options between generated command groups", async () => {
+    const error = await rejected(runCommand(["issues", "--json", "labels", "add", "--output", "out.json"]))
+
+    expect(errorMessage(error)).toContain("issues labels add does not support --output")
+  })
+
   it("rejects --output for commands without file output behavior", async () => {
     const error = await rejected(runCommand(["issues", "list", "--output", "out.json"]))
 
@@ -41,7 +47,16 @@ describe("CLI command tree", () => {
   it.each([
     [["boards", "cards", "labels", "list", "board-1", "card-1", "--output", "out.json"], "boards cards labels list"],
     [
-      ["channels", "messages", "attachments", "get", "message-1", "attachment-1", "--output", "out.json"],
+      [
+        "channels",
+        "messages",
+        "attachments",
+        "get",
+        "{\"messageId\":\"message-1\"}",
+        "attachment-1",
+        "--output",
+        "out.json"
+      ],
       "channels messages attachments get"
     ],
     [
