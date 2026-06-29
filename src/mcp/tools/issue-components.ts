@@ -2,6 +2,7 @@ import {
   createComponentParamsJsonSchema,
   deleteComponentParamsJsonSchema,
   getComponentParamsJsonSchema,
+  HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
   listComponentsParamsJsonSchema,
   parseCreateComponentParams,
   parseDeleteComponentParams,
@@ -60,7 +61,9 @@ export const issueComponentTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "create_component",
       description:
-        "Create a new component in a Huly project. Components help organize issues by area/feature. Returns the created component ID and label.",
+        "Create a new component in a Huly project. Components help organize issues by area/feature. Description supports markdown. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " Returns the created component ID and label.",
       category: CATEGORY,
       inputSchema: createComponentParamsJsonSchema,
       resultSchema: CreateComponentResultSchema
@@ -71,7 +74,9 @@ export const issueComponentTools: ReadonlyArray<RegisteredTool> = [
   defineTool(
     {
       name: "update_component",
-      description: "Update fields on an existing Huly component. Only provided fields are modified.",
+      description:
+        "Update fields on an existing Huly component. Only provided fields are modified. Description supports markdown. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: updateComponentParamsJsonSchema,
       resultSchema: UpdateComponentResultSchema

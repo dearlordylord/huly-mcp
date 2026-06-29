@@ -162,6 +162,7 @@ import type {
 } from "../../../src/huly/types/recruiting.js"
 import { withDiagnostics } from "../../helpers/diagnostics.js"
 import { corePersonId, docRef, findResult, personRef, spaceRef, statusRef } from "../../helpers/huly-sdk.js"
+import { capturedMarkupChildNodes, capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 const accountUuid = "00000000-0000-4000-8000-000000000000" as AccountUuid
 
@@ -178,12 +179,12 @@ interface Captures {
   readonly createdDocs: Array<{
     readonly class: string
     readonly id: string | undefined
-    readonly attributes: object
+    readonly attributes: Record<string, unknown>
   }>
   readonly updatedDocs: Array<{
     readonly class: string
     readonly id: string
-    readonly operations: object
+    readonly operations: Record<string, unknown>
     readonly retrieve: boolean | undefined
   }>
   readonly addedCollections: Array<{
@@ -191,18 +192,18 @@ interface Captures {
     readonly space: string
     readonly attachedTo: string
     readonly collection: string
-    readonly attributes: object
+    readonly attributes: Record<string, unknown>
     readonly id: string | undefined
   }>
   readonly createdMixins: Array<{
     readonly id: string
     readonly mixin: string
-    readonly attributes: object
+    readonly attributes: Record<string, unknown>
   }>
   readonly updatedMixins: Array<{
     readonly id: string
     readonly mixin: string
-    readonly attributes: object
+    readonly attributes: Record<string, unknown>
   }>
   readonly removedCollections: Array<{
     readonly class: string
@@ -215,7 +216,7 @@ interface Captures {
     readonly id: string
     readonly attachedTo: string
     readonly collection: string
-    readonly operations: object
+    readonly operations: Record<string, unknown>
   }>
   readonly removedDocs: Array<{
     readonly class: string
@@ -1077,7 +1078,12 @@ describe("Recruiting Operations", () => {
         private: true
       }).pipe(Effect.provide(layer))
       expect(updated.vacancy.name).toBe("Principal Engineer")
-      expect(captures.uploadedMarkup.at(-1)).toMatchObject({ id: "vacancy-1", markup: "# Updated" })
+      expect(captures.uploadedMarkup.at(-1)).toMatchObject({ id: "vacancy-1", format: "markup" })
+      expect(capturedMarkupChildNodes(captures.uploadedMarkup.at(-1)?.markup)).toContainEqual({
+        type: "text",
+        text: "Updated",
+        marks: []
+      })
       expect(captures.updatedDocs.at(-1)?.operations).toMatchObject({
         name: "Principal Engineer",
         description: "Lead APIs",
@@ -1088,6 +1094,21 @@ describe("Recruiting Operations", () => {
         dueTo: 1704000000000,
         private: true
       })
+
+      yield* updateRecruitingVacancy({
+        vacancy: VacancyIdentifier.make("VCN-1"),
+        fullDescription:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(layer))
+      expect(capturedMarkupReferenceNodes(captures.uploadedMarkup.at(-1)?.markup)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
+      expect(captures.updatedDocs.at(-1)?.operations).toMatchObject({ fullDescription: "markup-ref" })
 
       yield* updateRecruitingVacancy({
         vacancy: VacancyIdentifier.make("VCN-1"),
@@ -1260,7 +1281,12 @@ describe("Recruiting Operations", () => {
       }).pipe(Effect.provide(layer))
 
       expect(result.vacancy.identifier).toBe("VCN-42")
-      expect(captures.uploadedMarkup[0]?.markup).toBe("# Role")
+      expect(captures.uploadedMarkup[0]?.format).toBe("markup")
+      expect(capturedMarkupChildNodes(captures.uploadedMarkup[0]?.markup)).toContainEqual({
+        type: "text",
+        text: "Role",
+        marks: []
+      })
       expect(captures.createdDocs[0]?.class).toBe(String(recruitIds.class.Vacancy))
       expect(captures.createdDocs[0]?.attributes).toMatchObject({
         name: "Platform Engineer",
@@ -1273,6 +1299,29 @@ describe("Recruiting Operations", () => {
         mixin: String(vacancyTypeDataRef),
         attributes: {}
       })
+    }))
+
+  it.effect("creates vacancy full descriptions with native references", () =>
+    Effect.gen(function*() {
+      const { captures, layer } = createRecruitingLayer({
+        sequences: [makeSequence("seq-vacancy", recruitIds.class.Vacancy, 41)]
+      })
+
+      yield* createRecruitingVacancy({
+        name: "Native Ref Vacancy",
+        fullDescription:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(layer))
+
+      expect(capturedMarkupReferenceNodes(captures.uploadedMarkup[0]?.markup)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
+      expect(captures.createdDocs[0]?.attributes.fullDescription).toBe("markup-ref")
     }))
 
   it.effect("archives and unarchives vacancies", () =>
@@ -2063,6 +2112,23 @@ describe("Recruiting Operations", () => {
         location: ""
       })
 
+      yield* createRecruitingReview({
+        candidate: CandidateIdentifier.make("Ada Lovelace"),
+        title: "Native Ref Review",
+        date: Timestamp.make(1704000000000),
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(layer))
+      expect(capturedMarkupReferenceNodes(String(captures.addedCollections.at(-1)?.attributes.description))[0])
+        .toMatchObject({
+          type: "reference",
+          attrs: {
+            id: "issue-1",
+            objectclass: "tracker:class:Issue",
+            label: "HULY-1"
+          }
+        })
+
       yield* updateRecruitingReview({
         review: ReviewIdentifier.make("RVE-1"),
         description: "Updated review notes",
@@ -2094,6 +2160,21 @@ describe("Recruiting Operations", () => {
         description: "Description only"
       }).pipe(Effect.provide(layer))
       expect(captures.updatedCollections.at(-1)?.operations).toHaveProperty("description")
+
+      yield* updateRecruitingReview({
+        review: ReviewIdentifier.make("RVE-1"),
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(layer))
+      expect(capturedMarkupReferenceNodes(String(captures.updatedCollections.at(-1)?.operations.description))[0])
+        .toMatchObject({
+          type: "reference",
+          attrs: {
+            id: "issue-1",
+            objectclass: "tracker:class:Issue",
+            label: "HULY-1"
+          }
+        })
     }))
 
   it.effect("reports review model gaps, locator mismatches, and unsupported deletes", () =>
@@ -2295,11 +2376,42 @@ describe("Recruiting Operations", () => {
         description: ""
       })
 
+      yield* createRecruitingOpinion({
+        review: ReviewIdentifier.make("RVE-1"),
+        value: "Native ref opinion",
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(layer))
+      expect(capturedMarkupReferenceNodes(String(captures.addedCollections.at(-1)?.attributes.description))[0])
+        .toMatchObject({
+          type: "reference",
+          attrs: {
+            id: "issue-1",
+            objectclass: "tracker:class:Issue",
+            label: "HULY-1"
+          }
+        })
+
       yield* updateRecruitingOpinion({
         opinion: OpinionIdentifier.make("OPE-1"),
         description: "Updated opinion details"
       }).pipe(Effect.provide(layer))
       expect(captures.updatedCollections.at(-1)?.operations).toHaveProperty("description")
+
+      yield* updateRecruitingOpinion({
+        opinion: OpinionIdentifier.make("OPE-1"),
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(layer))
+      expect(capturedMarkupReferenceNodes(String(captures.updatedCollections.at(-1)?.operations.description))[0])
+        .toMatchObject({
+          type: "reference",
+          attrs: {
+            id: "issue-1",
+            objectclass: "tracker:class:Issue",
+            label: "HULY-1"
+          }
+        })
 
       yield* updateRecruitingOpinion({
         opinion: OpinionIdentifier.make("OPE-1"),

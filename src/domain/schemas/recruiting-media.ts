@@ -1,6 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
 import { UPDATE_ATTACHMENT_FIELDS } from "./attachments.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import { AttachmentDescription, AttachmentFileName, Base64FileData, LocalFilePath } from "./domain-values.js"
 import { withExactlyOneRequired, withJsonSchemaPropertyDescriptions } from "./json-schema.js"
 import {
@@ -153,7 +154,7 @@ export type ListRecruitingCommentsParams = Schema.Schema.Type<typeof ListRecruit
 const AddRecruitingCommentParamsSchema = Schema.Struct({
   target: RecruitingCommentTargetSchema,
   body: NonEmptyString.annotations({
-    description: "Comment body. Markdown is supported."
+    description: `Comment body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })
 })
 export type AddRecruitingCommentParams = Schema.Schema.Type<typeof AddRecruitingCommentParamsSchema>
@@ -164,7 +165,7 @@ const UpdateRecruitingCommentParamsSchema = Schema.Struct({
     description: "Comment ID. Must belong directly to the resolved Recruiting target."
   }),
   body: NonEmptyString.annotations({
-    description: "New comment body. Markdown is supported."
+    description: `New comment body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })
 })
 export type UpdateRecruitingCommentParams = Schema.Schema.Type<typeof UpdateRecruitingCommentParamsSchema>
@@ -267,7 +268,7 @@ const RECRUITING_MEDIA_FIELD_DESCRIPTIONS: Readonly<Partial<Record<string, strin
   target:
     "Recruiting target locator. Supported kinds depend on the tool: comments use vacancy/candidate/applicant/review/opinion; attachments use vacancy/candidate/applicant/opinion; activity uses vacancy/candidate/applicant/review; related issues use vacancy/candidate/applicant.",
   limit: `Maximum number of matching rows to return (default: ${DEFAULT_LIMIT}).`,
-  body: "Comment body. Markdown is supported.",
+  body: `Comment body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`,
   commentId: "Comment ID. Must belong directly to the resolved Recruiting target.",
   attachmentId: "Attachment ID. Must belong directly to the resolved Recruiting target.",
   filename: "Name of the file to attach to the Recruiting object.",

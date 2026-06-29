@@ -1,3 +1,4 @@
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas.js"
 import {
   AddInventoryProductAttachmentResultSchema,
   AddInventoryProductCommentResultSchema,
@@ -203,7 +204,8 @@ export const inventoryMediaTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "add_inventory_product_comment",
       description:
-        "Add a Markdown comment directly to an inventory product resolved by product ID or exact name. Pass category to disambiguate duplicate names.",
+        "Add a Markdown comment directly to an inventory product resolved by product ID or exact name. Pass category to disambiguate duplicate names. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: addInventoryProductCommentParamsJsonSchema,
       resultSchema: AddInventoryProductCommentResultSchema
@@ -215,7 +217,8 @@ export const inventoryMediaTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "update_inventory_product_comment",
       description:
-        "Update a comment attached directly to an inventory product. The commentId must belong to the resolved product.",
+        "Update a comment attached directly to an inventory product. The commentId must belong to the resolved product. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: updateInventoryProductCommentParamsJsonSchema,
       resultSchema: UpdateInventoryProductCommentResultSchema

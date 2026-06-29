@@ -10,6 +10,7 @@ import {
   deleteThreadReplyParamsJsonSchema,
   getChannelParamsJsonSchema,
   getChatMessageAttachmentParamsJsonSchema,
+  HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
   listChannelMessagesParamsJsonSchema,
   listChannelsParamsJsonSchema,
   listChatMessageAttachmentsParamsJsonSchema,
@@ -202,7 +203,8 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
   defineTool(
     {
       name: "send_channel_message",
-      description: "Send a message to a Huly channel. Message body supports markdown formatting.",
+      description: "Send a message to a Huly channel. Message body supports markdown formatting. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: sendChannelMessageParamsJsonSchema,
       resultSchema: SendChannelMessageResultSchema
@@ -213,7 +215,8 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
   defineTool(
     {
       name: "update_channel_message",
-      description: "Update a channel message. Only the body can be modified.",
+      description: "Update a channel message. Only the body can be modified; body supports markdown formatting. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: updateChannelMessageParamsJsonSchema,
       resultSchema: UpdateChannelMessageResultSchema
@@ -271,7 +274,8 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "send_dm_message",
       description:
-        "Send a message to a direct-message conversation. The `dm` argument accepts either the DM `_id` or a participant display name; a name resolves only to a one-to-one DM with the authenticated account. Message body supports markdown formatting.",
+        "Send a message to a direct-message conversation. The `dm` argument accepts either the DM `_id` or a participant display name; a name resolves only to a one-to-one DM with the authenticated account. Message body supports markdown formatting. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: sendDmMessageParamsJsonSchema,
       resultSchema: SendDmMessageResultSchema
@@ -283,7 +287,8 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "update_dm_message",
       description:
-        "Update a direct-message message. The `dm` argument accepts either the DM `_id` or a participant display name; a name resolves only to a one-to-one DM with the authenticated account. Only the body can be modified.",
+        "Update a direct-message message. The `dm` argument accepts either the DM `_id` or a participant display name; a name resolves only to a one-to-one DM with the authenticated account. Only the body can be modified; body supports markdown formatting. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: updateDmMessageParamsJsonSchema,
       resultSchema: UpdateDmMessageResultSchema
@@ -317,7 +322,8 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
   defineTool(
     {
       name: "add_thread_reply",
-      description: "Add a reply to a message thread. Reply body supports markdown formatting.",
+      description: "Add a reply to a message thread. Reply body supports markdown formatting. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: addThreadReplyParamsJsonSchema,
       resultSchema: AddThreadReplyResultSchema
@@ -328,7 +334,8 @@ export const channelTools: ReadonlyArray<RegisteredTool> = [
   defineTool(
     {
       name: "update_thread_reply",
-      description: "Update a thread reply. Only the body can be modified.",
+      description: "Update a thread reply. Only the body can be modified; body supports markdown formatting. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: updateThreadReplyParamsJsonSchema,
       resultSchema: UpdateThreadReplyResultSchema

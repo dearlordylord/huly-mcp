@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 
 import { UPDATE_ATTACHMENT_FIELDS } from "./attachments.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import { AttachmentDescription, AttachmentFileName, Base64FileData, LocalFilePath } from "./domain-values.js"
 import {
   INVENTORY_MEDIA_FILE_SOURCE_FIELDS,
@@ -226,7 +227,7 @@ export type ListInventoryProductCommentsParams = Schema.Schema.Type<typeof ListI
 const AddInventoryProductCommentParamsSchema = Schema.Struct({
   ...ProductLocatorFields,
   body: NonEmptyString.annotations({
-    description: "Comment body. Markdown is supported."
+    description: `Comment body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })
 }).annotations({
   title: "AddInventoryProductCommentParams",
@@ -240,7 +241,7 @@ const UpdateInventoryProductCommentParamsSchema = Schema.Struct({
     description: "Product comment ID to update."
   }),
   body: NonEmptyString.annotations({
-    description: "New comment body. Markdown is supported."
+    description: `New comment body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })
 }).annotations({
   title: "UpdateInventoryProductCommentParams",

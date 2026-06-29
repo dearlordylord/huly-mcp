@@ -40,6 +40,7 @@ import {
   testResultIdentifier,
   testRunIdentifier
 } from "../../helpers/brands.js"
+import { capturedMarkupChildNodes, capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 const PROJECT_ID = "proj-1" as Ref<TestProject>
 const RUN_ID = "run-1" as Ref<TestRun>
@@ -144,6 +145,7 @@ interface MockConfig {
   captureAddCollection?: Array<Record<string, unknown>>
   captureUpdateDoc?: { operations?: Record<string, unknown> }
   captureRemoveDoc?: { called?: boolean }
+  captureUploadMarkup?: { markup?: string }
 }
 
 const makePerson = (id: string, name: string): HulyPerson =>
@@ -238,7 +240,10 @@ const buildLayer = (c: MockConfig) => {
   ) as HulyClientOperations["removeDoc"]
 
   const uploadMarkupImpl: HulyClientOperations["uploadMarkup"] = (
-    () => Effect.succeed("markup-ref" as never)
+    (_class: unknown, _id: unknown, _attr: unknown, markup: unknown) => {
+      if (c.captureUploadMarkup) c.captureUploadMarkup.markup = String(markup)
+      return Effect.succeed("markup-ref" as never)
+    }
   ) as HulyClientOperations["uploadMarkup"]
 
   const fetchMarkupImpl: HulyClientOperations["fetchMarkup"] = (
@@ -493,14 +498,38 @@ describe("updateTestRun — description and dueDate branches", () => {
   it.effect("uploads a description and sets a dueDate", () =>
     Effect.gen(function*() {
       const cap: MockConfig["captureUpdateDoc"] = {}
+      const uploadCap: MockConfig["captureUploadMarkup"] = {}
       yield* updateTestRun({
         project: testProjectIdentifier("QA Project"),
         run: testRunIdentifier("Nightly Run"),
         description: "Run notes",
         dueDate: Timestamp.make(1000)
-      }).pipe(Effect.provide(buildLayer({ runs: [makeRun()], captureUpdateDoc: cap })))
+      }).pipe(Effect.provide(buildLayer({ runs: [makeRun()], captureUpdateDoc: cap, captureUploadMarkup: uploadCap })))
+      expect(capturedMarkupChildNodes(uploadCap.markup)).toContainEqual({ type: "text", text: "Run notes", marks: [] })
       expect(cap.operations?.description).toBe("markup-ref")
       expect(cap.operations?.dueDate).toBe(1000)
+    }))
+
+  it.effect("updates test run descriptions with native references", () =>
+    Effect.gen(function*() {
+      const cap: MockConfig["captureUpdateDoc"] = {}
+      const uploadCap: MockConfig["captureUploadMarkup"] = {}
+      yield* updateTestRun({
+        project: testProjectIdentifier("QA Project"),
+        run: testRunIdentifier("Nightly Run"),
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(buildLayer({ runs: [makeRun()], captureUpdateDoc: cap, captureUploadMarkup: uploadCap })))
+
+      expect(capturedMarkupReferenceNodes(uploadCap.markup)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
+      expect(cap.operations?.description).toBe("markup-ref")
     }))
 
   it.effect("clears description and dueDate when set to null", () =>
@@ -545,6 +574,7 @@ describe("updateTestResult — status, assignee, description branches", () => {
   it.effect("updates status, resolves an assignee, and uploads a description", () =>
     Effect.gen(function*() {
       const cap: MockConfig["captureUpdateDoc"] = {}
+      const uploadCap: MockConfig["captureUploadMarkup"] = {}
       yield* updateTestResult({
         project: testProjectIdentifier("QA Project"),
         result: testResultIdentifier("Result-r-1"),
@@ -554,10 +584,42 @@ describe("updateTestResult — status, assignee, description branches", () => {
       }).pipe(Effect.provide(buildLayer({
         results: [baseResult()],
         persons: [makePerson("person-1", "Alice")],
-        captureUpdateDoc: cap
+        captureUpdateDoc: cap,
+        captureUploadMarkup: uploadCap
       })))
       expect(cap.operations?.status).toBe(TestRunStatus.Failed)
       expect(cap.operations?.assignee).toBe("person-1")
+      expect(capturedMarkupChildNodes(uploadCap.markup)).toContainEqual({
+        type: "text",
+        text: "Logs attached",
+        marks: []
+      })
+      expect(cap.operations?.description).toBe("markup-ref")
+    }))
+
+  it.effect("updates test result descriptions with native references", () =>
+    Effect.gen(function*() {
+      const cap: MockConfig["captureUpdateDoc"] = {}
+      const uploadCap: MockConfig["captureUploadMarkup"] = {}
+      yield* updateTestResult({
+        project: testProjectIdentifier("QA Project"),
+        result: testResultIdentifier("Result-r-1"),
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(buildLayer({
+        results: [baseResult()],
+        captureUpdateDoc: cap,
+        captureUploadMarkup: uploadCap
+      })))
+
+      expect(capturedMarkupReferenceNodes(uploadCap.markup)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
       expect(cap.operations?.description).toBe("markup-ref")
     }))
 
@@ -634,14 +696,42 @@ describe("createTestRun optional fields", () => {
   it.effect("uploads a description and sets a dueDate on creation", () =>
     Effect.gen(function*() {
       const cap: MockConfig["captureCreateDoc"] = {}
+      const uploadCap: MockConfig["captureUploadMarkup"] = {}
       yield* createTestRun({
         project: testProjectIdentifier("QA Project"),
         name: "Release Run",
         description: "Release checklist",
         dueDate: Timestamp.make(9000)
-      }).pipe(Effect.provide(buildLayer({ captureCreateDoc: cap })))
+      }).pipe(Effect.provide(buildLayer({ captureCreateDoc: cap, captureUploadMarkup: uploadCap })))
+      expect(capturedMarkupChildNodes(uploadCap.markup)).toContainEqual({
+        type: "text",
+        text: "Release checklist",
+        marks: []
+      })
       expect(cap.attributes?.description).toBe("markup-ref")
       expect(cap.attributes?.dueDate).toBe(9000)
+    }))
+
+  it.effect("creates test run descriptions with native references", () =>
+    Effect.gen(function*() {
+      const cap: MockConfig["captureCreateDoc"] = {}
+      const uploadCap: MockConfig["captureUploadMarkup"] = {}
+      yield* createTestRun({
+        project: testProjectIdentifier("QA Project"),
+        name: "Native Ref Run",
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(buildLayer({ captureCreateDoc: cap, captureUploadMarkup: uploadCap })))
+
+      expect(capturedMarkupReferenceNodes(uploadCap.markup)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
+      expect(cap.attributes?.description).toBe("markup-ref")
     }))
 
   it.effect("treats a blank description as no description", () =>

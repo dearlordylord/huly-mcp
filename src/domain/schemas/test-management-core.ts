@@ -1,5 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
@@ -254,7 +255,7 @@ export const CreateTestCaseParamsSchema = Schema.Struct({
   }),
   description: Schema.optional(
     Schema.String.annotations({
-      description: "Test case description"
+      description: `Test case description in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
     })
   ),
   type: Schema.optional(
@@ -307,7 +308,7 @@ export const UpdateTestCaseParamsSchema = Schema.Struct({
   ),
   description: Schema.optional(
     Schema.NullOr(Schema.String).annotations({
-      description: "New description (null to clear)"
+      description: `New test case description in markdown, or null to clear. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
     })
   ),
   type: Schema.optional(

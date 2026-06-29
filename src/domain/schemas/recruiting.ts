@@ -1,5 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import { ApplicantIdentifier, CandidateIdentifier, VacancyIdentifier } from "./recruiting-common.js"
 import {
   assertUpdateFields,
@@ -92,7 +93,8 @@ export const CreateRecruitingVacancyParamsSchema = Schema.Struct({
     description: "Non-empty short vacancy summary."
   })),
   fullDescription: Schema.optional(RecruitingOptionalTextInput.annotations({
-    description: "Non-empty full vacancy description uploaded as collaborative markup."
+    description:
+      `Non-empty full vacancy description uploaded as collaborative markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })),
   type: Schema.optional(NonEmptyString.annotations({
     description: "Vacancy type ID or exact type name. Defaults to Huly's Default vacancy type."
@@ -128,7 +130,8 @@ export const UpdateRecruitingVacancyParamsSchema = Schema.Struct({
     description: "Non-empty replacement short vacancy summary."
   })),
   fullDescription: Schema.optional(RecruitingClearableTextInput.annotations({
-    description: "Non-empty replacement full vacancy description, or null to clear."
+    description:
+      `Non-empty replacement full vacancy description in markdown, or null to clear. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })),
   type: Schema.optional(NonEmptyString.annotations({
     description: "Replacement vacancy type ID or exact type name."

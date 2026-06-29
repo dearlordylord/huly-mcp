@@ -38,18 +38,19 @@ import {
   type WithLookup,
   type WorkspaceUuid
 } from "@hcengineering/core"
-import { PlatformError } from "@hcengineering/platform"
 import { absurd, Context, Effect, Layer, Redacted, Schedule } from "effect"
 
 import { type Auth, HulyConfigService } from "../config/config.js"
 import { UrlString, WorkspaceUrlSlug } from "../domain/schemas/shared.js"
 import { concatLink } from "../utils/url.js"
 import { HulyAuthError, HulyConnectionError } from "./errors.js"
+import { PlatformError } from "./huly-platform.js"
 import {
-  MARKDOWN_INPUT_REF_URL,
+  markdownInputUrlConfig,
   markupNodeToMarkdownString,
   type MarkupUrlConfig,
-  testMarkupUrlConfig
+  testMarkupUrlConfig,
+  transformMarkupNodeNativeReferenceLinks
 } from "./operations/markup.js"
 import { HulySdk, type HulySdkDependencies } from "./sdk-deps.js"
 import { testWorkbenchUrlConfig, type WorkbenchUrlConfig } from "./url-builders.js"
@@ -138,15 +139,7 @@ export const connectWithRetry = <A>(
     })
   )
 
-interface MarkupConvertOptions {
-  readonly refUrl: string
-  readonly imageUrl: string
-}
-
-const markdownInputOptions = (opts: MarkupConvertOptions): MarkupConvertOptions => ({
-  refUrl: MARKDOWN_INPUT_REF_URL,
-  imageUrl: opts.imageUrl
-})
+type MarkupConvertOptions = MarkupUrlConfig
 
 function toInternalMarkup(
   value: string,
@@ -160,7 +153,9 @@ function toInternalMarkup(
     case "html":
       return sdk.jsonToMarkup(sdk.htmlToJSON(value))
     case "markdown":
-      return sdk.jsonToMarkup(sdk.markdownToMarkup(value, markdownInputOptions(opts)))
+      return sdk.jsonToMarkup(
+        transformMarkupNodeNativeReferenceLinks(sdk.markdownToMarkup(value, markdownInputUrlConfig(opts)), opts).node
+      )
     default:
       absurd(format)
       throw new Error(`Invalid format: ${format}`)
@@ -651,8 +646,8 @@ interface RestConnection {
   socialIds: ReadonlyArray<PersonId>
   workspaceUrlSlug: WorkspaceUrlSlug
   markupOps: MarkupOperations
-  refUrl: string
-  imageUrl: string
+  refUrl: UrlString
+  imageUrl: UrlString
 }
 
 function createMarkupOps(
@@ -661,13 +656,13 @@ function createMarkupOps(
   token: string,
   collaboratorUrl: string,
   sdk: HulySdkDependencies
-): { ops: MarkupOperations; refUrl: string; imageUrl: string } {
+): { ops: MarkupOperations; refUrl: UrlString; imageUrl: UrlString } {
   // @hcengineering/text-markdown expects refUrl/imageUrl option names, but the Huly SDK does not
   // expose helpers or constants for the concrete workspace browse/files routes. We derive those
   // Huly-specific URLs here from the connected base URL and workspace id so markdown round-trips
   // preserve links and images across entities.
-  const refUrl = concatLink(url, `/browse?workspace=${workspace}`)
-  const imageUrl = concatLink(url, `/files?workspace=${workspace}&file=`)
+  const refUrl = UrlString.make(concatLink(url, `/browse?workspace=${workspace}`))
+  const imageUrl = UrlString.make(concatLink(url, `/files?workspace=${workspace}&file=`))
   const collaborator = sdk.getCollaboratorClient(workspace, token, collaboratorUrl)
 
   return {

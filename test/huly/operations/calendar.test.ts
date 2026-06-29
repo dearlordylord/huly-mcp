@@ -28,6 +28,7 @@ import {
 } from "../../../src/huly/operations/calendar.js"
 import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import { eventBrandId } from "../../helpers/brands.js"
+import { capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 import { calendar, contact, love } from "../../../src/huly/huly-plugins.js"
 
@@ -167,8 +168,8 @@ interface MockConfig {
   captureUpdateDoc?: { operations?: Record<string, unknown> }
   captureRemoveDoc?: { id?: string }
   captureAddCollection?: { attributes?: Record<string, unknown> }
-  captureUpdateMarkup?: { called?: boolean }
-  captureUploadMarkup?: { called?: boolean }
+  captureUpdateMarkup?: { called?: boolean; markup?: string }
+  captureUploadMarkup?: { called?: boolean; markup?: string }
 }
 
 const createTestLayer = (config: MockConfig) => {
@@ -287,16 +288,28 @@ const createTestLayer = (config: MockConfig) => {
     return Effect.succeed("new-id" as Ref<Doc>)
   }) as HulyClientOperations["addCollection"]
 
-  const uploadMarkupImpl: HulyClientOperations["uploadMarkup"] = (() => {
+  const uploadMarkupImpl: HulyClientOperations["uploadMarkup"] = ((
+    _objectClass: unknown,
+    _objectId: unknown,
+    _objectAttr: unknown,
+    markup: unknown
+  ) => {
     if (config.captureUploadMarkup) {
       config.captureUploadMarkup.called = true
+      config.captureUploadMarkup.markup = String(markup)
     }
     return Effect.succeed("markup-ref-123" as MarkupBlobRef)
   }) as HulyClientOperations["uploadMarkup"]
 
-  const updateMarkupImpl: HulyClientOperations["updateMarkup"] = (() => {
+  const updateMarkupImpl: HulyClientOperations["updateMarkup"] = ((
+    _objectClass: unknown,
+    _objectId: unknown,
+    _objectAttr: unknown,
+    markup: unknown
+  ) => {
     if (config.captureUpdateMarkup) {
       config.captureUpdateMarkup.called = true
+      config.captureUpdateMarkup.markup = String(markup)
     }
     return Effect.succeed(undefined)
   }) as HulyClientOperations["updateMarkup"]
@@ -531,6 +544,30 @@ describe("createEvent", () => {
       expect(captureAddCollection.attributes?.blockTime).toBe(true)
     }))
 
+  it.effect("creates event descriptions with native references", () =>
+    Effect.gen(function*() {
+      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+      const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+      const testLayer = createTestLayer({ captureAddCollection, captureUploadMarkup })
+
+      yield* createEvent({
+        title: calendarEventTitle("Native ref event"),
+        date: Timestamp.make(1700000000000),
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(testLayer))
+
+      expect(capturedMarkupReferenceNodes(captureUploadMarkup.markup)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
+      expect(captureAddCollection.attributes?.description).toBe("markup-ref-123")
+    }))
+
   it.effect("ignores malformed create visibility defensively", () =>
     Effect.gen(function*() {
       const captureAddCollection: MockConfig["captureAddCollection"] = {}
@@ -645,6 +682,29 @@ describe("updateEvent", () => {
       expect(captureUploadMarkup.called).toBeUndefined()
     }))
 
+  it.effect("updates existing event descriptions with native references", () =>
+    Effect.gen(function*() {
+      const event = makeEvent({ eventId: "evt-1", description: "existing-markup-ref" as HulyEvent["description"] })
+      const captureUpdateMarkup: MockConfig["captureUpdateMarkup"] = {}
+      const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+
+      yield* updateEvent({
+        eventId: eventBrandId("evt-1"),
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(createTestLayer({ events: [event], captureUpdateMarkup, captureUploadMarkup })))
+
+      expect(capturedMarkupReferenceNodes(captureUpdateMarkup.markup)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
+      expect(captureUploadMarkup.called).toBeUndefined()
+    }))
+
   it.effect("uploads new description when event has none", () =>
     Effect.gen(function*() {
       const event = makeEvent({ eventId: "evt-1", description: "" as HulyEvent["description"] })
@@ -660,6 +720,36 @@ describe("updateEvent", () => {
 
       expect(result.updated).toBe(true)
       expect(captureUploadMarkup.called).toBe(true)
+      expect(captureUpdateMarkup.called).toBeUndefined()
+      expect(captureUpdateDoc.operations?.description).toBe("markup-ref-123")
+    }))
+
+  it.effect("uploads missing event descriptions with native references", () =>
+    Effect.gen(function*() {
+      const event = makeEvent({ eventId: "evt-1", description: "" as HulyEvent["description"] })
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+      const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+      const captureUpdateMarkup: MockConfig["captureUpdateMarkup"] = {}
+
+      yield* updateEvent({
+        eventId: eventBrandId("evt-1"),
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(createTestLayer({
+        events: [event],
+        captureUpdateDoc,
+        captureUploadMarkup,
+        captureUpdateMarkup
+      })))
+
+      expect(capturedMarkupReferenceNodes(captureUploadMarkup.markup)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
       expect(captureUpdateMarkup.called).toBeUndefined()
       expect(captureUpdateDoc.operations?.description).toBe("markup-ref-123")
     }))
@@ -975,6 +1065,30 @@ describe("createRecurringEvent", () => {
       expect(result.eventId).toBeDefined()
       expect(captureAddCollection.attributes?.title).toBe("Daily Standup")
       expect(captureAddCollection.attributes?.rules).toEqual([{ freq: "DAILY" }])
+    }))
+
+  it.effect("creates recurring event descriptions with native references", () =>
+    Effect.gen(function*() {
+      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+      const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+
+      yield* createRecurringEvent({
+        title: calendarEventTitle("Native recurring"),
+        startDate: Timestamp.make(1700000000000),
+        rules: [{ freq: "DAILY" }],
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(createTestLayer({ captureAddCollection, captureUploadMarkup })))
+
+      expect(capturedMarkupReferenceNodes(captureUploadMarkup.markup)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
+      expect(captureAddCollection.attributes?.description).toBe("markup-ref-123")
     }))
 
   it.effect("creates recurring event with all optional fields", () =>

@@ -1,6 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
 import { clearableText } from "./clearable.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import {
   AccountUuid,
   assertUpdateFields,
@@ -201,7 +202,7 @@ export const SendChannelMessageParamsSchema = Schema.Struct({
     description: "Channel name or ID"
   }),
   body: NonEmptyString.annotations({
-    description: "Message body (markdown supported)"
+    description: `Message body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })
 }).annotations({
   title: "SendChannelMessageParams",
@@ -220,7 +221,7 @@ export const UpdateChannelMessageParamsSchema = Schema.Struct({
     description: "Message ID to update"
   }),
   body: NonEmptyString.annotations({
-    description: "New message body (markdown supported)"
+    description: `New message body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })
 }).annotations({
   title: "UpdateChannelMessageParams",
@@ -302,7 +303,7 @@ export const AddThreadReplyParamsSchema = Schema.Struct({
     description: "Parent message ID to reply to"
   }),
   body: NonEmptyString.annotations({
-    description: "Reply body (markdown supported)"
+    description: `Reply body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })
 }).annotations({
   title: "AddThreadReplyParams",
@@ -324,7 +325,7 @@ export const UpdateThreadReplyParamsSchema = Schema.Struct({
     description: "Thread reply ID to update"
   }),
   body: NonEmptyString.annotations({
-    description: "New reply body (markdown supported)"
+    description: `New reply body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })
 }).annotations({
   title: "UpdateThreadReplyParams",

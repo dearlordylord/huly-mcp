@@ -1,6 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
 import { clearableText } from "./clearable.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import { IssuePrioritySchema } from "./issues.js"
 import {
   assertUpdateFields,
@@ -51,7 +52,7 @@ const ChildTemplateFieldsSchema = Schema.Struct({
     description: "Child template title"
   }),
   description: Schema.optional(Schema.String.annotations({
-    description: "Child template description"
+    description: `Child template description in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })),
   priority: Schema.optional(IssuePrioritySchema.annotations({
     description: "Child default priority"
@@ -148,7 +149,7 @@ export const CreateIssueTemplateParamsSchema = Schema.Struct({
     description: "Template title"
   }),
   description: Schema.optional(Schema.String.annotations({
-    description: "Template description (markdown supported)"
+    description: `Template description in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })),
   priority: Schema.optional(IssuePrioritySchema.annotations({
     description: "Default priority for issues created from this template"
@@ -185,7 +186,8 @@ export const CreateIssueFromTemplateParamsSchema = Schema.Struct({
     description: "Override title (uses template title if not specified)"
   })),
   description: Schema.optional(Schema.String.annotations({
-    description: "Override description (uses template description if not specified)"
+    description:
+      `Override description in markdown (uses template description if not specified). ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })),
   priority: Schema.optional(IssuePrioritySchema.annotations({
     description: "Override priority"
@@ -227,7 +229,9 @@ export const UpdateIssueTemplateParamsSchema = Schema.Struct({
   title: Schema.optional(NonEmptyString.annotations({
     description: "New template title"
   })),
-  description: Schema.optional(clearableText("New template description (markdown supported).")),
+  description: Schema.optional(
+    clearableText(`New template description in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`)
+  ),
   priority: Schema.optional(IssuePrioritySchema.annotations({
     description: "New default priority"
   })),

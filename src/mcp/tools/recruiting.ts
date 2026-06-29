@@ -1,3 +1,4 @@
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas.js"
 import {
   ApplicantDetailSchema,
   CandidateDetailSchema,
@@ -141,7 +142,8 @@ export const recruitingTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "create_recruiting_vacancy",
       description:
-        "Create a Recruiting vacancy like the Huly UI: increments the vacancy sequence, stores fullDescription as markdown-backed collaborative markup, defaults members/owners to the current account, and creates vacancy type-data mixin {}.",
+        "Create a Recruiting vacancy like the Huly UI: increments the vacancy sequence, stores fullDescription as markdown-backed collaborative markup, defaults members/owners to the current account, and creates vacancy type-data mixin {}. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: createRecruitingVacancyParamsJsonSchema,
       resultSchema: RecruitingVacancyMutationResultSchema
@@ -153,7 +155,9 @@ export const recruitingTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "update_recruiting_vacancy",
       description:
-        "Update mutable Recruiting vacancy fields. vacancy accepts raw _id, VCN-<number>, bare number, or exact name. Provide at least one field. Pass null for fullDescription, company, location, or dueTo to clear.",
+        "Update mutable Recruiting vacancy fields. vacancy accepts raw _id, VCN-<number>, bare number, or exact name. Provide at least one field. fullDescription supports markdown. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " Pass null for fullDescription, company, location, or dueTo to clear.",
       category: CATEGORY,
       inputSchema: updateRecruitingVacancyParamsJsonSchema,
       resultSchema: RecruitingVacancyMutationResultSchema

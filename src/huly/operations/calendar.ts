@@ -59,6 +59,7 @@ import {
   toWritableCalendarAccess,
   visibilityToString
 } from "./calendar-shared.js"
+import { renderMarkdownPreservingNativeReferences } from "./native-reference-markup.js"
 import { hulyNonEmptyTextOrFallback } from "./non-empty-text.js"
 import { clampLimit } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
@@ -326,16 +327,17 @@ export const updateEvent = (
         if (params.description === null || params.description.trim() === "") {
           return { description: emptyEventDescription }
         }
+        const rendered = renderMarkdownPreservingNativeReferences(params.description, client.markupUrlConfig)
         if (event.description) {
-          yield* client.updateMarkup(calendar.class.Event, event._id, "description", params.description, "markdown")
+          yield* client.updateMarkup(calendar.class.Event, event._id, "description", rendered.markup, rendered.format)
           return {}
         }
         const descriptionRef = yield* client.uploadMarkup(
           calendar.class.Event,
           event._id,
           "description",
-          params.description,
-          "markdown"
+          rendered.markup,
+          rendered.format
         )
         return { description: markupRefAsDescription(descriptionRef) }
       }),

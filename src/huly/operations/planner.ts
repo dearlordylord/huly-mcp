@@ -46,6 +46,7 @@ import type { HulyDomainError, NoUpdateFieldsError, TodoWorkSlotNotFoundError } 
 import { TodoWorkSlotNotFoundError as WorkSlotMissing } from "../errors.js"
 import { time, tracker } from "../huly-plugins.js"
 import { batchGetEmailsForPersons } from "./contacts-shared.js"
+import { renderMarkdownPreservingNativeReferences } from "./native-reference-markup.js"
 import {
   findTodo,
   type HulyTodoWithLookup,
@@ -111,7 +112,8 @@ const uploadTodoDescription = (
 ): Effect.Effect<HulyToDo["description"], HulyClientError> =>
   Effect.gen(function*() {
     if (description === undefined || description.trim() === "") return ""
-    const ref = yield* client.uploadMarkup(objectClass, todoId, "description", description, "markdown")
+    const rendered = renderMarkdownPreservingNativeReferences(description, client.markupUrlConfig)
+    const ref = yield* client.uploadMarkup(objectClass, todoId, "description", rendered.markup, rendered.format)
     return markupRefAsTodoDescription(ref)
   })
 
@@ -263,11 +265,18 @@ export const updateTodo = (
       yield* Effect.gen(function*() {
         if (params.description === undefined) return {}
         if (params.description === null || params.description.trim() === "") return { description: "" }
+        const rendered = renderMarkdownPreservingNativeReferences(params.description, client.markupUrlConfig)
         if (todo.description) {
-          yield* client.updateMarkup(time.class.ToDo, todo._id, "description", params.description, "markdown")
+          yield* client.updateMarkup(time.class.ToDo, todo._id, "description", rendered.markup, rendered.format)
           return {}
         }
-        const ref = yield* client.uploadMarkup(time.class.ToDo, todo._id, "description", params.description, "markdown")
+        const ref = yield* client.uploadMarkup(
+          time.class.ToDo,
+          todo._id,
+          "description",
+          rendered.markup,
+          rendered.format
+        )
         return { description: markupRefAsTodoDescription(ref) }
       })
     ] satisfies ReadonlyArray<DocumentUpdate<HulyToDo>>

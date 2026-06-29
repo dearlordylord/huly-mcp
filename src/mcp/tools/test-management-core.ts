@@ -1,3 +1,4 @@
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas.js"
 import {
   createTestCaseParamsJsonSchema,
   CreateTestCaseResultSchema,
@@ -146,8 +147,9 @@ export const testManagementCoreTools: ReadonlyArray<RegisteredTool> = [
   defineTool(
     {
       name: "create_test_case",
-      description:
-        "Create a test case attached to a suite. Requires project and suite. Defaults: type=functional, priority=medium, status=draft.",
+      description: "Create a test case attached to a suite. Description supports markdown. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " Requires project and suite. Defaults: type=functional, priority=medium, status=draft.",
       category: CATEGORY,
       inputSchema: createTestCaseParamsJsonSchema,
       resultSchema: CreateTestCaseResultSchema
@@ -158,8 +160,9 @@ export const testManagementCoreTools: ReadonlyArray<RegisteredTool> = [
   defineTool(
     {
       name: "update_test_case",
-      description:
-        "Update a test case. Accepts test case ID or name. Only provided fields are modified. Set assignee to null to unassign.",
+      description: "Update a test case. Accepts test case ID or name. Description supports markdown. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " Only provided fields are modified. Set assignee to null to unassign.",
       category: CATEGORY,
       inputSchema: updateTestCaseParamsJsonSchema,
       resultSchema: UpdateTestCaseResultSchema

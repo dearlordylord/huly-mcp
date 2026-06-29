@@ -19,8 +19,11 @@ import {
   type TxResult,
   type WithLookup
 } from "@hcengineering/core"
-import { markupToJSON as parseMarkupToJSON } from "@hcengineering/text"
-import { markupToMarkdown as realMarkupToMarkdown } from "@hcengineering/text-markdown"
+import { jsonToMarkup as realJsonToMarkup, markupToJSON as parseMarkupToJSON } from "@hcengineering/text"
+import {
+  markdownToMarkup as realMarkdownToMarkup,
+  markupToMarkdown as realMarkupToMarkdown
+} from "@hcengineering/text-markdown"
 import { Cause, Effect, Exit, Fiber, Layer, TestClock } from "effect"
 import { beforeEach, expect } from "vitest"
 import { HulyConfigService } from "../../src/config/config.js"
@@ -1143,6 +1146,72 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         expect(uploadedValue).toContain("md-parsed")
       }))
 
+    it.effect("uploads markdown Huly browse links as native reference nodes", () =>
+      Effect.gen(function*() {
+        mockCreateMarkup.mockResolvedValue("ref-native")
+        const realMarkdownSdk: HulySdkDependencies = {
+          ...testSdk,
+          jsonToMarkup: realJsonToMarkup,
+          markdownToMarkup: realMarkdownToMarkup
+        }
+        const layer = HulyClient.layerWithDependencies.pipe(
+          Layer.provide(Layer.merge(testConfigLayer, Layer.succeed(HulySdk, realMarkdownSdk)))
+        )
+
+        const client = yield* HulyClient.pipe(Effect.provide(layer))
+        yield* client.uploadMarkup(
+          "docClass" as DocRef<Class<Doc>>,
+          "docId" as DocRef<Doc>,
+          "content",
+          "[HULY-1](http://localhost:8080/browse?workspace=ws-123&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)",
+          "markdown"
+        )
+
+        const uploadedValue = assertAt(mockCreateMarkup.mock.calls, 0)[1] as string
+        const root = parseMarkupToJSON(uploadedValue)
+        const reference = root.content?.[0]?.content?.find((node) => node.type === "reference")
+        expect(reference).toMatchObject({
+          type: "reference",
+          attrs: {
+            id: "issue-1",
+            objectclass: "tracker:class:Issue",
+            label: "HULY-1"
+          }
+        })
+      }))
+
+    it.effect("uploads malformed markdown Huly browse links as ordinary links", () =>
+      Effect.gen(function*() {
+        mockCreateMarkup.mockResolvedValue("ref-malformed")
+        const realMarkdownSdk: HulySdkDependencies = {
+          ...testSdk,
+          jsonToMarkup: realJsonToMarkup,
+          markdownToMarkup: realMarkdownToMarkup
+        }
+        const layer = HulyClient.layerWithDependencies.pipe(
+          Layer.provide(Layer.merge(testConfigLayer, Layer.succeed(HulySdk, realMarkdownSdk)))
+        )
+
+        const client = yield* HulyClient.pipe(Effect.provide(layer))
+        yield* client.uploadMarkup(
+          "docClass" as DocRef<Class<Doc>>,
+          "docId" as DocRef<Doc>,
+          "content",
+          "[Broken](http://localhost:8080/browse?workspace=ws-123&_id=doc-1)",
+          "markdown"
+        )
+
+        const uploadedValue = assertAt(mockCreateMarkup.mock.calls, 0)[1] as string
+        const root = parseMarkupToJSON(uploadedValue)
+        const content = root.content?.[0]?.content ?? []
+        expect(content.some((node) => node.type === "reference")).toBe(false)
+        expect(content.find((node) => node.type === "text" && node.text === "Broken")?.marks)
+          .toContainEqual({
+            type: "link",
+            attrs: { href: "http://localhost:8080/browse?workspace=ws-123&_id=doc-1" }
+          })
+      }))
+
     it.effect("wraps errors in HulyConnectionError", () =>
       Effect.gen(function*() {
         mockCreateMarkup.mockRejectedValue(new Error("upload failed"))
@@ -1314,6 +1383,70 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         })
         const uploadedValue = assertAt(mockUpdateMarkup.mock.calls, 0)[1] as string
         expect(uploadedValue).toContain("md-parsed")
+      }))
+
+    it.effect("updates markdown Huly browse links as native reference nodes", () =>
+      Effect.gen(function*() {
+        const realMarkdownSdk: HulySdkDependencies = {
+          ...testSdk,
+          jsonToMarkup: realJsonToMarkup,
+          markdownToMarkup: realMarkdownToMarkup
+        }
+        const layer = HulyClient.layerWithDependencies.pipe(
+          Layer.provide(Layer.merge(testConfigLayer, Layer.succeed(HulySdk, realMarkdownSdk)))
+        )
+
+        const client = yield* HulyClient.pipe(Effect.provide(layer))
+        yield* client.updateMarkup(
+          "docClass" as DocRef<Class<Doc>>,
+          "docId" as DocRef<Doc>,
+          "content",
+          "[HULY-1](http://localhost:8080/browse?workspace=ws-123&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)",
+          "markdown"
+        )
+
+        const uploadedValue = assertAt(mockUpdateMarkup.mock.calls, 0)[1] as string
+        const root = parseMarkupToJSON(uploadedValue)
+        const reference = root.content?.[0]?.content?.find((node) => node.type === "reference")
+        expect(reference).toMatchObject({
+          type: "reference",
+          attrs: {
+            id: "issue-1",
+            objectclass: "tracker:class:Issue",
+            label: "HULY-1"
+          }
+        })
+      }))
+
+    it.effect("updates malformed markdown Huly browse links as ordinary links", () =>
+      Effect.gen(function*() {
+        const realMarkdownSdk: HulySdkDependencies = {
+          ...testSdk,
+          jsonToMarkup: realJsonToMarkup,
+          markdownToMarkup: realMarkdownToMarkup
+        }
+        const layer = HulyClient.layerWithDependencies.pipe(
+          Layer.provide(Layer.merge(testConfigLayer, Layer.succeed(HulySdk, realMarkdownSdk)))
+        )
+
+        const client = yield* HulyClient.pipe(Effect.provide(layer))
+        yield* client.updateMarkup(
+          "docClass" as DocRef<Class<Doc>>,
+          "docId" as DocRef<Doc>,
+          "content",
+          "[Broken](http://localhost:8080/browse?workspace=ws-123&_id=doc-1)",
+          "markdown"
+        )
+
+        const uploadedValue = assertAt(mockUpdateMarkup.mock.calls, 0)[1] as string
+        const root = parseMarkupToJSON(uploadedValue)
+        const content = root.content?.[0]?.content ?? []
+        expect(content.some((node) => node.type === "reference")).toBe(false)
+        expect(content.find((node) => node.type === "text" && node.text === "Broken")?.marks)
+          .toContainEqual({
+            type: "link",
+            attrs: { href: "http://localhost:8080/browse?workspace=ws-123&_id=doc-1" }
+          })
       }))
 
     it.effect("wraps errors in HulyConnectionError", () =>

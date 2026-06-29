@@ -21,6 +21,7 @@ import {
 import { testManagement } from "../../../src/huly/test-management-classes.js"
 import type { TestCase, TestPlan, TestPlanItem, TestProject } from "../../../src/huly/test-management-types.js"
 import { testCaseIdentifier, testPlanIdentifier, testPlanItemId, testProjectIdentifier } from "../../helpers/brands.js"
+import { capturedMarkupChildNodes, capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 const PROJECT_ID = "proj-1" as Ref<TestProject>
 const PLAN_ID = "plan-1" as Ref<TestPlan>
@@ -92,6 +93,7 @@ interface MockConfig {
   captureAddCollection?: { attributes?: Record<string, unknown>; id?: string }
   captureUpdateDoc?: { operations?: Record<string, unknown> }
   captureRemoveDoc?: { called?: boolean; id?: string }
+  captureUploadMarkup?: { markup?: string }
 }
 
 const makePerson = (id: string, name: string): HulyPerson =>
@@ -189,7 +191,10 @@ const buildLayer = (c: MockConfig) => {
   ) as HulyClientOperations["removeDoc"]
 
   const uploadMarkupImpl: HulyClientOperations["uploadMarkup"] = (
-    () => Effect.succeed("markup-ref" as never)
+    (_class: unknown, _id: unknown, _attr: unknown, markup: unknown) => {
+      if (c.captureUploadMarkup) c.captureUploadMarkup.markup = String(markup)
+      return Effect.succeed("markup-ref" as never)
+    }
   ) as HulyClientOperations["uploadMarkup"]
 
   const fetchMarkupImpl: HulyClientOperations["fetchMarkup"] = (
@@ -261,11 +266,39 @@ describe("createTestPlan", () => {
   it.effect("uploads a non-empty description on creation", () =>
     Effect.gen(function*() {
       const cap: MockConfig["captureCreateDoc"] = {}
+      const uploadCap: MockConfig["captureUploadMarkup"] = {}
       yield* createTestPlan({
         project: testProjectIdentifier("QA Project"),
         name: "Documented Plan",
         description: "Plan scope"
-      }).pipe(Effect.provide(buildLayer({ captureCreateDoc: cap })))
+      }).pipe(Effect.provide(buildLayer({ captureCreateDoc: cap, captureUploadMarkup: uploadCap })))
+      expect(capturedMarkupChildNodes(uploadCap.markup)).toContainEqual({
+        type: "text",
+        text: "Plan scope",
+        marks: []
+      })
+      expect(cap.attributes?.description).toBe("markup-ref")
+    }))
+
+  it.effect("creates test plan descriptions with native references", () =>
+    Effect.gen(function*() {
+      const cap: MockConfig["captureCreateDoc"] = {}
+      const uploadCap: MockConfig["captureUploadMarkup"] = {}
+      yield* createTestPlan({
+        project: testProjectIdentifier("QA Project"),
+        name: "Native Ref Plan",
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(buildLayer({ captureCreateDoc: cap, captureUploadMarkup: uploadCap })))
+
+      expect(capturedMarkupReferenceNodes(uploadCap.markup)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
       expect(cap.attributes?.description).toBe("markup-ref")
     }))
 })
@@ -406,11 +439,39 @@ describe("test-management-plans — optional field branches", () => {
   it.effect("updateTestPlan uploads a new description", () =>
     Effect.gen(function*() {
       const cap: MockConfig["captureUpdateDoc"] = {}
+      const uploadCap: MockConfig["captureUploadMarkup"] = {}
       yield* updateTestPlan({
         project: testProjectIdentifier("QA Project"),
         plan: testPlanIdentifier("Sprint Plan"),
         description: "Updated"
-      }).pipe(Effect.provide(buildLayer({ plans: [makePlan()], captureUpdateDoc: cap })))
+      }).pipe(
+        Effect.provide(buildLayer({ plans: [makePlan()], captureUpdateDoc: cap, captureUploadMarkup: uploadCap }))
+      )
+      expect(capturedMarkupChildNodes(uploadCap.markup)).toContainEqual({ type: "text", text: "Updated", marks: [] })
+      expect(cap.operations?.description).toBe("markup-ref")
+    }))
+
+  it.effect("updateTestPlan uploads native references", () =>
+    Effect.gen(function*() {
+      const cap: MockConfig["captureUpdateDoc"] = {}
+      const uploadCap: MockConfig["captureUploadMarkup"] = {}
+      yield* updateTestPlan({
+        project: testProjectIdentifier("QA Project"),
+        plan: testPlanIdentifier("Sprint Plan"),
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(
+        Effect.provide(buildLayer({ plans: [makePlan()], captureUpdateDoc: cap, captureUploadMarkup: uploadCap }))
+      )
+
+      expect(capturedMarkupReferenceNodes(uploadCap.markup)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
       expect(cap.operations?.description).toBe("markup-ref")
     }))
 

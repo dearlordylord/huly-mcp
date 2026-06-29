@@ -39,6 +39,7 @@ import {
 } from "../../../src/huly/operations/planner.js"
 import { toRef } from "../../../src/huly/operations/sdk-boundary.js"
 import { issueIdentifier, projectIdentifier, todoId } from "../../helpers/brands.js"
+import { capturedMarkupChildNodes, capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 const asProject = (v: unknown) => v as HulyProject
 const asIssue = (v: unknown) => v as HulyIssue
@@ -512,10 +513,35 @@ describe("planner operations", () => {
         visibility: "public"
       }).pipe(Effect.provide(createLayer({ captures, employees: [makeEmployee()] })))
 
-      expect(captures.uploadMarkup?.markup).toBe("Body")
+      expect(capturedMarkupChildNodes(captures.uploadMarkup?.markup)).toContainEqual({
+        type: "text",
+        text: "Body",
+        marks: []
+      })
       expect(captures.addCollection?.attributes.description).toBe("markup-ref")
       expect(captures.addCollection?.attributes.dueDate).toBe(123)
       expect(captures.addCollection?.attributes.priority).toBe(ToDoPriority.Low)
+    }))
+
+  it.effect("creates a personal ToDo description with native references", () =>
+    Effect.gen(function*() {
+      const captures: Captures = {}
+
+      yield* createTodo({
+        title: todoTitle("Native ref personal task"),
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(createLayer({ captures, employees: [makeEmployee()] })))
+
+      expect(capturedMarkupReferenceNodes(captures.uploadMarkup?.markup)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
+      expect(captures.addCollection?.attributes.description).toBe("markup-ref")
     }))
 
   it.effect("creates a personal ToDo without uploading blank markdown", () =>
@@ -563,6 +589,32 @@ describe("planner operations", () => {
       )
 
       expect(captures.addCollection?.attributes.dueDate).toBe(123)
+    }))
+
+  it.effect("creates an issue-attached ProjectToDo description with native references", () =>
+    Effect.gen(function*() {
+      const captures: Captures = {}
+      const project = makeProject()
+      const issue = makeIssue()
+
+      yield* createTodo({
+        title: todoTitle("Issue task with native ref"),
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1).",
+        attachedTo: { type: "issue", project: projectIdentifier("HULY"), identifier: issueIdentifier("94") }
+      }).pipe(
+        Effect.provide(createLayer({ projects: [project], issues: [issue], captures, employees: [makeEmployee()] }))
+      )
+
+      expect(capturedMarkupReferenceNodes(captures.uploadMarkup?.markup)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
+      expect(captures.addCollection?.classId).toBe(time.class.ProjectToDo)
     }))
 
   it.effect("gets a ToDo detail with fetched description and issue attachment summary", () =>
@@ -852,8 +904,33 @@ describe("planner operations", () => {
         }))
       )
 
-      expect(captures.updateMarkup?.markup).toBe("Updated body")
+      expect(capturedMarkupChildNodes(captures.updateMarkup?.markup)).toContainEqual({
+        type: "text",
+        text: "Updated body",
+        marks: []
+      })
       expect(captures.updateDoc?.operations.user).toBe("employee-1")
+    }))
+
+  it.effect("updates existing ToDo description with native references", () =>
+    Effect.gen(function*() {
+      const captures: Captures = {}
+
+      yield* updateTodo({
+        locator: { todoId: todoId("todo-1") },
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(createLayer({ todos: [makeTodo({ description: "markup-ref" })], captures })))
+
+      expect(capturedMarkupReferenceNodes(captures.updateMarkup?.markup)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
+      expect(captures.updateDoc).toBeUndefined()
     }))
 
   it.effect("uploads description during update when no description ref exists", () =>
@@ -864,7 +941,32 @@ describe("planner operations", () => {
         Effect.provide(createLayer({ todos: [makeTodo({ description: "" })], captures }))
       )
 
-      expect(captures.uploadMarkup?.markup).toBe("New body")
+      expect(capturedMarkupChildNodes(captures.uploadMarkup?.markup)).toContainEqual({
+        type: "text",
+        text: "New body",
+        marks: []
+      })
+      expect(captures.updateDoc?.operations.description).toBe("markup-ref")
+    }))
+
+  it.effect("uploads missing ToDo description with native references during update", () =>
+    Effect.gen(function*() {
+      const captures: Captures = {}
+
+      yield* updateTodo({
+        locator: { todoId: todoId("todo-1") },
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(createLayer({ todos: [makeTodo({ description: "" })], captures })))
+
+      expect(capturedMarkupReferenceNodes(captures.uploadMarkup?.markup)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
       expect(captures.updateDoc?.operations.description).toBe("markup-ref")
     }))
 
@@ -887,7 +989,11 @@ describe("planner operations", () => {
         Effect.provide(createLayer({ todos: [makeTodo({ description: "markup-ref" })], captures }))
       )
 
-      expect(captures.updateMarkup?.markup).toBe("Only markup")
+      expect(capturedMarkupChildNodes(captures.updateMarkup?.markup)).toContainEqual({
+        type: "text",
+        text: "Only markup",
+        marks: []
+      })
       expect(captures.updateDoc).toBeUndefined()
     }))
 

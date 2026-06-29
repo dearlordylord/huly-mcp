@@ -1,6 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
 import { clearableText } from "./clearable.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
@@ -180,7 +181,8 @@ export const CreateBoardCardParamsSchema = Schema.Struct({
   board: BoardRefSchema,
   title: BoardCardTitle.annotations({ description: "Board card title." }),
   description: Schema.optional(Schema.String.annotations({
-    description: "Board card description in markdown. Stored as inline Huly Markup."
+    description:
+      `Board card description in markdown. Stored as inline Huly Markup. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })),
   kind: Schema.optional(TaskTypeRefSchema.annotations({
     description:
@@ -239,7 +241,9 @@ export const UpdateBoardCardParamsSchema = Schema.Struct({
   board: BoardRefSchema,
   card: BoardCardRefSchema,
   title: Schema.optional(BoardCardTitle.annotations({ description: "New board card title." })),
-  description: Schema.optional(clearableText("New board card description in markdown.")),
+  description: Schema.optional(
+    clearableText(`New board card description in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`)
+  ),
   status: Schema.optional(NonEmptyString.annotations({
     description: "New workflow status _id or exact status name in the board project type."
   })),

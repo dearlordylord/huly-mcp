@@ -2,6 +2,7 @@ import type { Visibility as HulyVisibility } from "@hcengineering/calendar"
 import { JSONSchema, Schema } from "effect"
 
 import { clearableText } from "./clearable.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
@@ -190,7 +191,7 @@ export const CreateTodoParamsSchema = Schema.Struct({
     description: "ToDo title."
   }),
   description: Schema.optional(Schema.String.annotations({
-    description: "ToDo description in markdown."
+    description: `ToDo description in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })),
   owner: Schema.optional(NonEmptyString.annotations({
     description: "Owner exact email or display name. If omitted, uses the authenticated user."
@@ -228,7 +229,9 @@ export const UpdateTodoParamsSchema = Schema.Struct({
   title: Schema.optional(TodoTitle.annotations({
     description: "New ToDo title."
   })),
-  description: Schema.optional(clearableText("New ToDo description in markdown.")),
+  description: Schema.optional(
+    clearableText(`New ToDo description in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`)
+  ),
   owner: Schema.optional(NonEmptyString.annotations({
     description: "New owner exact email or display name."
   })),

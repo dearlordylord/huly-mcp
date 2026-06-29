@@ -2,6 +2,7 @@ import { JSONSchema, Schema } from "effect"
 
 import { ActivityMessageWireSchema } from "./activity.js"
 import { CommentSchema } from "./comments.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import { DriveIdentifier, DriveItemId, DriveItemSummarySchema, DrivePath } from "./drive.js"
 import {
   CommentId,
@@ -63,7 +64,7 @@ export const AddDriveFileCommentParamsSchema = Schema.Struct({
   drive: DriveIdentifier,
   ...DriveFileLocatorFields,
   body: NonEmptyString.annotations({
-    description: "Comment body. Markdown is supported."
+    description: `Comment body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })
 }).pipe(
   Schema.filter(requireOneDriveFileLocator),
@@ -78,7 +79,7 @@ export const UpdateDriveFileCommentParamsSchema = Schema.Struct({
     description: "Drive file comment id to update."
   }),
   body: NonEmptyString.annotations({
-    description: "New comment body. Markdown is supported."
+    description: `New comment body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })
 }).pipe(
   Schema.filter(requireOneDriveFileLocator),

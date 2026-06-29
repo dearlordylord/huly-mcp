@@ -6,6 +6,7 @@ import {
   ContactChannelSummarySchema,
   parseAddOrganizationChannelParams
 } from "./contact-channels.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
@@ -99,7 +100,7 @@ export const UpdateOrganizationParamsSchema = Schema.Struct({
   ),
   description: Schema.optional(
     Schema.NullOr(Schema.String).annotations({
-      description: "New description/notes (null to clear). Supports multi-line plain text."
+      description: `New description/notes in markdown, or null to clear. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
     })
   )
 }).pipe(

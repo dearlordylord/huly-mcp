@@ -1,3 +1,4 @@
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas.js"
 import {
   addActivityReplyParamsJsonSchema,
   AddActivityReplyResultSchema,
@@ -144,7 +145,7 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
   defineTool(
     {
       name: "add_activity_reply",
-      description: "Add a Markdown reply to any activity message.",
+      description: "Add a Markdown reply to any activity message. " + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: addActivityReplyParamsJsonSchema,
       resultSchema: AddActivityReplyResultSchema
@@ -155,7 +156,8 @@ export const activityTools: ReadonlyArray<RegisteredTool> = [
   defineTool(
     {
       name: "update_activity_reply",
-      description: "Update a generic activity reply body.",
+      description: "Update a generic activity reply body. Body supports markdown. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: updateActivityReplyParamsJsonSchema,
       resultSchema: UpdateActivityReplyResultSchema

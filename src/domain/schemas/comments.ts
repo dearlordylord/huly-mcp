@@ -1,5 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import {
   CommentId,
   DEFAULT_LIMIT,
@@ -52,7 +53,7 @@ export const AddCommentParamsSchema = Schema.Struct({
     description: "Issue identifier (e.g., 'HULY-123' or just '123')"
   }),
   body: NonEmptyString.annotations({
-    description: "Comment body (markdown supported)"
+    description: `Comment body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })
 }).annotations({
   title: "AddCommentParams",
@@ -72,7 +73,7 @@ export const UpdateCommentParamsSchema = Schema.Struct({
     description: "Comment ID to update"
   }),
   body: NonEmptyString.annotations({
-    description: "New comment body (markdown supported)"
+    description: `New comment body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })
 }).annotations({
   title: "UpdateCommentParams",

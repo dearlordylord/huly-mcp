@@ -36,6 +36,7 @@ import {
   updateDirectMessage
 } from "../../../src/huly/operations/direct-messages.js"
 import { directMessageIdentifier, email, messageBrandId, personName } from "../../helpers/brands.js"
+import { capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 import { chunter, contact } from "../../../src/huly/huly-plugins.js"
 
@@ -674,6 +675,28 @@ describe("sendDirectMessage", () => {
       expect(capture.attributes?.message).toBeDefined()
     }))
 
+  it.effect("preserves native references when sending a DM message", () =>
+    Effect.gen(function*() {
+      const dm = makeDirectMessage({ _id: "dm-1" as Ref<HulyDirectMessage>, members: [currentAccountUuid] })
+      const capture: MockConfig["captureAddCollection"] = {}
+      const layer = createTestLayer({ directMessages: [dm], captureAddCollection: capture })
+
+      yield* sendDirectMessage({
+        dm: directMessageIdentifier("dm-1"),
+        body:
+          "See [TEST-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=TEST-1)."
+      }).pipe(Effect.provide(layer))
+
+      expect(capturedMarkupReferenceNodes(String(capture.attributes?.message))).toContainEqual({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "TEST-1"
+        }
+      })
+    }))
+
   it.effect("fails when DM cannot be resolved", () =>
     Effect.gen(function*() {
       const layer = createTestLayer({})
@@ -715,6 +738,37 @@ describe("updateDirectMessage", () => {
       expect(capture.operations).toBeDefined()
       expect(capture.operations?.message).toBeDefined()
       expect(capture.operations?.editedOn).toBeTypeOf("number")
+    }))
+
+  it.effect("preserves native references when updating a DM message", () =>
+    Effect.gen(function*() {
+      const dm = makeDirectMessage({ _id: "dm-1" as Ref<HulyDirectMessage>, members: [currentAccountUuid] })
+      const message = makeMessage({
+        _id: "msg-1" as Ref<ChatMessage>,
+        space: "dm-1" as Ref<Space>
+      })
+      const capture: MockConfig["captureUpdateDoc"] = {}
+      const layer = createTestLayer({
+        directMessages: [dm],
+        messages: [message],
+        captureUpdateDoc: capture
+      })
+
+      yield* updateDirectMessage({
+        dm: directMessageIdentifier("dm-1"),
+        messageId: messageBrandId("msg-1"),
+        body:
+          "See [TEST-2](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-2&label=TEST-2)."
+      }).pipe(Effect.provide(layer))
+
+      expect(capturedMarkupReferenceNodes(String(capture.operations?.message))).toContainEqual({
+        type: "reference",
+        attrs: {
+          id: "issue-2",
+          objectclass: "tracker:class:Issue",
+          label: "TEST-2"
+        }
+      })
     }))
 
   it.effect("fails with MessageNotFoundError when message id is unknown", () =>

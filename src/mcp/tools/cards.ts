@@ -2,6 +2,7 @@ import {
   createCardParamsJsonSchema,
   deleteCardParamsJsonSchema,
   getCardParamsJsonSchema,
+  HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
   listCardSpacesParamsJsonSchema,
   listCardsParamsJsonSchema,
   listMasterTagsParamsJsonSchema,
@@ -89,7 +90,9 @@ export const cardTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "create_card",
       description:
-        "Create a new card in a Huly card space. Requires a master tag (card type). Content supports markdown formatting. Returns the created card id.",
+        "Create a new card in a Huly card space. Requires a master tag (card type). Content supports markdown formatting. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " Returns the created card id.",
       category: CATEGORY,
       inputSchema: createCardParamsJsonSchema,
       resultSchema: CreateCardResultSchema
@@ -101,7 +104,8 @@ export const cardTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "update_card",
       description:
-        "Update fields on an existing Huly card. Only provided fields are modified. Content updates support markdown.",
+        "Update fields on an existing Huly card. Only provided fields are modified. Content updates support markdown. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: updateCardParamsJsonSchema,
       resultSchema: UpdateCardResultSchema

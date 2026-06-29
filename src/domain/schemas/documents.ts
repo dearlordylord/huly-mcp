@@ -1,5 +1,6 @@
 import { JSONSchema, Schema } from "effect"
 
+import { DOCUMENT_NATIVE_REFERENCE_TOOL_USAGE } from "./document-native-references.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
@@ -132,7 +133,7 @@ export const CreateDocumentParamsSchema = Schema.Struct({
     description: "Document title"
   }),
   content: Schema.optional(Schema.String.annotations({
-    description: "Document content (markdown supported)"
+    description: `Document content in markdown. ${DOCUMENT_NATIVE_REFERENCE_TOOL_USAGE}`
   })),
   parent: Schema.optional(DocumentIdentifier.annotations({
     description: "Parent document title or ID to nest this document under. If omitted, creates a top-level document."
@@ -178,7 +179,8 @@ const EditDocumentParamsBase = Schema.Struct({
     description: "New document title"
   })),
   content: Schema.optional(Schema.String.annotations({
-    description: "Full replacement content (markdown). Mutually exclusive with old_text/new_text."
+    description:
+      `Full replacement content in markdown. Mutually exclusive with old_text/new_text. ${DOCUMENT_NATIVE_REFERENCE_TOOL_USAGE}`
   })),
   old_text: Schema.optional(Schema.String.annotations({
     description: "Exact text to find in the document. Must be non-empty. Mutually exclusive with content."

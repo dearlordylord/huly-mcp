@@ -1,15 +1,24 @@
-import { getClient as getAccountClient } from "@hcengineering/account-client"
-import {
-  createRestClient,
-  createRestTxOperations,
-  createStorageClient,
-  getWorkspaceToken,
-  loadServerConfig
-} from "@hcengineering/api-client"
-import { getClient as getCollaboratorClient } from "@hcengineering/collaborator-client"
-import { htmlToJSON, jsonToHTML, jsonToMarkup, markupToJSON } from "@hcengineering/text"
-import { markdownToMarkup, markupToMarkdown } from "@hcengineering/text-markdown"
 import { Context, Layer } from "effect"
+import { markdownToMarkup, markupToMarkdown } from "./huly-text-markdown.js"
+import { htmlToJSON, jsonToHTML, jsonToMarkup, markupToJSON } from "./huly-text.js"
+
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports, no-restricted-syntax -- CJS interop boundary mirrors huly-plugins.ts */
+
+const accountClient = require("@hcengineering/account-client") as typeof import("@hcengineering/account-client")
+const apiClient = require("@hcengineering/api-client") as typeof import("@hcengineering/api-client")
+const collaboratorClient = require(
+  "@hcengineering/collaborator-client"
+) as typeof import("@hcengineering/collaborator-client")
+
+/* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/consistent-type-imports, no-restricted-syntax */
+
+const createRestClient = apiClient.createRestClient
+const createRestTxOperations = apiClient.createRestTxOperations
+const createStorageClient = apiClient.createStorageClient
+const getAccountClient = accountClient.getClient
+const getCollaboratorClient = collaboratorClient.getClient
+const getWorkspaceToken = apiClient.getWorkspaceToken
+const loadServerConfig = apiClient.loadServerConfig
 
 export interface HulySdkDependencies {
   readonly createRestClient: typeof createRestClient

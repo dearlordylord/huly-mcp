@@ -1,6 +1,7 @@
 import { JSONSchema, Schema } from "effect"
 
 import { clearableText } from "./clearable.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
@@ -93,7 +94,7 @@ export const CreateMilestoneParamsSchema = Schema.Struct({
     description: "Milestone name/label"
   }),
   description: Schema.optional(Schema.String.annotations({
-    description: "Milestone description (markdown supported)"
+    description: `Milestone description in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })),
   targetDate: Timestamp.annotations({
     description: "Target date as Unix timestamp in milliseconds"
@@ -122,7 +123,9 @@ export const UpdateMilestoneParamsSchema = Schema.Struct({
   label: Schema.optional(MilestoneLabel.annotations({
     description: "New milestone name/label"
   })),
-  description: Schema.optional(clearableText("New milestone description (markdown supported).")),
+  description: Schema.optional(
+    clearableText(`New milestone description in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`)
+  ),
   targetDate: Schema.optional(Timestamp.annotations({
     description: "New target date as Unix timestamp in milliseconds"
   })),

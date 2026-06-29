@@ -11,6 +11,7 @@ import {
   ParticipantSchema,
   VisibilitySchema
 } from "./calendar.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import {
   MonthDayOrdinal,
   MonthIndex,
@@ -234,7 +235,7 @@ export const CreateRecurringEventParamsSchema = Schema.Struct({
     description: "Event title"
   }),
   description: Schema.optional(Schema.String.annotations({
-    description: "Event description (markdown supported)"
+    description: `Event description in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
   })),
   startDate: Timestamp.annotations({
     description: "First occurrence start date/time (timestamp)"

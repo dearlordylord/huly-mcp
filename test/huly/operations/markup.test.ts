@@ -12,6 +12,7 @@ import {
   sanitizeNodeForMarkdown,
   testMarkupUrlConfig
 } from "../../../src/huly/operations/markup.js"
+import { renderMarkdownPreservingNativeReferences } from "../../../src/huly/operations/native-reference-markup.js"
 
 const markupWithInlineComment = JSON.stringify({
   type: "doc",
@@ -65,7 +66,7 @@ describe("markupToMarkdownString", () => {
 })
 
 describe("markdownToMarkupString", () => {
-  it.effect("keeps matching Huly browse URLs as markdown links instead of editor reference nodes", () =>
+  it.effect("converts matching Huly browse URLs to native reference nodes by default", () =>
     Effect.gen(function*() {
       const markdown =
         "I meant [Test Document](https://test.invalid/browse?workspace=test&_class=document%3Aclass%3ADocument&_id=doc-1&label=Test%20Document) like this"
@@ -74,15 +75,61 @@ describe("markdownToMarkupString", () => {
       const root = markupToJSON(markup)
       const paragraph = root.content?.[0]
       const content = paragraph?.content ?? []
-      const linkedText = content.find((node) => node.type === MarkupNodeType.text && node.text === "Test Document")
+      const reference = content.find((node) => node.type === MarkupNodeType.reference)
+
+      expect(reference).toMatchObject({
+        type: MarkupNodeType.reference,
+        attrs: {
+          id: "doc-1",
+          objectclass: "document:class:Document",
+          label: "Test Document"
+        }
+      })
+      expect(reference?.content).toBeUndefined()
+    }))
+
+  it.effect("preserves non-link marks when converting styled links to native references", () =>
+    Effect.gen(function*() {
+      const markdown =
+        "**[Test Document](https://test.invalid/browse?workspace=test&_class=document%3Aclass%3ADocument&_id=doc-1&label=Test%20Document)**"
+
+      const markup = markdownToMarkupString(markdown, testMarkupUrlConfig)
+      const root = markupToJSON(markup)
+      const reference = root.content?.[0]?.content?.find((node) => node.type === MarkupNodeType.reference)
+
+      expect(reference).toMatchObject({
+        type: MarkupNodeType.reference,
+        attrs: {
+          id: "doc-1",
+          objectclass: "document:class:Document",
+          label: "Test Document"
+        }
+      })
+      expect(reference?.marks).toContainEqual(expect.objectContaining({ type: MarkupMarkType.bold }))
+      expect(reference?.marks).not.toContainEqual(expect.objectContaining({ type: MarkupMarkType.link }))
+    }))
+
+  it.effect("keeps external and other-workspace URLs as markdown links by default", () =>
+    Effect.gen(function*() {
+      const markdown = [
+        "[external](https://example.com)",
+        "[other](https://test.invalid/browse?workspace=other&_class=document%3Aclass%3ADocument&_id=doc-1&label=Doc)"
+      ].join(" ")
+
+      const markup = markdownToMarkupString(markdown, testMarkupUrlConfig)
+      const root = markupToJSON(markup)
+      const content = root.content?.[0]?.content ?? []
 
       expect(content.some((node) => node.type === MarkupNodeType.reference)).toBe(false)
-      expect(linkedText).toBeDefined()
-      expect(linkedText?.marks).toContainEqual({
+      const linkMarks = content.filter((node) => node.type === MarkupNodeType.text).flatMap((node) => node.marks ?? [])
+      expect(linkMarks).toContainEqual({
+        type: MarkupMarkType.link,
+        attrs: { href: "https://example.com" }
+      })
+      expect(linkMarks).toContainEqual({
         type: MarkupMarkType.link,
         attrs: {
-          href:
-            "https://test.invalid/browse?workspace=test&_class=document%3Aclass%3ADocument&_id=doc-1&label=Test%20Document"
+          href: "https://test.invalid/browse?workspace=other&_class=document%3Aclass%3ADocument&_id=doc-1&label=Doc"
         }
       })
     }))
@@ -191,6 +238,40 @@ describe("markdownToMarkupString", () => {
 
       expect(rendered.malformedReferences).toEqual([])
       expect(content.some((node) => node.type === MarkupNodeType.reference)).toBe(false)
+    }))
+
+  it.effect("keeps malformed native-reference links as plain links on the default converter path", () =>
+    Effect.gen(function*() {
+      const markdown = "Broken [Doc](https://test.invalid/browse?workspace=test&_id=doc-1)."
+
+      const markup = markdownToMarkupString(markdown, testMarkupUrlConfig)
+      const root = markupToJSON(markup)
+      const content = root.content?.[0]?.content ?? []
+
+      expect(content.some((node) => node.type === MarkupNodeType.reference)).toBe(false)
+      expect(content.find((node) => node.type === MarkupNodeType.text && node.text === "Doc")?.marks)
+        .toContainEqual({
+          type: MarkupMarkType.link,
+          attrs: { href: "https://test.invalid/browse?workspace=test&_id=doc-1" }
+        })
+    }))
+
+  it.effect("keeps malformed native-reference links as plain links for non-strict collaborator rendering", () =>
+    Effect.gen(function*() {
+      const rendered = renderMarkdownPreservingNativeReferences(
+        "Broken [Doc](https://test.invalid/browse?workspace=test&_id=doc-1).",
+        testMarkupUrlConfig
+      )
+      const root = markupToJSON(rendered.markup)
+      const content = root.content?.[0]?.content ?? []
+
+      expect(rendered.format).toBe("markup")
+      expect(content.some((node) => node.type === MarkupNodeType.reference)).toBe(false)
+      expect(content.find((node) => node.type === MarkupNodeType.text && node.text === "Doc")?.marks)
+        .toContainEqual({
+          type: MarkupMarkType.link,
+          attrs: { href: "https://test.invalid/browse?workspace=test&_id=doc-1" }
+        })
     }))
 
   it.effect("reports malformed auto-converted Huly browse URLs", () =>

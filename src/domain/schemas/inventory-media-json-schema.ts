@@ -1,6 +1,7 @@
 import type { Schema } from "effect"
 import { JSONSchema } from "effect"
 
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import { withExactlyOneRequired, withJsonSchemaPropertyDescriptions } from "./json-schema.js"
 import { DEFAULT_LIMIT } from "./shared.js"
 
@@ -24,7 +25,7 @@ const INVENTORY_MEDIA_FIELD_DESCRIPTIONS: Readonly<Partial<Record<string, string
   description: "Optional media description. Use null on update to clear it.",
   pinned: "Whether the media item should be pinned.",
   commentId: "Product comment ID. Must belong directly to the resolved inventory product.",
-  body: "Comment body. Markdown is supported."
+  body: `Comment body in markdown. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
 }
 
 export const inventoryMediaJsonSchema = <A, I, R>(schema: Schema.Schema<A, I, R>): object =>

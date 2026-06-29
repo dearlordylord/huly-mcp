@@ -31,6 +31,7 @@ import type { PersonIdentifierAmbiguousError, PersonNotFoundError } from "../err
 import { CalendarNotAccessibleError, PersonNotFoundError as PersonMissing } from "../errors.js"
 import { calendar, contact } from "../huly-plugins.js"
 import { findPersonByExactEmailOrName } from "./contacts-shared.js"
+import { renderMarkdownPreservingNativeReferences } from "./native-reference-markup.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
@@ -270,14 +271,18 @@ export const resolveEventInputs = (
       ? yield* resolveParticipantLocators(client, params.participants)
       : []
 
-    const descriptionRef: MarkupBlobRef | null = params.description && params.description.trim() !== ""
-      ? yield* client.uploadMarkup(
-        eventClass,
-        toRef<Doc>(eventId),
-        "description",
-        params.description,
-        "markdown"
-      )
+    const description = params.description
+    const descriptionRef: MarkupBlobRef | null = description !== undefined && description.trim() !== ""
+      ? yield* Effect.gen(function*() {
+        const rendered = renderMarkdownPreservingNativeReferences(description, client.markupUrlConfig)
+        return yield* client.uploadMarkup(
+          eventClass,
+          toRef<Doc>(eventId),
+          "description",
+          rendered.markup,
+          rendered.format
+        )
+      })
       : null
 
     return { calendarRef, participantRefs, descriptionRef }

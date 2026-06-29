@@ -26,6 +26,7 @@ import { assertAt } from "../../../src/utils/assertions.js"
 import { tracker } from "../../../src/huly/huly-plugins.js"
 import { markdownToMarkupString, testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
 import { issueIdentifier, milestoneIdentifier, projectIdentifier } from "../../helpers/brands.js"
+import { capturedMarkupChildNodes, capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 const milestoneLabel = MilestoneLabel.make
 
@@ -551,8 +552,49 @@ describe("createMilestone", () => {
           markdownToMarkupString("First sprint of Q1", testMarkupUrlConfig)
         )
         expect(captureUploadMarkup.objectAttr).toBe("description")
-        expect(captureUploadMarkup.markup).toBe("First sprint of Q1")
-        expect(captureUploadMarkup.format).toBe("markdown")
+        expect(capturedMarkupChildNodes(captureUploadMarkup.markup)).toContainEqual({
+          type: "text",
+          text: "First sprint of Q1",
+          marks: []
+        })
+        expect(captureUploadMarkup.format).toBe("markup")
+      }))
+
+    it.effect("creates milestone descriptions with native references in both writes", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST" })
+        const captureCreateDoc: MockConfig["captureCreateDoc"] = {}
+        const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+
+        yield* createMilestone({
+          project: projectIdentifier("TEST"),
+          label: milestoneLabel("Native Ref"),
+          description:
+            "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1).",
+          targetDate: Timestamp.make(1706500000000)
+        }).pipe(Effect.provide(createTestLayerWithMocks({
+          projects: [project],
+          milestones: [],
+          captureCreateDoc,
+          captureUploadMarkup
+        })))
+
+        expect(capturedMarkupReferenceNodes(String(captureCreateDoc.attributes?.description))[0]).toMatchObject({
+          type: "reference",
+          attrs: {
+            id: "issue-1",
+            objectclass: "tracker:class:Issue",
+            label: "HULY-1"
+          }
+        })
+        expect(capturedMarkupReferenceNodes(captureUploadMarkup.markup)[0]).toMatchObject({
+          type: "reference",
+          attrs: {
+            id: "issue-1",
+            objectclass: "tracker:class:Issue",
+            label: "HULY-1"
+          }
+        })
       }))
 
     it.effect("sets initial status to Planned", () =>
@@ -685,11 +727,52 @@ describe("updateMilestone", () => {
 
         expect(result.updated).toBe(true)
         expect(captureUploadMarkup.objectAttr).toBe("description")
-        expect(captureUploadMarkup.markup).toBe("Updated description")
-        expect(captureUploadMarkup.format).toBe("markdown")
+        expect(capturedMarkupChildNodes(captureUploadMarkup.markup)).toContainEqual({
+          type: "text",
+          text: "Updated description",
+          marks: []
+        })
+        expect(captureUploadMarkup.format).toBe("markup")
         expect(captureUpdateDoc.operations?.description).toBe(
           markdownToMarkupString("Updated description", testMarkupUrlConfig)
         )
+      }))
+
+    it.effect("updates milestone descriptions with native references in both writes", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST" })
+        const milestone = makeMilestone({ label: milestoneLabel("Sprint 1") })
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+
+        yield* updateMilestone({
+          project: projectIdentifier("TEST"),
+          milestone: milestoneIdentifier("Sprint 1"),
+          description:
+            "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+        }).pipe(Effect.provide(createTestLayerWithMocks({
+          projects: [project],
+          milestones: [milestone],
+          captureUpdateDoc,
+          captureUploadMarkup
+        })))
+
+        expect(capturedMarkupReferenceNodes(String(captureUpdateDoc.operations?.description))[0]).toMatchObject({
+          type: "reference",
+          attrs: {
+            id: "issue-1",
+            objectclass: "tracker:class:Issue",
+            label: "HULY-1"
+          }
+        })
+        expect(capturedMarkupReferenceNodes(captureUploadMarkup.markup)[0]).toMatchObject({
+          type: "reference",
+          attrs: {
+            id: "issue-1",
+            objectclass: "tracker:class:Issue",
+            label: "HULY-1"
+          }
+        })
       }))
 
     it.effect("updates milestone targetDate", () =>
@@ -762,7 +845,11 @@ describe("updateMilestone", () => {
         expect(captureUpdateDoc.operations?.status).toBe(MilestoneStatus.Completed)
         expect(captureUpdateDoc.operations?.targetDate).toBe(1706700000000)
         expect(captureUploadMarkup.objectAttr).toBe("description")
-        expect(captureUploadMarkup.markup).toBe("Completed")
+        expect(capturedMarkupChildNodes(captureUploadMarkup.markup)).toContainEqual({
+          type: "text",
+          text: "Completed",
+          marks: []
+        })
       }))
 
     it.effect("fails when no fields provided", () =>

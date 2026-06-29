@@ -14,6 +14,7 @@ import {
   getBoardCommonPreferenceParamsJsonSchema,
   getBoardParamsJsonSchema,
   getBoardSavedViewParamsJsonSchema,
+  HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
   listBoardCardsParamsJsonSchema,
   listBoardLabelsParamsJsonSchema,
   listBoardMenuPagesParamsJsonSchema,
@@ -201,7 +202,8 @@ export const boardTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "create_board_card",
       description:
-        "Create a board card with safe defaults. Resolves kind/status from the board project type, increments the CARD-number sequence, and stores markdown description as inline Huly Markup.",
+        "Create a board card with safe defaults. Resolves kind/status from the board project type, increments the CARD-number sequence, and stores markdown description as inline Huly Markup. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: createBoardCardParamsJsonSchema,
       resultSchema: CreateBoardCardResultSchema
@@ -213,7 +215,9 @@ export const boardTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "update_board_card",
       description:
-        "Update board card fields: title, markdown description, status, assignee, members, location, cover, startDate, and dueDate. Use null to clear clearable fields.",
+        "Update board card fields: title, markdown description, status, assignee, members, location, cover, startDate, and dueDate. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT
+        + " Use null to clear clearable fields.",
       category: CATEGORY,
       inputSchema: updateBoardCardParamsJsonSchema,
       resultSchema: BoardCardMutationResultSchema

@@ -15,6 +15,7 @@ import type { CommentNotFoundError, IssueNotFoundError, ProjectNotFoundError } f
 import { addComment, deleteComment, listComments, updateComment } from "../../../src/huly/operations/comments.js"
 import { assertAt } from "../../../src/utils/assertions.js"
 import { commentBrandId, issueIdentifier, projectIdentifier } from "../../helpers/brands.js"
+import { capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 import { chunter, tracker } from "../../../src/huly/huly-plugins.js"
 import { markdownToMarkupString, testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
@@ -567,6 +568,35 @@ describe("addComment", () => {
         expect(stored).toBe(markdownToMarkupString(markdownBody, testMarkupUrlConfig))
       }))
 
+    it.effect("preserves native references in added comment body", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", number: 1 })
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          captureAddCollection
+        })
+
+        yield* addComment({
+          project: projectIdentifier("TEST"),
+          issueIdentifier: issueIdentifier("TEST-1"),
+          body:
+            "See [TEST-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=TEST-1)."
+        }).pipe(Effect.provide(testLayer))
+
+        expect(capturedMarkupReferenceNodes(String(captureAddCollection.attributes?.message))).toContainEqual({
+          type: "reference",
+          attrs: {
+            id: "issue-1",
+            objectclass: "tracker:class:Issue",
+            label: "TEST-1"
+          }
+        })
+      }))
+
     it.effect("returns comment ID and issue identifier", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "HULY" })
@@ -755,6 +785,44 @@ describe("updateComment", () => {
         expect(captureUpdateDoc.operations?.message).toBe(
           markdownToMarkupString("**Bold** and *italic*", testMarkupUrlConfig)
         )
+      }))
+
+    it.effect("preserves native references in updated comment body", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", number: 1 })
+        const messages = [
+          makeChatMessage({
+            _id: "comment-1" as Ref<ChatMessage>,
+            message: "Plain text",
+            attachedTo: "issue-1" as Ref<Doc>
+          })
+        ]
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          messages,
+          captureUpdateDoc
+        })
+
+        yield* updateComment({
+          project: projectIdentifier("TEST"),
+          issueIdentifier: issueIdentifier("TEST-1"),
+          commentId: commentBrandId("comment-1"),
+          body:
+            "See [TEST-2](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-2&label=TEST-2)."
+        }).pipe(Effect.provide(testLayer))
+
+        expect(capturedMarkupReferenceNodes(String(captureUpdateDoc.operations?.message))).toContainEqual({
+          type: "reference",
+          attrs: {
+            id: "issue-2",
+            objectclass: "tracker:class:Issue",
+            label: "TEST-2"
+          }
+        })
       }))
 
     it.effect("returns updated: false when body is unchanged", () =>

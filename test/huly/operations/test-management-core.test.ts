@@ -31,6 +31,7 @@ import {
 } from "../../../src/huly/test-management-types.js"
 import { assertAt } from "../../../src/utils/assertions.js"
 import { testCaseIdentifier, testProjectIdentifier, testSuiteIdentifier } from "../../helpers/brands.js"
+import { capturedMarkupChildNodes, capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 const makeTestProject = (overrides?: Partial<TestProject>): TestProject => {
   const base = {
@@ -729,9 +730,43 @@ describe("createTestCase — optional fields", () => {
         assignee: "Alice"
       }).pipe(Effect.provide(layer))
 
-      expect(captureUploadMarkup.markup).toBe("Detailed steps")
+      expect(capturedMarkupChildNodes(captureUploadMarkup.markup)).toContainEqual({
+        type: "text",
+        text: "Detailed steps",
+        marks: []
+      })
       expect(captureAddCollection.attributes?.description).toBe("markup-ref")
       expect(captureAddCollection.attributes?.assignee).toBe("person-1")
+    }))
+
+  it.effect("creates test case descriptions with native references", () =>
+    Effect.gen(function*() {
+      const captureAddCollection: { attributes?: Record<string, unknown>; id?: string } = {}
+      const captureUploadMarkup: { markup?: string } = {}
+      const layer = createTestLayerWithMocks({
+        projects: [makeTestProject()],
+        suites: [makeTestSuite()],
+        captureAddCollection,
+        captureUploadMarkup
+      })
+
+      yield* createTestCase({
+        project: testProjectIdentifier("QA Project"),
+        suite: testSuiteIdentifier("Login Suite"),
+        name: "Native Ref Case",
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(layer))
+
+      expect(capturedMarkupReferenceNodes(captureUploadMarkup.markup)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
+      expect(captureAddCollection.attributes?.description).toBe("markup-ref")
     }))
 
   it.effect("treats a whitespace-only description as no description", () =>
@@ -778,10 +813,44 @@ describe("updateTestCase — optional fields", () => {
         status: "approved"
       }).pipe(Effect.provide(layer))
 
-      expect(captureUploadMarkup.markup).toBe("Revised")
+      expect(capturedMarkupChildNodes(captureUploadMarkup.markup)).toContainEqual({
+        type: "text",
+        text: "Revised",
+        marks: []
+      })
       expect(captureUpdateDoc.operations?.description).toBe("markup-ref")
       expect(captureUpdateDoc.operations?.priority).toBe(TestCasePriority.High)
       expect(captureUpdateDoc.operations?.status).toBe(TestCaseStatus.Approved)
+    }))
+
+  it.effect("updates test case descriptions with native references", () =>
+    Effect.gen(function*() {
+      const captureUpdateDoc: { operations?: Record<string, unknown> } = {}
+      const captureUploadMarkup: { markup?: string } = {}
+      const layer = createTestLayerWithMocks({
+        projects: [makeTestProject()],
+        suites: [makeTestSuite()],
+        cases: [baseCase()],
+        captureUpdateDoc,
+        captureUploadMarkup
+      })
+
+      yield* updateTestCase({
+        project: testProjectIdentifier("QA Project"),
+        testCase: testCaseIdentifier("Case 1"),
+        description:
+          "See [HULY-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=HULY-1)."
+      }).pipe(Effect.provide(layer))
+
+      expect(capturedMarkupReferenceNodes(captureUploadMarkup.markup)[0]).toMatchObject({
+        type: "reference",
+        attrs: {
+          id: "issue-1",
+          objectclass: "tracker:class:Issue",
+          label: "HULY-1"
+        }
+      })
+      expect(captureUpdateDoc.operations?.description).toBe("markup-ref")
     }))
 
   it.effect("clears description and assignee when set to null", () =>

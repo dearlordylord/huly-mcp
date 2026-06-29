@@ -6,6 +6,7 @@ import {
   deleteTodoParamsJsonSchema,
   DeleteTodoResultSchema,
   getTodoParamsJsonSchema,
+  HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
   listTodosParamsJsonSchema,
   parseCompleteTodoParams,
   parseCreateTodoParams,
@@ -72,7 +73,8 @@ export const plannerTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "create_todo",
       description:
-        "Create a Planner ToDo. Omit attachedTo for a personal ToDo, or pass attachedTo.type=issue with project and identifier for an issue action item. Omit owner to use the authenticated user.",
+        "Create a Planner ToDo. Omit attachedTo for a personal ToDo, or pass attachedTo.type=issue with project and identifier for an issue action item. Omit owner to use the authenticated user. Description supports markdown. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: createTodoParamsJsonSchema,
       resultSchema: CreateTodoResultSchema
@@ -84,7 +86,8 @@ export const plannerTools: ReadonlyArray<RegisteredTool> = [
     {
       name: "update_todo",
       description:
-        "Update a Planner ToDo by human locator or raw todoId. Supports title, markdown description, owner, dueDate including null to clear, priority, and visibility.",
+        "Update a Planner ToDo by human locator or raw todoId. Supports title, markdown description, owner, dueDate including null to clear, priority, and visibility. "
+        + HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
       category: CATEGORY,
       inputSchema: updateTodoParamsJsonSchema,
       resultSchema: UpdateTodoResultSchema
