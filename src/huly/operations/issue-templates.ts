@@ -66,6 +66,7 @@ import type {
   HulyError,
   InvalidStatusError,
   IssueNotFoundError,
+  IssueReferenceError,
   NoUpdateFieldsError,
   ProjectNotFoundError
 } from "../errors.js"
@@ -108,6 +109,7 @@ type CreateIssueFromTemplateError =
   | HulyError
   | ProjectNotFoundError
   | IssueNotFoundError
+  | IssueReferenceError
   | IssueTemplateNotFoundError
   | InvalidStatusError
   | PersonNotFoundError

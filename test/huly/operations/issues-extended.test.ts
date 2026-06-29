@@ -27,6 +27,7 @@ import { addLabel, createIssue, deleteIssue, updateIssue } from "../../../src/hu
 import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import { issueIdentifier, projectIdentifier } from "../../helpers/brands.js"
 import { withDiagnostics } from "../../helpers/diagnostics.js"
+import { capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 import { contact, core, tags, tracker } from "../../../src/huly/huly-plugins.js"
 
@@ -135,8 +136,8 @@ interface MockConfig {
   captureUpdateDoc?: { operations?: Record<string, unknown> }
   captureAddCollection?: { attributes?: Record<string, unknown>; id?: string; class?: unknown }
   captureCreateDoc?: { attributes?: Record<string, unknown>; id?: string }
-  captureUploadMarkup?: { markup?: string }
-  captureUpdateMarkup?: { markup?: string }
+  captureUploadMarkup?: { markup?: string; format?: string }
+  captureUpdateMarkup?: { markup?: string; format?: string }
   captureRemoveDoc?: { id?: string }
   updateDocResult?: { object?: { sequence?: number } }
   // For addLabel: simulate tagElement not found after creation
@@ -337,10 +338,12 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     _objectClass: unknown,
     _objectId: unknown,
     _objectAttr: unknown,
-    markup: unknown
+    markup: unknown,
+    format: unknown
   ) => {
     if (config.captureUploadMarkup) {
       config.captureUploadMarkup.markup = markup as string
+      config.captureUploadMarkup.format = format as string
     }
     return Effect.succeed("markup-ref-123")
   }) as unknown as HulyClientOperations["uploadMarkup"]
@@ -349,10 +352,12 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     _objectClass: unknown,
     _objectId: unknown,
     _objectAttr: unknown,
-    markup: unknown
+    markup: unknown,
+    format: unknown
   ) => {
     if (config.captureUpdateMarkup) {
       config.captureUpdateMarkup.markup = markup as string
+      config.captureUpdateMarkup.format = format as string
     }
     return Effect.succeed(undefined)
   }) as HulyClientOperations["updateMarkup"]
@@ -606,8 +611,49 @@ describe("Issues Extended Coverage", () => {
         }).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result.updated).toBe(true)
-        expect(captureUpdateMarkup.markup).toBe("# Updated Description")
+        expect(captureUpdateMarkup.format).toBe("markup")
+        expect(captureUpdateMarkup.markup).not.toBe("# Updated Description")
         // Should NOT have set description in updateOps (it was updated in place)
+        expect(captureUpdateDoc.operations?.description).toBeUndefined()
+      }))
+
+    it.effect("updates existing issue descriptions with native references", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({
+          identifier: "TEST-1",
+          description: "existing-markup-ref" as MarkupBlobRef
+        })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUpdateMarkup: MockConfig["captureUpdateMarkup"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          captureUpdateDoc,
+          captureUpdateMarkup
+        })
+
+        const result = yield* updateIssue({
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
+          description:
+            "See [TEST-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=TEST-1)."
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+        expect(result.updated).toBe(true)
+        expect(captureUpdateMarkup.format).toBe("markup")
+        const reference = capturedMarkupReferenceNodes(captureUpdateMarkup.markup)[0]
+        expect(reference).toMatchObject({
+          type: "reference",
+          attrs: {
+            id: "issue-1",
+            objectclass: "tracker:class:Issue",
+            label: "TEST-1"
+          }
+        })
         expect(captureUpdateDoc.operations?.description).toBeUndefined()
       }))
 
@@ -637,7 +683,8 @@ describe("Issues Extended Coverage", () => {
 
         // Even though updateOps is empty, descriptionUpdatedInPlace should be true
         expect(result.updated).toBe(true)
-        expect(captureUpdateMarkup.markup).toBe("# Only desc updated")
+        expect(captureUpdateMarkup.format).toBe("markup")
+        expect(captureUpdateMarkup.markup).not.toBe("# Only desc updated")
       }))
   })
 })

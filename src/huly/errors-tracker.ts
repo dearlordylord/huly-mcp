@@ -50,6 +50,20 @@ export class InvalidStatusError extends Schema.TaggedError<InvalidStatusError>()
 }
 
 /**
+ * Native issue reference links are invalid.
+ */
+export class IssueReferenceError extends Schema.TaggedError<IssueReferenceError>()(
+  "IssueReferenceError",
+  {
+    reason: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Invalid issue references: ${this.reason}`
+  }
+}
+
+/**
  * Comment not found on the specified issue.
  */
 export class CommentNotFoundError extends Schema.TaggedError<CommentNotFoundError>()(

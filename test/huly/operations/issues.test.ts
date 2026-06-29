@@ -36,6 +36,7 @@ import { contact, core, tags, task, tracker } from "../../../src/huly/huly-plugi
 import { colorCode, email, issueIdentifier, projectIdentifier, statusName } from "../../helpers/brands.js"
 import { withDiagnostics } from "../../helpers/diagnostics.js"
 import { docRef } from "../../helpers/huly-sdk.js"
+import { capturedMarkupChildNodes, capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 // Helper to create properly typed FindResult for tests
 // FindResult<T> = T[] & { total: number; lookupMap?: Record<string, Doc> }
@@ -213,7 +214,7 @@ interface MockConfig {
     collection?: string
   }
   captureCreateDoc?: { attributes?: Record<string, unknown>; id?: string }
-  captureUploadMarkup?: { markup?: string }
+  captureUploadMarkup?: { markup?: string; format?: string }
   updateDocResult?: { object?: { sequence?: number } }
 }
 
@@ -461,10 +462,12 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     _objectClass: unknown,
     _objectId: unknown,
     _objectAttr: unknown,
-    markup: unknown
+    markup: unknown,
+    format: unknown
   ) => {
     if (config.captureUploadMarkup) {
       config.captureUploadMarkup.markup = markup as string
+      config.captureUploadMarkup.format = format as string
     }
     return Effect.succeed("markup-ref-123")
   }) as unknown as HulyClientOperations["uploadMarkup"]
@@ -1141,8 +1144,118 @@ describe("createIssue", () => {
         }).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result.identifier).toBe("TEST-2")
-        expect(captureUploadMarkup.markup).toBe("# Markdown\n\nThis is a description.")
+        expect(captureUploadMarkup.format).toBe("markup")
+        const nodes = capturedMarkupChildNodes(captureUploadMarkup.markup)
+        expect(nodes).toContainEqual({ type: "text", text: "Markdown", marks: [] })
+        expect(nodes).toContainEqual({ type: "text", text: "This is a description.", marks: [] })
         expect(captureAddCollection.attributes?.description).toBe("markup-ref-123")
+      }))
+
+    it.effect("creates issue descriptions with native references for current-workspace Huly browse links", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST", sequence: 1 })
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+        const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [],
+          captureAddCollection,
+          captureUploadMarkup,
+          updateDocResult: { object: { sequence: 2 } }
+        })
+
+        yield* createIssue({
+          project: projectIdentifier("TEST"),
+          title: "Native reference issue",
+          description:
+            "See [TEST-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=TEST-1)."
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+        expect(captureUploadMarkup.format).toBe("markup")
+        const reference = capturedMarkupReferenceNodes(captureUploadMarkup.markup)[0]
+        expect(reference).toMatchObject({
+          type: "reference",
+          attrs: {
+            id: "issue-1",
+            objectclass: "tracker:class:Issue",
+            label: "TEST-1"
+          }
+        })
+        expect(Object.hasOwn(reference ?? {}, "content")).toBe(false)
+        expect(captureAddCollection.attributes?.description).toBe("markup-ref-123")
+      }))
+
+    it.effect("keeps external links and other-workspace Huly browse links as normal issue description links", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST", sequence: 1 })
+        const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [],
+          captureUploadMarkup,
+          updateDocResult: { object: { sequence: 2 } }
+        })
+
+        yield* createIssue({
+          project: projectIdentifier("TEST"),
+          title: "Plain link issue",
+          description:
+            "[external](https://example.com) [other](https://test.invalid/browse?workspace=other&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=TEST-1)"
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+        const nodes = capturedMarkupChildNodes(captureUploadMarkup.markup)
+        expect(nodes.some((node) => node.type === "reference")).toBe(false)
+        const linkMarks = nodes.filter((node) => node.type === "text").flatMap((node) => node.marks ?? [])
+        expect(linkMarks).toContainEqual({
+          type: "link",
+          attrs: { href: "https://example.com" }
+        })
+        expect(linkMarks).toContainEqual({
+          type: "link",
+          attrs: {
+            href: "https://test.invalid/browse?workspace=other&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=TEST-1"
+          }
+        })
+      }))
+
+    it.effect("fails malformed current-workspace Huly browse links before issue description writes", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST", sequence: 1 })
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+        const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [],
+          statuses: [],
+          captureAddCollection,
+          captureUploadMarkup,
+          captureUpdateDoc,
+          updateDocResult: { object: { sequence: 2 } }
+        })
+
+        const error = yield* Effect.flip(
+          createIssue({
+            project: projectIdentifier("TEST"),
+            title: "Broken reference issue",
+            description: "[bad](https://test.invalid/browse?workspace=test&_id=issue-1)"
+          }).pipe(Effect.provide(testLayer), withDiagnostics)
+        )
+
+        expect(error._tag).toBe("IssueReferenceError")
+        if (error._tag === "IssueReferenceError") {
+          expect(error.reason).toBe(
+            "malformed Huly native reference links in description: 'reference missing objectclass, label'"
+          )
+        }
+        expect(captureUploadMarkup.markup).toBeUndefined()
+        expect(captureAddCollection.attributes).toBeUndefined()
+        expect(captureUpdateDoc.operations).toBeUndefined()
       }))
 
     it.effect("creates issue with priority", () =>
@@ -1817,8 +1930,76 @@ describe("updateIssue", () => {
           description: "# New Description\n\nUpdated content."
         }).pipe(Effect.provide(testLayer), withDiagnostics)
 
-        expect(captureUploadMarkup.markup).toBe("# New Description\n\nUpdated content.")
+        expect(captureUploadMarkup.format).toBe("markup")
+        const nodes = capturedMarkupChildNodes(captureUploadMarkup.markup)
+        expect(nodes).toContainEqual({ type: "text", text: "New Description", marks: [] })
+        expect(nodes).toContainEqual({ type: "text", text: "Updated content.", marks: [] })
         expect(captureUpdateDoc.operations?.description).toBe("markup-ref-123")
+      }))
+
+    it.effect("uploads a new issue description with native references when none exists", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", description: null })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          captureUpdateDoc,
+          captureUploadMarkup
+        })
+
+        yield* updateIssue({
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
+          description:
+            "See [TEST-1](https://test.invalid/browse?workspace=test&_class=tracker%3Aclass%3AIssue&_id=issue-1&label=TEST-1)."
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+        expect(captureUploadMarkup.format).toBe("markup")
+        const reference = capturedMarkupReferenceNodes(captureUploadMarkup.markup)[0]
+        expect(reference).toMatchObject({
+          type: "reference",
+          attrs: {
+            id: "issue-1",
+            objectclass: "tracker:class:Issue",
+            label: "TEST-1"
+          }
+        })
+        expect(captureUpdateDoc.operations?.description).toBe("markup-ref-123")
+      }))
+
+    it.effect("fails malformed issue description links before update markup writes", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", description: null })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          captureUpdateDoc,
+          captureUploadMarkup
+        })
+
+        const error = yield* Effect.flip(
+          updateIssue({
+            project: projectIdentifier("TEST"),
+            identifier: issueIdentifier("TEST-1"),
+            description: "[bad](https://test.invalid/browse?workspace=test&_id=issue-1)"
+          }).pipe(Effect.provide(testLayer), withDiagnostics)
+        )
+
+        expect(error._tag).toBe("IssueReferenceError")
+        expect(captureUploadMarkup.markup).toBeUndefined()
+        expect(captureUpdateDoc.operations).toBeUndefined()
       }))
 
     it.effect("updates issue assignee", () =>
