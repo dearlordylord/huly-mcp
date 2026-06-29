@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.44.3
+
+### Patch Changes
+
+- 2e060eb: Add optional CLI telemetry and tag PostHog events with package/surface discriminators.
+
 ## 0.44.2
 
 ### Patch Changes
