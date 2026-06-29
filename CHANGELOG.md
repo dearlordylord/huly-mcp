@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.44.1
+
+### Patch Changes
+
+- b4f6aa7: Preserve native Huly issue references when issue descriptions are created or updated from current-workspace browse links, and make workflow artifact cleanup tolerate null REST lookup maps during local integration release checks.
+
 ## 0.44.0
 
 ### Minor Changes
