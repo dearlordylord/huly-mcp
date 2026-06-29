@@ -68,6 +68,8 @@ cli_package_version="$(node -p "require('./packages/huly-cli/package.json').vers
 pnpm build
 pnpm verify-version
 pnpm --filter "$CLI_PACKAGE_NAME" verify-version
+pnpm verify-cli-integration-coverage
+pnpm integration:cli
 
 npm_config_ignore_scripts=true pnpm dlx "@changesets/cli@$CHANGES_VERSION" publish
 
