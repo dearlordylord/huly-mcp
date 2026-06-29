@@ -1,35 +1,11 @@
 import type { McpToolName } from "../../../src/mcp/tools/index.js"
+import { mutationCliCommandCatalog } from "./catalog-mutations.js"
+import { readOnlyCliCommandCatalog } from "./catalog-read-only.js"
+import type { CliCommandSpec } from "./catalog-types.js"
 import { ignoredBusinessMcpTools } from "./ignored-tools-business.js"
 import { ignoredCollaborationMcpTools } from "./ignored-tools-collaboration.js"
 import { ignoredCoreMcpTools } from "./ignored-tools-core.js"
 import { ignoredPlatformMcpTools } from "./ignored-tools-platform.js"
-
-export interface CliCommandSpec {
-  readonly path: readonly [string, ...Array<string>]
-  readonly positional: ReadonlyArray<string>
-  readonly description: string
-  readonly behavior?: CliCommandBehavior
-}
-
-interface CliCommandBehavior {
-  readonly confirmation?: CliConfirmationPolicy
-  readonly fileInput?: CliFileInputPolicy
-  readonly fileOutput?: CliFileOutputPolicy
-}
-
-interface CliConfirmationPolicy {
-  readonly message: string
-  readonly type: "requires-yes"
-}
-
-interface CliFileOutputPolicy {
-  readonly attachmentIdField: string
-  readonly type: "attachment-download"
-}
-
-interface CliFileInputPolicy {
-  readonly fields: ReadonlyArray<string>
-}
 
 export const cliCommandCatalog = {
   list_projects: {
@@ -262,7 +238,9 @@ export const cliCommandCatalog = {
     path: ["search"],
     positional: ["query"],
     description: "Search Huly"
-  }
+  },
+  ...readOnlyCliCommandCatalog,
+  ...mutationCliCommandCatalog
 } as const satisfies Partial<Record<McpToolName, CliCommandSpec>>
 
 export type CliToolName = keyof typeof cliCommandCatalog

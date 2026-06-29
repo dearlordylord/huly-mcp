@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest"
 
+import { deferredMechanicalCliCommandTools } from "../../packages/huly-cli/src/catalog-deferred.js"
+import { deferredReadOnlyCliCommandTools } from "../../packages/huly-cli/src/catalog-read-only.js"
 import {
   catalogSyncAssertions,
   cliCommandCatalog,
@@ -22,6 +24,16 @@ describe("CLI catalog", () => {
 
     expect(toolNames.filter((name) => !decided.has(name))).toEqual([])
     expect(catalogSyncAssertions).toEqual([])
+  })
+
+  it("keeps only logged non-mechanical read-like tools ignored", () => {
+    const ignoredReadLikeTools = ignoredMcpTools.filter((name) => /^(list|get|describe)_/.test(name))
+
+    expect(ignoredReadLikeTools.toSorted()).toEqual([...deferredReadOnlyCliCommandTools].toSorted())
+  })
+
+  it("keeps every ignored MCP tool in the mechanical deferral list", () => {
+    expect(ignoredMcpTools.toSorted()).toEqual([...deferredMechanicalCliCommandTools].toSorted())
   })
 
   it("narrows CLI tool names at runtime", () => {

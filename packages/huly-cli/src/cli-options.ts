@@ -3,7 +3,7 @@ import type { NodeContext } from "@effect/platform-node"
 import { Effect, Option } from "effect"
 
 import type { ToolDefinition } from "../../../src/mcp/tools/registry.js"
-import type { CliCommandSpec } from "./catalog.js"
+import type { CliCommandSpec } from "./catalog-types.js"
 import {
   collectFieldSpecs,
   fieldAcceptsBoolean,

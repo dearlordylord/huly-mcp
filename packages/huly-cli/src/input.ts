@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises"
 import { Effect, Schema } from "effect"
 
 import type { ToolDefinition } from "../../../src/mcp/tools/registry.js"
-import type { CliCommandSpec } from "./catalog.js"
+import type { CliCommandSpec } from "./catalog-types.js"
 import {
   type CliGlobalOptions,
   type ParsedCliCommandLine,

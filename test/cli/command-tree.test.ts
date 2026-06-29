@@ -38,6 +38,31 @@ describe("CLI command tree", () => {
     expect(errorMessage(error)).toContain("issues list does not support --output")
   })
 
+  it.each([
+    [["boards", "cards", "labels", "list", "board-1", "card-1", "--output", "out.json"], "boards cards labels list"],
+    [
+      ["channels", "messages", "attachments", "get", "message-1", "attachment-1", "--output", "out.json"],
+      "channels messages attachments get"
+    ],
+    [
+      ["recruiting", "vacancy", "statuses", "list", "vacancy-1", "--output", "out.json"],
+      "recruiting vacancy statuses list"
+    ]
+  ])("routes generated read-only command %s", async (argv, path) => {
+    const error = await rejected(runCommand(argv))
+
+    expect(errorMessage(error)).toContain(`${path} does not support --output`)
+  })
+
+  it.each([
+    [["labels", "create", "triage", "--output", "out.json"], "labels create does not support --output"],
+    [["boards", "cards", "delete", "board-1", "card-1"], "boards cards delete requires --yes."]
+  ])("routes generated mutation command %s", async (argv, message) => {
+    const error = await rejected(runCommand(argv))
+
+    expect(errorMessage(error)).toContain(message)
+  })
+
   it("maps root global option parse errors into CLI runtime errors", async () => {
     const error = await rejected(runCommand(["issues", "list", "--json=maybe"]))
 
