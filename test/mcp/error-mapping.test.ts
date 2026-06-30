@@ -90,7 +90,7 @@ import { funnelIdentifier, funnelReference, leadIdentifier } from "../helpers/br
 describe("Error Mapping to MCP", () => {
   describe("mapDomainErrorToMcp", () => {
     describe("InvalidParams errors (-32602)", () => {
-      it.effect("maps IssueNotFoundError with no errorTag", () =>
+      it.effect("maps IssueNotFoundError with its errorTag", () =>
         Effect.gen(function*() {
           const error = new IssueNotFoundError({
             identifier: "HULY-123",
@@ -100,7 +100,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response._meta.errorTag).toBeUndefined()
+          expect(response._meta.errorTag).toBe("IssueNotFoundError")
           expect(assertAt(response.content, 0).text).toBe(
             "Issue 'HULY-123' not found in project 'HULY'"
           )
@@ -140,6 +140,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+          expect(response._meta.errorTag).toBe("PersonNotFoundError")
           expect(assertAt(response.content, 0).text).toBe(
             "Person 'john@example.com' not found"
           )
@@ -155,6 +156,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+          expect(response._meta.errorTag).toBe("PersonIdentifierAmbiguousError")
           expect(assertAt(response.content, 0).text).toBe(
             "Person identifier 'Smith,Bill' matched 2 people; use an exact email address instead"
           )
@@ -252,7 +254,7 @@ describe("Error Mapping to MCP", () => {
           expect(assertAt(response.content, 0).text).toBe("Calendar 'cal-9' not found or not accessible")
         }))
 
-      it.effect("maps typed space role lookup errors as invalid params without errorTag", () =>
+      it.effect("maps typed space role lookup errors as invalid params with errorTag", () =>
         Effect.gen(function*() {
           const errors = [
             new SpaceNotTypedError({
@@ -278,7 +280,7 @@ describe("Error Mapping to MCP", () => {
 
             expect(response.isError).toBe(true)
             expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-            expect(response._meta.errorTag).toBeUndefined()
+            expect(response._meta.errorTag).toBe(error._tag)
             expect(assertAt(response.content, 0).text).toBe(error.message)
           }
         }))
@@ -290,7 +292,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response._meta.errorTag).toBeUndefined()
+          expect(response._meta.errorTag).toBe("DirectMessageNotFoundError")
           expect(assertAt(response.content, 0).text).toBe("Direct message 'Kerr,Shannon' not found")
         }))
 
@@ -304,7 +306,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response._meta.errorTag).toBeUndefined()
+          expect(response._meta.errorTag).toBe("DirectMessageIdentifierAmbiguousError")
           expect(assertAt(response.content, 0).text).toBe(
             "Direct message 'Kerr,Shannon' is ambiguous (2 matches); use the DM _id"
           )
@@ -352,7 +354,7 @@ describe("Error Mapping to MCP", () => {
 
             expect(response.isError).toBe(true)
             expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-            expect(response._meta.errorTag).toBeUndefined()
+            expect(response._meta.errorTag).toBe(error._tag)
             expect(assertAt(response.content, 0).text).toBe(error.message)
           }
         }))
@@ -404,7 +406,7 @@ describe("Error Mapping to MCP", () => {
 
             expect(response.isError).toBe(true)
             expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-            expect(response._meta.errorTag).toBeUndefined()
+            expect(response._meta.errorTag).toBe(error._tag)
             expect(assertAt(response.content, 0).text).toBe(error.message)
           }
         }))
@@ -419,7 +421,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-          expect(response._meta.errorTag).toBeUndefined()
+          expect(response._meta.errorTag).toBe("DocumentContentCorruptedError")
           expect(assertAt(response.content, 0).text).toBe(
             "Document content is unreadable or corrupted. Use edit_document with the full content field to replace and repair it."
           )
@@ -457,7 +459,7 @@ describe("Error Mapping to MCP", () => {
 
             expect(response.isError).toBe(true)
             expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
-            expect(response._meta.errorTag).toBeUndefined()
+            expect(response._meta.errorTag).toBe(error._tag)
             expect(assertAt(response.content, 0).text).toBe(error.message)
           }
         }))
