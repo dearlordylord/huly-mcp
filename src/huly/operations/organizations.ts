@@ -33,7 +33,8 @@ import type {
   InvalidContactProviderError,
   NoUpdateFieldsError,
   OrganizationIdentifierAmbiguousError,
-  OrganizationNotFoundError
+  OrganizationNotFoundError,
+  PersonIdentifierAmbiguousError
 } from "../errors.js"
 import { PersonNotFoundError } from "../errors.js"
 import { contact } from "../huly-plugins.js"
@@ -50,7 +51,7 @@ import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from 
 export { addOrganizationChannel } from "./contact-channels.js"
 
 type ListOrganizationsError = HulyClientError
-type CreateOrganizationError = HulyClientError | PersonNotFoundError
+type CreateOrganizationError = HulyClientError | PersonIdentifierAmbiguousError | PersonNotFoundError
 type GetOrganizationError =
   | HulyClientError
   | OrganizationIdentifierAmbiguousError
@@ -66,17 +67,19 @@ type AddOrganizationMemberError =
   | HulyClientError
   | OrganizationIdentifierAmbiguousError
   | OrganizationNotFoundError
+  | PersonIdentifierAmbiguousError
   | PersonNotFoundError
 type RemoveOrganizationMemberError =
   | HulyClientError
   | OrganizationIdentifierAmbiguousError
   | OrganizationNotFoundError
+  | PersonIdentifierAmbiguousError
   | PersonNotFoundError
 
 const resolvePersonIdentifier = (
   client: HulyClient["Type"],
   identifier: string
-): Effect.Effect<HulyPerson, HulyClientError | PersonNotFoundError> =>
+): Effect.Effect<HulyPerson, HulyClientError | PersonIdentifierAmbiguousError | PersonNotFoundError> =>
   Effect.gen(function*() {
     const byId = Option.fromNullable(yield* findPersonById(client, identifier))
     return yield* Option.match(byId, {
@@ -96,7 +99,7 @@ const resolvePersonIdentifier = (
 const resolvePersonIdentifiers = (
   client: HulyClient["Type"],
   identifiers: ReadonlyArray<string>
-): Effect.Effect<Array<Ref<HulyPerson>>, HulyClientError | PersonNotFoundError> =>
+): Effect.Effect<Array<Ref<HulyPerson>>, HulyClientError | PersonIdentifierAmbiguousError | PersonNotFoundError> =>
   Effect.gen(function*() {
     const resolvedPeople: Array<HulyPerson> = []
 

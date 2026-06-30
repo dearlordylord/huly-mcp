@@ -4,7 +4,6 @@ import { SocialIdType } from "@hcengineering/core"
 import { Effect, Option, Schema } from "effect"
 
 import { Count, Email, type NonEmptyString, PersonName, type PersonRefInput } from "../../domain/schemas/shared.js"
-import { isNonEmpty } from "../../utils/assertions.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import { PersonIdentifierAmbiguousError, PersonNotAnEmployeeError, PersonNotFoundError } from "../errors.js"
 import { contact } from "../huly-plugins.js"
@@ -25,25 +24,10 @@ export const findPersonById = (
 export const findPersonByEmail = (
   client: HulyClient["Type"],
   email: string
-): Effect.Effect<HulyPerson | undefined, HulyClientError> =>
-  Effect.gen(function*() {
-    const channels = yield* client.findAll<Channel>(
-      contact.class.Channel,
-      {
-        value: email,
-        provider: contact.channelProvider.Email
-      }
-    )
-
-    if (!isNonEmpty(channels)) {
-      return undefined
-    }
-
-    const channel = channels[0]
-    return yield* client.findOne<HulyPerson>(
-      contact.class.Person,
-      { _id: toRef<HulyPerson>(channel.attachedTo) }
-    )
+): Effect.Effect<HulyPerson | undefined, HulyClientError | PersonIdentifierAmbiguousError> =>
+  Option.match(Schema.decodeUnknownOption(Email)(email), {
+    onNone: () => Effect.succeed(undefined),
+    onSome: (parsedEmail) => findPersonByExactEmail(client, parsedEmail)
   })
 
 export const batchGetEmailsForPersons = <T extends Doc>(

@@ -392,6 +392,28 @@ describe("Contacts Extended Coverage", () => {
   })
 
   describe("getPerson by email (findPersonByEmail path)", () => {
+    it.effect("finds person by SocialIdentity email when no email channel exists", () =>
+      Effect.gen(function*() {
+        const mockPerson = createMockPerson()
+        const socialIdentity = createMockSocialIdentity({
+          value: "john@example.com",
+          attachedTo: "person-123" as Ref<HulyPerson>
+        })
+
+        const testLayer = createTestLayer({
+          persons: [mockPerson],
+          socialIdentities: [socialIdentity]
+        })
+
+        const result = yield* getPerson({ email: Email.make("john@example.com") }).pipe(
+          Effect.provide(testLayer)
+        )
+
+        expect(result.id).toBe("person-123")
+        expect(result.firstName).toBe("John")
+        expect(result.lastName).toBe("Doe")
+      }))
+
     it.effect("finds person by email when channel exists", () =>
       Effect.gen(function*() {
         const mockPerson = createMockPerson()
@@ -411,6 +433,64 @@ describe("Contacts Extended Coverage", () => {
 
         expect(result.id).toBe("person-123")
         expect(result.email).toBe("john@example.com")
+      }))
+
+    it.effect("does not treat SocialIdentity and email channel for the same person as ambiguous", () =>
+      Effect.gen(function*() {
+        const mockPerson = createMockPerson()
+        const socialIdentity = createMockSocialIdentity({
+          value: "john@example.com",
+          attachedTo: "person-123" as Ref<HulyPerson>
+        })
+        const mockChannel = createMockChannel({
+          value: "john@example.com",
+          attachedTo: "person-123" as Ref<Doc>
+        })
+
+        const testLayer = createTestLayer({
+          persons: [mockPerson],
+          channels: [mockChannel],
+          socialIdentities: [socialIdentity]
+        })
+
+        const result = yield* getPerson({ email: Email.make("john@example.com") }).pipe(
+          Effect.provide(testLayer)
+        )
+
+        expect(result.id).toBe("person-123")
+        expect(result.email).toBe("john@example.com")
+      }))
+
+    it.effect("returns PersonIdentifierAmbiguousError when SocialIdentity and channel point to different people", () =>
+      Effect.gen(function*() {
+        const socialPerson = createMockPerson({
+          _id: "person-social" as Ref<HulyPerson>,
+          name: "Social,Person"
+        })
+        const channelPerson = createMockPerson({
+          _id: "person-channel" as Ref<HulyPerson>,
+          name: "Channel,Person"
+        })
+        const socialIdentity = createMockSocialIdentity({
+          value: "shared@example.com",
+          attachedTo: "person-social" as Ref<HulyPerson>
+        })
+        const mockChannel = createMockChannel({
+          value: "shared@example.com",
+          attachedTo: "person-channel" as Ref<Doc>
+        })
+
+        const testLayer = createTestLayer({
+          persons: [socialPerson, channelPerson],
+          channels: [mockChannel],
+          socialIdentities: [socialIdentity]
+        })
+
+        const error = yield* Effect.flip(
+          getPerson({ email: Email.make("shared@example.com") }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("PersonIdentifierAmbiguousError")
       }))
 
     it.effect("returns PersonNotFoundError when email channel exists but person does not", () =>
@@ -841,6 +921,18 @@ describe("Contacts Extended Coverage", () => {
         }) as HulyClientOperations["findOne"]
 
         const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown, _options?: unknown) => {
+          if (_class === contact.class.Person) {
+            const q = query as Record<string, unknown>
+            const idFilter = q._id
+            const ids =
+              typeof idFilter === "object" && idFilter !== null && "$in" in idFilter && Array.isArray(idFilter.$in)
+                ? idFilter.$in
+                : []
+            const filtered = ids.length > 0
+              ? [person].filter(p => ids.includes(p._id))
+              : []
+            return Effect.succeed(toFindResult(filtered))
+          }
           if (_class === contact.class.Channel) {
             const q = query as Record<string, unknown>
             let filtered = [channel]

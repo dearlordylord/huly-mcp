@@ -283,7 +283,7 @@ export const mapDomainErrorToMcp = (
   warnings: ReadonlyArray<ToolWarning> = []
 ): McpErrorResponseWithMeta => {
   if (INVALID_PARAMS_TAGS.has(error._tag)) {
-    return createErrorResponse(error.message, McpErrorCode.InvalidParams, undefined, warnings)
+    return createErrorResponse(error.message, McpErrorCode.InvalidParams, error._tag, warnings)
   }
   const prefix = INTERNAL_ERROR_PREFIX[error._tag]
   const message = prefix !== undefined ? `${prefix}: ${error.message}` : error.message

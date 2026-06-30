@@ -143,7 +143,7 @@ describe("spaceTools", () => {
 
       expect(result.isError).toBe(true)
       expect(result._meta?.errorCode).toBe(McpErrorCode.InvalidParams)
-      expect(result._meta?.errorTag).toBeUndefined()
+      expect(result._meta?.errorTag).toBe("SpaceNotTypedError")
       expect(assertAt(result.content, 0).text).toBe(
         "Space 'General' (space-1) is not typed; role members can only be changed on spaces with a SpaceType"
       )
