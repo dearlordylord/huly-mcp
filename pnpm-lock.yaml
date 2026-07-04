@@ -147,6 +147,12 @@ importers:
       '@vitest/coverage-v8':
         specifier: latest
         version: 4.1.9(vitest@4.1.9)
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
+      ajv-formats:
+        specifier: ^3.0.1
+        version: 3.0.1(ajv@8.20.0)
       effect:
         specifier: ^3.19.15
         version: 3.21.4

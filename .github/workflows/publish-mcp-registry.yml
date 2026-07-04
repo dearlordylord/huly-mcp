@@ -1,0 +1,122 @@
+name: Publish MCP Registry
+
+on:
+  push:
+    tags:
+      - "@firfi/huly-mcp@*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish server.json
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify tag matches package version
+        if: github.ref_type == 'tag'
+        run: |
+          set -euo pipefail
+
+          expected="${GITHUB_REF_NAME#@firfi/huly-mcp@}"
+          actual="$(node -p "require('./package.json').version")"
+
+          if [[ "$expected" != "$actual" ]]; then
+            echo "Tag version $expected does not match package.json version $actual" >&2
+            exit 1
+          fi
+
+      - name: Run quality gate
+        run: pnpm check-all
+
+      - name: Verify npm package is published
+        run: |
+          set -euo pipefail
+
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+          published_version="$(pnpm view "${package_name}@${package_version}" version --json | tr -d '"')"
+
+          if [[ "$published_version" != "$package_version" ]]; then
+            echo "${package_name}@${package_version} is not visible on npm yet" >&2
+            exit 1
+          fi
+
+      - name: Install mcp-publisher
+        run: |
+          set -euo pipefail
+
+          os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_${os}_${arch}.tar.gz" | tar xz mcp-publisher
+          chmod +x mcp-publisher
+          ./mcp-publisher --help
+
+      - name: Authenticate to MCP Registry
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish to MCP Registry
+        run: ./mcp-publisher publish
+
+      - name: Verify registry publication
+        run: |
+          set -euo pipefail
+
+          node <<'NODE'
+          const { readFileSync } = require("node:fs")
+
+          async function main() {
+            const server = JSON.parse(readFileSync("server.json", "utf8"))
+            const response = await fetch(`https://registry.modelcontextprotocol.io/v0/servers?search=${encodeURIComponent(server.name)}`)
+
+            if (!response.ok) {
+              throw new Error(`Registry verification failed: HTTP ${response.status}`)
+            }
+
+            const body = await response.json()
+            const match = body.servers?.find((entry) => entry.server?.name === server.name && entry.server?.version === server.version)
+
+            if (!match) {
+              throw new Error(`Registry did not return ${server.name}@${server.version}`)
+            }
+
+            const npmPackage = server.packages.find((entry) => entry.registryType === "npm")
+            const publishedPackage = match.server.packages?.find((entry) =>
+              entry.registryType === "npm" &&
+              entry.identifier === npmPackage.identifier &&
+              entry.version === npmPackage.version
+            )
+
+            if (!publishedPackage) {
+              throw new Error(`Registry did not return ${npmPackage.identifier}@${npmPackage.version}`)
+            }
+
+            console.log(`Verified ${server.name}@${server.version} in MCP Registry`)
+          }
+
+          main().catch((error) => {
+            console.error(error)
+            process.exit(1)
+          })
+          NODE

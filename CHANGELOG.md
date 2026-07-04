@@ -1,5 +1,12 @@
 # @firfi/huly-mcp
 
+## 0.44.4
+
+### Patch Changes
+
+- 58d34e5: Fix person email resolution for workspace-member SocialIdentity records and include typed domain error tags in internal MCP metadata.
+- Publish server metadata to the official MCP Registry from GitHub Actions and validate server.json against its registry schema in the quality gate.
+
 ## 0.44.3
 
 ### Patch Changes
