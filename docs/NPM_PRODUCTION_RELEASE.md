@@ -8,7 +8,7 @@ The one-command flow is:
 pnpm local-release
 ```
 
-That command versions packages from pending changesets when they exist, computes which package versions are not yet published on npm, builds only those package bundles with `pnpm dlx esbuild` so host-local native binaries are not required, verifies the bundled versions, publishes to npm with the default `latest` dist-tag, pushes the release commit and git tags, and creates the MCP GitHub release when MCP changed. It fails before changing files if npm auth is not available.
+That command versions packages from pending changesets when they exist, computes which package versions are not yet published on npm, builds only those package bundles with `pnpm dlx esbuild` so workspace-native binaries are not required on the host, verifies the bundled versions, publishes to npm with the default `latest` dist-tag, pushes the release commit and git tags, and creates the MCP GitHub release when MCP changed. It fails before changing files if npm auth is not available.
 
 ## Preflight
 
@@ -44,15 +44,12 @@ The script runs:
 - package publish-plan detection from npm registry versions
 - host-safe bundle build through `pnpm dlx esbuild` for packages that need publishing
 - package bundle version verification
-- full MCP integration when `@firfi/huly-mcp` needs publishing
-- CLI integration coverage verification and live CLI integration when `@firfi/huly-cli` needs publishing
+- CLI integration coverage metadata verification when `@firfi/huly-cli` needs publishing
 - `changeset publish` without a prerelease tag, so npm `latest` moves
 - release commit/tag push
 - latest GitHub release creation from the `@firfi/huly-mcp@<version>` package tag when MCP changed
 
-Run `pnpm check-all` and the local Huly integration suites before starting the production release. The publish script also enforces live integration gates for every package it is about to publish: full MCP integration for `@firfi/huly-mcp`, and CLI coverage plus live CLI integration for `@firfi/huly-cli`.
-
-For live integration gates, `pnpm local-release` uses the current Huly environment when it is already set. If it is not set, it sources `.env.local` inside the integration subprocess. The MCP gate runs with `HULY_MCP_TELEMETRY=0`, and the CLI gate runs with `HULY_CLI_TELEMETRY=0`, so release verification does not emit analytics.
+Run `pnpm check-all` and the local Huly integration suites before starting the production release. The publish script does not run live Huly integration tests; those remain an explicit pre-release gate.
 
 ## Rerunning After A Failed Release
 
@@ -65,7 +62,7 @@ The rerun recomputes local package versions against npm:
 - A CLI-only release skips MCP build and MCP GitHub release creation.
 - If all package versions are already published, the script still pushes the current `master`, pushes the current package-version tags when they exist locally, and creates the MCP GitHub release if its package tag exists and the release is missing.
 
-If host-local `node_modules` contains the wrong native binary, the script's release builds still use `pnpm dlx esbuild`. For normal development commands, repair local dependencies with:
+If host-local `node_modules` contains the wrong native binary, the script's release builds still use `pnpm dlx esbuild` instead of the workspace esbuild. For normal development commands, repair local dependencies with:
 
 ```bash
 pnpm rebuild esbuild

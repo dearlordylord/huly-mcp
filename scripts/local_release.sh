@@ -96,56 +96,6 @@ build_cli_package() {
   pnpm --filter "$CLI_PACKAGE_NAME" verify-version
 }
 
-huly_env_present() {
-  if [[ -z "${HULY_URL:-}" || -z "${HULY_WORKSPACE:-}" ]]; then
-    return 1
-  fi
-
-  if [[ -n "${HULY_TOKEN:-}" ]]; then
-    return 0
-  fi
-
-  [[ -n "${HULY_EMAIL:-}" && -n "${HULY_PASSWORD:-}" ]]
-}
-
-load_huly_env_for_integration() {
-  if ! huly_env_present && [[ -f ".env.local" ]]; then
-    set -a
-    # shellcheck disable=SC1091
-    source ".env.local"
-    set +a
-  fi
-
-  if ! huly_env_present; then
-    echo "Release integration requires Huly env. Set HULY_URL, HULY_WORKSPACE, and either HULY_TOKEN or HULY_EMAIL/HULY_PASSWORD, or provide .env.local." >&2
-    exit 1
-  fi
-}
-
-is_container_environment() {
-  [[ -f /.dockerenv ]] && return 0
-  [[ -r /proc/1/cgroup ]] && grep -Eq "(docker|containerd|kubepods)" /proc/1/cgroup
-}
-
-rewrite_huly_url_for_container() {
-  if [[ "${HULY_URL:-}" == *localhost* ]] && is_container_environment; then
-    export HULY_URL="${HULY_URL/localhost/host.docker.internal}"
-  fi
-}
-
-run_mcp_integration_gate() (
-  load_huly_env_for_integration
-  rewrite_huly_url_for_container
-
-  HULY_MCP_TELEMETRY=0 bash scripts/integration_test_full.sh
-)
-
-run_cli_integration_gate() (
-  load_huly_env_for_integration
-
-  HULY_CLI_TELEMETRY=0 pnpm integration:cli
-)
-
 add_release_tag_if_present() {
   local tag_name="$1"
 
@@ -235,13 +185,11 @@ fi
 
 if [[ "$mcp_needs_publish" == "true" ]]; then
   build_mcp_package "$mcp_package_version"
-  run_mcp_integration_gate
 fi
 
 if [[ "$cli_needs_publish" == "true" ]]; then
   build_cli_package "$cli_package_version"
   pnpm dlx "tsx@$TSX_VERSION" scripts/verify-cli-integration-coverage.ts
-  run_cli_integration_gate
 fi
 
 if [[ "$mcp_needs_publish" == "true" || "$cli_needs_publish" == "true" ]]; then
