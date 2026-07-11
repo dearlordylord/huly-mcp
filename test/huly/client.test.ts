@@ -29,6 +29,7 @@ import { beforeEach, expect } from "vitest"
 import { HulyConfigService } from "../../src/config/config.js"
 import { HulyClient, type HulyClientError } from "../../src/huly/client.js"
 import { HulyAuthError, HulyConnectionError, HulyUnavailableError } from "../../src/huly/errors.js"
+import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import { INLINE_COMMENT_MARK_TYPE } from "../../src/huly/operations/inline-comment-mark.js"
 import { MARKDOWN_INPUT_REF_URL } from "../../src/huly/operations/markup.js"
 import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
@@ -596,7 +597,7 @@ describe("HulyClient Service", () => {
         const connErr = new HulyConnectionError({ message: "timeout" })
         const authErr = new HulyAuthError({ message: "invalid" })
         const unavailableErr = new HulyUnavailableError({
-          endpointOrigin: "https://huly.app",
+          endpointOrigin: normalizeHulyOrigin("https://huly.app"),
           failureKind: "timeout"
         })
 

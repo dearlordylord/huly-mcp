@@ -211,6 +211,7 @@ import {
   ViewletIdentifierAmbiguousError,
   ViewletNotFoundError
 } from "../../src/huly/errors.js"
+import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import { funnelIdentifier, funnelReference, leadIdentifier } from "../helpers/brands.js"
 
 describe("Huly Errors", () => {
@@ -250,7 +251,7 @@ describe("Huly Errors", () => {
     it.effect("stores only the safe endpoint diagnostic", () =>
       Effect.sync(() => {
         const error = new HulyUnavailableError({
-          endpointOrigin: "https://huly.app",
+          endpointOrigin: normalizeHulyOrigin("https://huly.app"),
           failureKind: "refused",
           detailCode: "ECONNREFUSED"
         })

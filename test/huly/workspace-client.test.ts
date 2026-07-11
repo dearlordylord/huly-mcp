@@ -16,6 +16,7 @@ import { beforeEach, expect } from "vitest"
 
 import { HulyConfigService } from "../../src/config/config.js"
 import { HulyAuthError, HulyConnectionError, HulyUnavailableError } from "../../src/huly/errors.js"
+import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
 import { WorkspaceClient, type WorkspaceClientError } from "../../src/huly/workspace-client.js"
 import { spaceBrandId } from "../helpers/brands.js"
@@ -661,7 +662,7 @@ describe("WorkspaceClientError type", () => {
       const authErr = new HulyAuthError({ message: "expired" })
       expect(handleError(authErr)).toBe("Auth: expired")
       const unavailableErr = new HulyUnavailableError({
-        endpointOrigin: "https://huly.app",
+        endpointOrigin: normalizeHulyOrigin("https://huly.app"),
         failureKind: "timeout"
       })
       expect(handleError(unavailableErr)).toBe("Unavailable: https://huly.app")

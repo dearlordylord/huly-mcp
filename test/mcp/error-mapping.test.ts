@@ -75,6 +75,7 @@ import {
   SpaceRoleIdentifierAmbiguousError,
   SpaceRoleNotFoundError
 } from "../../src/huly/errors.js"
+import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import {
   createSuccessResponse,
   createUnknownToolError,
@@ -484,7 +485,7 @@ describe("Error Mapping to MCP", () => {
         Effect.gen(function*() {
           const response = mapDomainErrorToMcp(
             new HulyUnavailableError({
-              endpointOrigin: "https://huly.app",
+              endpointOrigin: normalizeHulyOrigin("https://huly.app"),
               failureKind: "refused",
               detailCode: "ECONNREFUSED"
             })
@@ -502,7 +503,7 @@ describe("Error Mapping to MCP", () => {
         Effect.gen(function*() {
           const response = mapDomainErrorToMcp(
             new HulyUnavailableError({
-              endpointOrigin: "https://huly.example.test:8443",
+              endpointOrigin: normalizeHulyOrigin("https://huly.example.test:8443"),
               failureKind: "timeout"
             })
           )
