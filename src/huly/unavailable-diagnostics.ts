@@ -22,13 +22,24 @@ export const HulyEndpointOriginSchema = Schema.String.pipe(
 export type HulyEndpointOrigin = Schema.Schema.Type<typeof HulyEndpointOriginSchema>
 
 export const HulyUnavailableFailureKindSchema = Schema.Literal(
-  "refused", "timeout", "dns", "tls", "http_unavailable", "unknown"
+  "refused",
+  "timeout",
+  "dns",
+  "tls",
+  "http_unavailable",
+  "unknown"
 )
 export type HulyUnavailableFailureKind = Schema.Schema.Type<typeof HulyUnavailableFailureKindSchema>
 
 export const HulyUnavailableDetailCodeSchema = Schema.Literal(
-  "ECONNREFUSED", "ETIMEDOUT", "ECONNRESET", "ENOTFOUND", "EAI_AGAIN", "CERT_HAS_EXPIRED",
-  "DEPTH_ZERO_SELF_SIGNED_CERT", "UNABLE_TO_VERIFY_LEAF_SIGNATURE"
+  "ECONNREFUSED",
+  "ETIMEDOUT",
+  "ECONNRESET",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "CERT_HAS_EXPIRED",
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE"
 )
 export type HulyUnavailableDetailCode = Schema.Schema.Type<typeof HulyUnavailableDetailCodeSchema>
 
@@ -46,7 +57,9 @@ const errorCode = (error: unknown): string | undefined =>
 
 const errorMessage = (error: unknown): string => error instanceof Error ? error.message : ""
 
-const classifiedCodes: Readonly<Record<string, readonly [HulyUnavailableFailureKind, Schema.Schema.Type<typeof HulyUnavailableDetailCodeSchema>]>> = {
+const classifiedCodes: Readonly<
+  Record<string, readonly [HulyUnavailableFailureKind, Schema.Schema.Type<typeof HulyUnavailableDetailCodeSchema>]>
+> = {
   ECONNREFUSED: ["refused", "ECONNREFUSED"],
   ETIMEDOUT: ["timeout", "ETIMEDOUT"],
   ECONNRESET: ["timeout", "ECONNRESET"],

@@ -484,8 +484,8 @@ describe("Error Mapping to MCP", () => {
         Effect.gen(function*() {
           const response = mapDomainErrorToMcp(
             new HulyUnavailableError({
-            endpointOrigin: "https://huly.app",
-            failureKind: "refused",
+              endpointOrigin: "https://huly.app",
+              failureKind: "refused",
               detailCode: "ECONNREFUSED"
             })
           )
@@ -502,8 +502,8 @@ describe("Error Mapping to MCP", () => {
         Effect.gen(function*() {
           const response = mapDomainErrorToMcp(
             new HulyUnavailableError({
-            endpointOrigin: "https://huly.example.test:8443",
-            failureKind: "timeout"
+              endpointOrigin: "https://huly.example.test:8443",
+              failureKind: "timeout"
             })
           )
 
