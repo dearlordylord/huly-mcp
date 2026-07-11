@@ -19,4 +19,17 @@ describe("unavailable Huly diagnostics", () => {
     expect(classifyHulyUnavailableFailure(new Error("gateway returned 503 for token=secret")))
       .toEqual(["http_unavailable", undefined])
   })
+
+  it("classifies each safe failure category without retaining backend text", () => {
+    expect(classifyHulyUnavailableFailure(new Error("request timed out"))).toEqual(["timeout", undefined])
+    expect(classifyHulyUnavailableFailure(new Error("TLS certificate failed"))).toEqual(["tls", undefined])
+    expect(classifyHulyUnavailableFailure(new Error("getaddrinfo failed"))).toEqual(["dns", undefined])
+    expect(classifyHulyUnavailableFailure(new Error("unexpected token=secret"))).toEqual(["unknown", undefined])
+    expect(classifyHulyUnavailableFailure(Object.assign(new Error("hidden"), { code: "ENOTFOUND" })))
+      .toEqual(["dns", "ENOTFOUND"])
+  })
+
+  it("rejects empty endpoint values", () => {
+    expect(() => normalizeHulyOrigin("")).toThrow()
+  })
 })
