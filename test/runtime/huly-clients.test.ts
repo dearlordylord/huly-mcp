@@ -64,4 +64,19 @@ describe("shared Huly client runtime", () => {
     available = true
     await expect(resolve()).resolves.toBeDefined()
   })
+
+  it("does not evict a newer primed bundle after an unavailable acquisition fails", async () => {
+    const unavailable = new HulyUnavailableError({
+      endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+      failureKind: "refused"
+    })
+    const failingLayer = Layer.merge(Layer.fail(unavailable), clientLayer)
+    const [resolve, prime] = createClientResolver(failingLayer)
+    const primedBundle = await Effect.runPromise(buildClientBundle(clientLayer))
+    const failedAcquisition = resolve()
+    prime(primedBundle)
+
+    await expect(failedAcquisition).rejects.toBeDefined()
+    await expect(resolve()).resolves.toBe(primedBundle)
+  })
 })
