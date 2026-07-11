@@ -17,7 +17,13 @@ import type { WorkspaceClientOperations } from "../huly/workspace-client.js"
 import type { TelemetryOperations } from "../telemetry/telemetry.js"
 import { VERSION } from "../version.js"
 import type { McpToolResponse } from "./error-mapping.js"
-import { createSuccessResponse, createUnknownToolError, mapDomainErrorToMcp, toMcpResponse } from "./error-mapping.js"
+import {
+  createSuccessResponse,
+  createUnknownToolError,
+  mapClientResolutionErrorToMcp,
+  mapDomainErrorToMcp,
+  toMcpResponse
+} from "./error-mapping.js"
 import {
   GET_HULY_CONTEXT_TOOL_NAME,
   getHulyContextToolDefinition,
@@ -299,11 +305,7 @@ export const createMcpProtocolHandlers = (
           try {
             clients = await resolveClients()
           } catch (e) {
-            const errorResponse = mapDomainErrorToMcp(
-              new HulyError({
-                message: `Failed to initialize Huly clients: ${e instanceof Error ? e.message : String(e)}`
-              })
-            )
+            const errorResponse = mapClientResolutionErrorToMcp(e)
             return returnError(errorResponse, editMode)
           }
         }
@@ -362,9 +364,7 @@ export const createMcpProtocolHandlers = (
       try {
         clients = await resolveClients()
       } catch (e) {
-        const errorResponse = mapDomainErrorToMcp(
-          new HulyError({ message: `Failed to initialize Huly clients: ${e instanceof Error ? e.message : String(e)}` })
-        )
+        const errorResponse = mapClientResolutionErrorToMcp(e)
         return returnError(errorResponse, editMode)
       }
 

@@ -40,6 +40,7 @@ import {
   HulyAuthError,
   HulyConnectionError,
   HulyError,
+  HulyUnavailableError,
   InvalidContactProviderError,
   InvalidFileDataError,
   InvalidStatusError,
@@ -475,6 +476,41 @@ describe("Error Mapping to MCP", () => {
           expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
           expect(response._meta.errorTag).toBe("HulyConnectionError")
           expect(assertAt(response.content, 0).text).toBe("Connection error: Network timeout")
+        }))
+
+      it.effect("maps default-cloud unavailability without exposing backend details", () =>
+        Effect.gen(function*() {
+          const response = mapDomainErrorToMcp(
+            new HulyUnavailableError({
+              endpointOrigin: "https://huly.app",
+              endpointKind: "default_cloud",
+              failureKind: "refused",
+              detailCode: "ECONNREFUSED"
+            })
+          )
+
+          expect(response.isError).toBe(true)
+          expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
+          expect(response._meta.errorTag).toBe("HulyUnavailableError")
+          expect(assertAt(response.content, 0).text).toContain("shutdown expected July 20")
+          expect(assertAt(response.content, 0).text).toContain("HULY_URL")
+          expect(JSON.stringify(response)).not.toContain("ECONNREFUSED")
+        }))
+
+      it.effect("maps custom endpoint unavailability without mentioning hosted Huly", () =>
+        Effect.gen(function*() {
+          const response = mapDomainErrorToMcp(
+            new HulyUnavailableError({
+              endpointOrigin: "https://huly.example.test:8443",
+              endpointKind: "custom",
+              failureKind: "timeout"
+            })
+          )
+
+          const text = assertAt(response.content, 0).text
+          expect(text).toContain("https://huly.example.test:8443")
+          expect(text).toContain("HULY_CONNECTION_TIMEOUT")
+          expect(text).not.toContain("hosted Huly")
         }))
 
       it.effect("maps HulyAuthError with errorTag", () =>

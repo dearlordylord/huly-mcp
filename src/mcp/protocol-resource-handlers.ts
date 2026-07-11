@@ -12,6 +12,7 @@ import { HulyClient } from "../huly/client.js"
 import { Diagnostics, makeDiagnosticsScope } from "../huly/diagnostics.js"
 import type { HulyStorageClient } from "../huly/storage.js"
 import type { WorkspaceClientOperations } from "../huly/workspace-client.js"
+import { clientResolutionErrorMessage } from "./error-mapping.js"
 import { listResources, readHulyResource } from "./resources.js"
 
 interface ClientBundle {
@@ -44,16 +45,16 @@ const withResourceWarnings = (
       }
     }
 
-const createResourceClientResolutionError = (uri: string, _error: unknown): McpError =>
+const createResourceClientResolutionError = (uri: string, error: unknown): McpError =>
   new McpError(
     ErrorCode.InternalError,
-    `Failed to initialize Huly clients while reading resource "${uri}". Verify Huly URL, workspace, and authentication configuration.`
+    `${clientResolutionErrorMessage(error)} Unable to read resource "${uri}" until Huly is available.`
   )
 
-const createResourceListClientResolutionError = (_error: unknown): McpError =>
+const createResourceListClientResolutionError = (error: unknown): McpError =>
   new McpError(
     ErrorCode.InternalError,
-    "Failed to initialize Huly clients while listing resources. Verify Huly URL, workspace, and authentication configuration."
+    `${clientResolutionErrorMessage(error)} Unable to list Huly resources until Huly is available.`
   )
 
 const isConfigValidationFailure = (error: unknown): boolean => {

@@ -44,6 +44,7 @@
     "verify-schema-boundaries": "node scripts/verify-schema-boundaries.mjs",
     "verify-sdk-parity": "node scripts/audit-sdk-parity.mjs",
     "smoke:http-no-config": "node scripts/smoke-http-no-config.mjs",
+    "smoke:stdio-unreachable": "pnpm build:mcp && node scripts/smoke-stdio-unreachable.mjs",
     "integration:tool-scope": "bash scripts/integration_test_tool_scope.sh",
     "sync-registry-metadata": "node scripts/sync-registry-metadata.mjs",
     "prepack": "pnpm build:mcp && pnpm verify-version",

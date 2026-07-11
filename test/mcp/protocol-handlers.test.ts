@@ -964,7 +964,7 @@ describe("createMcpProtocolHandlers — tool dispatch", () => {
     const response = await handlers.callTool({ params: { name: "list_projects", arguments: {} } })
 
     expect(response.isError).toBe(true)
-    expect(firstText(response.content)).toContain("client init boom")
+    expect(firstText(response.content)).toBe("Failed to initialize Huly clients")
   })
 
   it("maps a null registry dispatch response to an unknown-tool error", async () => {
@@ -1427,9 +1427,9 @@ describe("createMcpProtocolHandlers — proxy mode", () => {
     })
 
     expect(errorResponse.isError).toBe(true)
-    expect(firstText(errorResponse.content)).toContain("client init boom")
+    expect(firstText(errorResponse.content)).toBe("Failed to initialize Huly clients")
     expect(nonErrorResponse.isError).toBe(true)
-    expect(firstText(nonErrorResponse.content)).toContain("client init boom")
+    expect(firstText(nonErrorResponse.content)).toBe("Failed to initialize Huly clients")
     expect(probe.toolCalled.map(call => call.status)).toEqual(["error", "error"])
   })
 

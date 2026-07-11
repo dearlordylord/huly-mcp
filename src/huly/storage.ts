@@ -23,6 +23,7 @@ import {
   FileUploadError,
   type HulyAuthError,
   type HulyConnectionError,
+  type HulyUnavailableError,
   InvalidContentTypeError,
   InvalidFileDataError,
   MAX_FILE_SIZE
@@ -110,6 +111,7 @@ export const getBufferFromParams = (
 
 export type StorageClientError =
   | HulyConnectionError
+  | HulyUnavailableError
   | HulyAuthError
   | FileUploadError
   | InvalidFileDataError
@@ -326,7 +328,7 @@ const connectStorageWithRetry = (
   config: StorageConnectionConfig,
   sdk: HulySdkDependencies
 ): Effect.Effect<StorageConnection, StorageClientError> =>
-  connectWithRetry(() => connectStorageClient(config, sdk), "Storage connection failed")
+  connectWithRetry(() => connectStorageClient(config, sdk), config.url)
 
 /**
  * Decode base64 data to Buffer with validation.

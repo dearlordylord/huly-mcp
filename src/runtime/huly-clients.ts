@@ -1,7 +1,8 @@
-import { Context, Effect, Exit, Layer, Scope } from "effect"
+import { Cause, Chunk, Context, Effect, Exit, Layer, Runtime, Scope } from "effect"
 
 import { type ConfigValidationError, HulyConfigService } from "../config/config.js"
 import { HulyClient, type HulyClientError } from "../huly/client.js"
+import { HulyUnavailableError } from "../huly/errors.js"
 import { HulyStorageClient, type StorageClientError } from "../huly/storage.js"
 import { WorkspaceClient, type WorkspaceClientError } from "../huly/workspace-client.js"
 import type { ClientBundle } from "../mcp/server.js"
@@ -86,7 +87,17 @@ export const createClientResolver = (
 
   const resolve = (): Promise<ClientBundle> => {
     if (clientsPromise === null) {
-      clientsPromise = Effect.runPromise(buildClientBundle(combinedClientLayer))
+      const acquisition = Effect.runPromise(buildClientBundle(combinedClientLayer))
+      clientsPromise = acquisition
+      void acquisition.catch((error: unknown) => {
+        const unavailable = error instanceof HulyUnavailableError || (
+          Runtime.isFiberFailure(error)
+          && Chunk.toArray(Cause.failures(error[Runtime.FiberFailureCauseId])).some(
+            failure => failure instanceof HulyUnavailableError
+          )
+        )
+        if (unavailable && clientsPromise === acquisition) clientsPromise = null
+      })
     }
     return clientsPromise
   }

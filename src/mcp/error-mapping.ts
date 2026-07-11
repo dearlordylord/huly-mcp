@@ -9,10 +9,17 @@
  *
  * @module
  */
-import { Cause, Chunk, ParseResult } from "effect"
+import { Cause, Chunk, ParseResult, Runtime } from "effect"
 
 import type { ToolWarning } from "../domain/schemas/tool-warnings.js"
-import type { HulyDomainError } from "../huly/errors.js"
+import {
+  HulyAuthError,
+  HulyConnectionError,
+  type HulyDomainError,
+  HulyError,
+  HulyUnavailableError
+} from "../huly/errors.js"
+import { HOSTED_HULY_SUNSET } from "../huly/unavailable-diagnostics.js"
 
 /**
  * MCP standard error codes.
@@ -278,10 +285,25 @@ const INTERNAL_ERROR_PREFIX: Partial<Record<HulyDomainError["_tag"], string>> = 
   HulyAuthError: "Authentication error"
 }
 
+const hulyUnavailableMessage = (error: HulyUnavailableError): string => {
+  const failureGuidance = error.failureKind === "timeout"
+    ? " The request timed out; verify HULY_CONNECTION_TIMEOUT before retrying."
+    : error.failureKind === "dns" || error.failureKind === "tls"
+    ? " Verify the hostname, certificate, DNS, and proxy configuration before retrying."
+    : ""
+  if (error.endpointKind === "default_cloud") {
+    return `Cannot reach hosted Huly (${error.endpointOrigin}) from this MCP server. Huly's README announces that hosted Huly is being discontinued, with shutdown expected ${HOSTED_HULY_SUNSET.expectedShutdown}; this outage may be related but is not confirmed. Export and back up your data, then migrate to a hosted alternative or self-hosted Huly. Check network/DNS/proxy access if you need one last connection; set HULY_URL to a reachable self-hosted instance after migration. Do not retry a write until connectivity is restored.${failureGuidance}`
+  }
+  return `Cannot reach the configured Huly endpoint (${error.endpointOrigin}). Check with this deployment's operator, then verify HULY_URL, network/DNS/proxy access, and HULY_CONNECTION_TIMEOUT before retrying. Do not retry a write until connectivity is restored.${failureGuidance}`
+}
+
 export const mapDomainErrorToMcp = (
   error: HulyDomainError,
   warnings: ReadonlyArray<ToolWarning> = []
 ): McpErrorResponseWithMeta => {
+  if (error instanceof HulyUnavailableError) {
+    return createErrorResponse(hulyUnavailableMessage(error), McpErrorCode.InternalError, error._tag, warnings)
+  }
   if (INVALID_PARAMS_TAGS.has(error._tag)) {
     return createErrorResponse(error.message, McpErrorCode.InvalidParams, error._tag, warnings)
   }
@@ -289,6 +311,28 @@ export const mapDomainErrorToMcp = (
   const message = prefix !== undefined ? `${prefix}: ${error.message}` : error.message
   return createErrorResponse(message, McpErrorCode.InternalError, error._tag, warnings)
 }
+
+const isClientResolutionError = (value: unknown): value is HulyUnavailableError | HulyConnectionError | HulyAuthError =>
+  value instanceof HulyUnavailableError || value instanceof HulyConnectionError || value instanceof HulyAuthError
+
+const clientResolutionFailure = (
+  error: unknown
+): HulyUnavailableError | HulyConnectionError | HulyAuthError | undefined => {
+  if (isClientResolutionError(error)) return error
+  if (!Runtime.isFiberFailure(error)) return undefined
+  return Chunk.toArray(Cause.failures(error[Runtime.FiberFailureCauseId])).find(isClientResolutionError)
+}
+
+/** Safely preserve known, schema-owned resolver errors and hide all other rejection details. */
+export const mapClientResolutionErrorToMcp = (error: unknown): McpErrorResponseWithMeta => {
+  const failure = clientResolutionFailure(error)
+  return failure === undefined
+    ? mapDomainErrorToMcp(new HulyError({ message: "Failed to initialize Huly clients" }))
+    : mapDomainErrorToMcp(failure)
+}
+
+export const clientResolutionErrorMessage = (error: unknown): string =>
+  mapClientResolutionErrorToMcp(error).content[0].text
 
 // --- Parse Error Mapping ---
 

@@ -15,7 +15,7 @@ import { Cause, Effect, Exit, Layer } from "effect"
 import { beforeEach, expect } from "vitest"
 
 import { HulyConfigService } from "../../src/config/config.js"
-import { HulyAuthError, HulyConnectionError } from "../../src/huly/errors.js"
+import { HulyAuthError, HulyConnectionError, HulyUnavailableError } from "../../src/huly/errors.js"
 import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
 import { WorkspaceClient, type WorkspaceClientError } from "../../src/huly/workspace-client.js"
 import { spaceBrandId } from "../helpers/brands.js"
@@ -648,6 +648,8 @@ describe("WorkspaceClientError type", () => {
         switch (error._tag) {
           case "HulyConnectionError":
             return `Connection: ${error.message}`
+          case "HulyUnavailableError":
+            return `Unavailable: ${error.endpointOrigin}`
           case "HulyAuthError":
             return `Auth: ${error.message}`
         }
@@ -658,5 +660,11 @@ describe("WorkspaceClientError type", () => {
 
       const authErr = new HulyAuthError({ message: "expired" })
       expect(handleError(authErr)).toBe("Auth: expired")
+      const unavailableErr = new HulyUnavailableError({
+        endpointOrigin: "https://huly.app",
+        endpointKind: "default_cloud",
+        failureKind: "timeout"
+      })
+      expect(handleError(unavailableErr)).toBe("Unavailable: https://huly.app")
     }))
 })

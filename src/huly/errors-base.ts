@@ -39,6 +39,17 @@ export class HulyConnectionError extends Schema.TaggedError<HulyConnectionError>
   }
 ) {}
 
+/** A sanitized connection failure that permits safe, actionable MCP guidance. */
+export class HulyUnavailableError extends Schema.TaggedError<HulyUnavailableError>()(
+  "HulyUnavailableError",
+  {
+    endpointOrigin: Schema.String,
+    endpointKind: Schema.Literal("default_cloud", "custom"),
+    failureKind: Schema.Literal("refused", "timeout", "dns", "tls", "http_unavailable", "unknown"),
+    detailCode: Schema.optionalWith(Schema.String, { exact: true })
+  }
+) {}
+
 /**
  * Authentication error - invalid credentials or expired session.
  */

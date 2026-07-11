@@ -43,7 +43,7 @@ import { absurd, Context, Effect, Layer, Redacted, Schedule } from "effect"
 import { type Auth, HulyConfigService } from "../config/config.js"
 import { UrlString, WorkspaceUrlSlug } from "../domain/schemas/shared.js"
 import { concatLink } from "../utils/url.js"
-import { HulyAuthError, HulyConnectionError } from "./errors.js"
+import { HulyAuthError, HulyConnectionError, HulyUnavailableError } from "./errors.js"
 import { PlatformError } from "./huly-platform.js"
 import {
   markdownInputUrlConfig,
@@ -53,6 +53,7 @@ import {
   transformMarkupNodeNativeReferenceLinks
 } from "./operations/markup.js"
 import { HulySdk, type HulySdkDependencies } from "./sdk-deps.js"
+import { classifyEndpointKind, classifyHulyUnavailableFailure, normalizeHulyOrigin } from "./unavailable-diagnostics.js"
 import { testWorkbenchUrlConfig, type WorkbenchUrlConfig } from "./url-builders.js"
 
 // --- Connection helpers ---
@@ -86,7 +87,7 @@ export interface ConnectionConfig {
   workspace: string
 }
 
-export type ConnectionError = HulyConnectionError | HulyAuthError
+export type ConnectionError = HulyConnectionError | HulyUnavailableError | HulyAuthError
 
 /**
  * Convert Auth union type to AuthOptions for API client.
@@ -120,7 +121,7 @@ const withConnectionRetry = <A>(
  */
 export const connectWithRetry = <A>(
   connect: () => Promise<A>,
-  errorPrefix: string
+  endpointUrl: string
 ): Effect.Effect<A, ConnectionError> =>
   withConnectionRetry(
     Effect.tryPromise({
@@ -128,13 +129,17 @@ export const connectWithRetry = <A>(
       catch: (e) => {
         if (isAuthError(e)) {
           return new HulyAuthError({
-            message: `${errorPrefix}: ${String(e)}`
+            message: "Credentials or workspace authorization failed"
           })
         }
-        return new HulyConnectionError({
-          message: `${errorPrefix}: ${String(e)}`,
-          cause: e
-        })
+        const [failureKind, detailCode] = classifyHulyUnavailableFailure(e)
+        const diagnostic = {
+          endpointOrigin: normalizeHulyOrigin(endpointUrl),
+          endpointKind: classifyEndpointKind(normalizeHulyOrigin(endpointUrl)),
+          failureKind,
+          ...(detailCode === undefined ? {} : { detailCode })
+        }
+        return new HulyUnavailableError(diagnostic)
       }
     })
   )
@@ -731,5 +736,4 @@ const connectRest = async (
 const connectRestWithRetry = (
   config: ConnectionConfig,
   sdk: HulySdkDependencies
-): Effect.Effect<RestConnection, ConnectionError> =>
-  connectWithRetry(() => connectRest(config, sdk), "Connection failed")
+): Effect.Effect<RestConnection, ConnectionError> => connectWithRetry(() => connectRest(config, sdk), config.url)
