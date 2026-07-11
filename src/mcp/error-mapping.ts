@@ -342,7 +342,6 @@ export const mapClientResolutionErrorToMcp = (error: unknown): McpErrorResponseW
 export const clientResolutionErrorMessage = (error: unknown): string =>
   mapClientResolutionErrorToMcp(error).content[0].text
 
-
 // --- Parse Error Mapping ---
 
 export const formatParseError = (error: ParseResult.ParseError): string => {
