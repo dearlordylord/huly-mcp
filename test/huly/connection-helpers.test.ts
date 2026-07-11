@@ -78,6 +78,21 @@ describe("connection-helpers", () => {
         expect(callCount).toBe(1)
       }))
 
+    it.effect("retains only an allow-listed detail code", () =>
+      Effect.gen(function*() {
+        const fiber = yield* Effect.fork(
+          connectWithRetry(
+            () => Promise.reject(Object.assign(new Error("token=secret"), { code: "ECONNREFUSED" })),
+            "https://huly.app"
+          )
+        )
+        yield* TestClock.adjust("500 millis")
+        const error = yield* Effect.flip(Fiber.join(fiber))
+
+        expect(error._tag).toBe("HulyUnavailableError")
+        if (error._tag === "HulyUnavailableError") expect(error.detailCode).toBe("ECONNREFUSED")
+      }))
+
     it.effect("succeeds after initial failures when retry works", () =>
       Effect.gen(function*() {
         let callCount = 0
