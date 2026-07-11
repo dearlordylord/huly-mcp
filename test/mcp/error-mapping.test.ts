@@ -475,16 +475,17 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
           expect(response._meta.errorTag).toBe("HulyConnectionError")
-          expect(assertAt(response.content, 0).text).toBe("Connection error: Network timeout")
+          expect(assertAt(response.content, 0).text).toBe(
+            "Connection error while communicating with Huly. Verify HULY_URL, workspace, and network connectivity before retrying."
+          )
         }))
 
       it.effect("maps default-cloud unavailability without exposing backend details", () =>
         Effect.gen(function*() {
           const response = mapDomainErrorToMcp(
             new HulyUnavailableError({
-              endpointOrigin: "https://huly.app",
-              endpointKind: "default_cloud",
-              failureKind: "refused",
+            endpointOrigin: "https://huly.app",
+            failureKind: "refused",
               detailCode: "ECONNREFUSED"
             })
           )
@@ -501,9 +502,8 @@ describe("Error Mapping to MCP", () => {
         Effect.gen(function*() {
           const response = mapDomainErrorToMcp(
             new HulyUnavailableError({
-              endpointOrigin: "https://huly.example.test:8443",
-              endpointKind: "custom",
-              failureKind: "timeout"
+            endpointOrigin: "https://huly.example.test:8443",
+            failureKind: "timeout"
             })
           )
 

@@ -597,7 +597,6 @@ describe("HulyClient Service", () => {
         const authErr = new HulyAuthError({ message: "invalid" })
         const unavailableErr = new HulyUnavailableError({
           endpointOrigin: "https://huly.app",
-          endpointKind: "default_cloud",
           failureKind: "timeout"
         })
 

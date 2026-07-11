@@ -662,7 +662,6 @@ describe("WorkspaceClientError type", () => {
       expect(handleError(authErr)).toBe("Auth: expired")
       const unavailableErr = new HulyUnavailableError({
         endpointOrigin: "https://huly.app",
-        endpointKind: "default_cloud",
         failureKind: "timeout"
       })
       expect(handleError(unavailableErr)).toBe("Unavailable: https://huly.app")

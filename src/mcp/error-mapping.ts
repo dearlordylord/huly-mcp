@@ -19,7 +19,7 @@ import {
   HulyError,
   HulyUnavailableError
 } from "../huly/errors.js"
-import { HOSTED_HULY_SUNSET } from "../huly/unavailable-diagnostics.js"
+import { HOSTED_HULY_SUNSET, isDefaultHulyCloudOrigin } from "../huly/unavailable-diagnostics.js"
 
 /**
  * MCP standard error codes.
@@ -291,7 +291,7 @@ const hulyUnavailableMessage = (error: HulyUnavailableError): string => {
     : error.failureKind === "dns" || error.failureKind === "tls"
     ? " Verify the hostname, certificate, DNS, and proxy configuration before retrying."
     : ""
-  if (error.endpointKind === "default_cloud") {
+  if (isDefaultHulyCloudOrigin(error.endpointOrigin)) {
     return `Cannot reach hosted Huly (${error.endpointOrigin}) from this MCP server. Huly's README announces that hosted Huly is being discontinued, with shutdown expected ${HOSTED_HULY_SUNSET.expectedShutdown}; this outage may be related but is not confirmed. Export and back up your data, then migrate to a hosted alternative or self-hosted Huly. Check network/DNS/proxy access if you need one last connection; set HULY_URL to a reachable self-hosted instance after migration. Do not retry a write until connectivity is restored.${failureGuidance}`
   }
   return `Cannot reach the configured Huly endpoint (${error.endpointOrigin}). Check with this deployment's operator, then verify HULY_URL, network/DNS/proxy access, and HULY_CONNECTION_TIMEOUT before retrying. Do not retry a write until connectivity is restored.${failureGuidance}`
@@ -303,6 +303,14 @@ export const mapDomainErrorToMcp = (
 ): McpErrorResponseWithMeta => {
   if (error instanceof HulyUnavailableError) {
     return createErrorResponse(hulyUnavailableMessage(error), McpErrorCode.InternalError, error._tag, warnings)
+  }
+  if (error instanceof HulyConnectionError) {
+    return createErrorResponse(
+      "Connection error while communicating with Huly. Verify HULY_URL, workspace, and network connectivity before retrying.",
+      McpErrorCode.InternalError,
+      error._tag,
+      warnings
+    )
   }
   if (INVALID_PARAMS_TAGS.has(error._tag)) {
     return createErrorResponse(error.message, McpErrorCode.InvalidParams, error._tag, warnings)

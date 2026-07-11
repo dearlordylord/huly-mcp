@@ -53,7 +53,7 @@ import {
   transformMarkupNodeNativeReferenceLinks
 } from "./operations/markup.js"
 import { HulySdk, type HulySdkDependencies } from "./sdk-deps.js"
-import { classifyEndpointKind, classifyHulyUnavailableFailure, normalizeHulyOrigin } from "./unavailable-diagnostics.js"
+import { classifyHulyUnavailableFailure, normalizeHulyOrigin } from "./unavailable-diagnostics.js"
 import { testWorkbenchUrlConfig, type WorkbenchUrlConfig } from "./url-builders.js"
 
 // --- Connection helpers ---
@@ -133,9 +133,9 @@ export const connectWithRetry = <A>(
           })
         }
         const [failureKind, detailCode] = classifyHulyUnavailableFailure(e)
+        const endpointOrigin = normalizeHulyOrigin(endpointUrl)
         const diagnostic = {
-          endpointOrigin: normalizeHulyOrigin(endpointUrl),
-          endpointKind: classifyEndpointKind(normalizeHulyOrigin(endpointUrl)),
+          endpointOrigin,
           failureKind,
           ...(detailCode === undefined ? {} : { detailCode })
         }

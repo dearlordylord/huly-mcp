@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest"
 
 import {
-  classifyEndpointKind,
   classifyHulyUnavailableFailure,
+  isDefaultHulyCloudOrigin,
   normalizeHulyOrigin
 } from "../../src/huly/unavailable-diagnostics.js"
 
 describe("unavailable Huly diagnostics", () => {
   it("normalizes an endpoint to a credential-free origin", () => {
     expect(normalizeHulyOrigin("HTTPS://user:secret@HULY.APP/path?token=leak#fragment")).toBe("https://huly.app")
-    expect(classifyEndpointKind("https://huly.app")).toBe("default_cloud")
-    expect(classifyEndpointKind("https://api.huly.app")).toBe("custom")
+    expect(isDefaultHulyCloudOrigin(normalizeHulyOrigin("https://huly.app"))).toBe(true)
+    expect(isDefaultHulyCloudOrigin(normalizeHulyOrigin("https://api.huly.app"))).toBe(false)
   })
 
   it("classifies only allow-listed connection details", () => {

@@ -135,8 +135,7 @@ Tune the wording by failure kind:
 - timeout: mention the configured connection timeout;
 - DNS/TLS: tell the agent to verify hostname, certificate, and proxy;
 - custom endpoint: name only the sanitized origin and point to the operator's
-  Huly deployment; state that the hosted-Huly shutdown does not affect
-  self-hosted deployments;
+  Huly deployment; do not mention hosted Huly or its shutdown;
 - auth: say credentials/token/workspace authorization failed and do not imply
   downtime.
 

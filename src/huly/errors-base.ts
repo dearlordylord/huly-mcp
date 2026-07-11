@@ -5,6 +5,12 @@
  */
 import { Schema } from "effect"
 
+import {
+  HulyEndpointOriginSchema,
+  HulyUnavailableDetailCodeSchema,
+  HulyUnavailableFailureKindSchema
+} from "./unavailable-diagnostics.js"
+
 /**
  * Base Huly error - generic operational error.
  */
@@ -43,10 +49,9 @@ export class HulyConnectionError extends Schema.TaggedError<HulyConnectionError>
 export class HulyUnavailableError extends Schema.TaggedError<HulyUnavailableError>()(
   "HulyUnavailableError",
   {
-    endpointOrigin: Schema.String,
-    endpointKind: Schema.Literal("default_cloud", "custom"),
-    failureKind: Schema.Literal("refused", "timeout", "dns", "tls", "http_unavailable", "unknown"),
-    detailCode: Schema.optionalWith(Schema.String, { exact: true })
+    endpointOrigin: HulyEndpointOriginSchema,
+    failureKind: HulyUnavailableFailureKindSchema,
+    detailCode: Schema.optionalWith(HulyUnavailableDetailCodeSchema, { exact: true })
   }
 ) {}
 

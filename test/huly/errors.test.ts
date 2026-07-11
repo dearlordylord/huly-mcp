@@ -251,7 +251,6 @@ describe("Huly Errors", () => {
       Effect.sync(() => {
         const error = new HulyUnavailableError({
           endpointOrigin: "https://huly.app",
-          endpointKind: "default_cloud",
           failureKind: "refused",
           detailCode: "ECONNREFUSED"
         })
