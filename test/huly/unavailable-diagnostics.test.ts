@@ -27,6 +27,8 @@ describe("unavailable Huly diagnostics", () => {
     expect(classifyHulyUnavailableFailure(new Error("unexpected token=secret"))).toEqual(["unknown", undefined])
     expect(classifyHulyUnavailableFailure(Object.assign(new Error("hidden"), { code: "ENOTFOUND" })))
       .toEqual(["dns", "ENOTFOUND"])
+    expect(classifyHulyUnavailableFailure(Object.assign(new Error("hidden"), { code: "EUNKNOWN" })))
+      .toEqual(["unknown", undefined])
   })
 
   it("rejects empty endpoint values", () => {
