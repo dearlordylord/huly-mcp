@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 
 /** Safe, agent-facing diagnostics for an unavailable Huly endpoint. */
-export const DEFAULT_HULY_CLOUD_ORIGIN = "https://huly.app"
+const DEFAULT_HULY_CLOUD_ORIGIN = "https://huly.app"
 
 export const HOSTED_HULY_SUNSET = {
   sourceUrl: "https://github.com/hcengineering/huly",
@@ -19,7 +19,7 @@ export const HulyEndpointOriginSchema = Schema.String.pipe(
   }, { message: () => "Must be a canonical http or https URL origin" }),
   Schema.brand("HulyEndpointOrigin")
 )
-export type HulyEndpointOrigin = Schema.Schema.Type<typeof HulyEndpointOriginSchema>
+type HulyEndpointOrigin = Schema.Schema.Type<typeof HulyEndpointOriginSchema>
 
 export const HulyUnavailableFailureKindSchema = Schema.Literal(
   "refused",
@@ -29,7 +29,7 @@ export const HulyUnavailableFailureKindSchema = Schema.Literal(
   "http_unavailable",
   "unknown"
 )
-export type HulyUnavailableFailureKind = Schema.Schema.Type<typeof HulyUnavailableFailureKindSchema>
+type HulyUnavailableFailureKind = Schema.Schema.Type<typeof HulyUnavailableFailureKindSchema>
 
 export const HulyUnavailableDetailCodeSchema = Schema.Literal(
   "ECONNREFUSED",
@@ -41,7 +41,7 @@ export const HulyUnavailableDetailCodeSchema = Schema.Literal(
   "DEPTH_ZERO_SELF_SIGNED_CERT",
   "UNABLE_TO_VERIFY_LEAF_SIGNATURE"
 )
-export type HulyUnavailableDetailCode = Schema.Schema.Type<typeof HulyUnavailableDetailCodeSchema>
+type HulyUnavailableDetailCode = Schema.Schema.Type<typeof HulyUnavailableDetailCodeSchema>
 
 export const normalizeHulyOrigin = (url: string): HulyEndpointOrigin => {
   const parsed = new URL(url)
