@@ -544,6 +544,25 @@ describe("Error Mapping to MCP", () => {
           expect(text).not.toContain("hosted Huly")
         }))
 
+      it.effect("adds default-cloud timeout and DNS guidance", () =>
+        Effect.sync(() => {
+          const timeout = mapDomainErrorToMcp(
+            new HulyUnavailableError({
+              endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+              failureKind: "timeout"
+            })
+          )
+          const dns = mapDomainErrorToMcp(
+            new HulyUnavailableError({
+              endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+              failureKind: "dns"
+            })
+          )
+
+          expect(assertAt(timeout.content, 0).text).toContain("HULY_CONNECTION_TIMEOUT")
+          expect(assertAt(dns.content, 0).text).toContain("certificate, DNS, and proxy")
+        }))
+
       it.effect("maps HulyAuthError with errorTag", () =>
         Effect.gen(function*() {
           const error = new HulyAuthError({ message: "Login failed" })
