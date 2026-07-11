@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest"
 
 import { HulyClient } from "../../src/huly/client.js"
 import { HulyUnavailableError } from "../../src/huly/errors.js"
-import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
+import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
 import { buildClientBundle, buildScopedClientBundle, createClientResolver } from "../../src/runtime/huly-clients.js"
 
