@@ -2,6 +2,8 @@ import { Effect, Layer } from "effect"
 import { describe, expect, it } from "vitest"
 
 import { HulyClient } from "../../src/huly/client.js"
+import { HulyUnavailableError } from "../../src/huly/errors.js"
+import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
 import { buildClientBundle, buildScopedClientBundle, createClientResolver } from "../../src/runtime/huly-clients.js"
@@ -45,5 +47,21 @@ describe("shared Huly client runtime", () => {
     prime(primedBundle)
 
     await expect(resolvePrimed()).resolves.toBe(primedBundle)
+  })
+
+  it("evicts an unavailable acquisition so a later call can recover", async () => {
+    let available = false
+    const unavailable = new HulyUnavailableError({
+      endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+      failureKind: "refused"
+    })
+    const recoverableLayer = Layer.suspend(() =>
+      available ? clientLayer : Layer.merge(Layer.fail(unavailable), clientLayer)
+    )
+    const [resolve] = createClientResolver(recoverableLayer)
+
+    await expect(resolve()).rejects.toBeDefined()
+    available = true
+    await expect(resolve()).resolves.toBeDefined()
   })
 })
