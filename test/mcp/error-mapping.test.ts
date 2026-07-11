@@ -491,6 +491,7 @@ describe("Error Mapping to MCP", () => {
             })
           )
           const unknown = mapClientResolutionErrorToMcp(new Error("token=secret"))
+          const auth = mapClientResolutionErrorToMcp(new HulyAuthError({ message: "secret" }))
           const fiberFailure = yield* Effect.promise(() =>
             Effect.runPromise(Effect.fail(
               new HulyUnavailableError({
@@ -506,6 +507,7 @@ describe("Error Mapping to MCP", () => {
 
           expect(assertAt(unavailable.content, 0).text).toContain("Cannot reach hosted Huly")
           expect(assertAt(unknown.content, 0).text).toBe("Failed to initialize Huly clients")
+          expect(assertAt(auth.content, 0).text).toBe("Authentication error: secret")
           expect(assertAt(fromFiber.content, 0).text).toContain("Cannot reach hosted Huly")
         }))
 
