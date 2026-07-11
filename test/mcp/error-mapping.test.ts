@@ -483,7 +483,7 @@ describe("Error Mapping to MCP", () => {
         }))
 
       it.effect("preserves known resolver failures and hides arbitrary resolver rejections", () =>
-        Effect.sync(() => {
+        Effect.gen(function*() {
           const unavailable = mapClientResolutionErrorToMcp(
             new HulyUnavailableError({
               endpointOrigin: normalizeHulyOrigin("https://huly.app"),
@@ -491,9 +491,22 @@ describe("Error Mapping to MCP", () => {
             })
           )
           const unknown = mapClientResolutionErrorToMcp(new Error("token=secret"))
+          const fiberFailure = yield* Effect.promise(() =>
+            Effect.runPromise(Effect.fail(
+              new HulyUnavailableError({
+                endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+                failureKind: "timeout"
+              })
+            )).then(
+              () => Promise.reject(new Error("expected failure")),
+              error => Promise.resolve(error)
+            )
+          )
+          const fromFiber = mapClientResolutionErrorToMcp(fiberFailure)
 
           expect(assertAt(unavailable.content, 0).text).toContain("Cannot reach hosted Huly")
           expect(assertAt(unknown.content, 0).text).toBe("Failed to initialize Huly clients")
+          expect(assertAt(fromFiber.content, 0).text).toContain("Cannot reach hosted Huly")
         }))
 
       it.effect("maps default-cloud unavailability without exposing backend details", () =>
