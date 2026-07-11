@@ -342,8 +342,6 @@ export const mapClientResolutionErrorToMcp = (error: unknown): McpErrorResponseW
 export const clientResolutionErrorMessage = (error: unknown): string =>
   mapClientResolutionErrorToMcp(error).content[0].text
 
-export const isHulyUnavailableClientResolution = (error: unknown): boolean =>
-  clientResolutionFailure(error) instanceof HulyUnavailableError
 
 // --- Parse Error Mapping ---
 
