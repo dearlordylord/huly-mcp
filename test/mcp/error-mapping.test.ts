@@ -79,6 +79,7 @@ import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import {
   createSuccessResponse,
   createUnknownToolError,
+  mapClientResolutionErrorToMcp,
   mapDomainCauseToMcp,
   mapDomainErrorToMcp,
   mapParseCauseToMcp,
@@ -479,6 +480,20 @@ describe("Error Mapping to MCP", () => {
           expect(assertAt(response.content, 0).text).toBe(
             "Connection error while communicating with Huly. Verify HULY_URL, workspace, and network connectivity before retrying."
           )
+        }))
+
+      it.effect("preserves known resolver failures and hides arbitrary resolver rejections", () =>
+        Effect.sync(() => {
+          const unavailable = mapClientResolutionErrorToMcp(
+            new HulyUnavailableError({
+              endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+              failureKind: "refused"
+            })
+          )
+          const unknown = mapClientResolutionErrorToMcp(new Error("token=secret"))
+
+          expect(assertAt(unavailable.content, 0).text).toContain("Cannot reach hosted Huly")
+          expect(assertAt(unknown.content, 0).text).toBe("Failed to initialize Huly clients")
         }))
 
       it.effect("maps default-cloud unavailability without exposing backend details", () =>
