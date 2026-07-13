@@ -123,6 +123,7 @@ import {
   type HulyDomainError,
   HulyDomainError as HulyDomainErrorSchema,
   HulyError,
+  HulyUnavailableError,
   InvalidContactChannelLocatorError,
   InvalidContactChannelValueError,
   InvalidContactProviderError,
@@ -210,6 +211,7 @@ import {
   ViewletIdentifierAmbiguousError,
   ViewletNotFoundError
 } from "../../src/huly/errors.js"
+import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import { funnelIdentifier, funnelReference, leadIdentifier } from "../helpers/brands.js"
 
 describe("Huly Errors", () => {
@@ -242,6 +244,20 @@ describe("Huly Errors", () => {
         const cause = new Error("network timeout")
         const error = new HulyConnectionError({ message: "Connection failed", cause })
         expect(error.cause).toBe(cause)
+      }))
+  })
+
+  describe("HulyUnavailableError", () => {
+    it.effect("stores only the safe endpoint diagnostic", () =>
+      Effect.sync(() => {
+        const error = new HulyUnavailableError({
+          endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+          failureKind: "refused",
+          detailCode: "ECONNREFUSED"
+        })
+        expect(error._tag).toBe("HulyUnavailableError")
+        expect(error.endpointOrigin).toBe("https://huly.app")
+        expect(error.detailCode).toBe("ECONNREFUSED")
       }))
   })
 
@@ -961,6 +977,8 @@ describe("Huly Errors", () => {
               return `fetch:${error.fileUrl}`
             case "HulyConnectionError":
               return "connection"
+            case "HulyUnavailableError":
+              return "unavailable"
             case "HulyAuthError":
               return "auth"
             case "HulyError":

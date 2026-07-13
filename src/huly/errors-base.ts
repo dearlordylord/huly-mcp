@@ -5,6 +5,12 @@
  */
 import { Schema } from "effect"
 
+import {
+  HulyEndpointOriginSchema,
+  HulyUnavailableDetailCodeSchema,
+  HulyUnavailableFailureKindSchema
+} from "./unavailable-diagnostics.js"
+
 /**
  * Base Huly error - generic operational error.
  */
@@ -36,6 +42,16 @@ export class HulyConnectionError extends Schema.TaggedError<HulyConnectionError>
   {
     message: Schema.String,
     cause: Schema.optional(Schema.Defect)
+  }
+) {}
+
+/** A sanitized connection failure that permits safe, actionable MCP guidance. */
+export class HulyUnavailableError extends Schema.TaggedError<HulyUnavailableError>()(
+  "HulyUnavailableError",
+  {
+    endpointOrigin: HulyEndpointOriginSchema,
+    failureKind: HulyUnavailableFailureKindSchema,
+    detailCode: Schema.optionalWith(HulyUnavailableDetailCodeSchema, { exact: true })
   }
 ) {}
 

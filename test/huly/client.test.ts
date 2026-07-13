@@ -28,10 +28,11 @@ import { Cause, Effect, Exit, Fiber, Layer, TestClock } from "effect"
 import { beforeEach, expect } from "vitest"
 import { HulyConfigService } from "../../src/config/config.js"
 import { HulyClient, type HulyClientError } from "../../src/huly/client.js"
-import { HulyAuthError, HulyConnectionError } from "../../src/huly/errors.js"
+import { HulyAuthError, HulyConnectionError, HulyUnavailableError } from "../../src/huly/errors.js"
 import { INLINE_COMMENT_MARK_TYPE } from "../../src/huly/operations/inline-comment-mark.js"
 import { MARKDOWN_INPUT_REF_URL } from "../../src/huly/operations/markup.js"
 import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
+import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import { assertAt } from "../../src/utils/assertions.js"
 import { mockFn } from "../helpers/mock-fn.js"
 
@@ -586,6 +587,8 @@ describe("HulyClient Service", () => {
           switch (error._tag) {
             case "HulyConnectionError":
               return `Connection: ${error.message}`
+            case "HulyUnavailableError":
+              return `Unavailable: ${error.endpointOrigin}`
             case "HulyAuthError":
               return `Auth: ${error.message}`
           }
@@ -593,9 +596,14 @@ describe("HulyClient Service", () => {
 
         const connErr = new HulyConnectionError({ message: "timeout" })
         const authErr = new HulyAuthError({ message: "invalid" })
+        const unavailableErr = new HulyUnavailableError({
+          endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+          failureKind: "timeout"
+        })
 
         expect(handleError(connErr)).toBe("Connection: timeout")
         expect(handleError(authErr)).toBe("Auth: invalid")
+        expect(handleError(unavailableErr)).toBe("Unavailable: https://huly.app")
       }))
   })
 

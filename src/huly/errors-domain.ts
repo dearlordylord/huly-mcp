@@ -1,7 +1,6 @@
 import { Schema } from "effect"
 
 import * as ApprovalRequestErrors from "./errors-approval-requests.js"
-import { HulyAuthError, HulyConnectionError, HulyError, NoUpdateFieldsError } from "./errors-base.js"
 import {
   BoardArchivedCardDeleteError,
   BoardCardIdentifierAmbiguousError,
@@ -56,6 +55,7 @@ import {
   DocumentTextNotFoundError,
   TeamspaceNotFoundError
 } from "./errors-documents.js"
+import { HulyDomainBaseError } from "./errors-domain-base.js"
 import {
   DriveFileCommentNotFoundError,
   DriveFileNotFoundError,
@@ -216,10 +216,7 @@ import {
 } from "./errors-views.js"
 
 export const HulyDomainError = Schema.Union(
-  HulyError,
-  NoUpdateFieldsError,
-  HulyConnectionError,
-  HulyAuthError,
+  HulyDomainBaseError,
   ApprovalRequestErrors.ApprovalRequestNotFoundError,
   ApprovalRequestErrors.ApprovalRequestTargetNotFoundError,
   ApprovalRequestErrors.ApprovalRequestInvalidApprovalThresholdError,

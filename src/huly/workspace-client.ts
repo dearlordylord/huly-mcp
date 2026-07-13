@@ -215,4 +215,4 @@ const connectAccountClientWithRetry = (
   config: ConnectionConfig,
   sdk: HulySdkDependencies
 ): Effect.Effect<{ client: AccountClient; token: string }, ConnectionError> =>
-  connectWithRetry(() => connectAccountClient(config, sdk), "Connection failed")
+  connectWithRetry(() => connectAccountClient(config, sdk), config.url)

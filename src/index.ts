@@ -174,7 +174,11 @@ const runConfiguredServer = (transport: McpTransportType): Effect.Effect<void, A
       yield* Effect.gen(function*() {
         const bundle = yield* buildClientBundle(combinedClientLayer)
         primeClients(bundle)
-      })
+      }).pipe(
+        // A network outage must not prevent the stdio transport from accepting
+        // initialize and returning its typed, actionable tool-call failure.
+        Effect.catchTag("HulyUnavailableError", () => Effect.void)
+      )
     }
 
     // stdout reserved for MCP protocol in stdio mode - no console output here

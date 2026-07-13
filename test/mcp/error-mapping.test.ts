@@ -40,6 +40,7 @@ import {
   HulyAuthError,
   HulyConnectionError,
   HulyError,
+  HulyUnavailableError,
   InvalidContactProviderError,
   InvalidFileDataError,
   InvalidStatusError,
@@ -74,9 +75,11 @@ import {
   SpaceRoleIdentifierAmbiguousError,
   SpaceRoleNotFoundError
 } from "../../src/huly/errors.js"
+import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import {
   createSuccessResponse,
   createUnknownToolError,
+  mapClientResolutionErrorToMcp,
   mapDomainCauseToMcp,
   mapDomainErrorToMcp,
   mapParseCauseToMcp,
@@ -474,7 +477,90 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
           expect(response._meta.errorTag).toBe("HulyConnectionError")
-          expect(assertAt(response.content, 0).text).toBe("Connection error: Network timeout")
+          expect(assertAt(response.content, 0).text).toBe(
+            "Connection error while communicating with Huly. Verify HULY_URL, workspace, and network connectivity before retrying."
+          )
+        }))
+
+      it.effect("preserves known resolver failures and hides arbitrary resolver rejections", () =>
+        Effect.gen(function*() {
+          const unavailable = mapClientResolutionErrorToMcp(
+            new HulyUnavailableError({
+              endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+              failureKind: "refused"
+            })
+          )
+          const unknown = mapClientResolutionErrorToMcp(new Error("token=secret"))
+          const auth = mapClientResolutionErrorToMcp(new HulyAuthError({ message: "secret" }))
+          const fiberFailure = yield* Effect.promise(() =>
+            Effect.runPromise(Effect.fail(
+              new HulyUnavailableError({
+                endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+                failureKind: "timeout"
+              })
+            )).then(
+              () => Promise.reject(new Error("expected failure")),
+              error => Promise.resolve(error)
+            )
+          )
+          const fromFiber = mapClientResolutionErrorToMcp(fiberFailure)
+
+          expect(assertAt(unavailable.content, 0).text).toContain("Cannot reach hosted Huly")
+          expect(assertAt(unknown.content, 0).text).toBe("Failed to initialize Huly clients")
+          expect(assertAt(auth.content, 0).text).toBe("Authentication error: secret")
+          expect(assertAt(fromFiber.content, 0).text).toContain("Cannot reach hosted Huly")
+        }))
+
+      it.effect("maps default-cloud unavailability without exposing backend details", () =>
+        Effect.gen(function*() {
+          const response = mapDomainErrorToMcp(
+            new HulyUnavailableError({
+              endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+              failureKind: "refused",
+              detailCode: "ECONNREFUSED"
+            })
+          )
+
+          expect(response.isError).toBe(true)
+          expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
+          expect(response._meta.errorTag).toBe("HulyUnavailableError")
+          expect(assertAt(response.content, 0).text).toContain("shutdown expected July 20")
+          expect(assertAt(response.content, 0).text).toContain("HULY_URL")
+          expect(JSON.stringify(response)).not.toContain("ECONNREFUSED")
+        }))
+
+      it.effect("maps custom endpoint unavailability without mentioning hosted Huly", () =>
+        Effect.gen(function*() {
+          const response = mapDomainErrorToMcp(
+            new HulyUnavailableError({
+              endpointOrigin: normalizeHulyOrigin("https://huly.example.test:8443"),
+              failureKind: "timeout"
+            })
+          )
+
+          const text = assertAt(response.content, 0).text
+          expect(text).toContain("https://huly.example.test:8443")
+          expect(text).toContain("HULY_CONNECTION_TIMEOUT")
+          expect(text).not.toContain("hosted Huly")
+        }))
+
+      it.effect("adds default-cloud timeout and DNS guidance", () =>
+        Effect.sync(() => {
+          const timeout = mapDomainErrorToMcp(
+            new HulyUnavailableError({
+              endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+              failureKind: "timeout"
+            })
+          )
+          const dns = mapDomainErrorToMcp(
+            new HulyUnavailableError({
+              endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+              failureKind: "dns"
+            })
+          )
+
+          expect(assertAt(timeout.content, 0).text).toContain("HULY_CONNECTION_TIMEOUT")
+          expect(assertAt(dns.content, 0).text).toContain("certificate, DNS, and proxy")
         }))
 
       it.effect("maps HulyAuthError with errorTag", () =>

@@ -4,7 +4,7 @@ import { Effect, Fiber, Redacted, TestClock } from "effect"
 import { expect } from "vitest"
 import type { Auth } from "../../src/config/config.js"
 import { authToOptions, connectWithRetry } from "../../src/huly/client.js"
-import { HulyAuthError, HulyConnectionError } from "../../src/huly/errors.js"
+import { HulyAuthError, HulyUnavailableError } from "../../src/huly/errors.js"
 
 const makePlatformError = (code: string): PlatformError<Record<string, never>> =>
   new PlatformError(new Status(Severity.ERROR, code as never, {}))
@@ -37,7 +37,7 @@ describe("connection-helpers", () => {
   describe("connectWithRetry", () => {
     it.effect("resolves on successful connection", () =>
       Effect.gen(function*() {
-        const result = yield* connectWithRetry(() => Promise.resolve("connected"), "test")
+        const result = yield* connectWithRetry(() => Promise.resolve("connected"), "https://huly.app")
         expect(result).toBe("connected")
       }))
 
@@ -48,17 +48,16 @@ describe("connection-helpers", () => {
           connectWithRetry(() => {
             callCount++
             return Promise.reject(new Error("network down"))
-          }, "connect")
+          }, "https://huly.app")
         )
 
         // Advance past exponential backoff: 100ms + 200ms
         yield* TestClock.adjust("500 millis")
 
         const error = yield* Effect.flip(Fiber.join(fiber))
-        expect(error).toBeInstanceOf(HulyConnectionError)
-        expect(error._tag).toBe("HulyConnectionError")
-        expect(error.message).toContain("connect")
-        expect(error.message).toContain("network down")
+        expect(error).toBeInstanceOf(HulyUnavailableError)
+        expect(error._tag).toBe("HulyUnavailableError")
+        if (error._tag === "HulyUnavailableError") expect(error.endpointOrigin).toBe("https://huly.app")
         // 1 initial + 2 retries = 3 total calls
         expect(callCount).toBe(3)
       }))
@@ -70,13 +69,28 @@ describe("connection-helpers", () => {
           connectWithRetry(() => {
             callCount++
             return Promise.reject(makePlatformError("platform:status:Unauthorized"))
-          }, "auth-test")
+          }, "https://huly.app")
         )
 
         expect(error).toBeInstanceOf(HulyAuthError)
         expect(error._tag).toBe("HulyAuthError")
-        expect(error.message).toContain("auth-test")
+        expect(error.message).toContain("authorization")
         expect(callCount).toBe(1)
+      }))
+
+    it.effect("retains only an allow-listed detail code", () =>
+      Effect.gen(function*() {
+        const fiber = yield* Effect.fork(
+          connectWithRetry(
+            () => Promise.reject(Object.assign(new Error("token=secret"), { code: "ECONNREFUSED" })),
+            "https://huly.app"
+          )
+        )
+        yield* TestClock.adjust("500 millis")
+        const error = yield* Effect.flip(Fiber.join(fiber))
+
+        expect(error._tag).toBe("HulyUnavailableError")
+        if (error._tag === "HulyUnavailableError") expect(error.detailCode).toBe("ECONNREFUSED")
       }))
 
     it.effect("succeeds after initial failures when retry works", () =>
@@ -89,7 +103,7 @@ describe("connection-helpers", () => {
               return Promise.reject(new Error("transient failure"))
             }
             return Promise.resolve("recovered")
-          }, "retry-test")
+          }, "https://huly.app")
         )
 
         yield* TestClock.adjust("500 millis")
@@ -114,7 +128,7 @@ describe("connection-helpers", () => {
 
         for (const code of authCodes) {
           const error = yield* Effect.flip(
-            connectWithRetry(() => Promise.reject(makePlatformError(code)), "auth")
+            connectWithRetry(() => Promise.reject(makePlatformError(code)), "https://huly.app")
           )
           expect(error).toBeInstanceOf(HulyAuthError)
         }
@@ -125,15 +139,15 @@ describe("connection-helpers", () => {
         const fiber = yield* Effect.fork(
           connectWithRetry(
             () => Promise.reject(makePlatformError("platform:status:InternalServerError")),
-            "server"
+            "https://huly.app"
           )
         )
 
         yield* TestClock.adjust("500 millis")
 
         const error = yield* Effect.flip(Fiber.join(fiber))
-        expect(error).toBeInstanceOf(HulyConnectionError)
-        expect(error._tag).toBe("HulyConnectionError")
+        expect(error).toBeInstanceOf(HulyUnavailableError)
+        expect(error._tag).toBe("HulyUnavailableError")
       }))
   })
 })
