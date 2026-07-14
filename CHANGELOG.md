@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.44.5
+
+### Patch Changes
+
+- 128de4b: Keep stdio MCP available when Huly is unreachable and return actionable, endpoint-aware connection diagnostics.
+
 ## 0.44.4
 
 ### Patch Changes
