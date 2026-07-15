@@ -1,7 +1,9 @@
 import type { SanitizedHulyRuntimeConfigContext } from "../config/config.js"
 import type { ToolWarning } from "../domain/schemas/tool-warnings.js"
 import {
+  HOSTED_HULY_MIGRATION_INSTRUCTIONS,
   HOSTED_HULY_MIGRATION_WARNING,
+  type HostedHulyMigrationInstructions,
   isDefaultHulyCloudOrigin,
   normalizeHulyOrigin
 } from "../huly/unavailable-diagnostics.js"
@@ -37,6 +39,11 @@ export const noToolCallNoticeProvider: ToolCallNoticeProvider = {
 const isHostedHulyOrigin = (origin: SanitizedHulyOrigin): boolean =>
   origin !== undefined && isDefaultHulyCloudOrigin(normalizeHulyOrigin(origin))
 
+export const hostedHulyMigrationInstructionsForOrigin = (
+  origin: SanitizedHulyOrigin
+): HostedHulyMigrationInstructions | undefined =>
+  isHostedHulyOrigin(origin) ? HOSTED_HULY_MIGRATION_INSTRUCTIONS : undefined
+
 const alwaysNoticeProvider = (): ToolCallNoticeProvider => ({
   claim: () => ({
     _tag: "Claimed",
@@ -70,6 +77,6 @@ const onceNoticeProvider = (): ToolCallNoticeProvider => {
 export const createHostedHulyMigrationNoticeProvider = (
   config: HostedHulyMigrationNoticeConfig
 ): ToolCallNoticeProvider => {
-  if (!isHostedHulyOrigin(config.hulyOrigin)) return noToolCallNoticeProvider
+  if (hostedHulyMigrationInstructionsForOrigin(config.hulyOrigin) === undefined) return noToolCallNoticeProvider
   return config.delivery === "always" ? alwaysNoticeProvider() : onceNoticeProvider()
 }

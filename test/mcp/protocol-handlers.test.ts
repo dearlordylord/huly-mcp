@@ -45,7 +45,7 @@ import {
 } from "../../src/mcp/protocol-handlers.js"
 import { resolveProtocolExposure, toListedTool } from "../../src/mcp/protocol-tool-exposure.js"
 import { handleProxyToolCall } from "../../src/mcp/proxy-tools.js"
-import { createHostedHulyMigrationNoticeProvider } from "../../src/mcp/tool-call-notices.js"
+import { createHostedHulyMigrationNoticeProvider, noToolCallNoticeProvider } from "../../src/mcp/tool-call-notices.js"
 import { parseMcpClientInfo } from "../../src/mcp/tool-mode.js"
 import { createToolOutputSchema } from "../../src/mcp/tool-output-schema.js"
 import { createFilteredRegistry, type ToolRegistry, toolRegistry } from "../../src/mcp/tools/index.js"
@@ -151,7 +151,7 @@ const unresolvedLocalJsonSchemaRefs = (
 
 describe("createMcpProtocolHandlers", () => {
   describe("serverDiscover", () => {
-    it("returns the 2026 capability envelope carrying the package version", () => {
+    it("returns the 2026 capability envelope without unrelated instructions", () => {
       const handlers = createMcpProtocolHandlers(
         unusedResolveClients,
         createTelemetryProbe().telemetry,
@@ -163,9 +163,24 @@ describe("createMcpProtocolHandlers", () => {
         resultType: "complete",
         supportedVersions: ["2026-07-28"],
         capabilities: { tools: {}, resources: {} },
-        serverInfo: { name: "huly-mcp", version: VERSION },
-        instructions: expect.stringContaining("Hosted Huly is shutting down")
+        serverInfo: { name: "huly-mcp", version: VERSION }
       })
+    })
+
+    it("includes hosted migration instructions when they apply to the request origin", () => {
+      const handlers = createMcpProtocolHandlers(
+        unusedResolveClients,
+        createTelemetryProbe().telemetry,
+        emptyRegistry,
+        unusedGetHulyContext,
+        liveNowClock,
+        fetchLatestNpmVersion,
+        {},
+        noToolCallNoticeProvider,
+        HOSTED_HULY_MIGRATION_WARNING.message
+      )
+
+      expect(handlers.serverDiscover().instructions).toBe(HOSTED_HULY_MIGRATION_WARNING.message)
     })
   })
 

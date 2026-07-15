@@ -13,7 +13,10 @@ import { type GetHulyContextResult, GetHulyContextResultSchema } from "../domain
 import type { HulyClient } from "../huly/client.js"
 import { HulyError } from "../huly/errors-base.js"
 import type { HulyStorageClient } from "../huly/storage.js"
-import { HOSTED_HULY_MIGRATION_INSTRUCTIONS } from "../huly/unavailable-diagnostics.js"
+import {
+  HOSTED_HULY_MIGRATION_INSTRUCTIONS,
+  type HostedHulyMigrationInstructions
+} from "../huly/unavailable-diagnostics.js"
 import type { WorkspaceClientOperations } from "../huly/workspace-client.js"
 import type { TelemetryOperations } from "../telemetry/telemetry.js"
 import { VERSION } from "../version.js"
@@ -105,7 +108,7 @@ const ServerDiscoverResultSchema = Schema.Struct({
     name: Schema.Literal("huly-mcp"),
     version: Schema.String
   }),
-  instructions: Schema.String
+  instructions: Schema.optionalWith(Schema.Literal(HOSTED_HULY_MIGRATION_INSTRUCTIONS), { exact: true })
 })
 type ServerDiscoverResult = Schema.Schema.Type<typeof ServerDiscoverResultSchema>
 
@@ -196,7 +199,8 @@ export const createMcpProtocolHandlers = (
   clock: NowClock = liveNowClock,
   fetchLatestVersion: () => Promise<string> = fetchLatestNpmVersion,
   exposureOptions: Partial<ProtocolExposureOptions> = {},
-  toolCallNoticeProvider: ToolCallNoticeProvider = noToolCallNoticeProvider
+  toolCallNoticeProvider: ToolCallNoticeProvider = noToolCallNoticeProvider,
+  serverInstructions?: HostedHulyMigrationInstructions
 ): McpProtocolHandlers => {
   const registries = normalizeRegistries(registry)
   const defaults = defaultExposureOptions()
@@ -433,7 +437,7 @@ export const createMcpProtocolHandlers = (
         supportedVersions: ["2026-07-28"],
         capabilities: { tools: {}, resources: {} },
         serverInfo: { name: "huly-mcp", version: VERSION },
-        instructions: HOSTED_HULY_MIGRATION_INSTRUCTIONS
+        ...(serverInstructions === undefined ? {} : { instructions: serverInstructions })
       }),
     drainInflight
   }

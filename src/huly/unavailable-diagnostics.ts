@@ -17,6 +17,7 @@ export const HOSTED_HULY_MIGRATION_LINKS =
 
 export const HOSTED_HULY_MIGRATION_INSTRUCTIONS =
   `Important: Hosted Huly is shutting down. Huly's upstream README says the hosted service is being discontinued because hosting is no longer funded, with shutdown expected ${HOSTED_HULY_SUNSET.expectedShutdown}. If this MCP uses ${DEFAULT_HULY_CLOUD_ORIGIN}, export and back up important data and migrate as soon as possible. ${HOSTED_HULY_MIGRATION_LINKS} Self-hosted deployments are not affected.`
+export type HostedHulyMigrationInstructions = typeof HOSTED_HULY_MIGRATION_INSTRUCTIONS
 
 export const HOSTED_HULY_MIGRATION_WARNING = Schema.decodeUnknownSync(ToolWarningSchema)({
   code: HostedHulyShutdownWarningCode,

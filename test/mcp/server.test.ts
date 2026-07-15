@@ -15,6 +15,7 @@ import {
   type Project as HulyProject,
   TimeReportDayType
 } from "@hcengineering/tracker"
+import type { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import {
   CallToolRequestSchema,
   ListResourcesRequestSchema,
@@ -29,7 +30,10 @@ import { sanitizeHulyRuntimeConfigFromEnv, sanitizeHulyRuntimeConfigFromHeaders 
 import { parseJsonSchemaRecord } from "../../src/domain/schemas/json-schema.js"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
-import { HOSTED_HULY_MIGRATION_WARNING } from "../../src/huly/unavailable-diagnostics.js"
+import {
+  HOSTED_HULY_MIGRATION_WARNING,
+  type HostedHulyMigrationInstructions
+} from "../../src/huly/unavailable-diagnostics.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
 import {
   HttpServerFactoryService,
@@ -86,14 +90,15 @@ const buildTestServerLayer = (
     autoExit?: boolean
     authMethod?: "token" | "password"
     httpTransportDependencies?: Partial<HttpTransportDependencies>
+    createServer?: (instructions?: HostedHulyMigrationInstructions) => Server
   },
   layers: Layer.Layer<HulyClient | HulyStorageClient | WorkspaceClient | TelemetryService>
 ) => {
-  const { httpTransportDependencies, ...serverConfig } = config
+  const { createServer = createMockServer, httpTransportDependencies, ...serverConfig } = config
   return McpServerService.layer({
     ...serverConfig,
     ...(httpTransportDependencies === undefined ? {} : { httpTransportDependencies }),
-    createServer: createMockServer,
+    createServer,
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test transport is never inspected by the mocked server
     createStdioTransport: () => ({}) as never,
     resolveClients: resolveClientsFromLayer(layers)
@@ -2209,12 +2214,14 @@ describe("McpServerService.layer operations", () => {
 
   describe("createMcpServer request handlers", () => {
     const buildAndRun = (
-      layers: Layer.Layer<HulyClient | HulyStorageClient | WorkspaceClient | TelemetryService>
+      layers: Layer.Layer<HulyClient | HulyStorageClient | WorkspaceClient | TelemetryService>,
+      createServer: (instructions?: HostedHulyMigrationInstructions) => Server = createMockServer
     ) =>
       Effect.gen(function*() {
         const serverLayer = buildTestServerLayer({
           transport: "stdio",
-          autoExit: true
+          autoExit: true,
+          createServer
         }, layers)
         const ctx = yield* Layer.build(serverLayer)
         const ops = yield* McpServerService.pipe(
@@ -2434,6 +2441,38 @@ describe("McpServerService.layer operations", () => {
         process.env = originalEnv
         yield* cleanup(fiber)
       }), { timeout: 5000 })
+
+    it.scoped(
+      "stdio initialization instructions apply only to the default hosted Huly origin",
+      () =>
+        Effect.gen(function*() {
+          const originalEnv = { ...process.env }
+          const seenInstructions: Array<HostedHulyMigrationInstructions | undefined> = []
+          const layers = Layer.mergeAll(
+            HulyClient.testLayer({}),
+            HulyStorageClient.testLayer({}),
+            WorkspaceClient.testLayer({}),
+            TelemetryService.testLayer()
+          )
+          const createServer = (instructions?: HostedHulyMigrationInstructions): Server => {
+            seenInstructions.push(instructions)
+            return createMockServer()
+          }
+
+          process.env["HULY_URL"] = "https://huly.app"
+          const hostedFiber = yield* buildAndRun(layers, createServer)
+          yield* cleanup(hostedFiber)
+
+          process.env["HULY_URL"] = "https://huly.example.com"
+          const selfHostedFiber = yield* buildAndRun(layers, createServer)
+          yield* cleanup(selfHostedFiber)
+
+          expect(seenInstructions).toEqual([HOSTED_HULY_MIGRATION_WARNING.message, undefined])
+
+          process.env = originalEnv
+        }),
+      { timeout: 5000 }
+    )
 
     it.scoped("get_huly_context remains visible and reports active TOOLSETS filtering", () =>
       Effect.gen(function*() {

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest"
 
 import { HOSTED_HULY_MIGRATION_WARNING } from "../../src/huly/unavailable-diagnostics.js"
-import { createHostedHulyMigrationNoticeProvider, type ToolCallNoticeClaim } from "../../src/mcp/tool-call-notices.js"
+import {
+  createHostedHulyMigrationNoticeProvider,
+  hostedHulyMigrationInstructionsForOrigin,
+  type ToolCallNoticeClaim
+} from "../../src/mcp/tool-call-notices.js"
 
 const expectClaimed = (claim: ToolCallNoticeClaim): Extract<ToolCallNoticeClaim, { readonly _tag: "Claimed" }> => {
   expect(claim._tag).toBe("Claimed")
@@ -10,6 +14,14 @@ const expectClaimed = (claim: ToolCallNoticeClaim): Extract<ToolCallNoticeClaim,
 }
 
 describe("createHostedHulyMigrationNoticeProvider", () => {
+  it("provides initialization instructions only for the default hosted Huly origin", () => {
+    expect(hostedHulyMigrationInstructionsForOrigin("https://huly.app")).toBe(
+      HOSTED_HULY_MIGRATION_WARNING.message
+    )
+    expect(hostedHulyMigrationInstructionsForOrigin("https://huly.example.com")).toBeUndefined()
+    expect(hostedHulyMigrationInstructionsForOrigin(undefined)).toBeUndefined()
+  })
+
   it("does not claim a notice when no Huly origin is configured", () => {
     const provider = createHostedHulyMigrationNoticeProvider({
       delivery: "once",
