@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.44.6
+
+### Patch Changes
+
+- 559b3e9: Warn MCP clients during initialization that hosted Huly is shutting down, with migration and self-hosting links. Affected `https://huly.app` configurations also receive a non-failing warning alongside the first stdio tool result or every stateless HTTP tool result.
+
 ## 0.44.5
 
 ### Patch Changes
