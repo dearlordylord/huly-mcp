@@ -18,6 +18,7 @@ import type { ProtocolExposureOptions } from "./protocol-tool-exposure.js"
 import { type SanitizedHulyRuntimeConfigContext, sanitizeHulyRuntimeConfigFromEnv } from "../config/config.js"
 import type { GetHulyContextResult } from "../domain/schemas/index.js"
 import { TelemetryService } from "../telemetry/telemetry.js"
+import { createHostedHulyMigrationNoticeProvider } from "./tool-call-notices.js"
 import {
   type McpClientInfoLike,
   parseMcpClientInfo,
@@ -193,13 +194,18 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
               yield* Ref.set(isRunning, true)
 
               if (config.transport === "stdio") {
+                const stdioRuntimeConfig = getRuntimeConfigContext()
                 const [stdioServer, drainInflight] = createMcpServer(
                   config.resolveClients,
                   telemetry,
                   registries,
-                  (toolExposure) => getHulyContext(getRuntimeConfigContext(), toolExposure),
+                  (toolExposure) => getHulyContext(stdioRuntimeConfig, toolExposure),
                   config.createServer,
-                  sdkExposureOptions
+                  sdkExposureOptions,
+                  createHostedHulyMigrationNoticeProvider({
+                    delivery: "once",
+                    hulyOrigin: stdioRuntimeConfig.huly.url.origin
+                  })
                 )
                 yield* Ref.set(serverRef, stdioServer)
                 const transport = config.createStdioTransport?.() ?? new StdioServerTransport()
@@ -273,7 +279,11 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                       registries,
                       (toolExposure) => getHulyContext(requestRuntimeConfig, toolExposure),
                       config.createServer,
-                      requestExposureOptions(() => clientInfoFromLegacyHttpRequest(req))
+                      requestExposureOptions(() => clientInfoFromLegacyHttpRequest(req)),
+                      createHostedHulyMigrationNoticeProvider({
+                        delivery: "always",
+                        hulyOrigin: requestRuntimeConfig.huly.url.origin
+                      })
                     )[0]
                   },
                   config.httpTransportDependencies,
@@ -286,7 +296,11 @@ export class McpServerService extends Context.Tag("@hulymcp/McpServer")<
                       (toolExposure) => getHulyContext(requestRuntimeConfig, toolExposure),
                       undefined,
                       undefined,
-                      requestExposureOptions(() => clientInfoFromMcp2026Request(req))
+                      requestExposureOptions(() => clientInfoFromMcp2026Request(req)),
+                      createHostedHulyMigrationNoticeProvider({
+                        delivery: "always",
+                        hulyOrigin: requestRuntimeConfig.huly.url.origin
+                      })
                     )
                   }
                 ).pipe(

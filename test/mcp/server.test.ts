@@ -29,6 +29,7 @@ import { sanitizeHulyRuntimeConfigFromEnv, sanitizeHulyRuntimeConfigFromHeaders 
 import { parseJsonSchemaRecord } from "../../src/domain/schemas/json-schema.js"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
+import { HOSTED_HULY_MIGRATION_WARNING } from "../../src/huly/unavailable-diagnostics.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
 import {
   HttpServerFactoryService,
@@ -1413,7 +1414,7 @@ describe("McpServerService.layer operations", () => {
         Effect.gen(function*() {
           capturedHandlers.clear()
           const originalEnv = { ...process.env }
-          process.env["HULY_URL"] = "https://env.huly.app"
+          process.env["HULY_URL"] = "https://huly.app"
           process.env["HULY_TOKEN"] = "env-token"
           process.env["HULY_EMAIL"] = "env-user@example.com"
           process.env["HULY_PASSWORD"] = "env-password"
@@ -1525,6 +1526,7 @@ describe("McpServerService.layer operations", () => {
                 auth?: { source?: string }
                 configSources?: { headers?: { present?: boolean } }
               }
+              warnings?: ReadonlyArray<{ readonly code: string; readonly message: string }>
             }
           }
 
@@ -1536,9 +1538,11 @@ describe("McpServerService.layer operations", () => {
             requiredComplete: true
           })
           expect(second.structuredContent?.result?.auth?.source).toBe("env")
-          expect(second.structuredContent?.result?.huly?.url?.origin).toBe("https://env.huly.app")
+          expect(second.structuredContent?.result?.huly?.url?.origin).toBe("https://huly.app")
           expect(second.structuredContent?.result?.huly?.workspace?.value).toBe("env-workspace")
           expect(second.structuredContent?.result?.configSources?.headers?.present).toBe(false)
+          expect(first.structuredContent).not.toHaveProperty("warnings")
+          expect(second.structuredContent?.warnings).toEqual([HOSTED_HULY_MIGRATION_WARNING])
 
           const serialized = JSON.stringify(responses)
           expect(serialized).not.toContain("header-token")
@@ -2355,6 +2359,7 @@ describe("McpServerService.layer operations", () => {
           }
         )
 
+        // The schema-keyed capture map cannot preserve the SDK handler type associated with each key.
         const callToolHandler = capturedHandlers.get(CallToolRequestSchema) as
           | ((req: { params: { name: string; arguments?: Record<string, unknown> } }) => Promise<unknown>)
           | undefined
@@ -2382,6 +2387,49 @@ describe("McpServerService.layer operations", () => {
         expect(serialized).not.toContain("secret-password")
         expect(serialized).not.toContain("user@example.com")
         expect(serialized).not.toContain("query-secret")
+
+        process.env = originalEnv
+        yield* cleanup(fiber)
+      }), { timeout: 5000 })
+
+    it.scoped("stdio appends the hosted-Huly warning only to the first tool result", () =>
+      Effect.gen(function*() {
+        capturedHandlers.clear()
+        const originalEnv = { ...process.env }
+        process.env["HULY_URL"] = "https://huly.app"
+
+        const layers = Layer.mergeAll(
+          HulyClient.testLayer({}),
+          HulyStorageClient.testLayer({}),
+          WorkspaceClient.testLayer({}),
+          TelemetryService.testLayer()
+        )
+        const fiber = yield* buildAndRun(layers)
+        // The schema-keyed capture map cannot preserve the SDK handler type associated with each key.
+        const callToolHandler = capturedHandlers.get(CallToolRequestSchema) as
+          | ((req: { params: { name: string; arguments?: Record<string, unknown> } }) => Promise<{
+            readonly content: ReadonlyArray<{ readonly text: string }>
+            readonly structuredContent?: {
+              readonly warnings?: ReadonlyArray<{ readonly code: string; readonly message: string }>
+            }
+          }>)
+          | undefined
+        expect(callToolHandler).toBeDefined()
+        if (callToolHandler === undefined) throw new Error("CallTool handler was not registered")
+
+        const first = yield* Effect.promise(() =>
+          callToolHandler({ params: { name: "get_huly_context", arguments: {} } })
+        )
+        const second = yield* Effect.promise(() =>
+          callToolHandler({ params: { name: "get_huly_context", arguments: {} } })
+        )
+
+        expect(first.structuredContent?.warnings).toEqual([HOSTED_HULY_MIGRATION_WARNING])
+        expect(JSON.parse(assertAt(first.content, 1).text)).toEqual({
+          warnings: [HOSTED_HULY_MIGRATION_WARNING]
+        })
+        expect(second.structuredContent?.warnings).toBeUndefined()
+        expect(second.content).toHaveLength(1)
 
         process.env = originalEnv
         yield* cleanup(fiber)

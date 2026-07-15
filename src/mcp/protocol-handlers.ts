@@ -19,6 +19,7 @@ import type { TelemetryOperations } from "../telemetry/telemetry.js"
 import { VERSION } from "../version.js"
 import type { McpToolResponse } from "./error-mapping.js"
 import {
+  appendToolWarnings,
   createSuccessResponse,
   createUnknownToolError,
   mapClientResolutionErrorToMcp,
@@ -51,6 +52,7 @@ import {
   proxyToolDefinitions
 } from "./proxy-tools.js"
 import { listResourceTemplates } from "./resources.js"
+import { noToolCallNoticeProvider, type ToolCallNoticeProvider } from "./tool-call-notices.js"
 import type { ToolRegistry } from "./tools/index.js"
 import {
   createMissingArgumentsError,
@@ -193,7 +195,8 @@ export const createMcpProtocolHandlers = (
   getHulyContext: HulyContextProvider,
   clock: NowClock = liveNowClock,
   fetchLatestVersion: () => Promise<string> = fetchLatestNpmVersion,
-  exposureOptions: Partial<ProtocolExposureOptions> = {}
+  exposureOptions: Partial<ProtocolExposureOptions> = {},
+  toolCallNoticeProvider: ToolCallNoticeProvider = noToolCallNoticeProvider
 ): McpProtocolHandlers => {
   const registries = normalizeRegistries(registry)
   const defaults = defaultExposureOptions()
@@ -228,6 +231,7 @@ export const createMcpProtocolHandlers = (
 
   const callTool = async (request: ToolCallRequest): Promise<CallToolResult> => {
     enter()
+    const noticeClaim = toolCallNoticeProvider.claim()
     try {
       const { arguments: args, name } = request.params
       const exposure = resolveProtocolExposure(registries, protocolExposureOptions)
@@ -235,20 +239,28 @@ export const createMcpProtocolHandlers = (
       const start = clock.currentTimeMillis()
       const inputBytes = JSON.stringify(args ?? {}).length
 
+      const withClaimedNotice = (response: McpToolResponse): McpToolResponse => {
+        if (noticeClaim._tag === "None") return response
+        const responseWithNotice = appendToolWarnings(response, [noticeClaim.warning])
+        noticeClaim.delivered()
+        return responseWithNotice
+      }
+
       const returnError = (errorResponse: McpToolResponse, editMode?: string) => {
+        const responseWithNotice = withClaimedNotice(errorResponse)
         const durationMs = clock.currentTimeMillis() - start
         telemetry.toolCalled({
           toolName: name,
           status: "error",
           clientKind: exposure.context.clientKind,
           resolvedMode: exposure.context.resolvedMode,
-          errorTag: errorResponse._meta?.errorTag,
+          errorTag: responseWithNotice._meta?.errorTag,
           durationMs,
           inputBytes,
-          outputBytes: computeOutputBytes(errorResponse),
+          outputBytes: computeOutputBytes(responseWithNotice),
           editMode
         })
-        return toMcpResponse(errorResponse)
+        return toMcpResponse(responseWithNotice)
       }
 
       if (name === VERSION_TOOL_NAME) {
@@ -261,7 +273,7 @@ export const createMcpProtocolHandlers = (
         } catch {
           return returnError(mapDomainErrorToMcp(new HulyError({ message: "Failed to build version result" })))
         }
-        const versionResponse = createSuccessResponse(versionResult)
+        const versionResponse = withClaimedNotice(createSuccessResponse(versionResult))
         const durationMs = clock.currentTimeMillis() - start
         telemetry.toolCalled({
           toolName: name,
@@ -287,7 +299,7 @@ export const createMcpProtocolHandlers = (
           return returnError(mapDomainErrorToMcp(new HulyError({ message: "Failed to build Huly context" })))
         }
 
-        const contextResponse = createSuccessResponse(context)
+        const contextResponse = withClaimedNotice(createSuccessResponse(context))
         const durationMs = clock.currentTimeMillis() - start
         telemetry.toolCalled({
           toolName: name,
@@ -330,19 +342,20 @@ export const createMcpProtocolHandlers = (
               }
             })
         })
+        const responseWithNotice = withClaimedNotice(response)
         const durationMs = clock.currentTimeMillis() - start
         telemetry.toolCalled({
           toolName: name,
-          status: response.isError === true ? "error" : "success",
+          status: responseWithNotice.isError === true ? "error" : "success",
           clientKind: exposure.context.clientKind,
           resolvedMode: exposure.context.resolvedMode,
-          errorTag: response._meta?.errorTag,
+          errorTag: responseWithNotice._meta?.errorTag,
           durationMs,
           inputBytes,
-          outputBytes: computeOutputBytes(response),
+          outputBytes: computeOutputBytes(responseWithNotice),
           editMode
         })
-        return toMcpResponse(response)
+        return toMcpResponse(responseWithNotice)
       }
 
       const hulyToolName = parseToolName(name)
@@ -384,19 +397,23 @@ export const createMcpProtocolHandlers = (
       const durationMs = clock.currentTimeMillis() - start
       if (response === null) return returnError(createUnknownToolError(name), editMode)
 
+      const responseWithNotice = withClaimedNotice(response)
       telemetry.toolCalled({
         toolName: hulyToolName,
-        status: response.isError === true ? "error" : "success",
+        status: responseWithNotice.isError === true ? "error" : "success",
         clientKind: exposure.context.clientKind,
         resolvedMode: exposure.context.resolvedMode,
-        errorTag: response._meta?.errorTag,
+        errorTag: responseWithNotice._meta?.errorTag,
         durationMs,
         inputBytes,
-        outputBytes: computeOutputBytes(response),
+        outputBytes: computeOutputBytes(responseWithNotice),
         editMode
       })
 
-      return toMcpResponse(response)
+      return toMcpResponse(responseWithNotice)
+    } catch (error) {
+      if (noticeClaim._tag === "Claimed") noticeClaim.release()
+      throw error
     } finally {
       leave()
     }

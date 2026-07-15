@@ -13,6 +13,7 @@ import type { ToolExposureContext } from "./huly-context-tool.js"
 import { type ClientBundle, createMcpProtocolHandlers } from "./protocol-handlers.js"
 import { type ProtocolExposureOptions, type ProtocolToolRegistries } from "./protocol-tool-exposure.js"
 import { createDefaultMcpSdkServer } from "./sdk-server.js"
+import { noToolCallNoticeProvider, type ToolCallNoticeProvider } from "./tool-call-notices.js"
 import { parseMcpClientInfo } from "./tool-mode.js"
 import type { ToolRegistry } from "./tools/index.js"
 
@@ -33,7 +34,8 @@ export const createMcpServer = (
   registry: ToolRegistry | ProtocolToolRegistries,
   getHulyContext: (toolExposure: ToolExposureContext) => GetHulyContextResult,
   createServer: () => Server = createDefaultMcpSdkServer,
-  exposureOptions: Partial<ProtocolExposureOptions> = {}
+  exposureOptions: Partial<ProtocolExposureOptions> = {},
+  toolCallNoticeProvider: ToolCallNoticeProvider = noToolCallNoticeProvider
 ): McpServerHandle => {
   const server = createServer()
   const currentClientInfo = (): ReturnType<NonNullable<ProtocolExposureOptions["currentClientInfo"]>> =>
@@ -48,7 +50,8 @@ export const createMcpServer = (
     {
       ...exposureOptions,
       currentClientInfo
-    }
+    },
+    toolCallNoticeProvider
   )
 
   server.setRequestHandler(ListToolsRequestSchema, handlers.listTools)

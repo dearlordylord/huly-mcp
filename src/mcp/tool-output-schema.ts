@@ -19,7 +19,7 @@ const toolWarningCodeEnum = [...ToolWarningCodeSchema.literals]
 const warningOutputSchema = {
   type: "array",
   description:
-    "Optional agent-visible warnings about degraded result fidelity. Omitted when the server returned the documented happy-path payload.",
+    "Optional agent-visible warnings about degraded result fidelity or important operational conditions. Omitted when there is nothing the agent needs to surface.",
   items: {
     type: "object",
     properties: {

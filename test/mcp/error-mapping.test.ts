@@ -77,6 +77,7 @@ import {
 } from "../../src/huly/errors.js"
 import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import {
+  appendToolWarnings,
   createSuccessResponse,
   createUnknownToolError,
   mapClientResolutionErrorToMcp,
@@ -812,6 +813,77 @@ describe("Error Mapping to MCP", () => {
 
         expect(response.structuredContent).toEqual({ result: { ok: true }, warnings: [warning] })
         expect(response.content).toHaveLength(2)
+        expect(JSON.parse(assertAt(response.content, 1).text)).toEqual({ warnings: [warning] })
+      }))
+  })
+
+  describe("appendToolWarnings", () => {
+    it.effect("returns the original response when there are no warnings to append", () =>
+      Effect.gen(function*() {
+        const original = createSuccessResponse({ ok: true })
+
+        expect(appendToolWarnings(original, [])).toBe(original)
+      }))
+
+    it.effect("appends a warning without changing a successful result", () =>
+      Effect.gen(function*() {
+        const warning = {
+          code: "hosted_huly_shutdown" as const,
+          message: "Hosted Huly is shutting down."
+        }
+        const response = appendToolWarnings(createSuccessResponse({ ok: true }), [warning])
+
+        expect(response.isError).not.toBe(true)
+        expect(response.structuredContent).toEqual({ result: { ok: true }, warnings: [warning] })
+        expect(JSON.parse(assertAt(response.content, 0).text)).toEqual({ ok: true })
+        expect(JSON.parse(assertAt(response.content, 1).text)).toEqual({ warnings: [warning] })
+      }))
+
+    it.effect("preserves existing warnings when appending a warning", () =>
+      Effect.gen(function*() {
+        const existing = {
+          code: "status_metadata_unresolved" as const,
+          message: "Status metadata was degraded."
+        }
+        const appended = {
+          code: "hosted_huly_shutdown" as const,
+          message: "Hosted Huly is shutting down."
+        }
+        const response = appendToolWarnings(createSuccessResponse({ ok: true }, [existing]), [appended])
+
+        expect(response.structuredContent).toEqual({
+          result: { ok: true },
+          warnings: [existing, appended]
+        })
+        expect(response.content).toHaveLength(2)
+        expect(JSON.parse(assertAt(response.content, 1).text)).toEqual({ warnings: [existing, appended] })
+      }))
+
+    it.effect("appends a visible warning to an error without changing its error status", () =>
+      Effect.gen(function*() {
+        const warning = {
+          code: "hosted_huly_shutdown" as const,
+          message: "Hosted Huly is shutting down."
+        }
+        const response = appendToolWarnings(createUnknownToolError("bogus_tool"), [warning])
+
+        expect(response.isError).toBe(true)
+        expect(response.structuredContent).toBeUndefined()
+        expect(assertAt(response.content, 0).text).toBe("Unknown tool: bogus_tool")
+        expect(JSON.parse(assertAt(response.content, 1).text)).toEqual({ warnings: [warning] })
+      }))
+
+    it.effect("keeps a content-only success response content-only", () =>
+      Effect.gen(function*() {
+        const warning = {
+          code: "hosted_huly_shutdown" as const,
+          message: "Hosted Huly is shutting down."
+        }
+        const response = appendToolWarnings({ content: [{ type: "text", text: "ok" }] }, [warning])
+
+        expect(response.isError).not.toBe(true)
+        expect(response.structuredContent).toBeUndefined()
+        expect(assertAt(response.content, 0).text).toBe("ok")
         expect(JSON.parse(assertAt(response.content, 1).text)).toEqual({ warnings: [warning] })
       }))
   })

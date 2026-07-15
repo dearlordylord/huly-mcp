@@ -7,7 +7,8 @@ export const ToolWarningCodeSchema = Schema.Literal(
   "viewlet_descriptor_metadata_degraded",
   "space_preference_metadata_degraded",
   "approval_request_person_metadata_degraded",
-  "approval_request_count_metadata_degraded"
+  "approval_request_count_metadata_degraded",
+  "hosted_huly_shutdown"
 ).annotations({
   identifier: "ToolWarningCode",
   title: "ToolWarningCode",
@@ -21,16 +22,17 @@ export const ViewletDescriptorMetadataDegradedWarningCode = ToolWarningCodeSchem
 export const SpacePreferenceMetadataDegradedWarningCode = ToolWarningCodeSchema.literals[4]
 export const ApprovalRequestPersonMetadataDegradedWarningCode = ToolWarningCodeSchema.literals[5]
 export const ApprovalRequestCountMetadataDegradedWarningCode = ToolWarningCodeSchema.literals[6]
+export const HostedHulyShutdownWarningCode = ToolWarningCodeSchema.literals[7]
 
 export const ToolWarningSchema = Schema.Struct({
   code: ToolWarningCodeSchema,
   message: Schema.Trim.pipe(Schema.nonEmptyString()).annotations({
     description:
-      "LLM-facing explanation of what part of the returned tool payload is degraded and how the agent should interpret it."
+      "LLM-facing explanation of degraded result fidelity or an important operational condition requiring user action."
   })
 }).annotations({
   identifier: "ToolWarning",
   title: "ToolWarning",
-  description: "Warning surfaced to an agent when a tool result is intentionally degraded instead of failing."
+  description: "Warning surfaced to an agent alongside a tool result without changing whether that tool call succeeded."
 })
 export type ToolWarning = Schema.Schema.Type<typeof ToolWarningSchema>

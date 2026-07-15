@@ -25,6 +25,7 @@ import { Diagnostics } from "../../src/huly/diagnostics.js"
 import { HulyConnectionError } from "../../src/huly/errors.js"
 import { task, tracker } from "../../src/huly/huly-plugins.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
+import { HOSTED_HULY_MIGRATION_WARNING } from "../../src/huly/unavailable-diagnostics.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
 import { createInvalidParamsError } from "../../src/mcp/error-mapping.js"
 import {
@@ -39,10 +40,12 @@ import {
   deriveEditMode,
   fetchLatestNpmVersion,
   liveNowClock,
+  type McpProtocolHandlers,
   type NowClock
 } from "../../src/mcp/protocol-handlers.js"
 import { resolveProtocolExposure, toListedTool } from "../../src/mcp/protocol-tool-exposure.js"
 import { handleProxyToolCall } from "../../src/mcp/proxy-tools.js"
+import { createHostedHulyMigrationNoticeProvider } from "../../src/mcp/tool-call-notices.js"
 import { parseMcpClientInfo } from "../../src/mcp/tool-mode.js"
 import { createToolOutputSchema } from "../../src/mcp/tool-output-schema.js"
 import { createFilteredRegistry, type ToolRegistry, toolRegistry } from "../../src/mcp/tools/index.js"
@@ -801,6 +804,116 @@ describe("createMcpProtocolHandlers — version tool", () => {
       clientKind: "codex",
       resolvedMode: "proxy"
     })
+  })
+
+  it("propagates an unexpected version lookup failure when no tool-call notice is claimed", async () => {
+    const handlers = createMcpProtocolHandlers(
+      unusedResolveClients,
+      createTelemetryProbe().telemetry,
+      emptyRegistry,
+      unusedGetHulyContext,
+      liveNowClock,
+      () => Promise.reject(new Error("npm unavailable"))
+    )
+
+    await expect(handlers.callTool({ params: { name: VERSION_TOOL_NAME, arguments: {} } })).rejects.toThrow(
+      "npm unavailable"
+    )
+  })
+})
+
+describe("createMcpProtocolHandlers — hosted Huly migration notice", () => {
+  const hostedNoticeProvider = (delivery: "once" | "always") =>
+    createHostedHulyMigrationNoticeProvider({ delivery, hulyOrigin: "https://huly.app" })
+
+  const expectMigrationWarning = (response: Awaited<ReturnType<McpProtocolHandlers["callTool"]>>): void => {
+    expect(response.structuredContent?.warnings).toEqual([HOSTED_HULY_MIGRATION_WARNING])
+    expect(JSON.parse(firstText([assertAt(response.content, 1)]))).toEqual({
+      warnings: [HOSTED_HULY_MIGRATION_WARNING]
+    })
+  }
+
+  it("appends the warning to only the first successful persistent-session tool result", async () => {
+    const handlers = createMcpProtocolHandlers(
+      unusedResolveClients,
+      createTelemetryProbe().telemetry,
+      emptyRegistry,
+      unusedGetHulyContext,
+      liveNowClock,
+      () => Promise.resolve("9.9.9"),
+      {},
+      hostedNoticeProvider("once")
+    )
+
+    const first = await handlers.callTool({ params: { name: VERSION_TOOL_NAME, arguments: {} } })
+    const second = await handlers.callTool({ params: { name: VERSION_TOOL_NAME, arguments: {} } })
+
+    expectMigrationWarning(first)
+    expect(second.structuredContent?.warnings).toBeUndefined()
+    expect(second.content).toHaveLength(1)
+  })
+
+  it("appends the warning without changing a first-call error", async () => {
+    const handlers = createMcpProtocolHandlers(
+      unusedResolveClients,
+      createTelemetryProbe().telemetry,
+      emptyRegistry,
+      unusedGetHulyContext,
+      liveNowClock,
+      () => Promise.resolve("9.9.9"),
+      {},
+      hostedNoticeProvider("once")
+    )
+
+    const first = await handlers.callTool({ params: { name: "does_not_exist", arguments: {} } })
+    const second = await handlers.callTool({ params: { name: "does_not_exist", arguments: {} } })
+
+    expect(first.isError).toBe(true)
+    expect(JSON.parse(firstText([assertAt(first.content, 1)]))).toEqual({
+      warnings: [HOSTED_HULY_MIGRATION_WARNING]
+    })
+    expect(second.isError).toBe(true)
+    expect(second.content).toHaveLength(1)
+  })
+
+  it("releases the notice when a tool call throws before returning a result", async () => {
+    let attempts = 0
+    const handlers = createMcpProtocolHandlers(
+      unusedResolveClients,
+      createTelemetryProbe().telemetry,
+      emptyRegistry,
+      unusedGetHulyContext,
+      liveNowClock,
+      () => {
+        attempts++
+        return attempts === 1 ? Promise.reject(new Error("npm unavailable")) : Promise.resolve("9.9.9")
+      },
+      {},
+      hostedNoticeProvider("once")
+    )
+
+    await expect(handlers.callTool({ params: { name: VERSION_TOOL_NAME, arguments: {} } })).rejects.toThrow(
+      "npm unavailable"
+    )
+
+    const retry = await handlers.callTool({ params: { name: VERSION_TOOL_NAME, arguments: {} } })
+    expectMigrationWarning(retry)
+  })
+
+  it("appends the warning to every affected stateless tool result", async () => {
+    const handlers = createMcpProtocolHandlers(
+      unusedResolveClients,
+      createTelemetryProbe().telemetry,
+      emptyRegistry,
+      unusedGetHulyContext,
+      liveNowClock,
+      () => Promise.resolve("9.9.9"),
+      {},
+      hostedNoticeProvider("always")
+    )
+
+    expectMigrationWarning(await handlers.callTool({ params: { name: VERSION_TOOL_NAME, arguments: {} } }))
+    expectMigrationWarning(await handlers.callTool({ params: { name: VERSION_TOOL_NAME, arguments: {} } }))
   })
 })
 

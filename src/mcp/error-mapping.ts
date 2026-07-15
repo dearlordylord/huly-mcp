@@ -424,6 +424,45 @@ export const createSuccessResponse = <T>(
     }
 })
 
+const appendWarningContent = (
+  content: McpTextContentList,
+  warnings: ReadonlyArray<ToolWarning>,
+  replaceExistingWarningBlock: boolean
+): McpTextContentList => {
+  const [first, ...remaining] = content
+  const preserved = replaceExistingWarningBlock ? remaining.slice(0, remaining.length - 1) : remaining
+  return [first, ...preserved, { type: "text", text: encodeJsonText({ warnings }) }]
+}
+
+export const appendToolWarnings = (
+  response: McpToolResponse,
+  warnings: ReadonlyArray<ToolWarning>
+): McpToolResponse => {
+  if (warnings.length === 0) return response
+  if (response.isError === true) {
+    return {
+      ...response,
+      content: appendWarningContent(response.content, warnings, false)
+    }
+  }
+  if (response.structuredContent === undefined) {
+    return {
+      ...response,
+      content: appendWarningContent(response.content, warnings, false)
+    }
+  }
+  const existingWarnings = response.structuredContent.warnings ?? []
+  const combinedWarnings = [...existingWarnings, ...warnings]
+  return {
+    ...response,
+    content: appendWarningContent(response.content, combinedWarnings, existingWarnings.length > 0),
+    structuredContent: {
+      result: response.structuredContent.result,
+      warnings: combinedWarnings
+    }
+  }
+}
+
 export const createUnknownToolError = (toolName: string): McpErrorResponseWithMeta =>
   createErrorResponse(`Unknown tool: ${toolName}`, McpErrorCode.InvalidParams, "UnknownTool")
 

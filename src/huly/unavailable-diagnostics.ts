@@ -1,5 +1,7 @@
 import { Schema } from "effect"
 
+import { HostedHulyShutdownWarningCode, ToolWarningSchema } from "../domain/schemas/tool-warnings.js"
+
 /** Safe, agent-facing diagnostics for an unavailable Huly endpoint. */
 const DEFAULT_HULY_CLOUD_ORIGIN = "https://huly.app"
 
@@ -15,6 +17,11 @@ export const HOSTED_HULY_MIGRATION_LINKS =
 
 export const HOSTED_HULY_MIGRATION_INSTRUCTIONS =
   `Important: Hosted Huly is shutting down. Huly's upstream README says the hosted service is being discontinued because hosting is no longer funded, with shutdown expected ${HOSTED_HULY_SUNSET.expectedShutdown}. If this MCP uses ${DEFAULT_HULY_CLOUD_ORIGIN}, export and back up important data and migrate as soon as possible. ${HOSTED_HULY_MIGRATION_LINKS} Self-hosted deployments are not affected.`
+
+export const HOSTED_HULY_MIGRATION_WARNING = Schema.decodeUnknownSync(ToolWarningSchema)({
+  code: HostedHulyShutdownWarningCode,
+  message: HOSTED_HULY_MIGRATION_INSTRUCTIONS
+})
 
 export const HulyEndpointOriginSchema = Schema.String.pipe(
   Schema.filter((value) => {
