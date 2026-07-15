@@ -35,9 +35,11 @@ args: ["-y", "@firfi/huly-mcp@latest"]
 Configure the MCP server with the name "huly".
 
 Ask me for:
-- HULY_URL, for example https://huly.app
+- HULY_URL for a reachable self-hosted or replacement hosted Huly instance
 - HULY_WORKSPACE
 - Either HULY_TOKEN, or HULY_EMAIL and HULY_PASSWORD
+
+Warn me that hosted Huly at https://huly.app is shutting down, link the migration announcement at https://github.com/hcengineering/platform/blob/develop/README.md, and do not configure that hosted URL for a new installation.
 
 Do not write Huly credentials into project files. Prefer user-level MCP configuration when credentials are involved, and do not expose secrets in chat, logs, or summaries.
 

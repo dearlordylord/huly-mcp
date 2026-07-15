@@ -525,6 +525,10 @@ describe("Error Mapping to MCP", () => {
           expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
           expect(response._meta.errorTag).toBe("HulyUnavailableError")
           expect(assertAt(response.content, 0).text).toContain("shutdown expected July 20")
+          expect(assertAt(response.content, 0).text).toContain(
+            "https://github.com/hcengineering/platform/blob/develop/docs/guides/backup-restore.en.md"
+          )
+          expect(assertAt(response.content, 0).text).toContain("https://github.com/hcengineering/huly-selfhost")
           expect(assertAt(response.content, 0).text).toContain("HULY_URL")
           expect(JSON.stringify(response)).not.toContain("ECONNREFUSED")
         }))

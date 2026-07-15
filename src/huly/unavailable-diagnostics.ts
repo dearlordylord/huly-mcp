@@ -4,9 +4,17 @@ import { Schema } from "effect"
 const DEFAULT_HULY_CLOUD_ORIGIN = "https://huly.app"
 
 export const HOSTED_HULY_SUNSET = {
-  sourceUrl: "https://github.com/hcengineering/huly",
+  sourceUrl: "https://github.com/hcengineering/platform/blob/develop/README.md",
+  backupRestoreUrl: "https://github.com/hcengineering/platform/blob/develop/docs/guides/backup-restore.en.md",
+  selfHostingUrl: "https://github.com/hcengineering/huly-selfhost",
   expectedShutdown: "July 20"
 } as const
+
+export const HOSTED_HULY_MIGRATION_LINKS =
+  `Announcement: ${HOSTED_HULY_SUNSET.sourceUrl}. Backup and restore guide: ${HOSTED_HULY_SUNSET.backupRestoreUrl}. Self-hosting: ${HOSTED_HULY_SUNSET.selfHostingUrl}.`
+
+export const HOSTED_HULY_MIGRATION_INSTRUCTIONS =
+  `Important: Hosted Huly is shutting down. Huly's upstream README says the hosted service is being discontinued because hosting is no longer funded, with shutdown expected ${HOSTED_HULY_SUNSET.expectedShutdown}. If this MCP uses ${DEFAULT_HULY_CLOUD_ORIGIN}, export and back up important data and migrate as soon as possible. ${HOSTED_HULY_MIGRATION_LINKS} Self-hosted deployments are not affected.`
 
 export const HulyEndpointOriginSchema = Schema.String.pipe(
   Schema.filter((value) => {

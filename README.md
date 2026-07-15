@@ -10,6 +10,9 @@
 
 **Huly MCP** is a feature-complete MCP server for [Huly](https://huly.io/) integration. Published on npm as [`@firfi/huly-mcp`](https://www.npmjs.com/package/@firfi/huly-mcp).
 
+> [!IMPORTANT]
+> **Hosted Huly is shutting down.** Huly's upstream README says shutdown is expected July 20. If you use `https://huly.app`, [export and migrate your data](https://github.com/hcengineering/platform/blob/develop/README.md) as soon as possible. See the [backup and restore guide](https://github.com/hcengineering/platform/blob/develop/docs/guides/backup-restore.en.md) and [self-hosting repository](https://github.com/hcengineering/huly-selfhost). Self-hosted deployments are not affected.
+
 ## Installation
 
 The standard configuration works with most MCP clients:
@@ -21,7 +24,7 @@ The standard configuration works with most MCP clients:
       "command": "npx",
       "args": ["-y", "@firfi/huly-mcp@latest"],
       "env": {
-        "HULY_URL": "https://huly.app",
+        "HULY_URL": "https://your-huly-instance.example.com",
         "HULY_EMAIL": "your@email.com",
         "HULY_PASSWORD": "yourpassword",
         "HULY_WORKSPACE": "yourworkspace"
@@ -44,7 +47,7 @@ Use Codex's MCP manager:
 
 ```bash
 codex mcp add huly \
-  --env HULY_URL=https://huly.app \
+  --env HULY_URL=https://your-huly-instance.example.com \
   --env HULY_EMAIL=your@email.com \
   --env HULY_PASSWORD=yourpassword \
   --env HULY_WORKSPACE=yourworkspace \
@@ -59,7 +62,7 @@ command = "npx"
 args = ["-y", "@firfi/huly-mcp@latest"]
 
 [mcp_servers.huly.env]
-HULY_URL = "https://huly.app"
+HULY_URL = "https://your-huly-instance.example.com"
 HULY_EMAIL = "your@email.com"
 HULY_PASSWORD = "yourpassword"
 HULY_WORKSPACE = "yourworkspace"
@@ -72,7 +75,7 @@ HULY_WORKSPACE = "yourworkspace"
 
 ```bash
 claude mcp add huly \
-  -e HULY_URL=https://huly.app \
+  -e HULY_URL=https://your-huly-instance.example.com \
   -e HULY_EMAIL=your@email.com \
   -e HULY_PASSWORD=yourpassword \
   -e HULY_WORKSPACE=yourworkspace \
@@ -105,7 +108,7 @@ Add with Command Palette → "MCP: Add Server", or put this in a VS Code MCP con
       "command": "npx",
       "args": ["-y", "@firfi/huly-mcp@latest"],
       "env": {
-        "HULY_URL": "https://huly.app",
+        "HULY_URL": "https://your-huly-instance.example.com",
         "HULY_EMAIL": "your@email.com",
         "HULY_PASSWORD": "yourpassword",
         "HULY_WORKSPACE": "yourworkspace"
@@ -143,7 +146,7 @@ Open the global configuration file (`~/.config/opencode/opencode.json`) and merg
       "type": "local",
       "command": ["npx", "-y", "@firfi/huly-mcp@latest"],
       "environment": {
-        "HULY_URL": "https://huly.app",
+        "HULY_URL": "https://your-huly-instance.example.com",
         "HULY_EMAIL": "your@email.com",
         "HULY_PASSWORD": "yourpassword",
         "HULY_WORKSPACE": "yourworkspace"
@@ -173,7 +176,7 @@ The `@latest` tag asks the package runner for the newest version. Some MCP clien
 By default, the server uses stdio transport. For HTTP transport (Streamable HTTP):
 
 ```bash
-HULY_URL=https://huly.app \
+HULY_URL=https://your-huly-instance.example.com \
 HULY_EMAIL=your@email.com \
 HULY_PASSWORD=yourpassword \
 HULY_WORKSPACE=yourworkspace \
@@ -235,7 +238,7 @@ For a Smithery publish schema example, see [docs/SMITHERY_URL_PUBLISH.md](docs/S
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `HULY_URL` | Yes | Huly instance URL |
+| `HULY_URL` | Yes | Reachable self-hosted or replacement hosted Huly instance URL |
 | `HULY_EMAIL` | Auth* | Account email |
 | `HULY_PASSWORD` | Auth* | Account password |
 | `HULY_TOKEN` | Auth* | API token (alternative to email/password) |

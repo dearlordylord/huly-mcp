@@ -21,8 +21,10 @@ huly --help
 
 The CLI reads the same Huly environment variables as the MCP server:
 
+> **Hosted Huly is shutting down.** If you use `https://huly.app`, follow Huly's [migration announcement](https://github.com/hcengineering/platform/blob/develop/README.md), [backup and restore guide](https://github.com/hcengineering/platform/blob/develop/docs/guides/backup-restore.en.md), and [self-hosting instructions](https://github.com/hcengineering/huly-selfhost). Self-hosted deployments are not affected.
+
 ```bash
-export HULY_URL=https://huly.app
+export HULY_URL=https://your-huly-instance.example.com
 export HULY_WORKSPACE=yourworkspace
 export HULY_EMAIL=your@email.com
 export HULY_PASSWORD=yourpassword

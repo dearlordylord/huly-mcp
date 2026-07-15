@@ -13,6 +13,7 @@ import { type GetHulyContextResult, GetHulyContextResultSchema } from "../domain
 import type { HulyClient } from "../huly/client.js"
 import { HulyError } from "../huly/errors-base.js"
 import type { HulyStorageClient } from "../huly/storage.js"
+import { HOSTED_HULY_MIGRATION_INSTRUCTIONS } from "../huly/unavailable-diagnostics.js"
 import type { WorkspaceClientOperations } from "../huly/workspace-client.js"
 import type { TelemetryOperations } from "../telemetry/telemetry.js"
 import { VERSION } from "../version.js"
@@ -91,18 +92,20 @@ export interface McpProtocolHandlers {
   readonly drainInflight: () => Promise<void>
 }
 
-interface ServerDiscoverResult {
-  readonly resultType: "complete"
-  readonly supportedVersions: readonly ["2026-07-28"]
-  readonly capabilities: {
-    readonly tools: Record<string, never>
-    readonly resources: Record<string, never>
-  }
-  readonly serverInfo: {
-    readonly name: "huly-mcp"
-    readonly version: string
-  }
-}
+const ServerDiscoverResultSchema = Schema.Struct({
+  resultType: Schema.Literal("complete"),
+  supportedVersions: Schema.Tuple(Schema.Literal("2026-07-28")),
+  capabilities: Schema.Struct({
+    tools: Schema.Struct({}),
+    resources: Schema.Struct({})
+  }),
+  serverInfo: Schema.Struct({
+    name: Schema.Literal("huly-mcp"),
+    version: Schema.String
+  }),
+  instructions: Schema.String
+})
+type ServerDiscoverResult = Schema.Schema.Type<typeof ServerDiscoverResultSchema>
 
 const DRAIN_POLL_MS = 50
 const DRAIN_TIMEOUT_MS = 30_000
@@ -125,6 +128,9 @@ const validateHulyContextResult = (value: unknown): GetHulyContextResult =>
 
 const validateVersionToolResult = (value: unknown): Schema.Schema.Type<typeof VersionToolResultSchema> =>
   Schema.decodeUnknownSync(VersionToolResultSchema)(value)
+
+const parseServerDiscoverResult = (value: unknown): ServerDiscoverResult =>
+  Schema.decodeUnknownSync(ServerDiscoverResultSchema)(value)
 
 /**
  * Injected wall-clock reader for telemetry timing and the drain-timeout loop. The live
@@ -404,12 +410,14 @@ export const createMcpProtocolHandlers = (
     listResources: resourceHandlers.listResources,
     listResourceTemplates,
     readResource: resourceHandlers.readResource,
-    serverDiscover: () => ({
-      resultType: "complete",
-      supportedVersions: ["2026-07-28"],
-      capabilities: { tools: {}, resources: {} },
-      serverInfo: { name: "huly-mcp", version: VERSION }
-    }),
+    serverDiscover: () =>
+      parseServerDiscoverResult({
+        resultType: "complete",
+        supportedVersions: ["2026-07-28"],
+        capabilities: { tools: {}, resources: {} },
+        serverInfo: { name: "huly-mcp", version: VERSION },
+        instructions: HOSTED_HULY_MIGRATION_INSTRUCTIONS
+      }),
     drainInflight
   }
 }

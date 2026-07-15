@@ -160,7 +160,8 @@ describe("createMcpProtocolHandlers", () => {
         resultType: "complete",
         supportedVersions: ["2026-07-28"],
         capabilities: { tools: {}, resources: {} },
-        serverInfo: { name: "huly-mcp", version: VERSION }
+        serverInfo: { name: "huly-mcp", version: VERSION },
+        instructions: expect.stringContaining("Hosted Huly is shutting down")
       })
     })
   })

@@ -12,7 +12,7 @@ startCommand:
       hulyUrl:
         type: string
         title: Huly URL
-        description: Base URL for the Huly instance, such as https://huly.app.
+        description: Reachable base URL for a self-hosted or replacement hosted Huly instance.
       hulyWorkspace:
         type: string
         title: Workspace
@@ -58,6 +58,6 @@ startCommand:
       }
     }
   exampleConfig:
-    hulyUrl: https://huly.app
+    hulyUrl: https://your-huly-instance.example.com
     hulyWorkspace: workspace-slug
     hulyToken: huly-token

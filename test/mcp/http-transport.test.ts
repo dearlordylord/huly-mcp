@@ -15,6 +15,7 @@ import { Effect, Exit, Layer } from "effect"
 import type { Express, Request, Response } from "express"
 import { describe, expect, it } from "vitest"
 
+import { HOSTED_HULY_MIGRATION_INSTRUCTIONS } from "../../src/huly/unavailable-diagnostics.js"
 import { shouldDispatchMcp2026Request } from "../../src/mcp/http-2026-dispatcher.js"
 import {
   createMcpHandlers,
@@ -215,7 +216,8 @@ const createMockProtocolHandlers = (): McpProtocolHandlers => ({
     resultType: "complete",
     supportedVersions: ["2026-07-28"],
     capabilities: { tools: {}, resources: {} },
-    serverInfo: { name: "huly-mcp", version: "0.0.0-test" }
+    serverInfo: { name: "huly-mcp", version: "0.0.0-test" },
+    instructions: HOSTED_HULY_MIGRATION_INSTRUCTIONS
   }),
   drainInflight: () => Promise.resolve()
 })
@@ -298,7 +300,8 @@ describe("HTTP Transport", () => {
             resultType: "complete",
             supportedVersions: ["2026-07-28"],
             capabilities: { tools: {}, resources: {} },
-            serverInfo: { name: "huly-mcp", version: "0.0.0-test" }
+            serverInfo: { name: "huly-mcp", version: "0.0.0-test" },
+            instructions: expect.stringContaining("Hosted Huly is shutting down")
           }
         }
       ]])

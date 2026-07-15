@@ -5,7 +5,7 @@
     "hulyUrl": {
       "type": "string",
       "title": "Huly URL",
-      "description": "Base URL for the Huly instance, such as https://huly.app.",
+      "description": "Reachable base URL for a self-hosted or replacement hosted Huly instance.",
       "x-from": {
         "header": "x-huly-url"
       }

@@ -29,7 +29,7 @@
       "environmentVariables": [
         {
           "name": "HULY_URL",
-          "description": "Huly API URL (e.g., https://huly.app)",
+          "description": "Reachable self-hosted or replacement hosted Huly API URL",
           "isRequired": true,
           "format": "string",
           "isSecret": false
