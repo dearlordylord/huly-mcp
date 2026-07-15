@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.44.7
+
+### Patch Changes
+
+- 20aea4a: Show hosted Huly shutdown instructions only when the effective MCP configuration targets `https://huly.app`. Self-hosted deployments no longer receive the announcement during initialization, discovery, or tool calls, while affected stdio and HTTP clients continue to receive it.
+
 ## 0.44.6
 
 ### Patch Changes
