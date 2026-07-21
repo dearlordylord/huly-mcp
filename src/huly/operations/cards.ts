@@ -102,7 +102,7 @@ const findCardSpace = (
     return { cardSpace, client }
   })
 
-const findCardSpaceAndCard = (
+export const findCardSpaceAndCard = (
   params: { card: string; cardSpace: string }
 ): Effect.Effect<
   { card: HulyCard; cardSpace: HulyCardSpace; client: HulyClient["Type"] },

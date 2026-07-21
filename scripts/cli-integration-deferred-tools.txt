@@ -5,6 +5,7 @@
 add_activity_reply
 add_approval_request_comment
 add_board_card_label
+add_card_comment
 add_channel_members
 add_document_attachment
 add_drive_file_comment
@@ -67,6 +68,7 @@ delete_activity_reply
 delete_board_card
 delete_board_label
 delete_card
+delete_card_comment
 delete_channel
 delete_chat_message_attachment
 delete_component
@@ -178,6 +180,7 @@ list_board_labels
 list_board_menu_pages
 list_board_saved_views
 list_board_viewlets
+list_card_comments
 list_cards
 list_channel_members
 list_channel_messages
@@ -315,6 +318,7 @@ update_board
 update_board_card
 update_board_label
 update_card
+update_card_comment
 update_channel
 update_chat_message_attachment
 update_component

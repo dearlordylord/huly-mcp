@@ -106,7 +106,7 @@ export const issueTools = [
       description:
         `Query Huly issues with optional filters. Returns issues sorted by modification date (newest first). Supports filtering by project, exact workflow status name (status), Huly SDK task.statusCategory key (statusCategory: ${
           enumValuesDescription(StatusCategoryValues)
-        }), assignee, component, and parentIssue (to list children of a specific issue). Supports searching by title substring (titleSearch) and description content (descriptionSearch).`,
+        }), assignee, component, label (attached tag title), and parentIssue (to list children of a specific issue). Supports searching by title substring (titleSearch) and description content (descriptionSearch).`,
       category: CATEGORY,
       inputSchema: listIssuesParamsJsonSchema,
       resultSchema: ListIssuesResultSchema

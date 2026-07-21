@@ -443,6 +443,31 @@ describe("listActivity", () => {
       })
     }))
 
+  it.effect("tolerates null isPinned and null counts from the CockroachDB backend", () =>
+    Effect.gen(function*() {
+      // Huly's CockroachDB backend returns null (not undefined) for unset
+      // optional columns; the mapper must omit them instead of failing the
+      // output schema (isPinned: null previously broke list_activity).
+      /* eslint-disable no-restricted-syntax -- simulate CockroachDB null runtime values that the SDK types as optional */
+      const msg = makeActivityMessage({
+        _id: "msg-null" as Ref<HulyActivityMessage>,
+        isPinned: null as unknown as boolean,
+        replies: null as unknown as number,
+        reactions: null as unknown as number
+      })
+      /* eslint-enable no-restricted-syntax */
+      const testLayer = createTestLayerWithMocks({ activityMessages: [msg] })
+
+      const result = yield* listActivity({
+        objectId: docId("obj-1"),
+        objectClass: objectClassName("tracker:class:Issue")
+      }).pipe(Effect.provide(testLayer))
+
+      expect(assertAt(result, 0).isPinned).toBeUndefined()
+      expect(assertAt(result, 0).replies).toBeUndefined()
+      expect(assertAt(result, 0).reactions).toBeUndefined()
+    }))
+
   it.effect("omits reply and reaction counts when absent on the message", () =>
     Effect.gen(function*() {
       // A bare message (no replies/reactions/editedOn) exercises the undefined

@@ -168,6 +168,9 @@ const ListIssuesParamsBase = Schema.Struct({
   component: Schema.optional(ComponentIdentifier.annotations({
     description: "Filter by component ID or label"
   })),
+  label: Schema.optional(NonEmptyString.annotations({
+    description: "Filter by attached label/tag title (case-insensitive exact match), e.g. 'bug'."
+  })),
   hasAssignee: Schema.optional(Schema.Boolean.annotations({
     description: "Filter by assignee presence. true = only assigned issues, false = only unassigned issues."
   })),

@@ -22,6 +22,7 @@ import {
 } from "@hcengineering/tracker"
 import { Effect } from "effect"
 import { expect } from "vitest"
+import { NonEmptyString } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import type {
   InvalidStatusError,
@@ -236,7 +237,10 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       }
       // Apply sorting if specified in options
       const opts = options as { sort?: Record<string, number>; lookup?: Record<string, unknown> } | undefined
-      let result = [...issues]
+      const idQuery = (query as Record<string, unknown>)._id as { $in?: Array<Ref<HulyIssue>> } | undefined
+      let result = idQuery?.$in === undefined
+        ? [...issues]
+        : issues.filter(issue => idQuery.$in?.includes(issue._id))
       if (opts?.sort?.modifiedOn !== undefined) {
         // SortingOrder.Descending = -1, Ascending = 1
         const direction = opts.sort.modifiedOn
@@ -286,10 +290,21 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     }
     if (_class === tags.class.TagReference) {
       const q = query as Record<string, unknown>
-      // Filter by attachedTo (issue id)
+      const titleQuery = q.title
+      const titleMatches = (tr: TagReference): boolean => {
+        if (titleQuery === undefined) return true
+        if (typeof titleQuery === "string") return tr.title === titleQuery
+        const like = (titleQuery as { $like?: string }).$like
+        if (like === undefined) return true
+        const pattern = like
+          .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+          .replace(/%/g, ".*")
+        return new RegExp(`^${pattern}$`, "i").test(tr.title)
+      }
       const filtered = tagReferences.filter(tr =>
-        tr.attachedTo === q.attachedTo
-        && tr.attachedToClass === q.attachedToClass
+        (q.attachedTo === undefined || tr.attachedTo === q.attachedTo)
+        && (q.attachedToClass === undefined || tr.attachedToClass === q.attachedToClass)
+        && titleMatches(tr)
       )
       return Effect.succeed(toFindResult(filtered))
     }
@@ -614,6 +629,43 @@ describe("listIssues", () => {
       }))
   })
 
+  describe("label filtering", () => {
+    it.effect("returns only issues carrying the label (case-insensitive)", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST" })
+        const issues = [
+          makeIssue({ identifier: "TEST-1", number: 1 }),
+          makeIssue({ _id: "issue-2" as Ref<HulyIssue>, identifier: "TEST-2", number: 2 })
+        ]
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+        const tagReferences = [makeTagReference({ attachedTo: "issue-1" as Ref<Doc>, title: "Bug" })]
+
+        const testLayer = createTestLayerWithMocks({ projects: [project], issues, statuses, tagReferences })
+
+        const result = yield* listIssues({ project: projectIdentifier("TEST"), label: NonEmptyString.make("bug") })
+          .pipe(Effect.provide(testLayer), withDiagnostics)
+
+        expect(result).toHaveLength(1)
+        expect(assertAt(result, 0).identifier).toBe("TEST-1")
+      }))
+
+    it.effect("returns empty when no issue carries the label", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST" })
+        const issues = [makeIssue({ identifier: "TEST-1", number: 1 })]
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+
+        const testLayer = createTestLayerWithMocks({ projects: [project], issues, statuses })
+
+        const result = yield* listIssues({
+          project: projectIdentifier("TEST"),
+          label: NonEmptyString.make("nonexistent")
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+        expect(result).toHaveLength(0)
+      }))
+  })
+
   describe("status filtering", () => {
     it.effect("filters by exact status name (case insensitive)", () =>
       Effect.gen(function*() {
@@ -826,6 +878,55 @@ describe("listIssues", () => {
 
 describe("getIssue", () => {
   describe("basic functionality", () => {
+    it.effect("returns labels attached to the issue", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", number: 1 })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+        const tagReferences = [
+          makeTagReference({ title: "Bug", color: 2 }),
+          makeTagReference({
+            _id: "tag-ref-2" as Ref<TagReference>,
+            title: "HUMAN-REQUIRED",
+            // eslint-disable-next-line no-restricted-syntax -- simulate CockroachDB null runtime value for unset optional column
+            color: null as unknown as number
+          })
+        ]
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          tagReferences
+        })
+
+        const result = yield* getIssue({ project: projectIdentifier("TEST"), identifier: issueIdentifier("TEST-1") })
+          .pipe(Effect.provide(testLayer), withDiagnostics)
+
+        expect(result.labels).toEqual([
+          { title: "Bug", color: 2 },
+          { title: "HUMAN-REQUIRED" }
+        ])
+      }))
+
+    it.effect("omits labels when the issue has none", () =>
+      Effect.gen(function*() {
+        const project = makeProject({ identifier: "TEST" })
+        const issue = makeIssue({ identifier: "TEST-1", number: 1 })
+        const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses
+        })
+
+        const result = yield* getIssue({ project: projectIdentifier("TEST"), identifier: issueIdentifier("TEST-1") })
+          .pipe(Effect.provide(testLayer), withDiagnostics)
+
+        expect(result.labels).toBeUndefined()
+      }))
+
     it.effect("returns issue with full identifier", () =>
       Effect.gen(function*() {
         const project = makeProject({ identifier: "TEST" })

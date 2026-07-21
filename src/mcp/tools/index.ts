@@ -7,6 +7,7 @@ import { approvalRequestTools } from "./approval-requests.js"
 import { attachmentTools } from "./attachments.js"
 import { boardTools } from "./boards.js"
 import { calendarTools } from "./calendar.js"
+import { cardCommentTools } from "./card-comments.js"
 import { cardTools } from "./cards.js"
 import { channelTools } from "./channels.js"
 import { collaboratorTools } from "./collaborators.js"
@@ -85,6 +86,7 @@ export const allTools = [
   ...boardTools,
   ...viewTools,
   ...cardTools,
+  ...cardCommentTools,
   ...leadTools,
   ...recruitingTools,
   ...customFieldTools,

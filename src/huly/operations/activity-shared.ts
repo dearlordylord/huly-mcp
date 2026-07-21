@@ -13,8 +13,10 @@ import { toRef } from "./sdk-boundary.js"
 const optionalNullableTimestamp = (value: number | null | undefined): Timestamp | null | undefined =>
   value === undefined || value === null ? value : Timestamp.make(value)
 
-const optionalActivityCount = (value: number | undefined): ActivityCount | undefined =>
-  value === undefined ? undefined : ActivityCount.make(value)
+// Huly's CockroachDB backend returns null (not undefined) for unset optional
+// columns, so runtime values can be null despite the SDK's `?: number` typing.
+const optionalActivityCount = (value: number | null | undefined): ActivityCount | undefined =>
+  value === undefined || value === null ? undefined : ActivityCount.make(value)
 
 const optionalStringProperty = (value: object, key: string): string | undefined => {
   const raw = Reflect.get(value, key)
@@ -51,7 +53,7 @@ export const toActivityMessage = (
     objectClass: ObjectClassName.make(msg.attachedToClass),
     modifiedBy: PersonId.make(msg.modifiedBy),
     modifiedOn: Timestamp.make(msg.modifiedOn),
-    ...(msg.isPinned === undefined ? {} : { isPinned: msg.isPinned }),
+    ...(typeof msg.isPinned === "boolean" ? { isPinned: msg.isPinned } : {}),
     ...(replies === undefined ? {} : { replies }),
     ...(reactions === undefined ? {} : { reactions }),
     ...(editedOn === undefined ? {} : { editedOn }),

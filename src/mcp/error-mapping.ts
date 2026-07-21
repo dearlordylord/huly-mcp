@@ -269,6 +269,7 @@ const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDo
   "DriveFileNotFoundError",
   "DriveFileCommentNotFoundError",
   "DriveFileVersionNotFoundError",
+  "CardCommentNotFoundError",
   "DrivePathConflictError",
   "DriveInvalidMoveError",
   "DriveInvalidItemOperationError",

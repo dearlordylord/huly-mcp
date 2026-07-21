@@ -167,6 +167,11 @@ export const businessReadOnlyCliCommandCatalogA = {
     positional: [],
     description: "List Calendars"
   },
+  list_card_comments: {
+    path: ["cards", "comments", "list"],
+    positional: ["cardSpace", "card"],
+    description: "List Card Comments"
+  },
   list_card_spaces: {
     path: ["cards", "spaces", "list"],
     positional: [],

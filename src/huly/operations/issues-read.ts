@@ -5,6 +5,7 @@
  */
 import type { Person } from "@hcengineering/contact"
 import { type Ref, SortingOrder, type Status, type WithLookup } from "@hcengineering/core"
+import type { TagReference } from "@hcengineering/tags"
 import { type Issue as HulyIssue } from "@hcengineering/tracker"
 import { Effect, Schema } from "effect"
 
@@ -21,7 +22,7 @@ import type { HulyClient, HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
 import type { ComponentNotFoundError, InvalidStatusError, ProjectNotFoundError } from "../errors.js"
 import { HulyConnectionError, IssueNotFoundError } from "../errors.js"
-import { contact, tracker } from "../huly-plugins.js"
+import { contact, tags, tracker } from "../huly-plugins.js"
 import { findComponentByIdOrLabel } from "./components.js"
 import { findPersonByEmailOrName } from "./contacts-shared.js"
 import {
@@ -33,6 +34,7 @@ import {
   type WorkflowStatus
 } from "./issues-shared.js"
 import { clampLimit, escapeLikeWildcards, hulyQuery, type StrictDocumentQuery, withLookup } from "./query-helpers.js"
+import { toRef } from "./sdk-boundary.js"
 
 type ListIssuesError =
   | HulyClientError
@@ -147,6 +149,22 @@ export const listIssues = (
       } else {
         return []
       }
+    }
+
+    if (params.label !== undefined) {
+      // TagReference rows are workspace-wide; the space filter in `query`
+      // narrows the resulting id set back down to this project.
+      const tagRefs = yield* client.findAll<TagReference>(
+        tags.class.TagReference,
+        hulyQuery<TagReference>({
+          attachedToClass: tracker.class.Issue,
+          title: { $like: escapeLikeWildcards(params.label.trim()) }
+        })
+      )
+      if (tagRefs.length === 0) {
+        return []
+      }
+      query._id = { $in: tagRefs.map((ref) => toRef<HulyIssue>(ref.attachedTo)) }
     }
 
     if (params.hasAssignee === true) {
@@ -271,6 +289,18 @@ export const getIssue = (
       ? issue.parents[issue.parents.length - 1]
       : undefined
 
+    const tagRefs = yield* client.findAll<TagReference>(
+      tags.class.TagReference,
+      hulyQuery<TagReference>({
+        attachedTo: issue._id,
+        attachedToClass: tracker.class.Issue
+      })
+    )
+    const labels = tagRefs.map((ref) => ({
+      title: ref.title,
+      ...(typeof ref.color === "number" ? { color: ref.color } : {})
+    }))
+
     return yield* parseIssue({
       issueId: IssueId.make(issue._id),
       identifier: issue.identifier,
@@ -282,6 +312,7 @@ export const getIssue = (
       assigneeRef: person
         ? { id: person._id, name: person.name }
         : undefined,
+      ...(labels.length > 0 ? { labels } : {}),
       project: params.project,
       parentIssue: directParent?.identifier,
       subIssues: issue.subIssues > 0 ? issue.subIssues : undefined,

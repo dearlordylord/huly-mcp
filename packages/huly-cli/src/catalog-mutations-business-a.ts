@@ -2,6 +2,14 @@ import type { McpToolName } from "../../../src/mcp/tools/index.js"
 import type { CliCommandSpec } from "./catalog-types.js"
 
 export const businessMutationCliCommandCatalogA = {
+  add_card_comment: {
+    path: ["cards", "comments", "add"],
+    positional: ["cardSpace", "card", "body"],
+    description: "Add Card Comment",
+    behavior: {
+      fileInput: { fields: ["body"] }
+    }
+  },
   add_drive_file_comment: {
     path: ["drive", "files", "comments", "add"],
     positional: ["drive", "body"],
@@ -180,6 +188,17 @@ export const businessMutationCliCommandCatalogA = {
       confirmation: {
         type: "requires-yes",
         message: "drive delete requires --yes."
+      }
+    }
+  },
+  delete_card_comment: {
+    path: ["cards", "comments", "delete"],
+    positional: ["cardSpace", "card", "commentId"],
+    description: "Delete Card Comment",
+    behavior: {
+      confirmation: {
+        type: "requires-yes",
+        message: "cards comments delete requires --yes."
       }
     }
   },

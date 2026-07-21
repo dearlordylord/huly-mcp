@@ -30,7 +30,12 @@ import {
   RecurringEventNotFoundError,
   ScheduleNotFoundError
 } from "./errors-calendar.js"
-import { CardNotFoundError, CardSpaceNotFoundError, MasterTagNotFoundError } from "./errors-cards.js"
+import {
+  CardCommentNotFoundError,
+  CardNotFoundError,
+  CardSpaceNotFoundError,
+  MasterTagNotFoundError
+} from "./errors-cards.js"
 import {
   ContactChannelConflictError,
   ContactChannelIdentifierAmbiguousError,
@@ -301,6 +306,7 @@ export const HulyDomainError = Schema.Union(
   DrawingNotFoundError,
   CardSpaceNotFoundError,
   CardNotFoundError,
+  CardCommentNotFoundError,
   MasterTagNotFoundError,
   TagNotFoundError,
   TagCategoryNotFoundError,

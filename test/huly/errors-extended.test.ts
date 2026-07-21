@@ -18,6 +18,7 @@ import {
   AssociationIdentifierAmbiguousError,
   AssociationInUseError,
   AssociationSystemClassUnsupportedError,
+  CardCommentNotFoundError,
   CardNotFoundError,
   CardSpaceNotFoundError,
   CustomFieldNotFoundError,
@@ -97,6 +98,11 @@ describe("Extended Huly error message getters", () => {
         error: new MasterTagNotFoundError({ identifier: "Bug", cardSpace: "my-space" }),
         tag: "MasterTagNotFoundError",
         message: "Master tag 'Bug' not found in card space 'my-space'"
+      },
+      {
+        error: new CardCommentNotFoundError({ commentId: "c-1", card: "CARD-1", cardSpace: "my-space" }),
+        tag: "CardCommentNotFoundError",
+        message: "Comment 'c-1' not found on card 'CARD-1' in card space 'my-space'"
       }
     ]))
 
