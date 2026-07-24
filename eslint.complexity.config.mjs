@@ -18,6 +18,6 @@ export default [{
     functional
   },
   rules: {
-    complexity: ["error", { max: 31, variant: "classic" }]
+    complexity: ["error", { max: 8, variant: "classic" }]
   }
 }]

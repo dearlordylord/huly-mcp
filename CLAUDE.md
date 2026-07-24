@@ -14,7 +14,7 @@ When setting up a new project from this one, ALL of these components must be cop
 1. **Test coverage** (`vitest.config.ts`): v8 provider, 99% thresholds, `test:coverage` script. Requires `@vitest/coverage-v8` dev dep.
 2. **Code duplication** (`.jscpd.json` + `jscpd src` in lint script): threshold 2%, console reporter.
 3. **Circular dependency detection** (`madge --circular` in `circular` script, wired into `check-all`): catches import cycles.
-4. **Cyclomatic complexity** (`eslint.complexity.config.mjs` + `complexity` script, wired into `check-all`): classic McCabe complexity capped for production TypeScript.
+4. **Cyclomatic complexity** (`eslint.complexity.config.mjs` + `eslint-complexity-suppressions.json` + `complexity` script, wired into `check-all`): classic McCabe complexity capped at 8 for production TypeScript. Existing violations are tracked as removable bulk suppressions; run `pnpm complexity:prune` after reducing them.
 5. **Pre-commit hooks** (`.husky/pre-commit`): lint-staged + gitleaks secrets scanning.
 6. **check-all** (`pnpm check-all`): build + typecheck + circular + complexity + lint (eslint + jscpd) + test. Gate for all work.
 7. **Effect testing** (`@effect/vitest`): Effect-aware test runner integration.

@@ -16,15 +16,27 @@ The implemented gate uses a dedicated config so `pnpm complexity` is a visible, 
   files: ["src/**/*.ts", "packages/**/src/**/*.ts"],
   ignores: ["**/*.test.ts", "**/*.spec.ts"],
   rules: {
-    complexity: ["error", { max: 31, variant: "classic" }]
+    complexity: ["error", { max: 8, variant: "classic" }]
   }
 }
 ```
 
-The current maximum is 31, so the gate starts at 31 without suppressions, a baseline allowlist, or runtime changes
-made solely to satisfy the metric. This is a green adoption threshold, not the desired end state: the initial scan
-found 7 production functions above 20 and 36 functions above 10 (one of the 36 is a colocated test). Ratchet the cap
-to ESLint's default of 20 after those seven production functions are split along coherent boundaries.
+The cap is 8, matching `crap4java`'s threshold when function coverage is 100% because CRAP then equals cyclomatic
+complexity. The adoption scan found 64 existing violations across 46 production files, with a maximum of 31. Those
+violations are recorded in `eslint-complexity-suppressions.json` using ESLint's bulk-suppression mechanism. The
+complexity scripts pass that dedicated location explicitly so the baseline cannot affect ordinary ESLint runs. New
+violations fail `pnpm complexity`; reducing the number of violations makes the check fail on stale suppressions
+until `pnpm complexity:prune` removes them. This establishes 8 as the enforced target without requiring a risky
+cross-cutting refactor of 46 files in the harness change.
+([ESLint bulk suppressions](https://eslint.org/docs/latest/use/suppressions))
+
+Bulk suppressions are counts per rule and file, not permanent exemptions for named functions. This makes the debt
+visible and monotonically removable at file granularity. It also means replacing one suppressed violation with
+another in the same file without changing the count is not distinguishable by ESLint; reviews should reject that
+kind of complexity transfer.
+
+The removal work is tracked in
+[GitHub issue #161](https://github.com/dearlordylord/huly-mcp/issues/161).
 
 ESLint defines the metric as the number of linearly independent paths, supports explicit `classic` and `modified`
 variants, defaults to classic with a maximum of 20, and counts modern JavaScript branching constructs such as
@@ -45,7 +57,7 @@ exceeds `8.0`. That single-command, stale-artifact-safe workflow is the useful d
 implementation cannot be reused directly.
 ([crap4java README](https://github.com/unclebob/crap4java#readme))
 
-For this repository, CRAP is a possible later complementary gate, not a replacement for the structural cap. At 100%
+For this repository, CRAP remains a possible complementary gate, not a replacement for the structural cap. At 100%
 function coverage CRAP equals cyclomatic complexity, but the repository's 99% aggregate coverage does not guarantee
 that every complex function is well covered. A CRAP gate would therefore add a distinct per-function risk signal
 once a compatible, maintainable implementation is available.

@@ -1,0 +1,232 @@
+{
+  "packages/huly-cli/src/input.ts": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "packages/huly-cli/src/schema-fields.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/domain/schemas/documents.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/domain/schemas/issues.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/activity-shared.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/approval-request-writes.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/boards-card-update.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/calendar-recurring.ts": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "src/huly/operations/calendar-schedules.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/calendar-shared.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/calendar.ts": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "src/huly/operations/chat-contexts.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/custom-fields.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/deletion.ts": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "src/huly/operations/documents-edit.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/drive-file-operations.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/drive.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/generic-associations.ts": {
+    "complexity": {
+      "count": 5
+    }
+  },
+  "src/huly/operations/inventory-categories.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/inventory-products.ts": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "src/huly/operations/issue-templates.ts": {
+    "complexity": {
+      "count": 3
+    }
+  },
+  "src/huly/operations/issues-read.ts": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "src/huly/operations/issues-update.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/issues-write.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/persons.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/planner-shared.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/processes.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/recruiting-candidates.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/recruiting-reviews.ts": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "src/huly/operations/recruiting-shared.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/recruiting-targets.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/recruiting-vacancies.ts": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "src/huly/operations/relations.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/sdk-discovery-mappers.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/spaces-read.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/operations/task-management.ts": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "src/huly/operations/time.ts": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "src/huly/operations/workspace.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/unavailable-diagnostics.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/huly/url-fetch.ts": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "src/huly/workspace-client.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/mcp/http-2026-boundary.ts": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "src/mcp/http-2026-dispatcher.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/mcp/protocol-handlers.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/mcp/proxy-tools.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/mcp/tool-mode.ts": {
+    "complexity": {
+      "count": 1
+    }
+  }
+}
