@@ -14,12 +14,13 @@ When setting up a new project from this one, ALL of these components must be cop
 1. **Test coverage** (`vitest.config.ts`): v8 provider, 99% thresholds, `test:coverage` script. Requires `@vitest/coverage-v8` dev dep.
 2. **Code duplication** (`.jscpd.json` + `jscpd src` in lint script): threshold 2%, console reporter.
 3. **Circular dependency detection** (`madge --circular` in `circular` script, wired into `check-all`): catches import cycles.
-4. **Pre-commit hooks** (`.husky/pre-commit`): lint-staged + gitleaks secrets scanning.
-5. **check-all** (`pnpm check-all`): build + typecheck + circular + lint (eslint + jscpd) + test. Gate for all work.
-6. **Effect testing** (`@effect/vitest`): Effect-aware test runner integration.
-7. **ESLint** (`@effect/eslint-plugin`, `eslint-plugin-functional`, `@effect/dprint`): formatting + lint.
-8. **Property test placement**: fast-check/property-based tests live in `*.property.test.ts` files only. ESLint must reject `fast-check` imports in ordinary `*.test.ts` files so generated tests stay discoverable and reviewable as a distinct test class.
-9. **Strict TypeScript baseline** (`tsconfig.json`): `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noImplicitOverride`, and `noFallthroughCasesInSwitch`.
+4. **Cyclomatic complexity** (`eslint.complexity.config.mjs` + `complexity` script, wired into `check-all`): classic McCabe complexity capped for production TypeScript.
+5. **Pre-commit hooks** (`.husky/pre-commit`): lint-staged + gitleaks secrets scanning.
+6. **check-all** (`pnpm check-all`): build + typecheck + circular + complexity + lint (eslint + jscpd) + test. Gate for all work.
+7. **Effect testing** (`@effect/vitest`): Effect-aware test runner integration.
+8. **ESLint** (`@effect/eslint-plugin`, `eslint-plugin-functional`, `@effect/dprint`): formatting + lint.
+9. **Property test placement**: fast-check/property-based tests live in `*.property.test.ts` files only. ESLint must reject `fast-check` imports in ordinary `*.test.ts` files so generated tests stay discoverable and reviewable as a distinct test class.
+10. **Strict TypeScript baseline** (`tsconfig.json`): `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noImplicitOverride`, and `noFallthroughCasesInSwitch`.
 
 Missing any of these degrades the quality gate. Coverage and duplication detection are especially easy to forget.
 
