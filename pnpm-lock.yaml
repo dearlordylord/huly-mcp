@@ -230,6 +230,9 @@ importers:
       '@hcengineering/document':
         specifier: 0.7.0
         version: 0.7.0
+      '@hcengineering/gmail':
+        specifier: 0.7.0
+        version: 0.7.0
       '@hcengineering/inventory':
         specifier: 0.7.0
         version: 0.7.0
