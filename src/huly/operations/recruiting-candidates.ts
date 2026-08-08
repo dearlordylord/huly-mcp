@@ -29,6 +29,7 @@ import type {
   PersonNotFoundError,
   RecruitingCandidateNotFoundError,
   TagCategoryNotFoundError,
+  TagIdentifierAmbiguousError,
   TagNotFoundError
 } from "../errors.js"
 import { tags } from "../huly-plugins.js"
@@ -72,6 +73,7 @@ type SkillWriteError =
   | PersonIdentifierAmbiguousError
   | PersonNotFoundError
   | TagCategoryNotFoundError
+  | TagIdentifierAmbiguousError
   | TagNotFoundError
 
 const candidateMatchesQuery = (candidate: Candidate, query: string | undefined): boolean => {

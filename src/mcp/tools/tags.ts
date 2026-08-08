@@ -39,7 +39,7 @@ export const tagTools = [
     {
       name: "list_tags",
       description:
-        "List generic Huly tag definitions for one SDK target class. Use this for SDK-level tags such as recruiting skills or document labels. For Tracker issue labels, prefer list_labels.",
+        "List generic Huly tag definitions for one SDK target class. Prefer module tools for issue labels, document labels, Planner ToDo labels, board labels, and recruiting skills; use this as the raw SDK fallback for other tag-backed domains or category administration.",
       category: CATEGORY,
       inputSchema: listTagsParamsJsonSchema,
       resultSchema: ListTagsResultSchema
@@ -51,7 +51,7 @@ export const tagTools = [
     {
       name: "create_tag",
       description:
-        "Create a generic Huly tag definition for one targetClass. Idempotent by targetClass + title. This exposes the SDK tags model; for Tracker issue labels, prefer create_label.",
+        "Create a generic Huly tag definition for one targetClass. Idempotent by targetClass + title. Prefer module label or skill tools when attaching to a supported object; use this raw fallback for definition administration and unsupported tag-backed domains.",
       category: CATEGORY,
       inputSchema: createTagParamsJsonSchema,
       resultSchema: CreateTagResultSchema
@@ -88,7 +88,7 @@ export const tagTools = [
     {
       name: "list_attached_tags",
       description:
-        "List generic Huly TagReference rows attached to one raw object collection. Requires objectId, objectClass, space, and collection because this is an SDK-level tool.",
+        "List generic Huly TagReference rows attached to one raw object collection. Prefer module tools for issues, documents, Planner ToDos, board cards, and recruiting candidates; this SDK fallback requires objectId, objectClass, space, and collection.",
       category: CATEGORY,
       inputSchema: listAttachedTagsParamsJsonSchema,
       resultSchema: ListAttachedTagsResultSchema
@@ -100,7 +100,7 @@ export const tagTools = [
     {
       name: "attach_tag",
       description:
-        "Attach a generic Huly tag to one raw object collection. Requires targetClass for the tag definition and objectId/objectClass/space/collection for the TagReference. Idempotent for the same object, collection, and tag.",
+        "Attach a generic Huly tag to one raw object collection. Prefer module tools for supported issue, document, Planner, board, and recruiting objects; this SDK fallback requires targetClass plus objectId/objectClass/space/collection and is idempotent for the same object, collection, and tag.",
       category: CATEGORY,
       inputSchema: attachTagParamsJsonSchema,
       annotations: { idempotentHint: true },
@@ -113,7 +113,7 @@ export const tagTools = [
     {
       name: "detach_tag",
       description:
-        "Detach a generic Huly tag from one raw object collection. Requires targetClass and objectId/objectClass/space/collection. Returns detached=false when the tag is not attached.",
+        "Detach a generic Huly tag from one raw object collection. Prefer module tools for supported issue, document, Planner, board, and recruiting objects; this SDK fallback requires targetClass and objectId/objectClass/space/collection.",
       category: CATEGORY,
       inputSchema: detachTagParamsJsonSchema,
       resultSchema: DetachTagResultSchema

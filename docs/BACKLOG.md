@@ -10,7 +10,7 @@ The backlog is driven by SDK parity and the project principle that this server s
 - Team planner/reporting: team agendas, workload/capacity summaries, visibility-aware free/busy views, document action items, and planner automation diagnostics.
 - Recruiting: vacancies, candidates, applications, application statuses, recruiter assignment, reviews, opinions, skills, and related comments/attachments/activity.
 - Controlled documents and trainings: controlled document spaces/projects, review/approval workflows, templates, categories, snapshots/history, training assignments, attempts, scoring, and results.
-- Module-specific tag wrappers for tag-backed concepts such as recruiting skills, controlled-document labels, and contact tags. Board-label definitions and board-card label attachment are covered by the `boards` tools.
+- Remaining module-specific tag wrappers are controlled-document labels (blocked until the SDK package is published) and contact tags when a stable collection is exposed. Issue labels, document labels, Planner ToDo labels, board labels, and recruiting skills have friendly module tools; generic `tags` tools remain the SDK fallback.
 
 ## Planned Feature Surfaces
 

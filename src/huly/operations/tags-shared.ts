@@ -3,15 +3,29 @@ import { generateId, SortingOrder } from "@hcengineering/core"
 import type { TagCategory as HulyTagCategory, TagElement as HulyTagElement, TagReference } from "@hcengineering/tags"
 import { Effect } from "effect"
 
-import { ColorCode, Count, MAX_COLOR_INDEX, TagElementId, TagReferenceId } from "../../domain/schemas/shared.js"
-import type { AttachedTagSummary, AttachTagResult, DetachTagResult, TagWeight } from "../../domain/schemas/tags.js"
+import {
+  ColorCode,
+  Count,
+  MAX_COLOR_INDEX,
+  TagElementId,
+  type TagIdentifier,
+  TagReferenceId
+} from "../../domain/schemas/shared.js"
+import type {
+  AttachedTagSummary,
+  AttachTagResult,
+  DetachTagResult,
+  TagTargetClass,
+  TagWeight
+} from "../../domain/schemas/tags.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import { TagCategoryNotFoundError, TagNotFoundError } from "../errors.js"
+import { TagCategoryNotFoundError, TagIdentifierAmbiguousError, TagNotFoundError } from "../errors.js"
 import { core, tags } from "../huly-plugins.js"
 import { hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
+import { assertAt } from "../../utils/assertions.js"
 
-type CreateTagError = HulyClientError | TagCategoryNotFoundError
+type CreateTagError = HulyClientError | TagCategoryNotFoundError | TagIdentifierAmbiguousError
 
 interface ResolvedTagElement {
   readonly id: Ref<HulyTagElement>
@@ -25,8 +39,8 @@ interface ResolvedTagElement {
 }
 
 interface EnsureTagElementParams {
-  readonly targetClass: string
-  readonly titleOrId: string
+  readonly targetClass: TagTargetClass
+  readonly titleOrId: TagIdentifier
   readonly color?: number | undefined
   readonly description?: string | undefined
   readonly category?: string | undefined
@@ -107,11 +121,11 @@ export const toAttachedTagSummary = (
   return tagRef.weight === undefined ? summary : { ...summary, weight: tagRef.weight }
 }
 
-const findTagElementByIdOrTitle = (
+export const findTagElementByIdOrTitle = (
   client: HulyClient["Type"],
-  targetClass: string,
-  idOrTitle: string
-): Effect.Effect<HulyTagElement | undefined, HulyClientError> =>
+  targetClass: TagTargetClass,
+  idOrTitle: TagIdentifier
+): Effect.Effect<HulyTagElement | undefined, HulyClientError | TagIdentifierAmbiguousError> =>
   Effect.gen(function* () {
     const targetClassRef = toTargetClassRef(targetClass)
 
@@ -121,17 +135,24 @@ const findTagElementByIdOrTitle = (
     )
     if (byId !== undefined) return byId
 
-    return yield* client.findOne<HulyTagElement>(
+    const byTitle = yield* client.findAll<HulyTagElement>(
       tags.class.TagElement,
       hulyQuery<HulyTagElement>({ title: idOrTitle, targetClass: targetClassRef })
     )
+    if (byTitle.length > 1) {
+      return yield* new TagIdentifierAmbiguousError({
+        identifier: idOrTitle,
+        candidateIds: byTitle.map((tag) => TagElementId.make(tag._id))
+      })
+    }
+    return byTitle.length === 0 ? undefined : assertAt(byTitle, 0)
   })
 
 export const findTagElementOrFail = (
   client: HulyClient["Type"],
-  targetClass: string,
-  idOrTitle: string
-): Effect.Effect<HulyTagElement, TagNotFoundError | HulyClientError> =>
+  targetClass: TagTargetClass,
+  idOrTitle: TagIdentifier
+): Effect.Effect<HulyTagElement, TagIdentifierAmbiguousError | TagNotFoundError | HulyClientError> =>
   Effect.gen(function* () {
     const tag = yield* findTagElementByIdOrTitle(client, targetClass, idOrTitle)
     if (tag === undefined) {

@@ -3146,6 +3146,38 @@ if [ -n "$TS_NAME" ]; then
       fi
     fi
 
+    DOCUMENT_LABEL_TITLE="inttest-document-label-$RUN_ID"
+    DOCUMENT_LABEL_TITLE_JSON=$(json_string "$DOCUMENT_LABEL_TITLE")
+    run_capture_to_var ADD_DOCUMENT_LABEL_TEXT "add_document_label($DOC_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_document_label\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\",\"label\":$DOCUMENT_LABEL_TITLE_JSON,\"color\":5}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      DOCUMENT_LABEL_ID=$(echo "$ADD_DOCUMENT_LABEL_TEXT" | jq -r '.label // empty' 2>/dev/null)
+      assert_json_field_equals "add_document_label($DOC_ID) attached" "$ADD_DOCUMENT_LABEL_TEXT" '.attached' 'true'
+      assert_json_field_equals "add_document_label($DOC_ID) created definition" "$ADD_DOCUMENT_LABEL_TEXT" '.labelCreated' 'true'
+      sleep 2
+      run_capture_to_var READD_DOCUMENT_LABEL_TEXT "add_document_label($DOC_ID idempotent)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_document_label\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\",\"label\":$DOCUMENT_LABEL_TITLE_JSON}},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "add_document_label($DOC_ID) is idempotent" "$READD_DOCUMENT_LABEL_TEXT" '.attached' 'false'
+      fi
+      run_capture_to_var DOCUMENT_LABELS_TEXT "list_document_labels($DOC_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_document_labels\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\"}},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        assert_json_array_contains "list_document_labels($DOC_ID) includes label" "$DOCUMENT_LABELS_TEXT" '.labels | map(.title)' "$DOCUMENT_LABEL_TITLE"
+      fi
+      run_test "list_document_label_definitions($DOCUMENT_LABEL_TITLE)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_document_label_definitions\",\"arguments\":{\"titleSearch\":$DOCUMENT_LABEL_TITLE_JSON}},\"id\":2}"
+      run_capture_to_var REMOVE_DOCUMENT_LABEL_TEXT "remove_document_label($DOC_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_document_label\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\",\"label\":$DOCUMENT_LABEL_TITLE_JSON}},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "remove_document_label($DOC_ID) detached" "$REMOVE_DOCUMENT_LABEL_TEXT" '.detached' 'true'
+      fi
+      if [ -n "$DOCUMENT_LABEL_ID" ]; then
+        run_test "delete_tag(document:$DOCUMENT_LABEL_ID cleanup)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_tag\",\"arguments\":{\"targetClass\":\"document:class:Document\",\"tag\":\"$DOCUMENT_LABEL_ID\"}},\"id\":2}"
+      fi
+    fi
+
     run_test "list_inline_comments($DOC_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_inline_comments\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$DOC_ID\"}},\"id\":2}"
     run_test "delete_document($DOC_ID)" \
@@ -3929,6 +3961,37 @@ if [ $? -eq 0 ]; then
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_todos\",\"arguments\":{\"titleSearch\":$TODO_TITLE_JSON,\"limit\":10}},\"id\":2}"
     if [ $? -eq 0 ]; then
       assert_json_array_contains "list_todos includes $TODO_ID" "$LIST_TODOS_TEXT" "map(.id)" "$TODO_ID"
+    fi
+    TODO_LABEL_TITLE="inttest-todo-label-$RUN_ID"
+    TODO_LABEL_TITLE_JSON=$(json_string "$TODO_LABEL_TITLE")
+    run_capture_to_var ADD_TODO_LABEL_TEXT "add_todo_label($TODO_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_todo_label\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"label\":$TODO_LABEL_TITLE_JSON,\"color\":6}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      TODO_LABEL_ID=$(echo "$ADD_TODO_LABEL_TEXT" | jq -r '.label // empty' 2>/dev/null)
+      assert_json_field_equals "add_todo_label($TODO_ID) attached" "$ADD_TODO_LABEL_TEXT" '.attached' 'true'
+      assert_json_field_equals "add_todo_label($TODO_ID) created definition" "$ADD_TODO_LABEL_TEXT" '.labelCreated' 'true'
+      sleep 2
+      run_capture_to_var READD_TODO_LABEL_TEXT "add_todo_label($TODO_ID idempotent)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_todo_label\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"label\":$TODO_LABEL_TITLE_JSON}},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "add_todo_label($TODO_ID) is idempotent" "$READD_TODO_LABEL_TEXT" '.attached' 'false'
+      fi
+      run_capture_to_var TODO_LABELS_TEXT "list_todo_labels($TODO_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_todo_labels\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        assert_json_array_contains "list_todo_labels($TODO_ID) includes label" "$TODO_LABELS_TEXT" '.labels | map(.title)' "$TODO_LABEL_TITLE"
+      fi
+      run_test "list_todo_label_definitions($TODO_LABEL_TITLE)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_todo_label_definitions\",\"arguments\":{\"titleSearch\":$TODO_LABEL_TITLE_JSON}},\"id\":2}"
+      run_capture_to_var REMOVE_TODO_LABEL_TEXT "remove_todo_label($TODO_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_todo_label\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"label\":$TODO_LABEL_TITLE_JSON}},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "remove_todo_label($TODO_ID) detached" "$REMOVE_TODO_LABEL_TEXT" '.detached' 'true'
+      fi
+      if [ -n "$TODO_LABEL_ID" ]; then
+        run_test "delete_tag(todo:$TODO_LABEL_ID cleanup)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_tag\",\"arguments\":{\"targetClass\":\"time:class:ToDo\",\"tag\":\"$TODO_LABEL_ID\"}},\"id\":2}"
+      fi
     fi
     run_capture_to_var GET_TODO_TEXT "get_todo($TODO_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"}}},\"id\":2}"

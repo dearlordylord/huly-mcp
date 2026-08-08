@@ -113,6 +113,17 @@ describe("CATEGORY_NAMES", () => {
     })
   )
 
+  it.effect("registers module label wrappers in their owning categories", () =>
+    Effect.sync(function () {
+      expect(toolDefinition("list_document_label_definitions").category).toBe("documents")
+      expect(toolDefinition("list_document_labels").category).toBe("documents")
+      expect(toolDefinition("add_document_label").description).not.toContain("targetClass")
+      expect(toolDefinition("list_todo_label_definitions").category).toBe("planner")
+      expect(toolDefinition("list_todo_labels").category).toBe("planner")
+      expect(toolDefinition("add_todo_label").description).not.toContain("collection")
+    })
+  )
+
   it.effect("registers preference tools in the preferences category", () =>
     Effect.sync(function () {
       expect(toolDefinition("list_space_preferences").category).toBe("preferences")

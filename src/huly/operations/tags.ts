@@ -3,7 +3,7 @@ import { SortingOrder } from "@hcengineering/core"
 import type { TagElement as HulyTagElement } from "@hcengineering/tags"
 import { Effect } from "effect"
 
-import { Count, TagElementId } from "../../domain/schemas/shared.js"
+import { Count, TagElementId, TagIdentifier } from "../../domain/schemas/shared.js"
 import type {
   AttachedTagSummary,
   AttachTagParams,
@@ -23,7 +23,12 @@ import type {
 } from "../../domain/schemas/tags.js"
 import { TagTargetClass, UPDATE_TAG_FIELDS } from "../../domain/schemas/tags.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import type { NoUpdateFieldsError, TagCategoryNotFoundError, TagNotFoundError } from "../errors.js"
+import type {
+  NoUpdateFieldsError,
+  TagCategoryNotFoundError,
+  TagIdentifierAmbiguousError,
+  TagNotFoundError
+} from "../errors.js"
 import { core, tags } from "../huly-plugins.js"
 import { clearTextAsEmptyString } from "./clear-field-updates.js"
 import { clampLimit, escapeLikeWildcards, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
@@ -43,10 +48,15 @@ import {
 import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 type ListTagsError = HulyClientError | TagCategoryNotFoundError
-type CreateTagError = HulyClientError | TagCategoryNotFoundError
-type UpdateTagError = HulyClientError | NoUpdateFieldsError | TagCategoryNotFoundError | TagNotFoundError
-type DeleteTagError = HulyClientError | TagNotFoundError
-type TagReferenceError = HulyClientError | TagCategoryNotFoundError | TagNotFoundError
+type CreateTagError = HulyClientError | TagCategoryNotFoundError | TagIdentifierAmbiguousError
+type UpdateTagError =
+  | HulyClientError
+  | NoUpdateFieldsError
+  | TagCategoryNotFoundError
+  | TagIdentifierAmbiguousError
+  | TagNotFoundError
+type DeleteTagError = HulyClientError | TagIdentifierAmbiguousError | TagNotFoundError
+type TagReferenceError = HulyClientError | TagCategoryNotFoundError | TagIdentifierAmbiguousError | TagNotFoundError
 
 const toTagSummary = (tag: HulyTagElement): TagSummary => {
   const summary = {
@@ -110,7 +120,7 @@ export const createTag = (params: CreateTagParams): Effect.Effect<CreateTagResul
   Effect.gen(function* () {
     const tag = yield* ensureTagElement({
       targetClass: params.targetClass,
-      titleOrId: params.title,
+      titleOrId: TagIdentifier.make(params.title),
       color: params.color,
       description: params.description,
       category: params.category

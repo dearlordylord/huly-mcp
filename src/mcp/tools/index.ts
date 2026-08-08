@@ -27,6 +27,7 @@ import { leadTools } from "./leads.js"
 import { messageTemplateTools } from "./message-templates.js"
 import { modelAdministrationTools } from "./model-administration.js"
 import { milestoneTools } from "./milestones.js"
+import { moduleLabelTools } from "./module-labels.js"
 import { notificationTools } from "./notifications.js"
 import { plannerTools } from "./planner.js"
 import { preferenceTools } from "./preferences.js"
@@ -76,6 +77,7 @@ export const allTools = [
   ...deletionTools,
   ...milestoneTools,
   ...documentTools,
+  ...moduleLabelTools,
   ...documentSnapshotTools,
   ...driveTools,
   ...genericAssociationTools,

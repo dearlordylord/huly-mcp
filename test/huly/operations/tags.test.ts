@@ -16,6 +16,7 @@ import { assertAt } from "../../../src/utils/assertions.js"
 
 import { MAX_COLOR_INDEX } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import { TagIdentifierAmbiguousError } from "../../../src/huly/errors.js"
 import { tags, tracker } from "../../../src/huly/huly-plugins.js"
 import { toRef } from "../../../src/huly/operations/sdk-boundary.js"
 import { normalizeColorCode } from "../../../src/huly/operations/tags-shared.js"
@@ -150,12 +151,14 @@ const createFixtureLayer = (config: FixtureConfig) => {
   const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown) => {
     const q = query as Record<string, unknown>
     if (_class === tags.class.TagElement) {
+      const exactTitle = typeof q.title === "string" ? q.title : undefined
       const titleLike = (q.title as { readonly $like?: string } | undefined)?.$like
       const titleNeedle = titleLike === undefined ? undefined : titleLike.replace(/^%|%$/g, "")
       const filtered = tagElements.filter(
         (tag) =>
           (!q.targetClass || tag.targetClass === q.targetClass) &&
           (!q.category || tag.category === q.category) &&
+          (exactTitle === undefined || tag.title === exactTitle) &&
           (titleNeedle === undefined || tag.title.includes(titleNeedle))
       )
       return Effect.succeed(toFindResult(filtered))
@@ -350,6 +353,24 @@ describe("createTag", () => {
         targetClass: "tracker:class:Issue",
         title: "needs-review"
       })
+    })
+  )
+
+  it.effect("returns candidate IDs for duplicate exact titles", () =>
+    Effect.gen(function* () {
+      const testLayer = createFixtureLayer({
+        tagElements: [
+          makeTagElement({ _id: toRef<HulyTagElement>("tag-a"), title: "bug" }),
+          makeTagElement({ _id: toRef<HulyTagElement>("tag-b"), title: "bug" })
+        ]
+      })
+
+      const error = yield* Effect.flip(
+        createTag({ targetClass: TARGET_CLASS, title: tagIdentifier("bug") }).pipe(Effect.provide(testLayer))
+      )
+
+      expect(error).toBeInstanceOf(TagIdentifierAmbiguousError)
+      expect(error).toMatchObject({ candidateIds: ["tag-a", "tag-b"] })
     })
   )
 })

@@ -33,7 +33,9 @@ import {
   RoomId,
   ScheduleId,
   SpaceId,
-  SpaceTypeId
+  SpaceTypeId,
+  TagElementId,
+  TagIdentifier
 } from "../../src/domain/schemas/shared.js"
 import {
   ActivityMessageNotFoundError,
@@ -205,6 +207,7 @@ import {
   SpaceRoleIdentifierAmbiguousError,
   SpaceRoleNotFoundError,
   TagCategoryNotFoundError,
+  TagIdentifierAmbiguousError,
   TagNotFoundError,
   TeamspaceNotFoundError,
   TemplateChildNotFoundError,
@@ -1159,6 +1162,8 @@ describe("Huly Errors", () => {
               return `tag:${error.identifier}`
             case "TagCategoryNotFoundError":
               return `tagcat:${error.identifier}`
+            case "TagIdentifierAmbiguousError":
+              return `tag-ambiguous:${error.identifier}:${error.candidateIds.length}`
             case "TestProjectNotFoundError":
               return `testproject:${error.identifier}`
             case "TestSuiteNotFoundError":
@@ -1979,6 +1984,14 @@ describe("Huly Errors", () => {
         expect(matchError(new MasterTagNotFoundError({ identifier: "mt-1", cardSpace: "cs-1" }))).toBe("mastertag:mt-1")
         expect(matchError(new TagNotFoundError({ identifier: "lbl-1" }))).toBe("tag:lbl-1")
         expect(matchError(new TagCategoryNotFoundError({ identifier: "cat-1" }))).toBe("tagcat:cat-1")
+        expect(
+          matchError(
+            new TagIdentifierAmbiguousError({
+              identifier: TagIdentifier.make("label"),
+              candidateIds: [TagElementId.make("label-1"), TagElementId.make("label-2")]
+            })
+          )
+        ).toBe("tag-ambiguous:label:2")
         expect(matchError(new TestPlanItemNotFoundError({ identifier: "item-1", plan: "plan-1" }))).toBe(
           "testplanitem:item-1"
         )

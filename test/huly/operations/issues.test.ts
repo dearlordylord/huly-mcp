@@ -350,6 +350,16 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       )
       return Effect.succeed(toFindResult(filtered))
     }
+    if (_class === tags.class.TagElement) {
+      const titleFilter = queryField(query, "title")
+      const targetClassFilter = queryField(query, "targetClass")
+      const filtered = tagElements.filter(
+        (tagElement) =>
+          tagElement.title === titleFilter &&
+          (targetClassFilter === undefined || tagElement.targetClass === targetClassFilter)
+      )
+      return Effect.succeed(toFindResult(filtered))
+    }
     return Effect.succeed(toFindResult([]))
   }) as HulyClientOperations["findAll"]
 

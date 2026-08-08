@@ -25,6 +25,11 @@ export const businessMutationCliCommandCatalogA = {
     positional: ["candidate", "skill"],
     description: "Add Recruiting Candidate Skill"
   },
+  add_todo_label: {
+    path: ["planner", "todos", "labels", "add"],
+    positional: ["locator", "label"],
+    description: "Add Todo Label"
+  },
   add_recruiting_comment: {
     path: ["recruiting", "comment", "add"],
     positional: ["target", "body"],

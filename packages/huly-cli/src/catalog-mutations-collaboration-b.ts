@@ -2,6 +2,12 @@ import type { McpToolName } from "../../../src/mcp/tools/index.js"
 import type { CliCommandSpec } from "./catalog-types.js"
 
 export const collaborationMutationCliCommandCatalogB = {
+  remove_document_label: {
+    path: ["documents", "labels", "remove"],
+    positional: ["teamspace", "document", "label"],
+    description: "Remove Document Label",
+    behavior: { confirmation: { type: "requires-yes", message: "documents labels remove requires --yes." } }
+  },
   remove_board_card_label: {
     path: ["boards", "cards", "labels", "remove"],
     positional: ["board", "card", "label"],

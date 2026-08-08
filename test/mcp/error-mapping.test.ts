@@ -22,7 +22,9 @@ import {
   RelationId,
   RoleId,
   SpaceId,
-  SpaceTypeId
+  SpaceTypeId,
+  TagElementId,
+  TagIdentifier
 } from "../../src/domain/schemas/shared.js"
 import {
   ActivityRecordInvalidError,
@@ -76,7 +78,10 @@ import {
   RelationNotFoundError,
   SpaceNotTypedError,
   SpaceRoleIdentifierAmbiguousError,
-  SpaceRoleNotFoundError
+  SpaceRoleNotFoundError,
+  TagCategoryNotFoundError,
+  TagIdentifierAmbiguousError,
+  TagNotFoundError
 } from "../../src/huly/errors.js"
 import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import {
@@ -129,6 +134,28 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
           expect(assertAt(response.content, 0).text).toBe("Invalid status 'bogus' for project 'HULY'")
+        })
+      )
+
+      it.effect("maps tag lookup failures as actionable invalid params", () =>
+        Effect.sync(function () {
+          const errors = [
+            new TagNotFoundError({ identifier: "missing-label" }),
+            new TagCategoryNotFoundError({ identifier: "missing-category" }),
+            new TagIdentifierAmbiguousError({
+              identifier: TagIdentifier.make("duplicate"),
+              candidateIds: [TagElementId.make("label-a"), TagElementId.make("label-b")]
+            })
+          ]
+
+          for (const error of errors) {
+            const response = mapDomainErrorToMcp(error)
+
+            expect(response.isError).toBe(true)
+            expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+            expect(response._meta.errorTag).toBe(error._tag)
+            expect(assertAt(response.content, 0).text).toBe(error.message)
+          }
         })
       )
 

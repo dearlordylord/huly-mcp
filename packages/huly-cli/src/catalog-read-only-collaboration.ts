@@ -109,6 +109,16 @@ export const collaborationReadOnlyCliCommandCatalog = {
     positional: [],
     description: "List Direct Messages"
   },
+  list_document_label_definitions: {
+    path: ["documents", "labels", "definitions", "list"],
+    positional: [],
+    description: "List Document Label Definitions"
+  },
+  list_document_labels: {
+    path: ["documents", "labels", "list"],
+    positional: ["teamspace", "document"],
+    description: "List Document Labels"
+  },
   list_dm_messages: {
     path: ["channels", "direct-messages", "messages", "list"],
     positional: ["dm"],

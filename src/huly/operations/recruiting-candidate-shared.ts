@@ -4,6 +4,7 @@ import { Effect, Schema } from "effect"
 
 import type { CandidateIdentifier, CandidateRef } from "../../domain/schemas/recruiting-common.js"
 import { PersonId, PersonName, PersonRefInput } from "../../domain/schemas/shared.js"
+import { TagTargetClass } from "../../domain/schemas/tags.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { PersonIdentifierAmbiguousError } from "../errors.js"
 import { PersonNotFoundError, RecruitingCandidateNotFoundError } from "../errors.js"
@@ -14,7 +15,7 @@ import { batchGetEmailsForPersons, findPersonByExactEmailOrName, findPersonById 
 import { escapeLikeWildcards, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
-export const CANDIDATE_SKILL_TARGET_CLASS = "recruit:mixin:Candidate"
+export const CANDIDATE_SKILL_TARGET_CLASS = TagTargetClass.make("recruit:mixin:Candidate")
 export const CANDIDATE_SKILL_COLLECTION = "skills"
 
 export type CandidateMixinAttributes = Partial<Pick<Candidate, "onsite" | "remote" | "source" | "title">>

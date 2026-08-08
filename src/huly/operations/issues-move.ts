@@ -9,10 +9,15 @@ import { Effect } from "effect"
 
 import type { AddLabelParams, MoveIssueParams } from "../../domain/schemas.js"
 import type { AddLabelResult, MoveIssueResult } from "../../domain/schemas/issues-results.js"
-import { IssueIdentifier } from "../../domain/schemas/shared.js"
+import { IssueIdentifier, TagIdentifier } from "../../domain/schemas/shared.js"
 import { TagTargetClass } from "../../domain/schemas/tags.js"
 import type { HulyClient, HulyClientError } from "../client.js"
-import type { IssueNotFoundError, ProjectNotFoundError, TagCategoryNotFoundError } from "../errors.js"
+import type {
+  IssueNotFoundError,
+  ProjectNotFoundError,
+  TagCategoryNotFoundError,
+  TagIdentifierAmbiguousError
+} from "../errors.js"
 import { tracker } from "../huly-plugins.js"
 import { attachIssueChild, childIssueParent, hasConcreteIssueParent, topLevelIssueParent } from "./issues-parent.js"
 import { findIssueInProject, findProjectAndIssue } from "./issues-shared.js"
@@ -20,7 +25,12 @@ import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import { attachTagReference, ensureTagElement } from "./tags-shared.js"
 
-type AddLabelError = HulyClientError | TagCategoryNotFoundError | ProjectNotFoundError | IssueNotFoundError
+type AddLabelError =
+  | HulyClientError
+  | TagCategoryNotFoundError
+  | TagIdentifierAmbiguousError
+  | ProjectNotFoundError
+  | IssueNotFoundError
 
 type MoveIssueError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
 
@@ -37,7 +47,7 @@ const issueTargetClass = TagTargetClass.make(String(tracker.class.Issue))
 export const addLabel = (params: AddLabelParams): Effect.Effect<AddLabelResult, AddLabelError, HulyClient> =>
   Effect.gen(function* () {
     const { issue, project } = yield* findProjectAndIssue(params)
-    const labelTitle = params.label.trim()
+    const labelTitle = TagIdentifier.make(params.label.trim())
     const tag = yield* ensureTagElement({
       targetClass: issueTargetClass,
       titleOrId: labelTitle,

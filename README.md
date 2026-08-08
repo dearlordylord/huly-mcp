@@ -378,6 +378,10 @@ When resolved tool exposure is `proxy`, clients see the built-in tools plus thes
 | `edit_document` | Edit an existing Huly document. You may rename with title and/or edit the body. Body editing has two mutually exclusive modes: (1) content replaces the entire markdown body, (2) old_text + new_text performs exact targeted search-and-replace. Use markdown links to current-workspace Huly browse URLs for native references; Huly browse links returned in get_document content round-trip as native references. The URL identifies the object; link text is display text; plain issue keys stay text. External URLs stay normal markdown links. For targeted replace, multiple matches error unless replace_all is true; empty new_text deletes matched text. Content supports native Mermaid diagrams. Returns a 'url' field pointing to the document in the Huly web app. |
 | `list_inline_comments` | List inline comment threads from a Huly document. Extracts comments embedded in document content as ProseMirror marks. Each comment includes the highlighted text and thread ID. Set includeReplies=true to also fetch thread reply messages with sender names. |
 | `delete_document` | Permanently delete a Huly document. This action cannot be undone. |
+| `list_document_label_definitions` | List label definitions available for ordinary Huly documents by optional title substring. Does not expose raw target-class or category mechanics. |
+| `list_document_labels` | List labels attached to one ordinary Huly document. Resolves the teamspace by name or ID and the document by title or ID; no raw class, space, or collection values are needed. |
+| `add_document_label` | Idempotently attach a label to an ordinary Huly document resolved by teamspace and title or ID. label accepts a definition ID or exact title; a missing title creates the document label definition first, while duplicate exact titles return candidate IDs. |
+| `remove_document_label` | Detach a label from one ordinary Huly document without deleting the reusable label definition. Returns detached=false when the label exists but is not attached; duplicate exact titles return candidate IDs. |
 
 ### Storage
 
@@ -776,6 +780,10 @@ When resolved tool exposure is `proxy`, clients see the built-in tools plus thes
 
 | Tool | Description |
 |------|-------------|
+| `list_todo_label_definitions` | List label definitions available for Huly Planner ToDos by optional title substring. Does not expose raw target-class or category mechanics. |
+| `list_todo_labels` | List labels attached to one Planner ToDo. Resolves the ToDo by raw ID or the same human-oriented issue, title, owner, and completion locators used by get_todo. |
+| `add_todo_label` | Idempotently attach a label to a Planner ToDo resolved by raw ID or human locator. label accepts a definition ID or exact title; a missing title creates the ToDo label definition first, while duplicate exact titles return candidate IDs. |
+| `remove_todo_label` | Detach a label from one Planner ToDo without deleting the reusable label definition. Returns detached=false when the label exists but is not attached; duplicate exact titles return candidate IDs. |
 | `list_todos` | List Huly Planner ToDos. Empty input returns up to 50 ToDos in planner order with all completion states. Use owner, issue, title, due date, priority, visibility, or completion filters to narrow results. |
 | `get_todo` | Get one Planner ToDo by raw todoId or by human locator such as issue + title + owner. Returns stable ToDo fields, owner, attachment context, description, labels count, and work slot count. |
 | `create_todo` | Create a Planner ToDo. Omit attachedTo for a personal ToDo, or pass attachedTo.type=issue with project and identifier for an issue action item. Omit owner to use the authenticated user. Description supports markdown. Markdown links to current-workspace Huly browse URLs with _class, _id, and label become native Huly references; external URLs and other-workspace browse URLs stay normal links. |
@@ -920,13 +928,13 @@ When resolved tool exposure is `proxy`, clients see the built-in tools plus thes
 
 | Tool | Description |
 |------|-------------|
-| `list_tags` | List generic Huly tag definitions for one SDK target class. Use this for SDK-level tags such as recruiting skills or document labels. For Tracker issue labels, prefer list_labels. |
-| `create_tag` | Create a generic Huly tag definition for one targetClass. Idempotent by targetClass + title. This exposes the SDK tags model; for Tracker issue labels, prefer create_label. |
+| `list_tags` | List generic Huly tag definitions for one SDK target class. Prefer module tools for issue labels, document labels, Planner ToDo labels, board labels, and recruiting skills; use this as the raw SDK fallback for other tag-backed domains or category administration. |
+| `create_tag` | Create a generic Huly tag definition for one targetClass. Idempotent by targetClass + title. Prefer module label or skill tools when attaching to a supported object; use this raw fallback for definition administration and unsupported tag-backed domains. |
 | `update_tag` | Update a generic Huly tag definition. The tag argument accepts a tag ID or exact title, resolved within targetClass. |
 | `delete_tag` | Delete a generic Huly tag definition by ID or exact title, resolved within targetClass. This deletes the tag definition, not only one object's tag reference. |
-| `list_attached_tags` | List generic Huly TagReference rows attached to one raw object collection. Requires objectId, objectClass, space, and collection because this is an SDK-level tool. |
-| `attach_tag` | Attach a generic Huly tag to one raw object collection. Requires targetClass for the tag definition and objectId/objectClass/space/collection for the TagReference. Idempotent for the same object, collection, and tag. |
-| `detach_tag` | Detach a generic Huly tag from one raw object collection. Requires targetClass and objectId/objectClass/space/collection. Returns detached=false when the tag is not attached. |
+| `list_attached_tags` | List generic Huly TagReference rows attached to one raw object collection. Prefer module tools for issues, documents, Planner ToDos, board cards, and recruiting candidates; this SDK fallback requires objectId, objectClass, space, and collection. |
+| `attach_tag` | Attach a generic Huly tag to one raw object collection. Prefer module tools for supported issue, document, Planner, board, and recruiting objects; this SDK fallback requires targetClass plus objectId/objectClass/space/collection and is idempotent for the same object, collection, and tag. |
+| `detach_tag` | Detach a generic Huly tag from one raw object collection. Prefer module tools for supported issue, document, Planner, board, and recruiting objects; this SDK fallback requires targetClass and objectId/objectClass/space/collection. |
 
 ### Task-Management
 

@@ -124,7 +124,7 @@ import {
   InventoryVariantIdentifierAmbiguousError,
   InventoryVariantNotFoundError
 } from "./errors-inventory.js"
-import { TagCategoryNotFoundError, TagNotFoundError } from "./errors-labels.js"
+import { LabelDomainError } from "./errors-labels.js"
 import { FunnelNotFoundError, LeadNotFoundError } from "./errors-leads.js"
 import { FloorNotFoundError, MeetingMinutesNotFoundError, RoomNotFoundError } from "./errors-love.js"
 import { AdministrationDomainError } from "./errors-administration-domain.js"
@@ -302,8 +302,7 @@ export const HulyDomainError = Schema.Union(
   CardNotFoundError,
   CardCommentNotFoundError,
   MasterTagNotFoundError,
-  TagNotFoundError,
-  TagCategoryNotFoundError,
+  LabelDomainError,
   InventoryCategoryNotFoundError,
   InventoryProductNotFoundError,
   InventoryVariantNotFoundError,

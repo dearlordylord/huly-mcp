@@ -19,6 +19,11 @@ export const collaborationMutationCliCommandCatalogA = {
     positional: ["board", "card", "label"],
     description: "Add Board Card Label"
   },
+  add_document_label: {
+    path: ["documents", "labels", "add"],
+    positional: ["teamspace", "document", "label"],
+    description: "Add Document Label"
+  },
   add_channel_members: {
     path: ["channels", "members", "add"],
     positional: ["channel", "members"],

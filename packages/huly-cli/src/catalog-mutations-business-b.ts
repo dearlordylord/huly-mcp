@@ -43,6 +43,12 @@ export const businessMutationCliCommandCatalogB = {
     description: "Remove Recruiting Candidate Skill",
     behavior: { confirmation: { type: "requires-yes", message: "recruiting candidate skill remove requires --yes." } }
   },
+  remove_todo_label: {
+    path: ["planner", "todos", "labels", "remove"],
+    positional: ["locator", "label"],
+    description: "Remove Todo Label",
+    behavior: { confirmation: { type: "requires-yes", message: "planner todos labels remove requires --yes." } }
+  },
   remove_recruiting_related_issue: {
     path: ["recruiting", "related", "issue", "remove"],
     positional: ["target", "issue"],

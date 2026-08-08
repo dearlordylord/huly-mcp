@@ -146,5 +146,15 @@ export const businessReadOnlyCliCommandCatalogB = {
     description: "List Time Spend Reports"
   },
   list_todos: { path: ["planner", "todos", "list"], positional: [], description: "List Todos" },
+  list_todo_label_definitions: {
+    path: ["planner", "todos", "labels", "definitions", "list"],
+    positional: [],
+    description: "List Todo Label Definitions"
+  },
+  list_todo_labels: {
+    path: ["planner", "todos", "labels", "list"],
+    positional: ["locator"],
+    description: "List Todo Labels"
+  },
   list_work_slots: { path: ["time", "work-slots", "list"], positional: [], description: "List Work Slots" }
 } as const satisfies Partial<Record<McpToolName, CliCommandSpec>>

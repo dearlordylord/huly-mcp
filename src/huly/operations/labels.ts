@@ -12,14 +12,15 @@ import type {
   UpdateLabelResult
 } from "../../domain/schemas/labels.js"
 import { UPDATE_LABEL_FIELDS } from "../../domain/schemas/labels.js"
-import { IssueIdentifier, TagElementId } from "../../domain/schemas/shared.js"
+import { IssueIdentifier, TagElementId, TagIdentifier } from "../../domain/schemas/shared.js"
 import { TagTargetClass, type UpdateTagParams } from "../../domain/schemas/tags.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type {
   IssueNotFoundError,
   NoUpdateFieldsError,
   ProjectNotFoundError,
-  TagCategoryNotFoundError
+  TagCategoryNotFoundError,
+  TagIdentifierAmbiguousError
 } from "../errors.js"
 import { TagNotFoundError } from "../errors.js"
 import { tags, tracker } from "../huly-plugins.js"
@@ -31,9 +32,14 @@ import { deleteTag, listTags, updateTag } from "./tags.js"
 import { requireUpdateFields } from "./update-guards.js"
 
 type ListLabelsError = HulyClientError | TagCategoryNotFoundError
-type CreateLabelError = HulyClientError | TagCategoryNotFoundError
-type UpdateLabelError = HulyClientError | NoUpdateFieldsError | TagCategoryNotFoundError | TagNotFoundError
-type DeleteLabelError = HulyClientError | TagNotFoundError
+type CreateLabelError = HulyClientError | TagCategoryNotFoundError | TagIdentifierAmbiguousError
+type UpdateLabelError =
+  | HulyClientError
+  | NoUpdateFieldsError
+  | TagCategoryNotFoundError
+  | TagIdentifierAmbiguousError
+  | TagNotFoundError
+type DeleteLabelError = HulyClientError | TagIdentifierAmbiguousError | TagNotFoundError
 type RemoveIssueLabelError = HulyClientError | ProjectNotFoundError | IssueNotFoundError | TagNotFoundError
 
 // Huly Tracker "labels" are generic tag definitions scoped to tracker issues:
@@ -58,7 +64,7 @@ export const createLabel = (
   Effect.gen(function* () {
     const result = yield* ensureTagElement({
       targetClass: issueTargetClass,
-      titleOrId: params.title,
+      titleOrId: TagIdentifier.make(params.title),
       color: params.color,
       description: params.description,
       category: params.category,

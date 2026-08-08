@@ -71,7 +71,6 @@ create_test_plan
 create_test_result
 create_test_run
 create_test_suite
-create_todo
 create_workflow_status
 delete_activity_reply
 delete_board_card
@@ -111,7 +110,6 @@ delete_recruiting_review
 delete_related_issue_space_target
 delete_schedule
 delete_status_category
-delete_tag
 delete_tag_category
 delete_teamspace
 delete_test_case
@@ -119,7 +117,6 @@ delete_test_plan
 delete_test_result
 delete_test_run
 delete_test_suite
-delete_todo
 delete_workflow_status
 delete_class_collaborator_metadata
 get_activity_message

@@ -33,9 +33,23 @@ COMMENT_ID=""
 TEAMSPACE=""
 DOCUMENT_ID=""
 ATTACHMENT_ID=""
+DOCUMENT_LABEL_ID=""
+TODO_ID=""
+TODO_LABEL_ID=""
 
 cleanup() {
   set +e
+  if [[ -n "$TODO_ID" && -n "$TODO_LABEL_ID" ]]; then
+    "${CLI[@]}" planner todos labels remove "{\"todoId\":\"$TODO_ID\"}" "$TODO_LABEL_ID" --yes --json >/dev/null 2>&1
+    "${CLI[@]}" tags delete "time:class:ToDo" "$TODO_LABEL_ID" --yes --json >/dev/null 2>&1
+  fi
+  if [[ -n "$TODO_ID" ]]; then
+    "${CLI[@]}" planner todos delete "{\"todoId\":\"$TODO_ID\"}" --yes --json >/dev/null 2>&1
+  fi
+  if [[ -n "$DOCUMENT_ID" && -n "$DOCUMENT_LABEL_ID" && -n "$TEAMSPACE" ]]; then
+    "${CLI[@]}" documents labels remove "$TEAMSPACE" "$DOCUMENT_ID" "$DOCUMENT_LABEL_ID" --yes --json >/dev/null 2>&1
+    "${CLI[@]}" tags delete "document:class:Document" "$DOCUMENT_LABEL_ID" --yes --json >/dev/null 2>&1
+  fi
   if [[ -n "$ATTACHMENT_ID" ]]; then
     "${CLI[@]}" attachments delete "$ATTACHMENT_ID" --yes --json >/dev/null 2>&1
   fi
@@ -230,8 +244,41 @@ cover_cli_json "edit_document" "documents edit" \
   documents edit --teamspace "$TEAMSPACE" --document "$DOCUMENT_ID" --old-text "Original body" --new-text "Updated body"
 cover_cli_json "list_documents" "documents list" documents list --teamspace "$TEAMSPACE" --title-search "CLI Integration Document"
 cover_cli_json "list_inline_comments" "documents comments" documents comments --teamspace "$TEAMSPACE" --document "$DOCUMENT_ID"
+DOCUMENT_LABEL_TITLE="cli-document-label-$RUN_ID"
+capture_cli_json "add_document_label" "documents labels add" DOCUMENT_LABEL_JSON \
+  documents labels add "$TEAMSPACE" "$DOCUMENT_ID" "$DOCUMENT_LABEL_TITLE"
+assert_json "add_document_label returns label id" "$DOCUMENT_LABEL_JSON" '.label | type == "string" and length > 0'
+DOCUMENT_LABEL_ID="$(json_value "$DOCUMENT_LABEL_JSON" '.label')"
+cover_cli_json "list_document_labels" "documents labels list" documents labels list "$TEAMSPACE" "$DOCUMENT_ID"
+cover_cli_json "list_document_label_definitions" "documents label definitions list" \
+  documents labels definitions list --title-search "$DOCUMENT_LABEL_TITLE"
+cover_cli_json "remove_document_label" "documents labels remove" \
+  documents labels remove "$TEAMSPACE" "$DOCUMENT_ID" "$DOCUMENT_LABEL_ID" --yes
+cover_cli_json "delete_tag" "document label definition cleanup" \
+  tags delete "document:class:Document" "$DOCUMENT_LABEL_ID" --yes
+DOCUMENT_LABEL_ID=""
 cover_cli_json "delete_document" "documents delete" documents delete "$TEAMSPACE" "$DOCUMENT_ID" --yes
 DOCUMENT_ID=""
+
+TODO_TITLE="CLI Integration Todo $RUN_ID"
+capture_cli_json "create_todo" "planner todos create" TODO_JSON planner todos create "$TODO_TITLE"
+assert_json "create_todo returns todo id" "$TODO_JSON" '.todoId | type == "string" and length > 0'
+TODO_ID="$(json_value "$TODO_JSON" '.todoId')"
+TODO_LOCATOR="{\"todoId\":\"$TODO_ID\"}"
+TODO_LABEL_TITLE="cli-todo-label-$RUN_ID"
+capture_cli_json "add_todo_label" "planner todo labels add" TODO_LABEL_JSON \
+  planner todos labels add "$TODO_LOCATOR" "$TODO_LABEL_TITLE"
+assert_json "add_todo_label returns label id" "$TODO_LABEL_JSON" '.label | type == "string" and length > 0'
+TODO_LABEL_ID="$(json_value "$TODO_LABEL_JSON" '.label')"
+cover_cli_json "list_todo_labels" "planner todo labels list" planner todos labels list "$TODO_LOCATOR"
+cover_cli_json "list_todo_label_definitions" "planner todo label definitions list" \
+  planner todos labels definitions list --title-search "$TODO_LABEL_TITLE"
+cover_cli_json "remove_todo_label" "planner todo labels remove" \
+  planner todos labels remove "$TODO_LOCATOR" "$TODO_LABEL_ID" --yes
+cover_cli_json "delete_tag" "todo label definition cleanup" tags delete "time:class:ToDo" "$TODO_LABEL_ID" --yes
+TODO_LABEL_ID=""
+cover_cli_json "delete_todo" "planner todos delete" planner todos delete "$TODO_LOCATOR" --yes
+TODO_ID=""
 
 cover_cli_json "fulltext_search" "search" search "CLI Integration" --limit 3
 cover_cli_json "delete_issue" "issues delete" issues delete "$PROJECT" "$ISSUE_ID" --yes
