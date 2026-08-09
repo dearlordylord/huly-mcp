@@ -89,7 +89,7 @@ Full communication-message reads require more than the normal document client. T
 This is a third path, not a replacement for the current provider assessment:
 
 - `@hcengineering/gmail@0.7.0` is installed and exposes legacy Gmail document classes. The existing `list_external_channel_messages` intentionally returns `supported=false` because the workspace cannot prove whether the live deployment writes legacy v1 documents or newer communication records; see `src/huly/operations/external-channel-messages.ts` and `src/domain/schemas/external-channel-messages.ts`. The live probe returned `unsupportedReasonCode: runtime-unverifiable`.
-- Telegram likewise remains an explicit `package-incompatible` result because this build has no compatible published Telegram message package.
+- Telegram is a separate provider-specific model. Subsequent issue #144 research identified exact `@hcengineering/telegram@0.7.0` as compatible and added persisted legacy Telegram reads; that does not establish provider freshness, send capability, or delivery/read status.
 - `@hcengineering/mail` identifies provider-neutral mail thread cards used by the newer communication pipeline. Its presence does not make legacy Gmail records safe to read, does not establish a provider connection, and does not expose Telegram data.
 
 ## Recommended tickets

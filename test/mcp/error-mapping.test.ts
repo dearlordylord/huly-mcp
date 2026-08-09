@@ -13,6 +13,7 @@ import {
 import {
   AssociationId,
   CardId,
+  ChannelIdentifier,
   Count,
   DocId,
   IssueIdentifier,
@@ -129,7 +130,10 @@ describe("Error Mapping to MCP", () => {
 
       it.effect("maps ambiguous Telegram channel values to invalid params", () =>
         Effect.sync(function () {
-          const error = new TelegramChannelIdentifierAmbiguousError({ identifier: "@ops", matches: Count.make(2) })
+          const error = new TelegramChannelIdentifierAmbiguousError({
+            identifier: ChannelIdentifier.make("@ops"),
+            matches: Count.make(2)
+          })
           const response = mapDomainErrorToMcp(error)
 
           expect(response.isError).toBe(true)

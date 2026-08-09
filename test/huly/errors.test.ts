@@ -19,6 +19,7 @@ import {
   AttachmentId,
   CardIdentifier,
   CardSpaceIdentifier,
+  ChannelIdentifier,
   CommentId,
   Count,
   DocId,
@@ -1931,7 +1932,12 @@ describe("Huly Errors", () => {
         ).toBe("milestone-ambiguous:Sprint:2")
         expect(matchError(new ChannelNotFoundError({ identifier: "ch-1" }))).toBe("channel:ch-1")
         expect(
-          matchError(new TelegramChannelIdentifierAmbiguousError({ identifier: "@ops", matches: Count.make(2) }))
+          matchError(
+            new TelegramChannelIdentifierAmbiguousError({
+              identifier: ChannelIdentifier.make("@ops"),
+              matches: Count.make(2)
+            })
+          )
         ).toBe("telegram-channel-ambiguous:@ops:2")
         expect(matchError(new ChannelArchivedError({ channel: "general" }))).toBe("channel-archived:general")
         expect(matchError(new ChannelLastMemberRemovalError({ channel: "general" }))).toBe(

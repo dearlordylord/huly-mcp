@@ -56,7 +56,7 @@ list_huly_classes {"query":"telegram","limit":50}
 get_huly_class {"class":"telegram:class:Message","includeInheritedAttributes":true}
 get_huly_class {"class":"telegram:class:NewMessage","includeInheritedAttributes":true}
 list_huly_plugin_configurations {}
-list_external_channel_messages {"provider":"telegram"}
+list_external_channel_messages {"provider":"telegram","channel":"Ops"}
 ```
 
 The first query returned exactly `telegram:class:Message`, `telegram:class:NewMessage`, and `telegram:class:SharedMessages`. The class probes confirmed the fields above. Plugin configuration records for `telegram` and `server-telegram` were enabled. The existing external-channel assessment correctly returned `supported:false`, reason code `package-incompatible`, because the package is not installed in this build.

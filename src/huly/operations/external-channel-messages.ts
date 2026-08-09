@@ -55,6 +55,10 @@ const TelegramMessageProjectionSchema = Schema.Struct({
 type TelegramMessageProjection = Schema.Schema.Type<typeof TelegramMessageProjectionSchema>
 
 type ExternalChannelMessagesError = HulyClientError | HulyError | TelegramChannelIdentifierAmbiguousError
+type TelegramUnsupportedResult = Extract<
+  ListExternalChannelMessagesResult,
+  { readonly supported: false; readonly provider: "telegram" }
+>
 
 const gmailUnsupportedResult = (
   params: ListExternalChannelMessagesParams,
@@ -74,7 +78,7 @@ const gmailUnsupportedResult = (
 const telegramUnsupportedResult = (
   params: ListExternalChannelMessagesParams,
   limit: LimitParam,
-  unsupportedReasonCode: "model-unavailable" | "channel-unavailable",
+  unsupportedReasonCode: TelegramUnsupportedResult["unsupportedReasonCode"],
   unsupportedReason: NonEmptyString
 ): ListExternalChannelMessagesResult => ({
   supported: false,

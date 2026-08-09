@@ -50,8 +50,17 @@ export const TelegramExternalChannelMessageSchema = Schema.Struct({
     description: "Telegram message content converted from Huly's stored markup to Markdown."
   }),
   direction: Schema.Literal("incoming", "outgoing"),
-  sentOn: Timestamp,
-  attachmentCount: Schema.optionalWith(Count, { exact: true })
+  sentOn: Timestamp.annotations({
+    description:
+      "Timestamp stored in the Huly Telegram message's sendOn field; it is not provider delivery or read evidence."
+  }),
+  attachmentCount: Schema.optionalWith(
+    Count.annotations({
+      description:
+        "Stored Huly attachment count. Inbound attachment creation is asynchronous, so this count can temporarily lag the message. Attachment bytes are not returned."
+    }),
+    { exact: true }
+  )
 })
 export type TelegramExternalChannelMessage = Schema.Schema.Type<typeof TelegramExternalChannelMessageSchema>
 
