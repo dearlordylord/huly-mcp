@@ -49,6 +49,9 @@ importers:
       '@hcengineering/love':
         specifier: 0.7.0
         version: 0.7.0
+      '@hcengineering/mail':
+        specifier: 0.7.0
+        version: 0.7.0
       '@hcengineering/notification':
         specifier: 0.7.0
         version: 0.7.0
@@ -237,6 +240,9 @@ importers:
         specifier: 0.7.0
         version: 0.7.0
       '@hcengineering/love':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/mail':
         specifier: 0.7.0
         version: 0.7.0
       '@hcengineering/notification':
@@ -986,6 +992,9 @@ packages:
 
   '@hcengineering/love@0.7.0':
     resolution: {integrity: sha512-oyyMxTv2s1w2usLk4bc429e+V5R1zjaxGDRZzVgsf0DPT5vr3sd1MNi73Nj91ruTPaqmE5bI7fQdG3uRG2MBzg==}
+
+  '@hcengineering/mail@0.7.0':
+    resolution: {integrity: sha512-r5ma2OHnxswFDzb71/hSyO7m+4zEJIOw/tH6+P/M7fc0s1KfNW3JJSZeNLB+kR2QznvV825PhM/j+fvofNP/sg==}
 
   '@hcengineering/measurements@0.7.423':
     resolution: {integrity: sha512-miQGTdEr47ha/3cJX3MFbqbfSgnK277yTSCJ+4evTRlEAM1WvcqxBrHB+vDTJxt3enj9hCGdX39BtpLNvDR2gQ==}
@@ -4119,6 +4128,12 @@ snapshots:
       '@hcengineering/ui': 0.7.0
       '@hcengineering/view': 0.7.0
       '@hcengineering/workbench': 0.7.0
+
+  '@hcengineering/mail@0.7.0':
+    dependencies:
+      '@hcengineering/card': 0.7.0
+      '@hcengineering/core': 0.7.26
+      '@hcengineering/platform': 0.7.20
 
   '@hcengineering/measurements@0.7.423': {}
 

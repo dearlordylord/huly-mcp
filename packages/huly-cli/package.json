@@ -32,6 +32,7 @@
     "@hcengineering/gmail": "0.7.0",
     "@hcengineering/inventory": "0.7.0",
     "@hcengineering/love": "0.7.0",
+    "@hcengineering/mail": "0.7.0",
     "@hcengineering/notification": "0.7.0",
     "@hcengineering/preference": "0.7.0",
     "@hcengineering/request": "0.7.0",

@@ -290,7 +290,7 @@ When resolved tool exposure is `proxy`, clients see the built-in tools plus thes
 | `get_tool_schema` | Returns the exact input and output schema for one proxy-visible Huly tool. Use this before invoke_tool when you are not certain about required argument names or result shape. |
 | `invoke_tool` | Invokes one proxy-visible Huly tool by exact name with its arguments. This tool can call read or write Huly operations; check get_tool_schema and the target tool annotations when safety matters. |
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `approvals`, `boards`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `templates`, `model-administration`, `planner`, `preferences`, `processes`, `recruiting`, `sdk-discovery`, `security-administration`, `sequence-administration`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `views`, `virtual-office`, `workflow-statuses`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `approvals`, `boards`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `mail`, `templates`, `model-administration`, `planner`, `preferences`, `processes`, `recruiting`, `sdk-discovery`, `security-administration`, `sequence-administration`, `spaces`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `views`, `virtual-office`, `workflow-statuses`
 
 ### Projects
 
@@ -754,6 +754,12 @@ When resolved tool exposure is `proxy`, clients see the built-in tools plus thes
 | `list_leads` | Query Huly leads in a funnel with optional filters. Pass the funnel ID returned by list_funnels, or a funnel name for convenience lookup. Returns leads sorted by modification date (newest first). Supports filtering by status, assignee, and title search. |
 | `get_lead` | Retrieve full details for a Huly lead including markdown description, customer name, funnel ID and funnel name, and status. Lead identifiers follow the upstream Huly format like 'LEAD-1'. |
 | `create_lead` | Create one native Huly lead in an active funnel for an existing person or organization. Resolve the funnel by ID or exact name; identify the customer explicitly as person or organization; optionally choose an employee assignee, Lead-compatible task type, exact workflow status, and Markdown description. Automatically applies the Customer mixin when needed, preserves native Huly references, and returns both leadId and LEAD-<number>. This tool never creates a person or organization inline. |
+
+### Mail
+
+| Tool | Description |
+|------|-------------|
+| `list_mail_threads` | Discover read-only Huly Mail thread metadata in one call: outer channel titles, human-resolved spaces, timestamps, and up to 10 newest child subject summaries per channel. This does not return message bodies or attachments and never sends, replies, mutates, or reports mailbox/delivery capability. A channelTitle may resemble a replication-recipient email but does not prove a correspondent or configured mailbox. Omit filters to list recent channels; filter by exact space name/ID or case-insensitive channel-title substring. Empty threads is a supported result. |
 
 ### Templates
 

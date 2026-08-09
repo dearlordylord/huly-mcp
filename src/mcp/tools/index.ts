@@ -24,6 +24,7 @@ import { inventoryTools } from "./inventory.js"
 import { issueTools } from "./issues.js"
 import { labelTools } from "./labels.js"
 import { leadTools } from "./leads.js"
+import { mailTools } from "./mail.js"
 import { messageTemplateTools } from "./message-templates.js"
 import { modelAdministrationTools } from "./model-administration.js"
 import { milestoneTools } from "./milestones.js"
@@ -92,6 +93,7 @@ export const allTools = [
   ...attachmentTools,
   ...contactTools,
   ...channelTools,
+  ...mailTools,
   ...boardTools,
   ...viewTools,
   ...cardTools,

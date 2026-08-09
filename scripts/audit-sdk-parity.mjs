@@ -70,8 +70,8 @@ const walkFiles = (directory, predicate) => {
   return result.sort()
 }
 
-const extractClassBlockNames = (text) =>
-  [...text.matchAll(/class:\s*\{([\s\S]*?)\n\s*};/g)].flatMap((block) =>
+const extractPluginModelNames = (text) =>
+  [...text.matchAll(/(?:class|tag):\s*\{([\s\S]*?)\n\s*};/g)].flatMap((block) =>
     [...block[1].matchAll(/^\s*([A-Za-z0-9_]+):/gm)].map((match) => match[1])
   )
 
@@ -103,12 +103,12 @@ const extractCandidates = () => {
       const filePath = join(typesDir, fileName)
       const text = readFileSync(filePath, "utf-8")
 
-      for (const exportName of extractClassBlockNames(text)) {
+      for (const exportName of extractPluginModelNames(text)) {
         addCandidate(candidates, {
           key: `${packageName}#${exportName}`,
           packageName,
           exportName,
-          sources: [`${filePath}:plugin-class`]
+          sources: [`${filePath}:plugin-model`]
         })
       }
 

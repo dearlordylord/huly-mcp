@@ -307,6 +307,23 @@ export const findSpace = (
     return assertAt(matches, 0)
   })
 
+export const spaceMapById = (
+  client: HulyClient["Type"],
+  ids: ReadonlyArray<Ref<Space>>
+): Effect.Effect<ReadonlyMap<SpaceId, GenericSpace>, HulyClientError> =>
+  Effect.gen(function* () {
+    const uniqueIds = [...new Set(ids.map(String))]
+    if (uniqueIds.length === 0) return new Map<SpaceId, GenericSpace>()
+
+    const spaces = yield* client.findAll<GenericSpace>(
+      spaceClass,
+      hulyQuery<GenericSpace>({ _id: { $in: uniqueIds.map((id) => toRef<GenericSpace>(SpaceId.make(id))) } }),
+      { limit: uniqueIds.length }
+    )
+
+    return new Map(spaces.map((space) => [SpaceId.make(space._id), space]))
+  })
+
 export const updateSpaceDoc = (
   client: HulyClient["Type"],
   space: GenericSpace,

@@ -8,7 +8,13 @@ import type { HulyClientOperations } from "../../src/huly/client.js"
 import { testMarkupUrlConfig } from "../../src/huly/operations/markup.js"
 import type { HulyStorageOperations } from "../../src/huly/storage.js"
 import { testWorkbenchUrlConfig } from "../../src/huly/url-builders.js"
-import { CATEGORY_NAMES, createFilteredRegistry, TOOL_DEFINITIONS, toolRegistry } from "../../src/mcp/tools/index.js"
+import {
+  CATEGORY_NAMES,
+  createFilteredRegistry,
+  resolveAnnotations,
+  TOOL_DEFINITIONS,
+  toolRegistry
+} from "../../src/mcp/tools/index.js"
 import { makeToolCategory, makeToolName } from "../../src/mcp/tools/registry.js"
 import { assertExists } from "../../src/utils/assertions.js"
 
@@ -56,6 +62,7 @@ describe("CATEGORY_NAMES", () => {
       expect(CATEGORY_NAMES.has(makeToolCategory("recruiting"))).toBe(true)
       expect(CATEGORY_NAMES.has(makeToolCategory("views"))).toBe(true)
       expect(CATEGORY_NAMES.has(makeToolCategory("preferences"))).toBe(true)
+      expect(CATEGORY_NAMES.has(makeToolCategory("mail"))).toBe(true)
       expect(CATEGORY_NAMES.has(makeToolCategory("approvals"))).toBe(true)
       expect(CATEGORY_NAMES.size).toBeGreaterThan(5)
     })
@@ -93,6 +100,23 @@ describe("CATEGORY_NAMES", () => {
       expect(definition.description).toContain("authoritative total")
       expect(definition.description).toContain("never creates or restores versions")
       expect(definition.annotations).toEqual({
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      })
+    })
+  )
+
+  it.effect("registers Mail thread metadata discovery separately from message tools", () =>
+    Effect.sync(function () {
+      const definition = toolDefinition("list_mail_threads")
+
+      expect(definition.category).toBe("mail")
+      expect(definition.description).toContain("read-only")
+      expect(definition.description).toContain("does not return message bodies or attachments")
+      expect(definition.description).toContain("does not prove a correspondent or configured mailbox")
+      expect(resolveAnnotations(definition)).toMatchObject({
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,

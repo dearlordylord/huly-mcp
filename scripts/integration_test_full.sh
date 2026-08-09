@@ -50,6 +50,8 @@ CUSTOM_FIELD_DATE_CLEANUP_FIELD_ID=""
 CUSTOM_FIELD_DATE_CLEANUP_FIELD_NAME=""
 CARD_VERSION_CLEANUP_BASE_ID=""
 CARD_UNVERSIONED_CLEANUP_ID=""
+MAIL_THREAD_CLEANUP_OUTER_ID=""
+MAIL_THREAD_CLEANUP_CHILD_ID=""
 TM_TASK_TYPE_NAME=""
 TM_STATUS_NAME=""
 WORKFLOW_CLEANED=false
@@ -329,6 +331,25 @@ cleanup_card_version_artifacts() {
   return "$cleanup_failed"
 }
 
+cleanup_mail_thread_artifacts() {
+  if [ -z "$MAIL_THREAD_CLEANUP_OUTER_ID" ] || [ -z "$MAIL_THREAD_CLEANUP_CHILD_ID" ]; then
+    return 0
+  fi
+  local cleanup_attempt
+  for cleanup_attempt in 1 2 3; do
+    if pnpm exec tsx scripts/integration-mail-threads.ts \
+      --mode cleanup \
+      --outerId "$MAIL_THREAD_CLEANUP_OUTER_ID" \
+      --childId "$MAIL_THREAD_CLEANUP_CHILD_ID" >/dev/null 2>&1; then
+      MAIL_THREAD_CLEANUP_OUTER_ID=""
+      MAIL_THREAD_CLEANUP_CHILD_ID=""
+      return 0
+    fi
+  done
+  echo "WARNING: Mail thread fixture cleanup failed after 3 attempts; retry markers retained" >&2
+  return 1
+}
+
 cleanup_global_space_admins() {
   if [ -z "$GLOBAL_ADMINS_CLEANUP_JSON" ]; then
     return 0
@@ -455,6 +476,7 @@ cleanup_all() {
   cleanup_generic_workflow_artifacts
   cleanup_global_space_admins || true
   cleanup_card_version_artifacts || true
+  cleanup_mail_thread_artifacts || true
   cleanup_custom_field_date_artifacts || true
   cleanup_board_artifacts || true
   cleanup_recruiting_artifacts || true
@@ -5677,6 +5699,43 @@ else
   skip_test "create/get/update/archive/delete board card" "create_board did not return a board id"
   echo "INFO: add/list/remove board card labels require create_board to return a board id"
 fi
+fi
+echo ""
+
+##############################
+# 14B. MAIL THREAD METADATA
+##############################
+echo "=== 14B. Mail thread metadata ==="
+MAIL_THREAD_SETUP_TEXT=$(pnpm exec tsx scripts/integration-mail-threads.ts --mode setup --runId "$RUN_ID" 2>/dev/null)
+if [ $? -eq 0 ]; then
+  MAIL_THREAD_CLEANUP_OUTER_ID=$(printf '%s\n' "$MAIL_THREAD_SETUP_TEXT" | jq -r '.outerId // empty' 2>/dev/null)
+  MAIL_THREAD_CLEANUP_CHILD_ID=$(printf '%s\n' "$MAIL_THREAD_SETUP_TEXT" | jq -r '.childId // empty' 2>/dev/null)
+  MAIL_THREAD_CHANNEL_TITLE=$(printf '%s\n' "$MAIL_THREAD_SETUP_TEXT" | jq -r '.channelTitle // empty' 2>/dev/null)
+  MAIL_THREAD_SUBJECT=$(printf '%s\n' "$MAIL_THREAD_SETUP_TEXT" | jq -r '.subject // empty' 2>/dev/null)
+  MAIL_THREAD_SPACE_ID=$(printf '%s\n' "$MAIL_THREAD_SETUP_TEXT" | jq -r '.spaceId // empty' 2>/dev/null)
+  MAIL_THREAD_SPACE_NAME=$(printf '%s\n' "$MAIL_THREAD_SETUP_TEXT" | jq -r '.spaceName // empty' 2>/dev/null)
+  echo "PASS: seed Mail thread metadata fixture"
+  PASSED=$((PASSED + 1))
+  restart_http_transport_if_needed "after Mail thread fixture writes" || exit 1
+
+  MAIL_THREAD_CHANNEL_TITLE_JSON=$(json_string "$MAIL_THREAD_CHANNEL_TITLE")
+  MAIL_THREAD_SPACE_ID_JSON=$(json_string "$MAIL_THREAD_SPACE_ID")
+  MAIL_THREAD_PAYLOAD="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_mail_threads\",\"arguments\":{\"space\":$MAIL_THREAD_SPACE_ID_JSON,\"channelTitleSearch\":$MAIL_THREAD_CHANNEL_TITLE_JSON,\"limit\":5}},\"id\":2}"
+  wait_for_json_array_contains_to_var MAIL_THREAD_LIST_TEXT "list_mail_threads includes fixture" \
+    "$MAIL_THREAD_PAYLOAD" ".threads | map(.id)" "$MAIL_THREAD_CLEANUP_OUTER_ID" 10 1
+  if [ $? -eq 0 ]; then
+    assert_json_field_equals "list_mail_threads resolves space name" "$MAIL_THREAD_LIST_TEXT" ".threads[0].space.name" "$MAIL_THREAD_SPACE_NAME"
+    assert_json_field_equals "list_mail_threads returns neutral channel title" "$MAIL_THREAD_LIST_TEXT" ".threads[0].channelTitle" "$MAIL_THREAD_CHANNEL_TITLE"
+    assert_json_array_contains "list_mail_threads includes child subject" "$MAIL_THREAD_LIST_TEXT" ".threads[0].subjects | map(.subject)" "$MAIL_THREAD_SUBJECT"
+    assert_json_field_equals "list_mail_threads omits body and attachment fields" "$MAIL_THREAD_LIST_TEXT" "[.. | objects | keys[]] | any(. == \"content\" or . == \"attachments\" or . == \"body\")" "false"
+  fi
+
+  if ! cleanup_mail_thread_artifacts; then
+    fail_test "cleanup Mail thread metadata fixture" "cleanup failed after 3 attempts; exit trap will retry"
+  fi
+  restart_http_transport_if_needed "after Mail thread fixture cleanup" || exit 1
+else
+  fail_test "seed Mail thread metadata fixture" "integration SDK fixture setup failed"
 fi
 echo ""
 

@@ -1,5 +1,5 @@
 // Centralized CJS require() interop for Huly platform plugins.
-// These packages only expose CommonJS default exports; import() doesn't work at runtime.
+// These plugin objects require CommonJS default-export interop; import() doesn't work at runtime.
 // All requires are collected here so consumers import typed values without eslint suppression.
 
 import { createRequire } from "node:module"
@@ -27,6 +27,7 @@ const gmailModule = load("@hcengineering/gmail") as typeof import("@hcengineerin
 export const gmail: typeof import("@hcengineering/gmail").default = gmailModule.default
 export const inventory = load("@hcengineering/inventory").default as typeof import("@hcengineering/inventory").default
 export const love = load("@hcengineering/love").default as typeof import("@hcengineering/love").default
+export const mail = load("@hcengineering/mail").default as typeof import("@hcengineering/mail").default
 export const notification = load("@hcengineering/notification")
   .default as typeof import("@hcengineering/notification").default
 export const preference = load("@hcengineering/preference")

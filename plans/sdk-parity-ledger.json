@@ -420,6 +420,15 @@
       ]
     },
     {
+      "package": "@hcengineering/mail",
+      "status": "covered",
+      "matrixLocation": "Huly Mail / Mail plugin",
+      "rationale": "list_mail_threads covers the published MailThread tag as read-only outer channel metadata with human-resolved spaces and bounded child Card subjects. The package exposes no message, attachment, mailbox, send/reply, or delivery contract; those broader capabilities remain explicitly blocked on communication/HulyLake and mailbox acknowledgement APIs.",
+      "exports": [
+        "MailThread"
+      ]
+    },
+    {
       "package": "@hcengineering/inventory",
       "status": "covered",
       "matrixLocation": "Inventory",

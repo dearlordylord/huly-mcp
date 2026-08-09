@@ -1,4 +1,3 @@
-import type { Ref, Space } from "@hcengineering/core"
 import { SortingOrder } from "@hcengineering/core"
 import type { SpacePreference as HulySpacePreference } from "@hcengineering/preference"
 import { Effect } from "effect"
@@ -18,32 +17,12 @@ import { Diagnostics } from "../diagnostics.js"
 import type { SpaceIdentifierAmbiguousError, SpaceNotFoundError } from "../errors.js"
 import { preference } from "../huly-plugins.js"
 import { clampLimit, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
-import { toRef } from "./sdk-boundary.js"
 import { toSpaceSummary } from "./spaces-projections.js"
-import { findSpace, type GenericSpace, listTotal, spaceClass } from "./spaces-shared.js"
+import { findSpace, type GenericSpace, listTotal, spaceMapById } from "./spaces-shared.js"
 
 type SpacePreferenceError = HulyClientError | SpaceNotFoundError | SpaceIdentifierAmbiguousError
 
 type SpacePreferenceProjection = Pick<HulySpacePreference, "_class" | "_id" | "attachedTo">
-
-const spaceRef = (id: string): Ref<Space> => toRef<Space>(SpaceId.make(id))
-
-const spaceMapById = (
-  client: HulyClient["Type"],
-  ids: ReadonlyArray<Ref<Space>>
-): Effect.Effect<ReadonlyMap<string, GenericSpace>, HulyClientError> =>
-  Effect.gen(function* () {
-    const uniqueIds = [...new Set(ids.map(String))]
-    if (uniqueIds.length === 0) return new Map<string, GenericSpace>()
-
-    const spaces = yield* client.findAll<GenericSpace>(
-      spaceClass,
-      hulyQuery<GenericSpace>({ _id: { $in: uniqueIds.map((id) => toRef<GenericSpace>(SpaceId.make(id))) } }),
-      { limit: uniqueIds.length }
-    )
-
-    return new Map(spaces.map((space) => [space._id, space]))
-  })
 
 const preferenceResult = (
   item: SpacePreferenceProjection,
@@ -58,10 +37,10 @@ const preferenceResult = (
 const warnMissingAttachedSpaces = (
   diagnostics: Diagnostics["Type"],
   items: ReadonlyArray<SpacePreferenceProjection>,
-  spacesById: ReadonlyMap<string, GenericSpace>
+  spacesById: ReadonlyMap<SpaceId, GenericSpace>
 ): Effect.Effect<void> => {
   const missingIds = [
-    ...new Set(items.map((item) => String(item.attachedTo)).filter((id) => !spacesById.has(id)))
+    ...new Set(items.map((item) => SpaceId.make(item.attachedTo)).filter((id) => !spacesById.has(id)))
   ].sort()
   if (missingIds.length === 0) return Effect.void
 
@@ -74,7 +53,7 @@ const warnMissingAttachedSpaces = (
 }
 
 const listQuery = (targetSpace: GenericSpace | undefined): StrictDocumentQuery<HulySpacePreference> =>
-  targetSpace === undefined ? {} : { attachedTo: spaceRef(targetSpace._id) }
+  targetSpace === undefined ? {} : { attachedTo: targetSpace._id }
 
 export const listSpacePreferences = (
   params: ListSpacePreferencesParams
@@ -104,7 +83,7 @@ export const listSpacePreferences = (
     yield* warnMissingAttachedSpaces(diagnostics, preferences, spacesById)
 
     return {
-      preferences: preferences.map((item) => preferenceResult(item, spacesById.get(item.attachedTo))),
+      preferences: preferences.map((item) => preferenceResult(item, spacesById.get(SpaceId.make(item.attachedTo)))),
       total: listTotal(preferences.total)
     }
   })
@@ -117,7 +96,7 @@ export const getSpacePreference = (
     const targetSpace = yield* findSpace(client, params)
     const item = yield* client.findOne<HulySpacePreference>(
       preference.class.SpacePreference,
-      hulyQuery<HulySpacePreference>({ attachedTo: spaceRef(targetSpace._id) })
+      hulyQuery<HulySpacePreference>({ attachedTo: targetSpace._id })
     )
 
     if (item === undefined) {

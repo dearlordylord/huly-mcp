@@ -130,6 +130,7 @@ export const collaborationReadOnlyCliCommandCatalog = {
     positional: ["provider", "channel"],
     description: "List External Channel Messages"
   },
+  list_mail_threads: { path: ["mail", "threads", "list"], positional: [], description: "List Mail Threads" },
   list_mentions: { path: ["activity", "mentions", "list"], positional: [], description: "List Mentions" },
   list_pinned_chat_messages: {
     path: ["channels", "messages", "pinned", "list"],

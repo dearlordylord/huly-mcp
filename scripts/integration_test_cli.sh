@@ -155,6 +155,7 @@ cover_cli_json "get_project_type" "project-types get" project-types get
 cover_cli_json "list_mentions" "activity mentions list" activity mentions list
 cover_cli_json "list_boards" "boards list" boards list
 cover_cli_json "list_channels" "channels list" channels list
+cover_cli_json "list_mail_threads" "mail threads list" mail threads list --limit 1
 cover_cli_json "list_persons" "contacts persons list" contacts persons list
 cover_cli_json "get_unread_notification_count" "notifications unread-count get" notifications unread-count get
 cover_cli_json "list_spaces" "spaces list" spaces list
