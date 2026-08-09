@@ -99,6 +99,7 @@
     "@hcengineering/time": "0.7.0",
     "@hcengineering/tracker": "0.7.0",
     "@hcengineering/view": "0.7.0",
+    "@hcengineering/workbench": "0.7.0",
     "ws": "^8.18.0"
   },
   "lint-staged": {

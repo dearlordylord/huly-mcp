@@ -23,7 +23,8 @@
         "task",
         "test-management",
         "time",
-        "tracker"
+        "tracker",
+        "workbench"
       ]
     },
     {
@@ -53,8 +54,7 @@
         "telegram",
         "templates",
         "training",
-        "view",
-        "workbench"
+        "view"
       ]
     },
     {
@@ -731,6 +731,29 @@
         "TypeMilestoneStatus",
         "TypeRemainingTime",
         "TypeReportedTime"
+      ]
+    },
+    {
+      "package": "@hcengineering/workbench",
+      "status": "covered",
+      "matrixLocation": "Workbench tabs/widgets/apps",
+      "rationale": "list_workbench_applications covers Application and ApplicationNavModel declarations by human URL alias and summarizes the authenticated account's HiddenApplication preference without exposing private preference row identifiers.",
+      "exports": [
+        "Application",
+        "ApplicationNavModel",
+        "HiddenApplication"
+      ]
+    },
+    {
+      "package": "@hcengineering/workbench",
+      "status": "not-mcp-facing",
+      "matrixLocation": "Workbench tabs/widgets/apps",
+      "rationale": "WorkbenchTab is private ephemeral browser history whose active selection lives only in localStorage. Widget and WidgetPreference lack a stable human-readable alias and useful agent workflow. SpaceView is presentation metadata. These are intentionally excluded rather than exposed as raw UI internals.",
+      "exports": [
+        "SpaceView",
+        "Widget",
+        "WidgetPreference",
+        "WorkbenchTab"
       ]
     }
   ]

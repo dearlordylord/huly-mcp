@@ -132,6 +132,11 @@ export const collaborationReadOnlyCliCommandCatalog = {
     description: "List External Channel Messages"
   },
   list_mail_threads: { path: ["mail", "threads", "list"], positional: [], description: "List Mail Threads" },
+  list_workbench_applications: {
+    path: ["workbench", "applications", "list"],
+    positional: [],
+    description: "List Workbench Applications"
+  },
   list_mentions: { path: ["activity", "mentions", "list"], positional: [], description: "List Mentions" },
   list_pinned_chat_messages: {
     path: ["channels", "messages", "pinned", "list"],

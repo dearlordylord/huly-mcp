@@ -1540,6 +1540,8 @@ describe("Huly Errors", () => {
               return `workflow-status-in-use:${error.statusId}:${error.references.length}`
             case "WorkflowStatusCategoryInUseError":
               return `workflow-category-in-use:${error.categoryId}:${error.statusIds.length}`
+            case "WorkbenchApplicationAliasAmbiguousError":
+              return `workbench-application-alias:${error.alias}:${error.matches}`
             default: {
               const _exhaustive: never = error
               return _exhaustive

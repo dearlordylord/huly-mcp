@@ -12,7 +12,7 @@ Local evidence sources:
 
 Current high-level MCP categories:
 
-`projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `mail`, `support`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `approvals`, `notifications`, `workspace`, `spaces`, `cards`, `boards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `planner`, `processes`, `sdk-discovery`, `tags`, `tag-categories`, `templates`, `task-management`, `test-management`, `user-statuses`, `virtual-office`.
+`projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `mail`, `support`, `workbench`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `approvals`, `notifications`, `workspace`, `spaces`, `cards`, `boards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `planner`, `processes`, `sdk-discovery`, `tags`, `tag-categories`, `templates`, `task-management`, `test-management`, `user-statuses`, `virtual-office`.
 
 ## Missing Or Partially Missing SDK Surfaces
 
@@ -58,7 +58,7 @@ Current high-level MCP categories:
 | Billing / tiers | `.reference/platform/models/billing/src/index.ts`: `Tier`; billing plugin/resources | No billing tools | Billing tier/status discovery if relevant to workspace administration |
 | Analytics collector / onboarding channel | `.reference/platform/models/analytics-collector/src/index.ts`: `OnboardingChannel` | No analytics/onboarding tools | Onboarding channels and analytics collector configuration; likely low priority for MCP |
 | View / saved filtered views | `.reference/platform/models/view/src/index.ts`: `FilteredView`, `Viewlet`, actions, view preferences | No saved-view tools; list tools accept ad hoc filters | Saved filtered views, user view preferences, viewlet descriptors, reusable filters/sorts/groups |
-| Workbench tabs/widgets/apps | `.reference/platform/models/workbench/src/index.ts`: `Application`, `ApplicationNavModel`, `HiddenApplication`, `Widget`, `WidgetPreference`, `WorkbenchTab` | No workbench UI state tools | List/hide apps, tabs, widgets, widget prefs. Mostly UI state, lower MCP priority |
+| Workbench tabs/widgets/apps | Installed exact `@hcengineering/workbench@0.7.0`; `docs/research/workbench-integration-spike.md`; `.reference/platform/models/workbench/src/index.ts`: `Application`, `ApplicationNavModel`, `HiddenApplication`, `Widget`, `WidgetPreference`, `WorkbenchTab` | `list_workbench_applications` discovers application and navigation model declarations by human URL alias and reports only the authenticated account's hidden preference boolean | Personal tabs and active selection are private/browser-local history; widgets and widget preferences lack a stable human-readable identifier and useful agent workflow; all Workbench mutations remain unsupported |
 | Preference model | `.reference/platform/models/preference`; many modules store preferences | Read-only generic `SpacePreference` discovery through `list_space_preferences` and `get_space_preference` | Generic preference writes and module-specific preference payloads remain deferred unless the published SDK exposes safe typed fields |
 | Document preferences and history | Installed `@hcengineering/document`; `node_modules/@hcengineering/document/types/types.d.ts` still exposes stale `SavedDocument extends Preference` plus `DocumentSnapshot`. Current platform source removed the `SavedDocument` model in hcengineering/platform#10124 and replaced document stars with rating-backed `DocReaction` / `ReactionKind.Star` | Document tools cover teamspaces, document CRUD, content edit, inline comments, relations, deletion, and read-only snapshot/history list/get. | Snapshot restore remains deferred until restore semantics are proven. Do not implement `SavedDocument` as SDK parity unless the platform model is restored; current document stars belong to the Rating / reputation row |
 
@@ -86,6 +86,7 @@ Current high-level MCP categories:
 | `@hcengineering/telegram` | Partial read-only | Live provider health/sync freshness, compose/send/reply, shared messages, attachment bytes, and durable delivery/read status |
 | `@hcengineering/tracker` | Strong but partial | GitHub pull-request task type/sync details, PDF export, saved views beyond ProjectTargetPreference, tracker-local Document support type, and broader workflow automation behavior |
 | `@hcengineering/view` | No saved-view tools | Saved filtered views, user view preferences, viewlet descriptors, reusable filters/sorts/groups |
+| `@hcengineering/workbench` | Application/navigation declarations and caller hidden preference covered | Private/browser-local tabs, widgets without human-readable aliases, widget preferences, and all Workbench mutations |
 
 ## Highest-Value Additions For LLM Agents
 

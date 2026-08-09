@@ -1,5 +1,30 @@
 /* eslint-disable max-lines -- barrel re-export index; no logic, only re-exports from domain modules */
 export {
+  type ListWorkbenchApplicationsParams,
+  listWorkbenchApplicationsParamsJsonSchema,
+  ListWorkbenchApplicationsParamsSchema,
+  type ListWorkbenchApplicationsResult,
+  ListWorkbenchApplicationsResultSchema,
+  parseListWorkbenchApplicationsParams,
+  WorkbenchAccountRoleSchema,
+  WorkbenchApplicationAlias,
+  WorkbenchApplicationAliasSearch,
+  WorkbenchApplicationId,
+  WorkbenchApplicationOrder,
+  type WorkbenchApplicationPosition,
+  WorkbenchApplicationPositionSchema,
+  WorkbenchApplicationSummarySchema,
+  WorkbenchApplicationType,
+  WorkbenchGroupNavigationSchema,
+  WorkbenchLabelId,
+  WorkbenchNavigationItemId,
+  WorkbenchNavigationPosition,
+  WorkbenchNavigationSummarySchema,
+  WorkbenchSpaceNavigationSchema,
+  WorkbenchSpecialNavigationSchema
+} from "./workbench.js"
+
+export {
   type GetSupportStatusParams,
   getSupportStatusParamsJsonSchema,
   GetSupportStatusParamsSchema,

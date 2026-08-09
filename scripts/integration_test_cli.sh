@@ -163,6 +163,10 @@ cover_cli_json "list_mail_threads" "mail threads list" mail threads list --limit
 capture_cli_json "get_support_status" "support status get" SUPPORT_STATUS_JSON support status get
 assert_json "support status reports the local missing setup" "$SUPPORT_STATUS_JSON" \
   '.supported == true and .setup.status == "missing" and (.statusRecords | type) == "array"'
+capture_cli_json "list_workbench_applications" "workbench applications list" WORKBENCH_APPLICATIONS_JSON \
+  workbench applications list --alias board
+assert_json "workbench returns the Board model declaration independently of disabled plugin capability" "$WORKBENCH_APPLICATIONS_JSON" \
+  '.total == 1 and (.applications | length) == 1 and .applications[0].alias == "board" and (.applications[0].navigation.spaces | type) == "array"'
 cover_cli_json "list_persons" "contacts persons list" contacts persons list
 cover_cli_json "get_unread_notification_count" "notifications unread-count get" notifications unread-count get
 cover_cli_json "list_spaces" "spaces list" spaces list

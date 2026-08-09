@@ -290,7 +290,7 @@ When resolved tool exposure is `proxy`, clients see the built-in tools plus thes
 | `get_tool_schema` | Returns the exact input and output schema for one proxy-visible Huly tool. Use this before invoke_tool when you are not certain about required argument names or result shape. |
 | `invoke_tool` | Invokes one proxy-visible Huly tool by exact name with its arguments. This tool can call read or write Huly operations; check get_tool_schema and the target tool annotations when safety matters. |
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `approvals`, `boards`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `mail`, `templates`, `model-administration`, `planner`, `preferences`, `processes`, `recruiting`, `sdk-discovery`, `security-administration`, `sequence-administration`, `spaces`, `support`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `views`, `virtual-office`, `workflow-statuses`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `approvals`, `boards`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `mail`, `templates`, `model-administration`, `planner`, `preferences`, `processes`, `recruiting`, `sdk-discovery`, `security-administration`, `sequence-administration`, `spaces`, `support`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `views`, `virtual-office`, `workbench`, `workflow-statuses`
 
 ### Projects
 
@@ -1022,6 +1022,12 @@ When resolved tool exposure is `proxy`, clients see the built-in tools plus thes
 | `get_meeting_minutes` | Get one meeting notes/transcript record (minutes) by meetingMinutesId, including description when readable. |
 | `list_device_preferences` | List readable virtual-office media device preferences. |
 | `list_office_defaults` | List room-level language, default recording, and default transcription settings. |
+
+### Workbench
+
+| Tool | Description |
+|------|-------------|
+| `list_workbench_applications` | List read-only Huly Workbench application model declarations by exact URL alias or case-insensitive alias substring. Returns untranslated labelId values, static model flags, the authenticated account's caller-scoped hiddenByPreference state, and summarized declarative space/special/group navigation without executing components, resource callbacks, or query builders. Legacy space-navigation entries without a stable id are omitted with an agent-visible warning. Application presence is not proof that a plugin, integration provider, worker, API, role, permission, or effective browser visibility is enabled. Personal tabs, active browser state, widgets, widget tabs/preferences, and all Workbench mutations are intentionally unsupported because they are private or browser-local and lack a reliable human-readable agent workflow. |
 
 ### Workflow-Statuses
 

@@ -3777,6 +3777,35 @@ if [ $? -eq 0 ]; then
   assert_json_field_equals "get_support_status local setup" "$SUPPORT_STATUS_TEXT" ".setup.status" "missing"
   assert_json_field_equals "get_support_status status records array" "$SUPPORT_STATUS_TEXT" ".statusRecords | type" "array"
 fi
+run_capture_to_var WORKBENCH_APPLICATION_CLASS_TEXT "get_huly_class(workbench Application)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_huly_class","arguments":{"class":"workbench:class:Application"}},"id":2}'
+if [ $? -eq 0 ]; then
+  assert_json_field_equals "Workbench Application classifier exists" "$WORKBENCH_APPLICATION_CLASS_TEXT" ".class.classId" "workbench:class:Application"
+fi
+run_capture_to_var WORKBENCH_NAV_CLASS_TEXT "get_huly_class(workbench ApplicationNavModel)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_huly_class","arguments":{"class":"workbench:class:ApplicationNavModel"}},"id":2}'
+if [ $? -eq 0 ]; then
+  assert_json_field_equals "Workbench ApplicationNavModel classifier exists" "$WORKBENCH_NAV_CLASS_TEXT" ".class.classId" "workbench:class:ApplicationNavModel"
+fi
+run_capture_to_var WORKBENCH_APPLICATIONS_TEXT "list_workbench_applications(all declarations)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_workbench_applications","arguments":{"limit":100}},"id":2}'
+if [ $? -eq 0 ]; then
+  assert_json_field_equals "list_workbench_applications returns declarations" "$WORKBENCH_APPLICATIONS_TEXT" ".applications | length > 0" "true"
+  assert_json_field_equals "list_workbench_applications aliases are non-empty" "$WORKBENCH_APPLICATIONS_TEXT" "[.applications[].alias | length > 0] | all" "true"
+  assert_json_field_equals "list_workbench_applications queries navigation models" "$WORKBENCH_APPLICATIONS_TEXT" "[.applications[].navigation | (.spaces | type) == \"array\" and (.specials | type) == \"array\" and (.groups | type) == \"array\"] | all" "true"
+fi
+run_capture_to_var WORKBENCH_PLUGIN_CONFIG_TEXT "list_huly_plugin_configurations(board disabled)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_huly_plugin_configurations","arguments":{}},"id":2}'
+if [ $? -eq 0 ]; then
+  assert_json_field_equals "local Board plugin configuration is disabled" "$WORKBENCH_PLUGIN_CONFIG_TEXT" "[.pluginConfigurations[] | select(.pluginId == \"board\") | .enabled] | first" "false"
+fi
+run_capture_to_var WORKBENCH_DISABLED_APP_TEXT "list_workbench_applications(board despite disabled plugin)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_workbench_applications","arguments":{"alias":"board"}},"id":2}'
+if [ $? -eq 0 ]; then
+  assert_json_field_equals "disabled plugin application remains a model declaration" "$WORKBENCH_DISABLED_APP_TEXT" ".applications[0].alias" "board"
+  assert_json_field_equals "disabled plugin application is not filtered as capability" "$WORKBENCH_DISABLED_APP_TEXT" ".total" "1"
+  assert_json_field_equals "list_workbench_applications returns caller preference state" "$WORKBENCH_DISABLED_APP_TEXT" ".applications[0].hiddenByPreference | type" "boolean"
+fi
 run_capture_to_var TELEGRAM_MESSAGES_TEXT "list_external_channel_messages(telegram missing channel)" \
   "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_external_channel_messages\",\"arguments\":{\"provider\":\"telegram\",\"channel\":\"mcp-no-channel-$RUN_ID\",\"limit\":5}},\"id\":2}"
 if [ $? -eq 0 ]; then

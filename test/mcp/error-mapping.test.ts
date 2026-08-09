@@ -5,6 +5,7 @@ import { expect } from "vitest"
 import { CanonicalBase64ImageData } from "../../src/domain/schemas/attachments.js"
 import { AssociationName } from "../../src/domain/schemas/generic-associations.js"
 import { ProcessId } from "../../src/domain/schemas/processes.js"
+import { WorkbenchApplicationAlias } from "../../src/domain/schemas/workbench.js"
 import {
   ApplicantIdentifier,
   CandidateIdentifier,
@@ -83,7 +84,8 @@ import {
   TagCategoryNotFoundError,
   TagIdentifierAmbiguousError,
   TagNotFoundError,
-  TelegramChannelIdentifierAmbiguousError
+  TelegramChannelIdentifierAmbiguousError,
+  WorkbenchApplicationAliasAmbiguousError
 } from "../../src/huly/errors.js"
 import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import {
@@ -140,6 +142,21 @@ describe("Error Mapping to MCP", () => {
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
           expect(response._meta.errorTag).toBe("TelegramChannelIdentifierAmbiguousError")
           expect(assertAt(response.content, 0).text).toContain("use the stable contact-channel ID")
+        })
+      )
+
+      it.effect("maps ambiguous Workbench aliases to invalid params", () =>
+        Effect.sync(function () {
+          const error = new WorkbenchApplicationAliasAmbiguousError({
+            alias: WorkbenchApplicationAlias.make("tracker"),
+            matches: Count.make(2)
+          })
+          const response = mapDomainErrorToMcp(error)
+
+          expect(response.isError).toBe(true)
+          expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+          expect(response._meta.errorTag).toBe("WorkbenchApplicationAliasAmbiguousError")
+          expect(assertAt(response.content, 0).text).toContain("inspect the workspace model")
         })
       )
 

@@ -64,6 +64,7 @@ import { viewTools } from "./views.js"
 import { virtualOfficeTools } from "./virtual-office.js"
 import { workspaceTools } from "./workspace.js"
 import { workflowStatusTools } from "./workflow-statuses.js"
+import { workbenchTools } from "./workbench.js"
 
 export const allTools = [
   ...projectTools,
@@ -116,6 +117,7 @@ export const allTools = [
   ...processTools,
   ...workspaceTools,
   ...workflowStatusTools,
+  ...workbenchTools,
   ...taskManagementTools,
   ...testManagementCoreTools,
   ...testManagementPlansTools

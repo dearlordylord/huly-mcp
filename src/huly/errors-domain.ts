@@ -66,6 +66,7 @@ import {
 } from "./errors-documents.js"
 import { HulyDomainBaseError } from "./errors-domain-base.js"
 import { HulyMessagingDomainError } from "./errors-domain-messaging.js"
+import { HulyViewDomainError } from "./errors-domain-view.js"
 import {
   DriveFileCommentNotFoundError,
   DriveFileNotFoundError,
@@ -215,16 +216,11 @@ import {
   ProjectNotFoundError,
   TemplateChildNotFoundError
 } from "./errors-tracker.js"
-import {
-  FilteredViewIdentifierAmbiguousError,
-  FilteredViewNotFoundError,
-  ViewletIdentifierAmbiguousError,
-  ViewletNotFoundError
-} from "./errors-views.js"
 import { WorkflowStatusDomainError } from "./errors-workflow-statuses.js"
 
 export const HulyDomainError = Schema.Union(
   HulyDomainBaseError,
+  HulyViewDomainError,
   ApprovalRequestErrors.ApprovalRequestNotFoundError,
   ApprovalRequestErrors.ApprovalRequestTargetNotFoundError,
   ApprovalRequestErrors.ApprovalRequestInvalidApprovalThresholdError,
@@ -253,10 +249,6 @@ export const HulyDomainError = Schema.Union(
   BoardMenuPageIdentifierAmbiguousError,
   BoardViewletNotFoundError,
   BoardViewletIdentifierAmbiguousError,
-  FilteredViewNotFoundError,
-  FilteredViewIdentifierAmbiguousError,
-  ViewletNotFoundError,
-  ViewletIdentifierAmbiguousError,
   IssueNotFoundError,
   IssueReferenceError,
   ProjectNotFoundError,

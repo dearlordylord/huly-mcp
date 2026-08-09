@@ -41,5 +41,6 @@ export const telegram = load("@hcengineering/telegram").default as typeof import
 export const time = load("@hcengineering/time").default as typeof import("@hcengineering/time").default
 export const tracker = load("@hcengineering/tracker").default as typeof import("@hcengineering/tracker").default
 export const view = load("@hcengineering/view").default as typeof import("@hcengineering/view").default
+export const workbench = load("@hcengineering/workbench").default as typeof import("@hcengineering/workbench").default
 
 /* eslint-enable @typescript-eslint/consistent-type-imports, no-restricted-syntax */

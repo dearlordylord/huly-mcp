@@ -216,6 +216,10 @@ const CATEGORY_DESCRIPTIONS: ReadonlyMap<ToolCategory, ToolDescription> = new Ma
     "Read-only support-widget setup and authenticated-account stored status discovery."
   ),
   categoryDescriptionEntry(
+    "workbench",
+    "Read-only Workbench application, declarative navigation, and caller hidden-preference discovery."
+  ),
+  categoryDescriptionEntry(
     "recruiting",
     "Recruiting vacancies, applicants, reviews, opinions, candidate skills, and recruiting media."
   ),
