@@ -67,6 +67,9 @@ importers:
       '@hcengineering/task':
         specifier: 0.7.0
         version: 0.7.0
+      '@hcengineering/telegram':
+        specifier: 0.7.0
+        version: 0.7.0
       '@hcengineering/templates':
         specifier: 0.7.0
         version: 0.7.0
@@ -258,6 +261,9 @@ importers:
         specifier: 0.7.0
         version: 0.7.0
       '@hcengineering/task':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/telegram':
         specifier: 0.7.0
         version: 0.7.0
       '@hcengineering/templates':
@@ -1031,6 +1037,9 @@ packages:
 
   '@hcengineering/task@0.7.0':
     resolution: {integrity: sha512-/ARXN6fAyouUzyf2OUVfR/kokMRrVb5RhOCqxNS9b688xBHg8DoDIMkO4RI+0vbkb+S6ZTWQoZjf7zwTHhBO+w==}
+
+  '@hcengineering/telegram@0.7.0':
+    resolution: {integrity: sha512-1IG9u6mZkutb7e/Vp1ePfr8EPV5cGR9Vt/IeFGs97AWNDQWGuScJkrxecx0TnqtQvPCpQgHXEapiC6hmGRkytQ==}
 
   '@hcengineering/templates@0.7.0':
     resolution: {integrity: sha512-1tmbv2Aw2/p5T0RPUunc/2s4c8bSdhOYN5NZTKl7KVA1W4RDjpg6rqcgls6IV+BuoIg3FFEWuVHVGin5fJClqg==}
@@ -4211,6 +4220,17 @@ snapshots:
       '@hcengineering/rank': 0.7.18
       '@hcengineering/ui': 0.7.0
       '@hcengineering/view': 0.7.0
+
+  '@hcengineering/telegram@0.7.0':
+    dependencies:
+      '@hcengineering/activity': 0.7.0
+      '@hcengineering/contact': 0.7.0
+      '@hcengineering/core': 0.7.26
+      '@hcengineering/notification': 0.7.0
+      '@hcengineering/platform': 0.7.20
+      '@hcengineering/setting': 0.7.0
+      '@hcengineering/templates': 0.7.0
+      '@hcengineering/ui': 0.7.0
 
   '@hcengineering/templates@0.7.0':
     dependencies:

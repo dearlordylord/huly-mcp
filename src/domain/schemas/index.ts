@@ -1563,7 +1563,11 @@ export {
   ListExternalChannelMessagesParamsSchema,
   type ListExternalChannelMessagesResult,
   ListExternalChannelMessagesResultSchema,
-  parseListExternalChannelMessagesParams
+  parseListExternalChannelMessagesParams,
+  type TelegramExternalChannel,
+  TelegramExternalChannelMessageSchema,
+  type TelegramExternalChannelMessage,
+  TelegramExternalChannelSchema
 } from "./external-channel-messages.js"
 
 export {

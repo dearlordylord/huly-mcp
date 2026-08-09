@@ -52,6 +52,8 @@ CARD_VERSION_CLEANUP_BASE_ID=""
 CARD_UNVERSIONED_CLEANUP_ID=""
 MAIL_THREAD_CLEANUP_OUTER_ID=""
 MAIL_THREAD_CLEANUP_CHILD_ID=""
+TELEGRAM_CLEANUP_CHANNEL_ID=""
+TELEGRAM_CLEANUP_MESSAGE_ID=""
 TM_TASK_TYPE_NAME=""
 TM_STATUS_NAME=""
 WORKFLOW_CLEANED=false
@@ -350,6 +352,25 @@ cleanup_mail_thread_artifacts() {
   return 1
 }
 
+cleanup_telegram_message_artifacts() {
+  if [ -z "$TELEGRAM_CLEANUP_CHANNEL_ID" ] || [ -z "$TELEGRAM_CLEANUP_MESSAGE_ID" ]; then
+    return 0
+  fi
+  local cleanup_attempt
+  for cleanup_attempt in 1 2 3; do
+    if pnpm exec tsx scripts/integration-telegram-messages.ts \
+      --mode cleanup \
+      --channelId "$TELEGRAM_CLEANUP_CHANNEL_ID" \
+      --messageId "$TELEGRAM_CLEANUP_MESSAGE_ID" >/dev/null 2>&1; then
+      TELEGRAM_CLEANUP_CHANNEL_ID=""
+      TELEGRAM_CLEANUP_MESSAGE_ID=""
+      return 0
+    fi
+  done
+  echo "WARNING: Telegram message fixture cleanup failed after 3 attempts; retry markers retained" >&2
+  return 1
+}
+
 cleanup_global_space_admins() {
   if [ -z "$GLOBAL_ADMINS_CLEANUP_JSON" ]; then
     return 0
@@ -477,6 +498,7 @@ cleanup_all() {
   cleanup_global_space_admins || true
   cleanup_card_version_artifacts || true
   cleanup_mail_thread_artifacts || true
+  cleanup_telegram_message_artifacts || true
   cleanup_custom_field_date_artifacts || true
   cleanup_board_artifacts || true
   cleanup_recruiting_artifacts || true
@@ -3748,10 +3770,11 @@ run_test "get_user_profile" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_user_profile","arguments":{}},"id":2}'
 run_test "list_contact_channel_providers" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_contact_channel_providers","arguments":{}},"id":2}'
-run_capture_to_var TELEGRAM_MESSAGES_TEXT "list_external_channel_messages(telegram unsupported)" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_external_channel_messages","arguments":{"provider":"telegram","channel":"Ops","limit":5}},"id":2}'
+run_capture_to_var TELEGRAM_MESSAGES_TEXT "list_external_channel_messages(telegram missing channel)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_external_channel_messages\",\"arguments\":{\"provider\":\"telegram\",\"channel\":\"mcp-no-channel-$RUN_ID\",\"limit\":5}},\"id\":2}"
 if [ $? -eq 0 ]; then
   assert_json_field_equals "list_external_channel_messages Telegram supported=false" "$TELEGRAM_MESSAGES_TEXT" ".supported" "false"
+  assert_json_field_equals "list_external_channel_messages Telegram missing-channel reason" "$TELEGRAM_MESSAGES_TEXT" ".unsupportedReasonCode" "channel-unavailable"
   assert_json_field_equals "list_external_channel_messages Telegram messages array" "$TELEGRAM_MESSAGES_TEXT" ".messages | type" "array"
 fi
 
@@ -5736,6 +5759,40 @@ if [ $? -eq 0 ]; then
   restart_http_transport_if_needed "after Mail thread fixture cleanup" || exit 1
 else
   fail_test "seed Mail thread metadata fixture" "integration SDK fixture setup failed"
+fi
+echo ""
+
+##############################
+# 14C. TELEGRAM STORED MESSAGES
+##############################
+echo "=== 14C. Telegram stored messages ==="
+TELEGRAM_SETUP_TEXT=$(pnpm exec tsx scripts/integration-telegram-messages.ts --mode setup --runId "$RUN_ID" 2>/dev/null)
+if [ $? -eq 0 ]; then
+  TELEGRAM_CLEANUP_CHANNEL_ID=$(printf '%s\n' "$TELEGRAM_SETUP_TEXT" | jq -r '.channelId // empty' 2>/dev/null)
+  TELEGRAM_CLEANUP_MESSAGE_ID=$(printf '%s\n' "$TELEGRAM_SETUP_TEXT" | jq -r '.messageId // empty' 2>/dev/null)
+  TELEGRAM_CONTENT_MARKDOWN=$(printf '%s\n' "$TELEGRAM_SETUP_TEXT" | jq -r '.contentMarkdown // empty' 2>/dev/null)
+  echo "PASS: seed Telegram stored-message fixture"
+  PASSED=$((PASSED + 1))
+  restart_http_transport_if_needed "after Telegram message fixture writes" || exit 1
+
+  TELEGRAM_CHANNEL_ID_JSON=$(json_string "$TELEGRAM_CLEANUP_CHANNEL_ID")
+  TELEGRAM_PAYLOAD="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_external_channel_messages\",\"arguments\":{\"provider\":\"telegram\",\"channel\":$TELEGRAM_CHANNEL_ID_JSON,\"limit\":5}},\"id\":2}"
+  wait_for_json_array_contains_to_var TELEGRAM_STORED_TEXT "list_external_channel_messages includes Telegram fixture" \
+    "$TELEGRAM_PAYLOAD" ".messages | map(.id)" "$TELEGRAM_CLEANUP_MESSAGE_ID" 10 1
+  if [ $? -eq 0 ]; then
+    assert_json_field_equals "list_external_channel_messages Telegram supported=true" "$TELEGRAM_STORED_TEXT" ".supported" "true"
+    assert_json_field_equals "list_external_channel_messages resolves Telegram channel ID" "$TELEGRAM_STORED_TEXT" ".channel.id" "$TELEGRAM_CLEANUP_CHANNEL_ID"
+    assert_json_field_equals "list_external_channel_messages converts Telegram markup" "$TELEGRAM_STORED_TEXT" ".messages[0].contentMarkdown" "$TELEGRAM_CONTENT_MARKDOWN"
+    assert_json_field_equals "list_external_channel_messages returns Telegram direction" "$TELEGRAM_STORED_TEXT" ".messages[0].direction" "incoming"
+    assert_json_field_equals "list_external_channel_messages returns Telegram attachment count" "$TELEGRAM_STORED_TEXT" ".messages[0].attachmentCount" "0"
+  fi
+
+  if ! cleanup_telegram_message_artifacts; then
+    fail_test "cleanup Telegram stored-message fixture" "cleanup failed after 3 attempts; exit trap will retry"
+  fi
+  restart_http_transport_if_needed "after Telegram message fixture cleanup" || exit 1
+else
+  fail_test "seed Telegram stored-message fixture" "integration SDK fixture setup failed"
 fi
 echo ""
 

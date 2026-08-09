@@ -93,6 +93,7 @@ import {
   DirectMessageIdentifierAmbiguousError,
   DirectMessageNotFoundError,
   DirectMessageParticipantCountError,
+  TelegramChannelIdentifierAmbiguousError,
   DocumentContentCorruptedError,
   DocumentEditModeError,
   DocumentNotFoundError,
@@ -1106,6 +1107,8 @@ describe("Huly Errors", () => {
               return `milestone-ambiguous:${error.identifier}:${error.candidates.length}`
             case "ChannelNotFoundError":
               return `channel:${error.identifier}`
+            case "TelegramChannelIdentifierAmbiguousError":
+              return `telegram-channel-ambiguous:${error.identifier}:${error.matches}`
             case "ChannelArchivedError":
               return `channel-archived:${error.channel}`
             case "ChannelLastMemberRemovalError":
@@ -1927,6 +1930,9 @@ describe("Huly Errors", () => {
           )
         ).toBe("milestone-ambiguous:Sprint:2")
         expect(matchError(new ChannelNotFoundError({ identifier: "ch-1" }))).toBe("channel:ch-1")
+        expect(
+          matchError(new TelegramChannelIdentifierAmbiguousError({ identifier: "@ops", matches: Count.make(2) }))
+        ).toBe("telegram-channel-ambiguous:@ops:2")
         expect(matchError(new ChannelArchivedError({ channel: "general" }))).toBe("channel-archived:general")
         expect(matchError(new ChannelLastMemberRemovalError({ channel: "general" }))).toBe(
           "channel-last-member:general"

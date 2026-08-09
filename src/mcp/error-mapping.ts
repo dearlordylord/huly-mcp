@@ -104,6 +104,7 @@ const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDo
   "MilestoneIdentifierAmbiguousError",
   "MilestoneNotFoundError",
   "ChannelNotFoundError",
+  "TelegramChannelIdentifierAmbiguousError",
   "ChannelArchivedError",
   "ChannelLastMemberRemovalError",
   "ChannelLastOwnerRemovalError",

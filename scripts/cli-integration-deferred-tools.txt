@@ -213,7 +213,6 @@ list_drive_file_versions
 list_drive_items
 list_employees
 list_event_instances
-list_external_channel_messages
 list_pinned_chat_messages
 list_filtered_views
 list_inventory_product_activity

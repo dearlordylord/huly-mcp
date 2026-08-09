@@ -155,6 +155,10 @@ cover_cli_json "get_project_type" "project-types get" project-types get
 cover_cli_json "list_mentions" "activity mentions list" activity mentions list
 cover_cli_json "list_boards" "boards list" boards list
 cover_cli_json "list_channels" "channels list" channels list
+capture_cli_json "list_external_channel_messages" "Telegram missing-channel assessment" TELEGRAM_EXTERNAL_JSON \
+  channels external-messages list telegram "mcp-cli-no-channel-$RUN_ID" --limit 1
+assert_json "Telegram missing-channel assessment is explicit" "$TELEGRAM_EXTERNAL_JSON" \
+  '.supported == false and .unsupportedReasonCode == "channel-unavailable" and .messages == []'
 cover_cli_json "list_mail_threads" "mail threads list" mail threads list --limit 1
 cover_cli_json "list_persons" "contacts persons list" contacts persons list
 cover_cli_json "get_unread_notification_count" "notifications unread-count get" notifications unread-count get

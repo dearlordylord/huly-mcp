@@ -39,6 +39,7 @@
     "@hcengineering/tags": "0.7.0",
     "@hcengineering/task": "0.7.0",
     "@hcengineering/templates": "0.7.0",
+    "@hcengineering/telegram": "0.7.0",
     "@hcengineering/time": "0.7.0",
     "@hcengineering/tracker": "0.7.0",
     "@hcengineering/view": "0.7.0",

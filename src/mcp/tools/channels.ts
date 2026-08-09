@@ -171,7 +171,7 @@ export const channelTools = [
     {
       name: "list_external_channel_messages",
       description:
-        "Assess whether external messages can be listed safely for a provider channel. Gmail returns supported=false because Huly does not expose the live deployment-wide v1/v2 writer version needed to distinguish current legacy records from stale data; Telegram returns supported=false because no compatible published message package is installed. Returns an unsupportedReason and an empty messages array. The limit defaults to 50 and is capped at 200. This tool never sends, replies, deletes, mutates, or returns fake messages.",
+        "Read persisted Telegram contact-channel messages or assess why an external provider cannot be read safely. For provider=telegram, resolve channel by exact stored value or stable contact-channel ID and return newest contentMarkdown, direction, sent time, and attachment count; returns supported=false when the workspace model or channel is unavailable. This proves only Huly-stored records, not provider freshness or an active Telegram connection, and does not return attachment bytes. Gmail returns supported=false because Huly does not expose the live deployment-wide v1/v2 writer version needed to distinguish current legacy records from stale data. The limit defaults to 50 and is capped at 200. This tool never sends, replies, deletes, or mutates.",
       category: CATEGORY,
       inputSchema: listExternalChannelMessagesParamsJsonSchema,
       resultSchema: ListExternalChannelMessagesResultSchema

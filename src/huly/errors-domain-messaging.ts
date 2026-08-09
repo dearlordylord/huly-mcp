@@ -16,6 +16,7 @@ import {
   PersonNotAnEmployeeError,
   ReactionNotFoundError,
   SavedMessageNotFoundError,
+  TelegramChannelIdentifierAmbiguousError,
   ThreadReplyNotFoundError
 } from "./errors-messaging.js"
 
@@ -35,5 +36,6 @@ export const HulyMessagingDomainError = Schema.Union(
   ActivityMessageNotFoundError,
   ActivityRecordInvalidError,
   ReactionNotFoundError,
-  SavedMessageNotFoundError
+  SavedMessageNotFoundError,
+  TelegramChannelIdentifierAmbiguousError
 )

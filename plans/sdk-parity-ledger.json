@@ -573,6 +573,29 @@
       ]
     },
     {
+      "package": "@hcengineering/telegram",
+      "status": "covered",
+      "matrixLocation": "Telegram channel",
+      "rationale": "list_external_channel_messages covers persisted legacy Telegram Message records and their BaseTelegramMessage fields through an exact contact-channel resolver, bounded newest-first reads, markup-to-Markdown conversion, and explicit model/channel unavailability. It intentionally makes no provider freshness claim.",
+      "exports": [
+        "BaseTelegramMessage",
+        "Message"
+      ]
+    },
+    {
+      "package": "@hcengineering/telegram",
+      "status": "gap",
+      "matrixLocation": "Telegram channel",
+      "rationale": "Queued sends/replies, shared-message records, provider-specific attachment behavior, and durable failed/delivered/read acknowledgement are not safe from the published model. The local workspace also exposes no authoritative provider-health or sync-freshness contract.",
+      "exports": [
+        "NewMessage",
+        "NewTelegramMessage",
+        "SharedMessage",
+        "SharedMessages",
+        "SharedTelegramMessages"
+      ]
+    },
+    {
       "package": "@hcengineering/time",
       "status": "covered",
       "matrixLocation": "Planner / ToDos",

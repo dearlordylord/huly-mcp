@@ -22,6 +22,18 @@ export class ChannelNotFoundError extends Schema.TaggedError<ChannelNotFoundErro
 }
 
 /**
+ * Telegram contact-channel value resolves to more than one channel.
+ */
+export class TelegramChannelIdentifierAmbiguousError extends Schema.TaggedError<TelegramChannelIdentifierAmbiguousError>()(
+  "TelegramChannelIdentifierAmbiguousError",
+  { identifier: Schema.String, matches: AmbiguousMatchCount }
+) {
+  override get message(): string {
+    return `Telegram channel '${this.identifier}' is ambiguous (${this.matches} matches); use the stable contact-channel ID`
+  }
+}
+
+/**
  * Direct-message conversation not found in the workspace.
  *
  * Raised when a `dm` identifier (DM `_id` or participant display name) does
