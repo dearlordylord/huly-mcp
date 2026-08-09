@@ -212,6 +212,10 @@ const CATEGORY_DESCRIPTIONS: ReadonlyMap<ToolCategory, ToolDescription> = new Ma
   ),
   categoryDescriptionEntry("leads", "CRM funnel discovery and native lead creation and retrieval."),
   categoryDescriptionEntry(
+    "support",
+    "Read-only support-widget setup and authenticated-account stored status discovery."
+  ),
+  categoryDescriptionEntry(
     "recruiting",
     "Recruiting vacancies, applicants, reviews, opinions, candidate skills, and recruiting media."
   ),

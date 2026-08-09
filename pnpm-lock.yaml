@@ -61,6 +61,9 @@ importers:
       '@hcengineering/request':
         specifier: 0.7.0
         version: 0.7.0
+      '@hcengineering/support':
+        specifier: 0.7.0
+        version: 0.7.0
       '@hcengineering/tags':
         specifier: 0.7.0
         version: 0.7.0
@@ -255,6 +258,9 @@ importers:
         specifier: 0.7.0
         version: 0.7.0
       '@hcengineering/request':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/support':
         specifier: 0.7.0
         version: 0.7.0
       '@hcengineering/tags':
@@ -1031,6 +1037,9 @@ packages:
 
   '@hcengineering/setting@0.7.0':
     resolution: {integrity: sha512-HQAyYjHZeE0k29i5M8uzrCgM8VpbmHx+4J0uJiDrFT0Zlt75NEud6IZJ+1OmQ6+PAXpqrieK8ISYxSlvU/zrzw==}
+
+  '@hcengineering/support@0.7.0':
+    resolution: {integrity: sha512-oCjuiWWXEOghutzY9Bpc+vkIIEd/arlFVBmaXzFfM/XeR4J8tZ8ynYKBYoXwV+UFaGczidLdEBYda9HqFU1mHg==}
 
   '@hcengineering/tags@0.7.0':
     resolution: {integrity: sha512-iqNNNYLm/23ET6uzw075OhmRL0z605wh4hacTFpCw8BMhYfr3hmOCnR456KXIqZBNQ02gty8yWj0Vt9C3KdkWQ==}
@@ -4203,6 +4212,11 @@ snapshots:
       '@hcengineering/platform': 0.7.20
       '@hcengineering/templates': 0.7.0
       '@hcengineering/ui': 0.7.0
+
+  '@hcengineering/support@0.7.0':
+    dependencies:
+      '@hcengineering/core': 0.7.26
+      '@hcengineering/platform': 0.7.20
 
   '@hcengineering/tags@0.7.0':
     dependencies:

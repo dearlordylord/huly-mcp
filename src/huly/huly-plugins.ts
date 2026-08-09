@@ -33,6 +33,7 @@ export const notification = load("@hcengineering/notification")
 export const preference = load("@hcengineering/preference")
   .default as typeof import("@hcengineering/preference").default
 export const request = load("@hcengineering/request").default as typeof import("@hcengineering/request").default
+export const support = load("@hcengineering/support").default as typeof import("@hcengineering/support").default
 export const tags = load("@hcengineering/tags").default as typeof import("@hcengineering/tags").default
 export const task = load("@hcengineering/task").default as typeof import("@hcengineering/task").default
 export const templates = load("@hcengineering/templates").default as typeof import("@hcengineering/templates").default

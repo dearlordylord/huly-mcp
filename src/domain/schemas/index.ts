@@ -1,5 +1,25 @@
 /* eslint-disable max-lines -- barrel re-export index; no logic, only re-exports from domain modules */
 export {
+  type GetSupportStatusParams,
+  getSupportStatusParamsJsonSchema,
+  GetSupportStatusParamsSchema,
+  type GetSupportStatusResult,
+  GetSupportStatusResultSchema,
+  parseGetSupportStatusParams,
+  type SupportSetup,
+  SupportSetupSchema,
+  SupportProviderConversationId,
+  type SupportStatusRecord,
+  SupportStatusRecordId,
+  SupportStatusRecordSchema,
+  SupportSystemId,
+  SupportSystemName,
+  type SupportSystemSummary,
+  SupportSystemSummarySchema,
+  SupportUnsupportedReason
+} from "./support.js"
+
+export {
   ActivityFilterId,
   ActivityReferenceId,
   assertUpdateFields,

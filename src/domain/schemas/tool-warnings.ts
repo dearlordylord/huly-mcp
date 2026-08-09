@@ -1,6 +1,8 @@
 import { Schema } from "effect"
 
 export const ExternalChannelRuntimeUnsupportedWarningCode = "external_channel_runtime_unsupported" as const
+export const SupportRuntimeUnsupportedWarningCode = "support_runtime_unsupported" as const
+export const SupportStatusMetadataDegradedWarningCode = "support_status_metadata_degraded" as const
 
 export const ToolWarningCodeSchema = Schema.Literal(
   "status_metadata_unresolved",
@@ -19,7 +21,9 @@ export const ToolWarningCodeSchema = Schema.Literal(
   "recruiting_review_metadata_degraded",
   "issue_relation_metadata_degraded",
   "class_collaborator_metadata_degraded",
-  ExternalChannelRuntimeUnsupportedWarningCode
+  ExternalChannelRuntimeUnsupportedWarningCode,
+  SupportRuntimeUnsupportedWarningCode,
+  SupportStatusMetadataDegradedWarningCode
 ).annotations({
   identifier: "ToolWarningCode",
   title: "ToolWarningCode",

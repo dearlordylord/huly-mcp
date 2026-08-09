@@ -596,6 +596,16 @@
       ]
     },
     {
+      "package": "@hcengineering/support",
+      "status": "covered",
+      "matrixLocation": "Support widget",
+      "rationale": "get_support_status covers SupportSystem discovery and authenticated-account-only SupportConversation fallback metadata. The model exposes no message, participant, attachment, transcript, provider-health, send/reply, or widget-control contract, and the tool never loads the executable factory resource.",
+      "exports": [
+        "SupportConversation",
+        "SupportSystem"
+      ]
+    },
+    {
       "package": "@hcengineering/time",
       "status": "covered",
       "matrixLocation": "Planner / ToDos",

@@ -52,6 +52,7 @@ import { securityAdministrationTools } from "./security-administration.js"
 import { sequenceAdministrationTools } from "./sequence-administration.js"
 import { spaceTools } from "./spaces.js"
 import { storageTools } from "./storage.js"
+import { supportTools } from "./support.js"
 import { tagCategoryTools } from "./tag-categories.js"
 import { tagTools } from "./tags.js"
 import { taskManagementTools } from "./task-management.js"
@@ -90,6 +91,7 @@ export const allTools = [
   ...securityAdministrationTools,
   ...sequenceAdministrationTools,
   ...storageTools,
+  ...supportTools,
   ...attachmentTools,
   ...contactTools,
   ...channelTools,

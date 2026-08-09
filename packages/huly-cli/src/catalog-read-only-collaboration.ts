@@ -41,6 +41,7 @@ export const collaborationReadOnlyCliCommandCatalog = {
   get_person: { path: ["contacts", "persons", "get"], positional: [], description: "Get Person" },
   get_space: { path: ["spaces", "get"], positional: ["space"], description: "Get Space" },
   get_space_type: { path: ["spaces", "types", "get"], positional: ["spaceType"], description: "Get Space Type" },
+  get_support_status: { path: ["support", "status", "get"], positional: [], description: "Get Support Status" },
   get_unread_notification_count: {
     path: ["notifications", "unread-count", "get"],
     positional: [],

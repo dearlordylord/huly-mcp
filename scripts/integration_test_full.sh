@@ -3770,6 +3770,13 @@ run_test "get_user_profile" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_user_profile","arguments":{}},"id":2}'
 run_test "list_contact_channel_providers" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_contact_channel_providers","arguments":{}},"id":2}'
+run_capture_to_var SUPPORT_STATUS_TEXT "get_support_status(missing setup)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_support_status","arguments":{}},"id":2}'
+if [ $? -eq 0 ]; then
+  assert_json_field_equals "get_support_status classifiers available" "$SUPPORT_STATUS_TEXT" ".supported" "true"
+  assert_json_field_equals "get_support_status local setup" "$SUPPORT_STATUS_TEXT" ".setup.status" "missing"
+  assert_json_field_equals "get_support_status status records array" "$SUPPORT_STATUS_TEXT" ".statusRecords | type" "array"
+fi
 run_capture_to_var TELEGRAM_MESSAGES_TEXT "list_external_channel_messages(telegram missing channel)" \
   "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_external_channel_messages\",\"arguments\":{\"provider\":\"telegram\",\"channel\":\"mcp-no-channel-$RUN_ID\",\"limit\":5}},\"id\":2}"
 if [ $? -eq 0 ]; then

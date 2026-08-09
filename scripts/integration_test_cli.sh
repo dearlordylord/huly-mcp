@@ -160,6 +160,9 @@ capture_cli_json "list_external_channel_messages" "Telegram missing-channel asse
 assert_json "Telegram missing-channel assessment is explicit" "$TELEGRAM_EXTERNAL_JSON" \
   '.supported == false and .unsupportedReasonCode == "channel-unavailable" and .messages == []'
 cover_cli_json "list_mail_threads" "mail threads list" mail threads list --limit 1
+capture_cli_json "get_support_status" "support status get" SUPPORT_STATUS_JSON support status get
+assert_json "support status reports the local missing setup" "$SUPPORT_STATUS_JSON" \
+  '.supported == true and .setup.status == "missing" and (.statusRecords | type) == "array"'
 cover_cli_json "list_persons" "contacts persons list" contacts persons list
 cover_cli_json "get_unread_notification_count" "notifications unread-count get" notifications unread-count get
 cover_cli_json "list_spaces" "spaces list" spaces list
