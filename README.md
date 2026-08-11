@@ -1,5 +1,7 @@
 # Huly MCP
 
+[![MCP Toplist](https://mcptoplist.com/badge/io.github.dearlordylord%2Fhuly-mcp.svg)](https://mcptoplist.com/server/io.github.dearlordylord%2Fhuly-mcp)
+
 [![npm](https://img.shields.io/npm/v/@firfi/huly-mcp)](https://www.npmjs.com/package/@firfi/huly-mcp)
 [![npm downloads](https://img.shields.io/npm/dm/@firfi/huly-mcp)](https://www.npmjs.com/package/@firfi/huly-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
