@@ -33,13 +33,7 @@ const resolveClientsFromLayer = (
 }
 
 const buildTestServerLayer = (
-  config: {
-    transport: "stdio" | "http"
-    httpPort?: number
-    httpHost?: string
-    autoExit?: boolean
-    authMethod?: "token" | "password"
-  },
+  config: { transport: "stdio" | "http"; httpPort?: number; httpHost?: string; authMethod?: "token" | "password" },
   layers: Layer.Layer<HulyClient | HulyStorageClient | WorkspaceClient | TelemetryService>,
   writeError?: (message: string) => void
 ) =>

@@ -116,6 +116,13 @@ export const appendToolWarnings = (
 export const createUnknownToolError = (toolName: string): McpErrorResponseWithMeta =>
   createErrorResponse(`Unknown tool: ${toolName}`, McpErrorCode.InvalidParams, "UnknownTool")
 
+export const createServerShuttingDownError = (): McpErrorResponseWithMeta =>
+  createErrorResponse(
+    "Huly MCP is shutting down; start a new connection before retrying",
+    McpErrorCode.InternalError,
+    "ServerShuttingDown"
+  )
+
 export const createInvalidParamsError = (message: string, errorTag?: string): McpErrorResponseWithMeta =>
   createErrorResponse(message, McpErrorCode.InvalidParams, errorTag)
 

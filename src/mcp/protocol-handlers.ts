@@ -19,6 +19,7 @@ import type { McpToolResponse } from "./error-mapping.js"
 import type { McpWireResponse } from "./tool-responses.js"
 import {
   appendToolWarnings,
+  createServerShuttingDownError,
   createSuccessResponse,
   createUnknownToolError,
   mapClientResolutionErrorToMcp,
@@ -34,6 +35,7 @@ import {
   VersionToolResultSchema
 } from "./huly-context-tool.js"
 import { createResourceProtocolHandlers } from "./protocol-resource-handlers.js"
+import { createRequestAdmission } from "./request-admission.js"
 import {
   defaultExposureOptions,
   normalizeRegistries,
@@ -86,11 +88,9 @@ export interface McpProtocolHandlers {
   readonly listResources: () => Promise<ListResourcesResult>
   readonly listResourceTemplates: () => ListResourceTemplatesResult
   readonly readResource: (request: ResourceReadRequest) => Promise<ReadResourceResult>
-  readonly drainInflight: () => Promise<void>
+  readonly quiesce: () => Promise<void>
 }
 
-const DRAIN_POLL_MS = 50
-const DRAIN_TIMEOUT_MS = 30_000
 const NPM_FETCH_TIMEOUT_MS = 5_000
 const NPM_PACKAGE_NAME = "@firfi/huly-mcp"
 
@@ -121,23 +121,6 @@ export interface NowClock {
 }
 
 export const liveNowClock: NowClock = { currentTimeMillis: () => Effect.runSync(Clock.currentTimeMillis) }
-
-const createDrainInflight =
-  (getInflight: () => number, clock: NowClock): (() => Promise<void>) =>
-  () => {
-    if (getInflight() <= 0) return Promise.resolve()
-    return new Promise((resolve) => {
-      const start = clock.currentTimeMillis()
-      const check = () => {
-        if (getInflight() <= 0 || clock.currentTimeMillis() - start > DRAIN_TIMEOUT_MS) {
-          resolve()
-        } else {
-          setTimeout(check, DRAIN_POLL_MS)
-        }
-      }
-      check()
-    })
-  }
 
 /**
  * Fetch the latest published npm version. The `fetch` implementation is injected
@@ -234,14 +217,7 @@ export const createMcpProtocolHandlers = (
     currentClientInfo: exposureOptions.currentClientInfo ?? defaults.currentClientInfo,
     toolScopeFilteringActive: exposureOptions.toolScopeFilteringActive ?? defaults.toolScopeFilteringActive
   }
-  let inflight = 0
-  const drainInflight = createDrainInflight(() => inflight, clock)
-  const enter = () => {
-    inflight++
-  }
-  const leave = () => {
-    inflight--
-  }
+  const admission = createRequestAdmission()
 
   const listTools = async (): Promise<ListToolsProtocolResult> => {
     const exposure = resolveProtocolExposure(registries, protocolExposureOptions)
@@ -256,7 +232,8 @@ export const createMcpProtocolHandlers = (
   }
 
   const callTool = async (request: ToolCallRequest): Promise<McpWireResponse> => {
-    enter()
+    const lease = admission.enter()
+    if (lease === null) return toMcpResponse(createServerShuttingDownError())
     const noticeClaim = toolCallNoticeProvider.claim()
     try {
       const { arguments: args, name } = request.params
@@ -422,11 +399,11 @@ export const createMcpProtocolHandlers = (
       if (noticeClaim._tag === "Claimed") noticeClaim.release()
       throw error
     } finally {
-      leave()
+      lease.release()
     }
   }
 
-  const resourceHandlers = createResourceProtocolHandlers({ resolveClients, enter, leave })
+  const resourceHandlers = createResourceProtocolHandlers({ resolveClients, admission })
 
   return {
     listTools,
@@ -434,6 +411,6 @@ export const createMcpProtocolHandlers = (
     listResources: resourceHandlers.listResources,
     listResourceTemplates,
     readResource: resourceHandlers.readResource,
-    drainInflight
+    quiesce: admission.quiesce
   }
 }

@@ -1841,7 +1841,7 @@ describe("createMcpProtocolHandlers — resource handlers", () => {
   })
 })
 
-describe("createMcpProtocolHandlers — drainInflight", () => {
+describe("createMcpProtocolHandlers — quiesce", () => {
   it("resolves immediately when nothing is in flight", async () => {
     const handlers = createMcpProtocolHandlers(
       buildStubClients(),
@@ -1849,7 +1849,7 @@ describe("createMcpProtocolHandlers — drainInflight", () => {
       emptyRegistry,
       unusedGetHulyContext
     )
-    await expect(handlers.drainInflight()).resolves.toBeUndefined()
+    await expect(handlers.quiesce()).resolves.toBeUndefined()
   })
 
   it("waits for an in-flight call to complete, then resolves", async () => {
@@ -1866,27 +1866,53 @@ describe("createMcpProtocolHandlers — drainInflight", () => {
 
     // enter() runs synchronously, so inflight becomes 1 before the first await
     const callPromise = handlers.callTool({ params: { name: "list_projects", arguments: {} } })
-    const drainPromise = handlers.drainInflight()
+    const drainPromise = handlers.quiesce()
 
     release(await buildStubClients()())
     await callPromise
     await expect(drainPromise).resolves.toBeUndefined()
   })
 
-  it("stops draining once the timeout elapses even if a call is still in flight", async () => {
-    const neverResolves = new Promise<ClientBundle>(() => {})
-    // Clock readings: callTool start, drain start, drain check (> 30s after start) -> timeout branch
-    const clock = queuedClock([0, 0, 31_000])
+  it("rejects a new tool call after quiescing without acquiring clients", async () => {
+    let resolutions = 0
     const handlers = createMcpProtocolHandlers(
-      () => neverResolves,
+      () => {
+        resolutions++
+        return buildStubClients()()
+      },
       createTelemetryProbe().telemetry,
       toolRegistry,
-      unusedGetHulyContext,
-      clock
+      unusedGetHulyContext
     )
 
-    void handlers.callTool({ params: { name: "list_projects", arguments: {} } })
-    await expect(handlers.drainInflight()).resolves.toBeUndefined()
+    await handlers.quiesce()
+    const response = await handlers.callTool({ params: { name: "list_projects", arguments: {} } })
+
+    expect(response).toMatchObject({ isError: true })
+    expect(response.content[0]?.text).toContain("shutting down")
+    expect(resolutions).toBe(0)
+  })
+
+  it("delivers an accepted tool response before quiescing finishes", async () => {
+    let release: (bundle: ClientBundle) => void = () => {}
+    const gate = new Promise<ClientBundle>((resolve) => {
+      release = resolve
+    })
+    const handlers = createMcpProtocolHandlers(
+      () => gate,
+      createTelemetryProbe().telemetry,
+      toolRegistry,
+      unusedGetHulyContext
+    )
+
+    const call = handlers.callTool({ params: { name: "list_projects", arguments: {} } })
+    const quiescing = handlers.quiesce()
+    release(await buildStubClients()())
+
+    const response = await call
+    await quiescing
+
+    expect(response.isError).not.toBe(true)
   })
 })
 

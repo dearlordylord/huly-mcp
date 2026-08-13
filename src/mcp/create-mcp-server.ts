@@ -12,7 +12,11 @@ import type { ToolRegistry } from "./tools/index.js"
 
 export type { ClientBundle } from "./protocol-handlers.js"
 
-type McpServerHandle = readonly [server: Server, drainInflight: () => Promise<void>]
+export interface McpServerLifecycle {
+  readonly quiesce: () => Promise<void>
+}
+
+type McpServerHandle = readonly [server: Server, lifecycle: McpServerLifecycle]
 
 const currentClientInfoFromServer = (
   server: Server
@@ -51,5 +55,5 @@ export const createMcpServer = (
   server.setRequestHandler("resources/templates/list", handlers.listResourceTemplates)
   server.setRequestHandler("resources/read", handlers.readResource)
 
-  return [server, handlers.drainInflight]
+  return [server, { quiesce: handlers.quiesce }]
 }

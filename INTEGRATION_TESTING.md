@@ -199,7 +199,7 @@ printf '{"jsonrpc":"2.0","method":"server/discover","params":{"_meta":{"io.model
 
 Expected: JSON with `"projects": [...]`
 
-**Note**: `MCP_AUTO_EXIT=true` makes the server exit when stdin closes (testing only).
+**Note**: The stdio server exits whenever stdin closes; no lifecycle environment flag is required.
 
 ## API-token certification preparation
 
@@ -382,15 +382,15 @@ Key response fields used by the test script for entity IDs:
 | send_channel_message | `.id` |
 | add_thread_reply | `.id` |
 
-## MCP_AUTO_EXIT and In-Flight Request Draining
+## Stdio EOF and In-Flight Request Draining
 
-`MCP_AUTO_EXIT=true` causes the server to exit when stdin closes. The server **drains in-flight tool calls before shutting down** — i.e., if a tool handler is mid-execution when stdin closes, the server waits (up to 30s) for it to complete and write its response before proceeding with shutdown.
+The stdio server always exits when stdin closes; `MCP_AUTO_EXIT` is no longer needed and cannot disable connection ownership. The server **drains in-flight tool calls before shutting down**: if a tool handler is mid-execution when stdin closes, it gets up to five seconds to complete and write its response. Wire and resource cleanup share the remainder of one ten-second global deadline.
 
 This matters for operations that make HTTP round-trips to Huly's collaborator service (e.g., `edit_document` with content changes calls `updateMarkup`). Without draining, the stdin-close event would race against the HTTP call, and the response would be lost even though the mutation succeeded on the server.
 
 **For script authors**: the standard `printf '%s\n%s\n' | node` pattern works correctly for all tools, including slow ones. No need for `sleep` workarounds.
 
-**Implementation**: `src/mcp/server.ts` — `createMcpServer` tracks in-flight requests with a counter. The `cleanup` handler (stdin close / SIGINT / SIGTERM) calls `drainInflight()` before resuming the shutdown fiber.
+**Implementation**: `src/mcp/server.ts` routes stdin EOF/close, SIGINT/SIGTERM, and programmatic stop through one idempotent shutdown coordinator. New requests are rejected after quiescing, and request completion notifications release the drain without polling timers.
 
 ## Eventual Consistency
 

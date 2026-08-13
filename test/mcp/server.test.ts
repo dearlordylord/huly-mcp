@@ -107,7 +107,6 @@ const buildTestServerLayer = (
     httpPort?: number
     httpHost?: string
     mcpAuthToken?: string
-    autoExit?: boolean
     authMethod?: "token" | "password"
     createServer?: (instructions?: HostedHulyMigrationInstructions) => Server
     writeError?: (message: string) => void
@@ -739,7 +738,7 @@ describe("Tool definition descriptions", () => {
 
 // --- McpServerService.layer run/stop tests ---
 
-const buildStdioService = (config?: { autoExit?: boolean; telemetryOps?: Partial<TelemetryOperations> }) => {
+const buildStdioService = (config?: { telemetryOps?: Partial<TelemetryOperations> }) => {
   const telemetryLayer = config?.telemetryOps
     ? TelemetryService.testLayer(config.telemetryOps)
     : TelemetryService.testLayer()
@@ -749,7 +748,7 @@ const buildStdioService = (config?: { autoExit?: boolean; telemetryOps?: Partial
     WorkspaceClient.testLayer({}),
     telemetryLayer
   )
-  return buildTestServerLayer({ transport: "stdio", autoExit: config?.autoExit ?? true }, layers)
+  return buildTestServerLayer({ transport: "stdio" }, layers)
 }
 
 describe("McpServerService.layer operations", () => {
@@ -785,10 +784,10 @@ describe("McpServerService.layer operations", () => {
 
   describe("run() stdio transport", () => {
     it.scoped(
-      "run completes when stdin ends (autoExit)",
+      "run completes when stdin ends",
       () =>
         Effect.gen(function* () {
-          const serverLayer = buildStdioService({ autoExit: true })
+          const serverLayer = buildStdioService({})
           const ctx = yield* Layer.build(serverLayer)
           const ops = yield* McpServerService.pipe(Effect.provide(Layer.succeedContext(ctx)))
 
@@ -807,7 +806,7 @@ describe("McpServerService.layer operations", () => {
       "run completes when SIGINT received",
       () =>
         Effect.gen(function* () {
-          const serverLayer = buildStdioService({ autoExit: false })
+          const serverLayer = buildStdioService({})
           const ctx = yield* Layer.build(serverLayer)
           const ops = yield* McpServerService.pipe(Effect.provide(Layer.succeedContext(ctx)))
 
@@ -834,7 +833,6 @@ describe("McpServerService.layer operations", () => {
           )
           const serverLayer = McpServerService.layer({
             transport: "stdio",
-            autoExit: true,
             createServer: createMockServer,
             resolveClients: resolveClientsFromLayer(layers)
           }).pipe(Layer.provide(layers))
@@ -856,7 +854,7 @@ describe("McpServerService.layer operations", () => {
       "run fails with already-running error on second call",
       () =>
         Effect.gen(function* () {
-          const serverLayer = buildStdioService({ autoExit: true })
+          const serverLayer = buildStdioService({})
           const ctx = yield* Layer.build(serverLayer)
           const ops = yield* McpServerService.pipe(Effect.provide(Layer.succeedContext(ctx)))
 
@@ -891,7 +889,6 @@ describe("McpServerService.layer operations", () => {
         const serverLayer = buildTestServerLayer(
           {
             transport: "stdio",
-            autoExit: true,
             createServer: (instructions) => {
               const server = createDefaultMcpSdkServer(instructions)
               server.connect = () => Promise.reject(new Error("connection refused"))
@@ -917,7 +914,7 @@ describe("McpServerService.layer operations", () => {
       () =>
         Effect.gen(function* () {
           mockCloseBehavior = () => Promise.reject(new Error("close failed"))
-          const serverLayer = buildStdioService({ autoExit: true })
+          const serverLayer = buildStdioService({})
           const ctx = yield* Layer.build(serverLayer)
           const ops = yield* McpServerService.pipe(Effect.provide(Layer.succeedContext(ctx)))
 
@@ -941,10 +938,10 @@ describe("McpServerService.layer operations", () => {
     )
 
     it.scoped(
-      "run cleanup removes signal listeners when fiber is interrupted (autoExit=true)",
+      "run cleanup removes signal listeners when fiber is interrupted",
       () =>
         Effect.gen(function* () {
-          const serverLayer = buildStdioService({ autoExit: true })
+          const serverLayer = buildStdioService({})
           const ctx = yield* Layer.build(serverLayer)
           const ops = yield* McpServerService.pipe(Effect.provide(Layer.succeedContext(ctx)))
 
@@ -959,10 +956,10 @@ describe("McpServerService.layer operations", () => {
     )
 
     it.scoped(
-      "run cleanup works when autoExit is false",
+      "run cleanup works",
       () =>
         Effect.gen(function* () {
-          const serverLayer = buildStdioService({ autoExit: false })
+          const serverLayer = buildStdioService({})
           const ctx = yield* Layer.build(serverLayer)
           const ops = yield* McpServerService.pipe(Effect.provide(Layer.succeedContext(ctx)))
 
@@ -971,7 +968,7 @@ describe("McpServerService.layer operations", () => {
           )
 
           yield* Effect.promise(() => new Promise((r) => setTimeout(r, 50)))
-          // Interrupt to trigger the cleanup/teardown with autoExit=false branch
+          // Interrupt to trigger cleanup through the interruption-safe finalizer.
           yield* Fiber.interrupt(fiber)
         }),
       { timeout: 5000 }
@@ -983,7 +980,6 @@ describe("McpServerService.layer operations", () => {
         let shutdownCalled = false
         return Effect.gen(function* () {
           const serverLayer = buildStdioService({
-            autoExit: true,
             telemetryOps: {
               shutdown: async () => {
                 shutdownCalled = true
@@ -1018,7 +1014,6 @@ describe("McpServerService.layer operations", () => {
         let shutdownCalled = false
         return Effect.gen(function* () {
           const serverLayer = buildStdioService({
-            autoExit: true,
             telemetryOps: {
               shutdown: async () => {
                 shutdownCalled = true
@@ -1108,7 +1103,6 @@ describe("McpServerService.layer operations", () => {
           const serverLayer = buildTestServerLayer(
             {
               transport: "stdio",
-              autoExit: true,
               createServer: (instructions) => {
                 const server = createDefaultMcpSdkServer(instructions)
                 server.close = () => Promise.reject(new Error("server close failed"))
@@ -1243,7 +1237,7 @@ describe("McpServerService.layer operations", () => {
       createServer: (instructions?: HostedHulyMigrationInstructions) => Server = createMockServer
     ) =>
       Effect.gen(function* () {
-        const serverLayer = buildTestServerLayer({ transport: "stdio", autoExit: true, createServer }, layers)
+        const serverLayer = buildTestServerLayer({ transport: "stdio", createServer }, layers)
         const ctx = yield* Layer.build(serverLayer)
         const ops = yield* McpServerService.pipe(Effect.provide(Layer.succeedContext(ctx)))
         const fiber = yield* Effect.fork(
@@ -1267,7 +1261,6 @@ describe("McpServerService.layer operations", () => {
       Effect.gen(function* () {
         const serverLayer = McpServerService.layer({
           transport: "stdio",
-          autoExit: true,
           createServer: createMockServer,
           createStdioTransport: createTestStdioTransport,
           resolveClients

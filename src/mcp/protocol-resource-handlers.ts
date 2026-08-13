@@ -10,6 +10,7 @@ import type { HulyStorageClient } from "../huly/storage.js"
 import type { WorkspaceClientOperations } from "../huly/workspace-client.js"
 import { clientResolutionErrorMessage } from "./error-mapping.js"
 import { listResources, readHulyResource } from "./resources.js"
+import type { RequestAdmission, RequestLease } from "./request-admission.js"
 
 interface ClientBundle {
   readonly hulyClient: HulyClient["Type"]
@@ -23,8 +24,16 @@ interface ResourceReadRequest {
 
 interface ResourceHandlerInput {
   readonly resolveClients: () => Promise<ClientBundle>
-  readonly enter: () => void
-  readonly leave: () => void
+  readonly admission: RequestAdmission
+}
+
+const enterOrThrow = (admission: RequestAdmission): RequestLease => {
+  const lease = admission.enter()
+  if (lease !== null) return lease
+  throw new ProtocolError(
+    ProtocolErrorCode.InternalError,
+    "Huly MCP is shutting down; start a new connection before retrying"
+  )
 }
 
 const withResourceWarnings = (result: ReadResourceResult, warnings: ReadonlyArray<ToolWarning>): ReadResourceResult =>
@@ -83,7 +92,7 @@ export const createResourceProtocolHandlers = (
   readonly readResource: (request: ResourceReadRequest) => Promise<ReadResourceResult>
 } => {
   const listResourcesHandler = async (): Promise<ListResourcesResult> => {
-    input.enter()
+    const lease = enterOrThrow(input.admission)
     try {
       let clients: ClientBundle
       try {
@@ -99,12 +108,12 @@ export const createResourceProtocolHandlers = (
       if (Exit.isSuccess(resourceList)) return resourceList.value
       return throwResourceListError(resourceList.cause)
     } finally {
-      input.leave()
+      lease.release()
     }
   }
 
   const readResource = async (request: ResourceReadRequest): Promise<ReadResourceResult> => {
-    input.enter()
+    const lease = enterOrThrow(input.admission)
     try {
       const { uri } = request.params
       const clients = await resolveResourceClientsOrThrow(input.resolveClients, (error) =>
@@ -121,7 +130,7 @@ export const createResourceProtocolHandlers = (
       if (Exit.isSuccess(resourceRead)) return withResourceWarnings(resourceRead.value, warnings)
       return throwResourceReadError(uri, resourceRead.cause)
     } finally {
-      input.leave()
+      lease.release()
     }
   }
 

@@ -141,7 +141,7 @@ describe("MCP 2026-07-28 stdio transport with 2025 compatibility", () => {
       const transport = new StdioClientTransport({
         command: process.execPath,
         args: [builtServerPath],
-        env: { ...getDefaultEnvironment(), LAZY_ENVS: "true", MCP_AUTO_EXIT: "true" },
+        env: { ...getDefaultEnvironment(), LAZY_ENVS: "true" },
         stderr: "pipe"
       })
       const client = new Client(
@@ -208,7 +208,7 @@ describe("MCP 2026-07-28 stdio transport with 2025 compatibility", () => {
       const transport = new StdioClientTransport({
         command: process.execPath,
         args: [builtServerPath],
-        env: { ...getDefaultEnvironment(), LAZY_ENVS: "true", MCP_AUTO_EXIT: "true" },
+        env: { ...getDefaultEnvironment(), LAZY_ENVS: "true" },
         stderr: "pipe"
       })
       const client = new Client(
@@ -234,7 +234,7 @@ describe("MCP 2026-07-28 stdio transport with 2025 compatibility", () => {
       const transport = new StdioClientTransport({
         command: process.execPath,
         args: [builtServerPath],
-        env: { ...getDefaultEnvironment(), LAZY_ENVS: "true", MCP_AUTO_EXIT: "true" },
+        env: { ...getDefaultEnvironment(), LAZY_ENVS: "true" },
         stderr: "pipe"
       })
       try {

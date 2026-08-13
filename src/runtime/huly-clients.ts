@@ -1,4 +1,4 @@
-import { Cause, Chunk, Context, Effect, Exit, Layer, Runtime, Scope } from "effect"
+import { Cause, Chunk, Context, Effect, Exit, Fiber, Layer, Runtime, Scope } from "effect"
 
 import { type ConfigValidationError, HulyConfigService } from "../config/config.js"
 import { HulyClient, type HulyClientError } from "../huly/client.js"
@@ -30,29 +30,43 @@ export const buildCombinedClientLayer = (): CombinedClientLayer => {
   return Layer.merge(Layer.merge(hulyClientLayer, storageClientLayer), workspaceClientLayer)
 }
 
-export const buildClientBundle = (
-  combinedClientLayer: CombinedClientLayer
-): Effect.Effect<ClientBundle, HulyClientBundleError> =>
-  buildScopedClientBundle(combinedClientLayer).pipe(Effect.map(({ bundle }) => bundle))
+export interface ScopedClientBundle {
+  readonly bundle: ClientBundle
+  readonly close: () => Promise<void>
+}
+
+interface ClientAcquisition {
+  readonly promise: Promise<ScopedClientBundle>
+  readonly close: () => Promise<void>
+}
+
+const makeScopeClose = (scope: Scope.CloseableScope): (() => Promise<void>) => {
+  const state: { promise: Promise<void> | null } = { promise: null }
+  return () => {
+    if (state.promise === null) state.promise = Effect.runPromise(Scope.close(scope, Exit.void))
+    return state.promise
+  }
+}
 
 export const buildScopedClientBundle = (
   combinedClientLayer: CombinedClientLayer
-): Effect.Effect<{ readonly bundle: ClientBundle; readonly close: () => Promise<void> }, HulyClientBundleError> =>
-  Effect.gen(function* () {
-    const scope = yield* Scope.make()
-    const close = (): Promise<void> => Effect.runPromise(Scope.close(scope, Exit.void))
-    const ctx = yield* Layer.buildWithScope(combinedClientLayer, scope).pipe(
-      Effect.tapError(() => Scope.close(scope, Exit.void))
-    )
-    return {
-      bundle: {
-        hulyClient: Context.get(ctx, HulyClient),
-        storageClient: Context.get(ctx, HulyStorageClient),
-        workspaceClient: Context.get(ctx, WorkspaceClient)
-      },
-      close
-    }
-  })
+): Effect.Effect<ScopedClientBundle, HulyClientBundleError> =>
+  Effect.uninterruptibleMask((restore) =>
+    Effect.gen(function* () {
+      const scope = yield* Scope.make()
+      const ctx = yield* restore(Layer.buildWithScope(combinedClientLayer, scope)).pipe(
+        Effect.onExit((exit) => (Exit.isFailure(exit) ? Scope.close(scope, exit) : Effect.void))
+      )
+      return {
+        bundle: {
+          hulyClient: Context.get(ctx, HulyClient),
+          storageClient: Context.get(ctx, HulyStorageClient),
+          workspaceClient: Context.get(ctx, WorkspaceClient)
+        },
+        close: makeScopeClose(scope)
+      }
+    })
+  )
 
 /**
  * Create a memoized client resolver that builds layers on first call
@@ -61,29 +75,66 @@ export const buildScopedClientBundle = (
  */
 export const createClientResolver = (
   combinedClientLayer: CombinedClientLayer
-): readonly [resolve: () => Promise<ClientBundle>, prime: (bundle: ClientBundle) => void] => {
-  let clientsPromise: Promise<ClientBundle> | null = null
+): readonly [
+  resolve: () => Promise<ClientBundle>,
+  prime: (scoped: ScopedClientBundle) => void,
+  close: () => Promise<void>
+] => {
+  const state: { active: Promise<ScopedClientBundle> | null; closePromise: Promise<void> | null; closed: boolean } = {
+    active: null,
+    closePromise: null,
+    closed: false
+  }
+  const acquisitions = new Set<ClientAcquisition>()
+
+  const startAcquisition = (): ClientAcquisition => {
+    const fiber = Effect.runFork(buildScopedClientBundle(combinedClientLayer))
+    const promise = Effect.runPromise(Fiber.join(fiber))
+    return {
+      promise,
+      close: () =>
+        Effect.runPromise(Fiber.interrupt(fiber)).then(() =>
+          promise.then(
+            (scoped) => scoped.close(),
+            () => Promise.resolve()
+          )
+        )
+    }
+  }
 
   const resolve = (): Promise<ClientBundle> => {
-    if (clientsPromise === null) {
-      const acquisition = Effect.runPromise(buildClientBundle(combinedClientLayer))
-      clientsPromise = acquisition
-      void acquisition.catch((error: unknown) => {
+    if (state.closed) return Promise.reject(new Error("Process-scoped Huly clients are closed"))
+    if (state.active === null) {
+      const acquisition = startAcquisition()
+      acquisitions.add(acquisition)
+      state.active = acquisition.promise
+      void acquisition.promise.catch((error: unknown) => {
         const unavailable =
           error instanceof HulyUnavailableError ||
           (Runtime.isFiberFailure(error) &&
             Chunk.toArray(Cause.failures(error[Runtime.FiberFailureCauseId])).some(
               (failure) => failure instanceof HulyUnavailableError
             ))
-        if (unavailable && clientsPromise === acquisition) clientsPromise = null
+        if (unavailable && state.active === acquisition.promise) state.active = null
       })
     }
-    return clientsPromise
+    return state.active.then(({ bundle }) => bundle)
   }
 
-  const prime = (bundle: ClientBundle): void => {
-    clientsPromise = Promise.resolve(bundle)
+  const prime = (scoped: ScopedClientBundle): void => {
+    if (state.closed) throw new Error("Cannot prime closed process-scoped Huly clients")
+    const acquisition = Promise.resolve(scoped)
+    acquisitions.add({ promise: acquisition, close: scoped.close })
+    state.active = acquisition
   }
 
-  return [resolve, prime] as const
+  const close = (): Promise<void> => {
+    state.closed = true
+    if (state.closePromise === null) {
+      state.closePromise = Promise.all([...acquisitions].map((acquisition) => acquisition.close())).then(() => {})
+    }
+    return state.closePromise
+  }
+
+  return [resolve, prime, close] as const
 }

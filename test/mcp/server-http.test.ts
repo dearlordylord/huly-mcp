@@ -67,6 +67,32 @@ const runningFactory = (
 ): HttpServerFactory => makeTestHttpServerFactory(listening.resolve, (message) => writes.push(message))
 
 describe("McpServerService released HTTP integration", () => {
+  it("keeps HTTP running when stdin emits EOF", async () => {
+    const listening = deferred<http.Server>()
+    const writes: Array<string> = []
+    const bundle = await clientBundle()
+    const layer = McpServerService.layer({
+      transport: "http",
+      httpPort: 0,
+      httpHost: "127.0.0.1",
+      resolveClients: async () => bundle,
+      getRuntimeConfigContext: () => sanitizeHulyRuntimeConfigFromEnv(runtimeEnv)
+    }).pipe(Layer.provide(TelemetryService.testLayer()))
+    const context = await Effect.runPromise(Layer.build(layer).pipe(Effect.scoped))
+    const operations = Context.get(context, McpServerService)
+    const fiber = Effect.runFork(
+      operations.run().pipe(Effect.provideService(HttpServerFactoryService, runningFactory(listening, writes)))
+    )
+    const server = await listening.promise
+
+    process.stdin.emit("end")
+    await Promise.resolve()
+
+    expect(server.listening).toBe(true)
+    await Effect.runPromise(operations.stop())
+    await Effect.runPromise(Fiber.join(fiber))
+  })
+
   it("uses request runtime config and releases a request-scoped client lease", async () => {
     const listening = deferred<http.Server>()
     const writes: Array<string> = []

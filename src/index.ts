@@ -30,7 +30,6 @@ import type { RequestClientLease } from "./mcp/request-client-lifecycle.js"
 import { type ClientBundle, type McpServerError, McpServerService, type McpTransportType } from "./mcp/server.js"
 import { type ConsoleRedirectHandle, redirectConsoleToStderr } from "./mcp/stdio-output.js"
 import {
-  buildClientBundle,
   buildCombinedClientLayer,
   buildScopedClientBundle,
   type CombinedClientLayer,
@@ -70,8 +69,6 @@ const getHttpHost: Effect.Effect<HttpHost, ConfigError.ConfigError> = Config.str
 )
 
 export const getMcpAuthToken = Config.redacted("MCP_AUTH_TOKEN").pipe(Config.option)
-
-const getAutoExit = Config.boolean("MCP_AUTO_EXIT").pipe(Config.withDefault(false))
 
 const isGlamaRegistryInspection = (): boolean => process.env["GLAMA_VERSION"] !== undefined
 
@@ -115,9 +112,9 @@ const buildAppLayer = (
   httpPort: HttpPort,
   httpHost: HttpHost,
   mcpAuthToken: string | undefined,
-  autoExit: boolean,
   authMethod: "token" | "password",
   resolveClients: () => Promise<ClientBundle>,
+  closeClients: () => Promise<void>,
   resolveClientLeaseForHttpRequest: (req: Request) => Promise<RequestClientLease>
 ): Layer.Layer<McpServerService | HttpServerFactoryService, McpServerError, never> => {
   const mcpServerConfig = {
@@ -125,9 +122,9 @@ const buildAppLayer = (
     httpPort,
     httpHost,
     ...(mcpAuthToken === undefined ? {} : { mcpAuthToken }),
-    autoExit,
     authMethod,
     resolveClients,
+    closeClients,
     resolveClientLeaseForHttpRequest,
     getRuntimeConfigContext: () => sanitizeHulyRuntimeConfigFromEnv(process.env),
     getRuntimeConfigContextForHttpRequest: (req: Request) =>
@@ -144,24 +141,16 @@ const runConfiguredServer = (transport: McpTransportType): Effect.Effect<void, A
     const httpHost = yield* getHttpHost
     const mcpAuthToken =
       transport === "http" ? Option.map(yield* getMcpAuthToken, Redacted.value).pipe(Option.getOrUndefined) : undefined
-    const autoExit = yield* getAutoExit
     const lazyEnvs = yield* getLazyEnvs
     const authMethod: "token" | "password" = process.env["HULY_TOKEN"] ? "token" : "password"
 
     const combinedClientLayer = buildCombinedClientLayer()
-    const [resolveClients, primeClients] = createClientResolver(combinedClientLayer)
+    const [resolveClients, primeClients, closeClients] = createClientResolver(combinedClientLayer)
     const resolveHttpClientLease = createHttpClientLeaseResolver(combinedClientLayer, resolveClients)
 
     if (!lazyEnvs && transport === "stdio") {
-      // Eager init: build client layers within the Effect pipeline to preserve
-      // typed errors (ConfigValidationError, HulyClientError, etc.).
-      // This also primes the memoized resolver for subsequent tool calls.
-      yield* Effect.gen(function* () {
-        const bundle = yield* buildClientBundle(combinedClientLayer)
-        primeClients(bundle)
-      }).pipe(
-        // A network outage must not prevent the stdio transport from accepting
-        // initialize and returning its typed, actionable tool-call failure.
+      yield* buildScopedClientBundle(combinedClientLayer).pipe(
+        Effect.tap(primeClients),
         Effect.catchTag("HulyUnavailableError", () => Effect.void)
       )
     }
@@ -172,9 +161,9 @@ const runConfiguredServer = (transport: McpTransportType): Effect.Effect<void, A
       httpPort,
       httpHost,
       mcpAuthToken,
-      autoExit,
       authMethod,
       resolveClients,
+      closeClients,
       resolveHttpClientLease
     )
 
