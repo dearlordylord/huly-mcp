@@ -18,11 +18,15 @@ export type StdioShutdownState =
 export interface StdioShutdownCoordinator {
   readonly request: (reason: StdioShutdownReason) => Effect.Effect<boolean>
   readonly awaitRequest: Effect.Effect<StdioShutdownReason>
-  readonly claimExecution: Effect.Effect<boolean>
-  readonly beginClosing: Effect.Effect<void>
-  readonly complete: (outcome: StdioShutdownOutcome) => Effect.Effect<void>
   readonly awaitComplete: Effect.Effect<void>
   readonly state: Effect.Effect<StdioShutdownState>
+  readonly execute: (resources: StdioShutdownResources) => Effect.Effect<void>
+}
+
+interface StdioShutdownInternals {
+  readonly claimExecution: Effect.Effect<boolean>
+  readonly beginClosing: (reason: StdioShutdownReason) => Effect.Effect<void>
+  readonly complete: (reason: StdioShutdownReason, outcome: StdioShutdownOutcome) => Effect.Effect<void>
 }
 
 export interface StdioShutdownResources {
@@ -62,22 +66,6 @@ export const liveStdioProcessPort: StdioProcessPort = {
   forceExit: (code) => process.exit(code)
 }
 
-const beginClosing = (state: StdioShutdownState): StdioShutdownState =>
-  state._tag === "Quiescing" ? { _tag: "Closing", reason: state.reason } : state
-
-const complete = (state: StdioShutdownState, outcome: StdioShutdownOutcome): StdioShutdownState => {
-  if (state._tag === "Complete" || state._tag === "Running") return state
-  return { _tag: "Complete", reason: state.reason, outcome }
-}
-
-const completeTransition = (
-  state: StdioShutdownState,
-  outcome: StdioShutdownOutcome
-): readonly [boolean, StdioShutdownState] => {
-  const next = complete(state, outcome)
-  return [next !== state, next]
-}
-
 export const makeStdioShutdownCoordinator = (
   onQuiesce: () => void = () => {}
 ): Effect.Effect<StdioShutdownCoordinator> =>
@@ -96,54 +84,68 @@ export const makeStdioShutdownCoordinator = (
         )
       )
 
-    return {
+    const internals: StdioShutdownInternals = {
+      claimExecution: Ref.getAndSet(executionClaimed, true).pipe(Effect.map((claimed) => !claimed)),
+      beginClosing: (reason) => Ref.set(state, { _tag: "Closing", reason }),
+      complete: (reason, outcome) =>
+        Ref.set(state, { _tag: "Complete", reason, outcome }).pipe(
+          Effect.zipRight(Deferred.succeed(completed, undefined)),
+          Effect.asVoid
+        )
+    }
+    const coordinator: StdioShutdownCoordinator = {
       request,
       awaitRequest: Deferred.await(requested),
-      claimExecution: Ref.getAndSet(executionClaimed, true).pipe(Effect.map((claimed) => !claimed)),
-      beginClosing: Ref.update(state, beginClosing),
-      complete: (outcome) =>
-        Ref.modify(state, (current) => completeTransition(current, outcome)).pipe(
-          Effect.flatMap((transitioned) =>
-            transitioned ? Deferred.succeed(completed, undefined).pipe(Effect.asVoid) : Effect.void
-          )
-        ),
       awaitComplete: Deferred.await(completed),
-      state: Ref.get(state)
+      state: Ref.get(state),
+      execute: (resources) => executeShutdown(coordinator, internals, resources)
     }
+    return coordinator
   })
 
 const ignoreCloseFailure = (effect: Effect.Effect<void, unknown>): Effect.Effect<void> => Effect.ignore(effect)
 
 const runGracefulShutdown = (
-  coordinator: StdioShutdownCoordinator,
+  internals: StdioShutdownInternals,
+  reason: StdioShutdownReason,
   resources: StdioShutdownResources
 ): Effect.Effect<void> =>
   Effect.gen(function* () {
     yield* resources.drain.pipe(Effect.disconnect, Effect.timeoutOption(STDIO_DRAIN_ALLOWANCE), Effect.ignore)
-    yield* coordinator.beginClosing
+    yield* internals.beginClosing(reason)
     yield* Effect.all([resources.closeWire, resources.closeTelemetry, resources.closeClients].map(ignoreCloseFailure), {
       concurrency: "unbounded",
       discard: true
     })
-    yield* coordinator.complete("graceful")
+    yield* internals.complete(reason, "graceful")
   })
 
-const forceShutdown = (coordinator: StdioShutdownCoordinator, resources: StdioShutdownResources): Effect.Effect<void> =>
+const forceShutdown = (
+  internals: StdioShutdownInternals,
+  reason: StdioShutdownReason,
+  resources: StdioShutdownResources
+): Effect.Effect<void> =>
   Effect.sleep(STDIO_SHUTDOWN_DEADLINE).pipe(
     Effect.zipRight(resources.writeDiagnostic(FORCED_STDIO_EXIT_DIAGNOSTIC)),
     Effect.zipRight(resources.forceExit(FORCED_STDIO_EXIT_CODE)),
-    Effect.zipRight(coordinator.complete("forced"))
+    Effect.zipRight(internals.complete(reason, "forced"))
   )
+
+const executeShutdown = (
+  coordinator: StdioShutdownCoordinator,
+  internals: StdioShutdownInternals,
+  resources: StdioShutdownResources
+): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    const reason = yield* coordinator.awaitRequest
+    if (!(yield* internals.claimExecution)) return yield* coordinator.awaitComplete
+    yield* Effect.raceFirst(
+      runGracefulShutdown(internals, reason, resources).pipe(Effect.disconnect, Effect.interruptible),
+      forceShutdown(internals, reason, resources).pipe(Effect.disconnect, Effect.interruptible)
+    )
+  }).pipe(Effect.asVoid)
 
 export const executeBoundedStdioShutdown = (
   coordinator: StdioShutdownCoordinator,
   resources: StdioShutdownResources
-): Effect.Effect<void> =>
-  Effect.gen(function* () {
-    yield* coordinator.awaitRequest
-    if (!(yield* coordinator.claimExecution)) return yield* coordinator.awaitComplete
-    yield* Effect.raceFirst(
-      runGracefulShutdown(coordinator, resources).pipe(Effect.disconnect, Effect.interruptible),
-      forceShutdown(coordinator, resources).pipe(Effect.disconnect, Effect.interruptible)
-    )
-  }).pipe(Effect.asVoid)
+): Effect.Effect<void> => coordinator.execute(resources)

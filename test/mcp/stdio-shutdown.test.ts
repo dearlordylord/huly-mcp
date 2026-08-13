@@ -29,20 +29,6 @@ const makeResources = (
   })
 
 describe("bounded stdio shutdown", () => {
-  it.effect("does not signal completion from an invalid Running transition", () =>
-    Effect.gen(function* () {
-      const coordinator = yield* makeStdioShutdownCoordinator()
-
-      yield* coordinator.complete("graceful")
-      const waiter = yield* coordinator.awaitComplete.pipe(Effect.fork)
-      yield* Effect.yieldNow()
-
-      expect(yield* Fiber.poll(waiter)).toEqual(Option.none())
-      expect(yield* coordinator.state).toEqual({ _tag: "Running" })
-      yield* Fiber.interrupt(waiter)
-    })
-  )
-
   it.effect("uses the first shutdown reason and completes graceful cleanup once", () =>
     Effect.gen(function* () {
       const coordinator = yield* makeStdioShutdownCoordinator()
@@ -57,8 +43,7 @@ describe("bounded stdio shutdown", () => {
       expect(yield* coordinator.request("stdin-eof")).toBe(true)
       expect(yield* coordinator.request("sigterm")).toBe(false)
       yield* executeBoundedStdioShutdown(coordinator, probe.resources)
-      yield* coordinator.beginClosing
-      yield* coordinator.complete("forced")
+      yield* executeBoundedStdioShutdown(coordinator, probe.resources)
 
       expect(yield* coordinator.state).toEqual({ _tag: "Complete", outcome: "graceful", reason: "stdin-eof" })
       expect(yield* Ref.get(closes)).toBe(3)

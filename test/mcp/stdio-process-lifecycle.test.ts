@@ -4,12 +4,15 @@ import { createServer as createTcpServer, type Socket } from "node:net"
 import { resolve } from "node:path"
 import { createInterface } from "node:readline"
 
+import { Schema } from "effect"
 import { beforeAll, describe, expect, it } from "vitest"
 
 const builtServerPath = resolve(process.cwd(), "dist/index.cjs")
 const PROCESS_BOUND_MS = 13_000
 const SECRET = "subprocess-secret-token"
 const PAYLOAD_MARKER = "lifecycle-secret-payload"
+const JsonRpcEnvelopeSchema = Schema.Struct({ id: Schema.Number, jsonrpc: Schema.Literal("2.0") })
+const parseJsonRpcLine = Schema.decodeUnknownSync(Schema.parseJson(JsonRpcEnvelopeSchema))
 
 interface SpawnedServer {
   readonly child: ChildProcessWithoutNullStreams
@@ -65,11 +68,11 @@ const spawnServer = (environment: Readonly<NodeJS.ProcessEnv> = {}): SpawnedServ
   const firstLine = once(lines, "line").then(([line]) => (typeof line === "string" ? line : ""))
   const responseWaiters = new Map<number, (line: string) => void>()
   lines.on("line", (line) => {
-    for (const [id, resolveResponse] of responseWaiters) {
-      if (!line.includes(`"id":${id}`)) continue
-      responseWaiters.delete(id)
-      resolveResponse(line)
-    }
+    const envelope = parseJsonRpcLine(line)
+    const resolveResponse = responseWaiters.get(envelope.id)
+    if (resolveResponse === undefined) return
+    responseWaiters.delete(envelope.id)
+    resolveResponse(line)
   })
   const exit = once(child, "exit").then(([code, signal]) => ({
     code: typeof code === "number" ? code : null,
@@ -113,8 +116,7 @@ const assertProtocolOnlyStdout = (stdout: string): void => {
     .filter((line) => line.length > 0)
   expect(lines.length).toBeGreaterThan(0)
   for (const line of lines) {
-    expect(() => JSON.parse(line)).not.toThrow()
-    expect(line).toContain('"jsonrpc":"2.0"')
+    expect(parseJsonRpcLine(line).jsonrpc).toBe("2.0")
   }
 }
 
@@ -252,7 +254,9 @@ describe("built stdio process lifecycle", () => {
     } finally {
       ensureStopped(server)
       for (const socket of sockets) socket.destroy()
-      stalledHuly.close()
+      await new Promise<void>((resolveClose, reject) => {
+        stalledHuly.close((error) => (error === undefined ? resolveClose() : reject(error)))
+      })
     }
   }, 20_000)
 })

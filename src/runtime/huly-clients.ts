@@ -77,7 +77,7 @@ export const buildScopedClientBundle = (
 /**
  * Create a memoized client resolver that builds layers on first call
  * and keeps the scope alive for the process lifetime.
- * Returns [resolver, prime] — prime pre-populates the cache from an existing bundle.
+ * The named operations support lazy resolution, eager priming, and exact-once closure.
  */
 export const createClientResolver = (combinedClientLayer: CombinedClientLayer): ClientResolver => {
   const state: { active: Promise<ScopedClientBundle> | null; closePromise: Promise<void> | null; closed: boolean } = {
