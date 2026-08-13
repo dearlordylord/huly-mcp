@@ -111,7 +111,7 @@ Manual setup for the second group-DM participant:
    printf '%s\n%s\n' \
    '{"jsonrpc":"2.0","method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"test","version":"1.0"}}},"id":1}' \
    '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_workspace_members","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"test","version":"1.0"}}},"id":2}' \
-     | HULY_TOOL_MODE=native MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep '"id":2'
+     | HULY_TOOL_MODE=native node dist/index.cjs 2>/dev/null | grep '"id":2'
    ```
 
 5. Confirm `list_employees` shows the owner plus two non-self employees with
@@ -194,7 +194,7 @@ INTEGRATION_TRANSPORT=http \
 ```bash
 printf '{"jsonrpc":"2.0","method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"test","version":"1.0"}}},"id":1}
 {"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"test","version":"1.0"}}},"id":2}
-' | HULY_TOOL_MODE=native MCP_AUTO_EXIT=true node dist/index.cjs 2>&1 | grep '"id":2'
+' | HULY_TOOL_MODE=native node dist/index.cjs 2>&1 | grep '"id":2'
 ```
 
 Expected: JSON with `"projects": [...]`
@@ -262,7 +262,7 @@ printf '%s\n' \
 '{"jsonrpc":"2.0","method":"resources/templates/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"test","version":"1.0"}}},"id":2}' \
 '{"jsonrpc":"2.0","method":"resources/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"test","version":"1.0"}}},"id":3}' \
 '{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"huly://projects/HULY","_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"test","version":"1.0"}}},"id":4}' \
-  | MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep -E '"id":[234]'
+  | node dist/index.cjs 2>/dev/null | grep -E '"id":[234]'
 ```
 
 For HTTP header mode, send the same JSON-RPC methods to `/mcp` with `x-huly-url`, `x-huly-workspace`, and `x-huly-token` headers. Resource reads use the same request-scoped header config as tool calls.
@@ -398,9 +398,9 @@ Huly REST API is eventually consistent. Reads immediately after writes may retur
 
 ```bash
 # Update, then wait, then read in separate connections
-printf '...update...' | MCP_AUTO_EXIT=true node dist/index.cjs
+printf '...update...' | node dist/index.cjs
 sleep 2
-printf '...get...' | MCP_AUTO_EXIT=true node dist/index.cjs
+printf '...get...' | node dist/index.cjs
 ```
 
 ## Individual Tool Test Pattern
@@ -410,7 +410,7 @@ META='"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelc
 
 printf '%s\n' \
   "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"TOOL_NAME\",\"arguments\":ARGS,$META},\"id\":2}" \
-  | HULY_TOOL_MODE=native MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep '"id":2'
+  | HULY_TOOL_MODE=native node dist/index.cjs 2>/dev/null | grep '"id":2'
 ```
 
 ## Checking Results

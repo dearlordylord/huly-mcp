@@ -1,12 +1,13 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
 import { once } from "node:events"
+import { createServer as createTcpServer, type Socket } from "node:net"
 import { resolve } from "node:path"
 import { createInterface } from "node:readline"
 
 import { beforeAll, describe, expect, it } from "vitest"
 
 const builtServerPath = resolve(process.cwd(), "dist/index.cjs")
-const PROCESS_BOUND_MS = 8_000
+const PROCESS_BOUND_MS = 13_000
 const SECRET = "subprocess-secret-token"
 const PAYLOAD_MARKER = "lifecycle-secret-payload"
 
@@ -17,6 +18,7 @@ interface SpawnedServer {
   readonly pid: number
   readonly stderr: () => string
   readonly stdout: () => string
+  readonly responseLine: (id: number) => Promise<string>
 }
 
 const withBound = <A>(promise: Promise<A>, label: string): Promise<A> =>
@@ -34,7 +36,7 @@ const withBound = <A>(promise: Promise<A>, label: string): Promise<A> =>
     )
   })
 
-const spawnServer = (): SpawnedServer => {
+const spawnServer = (environment: Readonly<NodeJS.ProcessEnv> = {}): SpawnedServer => {
   const { MCP_AUTO_EXIT: _ignoredAutoExit, ...inheritedEnvironment } = process.env
   const child = spawn(process.execPath, [builtServerPath], {
     env: {
@@ -43,7 +45,8 @@ const spawnServer = (): SpawnedServer => {
       HULY_TOKEN: SECRET,
       HULY_URL: "https://huly.example.com",
       HULY_WORKSPACE: "workspace",
-      LAZY_ENVS: "true"
+      LAZY_ENVS: "true",
+      ...environment
     }
   })
   const pid = child.pid
@@ -60,6 +63,14 @@ const spawnServer = (): SpawnedServer => {
   })
   const lines = createInterface({ input: child.stdout })
   const firstLine = once(lines, "line").then(([line]) => (typeof line === "string" ? line : ""))
+  const responseWaiters = new Map<number, (line: string) => void>()
+  lines.on("line", (line) => {
+    for (const [id, resolveResponse] of responseWaiters) {
+      if (!line.includes(`"id":${id}`)) continue
+      responseWaiters.delete(id)
+      resolveResponse(line)
+    }
+  })
   const exit = once(child, "exit").then(([code, signal]) => ({
     code: typeof code === "number" ? code : null,
     signal: typeof signal === "string" ? signal : null
@@ -80,7 +91,10 @@ const spawnServer = (): SpawnedServer => {
     })}\n`
   )
 
-  return { child, exit, firstLine, pid, stderr: () => output.stderr, stdout: () => output.stdout }
+  const responseLine = (id: number): Promise<string> =>
+    new Promise((resolveResponse) => responseWaiters.set(id, resolveResponse))
+
+  return { child, exit, firstLine, pid, responseLine, stderr: () => output.stderr, stdout: () => output.stdout }
 }
 
 const processExists = (pid: number): boolean => {
@@ -164,8 +178,7 @@ describe("built stdio process lifecycle", () => {
       server.child.kill("SIGTERM")
       const result = await withBound(server.exit, "racing shutdown")
 
-      expect([0, 1]).toContain(result.code)
-      expect(result.signal).toBeNull()
+      expect(result).toEqual({ code: 0, signal: null })
       expect(processExists(server.pid)).toBe(false)
       assertProtocolOnlyStdout(server.stdout())
       assertSanitizedStderr(server.stderr())
@@ -173,4 +186,73 @@ describe("built stdio process lifecycle", () => {
       ensureStopped(server)
     }
   })
+
+  it("delivers a response admitted immediately before EOF", async () => {
+    const server = spawnServer()
+    try {
+      await withBound(server.firstLine, "stdio discovery")
+      const response = server.responseLine(2)
+      server.child.stdin.end(
+        `${JSON.stringify({
+          jsonrpc: "2.0",
+          id: 2,
+          method: "tools/call",
+          params: { name: "get_huly_context", arguments: {} }
+        })}\n`
+      )
+
+      expect(await withBound(response, "in-flight response")).toContain('"id":2')
+      expect(await withBound(server.exit, "in-flight EOF shutdown")).toEqual({ code: 0, signal: null })
+      expect(processExists(server.pid)).toBe(false)
+      assertProtocolOnlyStdout(server.stdout())
+      assertSanitizedStderr(server.stderr())
+    } finally {
+      ensureStopped(server)
+    }
+  })
+
+  it("abandons a Huly request on SIGTERM and removes its PID after the drain allowance", async () => {
+    const sockets = new Set<Socket>()
+    const stalledHuly = createTcpServer((socket) => {
+      sockets.add(socket)
+      socket.on("close", () => sockets.delete(socket))
+    })
+    stalledHuly.listen(0, "127.0.0.1")
+    await once(stalledHuly, "listening")
+    const address = stalledHuly.address()
+    if (address === null || typeof address === "string") throw new Error("Stalled Huly server has no TCP port")
+    const server = spawnServer({ HULY_URL: `http://127.0.0.1:${address.port}` })
+
+    try {
+      await withBound(server.firstLine, "stdio discovery")
+      server.child.stdin.write(
+        `${JSON.stringify({
+          jsonrpc: "2.0",
+          id: 2,
+          method: "tools/call",
+          params: { name: "list_projects", arguments: {} }
+        })}\n`
+      )
+      await withBound(
+        once(stalledHuly, "connection").then(() => {}),
+        "Huly request admission"
+      )
+      server.child.kill("SIGTERM")
+
+      const exit = await withBound(server.exit, "abandoned request shutdown").catch((error: unknown) => {
+        throw new Error(
+          `${error instanceof Error ? error.message : String(error)}; stdout=${server.stdout()}; stderr=${server.stderr()}`
+        )
+      })
+      expect(exit).toEqual({ code: 0, signal: null })
+      expect(processExists(server.pid)).toBe(false)
+      expect(server.stdout()).not.toContain('"id":2')
+      assertProtocolOnlyStdout(server.stdout())
+      assertSanitizedStderr(server.stderr())
+    } finally {
+      ensureStopped(server)
+      for (const socket of sockets) socket.destroy()
+      stalledHuly.close()
+    }
+  }, 20_000)
 })

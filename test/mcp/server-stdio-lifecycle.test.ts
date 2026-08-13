@@ -1,5 +1,6 @@
 import { PassThrough } from "node:stream"
 
+import { Server } from "@modelcontextprotocol/server"
 import { it } from "@effect/vitest"
 import { Context, Effect, Fiber, Layer, TestClock } from "effect"
 import { describe, expect } from "vitest"
@@ -79,6 +80,19 @@ class CountingCloseTransport extends StdioServerTransport {
   }
 }
 
+class CountingSdkServer extends Server {
+  closes = 0
+
+  constructor() {
+    super({ name: "shutdown-test", version: "1.0.0" }, { capabilities: { resources: {}, tools: {} } })
+  }
+
+  override close(): Promise<void> {
+    this.closes++
+    return super.close()
+  }
+}
+
 describe("McpServerService released stdio lifecycle", () => {
   it("lets the SDK report owned stdio wire close failures out of band", async () => {
     const bundle = await clientBundle()
@@ -146,13 +160,23 @@ describe("McpServerService released stdio lifecycle", () => {
     const bundle = await clientBundle()
     let telemetryCloses = 0
     let clientCloses = 0
+    const sdkServers: Array<CountingSdkServer> = []
+    const sdkCreatedState = { resolve: () => {} }
+    const sdkCreated = new Promise<void>((resolve) => {
+      sdkCreatedState.resolve = resolve
+    })
     const layer = McpServerService.layer({
       transport: "stdio",
       resolveClients: async () => bundle,
       closeClients: async () => {
         clientCloses++
       },
-      createServer: createDefaultMcpSdkServer,
+      createServer: () => {
+        const server = new CountingSdkServer()
+        sdkServers.push(server)
+        sdkCreatedState.resolve()
+        return server
+      },
       createStdioTransport: () => transport,
       stdioProcess,
       getRuntimeConfigContext: () => sanitizeHulyRuntimeConfigFromEnv(runtimeEnv)
@@ -172,11 +196,27 @@ describe("McpServerService released stdio lifecycle", () => {
     )
 
     await stdioProcess.awaitListening()
+    input.write(
+      `${JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "server/discover",
+        params: {
+          _meta: {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientCapabilities": {}
+          }
+        }
+      })}\n`
+    )
+    await sdkCreated
     stdioProcess.emitEof()
     stdioProcess.emitSigterm()
     await Effect.runPromise(Fiber.join(fiber))
 
     expect(transport.closes).toBe(1)
+    expect(sdkServers).toHaveLength(1)
+    expect(sdkServers[0]?.closes).toBe(1)
     expect(telemetryCloses).toBe(1)
     expect(clientCloses).toBe(1)
     expect(stdioProcess.forcedExitCodes).toEqual([])

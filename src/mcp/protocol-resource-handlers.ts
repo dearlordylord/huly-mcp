@@ -11,6 +11,7 @@ import type { WorkspaceClientOperations } from "../huly/workspace-client.js"
 import { clientResolutionErrorMessage } from "./error-mapping.js"
 import { listResources, readHulyResource } from "./resources.js"
 import type { RequestAdmission, RequestLease } from "./request-admission.js"
+import { McpErrorCode, SERVER_SHUTTING_DOWN_MESSAGE } from "./tool-responses.js"
 
 interface ClientBundle {
   readonly hulyClient: HulyClient["Type"]
@@ -30,10 +31,7 @@ interface ResourceHandlerInput {
 const enterOrThrow = (admission: RequestAdmission): RequestLease => {
   const lease = admission.enter()
   if (lease !== null) return lease
-  throw new ProtocolError(
-    ProtocolErrorCode.InternalError,
-    "Huly MCP is shutting down; start a new connection before retrying"
-  )
+  throw new ProtocolError(McpErrorCode.InternalError, SERVER_SHUTTING_DOWN_MESSAGE)
 }
 
 const withResourceWarnings = (result: ReadResourceResult, warnings: ReadonlyArray<ToolWarning>): ReadResourceResult =>

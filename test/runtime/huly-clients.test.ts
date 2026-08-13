@@ -37,7 +37,7 @@ describe("shared Huly client runtime", () => {
   })
 
   it("memoizes resolver construction and supports primed bundles", async () => {
-    const [resolve, , close] = createClientResolver(clientLayer)
+    const { close, resolve } = createClientResolver(clientLayer)
 
     const first = await resolve()
     const second = await resolve()
@@ -46,7 +46,7 @@ describe("shared Huly client runtime", () => {
     await close()
 
     const primed = await Effect.runPromise(buildScopedClientBundle(clientLayer))
-    const [resolvePrimed, prime, closePrimed] = createClientResolver(clientLayer)
+    const { close: closePrimed, prime, resolve: resolvePrimed } = createClientResolver(clientLayer)
     prime(primed)
 
     await expect(resolvePrimed()).resolves.toBe(primed.bundle)
@@ -62,7 +62,7 @@ describe("shared Huly client runtime", () => {
     const recoverableLayer = Layer.suspend(() =>
       available ? clientLayer : Layer.merge(Layer.fail(unavailable), clientLayer)
     )
-    const [resolve, , close] = createClientResolver(recoverableLayer)
+    const { close, resolve } = createClientResolver(recoverableLayer)
 
     await expect(resolve()).rejects.toBeDefined()
     available = true
@@ -76,7 +76,7 @@ describe("shared Huly client runtime", () => {
       failureKind: "refused"
     })
     const failingLayer = Layer.merge(Layer.fail(unavailable), clientLayer)
-    const [resolve, prime, close] = createClientResolver(failingLayer)
+    const { close, prime, resolve } = createClientResolver(failingLayer)
     const primed = await Effect.runPromise(buildScopedClientBundle(clientLayer))
     const failedAcquisition = resolve()
     prime(primed)
@@ -98,7 +98,7 @@ describe("shared Huly client runtime", () => {
         )
       )
     )
-    const [resolve, , close] = createClientResolver(trackedLayer)
+    const { close, resolve } = createClientResolver(trackedLayer)
 
     await resolve()
     await Promise.all([close(), close()])
@@ -109,7 +109,7 @@ describe("shared Huly client runtime", () => {
 
   it("rejects priming after process-scoped clients close", async () => {
     const scoped = await Effect.runPromise(buildScopedClientBundle(clientLayer))
-    const [, prime, close] = createClientResolver(clientLayer)
+    const { close, prime } = createClientResolver(clientLayer)
 
     await close()
 
@@ -154,7 +154,7 @@ describe("shared Huly client runtime", () => {
           )
         )
       )
-      const [resolve, , close] = createClientResolver(startupLayer)
+      const { close, resolve } = createClientResolver(startupLayer)
       const acquisition = resolve()
 
       yield* Deferred.await(started)

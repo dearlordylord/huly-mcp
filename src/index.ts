@@ -145,7 +145,11 @@ const runConfiguredServer = (transport: McpTransportType): Effect.Effect<void, A
     const authMethod: "token" | "password" = process.env["HULY_TOKEN"] ? "token" : "password"
 
     const combinedClientLayer = buildCombinedClientLayer()
-    const [resolveClients, primeClients, closeClients] = createClientResolver(combinedClientLayer)
+    const {
+      close: closeClients,
+      prime: primeClients,
+      resolve: resolveClients
+    } = createClientResolver(combinedClientLayer)
     const resolveHttpClientLease = createHttpClientLeaseResolver(combinedClientLayer, resolveClients)
 
     if (!lazyEnvs && transport === "stdio") {

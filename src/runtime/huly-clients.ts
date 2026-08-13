@@ -35,6 +35,12 @@ export interface ScopedClientBundle {
   readonly close: () => Promise<void>
 }
 
+export interface ClientResolver {
+  readonly resolve: () => Promise<ClientBundle>
+  readonly prime: (scoped: ScopedClientBundle) => void
+  readonly close: () => Promise<void>
+}
+
 interface ClientAcquisition {
   readonly promise: Promise<ScopedClientBundle>
   readonly close: () => Promise<void>
@@ -73,13 +79,7 @@ export const buildScopedClientBundle = (
  * and keeps the scope alive for the process lifetime.
  * Returns [resolver, prime] — prime pre-populates the cache from an existing bundle.
  */
-export const createClientResolver = (
-  combinedClientLayer: CombinedClientLayer
-): readonly [
-  resolve: () => Promise<ClientBundle>,
-  prime: (scoped: ScopedClientBundle) => void,
-  close: () => Promise<void>
-] => {
+export const createClientResolver = (combinedClientLayer: CombinedClientLayer): ClientResolver => {
   const state: { active: Promise<ScopedClientBundle> | null; closePromise: Promise<void> | null; closed: boolean } = {
     active: null,
     closePromise: null,
@@ -136,5 +136,5 @@ export const createClientResolver = (
     return state.closePromise
   }
 
-  return [resolve, prime, close] as const
+  return { resolve, prime, close }
 }

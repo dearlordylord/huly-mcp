@@ -70,6 +70,14 @@ const complete = (state: StdioShutdownState, outcome: StdioShutdownOutcome): Std
   return { _tag: "Complete", reason: state.reason, outcome }
 }
 
+const completeTransition = (
+  state: StdioShutdownState,
+  outcome: StdioShutdownOutcome
+): readonly [boolean, StdioShutdownState] => {
+  const next = complete(state, outcome)
+  return [next !== state, next]
+}
+
 export const makeStdioShutdownCoordinator = (
   onQuiesce: () => void = () => {}
 ): Effect.Effect<StdioShutdownCoordinator> =>
@@ -94,9 +102,10 @@ export const makeStdioShutdownCoordinator = (
       claimExecution: Ref.getAndSet(executionClaimed, true).pipe(Effect.map((claimed) => !claimed)),
       beginClosing: Ref.update(state, beginClosing),
       complete: (outcome) =>
-        Ref.update(state, (current) => complete(current, outcome)).pipe(
-          Effect.zipRight(Deferred.succeed(completed, undefined)),
-          Effect.asVoid
+        Ref.modify(state, (current) => completeTransition(current, outcome)).pipe(
+          Effect.flatMap((transitioned) =>
+            transitioned ? Deferred.succeed(completed, undefined).pipe(Effect.asVoid) : Effect.void
+          )
         ),
       awaitComplete: Deferred.await(completed),
       state: Ref.get(state)
