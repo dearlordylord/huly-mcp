@@ -26,7 +26,7 @@
     "build:mcp": "PKG_VERSION=$(node -p \"require('./package.json').version\") NODE_ENGINE_REQUIREMENT=$(node -p \"require('./package.json').engines.node\") && esbuild src/launcher.ts --bundle --platform=node --format=cjs --log-level=warning --outfile=dist/index.cjs --external:ws \"--define:PKG_VERSION=\\\"$PKG_VERSION\\\"\" \"--define:NODE_ENGINE_REQUIREMENT=\\\"$NODE_ENGINE_REQUIREMENT\\\"\"",
     "build:cli": "pnpm --filter @firfi/huly-cli build",
     "typecheck": "pnpm typecheck:tsc && pnpm typecheck:effect",
-    "typecheck:tsc": "node node_modules/@typescript/native/bin/tsc -p tsconfig.json --noEmit 2>&1 | { grep -E '^(src/|packages/|scripts/|test/|tsconfig\\.json)' && exit 1 || exit 0; }",
+    "typecheck:tsc": "node node_modules/@typescript/native/bin/tsc -p tsconfig.json --noEmit 2>&1 | grep -v \": suggestion TS\" | { grep -E '^(src/|packages/|scripts/|test/|tsconfig\\.json)' && exit 1 || exit 0; }",
     "typecheck:effect": "effect-tsgo diagnostics --project tsconfig.json --strict --severity error,warning",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
