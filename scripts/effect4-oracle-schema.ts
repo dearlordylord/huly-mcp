@@ -3,19 +3,13 @@ import { Schema } from "effect"
 import { CliExitStatusSchema, CliFailureCodeSchema, CliFailureSchema } from "../packages/huly-cli/src/failures.js"
 import { Count } from "../src/domain/schemas/shared.js"
 import { ToolCategory, ToolName } from "../src/mcp/tools/registry.js"
+import { CapturedProcessResultSchema } from "./captured-process-schema.js"
 import { isJsonValue } from "./effect4-oracle-canonical.js"
 
 export type { JsonValue } from "./effect4-oracle-canonical.js"
 
 export const JsonValueSchema = Schema.declare(isJsonValue)
 export const JsonRecordSchema = Schema.Record(Schema.String, JsonValueSchema)
-
-export const OracleProcessResultSchema = Schema.Struct({
-  exitCode: Schema.Int,
-  stderr: Schema.String,
-  stdout: Schema.String
-})
-export type OracleProcessResult = Schema.Schema.Type<typeof OracleProcessResultSchema>
 
 export const OracleMethodSchema = Schema.Literals([
   "server/discover",
@@ -43,12 +37,12 @@ export type OracleJsonRpcRequest = Schema.Schema.Type<typeof OracleJsonRpcReques
 
 const ArtifactVersionCheckSchema = Schema.Struct({ embeddedManifestVersion: Schema.Boolean })
 const CliProcessFixturesSchema = Schema.Struct({
-  rootHelp: OracleProcessResultSchema,
-  groupHelp: OracleProcessResultSchema,
-  leafHelp: OracleProcessResultSchema,
-  humanError: OracleProcessResultSchema,
-  jsonErrorAfterDeepCommand: OracleProcessResultSchema,
-  jsonErrorBeforeDeepCommand: OracleProcessResultSchema
+  rootHelp: CapturedProcessResultSchema,
+  groupHelp: CapturedProcessResultSchema,
+  leafHelp: CapturedProcessResultSchema,
+  humanError: CapturedProcessResultSchema,
+  jsonErrorAfterDeepCommand: CapturedProcessResultSchema,
+  jsonErrorBeforeDeepCommand: CapturedProcessResultSchema
 })
 export const BundledProcessesSchema = Schema.Struct({
   artifacts: Schema.Struct({ cli: ArtifactVersionCheckSchema, mcp: ArtifactVersionCheckSchema }),

@@ -30,9 +30,12 @@ export default defineConfig({
         // Cross-platform process-tree control is an imperative quality-harness adapter. Dedicated tests cover
         // empty/mixed/forwarded output, spawn/nonzero/signal failures, and resistant-descendant cleanup.
         'scripts/run-bounded-command.ts',
-        // Oracle subprocess control is an imperative capture adapter. A dedicated test proves bounded
-        // SIGTERM-to-SIGKILL escalation and reaping; public process output remains in the checked oracle.
-        'scripts/effect4-oracle-process-runner.ts',
+        // Subprocess lifecycle control is an imperative adapter. A dedicated test proves bounded
+        // SIGTERM-to-SIGKILL escalation and reaping; callers test the captured output contracts.
+        'scripts/captured-process.ts',
+        // Live bundled-process capture is owned by the separately bounded behavioral-oracle gate. Coverage
+        // exercises parsing and oracle assembly through captured fixtures without duplicating nine processes.
+        'scripts/effect4-oracle-process-capture.ts',
         // Certification process wiring is an imperative shell over the tested workflow and secret ledger;
         // live local-Huly runs provide transport evidence for the built stdio and HTTP adapters.
         'scripts/api-token-certification-adapter.ts',

@@ -22,7 +22,8 @@ import { canonicalJson } from "./effect4-oracle-canonical.js"
 import { captureAuthoredConstraints } from "./effect4-oracle-constraints.js"
 import { validateCurrentDraft07Corpora } from "./effect4-oracle-current-corpus.js"
 import { validateDraft07DiscoveryResult } from "./effect4-oracle-draft07.js"
-import { captureBundledProcessOracle, LIST_TOOLS_REQUEST_ID } from "./effect4-oracle-process.js"
+import { captureBundledProcessOracle } from "./effect4-oracle-process-capture.js"
+import { LIST_TOOLS_REQUEST_ID } from "./effect4-oracle-process.js"
 import { type BehavioralOracle, BehavioralOracleSchema, type BundledProcesses } from "./effect4-oracle-schema.js"
 
 const ORACLE_HELP_WIDTH = 100
@@ -144,9 +145,13 @@ export const requireOracleDiscoveries = (bundledProcesses: BundledProcesses) => 
   return { native, proxy }
 }
 
-export const captureEffect4Oracle = async (): Promise<BehavioralOracle> => {
+type CaptureBundledProcesses = () => Promise<BundledProcesses>
+
+export const captureEffect4Oracle = async (
+  captureBundledProcesses: CaptureBundledProcesses = captureBundledProcessOracle
+): Promise<BehavioralOracle> => {
   validateCurrentDraft07Corpora()
-  const bundledProcesses = await captureBundledProcessOracle()
+  const bundledProcesses = await captureBundledProcesses()
   const { native: nativeDiscovery, proxy: proxyDiscovery } = requireOracleDiscoveries(bundledProcesses)
   validateDraft07DiscoveryResult(nativeDiscovery.result)
   validateDraft07DiscoveryResult(proxyDiscovery.result)

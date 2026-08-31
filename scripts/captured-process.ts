@@ -2,19 +2,19 @@ import { spawn } from "node:child_process"
 
 import { Schema } from "effect"
 
-import { type OracleProcessResult, OracleProcessResultSchema } from "./effect4-oracle-schema.js"
+import { type CapturedProcessResult, CapturedProcessResultSchema } from "./captured-process-schema.js"
 
 const PROCESS_TIMEOUT_MILLISECONDS = 15_000
 const PROCESS_TERMINATION_GRACE_MILLISECONDS = 1_000
 const PROCESS_EXIT_SIGNALLED = -1
 
-export const runOracleProcess = (
+export const runCapturedProcess = (
   executable: string,
   args: ReadonlyArray<string>,
   env: Readonly<Record<string, string>>,
   stdin = "",
   timeoutMilliseconds = PROCESS_TIMEOUT_MILLISECONDS
-): Promise<OracleProcessResult> =>
+): Promise<CapturedProcessResult> =>
   new Promise((resolve, reject) => {
     const child = spawn(executable, args, { cwd: process.cwd(), env, stdio: ["pipe", "pipe", "pipe"] })
     const stdout: Array<Buffer> = []
@@ -37,11 +37,11 @@ export const runOracleProcess = (
       clearTimeout(timeout)
       if (forceKillTimeout !== undefined) clearTimeout(forceKillTimeout)
       if (timedOut) {
-        reject(new Error(`Oracle process timed out and was terminated: ${args.join(" ")}`))
+        reject(new Error(`Captured process timed out and was terminated: ${args.join(" ")}`))
         return
       }
       resolve(
-        Schema.decodeUnknownSync(OracleProcessResultSchema)({
+        Schema.decodeUnknownSync(CapturedProcessResultSchema)({
           exitCode: exitCode ?? PROCESS_EXIT_SIGNALLED,
           stderr: Buffer.concat(stderr).toString("utf8"),
           stdout: Buffer.concat(stdout).toString("utf8")

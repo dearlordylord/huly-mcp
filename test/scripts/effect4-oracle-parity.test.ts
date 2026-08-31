@@ -40,8 +40,15 @@ import {
   runEffect4OracleDeltaReportCommand,
   writeEffect4OracleDeltaReport
 } from "../../scripts/report-effect4-oracle-deltas.js"
-import { BehavioralOracleSchema } from "../../scripts/effect4-oracle-schema.js"
-import { decodeOracleStdioResponses, requireSuccessfulOracleProcess } from "../../scripts/effect4-oracle-process.js"
+import {
+  decodeOracleStdioResponses,
+  LIST_TOOLS_REQUEST_ID,
+  normalizeOracleCliVersion,
+  oracleLegacyStdioInput,
+  oracleStdioInput,
+  requireSuccessfulOracleProcess
+} from "../../scripts/effect4-oracle-process.js"
+import { BehavioralOracleSchema, OracleJsonRpcRequestSchema } from "../../scripts/effect4-oracle-schema.js"
 
 describe("Effect 4 oracle structural parity", () => {
   it("retains array order and reports escaped JSON Pointer paths", () => {
@@ -149,6 +156,35 @@ describe("Effect 4 oracle structural parity", () => {
     expect(() =>
       requireSuccessfulOracleProcess("fixture", { exitCode: 0, stdout: "", stderr: "sanitized failure" })
     ).toThrow("sanitized failure")
+  })
+
+  it("builds current and legacy process inputs and normalizes CLI versions", () => {
+    const decodeRequest = Schema.decodeUnknownSync(Schema.fromJsonString(OracleJsonRpcRequestSchema))
+    const requests = oracleStdioInput()
+      .trim()
+      .split("\n")
+      .map((line) => decodeRequest(line))
+    expect(requests.map(({ id, method }) => ({ id, method }))).toEqual([
+      { id: 1, method: "server/discover" },
+      { id: LIST_TOOLS_REQUEST_ID, method: "tools/list" },
+      { id: 3, method: "resources/templates/list" },
+      { id: 4, method: "tools/call" },
+      { id: 5, method: "tools/call" },
+      { id: 6, method: "tools/call" },
+      { id: 7, method: "resources/list" }
+    ])
+    expect(oracleLegacyStdioInput()).toContain('"protocolVersion":"2025-06-18"')
+    expect(oracleLegacyStdioInput()).toContain(`"id":${LIST_TOOLS_REQUEST_ID},"method":"tools/list"`)
+    expect(normalizeOracleCliVersion({ exitCode: 0, stderr: "", stdout: "Huly CLI 1.2.3\nUsage" })).toEqual({
+      exitCode: 0,
+      stderr: "",
+      stdout: "Huly CLI <package-version>\nUsage"
+    })
+    expect(normalizeOracleCliVersion({ exitCode: 2, stderr: "failure", stdout: "" })).toEqual({
+      exitCode: 2,
+      stderr: "failure",
+      stdout: ""
+    })
   })
 
   it("classifies every reviewed delta surface and builds ordered category metadata", () => {

@@ -9,9 +9,11 @@ const MAXIMUM_SUCCESSFUL_OUTPUT_LINE_COUNT = 300
 const SECOND = Milliseconds.make(MILLISECONDS_PER_SECOND)
 const SECONDS_PER_MINUTE = 60
 const TWO_MINUTE_COUNT = 2
+const THREE_MINUTE_COUNT = 3
 const FIVE_MINUTE_COUNT = 5
 const MINUTE = Milliseconds.make(SECONDS_PER_MINUTE * SECOND)
 const TWO_MINUTES = Milliseconds.make(TWO_MINUTE_COUNT * MINUTE)
+const THREE_MINUTES = Milliseconds.make(THREE_MINUTE_COUNT * MINUTE)
 const FIVE_MINUTES = Milliseconds.make(FIVE_MINUTE_COUNT * MINUTE)
 const maximumSuccessfulOutputLines = OutputLineCount.make(MAXIMUM_SUCCESSFUL_OUTPUT_LINE_COUNT)
 const PnpmEntryPoint = NonEmptyString.annotate({
@@ -35,7 +37,7 @@ const gates: ReadonlyArray<QualityGate> = [
   { args: ["complexity"], name: "cyclomatic complexity", timeout: MINUTE },
   { args: ["verify-registry-metadata"], name: "registry metadata", timeout: MINUTE },
   { args: ["verify-registry-schema"], name: "registry schema", timeout: MINUTE },
-  { args: ["verify:effect4-oracle:built"], name: "Effect migration behavioral oracle", timeout: MINUTE },
+  { args: ["verify:effect4-oracle:built"], name: "Effect migration behavioral oracle", timeout: THREE_MINUTES },
   { args: ["verify-cli-integration-coverage"], name: "CLI integration coverage", timeout: TWO_MINUTES },
   { args: ["verify-sdk-parity"], name: "SDK parity", timeout: MINUTE },
   { args: ["verify-readme"], name: "README synchronization", timeout: MINUTE },

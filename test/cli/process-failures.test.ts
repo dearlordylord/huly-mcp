@@ -1,62 +1,24 @@
-import { spawn } from "node:child_process"
-
 import { Schema } from "effect"
 import { describe, expect, it } from "vitest"
 
 import { CliFailureSchema } from "../../packages/huly-cli/src/failures.js"
+import { runCapturedProcess } from "../../scripts/captured-process.js"
 import type { FailureBoundaryScenario } from "./fixtures/failure-boundary-scenarios.js"
 
-const ProcessResultSchema = Schema.Struct({ exitCode: Schema.Int, stderr: Schema.String, stdout: Schema.String })
 const parseCliFailure = Schema.decodeUnknownSync(Schema.fromJsonString(CliFailureSchema))
+const PROCESS_TEST_TIMEOUT_MILLISECONDS = 20_000
 
-const runCli = (args: ReadonlyArray<string>): Promise<Schema.Schema.Type<typeof ProcessResultSchema>> =>
-  new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ["packages/huly-cli/dist/index.cjs", ...args], {
-      cwd: process.cwd(),
-      env: {}
-    })
-    const stdout: Array<Buffer> = []
-    const stderr: Array<Buffer> = []
-    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk))
-    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk))
-    child.on("error", reject)
-    child.on("close", (exitCode) =>
-      resolve(
-        Schema.decodeUnknownSync(ProcessResultSchema)({
-          exitCode,
-          stdout: Buffer.concat(stdout).toString("utf8"),
-          stderr: Buffer.concat(stderr).toString("utf8")
-        })
-      )
-    )
-  })
+const runCli = (args: ReadonlyArray<string>) =>
+  runCapturedProcess(process.execPath, ["packages/huly-cli/dist/index.cjs", ...args], {})
 
-const runFailureBoundary = (
-  scenario: FailureBoundaryScenario
-): Promise<Schema.Schema.Type<typeof ProcessResultSchema>> =>
-  new Promise((resolve, reject) => {
-    const child = spawn(
-      process.execPath,
-      ["--import", "tsx", "test/cli/fixtures/failure-boundary-process.ts", scenario],
-      { cwd: process.cwd(), env: {} }
-    )
-    const stdout: Array<Buffer> = []
-    const stderr: Array<Buffer> = []
-    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk))
-    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk))
-    child.on("error", reject)
-    child.on("close", (exitCode) =>
-      resolve(
-        Schema.decodeUnknownSync(ProcessResultSchema)({
-          exitCode,
-          stdout: Buffer.concat(stdout).toString("utf8"),
-          stderr: Buffer.concat(stderr).toString("utf8")
-        })
-      )
-    )
-  })
+const runFailureBoundary = (scenario: FailureBoundaryScenario) =>
+  runCapturedProcess(
+    process.execPath,
+    ["--import", "tsx", "test/cli/fixtures/failure-boundary-process.ts", scenario],
+    {}
+  )
 
-describe("CLI failure process boundary", () => {
+describe("CLI failure process boundary", { timeout: PROCESS_TEST_TIMEOUT_MILLISECONDS }, () => {
   it("writes one JSON failure to stderr, keeps stdout empty, and exits by taxonomy", async () => {
     const result = await runCli(["issues", "create", "--input-json", "{bad", "--json"])
 
