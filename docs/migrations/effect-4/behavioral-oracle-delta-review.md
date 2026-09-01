@@ -31,7 +31,7 @@ stale categories, duplicate categories, and corpus hash drift.
 | 3,428 | Authored-constraint projection | The same 522 ordered tools remain represented; generated ref/composition paths changed. Manual cross-field constraints remain in the corpus and representative runtime/Ajv agreement passes. |
 | 3 | Direct issue-assignee tool descriptions | Direct issue create, update, and list advertise exact agent UserProfile titles as assignee inputs (#244). |
 | 6 | CLI JSON parse diagnostics | Effect 4 adds deterministic line/column context; code, hint, retryability, and exit status are unchanged. |
-| 4 | CLI help rendering | The Effect 4 CLI renderer intentionally uses concise help and omits branch-only patterns from union fields. Route inventory and ordering remain unchanged. |
+| 4 | CLI help rendering | The Effect 4 CLI renderer intentionally uses concise help and omits patterns that are not shared by every string-capable union branch, while retaining string patterns across nullable alternatives. Route inventory and ordering remain unchanged. |
 
 The comparison deliberately retains public array order, descriptions, titles,
 refs, required fields, enums, patterns, bounds, compositions, help, and error
@@ -51,6 +51,6 @@ mise exec node@22.22.2 -- pnpm exec vitest run \
   test/scripts/effect4-oracle-parity.test.ts
 ```
 
-The full verifier re-renders the current bundled corpus and matches all 21,086
+The full verifier re-renders the current bundled corpus and matches all 21,092
 exact entries. Any future semantic or structural drift is unexpected; an
 accepted entry that stops occurring is stale and also fails verification.

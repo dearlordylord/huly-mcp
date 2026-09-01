@@ -49,10 +49,11 @@ Four live-only defects were repaired during certification:
 
 The immutable Effect 3 oracle was not regenerated. The final Effect 4 corpus is
 verified by the compact reviewed certificate described in
-`behavioral-oracle-delta-review.md`: 21,086 exact differences are divided into
-12,754 Draft-07 structural dialect changes, 4,894 schema-metadata changes, 3,428
-authored-constraint projections, 6 richer CLI JSON diagnostics, and 4 concise
-CLI help changes. Counts, current/baseline hashes, and sorted delta-set hashes
+`behavioral-oracle-delta-review.md`: 21,092 exact differences are divided into
+12,754 Draft-07 structural dialect changes, 4,897 schema-metadata changes, 3,428
+authored-constraint projections, 3 direct issue-assignee tool-description
+changes, 6 richer CLI JSON diagnostics, and 4 concise CLI help changes. Counts,
+current/baseline hashes, and sorted delta-set hashes
 reject unreviewed, changed, duplicate, or stale classifications.
 
 The certified registry remains 522 ordered unique operations. Strict Ajv
@@ -80,9 +81,9 @@ release-candidate gate is:
 mise exec node@22.22.2 -- pnpm check-all
 ```
 
-It passed on the final tree after this report and the integration-driven fixes:
-854 files produced zero strict Effect diagnostics, all 289 test files and 4,278
-tests passed, and coverage was 99.57% statements, 99.01% branches, 99.25%
-functions, and 99.61% lines. The gate retains the existing TypeScript 7, strict Effect diagnostics,
+It passed on the current tree after this report, the integration-driven fixes,
+and subsequent certified maintenance: 861 files produced zero strict Effect
+diagnostics, all 290 test files and 4,320 tests passed, and coverage was 99.57%
+statements, 99.00% branches, 99.26% functions, and 99.61% lines. The gate retains the existing TypeScript 7, strict Effect diagnostics,
 circular-dependency, complexity, schema-boundary, no-mocks, duplication, and 99%
 coverage requirements.

@@ -569,7 +569,7 @@ catalog assertion is resolved. The CLI-owned and directly required adapter paths
 have no TypeScript diagnostics; broader diagnostics remain in separately owned
 migration surfaces.
 
-## Ticket #225 final bundled oracle certification
+## Ticket #225 bundled oracle certification (historical checkpoint)
 
 The immutable Effect 3 behavioral baseline was compared to a separately rendered
 Effect 4 corpus after the #227 HTTP and #228 CLI build edges landed. The baseline
@@ -577,6 +577,12 @@ was not regenerated. The comparison found exactly 21,086 structural deltas:
 12,754 Draft-07 structural dialect changes, 4,894 schema-metadata changes, 3,428
 authored-constraint projection changes, 6 richer CLI JSON parse diagnostics, and
 4 concise CLI help-renderer changes.
+
+These counts describe the #225 checkpoint, not the current bundled corpus. The
+current certificate supersedes this checkpoint with 21,092 deltas: metadata is
+4,897 and a separate three-entry #244 direct issue-assignee tool-description
+category is present. `behavioral-oracle-delta-review.md` and its JSON certificate
+are authoritative for current totals and hashes.
 
 Each category records an exact count and SHA-256 of its sorted exact delta identities
 in `behavioral-oracle-delta-review.json`, avoiding duplication of baseline/current
@@ -698,9 +704,11 @@ and 200 for the configured credential. Disposable resources are cleaned by the
 lifecycle harness, and stdio/HTTP shutdown remains owned and bounded by the
 certified lifecycle implementation.
 
-The final parity report is `final-parity-report.md`. It links the unchanged
-Effect 3 baseline to the reviewed 21,086-delta certificate and the #225, #229,
-and #231 schema, CLI, artifact, and clean-consumer evidence. The archival
+At the #232 checkpoint, the final parity report linked the unchanged Effect 3
+baseline to the then-current reviewed 21,086-delta certificate and the #225,
+#229, and #231 schema, CLI, artifact, and clean-consumer evidence. That count is
+historical and is superseded by the current 21,092-delta certificate documented
+in `behavioral-oracle-delta-review.md` and `final-parity-report.md`. The archival
 decision is explicit: `.reference/effect-v3.22.1` remains historical parity
 provenance only; setup does not provision or verify it, it is outside the active
 lookup order, and no `.reference/effect` alias exists. Active guidance names the
