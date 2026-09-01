@@ -215,7 +215,7 @@ describe("Error Mapping to MCP", () => {
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
           expect(response._meta.errorTag).toBe("PersonIdentifierAmbiguousError")
           expect(assertAt(response.content, 0).text).toBe(
-            "Person identifier 'Smith,Bill' matched 2 people; use an exact email address instead"
+            "Person identifier 'Smith,Bill' matched 2 people; use a unique Person display name or email address instead"
           )
         })
       )

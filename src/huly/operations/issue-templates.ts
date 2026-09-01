@@ -81,7 +81,7 @@ import { findComponentByIdOrLabel } from "./components.js"
 import { findPersonByEmailOrName } from "./contacts-shared.js"
 import { attachIssueChild } from "./issues-parent.js"
 import { findProject, priorityToString, stringToPriority, zeroAsUnset } from "./issues-shared.js"
-import { createIssueWithResolvedAssignee } from "./issues-write.js"
+import { createIssueWithResolvedAssignee, type CreateIssueWithResolvedAssigneeParams } from "./issues-write.js"
 import { clampLimit, hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
@@ -437,10 +437,11 @@ const templateChildCreateParams = (
     entity: "issue template child description"
   }).pipe(
     Effect.map(
-      (description): CreateIssueParams => ({
+      (description): CreateIssueWithResolvedAssigneeParams => ({
         project: params.project,
         title: child.title,
         priority: priorityToString(child.priority),
+        resolvedAssignee: null,
         ...(description === undefined ? {} : { description })
       })
     )
@@ -470,7 +471,7 @@ const createTemplateChildIssues = (
     }
     for (const child of template.children) {
       const childParams = yield* templateChildCreateParams(params, child, markupUrlConfig)
-      const childResult = yield* createIssueWithResolvedAssignee(childParams, null)
+      const childResult = yield* createIssueWithResolvedAssignee(childParams)
       yield* attachIssueChild(
         client,
         project._id,
@@ -505,15 +506,16 @@ export const createIssueFromTemplate = (
 
     const assignee = yield* resolveIssueFromTemplateAssignee(client, params, template)
 
-    const issueParams: CreateIssueParams = {
+    const issueParams: CreateIssueWithResolvedAssigneeParams = {
       project: params.project,
       title,
       description,
       priority,
+      resolvedAssignee: assignee,
       status: params.status
     }
 
-    const result = yield* createIssueWithResolvedAssignee(issueParams, assignee)
+    const result = yield* createIssueWithResolvedAssignee(issueParams)
 
     if (template.component !== null) {
       yield* client.updateDoc(tracker.class.Issue, project._id, toRef<HulyIssue>(result.issueId), {

@@ -23,7 +23,7 @@
       "rationale": "Reviewed authored-constraint projection: the same 522 ordered tools remain represented and strict Draft-07/runtime agreement passes."
     },
     {
-      "category": "tool-description",
+      "category": "issue-assignee-tool-description",
       "count": 3,
       "deltaSetSha256": "ed177998cf115951e05d66d6cb09801800f18a8de4aca74fd47ba9b283864cb5",
       "issue": "#244",

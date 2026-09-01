@@ -194,7 +194,7 @@ describe("Effect 4 oracle structural parity", () => {
       { _tag: "Changed", path: "/registry/tools/0/outputSchema/type", before: "string", after: "number" },
       {
         _tag: "Changed",
-        path: "/bundledProcesses/stdio/native/1/result/tools/0/description",
+        path: "/bundledProcesses/stdio/native/1/result/tools/10/description",
         before: "old",
         after: "new"
       },
@@ -205,7 +205,7 @@ describe("Effect 4 oracle structural parity", () => {
       "authored-constraints",
       "schema-metadata",
       "draft07-structure",
-      "tool-description",
+      "issue-assignee-tool-description",
       "cli-help",
       "cli-json-diagnostic"
     ])
@@ -216,13 +216,21 @@ describe("Effect 4 oracle structural parity", () => {
       oracleDeltaReviewCategory({ _tag: "Changed", path: "/cli/result/stderr", before: "old", after: "new" })
     ).toBe("cli-json-diagnostic")
     expect(oracleDeltaReviewCategory({ _tag: "Added", path: "/unclassified", after: true })).toBeUndefined()
+    expect(
+      oracleDeltaReviewCategory({
+        _tag: "Changed",
+        path: "/bundledProcesses/stdio/native/1/result/tools/11/description",
+        before: "old",
+        after: "unrelated future change"
+      })
+    ).toBeUndefined()
 
     const review = createOracleDeltaReview("baseline", "current", deltas)
     expect(review.categories.map(({ category, issue }) => ({ category, issue }))).toEqual([
       { category: "draft07-structure", issue: "#225" },
       { category: "schema-metadata", issue: "#225" },
       { category: "authored-constraints", issue: "#225" },
-      { category: "tool-description", issue: "#244" },
+      { category: "issue-assignee-tool-description", issue: "#244" },
       { category: "cli-json-diagnostic", issue: "#228" },
       { category: "cli-help", issue: "#228" }
     ])

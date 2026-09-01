@@ -26,54 +26,52 @@ const loadPeople = (
       )
 }
 
-const findExactPeople = (
+const findExactPeople = Effect.fn("IssueAssigneeResolution.findExactPeople")(function* (
   client: HulyClient["Service"],
   identifier: PersonRefInput
-): Effect.Effect<Array<Person>, HulyClientError> =>
-  Effect.gen(function* () {
-    const [identities, channels, namedPeople, profiles] = yield* Effect.all([
-      client.findAll<SocialIdentity>(
-        contact.class.SocialIdentity,
-        hulyQuery<SocialIdentity>({ type: SocialIdType.EMAIL, value: identifier })
-      ),
-      client.findAll<Channel>(
-        contact.class.Channel,
-        hulyQuery<Channel>({ provider: contact.channelProvider.Email, value: identifier })
-      ),
-      client.findAll<Person>(contact.class.Person, hulyQuery<Person>({ name: identifier })),
-      client.findAll<UserProfile>(
-        toClassRef<UserProfile>(contact.class.UserProfile),
-        hulyQuery<UserProfile>({ title: identifier })
-      )
-    ])
+) {
+  const [identities, channels, namedPeople, profiles] = yield* Effect.all([
+    client.findAll<SocialIdentity>(
+      contact.class.SocialIdentity,
+      hulyQuery<SocialIdentity>({ type: SocialIdType.EMAIL, value: identifier })
+    ),
+    client.findAll<Channel>(
+      contact.class.Channel,
+      hulyQuery<Channel>({ provider: contact.channelProvider.Email, value: identifier })
+    ),
+    client.findAll<Person>(contact.class.Person, hulyQuery<Person>({ name: identifier })),
+    client.findAll<UserProfile>(
+      toClassRef<UserProfile>(contact.class.UserProfile),
+      hulyQuery<UserProfile>({ title: identifier })
+    )
+  ])
 
-    return yield* loadPeople(client, [
-      ...identities.map((identity) => toRef<Person>(identity.attachedTo)),
-      ...channels.map((channel) => toRef<Person>(channel.attachedTo)),
-      ...namedPeople.map((person) => person._id),
-      ...profiles.map((profile) => profile.person)
-    ])
-  })
+  return yield* loadPeople(client, [
+    ...identities.map((identity) => toRef<Person>(identity.attachedTo)),
+    ...channels.map((channel) => toRef<Person>(channel.attachedTo)),
+    ...namedPeople.map((person) => person._id),
+    ...profiles.map((profile) => profile.person)
+  ])
+})
 
-const findFuzzyPeople = (
+const findFuzzyPeople = Effect.fn("IssueAssigneeResolution.findFuzzyPeople")(function* (
   client: HulyClient["Service"],
   identifier: PersonRefInput
-): Effect.Effect<Array<Person>, HulyClientError> =>
-  Effect.gen(function* () {
-    const value = { $like: `%${escapeLikeWildcards(identifier)}%` }
-    const [channels, namedPeople] = yield* Effect.all([
-      client.findAll<Channel>(
-        contact.class.Channel,
-        hulyQuery<Channel>({ provider: contact.channelProvider.Email, value })
-      ),
-      client.findAll<Person>(contact.class.Person, hulyQuery<Person>({ name: value }))
-    ])
+) {
+  const value = { $like: `%${escapeLikeWildcards(identifier)}%` }
+  const [channels, namedPeople] = yield* Effect.all([
+    client.findAll<Channel>(
+      contact.class.Channel,
+      hulyQuery<Channel>({ provider: contact.channelProvider.Email, value })
+    ),
+    client.findAll<Person>(contact.class.Person, hulyQuery<Person>({ name: value }))
+  ])
 
-    return yield* loadPeople(client, [
-      ...channels.map((channel) => toRef<Person>(channel.attachedTo)),
-      ...namedPeople.map((person) => person._id)
-    ])
-  })
+  return yield* loadPeople(client, [
+    ...channels.map((channel) => toRef<Person>(channel.attachedTo)),
+    ...namedPeople.map((person) => person._id)
+  ])
+})
 
 const solePerson = (
   identifier: PersonRefInput,
@@ -83,12 +81,14 @@ const solePerson = (
     ? Effect.fail(new PersonIdentifierAmbiguousError({ identifier, matches: Count.make(people.length) }))
     : Effect.succeed(people[0])
 
-export const findIssueAssignee = (
+export const findIssueAssignee = Effect.fn("IssueAssigneeResolution.findIssueAssignee")(function* (
   client: HulyClient["Service"],
   identifier: PersonRefInput
-): Effect.Effect<Person | undefined, ResolutionError> =>
-  Effect.gen(function* () {
-    const exactPeople = yield* findExactPeople(client, identifier)
-    if (exactPeople.length > 0) return yield* solePerson(identifier, exactPeople)
-    return yield* solePerson(identifier, yield* findFuzzyPeople(client, identifier))
-  })
+) {
+  const exactPeople = yield* findExactPeople(client, identifier)
+  if (exactPeople.length > 0) return yield* solePerson(identifier, exactPeople)
+  return yield* solePerson(identifier, yield* findFuzzyPeople(client, identifier))
+}) satisfies (
+  client: HulyClient["Service"],
+  identifier: PersonRefInput
+) => Effect.Effect<Person | undefined, ResolutionError>

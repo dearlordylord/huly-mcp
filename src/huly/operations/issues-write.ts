@@ -58,6 +58,11 @@ type CreateIssueError =
 
 type DeleteIssueError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
 
+export type CreateIssueWithResolvedAssigneeParams = Omit<CreateIssueParams, "assignee"> & {
+  readonly assignee?: never
+  readonly resolvedAssignee: Ref<Person> | null
+}
+
 // SDK: updateDoc with retrieve=true returns TxResult which doesn't type the embedded object.
 // The runtime value includes { object: { sequence: number } } for $inc operations.
 const TxIncResult = Schema.Struct({ object: Schema.Struct({ sequence: Schema.Number }) })
@@ -249,10 +254,9 @@ type CreateIssueWithResolvedAssigneeError = Exclude<
 >
 
 export const createIssueWithResolvedAssignee = (
-  params: CreateIssueParams,
-  assignee: Ref<Person> | null
+  params: CreateIssueWithResolvedAssigneeParams
 ): Effect.Effect<CreateIssueResult, CreateIssueWithResolvedAssigneeError, HulyClient | Diagnostics> =>
-  createIssueWithAssignee(params, () => Effect.succeed(assignee))
+  createIssueWithAssignee(params, () => Effect.succeed(params.resolvedAssignee))
 
 /**
  * Delete an issue from a project.

@@ -3,6 +3,7 @@ import type { Channel, Person, SocialIdentity, UserProfile } from "@hcengineerin
 import { SocialIdType } from "@hcengineering/core"
 import type {
   Attribute,
+  Blob,
   Class,
   Doc,
   FindResult,
@@ -223,7 +224,7 @@ const makeUserProfile = (person: Person, title: string, id = `profile-${person._
   _class: contact.class.UserProfile,
   space: spaceRef("space-1"),
   title,
-  content: "profile-content" as MarkupBlobRef,
+  content: docRef<Blob>("profile-content"),
   blobs: {},
   parentInfo: [],
   rank: "0|profile",
@@ -367,7 +368,7 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       return Effect.succeed(toFindResult(statuses))
     }
     if (_class === contact.class.Channel) {
-      const value = (query as Record<string, unknown>).value
+      const value = queryField(query, "value")
       const filtered = channels.filter((channel) =>
         typeof value === "string"
           ? channel.value === value
@@ -1847,6 +1848,36 @@ describe("createIssue", () => {
         }).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(captureAddCollection.attributes?.assignee).toBe("person-agent")
+      })
+    )
+
+    it.effect("rejects an exact email shared by distinct Persons with actionable guidance", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ sequence: 1 })
+        const sharedEmail = "shared@example.com"
+        const firstPerson = makePerson({ _id: docRef<Person>("person-first"), name: "First Person" })
+        const secondPerson = makePerson({ _id: docRef<Person>("person-second"), name: "Second Person" })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          persons: [firstPerson, secondPerson],
+          channels: [
+            makeChannel({ _id: docRef<Channel>("channel-first"), attachedTo: firstPerson._id, value: sharedEmail }),
+            makeChannel({ _id: docRef<Channel>("channel-second"), attachedTo: secondPerson._id, value: sharedEmail })
+          ]
+        })
+
+        const error = yield* Effect.flip(
+          createIssue({
+            project: projectIdentifier("TEST"),
+            title: "Ambiguous exact email",
+            assignee: email(sharedEmail)
+          }).pipe(Effect.provide(testLayer), withDiagnostics)
+        )
+
+        expect(error._tag).toBe("PersonIdentifierAmbiguousError")
+        expect(error.message).toBe(
+          "Person identifier 'shared@example.com' matched 2 people; use a unique Person display name or email address instead"
+        )
       })
     )
 

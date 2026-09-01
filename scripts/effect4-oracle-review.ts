@@ -12,7 +12,7 @@ const ReviewCategorySchema = Schema.Literals([
   "draft07-structure",
   "schema-metadata",
   "authored-constraints",
-  "tool-description",
+  "issue-assignee-tool-description",
   "cli-json-diagnostic",
   "cli-help"
 ])
@@ -39,6 +39,12 @@ export type OracleDeltaReview = Schema.Schema.Type<typeof OracleDeltaReviewSchem
 
 const sha256 = (value: string): string => crypto.createHash("sha256").update(value).digest("hex")
 
+const ISSUE_ASSIGNEE_TOOL_DESCRIPTION_PATHS = new Set([
+  "/bundledProcesses/stdio/native/1/result/tools/10/description",
+  "/bundledProcesses/stdio/native/1/result/tools/12/description",
+  "/bundledProcesses/stdio/native/1/result/tools/13/description"
+])
+
 export const oracleDeltaReviewCategory = (delta: OracleDelta): ReviewCategory | undefined => {
   if (delta.path.startsWith("/registry/authoredConstraints/")) return "authored-constraints"
   if (delta.path.includes("/inputSchema/") || delta.path.includes("/outputSchema/")) {
@@ -46,7 +52,7 @@ export const oracleDeltaReviewCategory = (delta: OracleDelta): ReviewCategory | 
       ? "schema-metadata"
       : "draft07-structure"
   }
-  if (delta.path.includes("/result/tools/") && delta.path.endsWith("/description")) return "tool-description"
+  if (ISSUE_ASSIGNEE_TOOL_DESCRIPTION_PATHS.has(delta.path)) return "issue-assignee-tool-description"
   if (delta.path.includes("/help/") || delta.path.endsWith("Help/stdout")) return "cli-help"
   if (delta.path.includes("/cli/") && delta.path.endsWith("stderr")) return "cli-json-diagnostic"
   if (delta.path.startsWith("/cli/errors/") && delta.path.endsWith("/message")) return "cli-json-diagnostic"
@@ -60,7 +66,7 @@ const REVIEW_CATEGORY_ORDER: ReadonlyArray<ReviewCategory> = [
   "draft07-structure",
   "schema-metadata",
   "authored-constraints",
-  "tool-description",
+  "issue-assignee-tool-description",
   "cli-json-diagnostic",
   "cli-help"
 ]
@@ -85,7 +91,7 @@ const categoryMetadata = (category: ReviewCategory): { readonly issue: string; r
         rationale:
           "Reviewed authored-constraint projection: the same 522 ordered tools remain represented and strict Draft-07/runtime agreement passes."
       }
-    case "tool-description":
+    case "issue-assignee-tool-description":
       return {
         issue: "#244",
         rationale:
