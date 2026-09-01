@@ -66,7 +66,7 @@ export const batchGetEmailsForPersons = <T extends HulyPerson>(
 
 export const findPersonIdsByEmailSearch = (
   client: HulyClient["Service"],
-  emailSearch: string
+  emailSearch: NonEmptyString
 ): Effect.Effect<Array<Ref<HulyPerson>>, HulyClientError> =>
   Effect.gen(function* () {
     const [channelPersonIds, socialIdentities] = yield* Effect.all([
@@ -87,7 +87,7 @@ export const findPersonIdsByEmailSearch = (
 
 export const findPersonIdsByEmailChannelSearch = (
   client: HulyClient["Service"],
-  emailSearch: string
+  emailSearch: NonEmptyString | PersonRefInput
 ): Effect.Effect<Array<Ref<HulyPerson>>, HulyClientError> =>
   Effect.map(
     client.findAll<Channel>(
@@ -102,7 +102,7 @@ export const findPersonIdsByEmailChannelSearch = (
 
 export const findPersonIdsByExactEmailSources = (
   client: HulyClient["Service"],
-  email: string
+  email: PersonRefInput
 ): Effect.Effect<Array<Ref<HulyPerson>>, HulyClientError> =>
   Effect.map(
     Effect.all([
@@ -138,13 +138,13 @@ export const loadPeopleByIds = (
 
 export const findPeopleByExactName = (
   client: HulyClient["Service"],
-  name: string
+  name: PersonRefInput
 ): Effect.Effect<Array<HulyPerson>, HulyClientError> =>
   client.findAll<HulyPerson>(contact.class.Person, hulyQuery<HulyPerson>({ name }))
 
 export const findPeopleByNameSearch = (
   client: HulyClient["Service"],
-  nameSearch: string
+  nameSearch: PersonRefInput
 ): Effect.Effect<Array<HulyPerson>, HulyClientError> =>
   client.findAll<HulyPerson>(
     contact.class.Person,

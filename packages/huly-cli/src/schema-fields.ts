@@ -308,7 +308,9 @@ const sharedUnionPatterns = (
   ["anyOf", "oneOf"].flatMap((variantKey) => {
     const variants = schema[variantKey]
     if (!Array.isArray(variants) || variants.length === 0) return []
-    return [...intersectSets(variants.map((variant) => collectUniversalPatterns(rootSchema, variant, depth + 1)))]
+    const stringVariants = variants.filter((variant) => schemaHasType(rootSchema, variant, "string", depth + 1))
+    if (stringVariants.length === 0) return []
+    return [...intersectSets(stringVariants.map((variant) => collectUniversalPatterns(rootSchema, variant, depth + 1)))]
   })
 
 const collectUniversalPatterns = (rootSchema: object, schema: unknown, depth = 0): ReadonlySet<string> => {

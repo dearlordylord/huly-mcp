@@ -32,6 +32,7 @@ import {
   oracleDeltaReviewCategory,
   OracleDeltaAuditReportSchema,
   OracleDeltaReviewSchema,
+  parseCandidateToolIdentities,
   verifyReviewedOracleDeltas
 } from "../../scripts/effect4-oracle-review.js"
 import {
@@ -201,7 +202,7 @@ describe("Effect 4 oracle structural parity", () => {
   })
 
   it("classifies every reviewed delta surface and builds ordered category metadata", () => {
-    const candidateResponses = candidateToolResponses(["future_tool", "list_issues"])
+    const candidateToolIdentities = parseCandidateToolIdentities(candidateToolResponses(["future_tool", "list_issues"]))
     const deltas = [
       { _tag: "Added", path: "/registry/authoredConstraints/0/constraints/0", after: true },
       { _tag: "Changed", path: "/registry/tools/0/inputSchema/description", before: "old", after: "new" },
@@ -215,7 +216,7 @@ describe("Effect 4 oracle structural parity", () => {
       { _tag: "Changed", path: "/bundledProcesses/cli/rootHelp/stdout", before: "old", after: "new" },
       { _tag: "Changed", path: "/cli/errors/json/message", before: "old", after: "new" }
     ] as const
-    expect(deltas.map((delta) => oracleDeltaReviewCategory(delta, candidateResponses))).toEqual([
+    expect(deltas.map((delta) => oracleDeltaReviewCategory(delta, candidateToolIdentities))).toEqual([
       "authored-constraints",
       "schema-metadata",
       "draft07-structure",
@@ -238,11 +239,11 @@ describe("Effect 4 oracle structural parity", () => {
           before: "old",
           after: "unrelated future change"
         },
-        candidateResponses
+        candidateToolIdentities
       )
     ).toBeUndefined()
 
-    const review = createOracleDeltaReview("baseline", "current", deltas, candidateResponses)
+    const review = createOracleDeltaReview("baseline", "current", deltas, candidateToolIdentities)
     expect(review.categories.map(({ category, issue }) => ({ category, issue }))).toEqual([
       { category: "draft07-structure", issue: "#225" },
       { category: "schema-metadata", issue: "#225" },
@@ -257,13 +258,12 @@ describe("Effect 4 oracle structural parity", () => {
   })
 
   it("classifies issue-assignee descriptions by candidate tool name across reorder and insertion", () => {
-    const firstCandidate = candidateToolResponses(["list_issues", "create_issue", "update_issue"])
-    const reorderedCandidate = candidateToolResponses([
-      "future_inserted_tool",
-      "update_issue",
-      "list_issues",
-      "create_issue"
-    ])
+    const firstCandidate = parseCandidateToolIdentities(
+      candidateToolResponses(["list_issues", "create_issue", "update_issue"])
+    )
+    const reorderedCandidate = parseCandidateToolIdentities(
+      candidateToolResponses(["future_inserted_tool", "update_issue", "list_issues", "create_issue"])
+    )
     const descriptionDelta = (toolIndex: number) => ({
       _tag: "Changed" as const,
       path: `/bundledProcesses/stdio/native/0/result/tools/${toolIndex}/description`,
@@ -295,10 +295,10 @@ describe("Effect 4 oracle structural parity", () => {
       Schema.decodeUnknownSync(Schema.Array(OracleJsonRpcResponseSchema))([{ id: 2, jsonrpc: "2.0", result }])
 
     expect(oracleDeltaReviewCategory(delta)).toBeUndefined()
-    expect(oracleDeltaReviewCategory(delta, responses(null))).toBeUndefined()
-    expect(oracleDeltaReviewCategory(delta, responses({}))).toBeUndefined()
-    expect(oracleDeltaReviewCategory(delta, responses({ tools: [null] }))).toBeUndefined()
-    expect(oracleDeltaReviewCategory(delta, responses({ tools: [{}] }))).toBeUndefined()
+    expect(oracleDeltaReviewCategory(delta, parseCandidateToolIdentities(responses(null)))).toBeUndefined()
+    expect(oracleDeltaReviewCategory(delta, parseCandidateToolIdentities(responses({})))).toBeUndefined()
+    expect(oracleDeltaReviewCategory(delta, parseCandidateToolIdentities(responses({ tools: [null] })))).toBeUndefined()
+    expect(oracleDeltaReviewCategory(delta, parseCandidateToolIdentities(responses({ tools: [{}] })))).toBeUndefined()
   })
 
   it("rejects unclassified, zero-count, duplicate, and stale compact review categories", () => {

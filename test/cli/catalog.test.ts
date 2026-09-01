@@ -229,9 +229,14 @@ describe("CLI catalog", () => {
         }
       }
     )
+    const nullableConstrained = fieldOptionDescription(
+      {},
+      { fieldName: "email", schema: { anyOf: [{ type: "string", pattern: "^[^@]+@[^@]+$" }, { type: "null" }] } }
+    )
 
     expect(partlyConstrained).not.toContain("Pattern:")
     expect(universallyConstrained).toContain("Pattern: ^[A-Z]+$")
+    expect(nullableConstrained).toContain("Pattern: ^[^@]+@[^@]+$")
   })
 
   it("describes nested schema constraints without assuming every variant is an object", () => {

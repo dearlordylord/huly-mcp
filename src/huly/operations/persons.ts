@@ -31,7 +31,7 @@ import type {
 import type { ListPersonOrganizationsResult } from "../../domain/schemas/contact-organizations.js"
 import type { CreatePersonResult, DeletePersonResult, UpdatePersonResult } from "../../domain/schemas/contacts.js"
 import { UPDATE_PERSON_FIELDS } from "../../domain/schemas/contacts.js"
-import { Email, OrganizationId, PersonId, PersonName } from "../../domain/schemas/shared.js"
+import { Email, NonEmptyString, OrganizationId, PersonId, PersonName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { InvalidContactProviderError, NoUpdateFieldsError, PersonIdentifierAmbiguousError } from "../errors.js"
 import { PersonNotFoundError } from "../errors.js"
@@ -113,7 +113,7 @@ const applyPersonEmailSearch = (
 ): Effect.Effect<boolean, HulyClientError> =>
   Effect.gen(function* () {
     if (emailSearch === undefined || emailSearch === "") return true
-    const matchingPersonIds = yield* findPersonIdsByEmailSearch(client, emailSearch)
+    const matchingPersonIds = yield* findPersonIdsByEmailSearch(client, NonEmptyString.make(emailSearch))
     if (matchingPersonIds.length === 0) return false
     query._id = { $in: matchingPersonIds }
     return true
