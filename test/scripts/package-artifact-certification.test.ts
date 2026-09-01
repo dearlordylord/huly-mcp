@@ -4,10 +4,15 @@ import * as path from "node:path"
 import { createWriteStream } from "node:fs"
 import { createGzip } from "node:zlib"
 
+import { Schema } from "effect"
 import * as tar from "tar-stream"
 import { describe, expect, it } from "vitest"
 
-import { certifyPackedArtifact } from "../../scripts/package-artifact-certification.js"
+import {
+  certifyPackedArtifact,
+  packedArtifactEvidenceMismatchError,
+  PackedArtifactCertificationSchema
+} from "../../scripts/package-artifact-certification.js"
 
 interface TestArchiveEntry {
   readonly body: string
@@ -54,6 +59,28 @@ const expectedArtifact = {
 }
 
 describe("packed artifact certification", () => {
+  it("reports both expected and actual certificates when evidence is stale", () => {
+    const parseCertification = Schema.decodeUnknownSync(PackedArtifactCertificationSchema)
+    const expected = parseCertification({
+      archiveBytes: 100,
+      bundleBytes: 200,
+      bundleGzipBytes: 150,
+      entryCount: 4,
+      executableMode: 0o755,
+      externalModules: ["ws"],
+      name: "@firfi/huly-mcp",
+      unpackedBytes: 300,
+      version: "1.2.3"
+    })
+    const actual = parseCertification({ ...expected, archiveBytes: 101, bundleBytes: 201 })
+
+    expect(packedArtifactEvidenceMismatchError(expected, actual).message).toBe(
+      "Packed MCP artifact evidence is stale; run certify-packed-artifact with --write." +
+        `\nExpected: ${JSON.stringify(expected)}` +
+        `\nActual: ${JSON.stringify(actual)}`
+    )
+  })
+
   it("certifies executable bundle, manifest, closure, and Effect 4 composition", async () => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), "packed-artifact-certification-"))
     const archive = path.join(directory, "package.tgz")

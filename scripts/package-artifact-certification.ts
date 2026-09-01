@@ -34,6 +34,16 @@ export const PackedArtifactCertificationSchema = Schema.Struct({
 
 export type PackedArtifactCertification = Schema.Schema.Type<typeof PackedArtifactCertificationSchema>
 
+export const packedArtifactEvidenceMismatchError = (
+  expected: PackedArtifactCertification,
+  actual: PackedArtifactCertification
+): Error =>
+  new Error(
+    "Packed MCP artifact evidence is stale; run certify-packed-artifact with --write." +
+      `\nExpected: ${JSON.stringify(expected)}` +
+      `\nActual: ${JSON.stringify(actual)}`
+  )
+
 interface ExpectedPackedArtifact {
   readonly binName: string
   readonly expectedEntries: ReadonlyArray<string>
