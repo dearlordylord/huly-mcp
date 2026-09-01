@@ -247,12 +247,40 @@ describe("CLI catalog", () => {
     expect(patternWithAlternative({ const: 1 })).toContain("Pattern: ^[A-Z]+$")
     expect(patternWithAlternative({ enum: [null, "lower"] })).not.toContain("Pattern:")
     expect(patternWithAlternative({ enum: [null, 1] })).toContain("Pattern: ^[A-Z]+$")
-    expect(patternWithAlternative(null)).toContain("Pattern: ^[A-Z]+$")
+    expect(patternWithAlternative(true)).not.toContain("Pattern:")
+    expect(patternWithAlternative(false)).toContain("Pattern: ^[A-Z]+$")
+    expect(patternWithAlternative(null)).not.toContain("Pattern:")
     expect(patternWithAlternative({ allOf: [{}] })).not.toContain("Pattern:")
     expect(patternWithAlternative({ allOf: [{ type: "null" }] })).toContain("Pattern: ^[A-Z]+$")
     expect(patternWithAlternative({ oneOf: [{}] })).not.toContain("Pattern:")
     expect(patternWithAlternative({ oneOf: [{ type: "null" }] })).toContain("Pattern: ^[A-Z]+$")
     expect(patternWithAlternative({ $ref: "#/$defs/Anything" }, { $defs: { Anything: {} } })).not.toContain("Pattern:")
+    expect(patternWithAlternative({ $ref: "#/$defs/Missing" })).not.toContain("Pattern:")
+    expect(patternWithAlternative({ $ref: "#/$defs/Nothing" }, { $defs: { Nothing: false } })).toContain(
+      "Pattern: ^[A-Z]+$"
+    )
+    expect(
+      patternWithAlternative({ $ref: "#/$defs/Loop" }, { $defs: { Loop: { $ref: "#/$defs/Loop" } } })
+    ).not.toContain("Pattern:")
+    expect(
+      patternWithAlternative(
+        { $ref: "#/$defs/Level0" },
+        {
+          $defs: {
+            Level0: { $ref: "#/$defs/Level1" },
+            Level1: { $ref: "#/$defs/Level2" },
+            Level2: { $ref: "#/$defs/Level3" },
+            Level3: { $ref: "#/$defs/Level4" },
+            Level4: { $ref: "#/$defs/Level5" },
+            Level5: { $ref: "#/$defs/Level6" },
+            Level6: { $ref: "#/$defs/Level7" },
+            Level7: { $ref: "#/$defs/Level8" },
+            Level8: { $ref: "#/$defs/Level9" },
+            Level9: false
+          }
+        }
+      )
+    ).not.toContain("Pattern:")
   })
 
   it("describes nested schema constraints without assuming every variant is an object", () => {
