@@ -12,7 +12,7 @@ const ReviewCategorySchema = Schema.Literals([
   "draft07-structure",
   "schema-metadata",
   "authored-constraints",
-  "issue-assignee-tool-description",
+  "issue-assignee-description",
   "cli-json-diagnostic",
   "cli-help"
 ])
@@ -45,10 +45,19 @@ const ISSUE_ASSIGNEE_TOOL_NAMES: ReadonlySet<ToolNameType> = new Set([
   ToolName.make("update_issue")
 ])
 const TOOL_DESCRIPTION_PATH = /^\/bundledProcesses\/stdio\/native\/(\d+)\/result\/tools\/(\d+)\/description$/u
-const CandidateListToolsResponseSchema = Schema.Struct({
-  result: Schema.Struct({ tools: Schema.Array(Schema.Struct({ name: ToolName })) })
+const INPUT_FIELD_DESCRIPTION_PATH =
+  /^\/bundledProcesses\/stdio\/native\/(\d+)\/result\/tools\/(\d+)\/inputSchema\/properties\/([^/]+)\/description$/u
+const CandidateToolSchema = Schema.Struct({
+  name: ToolName,
+  inputSchema: Schema.optional(
+    Schema.Struct({ properties: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)) })
+  )
 })
-type CandidateToolIdentities = ReadonlyMap<string, ToolNameType>
+const CandidateListToolsResponseSchema = Schema.Struct({
+  result: Schema.Struct({ tools: Schema.Array(CandidateToolSchema) })
+})
+type CandidateTool = Schema.Schema.Type<typeof CandidateToolSchema>
+type CandidateToolIdentities = ReadonlyMap<string, CandidateTool>
 const EMPTY_CANDIDATE_TOOL_IDENTITIES: CandidateToolIdentities = new Map()
 
 const candidateToolIdentityKey = (responseIndex: number, toolIndex: number): string => `${responseIndex}/${toolIndex}`
@@ -56,12 +65,12 @@ const candidateToolIdentityKey = (responseIndex: number, toolIndex: number): str
 export const parseCandidateToolIdentities = (
   candidateResponses: ReadonlyArray<OracleJsonRpcResponse>
 ): CandidateToolIdentities => {
-  const identities = new Map<string, ToolNameType>()
+  const identities = new Map<string, CandidateTool>()
   for (const [responseIndex, response] of candidateResponses.entries()) {
     const candidate = Schema.decodeUnknownOption(CandidateListToolsResponseSchema)(response)
     if (Option.isNone(candidate)) continue
     for (const [toolIndex, tool] of candidate.value.result.tools.entries()) {
-      identities.set(candidateToolIdentityKey(responseIndex, toolIndex), tool.name)
+      identities.set(candidateToolIdentityKey(responseIndex, toolIndex), tool)
     }
   }
   return identities
@@ -73,7 +82,19 @@ const candidateToolName = (
 ): ToolNameType | undefined => {
   const match = TOOL_DESCRIPTION_PATH.exec(path)
   if (match?.[1] === undefined || match[2] === undefined) return undefined
-  return candidateToolIdentities.get(candidateToolIdentityKey(Number(match[1]), Number(match[2])))
+  return candidateToolIdentities.get(candidateToolIdentityKey(Number(match[1]), Number(match[2])))?.name
+}
+
+const isIssueAssigneeInputDescription = (path: string, candidateToolIdentities: CandidateToolIdentities): boolean => {
+  const match = INPUT_FIELD_DESCRIPTION_PATH.exec(path)
+  if (match?.[1] === undefined || match[2] === undefined || match[3] !== "assignee") return false
+  const tool = candidateToolIdentities.get(candidateToolIdentityKey(Number(match[1]), Number(match[2])))
+  return (
+    tool !== undefined &&
+    ISSUE_ASSIGNEE_TOOL_NAMES.has(tool.name) &&
+    tool.inputSchema?.properties !== undefined &&
+    Object.hasOwn(tool.inputSchema.properties, "assignee")
+  )
 }
 
 export const oracleDeltaReviewCategory = (
@@ -81,6 +102,7 @@ export const oracleDeltaReviewCategory = (
   candidateToolIdentities: CandidateToolIdentities = EMPTY_CANDIDATE_TOOL_IDENTITIES
 ): ReviewCategory | undefined => {
   if (delta.path.startsWith("/registry/authoredConstraints/")) return "authored-constraints"
+  if (isIssueAssigneeInputDescription(delta.path, candidateToolIdentities)) return "issue-assignee-description"
   if (delta.path.includes("/inputSchema/") || delta.path.includes("/outputSchema/")) {
     return delta.path.endsWith("/description") || delta.path.endsWith("/title")
       ? "schema-metadata"
@@ -88,7 +110,7 @@ export const oracleDeltaReviewCategory = (
   }
   const toolName = candidateToolName(delta.path, candidateToolIdentities)
   if (toolName !== undefined && ISSUE_ASSIGNEE_TOOL_NAMES.has(toolName)) {
-    return "issue-assignee-tool-description"
+    return "issue-assignee-description"
   }
   if (delta.path.includes("/help/") || delta.path.endsWith("Help/stdout")) return "cli-help"
   if (delta.path.includes("/cli/") && delta.path.endsWith("stderr")) return "cli-json-diagnostic"
@@ -103,7 +125,7 @@ const REVIEW_CATEGORY_ORDER: ReadonlyArray<ReviewCategory> = [
   "draft07-structure",
   "schema-metadata",
   "authored-constraints",
-  "issue-assignee-tool-description",
+  "issue-assignee-description",
   "cli-json-diagnostic",
   "cli-help"
 ]
@@ -128,11 +150,11 @@ const categoryMetadata = (category: ReviewCategory): { readonly issue: string; r
         rationale:
           "Reviewed authored-constraint projection: the same 522 ordered tools remain represented and strict Draft-07/runtime agreement passes."
       }
-    case "issue-assignee-tool-description":
+    case "issue-assignee-description":
       return {
         issue: "#245",
         rationale:
-          "Reviewed agent-facing issue tool descriptions advertising exact agent UserProfile titles as assignee inputs."
+          "Reviewed agent-facing issue tool and assignee input descriptions advertising exact agent UserProfile titles."
       }
     case "cli-json-diagnostic":
       return {

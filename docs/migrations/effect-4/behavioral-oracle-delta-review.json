@@ -10,8 +10,8 @@
     },
     {
       "category": "schema-metadata",
-      "count": 4897,
-      "deltaSetSha256": "b45a00c1303aa9b7c5b31f115c79aa78d2b8cd79866bdbda86b868f3bdd0f1e7",
+      "count": 4894,
+      "deltaSetSha256": "434fa559d6434f645a0a3d090372419a68aced945c39a11da7a3fdee0a126014",
       "issue": "#225",
       "rationale": "Reviewed schema metadata migration: authored descriptions are preserved and legacy generator-default metadata is replaced."
     },
@@ -23,11 +23,11 @@
       "rationale": "Reviewed authored-constraint projection: the same 522 ordered tools remain represented and strict Draft-07/runtime agreement passes."
     },
     {
-      "category": "issue-assignee-tool-description",
-      "count": 3,
-      "deltaSetSha256": "ed177998cf115951e05d66d6cb09801800f18a8de4aca74fd47ba9b283864cb5",
+      "category": "issue-assignee-description",
+      "count": 6,
+      "deltaSetSha256": "1b96ecc02119831de41d610adc1a98b8c4346581db372a0e72901aac5b5b8b64",
       "issue": "#245",
-      "rationale": "Reviewed agent-facing issue tool descriptions advertising exact agent UserProfile titles as assignee inputs."
+      "rationale": "Reviewed agent-facing issue tool and assignee input descriptions advertising exact agent UserProfile titles."
     },
     {
       "category": "cli-json-diagnostic",

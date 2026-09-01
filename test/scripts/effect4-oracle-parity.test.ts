@@ -60,7 +60,13 @@ const candidateToolResponses = (toolNames: ReadonlyArray<string>) =>
     {
       id: 2,
       jsonrpc: "2.0",
-      result: { tools: toolNames.map((name) => ({ description: `${name} description`, name })) }
+      result: {
+        tools: toolNames.map((name) => ({
+          description: `${name} description`,
+          inputSchema: { properties: { assignee: { type: "string" }, unrelated: { type: "string" } } },
+          name
+        }))
+      }
     }
   ])
 
@@ -220,7 +226,7 @@ describe("Effect 4 oracle structural parity", () => {
       "authored-constraints",
       "schema-metadata",
       "draft07-structure",
-      "issue-assignee-tool-description",
+      "issue-assignee-description",
       "cli-help",
       "cli-json-diagnostic"
     ])
@@ -248,7 +254,7 @@ describe("Effect 4 oracle structural parity", () => {
       { category: "draft07-structure", issue: "#225" },
       { category: "schema-metadata", issue: "#225" },
       { category: "authored-constraints", issue: "#225" },
-      { category: "issue-assignee-tool-description", issue: "#245" },
+      { category: "issue-assignee-description", issue: "#245" },
       { category: "cli-json-diagnostic", issue: "#228" },
       { category: "cli-help", issue: "#228" }
     ])
@@ -270,18 +276,43 @@ describe("Effect 4 oracle structural parity", () => {
       before: "old",
       after: "new"
     })
+    const inputDescriptionDelta = (toolIndex: number, fieldName = "assignee") => ({
+      _tag: "Changed" as const,
+      path: `/bundledProcesses/stdio/native/0/result/tools/${toolIndex}/inputSchema/properties/${fieldName}/description`,
+      before: "old",
+      after: "new"
+    })
 
     expect([0, 1, 2].map((index) => oracleDeltaReviewCategory(descriptionDelta(index), firstCandidate))).toEqual([
-      "issue-assignee-tool-description",
-      "issue-assignee-tool-description",
-      "issue-assignee-tool-description"
+      "issue-assignee-description",
+      "issue-assignee-description",
+      "issue-assignee-description"
     ])
     expect([1, 2, 3].map((index) => oracleDeltaReviewCategory(descriptionDelta(index), reorderedCandidate))).toEqual([
-      "issue-assignee-tool-description",
-      "issue-assignee-tool-description",
-      "issue-assignee-tool-description"
+      "issue-assignee-description",
+      "issue-assignee-description",
+      "issue-assignee-description"
     ])
     expect(oracleDeltaReviewCategory(descriptionDelta(0), reorderedCandidate)).toBeUndefined()
+    expect([0, 1, 2].map((index) => oracleDeltaReviewCategory(inputDescriptionDelta(index), firstCandidate))).toEqual([
+      "issue-assignee-description",
+      "issue-assignee-description",
+      "issue-assignee-description"
+    ])
+    expect(
+      [1, 2, 3].map((index) => oracleDeltaReviewCategory(inputDescriptionDelta(index), reorderedCandidate))
+    ).toEqual(["issue-assignee-description", "issue-assignee-description", "issue-assignee-description"])
+    expect(oracleDeltaReviewCategory(inputDescriptionDelta(0), reorderedCandidate)).toBe("schema-metadata")
+    expect(oracleDeltaReviewCategory(inputDescriptionDelta(1, "unrelated"), reorderedCandidate)).toBe("schema-metadata")
+    expect(
+      oracleDeltaReviewCategory(
+        {
+          ...inputDescriptionDelta(1),
+          path: "/bundledProcesses/stdio/native/0/result/tools/1/inputSchema/properties/assignee/anyOf/0/description"
+        },
+        reorderedCandidate
+      )
+    ).toBe("schema-metadata")
   })
 
   it("leaves malformed candidate tool entries unclassified", () => {

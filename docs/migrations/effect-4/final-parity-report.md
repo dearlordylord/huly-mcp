@@ -50,8 +50,8 @@ Four live-only defects were repaired during certification:
 The immutable Effect 3 oracle was not regenerated. The final Effect 4 corpus is
 verified by the compact reviewed certificate described in
 `behavioral-oracle-delta-review.md`: 21,092 exact differences are divided into
-12,754 Draft-07 structural dialect changes, 4,897 schema-metadata changes, 3,428
-authored-constraint projections, 3 direct issue-assignee tool-description
+12,754 Draft-07 structural dialect changes, 4,894 schema-metadata changes, 3,428
+authored-constraint projections, 6 direct issue-assignee description
 changes, 6 richer CLI JSON diagnostics, and 4 concise CLI help changes. Counts,
 current/baseline hashes, and sorted delta-set hashes
 reject unreviewed, changed, duplicate, or stale classifications.

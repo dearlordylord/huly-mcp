@@ -580,7 +580,7 @@ authored-constraint projection changes, 6 richer CLI JSON parse diagnostics, and
 
 These counts describe the #225 checkpoint, not the current bundled corpus. The
 current certificate supersedes this checkpoint with 21,092 deltas: metadata is
-4,897 and a separate three-entry #245 direct issue-assignee tool-description
+4,894 and a separate six-entry #245 direct issue-assignee description
 category is present. `behavioral-oracle-delta-review.md` and its JSON certificate
 are authoritative for current totals and hashes.
 
