@@ -192,6 +192,12 @@ describe("Effect 4 oracle structural parity", () => {
       { _tag: "Added", path: "/registry/authoredConstraints/0/constraints/0", after: true },
       { _tag: "Changed", path: "/registry/tools/0/inputSchema/description", before: "old", after: "new" },
       { _tag: "Changed", path: "/registry/tools/0/outputSchema/type", before: "string", after: "number" },
+      {
+        _tag: "Changed",
+        path: "/bundledProcesses/stdio/native/1/result/tools/0/description",
+        before: "old",
+        after: "new"
+      },
       { _tag: "Changed", path: "/bundledProcesses/cli/rootHelp/stdout", before: "old", after: "new" },
       { _tag: "Changed", path: "/cli/errors/json/message", before: "old", after: "new" }
     ] as const
@@ -199,6 +205,7 @@ describe("Effect 4 oracle structural parity", () => {
       "authored-constraints",
       "schema-metadata",
       "draft07-structure",
+      "tool-description",
       "cli-help",
       "cli-json-diagnostic"
     ])
@@ -215,6 +222,7 @@ describe("Effect 4 oracle structural parity", () => {
       { category: "draft07-structure", issue: "#225" },
       { category: "schema-metadata", issue: "#225" },
       { category: "authored-constraints", issue: "#225" },
+      { category: "tool-description", issue: "#244" },
       { category: "cli-json-diagnostic", issue: "#228" },
       { category: "cli-help", issue: "#228" }
     ])

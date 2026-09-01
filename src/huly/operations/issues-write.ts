@@ -24,7 +24,13 @@ import { DEFAULT_ISSUE_PRIORITY } from "../../domain/schemas/issues.js"
 import { IssueId, IssueIdentifier, type ProjectIdentifier } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
-import type { IssueNotFoundError, IssueReferenceError, PersonNotFoundError, ProjectNotFoundError } from "../errors.js"
+import type {
+  IssueNotFoundError,
+  IssueReferenceError,
+  PersonIdentifierAmbiguousError,
+  PersonNotFoundError,
+  ProjectNotFoundError
+} from "../errors.js"
 import { HulyError, InvalidStatusError } from "../errors.js"
 import { tracker } from "../huly-plugins.js"
 import { renderIssueDescriptionForWrite } from "./issue-native-references.js"
@@ -47,6 +53,7 @@ type CreateIssueError =
   | InvalidStatusError
   | HulyError
   | PersonNotFoundError
+  | PersonIdentifierAmbiguousError
   | IssueReferenceError
 
 type DeleteIssueError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
@@ -82,7 +89,7 @@ const resolveCreateIssueTaskType = (
   project: HulyProject,
   workflow: Pick<ProjectWorkflowData, "projectType" | "statuses">,
   params: CreateIssueParams
-): Effect.Effect<CreateIssueTaskTypeWorkflow | undefined, CreateIssueError, Diagnostics> =>
+): Effect.Effect<CreateIssueTaskTypeWorkflow | undefined, HulyClientError | HulyError, Diagnostics> =>
   params.taskType === undefined
     ? Effect.succeed(undefined)
     : resolveTaskTypeWorkflow(client, project, workflow.projectType, workflow.statuses, params.taskType, params.project)
@@ -103,7 +110,7 @@ const resolveCreateIssueStatus = (
 const resolveCreateIssueAssignee = (
   client: HulyClient["Service"],
   params: CreateIssueParams
-): Effect.Effect<Ref<Person> | null, HulyClientError | PersonNotFoundError> =>
+): Effect.Effect<Ref<Person> | null, HulyClientError | PersonIdentifierAmbiguousError | PersonNotFoundError> =>
   params.assignee === undefined
     ? Effect.succeed(null)
     : Effect.map(resolveAssignee(client, params.assignee), (person) => person._id)
@@ -151,11 +158,15 @@ const uploadCreateIssueDescription = (
  * - Description (optional, markdown supported)
  * - Priority (optional, uses DEFAULT_ISSUE_PRIORITY when omitted)
  * - Status (optional, uses project default)
- * - Assignee (optional, by email or name)
+ * - Assignee (optional, by email, Person name, or exact agent UserProfile title)
  */
-export const createIssue = (
-  params: CreateIssueParams
-): Effect.Effect<CreateIssueResult, CreateIssueError, HulyClient | Diagnostics> =>
+const createIssueWithAssignee = <AssigneeError>(
+  params: CreateIssueParams,
+  assigneeResolution: (
+    client: HulyClient["Service"],
+    params: CreateIssueParams
+  ) => Effect.Effect<Ref<Person> | null, AssigneeError>
+) =>
   Effect.gen(function* () {
     const { client, defaultStatusId, project, projectType, statuses } = yield* findProjectWithStatuses(params.project)
 
@@ -164,7 +175,7 @@ export const createIssue = (
     const workflow = { projectType, statuses, defaultStatusId }
     const taskTypeWorkflow = yield* resolveCreateIssueTaskType(client, project, workflow, params)
     const statusRef = yield* resolveCreateIssueStatus(workflow, taskTypeWorkflow, params)
-    const assigneeRef = yield* resolveCreateIssueAssignee(client, params)
+    const assigneeRef = yield* assigneeResolution(client, params)
     const renderedDescription = yield* renderCreateIssueDescription(params)
     const { attachedTo, attachedToClass, collection, parents } = yield* resolveCreateIssueParent(
       client,
@@ -226,6 +237,22 @@ export const createIssue = (
 
     return { identifier: IssueIdentifier.make(identifier), issueId: IssueId.make(issueId) }
   })
+
+export const createIssue = (
+  params: CreateIssueParams
+): Effect.Effect<CreateIssueResult, CreateIssueError, HulyClient | Diagnostics> =>
+  createIssueWithAssignee(params, resolveCreateIssueAssignee)
+
+type CreateIssueWithResolvedAssigneeError = Exclude<
+  CreateIssueError,
+  PersonIdentifierAmbiguousError | PersonNotFoundError
+>
+
+export const createIssueWithResolvedAssignee = (
+  params: CreateIssueParams,
+  assignee: Ref<Person> | null
+): Effect.Effect<CreateIssueResult, CreateIssueWithResolvedAssigneeError, HulyClient | Diagnostics> =>
+  createIssueWithAssignee(params, () => Effect.succeed(assignee))
 
 /**
  * Delete an issue from a project.

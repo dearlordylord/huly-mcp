@@ -30,7 +30,8 @@ import type {
 import { HulyDataInvalidError, IssueNotFoundError } from "../errors.js"
 import { contact, tracker } from "../huly-plugins.js"
 import { findComponentByIdOrLabel } from "./components.js"
-import { findPersonByEmailOrName, findPersonByIdOrExactEmailOrName } from "./contacts-shared.js"
+import { findPersonByIdOrExactEmailOrName } from "./contacts-shared.js"
+import { findIssueAssignee } from "./issue-assignee-resolution.js"
 import { creatorForIssue, loadIssueCreatorIndex } from "./issue-creators-read.js"
 import { issueIdsMatchingLabel, labelsForIssue, loadIssueLabelIndex } from "./issue-labels-read.js"
 import { loadIssueMilestoneIndex, milestoneForIssue } from "./issue-milestones-read.js"
@@ -105,7 +106,7 @@ const applyStatusAndAssigneeFilters = (
       query.status = yield* resolveStatusByName([...statuses], params.status, params.project)
     }
     if (params.assignee !== undefined) {
-      const assigneePerson = yield* findPersonByEmailOrName(client, params.assignee)
+      const assigneePerson = yield* findIssueAssignee(client, params.assignee)
       if (assigneePerson === undefined) return false
       query.assignee = assigneePerson._id
     }

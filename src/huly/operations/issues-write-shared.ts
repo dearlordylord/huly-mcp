@@ -4,22 +4,22 @@ import type { ProjectType, TaskType } from "@hcengineering/task"
 import type { Project as HulyProject } from "@hcengineering/tracker"
 import { Effect } from "effect"
 
-import type { ProjectIdentifier, StatusName } from "../../domain/schemas/shared.js"
+import type { PersonRefInput, ProjectIdentifier, StatusName } from "../../domain/schemas/shared.js"
 import type { TaskTypeRef } from "../../domain/schemas/task-management.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import type { HulyClient, HulyClientError } from "../client.js"
-import { HulyError, PersonNotFoundError } from "../errors.js"
+import { HulyError, type PersonIdentifierAmbiguousError, PersonNotFoundError } from "../errors.js"
 import { task } from "../huly-plugins.js"
-import { findPersonByEmailOrName } from "./contacts-shared.js"
+import { findIssueAssignee } from "./issue-assignee-resolution.js"
 import type { WorkflowStatus } from "./issues-shared.js"
 import { hulyQuery } from "./query-helpers.js"
 
 export const resolveAssignee = (
   client: HulyClient["Service"],
-  assigneeIdentifier: string
-): Effect.Effect<Person, PersonNotFoundError | HulyClientError> =>
+  assigneeIdentifier: PersonRefInput
+): Effect.Effect<Person, PersonNotFoundError | PersonIdentifierAmbiguousError | HulyClientError> =>
   Effect.gen(function* () {
-    const person = yield* findPersonByEmailOrName(client, assigneeIdentifier)
+    const person = yield* findIssueAssignee(client, assigneeIdentifier)
     if (person === undefined) {
       return yield* new PersonNotFoundError({ identifier: assigneeIdentifier })
     }

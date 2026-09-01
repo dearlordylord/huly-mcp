@@ -10,10 +10,10 @@ the baseline was not regenerated.
 - Effect 3 baseline SHA-256:
   `02bb5e4bf2fdb0e4dd30f980810bd0fe70d5c91482c309b4621264c373d6adac`
 - Reviewed Effect 4 corpus SHA-256:
-  `3dcaac8a240371853f2b50f304ea3478aac23b29b24bd18db82ae7d73769fa6d`
-- Exact structural deltas: 21,086
+  `04a8f1d9cec96ac3e745ef7eb9724f60eaf05900638f5548870decaa027c7d46`
+- Exact structural deltas: 21,092
 - Added: 8,837
-- Changed: 2,146
+- Changed: 2,152
 - Removed: 10,103
 
 Each category records its exact delta count and the SHA-256 of its sorted exact
@@ -27,8 +27,9 @@ stale categories, duplicate categories, and corpus hash drift.
 | Count | Classification | Evidence |
 | ---: | --- | --- |
 | 12,754 | Draft-07 structural dialect | Effect 4 refs, definitions, optional/null unions, refinements, and composition wrappers. All 524 native and 6 proxy schemas compile under strict Ajv Draft-07. |
-| 4,894 | Schema metadata | Authored descriptions restored by the central adapter and obsolete Effect 3 generator-default titles/descriptions removed. |
+| 4,897 | Schema metadata | Authored descriptions restored by the central adapter, including direct-issue assignee support for exact agent UserProfile titles, and obsolete Effect 3 generator-default titles/descriptions removed. |
 | 3,428 | Authored-constraint projection | The same 522 ordered tools remain represented; generated ref/composition paths changed. Manual cross-field constraints remain in the corpus and representative runtime/Ajv agreement passes. |
+| 3 | Agent-facing tool descriptions | Direct issue create, update, and list advertise exact agent UserProfile titles as assignee inputs (#244). |
 | 6 | CLI JSON parse diagnostics | Effect 4 adds deterministic line/column context; code, hint, retryability, and exit status are unchanged. |
 | 4 | CLI help rendering | The Effect 4 CLI renderer intentionally uses concise help. Route inventory and ordering remain unchanged. |
 

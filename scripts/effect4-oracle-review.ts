@@ -12,6 +12,7 @@ const ReviewCategorySchema = Schema.Literals([
   "draft07-structure",
   "schema-metadata",
   "authored-constraints",
+  "tool-description",
   "cli-json-diagnostic",
   "cli-help"
 ])
@@ -45,6 +46,7 @@ export const oracleDeltaReviewCategory = (delta: OracleDelta): ReviewCategory | 
       ? "schema-metadata"
       : "draft07-structure"
   }
+  if (delta.path.includes("/result/tools/") && delta.path.endsWith("/description")) return "tool-description"
   if (delta.path.includes("/help/") || delta.path.endsWith("Help/stdout")) return "cli-help"
   if (delta.path.includes("/cli/") && delta.path.endsWith("stderr")) return "cli-json-diagnostic"
   if (delta.path.startsWith("/cli/errors/") && delta.path.endsWith("/message")) return "cli-json-diagnostic"
@@ -58,6 +60,7 @@ const REVIEW_CATEGORY_ORDER: ReadonlyArray<ReviewCategory> = [
   "draft07-structure",
   "schema-metadata",
   "authored-constraints",
+  "tool-description",
   "cli-json-diagnostic",
   "cli-help"
 ]
@@ -81,6 +84,12 @@ const categoryMetadata = (category: ReviewCategory): { readonly issue: string; r
         issue: "#225",
         rationale:
           "Reviewed authored-constraint projection: the same 522 ordered tools remain represented and strict Draft-07/runtime agreement passes."
+      }
+    case "tool-description":
+      return {
+        issue: "#244",
+        rationale:
+          "Reviewed agent-facing issue tool descriptions advertising exact agent UserProfile titles as assignee inputs."
       }
     case "cli-json-diagnostic":
       return {

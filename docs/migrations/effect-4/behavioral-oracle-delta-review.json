@@ -10,17 +10,24 @@
     },
     {
       "category": "schema-metadata",
-      "count": 4894,
-      "deltaSetSha256": "0fecd4efc0fe1c325a1d53476f9d1161723e62f67c7c41f5ede3de15d6cfa144",
+      "count": 4897,
+      "deltaSetSha256": "b45a00c1303aa9b7c5b31f115c79aa78d2b8cd79866bdbda86b868f3bdd0f1e7",
       "issue": "#225",
       "rationale": "Reviewed schema metadata migration: authored descriptions are preserved and legacy generator-default metadata is replaced."
     },
     {
       "category": "authored-constraints",
       "count": 3428,
-      "deltaSetSha256": "7ef10e257d365c7b850a38b906a271f26318f848228992806426ec1eeafec4fd",
+      "deltaSetSha256": "039641400c9411afddbc52e53574f9e169f7915b67a18f8edd43b9c89aa9d1c8",
       "issue": "#225",
       "rationale": "Reviewed authored-constraint projection: the same 522 ordered tools remain represented and strict Draft-07/runtime agreement passes."
+    },
+    {
+      "category": "tool-description",
+      "count": 3,
+      "deltaSetSha256": "ed177998cf115951e05d66d6cb09801800f18a8de4aca74fd47ba9b283864cb5",
+      "issue": "#244",
+      "rationale": "Reviewed agent-facing issue tool descriptions advertising exact agent UserProfile titles as assignee inputs."
     },
     {
       "category": "cli-json-diagnostic",
@@ -32,11 +39,11 @@
     {
       "category": "cli-help",
       "count": 4,
-      "deltaSetSha256": "753af7b643f82ef61da69ec085f6ead23e244f8cf726b6f690acb7041e8535ea",
+      "deltaSetSha256": "25ea80cc5a4c7f5a4d71a95b800bedb0393c542af39ce97d094673546073e9b1",
       "issue": "#228",
       "rationale": "Reviewed concise Effect 4 CLI help rendering; route inventory and order are unchanged."
     }
   ],
   "formatVersion": 1,
-  "reviewedCurrentSha256": "3dcaac8a240371853f2b50f304ea3478aac23b29b24bd18db82ae7d73769fa6d"
+  "reviewedCurrentSha256": "04a8f1d9cec96ac3e745ef7eb9724f60eaf05900638f5548870decaa027c7d46"
 }
