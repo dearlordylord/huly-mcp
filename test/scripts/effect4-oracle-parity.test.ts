@@ -32,6 +32,7 @@ import {
   oracleDeltaReviewCategory,
   OracleDeltaAuditReportSchema,
   OracleDeltaReviewSchema,
+  parseCandidateToolIdentities,
   verifyReviewedOracleDeltas
 } from "../../scripts/effect4-oracle-review.js"
 import {
@@ -48,7 +49,26 @@ import {
   oracleStdioInput,
   requireSuccessfulOracleProcess
 } from "../../scripts/effect4-oracle-process.js"
-import { BehavioralOracleSchema, OracleJsonRpcRequestSchema } from "../../scripts/effect4-oracle-schema.js"
+import {
+  BehavioralOracleSchema,
+  OracleJsonRpcRequestSchema,
+  OracleJsonRpcResponseSchema
+} from "../../scripts/effect4-oracle-schema.js"
+
+const candidateToolResponses = (toolNames: ReadonlyArray<string>) =>
+  Schema.decodeUnknownSync(Schema.Array(OracleJsonRpcResponseSchema))([
+    {
+      id: 2,
+      jsonrpc: "2.0",
+      result: {
+        tools: toolNames.map((name) => ({
+          description: `${name} description`,
+          inputSchema: { properties: { assignee: { type: "string" }, unrelated: { type: "string" } } },
+          name
+        }))
+      }
+    }
+  ])
 
 describe("Effect 4 oracle structural parity", () => {
   it("retains array order and reports escaped JSON Pointer paths", () => {
@@ -188,17 +208,25 @@ describe("Effect 4 oracle structural parity", () => {
   })
 
   it("classifies every reviewed delta surface and builds ordered category metadata", () => {
+    const candidateToolIdentities = parseCandidateToolIdentities(candidateToolResponses(["future_tool", "list_issues"]))
     const deltas = [
       { _tag: "Added", path: "/registry/authoredConstraints/0/constraints/0", after: true },
       { _tag: "Changed", path: "/registry/tools/0/inputSchema/description", before: "old", after: "new" },
       { _tag: "Changed", path: "/registry/tools/0/outputSchema/type", before: "string", after: "number" },
+      {
+        _tag: "Changed",
+        path: "/bundledProcesses/stdio/native/0/result/tools/1/description",
+        before: "old",
+        after: "new"
+      },
       { _tag: "Changed", path: "/bundledProcesses/cli/rootHelp/stdout", before: "old", after: "new" },
       { _tag: "Changed", path: "/cli/errors/json/message", before: "old", after: "new" }
     ] as const
-    expect(deltas.map(oracleDeltaReviewCategory)).toEqual([
+    expect(deltas.map((delta) => oracleDeltaReviewCategory(delta, candidateToolIdentities))).toEqual([
       "authored-constraints",
       "schema-metadata",
       "draft07-structure",
+      "issue-assignee-description",
       "cli-help",
       "cli-json-diagnostic"
     ])
@@ -209,18 +237,110 @@ describe("Effect 4 oracle structural parity", () => {
       oracleDeltaReviewCategory({ _tag: "Changed", path: "/cli/result/stderr", before: "old", after: "new" })
     ).toBe("cli-json-diagnostic")
     expect(oracleDeltaReviewCategory({ _tag: "Added", path: "/unclassified", after: true })).toBeUndefined()
+    expect(
+      oracleDeltaReviewCategory(
+        {
+          _tag: "Changed",
+          path: "/bundledProcesses/stdio/native/0/result/tools/0/description",
+          before: "old",
+          after: "unrelated future change"
+        },
+        candidateToolIdentities
+      )
+    ).toBeUndefined()
 
-    const review = createOracleDeltaReview("baseline", "current", deltas)
+    const review = createOracleDeltaReview("baseline", "current", deltas, candidateToolIdentities)
     expect(review.categories.map(({ category, issue }) => ({ category, issue }))).toEqual([
       { category: "draft07-structure", issue: "#225" },
       { category: "schema-metadata", issue: "#225" },
       { category: "authored-constraints", issue: "#225" },
+      { category: "issue-assignee-description", issue: "#245" },
       { category: "cli-json-diagnostic", issue: "#228" },
       { category: "cli-help", issue: "#228" }
     ])
     expect(() =>
       createOracleDeltaReview("baseline", "current", [{ _tag: "Added", path: "/unclassified", after: true }])
     ).toThrow("unclassified")
+  })
+
+  it("classifies issue-assignee descriptions by candidate tool name across reorder and insertion", () => {
+    const firstCandidate = parseCandidateToolIdentities(
+      candidateToolResponses(["list_issues", "create_issue", "update_issue"])
+    )
+    const reorderedCandidate = parseCandidateToolIdentities(
+      candidateToolResponses(["future_inserted_tool", "update_issue", "list_issues", "create_issue"])
+    )
+    const descriptionDelta = (toolIndex: number) => ({
+      _tag: "Changed" as const,
+      path: `/bundledProcesses/stdio/native/0/result/tools/${toolIndex}/description`,
+      before: "old",
+      after: "new"
+    })
+    const inputDescriptionDelta = (toolIndex: number, fieldName = "assignee") => ({
+      _tag: "Changed" as const,
+      path: `/bundledProcesses/stdio/native/0/result/tools/${toolIndex}/inputSchema/properties/${fieldName}/description`,
+      before: "old",
+      after: "new"
+    })
+
+    expect([0, 1, 2].map((index) => oracleDeltaReviewCategory(descriptionDelta(index), firstCandidate))).toEqual([
+      "issue-assignee-description",
+      "issue-assignee-description",
+      "issue-assignee-description"
+    ])
+    expect([1, 2, 3].map((index) => oracleDeltaReviewCategory(descriptionDelta(index), reorderedCandidate))).toEqual([
+      "issue-assignee-description",
+      "issue-assignee-description",
+      "issue-assignee-description"
+    ])
+    expect(oracleDeltaReviewCategory(descriptionDelta(0), reorderedCandidate)).toBeUndefined()
+    expect([0, 1, 2].map((index) => oracleDeltaReviewCategory(inputDescriptionDelta(index), firstCandidate))).toEqual([
+      "issue-assignee-description",
+      "issue-assignee-description",
+      "issue-assignee-description"
+    ])
+    expect(
+      [1, 2, 3].map((index) => oracleDeltaReviewCategory(inputDescriptionDelta(index), reorderedCandidate))
+    ).toEqual(["issue-assignee-description", "issue-assignee-description", "issue-assignee-description"])
+    expect(oracleDeltaReviewCategory(inputDescriptionDelta(0), reorderedCandidate)).toBe("schema-metadata")
+    expect(oracleDeltaReviewCategory(inputDescriptionDelta(1, "unrelated"), reorderedCandidate)).toBe("schema-metadata")
+    expect(
+      oracleDeltaReviewCategory(
+        {
+          ...inputDescriptionDelta(1),
+          path: "/bundledProcesses/stdio/native/0/result/tools/1/inputSchema/properties/assignee/anyOf/0/description"
+        },
+        reorderedCandidate
+      )
+    ).toBe("schema-metadata")
+
+    const issueToolWithoutAssignee = parseCandidateToolIdentities(
+      Schema.decodeUnknownSync(Schema.Array(OracleJsonRpcResponseSchema))([
+        {
+          id: 2,
+          jsonrpc: "2.0",
+          result: { tools: [{ inputSchema: { properties: { unrelated: { type: "string" } } }, name: "list_issues" }] }
+        }
+      ])
+    )
+    expect(oracleDeltaReviewCategory(inputDescriptionDelta(0), issueToolWithoutAssignee)).toBe("schema-metadata")
+  })
+
+  it("leaves malformed candidate tool entries unclassified", () => {
+    const delta = {
+      _tag: "Changed" as const,
+      path: "/bundledProcesses/stdio/native/0/result/tools/0/description",
+      before: "old",
+      after: "new"
+    }
+    const responses = (result: unknown) =>
+      Schema.decodeUnknownSync(Schema.Array(OracleJsonRpcResponseSchema))([{ id: 2, jsonrpc: "2.0", result }])
+
+    expect(oracleDeltaReviewCategory(delta)).toBeUndefined()
+    expect(oracleDeltaReviewCategory(delta, parseCandidateToolIdentities(responses(null)))).toBeUndefined()
+    expect(oracleDeltaReviewCategory(delta, parseCandidateToolIdentities(responses({})))).toBeUndefined()
+    expect(oracleDeltaReviewCategory(delta, parseCandidateToolIdentities(responses({ tools: [null] })))).toBeUndefined()
+    expect(oracleDeltaReviewCategory(delta, parseCandidateToolIdentities(responses({ tools: [{}] })))).toBeUndefined()
   })
 
   it("rejects unclassified, zero-count, duplicate, and stale compact review categories", () => {

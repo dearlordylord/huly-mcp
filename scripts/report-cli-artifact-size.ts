@@ -6,12 +6,18 @@ import { gzipSync } from "node:zlib"
 
 import { Schema } from "effect"
 
-import { cliArtifactSizeReport, CliArtifactSizeReportSchema, CliArtifactSizeSchema } from "./cli-artifact-size.js"
+import {
+  cliArtifactSizeEvidenceMismatchError,
+  cliArtifactSizeReport,
+  CliArtifactSizeReportSchema,
+  CliArtifactSizeSchema
+} from "./cli-artifact-size.js"
 import { parsePnpmPackMetadata, tarArchiveUnpackedSize } from "./cli-package-artifact.js"
 
 const JSON_INDENT = 2
 const evidencePath = "docs/migrations/effect-4/cli-artifact-size.json"
 const write = process.argv.includes("--write")
+const parseEvidence = Schema.decodeUnknownSync(Schema.fromJsonString(CliArtifactSizeReportSchema))
 
 const main = async (): Promise<void> => {
   const directory = mkdtempSync(join(tmpdir(), "huly-cli-artifact-size-"))
@@ -33,8 +39,11 @@ const main = async (): Promise<void> => {
     )
     const encoded = `${JSON.stringify(Schema.encodeSync(CliArtifactSizeReportSchema)(report), null, JSON_INDENT)}\n`
     if (write) writeFileSync(evidencePath, encoded)
-    else if (readFileSync(evidencePath, "utf8") !== encoded) {
-      throw new Error(`CLI artifact metrics are stale. Run pnpm update-cli-artifact-size.`)
+    else {
+      const evidence = readFileSync(evidencePath, "utf8")
+      if (evidence !== encoded) {
+        throw cliArtifactSizeEvidenceMismatchError(parseEvidence(evidence), report)
+      }
     }
     console.log(encoded.trimEnd())
     if (report.materialIncrease) process.exitCode = 1

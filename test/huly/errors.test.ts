@@ -748,7 +748,7 @@ describe("Huly Errors", () => {
       Effect.sync(function () {
         const error = new PersonIdentifierAmbiguousError({ identifier: "Smith,Bill", matches: Count.make(2) })
         expect(error.message).toBe(
-          "Person identifier 'Smith,Bill' matched 2 people; use an exact email address instead"
+          "Person identifier 'Smith,Bill' matched 2 people; use a unique Person display name or email address instead"
         )
       })
     )

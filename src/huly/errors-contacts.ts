@@ -29,7 +29,7 @@ export class PersonIdentifierAmbiguousError extends Schema.TaggedError<PersonIde
   { identifier: Schema.String, matches: AmbiguousMatchCount }
 ) {
   override get message(): string {
-    return `Person identifier '${this.identifier}' matched ${this.matches} people; use an exact email address instead`
+    return `Person identifier '${this.identifier}' matched ${this.matches} people; use a unique Person display name or email address instead`
   }
 }
 

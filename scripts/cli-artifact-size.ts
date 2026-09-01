@@ -59,6 +59,18 @@ export const CliArtifactSizeReportSchema = CliArtifactSizeReportFields.check(
 )
 export type CliArtifactSizeReport = Schema.Schema.Type<typeof CliArtifactSizeReportSchema>
 
+const encodeCliArtifactSizeReport = Schema.encodeSync(CliArtifactSizeReportSchema)
+
+export const cliArtifactSizeEvidenceMismatchError = (
+  expected: CliArtifactSizeReport,
+  actual: CliArtifactSizeReport
+): Error =>
+  new Error(
+    "CLI artifact metrics are stale. Run pnpm update-cli-artifact-size." +
+      `\nExpected: ${JSON.stringify(encodeCliArtifactSizeReport(expected))}` +
+      `\nActual: ${JSON.stringify(encodeCliArtifactSizeReport(actual))}`
+  )
+
 export const CLI_ARTIFACT_SIZE_BASELINE = Schema.decodeUnknownSync(CliArtifactSizeSchema)({
   bundleGzipBytes: 1_506_144,
   bundleRawBytes: 8_124_110,

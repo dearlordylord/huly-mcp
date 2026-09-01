@@ -163,7 +163,11 @@ const ListIssuesParamsBase = Schema.Struct({
       )}. Use status for exact project-specific status names.`
     })
   ),
-  assignee: Schema.optional(PersonRefInput.annotate({ description: "Filter by assignee email or display name" })),
+  assignee: Schema.optional(
+    PersonRefInput.annotate({
+      description: "Filter by assignee email, Person display name, or exact agent UserProfile title"
+    })
+  ),
   creator: Schema.optional(
     PersonRefInput.annotate({
       description:
@@ -305,7 +309,9 @@ export const CreateIssueParamsSchema = Schema.Struct({
   priority: Schema.optional(
     IssuePrioritySchema.annotate({ description: "Issue priority (urgent, high, medium, low, no-priority)" })
   ),
-  assignee: Schema.optional(PersonRefInput.annotate({ description: "Assignee email address or display name" })),
+  assignee: Schema.optional(
+    PersonRefInput.annotate({ description: "Assignee email, Person display name, or exact agent UserProfile title" })
+  ),
   status: Schema.optional(
     StatusName.annotate({ description: "Initial status (uses project default if not specified)" })
   ),
@@ -355,7 +361,9 @@ export const UpdateIssueParamsSchema = Schema.Struct({
   ),
   priority: Schema.optional(IssuePrioritySchema.annotate({ description: "New issue priority" })),
   assignee: Schema.optional(
-    Schema.NullOr(PersonRefInput).annotate({ description: "New assignee email or display name (null to unassign)" })
+    Schema.NullOr(PersonRefInput).annotate({
+      description: "New assignee email, Person display name, or exact agent UserProfile title (null to unassign)"
+    })
   ),
   status: Schema.optional(StatusName.annotate({ description: "New status" })),
   taskType: Schema.optional(

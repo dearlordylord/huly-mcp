@@ -161,6 +161,74 @@ const schemaHasType = (rootSchema: object, schema: unknown, typeName: string, de
   return directSchemaTypeMatches(resolved, typeName) || variantSchemaTypeMatches(rootSchema, resolved, typeName, depth)
 }
 
+type StringAcceptance = "accepts" | "rejects" | "unknown"
+
+const intersectStringAcceptance = (acceptances: ReadonlyArray<StringAcceptance>): StringAcceptance =>
+  acceptances.includes("rejects") ? "rejects" : acceptances.includes("unknown") ? "unknown" : "accepts"
+
+const unionStringAcceptance = (acceptances: ReadonlyArray<StringAcceptance>): StringAcceptance =>
+  acceptances.includes("accepts") ? "accepts" : acceptances.includes("unknown") ? "unknown" : "rejects"
+
+const oneOfStringAcceptance = (acceptances: ReadonlyArray<StringAcceptance>): StringAcceptance => {
+  if (acceptances.includes("unknown")) return "unknown"
+  const acceptingBranches = acceptances.filter((acceptance) => acceptance === "accepts").length
+  if (acceptingBranches === 0) return "rejects"
+  return acceptingBranches === 1 ? "accepts" : "unknown"
+}
+
+const directSchemaStringAcceptance = (schema: Record<string, unknown>): StringAcceptance => {
+  if (schema.type !== undefined && !directSchemaTypeMatches(schema, "string")) return "rejects"
+  if (schema.const !== undefined && typeof schema.const !== "string") return "rejects"
+  if (Array.isArray(schema.enum) && !schema.enum.some((literal) => typeof literal === "string")) return "rejects"
+  return "accepts"
+}
+
+const variantStringAcceptances = (
+  rootSchema: object,
+  variants: unknown,
+  depth: number
+): ReadonlyArray<StringAcceptance> | undefined =>
+  Array.isArray(variants)
+    ? variants.map((variant) => schemaStringAcceptance(rootSchema, variant, depth + 1))
+    : undefined
+
+const compositionStringAcceptance = (
+  rootSchema: object,
+  schema: Record<string, unknown>,
+  depth: number
+): StringAcceptance => {
+  const allOf = variantStringAcceptances(rootSchema, schema.allOf, depth)
+  const anyOf = variantStringAcceptances(rootSchema, schema.anyOf, depth)
+  const oneOf = variantStringAcceptances(rootSchema, schema.oneOf, depth)
+  return intersectStringAcceptance([
+    ...(allOf === undefined ? [] : [intersectStringAcceptance(allOf)]),
+    ...(anyOf === undefined ? [] : [unionStringAcceptance(anyOf)]),
+    ...(oneOf === undefined ? [] : [oneOfStringAcceptance(oneOf)])
+  ])
+}
+
+const recordSchemaStringAcceptance = (
+  rootSchema: object,
+  schema: Record<string, unknown>,
+  depth: number
+): StringAcceptance => {
+  const resolved = resolveLocalRef(rootSchema, schema)
+  if (typeof schema.$ref === "string") {
+    return resolved === schema ? "unknown" : schemaStringAcceptance(rootSchema, resolved, depth + 1)
+  }
+  const direct = directSchemaStringAcceptance(schema)
+  return direct === "rejects"
+    ? "rejects"
+    : intersectStringAcceptance([direct, compositionStringAcceptance(rootSchema, schema, depth)])
+}
+
+const schemaStringAcceptance = (rootSchema: object, schema: unknown, depth = 0): StringAcceptance => {
+  if (depth > MAX_SCHEMA_REF_DEPTH) return "unknown"
+  if (schema === true) return "accepts"
+  if (schema === false) return "rejects"
+  return isRecord(schema) ? recordSchemaStringAcceptance(rootSchema, schema, depth) : "unknown"
+}
+
 export const fieldAcceptsBoolean = (rootSchema: object, field: FieldSpec): boolean =>
   schemaHasType(rootSchema, field.schema, "boolean")
 
@@ -214,7 +282,6 @@ const fieldSchemaDescription = (rootSchema: object, field: FieldSpec): string | 
 interface FieldConstraints {
   readonly defaults: Set<string>
   readonly literals: Set<string>
-  readonly patterns: Set<string>
   readonly shapes: Set<string>
   readonly types: Set<string>
 }
@@ -222,7 +289,6 @@ interface FieldConstraints {
 const emptyFieldConstraints = (): FieldConstraints => ({
   defaults: new Set(),
   literals: new Set(),
-  patterns: new Set(),
   shapes: new Set(),
   types: new Set()
 })
@@ -246,7 +312,6 @@ const addLiteralConstraints = (schema: Record<string, unknown>, constraints: Fie
 }
 
 const addScalarConstraints = (schema: Record<string, unknown>, constraints: FieldConstraints): void => {
-  if (typeof schema.pattern === "string") constraints.patterns.add(schema.pattern)
   const encodedDefault = encodedLiteral(schema.default)
   if (encodedDefault !== undefined) constraints.defaults.add(encodedDefault)
 }
@@ -295,13 +360,49 @@ const collectFieldConstraints = (
 const joinedConstraint = (label: string, values: ReadonlySet<string>): string | undefined =>
   values.size === 0 ? undefined : `${label}: ${[...values].join(" | ")}.`
 
+const directPatterns = (schema: Record<string, unknown>): ReadonlyArray<string> =>
+  typeof schema.pattern === "string" ? [schema.pattern] : []
+
+const allOfPatterns = (rootSchema: object, schema: Record<string, unknown>, depth: number): ReadonlyArray<string> =>
+  (Array.isArray(schema.allOf) ? schema.allOf : []).flatMap((variant) => [
+    ...collectUniversalPatterns(rootSchema, variant, depth + 1)
+  ])
+
+const sharedUnionPatterns = (
+  rootSchema: object,
+  schema: Record<string, unknown>,
+  depth: number
+): ReadonlyArray<string> =>
+  ["anyOf", "oneOf"].flatMap((variantKey) => {
+    const variants = schema[variantKey]
+    if (!Array.isArray(variants) || variants.length === 0) return []
+    const stringVariants = variants.filter(
+      (variant) => schemaStringAcceptance(rootSchema, variant, depth + 1) !== "rejects"
+    )
+    if (stringVariants.length === 0) return []
+    return [...intersectSets(stringVariants.map((variant) => collectUniversalPatterns(rootSchema, variant, depth + 1)))]
+  })
+
+const collectUniversalPatterns = (rootSchema: object, schema: unknown, depth = 0): ReadonlySet<string> => {
+  if (depth > MAX_SCHEMA_REF_DEPTH || !isRecord(schema)) return new Set()
+  const resolved = resolveLocalRef(rootSchema, schema)
+  if (typeof schema.$ref === "string") {
+    return resolved === schema ? new Set() : collectUniversalPatterns(rootSchema, resolved, depth + 1)
+  }
+  return new Set([
+    ...directPatterns(schema),
+    ...allOfPatterns(rootSchema, schema, depth),
+    ...sharedUnionPatterns(rootSchema, schema, depth)
+  ])
+}
+
 export const fieldOptionDescription = (rootSchema: object, field: FieldSpec): string => {
   const description = fieldSchemaDescription(rootSchema, field)
   const constraints = emptyFieldConstraints()
   collectFieldConstraints(rootSchema, field.schema, constraints)
   const allowed = joinedConstraint("Allowed values", constraints.literals)
   const types = joinedConstraint("Type", constraints.types)
-  const patterns = joinedConstraint("Pattern", constraints.patterns)
+  const patterns = joinedConstraint("Pattern", collectUniversalPatterns(rootSchema, field.schema))
   const shapes = joinedConstraint("JSON shape alternatives", constraints.shapes)
   const defaults = joinedConstraint("Default", constraints.defaults)
   const unionAlternatives = unionAlternativesDescription(rootSchema, field.fieldName)

@@ -15,6 +15,7 @@ import type {
   IssueNotFoundError,
   IssueReferenceError,
   NoUpdateFieldsError,
+  PersonIdentifierAmbiguousError,
   PersonNotFoundError,
   ProjectNotFoundError
 } from "../errors.js"
@@ -41,12 +42,18 @@ type UpdateIssueError =
   | InvalidStatusError
   | HulyError
   | PersonNotFoundError
+  | PersonIdentifierAmbiguousError
   | IssueReferenceError
 
 type UpdateIssueField = (typeof UPDATE_ISSUE_FIELDS)[number]
 type UpdateIssueDirectEffect<Field extends UpdateIssueField & keyof DocumentUpdate<HulyIssue>> = Effect.Effect<
   CoveredUpdateEntry<Field, DirectUpdateEntry<UpdateIssueField, DocumentUpdate<HulyIssue>, Field>>,
-  ConnectionError | HulyError | InvalidStatusError | PersonNotFoundError | IssueReferenceError
+  | ConnectionError
+  | HulyError
+  | InvalidStatusError
+  | PersonIdentifierAmbiguousError
+  | PersonNotFoundError
+  | IssueReferenceError
 >
 type IssueTaskTypeUpdateEntry = DirectUpdateSubsetEntry<"kind" | "status", DocumentUpdate<HulyIssue>>
 type IssueDescriptionUpdateEntry = DirectUpdateEntry<UpdateIssueField, DocumentUpdate<HulyIssue>, "description">
@@ -148,7 +155,7 @@ const isDescriptionUpdatedInPlace = (params: UpdateIssueParams, issue: HulyIssue
  * - description: New markdown description (uploaded via uploadMarkup)
  * - status: New status (resolved by name)
  * - priority: New priority
- * - assignee: New assignee email/name, or null to unassign
+ * - assignee: New assignee email, Person name, or exact agent UserProfile title; null to unassign
  *
  * Note: Huly REST API is eventually consistent. Reads immediately after
  * updates may return stale data. Allow ~2 seconds for propagation.

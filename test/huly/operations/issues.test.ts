@@ -1,7 +1,9 @@
 import { describe, it } from "@effect/vitest"
-import type { Channel, Person } from "@hcengineering/contact"
+import type { Channel, Person, SocialIdentity, UserProfile } from "@hcengineering/contact"
+import { SocialIdType } from "@hcengineering/core"
 import type {
   Attribute,
+  Blob,
   Class,
   Doc,
   FindResult,
@@ -43,6 +45,7 @@ import {
 import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 
 import { contact, core, tags, task, tracker } from "../../../src/huly/huly-plugins.js"
+import { toSocialIdentityRef } from "../../../src/huly/operations/sdk-boundary.js"
 import {
   colorCode,
   email,
@@ -52,11 +55,12 @@ import {
   milestoneId,
   milestoneIdentifier,
   milestoneLabel,
+  personName,
   projectIdentifier,
   statusName
 } from "../../helpers/brands.js"
 import { withDiagnostics } from "../../helpers/diagnostics.js"
-import { corePersonId, docRef } from "../../helpers/huly-sdk.js"
+import { corePersonId, docRef, spaceRef } from "../../helpers/huly-sdk.js"
 import { capturedMarkupChildNodes, capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 import { listIssuesParams } from "../../helpers/parsed-params.js"
 
@@ -199,6 +203,38 @@ const makeChannel = (overrides?: Partial<Channel>): Channel => {
   return result
 }
 
+const makeSocialIdentity = (person: Person, value: string): SocialIdentity => ({
+  _id: toSocialIdentityRef(corePersonId(`identity-${person._id}`)),
+  _class: contact.class.SocialIdentity,
+  space: spaceRef("space-1"),
+  attachedTo: person._id,
+  attachedToClass: contact.class.Person,
+  collection: "socialIds",
+  type: SocialIdType.EMAIL,
+  value,
+  key: `${SocialIdType.EMAIL}:${value}`,
+  modifiedBy: corePersonId("user-1"),
+  modifiedOn: 0,
+  createdBy: corePersonId("user-1"),
+  createdOn: 0
+})
+
+const makeUserProfile = (person: Person, title: string, id = `profile-${person._id}`): UserProfile => ({
+  _id: docRef<UserProfile>(id),
+  _class: contact.class.UserProfile,
+  space: spaceRef("space-1"),
+  title,
+  content: docRef<Blob>("profile-content"),
+  blobs: {},
+  parentInfo: [],
+  rank: "0|profile",
+  person: person._id,
+  modifiedBy: corePersonId("user-1"),
+  modifiedOn: 0,
+  createdBy: corePersonId("user-1"),
+  createdOn: 0
+})
+
 const makeTagElement = (overrides?: Partial<TagElement>): TagElement => {
   const result: TagElement = {
     _id: "tag-element-1" as Ref<TagElement>,
@@ -248,6 +284,8 @@ interface MockConfig {
   captureMilestoneQueries?: Array<unknown>
   persons?: Array<Person>
   channels?: Array<Channel>
+  socialIdentities?: Array<SocialIdentity>
+  userProfiles?: Array<UserProfile>
   tagElements?: Array<TagElement>
   tagReferences?: Array<TagReference>
   captureIssueQuery?: { query?: Record<string, unknown>; options?: Record<string, unknown> }
@@ -274,6 +312,8 @@ const createTestLayerWithMocks = (config: MockConfig) => {
   const milestones = config.milestones ?? []
   const persons = config.persons ?? []
   const channels = config.channels ?? []
+  const socialIdentities = config.socialIdentities ?? []
+  const userProfiles = config.userProfiles ?? []
   const tagElements = config.tagElements ?? []
   const tagReferences = config.tagReferences ?? []
 
@@ -328,17 +368,40 @@ const createTestLayerWithMocks = (config: MockConfig) => {
       return Effect.succeed(toFindResult(statuses))
     }
     if (_class === contact.class.Channel) {
-      const value = (query as Record<string, unknown>).value as string
-      const filtered = channels.filter((c) => c.value === value)
+      const value = queryField(query, "value")
+      const filtered = channels.filter((channel) =>
+        typeof value === "string"
+          ? channel.value === value
+          : typeof value === "object" && value !== null && "$like" in value
+            ? channel.value.includes(String(Reflect.get(value, "$like")).replaceAll("%", ""))
+            : true
+      )
+      return Effect.succeed(toFindResult(filtered))
+    }
+    if (_class === contact.class.SocialIdentity) {
+      const value = queryField(query, "value")
+      const filtered = socialIdentities.filter((identity) => identity.value === value)
+      return Effect.succeed(toFindResult(filtered))
+    }
+    if (_class === contact.class.UserProfile) {
+      const title = queryField(query, "title")
+      const filtered = userProfiles.filter((profile) => profile.title === title)
       return Effect.succeed(toFindResult(filtered))
     }
     if (_class === contact.class.Person) {
-      const nameFilter = (query as Record<string, unknown>).name as string | undefined
-      if (nameFilter) {
-        const filtered = persons.filter((p) => p.name === nameFilter)
-        return Effect.succeed(toFindResult(filtered))
-      }
-      return Effect.succeed(toFindResult(persons))
+      const idFilter = queryField(query, "_id")
+      const nameFilter = queryField(query, "name")
+      const filtered = persons.filter(
+        (person) =>
+          (idFilter === undefined || matchesQueryValue(person._id, idFilter)) &&
+          (nameFilter === undefined ||
+            (typeof nameFilter === "string"
+              ? person.name === nameFilter
+              : typeof nameFilter === "object" && nameFilter !== null && "$like" in nameFilter
+                ? person.name.includes(String(Reflect.get(nameFilter, "$like")).replaceAll("%", ""))
+                : true))
+      )
+      return Effect.succeed(toFindResult(filtered))
     }
     if (_class === tags.class.TagReference) {
       const attachedToFilter = queryField(query, "attachedTo")
@@ -977,7 +1040,7 @@ describe("listIssues", () => {
       })
     )
 
-    it.effect("returns empty results when assignee not found", () =>
+    it.effect("maps an absent assignee resolution to empty list results", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
@@ -996,6 +1059,31 @@ describe("listIssues", () => {
         }).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result).toHaveLength(0)
+      })
+    )
+
+    it.effect("filters by an exact agent UserProfile title using its linked Person", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const person = makePerson({ _id: docRef<Person>("person-agent"), name: "Coding Agent" })
+        const issue = makeIssue({ assignee: person._id })
+        const statuses = [makeStatus({ _id: docRef<Status>("status-open"), name: "Open" })]
+        const captureQuery: MockConfig["captureIssueQuery"] = {}
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          persons: [person],
+          userProfiles: [makeUserProfile(person, "Codex")],
+          captureIssueQuery: captureQuery
+        })
+
+        yield* listIssues({ project: projectIdentifier("TEST"), assignee: personName("Codex") }).pipe(
+          Effect.provide(testLayer),
+          withDiagnostics
+        )
+
+        expect(captureQuery.query?.assignee).toBe("person-agent")
       })
     )
   })
@@ -1689,6 +1777,227 @@ describe("createIssue", () => {
       })
     )
 
+    it.effect("creates an issue assigned through an exact agent UserProfile title", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ sequence: 1 })
+        const person = makePerson({ _id: docRef<Person>("person-agent"), name: "Coding Agent" })
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          persons: [person],
+          userProfiles: [makeUserProfile(person, "Codex")],
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 2 } }
+        })
+
+        yield* createIssue({
+          project: projectIdentifier("TEST"),
+          title: "Agent work",
+          assignee: personName("Codex")
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+        expect(captureAddCollection.attributes?.assignee).toBe("person-agent")
+      })
+    )
+
+    it.effect("deduplicates exact email and profile representations of one Person", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ sequence: 1 })
+        const person = makePerson({ _id: docRef<Person>("person-agent"), name: "Coding Agent" })
+        const identifier = "agent@example.com"
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          persons: [person],
+          socialIdentities: [makeSocialIdentity(person, identifier)],
+          userProfiles: [makeUserProfile(person, identifier)],
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 2 } }
+        })
+
+        yield* createIssue({
+          project: projectIdentifier("TEST"),
+          title: "Converged identity",
+          assignee: email(identifier)
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+        expect(captureAddCollection.attributes?.assignee).toBe("person-agent")
+      })
+    )
+
+    it.effect("deduplicates multiple exact profiles linked to one Person", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ sequence: 1 })
+        const person = makePerson({ _id: docRef<Person>("person-agent"), name: "Coding Agent" })
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          persons: [person],
+          userProfiles: [
+            makeUserProfile(person, "Codex", "profile-primary"),
+            makeUserProfile(person, "Codex", "profile-alias")
+          ],
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 2 } }
+        })
+
+        yield* createIssue({
+          project: projectIdentifier("TEST"),
+          title: "Profile aliases",
+          assignee: personName("Codex")
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+        expect(captureAddCollection.attributes?.assignee).toBe("person-agent")
+      })
+    )
+
+    it.effect("rejects an exact email shared by distinct Persons with actionable guidance", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ sequence: 1 })
+        const sharedEmail = "shared@example.com"
+        const firstPerson = makePerson({ _id: docRef<Person>("person-first"), name: "First Person" })
+        const secondPerson = makePerson({ _id: docRef<Person>("person-second"), name: "Second Person" })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          persons: [firstPerson, secondPerson],
+          channels: [
+            makeChannel({ _id: docRef<Channel>("channel-first"), attachedTo: firstPerson._id, value: sharedEmail }),
+            makeChannel({ _id: docRef<Channel>("channel-second"), attachedTo: secondPerson._id, value: sharedEmail })
+          ]
+        })
+
+        const error = yield* Effect.flip(
+          createIssue({
+            project: projectIdentifier("TEST"),
+            title: "Ambiguous exact email",
+            assignee: email(sharedEmail)
+          }).pipe(Effect.provide(testLayer), withDiagnostics)
+        )
+
+        expect(error._tag).toBe("PersonIdentifierAmbiguousError")
+        expect(error.message).toBe(
+          "Person identifier 'shared@example.com' matched 2 people; use a unique Person display name or email address instead"
+        )
+      })
+    )
+
+    it.effect("rejects distinct Persons matching the same exact assignee identifier", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ sequence: 1 })
+        const namedPerson = makePerson({ _id: docRef<Person>("person-named"), name: "Codex" })
+        const profilePerson = makePerson({ _id: docRef<Person>("person-profile"), name: "Agent Account" })
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          persons: [namedPerson, profilePerson],
+          userProfiles: [makeUserProfile(profilePerson, "Codex")]
+        })
+
+        const error = yield* Effect.flip(
+          createIssue({
+            project: projectIdentifier("TEST"),
+            title: "Ambiguous exact identity",
+            assignee: personName("Codex")
+          }).pipe(Effect.provide(testLayer), withDiagnostics)
+        )
+
+        expect(error._tag).toBe("PersonIdentifierAmbiguousError")
+        expect(error.message).toContain("matched 2 people")
+      })
+    )
+
+    it.effect("prefers a short exact profile title over all fuzzy Person matches", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ sequence: 1 })
+        const agent = makePerson({ _id: docRef<Person>("person-agent"), name: "Robot" })
+        const fuzzyPeople = [
+          makePerson({ _id: docRef<Person>("person-alice"), name: "Alice" }),
+          makePerson({ _id: docRef<Person>("person-zane"), name: "Zane" })
+        ]
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          persons: [agent, ...fuzzyPeople],
+          userProfiles: [makeUserProfile(agent, "a"), makeUserProfile(assertAt(fuzzyPeople, 0), "agent-a")],
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 2 } }
+        })
+
+        yield* createIssue({
+          project: projectIdentifier("TEST"),
+          title: "Exact precedence",
+          assignee: personName("a")
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+        expect(captureAddCollection.attributes?.assignee).toBe("person-agent")
+      })
+    )
+
+    it.effect("retains one-person substring fallback when no exact candidate exists", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ sequence: 1 })
+        const person = makePerson({ _id: docRef<Person>("person-jane"), name: "Jane Developer" })
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          persons: [person],
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 2 } }
+        })
+
+        yield* createIssue({
+          project: projectIdentifier("TEST"),
+          title: "Fuzzy fallback",
+          assignee: personName("Jane")
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+        expect(captureAddCollection.attributes?.assignee).toBe("person-jane")
+      })
+    )
+
+    it.effect("rejects multiple distinct substring candidates instead of selecting by row order", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ sequence: 1 })
+        const people = [
+          makePerson({ _id: docRef<Person>("person-one"), name: "Jane Developer" }),
+          makePerson({ _id: docRef<Person>("person-two"), name: "Jane Operator" })
+        ]
+        const testLayer = createTestLayerWithMocks({ projects: [project], persons: people })
+
+        const error = yield* Effect.flip(
+          createIssue({
+            project: projectIdentifier("TEST"),
+            title: "Ambiguous fuzzy identity",
+            assignee: personName("Jane")
+          }).pipe(Effect.provide(testLayer), withDiagnostics)
+        )
+
+        expect(error._tag).toBe("PersonIdentifierAmbiguousError")
+        expect(error.message).toContain("matched 2 people")
+      })
+    )
+
+    it.effect("resolves an email-shaped exact Person name without email records", () =>
+      Effect.gen(function* () {
+        const project = makeProject({ sequence: 1 })
+        const person = makePerson({ _id: docRef<Person>("person-email-name"), name: "agent@example.com" })
+        const captureAddCollection: MockConfig["captureAddCollection"] = {}
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          persons: [person],
+          captureAddCollection,
+          updateDocResult: { object: { sequence: 2 } }
+        })
+
+        yield* createIssue({
+          project: projectIdentifier("TEST"),
+          title: "Email-shaped name",
+          assignee: email("agent@example.com")
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+        expect(captureAddCollection.attributes?.assignee).toBe("person-email-name")
+      })
+    )
+
     it.effect("creates issue with specific status", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST", sequence: 1 })
@@ -1843,7 +2152,7 @@ describe("createIssue", () => {
       })
     )
 
-    it.effect("returns PersonNotFoundError when assignee not found", () =>
+    it.effect("maps an absent assignee resolution to PersonNotFoundError on create", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
 
@@ -2412,6 +2721,32 @@ describe("updateIssue", () => {
       })
     )
 
+    it.effect("updates an issue assignee through an exact agent UserProfile title", () =>
+      Effect.gen(function* () {
+        const project = makeProject()
+        const issue = makeIssue({ identifier: "TEST-1", assignee: null })
+        const person = makePerson({ _id: docRef<Person>("person-agent"), name: "Coding Agent" })
+        const statuses = [makeStatus({ _id: docRef<Status>("status-open"), name: "Open" })]
+        const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+        const testLayer = createTestLayerWithMocks({
+          projects: [project],
+          issues: [issue],
+          statuses,
+          persons: [person],
+          userProfiles: [makeUserProfile(person, "Codex")],
+          captureUpdateDoc
+        })
+
+        yield* updateIssue({
+          project: projectIdentifier("TEST"),
+          identifier: issueIdentifier("TEST-1"),
+          assignee: personName("Codex")
+        }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+        expect(captureUpdateDoc.operations?.assignee).toBe("person-agent")
+      })
+    )
+
     it.effect("unassigns issue when assignee is null", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
@@ -2624,7 +2959,7 @@ describe("updateIssue", () => {
       })
     )
 
-    it.effect("returns PersonNotFoundError when assignee not found", () =>
+    it.effect("maps an absent assignee resolution to PersonNotFoundError on update", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1" })

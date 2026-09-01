@@ -24,7 +24,13 @@ import { DEFAULT_ISSUE_PRIORITY } from "../../domain/schemas/issues.js"
 import { IssueId, IssueIdentifier, type ProjectIdentifier } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
-import type { IssueNotFoundError, IssueReferenceError, PersonNotFoundError, ProjectNotFoundError } from "../errors.js"
+import type {
+  IssueNotFoundError,
+  IssueReferenceError,
+  PersonIdentifierAmbiguousError,
+  PersonNotFoundError,
+  ProjectNotFoundError
+} from "../errors.js"
 import { HulyError, InvalidStatusError } from "../errors.js"
 import { tracker } from "../huly-plugins.js"
 import { renderIssueDescriptionForWrite } from "./issue-native-references.js"
@@ -47,9 +53,15 @@ type CreateIssueError =
   | InvalidStatusError
   | HulyError
   | PersonNotFoundError
+  | PersonIdentifierAmbiguousError
   | IssueReferenceError
 
 type DeleteIssueError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
+
+export type CreateIssueWithResolvedAssigneeParams = Omit<CreateIssueParams, "assignee"> & {
+  readonly assignee?: never
+  readonly resolvedAssignee: Ref<Person> | null
+}
 
 // SDK: updateDoc with retrieve=true returns TxResult which doesn't type the embedded object.
 // The runtime value includes { object: { sequence: number } } for $inc operations.
@@ -82,7 +94,7 @@ const resolveCreateIssueTaskType = (
   project: HulyProject,
   workflow: Pick<ProjectWorkflowData, "projectType" | "statuses">,
   params: CreateIssueParams
-): Effect.Effect<CreateIssueTaskTypeWorkflow | undefined, CreateIssueError, Diagnostics> =>
+): Effect.Effect<CreateIssueTaskTypeWorkflow | undefined, HulyClientError | HulyError, Diagnostics> =>
   params.taskType === undefined
     ? Effect.succeed(undefined)
     : resolveTaskTypeWorkflow(client, project, workflow.projectType, workflow.statuses, params.taskType, params.project)
@@ -103,7 +115,7 @@ const resolveCreateIssueStatus = (
 const resolveCreateIssueAssignee = (
   client: HulyClient["Service"],
   params: CreateIssueParams
-): Effect.Effect<Ref<Person> | null, HulyClientError | PersonNotFoundError> =>
+): Effect.Effect<Ref<Person> | null, HulyClientError | PersonIdentifierAmbiguousError | PersonNotFoundError> =>
   params.assignee === undefined
     ? Effect.succeed(null)
     : Effect.map(resolveAssignee(client, params.assignee), (person) => person._id)
@@ -151,81 +163,99 @@ const uploadCreateIssueDescription = (
  * - Description (optional, markdown supported)
  * - Priority (optional, uses DEFAULT_ISSUE_PRIORITY when omitted)
  * - Status (optional, uses project default)
- * - Assignee (optional, by email or name)
+ * - Assignee (optional, by email, Person name, or exact agent UserProfile title)
  */
+const createIssueWithAssignee = Effect.fn("Issues.createWithAssignee")(function* <AssigneeError>(
+  params: CreateIssueParams,
+  assigneeResolution: (
+    client: HulyClient["Service"],
+    params: CreateIssueParams
+  ) => Effect.Effect<Ref<Person> | null, AssigneeError>
+) {
+  const { client, defaultStatusId, project, projectType, statuses } = yield* findProjectWithStatuses(params.project)
+
+  const issueId: Ref<HulyIssue> = generateId()
+
+  const workflow = { projectType, statuses, defaultStatusId }
+  const taskTypeWorkflow = yield* resolveCreateIssueTaskType(client, project, workflow, params)
+  const statusRef = yield* resolveCreateIssueStatus(workflow, taskTypeWorkflow, params)
+  const assigneeRef = yield* assigneeResolution(client, params)
+  const renderedDescription = yield* renderCreateIssueDescription(params)
+  const { attachedTo, attachedToClass, collection, parents } = yield* resolveCreateIssueParent(
+    client,
+    project,
+    params.parentIssue
+  )
+
+  const incOps: DocumentUpdate<HulyProject> = { $inc: { sequence: 1 } }
+  const incResult = yield* client.updateDoc(
+    tracker.class.Project,
+    toRef<Space>("core:space:Space"),
+    project._id,
+    incOps,
+    true
+  )
+  const sequence = yield* requireUpdatedSequence(incResult, params.project)
+
+  const lastIssue = yield* client.findOne<HulyIssue>(
+    tracker.class.Issue,
+    hulyQuery<HulyIssue>({ space: project._id }),
+    { sort: { rank: SortingOrder.Descending } }
+  )
+  const rank = makeRank(lastIssue?.rank, undefined)
+
+  const descriptionMarkupRef = yield* uploadCreateIssueDescription(client, issueId, renderedDescription)
+
+  const priority = stringToPriority(params.priority ?? DEFAULT_ISSUE_PRIORITY)
+  const identifier = `${project.identifier}-${sequence}`
+
+  const issueData: AttachedData<HulyIssue> = {
+    title: params.title,
+    description: descriptionMarkupRef,
+    status: statusRef,
+    number: sequence,
+    kind: taskTypeWorkflow?.taskType._id ?? tracker.taskTypes.Issue,
+    identifier,
+    priority,
+    assignee: assigneeRef,
+    component: null,
+    estimation: params.estimation ?? 0,
+    remainingTime: 0,
+    reportedTime: 0,
+    reports: 0,
+    subIssues: 0,
+    parents,
+    childInfo: [],
+    dueDate: params.dueDate ?? null,
+    rank
+  }
+  yield* client.addCollection(
+    tracker.class.Issue,
+    project._id,
+    attachedTo,
+    attachedToClass,
+    collection,
+    issueData,
+    issueId
+  )
+
+  return { identifier: IssueIdentifier.make(identifier), issueId: IssueId.make(issueId) }
+})
+
 export const createIssue = (
   params: CreateIssueParams
 ): Effect.Effect<CreateIssueResult, CreateIssueError, HulyClient | Diagnostics> =>
-  Effect.gen(function* () {
-    const { client, defaultStatusId, project, projectType, statuses } = yield* findProjectWithStatuses(params.project)
+  createIssueWithAssignee(params, resolveCreateIssueAssignee)
 
-    const issueId: Ref<HulyIssue> = generateId()
+type CreateIssueWithResolvedAssigneeError = Exclude<
+  CreateIssueError,
+  PersonIdentifierAmbiguousError | PersonNotFoundError
+>
 
-    const workflow = { projectType, statuses, defaultStatusId }
-    const taskTypeWorkflow = yield* resolveCreateIssueTaskType(client, project, workflow, params)
-    const statusRef = yield* resolveCreateIssueStatus(workflow, taskTypeWorkflow, params)
-    const assigneeRef = yield* resolveCreateIssueAssignee(client, params)
-    const renderedDescription = yield* renderCreateIssueDescription(params)
-    const { attachedTo, attachedToClass, collection, parents } = yield* resolveCreateIssueParent(
-      client,
-      project,
-      params.parentIssue
-    )
-
-    const incOps: DocumentUpdate<HulyProject> = { $inc: { sequence: 1 } }
-    const incResult = yield* client.updateDoc(
-      tracker.class.Project,
-      toRef<Space>("core:space:Space"),
-      project._id,
-      incOps,
-      true
-    )
-    const sequence = yield* requireUpdatedSequence(incResult, params.project)
-
-    const lastIssue = yield* client.findOne<HulyIssue>(
-      tracker.class.Issue,
-      hulyQuery<HulyIssue>({ space: project._id }),
-      { sort: { rank: SortingOrder.Descending } }
-    )
-    const rank = makeRank(lastIssue?.rank, undefined)
-
-    const descriptionMarkupRef = yield* uploadCreateIssueDescription(client, issueId, renderedDescription)
-
-    const priority = stringToPriority(params.priority ?? DEFAULT_ISSUE_PRIORITY)
-    const identifier = `${project.identifier}-${sequence}`
-
-    const issueData: AttachedData<HulyIssue> = {
-      title: params.title,
-      description: descriptionMarkupRef,
-      status: statusRef,
-      number: sequence,
-      kind: taskTypeWorkflow?.taskType._id ?? tracker.taskTypes.Issue,
-      identifier,
-      priority,
-      assignee: assigneeRef,
-      component: null,
-      estimation: params.estimation ?? 0,
-      remainingTime: 0,
-      reportedTime: 0,
-      reports: 0,
-      subIssues: 0,
-      parents,
-      childInfo: [],
-      dueDate: params.dueDate ?? null,
-      rank
-    }
-    yield* client.addCollection(
-      tracker.class.Issue,
-      project._id,
-      attachedTo,
-      attachedToClass,
-      collection,
-      issueData,
-      issueId
-    )
-
-    return { identifier: IssueIdentifier.make(identifier), issueId: IssueId.make(issueId) }
-  })
+export const createIssueWithResolvedAssignee = (
+  params: CreateIssueWithResolvedAssigneeParams
+): Effect.Effect<CreateIssueResult, CreateIssueWithResolvedAssigneeError, HulyClient | Diagnostics> =>
+  createIssueWithAssignee(params, () => Effect.succeed(params.resolvedAssignee))
 
 /**
  * Delete an issue from a project.

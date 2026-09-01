@@ -21,6 +21,7 @@ import { getPerson, listEmployees, listPersons, updatePerson } from "../../../sr
 import { resolveAssignee } from "../../../src/huly/operations/test-management-shared.js"
 import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import { memberReference } from "../../helpers/brands.js"
+import { docRef } from "../../helpers/huly-sdk.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   const result = docs as FindResult<T>
@@ -372,6 +373,21 @@ describe("Contacts Extended Coverage", () => {
   )
 
   describe("findPersonByExactEmailOrName", () => {
+    it.effect("returns the sole Person for one exact email match", () =>
+      Effect.gen(function* () {
+        const person = createMockPerson()
+        const identity = createMockSocialIdentity({ attachedTo: person._id, value: "john@example.com" })
+        const testLayer = createTestLayer({ persons: [person], socialIdentities: [identity] })
+
+        const result = yield* Effect.gen(function* () {
+          const client = yield* HulyClient
+          return yield* findPersonByExactEmailOrName(client, Email.make("john@example.com"))
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result?._id).toBe(person._id)
+      })
+    )
+
     it.effect("returns undefined when exact email has no identity or channel matches", () =>
       Effect.gen(function* () {
         const testLayer = createTestLayer({ persons: [], channels: [], socialIdentities: [] })
@@ -399,6 +415,27 @@ describe("Contacts Extended Coverage", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(result).toBeUndefined()
+      })
+    )
+
+    it.effect("fails when one exact email identifies distinct Persons", () =>
+      Effect.gen(function* () {
+        const first = createMockPerson({ _id: docRef<HulyPerson>("person-1") })
+        const second = createMockPerson({ _id: docRef<HulyPerson>("person-2") })
+        const identities = [
+          createMockSocialIdentity({ attachedTo: first._id }),
+          createMockSocialIdentity({ attachedTo: second._id })
+        ]
+        const testLayer = createTestLayer({ persons: [first, second], socialIdentities: identities })
+
+        const error = yield* Effect.flip(
+          Effect.gen(function* () {
+            const client = yield* HulyClient
+            return yield* findPersonByExactEmailOrName(client, Email.make("john@example.com"))
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("PersonIdentifierAmbiguousError")
       })
     )
   })

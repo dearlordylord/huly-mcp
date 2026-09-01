@@ -10,6 +10,7 @@ import { SocialIdType } from "@hcengineering/core"
 import { Effect, Option, Schema } from "effect"
 
 import { Count, Email, type NonEmptyString, PersonName, type PersonRefInput } from "../../domain/schemas/shared.js"
+import { getOneOrNoneEffect } from "../../utils/assertions.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import { PersonIdentifierAmbiguousError, PersonNotAnEmployeeError, PersonNotFoundError } from "../errors.js"
 import { contact } from "../huly-plugins.js"
@@ -66,28 +67,90 @@ export const batchGetEmailsForPersons = <T extends HulyPerson>(
 
 export const findPersonIdsByEmailSearch = (
   client: HulyClient["Service"],
-  emailSearch: string
+  emailSearch: NonEmptyString
 ): Effect.Effect<Array<Ref<HulyPerson>>, HulyClientError> =>
   Effect.gen(function* () {
-    const value = { $like: `%${escapeLikeWildcards(emailSearch)}%` }
-    const [channels, socialIdentities] = yield* Effect.all([
-      client.findAll<Channel>(
-        contact.class.Channel,
-        hulyQuery<Channel>({ provider: contact.channelProvider.Email, value })
-      ),
+    const [channelPersonIds, socialIdentities] = yield* Effect.all([
+      findPersonIdsByEmailChannelSearch(client, emailSearch),
       client.findAll<SocialIdentity>(
         contact.class.SocialIdentity,
-        hulyQuery<SocialIdentity>({ type: SocialIdType.EMAIL, value })
+        hulyQuery<SocialIdentity>({
+          type: SocialIdType.EMAIL,
+          value: { $like: `%${escapeLikeWildcards(emailSearch)}%` }
+        })
       )
     ])
 
     return [
-      ...new Set([
-        ...channels.map((channel) => toRef<HulyPerson>(channel.attachedTo)),
-        ...socialIdentities.map((identity) => toRef<HulyPerson>(identity.attachedTo))
-      ])
+      ...new Set([...channelPersonIds, ...socialIdentities.map((identity) => toRef<HulyPerson>(identity.attachedTo))])
     ]
   })
+
+export const findPersonIdsByEmailChannelSearch = (
+  client: HulyClient["Service"],
+  emailSearch: NonEmptyString | PersonRefInput
+): Effect.Effect<Array<Ref<HulyPerson>>, HulyClientError> =>
+  Effect.map(
+    client.findAll<Channel>(
+      contact.class.Channel,
+      hulyQuery<Channel>({
+        provider: contact.channelProvider.Email,
+        value: { $like: `%${escapeLikeWildcards(emailSearch)}%` }
+      })
+    ),
+    (channels) => [...new Set(channels.map((channel) => toRef<HulyPerson>(channel.attachedTo)))]
+  )
+
+export const findPersonIdsByExactEmailSources = (
+  client: HulyClient["Service"],
+  email: PersonRefInput
+): Effect.Effect<Array<Ref<HulyPerson>>, HulyClientError> =>
+  Effect.map(
+    Effect.all([
+      client.findAll<SocialIdentity>(
+        contact.class.SocialIdentity,
+        hulyQuery<SocialIdentity>({ type: SocialIdType.EMAIL, value: email })
+      ),
+      client.findAll<Channel>(
+        contact.class.Channel,
+        hulyQuery<Channel>({ value: email, provider: contact.channelProvider.Email })
+      )
+    ]),
+    ([socialIdentities, channels]) => [
+      ...new Set([
+        ...socialIdentities.map((identity) => toRef<HulyPerson>(identity.attachedTo)),
+        ...channels.map((channel) => toRef<HulyPerson>(channel.attachedTo))
+      ])
+    ]
+  )
+
+export const loadPeopleByIds = (
+  client: HulyClient["Service"],
+  personIds: ReadonlyArray<Ref<HulyPerson>>
+): Effect.Effect<Array<HulyPerson>, HulyClientError> => {
+  const uniqueIds = [...new Set(personIds)]
+  return uniqueIds.length === 0
+    ? Effect.succeed([])
+    : Effect.map(
+        client.findAll<HulyPerson>(contact.class.Person, hulyQuery<HulyPerson>({ _id: { $in: uniqueIds } })),
+        (people) => [...new Map(people.map((person) => [person._id, person])).values()]
+      )
+}
+
+export const findPeopleByExactName = (
+  client: HulyClient["Service"],
+  name: PersonRefInput
+): Effect.Effect<Array<HulyPerson>, HulyClientError> =>
+  client.findAll<HulyPerson>(contact.class.Person, hulyQuery<HulyPerson>({ name }))
+
+export const findPeopleByNameSearch = (
+  client: HulyClient["Service"],
+  nameSearch: PersonRefInput
+): Effect.Effect<Array<HulyPerson>, HulyClientError> =>
+  client.findAll<HulyPerson>(
+    contact.class.Person,
+    hulyQuery<HulyPerson>({ name: { $like: `%${escapeLikeWildcards(nameSearch)}%` } })
+  )
 
 const findPersonBySocialIdentityEmail = (
   client: HulyClient["Service"],
@@ -107,39 +170,14 @@ const findPersonByExactEmail = (
   email: Email
 ): Effect.Effect<HulyPerson | undefined, HulyClientError | PersonIdentifierAmbiguousError> =>
   Effect.gen(function* () {
-    const socialIdentities = yield* client.findAll<SocialIdentity>(contact.class.SocialIdentity, {
-      type: SocialIdType.EMAIL,
-      value: email
-    })
-
-    const channels = yield* client.findAll<Channel>(contact.class.Channel, {
-      value: email,
-      provider: contact.channelProvider.Email
-    })
-
-    const personIds = [
-      ...new Set([
-        ...socialIdentities.map((identity) => identity.attachedTo),
-        ...channels.map((channel) => channel.attachedTo)
-      ])
-    ]
-    if (personIds.length === 0) {
-      return undefined
-    }
-
-    const persons = yield* client.findAll<HulyPerson>(contact.class.Person, {
-      _id: { $in: personIds.map(toRef<HulyPerson>) }
-    })
-
-    if (persons.length === 0) {
-      return undefined
-    }
-
-    if (persons.length > 1) {
-      return yield* new PersonIdentifierAmbiguousError({ identifier: email, matches: Count.make(persons.length) })
-    }
-
-    return persons[0]
+    const personIds = yield* findPersonIdsByExactEmailSources(client, email)
+    const persons = yield* loadPeopleByIds(client, personIds)
+    return Option.getOrUndefined(
+      yield* getOneOrNoneEffect(
+        persons,
+        (matches) => new PersonIdentifierAmbiguousError({ identifier: email, matches: Count.make(matches.length) })
+      )
+    )
   })
 
 const findPersonByExactName = (
@@ -147,17 +185,13 @@ const findPersonByExactName = (
   name: PersonName
 ): Effect.Effect<HulyPerson | undefined, HulyClientError | PersonIdentifierAmbiguousError> =>
   Effect.gen(function* () {
-    const persons = yield* client.findAll<HulyPerson>(contact.class.Person, { name })
-
-    if (persons.length === 0) {
-      return undefined
-    }
-
-    if (persons.length > 1) {
-      return yield* new PersonIdentifierAmbiguousError({ identifier: name, matches: Count.make(persons.length) })
-    }
-
-    return persons[0]
+    const persons = yield* findPeopleByExactName(client, name)
+    return Option.getOrUndefined(
+      yield* getOneOrNoneEffect(
+        persons,
+        (matches) => new PersonIdentifierAmbiguousError({ identifier: name, matches: Count.make(matches.length) })
+      )
+    )
   })
 
 export const findPersonByExactEmailOrName = (

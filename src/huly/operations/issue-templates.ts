@@ -7,7 +7,7 @@
  *
  * @module
  */
-import type { Channel, Person } from "@hcengineering/contact"
+import type { Person } from "@hcengineering/contact"
 import type { Data, DocumentUpdate, Ref } from "@hcengineering/core"
 import { generateId, SortingOrder } from "@hcengineering/core"
 import type {
@@ -50,7 +50,6 @@ import { DEFAULT_ISSUE_PRIORITY } from "../../domain/schemas/issues.js"
 import {
   ComponentLabel,
   Count,
-  Email,
   IssueTemplateChildId,
   IssueTemplateId,
   NonNegativeNumber,
@@ -82,7 +81,7 @@ import { findComponentByIdOrLabel } from "./components.js"
 import { findPersonByEmailOrName } from "./contacts-shared.js"
 import { attachIssueChild } from "./issues-parent.js"
 import { findProject, priorityToString, stringToPriority, zeroAsUnset } from "./issues-shared.js"
-import { createIssue } from "./issues.js"
+import { createIssueWithResolvedAssignee, type CreateIssueWithResolvedAssigneeParams } from "./issues-write.js"
 import { clampLimit, hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
@@ -413,17 +412,19 @@ const resolveIssueFromTemplateAssignee = (
   client: HulyClient["Service"],
   params: CreateIssueFromTemplateParams,
   template: HulyIssueTemplate
-): Effect.Effect<CreateIssueParams["assignee"], HulyClientError> =>
+): Effect.Effect<Ref<Person> | null, HulyClientError | PersonNotFoundError> =>
   Effect.gen(function* () {
-    if (params.assignee !== undefined) return params.assignee
-    if (template.assignee === null) return undefined
-    const person = yield* client.findOne<Person>(contact.class.Person, hulyQuery<Person>({ _id: template.assignee }))
-    if (person === undefined) return undefined
-    const emailChannel = yield* client.findOne<Channel>(
-      contact.class.Channel,
-      hulyQuery<Channel>({ attachedTo: person._id, provider: contact.channelProvider.Email })
-    )
-    return Email.make(emailChannel?.value ?? person.name)
+    if (params.assignee === undefined) {
+      if (template.assignee === null) return null
+      const templatePerson = yield* client.findOne<Person>(
+        contact.class.Person,
+        hulyQuery<Person>({ _id: template.assignee })
+      )
+      return templatePerson?._id ?? null
+    }
+    const person = yield* findPersonByEmailOrName(client, params.assignee)
+    if (person === undefined) return yield* new PersonNotFoundError({ identifier: params.assignee })
+    return person._id
   })
 
 const templateChildCreateParams = (
@@ -436,10 +437,11 @@ const templateChildCreateParams = (
     entity: "issue template child description"
   }).pipe(
     Effect.map(
-      (description): CreateIssueParams => ({
+      (description): CreateIssueWithResolvedAssigneeParams => ({
         project: params.project,
         title: child.title,
         priority: priorityToString(child.priority),
+        resolvedAssignee: null,
         ...(description === undefined ? {} : { description })
       })
     )
@@ -456,7 +458,7 @@ const createTemplateChildIssues = (
   project: HulyProject,
   template: HulyIssueTemplate,
   params: CreateIssueFromTemplateParams,
-  parentResult: Effect.Success<ReturnType<typeof createIssue>>,
+  parentResult: Effect.Success<ReturnType<typeof createIssueWithResolvedAssignee>>,
   title: CreateIssueParams["title"],
   markupUrlConfig: MarkupUrlConfig
 ): Effect.Effect<void, CreateIssueFromTemplateError, HulyClient | Diagnostics> =>
@@ -469,7 +471,7 @@ const createTemplateChildIssues = (
     }
     for (const child of template.children) {
       const childParams = yield* templateChildCreateParams(params, child, markupUrlConfig)
-      const childResult = yield* createIssue(childParams)
+      const childResult = yield* createIssueWithResolvedAssignee(childParams)
       yield* attachIssueChild(
         client,
         project._id,
@@ -504,16 +506,16 @@ export const createIssueFromTemplate = (
 
     const assignee = yield* resolveIssueFromTemplateAssignee(client, params, template)
 
-    const issueParams: CreateIssueParams = {
+    const issueParams: CreateIssueWithResolvedAssigneeParams = {
       project: params.project,
       title,
       description,
       priority,
-      assignee,
+      resolvedAssignee: assignee,
       status: params.status
     }
 
-    const result = yield* createIssue(issueParams)
+    const result = yield* createIssueWithResolvedAssignee(issueParams)
 
     if (template.component !== null) {
       yield* client.updateDoc(tracker.class.Issue, project._id, toRef<HulyIssue>(result.issueId), {

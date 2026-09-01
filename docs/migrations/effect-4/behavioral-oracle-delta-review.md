@@ -10,10 +10,10 @@ the baseline was not regenerated.
 - Effect 3 baseline SHA-256:
   `02bb5e4bf2fdb0e4dd30f980810bd0fe70d5c91482c309b4621264c373d6adac`
 - Reviewed Effect 4 corpus SHA-256:
-  `3dcaac8a240371853f2b50f304ea3478aac23b29b24bd18db82ae7d73769fa6d`
-- Exact structural deltas: 21,086
+  `9c6249928b1ad74f1be091245dd3591dcbe104bed1147a08ad2ba8d1ebe8823c`
+- Exact structural deltas: 21,092
 - Added: 8,837
-- Changed: 2,146
+- Changed: 2,152
 - Removed: 10,103
 
 Each category records its exact delta count and the SHA-256 of its sorted exact
@@ -29,8 +29,9 @@ stale categories, duplicate categories, and corpus hash drift.
 | 12,754 | Draft-07 structural dialect | Effect 4 refs, definitions, optional/null unions, refinements, and composition wrappers. All 524 native and 6 proxy schemas compile under strict Ajv Draft-07. |
 | 4,894 | Schema metadata | Authored descriptions restored by the central adapter and obsolete Effect 3 generator-default titles/descriptions removed. |
 | 3,428 | Authored-constraint projection | The same 522 ordered tools remain represented; generated ref/composition paths changed. Manual cross-field constraints remain in the corpus and representative runtime/Ajv agreement passes. |
+| 6 | Direct issue-assignee descriptions | Direct issue create, update, and list advertise exact agent UserProfile titles in both their tool and assignee input descriptions (#245). |
 | 6 | CLI JSON parse diagnostics | Effect 4 adds deterministic line/column context; code, hint, retryability, and exit status are unchanged. |
-| 4 | CLI help rendering | The Effect 4 CLI renderer intentionally uses concise help. Route inventory and ordering remain unchanged. |
+| 4 | CLI help rendering | The Effect 4 CLI renderer intentionally uses concise help and omits patterns that are not shared by every string-capable union branch, while retaining string patterns across nullable alternatives. Route inventory and ordering remain unchanged. |
 
 The comparison deliberately retains public array order, descriptions, titles,
 refs, required fields, enums, patterns, bounds, compositions, help, and error
@@ -50,6 +51,6 @@ mise exec node@22.22.2 -- pnpm exec vitest run \
   test/scripts/effect4-oracle-parity.test.ts
 ```
 
-The full verifier re-renders the current bundled corpus and matches all 21,086
+The full verifier re-renders the current bundled corpus and matches all 21,092
 exact entries. Any future semantic or structural drift is unexpected; an
 accepted entry that stops occurring is stale and also fails verification.

@@ -2,7 +2,11 @@ import { readFileSync, writeFileSync } from "node:fs"
 
 import { Schema } from "effect"
 
-import { certifyPackedArtifact, PackedArtifactCertificationSchema } from "./package-artifact-certification.js"
+import {
+  certifyPackedArtifact,
+  packedArtifactEvidenceMismatchError,
+  PackedArtifactCertificationSchema
+} from "./package-artifact-certification.js"
 
 const CertificationArgumentsSchema = Schema.Tuple([
   Schema.NonEmptyString,
@@ -19,6 +23,7 @@ const ArgumentsSchema = Schema.Union([CertificationArgumentsSchema, WriteArgumen
 
 const processArgumentOffset = 2
 const jsonIndent = 2
+
 const [archivePath, kind, version, writeFlag] = Schema.decodeUnknownSync(ArgumentsSchema)(
   process.argv.slice(processArgumentOffset)
 )
@@ -64,7 +69,7 @@ const main = async (): Promise<void> => {
     } else {
       const expectedCertification = parseEvidence(readFileSync(evidencePath, "utf8"))
       if (JSON.stringify(certification) !== JSON.stringify(expectedCertification)) {
-        throw new Error("Packed MCP artifact evidence is stale; run certify-packed-artifact with --write.")
+        throw packedArtifactEvidenceMismatchError(expectedCertification, certification)
       }
     }
   }

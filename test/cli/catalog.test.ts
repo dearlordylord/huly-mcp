@@ -206,6 +206,126 @@ describe("CLI catalog", () => {
 
     expect(fieldOptionDescription(createIssue.inputSchema, priority)).toContain('Allowed values: "urgent"')
     expect(fieldOptionDescription(setConversationClosed.inputSchema, channel)).toContain("{ channel } | { dm }")
+
+    const assignee = collectFieldSpecs(createIssue.inputSchema).get("assignee")
+    if (assignee === undefined) throw new Error("Missing create issue assignee help fixture.")
+    expect(fieldOptionDescription(createIssue.inputSchema, assignee)).not.toContain("Pattern:")
+  })
+
+  it("only presents patterns that apply to every scalar union branch", () => {
+    const partlyConstrained = fieldOptionDescription(
+      {},
+      { fieldName: "assignee", schema: { anyOf: [{ type: "string", pattern: "^[^@]+@[^@]+$" }, { type: "string" }] } }
+    )
+    const universallyConstrained = fieldOptionDescription(
+      {},
+      {
+        fieldName: "code",
+        schema: {
+          anyOf: [
+            { type: "string", pattern: "^[A-Z]+$" },
+            { type: "string", pattern: "^[A-Z]+$", description: "Alias" }
+          ]
+        }
+      }
+    )
+    const nullableConstrained = fieldOptionDescription(
+      {},
+      { fieldName: "email", schema: { anyOf: [{ type: "string", pattern: "^[^@]+@[^@]+$" }, { type: "null" }] } }
+    )
+    const patternWithAlternative = (alternative: unknown, rootSchema: object = {}) =>
+      fieldOptionDescription(rootSchema, {
+        fieldName: "code",
+        schema: { anyOf: [{ type: "string", pattern: "^[A-Z]+$" }, alternative] }
+      })
+
+    expect(partlyConstrained).not.toContain("Pattern:")
+    expect(universallyConstrained).toContain("Pattern: ^[A-Z]+$")
+    expect(nullableConstrained).toContain("Pattern: ^[^@]+@[^@]+$")
+    expect(patternWithAlternative({})).not.toContain("Pattern:")
+    expect(patternWithAlternative({ const: "lower" })).not.toContain("Pattern:")
+    expect(patternWithAlternative({ const: 1 })).toContain("Pattern: ^[A-Z]+$")
+    expect(patternWithAlternative({ enum: [null, "lower"] })).not.toContain("Pattern:")
+    expect(patternWithAlternative({ enum: [null, 1] })).toContain("Pattern: ^[A-Z]+$")
+    expect(patternWithAlternative(true)).not.toContain("Pattern:")
+    expect(patternWithAlternative(false)).toContain("Pattern: ^[A-Z]+$")
+    expect(patternWithAlternative(null)).not.toContain("Pattern:")
+    expect(patternWithAlternative({ allOf: [{}] })).not.toContain("Pattern:")
+    expect(patternWithAlternative({ allOf: [{ type: "null" }] })).toContain("Pattern: ^[A-Z]+$")
+    expect(patternWithAlternative({ oneOf: [{}] })).not.toContain("Pattern:")
+    expect(patternWithAlternative({ oneOf: [{ type: "null" }] })).toContain("Pattern: ^[A-Z]+$")
+    expect(patternWithAlternative({ oneOf: [{ $ref: "#/$defs/Missing" }] })).not.toContain("Pattern:")
+    expect(patternWithAlternative({ anyOf: [false, { $ref: "#/$defs/Missing" }] })).not.toContain("Pattern:")
+    expect(patternWithAlternative({ anyOf: [false, { type: "null" }] })).toContain("Pattern: ^[A-Z]+$")
+    expect(
+      patternWithAlternative({
+        oneOf: [
+          { type: "string", pattern: "^[a-z]+$" },
+          { type: "string", pattern: "^[0-9]+$" }
+        ]
+      })
+    ).not.toContain("Pattern:")
+    expect(patternWithAlternative({ $ref: "#/$defs/Anything" }, { $defs: { Anything: {} } })).not.toContain("Pattern:")
+    expect(patternWithAlternative({ $ref: "#/$defs/Missing" })).not.toContain("Pattern:")
+    expect(patternWithAlternative({ $ref: "#/$defs/Nothing" }, { $defs: { Nothing: false } })).toContain(
+      "Pattern: ^[A-Z]+$"
+    )
+    expect(
+      patternWithAlternative({ $ref: "#/$defs/Loop" }, { $defs: { Loop: { $ref: "#/$defs/Loop" } } })
+    ).not.toContain("Pattern:")
+    expect(
+      patternWithAlternative(
+        { $ref: "#/$defs/Level0" },
+        {
+          $defs: {
+            Level0: { $ref: "#/$defs/Level1" },
+            Level1: { $ref: "#/$defs/Level2" },
+            Level2: { $ref: "#/$defs/Level3" },
+            Level3: { $ref: "#/$defs/Level4" },
+            Level4: { $ref: "#/$defs/Level5" },
+            Level5: { $ref: "#/$defs/Level6" },
+            Level6: { $ref: "#/$defs/Level7" },
+            Level7: { $ref: "#/$defs/Level8" },
+            Level8: { $ref: "#/$defs/Level9" },
+            Level9: false
+          }
+        }
+      )
+    ).not.toContain("Pattern:")
+  })
+
+  it("follows local pattern references only while their resolution is certain", () => {
+    const referencedPattern = (fieldSchema: unknown, definitions: object) =>
+      fieldOptionDescription({ $defs: definitions }, { fieldName: "code", schema: fieldSchema })
+
+    expect(
+      referencedPattern({ $ref: "#/$defs/Patterned" }, { Patterned: { type: "string", pattern: "^[A-Z]+$" } })
+    ).toContain("Pattern: ^[A-Z]+$")
+    expect(
+      referencedPattern(
+        { $ref: "#/$defs/First" },
+        { First: { $ref: "#/$defs/Second" }, Second: { type: "string", pattern: "^[A-Z]+$" } }
+      )
+    ).toContain("Pattern: ^[A-Z]+$")
+    expect(referencedPattern({ $ref: "#/$defs/Missing" }, {})).not.toContain("Pattern:")
+    expect(referencedPattern({ $ref: "#/$defs/Loop" }, { Loop: { $ref: "#/$defs/Loop" } })).not.toContain("Pattern:")
+    expect(
+      referencedPattern(
+        { $ref: "#/$defs/Level0" },
+        {
+          Level0: { $ref: "#/$defs/Level1" },
+          Level1: { $ref: "#/$defs/Level2" },
+          Level2: { $ref: "#/$defs/Level3" },
+          Level3: { $ref: "#/$defs/Level4" },
+          Level4: { $ref: "#/$defs/Level5" },
+          Level5: { $ref: "#/$defs/Level6" },
+          Level6: { $ref: "#/$defs/Level7" },
+          Level7: { $ref: "#/$defs/Level8" },
+          Level8: { $ref: "#/$defs/Level9" },
+          Level9: { type: "string", pattern: "^[A-Z]+$" }
+        }
+      )
+    ).not.toContain("Pattern:")
   })
 
   it("describes nested schema constraints without assuming every variant is an object", () => {
