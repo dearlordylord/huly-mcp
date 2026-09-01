@@ -21,6 +21,7 @@ import { getPerson, listEmployees, listPersons, updatePerson } from "../../../sr
 import { resolveAssignee } from "../../../src/huly/operations/test-management-shared.js"
 import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import { memberReference } from "../../helpers/brands.js"
+import { docRef } from "../../helpers/huly-sdk.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   const result = docs as FindResult<T>
@@ -419,8 +420,8 @@ describe("Contacts Extended Coverage", () => {
 
     it.effect("fails when one exact email identifies distinct Persons", () =>
       Effect.gen(function* () {
-        const first = createMockPerson({ _id: "person-1" as Ref<HulyPerson> })
-        const second = createMockPerson({ _id: "person-2" as Ref<HulyPerson> })
+        const first = createMockPerson({ _id: docRef<HulyPerson>("person-1") })
+        const second = createMockPerson({ _id: docRef<HulyPerson>("person-2") })
         const identities = [
           createMockSocialIdentity({ attachedTo: first._id }),
           createMockSocialIdentity({ attachedTo: second._id })
