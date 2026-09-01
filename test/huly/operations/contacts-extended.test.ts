@@ -372,6 +372,21 @@ describe("Contacts Extended Coverage", () => {
   )
 
   describe("findPersonByExactEmailOrName", () => {
+    it.effect("returns the sole Person for one exact email match", () =>
+      Effect.gen(function* () {
+        const person = createMockPerson()
+        const identity = createMockSocialIdentity({ attachedTo: person._id, value: "john@example.com" })
+        const testLayer = createTestLayer({ persons: [person], socialIdentities: [identity] })
+
+        const result = yield* Effect.gen(function* () {
+          const client = yield* HulyClient
+          return yield* findPersonByExactEmailOrName(client, Email.make("john@example.com"))
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result?._id).toBe(person._id)
+      })
+    )
+
     it.effect("returns undefined when exact email has no identity or channel matches", () =>
       Effect.gen(function* () {
         const testLayer = createTestLayer({ persons: [], channels: [], socialIdentities: [] })
@@ -399,6 +414,27 @@ describe("Contacts Extended Coverage", () => {
         }).pipe(Effect.provide(testLayer))
 
         expect(result).toBeUndefined()
+      })
+    )
+
+    it.effect("fails when one exact email identifies distinct Persons", () =>
+      Effect.gen(function* () {
+        const first = createMockPerson({ _id: "person-1" as Ref<HulyPerson> })
+        const second = createMockPerson({ _id: "person-2" as Ref<HulyPerson> })
+        const identities = [
+          createMockSocialIdentity({ attachedTo: first._id }),
+          createMockSocialIdentity({ attachedTo: second._id })
+        ]
+        const testLayer = createTestLayer({ persons: [first, second], socialIdentities: identities })
+
+        const error = yield* Effect.flip(
+          Effect.gen(function* () {
+            const client = yield* HulyClient
+            return yield* findPersonByExactEmailOrName(client, Email.make("john@example.com"))
+          }).pipe(Effect.provide(testLayer))
+        )
+
+        expect(error._tag).toBe("PersonIdentifierAmbiguousError")
       })
     )
   })

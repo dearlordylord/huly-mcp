@@ -6,7 +6,7 @@
 import type { Person, SocialIdentity } from "@hcengineering/contact"
 import { type Ref, SortingOrder, type Status, type WithLookup } from "@hcengineering/core"
 import { type Issue as HulyIssue } from "@hcengineering/tracker"
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
 
 import type {
   GetIssueParams,
@@ -107,8 +107,8 @@ const applyStatusAndAssigneeFilters = (
     }
     if (params.assignee !== undefined) {
       const assigneePerson = yield* findIssueAssignee(client, params.assignee)
-      if (assigneePerson === undefined) return false
-      query.assignee = assigneePerson._id
+      if (Option.isNone(assigneePerson)) return false
+      query.assignee = assigneePerson.value._id
     }
     return true
   })

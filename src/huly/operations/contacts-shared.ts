@@ -10,6 +10,7 @@ import { SocialIdType } from "@hcengineering/core"
 import { Effect, Option, Schema } from "effect"
 
 import { Count, Email, type NonEmptyString, PersonName, type PersonRefInput } from "../../domain/schemas/shared.js"
+import { getOneOrNoneEffect } from "../../utils/assertions.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import { PersonIdentifierAmbiguousError, PersonNotAnEmployeeError, PersonNotFoundError } from "../errors.js"
 import { contact } from "../huly-plugins.js"
@@ -170,21 +171,13 @@ const findPersonByExactEmail = (
 ): Effect.Effect<HulyPerson | undefined, HulyClientError | PersonIdentifierAmbiguousError> =>
   Effect.gen(function* () {
     const personIds = yield* findPersonIdsByExactEmailSources(client, email)
-    if (personIds.length === 0) {
-      return undefined
-    }
-
     const persons = yield* loadPeopleByIds(client, personIds)
-
-    if (persons.length === 0) {
-      return undefined
-    }
-
-    if (persons.length > 1) {
-      return yield* new PersonIdentifierAmbiguousError({ identifier: email, matches: Count.make(persons.length) })
-    }
-
-    return persons[0]
+    return Option.getOrUndefined(
+      yield* getOneOrNoneEffect(
+        persons,
+        (matches) => new PersonIdentifierAmbiguousError({ identifier: email, matches: Count.make(matches.length) })
+      )
+    )
   })
 
 const findPersonByExactName = (
@@ -193,16 +186,12 @@ const findPersonByExactName = (
 ): Effect.Effect<HulyPerson | undefined, HulyClientError | PersonIdentifierAmbiguousError> =>
   Effect.gen(function* () {
     const persons = yield* findPeopleByExactName(client, name)
-
-    if (persons.length === 0) {
-      return undefined
-    }
-
-    if (persons.length > 1) {
-      return yield* new PersonIdentifierAmbiguousError({ identifier: name, matches: Count.make(persons.length) })
-    }
-
-    return persons[0]
+    return Option.getOrUndefined(
+      yield* getOneOrNoneEffect(
+        persons,
+        (matches) => new PersonIdentifierAmbiguousError({ identifier: name, matches: Count.make(matches.length) })
+      )
+    )
   })
 
 export const findPersonByExactEmailOrName = (

@@ -1,7 +1,8 @@
 import type { Person, UserProfile } from "@hcengineering/contact"
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 
 import { Count, type PersonRefInput } from "../../domain/schemas/shared.js"
+import { getOneOrNoneEffect } from "../../utils/assertions.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import { PersonIdentifierAmbiguousError } from "../errors.js"
 import { contact } from "../huly-plugins.js"
@@ -49,22 +50,24 @@ const findFuzzyPeople = Effect.fn("IssueAssigneeResolution.findFuzzyPeople")(fun
   return yield* loadPeopleByIds(client, [...emailPersonIds, ...namedPeople.map((person) => person._id)])
 })
 
-const solePerson = (
+const oneAssigneeOrNone = (
   identifier: PersonRefInput,
   people: ReadonlyArray<Person>
-): Effect.Effect<Person | undefined, PersonIdentifierAmbiguousError> =>
-  people.length > 1
-    ? Effect.fail(new PersonIdentifierAmbiguousError({ identifier, matches: Count.make(people.length) }))
-    : Effect.succeed(people[0])
+): Effect.Effect<Option.Option<Person>, PersonIdentifierAmbiguousError> =>
+  getOneOrNoneEffect(
+    people,
+    (matches) => new PersonIdentifierAmbiguousError({ identifier, matches: Count.make(matches.length) })
+  )
 
 export const findIssueAssignee = Effect.fn("IssueAssigneeResolution.findIssueAssignee")(function* (
   client: HulyClient["Service"],
   identifier: PersonRefInput
 ) {
   const exactPeople = yield* findExactPeople(client, identifier)
-  if (exactPeople.length > 0) return yield* solePerson(identifier, exactPeople)
-  return yield* solePerson(identifier, yield* findFuzzyPeople(client, identifier))
+  const exactPerson = yield* oneAssigneeOrNone(identifier, exactPeople)
+  if (Option.isSome(exactPerson)) return exactPerson
+  return yield* oneAssigneeOrNone(identifier, yield* findFuzzyPeople(client, identifier))
 }) satisfies (
   client: HulyClient["Service"],
   identifier: PersonRefInput
-) => Effect.Effect<Person | undefined, ResolutionError>
+) => Effect.Effect<Option.Option<Person>, ResolutionError>

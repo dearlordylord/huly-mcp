@@ -1040,7 +1040,7 @@ describe("listIssues", () => {
       })
     )
 
-    it.effect("returns empty results when assignee not found", () =>
+    it.effect("maps an absent assignee resolution to empty list results", () =>
       Effect.gen(function* () {
         const project = makeProject()
         const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
@@ -2152,7 +2152,7 @@ describe("createIssue", () => {
       })
     )
 
-    it.effect("returns PersonNotFoundError when assignee not found", () =>
+    it.effect("maps an absent assignee resolution to PersonNotFoundError on create", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
 
@@ -2959,7 +2959,7 @@ describe("updateIssue", () => {
       })
     )
 
-    it.effect("returns PersonNotFoundError when assignee not found", () =>
+    it.effect("maps an absent assignee resolution to PersonNotFoundError on update", () =>
       Effect.gen(function* () {
         const project = makeProject({ identifier: "TEST" })
         const issue = makeIssue({ identifier: "TEST-1" })

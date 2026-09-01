@@ -2,7 +2,7 @@ import type { Person } from "@hcengineering/contact"
 import type { Ref, Status } from "@hcengineering/core"
 import type { ProjectType, TaskType } from "@hcengineering/task"
 import type { Project as HulyProject } from "@hcengineering/tracker"
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 
 import type { PersonRefInput, ProjectIdentifier, StatusName } from "../../domain/schemas/shared.js"
 import type { TaskTypeRef } from "../../domain/schemas/task-management.js"
@@ -20,10 +20,10 @@ export const resolveAssignee = (
 ): Effect.Effect<Person, PersonNotFoundError | PersonIdentifierAmbiguousError | HulyClientError> =>
   Effect.gen(function* () {
     const person = yield* findIssueAssignee(client, assigneeIdentifier)
-    if (person === undefined) {
-      return yield* new PersonNotFoundError({ identifier: assigneeIdentifier })
-    }
-    return person
+    return yield* Option.match(person, {
+      onNone: () => Effect.fail(new PersonNotFoundError({ identifier: assigneeIdentifier })),
+      onSome: Effect.succeed
+    })
   })
 
 interface TaskTypeWorkflow {
