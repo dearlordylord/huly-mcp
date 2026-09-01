@@ -7,46 +7,19 @@ import { describe, expect, it } from "vitest"
 
 import { canonicalJson } from "../../scripts/effect4-oracle-canonical.js"
 import { runCapturedProcess } from "../../scripts/captured-process.js"
-import {
-  captureEffect4Oracle,
-  renderEffect4Oracle,
-  requireOracleDiscoveries
-} from "../../scripts/effect4-oracle-data.js"
-import { currentDraft07Corpora, validateCurrentDraft07Corpora } from "../../scripts/effect4-oracle-current-corpus.js"
+import { validateCurrentDraft07Corpora } from "../../scripts/effect4-oracle-current-corpus.js"
 import {
   EFFECT4_ORACLE_DELTA_REVIEW_PATH,
   EFFECT4_ORACLE_PATH,
   verifyEffect4Oracle,
   writeEffect4Oracle
 } from "../../scripts/effect4-oracle-io.js"
-import { LIST_TOOLS_REQUEST_ID } from "../../scripts/effect4-oracle-process.js"
-import {
-  BehavioralOracleSchema,
-  type BundledProcesses,
-  BundledProcessesSchema,
-  JsonValueSchema
-} from "../../scripts/effect4-oracle-schema.js"
+import { BehavioralOracleSchema, JsonValueSchema } from "../../scripts/effect4-oracle-schema.js"
 
 const readCheckedOracle = async () =>
   Schema.decodeUnknownSync(Schema.fromJsonString(BehavioralOracleSchema))(
     await fs.readFile(EFFECT4_ORACLE_PATH, "utf8")
   )
-
-const withCurrentDiscoveryCorpora = (bundledProcesses: BundledProcesses): BundledProcesses => {
-  const corpora = currentDraft07Corpora()
-  const replaceDiscovery = (responses: BundledProcesses["stdio"]["native"], tools: (typeof corpora)["native"]) =>
-    responses.map((response) => (response.id === LIST_TOOLS_REQUEST_ID ? { ...response, result: { tools } } : response))
-  return Schema.decodeUnknownSync(Schema.fromJsonString(BundledProcessesSchema))(
-    JSON.stringify({
-      ...bundledProcesses,
-      stdio: {
-        ...bundledProcesses.stdio,
-        native: replaceDiscovery(bundledProcesses.stdio.native, corpora.native),
-        proxy: replaceDiscovery(bundledProcesses.stdio.proxy, corpora.proxy)
-      }
-    })
-  )
-}
 
 describe("Effect 4 behavioral oracle", () => {
   it("captures complete registries and deterministic CLI fixtures", async () => {
@@ -156,24 +129,6 @@ describe("Effect 4 behavioral oracle", () => {
 
   it("compiles every native and proxy public schema as Draft-07", () => {
     expect(validateCurrentDraft07Corpora()).toEqual({ native: 524, proxy: 6 })
-  }, 60_000)
-
-  it("assembles the complete current oracle from captured process fixtures", async () => {
-    const checkedOracle = await readCheckedOracle()
-    const bundledProcesses = withCurrentDiscoveryCorpora(checkedOracle.bundledProcesses)
-    const oracle = await captureEffect4Oracle(() => Promise.resolve(bundledProcesses))
-    expect(oracle.registry.operationOrder).toHaveLength(522)
-    expect(oracle.registry.authoredConstraints).toHaveLength(522)
-    expect(oracle.bundledProcesses.stdio.native).toEqual(expect.arrayContaining([expect.objectContaining({ id: 2 })]))
-    expect(oracle.bundledProcesses.stdio.proxy).toEqual(expect.arrayContaining([expect.objectContaining({ id: 2 })]))
-    expect(oracle.bundledProcesses.stdio.legacy).toEqual(expect.arrayContaining([expect.objectContaining({ id: 2 })]))
-    expect(oracle.cli.input.explicitLast.input).toMatchObject({ limit: 3, query: "positional query" })
-    expect(oracle.cli.errors.json.decoded.code).toBe("INVALID_INPUT")
-    expect(requireOracleDiscoveries(oracle.bundledProcesses)).toMatchObject({ native: { id: 2 }, proxy: { id: 2 } })
-    expect(() =>
-      requireOracleDiscoveries({ ...oracle.bundledProcesses, stdio: { ...oracle.bundledProcesses.stdio, native: [] } })
-    ).toThrow("both native and proxy")
-    expect(renderEffect4Oracle(oracle)).toContain('"formatVersion": 1')
   }, 60_000)
 
   it("terminates and reaps an oracle subprocess after its deadline", async () => {

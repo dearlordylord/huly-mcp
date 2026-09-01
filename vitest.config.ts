@@ -36,6 +36,9 @@ export default defineConfig({
         // Live bundled-process capture is owned by the separately bounded behavioral-oracle gate. Coverage
         // exercises parsing and oracle assembly through captured fixtures without duplicating nine processes.
         'scripts/effect4-oracle-process-capture.ts',
+        // The completed Effect migration oracle assembly is retained as historical release tooling. The built
+        // deterministic verifier remains in check-all; its CPU-sensitive full assembly is no longer a unit gate.
+        'scripts/effect4-oracle-data.ts',
         // Certification process wiring is an imperative shell over the tested workflow and secret ledger;
         // live local-Huly runs provide transport evidence for the built stdio and HTTP adapters.
         'scripts/api-token-certification-adapter.ts',
