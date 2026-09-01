@@ -39,7 +39,11 @@ export type OracleDeltaReview = Schema.Schema.Type<typeof OracleDeltaReviewSchem
 
 const sha256 = (value: string): string => crypto.createHash("sha256").update(value).digest("hex")
 
-const ISSUE_ASSIGNEE_TOOL_NAMES = new Set(["list_issues", "create_issue", "update_issue"])
+const ISSUE_ASSIGNEE_TOOL_NAMES: ReadonlySet<ToolNameType> = new Set([
+  ToolName.make("list_issues"),
+  ToolName.make("create_issue"),
+  ToolName.make("update_issue")
+])
 const TOOL_DESCRIPTION_PATH = /^\/bundledProcesses\/stdio\/native\/(\d+)\/result\/tools\/(\d+)\/description$/u
 const CandidateListToolsResponseSchema = Schema.Struct({
   result: Schema.Struct({ tools: Schema.Array(Schema.Struct({ name: ToolName })) })
@@ -82,7 +86,8 @@ export const oracleDeltaReviewCategory = (
       ? "schema-metadata"
       : "draft07-structure"
   }
-  if (ISSUE_ASSIGNEE_TOOL_NAMES.has(candidateToolName(delta.path, candidateToolIdentities) ?? "")) {
+  const toolName = candidateToolName(delta.path, candidateToolIdentities)
+  if (toolName !== undefined && ISSUE_ASSIGNEE_TOOL_NAMES.has(toolName)) {
     return "issue-assignee-tool-description"
   }
   if (delta.path.includes("/help/") || delta.path.endsWith("Help/stdout")) return "cli-help"

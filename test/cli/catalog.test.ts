@@ -233,10 +233,26 @@ describe("CLI catalog", () => {
       {},
       { fieldName: "email", schema: { anyOf: [{ type: "string", pattern: "^[^@]+@[^@]+$" }, { type: "null" }] } }
     )
+    const patternWithAlternative = (alternative: unknown, rootSchema: object = {}) =>
+      fieldOptionDescription(rootSchema, {
+        fieldName: "code",
+        schema: { anyOf: [{ type: "string", pattern: "^[A-Z]+$" }, alternative] }
+      })
 
     expect(partlyConstrained).not.toContain("Pattern:")
     expect(universallyConstrained).toContain("Pattern: ^[A-Z]+$")
     expect(nullableConstrained).toContain("Pattern: ^[^@]+@[^@]+$")
+    expect(patternWithAlternative({})).not.toContain("Pattern:")
+    expect(patternWithAlternative({ const: "lower" })).not.toContain("Pattern:")
+    expect(patternWithAlternative({ const: 1 })).toContain("Pattern: ^[A-Z]+$")
+    expect(patternWithAlternative({ enum: [null, "lower"] })).not.toContain("Pattern:")
+    expect(patternWithAlternative({ enum: [null, 1] })).toContain("Pattern: ^[A-Z]+$")
+    expect(patternWithAlternative(null)).toContain("Pattern: ^[A-Z]+$")
+    expect(patternWithAlternative({ allOf: [{}] })).not.toContain("Pattern:")
+    expect(patternWithAlternative({ allOf: [{ type: "null" }] })).toContain("Pattern: ^[A-Z]+$")
+    expect(patternWithAlternative({ oneOf: [{}] })).not.toContain("Pattern:")
+    expect(patternWithAlternative({ oneOf: [{ type: "null" }] })).toContain("Pattern: ^[A-Z]+$")
+    expect(patternWithAlternative({ $ref: "#/$defs/Anything" }, { $defs: { Anything: {} } })).not.toContain("Pattern:")
   })
 
   it("describes nested schema constraints without assuming every variant is an object", () => {

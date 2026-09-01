@@ -161,6 +161,41 @@ const schemaHasType = (rootSchema: object, schema: unknown, typeName: string, de
   return directSchemaTypeMatches(resolved, typeName) || variantSchemaTypeMatches(rootSchema, resolved, typeName, depth)
 }
 
+const directSchemaMayAcceptString = (schema: Record<string, unknown>): boolean => {
+  if (schema.type !== undefined && !directSchemaTypeMatches(schema, "string")) return false
+  if (schema.const !== undefined && typeof schema.const !== "string") return false
+  if (Array.isArray(schema.enum) && !schema.enum.some((literal) => typeof literal === "string")) return false
+  return true
+}
+
+const allOfMayAcceptString = (rootSchema: object, schema: Record<string, unknown>, depth: number): boolean => {
+  const variants = schema.allOf
+  return !Array.isArray(variants) || variants.every((variant) => schemaMayAcceptString(rootSchema, variant, depth + 1))
+}
+
+const unionMayAcceptString = (
+  rootSchema: object,
+  schema: Record<string, unknown>,
+  variantKey: "anyOf" | "oneOf",
+  depth: number
+): boolean => {
+  const variants = schema[variantKey]
+  return !Array.isArray(variants) || variants.some((variant) => schemaMayAcceptString(rootSchema, variant, depth + 1))
+}
+
+const compositionsMayAcceptString = (rootSchema: object, schema: Record<string, unknown>, depth: number): boolean =>
+  allOfMayAcceptString(rootSchema, schema, depth) &&
+  unionMayAcceptString(rootSchema, schema, "anyOf", depth) &&
+  unionMayAcceptString(rootSchema, schema, "oneOf", depth)
+
+const schemaMayAcceptString = (rootSchema: object, schema: unknown, depth = 0): boolean => {
+  if (depth > MAX_SCHEMA_REF_DEPTH || !isRecord(schema)) return false
+  const resolved = resolveLocalRef(rootSchema, schema)
+  if (!isRecord(resolved) || !directSchemaMayAcceptString(resolved)) return false
+  if (resolved !== schema) return schemaMayAcceptString(rootSchema, resolved, depth + 1)
+  return compositionsMayAcceptString(rootSchema, resolved, depth)
+}
+
 export const fieldAcceptsBoolean = (rootSchema: object, field: FieldSpec): boolean =>
   schemaHasType(rootSchema, field.schema, "boolean")
 
@@ -308,7 +343,7 @@ const sharedUnionPatterns = (
   ["anyOf", "oneOf"].flatMap((variantKey) => {
     const variants = schema[variantKey]
     if (!Array.isArray(variants) || variants.length === 0) return []
-    const stringVariants = variants.filter((variant) => schemaHasType(rootSchema, variant, "string", depth + 1))
+    const stringVariants = variants.filter((variant) => schemaMayAcceptString(rootSchema, variant, depth + 1))
     if (stringVariants.length === 0) return []
     return [...intersectSets(stringVariants.map((variant) => collectUniversalPatterns(rootSchema, variant, depth + 1)))]
   })
