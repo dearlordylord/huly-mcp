@@ -152,10 +152,11 @@ dispatch_and_watch_workflow() {
   local branch="$2"
   local previous_run_id
   local run_id
+  local attempt
   previous_run_id="$(latest_dispatched_run_id "$workflow" "$branch")"
 
   gh workflow run "$workflow" --ref "$branch"
-  for _ in $(seq 1 30); do
+  for ((attempt = 0; attempt < 30; attempt++)); do
     run_id="$(latest_dispatched_run_id "$workflow" "$branch")"
     if [[ -n "$run_id" && "$run_id" != "$previous_run_id" ]]; then
       gh run watch "$run_id" --exit-status
