@@ -60,6 +60,9 @@ MAIL_THREAD_CLEANUP_OUTER_ID=""
 MAIL_THREAD_CLEANUP_CHILD_ID=""
 TELEGRAM_CLEANUP_CHANNEL_ID=""
 TELEGRAM_CLEANUP_MESSAGE_ID=""
+ISSUE_AGENT_CLEANUP_ISSUE_ID=""
+ISSUE_AGENT_CLEANUP_PROFILE_ID=""
+ISSUE_AGENT_CLEANUP_PERSON_ID=""
 TM_TASK_TYPE_NAME=""
 TM_STATUS_NAME=""
 WORKFLOW_CLEANED=false
@@ -509,7 +512,39 @@ cleanup_security_administration_artifacts() {
   fi
 }
 
+cleanup_issue_agent_assignee_artifacts() {
+  local cleanup_failed=0
+  if [ -n "$ISSUE_AGENT_CLEANUP_ISSUE_ID" ]; then
+    local issue_json
+    issue_json=$(json_string "$ISSUE_AGENT_CLEANUP_ISSUE_ID")
+    if call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":$issue_json}},\"id\":2}" >/dev/null 2>&1; then
+      ISSUE_AGENT_CLEANUP_ISSUE_ID=""
+    else
+      cleanup_failed=1
+    fi
+  fi
+  if [ -z "$ISSUE_AGENT_CLEANUP_ISSUE_ID" ] && [ -n "$ISSUE_AGENT_CLEANUP_PROFILE_ID" ]; then
+    if pnpm exec tsx scripts/integration-issue-agent-profile.ts \
+      --mode cleanup --profileId "$ISSUE_AGENT_CLEANUP_PROFILE_ID" >/dev/null 2>&1; then
+      ISSUE_AGENT_CLEANUP_PROFILE_ID=""
+    else
+      cleanup_failed=1
+    fi
+  fi
+  if [ -z "$ISSUE_AGENT_CLEANUP_PROFILE_ID" ] && [ -n "$ISSUE_AGENT_CLEANUP_PERSON_ID" ]; then
+    local person_json
+    person_json=$(json_string "$ISSUE_AGENT_CLEANUP_PERSON_ID")
+    if call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" >/dev/null 2>&1; then
+      ISSUE_AGENT_CLEANUP_PERSON_ID=""
+    else
+      cleanup_failed=1
+    fi
+  fi
+  return "$cleanup_failed"
+}
+
 cleanup_all() {
+  cleanup_issue_agent_assignee_artifacts || true
   cleanup_security_administration_artifacts
   cleanup_sequence_administration_artifacts
   cleanup_model_administration_artifacts
@@ -2664,6 +2699,56 @@ if [ $? -eq 0 ]; then
 
   run_test "update_issue($ISSUE_ID)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$ISSUE_ID\",\"title\":\"Updated IntTest\",\"priority\":\"high\"}},\"id\":2}"
+
+  AGENT_ASSIGNEE_TITLE="Integration Agent Profile $RUN_ID"
+  AGENT_ASSIGNEE_TITLE_JSON=$(json_string "$AGENT_ASSIGNEE_TITLE")
+  AGENT_ASSIGNEE_EMAIL="issue-agent-$RUN_ID@example.invalid"
+  AGENT_ASSIGNEE_EMAIL_JSON=$(json_string "$AGENT_ASSIGNEE_EMAIL")
+  run_capture_to_var AGENT_ASSIGNEE_PERSON_TEXT "create_person(for_agent_profile_assignee)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":\"Issue Agent\",\"lastName\":\"$RUN_ID\",\"email\":$AGENT_ASSIGNEE_EMAIL_JSON}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    ISSUE_AGENT_CLEANUP_PERSON_ID=$(printf '%s\n' "$AGENT_ASSIGNEE_PERSON_TEXT" | jq -r '.id // empty')
+    if AGENT_ASSIGNEE_PROFILE_FIXTURE=$(pnpm exec tsx scripts/integration-issue-agent-profile.ts \
+      --mode setup --personId "$ISSUE_AGENT_CLEANUP_PERSON_ID" --title "$AGENT_ASSIGNEE_TITLE"); then
+      ISSUE_AGENT_CLEANUP_PROFILE_ID=$(printf '%s\n' "$AGENT_ASSIGNEE_PROFILE_FIXTURE" | jq -r '.profileId // empty')
+      sleep 2
+      AGENT_ASSIGNEE_ISSUE_TITLE="Agent Assignee Issue $RUN_ID"
+      AGENT_ASSIGNEE_ISSUE_TITLE_JSON=$(json_string "$AGENT_ASSIGNEE_ISSUE_TITLE")
+      run_capture_to_var AGENT_ASSIGNEE_ISSUE_TEXT "create_issue(agent UserProfile title assignee)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"title\":$AGENT_ASSIGNEE_ISSUE_TITLE_JSON,\"assignee\":$AGENT_ASSIGNEE_TITLE_JSON}},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        ISSUE_AGENT_CLEANUP_ISSUE_ID=$(printf '%s\n' "$AGENT_ASSIGNEE_ISSUE_TEXT" | jq -r '.identifier // empty')
+        ISSUE_AGENT_ASSIGNEE_OBJECT_ID=$(printf '%s\n' "$AGENT_ASSIGNEE_ISSUE_TEXT" | jq -r '.issueId // empty')
+        sleep 2
+        run_capture_to_var AGENT_ASSIGNEE_CREATED_GET_TEXT "get_issue(agent UserProfile title assignee)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$ISSUE_AGENT_CLEANUP_ISSUE_ID\"}},\"id\":2}"
+        assert_json_field_equals "create_issue resolves agent UserProfile title to linked Person" \
+          "$AGENT_ASSIGNEE_CREATED_GET_TEXT" ".assigneeRef.id" "$ISSUE_AGENT_CLEANUP_PERSON_ID"
+        wait_for_json_array_contains_to_var AGENT_ASSIGNEE_LIST_TEXT \
+          "list_issues resolves exact agent UserProfile title" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_issues\",\"arguments\":{\"project\":\"$PROJECT\",\"assignee\":$AGENT_ASSIGNEE_TITLE_JSON,\"titleSearch\":$AGENT_ASSIGNEE_ISSUE_TITLE_JSON,\"limit\":10}},\"id\":2}" \
+          "map(.issueId)" "$ISSUE_AGENT_ASSIGNEE_OBJECT_ID"
+        run_test "update_issue(unassign agent UserProfile fixture)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$ISSUE_AGENT_CLEANUP_ISSUE_ID\",\"assignee\":null}},\"id\":2}"
+        run_test "update_issue(agent UserProfile title assignee)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$ISSUE_AGENT_CLEANUP_ISSUE_ID\",\"assignee\":$AGENT_ASSIGNEE_TITLE_JSON}},\"id\":2}"
+        sleep 2
+        run_capture_to_var AGENT_ASSIGNEE_UPDATED_GET_TEXT "get_issue(after agent UserProfile title update)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$ISSUE_AGENT_CLEANUP_ISSUE_ID\"}},\"id\":2}"
+        assert_json_field_equals "update_issue resolves agent UserProfile title to linked Person" \
+          "$AGENT_ASSIGNEE_UPDATED_GET_TEXT" ".assigneeRef.id" "$ISSUE_AGENT_CLEANUP_PERSON_ID"
+      else
+        skip_test "list/update issue by agent UserProfile title" "could not create assigned issue fixture"
+      fi
+    else
+      skip_test "issue assignee agent UserProfile title lifecycle" "could not create UserProfile fixture"
+    fi
+  else
+    skip_test "issue assignee agent UserProfile title lifecycle" "could not create Person fixture"
+  fi
+  if ! cleanup_issue_agent_assignee_artifacts; then
+    fail_test "agent UserProfile assignee fixture cleanup" "cleanup failed; exit trap will retry retained markers"
+  fi
 
   if [ "$TM_TASK_TYPE_READY" = "true" ]; then
     run_capture_to_var TASK_TYPED_ISSUE_TEXT "create_issue(taskType=$TM_TASK_TYPE_NAME)" \
