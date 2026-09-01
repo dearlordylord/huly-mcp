@@ -1,0 +1,76 @@
+name: Prepare Release Evidence
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: prepare-release-evidence-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  evidence:
+    name: Refresh canonical x64 evidence
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build versioned packages
+        run: pnpm build
+
+      - name: Refresh package evidence
+        run: |
+          set -euo pipefail
+
+          evidence_directory="$(mktemp -d)"
+          npm_config_ignore_scripts=true pnpm pack --pack-destination "$evidence_directory"
+          tarball="$(find "$evidence_directory" -maxdepth 1 -type f -name '*.tgz' -print -quit)"
+          version="$(node -p "require('./package.json').version")"
+
+          if [[ -z "$tarball" ]]; then
+            echo "The MCP package archive was not created." >&2
+            exit 1
+          fi
+
+          node scripts/run-bundled.mjs scripts/certify-packed-artifact.ts "$tarball" mcp "$version" --write
+          pnpm update-cli-artifact-size
+
+      - name: Commit canonical evidence
+        run: |
+          set -euo pipefail
+
+          evidence_files=(
+            docs/migrations/effect-4/mcp-artifact-certification.json
+            docs/migrations/effect-4/cli-artifact-size.json
+          )
+          if git diff --quiet -- "${evidence_files[@]}"; then
+            echo "Release artifact evidence is already current."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${evidence_files[@]}"
+          git commit -m "chore: refresh release artifact evidence"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

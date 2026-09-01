@@ -16,7 +16,7 @@ packages' consumer requirement, Node `>=22.19.0`. Users may run the packages on
 newer Node releases; maintainers publish from an exact certified runtime so the
 generated artifacts remain reproducible.
 
-That command versions packages from pending changesets when they exist, computes which package versions are not yet published on npm, builds only those package bundles with `pnpm dlx esbuild` so workspace-native binaries are not required on the host, verifies the bundled versions, publishes to npm with the default `latest` dist-tag, pushes the release commit and git tags, and creates the MCP GitHub release when MCP changed. It fails before changing files if npm auth is not available.
+That command versions packages from pending changesets when they exist and pushes a uniquely named release-candidate branch. GitHub Actions builds that candidate on canonical Linux x64, refreshes version-sensitive MCP and CLI artifact evidence, and runs the complete Package Smoke workflow. Only after Package Smoke passes does the host fast-forward and push `master`, build the packages with host-safe `pnpm dlx esbuild`, publish to npm, push package tags, and create the MCP GitHub release when MCP changed. It fails before changing files if GitHub or npm auth is unavailable.
 
 ## Preflight
 
@@ -49,6 +49,10 @@ The script runs:
 - `changeset version`
 - registry metadata sync
 - release metadata commit
+- temporary release-candidate branch push
+- canonical Linux x64 MCP and CLI artifact-evidence generation in GitHub Actions
+- Package Smoke on the exact versioned and certified release candidate
+- fast-forward of `master` only after Package Smoke passes
 - package publish-plan detection from npm registry versions
 - host-safe bundle build through `pnpm dlx esbuild` for packages that need publishing
 - package bundle version verification
@@ -57,7 +61,7 @@ The script runs:
 - release commit/tag push
 - latest GitHub release creation from the `@firfi/huly-mcp@<version>` package tag when MCP changed
 
-Run `pnpm check-all` and the local Huly integration suites before starting the production release. `pnpm local-release` intentionally does not repeat the full quality gate or live Huly integration tests; those remain explicit pre-release and CI gates. The release command retains only its focused build, version, package, and publishing checks.
+Run `pnpm check-all` and the local Huly integration suites before starting the production release. `pnpm local-release` intentionally does not repeat the full quality gate or live Huly integration tests; those remain explicit pre-release and CI gates. It does require the canonical Package Smoke workflow to pass before publication. The temporary release-candidate branch is deleted after its certified commit is fast-forwarded to `master`; a failed workflow leaves the branch available for diagnosis and a safe rerun.
 
 ## Rerunning After A Failed Release
 

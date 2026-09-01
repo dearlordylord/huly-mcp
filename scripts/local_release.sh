@@ -7,6 +7,8 @@ RELEASE_BRANCH="master"
 CHANGES_DIR=".changeset"
 CHANGES_VERSION="2.30.0"
 ESBUILD_VERSION="0.27.2"
+EVIDENCE_WORKFLOW="prepare-release-evidence.yml"
+PACKAGE_SMOKE_WORKFLOW="package-smoke.yml"
 
 show_dist_tags() {
   local package_name="$1"
@@ -133,6 +135,69 @@ create_github_release_if_needed() {
   gh release create "$release_tag" --generate-notes --latest --verify-tag
 }
 
+latest_dispatched_run_id() {
+  local workflow="$1"
+  local branch="$2"
+
+  gh run list \
+    --workflow "$workflow" \
+    --branch "$branch" \
+    --limit 20 \
+    --json databaseId,event \
+    --jq '[.[] | select(.event == "workflow_dispatch")][0].databaseId // empty'
+}
+
+dispatch_and_watch_workflow() {
+  local workflow="$1"
+  local branch="$2"
+  local previous_run_id
+  local run_id
+  previous_run_id="$(latest_dispatched_run_id "$workflow" "$branch")"
+
+  gh workflow run "$workflow" --ref "$branch"
+  for _ in $(seq 1 30); do
+    run_id="$(latest_dispatched_run_id "$workflow" "$branch")"
+    if [[ -n "$run_id" && "$run_id" != "$previous_run_id" ]]; then
+      gh run watch "$run_id" --exit-status
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "Timed out waiting for $workflow to start on $branch." >&2
+  return 1
+}
+
+prepare_release_candidate() {
+  local mcp_version="$1"
+  local cli_version="$2"
+  local release_commit
+  local release_candidate_branch
+  release_commit="$(git rev-parse --short=12 HEAD)"
+  release_candidate_branch="release-candidate/mcp-${mcp_version}-cli-${cli_version}-${release_commit}"
+
+  if git ls-remote --exit-code --heads origin "$release_candidate_branch" >/dev/null 2>&1; then
+    git fetch origin "$release_candidate_branch"
+    if ! git merge-base --is-ancestor HEAD "origin/$release_candidate_branch"; then
+      echo "Existing release candidate branch $release_candidate_branch is not based on the local release commit." >&2
+      return 1
+    fi
+  else
+    git push origin "HEAD:refs/heads/$release_candidate_branch"
+  fi
+
+  echo "Refreshing canonical x64 package evidence on $release_candidate_branch."
+  dispatch_and_watch_workflow "$EVIDENCE_WORKFLOW" "$release_candidate_branch"
+  git fetch origin "$release_candidate_branch"
+  git merge --ff-only "origin/$release_candidate_branch"
+
+  echo "Running Package Smoke against $release_candidate_branch before publication."
+  dispatch_and_watch_workflow "$PACKAGE_SMOKE_WORKFLOW" "$release_candidate_branch"
+
+  git push origin "$RELEASE_BRANCH"
+  git push origin --delete "$release_candidate_branch"
+}
+
 current_branch="$(git branch --show-current)"
 if [[ "$current_branch" != "$RELEASE_BRANCH" ]]; then
   echo "Refusing production release from branch '$current_branch'; expected '$RELEASE_BRANCH'." >&2
@@ -157,6 +222,7 @@ fi
 # not have node_modules yet, so make the one-command release path self-contained.
 CI=true pnpm install --frozen-lockfile --prod=false
 
+gh auth status >/dev/null
 npm whoami >/dev/null
 show_dist_tags "$MCP_PACKAGE_NAME" false
 show_dist_tags "$CLI_PACKAGE_NAME" true
@@ -197,6 +263,12 @@ else
   fi
 fi
 
+if [[ "$mcp_needs_publish" == "true" || "$cli_needs_publish" == "true" ]]; then
+  prepare_release_candidate "$mcp_package_version" "$cli_package_version"
+else
+  git push origin "$RELEASE_BRANCH"
+fi
+
 if [[ "$mcp_needs_publish" == "true" ]]; then
   build_mcp_package "$mcp_package_version"
 fi
@@ -210,7 +282,6 @@ if [[ "$mcp_needs_publish" == "true" || "$cli_needs_publish" == "true" ]]; then
   npm_config_ignore_scripts=true pnpm dlx "@changesets/cli@$CHANGES_VERSION" publish
 fi
 
-git push origin "$RELEASE_BRANCH"
 release_tags=()
 while IFS= read -r release_tag_at_head; do
   release_tags[${#release_tags[@]}]="$release_tag_at_head"
