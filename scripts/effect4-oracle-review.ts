@@ -130,7 +130,7 @@ const categoryMetadata = (category: ReviewCategory): { readonly issue: string; r
       }
     case "issue-assignee-tool-description":
       return {
-        issue: "#244",
+        issue: "#245",
         rationale:
           "Reviewed agent-facing issue tool descriptions advertising exact agent UserProfile titles as assignee inputs."
       }

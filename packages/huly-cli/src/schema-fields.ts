@@ -171,7 +171,9 @@ const unionStringAcceptance = (acceptances: ReadonlyArray<StringAcceptance>): St
 
 const oneOfStringAcceptance = (acceptances: ReadonlyArray<StringAcceptance>): StringAcceptance => {
   if (acceptances.includes("unknown")) return "unknown"
-  return acceptances.filter((acceptance) => acceptance === "accepts").length === 1 ? "accepts" : "rejects"
+  const acceptingBranches = acceptances.filter((acceptance) => acceptance === "accepts").length
+  if (acceptingBranches === 0) return "rejects"
+  return acceptingBranches === 1 ? "accepts" : "unknown"
 }
 
 const directSchemaStringAcceptance = (schema: Record<string, unknown>): StringAcceptance => {
@@ -384,11 +386,13 @@ const sharedUnionPatterns = (
 const collectUniversalPatterns = (rootSchema: object, schema: unknown, depth = 0): ReadonlySet<string> => {
   if (depth > MAX_SCHEMA_REF_DEPTH || !isRecord(schema)) return new Set()
   const resolved = resolveLocalRef(rootSchema, schema)
-  if (!isRecord(resolved)) return new Set()
+  if (typeof schema.$ref === "string") {
+    return resolved === schema ? new Set() : collectUniversalPatterns(rootSchema, resolved, depth + 1)
+  }
   return new Set([
-    ...directPatterns(resolved),
-    ...allOfPatterns(rootSchema, resolved, depth),
-    ...sharedUnionPatterns(rootSchema, resolved, depth)
+    ...directPatterns(schema),
+    ...allOfPatterns(rootSchema, schema, depth),
+    ...sharedUnionPatterns(rootSchema, schema, depth)
   ])
 }
 

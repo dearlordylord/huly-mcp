@@ -29,7 +29,7 @@ stale categories, duplicate categories, and corpus hash drift.
 | 12,754 | Draft-07 structural dialect | Effect 4 refs, definitions, optional/null unions, refinements, and composition wrappers. All 524 native and 6 proxy schemas compile under strict Ajv Draft-07. |
 | 4,897 | Schema metadata | Authored descriptions restored by the central adapter, including direct-issue assignee support for exact agent UserProfile titles, and obsolete Effect 3 generator-default titles/descriptions removed. |
 | 3,428 | Authored-constraint projection | The same 522 ordered tools remain represented; generated ref/composition paths changed. Manual cross-field constraints remain in the corpus and representative runtime/Ajv agreement passes. |
-| 3 | Direct issue-assignee tool descriptions | Direct issue create, update, and list advertise exact agent UserProfile titles as assignee inputs (#244). |
+| 3 | Direct issue-assignee tool descriptions | Direct issue create, update, and list advertise exact agent UserProfile titles as assignee inputs (#245). |
 | 6 | CLI JSON parse diagnostics | Effect 4 adds deterministic line/column context; code, hint, retryability, and exit status are unchanged. |
 | 4 | CLI help rendering | The Effect 4 CLI renderer intentionally uses concise help and omits patterns that are not shared by every string-capable union branch, while retaining string patterns across nullable alternatives. Route inventory and ordering remain unchanged. |
 

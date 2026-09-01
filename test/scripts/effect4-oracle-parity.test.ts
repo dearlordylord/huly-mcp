@@ -248,7 +248,7 @@ describe("Effect 4 oracle structural parity", () => {
       { category: "draft07-structure", issue: "#225" },
       { category: "schema-metadata", issue: "#225" },
       { category: "authored-constraints", issue: "#225" },
-      { category: "issue-assignee-tool-description", issue: "#244" },
+      { category: "issue-assignee-tool-description", issue: "#245" },
       { category: "cli-json-diagnostic", issue: "#228" },
       { category: "cli-help", issue: "#228" }
     ])

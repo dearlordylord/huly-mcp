@@ -254,6 +254,14 @@ describe("CLI catalog", () => {
     expect(patternWithAlternative({ allOf: [{ type: "null" }] })).toContain("Pattern: ^[A-Z]+$")
     expect(patternWithAlternative({ oneOf: [{}] })).not.toContain("Pattern:")
     expect(patternWithAlternative({ oneOf: [{ type: "null" }] })).toContain("Pattern: ^[A-Z]+$")
+    expect(
+      patternWithAlternative({
+        oneOf: [
+          { type: "string", pattern: "^[a-z]+$" },
+          { type: "string", pattern: "^[0-9]+$" }
+        ]
+      })
+    ).not.toContain("Pattern:")
     expect(patternWithAlternative({ $ref: "#/$defs/Anything" }, { $defs: { Anything: {} } })).not.toContain("Pattern:")
     expect(patternWithAlternative({ $ref: "#/$defs/Missing" })).not.toContain("Pattern:")
     expect(patternWithAlternative({ $ref: "#/$defs/Nothing" }, { $defs: { Nothing: false } })).toContain(
@@ -278,6 +286,40 @@ describe("CLI catalog", () => {
             Level8: { $ref: "#/$defs/Level9" },
             Level9: false
           }
+        }
+      )
+    ).not.toContain("Pattern:")
+  })
+
+  it("follows local pattern references only while their resolution is certain", () => {
+    const referencedPattern = (fieldSchema: unknown, definitions: object) =>
+      fieldOptionDescription({ $defs: definitions }, { fieldName: "code", schema: fieldSchema })
+
+    expect(
+      referencedPattern({ $ref: "#/$defs/Patterned" }, { Patterned: { type: "string", pattern: "^[A-Z]+$" } })
+    ).toContain("Pattern: ^[A-Z]+$")
+    expect(
+      referencedPattern(
+        { $ref: "#/$defs/First" },
+        { First: { $ref: "#/$defs/Second" }, Second: { type: "string", pattern: "^[A-Z]+$" } }
+      )
+    ).toContain("Pattern: ^[A-Z]+$")
+    expect(referencedPattern({ $ref: "#/$defs/Missing" }, {})).not.toContain("Pattern:")
+    expect(referencedPattern({ $ref: "#/$defs/Loop" }, { Loop: { $ref: "#/$defs/Loop" } })).not.toContain("Pattern:")
+    expect(
+      referencedPattern(
+        { $ref: "#/$defs/Level0" },
+        {
+          Level0: { $ref: "#/$defs/Level1" },
+          Level1: { $ref: "#/$defs/Level2" },
+          Level2: { $ref: "#/$defs/Level3" },
+          Level3: { $ref: "#/$defs/Level4" },
+          Level4: { $ref: "#/$defs/Level5" },
+          Level5: { $ref: "#/$defs/Level6" },
+          Level6: { $ref: "#/$defs/Level7" },
+          Level7: { $ref: "#/$defs/Level8" },
+          Level8: { $ref: "#/$defs/Level9" },
+          Level9: { type: "string", pattern: "^[A-Z]+$" }
         }
       )
     ).not.toContain("Pattern:")
