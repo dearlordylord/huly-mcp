@@ -1,6 +1,6 @@
 {
   "name": "@firfi/huly-cli",
-  "version": "0.48.2",
+  "version": "0.48.3",
   "description": "Feature-complete CLI for self-hosted Huly project management, issue tracking, automation, CI, and AI agents with 500+ native commands",
   "type": "module",
   "main": "./dist/index.cjs",

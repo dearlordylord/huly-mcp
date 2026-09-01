@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.50.0
+
+### Minor Changes
+
+- 1136846: Allow direct issue create, update, and list assignee inputs to resolve exact agent UserProfile titles to their linked Person. Correct generated CLI pattern guidance so constraints from only one union branch are not presented as universal.
+
 ## 0.49.7
 
 ### Patch Changes
