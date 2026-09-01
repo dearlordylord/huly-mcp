@@ -254,6 +254,9 @@ describe("CLI catalog", () => {
     expect(patternWithAlternative({ allOf: [{ type: "null" }] })).toContain("Pattern: ^[A-Z]+$")
     expect(patternWithAlternative({ oneOf: [{}] })).not.toContain("Pattern:")
     expect(patternWithAlternative({ oneOf: [{ type: "null" }] })).toContain("Pattern: ^[A-Z]+$")
+    expect(patternWithAlternative({ oneOf: [{ $ref: "#/$defs/Missing" }] })).not.toContain("Pattern:")
+    expect(patternWithAlternative({ anyOf: [false, { $ref: "#/$defs/Missing" }] })).not.toContain("Pattern:")
+    expect(patternWithAlternative({ anyOf: [false, { type: "null" }] })).toContain("Pattern: ^[A-Z]+$")
     expect(
       patternWithAlternative({
         oneOf: [

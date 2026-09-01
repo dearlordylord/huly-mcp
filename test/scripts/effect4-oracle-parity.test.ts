@@ -313,6 +313,17 @@ describe("Effect 4 oracle structural parity", () => {
         reorderedCandidate
       )
     ).toBe("schema-metadata")
+
+    const issueToolWithoutAssignee = parseCandidateToolIdentities(
+      Schema.decodeUnknownSync(Schema.Array(OracleJsonRpcResponseSchema))([
+        {
+          id: 2,
+          jsonrpc: "2.0",
+          result: { tools: [{ inputSchema: { properties: { unrelated: { type: "string" } } }, name: "list_issues" }] }
+        }
+      ])
+    )
+    expect(oracleDeltaReviewCategory(inputDescriptionDelta(0), issueToolWithoutAssignee)).toBe("schema-metadata")
   })
 
   it("leaves malformed candidate tool entries unclassified", () => {
