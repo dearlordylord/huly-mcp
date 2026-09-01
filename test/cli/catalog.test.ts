@@ -206,6 +206,32 @@ describe("CLI catalog", () => {
 
     expect(fieldOptionDescription(createIssue.inputSchema, priority)).toContain('Allowed values: "urgent"')
     expect(fieldOptionDescription(setConversationClosed.inputSchema, channel)).toContain("{ channel } | { dm }")
+
+    const assignee = collectFieldSpecs(createIssue.inputSchema).get("assignee")
+    if (assignee === undefined) throw new Error("Missing create issue assignee help fixture.")
+    expect(fieldOptionDescription(createIssue.inputSchema, assignee)).not.toContain("Pattern:")
+  })
+
+  it("only presents patterns that apply to every scalar union branch", () => {
+    const partlyConstrained = fieldOptionDescription(
+      {},
+      { fieldName: "assignee", schema: { anyOf: [{ type: "string", pattern: "^[^@]+@[^@]+$" }, { type: "string" }] } }
+    )
+    const universallyConstrained = fieldOptionDescription(
+      {},
+      {
+        fieldName: "code",
+        schema: {
+          anyOf: [
+            { type: "string", pattern: "^[A-Z]+$" },
+            { type: "string", pattern: "^[A-Z]+$", description: "Alias" }
+          ]
+        }
+      }
+    )
+
+    expect(partlyConstrained).not.toContain("Pattern:")
+    expect(universallyConstrained).toContain("Pattern: ^[A-Z]+$")
   })
 
   it("describes nested schema constraints without assuming every variant is an object", () => {

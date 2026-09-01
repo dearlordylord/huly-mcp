@@ -10,7 +10,7 @@ the baseline was not regenerated.
 - Effect 3 baseline SHA-256:
   `02bb5e4bf2fdb0e4dd30f980810bd0fe70d5c91482c309b4621264c373d6adac`
 - Reviewed Effect 4 corpus SHA-256:
-  `04a8f1d9cec96ac3e745ef7eb9724f60eaf05900638f5548870decaa027c7d46`
+  `9c6249928b1ad74f1be091245dd3591dcbe104bed1147a08ad2ba8d1ebe8823c`
 - Exact structural deltas: 21,092
 - Added: 8,837
 - Changed: 2,152
@@ -31,7 +31,7 @@ stale categories, duplicate categories, and corpus hash drift.
 | 3,428 | Authored-constraint projection | The same 522 ordered tools remain represented; generated ref/composition paths changed. Manual cross-field constraints remain in the corpus and representative runtime/Ajv agreement passes. |
 | 3 | Direct issue-assignee tool descriptions | Direct issue create, update, and list advertise exact agent UserProfile titles as assignee inputs (#244). |
 | 6 | CLI JSON parse diagnostics | Effect 4 adds deterministic line/column context; code, hint, retryability, and exit status are unchanged. |
-| 4 | CLI help rendering | The Effect 4 CLI renderer intentionally uses concise help. Route inventory and ordering remain unchanged. |
+| 4 | CLI help rendering | The Effect 4 CLI renderer intentionally uses concise help and omits branch-only patterns from union fields. Route inventory and ordering remain unchanged. |
 
 The comparison deliberately retains public array order, descriptions, titles,
 refs, required fields, enums, patterns, bounds, compositions, help, and error

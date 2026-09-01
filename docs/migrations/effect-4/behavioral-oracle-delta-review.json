@@ -39,11 +39,11 @@
     {
       "category": "cli-help",
       "count": 4,
-      "deltaSetSha256": "25ea80cc5a4c7f5a4d71a95b800bedb0393c542af39ce97d094673546073e9b1",
+      "deltaSetSha256": "1202039ed0cf9902be71ccf58d59450ae7dfed6537b5ee22de1e850959220e90",
       "issue": "#228",
       "rationale": "Reviewed concise Effect 4 CLI help rendering; route inventory and order are unchanged."
     }
   ],
   "formatVersion": 1,
-  "reviewedCurrentSha256": "04a8f1d9cec96ac3e745ef7eb9724f60eaf05900638f5548870decaa027c7d46"
+  "reviewedCurrentSha256": "9c6249928b1ad74f1be091245dd3591dcbe104bed1147a08ad2ba8d1ebe8823c"
 }

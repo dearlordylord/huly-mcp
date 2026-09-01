@@ -4,7 +4,7 @@ import { Schema } from "effect"
 
 import { canonicalJson } from "./effect4-oracle-canonical.js"
 import { oracleDeltaIdentity, type OracleDelta, OracleDeltaSchema } from "./effect4-oracle-delta.js"
-import type { BehavioralOracle } from "./effect4-oracle-schema.js"
+import { BehavioralOracleSchema, type BehavioralOracle, type OracleJsonRpcResponse } from "./effect4-oracle-schema.js"
 import { ToolName } from "../src/mcp/tools/registry.js"
 
 const Sha256Schema = Schema.String.pipe(Schema.check(Schema.isPattern(/^[0-9a-f]{64}$/u)))
@@ -39,20 +39,39 @@ export type OracleDeltaReview = Schema.Schema.Type<typeof OracleDeltaReviewSchem
 
 const sha256 = (value: string): string => crypto.createHash("sha256").update(value).digest("hex")
 
-const ISSUE_ASSIGNEE_TOOL_DESCRIPTION_PATHS = new Set([
-  "/bundledProcesses/stdio/native/1/result/tools/10/description",
-  "/bundledProcesses/stdio/native/1/result/tools/12/description",
-  "/bundledProcesses/stdio/native/1/result/tools/13/description"
-])
+const ISSUE_ASSIGNEE_TOOL_NAMES = new Set(["list_issues", "create_issue", "update_issue"])
+const TOOL_DESCRIPTION_PATH = /^\/bundledProcesses\/stdio\/native\/(\d+)\/result\/tools\/(\d+)\/description$/u
 
-export const oracleDeltaReviewCategory = (delta: OracleDelta): ReviewCategory | undefined => {
+const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+const candidateToolName = (
+  path: string,
+  candidateResponses: ReadonlyArray<OracleJsonRpcResponse>
+): string | undefined => {
+  const match = TOOL_DESCRIPTION_PATH.exec(path)
+  if (match?.[1] === undefined || match[2] === undefined) return undefined
+  const response = candidateResponses[Number(match[1])]
+  if (response === undefined || !isRecord(response.result)) return undefined
+  const tools = response.result.tools
+  if (!Array.isArray(tools)) return undefined
+  const tool = tools[Number(match[2])]
+  return isRecord(tool) && typeof tool.name === "string" ? tool.name : undefined
+}
+
+export const oracleDeltaReviewCategory = (
+  delta: OracleDelta,
+  candidateResponses: ReadonlyArray<OracleJsonRpcResponse> = []
+): ReviewCategory | undefined => {
   if (delta.path.startsWith("/registry/authoredConstraints/")) return "authored-constraints"
   if (delta.path.includes("/inputSchema/") || delta.path.includes("/outputSchema/")) {
     return delta.path.endsWith("/description") || delta.path.endsWith("/title")
       ? "schema-metadata"
       : "draft07-structure"
   }
-  if (ISSUE_ASSIGNEE_TOOL_DESCRIPTION_PATHS.has(delta.path)) return "issue-assignee-tool-description"
+  if (ISSUE_ASSIGNEE_TOOL_NAMES.has(candidateToolName(delta.path, candidateResponses) ?? "")) {
+    return "issue-assignee-tool-description"
+  }
   if (delta.path.includes("/help/") || delta.path.endsWith("Help/stdout")) return "cli-help"
   if (delta.path.includes("/cli/") && delta.path.endsWith("stderr")) return "cli-json-diagnostic"
   if (delta.path.startsWith("/cli/errors/") && delta.path.endsWith("/message")) return "cli-json-diagnostic"
@@ -112,7 +131,8 @@ const categoryMetadata = (category: ReviewCategory): { readonly issue: string; r
 }
 
 const categorizeOracleDeltas = (
-  deltas: ReadonlyArray<OracleDelta>
+  deltas: ReadonlyArray<OracleDelta>,
+  candidateResponses: ReadonlyArray<OracleJsonRpcResponse> = []
 ): {
   readonly categorized: Map<ReviewCategory, Array<OracleDelta>>
   readonly unclassified: ReadonlyArray<OracleDelta>
@@ -120,7 +140,7 @@ const categorizeOracleDeltas = (
   const categorized = new Map<ReviewCategory, Array<OracleDelta>>()
   const unclassified: Array<OracleDelta> = []
   for (const delta of deltas) {
-    const category = oracleDeltaReviewCategory(delta)
+    const category = oracleDeltaReviewCategory(delta, candidateResponses)
     if (category === undefined) {
       unclassified.push(delta)
       continue
@@ -135,9 +155,10 @@ const categorizeOracleDeltas = (
 export const createOracleDeltaReview = (
   baselineJson: string,
   currentJson: string,
-  deltas: ReadonlyArray<OracleDelta>
+  deltas: ReadonlyArray<OracleDelta>,
+  candidateResponses: ReadonlyArray<OracleJsonRpcResponse> = []
 ): OracleDeltaReview => {
-  const { categorized, unclassified } = categorizeOracleDeltas(deltas)
+  const { categorized, unclassified } = categorizeOracleDeltas(deltas, candidateResponses)
   if (unclassified.length > 0) throw new Error("Cannot review unclassified oracle deltas.")
   return Schema.decodeUnknownSync(OracleDeltaReviewSchema)({
     formatVersion: 1,
@@ -180,7 +201,8 @@ export const createOracleDeltaAuditReport = (
   current: BehavioralOracle,
   deltas: ReadonlyArray<OracleDelta>
 ): OracleDeltaAuditReport => {
-  const { categorized, unclassified } = categorizeOracleDeltas(deltas)
+  const candidateResponses = current.bundledProcesses.stdio.native
+  const { categorized, unclassified } = categorizeOracleDeltas(deltas, candidateResponses)
   if (unclassified.length > 0) throw new Error("Cannot report unclassified oracle deltas.")
   const byTool = new Map<string, Array<OracleDelta>>()
   for (const delta of categorized.get("authored-constraints") ?? []) {
@@ -195,7 +217,7 @@ export const createOracleDeltaAuditReport = (
     byTool.set(currentName, entries)
   }
   return Schema.decodeUnknownSync(OracleDeltaAuditReportSchema)({
-    certificate: createOracleDeltaReview(baselineJson, currentJson, deltas),
+    certificate: createOracleDeltaReview(baselineJson, currentJson, deltas, candidateResponses),
     categories: REVIEW_CATEGORY_ORDER.flatMap((category) => {
       const entries = categorized.get(category) ?? []
       return entries.length === 0 ? [] : [{ category, deltas: entries }]
@@ -222,7 +244,9 @@ export const verifyReviewedOracleDeltas = (
   )
   if (duplicateCategories.length > 0) throw new Error("Oracle delta review contains duplicate categories.")
 
-  const { categorized, unclassified } = categorizeOracleDeltas(deltas)
+  const candidate = Schema.decodeUnknownOption(Schema.fromJsonString(BehavioralOracleSchema))(currentJson)
+  const candidateResponses = candidate._tag === "Some" ? candidate.value.bundledProcesses.stdio.native : []
+  const { categorized, unclassified } = categorizeOracleDeltas(deltas, candidateResponses)
   if (unclassified.length > 0) {
     throw new Error(`Oracle comparison contains ${unclassified.length} unclassified deltas.`)
   }

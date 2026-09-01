@@ -214,7 +214,6 @@ const fieldSchemaDescription = (rootSchema: object, field: FieldSpec): string | 
 interface FieldConstraints {
   readonly defaults: Set<string>
   readonly literals: Set<string>
-  readonly patterns: Set<string>
   readonly shapes: Set<string>
   readonly types: Set<string>
 }
@@ -222,7 +221,6 @@ interface FieldConstraints {
 const emptyFieldConstraints = (): FieldConstraints => ({
   defaults: new Set(),
   literals: new Set(),
-  patterns: new Set(),
   shapes: new Set(),
   types: new Set()
 })
@@ -246,7 +244,6 @@ const addLiteralConstraints = (schema: Record<string, unknown>, constraints: Fie
 }
 
 const addScalarConstraints = (schema: Record<string, unknown>, constraints: FieldConstraints): void => {
-  if (typeof schema.pattern === "string") constraints.patterns.add(schema.pattern)
   const encodedDefault = encodedLiteral(schema.default)
   if (encodedDefault !== undefined) constraints.defaults.add(encodedDefault)
 }
@@ -295,13 +292,43 @@ const collectFieldConstraints = (
 const joinedConstraint = (label: string, values: ReadonlySet<string>): string | undefined =>
   values.size === 0 ? undefined : `${label}: ${[...values].join(" | ")}.`
 
+const directPatterns = (schema: Record<string, unknown>): ReadonlyArray<string> =>
+  typeof schema.pattern === "string" ? [schema.pattern] : []
+
+const allOfPatterns = (rootSchema: object, schema: Record<string, unknown>, depth: number): ReadonlyArray<string> =>
+  (Array.isArray(schema.allOf) ? schema.allOf : []).flatMap((variant) => [
+    ...collectUniversalPatterns(rootSchema, variant, depth + 1)
+  ])
+
+const sharedUnionPatterns = (
+  rootSchema: object,
+  schema: Record<string, unknown>,
+  depth: number
+): ReadonlyArray<string> =>
+  ["anyOf", "oneOf"].flatMap((variantKey) => {
+    const variants = schema[variantKey]
+    if (!Array.isArray(variants) || variants.length === 0) return []
+    return [...intersectSets(variants.map((variant) => collectUniversalPatterns(rootSchema, variant, depth + 1)))]
+  })
+
+const collectUniversalPatterns = (rootSchema: object, schema: unknown, depth = 0): ReadonlySet<string> => {
+  if (depth > MAX_SCHEMA_REF_DEPTH || !isRecord(schema)) return new Set()
+  const resolved = resolveLocalRef(rootSchema, schema)
+  if (!isRecord(resolved)) return new Set()
+  return new Set([
+    ...directPatterns(resolved),
+    ...allOfPatterns(rootSchema, resolved, depth),
+    ...sharedUnionPatterns(rootSchema, resolved, depth)
+  ])
+}
+
 export const fieldOptionDescription = (rootSchema: object, field: FieldSpec): string => {
   const description = fieldSchemaDescription(rootSchema, field)
   const constraints = emptyFieldConstraints()
   collectFieldConstraints(rootSchema, field.schema, constraints)
   const allowed = joinedConstraint("Allowed values", constraints.literals)
   const types = joinedConstraint("Type", constraints.types)
-  const patterns = joinedConstraint("Pattern", constraints.patterns)
+  const patterns = joinedConstraint("Pattern", collectUniversalPatterns(rootSchema, field.schema))
   const shapes = joinedConstraint("JSON shape alternatives", constraints.shapes)
   const defaults = joinedConstraint("Default", constraints.defaults)
   const unionAlternatives = unionAlternativesDescription(rootSchema, field.fieldName)

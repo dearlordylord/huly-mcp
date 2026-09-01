@@ -165,83 +165,82 @@ const uploadCreateIssueDescription = (
  * - Status (optional, uses project default)
  * - Assignee (optional, by email, Person name, or exact agent UserProfile title)
  */
-const createIssueWithAssignee = <AssigneeError>(
+const createIssueWithAssignee = Effect.fn("Issues.createWithAssignee")(function* <AssigneeError>(
   params: CreateIssueParams,
   assigneeResolution: (
     client: HulyClient["Service"],
     params: CreateIssueParams
   ) => Effect.Effect<Ref<Person> | null, AssigneeError>
-) =>
-  Effect.gen(function* () {
-    const { client, defaultStatusId, project, projectType, statuses } = yield* findProjectWithStatuses(params.project)
+) {
+  const { client, defaultStatusId, project, projectType, statuses } = yield* findProjectWithStatuses(params.project)
 
-    const issueId: Ref<HulyIssue> = generateId()
+  const issueId: Ref<HulyIssue> = generateId()
 
-    const workflow = { projectType, statuses, defaultStatusId }
-    const taskTypeWorkflow = yield* resolveCreateIssueTaskType(client, project, workflow, params)
-    const statusRef = yield* resolveCreateIssueStatus(workflow, taskTypeWorkflow, params)
-    const assigneeRef = yield* assigneeResolution(client, params)
-    const renderedDescription = yield* renderCreateIssueDescription(params)
-    const { attachedTo, attachedToClass, collection, parents } = yield* resolveCreateIssueParent(
-      client,
-      project,
-      params.parentIssue
-    )
+  const workflow = { projectType, statuses, defaultStatusId }
+  const taskTypeWorkflow = yield* resolveCreateIssueTaskType(client, project, workflow, params)
+  const statusRef = yield* resolveCreateIssueStatus(workflow, taskTypeWorkflow, params)
+  const assigneeRef = yield* assigneeResolution(client, params)
+  const renderedDescription = yield* renderCreateIssueDescription(params)
+  const { attachedTo, attachedToClass, collection, parents } = yield* resolveCreateIssueParent(
+    client,
+    project,
+    params.parentIssue
+  )
 
-    const incOps: DocumentUpdate<HulyProject> = { $inc: { sequence: 1 } }
-    const incResult = yield* client.updateDoc(
-      tracker.class.Project,
-      toRef<Space>("core:space:Space"),
-      project._id,
-      incOps,
-      true
-    )
-    const sequence = yield* requireUpdatedSequence(incResult, params.project)
+  const incOps: DocumentUpdate<HulyProject> = { $inc: { sequence: 1 } }
+  const incResult = yield* client.updateDoc(
+    tracker.class.Project,
+    toRef<Space>("core:space:Space"),
+    project._id,
+    incOps,
+    true
+  )
+  const sequence = yield* requireUpdatedSequence(incResult, params.project)
 
-    const lastIssue = yield* client.findOne<HulyIssue>(
-      tracker.class.Issue,
-      hulyQuery<HulyIssue>({ space: project._id }),
-      { sort: { rank: SortingOrder.Descending } }
-    )
-    const rank = makeRank(lastIssue?.rank, undefined)
+  const lastIssue = yield* client.findOne<HulyIssue>(
+    tracker.class.Issue,
+    hulyQuery<HulyIssue>({ space: project._id }),
+    { sort: { rank: SortingOrder.Descending } }
+  )
+  const rank = makeRank(lastIssue?.rank, undefined)
 
-    const descriptionMarkupRef = yield* uploadCreateIssueDescription(client, issueId, renderedDescription)
+  const descriptionMarkupRef = yield* uploadCreateIssueDescription(client, issueId, renderedDescription)
 
-    const priority = stringToPriority(params.priority ?? DEFAULT_ISSUE_PRIORITY)
-    const identifier = `${project.identifier}-${sequence}`
+  const priority = stringToPriority(params.priority ?? DEFAULT_ISSUE_PRIORITY)
+  const identifier = `${project.identifier}-${sequence}`
 
-    const issueData: AttachedData<HulyIssue> = {
-      title: params.title,
-      description: descriptionMarkupRef,
-      status: statusRef,
-      number: sequence,
-      kind: taskTypeWorkflow?.taskType._id ?? tracker.taskTypes.Issue,
-      identifier,
-      priority,
-      assignee: assigneeRef,
-      component: null,
-      estimation: params.estimation ?? 0,
-      remainingTime: 0,
-      reportedTime: 0,
-      reports: 0,
-      subIssues: 0,
-      parents,
-      childInfo: [],
-      dueDate: params.dueDate ?? null,
-      rank
-    }
-    yield* client.addCollection(
-      tracker.class.Issue,
-      project._id,
-      attachedTo,
-      attachedToClass,
-      collection,
-      issueData,
-      issueId
-    )
+  const issueData: AttachedData<HulyIssue> = {
+    title: params.title,
+    description: descriptionMarkupRef,
+    status: statusRef,
+    number: sequence,
+    kind: taskTypeWorkflow?.taskType._id ?? tracker.taskTypes.Issue,
+    identifier,
+    priority,
+    assignee: assigneeRef,
+    component: null,
+    estimation: params.estimation ?? 0,
+    remainingTime: 0,
+    reportedTime: 0,
+    reports: 0,
+    subIssues: 0,
+    parents,
+    childInfo: [],
+    dueDate: params.dueDate ?? null,
+    rank
+  }
+  yield* client.addCollection(
+    tracker.class.Issue,
+    project._id,
+    attachedTo,
+    attachedToClass,
+    collection,
+    issueData,
+    issueId
+  )
 
-    return { identifier: IssueIdentifier.make(identifier), issueId: IssueId.make(issueId) }
-  })
+  return { identifier: IssueIdentifier.make(identifier), issueId: IssueId.make(issueId) }
+})
 
 export const createIssue = (
   params: CreateIssueParams
