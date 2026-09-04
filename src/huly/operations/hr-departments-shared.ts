@@ -102,9 +102,16 @@ export const resolveDepartmentFromCatalog = (
   identifier: DepartmentIdentifier
 ): Effect.Effect<HulyDepartment, DepartmentNotFoundError | DepartmentIdentifierAmbiguousError> => {
   const byId = catalog.byId.get(toRef<HulyDepartment>(identifier))
-  if (byId !== undefined && !isHead(byId)) return Effect.succeed(byId)
   const normalized = identifier.trim().replaceAll(/\s*\/\s*/g, "/")
-  const matches = catalog.departments.filter((department) => catalog.pathById.get(department._id) === normalized)
+  const pathMatches = catalog.departments.filter((department) => catalog.pathById.get(department._id) === normalized)
+  const matches = [
+    ...new Map(
+      [...(byId === undefined || isHead(byId) ? [] : [byId]), ...pathMatches].map((department) => [
+        department._id,
+        department
+      ])
+    ).values()
+  ]
   if (isSingle(matches)) return Effect.succeed(matches[0])
   if (matches.length > 1) {
     return Effect.fail(new DepartmentIdentifierAmbiguousError({ identifier, matches: Count.make(matches.length) }))

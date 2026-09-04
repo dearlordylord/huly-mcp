@@ -60,6 +60,20 @@ describe("HR department hierarchy", () => {
     expect(Effect.runSync(resolveDepartmentFromCatalog(catalog, DepartmentIdentifier.make("Design")))).toBe(duplicate)
   })
 
+  it("rejects a locator matching one department ID and another department path", () => {
+    const idCollision = department("Design", "Operations", hr.ids.Head)
+    const collisionCatalog: DepartmentCatalog = {
+      departments: [...catalog.departments, idCollision],
+      byId: new Map([...catalog.byId, [idCollision._id, idCollision]]),
+      pathById: new Map([...catalog.pathById, [idCollision._id, DepartmentPath.make("Operations")]])
+    }
+    const error = Effect.runSync(
+      Effect.flip(resolveDepartmentFromCatalog(collisionCatalog, DepartmentIdentifier.make("Design")))
+    )
+    expect(error._tag).toBe("DepartmentIdentifierAmbiguousError")
+    if (error._tag === "DepartmentIdentifierAmbiguousError") expect(error.matches).toBe(2)
+  })
+
   it("returns every descendant once for destructive impact", () => {
     expect(descendantsOf(catalog, root).map((item) => item._id)).toEqual(["child", "nested"])
   })

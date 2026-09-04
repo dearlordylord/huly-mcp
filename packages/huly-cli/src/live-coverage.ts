@@ -101,7 +101,7 @@ export const CLI_LIVE_COVERAGE_CASES: ReadonlyArray<CliLiveCoverageCase> = [
   },
   {
     id: "hr-department-lifecycle",
-    tools: ["create_department", "update_department", "assign_staff_department", "delete_department"],
+    tools: ["get_department", "create_department", "update_department", "assign_staff_department", "delete_department"],
     behaviors: ["structured-json-input"],
     risks: ["lifecycle"]
   },
