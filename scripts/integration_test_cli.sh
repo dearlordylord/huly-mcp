@@ -42,6 +42,9 @@ HR_STAFF_ORIGINAL_DEPARTMENT=""
 HR_STAFF_NEEDS_RESTORE=""
 HR_REQUEST_ID=""
 FUNNEL_ID=""
+PERSON_ADMIN_ID=""
+PERSON_ADMIN_COMMENT_ID=""
+PERSON_ADMIN_ATTACHMENT_ID=""
 
 cleanup() {
   set +e
@@ -52,6 +55,17 @@ cleanup() {
       && grep -Fq -- "not found" "$HR_REQUEST_CLEANUP_STDERR"; then
       HR_REQUEST_ID=""
     fi
+  fi
+  if [[ -n "$PERSON_ADMIN_ATTACHMENT_ID" && -n "$PERSON_ADMIN_ID" ]]; then
+    "${CLI[@]}" contacts persons attachments delete --person "{\"id\":\"$PERSON_ADMIN_ID\"}" \
+      --attachment-id "$PERSON_ADMIN_ATTACHMENT_ID" --yes --json >/dev/null 2>&1
+  fi
+  if [[ -n "$PERSON_ADMIN_COMMENT_ID" && -n "$PERSON_ADMIN_ID" ]]; then
+    "${CLI[@]}" contacts persons comments delete --person "{\"id\":\"$PERSON_ADMIN_ID\"}" \
+      --comment-id "$PERSON_ADMIN_COMMENT_ID" --yes --json >/dev/null 2>&1
+  fi
+  if [[ -n "$PERSON_ADMIN_ID" ]]; then
+    "${CLI[@]}" contacts persons delete "$PERSON_ADMIN_ID" --yes --json >/dev/null 2>&1
   fi
   if [[ -n "$FUNNEL_ID" ]]; then
     if "${CLI[@]}" leads funnels archive "$FUNNEL_ID" --yes --json >/dev/null 2>&1; then
@@ -511,6 +525,48 @@ assert_json "add_attachment returns attachment id" "$RAW_ATTACHMENT_JSON" \
 cli_live_case_end "raw-upload"
 cover_cli_json "delete_attachment" "generic attachment cleanup" attachments delete "$ATTACHMENT_ID" --yes
 ATTACHMENT_ID=""
+
+cli_live_case_begin "person-administration-lifecycle"
+capture_cli_json "create_person" "person administration fixture" PERSON_ADMIN_JSON \
+  contacts persons create "CLI-$RUN_ID" Person --email "cli-person-$RUN_ID@example.test"
+PERSON_ADMIN_ID="$(json_value "$PERSON_ADMIN_JSON" '.id')"
+PERSON_ADMIN_TARGET="{\"id\":\"$PERSON_ADMIN_ID\"}"
+cover_cli_json "get_person_administration" "person administration read" \
+  contacts persons administration get --person "$PERSON_ADMIN_TARGET"
+cover_cli_json "list_social_identity_providers" "person identity providers" \
+  contacts persons identities providers
+cover_cli_failure "repair_person_social_identities" "unlinked person repair refusal" "not linked to an account personUuid" \
+  contacts persons identities repair --person "$PERSON_ADMIN_TARGET" --yes
+capture_cli_json "add_person_comment" "person comment add" PERSON_ADMIN_COMMENT_JSON \
+  contacts persons comments add --person "$PERSON_ADMIN_TARGET" --body "CLI person note $RUN_ID"
+PERSON_ADMIN_COMMENT_ID="$(json_value "$PERSON_ADMIN_COMMENT_JSON" '.commentId')"
+cover_cli_json "list_person_comments" "person comments list" \
+  contacts persons comments list --person "$PERSON_ADMIN_TARGET"
+cover_cli_json "update_person_comment" "person comment update" \
+  contacts persons comments update --person "$PERSON_ADMIN_TARGET" --comment-id "$PERSON_ADMIN_COMMENT_ID" \
+    --body "CLI person note updated $RUN_ID"
+printf 'person attachment %s\n' "$RUN_ID" >"$TEST_TMPDIR/person-attachment.txt"
+capture_cli_json "add_person_attachment" "person attachment add" PERSON_ADMIN_ATTACHMENT_JSON \
+  contacts persons attachments add --person "$PERSON_ADMIN_TARGET" --filename "person-$RUN_ID.txt" \
+    --content-type text/plain --data-base64-file "$TEST_TMPDIR/person-attachment.txt"
+PERSON_ADMIN_ATTACHMENT_ID="$(json_value "$PERSON_ADMIN_ATTACHMENT_JSON" '.attachmentId')"
+cover_cli_json "list_person_attachments" "person attachments list" \
+  contacts persons attachments list --person "$PERSON_ADMIN_TARGET"
+cover_cli_json "get_person_attachment" "person attachment get" \
+  contacts persons attachments get --person "$PERSON_ADMIN_TARGET" --attachment-id "$PERSON_ADMIN_ATTACHMENT_ID"
+cover_cli_json "update_person_attachment" "person attachment update" \
+  contacts persons attachments update --person "$PERSON_ADMIN_TARGET" \
+    --attachment-id "$PERSON_ADMIN_ATTACHMENT_ID" --pinned true
+cover_cli_json "delete_person_attachment" "person attachment delete" \
+  contacts persons attachments delete --person "$PERSON_ADMIN_TARGET" \
+    --attachment-id "$PERSON_ADMIN_ATTACHMENT_ID" --yes
+PERSON_ADMIN_ATTACHMENT_ID=""
+cover_cli_json "delete_person_comment" "person comment delete" \
+  contacts persons comments delete --person "$PERSON_ADMIN_TARGET" --comment-id "$PERSON_ADMIN_COMMENT_ID" --yes
+PERSON_ADMIN_COMMENT_ID=""
+cover_cli_json "delete_person" "person administration cleanup" contacts persons delete "$PERSON_ADMIN_ID" --yes
+PERSON_ADMIN_ID=""
+cli_live_case_end "person-administration-lifecycle"
 
 printf '{"nodes":[{"id":"%s"}]}\n' "$RUN_ID" >"$TEST_TMPDIR/drawing.json"
 cli_live_case_begin "nullable-drawing-lifecycle"

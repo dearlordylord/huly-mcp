@@ -1,5 +1,6 @@
 import type { McpToolName } from "../../../src/mcp/tools/index.js"
 import type { CliCommandSpec } from "./catalog-types.js"
+import { CLI_UPLOAD_SOURCE_SEMANTICS } from "./parity-contract.js"
 
 export const collaborationMutationCliCommandCatalogA = {
   add_activity_reply: {
@@ -43,6 +44,46 @@ export const collaborationMutationCliCommandCatalogA = {
     path: ["contacts", "persons", "channels", "add"],
     positional: ["provider", "value", "person"],
     description: "Add Person Channel"
+  },
+  repair_person_social_identities: {
+    path: ["contacts", "persons", "identities", "repair"],
+    positional: [],
+    description: "Restore Person Social Identities",
+    behavior: { confirmation: { type: "requires-yes", message: "contacts persons identities repair requires --yes." } }
+  },
+  add_person_comment: {
+    path: ["contacts", "persons", "comments", "add"],
+    positional: [],
+    description: "Add Person Comment"
+  },
+  update_person_comment: {
+    path: ["contacts", "persons", "comments", "update"],
+    positional: [],
+    description: "Update Person Comment"
+  },
+  delete_person_comment: {
+    path: ["contacts", "persons", "comments", "delete"],
+    positional: [],
+    description: "Delete Person Comment",
+    behavior: { confirmation: { type: "requires-yes", message: "contacts persons comments delete requires --yes." } }
+  },
+  add_person_attachment: {
+    path: ["contacts", "persons", "attachments", "add"],
+    positional: [],
+    description: `Add Person Attachment. ${CLI_UPLOAD_SOURCE_SEMANTICS}`,
+    behavior: { base64FileInput: { fields: ["data"] }, fileInput: { fields: ["description"] } }
+  },
+  delete_person_attachment: {
+    path: ["contacts", "persons", "attachments", "delete"],
+    positional: [],
+    description: "Delete Person Attachment",
+    behavior: { confirmation: { type: "requires-yes", message: "contacts persons attachments delete requires --yes." } }
+  },
+  update_person_attachment: {
+    path: ["contacts", "persons", "attachments", "update"],
+    positional: [],
+    description: "Update Person Attachment",
+    behavior: { fileInput: { fields: ["description"] } }
   },
   add_reaction: {
     path: ["activity", "reactions", "add"],

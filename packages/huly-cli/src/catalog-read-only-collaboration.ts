@@ -200,6 +200,31 @@ export const collaborationReadOnlyCliCommandCatalog = {
     positional: ["person"],
     description: "List Person Channels"
   },
+  get_person_administration: {
+    path: ["contacts", "persons", "administration", "get"],
+    positional: [],
+    description: "Get Person Administration"
+  },
+  list_social_identity_providers: {
+    path: ["contacts", "persons", "identities", "providers"],
+    positional: [],
+    description: "List Social Identity Providers"
+  },
+  list_person_comments: {
+    path: ["contacts", "persons", "comments", "list"],
+    positional: [],
+    description: "List Person Comments"
+  },
+  list_person_attachments: {
+    path: ["contacts", "persons", "attachments", "list"],
+    positional: [],
+    description: "List Person Attachments"
+  },
+  get_person_attachment: {
+    path: ["contacts", "persons", "attachments", "get"],
+    positional: [],
+    description: "Get Person Attachment"
+  },
   list_person_organizations: {
     path: ["contacts", "persons", "organizations", "list"],
     positional: [],

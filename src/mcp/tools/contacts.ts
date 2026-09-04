@@ -109,6 +109,7 @@ import {
   UpdatePersonResultSchema
 } from "../../domain/schemas/contacts.js"
 import { contactEmployeeTools } from "./contact-employee-tools.js"
+import { personAdministrationTools } from "./person-administration.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "contacts" as const
@@ -172,6 +173,7 @@ export const contactTools = [
     deletePerson
   ),
   ...contactEmployeeTools,
+  ...personAdministrationTools,
   defineTool(
     {
       name: "list_contact_channel_providers",

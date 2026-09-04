@@ -89,6 +89,9 @@ SPACE_ROLE_CREATED_CLEANUP_ROLE=""
 EMPLOYEE_POSITION_CLEANUP_ID=""
 EMPLOYEE_POSITION_CLEANUP_ORIGINAL_POSITION_JSON=""
 EMPLOYEE_POSITION_CLEANUP_PENDING=false
+PERSON_ADMIN_CLEANUP_ID=""
+PERSON_ADMIN_COMMENT_CLEANUP_ID=""
+PERSON_ADMIN_ATTACHMENT_CLEANUP_ID=""
 
 if [ -z "$HULY_URL" ]; then
   echo "ERROR: HULY_URL not set. Run: set -a && source .env.local && set +a"
@@ -705,6 +708,44 @@ restore_employee_position() {
   return 1
 }
 
+cleanup_person_admin_artifacts() {
+  local attachment_json cleanup_failed=0 comment_json person_json readback readback_text
+  if [ -n "$PERSON_ADMIN_CLEANUP_ID" ]; then
+    person_json=$(json_string "$PERSON_ADMIN_CLEANUP_ID")
+  fi
+  if [ -n "$PERSON_ADMIN_ATTACHMENT_CLEANUP_ID" ] && [ -n "$PERSON_ADMIN_CLEANUP_ID" ]; then
+    attachment_json=$(json_string "$PERSON_ADMIN_ATTACHMENT_CLEANUP_ID")
+    call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person_attachment\",\"arguments\":{\"person\":{\"id\":$person_json},\"attachmentId\":$attachment_json}},\"id\":2}" >/dev/null 2>&1 || true
+    readback=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person_attachment\",\"arguments\":{\"person\":{\"id\":$person_json},\"attachmentId\":$attachment_json}},\"id\":2}" 2>/dev/null || true)
+    if [ "$(printf '%s\n' "$readback" | jq -r '.result.isError // false' 2>/dev/null)" = "true" ]; then
+      PERSON_ADMIN_ATTACHMENT_CLEANUP_ID=""
+    else
+      cleanup_failed=1
+    fi
+  fi
+  if [ -n "$PERSON_ADMIN_COMMENT_CLEANUP_ID" ] && [ -n "$PERSON_ADMIN_CLEANUP_ID" ]; then
+    comment_json=$(json_string "$PERSON_ADMIN_COMMENT_CLEANUP_ID")
+    call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person_comment\",\"arguments\":{\"person\":{\"id\":$person_json},\"commentId\":$comment_json}},\"id\":2}" >/dev/null 2>&1 || true
+    readback=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_person_comments\",\"arguments\":{\"person\":{\"id\":$person_json}}},\"id\":2}" 2>/dev/null || true)
+    readback_text=$(printf '%s\n' "$readback" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+    if [ -n "$readback_text" ] && ! printf '%s\n' "$readback_text" | jq -e --arg id "$PERSON_ADMIN_COMMENT_CLEANUP_ID" '.comments[]? | select(.id == $id)' >/dev/null 2>&1; then
+      PERSON_ADMIN_COMMENT_CLEANUP_ID=""
+    else
+      cleanup_failed=1
+    fi
+  fi
+  if [ -n "$PERSON_ADMIN_CLEANUP_ID" ] && [ -z "$PERSON_ADMIN_ATTACHMENT_CLEANUP_ID" ] && [ -z "$PERSON_ADMIN_COMMENT_CLEANUP_ID" ]; then
+    call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" >/dev/null 2>&1 || true
+    readback=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" 2>/dev/null || true)
+    if [ "$(printf '%s\n' "$readback" | jq -r '.result.isError // false' 2>/dev/null)" = "true" ]; then
+      PERSON_ADMIN_CLEANUP_ID=""
+    else
+      cleanup_failed=1
+    fi
+  fi
+  return "$cleanup_failed"
+}
+
 cleanup_all() {
   local original_exit_status=$?
   local cleanup_failed=0
@@ -714,6 +755,10 @@ cleanup_all() {
   fi
   if ! cleanup_hr_artifacts; then
     fail_test "HR fixture cleanup" "restoration or deletion failed; cleanup markers retained"
+    cleanup_failed=1
+  fi
+  if ! cleanup_person_admin_artifacts; then
+    fail_test "person administration cleanup" "delete/readback was not confirmed; cleanup markers retained"
     cleanup_failed=1
   fi
   cleanup_issue_agent_assignee_artifacts || true
@@ -4443,6 +4488,7 @@ run_capture_to_var PERSON_TEXT "create_person" \
   "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":$PERSON_FIRST_NAME_JSON,\"lastName\":\"Person\",\"email\":$PERSON_EMAIL_JSON}},\"id\":2}"
 if [ $? -eq 0 ]; then
   PERSON_ID=$(echo "$PERSON_TEXT" | jq -r '.id' 2>/dev/null)
+  PERSON_ADMIN_CLEANUP_ID="$PERSON_ID"
   echo "  => person: $PERSON_ID"
   run_capture_to_var PERSON_REGEX_TEXT "list_persons(nameRegex SIMILAR TO contains)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_persons\",\"arguments\":{\"nameRegex\":$PERSON_NAME_REGEX_JSON,\"limit\":10}},\"id\":2}"
@@ -4457,6 +4503,63 @@ if [ $? -eq 0 ]; then
   fi
 	  run_test "update_person($PERSON_ID)" \
 	    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_person\",\"arguments\":{\"personId\":\"$PERSON_ID\",\"city\":\"TestCity\"}},\"id\":2}"
+	  run_capture_to_var_fresh PERSON_ADMIN_TEXT "get_person_administration($PERSON_ID)" \
+	    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person_administration\",\"arguments\":{\"person\":{\"id\":\"$PERSON_ID\"}}},\"id\":2}"
+	  if [ $? -eq 0 ]; then
+	    assert_json_field_equals "person administration resolves exact ID" "$PERSON_ADMIN_TEXT" ".personId" "$PERSON_ID"
+	    assert_json_field_equals "person administration classifies identity mutation" "$PERSON_ADMIN_TEXT" '[.fieldClassifications[] | select(.field == "socialIdentityMutation") | .classification] | first' "unsupported"
+	  fi
+	  restart_http_transport_if_needed "before person identity repair verification" >/dev/null 2>&1
+	  run_expect_error_contains "repair_person_social_identities(unlinked person)" \
+	    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"repair_person_social_identities\",\"arguments\":{\"person\":{\"id\":\"$PERSON_ID\"}}},\"id\":2}" \
+	    "not linked to an account personUuid"
+	  run_capture_to_var SOCIAL_PROVIDER_TEXT "list_social_identity_providers" \
+	    '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_social_identity_providers","arguments":{}},"id":2}'
+	  if [ $? -eq 0 ]; then
+	    assert_json_field_equals "social identity providers are discoverable" "$SOCIAL_PROVIDER_TEXT" "length > 0" "true"
+	  fi
+	  PERSON_NOTE_BODY="Person note $RUN_ID"
+	  PERSON_NOTE_BODY_JSON=$(json_string "$PERSON_NOTE_BODY")
+	  run_capture_to_var_fresh PERSON_COMMENT_TEXT "add_person_comment($PERSON_ID)" \
+	    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_person_comment\",\"arguments\":{\"person\":{\"id\":\"$PERSON_ID\"},\"body\":$PERSON_NOTE_BODY_JSON}},\"id\":2}"
+	  if [ $? -eq 0 ]; then
+	    PERSON_COMMENT_ID=$(echo "$PERSON_COMMENT_TEXT" | jq -r '.commentId' 2>/dev/null)
+	    PERSON_ADMIN_COMMENT_CLEANUP_ID="$PERSON_COMMENT_ID"
+	    run_capture_to_var_fresh PERSON_COMMENTS_TEXT "list_person_comments($PERSON_ID)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_person_comments\",\"arguments\":{\"person\":{\"id\":\"$PERSON_ID\"}}},\"id\":2}"
+	    if [ $? -eq 0 ]; then
+	      assert_json_array_contains "person notes preserve native attachment" "$PERSON_COMMENTS_TEXT" ".comments | map(.id)" "$PERSON_COMMENT_ID"
+	    fi
+	    if run_capture_to_var_fresh PERSON_COMMENT_DELETE_TEXT "delete_person_comment($PERSON_COMMENT_ID)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person_comment\",\"arguments\":{\"person\":{\"id\":\"$PERSON_ID\"},\"commentId\":\"$PERSON_COMMENT_ID\"}},\"id\":2}"; then
+	      if run_capture_to_var_fresh PERSON_COMMENTS_AFTER_DELETE_TEXT "list_person_comments(after delete:$PERSON_ID)" \
+	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_person_comments\",\"arguments\":{\"person\":{\"id\":\"$PERSON_ID\"}}},\"id\":2}" \
+	        && ! printf '%s\n' "$PERSON_COMMENTS_AFTER_DELETE_TEXT" | jq -e --arg id "$PERSON_COMMENT_ID" '.comments[]? | select(.id == $id)' >/dev/null 2>&1; then
+	        PERSON_ADMIN_COMMENT_CLEANUP_ID=""
+	      fi
+	    fi
+	  fi
+	  run_capture_to_var_fresh PERSON_ATTACHMENT_TEXT "add_person_attachment($PERSON_ID)" \
+	    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_person_attachment\",\"arguments\":{\"person\":{\"id\":\"$PERSON_ID\"},\"filename\":\"person-$RUN_ID.txt\",\"contentType\":\"text/plain\",\"data\":\"aGVsbG8=\"}},\"id\":2}"
+	  if [ $? -eq 0 ]; then
+	    PERSON_ATTACHMENT_ID=$(echo "$PERSON_ATTACHMENT_TEXT" | jq -r '.attachmentId' 2>/dev/null)
+	    PERSON_ADMIN_ATTACHMENT_CLEANUP_ID="$PERSON_ATTACHMENT_ID"
+	    run_capture_to_var_fresh PERSON_ATTACHMENTS_TEXT "list_person_attachments($PERSON_ID)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_person_attachments\",\"arguments\":{\"person\":{\"id\":\"$PERSON_ID\"}}},\"id\":2}"
+	    if [ $? -eq 0 ]; then
+	      assert_json_array_contains "person attachment retains native parent" "$PERSON_ATTACHMENTS_TEXT" ".attachments | map(.id)" "$PERSON_ATTACHMENT_ID"
+	    fi
+	    run_capture_to_var_fresh PERSON_ATTACHMENT_UPDATE_TEXT "update_person_attachment($PERSON_ATTACHMENT_ID)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_person_attachment\",\"arguments\":{\"person\":{\"id\":\"$PERSON_ID\"},\"attachmentId\":\"$PERSON_ATTACHMENT_ID\",\"pinned\":true}},\"id\":2}"
+	    if run_capture_to_var_fresh PERSON_ATTACHMENT_DELETE_TEXT "delete_person_attachment($PERSON_ATTACHMENT_ID)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person_attachment\",\"arguments\":{\"person\":{\"id\":\"$PERSON_ID\"},\"attachmentId\":\"$PERSON_ATTACHMENT_ID\"}},\"id\":2}"; then
+	      if run_capture_to_var_fresh PERSON_ATTACHMENTS_AFTER_DELETE_TEXT "list_person_attachments(after delete:$PERSON_ID)" \
+	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_person_attachments\",\"arguments\":{\"person\":{\"id\":\"$PERSON_ID\"}}},\"id\":2}" \
+	        && ! printf '%s\n' "$PERSON_ATTACHMENTS_AFTER_DELETE_TEXT" | jq -e --arg id "$PERSON_ATTACHMENT_ID" '.attachments[]? | select(.id == $id)' >/dev/null 2>&1; then
+	        PERSON_ADMIN_ATTACHMENT_CLEANUP_ID=""
+	      fi
+	    fi
+	  fi
 	  run_capture_to_var PERSON_CHANNEL_TEXT "add_person_channel($PERSON_ID phone)" \
 	    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_person_channel\",\"arguments\":{\"person\":\"$PERSON_ID\",\"provider\":\"phone\",\"value\":$PERSON_PHONE_JSON}},\"id\":2}"
 	  if [ $? -eq 0 ]; then
@@ -4482,8 +4585,12 @@ if [ $? -eq 0 ]; then
 	    run_test "remove_person_channel($PERSON_ID provider+value)" \
 	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_person_channel\",\"arguments\":{\"person\":\"$PERSON_ID\",\"provider\":\"phone\",\"value\":$PERSON_PHONE_UPDATED_JSON}},\"id\":2}"
 	  fi
-	  run_test "delete_person($PERSON_ID)" \
-	    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":\"$PERSON_ID\"}},\"id\":2}"
+	  if [ -z "$PERSON_ADMIN_COMMENT_CLEANUP_ID" ] && [ -z "$PERSON_ADMIN_ATTACHMENT_CLEANUP_ID" ]; then
+	    run_test "delete_person($PERSON_ID)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":\"$PERSON_ID\"}},\"id\":2}"
+	  else
+	    fail_test "delete_person($PERSON_ID)" "child cleanup was not confirmed; preserving parent for EXIT cleanup"
+	  fi
 fi
 
 skip_test "get_person" "covered by create+update cycle"

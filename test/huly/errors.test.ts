@@ -1172,6 +1172,10 @@ describe("Huly Errors", () => {
               return `status:${error.status}`
             case "PersonNotFoundError":
               return `person:${error.identifier}`
+            case "PersonCommentNotFoundError":
+              return `person-comment:${error.personId}:${error.commentId}`
+            case "PersonIdentityRepairUnsupportedError":
+              return `person-identity-repair:${error.personId}:${error.reason}`
             case "PersonIdentifierAmbiguousError":
               return `person-ambiguous:${error.identifier}:${error.matches}`
             case "DepartmentNotFoundError":

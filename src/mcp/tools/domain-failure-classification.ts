@@ -186,6 +186,8 @@ const DOMAIN_FAILURE_KIND_BY_TAG = {
   PermissionNotFoundError: "lookup",
   PermissionProtectedError: "authorization",
   PersonIdentifierAmbiguousError: "ambiguity",
+  PersonCommentNotFoundError: "lookup",
+  PersonIdentityRepairUnsupportedError: "integration",
   PersonNotAnEmployeeError: "input",
   PersonNotFoundError: "lookup",
   PlannerSchedulingPrerequisiteError: "integration",

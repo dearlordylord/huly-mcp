@@ -34,7 +34,19 @@ export const firstClassToolHints = new Map<string, ReadonlyArray<HulyClassToolHi
     String(documentPlugin.class.DocumentSnapshot),
     [toolHint("documents", ["list_document_snapshots", "get_document_snapshot"])]
   ],
-  [String(contact.class.Person), [toolHint("contacts", ["list_persons", "get_person", "create_person"])]],
+  [
+    String(contact.class.Person),
+    [
+      toolHint("contacts", [
+        "list_persons",
+        "get_person",
+        "get_person_administration",
+        "list_person_comments",
+        "list_person_attachments",
+        "create_person"
+      ])
+    ]
+  ],
   [String(contact.mixin.Employee), [toolHint("contacts", ["list_employees", "set_employee_position"])]],
   [
     String(contact.class.Organization),
@@ -108,7 +120,7 @@ const trackerCoveredRationale =
 const documentCoveredRationale =
   "Current document tools cover non-controlled document teamspaces, document CRUD/content operations, and read-only snapshot/history listing plus markdown retrieval. Snapshot restore and document PDF/export remain deferred."
 const contactCoveredRationale =
-  "Current contacts tools expose person, organization, employee/member, and organization-channel operations. Employee summaries project stable Contact Employee fields including active, role, statuses, position, and personUuid; set_employee_position updates only contact.mixin.Employee.position. SDK avatarType/avatar/avatarProps are provider/blob metadata; attachment/comment/channel counters and social identity collections are derived; birthday/profile need separate contracts; createdOn/createdBy/modifiedBy and class/space refs are internal metadata and remain intentionally unsupported in that summary."
+  "Current contacts tools expose person, organization, employee/member, channels, exact-locator person notes and attachments, and person administration. Person administration exposes avatar and birthday, derives contact/workspace status, social identities and channel activity, reads account profile data, and applies only Huly-native account-authoritative SocialIdentity projection repairs; arbitrary identity mutations remain explicitly unsupported. Employee summaries project stable Contact Employee fields including active, role, statuses, position, and personUuid."
 const cardCoveredRationale = "Current card tools cover card spaces, master tags, and card CRUD."
 const boardCoveredRationale =
   "Current board tools cover board discovery, board create/update/archive, board card list/get/create/update, workflow status/type resolution, assignees, members, location, cover, dates, archived-card deletion, board labels, saved views, menu pages, viewlets, and common board preference reads. Provider integrations and board deletion remain deferred."

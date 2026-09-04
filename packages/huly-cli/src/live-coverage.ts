@@ -20,7 +20,7 @@ export type CliIntegrationCoverageDecision =
       readonly type: "representative"
     }
 
-export const CLI_COVERAGE_REVIEWED_REGISTRY_OPERATIONS = 550
+export const CLI_COVERAGE_REVIEWED_REGISTRY_OPERATIONS = 562
 export const CLI_COVERAGE_REVIEWED_ROOT_COMMANDS = 55
 export const CLI_COVERAGE_REVIEWED_LOCAL_COMMANDS = 7
 
@@ -124,6 +124,27 @@ export const CLI_LIVE_COVERAGE_CASES: ReadonlyArray<CliLiveCoverageCase> = [
     behaviors: ["structured-json-input", "nullable-clear-input", "text-file-input", "consequential-confirmation"],
     risks: ["lifecycle", "safety"]
   },
+  {
+    id: "person-administration-lifecycle",
+    tools: [
+      "create_person",
+      "get_person_administration",
+      "list_social_identity_providers",
+      "repair_person_social_identities",
+      "add_person_comment",
+      "list_person_comments",
+      "update_person_comment",
+      "delete_person_comment",
+      "add_person_attachment",
+      "list_person_attachments",
+      "get_person_attachment",
+      "update_person_attachment",
+      "delete_person_attachment",
+      "delete_person"
+    ],
+    behaviors: ["structured-json-input", "upload-input"],
+    risks: ["lifecycle", "transport"]
+  },
   { id: "text-file-input", tools: ["add_comment"], behaviors: ["text-file-input"], risks: [] },
   { id: "raw-upload", tools: ["add_attachment"], behaviors: ["upload-input"], risks: ["transport"] },
   { id: "binary-download", tools: ["download_attachment"], behaviors: ["binary-output"], risks: ["transport"] },
@@ -182,6 +203,25 @@ export const CLI_UNIQUE_RISK_DECISIONS: ReadonlyArray<CliUniqueRiskDecision> = [
     caseId: "funnel-administration-lifecycle",
     tools: ["create_funnel", "update_funnel", "archive_funnel", "delete_funnel"],
     risks: ["lifecycle"]
+  },
+  {
+    caseId: "person-administration-lifecycle",
+    tools: [
+      "create_person",
+      "add_person_comment",
+      "update_person_comment",
+      "delete_person_comment",
+      "add_person_attachment",
+      "update_person_attachment",
+      "delete_person_attachment",
+      "delete_person"
+    ],
+    risks: ["lifecycle"]
+  },
+  {
+    caseId: "person-administration-lifecycle",
+    tools: ["add_person_attachment", "get_person_attachment"],
+    risks: ["transport"]
   },
   { caseId: "funnel-administration-lifecycle", tools: ["archive_funnel", "delete_funnel"], risks: ["safety"] },
   { caseId: "raw-upload", tools: ["add_attachment"], risks: ["transport"] },

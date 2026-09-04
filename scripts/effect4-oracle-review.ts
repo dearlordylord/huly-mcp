@@ -88,7 +88,19 @@ const ISSUE_97_TOOL_NAMES: ReadonlySet<ToolNameType> = new Set([
   ToolName.make("create_funnel"),
   ToolName.make("update_funnel"),
   ToolName.make("archive_funnel"),
-  ToolName.make("delete_funnel")
+  ToolName.make("delete_funnel"),
+  ToolName.make("get_person_administration"),
+  ToolName.make("list_social_identity_providers"),
+  ToolName.make("repair_person_social_identities"),
+  ToolName.make("list_person_comments"),
+  ToolName.make("add_person_comment"),
+  ToolName.make("update_person_comment"),
+  ToolName.make("delete_person_comment"),
+  ToolName.make("list_person_attachments"),
+  ToolName.make("add_person_attachment"),
+  ToolName.make("get_person_attachment"),
+  ToolName.make("update_person_attachment"),
+  ToolName.make("delete_person_attachment")
 ])
 
 const candidateToolIdentityKey = (responseIndex: number, toolIndex: number): string => `${responseIndex}/${toolIndex}`
@@ -195,7 +207,7 @@ const categoryMetadata = (category: ReviewCategory): { readonly issue: string; r
       return {
         issue: "#97",
         rationale:
-          "Reviewed employee-position, HR-department, Staff-assignment, funnel-administration, and HR-request operations with their exact schemas and ordered registry/CLI exposure."
+          "Reviewed employee-position, HR-department, Staff-assignment, funnel-administration, HR-request, and person-administration operations with their exact schemas and ordered registry/CLI exposure."
       }
     case "cli-json-diagnostic":
       return {
@@ -207,7 +219,7 @@ const categoryMetadata = (category: ReviewCategory): { readonly issue: string; r
       return {
         issue: "#228",
         rationale:
-          "Reviewed concise Effect 4 CLI help rendering; funnel and HR-request routes are added without changing other route behavior."
+          "Reviewed concise Effect 4 CLI help rendering; funnel, HR-request, and person-administration routes are added without changing other route behavior."
       }
   }
 }
