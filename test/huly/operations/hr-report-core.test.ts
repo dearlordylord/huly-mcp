@@ -6,17 +6,17 @@ import { DepartmentId } from "../../../src/domain/schemas/hr-departments.js"
 import { PublicHolidaySummarySchema } from "../../../src/domain/schemas/hr-holidays.js"
 import { HrCalendarDate, HrRequestSummarySchema } from "../../../src/domain/schemas/hr-requests.js"
 import { hr } from "../../../src/huly/huly-plugins.js"
-import { applicableHolidayDates, hrRequestMeasures } from "../../../src/huly/operations/hr-report-core.js"
+import { applicableHolidayDates, hrRequestMeasures, hrTypeTotals } from "../../../src/huly/operations/hr-report-core.js"
 import { corePersonId, docRef, spaceRef } from "../../helpers/huly-sdk.js"
 
-const request = (value: number) =>
-  Schema.decodeUnknownSync(HrRequestSummarySchema)({
+const request = (value: number, id = "request-type-1", label = "Leave") =>
+  Schema.decodeSync(HrRequestSummarySchema)({
     id: "request-1",
     employee: { id: "employee-1", name: "Alice" },
     department: { id: "department-1", path: "Product" },
     requestType: {
-      id: "request-type-1",
-      label: "Leave",
+      id,
+      label,
       labelLocale: "en",
       labelResource: "embedded:embedded:Leave",
       value,
@@ -31,7 +31,7 @@ const request = (value: number) =>
     attachments: 0
   })
 
-const date = (value: string): HrCalendarDate => Schema.decodeUnknownSync(HrCalendarDate)(value)
+const date = (value: string): HrCalendarDate => Schema.decodeSync(HrCalendarDate)(value)
 
 const department = (id: string, name: string, parent = hr.ids.Head): Department => ({
   _id: docRef<Department>(id),
@@ -74,6 +74,44 @@ describe("HR report calendar semantics", () => {
     expect(result).toEqual({ calendarDays: 1, workdays: 1, units: -1 })
   })
 
+  it("returns zero measures outside the report range and for zero-valued request types", () => {
+    expect(hrRequestMeasures(request(-1), date("2026-09-08"), date("2026-09-09"), new Set<HrCalendarDate>())).toEqual({
+      calendarDays: 0,
+      workdays: 0,
+      units: 0
+    })
+    expect(hrRequestMeasures(request(0), date("2026-09-04"), date("2026-09-07"), new Set<HrCalendarDate>())).toEqual({
+      calendarDays: 4,
+      workdays: 2,
+      units: 0
+    })
+  })
+
+  it("groups repeated request types and sorts totals by their labels", () => {
+    const totals = hrTypeTotals(
+      [request(-1), request(-1), request(2, "request-type-2", "Allowance")],
+      date("2026-09-04"),
+      date("2026-09-07"),
+      new Set<HrCalendarDate>([date("2026-09-04")])
+    )
+    expect(totals).toEqual([
+      {
+        requestType: { id: "request-type-2", label: "Allowance" },
+        requestCount: 1,
+        calendarDays: 4,
+        workdays: 1,
+        units: 8
+      },
+      {
+        requestType: { id: "request-type-1", label: "Leave" },
+        requestCount: 2,
+        calendarDays: 8,
+        workdays: 2,
+        units: -2
+      }
+    ])
+  })
+
   it("inherits holiday dates from every ancestor but never from siblings or descendants", () => {
     const root = department("root", "Root")
     const child = department("child", "Child", root._id)
@@ -86,7 +124,7 @@ describe("HR report calendar semantics", () => {
       { id: "grandchild-holiday", date: "2026-09-03", owner: grandchild },
       { id: "sibling-holiday", date: "2026-09-04", owner: sibling }
     ].map(({ date: holidayDate, id, owner }) =>
-      Schema.decodeUnknownSync(PublicHolidaySummarySchema)({
+      Schema.decodeSync(PublicHolidaySummarySchema)({
         id,
         title: id,
         description: "",
