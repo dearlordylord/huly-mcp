@@ -14,9 +14,9 @@ const ReferenceTypeMetadataSchema = Schema.Struct({
 
 const RefToMetadataSchema = Schema.Struct({ _class: Schema.Literal(String(core.class.RefTo)), to: ObjectClassName })
 
-const ArrOfRefToMetadataSchema = Schema.Struct({
+const ArrOfMetadataSchema = Schema.Struct({
   _class: Schema.Literal(String(core.class.ArrOf)),
-  of: RefToMetadataSchema
+  of: ReferenceTypeMetadataSchema
 })
 
 const ReferenceAttributeSchema = Schema.Struct({
@@ -49,7 +49,7 @@ export const invalidReferenceData = (
 
 const decodeReferenceAttribute = Schema.decodeUnknownEffect(ReferenceAttributeSchema)
 const decodeRefToMetadata = Schema.decodeUnknownEffect(RefToMetadataSchema)
-const decodeArrOfRefToMetadata = Schema.decodeUnknownEffect(ArrOfRefToMetadataSchema)
+const decodeArrOfMetadata = Schema.decodeUnknownEffect(ArrOfMetadataSchema)
 
 export const parseReferenceAttribute = (
   input: unknown,
@@ -79,10 +79,14 @@ export const referenceDescriptor = Effect.fn("PersonReferenceMigration.reference
     return { kind: "single", target: metadata.to }
   }
   if (attribute.type._class === String(core.class.ArrOf)) {
-    const metadata = yield* decodeArrOfRefToMetadata(attribute.type).pipe(
+    const metadata = yield* decodeArrOfMetadata(attribute.type).pipe(
       Effect.mapError((cause) => invalidReferenceData(operation, entity, cause))
     )
-    return { kind: "array", target: metadata.of.to }
+    if (metadata.of._class !== String(core.class.RefTo)) return undefined
+    const element = yield* decodeRefToMetadata(metadata.of).pipe(
+      Effect.mapError((cause) => invalidReferenceData(operation, entity, cause))
+    )
+    return { kind: "array", target: element.to }
   }
   return undefined
 })

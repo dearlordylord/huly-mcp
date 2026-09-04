@@ -1071,11 +1071,18 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
           entity: "Attribute 'attribute-created-by' reference type"
         })
 
-        mockFindAllInModel.mockReturnValue([
-          { ...singleAttribute, type: { _class: String(core.class.ArrOf), of: { _class: "core:class:TypeString" } } }
-        ])
+        mockFindAllInModel.mockReturnValue([{ ...singleAttribute, type: { _class: String(core.class.ArrOf) } }])
         const malformedArray = yield* Effect.flip(client.inspectPersonReferences(sourceId))
         expect(malformedArray).toMatchObject({
+          _tag: "HulyDataInvalidError",
+          entity: "Attribute 'attribute-created-by' reference type"
+        })
+
+        mockFindAllInModel.mockReturnValue([
+          { ...singleAttribute, type: { _class: String(core.class.ArrOf), of: { _class: String(core.class.RefTo) } } }
+        ])
+        const malformedArrayReference = yield* Effect.flip(client.inspectPersonReferences(sourceId))
+        expect(malformedArrayReference).toMatchObject({
           _tag: "HulyDataInvalidError",
           entity: "Attribute 'attribute-created-by' reference type"
         })
@@ -1118,6 +1125,11 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         mockFindAllInModel.mockReturnValue([
           { ...singleAttribute, _id: "_id", name: "_id" },
           { ...singleAttribute, _id: "primitive", type: { _class: "core:class:TypeString" } },
+          {
+            ...singleAttribute,
+            _id: "primitive-array",
+            type: { _class: String(core.class.ArrOf), of: { _class: "core:class:TypeString" } }
+          },
           {
             ...singleAttribute,
             _id: "not-person",

@@ -40,6 +40,16 @@ describe("full integration HTTP fresh-session contract", () => {
     expect(body).not.toContain("run_capture_to_var")
   })
 
+  it("retains the person merge source cleanup marker until fresh readback confirms deletion", () => {
+    const body = functionBody("cleanup_retained_merge_source")
+    const readbackIndex = body.indexOf('if wait_for_error_contains "get_person(person merge retained source cleanup)"')
+    const clearIndex = body.indexOf('PERSON_MERGE_SOURCE_CLEANUP_ID=""')
+    expectRestartBeforeCapture(body, "run_test")
+    expect(readbackIndex).toBeGreaterThanOrEqual(0)
+    expect(clearIndex).toBeGreaterThan(readbackIndex)
+    expect(body).toContain("cleanup marker retained")
+  })
+
   it("keeps page-size-one live HR report composition behind the internal adapter", () => {
     expect(script).toContain("scripts/integration-hr-report-pagination-fixture.ts")
     expect(script).not.toContain("scanPageSize")

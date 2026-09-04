@@ -178,10 +178,9 @@ const preparePersonMerge = Effect.fn("PersonMerge.prepare")(function* (
   }
 })
 
-interface PreparedGlobalMerge {
-  readonly accountAction: PersonMergeFinalAccountAction
-  readonly merge: Effect.Effect<void, WorkspaceClientError> | undefined
-}
+type PreparedGlobalMerge =
+  | { readonly accountAction: Exclude<PersonMergeFinalAccountAction, "merged">; readonly merge: undefined }
+  | { readonly accountAction: "merged"; readonly merge: Effect.Effect<void, WorkspaceClientError> }
 
 const prepareGlobalMerge = Effect.fn("PersonMerge.prepareGlobalMerge")(function* (
   workspace: WorkspaceClient["Service"],
@@ -246,7 +245,7 @@ const executePreparedMerge = Effect.fn("PersonMerge.executePrepared")(function* 
   const workspace = yield* WorkspaceClient
   const global = yield* prepareGlobalMerge(workspace, prepared)
   yield* prepared.migrateReferences(prepared.impact.references, prepared.source.id, prepared.survivor.id)
-  if (global.merge !== undefined) yield* global.merge
+  if (global.accountAction === "merged") yield* global.merge
   return {
     ...resultCommon(prepared),
     executed: true,

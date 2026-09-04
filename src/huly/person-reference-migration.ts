@@ -335,14 +335,14 @@ const replacementArray = (
 
 interface PreparedReferenceWrite {
   readonly operation: ReferenceOperation
-  readonly source: PersonId
-  readonly survivor: PersonId
-  readonly descriptorCount: PositiveInteger
   readonly concreteClass: ObjectClassName
   readonly field: NonEmptyString
   readonly attribute: AnyAttribute
+  // Huly's native updateAttribute selects updateDoc, updateMixin, or
+  // updateCollection from the original SDK document. The immutable parsed
+  // route was validated before this plan was constructed; the raw document is
+  // retained only as the native adapter input.
   readonly document: Doc
-  readonly route: ReferenceDocumentRoute
   readonly replacement: PersonId | ReadonlyArray<PersonId>
 }
 
@@ -389,14 +389,10 @@ const loadImpactDocuments = Effect.fn("PersonReferenceMigration.loadImpactDocume
   }
   return snapshot.documents.map((document) => ({
     operation: "migratePersonReferences",
-    source,
-    survivor,
-    descriptorCount: impact.count,
     concreteClass: impact.concreteClass,
     field: impact.field,
     attribute: rawAttribute,
     document: document.raw,
-    route: document.route,
     replacement: document.kind === "single" ? survivor : replacementArray(document.value, source, survivor)
   }))
 })

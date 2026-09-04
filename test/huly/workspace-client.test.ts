@@ -38,6 +38,9 @@ const mockGetWorkspaceMembers = mockFn<() => Promise<Array<WorkspaceMemberInfo>>
 const mockGetCurrentPerson = mockFn<() => Promise<Person>>()
 const mockGetCurrentSocialIds = mockFn<(includeDeleted?: boolean) => Promise<Array<SocialId>>>()
 const mockGetPersonInfo = mockFn<(account: PersonUuid) => Promise<PersonInfo>>()
+const mockCanMergeSpecifiedPersons =
+  mockFn<(primaryPerson: PersonUuid, secondaryPerson: PersonUuid) => Promise<boolean>>()
+const mockMergeSpecifiedPersons = mockFn<(primaryPerson: PersonUuid, secondaryPerson: PersonUuid) => Promise<void>>()
 const mockUpdateWorkspaceRole = mockFn<(account: string, role: AccountRole) => Promise<void>>()
 const mockGetWorkspaceInfo = mockFn<(updateLastVisit?: boolean) => Promise<WorkspaceInfoWithStatus>>()
 const mockGetUserWorkspaces = mockFn<() => Promise<Array<WorkspaceInfoWithStatus>>>()
@@ -70,6 +73,8 @@ const clearAllMockFns = () => {
   mockGetCurrentPerson.mockClear()
   mockGetCurrentSocialIds.mockClear()
   mockGetPersonInfo.mockClear()
+  mockCanMergeSpecifiedPersons.mockClear()
+  mockMergeSpecifiedPersons.mockClear()
   mockUpdateWorkspaceRole.mockClear()
   mockGetWorkspaceInfo.mockClear()
   mockGetUserWorkspaces.mockClear()
@@ -89,8 +94,8 @@ const mockAccountClient: AccountClient = {
   getPerson: mockGetCurrentPerson,
   getSocialIds: mockGetCurrentSocialIds,
   getPersonInfo: mockGetPersonInfo,
-  canMergeSpecifiedPersons: async () => true,
-  mergeSpecifiedPersons: async () => {},
+  canMergeSpecifiedPersons: mockCanMergeSpecifiedPersons,
+  mergeSpecifiedPersons: mockMergeSpecifiedPersons,
   updateWorkspaceRole: mockUpdateWorkspaceRole,
   getWorkspaceInfo: mockGetWorkspaceInfo,
   getUserWorkspaces: mockGetUserWorkspaces,
@@ -170,6 +175,8 @@ describe("WorkspaceClient.layer (real layer)", () => {
     Effect.gen(function* () {
       const source = toAccountUuid(NonEmptyString.make("00000000-0000-4000-8000-000000000250"))
       const survivor = toAccountUuid(NonEmptyString.make("00000000-0000-4000-8000-000000000251"))
+      mockCanMergeSpecifiedPersons.mockResolvedValue(true)
+      mockMergeSpecifiedPersons.mockResolvedValue(undefined)
       const client = yield* WorkspaceClient
       if (client.canMergeSpecifiedPersons === undefined || client.mergeSpecifiedPersons === undefined) {
         return yield* Effect.die(new Error("live WorkspaceClient omitted global Person merge operations"))
@@ -177,6 +184,8 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
       expect(yield* client.canMergeSpecifiedPersons(survivor, source)).toBe(true)
       yield* client.mergeSpecifiedPersons(survivor, source)
+      expect(mockCanMergeSpecifiedPersons.mock.calls).toContainEqual([survivor, source])
+      expect(mockMergeSpecifiedPersons.mock.calls).toContainEqual([survivor, source])
     }).pipe(Effect.provide(liveLayer))
   )
 

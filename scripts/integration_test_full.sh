@@ -848,6 +848,25 @@ cleanup_person_admin_artifacts() {
   return "$cleanup_failed"
 }
 
+cleanup_retained_merge_source() {
+  if [ -z "$PERSON_MERGE_SOURCE_CLEANUP_ID" ]; then
+    return 0
+  fi
+  local person_json
+  person_json=$(json_string "$PERSON_MERGE_SOURCE_CLEANUP_ID")
+  restart_http_transport_if_needed "person merge retained source cleanup" >/dev/null 2>&1 || return 1
+  run_test "delete_person(person merge retained source:$PERSON_MERGE_SOURCE_CLEANUP_ID)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" || true
+  if wait_for_error_contains "get_person(person merge retained source cleanup)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" \
+    "not found"; then
+    PERSON_MERGE_SOURCE_CLEANUP_ID=""
+    return 0
+  fi
+  echo "WARNING: retained person merge source deletion was not confirmed; cleanup marker retained" >&2
+  return 1
+}
+
 cleanup_all() {
   local original_exit_status=$?
   local cleanup_failed=0
@@ -5134,11 +5153,7 @@ if [ $? -eq 0 ]; then
 	      fi
 	    fi
 	    cleanup_person_admin_artifacts || true
-	    if [ -n "$PERSON_MERGE_SOURCE_CLEANUP_ID" ]; then
-	      run_test "delete_person(person merge retained source:$PERSON_MERGE_SOURCE_CLEANUP_ID)" \
-	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":\"$PERSON_MERGE_SOURCE_CLEANUP_ID\"}},\"id\":2}"
-	      PERSON_MERGE_SOURCE_CLEANUP_ID=""
-	    fi
+	    cleanup_retained_merge_source || true
 	  else
 	    fail_test "delete_person($PERSON_ID)" "child cleanup was not confirmed; preserving parent for EXIT cleanup"
 	  fi
