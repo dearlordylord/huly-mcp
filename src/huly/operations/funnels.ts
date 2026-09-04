@@ -3,17 +3,18 @@ import { generateId, SortingOrder } from "@hcengineering/core"
 import type { ProjectType } from "@hcengineering/task"
 import { Effect } from "effect"
 
-import type {
-  CreateFunnelParams,
-  CreateFunnelResult,
-  DeleteFunnelParams,
-  DeleteFunnelResult,
-  FunnelDetail,
-  FunnelImpact,
-  FunnelMutationParams,
-  FunnelMutationResult,
-  GetFunnelParams,
-  UpdateFunnelParams
+import {
+  UPDATE_FUNNEL_FIELDS,
+  type CreateFunnelParams,
+  type CreateFunnelResult,
+  type DeleteFunnelParams,
+  type DeleteFunnelResult,
+  type FunnelDetail,
+  type FunnelImpact,
+  type FunnelMutationParams,
+  type FunnelMutationResult,
+  type GetFunnelParams,
+  type UpdateFunnelParams
 } from "../../domain/schemas/funnels.js"
 import {
   FunnelIdentifier,
@@ -316,7 +317,7 @@ export const updateFunnel = (
   params: UpdateFunnelParams
 ): Effect.Effect<FunnelMutationResult, FunnelWriteError, HulyClient | WorkspaceClient | Diagnostics> =>
   Effect.gen(function* () {
-    yield* requireUpdateFields("update_funnel", params, [...paramsFields])
+    yield* requireUpdateFields("update_funnel", params, UPDATE_FUNNEL_FIELDS)
     const { client, funnel } = yield* resolveFunnelFromContext(params.funnel)
     const projectType = yield* getFunnelProjectType(client, funnel)
     yield* validatedWorkflow(client, projectType)
@@ -330,8 +331,6 @@ export const updateFunnel = (
     yield* client.updateDoc(leadClassIds.class.Funnel, core.space.Space, funnel._id, update)
     return { identifier: FunnelIdentifier.make(funnel._id), updated: true, impact: yield* funnelImpact(client, funnel) }
   })
-
-const paramsFields = ["name", "description", "fullDescription", "private", "members", "owners", "autoJoin"] as const
 
 export const archiveFunnel = (
   params: FunnelMutationParams

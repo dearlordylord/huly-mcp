@@ -11,6 +11,7 @@ import {
   VacancyIdentifier
 } from "../../src/domain/schemas/recruiting-common.js"
 import {
+  AccountUuid,
   AssociationId,
   CardId,
   ChannelIdentifier,
@@ -38,7 +39,13 @@ import {
   FileFetchError,
   FileNotFoundError,
   FileUploadError,
+  FunnelAccountNotFoundError,
+  FunnelDeleteConflictError,
+  FunnelIdentifierAmbiguousError,
   FunnelNotFoundError,
+  FunnelProjectTypeIdentifierAmbiguousError,
+  FunnelProjectTypeNotFoundError,
+  FunnelWorkflowInvalidError,
   GenericObjectIdentifierAmbiguousError,
   GenericObjectLocatorInvalidError,
   GenericObjectNotFoundError,
@@ -87,6 +94,7 @@ import {
   WorkbenchApplicationAliasAmbiguousError,
   makeOperationConnectionError
 } from "../../src/huly/errors.js"
+import { ProjectTypeRefSchema } from "../../src/domain/schemas/task-management.js"
 import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import {
   appendToolWarnings,
@@ -285,6 +293,35 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
           expect(assertAt(response.content, 0).text).toBe("Funnel 'sales' not found")
+        })
+      )
+
+      it.effect("maps all funnel domain precondition failures to invalid params", () =>
+        Effect.sync(function () {
+          const projectType = ProjectTypeRefSchema.make("missing-funnel-project-type")
+          const errors = [
+            new FunnelIdentifierAmbiguousError({ identifier: funnelReference("sales"), matches: Count.make(2) }),
+            new FunnelProjectTypeNotFoundError({ identifier: projectType }),
+            new FunnelProjectTypeIdentifierAmbiguousError({ identifier: projectType, matches: Count.make(2) }),
+            new FunnelWorkflowInvalidError({
+              projectType,
+              reason: NonEmptyString.make("task type mapping is invalid")
+            }),
+            new FunnelDeleteConflictError({
+              identifier: funnelReference("sales"),
+              reason: NonEmptyString.make("archive it first")
+            }),
+            new FunnelAccountNotFoundError({ account: AccountUuid.make("00000000-0000-4000-8000-000000000001") })
+          ]
+
+          for (const error of errors) {
+            const response = mapDomainErrorToMcp(error)
+
+            expect(response.isError).toBe(true)
+            expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+            expect(response._meta.errorTag).toBe(error._tag)
+            expect(assertAt(response.content, 0).text).toBe(error.message)
+          }
         })
       )
 
