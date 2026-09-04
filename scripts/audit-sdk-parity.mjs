@@ -15,6 +15,7 @@ const MODEL_ROOT_NAMES = [
   "ChunterSpace",
   "Class",
   "Doc",
+  "Employee",
   "Event",
   "Mixin",
   "Preference",

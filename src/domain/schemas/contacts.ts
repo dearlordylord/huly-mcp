@@ -79,7 +79,13 @@ export const EmployeeLocatorSchema = Schema.Union([
   title: "EmployeeLocator",
   description:
     "Structured exact employee locator. Provide exactly one of id, email, or name; combining modalities is rejected.",
-  jsonSchema: { oneOf: [{ required: ["id"] }, { required: ["email"] }, { required: ["name"] }] }
+  jsonSchema: {
+    oneOf: [
+      { type: "object", required: ["id"] },
+      { type: "object", required: ["email"] },
+      { type: "object", required: ["name"] }
+    ]
+  }
 })
 export type EmployeeLocator = Schema.Schema.Type<typeof EmployeeLocatorSchema>
 

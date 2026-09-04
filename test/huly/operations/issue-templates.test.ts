@@ -855,6 +855,18 @@ describe("createIssueFromTemplate", () => {
     })
   )
 
+  it.effect("rejects a missing assignee override", () =>
+    Effect.gen(function* () {
+      const error = yield* createIssueFromTemplate({
+        project: projectIdentifier("TEST"),
+        template: templateIdentifier("Bug Report"),
+        assignee: email("missing@example.com")
+      }).pipe(Effect.flip, Effect.provide(setupForCreateFromTemplate()), withDiagnostics)
+
+      expect(error._tag).toBe("PersonNotFoundError")
+    })
+  )
+
   it.effect("preserves native references from template descriptions", () =>
     Effect.gen(function* () {
       const captureUploadMarkup: MockConfig["captureUploadMarkup"] = {}
@@ -1611,6 +1623,26 @@ describe("createIssueTemplate with children", () => {
 
       const attrs = capture.attributes as Record<string, unknown>
       expect(attrs.children).toEqual([])
+    })
+  )
+
+  it.effect("rejects missing child assignees and components", () =>
+    Effect.gen(function* () {
+      const project = makeProject({ identifier: "TEST" })
+      const testLayer = createTestLayerWithMocks({ projects: [project] })
+      const missingAssignee = yield* createIssueTemplate({
+        project: projectIdentifier("TEST"),
+        title: "Missing child assignee",
+        children: [{ title: "Child", assignee: email("missing@example.com") }]
+      }).pipe(Effect.flip, Effect.provide(testLayer), withDiagnostics)
+      const missingComponent = yield* createIssueTemplate({
+        project: projectIdentifier("TEST"),
+        title: "Missing child component",
+        children: [{ title: "Child", component: componentIdentifier("Missing") }]
+      }).pipe(Effect.flip, Effect.provide(testLayer), withDiagnostics)
+
+      expect(missingAssignee._tag).toBe("PersonNotFoundError")
+      expect(missingComponent._tag).toBe("ComponentNotFoundError")
     })
   )
 })

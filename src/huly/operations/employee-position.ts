@@ -8,7 +8,7 @@ import type {
 } from "../../domain/schemas/contacts.js"
 import { PersonId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import { PersonIdentifierAmbiguousError, PersonNotAnEmployeeError, PersonNotFoundError } from "../errors.js"
+import { type PersonIdentifierAmbiguousError, PersonNotAnEmployeeError, PersonNotFoundError } from "../errors.js"
 import { contact } from "../huly-plugins.js"
 import { findPersonByExactEmail, findPersonByExactName } from "./contacts-shared.js"
 import { hulyQuery } from "./query-helpers.js"

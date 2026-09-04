@@ -343,6 +343,116 @@ describe("Effect 4 oracle structural parity", () => {
     expect(oracleDeltaReviewCategory(delta, parseCandidateToolIdentities(responses({ tools: [{}] })))).toBeUndefined()
   })
 
+  it("classifies issue-97 insertions across registry, CLI, native, and live parity surfaces", async () => {
+    const baselineJson = await fs.readFile(EFFECT4_ORACLE_PATH, "utf8")
+    const source = Schema.decodeUnknownSync(Schema.fromJsonString(BehavioralOracleSchema))(baselineJson)
+    const authored = source.registry.authoredConstraints.find((entry) => entry.toolName === "list_issues")
+    const registryTool = source.registry.tools.find((entry) => entry.name === "list_issues")
+    const route = source.cli.routes.find((entry) => entry.toolName === "list_issues")
+    expect(authored).toBeDefined()
+    expect(registryTool).toBeDefined()
+    expect(route).toBeDefined()
+    if (authored === undefined || registryTool === undefined || route === undefined) return
+
+    const baseline = Schema.decodeUnknownSync(BehavioralOracleSchema)({
+      ...source,
+      bundledProcesses: {
+        ...source.bundledProcesses,
+        stdio: { ...source.bundledProcesses.stdio, native: candidateToolResponses(["list_issues"]) }
+      },
+      registry: {
+        ...source.registry,
+        authoredConstraints: [authored],
+        operationOrder: ["list_issues"],
+        rawOrder: ["list_issues"],
+        tools: [registryTool]
+      },
+      cli: { ...source.cli, routes: [route] }
+    })
+    const current = Schema.decodeUnknownSync(BehavioralOracleSchema)({
+      ...baseline,
+      bundledProcesses: {
+        ...baseline.bundledProcesses,
+        stdio: {
+          ...baseline.bundledProcesses.stdio,
+          native: candidateToolResponses(["set_employee_position", "list_issues"])
+        }
+      },
+      registry: {
+        ...baseline.registry,
+        authoredConstraints: [{ ...authored, toolName: "set_employee_position" }, { ...authored }],
+        operationOrder: ["set_employee_position", "list_issues"],
+        rawOrder: ["set_employee_position", "list_issues"],
+        tools: [{ ...registryTool, name: "set_employee_position" }, { ...registryTool }]
+      },
+      cli: {
+        ...baseline.cli,
+        routes: [
+          { ...route, path: ["contacts", "employees", "set-position"], toolName: "set_employee_position" },
+          { ...route }
+        ],
+        parity: {
+          ...baseline.cli.parity,
+          live: {
+            ...baseline.cli.parity.live,
+            cliRoutes: baseline.cli.parity.live.cliRoutes + 1,
+            registryOperations: baseline.cli.parity.live.registryOperations + 1
+          }
+        }
+      }
+    })
+    const deltas = compareOracleValues(baseline, current)
+    const report = createOracleDeltaAuditReport("baseline", "current", baseline, current, deltas)
+
+    expect(deltas.length).toBeGreaterThan(10)
+    expect(report.categories).toEqual([{ category: "issue-97-administration", deltas }])
+    expect(report.certificate.categories.find(({ category }) => category === "issue-97-administration")).toMatchObject({
+      issue: "#97",
+      rationale: expect.stringContaining("funnel-administration")
+    })
+  })
+
+  it("classifies issue-97 tool descriptions by native tool identity without an insertion", async () => {
+    const baselineJson = await fs.readFile(EFFECT4_ORACLE_PATH, "utf8")
+    const source = Schema.decodeUnknownSync(Schema.fromJsonString(BehavioralOracleSchema))(baselineJson)
+    const native = candidateToolResponses(["set_employee_position"])
+    const oracle = Schema.decodeUnknownSync(BehavioralOracleSchema)({
+      ...source,
+      bundledProcesses: { ...source.bundledProcesses, stdio: { ...source.bundledProcesses.stdio, native } }
+    })
+    const descriptionDelta = {
+      _tag: "Changed" as const,
+      path: "/bundledProcesses/stdio/native/0/result/tools/0/description",
+      before: "old",
+      after: "new"
+    }
+    const report = createOracleDeltaAuditReport("same", "same", oracle, oracle, [descriptionDelta])
+
+    expect(report.categories).toEqual([{ category: "issue-97-administration", deltas: [descriptionDelta] }])
+  })
+
+  it("verifies reviews when either or both oracle corpora decode for expansion classification", async () => {
+    const baselineJson = await fs.readFile(EFFECT4_ORACLE_PATH, "utf8")
+    const source = Schema.decodeUnknownSync(Schema.fromJsonString(BehavioralOracleSchema))(baselineJson)
+    const validJson = canonicalJson(source)
+    const invalidJson = "not-an-oracle"
+    const delta = {
+      _tag: "Changed" as const,
+      path: "/bundledProcesses/cli/rootHelp/stdout",
+      before: "old",
+      after: "new"
+    }
+
+    for (const { baseline, current } of [
+      { baseline: validJson, current: invalidJson },
+      { baseline: invalidJson, current: validJson },
+      { baseline: validJson, current: validJson }
+    ]) {
+      const review = createOracleDeltaReview(baseline, current, [delta])
+      expect(() => verifyReviewedOracleDeltas(baseline, current, [delta], review)).not.toThrow()
+    }
+  })
+
   it("rejects unclassified, zero-count, duplicate, and stale compact review categories", () => {
     const fixture = canonicalJson({ count: 1 })
     const review = (categories: ReadonlyArray<unknown>) =>

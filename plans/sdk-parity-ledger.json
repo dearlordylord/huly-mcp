@@ -245,7 +245,7 @@
       "package": "@hcengineering/contact",
       "status": "covered",
       "matrixLocation": "Contact channels and identities",
-      "rationale": "Current contacts tools expose person, organization, employee/member, and organization-channel operations.",
+      "rationale": "Current contacts tools expose person, organization, employee/member, and organization-channel operations. Employee summaries project stable Contact Employee fields including active, role, statuses, position, and personUuid; set_employee_position updates only contact.mixin.Employee.position. SDK avatarType/avatar/avatarProps are provider/blob metadata; attachment/comment/channel counters and social identity collections are derived; birthday/profile need separate contracts; createdOn/createdBy/modifiedBy and class/space refs are internal metadata and remain intentionally unsupported in that summary.",
       "exports": [
         "Contact",
         "Member",
@@ -417,6 +417,28 @@
         "NewMessage",
         "SharedMessage",
         "SharedMessages"
+      ]
+    },
+    {
+      "package": "@hcengineering/hr",
+      "status": "covered",
+      "matrixLocation": "Human Resources",
+      "rationale": "Department hierarchy CRUD, department membership and manager/subscriber/team-lead updates, and employee department assignment through the Staff mixin are covered by the HR department tools added for issue #253.",
+      "exports": [
+        "Department",
+        "Staff"
+      ]
+    },
+    {
+      "package": "@hcengineering/hr",
+      "status": "gap",
+      "matrixLocation": "Human Resources",
+      "rationale": "HR request types and requests remain assigned to issue #254; public holidays and timezone-date schedule data remain assigned to issue #255.",
+      "exports": [
+        "PublicHoliday",
+        "Request",
+        "RequestType",
+        "TzDate"
       ]
     },
     {

@@ -29,7 +29,13 @@ import { contact } from "../../../src/huly/huly-plugins.js"
 import { findPersonByEmailOrName, findPersonByExactEmailOrName } from "../../../src/huly/operations/contacts-shared.js"
 import { setEmployeePosition } from "../../../src/huly/operations/employee-position.js"
 import { createOrganization, listOrganizations } from "../../../src/huly/operations/organizations.js"
-import { getPerson, listEmployees, listPersons, updatePerson } from "../../../src/huly/operations/persons.js"
+import {
+  getPerson,
+  listEmployees,
+  listPersonOrganizations,
+  listPersons,
+  updatePerson
+} from "../../../src/huly/operations/persons.js"
 import { resolveAssignee } from "../../../src/huly/operations/test-management-shared.js"
 import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import { memberReference } from "../../helpers/brands.js"
@@ -893,6 +899,21 @@ describe("Contacts Extended Coverage", () => {
       })
     )
 
+    it.effect("omits unavailable optional employee metadata", () =>
+      Effect.gen(function* () {
+        const employee = createMockEmployee({ _id: docRef<HulyEmployee>("employee-minimal") })
+        Reflect.deleteProperty(employee, "city")
+        Reflect.deleteProperty(employee, "modifiedOn")
+
+        const result = yield* listEmployees({ limit: 10 }).pipe(
+          Effect.provide(createTestLayer({ employees: [employee] }))
+        )
+
+        expect(Object.hasOwn(assertAt(result, 0), "city")).toBe(false)
+        expect(Object.hasOwn(assertAt(result, 0), "modifiedOn")).toBe(false)
+      })
+    )
+
     it.effect("returns empty array when no employees", () =>
       Effect.gen(function* () {
         const testLayer = createTestLayer({ employees: [] })
@@ -900,6 +921,23 @@ describe("Contacts Extended Coverage", () => {
         const result = yield* listEmployees({}).pipe(Effect.provide(testLayer))
 
         expect(result).toEqual([])
+      })
+    )
+  })
+
+  describe("listPersonOrganizations", () => {
+    it.effect("fails when the person ID or email does not exist", () =>
+      Effect.gen(function* () {
+        const layer = createTestLayer({ persons: [] })
+        const idError = yield* Effect.flip(
+          listPersonOrganizations({ personId: PersonId.make("missing-person") }).pipe(Effect.provide(layer))
+        )
+        const emailError = yield* Effect.flip(
+          listPersonOrganizations({ email: Email.make("missing@example.com") }).pipe(Effect.provide(layer))
+        )
+
+        expect(idError._tag).toBe("PersonNotFoundError")
+        expect(emailError._tag).toBe("PersonNotFoundError")
       })
     )
   })
@@ -1009,6 +1047,63 @@ describe("Contacts Extended Coverage", () => {
 
         expect(result).toEqual({ id: "employee-current", updated: false, position: "Developer" })
         expect(capture.attributes).toBeUndefined()
+      })
+    )
+
+    it.effect("does not write when an unset position is explicitly cleared", () =>
+      Effect.gen(function* () {
+        const employee = createMockEmployee({ _id: docRef<HulyEmployee>("employee-unset"), position: null })
+        const capture: MockConfig["captureUpdateMixin"] = {}
+        const params = yield* parseSetEmployeePositionParams({ employee: { id: "employee-unset" }, position: null })
+
+        const result = yield* setEmployeePosition(params).pipe(
+          Effect.provide(createTestLayer({ employees: [employee], captureUpdateMixin: capture }))
+        )
+
+        expect(result).toEqual({ id: "employee-unset", updated: false, position: null })
+        expect(capture.attributes).toBeUndefined()
+      })
+    )
+
+    it.effect("distinguishes missing IDs from Persons without the Employee mixin", () =>
+      Effect.gen(function* () {
+        const person = createMockPerson({ _id: docRef<HulyPerson>("person-only") })
+        const missingParams = yield* parseSetEmployeePositionParams({
+          employee: { id: "missing-person" },
+          position: "Lead"
+        })
+        const personParams = yield* parseSetEmployeePositionParams({
+          employee: { id: "person-only" },
+          position: "Lead"
+        })
+        const testLayer = createTestLayer({ persons: [person], employees: [] })
+
+        const missing = yield* Effect.flip(setEmployeePosition(missingParams).pipe(Effect.provide(testLayer)))
+        const notEmployee = yield* Effect.flip(setEmployeePosition(personParams).pipe(Effect.provide(testLayer)))
+
+        expect(missing._tag).toBe("PersonNotFoundError")
+        expect(notEmployee._tag).toBe("PersonNotAnEmployeeError")
+      })
+    )
+
+    it.effect("distinguishes missing names from matching Persons without the Employee mixin", () =>
+      Effect.gen(function* () {
+        const person = createMockPerson({ _id: docRef<HulyPerson>("person-only"), name: "Person,Only" })
+        const missingParams = yield* parseSetEmployeePositionParams({
+          employee: { name: "Missing,Person" },
+          position: "Lead"
+        })
+        const personParams = yield* parseSetEmployeePositionParams({
+          employee: { name: "Person,Only" },
+          position: "Lead"
+        })
+        const testLayer = createTestLayer({ persons: [person], employees: [] })
+
+        const missing = yield* Effect.flip(setEmployeePosition(missingParams).pipe(Effect.provide(testLayer)))
+        const notEmployee = yield* Effect.flip(setEmployeePosition(personParams).pipe(Effect.provide(testLayer)))
+
+        expect(missing._tag).toBe("PersonNotFoundError")
+        expect(notEmployee._tag).toBe("PersonNotAnEmployeeError")
       })
     )
 

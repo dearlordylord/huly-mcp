@@ -1,13 +1,31 @@
 import { describe, it } from "@effect/vitest"
 import type { Class, Doc, Ref, Space, Status } from "@hcengineering/core"
 import { AccountRole, toFindResult } from "@hcengineering/core"
-import type { Project, ProjectType, Task, TaskType, TaskTypeDescriptor } from "@hcengineering/task"
-import { Effect } from "effect"
+import type {
+  Project,
+  ProjectType,
+  ProjectTypeDescriptor,
+  Task,
+  TaskType,
+  TaskTypeDescriptor
+} from "@hcengineering/task"
+import { Effect, Layer } from "effect"
 import { expect } from "vitest"
 
-import { AccountUuid, Count, NonEmptyString } from "../../../src/domain/schemas/shared.js"
-import { FunnelReference } from "../../../src/domain/schemas/leads.js"
+import { FunnelIdentifier, FunnelReference, LeadIdentifier } from "../../../src/domain/schemas/leads.js"
+import { AccountUuid, Count, NonEmptyString, UNKNOWN_TOTAL } from "../../../src/domain/schemas/shared.js"
+import { ProjectTypeRefSchema } from "../../../src/domain/schemas/task-management.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import {
+  FunnelAccountNotFoundError,
+  FunnelDeleteConflictError,
+  FunnelIdentifierAmbiguousError,
+  FunnelNotFoundError,
+  FunnelProjectTypeIdentifierAmbiguousError,
+  FunnelProjectTypeNotFoundError,
+  FunnelWorkflowInvalidError,
+  LeadNotFoundError
+} from "../../../src/huly/errors-leads.js"
 import { WorkspaceClient } from "../../../src/huly/workspace-client.js"
 import { Diagnostics, makeDiagnosticsScope } from "../../../src/huly/diagnostics.js"
 import { core, task } from "../../../src/huly/huly-plugins.js"
@@ -18,6 +36,7 @@ import {
   createFunnel,
   deleteFunnel,
   getFunnel,
+  listFunnels,
   updateFunnel
 } from "../../../src/huly/operations/funnels.js"
 import { markdownToMarkupString, testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
@@ -202,12 +221,29 @@ const provide = <A, E>(
     const scope = yield* makeDiagnosticsScope
     return yield* effect.pipe(
       Effect.provideService(Diagnostics, scope.service),
-      Effect.provide(layers.layer),
-      Effect.provide(layers.workspaceLayer)
+      Effect.provide(Layer.mergeAll(layers.layer, layers.workspaceLayer))
     )
   })
 
 describe("funnel administration operations", () => {
+  it.effect("lists active funnels by default and includes archived funnels when requested", () =>
+    Effect.gen(function* () {
+      const active = makeFunnel({ description: "" })
+      const archived = makeFunnel({ _id: toRef<HulyFunnel>("funnel-2"), archived: true })
+      const test = fixture({ funnels: [active, archived] })
+
+      const activeResult = yield* provide(listFunnels({}), test)
+      const allResult = yield* provide(listFunnels({ includeArchived: true, limit: Count.make(2) }), test)
+
+      expect(activeResult.funnels).toEqual([
+        { identifier: "funnel-1", name: "Sales", description: undefined, archived: false }
+      ])
+      expect(activeResult.total).toBe(1)
+      expect(allResult.funnels).toHaveLength(2)
+      expect(allResult.total).toBe(2)
+    })
+  )
+
   it.effect("projects stable fields, validated workflow, impact, and unsupported classification", () =>
     Effect.gen(function* () {
       const test = fixture({ leadCount: 3 })
@@ -219,12 +255,41 @@ describe("funnel administration operations", () => {
     })
   )
 
+  it.effect("projects optional roles and unknown lead totals", () =>
+    Effect.gen(function* () {
+      const test = fixture({
+        funnels: [makeFunnel({ autoJoinForRoles: [AccountRole.User], restricted: true })],
+        leadCount: UNKNOWN_TOTAL
+      })
+      const result = yield* provide(getFunnel({ funnel: funnel("funnel-1") }), test)
+      expect(result.autoJoinForRoles).toEqual([AccountRole.User])
+      expect(result.restricted).toBe(true)
+      expect(result.impact.totalAffected).toBe(UNKNOWN_TOTAL)
+    })
+  )
+
+  it.effect("defaults absent native counters, owners, and auto-join values", () =>
+    Effect.gen(function* () {
+      const {
+        attachments: _attachments,
+        autoJoin: _autoJoin,
+        comments: _comments,
+        owners: _owners,
+        ...minimalFunnel
+      } = makeFunnel()
+      const result = yield* provide(getFunnel({ funnel: funnel("funnel-1") }), fixture({ funnels: [minimalFunnel] }))
+      expect(result.owners).toEqual([])
+      expect(result.autoJoin).toBe(false)
+      expect(result.impact).toMatchObject({ comments: 0, attachments: 0 })
+    })
+  )
+
   it.effect("omits unavailable exact-optional projection fields", () =>
     Effect.gen(function* () {
       const {
-        fullDescription: _fullDescription,
-        createdOn: _createdOn,
         createdBy: _createdBy,
+        createdOn: _createdOn,
+        fullDescription: _fullDescription,
         ...withoutOptionalFields
       } = makeFunnel()
       const test = fixture({ funnels: [withoutOptionalFields] })
@@ -304,6 +369,88 @@ describe("funnel administration operations", () => {
     })
   )
 
+  it.effect("accepts a generated Lead task mixin and rejects missing workflow model references", () =>
+    Effect.gen(function* () {
+      const customTarget = toClassRef<Task>("custom-lead:type:mixin")
+      const customTask = { ...taskType, targetClass: customTarget }
+      const customMixin = {
+        ...docBase(toRef<Doc>(customTarget), core.class.Mixin, core.space.Model),
+        extends: leadClassIds.class.Lead,
+        projectType: projectTypeId,
+        taskType: taskTypeId
+      }
+      const valid = fixture({ taskTypes: [customTask], modelDocs: [customMixin] })
+      const detail = yield* provide(getFunnel({ funnel: funnel("funnel-1") }), valid)
+      expect(detail.workflow[0]?.id).toBe("lead-task-type")
+
+      const incompatible = fixture({ taskTypes: [{ ...taskType, parent: toRef<ProjectType>("other-project") }] })
+      const incompatibleError = yield* Effect.flip(provide(getFunnel({ funnel: funnel("funnel-1") }), incompatible))
+      expect(incompatibleError._tag).toBe("FunnelWorkflowInvalidError")
+
+      const noStatuses = fixture({
+        projectTypes: [{ ...projectType, statuses: [] }],
+        taskTypes: [{ ...taskType, statuses: [] }]
+      })
+      const noStatusError = yield* Effect.flip(provide(getFunnel({ funnel: funnel("funnel-1") }), noStatuses))
+      expect(noStatusError._tag).toBe("FunnelWorkflowInvalidError")
+
+      const missingStatus = fixture({ statuses: [] })
+      const missingStatusError = yield* Effect.flip(provide(getFunnel({ funnel: funnel("funnel-1") }), missingStatus))
+      expect(missingStatusError._tag).toBe("FunnelWorkflowInvalidError")
+
+      const emptyWorkflow = fixture({ projectTypes: [{ ...projectType, tasks: [], statuses: [] }] })
+      const emptyWorkflowError = yield* Effect.flip(provide(getFunnel({ funnel: funnel("funnel-1") }), emptyWorkflow))
+      expect(emptyWorkflowError._tag).toBe("FunnelWorkflowInvalidError")
+    })
+  )
+
+  it.effect("rejects missing and multiply matched funnels and project types", () =>
+    Effect.gen(function* () {
+      const missing = yield* Effect.flip(
+        provide(getFunnel({ funnel: funnel("missing-funnel") }), fixture({ funnels: [] }))
+      )
+      expect(missing._tag).toBe("FunnelNotFoundError")
+
+      const secondType = {
+        ...projectType,
+        _id: toRef<ProjectType>("funnel-project-type-2"),
+        name: "Second funnel type"
+      }
+      const ambiguousType = yield* Effect.flip(
+        provide(
+          createFunnel({ name: NonEmptyString.make("New funnel") }),
+          fixture({ funnels: [], projectTypes: [projectType, secondType] })
+        )
+      )
+      expect(ambiguousType._tag).toBe("FunnelProjectTypeIdentifierAmbiguousError")
+
+      const incompatibleType = yield* Effect.flip(
+        provide(
+          createFunnel({ name: NonEmptyString.make("Wrong type") }),
+          fixture({
+            funnels: [],
+            projectTypes: [{ ...projectType, descriptor: toRef<ProjectTypeDescriptor>("other:descriptor") }]
+          })
+        )
+      )
+      expect(incompatibleType._tag).toBe("FunnelProjectTypeNotFoundError")
+
+      const byId = yield* provide(
+        createFunnel({ name: NonEmptyString.make("By ID"), projectType: ProjectTypeRefSchema.make(projectTypeId) }),
+        fixture({ funnels: [] })
+      )
+      const byName = yield* provide(
+        createFunnel({
+          name: NonEmptyString.make("By name"),
+          projectType: ProjectTypeRefSchema.make(projectType.name)
+        }),
+        fixture({ funnels: [] })
+      )
+      expect(byId.created).toBe(true)
+      expect(byName.created).toBe(true)
+    })
+  )
+
   it.effect("rejects unknown workspace member accounts before mutation", () =>
     Effect.gen(function* () {
       const unknown = AccountUuid.make("00000000-0000-4000-8000-000000000999")
@@ -316,6 +463,22 @@ describe("funnel administration operations", () => {
       )
       expect(error._tag).toBe("FunnelAccountNotFoundError")
       expect(test.created).toHaveLength(0)
+    })
+  )
+
+  it.effect("rejects an existing funnel with invalid membership and a missing project type", () =>
+    Effect.gen(function* () {
+      const invalidMembership = fixture({ funnels: [makeFunnel({ owners: [] })] })
+      const membershipError = yield* Effect.flip(
+        provide(updateFunnel({ funnel: funnel("funnel-1"), description: "Changed" }), invalidMembership)
+      )
+      expect(membershipError._tag).toBe("FunnelWorkflowInvalidError")
+      expect(invalidMembership.updates).toHaveLength(0)
+
+      const missingType = yield* Effect.flip(
+        provide(getFunnel({ funnel: funnel("funnel-1") }), fixture({ projectTypes: [] }))
+      )
+      expect(missingType._tag).toBe("FunnelProjectTypeNotFoundError")
     })
   )
 
@@ -430,6 +593,78 @@ describe("funnel administration operations", () => {
     })
   )
 
+  it.effect("rejects duplicate existing creates and updates every mutable field", () =>
+    Effect.gen(function* () {
+      const duplicate = fixture({ funnels: [makeFunnel(), makeFunnel({ _id: toRef<HulyFunnel>("funnel-2") })] })
+      const duplicateError = yield* Effect.flip(
+        provide(createFunnel({ name: NonEmptyString.make("Sales") }), duplicate)
+      )
+      expect(duplicateError._tag).toBe("FunnelIdentifierAmbiguousError")
+
+      const updateTest = fixture()
+      const result = yield* provide(
+        updateFunnel({
+          funnel: funnel("funnel-1"),
+          name: NonEmptyString.make("Sales"),
+          description: "Updated",
+          fullDescription: null,
+          private: true,
+          members: [account],
+          owners: [account],
+          autoJoin: true
+        }),
+        updateTest
+      )
+      expect(result.updated).toBe(true)
+      expect(updateTest.updates[0]).toMatchObject({
+        name: "Sales",
+        description: "Updated",
+        fullDescription: "",
+        private: true,
+        members: [account],
+        owners: [account],
+        autoJoin: true
+      })
+
+      const archived = fixture({ funnels: [makeFunnel({ archived: true })] })
+      const archivedAgain = yield* provide(archiveFunnel({ funnel: funnel("funnel-1") }), archived)
+      expect(archivedAgain.updated).toBe(false)
+      expect(archived.updates).toHaveLength(0)
+
+      const renamed = fixture()
+      const renamedResult = yield* provide(
+        updateFunnel({ funnel: funnel("funnel-1"), name: NonEmptyString.make("Renamed") }),
+        renamed
+      )
+      expect(renamedResult.updated).toBe(true)
+      expect(renamed.updates[0]).toMatchObject({ name: "Renamed" })
+
+      const { owners: _owners, ...withoutOwners } = makeFunnel()
+      const missingOwners = fixture({ funnels: [withoutOwners] })
+      const missingOwnersError = yield* Effect.flip(
+        provide(updateFunnel({ funnel: funnel("funnel-1"), name: NonEmptyString.make("Another name") }), missingOwners)
+      )
+      expect(missingOwnersError._tag).toBe("FunnelWorkflowInvalidError")
+    })
+  )
+
+  it.effect("rejects malformed native references before creating a funnel", () =>
+    Effect.gen(function* () {
+      const test = fixture({ funnels: [] })
+      const error = yield* Effect.flip(
+        provide(
+          createFunnel({
+            name: NonEmptyString.make("Malformed reference"),
+            fullDescription: "Broken [Lead](https://test.invalid/browse?workspace=test&_id=lead-1)."
+          }),
+          test
+        )
+      )
+      expect(error._tag).toBe("HulyDataInvalidError")
+      expect(test.created).toHaveLength(0)
+    })
+  )
+
   it.effect("rejects a locator matching one funnel ID and another funnel name", () =>
     Effect.gen(function* () {
       const test = fixture({
@@ -440,4 +675,29 @@ describe("funnel administration operations", () => {
       if (error._tag === "FunnelIdentifierAmbiguousError") expect(error.matches).toBe(2)
     })
   )
+
+  it("renders actionable funnel domain error messages", () => {
+    const projectTypeRef = ProjectTypeRefSchema.make("funnel-project-type")
+    expect(new FunnelNotFoundError({ identifier: funnel("missing") }).message).toContain("not found")
+    expect(
+      new FunnelIdentifierAmbiguousError({ identifier: funnel("Sales"), matches: Count.make(2) }).message
+    ).toContain("2 funnels")
+    expect(new FunnelProjectTypeNotFoundError({ identifier: projectTypeRef }).message).toContain("not compatible")
+    expect(
+      new FunnelProjectTypeIdentifierAmbiguousError({ identifier: projectTypeRef, matches: Count.make(2) }).message
+    ).toContain("2 project types")
+    expect(
+      new FunnelWorkflowInvalidError({ projectType: projectTypeRef, reason: NonEmptyString.make("missing statuses") })
+        .message
+    ).toContain("missing statuses")
+    expect(
+      new FunnelDeleteConflictError({ identifier: funnel("Sales"), reason: NonEmptyString.make("archive first") })
+        .message
+    ).toContain("archive first")
+    expect(new FunnelAccountNotFoundError({ account }).message).toContain("does not exist")
+    expect(
+      new LeadNotFoundError({ identifier: LeadIdentifier.make("LEAD-404"), funnel: FunnelIdentifier.make("funnel-1") })
+        .message
+    ).toContain("LEAD-404")
+  })
 })

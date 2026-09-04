@@ -189,6 +189,19 @@ const taskTypeStatusRefs = (projectType: ProjectType, taskType: TaskType): Reado
   return uniqueStatusRefs(taskType.statuses.length > 0 ? taskType.statuses : configured)
 }
 
+const hasConsistentStatusMapping = (
+  refs: ReadonlyArray<Ref<Status>>,
+  projectStatusRefs: ReadonlyArray<Ref<Status>>
+): boolean => {
+  const uniqueProjectStatusRefs = uniqueStatusRefs(projectStatusRefs)
+  return (
+    projectStatusRefs.length === uniqueProjectStatusRefs.length &&
+    refs.length === uniqueProjectStatusRefs.length &&
+    refs.every((statusRef) => projectStatusRefs.includes(statusRef)) &&
+    projectStatusRefs.every((statusRef) => refs.includes(statusRef))
+  )
+}
+
 export const resolveFunnelWorkflow = (
   client: HulyClient["Service"],
   projectType: ProjectType
@@ -238,12 +251,7 @@ export const resolveFunnelWorkflow = (
         const projectStatusRefs = projectType.statuses
           .filter((status) => status.taskType === taskType._id)
           .map((status) => status._id)
-        if (
-          projectStatusRefs.length !== uniqueStatusRefs(projectStatusRefs).length ||
-          refs.length !== uniqueStatusRefs(projectStatusRefs).length ||
-          refs.some((statusRef) => !projectStatusRefs.includes(statusRef)) ||
-          projectStatusRefs.some((statusRef) => !refs.includes(statusRef))
-        ) {
+        if (!hasConsistentStatusMapping(refs, projectStatusRefs)) {
           return yield* workflowInvalid(
             projectType,
             NonEmptyString.make(`task type '${taskType._id}' statuses are inconsistent with the project workflow`)

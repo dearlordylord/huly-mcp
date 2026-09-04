@@ -212,8 +212,9 @@ const makeLeadCreateHarness = (config: LeadCreateHarnessConfig = {}) => {
     reads.push(String(requestedClass))
     let matches: ReadonlyArray<Doc> = []
     if (requestedClass === leadClassIds.class.Funnel) {
+      const id = Reflect.get(query, "_id")
       const name = Reflect.get(query, "name")
-      matches = funnels.filter((candidate) => candidate.name === name)
+      matches = funnels.filter((candidate) => candidate._id === id || candidate.name === name)
     } else if (requestedClass === task.class.TaskType) {
       matches = taskTypes
     } else if (requestedClass === core.class.Status) {
@@ -398,7 +399,7 @@ describe("createLead", () => {
       expect(archivedError._tag).toBe("HulyError")
       expect(archivedError.message).toContain("archived")
       expect(archivedHarness.mutations).toEqual([])
-      expect(ambiguousError._tag).toBe("HulyError")
+      expect(ambiguousError._tag).toBe("FunnelIdentifierAmbiguousError")
       expect(ambiguousError.message).toContain("matched 2 funnels")
       expect(ambiguousHarness.mutations).toEqual([])
     })

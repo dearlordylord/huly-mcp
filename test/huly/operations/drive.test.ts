@@ -465,11 +465,11 @@ describe("drive operations", () => {
         updatedDrives: []
       }
 
-      const params = yield* parseUpdateDriveParams({ drive: "Docs", autoJoin: true })
+      const params = yield* parseUpdateDriveParams({ drive: "Docs", name: "Renamed Docs" })
       const result = yield* updateDrive(params).pipe(Effect.provide(makeLayer(state)))
 
-      expect(result.drive).toMatchObject({ name: "Docs", autoJoin: true })
-      expect(state.updatedDrives).toEqual([{ id: "drive-1", operations: { autoJoin: true } }])
+      expect(result.drive).toMatchObject({ name: "Renamed Docs", autoJoin: false })
+      expect(state.updatedDrives).toEqual([{ id: "drive-1", operations: { name: "Renamed Docs" } }])
     })
   )
 

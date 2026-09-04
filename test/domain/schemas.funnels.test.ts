@@ -51,10 +51,12 @@ describe("funnel administration schemas", () => {
   it.effect("rejects empty members and owners outside members", () =>
     Effect.gen(function* () {
       const emptyMembers = yield* Effect.flip(parseCreateFunnelParams({ name: "Sales", members: [] }))
+      const emptyOwners = yield* Effect.flip(parseCreateFunnelParams({ name: "Sales", members: [member], owners: [] }))
       const ownerOutsideMembers = yield* Effect.flip(
         parseCreateFunnelParams({ name: "Sales", members: [member], owners: [owner] })
       )
       expect(String(emptyMembers)).toContain("members must not be empty")
+      expect(String(emptyOwners)).toContain("owners must not be empty")
       expect(String(ownerOutsideMembers)).toContain("every owner must also be a member")
     })
   )

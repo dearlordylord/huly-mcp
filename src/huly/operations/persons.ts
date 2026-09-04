@@ -289,6 +289,15 @@ export const deletePerson = (
     return { id: PersonId.make(params.personId), deleted: true }
   })
 
+const employeeOptionalFields = (emp: HulyEmployee, email: Email | undefined) => ({
+  ...(emp.city === undefined ? {} : { city: emp.city }),
+  ...(email === undefined ? {} : { email }),
+  ...(emp.role === undefined ? {} : { role: emp.role }),
+  ...(emp.statuses === undefined ? {} : { statuses: Count.make(emp.statuses) }),
+  ...(emp.personUuid === undefined ? {} : { personUuid: AccountUuid.make(emp.personUuid) }),
+  ...(emp.position === undefined || emp.position === null ? {} : { position: emp.position })
+})
+
 export const listEmployees = (
   params: ListEmployeesParams
 ): Effect.Effect<Array<EmployeeSummary>, ListEmployeesError, HulyClient> =>
@@ -306,16 +315,12 @@ export const listEmployees = (
 
     return employees.map((emp) => {
       const emailValue = emailMap.get(emp._id)
+      const email = emailValue === undefined ? undefined : Email.make(emailValue)
       const id = PersonId.make(emp._id)
       return {
         id,
         name: PersonName.make(emp.name),
-        ...(emp.city === undefined ? {} : { city: emp.city }),
-        ...(emailValue === undefined ? {} : { email: Email.make(emailValue) }),
-        ...(emp.role === undefined ? {} : { role: emp.role }),
-        ...(emp.statuses === undefined ? {} : { statuses: Count.make(emp.statuses) }),
-        ...(emp.personUuid === undefined ? {} : { personUuid: AccountUuid.make(emp.personUuid) }),
-        ...(emp.position === undefined || emp.position === null ? {} : { position: emp.position }),
+        ...employeeOptionalFields(emp, email),
         active: emp.active,
         url: buildContactUrlFromConfig(client.workbenchUrlConfig, id),
         ...(emp.modifiedOn === undefined ? {} : { modifiedOn: emp.modifiedOn })
