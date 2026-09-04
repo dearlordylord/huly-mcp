@@ -1171,6 +1171,18 @@ describe("Huly Errors", () => {
               return `person:${error.identifier}`
             case "PersonIdentifierAmbiguousError":
               return `person-ambiguous:${error.identifier}:${error.matches}`
+            case "DepartmentNotFoundError":
+              return `department:${error.identifier}`
+            case "DepartmentIdentifierAmbiguousError":
+              return `department-ambiguous:${error.identifier}:${error.matches}`
+            case "DepartmentHierarchyError":
+              return `department-hierarchy:${error.message}`
+            case "DepartmentConflictError":
+              return `department-conflict:${error.message}`
+            case "DepartmentImpactMismatchError":
+              return `department-impact:${error.actualSubdepartments}:${error.actualAssignedStaff}`
+            case "EmployeeNotFoundError":
+              return `employee:${error.identifier}`
             case "OrganizationNotFoundError":
               return `organization:${error.identifier}`
             case "OrganizationIdentifierAmbiguousError":

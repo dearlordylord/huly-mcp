@@ -2,6 +2,8 @@ import type { McpToolName } from "../../../src/mcp/tools/index.js"
 import type { CliCommandSpec } from "./catalog-types.js"
 
 export const businessReadOnlyCliCommandCatalogB = {
+  get_department: { path: ["hr", "departments", "get"], positional: ["department"], description: "Get Department" },
+  list_departments: { path: ["hr", "departments", "list"], positional: [], description: "List Departments" },
   list_events: { path: ["calendar", "events", "list"], positional: [], description: "List Events" },
   list_funnels: { path: ["leads", "funnels", "list"], positional: [], description: "List Funnels" },
   list_inventory_categories: {
@@ -130,6 +132,7 @@ export const businessReadOnlyCliCommandCatalogB = {
     description: "List Recurring Events"
   },
   list_schedules: { path: ["calendar", "schedules", "list"], positional: [], description: "List Schedules" },
+  list_staff: { path: ["hr", "staff", "list"], positional: [], description: "List Staff" },
   list_test_cases: { path: ["tests", "cases", "list"], positional: ["project"], description: "List Test Cases" },
   list_test_plans: { path: ["tests", "plans", "list"], positional: ["project"], description: "List Test Plans" },
   list_test_projects: { path: ["tests", "projects", "list"], positional: [], description: "List Test Projects" },

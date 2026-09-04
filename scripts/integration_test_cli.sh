@@ -36,9 +36,25 @@ TODO_ID=""
 TODO_LABEL_ID=""
 DRAWING_ID=""
 EVENT_ID=""
+HR_DEPARTMENT_ID=""
+HR_STAFF_EMPLOYEE=""
+HR_STAFF_ORIGINAL_DEPARTMENT=""
+HR_STAFF_NEEDS_RESTORE=""
 
 cleanup() {
   set +e
+  if [[ -n "$HR_STAFF_NEEDS_RESTORE" ]]; then
+    if [[ -n "$HR_STAFF_ORIGINAL_DEPARTMENT" ]]; then
+      "${CLI[@]}" hr staff assign-department "$HR_STAFF_EMPLOYEE" \
+        "$HR_STAFF_ORIGINAL_DEPARTMENT" --yes --json >/dev/null 2>&1
+    else
+      "${CLI[@]}" hr staff assign-department "$HR_STAFF_EMPLOYEE" null --yes --json >/dev/null 2>&1
+    fi
+  fi
+  if [[ -n "$HR_DEPARTMENT_ID" ]]; then
+    "${CLI[@]}" hr departments delete "$HR_DEPARTMENT_ID" --execute \
+      --expected-subdepartments 0 --expected-assigned-staff 0 --yes --json >/dev/null 2>&1
+  fi
   if [[ -n "$EVENT_ID" ]]; then
     "${CLI[@]}" calendar events delete "$EVENT_ID" --yes --json >/dev/null 2>&1
   fi
@@ -316,6 +332,42 @@ fi
 cover_cli_json "delete_event" "calendar event cleanup" calendar events delete "$EVENT_ID" --yes
 EVENT_ID=""
 cli_live_case_end "structured-calendar-lifecycle"
+
+cli_live_case_begin "hr-department-lifecycle"
+HR_DEPARTMENT_NAME="CLI HR $RUN_ID"
+capture_cli_json "create_department" "HR department create" HR_DEPARTMENT_JSON \
+  hr departments create "$HR_DEPARTMENT_NAME" --description "CLI integration fixture"
+HR_DEPARTMENT_ID="$(json_value "$HR_DEPARTMENT_JSON" '.id // empty')"
+if [[ -z "$HR_DEPARTMENT_ID" ]]; then
+  echo "create_department did not return a department ID." >&2
+  exit 1
+fi
+cover_cli_json "update_department" "HR department update" \
+  hr departments update "$HR_DEPARTMENT_ID" --description "Updated CLI integration fixture"
+HR_STAFF_JSON="$(run_cli_json_output hr staff list)"
+HR_STAFF_EMPLOYEE="$(json_value "$HR_STAFF_JSON" '.staff[0].id // empty')"
+if [[ -n "$HR_STAFF_EMPLOYEE" ]]; then
+  HR_STAFF_ORIGINAL_DEPARTMENT="$(json_value "$HR_STAFF_JSON" '.staff[0].departmentId // empty')"
+  cover_cli_json "assign_staff_department" "HR staff department assignment" \
+    hr staff assign-department "$HR_STAFF_EMPLOYEE" "$HR_DEPARTMENT_ID" --yes
+  HR_STAFF_NEEDS_RESTORE=1
+  if [[ -n "$HR_STAFF_ORIGINAL_DEPARTMENT" ]]; then
+    cover_cli_json "assign_staff_department" "HR staff department restoration" \
+      hr staff assign-department "$HR_STAFF_EMPLOYEE" "$HR_STAFF_ORIGINAL_DEPARTMENT" --yes
+  else
+    cover_cli_json "assign_staff_department" "HR staff department restoration" \
+      hr staff assign-department "$HR_STAFF_EMPLOYEE" null --yes
+  fi
+  HR_STAFF_NEEDS_RESTORE=""
+else
+  cover_cli_failure "assign_staff_department" "HR staff assignment exact lookup" "not found" \
+    hr staff assign-department "missing-$RUN_ID" "$HR_DEPARTMENT_ID" --yes
+fi
+cover_cli_json "delete_department" "HR department cleanup" \
+  hr departments delete "$HR_DEPARTMENT_ID" --execute \
+    --expected-subdepartments 0 --expected-assigned-staff 0 --yes
+HR_DEPARTMENT_ID=""
+cli_live_case_end "hr-department-lifecycle"
 
 capture_cli_json "list_teamspaces" "teamspaces list" TEAMSPACES_JSON teamspaces list
 TEAMSPACE="$(json_value "$TEAMSPACES_JSON" '.teamspaces[0].name // .teamspaces[0].id // empty')"

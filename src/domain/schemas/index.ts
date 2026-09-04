@@ -119,6 +119,7 @@ export {
 export * from "./workflow-statuses.js"
 export * from "./workflow-status-results.js"
 export * from "./mail.js"
+export * from "./hr-departments.js"
 
 export { optionalOutput } from "./output-helpers.js"
 

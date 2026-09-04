@@ -2,6 +2,19 @@ import type { McpToolName } from "../../../src/mcp/tools/index.js"
 import type { CliCommandSpec } from "./catalog-types.js"
 
 export const businessMutationCliCommandCatalogB = {
+  assign_staff_department: {
+    path: ["hr", "staff", "assign-department"],
+    positional: ["employee", "department"],
+    description: "Set Staff Department",
+    behavior: { confirmation: { type: "requires-yes", message: "hr staff assign-department requires --yes." } }
+  },
+  create_department: { path: ["hr", "departments", "create"], positional: ["name"], description: "Create Department" },
+  delete_department: {
+    path: ["hr", "departments", "delete"],
+    positional: ["department"],
+    description: "Delete Department",
+    behavior: { confirmation: { type: "requires-yes", message: "hr departments delete requires --yes." } }
+  },
   delete_test_plan: {
     path: ["tests", "plan", "delete"],
     positional: ["project", "plan"],
@@ -36,6 +49,11 @@ export const businessMutationCliCommandCatalogB = {
     path: ["drive", "items", "move"],
     positional: ["drive", "targetFolderPath"],
     description: "Move Drive Item"
+  },
+  update_department: {
+    path: ["hr", "departments", "update"],
+    positional: ["department"],
+    description: "Update Department"
   },
   remove_recruiting_candidate_skill: {
     path: ["recruiting", "candidate", "skill", "remove"],

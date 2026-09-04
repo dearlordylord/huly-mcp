@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 
 import * as ApprovalRequestErrors from "./errors-approval-requests.js"
+import * as HrErrors from "./errors-hr.js"
 import {
   BoardArchivedCardDeleteError,
   BoardCardIdentifierAmbiguousError,
@@ -263,6 +264,12 @@ export const HulyDomainError = Schema.Union([
   OrganizationNotFoundError,
   OrganizationIdentifierAmbiguousError,
   InvalidContactProviderError,
+  HrErrors.DepartmentNotFoundError,
+  HrErrors.DepartmentIdentifierAmbiguousError,
+  HrErrors.DepartmentHierarchyError,
+  HrErrors.DepartmentConflictError,
+  HrErrors.DepartmentImpactMismatchError,
+  HrErrors.EmployeeNotFoundError,
   FileUploadError,
   InvalidFileDataError,
   FileNotFoundError,

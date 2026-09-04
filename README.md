@@ -340,7 +340,7 @@ When resolved tool exposure is `proxy`, clients see the built-in tools plus thes
 | `get_tool_schema` | Returns the exact input and output schema for one proxy-visible Huly tool. Use this before invoke_tool when you are not certain about required argument names or result shape. |
 | `invoke_tool` | Invokes one proxy-visible Huly tool by exact name with its arguments. This tool can call read or write Huly operations; check get_tool_schema and the target tool annotations when safety matters. |
 
-**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `approvals`, `boards`, `cards`, `collaborators`, `custom-fields`, `drive`, `inventory`, `labels`, `leads`, `mail`, `templates`, `model-administration`, `planner`, `preferences`, `processes`, `recruiting`, `sdk-discovery`, `security-administration`, `sequence-administration`, `spaces`, `support`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `views`, `virtual-office`, `workbench`, `workflow-statuses`
+**`TOOLSETS` categories:** `projects`, `issues`, `comments`, `milestones`, `documents`, `storage`, `attachments`, `contacts`, `channels`, `calendar`, `time tracking`, `search`, `associations`, `activity`, `notifications`, `workspace`, `approvals`, `boards`, `cards`, `collaborators`, `custom-fields`, `drive`, `hr`, `inventory`, `labels`, `leads`, `mail`, `templates`, `model-administration`, `planner`, `preferences`, `processes`, `recruiting`, `sdk-discovery`, `security-administration`, `sequence-administration`, `spaces`, `support`, `tag-categories`, `tags`, `task-management`, `test-management`, `user-statuses`, `views`, `virtual-office`, `workbench`, `workflow-statuses`
 
 ### Projects
 
@@ -751,6 +751,18 @@ When resolved tool exposure is `proxy`, clients see the built-in tools plus thes
 | `delete_drive_item` | Permanently delete a Drive item, meaning a file or folder. Files are deleted with their version records. Folders must be empty; non-empty folders fail with child count and child summaries. This is permanent deletion, not archive or trash. |
 | `list_drive_file_versions` | List versions for a Drive file resolved by file id or file path. Marks the current version and includes blob id, size, MIME type, lastModified, and download URL. |
 | `restore_drive_file_version` | Restore an existing Drive file version by version id or numeric version. Idempotent when the requested version is already current and does not increment the file version counter. |
+
+### Hr
+
+| Tool | Description |
+|------|-------------|
+| `list_departments` | List HR departments with exact full paths, hierarchy, managers, subscribers, team lead, direct Staff assignments, server-derived member count, and stable counters. Scope by exact parent path/ID; recursive=false returns direct children. |
+| `get_department` | Get one HR department by exact full slash-separated path or department ID. |
+| `create_department` | Create a top-level or nested HR department. Parent and people use exact paths/IDs/names/emails and reject ambiguity. Names cannot contain '/'. Department.members starts empty and remains server-derived. |
+| `update_department` | Rename, move, or replace department metadata and people. Rejects duplicate sibling names and parent cycles. newParent=null moves top-level; teamLead=null clears. Never writes Department.members. |
+| `delete_department` | Preview destructive impact by default. Execution requires execute=true plus exact previewed descendant and assigned-Staff counts; Huly then cascades descendant deletion and clears affected Staff assignments. |
+| `list_staff` | List HR Staff and authoritative department assignments. Optionally scope by exact department path/ID, include descendants, and filter Employee active state. |
+| `assign_staff_department` | Assign an exact employee ID/email/display name by writing only authoritative Staff.department. Use department=null to clear. Department.members hierarchy propagation is performed asynchronously by Huly's server trigger. |
 
 ### Inventory
 

@@ -63,6 +63,9 @@ TELEGRAM_CLEANUP_MESSAGE_ID=""
 ISSUE_AGENT_CLEANUP_ISSUE_ID=""
 ISSUE_AGENT_CLEANUP_PROFILE_ID=""
 ISSUE_AGENT_CLEANUP_PERSON_ID=""
+HR_CLEANUP_DEPARTMENT_ID=""
+HR_STAFF_RESTORE_EMPLOYEE=""
+HR_STAFF_RESTORE_DEPARTMENT=""
 TM_TASK_TYPE_NAME=""
 TM_STATUS_NAME=""
 WORKFLOW_CLEANED=false
@@ -543,7 +546,32 @@ cleanup_issue_agent_assignee_artifacts() {
   return "$cleanup_failed"
 }
 
+cleanup_hr_artifacts() {
+  if [ -n "$HR_STAFF_RESTORE_EMPLOYEE" ]; then
+    local employee_json restore_json
+    employee_json=$(json_string "$HR_STAFF_RESTORE_EMPLOYEE")
+    if [ -n "$HR_STAFF_RESTORE_DEPARTMENT" ]; then
+      restore_json=$(json_string "$HR_STAFF_RESTORE_DEPARTMENT")
+    else
+      restore_json="null"
+    fi
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"assign_staff_department\",\"arguments\":{\"employee\":$employee_json,\"department\":$restore_json}},\"id\":2}" >/dev/null 2>&1 || true
+    HR_STAFF_RESTORE_EMPLOYEE=""
+  fi
+  if [ -n "$HR_CLEANUP_DEPARTMENT_ID" ]; then
+    local department_json preview preview_text descendants staff
+    department_json=$(json_string "$HR_CLEANUP_DEPARTMENT_ID")
+    preview=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_department\",\"arguments\":{\"department\":$department_json}},\"id\":2}" 2>/dev/null || true)
+    preview_text=$(echo "$preview" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+    descendants=$(echo "$preview_text" | jq -r '.impact.subdepartments // 0' 2>/dev/null)
+    staff=$(echo "$preview_text" | jq -r '.impact.assignedStaff // 0' 2>/dev/null)
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_department\",\"arguments\":{\"department\":$department_json,\"execute\":true,\"expectedSubdepartments\":$descendants,\"expectedAssignedStaff\":$staff}},\"id\":2}" >/dev/null 2>&1 || true
+    HR_CLEANUP_DEPARTMENT_ID=""
+  fi
+}
+
 cleanup_all() {
+  cleanup_hr_artifacts || true
   cleanup_issue_agent_assignee_artifacts || true
   cleanup_security_administration_artifacts
   cleanup_sequence_administration_artifacts
@@ -3897,6 +3925,71 @@ run_test "list_persons" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_persons","arguments":{"limit":3}},"id":2}'
 run_test "list_employees" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_employees","arguments":{"limit":3}},"id":2}'
+run_capture_to_var HR_STAFF_TEXT "list_staff" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_staff","arguments":{"limit":20}},"id":2}'
+if [ $? -eq 0 ]; then
+  HR_STAFF_EMPLOYEE=$(echo "$HR_STAFF_TEXT" | jq -r '.staff[0].id // empty' 2>/dev/null)
+  HR_STAFF_ORIGINAL_DEPARTMENT=$(echo "$HR_STAFF_TEXT" | jq -r '.staff[0].departmentId // empty' 2>/dev/null)
+  HR_DEPARTMENT_NAME="MCP HR $RUN_ID"
+  HR_CHILD_NAME="Platform"
+  HR_DEPARTMENT_NAME_JSON=$(json_string "$HR_DEPARTMENT_NAME")
+  run_capture_to_var HR_CREATE_TEXT "create_department(top-level)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_department\",\"arguments\":{\"name\":$HR_DEPARTMENT_NAME_JSON,\"description\":\"Issue 253 integration fixture\"}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    HR_CLEANUP_DEPARTMENT_ID=$(echo "$HR_CREATE_TEXT" | jq -r '.id' 2>/dev/null)
+    run_capture_to_var HR_CHILD_TEXT "create_department(nested)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_department\",\"arguments\":{\"name\":\"$HR_CHILD_NAME\",\"parent\":$HR_DEPARTMENT_NAME_JSON}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      HR_CHILD_ID=$(echo "$HR_CHILD_TEXT" | jq -r '.id' 2>/dev/null)
+      run_capture_to_var HR_GET_TEXT "get_department(path)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_department\",\"arguments\":{\"department\":\"$HR_DEPARTMENT_NAME/$HR_CHILD_NAME\"}},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "get_department resolves nested path" "$HR_GET_TEXT" ".id" "$HR_CHILD_ID"
+      fi
+      run_test "update_department(nested metadata)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_department\",\"arguments\":{\"department\":\"$HR_DEPARTMENT_NAME/$HR_CHILD_NAME\",\"description\":\"Updated integration fixture\"}},\"id\":2}"
+      if [ -n "$HR_STAFF_EMPLOYEE" ]; then
+        HR_STAFF_RESTORE_EMPLOYEE="$HR_STAFF_EMPLOYEE"
+        HR_STAFF_RESTORE_DEPARTMENT="$HR_STAFF_ORIGINAL_DEPARTMENT"
+        run_test "assign_staff_department(authoritative)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"assign_staff_department\",\"arguments\":{\"employee\":\"$HR_STAFF_EMPLOYEE\",\"department\":\"$HR_CHILD_ID\"}},\"id\":2}"
+        HR_CHILD_PATH_JSON=$(json_string "$HR_DEPARTMENT_NAME/$HR_CHILD_NAME")
+        HR_PROPAGATED_CHILD="{}"
+        HR_PROPAGATED_PARENT="{}"
+        for _ in $(seq 1 20); do
+          HR_CHILD_RESPONSE=$(call_tool \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_department\",\"arguments\":{\"department\":$HR_CHILD_PATH_JSON}},\"id\":2}" 2>/dev/null) || true
+          HR_PARENT_RESPONSE=$(call_tool \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_department\",\"arguments\":{\"department\":$HR_DEPARTMENT_NAME_JSON}},\"id\":2}" 2>/dev/null) || true
+          HR_PROPAGATED_CHILD=$(echo "$HR_CHILD_RESPONSE" | jq -r '.result.content[0].text // "{}"' 2>/dev/null)
+          HR_PROPAGATED_PARENT=$(echo "$HR_PARENT_RESPONSE" | jq -r '.result.content[0].text // "{}"' 2>/dev/null)
+          if [ "$(echo "$HR_PROPAGATED_CHILD" | jq -r '.derivedMembers // 0')" -ge 1 ] \
+            && [ "$(echo "$HR_PROPAGATED_PARENT" | jq -r '.derivedMembers // 0')" -ge 1 ]; then
+            break
+          fi
+          sleep 0.25
+        done
+        assert_json_field_equals "Staff assignment propagates to child members" \
+          "$HR_PROPAGATED_CHILD" ".derivedMembers >= 1" "true"
+        assert_json_field_equals "Staff assignment propagates to ancestor members" \
+          "$HR_PROPAGATED_PARENT" ".derivedMembers >= 1" "true"
+      else
+        skip_test "assign_staff_department" "local workspace has no existing Staff fixture"
+      fi
+      run_capture_to_var HR_DELETE_PREVIEW "delete_department(preview cascade)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_department\",\"arguments\":{\"department\":\"$HR_CLEANUP_DEPARTMENT_ID\"}},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "delete_department previews nested impact" "$HR_DELETE_PREVIEW" ".impact.subdepartments" "1"
+        HR_DELETE_DESCENDANTS=$(echo "$HR_DELETE_PREVIEW" | jq -r '.impact.subdepartments' 2>/dev/null)
+        HR_DELETE_STAFF=$(echo "$HR_DELETE_PREVIEW" | jq -r '.impact.assignedStaff' 2>/dev/null)
+        run_test "delete_department(exact impact)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_department\",\"arguments\":{\"department\":\"$HR_CLEANUP_DEPARTMENT_ID\",\"execute\":true,\"expectedSubdepartments\":$HR_DELETE_DESCENDANTS,\"expectedAssignedStaff\":$HR_DELETE_STAFF}},\"id\":2}"
+        HR_CLEANUP_DEPARTMENT_ID=""
+        cleanup_hr_artifacts
+      fi
+    fi
+  fi
+fi
 run_test "list_organizations" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_organizations","arguments":{"limit":3}},"id":2}'
 run_test "get_user_profile" \

@@ -20,8 +20,8 @@ export type CliIntegrationCoverageDecision =
       readonly type: "representative"
     }
 
-export const CLI_COVERAGE_REVIEWED_REGISTRY_OPERATIONS = 522
-export const CLI_COVERAGE_REVIEWED_ROOT_COMMANDS = 54
+export const CLI_COVERAGE_REVIEWED_REGISTRY_OPERATIONS = 529
+export const CLI_COVERAGE_REVIEWED_ROOT_COMMANDS = 55
 export const CLI_COVERAGE_REVIEWED_LOCAL_COMMANDS = 7
 
 export const CLI_REVIEWED_COVERAGE_CATEGORIES = [
@@ -39,6 +39,7 @@ export const CLI_REVIEWED_COVERAGE_CATEGORIES = [
   "custom-fields",
   "documents",
   "drive",
+  "hr",
   "inventory",
   "issues",
   "labels",
@@ -98,6 +99,12 @@ export const CLI_LIVE_COVERAGE_CASES: ReadonlyArray<CliLiveCoverageCase> = [
     behaviors: ["nullable-clear-input"],
     risks: ["lifecycle"]
   },
+  {
+    id: "hr-department-lifecycle",
+    tools: ["create_department", "update_department", "assign_staff_department", "delete_department"],
+    behaviors: ["structured-json-input"],
+    risks: ["lifecycle"]
+  },
   { id: "text-file-input", tools: ["add_comment"], behaviors: ["text-file-input"], risks: [] },
   { id: "raw-upload", tools: ["add_attachment"], behaviors: ["upload-input"], risks: ["transport"] },
   { id: "binary-download", tools: ["download_attachment"], behaviors: ["binary-output"], risks: ["transport"] },
@@ -139,6 +146,11 @@ export const CLI_UNIQUE_RISK_DECISIONS: ReadonlyArray<CliUniqueRiskDecision> = [
   {
     caseId: "nullable-drawing-lifecycle",
     tools: ["create_drawing", "update_drawing", "delete_drawing"],
+    risks: ["lifecycle"]
+  },
+  {
+    caseId: "hr-department-lifecycle",
+    tools: ["create_department", "update_department", "assign_staff_department", "delete_department"],
     risks: ["lifecycle"]
   },
   { caseId: "raw-upload", tools: ["add_attachment"], risks: ["transport"] },
