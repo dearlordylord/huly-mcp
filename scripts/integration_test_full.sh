@@ -1102,6 +1102,18 @@ call_tool() {
   fi
 }
 
+call_tool_fresh_session() {
+  local payload="$1"
+  if [ "$INTEGRATION_SURFACE" = "cli" ]; then
+    call_tool_cli "$payload"
+  else
+    # A one-shot stdio process owns a new Huly client and is already bounded by
+    # TOOL_TIMEOUT. This also avoids mutating the parent HTTP server lifecycle
+    # when callers capture the response through command substitution.
+    call_tool_stdio "$payload"
+  fi
+}
+
 if [ "$INTEGRATION_SURFACE" = "mcp" ] && [ "$INTEGRATION_TRANSPORT" = "http" ]; then
   start_http_transport || exit 1
 fi

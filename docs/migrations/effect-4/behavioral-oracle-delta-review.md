@@ -26,7 +26,7 @@ stale categories, duplicate categories, and corpus hash drift.
 
 | Count | Classification | Evidence |
 | ---: | --- | --- |
-| 3,120 | Draft-07 structural dialect | Effect 4 refs, definitions, optional/null unions, refinements, and composition wrappers. All 578 native and 6 proxy schemas compile under strict Ajv Draft-07. |
+| 3,120 | Draft-07 structural dialect | Effect 4 refs, definitions, optional/null unions, refinements, and composition wrappers. All 580 native and 6 proxy schemas compile under strict Ajv Draft-07. |
 | 1,192 | Schema metadata | Authored descriptions restored by the central adapter and obsolete Effect 3 generator-default titles/descriptions removed. |
 | 977 | Authored-constraint projection | Pre-administration tools remain represented; generated ref/composition paths changed. Manual cross-field constraints remain in the corpus and representative runtime/Ajv agreement passes. |
 | 6 | Direct issue-assignee descriptions | Direct issue create, update, and list advertise exact agent UserProfile titles in both their tool and assignee input descriptions (#245). |

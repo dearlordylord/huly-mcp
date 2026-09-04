@@ -32,6 +32,30 @@ describe("full integration HTTP fresh-session contract", () => {
     expect(functionBody("run_capture_to_var_fresh")).toContain("run_capture_to_var_with_runner call_tool")
   })
 
+  it("uses bounded one-shot transports for fresh-session cleanup and readback", () => {
+    const freshSession = functionBody("call_tool_fresh_session")
+    expect(freshSession).toContain('call_tool_cli "$payload"')
+    expect(freshSession).toContain('call_tool_stdio "$payload"')
+    expect(freshSession).not.toContain("call_tool_http")
+    expect(freshSession).not.toContain("restart_http_transport_if_needed")
+    expect(functionBody("call_tool_stdio")).toContain('timeout "$TOOL_TIMEOUT"')
+    expect(functionBody("call_tool_cli")).toContain('timeout "$TOOL_TIMEOUT"')
+  })
+
+  it("retains employee cleanup state until fresh Person and Employee readback confirm deletion", () => {
+    const body = functionBody("cleanup_employee_lifecycle_artifacts")
+    const deleteIndex = body.indexOf("delete_result=$(call_tool_fresh_session")
+    const personReadIndex = body.indexOf("read_result=$(call_tool_fresh_session")
+    const employeeReadIndex = body.indexOf("employee_result=$(call_tool_fresh_session")
+    const clearIndex = body.indexOf('EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID=""')
+    expect(deleteIndex).toBeGreaterThanOrEqual(0)
+    expect(personReadIndex).toBeGreaterThan(deleteIndex)
+    expect(employeeReadIndex).toBeGreaterThan(personReadIndex)
+    expect(clearIndex).toBeGreaterThan(employeeReadIndex)
+    expect(body).toContain('while [ "$attempt" -le 8 ]')
+    expect(body.match(/test\("not found"; "i"\)/gu)).toHaveLength(2)
+  })
+
   it("polls nested department readback with parent-owned fresh sessions", () => {
     const body = functionBody("wait_for_department_path")
     expectRestartBeforeCapture(body, 'result=$(call_tool "$payload"')
