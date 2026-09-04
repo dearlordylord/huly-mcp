@@ -1349,6 +1349,16 @@ describe("Huly Errors", () => {
               return `contenttype:${error.contentType}`
             case "FunnelNotFoundError":
               return `funnel:${error.identifier}`
+            case "FunnelIdentifierAmbiguousError":
+              return `funnel-ambiguous:${error.identifier}:${error.matches}`
+            case "FunnelProjectTypeNotFoundError":
+              return `funnel-project-type:${error.identifier}`
+            case "FunnelProjectTypeIdentifierAmbiguousError":
+              return `funnel-project-type-ambiguous:${error.identifier}:${error.matches}`
+            case "FunnelWorkflowInvalidError":
+              return `funnel-workflow:${error.projectType}:${error.reason}`
+            case "FunnelDeleteConflictError":
+              return `funnel-delete:${error.identifier}:${error.reason}`
             case "LeadNotFoundError":
               return `lead:${error.identifier}`
             case "ProcessNotFoundError":

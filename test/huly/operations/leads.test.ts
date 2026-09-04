@@ -334,12 +334,12 @@ describe("Lead Operations", () => {
       })
     )
 
-    it.effect("accepts case-insensitive funnel name lookup as a convenience", () =>
+    it.effect("accepts an exact funnel name lookup", () =>
       Effect.gen(function* () {
         const lead = makeLead()
         const testLayer = createTestLayer({ leads: [lead] })
 
-        const result = yield* listLeads({ funnel: funnelReference("sales") }).pipe(
+        const result = yield* listLeads({ funnel: funnelReference("Sales") }).pipe(
           Effect.provide(testLayer),
           withDiagnostics
         )
@@ -349,7 +349,7 @@ describe("Lead Operations", () => {
       })
     )
 
-    it.effect("prefers the most recently modified non-archived funnel when names collide", () =>
+    it.effect("rejects colliding exact funnel names", () =>
       Effect.gen(function* () {
         const olderArchived = makeFunnel({
           _id: docRef<MockFunnel>("funnel-archived"),
@@ -367,13 +367,10 @@ describe("Lead Operations", () => {
 
         const testLayer = createTestLayer({ funnels: [olderArchived, newestActive], leads: [lead] })
 
-        const result = yield* listLeads({ funnel: funnelReference("sales") }).pipe(
-          Effect.provide(testLayer),
-          withDiagnostics
+        const error = yield* Effect.flip(
+          listLeads({ funnel: funnelReference("Sales") }).pipe(Effect.provide(testLayer), withDiagnostics)
         )
-
-        expect(result).toHaveLength(1)
-        expect(assertAt(result, 0).identifier).toBe("LEAD-1")
+        expect(error._tag).toBe("FunnelIdentifierAmbiguousError")
       })
     )
 
@@ -687,8 +684,8 @@ describe("Lead status resolution failures", () => {
   )
 })
 
-describe("Lead funnel sorting and filter branches", () => {
-  it.effect("sorts colliding funnel names by archived flag then recency", () =>
+describe("Lead funnel exact resolution and filter branches", () => {
+  it.effect("rejects three colliding funnel names", () =>
     Effect.gen(function* () {
       const archived = makeFunnel({
         _id: docRef<MockFunnel>("f-archived"),
@@ -710,11 +707,13 @@ describe("Lead funnel sorting and filter branches", () => {
       })
       const lead = makeLead({ space: spaceRef("f-new") })
 
-      const result = yield* listLeads({ funnel: funnelReference("sales") }).pipe(
-        Effect.provide(createTestLayer({ funnels: [olderActive, archived, newerActive], leads: [lead] })),
-        withDiagnostics
+      const error = yield* Effect.flip(
+        listLeads({ funnel: funnelReference("Sales") }).pipe(
+          Effect.provide(createTestLayer({ funnels: [olderActive, archived, newerActive], leads: [lead] })),
+          withDiagnostics
+        )
       )
-      expect(result).toHaveLength(1)
+      expect(error._tag).toBe("FunnelIdentifierAmbiguousError")
     })
   )
 

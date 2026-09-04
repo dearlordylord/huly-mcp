@@ -12,8 +12,30 @@ import {
   parseListFunnelsParams,
   parseListLeadsParams
 } from "../../domain/schemas/leads.js"
+import {
+  createFunnelParamsJsonSchema,
+  CreateFunnelResultSchema,
+  DeleteFunnelResultSchema,
+  FunnelDetailSchema,
+  funnelMutationParamsJsonSchema,
+  FunnelMutationResultSchema,
+  getFunnelParamsJsonSchema,
+  parseCreateFunnelParams,
+  parseFunnelMutationParams,
+  parseGetFunnelParams,
+  parseUpdateFunnelParams,
+  updateFunnelParamsJsonSchema
+} from "../../domain/schemas/funnels.js"
 import { createLead } from "../../huly/operations/leads-create.js"
-import { getLead, listFunnels, listLeads } from "../../huly/operations/leads.js"
+import {
+  archiveFunnel,
+  createFunnel,
+  deleteFunnel,
+  getFunnel,
+  listFunnels,
+  updateFunnel
+} from "../../huly/operations/funnels.js"
+import { getLead, listLeads } from "../../huly/operations/leads.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "leads" as const
@@ -30,6 +52,66 @@ export const leadTools = [
     },
     parseListFunnelsParams,
     listFunnels
+  ),
+  defineTool(
+    {
+      name: "get_funnel",
+      description:
+        "Get one funnel by stable _id or exact name. Ambiguous names are rejected. Returns the full stable Funnel/Project projection, validated Lead workflow, content counts, deletion impact, and explicit unsupported-field classifications.",
+      category: CATEGORY,
+      inputSchema: getFunnelParamsJsonSchema,
+      resultSchema: FunnelDetailSchema
+    },
+    parseGetFunnelParams,
+    getFunnel
+  ),
+  defineTool(
+    {
+      name: "create_funnel",
+      description:
+        "Create a native Huly funnel after validating its Funnel project type, Lead task types, workflow statuses, membership, and owners. Full description accepts Markdown and preserves current-workspace native references. Creation is idempotent only for one exact existing name; the result explicitly reports whether that existing funnel is archived, and ambiguous names are rejected.",
+      category: CATEGORY,
+      inputSchema: createFunnelParamsJsonSchema,
+      resultSchema: CreateFunnelResultSchema
+    },
+    parseCreateFunnelParams,
+    createFunnel
+  ),
+  defineTool(
+    {
+      name: "update_funnel",
+      description:
+        "Update a funnel resolved by stable _id or exact unambiguous name. Validates the existing Funnel project type/workflow and membership before mutation. Null clears description or fullDescription; Markdown native references are preserved.",
+      category: CATEGORY,
+      inputSchema: updateFunnelParamsJsonSchema,
+      resultSchema: FunnelMutationResultSchema
+    },
+    parseUpdateFunnelParams,
+    updateFunnel
+  ),
+  defineTool(
+    {
+      name: "archive_funnel",
+      description:
+        "Archive a funnel without deleting it. Returns lead/comment/attachment impact so the caller can assess the hidden native content. Already archived funnels are an idempotent no-op.",
+      category: CATEGORY,
+      inputSchema: funnelMutationParamsJsonSchema,
+      resultSchema: FunnelMutationResultSchema
+    },
+    parseFunnelMutationParams,
+    archiveFunnel
+  ),
+  defineTool(
+    {
+      name: "delete_funnel",
+      description:
+        "Permanently delete an exact funnel only after it is archived and its lead, comment, and attachment impact is empty. Use get_funnel for preflight and archive_funnel first. Non-empty funnels are rejected.",
+      category: CATEGORY,
+      inputSchema: funnelMutationParamsJsonSchema,
+      resultSchema: DeleteFunnelResultSchema
+    },
+    parseFunnelMutationParams,
+    deleteFunnel
   ),
   defineTool(
     {

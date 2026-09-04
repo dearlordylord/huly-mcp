@@ -6,6 +6,7 @@ export const CONSEQUENTIAL_CLI_TOOLS = [
   "approve_approval_request",
   "reject_approval_request",
   "archive_all_notifications",
+  "archive_funnel",
   "mark_all_notifications_read",
   "add_drive_members",
   "remove_drive_members",

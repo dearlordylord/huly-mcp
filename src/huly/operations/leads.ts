@@ -18,12 +18,9 @@ import { Effect, Schema } from "effect"
 
 import type {
   FunnelReference,
-  FunnelSummary,
   GetLeadParams,
   LeadDetail,
   LeadSummary,
-  ListFunnelsParams,
-  ListFunnelsResult,
   ListLeadsParams
 } from "../../domain/schemas/leads.js"
 import {
@@ -36,12 +33,12 @@ import { StatusName } from "../../domain/schemas/shared.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
-import { FunnelNotFoundError, LeadNotFoundError } from "../errors-leads.js"
+import type { FunnelIdentifierAmbiguousError, FunnelNotFoundError } from "../errors-leads.js"
+import { LeadNotFoundError } from "../errors-leads.js"
 import { HulyDataInvalidError, InvalidStatusError } from "../errors.js"
 import { contact, task } from "../huly-plugins.js"
 import { leadClassIds } from "../lead-plugin.js"
 import { findPersonByEmailOrName } from "./contacts-shared.js"
-import { listTotal } from "./counts.js"
 import {
   findStatusDocs,
   resolveByStatusRef,
@@ -51,13 +48,9 @@ import {
 } from "./issues-shared.js"
 import { clampLimit, escapeLikeWildcards } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
+import { type HulyFunnel, resolveFunnel } from "./funnels-shared.js"
 
-interface HulyFunnel extends Doc {
-  name: string
-  description?: string
-  archived: boolean
-  type?: Ref<Doc>
-}
+export { listFunnels } from "./funnels.js"
 
 interface HulyLead extends Doc {
   title: string
@@ -102,42 +95,11 @@ const normalizeLeadIdentifier = (identifier: string): string => {
   return `LEAD-${match[1]}`
 }
 
-const SORT_LEFT_BEFORE_RIGHT = -1
-const SORT_RIGHT_BEFORE_LEFT = 1
-
-const compareFunnelsByRecency = (left: HulyFunnel, right: HulyFunnel): number => {
-  if (left.archived !== right.archived) {
-    return left.archived ? SORT_RIGHT_BEFORE_LEFT : SORT_LEFT_BEFORE_RIGHT
-  }
-  return right.modifiedOn - left.modifiedOn
-}
-
 const findFunnel = (
   client: HulyClient["Service"],
   funnelIdentifier: FunnelReference
-): Effect.Effect<HulyFunnel, FunnelNotFoundError | HulyClientError> =>
-  Effect.gen(function* () {
-    const byId = yield* client.findOne<HulyFunnel>(leadClassIds.class.Funnel, {
-      _id: toRef<HulyFunnel>(funnelIdentifier)
-    })
-    if (byId !== undefined) return byId
-
-    // Upstream Huly Funnel is a Project-derived space without a tracker-style
-    // human identifier field. We accept normalized name lookup only as a
-    // convenience, but list_funnels returns `_id` as the stable identifier.
-    // Reference:
-    // https://github.com/hcengineering/platform/blob/b9657d53d130a2ed8034c1b71ab0cf8b7a0b4994/models/lead/src/types.ts#L55-L57
-    const allFunnels = yield* client.findAll<HulyFunnel>(leadClassIds.class.Funnel, {})
-    const normalized = normalizeForComparison(funnelIdentifier)
-    const matchingFunnels = [...allFunnels]
-      .filter((candidate) => normalizeForComparison(candidate.name) === normalized)
-      .sort(compareFunnelsByRecency)
-    const funnel = matchingFunnels.at(0)
-    if (funnel === undefined) {
-      return yield* new FunnelNotFoundError({ identifier: funnelIdentifier })
-    }
-    return funnel
-  })
+): Effect.Effect<HulyFunnel, FunnelNotFoundError | FunnelIdentifierAmbiguousError | HulyClientError> =>
+  resolveFunnel(client, funnelIdentifier)
 
 const getFunnelStatuses = (
   client: HulyClient["Service"],
@@ -215,34 +177,12 @@ const findCustomer = (
     })
   })
 
-type ListFunnelsError = HulyClientError
-
-export const listFunnels = (
-  params: ListFunnelsParams
-): Effect.Effect<ListFunnelsResult, ListFunnelsError, HulyClient> =>
-  Effect.gen(function* () {
-    const client = yield* HulyClient
-
-    const query: DocumentQuery<HulyFunnel> = params.includeArchived !== true ? { archived: false } : {}
-
-    const limit = clampLimit(params.limit)
-
-    const funnels = yield* client.findAll<HulyFunnel>(leadClassIds.class.Funnel, query, {
-      limit,
-      sort: { name: SortingOrder.Ascending }
-    })
-
-    const summaries: ReadonlyArray<FunnelSummary> = funnels.map((funnel) => ({
-      identifier: FunnelIdentifier.make(funnel._id),
-      name: funnel.name,
-      description: funnel.description,
-      archived: funnel.archived
-    }))
-
-    return { funnels: summaries, total: listTotal(funnels.total) }
-  })
-
-type ListLeadsError = HulyClientError | HulyDataInvalidError | FunnelNotFoundError | InvalidStatusError
+type ListLeadsError =
+  | HulyClientError
+  | HulyDataInvalidError
+  | FunnelNotFoundError
+  | FunnelIdentifierAmbiguousError
+  | InvalidStatusError
 
 export const listLeads = (
   params: ListLeadsParams
@@ -314,7 +254,12 @@ export const listLeads = (
     return [...validated]
   })
 
-type GetLeadError = HulyClientError | HulyDataInvalidError | FunnelNotFoundError | LeadNotFoundError
+type GetLeadError =
+  | HulyClientError
+  | HulyDataInvalidError
+  | FunnelNotFoundError
+  | FunnelIdentifierAmbiguousError
+  | LeadNotFoundError
 
 export const getLead = (params: GetLeadParams): Effect.Effect<LeadDetail, GetLeadError, HulyClient | Diagnostics> =>
   Effect.gen(function* () {

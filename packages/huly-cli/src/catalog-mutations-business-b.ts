@@ -147,6 +147,12 @@ export const businessMutationCliCommandCatalogB = {
     description: "Update Inventory Product Attachment",
     behavior: { fileInput: { fields: ["description"] } }
   },
+  update_funnel: {
+    path: ["leads", "funnels", "update"],
+    positional: ["funnel"],
+    description: "Update Funnel",
+    behavior: { fileInput: { fields: ["fullDescription"] } }
+  },
   update_inventory_product_comment: {
     path: ["inventory", "product", "comment", "update"],
     positional: ["product", "commentId", "body"],

@@ -51,6 +51,7 @@ RECRUITING_CLEANUP_SKILL=""
 BOARD_CLEANUP_BOARD_ID=""
 BOARD_CLEANUP_LABEL_ID=""
 BOARD_CLEANUP_CARD_LABEL_ID=""
+FUNNEL_CLEANUP_ID=""
 CUSTOM_FIELD_DATE_CLEANUP_ISSUE_ID=""
 CUSTOM_FIELD_DATE_CLEANUP_FIELD_ID=""
 CUSTOM_FIELD_DATE_CLEANUP_FIELD_NAME=""
@@ -298,6 +299,17 @@ cleanup_board_artifacts() {
   if [ -n "$BOARD_CLEANUP_BOARD_ID" ]; then
     board_json=$(json_string "$BOARD_CLEANUP_BOARD_ID")
     call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_board\",\"arguments\":{\"board\":$board_json}},\"id\":2}" >/dev/null 2>&1 || true
+  fi
+}
+
+cleanup_funnel_artifacts() {
+  if [ -n "$FUNNEL_CLEANUP_ID" ]; then
+    local funnel_json
+    funnel_json=$(json_string "$FUNNEL_CLEANUP_ID")
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_funnel\",\"arguments\":{\"funnel\":$funnel_json}},\"id\":2}" >/dev/null 2>&1 || true
+    if call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_funnel\",\"arguments\":{\"funnel\":$funnel_json}},\"id\":2}" >/dev/null 2>&1; then
+      FUNNEL_CLEANUP_ID=""
+    fi
   fi
 }
 
@@ -602,6 +614,7 @@ cleanup_all() {
   cleanup_telegram_message_artifacts || true
   cleanup_custom_field_date_artifacts || true
   cleanup_board_artifacts || true
+  cleanup_funnel_artifacts || true
   cleanup_recruiting_artifacts || true
   cleanup_generic_associations
   cleanup_workflow_artifacts || true
@@ -1893,6 +1906,38 @@ if [ $? -eq 0 ]; then
       '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_funnels","arguments":{"limit":5}},"id":2}'
 
     if [ -n "$FIRST_FUNNEL_ID" ]; then
+      FIRST_FUNNEL_ID_JSON=$(json_string "$FIRST_FUNNEL_ID")
+      run_capture_to_var FUNNEL_DETAIL_TEXT "get_funnel($FIRST_FUNNEL_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_funnel\",\"arguments\":{\"funnel\":$FIRST_FUNNEL_ID_JSON}},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        FUNNEL_PROJECT_TYPE=$(echo "$FUNNEL_DETAIL_TEXT" | jq -r '.projectType.id // empty' 2>/dev/null)
+        FUNNEL_PROJECT_TYPE_JSON=$(json_string "$FUNNEL_PROJECT_TYPE")
+        FUNNEL_ADMIN_NAME="Integration funnel $RUN_ID-$$"
+        FUNNEL_ADMIN_NAME_JSON=$(json_string "$FUNNEL_ADMIN_NAME")
+        run_capture_to_var FUNNEL_CREATE_TEXT "create_funnel($FUNNEL_ADMIN_NAME)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_funnel\",\"arguments\":{\"name\":$FUNNEL_ADMIN_NAME_JSON,\"projectType\":$FUNNEL_PROJECT_TYPE_JSON,\"description\":\"integration funnel\",\"fullDescription\":\"Native [reference](https://example.invalid) coverage\"}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          FUNNEL_CLEANUP_ID=$(echo "$FUNNEL_CREATE_TEXT" | jq -r '.identifier // empty' 2>/dev/null)
+          FUNNEL_CLEANUP_ID_JSON=$(json_string "$FUNNEL_CLEANUP_ID")
+          restart_http_transport_if_needed "after create_funnel" || exit 1
+          run_test "get_funnel(created:$FUNNEL_CLEANUP_ID)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_funnel\",\"arguments\":{\"funnel\":$FUNNEL_CLEANUP_ID_JSON}},\"id\":2}"
+          run_test "update_funnel($FUNNEL_CLEANUP_ID)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_funnel\",\"arguments\":{\"funnel\":$FUNNEL_CLEANUP_ID_JSON,\"description\":null}},\"id\":2}"
+          run_capture_to_var FUNNEL_ARCHIVE_TEXT "archive_funnel($FUNNEL_CLEANUP_ID)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_funnel\",\"arguments\":{\"funnel\":$FUNNEL_CLEANUP_ID_JSON}},\"id\":2}"
+          if [ $? -eq 0 ]; then
+            restart_http_transport_if_needed "after archive_funnel" || exit 1
+            run_capture_to_var FUNNEL_DELETE_TEXT "delete_funnel($FUNNEL_CLEANUP_ID)" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_funnel\",\"arguments\":{\"funnel\":$FUNNEL_CLEANUP_ID_JSON}},\"id\":2}"
+            if [ $? -eq 0 ]; then
+              FUNNEL_CLEANUP_ID=""
+              assert_json_field_equals "delete_funnel reports deleted" "$FUNNEL_DELETE_TEXT" '.deleted' "true"
+            fi
+          fi
+        fi
+      fi
+
       LEAD_FIXTURE_SUFFIX="$RUN_ID-$$"
       LEAD_PERSON_EMAIL="lead-person-$LEAD_FIXTURE_SUFFIX@test.local"
       LEAD_PERSON_EMAIL_JSON=$(json_string "$LEAD_PERSON_EMAIL")

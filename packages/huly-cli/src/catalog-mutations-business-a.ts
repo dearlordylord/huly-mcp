@@ -51,6 +51,7 @@ export const businessMutationCliCommandCatalogA = {
     positional: ["vacancy"],
     description: "Archive Recruiting Vacancy"
   },
+  archive_funnel: { path: ["leads", "funnels", "archive"], positional: ["funnel"], description: "Archive Funnel" },
   complete_todo: { path: ["planner", "todos", "complete"], positional: ["locator"], description: "Complete Todo" },
   create_card: {
     path: ["cards", "create"],
@@ -83,6 +84,12 @@ export const businessMutationCliCommandCatalogA = {
     path: ["inventory", "variant", "create"],
     positional: ["product", "name", "sku"],
     description: "Create Inventory Variant"
+  },
+  create_funnel: {
+    path: ["leads", "funnels", "create"],
+    positional: ["name"],
+    description: "Create Funnel",
+    behavior: { fileInput: { fields: ["fullDescription"] } }
   },
   create_lead: {
     path: ["leads", "create"],
@@ -177,6 +184,12 @@ export const businessMutationCliCommandCatalogA = {
     positional: ["drive"],
     description: "Delete Drive Item",
     behavior: { confirmation: { type: "requires-yes", message: "drive items delete requires --yes." } }
+  },
+  delete_funnel: {
+    path: ["leads", "funnels", "delete"],
+    positional: ["funnel"],
+    description: "Delete Funnel",
+    behavior: { confirmation: { type: "requires-yes", message: "leads funnels delete requires --yes." } }
   },
   delete_event: {
     path: ["calendar", "events", "delete"],

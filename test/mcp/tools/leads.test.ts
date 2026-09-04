@@ -64,9 +64,22 @@ describe("Lead MCP Tools", () => {
     })
   )
 
-  it.effect("has exactly 4 tools", () =>
+  it.effect("registers the workflow-aware funnel administration tools", () =>
     Effect.sync(function () {
-      expect(leadTools).toHaveLength(4)
+      for (const name of ["get_funnel", "create_funnel", "update_funnel", "archive_funnel", "delete_funnel"]) {
+        const tool = leadTools.find((candidate) => candidate.name === name)
+        expect(tool, `${name} is registered`).toBeDefined()
+        expect(tool?.category).toBe("leads")
+      }
+      const deleteTool = leadTools.find((candidate) => candidate.name === "delete_funnel")
+      expect(deleteTool?.description).toContain("archived")
+      expect(deleteTool?.description).toContain("impact")
+    })
+  )
+
+  it.effect("has exactly 9 tools", () =>
+    Effect.sync(function () {
+      expect(leadTools).toHaveLength(9)
     })
   )
 

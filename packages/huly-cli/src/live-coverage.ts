@@ -20,7 +20,7 @@ export type CliIntegrationCoverageDecision =
       readonly type: "representative"
     }
 
-export const CLI_COVERAGE_REVIEWED_REGISTRY_OPERATIONS = 529
+export const CLI_COVERAGE_REVIEWED_REGISTRY_OPERATIONS = 534
 export const CLI_COVERAGE_REVIEWED_ROOT_COMMANDS = 55
 export const CLI_COVERAGE_REVIEWED_LOCAL_COMMANDS = 7
 
@@ -105,6 +105,12 @@ export const CLI_LIVE_COVERAGE_CASES: ReadonlyArray<CliLiveCoverageCase> = [
     behaviors: ["structured-json-input"],
     risks: ["lifecycle"]
   },
+  {
+    id: "funnel-administration-lifecycle",
+    tools: ["get_funnel", "create_funnel", "update_funnel", "archive_funnel", "delete_funnel"],
+    behaviors: ["structured-json-input", "nullable-clear-input", "text-file-input", "consequential-confirmation"],
+    risks: ["lifecycle", "safety"]
+  },
   { id: "text-file-input", tools: ["add_comment"], behaviors: ["text-file-input"], risks: [] },
   { id: "raw-upload", tools: ["add_attachment"], behaviors: ["upload-input"], risks: ["transport"] },
   { id: "binary-download", tools: ["download_attachment"], behaviors: ["binary-output"], risks: ["transport"] },
@@ -153,6 +159,12 @@ export const CLI_UNIQUE_RISK_DECISIONS: ReadonlyArray<CliUniqueRiskDecision> = [
     tools: ["create_department", "update_department", "assign_staff_department", "delete_department"],
     risks: ["lifecycle"]
   },
+  {
+    caseId: "funnel-administration-lifecycle",
+    tools: ["create_funnel", "update_funnel", "archive_funnel", "delete_funnel"],
+    risks: ["lifecycle"]
+  },
+  { caseId: "funnel-administration-lifecycle", tools: ["archive_funnel", "delete_funnel"], risks: ["safety"] },
   { caseId: "raw-upload", tools: ["add_attachment"], risks: ["transport"] },
   { caseId: "binary-download", tools: ["download_attachment"], risks: ["transport"] },
   { caseId: "image-output", tools: ["read_attachment_content"], risks: ["transport"] },

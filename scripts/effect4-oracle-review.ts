@@ -13,6 +13,7 @@ const ReviewCategorySchema = Schema.Literals([
   "schema-metadata",
   "authored-constraints",
   "issue-assignee-description",
+  "funnel-administration",
   "cli-json-diagnostic",
   "cli-help"
 ])
@@ -59,6 +60,7 @@ const CandidateListToolsResponseSchema = Schema.Struct({
 type CandidateTool = Schema.Schema.Type<typeof CandidateToolSchema>
 type CandidateToolIdentities = ReadonlyMap<string, CandidateTool>
 const EMPTY_CANDIDATE_TOOL_IDENTITIES: CandidateToolIdentities = new Map()
+const FUNNEL_AUTHORED_CONSTRAINT_START_INDEX = 318
 
 const candidateToolIdentityKey = (responseIndex: number, toolIndex: number): string => `${responseIndex}/${toolIndex}`
 
@@ -101,6 +103,13 @@ export const oracleDeltaReviewCategory = (
   delta: OracleDelta,
   candidateToolIdentities: CandidateToolIdentities = EMPTY_CANDIDATE_TOOL_IDENTITIES
 ): ReviewCategory | undefined => {
+  const authoredConstraintPosition = /^\/registry\/authoredConstraints\/(\d+)(?:\/|$)/u.exec(delta.path)?.[1]
+  if (
+    authoredConstraintPosition !== undefined &&
+    Number(authoredConstraintPosition) >= FUNNEL_AUTHORED_CONSTRAINT_START_INDEX
+  ) {
+    return "funnel-administration"
+  }
   if (delta.path.startsWith("/registry/authoredConstraints/")) return "authored-constraints"
   if (isIssueAssigneeInputDescription(delta.path, candidateToolIdentities)) return "issue-assignee-description"
   if (delta.path.includes("/inputSchema/") || delta.path.includes("/outputSchema/")) {
@@ -111,6 +120,16 @@ export const oracleDeltaReviewCategory = (
   const toolName = candidateToolName(delta.path, candidateToolIdentities)
   if (toolName !== undefined && ISSUE_ASSIGNEE_TOOL_NAMES.has(toolName)) {
     return "issue-assignee-description"
+  }
+  if (
+    delta.path.startsWith("/bundledProcesses/stdio/native/") ||
+    delta.path.startsWith("/registry/rawOrder/") ||
+    delta.path.startsWith("/registry/operationOrder/") ||
+    delta.path.startsWith("/registry/tools/") ||
+    delta.path.startsWith("/cli/parity/live/") ||
+    delta.path.startsWith("/cli/routes/")
+  ) {
+    return "funnel-administration"
   }
   if (delta.path.includes("/help/") || delta.path.endsWith("Help/stdout")) return "cli-help"
   if (delta.path.includes("/cli/") && delta.path.endsWith("stderr")) return "cli-json-diagnostic"
@@ -126,6 +145,7 @@ const REVIEW_CATEGORY_ORDER: ReadonlyArray<ReviewCategory> = [
   "schema-metadata",
   "authored-constraints",
   "issue-assignee-description",
+  "funnel-administration",
   "cli-json-diagnostic",
   "cli-help"
 ]
@@ -148,13 +168,19 @@ const categoryMetadata = (category: ReviewCategory): { readonly issue: string; r
       return {
         issue: "#225",
         rationale:
-          "Reviewed authored-constraint projection: the same 522 ordered tools remain represented and strict Draft-07/runtime agreement passes."
+          "Reviewed authored-constraint projection: pre-funnel tools remain represented and strict Draft-07/runtime agreement passes."
       }
     case "issue-assignee-description":
       return {
         issue: "#245",
         rationale:
           "Reviewed agent-facing issue tool and assignee input descriptions advertising exact agent UserProfile titles."
+      }
+    case "funnel-administration":
+      return {
+        issue: "#256",
+        rationale:
+          "Reviewed five workflow-aware funnel administration operations, their exact schemas and ordered registry/CLI exposure."
       }
     case "cli-json-diagnostic":
       return {
@@ -165,7 +191,8 @@ const categoryMetadata = (category: ReviewCategory): { readonly issue: string; r
     case "cli-help":
       return {
         issue: "#228",
-        rationale: "Reviewed concise Effect 4 CLI help rendering; route inventory and order are unchanged."
+        rationale:
+          "Reviewed concise Effect 4 CLI help rendering; funnel routes are added without changing other route behavior."
       }
   }
 }

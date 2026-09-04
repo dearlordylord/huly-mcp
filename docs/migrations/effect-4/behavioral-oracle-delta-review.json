@@ -3,24 +3,24 @@
   "categories": [
     {
       "category": "draft07-structure",
-      "count": 12754,
-      "deltaSetSha256": "d9debbd147cb85251d7dfb58eec310a71ff5dd330826289eb25f0276084e6408",
+      "count": 11875,
+      "deltaSetSha256": "1ceadad182fe7f83838b76f565462d0b29ccfa18e085fdba3de3b16cd9829654",
       "issue": "#225",
       "rationale": "Reviewed Effect 4 Draft-07 structural dialect: refs, definitions, optional/null unions, refinements, and composition wrappers."
     },
     {
       "category": "schema-metadata",
-      "count": 4894,
-      "deltaSetSha256": "434fa559d6434f645a0a3d090372419a68aced945c39a11da7a3fdee0a126014",
+      "count": 3688,
+      "deltaSetSha256": "9e3da9e339dd586908239c07c05f35613b7c27cc32c353f8b511cf51d7ad1daf",
       "issue": "#225",
       "rationale": "Reviewed schema metadata migration: authored descriptions are preserved and legacy generator-default metadata is replaced."
     },
     {
       "category": "authored-constraints",
-      "count": 3428,
-      "deltaSetSha256": "039641400c9411afddbc52e53574f9e169f7915b67a18f8edd43b9c89aa9d1c8",
+      "count": 1674,
+      "deltaSetSha256": "2e9dc3657d09911043fc3d180138b77aff7d12fd1235aba647fb58ba72817b95",
       "issue": "#225",
-      "rationale": "Reviewed authored-constraint projection: the same 522 ordered tools remain represented and strict Draft-07/runtime agreement passes."
+      "rationale": "Reviewed authored-constraint projection: pre-funnel tools remain represented and strict Draft-07/runtime agreement passes."
     },
     {
       "category": "issue-assignee-description",
@@ -28,6 +28,13 @@
       "deltaSetSha256": "1b96ecc02119831de41d610adc1a98b8c4346581db372a0e72901aac5b5b8b64",
       "issue": "#245",
       "rationale": "Reviewed agent-facing issue tool and assignee input descriptions advertising exact agent UserProfile titles."
+    },
+    {
+      "category": "funnel-administration",
+      "count": 6575,
+      "deltaSetSha256": "55f7d971b8ca24c52f2fc7c393c74860fcee8f3603c86db213519d80f806cb9c",
+      "issue": "#256",
+      "rationale": "Reviewed five workflow-aware funnel administration operations, their exact schemas and ordered registry/CLI exposure."
     },
     {
       "category": "cli-json-diagnostic",
@@ -39,11 +46,11 @@
     {
       "category": "cli-help",
       "count": 4,
-      "deltaSetSha256": "1202039ed0cf9902be71ccf58d59450ae7dfed6537b5ee22de1e850959220e90",
+      "deltaSetSha256": "7db4c1d3370368cd1ed920a689bbb768d8257869560a33f767957b25cad507fa",
       "issue": "#228",
-      "rationale": "Reviewed concise Effect 4 CLI help rendering; route inventory and order are unchanged."
+      "rationale": "Reviewed concise Effect 4 CLI help rendering; funnel routes are added without changing other route behavior."
     }
   ],
   "formatVersion": 1,
-  "reviewedCurrentSha256": "9c6249928b1ad74f1be091245dd3591dcbe104bed1147a08ad2ba8d1ebe8823c"
+  "reviewedCurrentSha256": "2b14e627f66bed17e6fa19340f09a2a8774bc8a4644e23c1f48f0ffabc3931c5"
 }

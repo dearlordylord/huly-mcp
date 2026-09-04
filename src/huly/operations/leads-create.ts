@@ -31,19 +31,15 @@ import { makeRank, type Rank } from "@hcengineering/rank"
 import type { ProjectType, TaskType } from "@hcengineering/task"
 import { Effect, Option, Schema } from "effect"
 
-import type {
-  CreateLeadParams,
-  CreateLeadResult,
-  FunnelReference,
-  LeadCustomerLocator
-} from "../../domain/schemas/leads.js"
+import type { CreateLeadParams, CreateLeadResult, LeadCustomerLocator } from "../../domain/schemas/leads.js"
 import { FunnelIdentifier, LeadIdentifier } from "../../domain/schemas/leads.js"
-import { Count, DocId } from "../../domain/schemas/shared.js"
+import { DocId } from "../../domain/schemas/shared.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
 import {
-  FunnelNotFoundError,
+  type FunnelIdentifierAmbiguousError,
+  type FunnelNotFoundError,
   HulyDataInvalidError,
   HulyError,
   type OrganizationIdentifierAmbiguousError,
@@ -60,6 +56,7 @@ import { renderMarkdownWithNativeReferencesForWrite } from "./native-reference-m
 import { resolveOrganizationByIdentifier } from "./organization-resolvers.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toClassRef, toMixinRef, toRef } from "./sdk-boundary.js"
+import { resolveFunnel } from "./funnels-shared.js"
 
 interface HulyFunnel extends Doc {
   readonly name: string
@@ -95,34 +92,6 @@ const LeadSequenceNumber = Schema.Int.check(Schema.isGreaterThan(0)).pipe(Schema
 type LeadSequenceNumber = Schema.Schema.Type<typeof LeadSequenceNumber>
 
 const SequenceIncrementResultSchema = Schema.Struct({ object: Schema.Struct({ sequence: LeadSequenceNumber }) })
-
-const strictFunnelLookup = (
-  client: HulyClient["Service"],
-  identifier: FunnelReference
-): Effect.Effect<HulyFunnel, HulyClientError | FunnelNotFoundError | HulyError> =>
-  Effect.gen(function* () {
-    const byId = yield* client.findOne<HulyFunnel>(
-      leadClassIds.class.Funnel,
-      hulyQuery<HulyFunnel>({ _id: toRef<HulyFunnel>(identifier) })
-    )
-    if (byId !== undefined) return byId
-
-    const byExactName = yield* client.findAll<HulyFunnel>(
-      leadClassIds.class.Funnel,
-      hulyQuery<HulyFunnel>({ name: identifier })
-    )
-    if (byExactName.length === 0) {
-      return yield* new FunnelNotFoundError({ identifier })
-    }
-    if (byExactName.length > 1) {
-      return yield* new HulyError({
-        message: `Funnel name '${identifier}' matched ${Count.make(byExactName.length)} funnels; use the stable funnel ID from list_funnels`
-      })
-    }
-    const funnel = byExactName[0]
-    /* v8 ignore next -- guarded by the zero-length check above */
-    return funnel === undefined ? yield* new FunnelNotFoundError({ identifier }) : funnel
-  })
 
 const resolveCustomer = (
   client: HulyClient["Service"],
@@ -357,6 +326,7 @@ const markupRefAsBlobRef = (value: MarkupRef): MarkupBlobRef => {
 type CreateLeadError =
   | HulyClientError
   | FunnelNotFoundError
+  | FunnelIdentifierAmbiguousError
   | HulyDataInvalidError
   | HulyError
   | OrganizationIdentifierAmbiguousError
@@ -371,7 +341,7 @@ export const createLead = (
   Effect.gen(function* () {
     const client = yield* HulyClient
 
-    const funnel = yield* strictFunnelLookup(client, params.funnel)
+    const funnel = yield* resolveFunnel(client, params.funnel)
     if (funnel.archived) {
       return yield* new HulyError({
         message: `Funnel '${FunnelIdentifier.make(funnel._id)}' is archived and cannot accept new leads`

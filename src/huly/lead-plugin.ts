@@ -13,7 +13,7 @@
  */
 import type { Contact } from "@hcengineering/contact"
 import type { Class, Doc, Mixin, Ref } from "@hcengineering/core"
-import type { TaskType } from "@hcengineering/task"
+import type { Project, ProjectType, ProjectTypeDescriptor, TaskType } from "@hcengineering/task"
 
 // Lead plugin refs are opaque strings from upstream Huly. There is no published
 // runtime factory for these phantom refs, so the bridge lives in one place.
@@ -26,6 +26,11 @@ const leadMixinRef = <T extends Doc>(identifier: string): Ref<Mixin<T>> => ident
 
 export const leadClassIds = {
   class: { Lead: leadRef("lead:class:Lead"), Funnel: leadRef("lead:class:Funnel") },
-  mixin: { Customer: leadMixinRef<Contact>("lead:mixin:Customer") },
-  taskType: { Lead: leadDocRef<TaskType>("lead:taskType:Lead") }
+  mixin: {
+    Customer: leadMixinRef<Contact>("lead:mixin:Customer"),
+    DefaultFunnelTypeData: leadMixinRef<Project>("lead:mixin:DefaultFunnelTypeData")
+  },
+  descriptor: { FunnelType: leadDocRef<ProjectTypeDescriptor>("lead:descriptor:FunnelType") },
+  taskType: { Lead: leadDocRef<TaskType>("lead:taskType:Lead") },
+  template: { DefaultFunnel: leadDocRef<ProjectType>("lead:projectType:DefaultFunnel") }
 } as const
