@@ -18,20 +18,22 @@ const decodeSocialIdentityProviders = (
     )
   )
 
-export const listSocialIdentityProviders = (): Effect.Effect<
-  ReadonlyArray<SocialIdentityProviderResult>,
-  HulyClientError | HulyDataInvalidError,
-  HulyClient
-> =>
-  HulyClient.pipe(
-    Effect.flatMap((client) =>
-      client.findAllInModel<SocialIdentityProvider>(contact.class.SocialIdentityProvider, hulyQuery({}))
-    ),
-    Effect.map((providers) => providers.map((provider) => ({ id: provider._id, type: provider.type }))),
-    Effect.flatMap(decodeSocialIdentityProviders),
-    Effect.map((decoded) =>
-      [...decoded].sort(
-        (left, right) => left.type.localeCompare(right.type) || String(left.id).localeCompare(String(right.id))
-      )
+export const listSocialIdentityProviders = Effect.fn("PersonAdministration.listSocialIdentityProviders")(
+  function* (): Effect.fn.Return<
+    ReadonlyArray<SocialIdentityProviderResult>,
+    HulyClientError | HulyDataInvalidError,
+    HulyClient
+  > {
+    const client = yield* HulyClient
+    const providers = yield* client.findAllInModel<SocialIdentityProvider>(
+      contact.class.SocialIdentityProvider,
+      hulyQuery({})
     )
-  )
+    const decoded = yield* decodeSocialIdentityProviders(
+      providers.map((provider) => ({ id: provider._id, type: provider.type }))
+    )
+    return [...decoded].sort(
+      (left, right) => left.type.localeCompare(right.type) || String(left.id).localeCompare(String(right.id))
+    )
+  }
+)

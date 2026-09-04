@@ -2,10 +2,12 @@ import type { Employee, Person, SocialIdentity } from "@hcengineering/contact"
 import { buildSocialIdString, SocialIdType, type DocumentUpdate, type Space } from "@hcengineering/core"
 import { Effect } from "effect"
 
-import type {
-  RepairPersonSocialIdentitiesParams,
-  RepairPersonSocialIdentitiesResult,
-  SocialIdentityId
+import {
+  type RepairPersonSocialIdentitiesParams,
+  type RepairPersonSocialIdentitiesResult,
+  type SocialIdentityId,
+  type SocialIdentityKey,
+  SocialIdentityKey as SocialIdentityKeySchema
 } from "../../domain/schemas/person-administration.js"
 import { Count, NonEmptyString } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
@@ -51,8 +53,10 @@ const nativeSocialIdentityTypes: Record<AccountSocialIdentity["type"], SocialIdT
   "huly-assistant": SocialIdType.HULY_ASSISTANT
 }
 
-const identityKey = (identity: AccountSocialIdentity): string =>
-  buildSocialIdString({ type: nativeSocialIdentityTypes[identity.type], value: identity.value })
+const identityKey = (identity: AccountSocialIdentity): SocialIdentityKey =>
+  SocialIdentityKeySchema.make(
+    buildSocialIdString({ type: nativeSocialIdentityTypes[identity.type], value: identity.value })
+  )
 
 const activeIdentityDiffers = (identity: WorkspaceSocialIdentity, authoritative: AccountSocialIdentity): boolean =>
   identity.type !== authoritative.type ||

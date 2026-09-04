@@ -74,6 +74,14 @@ export const SocialIdentityId = NonEmptyString.pipe(
   Schema.annotate({ identifier: "SocialIdentityId", description: "Exact Huly SocialIdentity document ID." })
 )
 export type SocialIdentityId = Schema.Schema.Type<typeof SocialIdentityId>
+export const SocialIdentityKey = NonEmptyString.pipe(
+  Schema.brand("SocialIdentityKey"),
+  Schema.annotate({
+    identifier: "SocialIdentityKey",
+    description: "Canonical Huly social identity lookup key, including its native provider prefix."
+  })
+)
+export type SocialIdentityKey = Schema.Schema.Type<typeof SocialIdentityKey>
 export const HistoricalInstant = Schema.Int.pipe(
   Schema.brand("HistoricalInstant"),
   Schema.annotate({
@@ -86,7 +94,7 @@ export const SocialIdentitySchema = Schema.Struct({
   id: SocialIdentityId,
   type: SocialIdentityTypeSchema,
   value: NonEmptyString,
-  key: NonEmptyString,
+  key: SocialIdentityKey,
   displayValue: Schema.optionalKey(NonEmptyString),
   verifiedOn: Schema.optionalKey(Timestamp),
   isDeleted: Schema.Boolean

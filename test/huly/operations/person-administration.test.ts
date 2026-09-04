@@ -19,13 +19,13 @@ import {
   parseListPersonCommentsParams,
   GetPersonAdministrationResultSchema,
   SocialIdentityId,
+  SocialIdentityKey,
   SocialIdentityTypeSchema,
   parseUpdatePersonAttachmentParams,
   parseUpdatePersonCommentParams
 } from "../../../src/domain/schemas/person-administration.js"
 import {
   Email,
-  NonEmptyString,
   PersonId,
   PersonName,
   PersonUuid as DomainPersonUuid,
@@ -126,7 +126,7 @@ const workspaceIdentity = (overrides?: Partial<SocialIdentity>): WorkspaceSocial
     attachedTo: PersonId.make(identity.attachedTo),
     type: SocialIdentityTypeSchema.make(identity.type),
     value: identity.value,
-    key: NonEmptyString.make(identity.key),
+    key: SocialIdentityKey.make(identity.key),
     ...(identity.displayValue === undefined ? {} : { displayValue: identity.displayValue }),
     ...(identity.verifiedOn === undefined ? {} : { verifiedOn: Timestamp.make(identity.verifiedOn) }),
     ...(identity.isDeleted === undefined ? {} : { isDeleted: identity.isDeleted })
@@ -376,6 +376,7 @@ describe("person administration schemas", () => {
           displayValue: null
         }
       ])
+      const brandedKeys: ReadonlyArray<SocialIdentityKey> = decoded.map((identity) => identity.key)
 
       expect(decoded).toEqual([
         {
@@ -388,7 +389,15 @@ describe("person administration schemas", () => {
           displayValue: null
         }
       ])
+      expect(brandedKeys).toEqual(["email:ada@example.test"])
     })
+  )
+
+  it.effect("rejects an empty social identity key at the boundary", () =>
+    decodeAccountSocialIdentities([{ _id: "social-live", type: "email", value: "ada@example.test", key: "" }]).pipe(
+      Effect.flip,
+      Effect.map((error) => expect(error).toBeInstanceOf(HulyDataInvalidError))
+    )
   )
 
   it.effect("rejects a malformed account profile as a typed Huly data failure", () =>

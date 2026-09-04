@@ -3,6 +3,7 @@ import { Effect, Schema } from "effect"
 import {
   HistoricalInstant,
   SocialIdentityId,
+  SocialIdentityKey,
   SocialIdentityTypeSchema
 } from "../../domain/schemas/person-administration.js"
 import { AccountRoleSchema } from "../../domain/schemas/workspace.js"
@@ -23,7 +24,7 @@ export const AccountSocialIdentitySchema = Schema.Struct({
   _id: SocialIdentityId,
   type: SocialIdentityTypeSchema,
   value: Schema.String,
-  key: NonEmptyString,
+  key: SocialIdentityKey,
   // The account PostgreSQL adapter emits SQL NULL for an absent display value,
   // despite the public SDK declaring this property as optional.
   displayValue: Schema.optionalKey(Schema.NullOr(Schema.String)),
@@ -45,7 +46,7 @@ export const WorkspaceSocialIdentitySchema = Schema.Struct({
   attachedTo: PersonId,
   type: SocialIdentityTypeSchema,
   value: Schema.String,
-  key: NonEmptyString,
+  key: SocialIdentityKey,
   displayValue: Schema.optionalKey(Schema.String),
   verifiedOn: Schema.optionalKey(Timestamp),
   isDeleted: Schema.optionalKey(Schema.Boolean)
