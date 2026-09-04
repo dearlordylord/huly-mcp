@@ -87,6 +87,8 @@ const DOMAIN_FAILURE_KIND_BY_TAG = {
   EmployeeLifecycleImpactMismatchError: "conflict",
   EmployeeLifecycleStateError: "input",
   EmployeeInvitationPartialFailureError: "conflict",
+  EmployeePreparationConflictError: "conflict",
+  EmployeeDeactivationPartialFailureError: "conflict",
   DrawingNotFoundError: "lookup",
   DriveFileCommentNotFoundError: "lookup",
   DriveFileNotFoundError: "lookup",

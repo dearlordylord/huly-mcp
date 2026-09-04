@@ -1729,6 +1729,10 @@ describe("Huly Errors", () => {
               return `employee-lifecycle-impact:${error.identifier}`
             case "EmployeeInvitationPartialFailureError":
               return `employee-invitation-partial:${error.personId}`
+            case "EmployeePreparationConflictError":
+              return `employee-preparation-conflict:${error.personId}`
+            case "EmployeeDeactivationPartialFailureError":
+              return `employee-deactivation-partial:${error.personId}`
             case "HrRequestMutationUnsupportedError":
               return `hr-request-unsupported:${error.operation}`
             case "PublicHolidayNotFoundError":

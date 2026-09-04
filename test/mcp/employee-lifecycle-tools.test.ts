@@ -9,7 +9,7 @@ describe("employee lifecycle tools", () => {
     expect(tools.every((tool) => tool !== undefined)).toBe(true)
     expect(tools[0]?.description).toContain("exact email")
     expect(tools[1]?.description).toContain("workspace membership")
-    expect(tools[2]?.description).toContain("exact previewed")
+    expect(tools[2]?.description).toContain("exact expected relationship")
     expect(tools[2]?.annotations).toMatchObject({ destructiveHint: true, idempotentHint: true })
   })
 })

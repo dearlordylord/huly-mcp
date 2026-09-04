@@ -15,7 +15,7 @@ import { Cause, Effect, Exit, Layer } from "effect"
 import { beforeEach, expect } from "vitest"
 
 import { HulyConfigService } from "../../src/config/config.js"
-import { NonEmptyString } from "../../src/domain/schemas/shared.js"
+import { Email, NonEmptyString } from "../../src/domain/schemas/shared.js"
 import { HulyAuthError, HulyConnectionError, HulyUnavailableError } from "../../src/huly/errors.js"
 import { toAccountUuid } from "../../src/huly/operations/sdk-boundary.js"
 import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
@@ -233,8 +233,8 @@ describe("WorkspaceClient.layer (real layer)", () => {
       mockResendInvite.mockResolvedValue(undefined)
       mockLeaveWorkspace.mockResolvedValue(null)
       const client = yield* WorkspaceClient
-      yield* client.sendInvite("new@example.test", AccountRole.User)
-      yield* client.resendInvite("inactive@example.test", AccountRole.Maintainer)
+      yield* client.sendInvite(Email.make("new@example.test"), AccountRole.User)
+      yield* client.resendInvite(Email.make("inactive@example.test"), AccountRole.Maintainer)
       yield* client.leaveWorkspace(toAccountUuid("00000000-0000-4000-8000-000000000251"))
       expect(mockSendInvite.mock.calls).toContainEqual(["new@example.test", AccountRole.User])
       expect(mockResendInvite.mock.calls).toContainEqual(["inactive@example.test", AccountRole.Maintainer])
@@ -652,8 +652,8 @@ describe("WorkspaceClient.testLayer", () => {
   it.effect("default employee lifecycle account mutations die when not implemented", () =>
     Effect.gen(function* () {
       const client = yield* WorkspaceClient.pipe(Effect.provide(WorkspaceClient.testLayer({})))
-      const send = yield* Effect.exit(client.sendInvite("a@example.test", AccountRole.User))
-      const resend = yield* Effect.exit(client.resendInvite("a@example.test", AccountRole.User))
+      const send = yield* Effect.exit(client.sendInvite(Email.make("a@example.test"), AccountRole.User))
+      const resend = yield* Effect.exit(client.resendInvite(Email.make("a@example.test"), AccountRole.User))
       const leave = yield* Effect.exit(client.leaveWorkspace(toAccountUuid("00000000-0000-4000-8000-000000000251")))
       expect(Exit.isFailure(send) && Cause.hasDies(send.cause)).toBe(true)
       expect(Exit.isFailure(resend) && Cause.hasDies(resend.cause)).toBe(true)

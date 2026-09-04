@@ -53,7 +53,7 @@ export const contactEmployeeTools = [
     {
       name: "invite_employee",
       description:
-        "Create or promote and invite an employee, or resend an inactive employee invitation. mode=create-or-promote requires the exact Huly display name and email; it resolves both before writing, creates or updates the Person, creates the email SocialIdentity, then applies an active Employee mixin before sending. mode=invite-existing requires an exact email/name locator and rejects active or non-Employee targets. Returns no invitation link, credential, or token; an invitation-provider failure reports completed preparation for safe exact-input retry.",
+        "Create or promote and invite an employee, or resend an inactive employee invitation. mode=create-or-promote requires the exact Huly display name and email; one checked atomic transaction creates or updates the Person, email SocialIdentity, and active Employee before sending. A changed authoritative precondition sends no invite and directs the caller to retry in a fresh session. mode=invite-existing requires an exact email/name locator and rejects active or non-Employee targets. Omitted role preserves the Employee role; an explicit different role is persisted atomically before resend. Returns no invitation link, credential, or token; an invitation-provider failure reports completed preparation.",
       category: CATEGORY,
       inputSchema: inviteEmployeeParamsJsonSchema,
       resultSchema: InviteEmployeeResultSchema
@@ -77,7 +77,7 @@ export const contactEmployeeTools = [
     {
       name: "deactivate_employee",
       description:
-        "Preview or execute an employee lifecycle change resolved by exact email or exact display name. action=deactivate only sets Employee.active=false and retains workspace membership; action=kick also removes the linked account from the workspace. Preview is the default. Execution requires execute=true plus the exact previewed Person ID, account UUID/null, Employee active flag, and workspace role/null; any changed state is rejected. The authenticated employee cannot target itself.",
+        "Preview or execute an employee lifecycle change resolved by exact email or exact display name. action=deactivate only sets Employee.active=false and retains workspace membership; action=kick then removes the linked account from the workspace. If workspace removal fails after deactivation, the typed partial failure lists completed changes and directs a safe preview-and-retry. Preview is the default. Execution requires execute=true plus one exact expected relationship object copied from the preview: unlinked, linked-without-membership, or workspace-member. Any changed Person ID, account UUID, Employee active flag, membership, or workspace role is rejected. The authenticated employee cannot target itself.",
       category: CATEGORY,
       inputSchema: deactivateEmployeeParamsJsonSchema,
       resultSchema: DeactivateEmployeeResultSchema,

@@ -62,6 +62,7 @@ import {
   makeOperationConnectionError
 } from "./errors-base.js"
 import type { PersonMergeSnapshotStaleError } from "./errors-person-administration.js"
+import { executeEmployeePreparation, type EmployeePreparationPlan } from "./employee-preparation.js"
 import { PlatformError } from "./huly-platform.js"
 import {
   markdownInputUrlConfig,
@@ -344,20 +345,10 @@ export interface HulyClientOperations extends HulyClientContext {
     attributes: MixinData<D, M>
   ) => Effect.Effect<TxResult, HulyClientError>
 
-  /** Commit a new root document, one attached document, and one mixin atomically. */
-  readonly createDocWithCollectionAndMixin?: <D extends Doc, A extends AttachedDoc, M extends D>(
-    documentClass: Ref<Class<D>>,
-    space: Ref<Space>,
-    documentData: Data<D>,
-    documentId: Ref<D>,
-    attachedClass: Ref<Class<A>>,
-    collection: string,
-    attachedData: AttachedData<A>,
-    attachedId: Ref<A>,
-    mixin: Ref<Mixin<M>>,
-    mixinData: MixinData<D, M>,
-    scope: HulyTransactionScope
-  ) => Effect.Effect<void, HulyClientError>
+  /** Commit a checked Person, email identity, and Employee preparation as one Apply transaction. */
+  readonly commitEmployeePreparation?: (
+    preparation: EmployeePreparationPlan
+  ) => Effect.Effect<HulyConditionalWriteResult, HulyClientError>
 
   readonly updateMixin: <D extends Doc, M extends D>(
     objectId: Ref<D>,
@@ -548,34 +539,8 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
               "createMixin"
             ),
 
-          createDocWithCollectionAndMixin: <D extends Doc, A extends AttachedDoc, M extends D>(
-            documentClass: Ref<Class<D>>,
-            space: Ref<Space>,
-            documentData: Data<D>,
-            documentId: Ref<D>,
-            attachedClass: Ref<Class<A>>,
-            collection: string,
-            attachedData: AttachedData<A>,
-            attachedId: Ref<A>,
-            mixin: Ref<Mixin<M>>,
-            mixinData: MixinData<D, M>,
-            scope: HulyTransactionScope
-          ) =>
-            withClient(async (client) => {
-              const apply = client.apply(scope)
-              await apply.createDoc(documentClass, space, documentData, documentId)
-              await apply.addCollection(
-                attachedClass,
-                space,
-                documentId,
-                documentClass,
-                collection,
-                attachedData,
-                attachedId
-              )
-              await apply.createMixin(documentId, documentClass, space, mixin, mixinData)
-              await apply.commit()
-            }, "createDocWithCollectionAndMixin"),
+          commitEmployeePreparation: (preparation) =>
+            withClient((client) => executeEmployeePreparation(client, preparation), "commitEmployeePreparation"),
 
           updateMixin: <D extends Doc, M extends D>(
             objectId: Ref<D>,
@@ -656,7 +621,7 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
       uploadMarkup: notImplemented("uploadMarkup"),
       fetchMarkup: noopFetchMarkup,
       createMixin: notImplemented("createMixin"),
-      createDocWithCollectionAndMixin: notImplemented("createDocWithCollectionAndMixin"),
+      commitEmployeePreparation: notImplemented("commitEmployeePreparation"),
       updateMixin: notImplemented("updateMixin"),
       updateMarkup: notImplemented("updateMarkup"),
       searchFulltext: notImplemented("searchFulltext")

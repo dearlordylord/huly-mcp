@@ -1,10 +1,32 @@
 import { Effect, Schema } from "effect"
 
-import type { EmployeeLifecycleState } from "../../domain/schemas/employee-lifecycle.js"
-import { EmployeeLifecycleStateSchema } from "../../domain/schemas/employee-lifecycle.js"
+import {
+  EmployeeInvitationRoleSchema,
+  type EmployeeLifecycleState,
+  EmployeeLifecycleStateSchema
+} from "../../domain/schemas/employee-lifecycle.js"
+import { SocialIdentityId } from "../../domain/schemas/person-administration.js"
 import { AccountRoleSchema } from "../../domain/schemas/workspace.js"
 import { Email, PersonId, PersonName, PersonUuid, SpaceId } from "../../domain/schemas/shared.js"
 import { HulyDataInvalidError } from "../errors.js"
+
+const EmployeeLifecycleBoundaryOperationSchema = Schema.Literals([
+  "resolveEmployeeLifecycleTarget",
+  "prepareEmployee",
+  "inviteEmployee",
+  "inviteEmployee.roleReconciliation",
+  "listInactiveEmployees",
+  "deactivateEmployee"
+])
+export type EmployeeLifecycleBoundaryOperation = Schema.Schema.Type<typeof EmployeeLifecycleBoundaryOperationSchema>
+type EmployeeLifecycleBoundaryEntity =
+  | "Employee mixin"
+  | "Employee mixins"
+  | "Person"
+  | "workspace members"
+  | "email SocialIdentities"
+  | "employee lifecycle projection"
+  | "employee email"
 
 const EmployeeLifecycleDocumentFields = {
   _id: PersonId,
@@ -12,18 +34,20 @@ const EmployeeLifecycleDocumentFields = {
   name: PersonName,
   personUuid: Schema.optionalKey(PersonUuid)
 }
-const EmployeeRole = Schema.Literals(["USER", "GUEST"])
 const EMPLOYEE_MIXIN_KEY = "contact:mixin:Employee"
 export const EmployeeLifecycleDocumentSchema = Schema.Struct({
   ...EmployeeLifecycleDocumentFields,
   active: Schema.Boolean,
-  role: Schema.optionalKey(EmployeeRole)
+  role: Schema.optionalKey(EmployeeInvitationRoleSchema)
 })
 export type EmployeeLifecycleDocument = Schema.Schema.Type<typeof EmployeeLifecycleDocumentSchema>
 
 const NestedEmployeeLifecycleDocumentSchema = Schema.Struct({
   ...EmployeeLifecycleDocumentFields,
-  [EMPLOYEE_MIXIN_KEY]: Schema.Struct({ active: Schema.Boolean, role: Schema.optionalKey(EmployeeRole) })
+  [EMPLOYEE_MIXIN_KEY]: Schema.Struct({
+    active: Schema.Boolean,
+    role: Schema.optionalKey(EmployeeInvitationRoleSchema)
+  })
 })
 const RawEmployeeLifecycleDocumentSchema = Schema.Union([
   EmployeeLifecycleDocumentSchema,
@@ -36,14 +60,22 @@ export type EmployeeLifecyclePerson = Schema.Schema.Type<typeof EmployeeLifecycl
 export const EmployeeLifecycleMemberSchema = Schema.Struct({ person: PersonUuid, role: AccountRoleSchema })
 export type EmployeeLifecycleMember = Schema.Schema.Type<typeof EmployeeLifecycleMemberSchema>
 
+export const EmployeeLifecycleIdentitySchema = Schema.Struct({
+  _id: SocialIdentityId,
+  attachedTo: PersonId,
+  value: Email,
+  isDeleted: Schema.Boolean
+})
+export type EmployeeLifecycleIdentity = Schema.Schema.Type<typeof EmployeeLifecycleIdentitySchema>
+
 const invalid =
-  (operation: string, entity: string) =>
+  (operation: EmployeeLifecycleBoundaryOperation, entity: EmployeeLifecycleBoundaryEntity) =>
   (cause: unknown): HulyDataInvalidError =>
     new HulyDataInvalidError({ operation, entity, cause })
 
 export const decodeEmployeeLifecycleDocument = (
   input: unknown,
-  operation: string
+  operation: EmployeeLifecycleBoundaryOperation
 ): Effect.Effect<EmployeeLifecycleDocument, HulyDataInvalidError> =>
   Schema.decodeUnknownEffect(RawEmployeeLifecycleDocumentSchema)(input).pipe(
     Effect.map((document) =>
@@ -62,7 +94,7 @@ export const decodeEmployeeLifecycleDocument = (
 
 export const decodeEmployeeLifecycleDocuments = (
   input: unknown,
-  operation: string
+  operation: EmployeeLifecycleBoundaryOperation
 ): Effect.Effect<ReadonlyArray<EmployeeLifecycleDocument>, HulyDataInvalidError> =>
   Schema.decodeUnknownEffect(Schema.Array(RawEmployeeLifecycleDocumentSchema))(input).pipe(
     Effect.map((documents) =>
@@ -83,21 +115,29 @@ export const decodeEmployeeLifecycleDocuments = (
 
 export const decodeEmployeeLifecyclePerson = (
   input: unknown,
-  operation: string
+  operation: EmployeeLifecycleBoundaryOperation
 ): Effect.Effect<EmployeeLifecyclePerson, HulyDataInvalidError> =>
   Schema.decodeUnknownEffect(EmployeeLifecyclePersonSchema)(input).pipe(Effect.mapError(invalid(operation, "Person")))
 
 export const decodeEmployeeLifecycleMembers = (
   input: unknown,
-  operation: string
+  operation: EmployeeLifecycleBoundaryOperation
 ): Effect.Effect<ReadonlyArray<EmployeeLifecycleMember>, HulyDataInvalidError> =>
   Schema.decodeUnknownEffect(Schema.Array(EmployeeLifecycleMemberSchema))(input).pipe(
     Effect.mapError(invalid(operation, "workspace members"))
   )
 
+export const decodeEmployeeLifecycleIdentities = (
+  input: unknown,
+  operation: EmployeeLifecycleBoundaryOperation
+): Effect.Effect<ReadonlyArray<EmployeeLifecycleIdentity>, HulyDataInvalidError> =>
+  Schema.decodeUnknownEffect(Schema.Array(EmployeeLifecycleIdentitySchema))(input).pipe(
+    Effect.mapError(invalid(operation, "email SocialIdentities"))
+  )
+
 export const decodeEmployeeLifecycleState = (
   input: unknown,
-  operation: string
+  operation: EmployeeLifecycleBoundaryOperation
 ): Effect.Effect<EmployeeLifecycleState, HulyDataInvalidError> =>
   Schema.decodeUnknownEffect(EmployeeLifecycleStateSchema)(input).pipe(
     Effect.mapError(invalid(operation, "employee lifecycle projection"))
@@ -105,7 +145,7 @@ export const decodeEmployeeLifecycleState = (
 
 export const decodeOptionalEmployeeEmail = (
   input: unknown,
-  operation: string
+  operation: EmployeeLifecycleBoundaryOperation
 ): Effect.Effect<Email | undefined, HulyDataInvalidError> =>
   Schema.decodeUnknownEffect(Schema.UndefinedOr(Email))(input).pipe(
     Effect.mapError(invalid(operation, "employee email"))

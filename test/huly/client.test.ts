@@ -15,6 +15,7 @@ import {
   type MixinUpdate,
   type PersonId,
   type Ref as DocRef,
+  SocialIdType,
   type Space,
   toFindResult,
   type TxResult,
@@ -29,13 +30,17 @@ import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect"
 import { TestClock } from "effect/testing"
 import { beforeEach, expect } from "vitest"
 import { HulyConfigService } from "../../src/config/config.js"
+import { SocialIdentityId } from "../../src/domain/schemas/person-administration.js"
 import { PersonMergeReferenceImpactSchema } from "../../src/domain/schemas/person-merge.js"
 import {
+  Email,
   HulyTransactionScope,
   NonEmptyString,
-  PersonId as DomainPersonId
+  PersonId as DomainPersonId,
+  PersonName
 } from "../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../../src/huly/client.js"
+import type { EmployeePreparationPlan } from "../../src/huly/employee-preparation.js"
 import {
   HulyAuthError,
   HulyConnectionError,
@@ -71,6 +76,7 @@ const mockApplyCreateDoc = mockFn()
 const mockApplyAddCollection = mockFn()
 const mockApplyCreateMixin = mockFn()
 const mockApplyUpdateDoc = mockFn()
+const mockApplyUpdateMixin = mockFn()
 const mockApplyRemoveDoc = mockFn()
 const mockApplyCommit = mockFn()
 const mockCreateMixin = mockFn()
@@ -135,6 +141,7 @@ const clearAllMockFns = () => {
   mockApplyAddCollection.mockClear()
   mockApplyCreateMixin.mockClear()
   mockApplyUpdateDoc.mockClear()
+  mockApplyUpdateMixin.mockClear()
   mockApplyRemoveDoc.mockClear()
   mockApplyCommit.mockClear()
   mockCreateMixin.mockClear()
@@ -160,6 +167,7 @@ const resetApplyDefaults = () => {
   mockApplyAddCollection.mockResolvedValue(undefined)
   mockApplyCreateMixin.mockResolvedValue(undefined)
   mockApplyUpdateDoc.mockResolvedValue(undefined)
+  mockApplyUpdateMixin.mockResolvedValue(undefined)
   mockApplyRemoveDoc.mockResolvedValue(undefined)
   mockApplyCommit.mockResolvedValue({ result: true })
   mockApply.mockReturnValue({
@@ -169,6 +177,7 @@ const resetApplyDefaults = () => {
     addCollection: mockApplyAddCollection,
     createMixin: mockApplyCreateMixin,
     updateDoc: mockApplyUpdateDoc,
+    updateMixin: mockApplyUpdateMixin,
     removeDoc: mockApplyRemoveDoc,
     commit: mockApplyCommit
   })
@@ -252,12 +261,6 @@ const liveClientLayer = HulyClient.layerWithDependencies.pipe(Layer.provide(Laye
 // Mock doc for testing
 interface TestDoc extends Doc {
   title: string
-}
-interface TestAttachedDoc extends AttachedDoc {
-  readonly fixture?: string
-}
-interface TestMixinDoc extends TestDoc {
-  readonly mixinValue: string
 }
 
 describe("HulyClient Service", () => {
@@ -1502,32 +1505,119 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
       })
     )
 
-    it.effect("commits a document, attached identity, and mixin in one apply operation", () =>
+    it.effect("commits a new Employee preparation once and exposes a false authoritative result", () =>
       Effect.gen(function* () {
+        mockApplyCommit.mockResolvedValue({ result: false })
         const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
-        const createBundle = client.createDocWithCollectionAndMixin
-        expect(createBundle).toBeDefined()
-        if (createBundle === undefined) return
-        const documentData: Data<TestDoc> = { title: "Employee bundle" }
-        const attachedData: AttachedData<TestAttachedDoc> = { fixture: "identity" }
-        const mixinData: MixinData<TestDoc, TestMixinDoc> = { mixinValue: "employee" }
-        yield* createBundle<TestDoc, TestAttachedDoc, TestMixinDoc>(
-          toClassRef<TestDoc>("person-class"),
-          toRef<Space>(NonEmptyString.make("space")),
-          documentData,
-          toRef<TestDoc>(NonEmptyString.make("person")),
-          toClassRef<TestAttachedDoc>("attached-class"),
-          "identities",
-          attachedData,
-          toRef<TestAttachedDoc>(NonEmptyString.make("identity")),
-          toMixinRef<TestMixinDoc>("mixin"),
-          mixinData,
-          HulyTransactionScope.make("employee-bundle")
-        )
+        const commit = client.commitEmployeePreparation
+        expect(commit).toBeDefined()
+        if (commit === undefined) return
+        const preparation: EmployeePreparationPlan = {
+          kind: "create-person",
+          personId: DomainPersonId.make("person-new"),
+          identityId: SocialIdentityId.make("identity-new"),
+          name: PersonName.make("Person,New"),
+          email: Email.make("new@example.test"),
+          targetRole: "USER",
+          scope: HulyTransactionScope.make("employee:new@example.test")
+        }
+        expect(yield* commit(preparation)).toBe("condition-not-met")
+        expect(mockApply.mock.calls).toEqual([["employee:new@example.test"]])
         expect(mockApplyCreateDoc.mock.calls).toHaveLength(1)
         expect(mockApplyAddCollection.mock.calls).toHaveLength(1)
         expect(mockApplyCreateMixin.mock.calls).toHaveLength(1)
         expect(mockApplyCommit.mock.calls).toHaveLength(1)
+        expect(mockApplyNotMatch.mock.calls.length).toBeGreaterThanOrEqual(6)
+      })
+    )
+
+    it.effect("queues existing promotion in one Apply and never commits an incomplete preparation", () =>
+      Effect.gen(function* () {
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        const commit = client.commitEmployeePreparation
+        expect(commit).toBeDefined()
+        if (commit === undefined) return
+        const preparation: EmployeePreparationPlan = {
+          kind: "prepare-existing",
+          personId: DomainPersonId.make("person-existing"),
+          previousName: PersonName.make("Person,Old"),
+          identity: { state: "existing", identityId: SocialIdentityId.make("identity-existing") },
+          employee: { state: "update", previousActive: false, previousRole: "USER" },
+          name: PersonName.make("Person,Renamed"),
+          email: Email.make("existing@example.test"),
+          targetRole: "GUEST",
+          scope: HulyTransactionScope.make("employee:existing@example.test")
+        }
+        expect(yield* commit(preparation)).toBe("applied")
+        expect(mockApplyMatch.mock.calls).toHaveLength(3)
+        expect(mockApplyNotMatch.mock.calls).toContainEqual([
+          expect.anything(),
+          expect.objectContaining({
+            _id: { $ne: "identity-existing" },
+            type: SocialIdType.EMAIL,
+            value: "existing@example.test"
+          })
+        ])
+        expect(mockApplyUpdateDoc.mock.calls).toHaveLength(1)
+        expect(mockApplyUpdateMixin.mock.calls).toHaveLength(1)
+        expect(mockApplyCommit.mock.calls).toHaveLength(1)
+
+        resetApplyDefaults()
+        mockApplyCommit.mockClear()
+        mockApplyAddCollection.mockRejectedValue(new Error("cannot queue identity"))
+        const incomplete: EmployeePreparationPlan = {
+          ...preparation,
+          identity: { state: "create", identityId: SocialIdentityId.make("identity-retry") }
+        }
+        const error = yield* Effect.flip(commit(incomplete))
+        expect(error).toBeInstanceOf(HulyConnectionError)
+        expect(mockApplyCommit.mock.calls).toHaveLength(0)
+      })
+    )
+
+    it.effect("covers existing Employee creation and inactive role reconciliation preparation variants", () =>
+      Effect.gen(function* () {
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        const commit = client.commitEmployeePreparation
+        expect(commit).toBeDefined()
+        if (commit === undefined) return
+        const createEmployee: EmployeePreparationPlan = {
+          kind: "prepare-existing",
+          personId: DomainPersonId.make("person-existing"),
+          previousName: PersonName.make("Person,Existing"),
+          identity: { state: "create", identityId: SocialIdentityId.make("identity-new") },
+          employee: { state: "create" },
+          name: PersonName.make("Person,Existing"),
+          email: Email.make("existing@example.test"),
+          targetRole: "USER",
+          scope: HulyTransactionScope.make("employee:existing@example.test")
+        }
+        expect(yield* commit(createEmployee)).toBe("applied")
+        expect(mockApplyUpdateDoc.mock.calls).toHaveLength(0)
+        expect(mockApplyAddCollection.mock.calls).toHaveLength(1)
+        expect(mockApplyCreateMixin.mock.calls).toHaveLength(1)
+
+        resetApplyDefaults()
+        mockApplyAddCollection.mockClear()
+        mockApplyMatch.mockClear()
+        mockApplyUpdateMixin.mockClear()
+        const reconcileRole: EmployeePreparationPlan = {
+          kind: "reconcile-role",
+          personId: DomainPersonId.make("person-existing"),
+          previousName: PersonName.make("Person,Existing"),
+          employee: { state: "update", previousActive: false },
+          name: PersonName.make("Person,Existing"),
+          email: Email.make("existing@example.test"),
+          targetRole: "GUEST",
+          scope: HulyTransactionScope.make("employee:existing@example.test")
+        }
+        expect(yield* commit(reconcileRole)).toBe("applied")
+        expect(mockApplyAddCollection.mock.calls).toHaveLength(0)
+        expect(mockApplyUpdateMixin.mock.calls).toHaveLength(1)
+        expect(mockApplyMatch.mock.calls).toContainEqual([
+          expect.anything(),
+          expect.objectContaining({ active: false, role: { $exists: false } })
+        ])
       })
     )
 

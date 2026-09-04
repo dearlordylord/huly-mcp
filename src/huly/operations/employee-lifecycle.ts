@@ -1,143 +1,210 @@
-import type { Employee as HulyEmployee, Person as HulyPerson, SocialIdentity } from "@hcengineering/contact"
-import { AvatarType } from "@hcengineering/contact"
-import { buildSocialIdString, generateId, SocialIdType, type Space } from "@hcengineering/core"
+import type { Person as HulyPerson, SocialIdentity } from "@hcengineering/contact"
+import { generateId, SocialIdType } from "@hcengineering/core"
 import { Effect } from "effect"
 
 import {
-  type DeactivateEmployeeParams,
-  type DeactivateEmployeeResult,
-  EMPLOYEE_LIFECYCLE_DEFAULT_LIMIT,
-  type EmployeeLifecycleLocator,
-  type EmployeeLifecycleState,
   type EmployeeInvitationRole,
+  type EmployeePreparationChange,
+  EmployeePreparationChangesSchema,
   type InviteEmployeeParams,
-  type InviteEmployeeResult,
-  type ListInactiveEmployeesParams,
-  type ListInactiveEmployeesResult
+  InviteEmployeeParamsGuards,
+  type InviteEmployeeResult
 } from "../../domain/schemas/employee-lifecycle.js"
-import { Count, HulyTransactionScope, NonNegativeInteger, PersonId, type Email } from "../../domain/schemas/shared.js"
+import { HulyTransactionScope, PersonId, type Email } from "../../domain/schemas/shared.js"
+import { SocialIdentityId } from "../../domain/schemas/person-administration.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import {
-  EmployeeLifecycleImpactMismatchError,
   EmployeeInvitationPartialFailureError,
   EmployeeLifecycleStateError,
+  EmployeePreparationConflictError,
   type HulyDataInvalidError,
   type PersonIdentifierAmbiguousError,
   PersonNotAnEmployeeError,
   PersonNotFoundError
 } from "../errors.js"
+import type { EmployeePreparationPlan } from "../employee-preparation.js"
 import { contact } from "../huly-plugins.js"
 import { WorkspaceClient, type WorkspaceClientOperations } from "../workspace-client.js"
-import { batchGetEmailsForPersons, findPersonByExactEmail, findPersonByExactName } from "./contacts-shared.js"
 import {
-  decodeEmployeeLifecycleDocument,
-  decodeEmployeeLifecycleDocuments,
-  decodeEmployeeLifecycleMembers,
-  decodeEmployeeLifecyclePerson,
+  decodeEmployeeLifecycleIdentities,
   decodeEmployeeLifecycleState,
-  decodeOptionalEmployeeEmail,
   type EmployeeLifecycleDocument,
-  type EmployeeLifecycleMember
+  type EmployeeLifecycleIdentity,
+  type EmployeeLifecyclePerson
 } from "./employee-lifecycle-boundaries.js"
+import {
+  employeeLifecycleIdentifier,
+  findLifecycleEmployee,
+  loadEmployeeLifecycleState,
+  resolveLifecyclePerson
+} from "./employee-lifecycle-state.js"
 import { hulyQuery } from "./query-helpers.js"
-import { toAccountUuid, toRef } from "./sdk-boundary.js"
+import { toRef } from "./sdk-boundary.js"
 import { toHulyAccountRole } from "./workspace.js"
 
 type EmployeeLifecycleError =
-  | EmployeeLifecycleImpactMismatchError
   | EmployeeInvitationPartialFailureError
   | EmployeeLifecycleStateError
+  | EmployeePreparationConflictError
   | HulyClientError
   | HulyDataInvalidError
   | PersonIdentifierAmbiguousError
   | PersonNotAnEmployeeError
   | PersonNotFoundError
 
-const locatorText = (locator: EmployeeLifecycleLocator): string => ("email" in locator ? locator.email : locator.name)
-
-const resolvePerson = Effect.fn("EmployeeLifecycle.resolvePerson")(function* (
-  client: HulyClient["Service"],
-  locator: EmployeeLifecycleLocator
-) {
-  const raw =
-    "email" in locator
-      ? yield* findPersonByExactEmail(client, locator.email)
-      : yield* findPersonByExactName(client, locator.name)
-  if (raw === undefined) return undefined
-  return yield* decodeEmployeeLifecyclePerson(raw, "resolveEmployeeLifecycleTarget")
-})
-
-const findEmployeeForPerson = Effect.fn("EmployeeLifecycle.findEmployeeForPerson")(function* (
-  client: HulyClient["Service"],
-  personId: PersonId
-) {
-  const raw = yield* client.findOne<HulyEmployee>(
-    contact.mixin.Employee,
-    hulyQuery<HulyEmployee>({ _id: toRef<HulyEmployee>(personId) })
-  )
-  return raw === undefined ? undefined : yield* decodeEmployeeLifecycleDocument(raw, "resolveEmployeeLifecycleTarget")
-})
-
-const resolveEmployee = Effect.fn("EmployeeLifecycle.resolveEmployee")(function* (
-  client: HulyClient["Service"],
-  locator: EmployeeLifecycleLocator
-): Effect.fn.Return<EmployeeLifecycleDocument, EmployeeLifecycleError> {
-  const identifier = locatorText(locator)
-  const person = yield* resolvePerson(client, locator)
-  if (person === undefined) return yield* new PersonNotFoundError({ identifier })
-  const employee = yield* findEmployeeForPerson(client, person._id)
-  if (employee === undefined) return yield* new PersonNotAnEmployeeError({ identifier })
-  return employee
-})
-
-const employeeState = Effect.fn("EmployeeLifecycle.projectState")(function* (
-  employee: EmployeeLifecycleDocument,
-  email: Email | undefined,
-  members: ReadonlyArray<EmployeeLifecycleMember>,
-  operation: string
-) {
-  const member =
-    employee.personUuid === undefined
-      ? undefined
-      : members.find((candidate) => candidate.person === employee.personUuid)
-  return yield* decodeEmployeeLifecycleState(
-    {
-      personId: employee._id,
-      name: employee.name,
-      ...(email === undefined ? {} : { email }),
-      account:
-        employee.personUuid === undefined
-          ? { state: "unlinked" }
-          : { state: "linked", personUuid: employee.personUuid },
-      workspaceMembership: member === undefined ? { state: "absent" } : { state: "member", role: member.role },
-      employee: {
-        state: employee.active ? "active" : "inactive",
-        ...(employee.role === undefined ? {} : { role: employee.role })
-      }
-    },
-    operation
-  )
-})
-
-const loadState = Effect.fn("EmployeeLifecycle.loadState")(function* (
-  client: HulyClient["Service"],
-  workspace: WorkspaceClientOperations,
-  employee: EmployeeLifecycleDocument,
-  knownEmail: Email | undefined,
-  operation: string
-) {
-  const [emailMap, rawMembers] = yield* Effect.all([
-    knownEmail === undefined
-      ? batchGetEmailsForPersons(client, [toRef<HulyPerson>(employee._id)])
-      : Effect.succeed(new Map([[toRef<HulyPerson>(employee._id), knownEmail]])),
-    workspace.getWorkspaceMembers()
-  ])
-  const members = yield* decodeEmployeeLifecycleMembers(rawMembers, operation)
-  const email = yield* decodeOptionalEmployeeEmail(emailMap.get(toRef<HulyPerson>(employee._id)), operation)
-  return yield* employeeState(employee, email, members, operation)
-})
-
 const DEFAULT_INVITE_ROLE: EmployeeInvitationRole = "USER"
+
+type EmployeePreparedResult = Extract<InviteEmployeeResult, { readonly outcome: "employee-prepared-and-invited" }>
+
+const preparationChanges = (changes: EmployeePreparedResult["changes"]): Array<EmployeePreparationChange> => {
+  const completed: Array<EmployeePreparationChange> = []
+  if (EmployeePreparationChangesSchema.guards["person-created"](changes)) {
+    return ["personCreated", "emailIdentityCreated", "employeeCreated"]
+  }
+  if (changes.nameUpdated) completed.push("nameUpdated")
+  if (changes.emailIdentityCreated) completed.push("emailIdentityCreated")
+  if (changes.employeeTransition === "created") completed.push("employeeCreated")
+  if (["reactivated", "reactivated-and-role-updated"].includes(changes.employeeTransition)) {
+    completed.push("employeeReactivated")
+  }
+  if (["role-updated", "reactivated-and-role-updated"].includes(changes.employeeTransition)) {
+    completed.push("employeeRoleUpdated")
+  }
+  return completed
+}
+
+const findEmailIdentity = Effect.fn("EmployeeLifecycle.findEmailIdentity")(function* (
+  client: HulyClient["Service"],
+  personId: PersonId,
+  email: Email
+) {
+  const raw = yield* client.findAll<SocialIdentity>(
+    contact.class.SocialIdentity,
+    hulyQuery<SocialIdentity>({ attachedTo: toRef<HulyPerson>(personId), type: SocialIdType.EMAIL, value: email })
+  )
+  const identities = yield* decodeEmployeeLifecycleIdentities(raw, "prepareEmployee")
+  if (identities.length > 1) {
+    return yield* new EmployeeLifecycleStateError({
+      identifier: email,
+      reason: `multiple active email SocialIdentities exist for Person '${personId}'`
+    })
+  }
+  const identity = identities[0]
+  if (identity?.isDeleted === true) {
+    return yield* new EmployeeLifecycleStateError({
+      identifier: email,
+      reason: `the exact email SocialIdentity for Person '${personId}' is deleted and cannot be reused safely`
+    })
+  }
+  return identity
+})
+
+const commitPreparation = Effect.fn("EmployeeLifecycle.commitPreparation")(function* (
+  client: HulyClient["Service"],
+  preparation: EmployeePreparationPlan
+) {
+  const commit = client.commitEmployeePreparation
+  if (commit === undefined) {
+    return yield* new EmployeeLifecycleStateError({
+      identifier: preparation.email,
+      reason: "the connected Huly adapter does not support checked atomic Employee preparation"
+    })
+  }
+  const result = yield* commit(preparation)
+  if (result === "condition-not-met") {
+    return yield* new EmployeePreparationConflictError({
+      personId: preparation.personId,
+      email: preparation.email,
+      operation: "prepareEmployee",
+      reason: "a Person, email identity, or Employee precondition no longer matches"
+    })
+  }
+})
+
+interface EmployeePreparationInput {
+  readonly existing: EmployeeLifecyclePerson | undefined
+  readonly employee: EmployeeLifecycleDocument | undefined
+  readonly identity: EmployeeLifecycleIdentity | undefined
+  readonly personId: PersonId
+  readonly name: Extract<InviteEmployeeParams, { readonly mode: "create-or-promote" }>["name"]
+  readonly email: Email
+  readonly role: EmployeeInvitationRole
+}
+
+const makeEmployeePreparationPlan = (input: EmployeePreparationInput): EmployeePreparationPlan => {
+  const base = {
+    name: input.name,
+    email: input.email,
+    targetRole: input.role,
+    scope: HulyTransactionScope.make(`huly-mcp:employee-lifecycle:${input.email}`)
+  }
+  if (input.existing === undefined) {
+    return {
+      ...base,
+      kind: "create-person",
+      personId: input.personId,
+      identityId: SocialIdentityId.make(generateId<SocialIdentity>())
+    }
+  }
+  const identity: Extract<EmployeePreparationPlan, { readonly kind: "prepare-existing" }>["identity"] =
+    input.identity === undefined
+      ? { state: "create", identityId: SocialIdentityId.make(generateId<SocialIdentity>()) }
+      : { state: "existing", identityId: input.identity._id }
+  const employee: Extract<EmployeePreparationPlan, { readonly kind: "prepare-existing" }>["employee"] =
+    input.employee === undefined
+      ? { state: "create" }
+      : {
+          state: "update",
+          previousActive: input.employee.active,
+          ...(input.employee.role === undefined ? {} : { previousRole: input.employee.role })
+        }
+  return {
+    ...base,
+    kind: "prepare-existing",
+    personId: input.personId,
+    previousName: input.existing.name,
+    identity,
+    employee
+  }
+}
+
+const employeeTransition = (
+  employee: EmployeeLifecycleDocument | undefined,
+  role: EmployeeInvitationRole
+): Extract<EmployeePreparedResult["changes"], { readonly kind: "existing-person" }>["employeeTransition"] => {
+  if (employee === undefined) return "created"
+  const reactivated = !employee.active
+  const roleUpdated = employee.role !== role
+  if (reactivated && roleUpdated) return "reactivated-and-role-updated"
+  if (reactivated) return "reactivated"
+  return roleUpdated ? "role-updated" : "unchanged"
+}
+
+const preparationResultChanges = (input: EmployeePreparationInput): EmployeePreparedResult["changes"] => {
+  if (input.existing === undefined) return { kind: "person-created" }
+  return {
+    kind: "existing-person",
+    nameUpdated: input.existing.name !== input.name,
+    emailIdentityCreated: input.identity === undefined,
+    employeeTransition: employeeTransition(input.employee, input.role)
+  }
+}
+
+const resolvePreparationPerson = (
+  byEmail: EmployeeLifecyclePerson | undefined,
+  byName: EmployeeLifecyclePerson | undefined,
+  email: Email
+): Effect.Effect<EmployeeLifecyclePerson | undefined, EmployeeLifecycleStateError> => {
+  if (byEmail !== undefined && byName !== undefined && byEmail._id !== byName._id) {
+    return Effect.fail(
+      new EmployeeLifecycleStateError({
+        identifier: email,
+        reason: `the exact email and exact name resolve to different People ('${byEmail._id}' and '${byName._id}')`
+      })
+    )
+  }
+  return Effect.succeed(byEmail ?? byName)
+}
 
 const prepareEmployee = Effect.fn("EmployeeLifecycle.prepareEmployee")(function* (
   client: HulyClient["Service"],
@@ -145,133 +212,60 @@ const prepareEmployee = Effect.fn("EmployeeLifecycle.prepareEmployee")(function*
   email: Email,
   role: EmployeeInvitationRole
 ) {
-  const [byEmail, byName] = yield* Effect.all([resolvePerson(client, { email }), resolvePerson(client, { name })])
-  if (byEmail !== undefined && byName !== undefined && byEmail._id !== byName._id) {
-    return yield* new EmployeeLifecycleStateError({
-      identifier: email,
-      reason: `the exact email and exact name resolve to different People ('${byEmail._id}' and '${byName._id}')`
-    })
-  }
-
-  const existing = byEmail ?? byName
+  const [byEmail, byName] = yield* Effect.all([
+    resolveLifecyclePerson(client, { email }),
+    resolveLifecyclePerson(client, { name })
+  ])
+  const existing = yield* resolvePreparationPerson(byEmail, byName, email)
   const personId = existing?._id ?? PersonId.make(generateId<HulyPerson>())
-  const existingEmployee = existing === undefined ? undefined : yield* findEmployeeForPerson(client, personId)
-  const personCreated = existing === undefined
-  const nameUpdated = existing !== undefined && existing.name !== name
-  const emailIdentityCreated = byEmail === undefined
-  const targetRole = role
-  const employeeCreated = existingEmployee === undefined
-  const employeeReactivated = existingEmployee !== undefined && !existingEmployee.active
-  const employeeRoleUpdated = existingEmployee !== undefined && existingEmployee.role !== targetRole
-  const identityData = {
-    type: SocialIdType.EMAIL,
-    value: email,
-    key: buildSocialIdString({ type: SocialIdType.EMAIL, value: email }),
-    isDeleted: false
-  }
-  if (personCreated) {
-    const createBundle = client.createDocWithCollectionAndMixin
-    if (createBundle === undefined) {
-      return yield* new EmployeeLifecycleStateError({
-        identifier: email,
-        reason: "the connected Huly adapter does not support atomic Person, SocialIdentity, and Employee creation"
-      })
-    }
-    yield* createBundle<HulyPerson, SocialIdentity, HulyEmployee>(
-      contact.class.Person,
-      contact.space.Contacts,
-      { name, city: "", avatarType: AvatarType.COLOR },
-      toRef<HulyPerson>(personId),
-      contact.class.SocialIdentity,
-      "socialIds",
-      identityData,
-      toRef<SocialIdentity>(generateId<SocialIdentity>()),
-      contact.mixin.Employee,
-      { active: true, role: targetRole },
-      HulyTransactionScope.make(`huly-mcp:employee-lifecycle:${personId}`)
+  const existingEmployee = existing === undefined ? undefined : yield* findLifecycleEmployee(client, personId)
+  const emailIdentity = existing === undefined ? undefined : yield* findEmailIdentity(client, personId, email)
+  const input = { existing, employee: existingEmployee, identity: emailIdentity, personId, name, email, role }
+  const preparation = makeEmployeePreparationPlan(input)
+  yield* commitPreparation(client, preparation)
+  return { personId, changes: preparationResultChanges(input) }
+})
+
+const invitePreparedEmployee = Effect.fn("EmployeeLifecycle.invitePrepared")(function* (
+  client: HulyClient["Service"],
+  workspace: WorkspaceClientOperations,
+  params: Extract<InviteEmployeeParams, { readonly mode: "create-or-promote" }>
+): Effect.fn.Return<InviteEmployeeResult, EmployeeLifecycleError> {
+  const role = params.role ?? DEFAULT_INVITE_ROLE
+  const prepared = yield* prepareEmployee(client, params.name, params.email, role)
+  const completedChanges = preparationChanges(prepared.changes)
+  yield* workspace
+    .sendInvite(params.email, toHulyAccountRole(role))
+    .pipe(
+      Effect.mapError(
+        (error) =>
+          new EmployeeInvitationPartialFailureError({
+            personId: prepared.personId,
+            email: params.email,
+            operation: "sendInvite",
+            completedChanges,
+            reason: error.message
+          })
+      )
     )
-  } else if (nameUpdated) {
-    yield* client.updateDoc(contact.class.Person, contact.space.Contacts, toRef<HulyPerson>(personId), { name })
-  }
-  if (!personCreated && emailIdentityCreated) {
-    yield* client.addCollection<HulyPerson, SocialIdentity>(
-      contact.class.SocialIdentity,
-      contact.space.Contacts,
-      toRef<HulyPerson>(personId),
-      contact.class.Person,
-      "socialIds",
-      identityData
-    )
-  }
-  if (!personCreated && employeeCreated) {
-    yield* client.createMixin<HulyPerson, HulyEmployee>(
-      toRef<HulyPerson>(personId),
-      contact.class.Person,
-      contact.space.Contacts,
-      contact.mixin.Employee,
-      { active: true, role: targetRole }
-    )
-  } else if (employeeReactivated || employeeRoleUpdated) {
-    yield* client.updateMixin<HulyPerson, HulyEmployee>(
-      toRef<HulyPerson>(personId),
-      contact.class.Person,
-      contact.space.Contacts,
-      contact.mixin.Employee,
-      { active: true, role: targetRole }
-    )
-  }
   return {
-    personId,
-    changes: {
-      personCreated,
-      nameUpdated,
-      emailIdentityCreated,
-      employeeCreated,
-      employeeReactivated,
-      employeeRoleUpdated
-    }
+    outcome: "employee-prepared-and-invited",
+    email: params.email,
+    role,
+    personId: prepared.personId,
+    changes: prepared.changes
   }
 })
 
-export const inviteEmployee = Effect.fn("EmployeeLifecycle.invite")(function* (
-  params: InviteEmployeeParams
-): Effect.fn.Return<InviteEmployeeResult, EmployeeLifecycleError, HulyClient | WorkspaceClient> {
-  const client = yield* HulyClient
-  const workspace = yield* WorkspaceClient
-  const role = params.role ?? DEFAULT_INVITE_ROLE
-  if (params.mode === "create-or-promote") {
-    const prepared = yield* prepareEmployee(client, params.name, params.email, role)
-    const completedChanges = Object.entries(prepared.changes)
-      .filter(([, changed]) => changed)
-      .map(([change]) => change)
-    yield* workspace
-      .sendInvite(params.email, toHulyAccountRole(role))
-      .pipe(
-        Effect.mapError(
-          (error) =>
-            new EmployeeInvitationPartialFailureError({
-              personId: prepared.personId,
-              email: params.email,
-              completedChanges,
-              reason: error.message
-            })
-        )
-      )
-    return {
-      outcome: "employee-prepared-and-invited",
-      email: params.email,
-      role,
-      personId: prepared.personId,
-      changes: prepared.changes
-    }
-  }
-  const person = yield* resolvePerson(client, params.employee)
-  if (person === undefined) {
-    return yield* new PersonNotFoundError({ identifier: locatorText(params.employee) })
-  }
-
-  const identifier = locatorText(params.employee)
-  const employee = yield* findEmployeeForPerson(client, person._id)
+const resolveReinviteTarget = Effect.fn("EmployeeLifecycle.resolveReinviteTarget")(function* (
+  client: HulyClient["Service"],
+  workspace: WorkspaceClientOperations,
+  params: Extract<InviteEmployeeParams, { readonly mode: "invite-existing" }>
+) {
+  const identifier = employeeLifecycleIdentifier(params.employee)
+  const person = yield* resolveLifecyclePerson(client, params.employee)
+  if (person === undefined) return yield* new PersonNotFoundError({ identifier })
+  const employee = yield* findLifecycleEmployee(client, person._id)
   if (employee === undefined) return yield* new PersonNotAnEmployeeError({ identifier })
   if (employee.active) {
     return yield* new EmployeeLifecycleStateError({
@@ -279,123 +273,88 @@ export const inviteEmployee = Effect.fn("EmployeeLifecycle.invite")(function* (
       reason: "the employee is active; invitation resend is only valid for an inactive employee"
     })
   }
-  const state = yield* loadState(
+  const state = yield* loadEmployeeLifecycleState(
     client,
     workspace,
     employee,
     "email" in params.employee ? params.employee.email : undefined,
     "inviteEmployee"
   )
-  if (state.email === undefined) {
+  const email = state.email
+  if (email === undefined) {
     return yield* new EmployeeLifecycleStateError({
       identifier,
       reason: "the inactive employee has no exact email social identity or email channel"
     })
   }
-  yield* workspace.resendInvite(state.email, toHulyAccountRole(role))
-  return { outcome: "invitation-resent", email: state.email, role, employee: state }
-})
-
-export const listInactiveEmployees = Effect.fn("EmployeeLifecycle.listInactive")(function* (
-  params: ListInactiveEmployeesParams
-): Effect.fn.Return<ListInactiveEmployeesResult, EmployeeLifecycleError, HulyClient | WorkspaceClient> {
-  const client = yield* HulyClient
-  const workspace = yield* WorkspaceClient
-  const rawEmployees = yield* client.findAll<HulyEmployee>(
-    contact.mixin.Employee,
-    hulyQuery<HulyEmployee>({ active: false })
-  )
-  const employees = yield* decodeEmployeeLifecycleDocuments(rawEmployees, "listInactiveEmployees")
-  const [emailMap, rawMembers] = yield* Effect.all([
-    batchGetEmailsForPersons(
-      client,
-      employees.map((employee) => toRef<HulyPerson>(employee._id))
-    ),
-    workspace.getWorkspaceMembers()
-  ])
-  const members = yield* decodeEmployeeLifecycleMembers(rawMembers, "listInactiveEmployees")
-  const states = yield* Effect.forEach(employees, (employee) =>
-    employeeState(employee, emailMap.get(toRef<HulyPerson>(employee._id)), members, "listInactiveEmployees")
-  )
-  const ordered = [...states].sort((left, right) =>
-    left.name === right.name ? left.personId.localeCompare(right.personId) : left.name.localeCompare(right.name)
-  )
-  const offset = params.offset ?? NonNegativeInteger.make(0)
-  const limit = params.limit ?? EMPLOYEE_LIFECYCLE_DEFAULT_LIMIT
-  const page = ordered.slice(offset, offset + limit)
-  const next = offset + page.length
-  const truncated = next < ordered.length
-  return {
-    employees: page,
-    total: Count.make(ordered.length),
-    offset,
-    truncated,
-    ...(truncated ? { nextOffset: NonNegativeInteger.make(next) } : {})
-  }
-})
-
-const expectedPersonUuid = (impact: EmployeeLifecycleState) =>
-  impact.account.state === "linked" ? impact.account.personUuid : null
-const expectedWorkspaceRole = (impact: EmployeeLifecycleState) =>
-  impact.workspaceMembership.state === "member" ? impact.workspaceMembership.role : null
-
-const assertExpectedImpact = (
-  params: Extract<DeactivateEmployeeParams, { readonly execute: true }>,
-  impact: EmployeeLifecycleState,
-  identifier: string
-): Effect.Effect<void, EmployeeLifecycleImpactMismatchError> => {
-  const mismatches = [
-    params.expectedPersonId === impact.personId ? undefined : "person ID differs",
-    params.expectedPersonUuid === expectedPersonUuid(impact) ? undefined : "account link differs",
-    params.expectedEmployeeActive === (impact.employee.state === "active") ? undefined : "Employee.active differs",
-    params.expectedWorkspaceRole === expectedWorkspaceRole(impact) ? undefined : "workspace membership or role differs"
-  ].filter((message) => message !== undefined)
-  return mismatches.length === 0
-    ? Effect.void
-    : Effect.fail(new EmployeeLifecycleImpactMismatchError({ identifier, reason: mismatches.join(", ") }))
-}
-
-export const deactivateEmployee = Effect.fn("EmployeeLifecycle.deactivate")(function* (
-  params: DeactivateEmployeeParams
-): Effect.fn.Return<DeactivateEmployeeResult, EmployeeLifecycleError, HulyClient | WorkspaceClient> {
-  const client = yield* HulyClient
-  const workspace = yield* WorkspaceClient
-  const identifier = locatorText(params.employee)
-  const employee = yield* resolveEmployee(client, params.employee)
-  if (employee.personUuid !== undefined && toAccountUuid(employee.personUuid) === client.getAccountUuid()) {
+  const role = params.role ?? employee.role
+  if (role === undefined) {
     return yield* new EmployeeLifecycleStateError({
       identifier,
-      reason: "the authenticated employee cannot deactivate or kick itself"
+      reason: "the inactive Employee has no persisted USER/GUEST role; provide an explicit role to reconcile it"
     })
   }
-  const impact = yield* loadState(
-    client,
-    workspace,
-    employee,
-    "email" in params.employee ? params.employee.email : undefined,
-    "deactivateEmployee"
-  )
-  if (params.execute !== true) return { executed: false, action: params.action, impact }
-  yield* assertExpectedImpact(params, impact, identifier)
-
-  const employeeDeactivated = employee.active
-  if (employeeDeactivated) {
-    yield* client.updateMixin<HulyPerson, HulyEmployee>(
-      toRef<HulyPerson>(employee._id),
-      contact.class.Person,
-      toRef<Space>(employee.space),
-      contact.mixin.Employee,
-      { active: false }
-    )
-  }
-  const workspaceMemberRemoved = params.action === "kick" && impact.workspaceMembership.state === "member"
-  if (workspaceMemberRemoved && employee.personUuid !== undefined) {
-    yield* workspace.leaveWorkspace(toAccountUuid(employee.personUuid))
-  }
-  return {
-    executed: true,
-    action: params.action,
-    impactBefore: impact,
-    changes: { employeeDeactivated, workspaceMemberRemoved }
-  }
+  return { person, employee, state, email, role }
 })
+
+const reinviteEmployee = Effect.fn("EmployeeLifecycle.reinvite")(function* (
+  client: HulyClient["Service"],
+  workspace: WorkspaceClientOperations,
+  params: Extract<InviteEmployeeParams, { readonly mode: "invite-existing" }>
+): Effect.fn.Return<InviteEmployeeResult, EmployeeLifecycleError> {
+  const { email, employee, person, role, state } = yield* resolveReinviteTarget(client, workspace, params)
+  const employeeRoleUpdated = employee.role !== role
+  if (employeeRoleUpdated) {
+    const preparation: EmployeePreparationPlan = {
+      kind: "reconcile-role",
+      personId: person._id,
+      previousName: person.name,
+      employee: {
+        state: "update",
+        previousActive: employee.active,
+        ...(employee.role === undefined ? {} : { previousRole: employee.role })
+      },
+      name: person.name,
+      email,
+      targetRole: role,
+      scope: HulyTransactionScope.make(`huly-mcp:employee-lifecycle:${email}`)
+    }
+    yield* commitPreparation(client, preparation)
+  }
+  const projected = employeeRoleUpdated
+    ? yield* decodeEmployeeLifecycleState(
+        { ...state, employee: { state: "inactive", role } },
+        "inviteEmployee.roleReconciliation"
+      )
+    : state
+  const resend = workspace.resendInvite(email, toHulyAccountRole(role))
+  if (employeeRoleUpdated) {
+    yield* resend.pipe(
+      Effect.mapError(
+        (error) =>
+          new EmployeeInvitationPartialFailureError({
+            personId: person._id,
+            email,
+            operation: "resendInvite",
+            completedChanges: ["employeeRoleUpdated"],
+            reason: error.message
+          })
+      )
+    )
+  } else {
+    yield* resend
+  }
+  return { outcome: "invitation-resent", email, role, employee: projected }
+})
+
+export const inviteEmployee = Effect.fn("EmployeeLifecycle.invite")(function* (
+  params: InviteEmployeeParams
+): Effect.fn.Return<InviteEmployeeResult, EmployeeLifecycleError, HulyClient | WorkspaceClient> {
+  const client = yield* HulyClient
+  const workspace = yield* WorkspaceClient
+  return InviteEmployeeParamsGuards["create-or-promote"](params)
+    ? yield* invitePreparedEmployee(client, workspace, params)
+    : yield* reinviteEmployee(client, workspace, params)
+})
+
+export { deactivateEmployee, listInactiveEmployees } from "./employee-deactivation.js"

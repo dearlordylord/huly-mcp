@@ -66,13 +66,9 @@ import {
   TeamspaceNotFoundError
 } from "./errors-documents.js"
 import { HulyDomainBaseError } from "./errors-domain-base.js"
+import { EmployeeLifecycleDomainError } from "./errors-domain-employee-lifecycle.js"
 import { HulyMessagingDomainError } from "./errors-domain-messaging.js"
 import { HulyViewDomainError } from "./errors-domain-view.js"
-import {
-  EmployeeInvitationPartialFailureError,
-  EmployeeLifecycleImpactMismatchError,
-  EmployeeLifecycleStateError
-} from "./errors-employee-lifecycle.js"
 import { PersonAdministrationDomainError } from "./errors-person-administration.js"
 import {
   DriveFileCommentNotFoundError,
@@ -267,9 +263,7 @@ export const HulyDomainError = Schema.Union([
   InvalidContactChannelValueError,
   PersonIdentifierAmbiguousError,
   PersonNotFoundError,
-  EmployeeLifecycleStateError,
-  EmployeeLifecycleImpactMismatchError,
-  EmployeeInvitationPartialFailureError,
+  EmployeeLifecycleDomainError,
   PersonAdministrationDomainError,
   OrganizationNotFoundError,
   OrganizationIdentifierAmbiguousError,

@@ -1241,7 +1241,7 @@ run_employee_invitation_step() {
   result=$(call_tool "$payload")
   is_error=$(printf '%s\n' "$result" | jq -r '.result.isError // false' 2>/dev/null)
   text=$(printf '%s\n' "$result" | jq -r '.result.content[0].text // empty' 2>/dev/null)
-  if [ "$is_error" = "false" ] || printf '%s\n' "$text" | grep -q "but sending the invitation failed after:"; then
+  if [ "$is_error" = "false" ] || printf '%s\n' "$text" | grep -Eq "but (sendInvite|resendInvite) failed after:"; then
     echo "PASS: $name" >&2
     PASSED=$((PASSED + 1))
     printf -v "$output_var" '%s' "$text"
@@ -4642,13 +4642,11 @@ if [ $? -eq 0 ]; then
   run_capture_to_var_fresh EMPLOYEE_LIFECYCLE_CREATED_PREVIEW "deactivate_employee(created preview)" \
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"deactivate_employee\",\"arguments\":{\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON},\"action\":\"deactivate\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
-    EMPLOYEE_LIFECYCLE_CREATED_ID=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -c '.impact.personId')
     EMPLOYEE_LIFECYCLE_CREATED_ID_VALUE=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -r '.impact.personId')
-    EMPLOYEE_LIFECYCLE_CREATED_UUID=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -c '.impact.account.personUuid // null')
-    EMPLOYEE_LIFECYCLE_CREATED_ACTIVE=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -c '.impact.employee.state == "active"')
-    EMPLOYEE_LIFECYCLE_CREATED_ROLE=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -c '.impact.workspaceMembership.role // null')
+    EMPLOYEE_LIFECYCLE_CREATED_EXPECTED=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -c \
+      '.impact | {relationship, personId, employeeActive: (.employee.state == "active")} + (if .relationship == "unlinked" then {} else {personUuid: .account.personUuid} end) + (if .relationship == "workspace-member" then {workspaceRole: .workspaceMembership.role} else {} end)')
     run_capture_to_var_fresh EMPLOYEE_LIFECYCLE_DEACTIVATED "deactivate_employee(created execute)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"deactivate_employee\",\"arguments\":{\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON},\"action\":\"deactivate\",\"execute\":true,\"expectedPersonId\":$EMPLOYEE_LIFECYCLE_CREATED_ID,\"expectedPersonUuid\":$EMPLOYEE_LIFECYCLE_CREATED_UUID,\"expectedEmployeeActive\":$EMPLOYEE_LIFECYCLE_CREATED_ACTIVE,\"expectedWorkspaceRole\":$EMPLOYEE_LIFECYCLE_CREATED_ROLE}},\"id\":2}"
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"deactivate_employee\",\"arguments\":{\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON},\"action\":\"deactivate\",\"execute\":true,\"expected\":$EMPLOYEE_LIFECYCLE_CREATED_EXPECTED}},\"id\":2}"
     run_employee_invitation_step EMPLOYEE_LIFECYCLE_RESENT "invite_employee(inactive resend)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"invite_employee\",\"arguments\":{\"mode\":\"invite-existing\",\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON}}},\"id\":2}"
     run_employee_invitation_step EMPLOYEE_LIFECYCLE_REACTIVATED "invite_employee(reactivate and restore)" \
@@ -4691,11 +4689,10 @@ if [ -n "$EMPLOYEE_LIFECYCLE_TARGET" ]; then
   if [ $? -eq 0 ]; then
     assert_json_field_equals "deactivate_employee preview performs no mutation" \
       "$EMPLOYEE_LIFECYCLE_PREVIEW" ".executed" "false"
-    EMPLOYEE_LIFECYCLE_UUID=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_PREVIEW" | jq -c '.impact.account.personUuid // null')
-    EMPLOYEE_LIFECYCLE_ACTIVE=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_PREVIEW" | jq -c '.impact.employee.state == "active"')
-    EMPLOYEE_LIFECYCLE_ROLE=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_PREVIEW" | jq -c '.impact.workspaceMembership.role // null')
+    EMPLOYEE_LIFECYCLE_STALE_EXPECTED=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_PREVIEW" | jq -c \
+      '.impact | {relationship, personId: "stale-person-id", employeeActive: (.employee.state == "active")} + (if .relationship == "unlinked" then {} else {personUuid: .account.personUuid} end) + (if .relationship == "workspace-member" then {workspaceRole: .workspaceMembership.role} else {} end)')
     run_expect_error "deactivate_employee(stale impact guard)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"deactivate_employee\",\"arguments\":{\"employee\":{\"name\":$EMPLOYEE_LIFECYCLE_TARGET_JSON},\"action\":\"kick\",\"execute\":true,\"expectedPersonId\":\"stale-person-id\",\"expectedPersonUuid\":$EMPLOYEE_LIFECYCLE_UUID,\"expectedEmployeeActive\":$EMPLOYEE_LIFECYCLE_ACTIVE,\"expectedWorkspaceRole\":$EMPLOYEE_LIFECYCLE_ROLE}},\"id\":2}"
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"deactivate_employee\",\"arguments\":{\"employee\":{\"name\":$EMPLOYEE_LIFECYCLE_TARGET_JSON},\"action\":\"kick\",\"execute\":true,\"expected\":$EMPLOYEE_LIFECYCLE_STALE_EXPECTED}},\"id\":2}"
   fi
 else
   skip_test "deactivate_employee(preview and stale guard)" "no unique active non-self employee fixture"

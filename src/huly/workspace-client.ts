@@ -33,7 +33,7 @@ import type {
 import { Context, Effect, Layer } from "effect"
 
 import { HulyConfigService } from "../config/config.js"
-import type { SpaceId } from "../domain/schemas/shared.js"
+import type { Email, SpaceId } from "../domain/schemas/shared.js"
 import { authToOptions, type ConnectionConfig, type ConnectionError, connectWithRetry } from "./client.js"
 import { type HulyConnectionOperation, makeOperationConnectionError } from "./errors-base.js"
 import { HulySdk, type HulySdkDependencies } from "./sdk-deps.js"
@@ -75,8 +75,8 @@ export interface WorkspaceClientOperations {
     secondaryPerson: PersonUuid
   ) => Effect.Effect<void, WorkspaceClientError>
   readonly updateWorkspaceRole: (account: string, role: AccountRole) => Effect.Effect<void, WorkspaceClientError>
-  readonly sendInvite: (email: string, role: AccountRole) => Effect.Effect<void, WorkspaceClientError>
-  readonly resendInvite: (email: string, role: AccountRole) => Effect.Effect<void, WorkspaceClientError>
+  readonly sendInvite: (email: Email, role: AccountRole) => Effect.Effect<void, WorkspaceClientError>
+  readonly resendInvite: (email: Email, role: AccountRole) => Effect.Effect<void, WorkspaceClientError>
   readonly leaveWorkspace: (account: AccountUuid) => Effect.Effect<void, WorkspaceClientError>
   readonly getWorkspaceInfo: (updateLastVisit?: boolean) => Effect.Effect<WorkspaceInfoWithStatus, WorkspaceClientError>
   readonly getUserWorkspaces: () => Effect.Effect<Array<WorkspaceInfoWithStatus>, WorkspaceClientError>
