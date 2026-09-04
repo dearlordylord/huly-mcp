@@ -50,10 +50,22 @@ cleanup() {
     else
       "${CLI[@]}" hr staff assign-department "$HR_STAFF_EMPLOYEE" null --yes --json >/dev/null 2>&1
     fi
+    for _ in $(seq 1 20); do
+      HR_STAFF_JSON="$(run_cli_json_output hr staff list --limit 200 2>/dev/null)"
+      HR_RESTORED_DEPARTMENT="$(json_value "$HR_STAFF_JSON" ".staff[] | select(.id == \"$HR_STAFF_EMPLOYEE\") | .department.id // empty")"
+      HR_RESTORED_PRESENT="$(json_value "$HR_STAFF_JSON" "[.staff[] | select(.id == \"$HR_STAFF_EMPLOYEE\")] | length")"
+      if [[ "$HR_RESTORED_PRESENT" == "1" && "$HR_RESTORED_DEPARTMENT" == "$HR_STAFF_ORIGINAL_DEPARTMENT" ]]; then
+        HR_STAFF_NEEDS_RESTORE=""
+        break
+      fi
+      sleep 0.25
+    done
   fi
-  if [[ -n "$HR_DEPARTMENT_ID" ]]; then
+  if [[ -z "$HR_STAFF_NEEDS_RESTORE" && -n "$HR_DEPARTMENT_ID" ]]; then
     "${CLI[@]}" hr departments delete "$HR_DEPARTMENT_ID" --execute \
       --expected-subdepartments 0 --expected-assigned-staff 0 --yes --json >/dev/null 2>&1
+  elif [[ -n "$HR_STAFF_NEEDS_RESTORE" && -n "$HR_DEPARTMENT_ID" ]]; then
+    echo "HR Staff restoration remains unconfirmed; retaining department '$HR_DEPARTMENT_ID'." >&2
   fi
   if [[ -n "$EVENT_ID" ]]; then
     "${CLI[@]}" calendar events delete "$EVENT_ID" --yes --json >/dev/null 2>&1
@@ -351,9 +363,9 @@ if [[ -z "$HR_STAFF_EMPLOYEE" ]]; then
   echo "Authenticated workspace user did not resolve to an Employee." >&2
   exit 1
 fi
+HR_STAFF_NEEDS_RESTORE=1
 cover_cli_json "assign_staff_department" "HR staff department assignment" \
   hr staff assign-department "$HR_STAFF_EMPLOYEE" "$HR_DEPARTMENT_ID" --yes
-HR_STAFF_NEEDS_RESTORE=1
 if [[ -n "$HR_STAFF_ORIGINAL_DEPARTMENT" ]]; then
   cover_cli_json "assign_staff_department" "HR staff department restoration" \
     hr staff assign-department "$HR_STAFF_EMPLOYEE" "$HR_STAFF_ORIGINAL_DEPARTMENT" --yes

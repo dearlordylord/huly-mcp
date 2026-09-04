@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 
-import { DepartmentIdentifier } from "../domain/schemas/hr-departments.js"
-import { Count, NonEmptyString } from "../domain/schemas/shared.js"
+import { DepartmentIdentifier, PersonLocator } from "../domain/schemas/hr-departments.js"
+import { Count } from "../domain/schemas/shared.js"
 
 export class DepartmentNotFoundError extends Schema.TaggedError<DepartmentNotFoundError>()("DepartmentNotFoundError", {
   identifier: DepartmentIdentifier
@@ -44,7 +44,7 @@ export class DepartmentImpactMismatchError extends Schema.TaggedError<Department
 }
 
 export class EmployeeNotFoundError extends Schema.TaggedError<EmployeeNotFoundError>()("EmployeeNotFoundError", {
-  identifier: NonEmptyString
+  identifier: PersonLocator
 }) {
   override get message(): string {
     return `Employee '${this.identifier}' not found`

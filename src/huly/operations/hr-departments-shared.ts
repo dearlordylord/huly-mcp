@@ -52,7 +52,7 @@ export interface DepartmentCatalog {
 
 const isHead = (department: HulyDepartment): boolean => department._id === hr.ids.Head
 
-const exactPersonLocator = (identifier: string) =>
+const exactPersonLocator = (identifier: PersonLocator) =>
   Schema.is(Email)(identifier) ? identifier : PersonName.make(identifier)
 
 const pathFor = (
@@ -299,7 +299,7 @@ export const toDepartmentSummary = (
 export const ensureNameAvailable = (
   catalog: DepartmentCatalog,
   parent: Ref<HulyDepartment>,
-  name: string,
+  name: DepartmentName,
   except?: Ref<HulyDepartment>
 ): Effect.Effect<void, DepartmentConflictError> =>
   catalog.departments.some(

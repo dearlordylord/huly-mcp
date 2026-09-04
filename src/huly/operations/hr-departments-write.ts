@@ -14,6 +14,7 @@ import {
   DepartmentId,
   type DepartmentImpact,
   type DepartmentMutationResult,
+  DepartmentName,
   DepartmentPath,
   PersonId,
   UPDATE_DEPARTMENT_FIELDS,
@@ -147,7 +148,7 @@ export const updateDepartment = (
     const { catalog, department } = yield* resolveDepartment(client, params.department)
     const parent = yield* resolveUpdateParent(client, department, params.newParent)
     yield* validateDepartmentMove(catalog, department, parent)
-    yield* ensureNameAvailable(catalog, parent, params.name ?? department.name, department._id)
+    yield* ensureNameAvailable(catalog, parent, params.name ?? DepartmentName.make(department.name), department._id)
     const relationships = yield* resolveRelationships(client, params)
     const updates = departmentUpdates(params, parent, relationships)
     yield* client.updateDoc(hr.class.Department, department.space, department._id, mergeUpdateEntries(updates))

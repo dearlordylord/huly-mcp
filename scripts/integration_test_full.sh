@@ -4022,21 +4022,23 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
       else
         fail_test "HR Staff fixture restoration" "restored department was not confirmed; cleanup marker retained"
       fi
-      restart_http_transport_if_needed "after HR Staff restoration before delete preview" || exit 1
-      run_capture_to_var HR_DELETE_PREVIEW "delete_department(preview cascade)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_department\",\"arguments\":{\"department\":\"$HR_CLEANUP_DEPARTMENT_ID\"}},\"id\":2}"
-      if [ $? -eq 0 ]; then
-        assert_json_field_equals "delete_department previews nested impact" "$HR_DELETE_PREVIEW" ".impact.subdepartments" "1"
-        HR_DELETE_DESCENDANTS=$(echo "$HR_DELETE_PREVIEW" | jq -r '.impact.subdepartments' 2>/dev/null)
-        HR_DELETE_STAFF=$(echo "$HR_DELETE_PREVIEW" | jq -r '.impact.assignedStaff' 2>/dev/null)
-        run_test "delete_department(exact impact)" \
-          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_department\",\"arguments\":{\"department\":\"$HR_CLEANUP_DEPARTMENT_ID\",\"execute\":true,\"expectedSubdepartments\":$HR_DELETE_DESCENDANTS,\"expectedAssignedStaff\":$HR_DELETE_STAFF}},\"id\":2}"
-        restart_http_transport_if_needed "after HR department delete" || exit 1
-        run_expect_error_contains "get_department(deleted fixture)" \
-          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_department\",\"arguments\":{\"department\":\"$HR_CLEANUP_DEPARTMENT_ID\"}},\"id\":2}" \
-          "not found"
+      if [ -z "$HR_STAFF_RESTORE_EMPLOYEE" ]; then
+        restart_http_transport_if_needed "after HR Staff restoration before delete preview" || exit 1
+        run_capture_to_var HR_DELETE_PREVIEW "delete_department(preview cascade)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_department\",\"arguments\":{\"department\":\"$HR_CLEANUP_DEPARTMENT_ID\"}},\"id\":2}"
         if [ $? -eq 0 ]; then
-          HR_CLEANUP_DEPARTMENT_ID=""
+          assert_json_field_equals "delete_department previews nested impact" "$HR_DELETE_PREVIEW" ".impact.subdepartments" "1"
+          HR_DELETE_DESCENDANTS=$(echo "$HR_DELETE_PREVIEW" | jq -r '.impact.subdepartments' 2>/dev/null)
+          HR_DELETE_STAFF=$(echo "$HR_DELETE_PREVIEW" | jq -r '.impact.assignedStaff' 2>/dev/null)
+          run_test "delete_department(exact impact)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_department\",\"arguments\":{\"department\":\"$HR_CLEANUP_DEPARTMENT_ID\",\"execute\":true,\"expectedSubdepartments\":$HR_DELETE_DESCENDANTS,\"expectedAssignedStaff\":$HR_DELETE_STAFF}},\"id\":2}"
+          restart_http_transport_if_needed "after HR department delete" || exit 1
+          run_expect_error_contains "get_department(deleted fixture)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_department\",\"arguments\":{\"department\":\"$HR_CLEANUP_DEPARTMENT_ID\"}},\"id\":2}" \
+            "not found"
+          if [ $? -eq 0 ]; then
+            HR_CLEANUP_DEPARTMENT_ID=""
+          fi
         fi
       fi
       if ! cleanup_hr_artifacts; then
