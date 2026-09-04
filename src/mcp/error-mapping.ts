@@ -165,7 +165,6 @@ const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDo
   "FunnelIdentifierAmbiguousError",
   "FunnelProjectTypeNotFoundError",
   "FunnelProjectTypeIdentifierAmbiguousError",
-  "FunnelWorkflowInvalidError",
   "FunnelDeleteConflictError",
   "FunnelAccountNotFoundError",
   "LeadNotFoundError",

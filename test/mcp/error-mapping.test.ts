@@ -110,6 +110,7 @@ import {
   McpErrorCode,
   toMcpResponse
 } from "../../src/mcp/error-mapping.js"
+import { classifyDomainFailure } from "../../src/mcp/tools/domain-failure-classification.js"
 import { assertAt } from "../../src/utils/assertions.js"
 import { funnelIdentifier, funnelReference, leadIdentifier } from "../helpers/brands.js"
 
@@ -303,10 +304,6 @@ describe("Error Mapping to MCP", () => {
             new FunnelIdentifierAmbiguousError({ identifier: funnelReference("sales"), matches: Count.make(2) }),
             new FunnelProjectTypeNotFoundError({ identifier: projectType }),
             new FunnelProjectTypeIdentifierAmbiguousError({ identifier: projectType, matches: Count.make(2) }),
-            new FunnelWorkflowInvalidError({
-              projectType,
-              reason: NonEmptyString.make("task type mapping is invalid")
-            }),
             new FunnelDeleteConflictError({
               identifier: funnelReference("sales"),
               reason: NonEmptyString.make("archive it first")
@@ -322,6 +319,17 @@ describe("Error Mapping to MCP", () => {
             expect(response._meta.errorTag).toBe(error._tag)
             expect(assertAt(response.content, 0).text).toBe(error.message)
           }
+
+          const workflowError = new FunnelWorkflowInvalidError({
+            projectType,
+            reason: NonEmptyString.make("task type mapping is invalid")
+          })
+          const workflowResponse = mapDomainErrorToMcp(workflowError)
+          expect(workflowResponse.isError).toBe(true)
+          expect(workflowResponse._meta.errorCode).toBe(McpErrorCode.InternalError)
+          expect(workflowResponse._meta.errorTag).toBe("FunnelWorkflowInvalidError")
+          expect(assertAt(workflowResponse.content, 0).text).toBe(workflowError.message)
+          expect(classifyDomainFailure(workflowError)).toBe("integration")
         })
       )
 
