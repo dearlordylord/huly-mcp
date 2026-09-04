@@ -84,6 +84,8 @@ const DOMAIN_FAILURE_KIND_BY_TAG = {
   DocumentReferenceError: "input",
   DocumentTextMultipleMatchesError: "ambiguity",
   DocumentTextNotFoundError: "lookup",
+  EmployeeLifecycleImpactMismatchError: "conflict",
+  EmployeeLifecycleStateError: "input",
   DrawingNotFoundError: "lookup",
   DriveFileCommentNotFoundError: "lookup",
   DriveFileNotFoundError: "lookup",

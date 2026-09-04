@@ -122,6 +122,7 @@ export * from "./mail.js"
 export * from "./hr-departments.js"
 export * from "./person-administration.js"
 export * from "./person-merge.js"
+export * from "./employee-lifecycle.js"
 
 export { optionalOutput } from "./output-helpers.js"
 

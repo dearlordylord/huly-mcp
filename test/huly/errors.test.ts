@@ -1723,6 +1723,10 @@ describe("Huly Errors", () => {
               return `hr-request-date:${error.startDate}:${error.endDate}`
             case "HrRequestCommentNotFoundError":
               return `hr-request-comment:${error.request}:${error.commentId}`
+            case "EmployeeLifecycleStateError":
+              return `employee-lifecycle:${error.identifier}`
+            case "EmployeeLifecycleImpactMismatchError":
+              return `employee-lifecycle-impact:${error.identifier}`
             case "HrRequestMutationUnsupportedError":
               return `hr-request-unsupported:${error.operation}`
             case "PublicHolidayNotFoundError":

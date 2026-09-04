@@ -21,6 +21,7 @@ import type {
   WorkspaceLoginInfo
 } from "@hcengineering/account-client"
 import type {
+  AccountUuid,
   AccountRole,
   Person,
   PersonInfo,
@@ -74,6 +75,9 @@ export interface WorkspaceClientOperations {
     secondaryPerson: PersonUuid
   ) => Effect.Effect<void, WorkspaceClientError>
   readonly updateWorkspaceRole: (account: string, role: AccountRole) => Effect.Effect<void, WorkspaceClientError>
+  readonly sendInvite: (email: string, role: AccountRole) => Effect.Effect<void, WorkspaceClientError>
+  readonly resendInvite: (email: string, role: AccountRole) => Effect.Effect<void, WorkspaceClientError>
+  readonly leaveWorkspace: (account: AccountUuid) => Effect.Effect<void, WorkspaceClientError>
   readonly getWorkspaceInfo: (updateLastVisit?: boolean) => Effect.Effect<WorkspaceInfoWithStatus, WorkspaceClientError>
   readonly getUserWorkspaces: () => Effect.Effect<Array<WorkspaceInfoWithStatus>, WorkspaceClientError>
   readonly createWorkspace: (name: string, region?: string) => Effect.Effect<WorkspaceLoginInfo, WorkspaceClientError>
@@ -153,6 +157,10 @@ export class WorkspaceClient extends Context.Service<WorkspaceClient, WorkspaceC
           withClient((c) => c.mergeSpecifiedPersons(primaryPerson, secondaryPerson), "mergeSpecifiedPersons"),
         updateWorkspaceRole: (account, role) =>
           withClient((c) => c.updateWorkspaceRole(account, role), "updateWorkspaceRole"),
+        sendInvite: (email, role) => withClient((c) => c.sendInvite(email, role), "sendInvite"),
+        resendInvite: (email, role) => withClient((c) => c.resendInvite(email, role), "resendInvite"),
+        leaveWorkspace: (account) =>
+          withClient((c) => c.leaveWorkspace(account).then(() => undefined), "leaveWorkspace"),
         getWorkspaceInfo: (updateLastVisit) =>
           withClient((c) => c.getWorkspaceInfo(updateLastVisit), "getWorkspaceInfo"),
         getUserWorkspaces: () => withClient((c) => c.getUserWorkspaces(), "getUserWorkspaces"),
@@ -186,6 +194,9 @@ export class WorkspaceClient extends Context.Service<WorkspaceClient, WorkspaceC
       getCurrentSocialIds: notImplemented("getCurrentSocialIds"),
       getPersonInfo: notImplemented("getPersonInfo"),
       updateWorkspaceRole: notImplemented("updateWorkspaceRole"),
+      sendInvite: notImplemented("sendInvite"),
+      resendInvite: notImplemented("resendInvite"),
+      leaveWorkspace: notImplemented("leaveWorkspace"),
       getWorkspaceInfo: notImplemented("getWorkspaceInfo"),
       getUserWorkspaces: () => Effect.succeed([]),
       createWorkspace: notImplemented("createWorkspace"),

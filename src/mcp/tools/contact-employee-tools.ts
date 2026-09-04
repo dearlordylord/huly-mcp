@@ -5,9 +5,21 @@ import {
   setEmployeePositionParamsJsonSchema
 } from "../../domain/schemas.js"
 import { ListEmployeesResultSchema, SetEmployeePositionResultSchema } from "../../domain/schemas/contacts.js"
+import {
+  deactivateEmployeeParamsJsonSchema,
+  DeactivateEmployeeResultSchema,
+  inviteEmployeeParamsJsonSchema,
+  InviteEmployeeResultSchema,
+  listInactiveEmployeesParamsJsonSchema,
+  ListInactiveEmployeesResultSchema,
+  parseDeactivateEmployeeParams,
+  parseInviteEmployeeParams,
+  parseListInactiveEmployeesParams
+} from "../../domain/schemas/employee-lifecycle.js"
+import { deactivateEmployee, inviteEmployee, listInactiveEmployees } from "../../huly/operations/employee-lifecycle.js"
 import { setEmployeePosition } from "../../huly/operations/employee-position.js"
 import { listEmployees } from "../../huly/operations/persons.js"
-import { defineTool, type RegisteredTool } from "./registry.js"
+import { defineHulyWorkspaceTool, defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "contacts" as const
 
@@ -36,5 +48,42 @@ export const contactEmployeeTools = [
     },
     parseSetEmployeePositionParams,
     setEmployeePosition
+  ),
+  defineHulyWorkspaceTool(
+    {
+      name: "invite_employee",
+      description:
+        "Invite a new employee by exact email, or resend an invitation to an existing inactive Employee resolved by exact email or exact display name. Active employees and existing non-Employee persons are rejected. Returns no invitation link, credential, or token.",
+      category: CATEGORY,
+      inputSchema: inviteEmployeeParamsJsonSchema,
+      resultSchema: InviteEmployeeResultSchema
+    },
+    parseInviteEmployeeParams,
+    inviteEmployee
+  ),
+  defineHulyWorkspaceTool(
+    {
+      name: "list_inactive_employees",
+      description:
+        "List every inactive Employee before applying output pagination. Each result distinguishes the account link, workspace membership and role, Person identity, and Employee active state so an agent can choose reinvite, deactivate, or kick safely.",
+      category: CATEGORY,
+      inputSchema: listInactiveEmployeesParamsJsonSchema,
+      resultSchema: ListInactiveEmployeesResultSchema
+    },
+    parseListInactiveEmployeesParams,
+    listInactiveEmployees
+  ),
+  defineHulyWorkspaceTool(
+    {
+      name: "deactivate_employee",
+      description:
+        "Preview or execute an employee lifecycle change resolved by exact email or exact display name. action=deactivate only sets Employee.active=false and retains workspace membership; action=kick also removes the linked account from the workspace. Preview is the default. Execution requires execute=true plus the exact previewed Person ID, account UUID/null, Employee active flag, and workspace role/null; any changed state is rejected. The authenticated employee cannot target itself.",
+      category: CATEGORY,
+      inputSchema: deactivateEmployeeParamsJsonSchema,
+      resultSchema: DeactivateEmployeeResultSchema,
+      annotations: { destructiveHint: true, idempotentHint: true }
+    },
+    parseDeactivateEmployeeParams,
+    deactivateEmployee
   )
 ] as const satisfies ReadonlyArray<RegisteredTool>

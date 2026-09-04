@@ -2,6 +2,9 @@ import { ToolName, type ToolName as ToolNameType } from "../src/mcp/tools/regist
 
 export const ISSUE_97_ADMINISTRATION_TOOL_NAMES: ReadonlySet<ToolNameType> = new Set([
   ToolName.make("set_employee_position"),
+  ToolName.make("invite_employee"),
+  ToolName.make("list_inactive_employees"),
+  ToolName.make("deactivate_employee"),
   ToolName.make("list_departments"),
   ToolName.make("get_department"),
   ToolName.make("create_department"),

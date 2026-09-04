@@ -20,7 +20,7 @@ export type CliIntegrationCoverageDecision =
       readonly type: "representative"
     }
 
-export const CLI_COVERAGE_REVIEWED_REGISTRY_OPERATIONS = 575
+export const CLI_COVERAGE_REVIEWED_REGISTRY_OPERATIONS = 578
 export const CLI_COVERAGE_REVIEWED_ROOT_COMMANDS = 55
 export const CLI_COVERAGE_REVIEWED_LOCAL_COMMANDS = 7
 
@@ -171,6 +171,7 @@ export const CLI_LIVE_COVERAGE_CASES: ReadonlyArray<CliLiveCoverageCase> = [
     id: "consequential-refusals",
     tools: [
       "create_workspace",
+      "invite_employee",
       "update_member_role",
       "approve_approval_request",
       "add_space_members",
@@ -255,6 +256,7 @@ export const CLI_UNIQUE_RISK_DECISIONS: ReadonlyArray<CliUniqueRiskDecision> = [
     caseId: "consequential-refusals",
     tools: [
       "create_workspace",
+      "invite_employee",
       "update_member_role",
       "approve_approval_request",
       "add_space_members",

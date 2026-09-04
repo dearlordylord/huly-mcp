@@ -4578,6 +4578,37 @@ run_test "list_persons" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_persons","arguments":{"limit":3}},"id":2}'
 run_capture_to_var EMPLOYEES_TEXT "list_employees" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_employees","arguments":{"limit":3}},"id":2}'
+run_capture_to_var INACTIVE_EMPLOYEES_TEXT "list_inactive_employees" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_inactive_employees","arguments":{"limit":3,"offset":0}},"id":2}'
+if [ $? -eq 0 ]; then
+  assert_json_field_equals "list_inactive_employees returns exact total metadata" \
+    "$INACTIVE_EMPLOYEES_TEXT" ".total >= (.employees | length)" "true"
+fi
+EMPLOYEE_LIFECYCLE_ALL=$(run_capture_only \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_employees","arguments":{"limit":200}},"id":2}' 2>/dev/null || true)
+if [ -n "${HULY_EMAIL:-}" ]; then
+  EMPLOYEE_LIFECYCLE_SELF_EMAIL=$(json_string "$HULY_EMAIL")
+  run_expect_error "invite_employee(active self is incompatible)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"invite_employee\",\"arguments\":{\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_SELF_EMAIL}}},\"id\":2}"
+fi
+EMPLOYEE_LIFECYCLE_TARGET=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_ALL" | jq -r --arg email "${HULY_EMAIL:-}" \
+  '[.[]? | select(.active == true and (.email // "") != $email and (.name // "") != "") | .name] | sort | group_by(.) | map(select(length == 1) | .[0]) | .[0] // empty' 2>/dev/null)
+if [ -n "$EMPLOYEE_LIFECYCLE_TARGET" ]; then
+  EMPLOYEE_LIFECYCLE_TARGET_JSON=$(json_string "$EMPLOYEE_LIFECYCLE_TARGET")
+  run_capture_to_var EMPLOYEE_LIFECYCLE_PREVIEW "deactivate_employee(preview)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"deactivate_employee\",\"arguments\":{\"employee\":{\"name\":$EMPLOYEE_LIFECYCLE_TARGET_JSON},\"action\":\"kick\"}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    assert_json_field_equals "deactivate_employee preview performs no mutation" \
+      "$EMPLOYEE_LIFECYCLE_PREVIEW" ".executed" "false"
+    EMPLOYEE_LIFECYCLE_UUID=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_PREVIEW" | jq -c '.impact.account.personUuid // null')
+    EMPLOYEE_LIFECYCLE_ACTIVE=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_PREVIEW" | jq -c '.impact.employee.state == "active"')
+    EMPLOYEE_LIFECYCLE_ROLE=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_PREVIEW" | jq -c '.impact.workspaceMembership.role // null')
+    run_expect_error "deactivate_employee(stale impact guard)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"deactivate_employee\",\"arguments\":{\"employee\":{\"name\":$EMPLOYEE_LIFECYCLE_TARGET_JSON},\"action\":\"kick\",\"execute\":true,\"expectedPersonId\":\"stale-person-id\",\"expectedPersonUuid\":$EMPLOYEE_LIFECYCLE_UUID,\"expectedEmployeeActive\":$EMPLOYEE_LIFECYCLE_ACTIVE,\"expectedWorkspaceRole\":$EMPLOYEE_LIFECYCLE_ROLE}},\"id\":2}"
+  fi
+else
+  skip_test "deactivate_employee(preview and stale guard)" "no unique active non-self employee fixture"
+fi
 HR_STAFF_FIXTURE=$(pnpm exec tsx scripts/integration-hr-staff-fixture.ts 2>/dev/null)
 HR_STAFF_EMPLOYEE=$(echo "$HR_STAFF_FIXTURE" | jq -r '.employeeId // empty' 2>/dev/null)
 HR_STAFF_ORIGINAL_DEPARTMENT=$(echo "$HR_STAFF_FIXTURE" | jq -r '.departmentId // empty' 2>/dev/null)

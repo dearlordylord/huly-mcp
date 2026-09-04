@@ -2,6 +2,16 @@ import type { McpToolName } from "../../../src/mcp/tools/index.js"
 import type { CliCommandSpec } from "./catalog-types.js"
 
 export const collaborationMutationCliCommandCatalogB = {
+  invite_employee: {
+    path: ["contacts", "employees", "invite"],
+    positional: ["employee"],
+    description: "Send Employee Invitation or Reinvitation"
+  },
+  deactivate_employee: {
+    path: ["contacts", "employees", "deactivate"],
+    positional: ["employee", "action"],
+    description: "Preview or Execute Employee Deactivation"
+  },
   remove_document_label: {
     path: ["documents", "labels", "remove"],
     positional: ["teamspace", "document", "label"],

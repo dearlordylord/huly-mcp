@@ -68,6 +68,7 @@ import {
 import { HulyDomainBaseError } from "./errors-domain-base.js"
 import { HulyMessagingDomainError } from "./errors-domain-messaging.js"
 import { HulyViewDomainError } from "./errors-domain-view.js"
+import { EmployeeLifecycleImpactMismatchError, EmployeeLifecycleStateError } from "./errors-employee-lifecycle.js"
 import { PersonAdministrationDomainError } from "./errors-person-administration.js"
 import {
   DriveFileCommentNotFoundError,
@@ -262,6 +263,8 @@ export const HulyDomainError = Schema.Union([
   InvalidContactChannelValueError,
   PersonIdentifierAmbiguousError,
   PersonNotFoundError,
+  EmployeeLifecycleStateError,
+  EmployeeLifecycleImpactMismatchError,
   PersonAdministrationDomainError,
   OrganizationNotFoundError,
   OrganizationIdentifierAmbiguousError,

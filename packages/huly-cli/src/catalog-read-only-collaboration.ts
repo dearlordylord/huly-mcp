@@ -220,6 +220,11 @@ export const collaborationReadOnlyCliCommandCatalog = {
     positional: [],
     description: "List Person Attachments"
   },
+  list_inactive_employees: {
+    path: ["contacts", "employees", "inactive", "list"],
+    positional: [],
+    description: "List Inactive Employees"
+  },
   get_person_attachment: {
     path: ["contacts", "persons", "attachments", "get"],
     positional: [],

@@ -165,7 +165,7 @@ const categoryMetadata = (category: ReviewCategory): { readonly issue: string; r
       return {
         issue: "#97",
         rationale:
-          "Reviewed employee-position, HR-department, Staff-assignment, funnel-administration, lead-mutation, HR-request, public-holiday, HR-report, person-administration, and explicit person-merge operations with their exact schemas and ordered registry/CLI exposure."
+          "Reviewed employee lifecycle, employee-position, HR-department, Staff-assignment, funnel-administration, lead-mutation, HR-request, public-holiday, HR-report, person-administration, and explicit person-merge operations with their exact schemas and ordered registry/CLI exposure."
       }
     case "cli-json-diagnostic":
       return {
@@ -177,7 +177,7 @@ const categoryMetadata = (category: ReviewCategory): { readonly issue: string; r
       return {
         issue: "#228",
         rationale:
-          "Reviewed concise Effect 4 CLI help rendering; funnel, HR-request, public-holiday, HR-report, and person-administration routes are added without changing other route behavior."
+          "Reviewed concise Effect 4 CLI help rendering; employee lifecycle, funnel, HR-request, public-holiday, HR-report, and person-administration routes are added without changing other route behavior."
       }
   }
 }

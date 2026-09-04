@@ -27,6 +27,7 @@ export const CONSEQUENTIAL_CLI_TOOLS = [
   "update_guest_settings",
   "update_member_role",
   "update_user_profile",
+  "invite_employee",
   "start_process",
   "cancel_execution",
   "upsert_project_target_preference",

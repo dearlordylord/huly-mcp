@@ -42,6 +42,9 @@ const mockCanMergeSpecifiedPersons =
   mockFn<(primaryPerson: PersonUuid, secondaryPerson: PersonUuid) => Promise<boolean>>()
 const mockMergeSpecifiedPersons = mockFn<(primaryPerson: PersonUuid, secondaryPerson: PersonUuid) => Promise<void>>()
 const mockUpdateWorkspaceRole = mockFn<(account: string, role: AccountRole) => Promise<void>>()
+const mockSendInvite = mockFn<(email: string, role: AccountRole) => Promise<void>>()
+const mockResendInvite = mockFn<(email: string, role: AccountRole) => Promise<void>>()
+const mockLeaveWorkspace = mockFn<(account: AccountUuid) => Promise<null>>()
 const mockGetWorkspaceInfo = mockFn<(updateLastVisit?: boolean) => Promise<WorkspaceInfoWithStatus>>()
 const mockGetUserWorkspaces = mockFn<() => Promise<Array<WorkspaceInfoWithStatus>>>()
 const mockCreateWorkspace = mockFn<(name: string, region?: string) => Promise<WorkspaceLoginInfo>>()
@@ -76,6 +79,9 @@ const clearAllMockFns = () => {
   mockCanMergeSpecifiedPersons.mockClear()
   mockMergeSpecifiedPersons.mockClear()
   mockUpdateWorkspaceRole.mockClear()
+  mockSendInvite.mockClear()
+  mockResendInvite.mockClear()
+  mockLeaveWorkspace.mockClear()
   mockGetWorkspaceInfo.mockClear()
   mockGetUserWorkspaces.mockClear()
   mockCreateWorkspace.mockClear()
@@ -97,6 +103,9 @@ const mockAccountClient: AccountClient = {
   canMergeSpecifiedPersons: mockCanMergeSpecifiedPersons,
   mergeSpecifiedPersons: mockMergeSpecifiedPersons,
   updateWorkspaceRole: mockUpdateWorkspaceRole,
+  sendInvite: mockSendInvite,
+  resendInvite: mockResendInvite,
+  leaveWorkspace: mockLeaveWorkspace,
   getWorkspaceInfo: mockGetWorkspaceInfo,
   getUserWorkspaces: mockGetUserWorkspaces,
   createWorkspace: mockCreateWorkspace,
@@ -215,6 +224,21 @@ describe("WorkspaceClient.layer (real layer)", () => {
       yield* client.updateWorkspaceRole("acc-1", AccountRole.Maintainer)
 
       expect(mockUpdateWorkspaceRole.mock.calls).toContainEqual(["acc-1", AccountRole.Maintainer])
+    }).pipe(Effect.provide(liveLayer))
+  )
+
+  it.effect("delegates employee invitation and removal without returning account tokens", () =>
+    Effect.gen(function* () {
+      mockSendInvite.mockResolvedValue(undefined)
+      mockResendInvite.mockResolvedValue(undefined)
+      mockLeaveWorkspace.mockResolvedValue(null)
+      const client = yield* WorkspaceClient
+      yield* client.sendInvite("new@example.test", AccountRole.User)
+      yield* client.resendInvite("inactive@example.test", AccountRole.Maintainer)
+      yield* client.leaveWorkspace(toAccountUuid("00000000-0000-4000-8000-000000000251"))
+      expect(mockSendInvite.mock.calls).toContainEqual(["new@example.test", AccountRole.User])
+      expect(mockResendInvite.mock.calls).toContainEqual(["inactive@example.test", AccountRole.Maintainer])
+      expect(mockLeaveWorkspace.mock.calls).toHaveLength(1)
     }).pipe(Effect.provide(liveLayer))
   )
 
@@ -562,6 +586,9 @@ describe("WorkspaceClient.testLayer", () => {
       expect(client.getCurrentSocialIds).toBeDefined()
       expect(client.getPersonInfo).toBeDefined()
       expect(client.updateWorkspaceRole).toBeDefined()
+      expect(client.sendInvite).toBeDefined()
+      expect(client.resendInvite).toBeDefined()
+      expect(client.leaveWorkspace).toBeDefined()
       expect(client.getWorkspaceInfo).toBeDefined()
       expect(client.getUserWorkspaces).toBeDefined()
       expect(client.createWorkspace).toBeDefined()
@@ -619,6 +646,18 @@ describe("WorkspaceClient.testLayer", () => {
       const client = yield* WorkspaceClient.pipe(Effect.provide(WorkspaceClient.testLayer({})))
       const exit = yield* Effect.exit(client.updateWorkspaceRole("acc", AccountRole.User))
       expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(true)
+    })
+  )
+
+  it.effect("default employee lifecycle account mutations die when not implemented", () =>
+    Effect.gen(function* () {
+      const client = yield* WorkspaceClient.pipe(Effect.provide(WorkspaceClient.testLayer({})))
+      const send = yield* Effect.exit(client.sendInvite("a@example.test", AccountRole.User))
+      const resend = yield* Effect.exit(client.resendInvite("a@example.test", AccountRole.User))
+      const leave = yield* Effect.exit(client.leaveWorkspace(toAccountUuid("00000000-0000-4000-8000-000000000251")))
+      expect(Exit.isFailure(send) && Cause.hasDies(send.cause)).toBe(true)
+      expect(Exit.isFailure(resend) && Cause.hasDies(resend.cause)).toBe(true)
+      expect(Exit.isFailure(leave) && Cause.hasDies(leave.cause)).toBe(true)
     })
   )
 

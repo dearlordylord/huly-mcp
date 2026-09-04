@@ -71,7 +71,7 @@ type ExactAccountRoleMapping = [HulyAccountRole] extends [MappedAccountRole]
 const exactAccountRoleMapping = <T extends true>(value: T): T => value
 exactAccountRoleMapping<ExactAccountRoleMapping>(true)
 
-const toHulyAccountRole = (role: AccountRole): HulyAccountRole => accountRoleMap[role]
+export const toHulyAccountRole = (role: AccountRole): HulyAccountRole => accountRoleMap[role]
 
 type ListWorkspaceMembersError = WorkspaceClientError
 type UpdateMemberRoleError = WorkspaceClientError
