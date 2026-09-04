@@ -31,10 +31,10 @@
     },
     {
       "category": "issue-97-administration",
-      "count": 18928,
-      "deltaSetSha256": "c0a178aa7dee70cabd3d365da18af1352cb6c50821c4b2b3db714b6b298c9ab9",
+      "count": 19137,
+      "deltaSetSha256": "f4a60944ab1b05ba829d4834cfdd11464549540dce73304feed10087ba341538",
       "issue": "#97",
-      "rationale": "Reviewed employee-position, HR-department, Staff-assignment, funnel-administration, HR-request, public-holiday, HR-report, and person-administration operations with their exact schemas and ordered registry/CLI exposure."
+      "rationale": "Reviewed employee-position, HR-department, Staff-assignment, funnel-administration, lead-mutation, HR-request, public-holiday, HR-report, and person-administration operations with their exact schemas and ordered registry/CLI exposure."
     },
     {
       "category": "cli-json-diagnostic",
@@ -46,11 +46,11 @@
     {
       "category": "cli-help",
       "count": 4,
-      "deltaSetSha256": "c25194b3b9822bc3685f7d94b9a6e42b4124593aad7d95abead94f4c58b831b4",
+      "deltaSetSha256": "cf607789dc1562757a84aca00aadaddfd4371470ef09d5d6dfda4aaf6df51a30",
       "issue": "#228",
       "rationale": "Reviewed concise Effect 4 CLI help rendering; funnel, HR-request, public-holiday, HR-report, and person-administration routes are added without changing other route behavior."
     }
   ],
   "formatVersion": 1,
-  "reviewedCurrentSha256": "a096afa67e1cfefbcc5eaa61abc22e800aad7e21dd2edabf387b3cb674bf3574"
+  "reviewedCurrentSha256": "e9c11e5626fd1ae8dc0cb060466205a727743653ff87a1f0277adbe7a25edfa8"
 }
