@@ -500,6 +500,33 @@ describe("employee lifecycle operations", () => {
     )
   })
 
+  it.effect("reconciles an exact-email resend when another Person has the same display name", () => {
+    const resent: Array<string> = []
+    const preparations: Array<EmployeePreparationPlan> = []
+    return Effect.gen(function* () {
+      const result = yield* inviteEmployee({
+        mode: "invite-existing",
+        employee: { email: Email.make("ada@example.test") },
+        role: "GUEST"
+      })
+      expect(result).toMatchObject({ outcome: "invitation-resent", role: "GUEST" })
+      expect(preparations).toMatchObject([{ kind: "reconcile-role", previousName: "Lovelace,Ada" }])
+      expect(resent).toEqual(["ada@example.test"])
+    }).pipe(
+      Effect.provide(
+        layer(
+          {
+            people: [person("person-1", "Lovelace,Ada"), person("person-2", "Lovelace,Ada")],
+            employees: [employee(false)],
+            channels: [emailChannel()],
+            preparations
+          },
+          { resent }
+        )
+      )
+    )
+  })
+
   it.effect("reports explicit resend role persistence when resend then fails", () => {
     const updated: Array<unknown> = []
     return Effect.gen(function* () {

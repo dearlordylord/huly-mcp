@@ -1,9 +1,11 @@
 import type { Person as HulyPerson, SocialIdentity } from "@hcengineering/contact"
 import { generateId, SocialIdType } from "@hcengineering/core"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 
 import {
   type EmployeeInvitationRole,
+  type EmployeeInvitationProgress,
+  EmployeeInvitationProgressSchema,
   type EmployeePreparationChange,
   EmployeePreparationChangesSchema,
   type InviteEmployeeParams,
@@ -27,7 +29,7 @@ import { contact } from "../huly-plugins.js"
 import { WorkspaceClient, type WorkspaceClientOperations } from "../workspace-client.js"
 import {
   decodeEmployeeLifecycleIdentities,
-  decodeEmployeeLifecycleState,
+  decodeInactiveEmployeeLifecycleState,
   type EmployeeLifecycleDocument,
   type EmployeeLifecycleIdentity,
   type EmployeeLifecyclePerson
@@ -55,11 +57,12 @@ type EmployeeLifecycleError =
 const DEFAULT_INVITE_ROLE: EmployeeInvitationRole = "USER"
 
 type EmployeePreparedResult = Extract<InviteEmployeeResult, { readonly outcome: "employee-prepared-and-invited" }>
+const parseEmployeeInvitationProgress = Schema.decodeUnknownSync(EmployeeInvitationProgressSchema)
 
-const preparationChanges = (changes: EmployeePreparedResult["changes"]): Array<EmployeePreparationChange> => {
+const preparationChanges = (changes: EmployeePreparedResult["changes"]): EmployeeInvitationProgress => {
   const completed: Array<EmployeePreparationChange> = []
   if (EmployeePreparationChangesSchema.guards["person-created"](changes)) {
-    return ["personCreated", "emailIdentityCreated", "employeeCreated"]
+    return parseEmployeeInvitationProgress(["personCreated", "emailIdentityCreated", "employeeCreated"])
   }
   if (changes.nameUpdated) completed.push("nameUpdated")
   if (changes.emailIdentityCreated) completed.push("emailIdentityCreated")
@@ -70,7 +73,7 @@ const preparationChanges = (changes: EmployeePreparedResult["changes"]): Array<E
   if (["role-updated", "reactivated-and-role-updated"].includes(changes.employeeTransition)) {
     completed.push("employeeRoleUpdated")
   }
-  return completed
+  return parseEmployeeInvitationProgress(completed)
 }
 
 const findEmailIdentity = Effect.fn("EmployeeLifecycle.findEmailIdentity")(function* (
@@ -273,13 +276,14 @@ const resolveReinviteTarget = Effect.fn("EmployeeLifecycle.resolveReinviteTarget
       reason: "the employee is active; invitation resend is only valid for an inactive employee"
     })
   }
-  const state = yield* loadEmployeeLifecycleState(
+  const projected = yield* loadEmployeeLifecycleState(
     client,
     workspace,
     employee,
     "email" in params.employee ? params.employee.email : undefined,
     "inviteEmployee"
   )
+  const state = yield* decodeInactiveEmployeeLifecycleState(projected, "inviteEmployee")
   const email = state.email
   if (email === undefined) {
     return yield* new EmployeeLifecycleStateError({
@@ -322,7 +326,7 @@ const reinviteEmployee = Effect.fn("EmployeeLifecycle.reinvite")(function* (
     yield* commitPreparation(client, preparation)
   }
   const projected = employeeRoleUpdated
-    ? yield* decodeEmployeeLifecycleState(
+    ? yield* decodeInactiveEmployeeLifecycleState(
         { ...state, employee: { state: "inactive", role } },
         "inviteEmployee.roleReconciliation"
       )

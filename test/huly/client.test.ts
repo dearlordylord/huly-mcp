@@ -1558,6 +1558,10 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
             value: "existing@example.test"
           })
         ])
+        expect(mockApplyNotMatch.mock.calls).toContainEqual([
+          expect.anything(),
+          expect.objectContaining({ _id: { $ne: "person-existing" }, name: "Person,Renamed" })
+        ])
         expect(mockApplyUpdateDoc.mock.calls).toHaveLength(1)
         expect(mockApplyUpdateMixin.mock.calls).toHaveLength(1)
         expect(mockApplyCommit.mock.calls).toHaveLength(1)
@@ -1600,6 +1604,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         resetApplyDefaults()
         mockApplyAddCollection.mockClear()
         mockApplyMatch.mockClear()
+        mockApplyNotMatch.mockClear()
         mockApplyUpdateMixin.mockClear()
         const reconcileRole: EmployeePreparationPlan = {
           kind: "reconcile-role",
@@ -1613,6 +1618,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         }
         expect(yield* commit(reconcileRole)).toBe("applied")
         expect(mockApplyAddCollection.mock.calls).toHaveLength(0)
+        expect(mockApplyNotMatch.mock.calls).toHaveLength(0)
         expect(mockApplyUpdateMixin.mock.calls).toHaveLength(1)
         expect(mockApplyMatch.mock.calls).toContainEqual([
           expect.anything(),

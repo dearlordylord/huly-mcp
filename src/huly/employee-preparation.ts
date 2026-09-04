@@ -54,7 +54,9 @@ type ExistingPlan = Extract<EmployeePreparationPlan, { readonly kind: "prepare-e
 const addExistingPersonConditions = (apply: ReturnType<TxOperations["apply"]>, preparation: ExistingPlan): void => {
   const personId = toRef<Person>(preparation.personId)
   apply.match(contact.class.Person, hulyQuery<Person>({ _id: personId, name: preparation.previousName }))
-  apply.notMatch(contact.class.Person, hulyQuery<Person>({ _id: { $ne: personId }, name: preparation.name }))
+  if (preparation.kind === "prepare-existing") {
+    apply.notMatch(contact.class.Person, hulyQuery<Person>({ _id: { $ne: personId }, name: preparation.name }))
+  }
 }
 
 const addEmailIdentity = async (

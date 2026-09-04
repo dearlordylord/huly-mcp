@@ -4,8 +4,12 @@ import { describe, expect, it } from "vitest"
 import {
   DeactivateEmployeeParamsSchema,
   DeactivateEmployeeResultSchema,
+  EmployeeInvitationProgressSchema,
+  EmployeeKickProgressSchema,
   EmployeeLifecycleStateSchema,
+  InviteEmployeeResultSchema,
   InviteEmployeeParamsGuards,
+  ListInactiveEmployeesResultSchema,
   parseDeactivateEmployeeParams,
   parseInviteEmployeeParams
 } from "./employee-lifecycle.js"
@@ -125,6 +129,69 @@ describe("employee lifecycle schemas", () => {
         impactBefore: unlinkedState,
         changes: { employeeDeactivated: true, workspaceMemberRemoved: true }
       })
+    ).toThrow()
+    expect(() =>
+      Schema.decodeUnknownSync(InviteEmployeeResultSchema)({
+        outcome: "invitation-resent",
+        email: "ada@example.test",
+        role: "USER",
+        employee: { ...unlinkedState, employee: { state: "active", role: "USER" } }
+      })
+    ).toThrow()
+  })
+
+  it("couples inactive pagination and constrains partial progress tuples", () => {
+    const inactive = {
+      relationship: "unlinked",
+      personId: "person-1",
+      name: "Lovelace,Ada",
+      account: { state: "unlinked" },
+      workspaceMembership: { state: "absent" },
+      employee: { state: "inactive", role: "USER" }
+    }
+    expect(
+      Schema.decodeUnknownSync(ListInactiveEmployeesResultSchema)({
+        employees: [inactive],
+        total: 2,
+        offset: 0,
+        truncated: true,
+        nextOffset: 1
+      })
+    ).toMatchObject({ truncated: true, nextOffset: 1 })
+    expect(() =>
+      Schema.decodeUnknownSync(ListInactiveEmployeesResultSchema)({
+        employees: [inactive],
+        total: 1,
+        offset: 0,
+        truncated: false,
+        nextOffset: 1
+      })
+    ).toThrow()
+    expect(() =>
+      Schema.decodeUnknownSync(ListInactiveEmployeesResultSchema)({
+        employees: [{ ...inactive, employee: { state: "active", role: "USER" } }],
+        total: 1,
+        offset: 0,
+        truncated: false
+      })
+    ).toThrow()
+    expect(() =>
+      Schema.decodeUnknownSync(ListInactiveEmployeesResultSchema)({
+        employees: [inactive],
+        total: 2,
+        offset: 0,
+        truncated: true
+      })
+    ).toThrow()
+    expect(Schema.decodeUnknownSync(EmployeeKickProgressSchema)([])).toEqual([])
+    expect(Schema.decodeUnknownSync(EmployeeKickProgressSchema)(["employeeDeactivated"])).toEqual([
+      "employeeDeactivated"
+    ])
+    expect(() =>
+      Schema.decodeUnknownSync(EmployeeKickProgressSchema)(["employeeDeactivated", "employeeDeactivated"])
+    ).toThrow()
+    expect(() =>
+      Schema.decodeUnknownSync(EmployeeInvitationProgressSchema)(["employeeRoleUpdated", "nameUpdated"])
     ).toThrow()
   })
 })

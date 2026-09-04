@@ -2,6 +2,8 @@ import { Effect, Schema } from "effect"
 
 import {
   EmployeeInvitationRoleSchema,
+  type InactiveEmployeeLifecycleState,
+  InactiveEmployeeLifecycleStateSchema,
   type EmployeeLifecycleState,
   EmployeeLifecycleStateSchema
 } from "../../domain/schemas/employee-lifecycle.js"
@@ -26,6 +28,7 @@ type EmployeeLifecycleBoundaryEntity =
   | "workspace members"
   | "email SocialIdentities"
   | "employee lifecycle projection"
+  | "inactive employee lifecycle projection"
   | "employee email"
 
 const EmployeeLifecycleDocumentFields = {
@@ -141,6 +144,14 @@ export const decodeEmployeeLifecycleState = (
 ): Effect.Effect<EmployeeLifecycleState, HulyDataInvalidError> =>
   Schema.decodeUnknownEffect(EmployeeLifecycleStateSchema)(input).pipe(
     Effect.mapError(invalid(operation, "employee lifecycle projection"))
+  )
+
+export const decodeInactiveEmployeeLifecycleState = (
+  input: unknown,
+  operation: EmployeeLifecycleBoundaryOperation
+): Effect.Effect<InactiveEmployeeLifecycleState, HulyDataInvalidError> =>
+  Schema.decodeUnknownEffect(InactiveEmployeeLifecycleStateSchema)(input).pipe(
+    Effect.mapError(invalid(operation, "inactive employee lifecycle projection"))
   )
 
 export const decodeOptionalEmployeeEmail = (

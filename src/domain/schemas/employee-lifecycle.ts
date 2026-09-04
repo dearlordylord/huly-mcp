@@ -82,6 +82,37 @@ export const EmployeeLifecycleStateSchema = EmployeeLifecycleStateTaggedSchema.a
 export const EmployeeLifecycleStateGuards = EmployeeLifecycleStateTaggedSchema.guards
 export type EmployeeLifecycleState = Schema.Schema.Type<typeof EmployeeLifecycleStateSchema>
 
+const InactiveEmployeeLifecycleStateFields = {
+  ...EmployeeLifecycleStateFields,
+  employee: EmployeeStateSchema.cases.inactive
+}
+export const InactiveEmployeeLifecycleStateSchema = Schema.Union([
+  Schema.Struct({
+    ...InactiveEmployeeLifecycleStateFields,
+    relationship: Schema.Literal("unlinked"),
+    account: AccountStateSchema.cases.unlinked,
+    workspaceMembership: WorkspaceMembershipStateSchema.cases.absent
+  }),
+  Schema.Struct({
+    ...InactiveEmployeeLifecycleStateFields,
+    relationship: Schema.Literal("linked-without-membership"),
+    account: AccountStateSchema.cases.linked,
+    workspaceMembership: WorkspaceMembershipStateSchema.cases.absent
+  }),
+  Schema.Struct({
+    ...InactiveEmployeeLifecycleStateFields,
+    relationship: Schema.Literal("workspace-member"),
+    account: AccountStateSchema.cases.linked,
+    workspaceMembership: WorkspaceMembershipStateSchema.cases.member
+  })
+])
+  .pipe(Schema.toTaggedUnion("relationship"))
+  .annotate({
+    identifier: "InactiveEmployeeLifecycleState",
+    description: "Exact lifecycle projection for an inactive Contact Employee."
+  })
+export type InactiveEmployeeLifecycleState = Schema.Schema.Type<typeof InactiveEmployeeLifecycleStateSchema>
+
 const InviteExistingEmployeeParamsSchema = Schema.Struct({
   mode: Schema.Literal("invite-existing"),
   employee: EmployeeLifecycleLocatorSchema,
@@ -114,6 +145,35 @@ export const EmployeePreparationChangeSchema = Schema.Literals([
   "employeeRoleUpdated"
 ])
 export type EmployeePreparationChange = Schema.Schema.Type<typeof EmployeePreparationChangeSchema>
+const NamePreparation = Schema.Literal("nameUpdated")
+const IdentityPreparation = Schema.Literal("emailIdentityCreated")
+const CreatedPreparation = Schema.Literal("employeeCreated")
+const ReactivatedPreparation = Schema.Literal("employeeReactivated")
+const RolePreparation = Schema.Literal("employeeRoleUpdated")
+export const EmployeeInvitationProgressSchema = Schema.Union([
+  Schema.Tuple([]),
+  Schema.Tuple([NamePreparation]),
+  Schema.Tuple([IdentityPreparation]),
+  Schema.Tuple([NamePreparation, IdentityPreparation]),
+  Schema.Tuple([CreatedPreparation]),
+  Schema.Tuple([NamePreparation, CreatedPreparation]),
+  Schema.Tuple([IdentityPreparation, CreatedPreparation]),
+  Schema.Tuple([NamePreparation, IdentityPreparation, CreatedPreparation]),
+  Schema.Tuple([ReactivatedPreparation]),
+  Schema.Tuple([NamePreparation, ReactivatedPreparation]),
+  Schema.Tuple([IdentityPreparation, ReactivatedPreparation]),
+  Schema.Tuple([NamePreparation, IdentityPreparation, ReactivatedPreparation]),
+  Schema.Tuple([RolePreparation]),
+  Schema.Tuple([NamePreparation, RolePreparation]),
+  Schema.Tuple([IdentityPreparation, RolePreparation]),
+  Schema.Tuple([NamePreparation, IdentityPreparation, RolePreparation]),
+  Schema.Tuple([ReactivatedPreparation, RolePreparation]),
+  Schema.Tuple([NamePreparation, ReactivatedPreparation, RolePreparation]),
+  Schema.Tuple([IdentityPreparation, ReactivatedPreparation, RolePreparation]),
+  Schema.Tuple([NamePreparation, IdentityPreparation, ReactivatedPreparation, RolePreparation]),
+  Schema.Tuple([Schema.Literal("personCreated"), IdentityPreparation, CreatedPreparation])
+])
+export type EmployeeInvitationProgress = Schema.Schema.Type<typeof EmployeeInvitationProgressSchema>
 const ExistingEmployeeTransitionSchema = Schema.Literals([
   "created",
   "reactivated",
@@ -143,7 +203,7 @@ export const InviteEmployeeResultSchema = Schema.Union([
     outcome: Schema.Literal("invitation-resent"),
     email: Email,
     role: EmployeeInvitationRoleSchema,
-    employee: EmployeeLifecycleStateSchema
+    employee: InactiveEmployeeLifecycleStateSchema
   })
 ]).pipe(Schema.toTaggedUnion("outcome"))
 export type InviteEmployeeResult = Schema.Schema.Type<typeof InviteEmployeeResultSchema>
@@ -153,13 +213,23 @@ export const ListInactiveEmployeesParamsSchema = Schema.Struct({
   offset: Schema.optionalKey(NonNegativeInteger)
 })
 export type ListInactiveEmployeesParams = Schema.Schema.Type<typeof ListInactiveEmployeesParamsSchema>
-export const ListInactiveEmployeesResultSchema = Schema.Struct({
-  employees: Schema.Array(EmployeeLifecycleStateSchema),
+const ListInactiveEmployeesResultFields = {
+  employees: Schema.Array(InactiveEmployeeLifecycleStateSchema),
   total: Count,
-  offset: NonNegativeInteger,
-  truncated: Schema.Boolean,
-  nextOffset: Schema.optionalKey(NonNegativeInteger)
-})
+  offset: NonNegativeInteger
+}
+export const ListInactiveEmployeesResultSchema = Schema.Union([
+  Schema.Struct({
+    ...ListInactiveEmployeesResultFields,
+    truncated: Schema.Literal(true),
+    nextOffset: NonNegativeInteger
+  }),
+  Schema.Struct({
+    ...ListInactiveEmployeesResultFields,
+    truncated: Schema.Literal(false),
+    nextOffset: Schema.optionalKey(Schema.Never)
+  })
+])
 export type ListInactiveEmployeesResult = Schema.Schema.Type<typeof ListInactiveEmployeesResultSchema>
 
 const EmployeeLifecycleActionSchema = Schema.Literals(["deactivate", "kick"])
@@ -205,7 +275,10 @@ const EmployeeLifecycleMutationSchema = Schema.Struct({
   employeeDeactivated: Schema.Boolean,
   workspaceMemberRemoved: Schema.Boolean
 })
-export const EmployeeKickPartialChangeSchema = Schema.Literal("employeeDeactivated")
+export const EmployeeKickProgressSchema = Schema.Union([
+  Schema.Tuple([]),
+  Schema.Tuple([Schema.Literal("employeeDeactivated")])
+])
 
 export const EmployeePreparationOperationSchema = Schema.Literal("prepareEmployee")
 export const EmployeeInvitationOperationSchema = Schema.Literals(["sendInvite", "resendInvite"])

@@ -2,11 +2,11 @@ import { Schema } from "effect"
 
 import {
   EmployeeLifecycleIdentifierSchema,
-  EmployeeKickPartialChangeSchema,
+  EmployeeInvitationProgressSchema,
   EmployeeInvitationOperationSchema,
+  EmployeeKickProgressSchema,
   EmployeePreparationOperationSchema,
-  EmployeeWorkspaceRemovalOperationSchema,
-  EmployeePreparationChangeSchema
+  EmployeeWorkspaceRemovalOperationSchema
 } from "../domain/schemas/employee-lifecycle.js"
 import { Email, PersonId, PersonUuid } from "../domain/schemas/shared.js"
 
@@ -34,7 +34,7 @@ export class EmployeeInvitationPartialFailureError extends Schema.TaggedError<Em
     personId: PersonId,
     email: Email,
     operation: EmployeeInvitationOperationSchema,
-    completedChanges: Schema.Array(EmployeePreparationChangeSchema),
+    completedChanges: EmployeeInvitationProgressSchema,
     reason: Schema.String
   }
 ) {
@@ -59,7 +59,7 @@ export class EmployeeDeactivationPartialFailureError extends Schema.TaggedError<
     personUuid: PersonUuid,
     action: Schema.Literal("kick"),
     failedOperation: EmployeeWorkspaceRemovalOperationSchema,
-    completedChanges: Schema.Array(EmployeeKickPartialChangeSchema),
+    completedChanges: EmployeeKickProgressSchema,
     reason: Schema.String
   }
 ) {

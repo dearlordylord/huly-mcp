@@ -30,6 +30,7 @@ import { batchGetEmailsForPersons } from "./contacts-shared.js"
 import {
   decodeEmployeeLifecycleDocuments,
   decodeEmployeeLifecycleMembers,
+  decodeInactiveEmployeeLifecycleState,
   type EmployeeLifecycleDocument
 } from "./employee-lifecycle-boundaries.js"
 import {
@@ -87,7 +88,7 @@ export const listInactiveEmployees = Effect.fn("EmployeeLifecycle.listInactive")
       emailMap.get(toRef<HulyPerson>(employee._id)),
       members,
       "listInactiveEmployees"
-    )
+    ).pipe(Effect.flatMap((state) => decodeInactiveEmployeeLifecycleState(state, "listInactiveEmployees")))
   )
   const ordered = [...states].sort((left, right) =>
     left.name === right.name ? left.personId.localeCompare(right.personId) : left.name.localeCompare(right.name)
@@ -96,14 +97,12 @@ export const listInactiveEmployees = Effect.fn("EmployeeLifecycle.listInactive")
   const limit = params.limit ?? EMPLOYEE_LIFECYCLE_DEFAULT_LIMIT
   const page = ordered.slice(offset, offset + limit)
   const next = offset + page.length
-  const truncated = next < ordered.length
-  return {
-    employees: page,
-    total: Count.make(ordered.length),
-    offset,
-    truncated,
-    ...(truncated ? { nextOffset: NonNegativeInteger.make(next) } : {})
-  }
+  const pageResult = { employees: page, total: Count.make(ordered.length), offset }
+  const result: ListInactiveEmployeesResult =
+    next < ordered.length
+      ? { ...pageResult, truncated: true, nextOffset: NonNegativeInteger.make(next) }
+      : { ...pageResult, truncated: false }
+  return result
 })
 
 const assertExpectedImpact = (

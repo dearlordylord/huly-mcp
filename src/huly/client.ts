@@ -41,14 +41,16 @@ import {
 import { absurd, Context, Effect, Layer, Redacted, Schedule } from "effect"
 
 import { type Auth, HulyConfigService } from "../config/config.js"
-import type { PersonAdministrationLocator } from "../domain/schemas/person-administration.js"
+import {
+  type PersonAdministrationLocator,
+  SocialIdentityId
+} from "../domain/schemas/person-administration.js"
 import type { PersonMergeReferenceImpact } from "../domain/schemas/person-merge.js"
 import {
   AccountUuid as ParsedAccountUuid,
   type HulyConditionalWriteResult,
   type HulyTransactionScope,
   type PersonId as DomainPersonId,
-  NonEmptyString,
   UrlString,
   WorkspaceUrlSlug
 } from "../domain/schemas/shared.js"
@@ -604,8 +606,8 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
 
     const defaultOps: HulyClientOperations = {
       getAccountUuid: () => toAccountUuid(ParsedAccountUuid.make("00000000-0000-4000-8000-000000000000")),
-      getPrimarySocialId: () => toCorePersonId(NonEmptyString.make("test-primary-social-id")),
-      getSocialIds: () => [toCorePersonId(NonEmptyString.make("test-primary-social-id"))],
+      getPrimarySocialId: () => toCorePersonId(SocialIdentityId.make("test-primary-social-id")),
+      getSocialIds: () => [toCorePersonId(SocialIdentityId.make("test-primary-social-id"))],
       markupUrlConfig: testMarkupUrlConfig,
       workbenchUrlConfig: testWorkbenchUrlConfig,
       findAll: noopFindAll,

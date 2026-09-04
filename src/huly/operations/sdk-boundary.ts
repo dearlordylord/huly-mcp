@@ -2,6 +2,7 @@ import type { SocialIdentity } from "@hcengineering/contact"
 import type { AccountUuid, Class, Doc, Mixin, PersonId as HulyPersonId, PersonUuid, Ref, Tx } from "@hcengineering/core"
 import { Effect } from "effect"
 
+import type { SocialIdentityId } from "../../domain/schemas/person-administration.js"
 import type { NonEmptyString } from "../../domain/schemas/shared.js"
 import { InvalidPersonUuidError } from "../errors-contacts.js"
 
@@ -34,7 +35,7 @@ export const toAccountUuid = (uuid: NonEmptyString | AccountUuid): AccountUuid =
 // Parsed non-empty social identity IDs are plain strings at runtime; this is the
 // centralized bridge into the SDK's structural PersonId brand.
 // eslint-disable-next-line no-restricted-syntax -- see above
-export const toCorePersonId = (id: NonEmptyString | HulyPersonId): HulyPersonId => id as HulyPersonId
+export const toCorePersonId = (id: SocialIdentityId | HulyPersonId): HulyPersonId => id as HulyPersonId
 
 // Core person IDs and parsed non-empty identity IDs are plain strings at runtime.
 export const toSocialIdentityRef = (id: HulyPersonId | NonEmptyString): SocialIdentity["_id"] => {
