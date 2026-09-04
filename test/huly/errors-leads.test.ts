@@ -4,11 +4,12 @@ import { expect } from "vitest"
 import {
   FunnelNotFoundError,
   LeadDeleteConflictError,
+  LeadIdentifierAmbiguousError,
   LeadMoveConflictError,
   LeadNotFoundError,
   LeadUpdateConflictError
 } from "../../src/huly/errors-leads.js"
-import { NonEmptyString } from "../../src/domain/schemas/shared.js"
+import { Count, NonEmptyString } from "../../src/domain/schemas/shared.js"
 import { funnelIdentifier, funnelReference, leadIdentifier } from "../helpers/brands.js"
 
 describe("Lead Errors", () => {
@@ -37,6 +38,18 @@ describe("Lead Errors", () => {
       })
     )
   })
+
+  it.effect("describes duplicate lead identifiers with their exact funnel scope", () =>
+    Effect.sync(function () {
+      const error = new LeadIdentifierAmbiguousError({
+        identifier: leadIdentifier("LEAD-1"),
+        funnel: funnelIdentifier("funnel-1"),
+        matches: Count.make(2)
+      })
+      expect(error.message).toContain("matched 2 records")
+      expect(error.message).toContain("funnel-1")
+    })
+  )
 
   it.effect("describes move and deletion conflicts with actionable targets", () =>
     Effect.sync(function () {

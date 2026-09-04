@@ -96,6 +96,15 @@ export class LeadNotFoundError extends Schema.TaggedError<LeadNotFoundError>()("
   }
 }
 
+export class LeadIdentifierAmbiguousError extends Schema.TaggedError<LeadIdentifierAmbiguousError>()(
+  "LeadIdentifierAmbiguousError",
+  { identifier: LeadIdentifier, funnel: FunnelIdentifier, matches: Count }
+) {
+  override get message(): string {
+    return `Lead '${this.identifier}' matched ${this.matches} records in funnel '${this.funnel}'; repair the duplicate LEAD identifier before retrying`
+  }
+}
+
 export class LeadUpdateConflictError extends Schema.TaggedError<LeadUpdateConflictError>()("LeadUpdateConflictError", {
   identifier: LeadIdentifier,
   funnel: FunnelIdentifier,
@@ -137,6 +146,7 @@ export class LeadCommentNotFoundError extends Schema.TaggedError<LeadCommentNotF
 }
 
 export const LeadMutationDomainError = Schema.Union([
+  LeadIdentifierAmbiguousError,
   LeadUpdateConflictError,
   LeadMoveConflictError,
   LeadDeleteConflictError,

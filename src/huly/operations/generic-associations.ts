@@ -65,7 +65,12 @@ import type {
   RelationNotFoundError,
   TeamspaceNotFoundError
 } from "../errors.js"
-import type { FunnelIdentifierAmbiguousError, FunnelNotFoundError, LeadNotFoundError } from "../errors-leads.js"
+import type {
+  FunnelIdentifierAmbiguousError,
+  FunnelNotFoundError,
+  LeadIdentifierAmbiguousError,
+  LeadNotFoundError
+} from "../errors-leads.js"
 import type { HulyModelMetadataError } from "../errors-base.js"
 import {
   AssociationConflictError,
@@ -126,6 +131,7 @@ type GenericAssociationsError =
   | IssueNotFoundError
   | FunnelNotFoundError
   | FunnelIdentifierAmbiguousError
+  | LeadIdentifierAmbiguousError
   | LeadNotFoundError
   | HulyDataInvalidError
   | HulyModelMetadataError

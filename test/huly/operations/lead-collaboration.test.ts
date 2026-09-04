@@ -19,7 +19,11 @@ import { expect } from "vitest"
 
 import { AttachmentId, CommentId, NonEmptyString } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
-import { FunnelIdentifierAmbiguousError, LeadCommentNotFoundError } from "../../../src/huly/errors-leads.js"
+import {
+  FunnelIdentifierAmbiguousError,
+  LeadCommentNotFoundError,
+  LeadIdentifierAmbiguousError
+} from "../../../src/huly/errors-leads.js"
 import { attachment, chunter, core, tags } from "../../../src/huly/huly-plugins.js"
 import { leadClassIds } from "../../../src/huly/lead-plugin.js"
 import {
@@ -74,6 +78,8 @@ const lead = {
   modifiedOn: 10,
   title: NonEmptyString.make("Deal"),
   identifier: leadIdentifier("LEAD-1"),
+  number: 1,
+  rank: "0|hzzzzz:",
   status: toRef("status-1"),
   kind: toRef("lead:taskType:Lead"),
   assignee: null,
@@ -135,7 +141,7 @@ const label = (overrides?: Partial<TagElement>): TagElement => ({
   ...overrides
 })
 
-const labelRef = (): TagReference => ({
+const labelRef = (overrides?: Partial<TagReference>): TagReference => ({
   _id: toRef<TagReference>("label-ref-1"),
   _class: tags.class.TagReference,
   space: lead.space,
@@ -149,11 +155,13 @@ const labelRef = (): TagReference => ({
   modifiedBy: corePersonId("actor"),
   modifiedOn: 10,
   createdBy: corePersonId("actor"),
-  createdOn: 9
+  createdOn: 9,
+  ...overrides
 })
 
 interface State {
   readonly funnels?: ReadonlyArray<typeof funnel>
+  readonly leads?: ReadonlyArray<typeof lead>
   readonly comments: ReadonlyArray<ChatMessage>
   readonly attachments: ReadonlyArray<HulyAttachment>
   readonly labels: ReadonlyArray<TagElement>
@@ -186,7 +194,7 @@ const docsForClass = <T extends Doc>(_class: Ref<Class<T>>, docs: ReadonlyArray<
 const testLayer = (state: State) => {
   const docs = (): ReadonlyArray<Doc> => [
     ...(state.funnels ?? [funnel]),
-    lead,
+    ...(state.leads ?? [lead]),
     ...state.comments,
     ...state.attachments,
     ...state.labels,
@@ -307,6 +315,22 @@ describe("lead collaboration", () => {
     }).pipe(Effect.provide(testLayer(fixture)))
   })
 
+  it.effect("rejects a duplicate exact lead identifier before reading collaboration collections", () => {
+    const duplicate = { ...lead, _id: toRef<Doc>("lead-2") }
+    const fixture = state({ leads: [lead, duplicate] })
+    return Effect.gen(function* () {
+      const commentError = yield* Effect.flip(listLeadComments(target))
+      const relationError = yield* Effect.flip(
+        listRelations({
+          source: { kind: "lead", funnel: funnelReference("Sales"), identifier: leadIdentifier("LEAD-1") }
+        })
+      )
+      expect(commentError).toBeInstanceOf(LeadIdentifierAmbiguousError)
+      expect(relationError).toBeInstanceOf(LeadIdentifierAmbiguousError)
+      if (commentError instanceof LeadIdentifierAmbiguousError) expect(commentError.matches).toBe(2)
+    }).pipe(Effect.provide(testLayer(fixture)))
+  })
+
   it.effect("uploads, lists, gets, updates, and deletes scoped attachments", () => {
     const fixture = state({ attachments: [file()] })
     return Effect.gen(function* () {
@@ -332,20 +356,28 @@ describe("lead collaboration", () => {
   })
 
   it.effect("lists definitions and manages native label relations", () => {
+    const definitionWithoutCount = label()
+    delete definitionWithoutCount.refCount
+    const referenceWithoutWeight = labelRef()
+    delete referenceWithoutWeight.weight
     const fixture = state({
-      labels: [label(), label({ _id: toRef<TagElement>("label-2"), title: "secondary" })],
-      references: [labelRef()]
+      labels: [label(), { ...definitionWithoutCount, _id: toRef<TagElement>("label-2"), title: "secondary" }],
+      references: [labelRef(), { ...referenceWithoutWeight, _id: toRef<TagReference>("label-ref-2") }]
     })
     return Effect.gen(function* () {
       const definitions = yield* listLeadLabelDefinitions({ limit: 1 })
+      const allDefinitions = yield* listLeadLabelDefinitions({ limit: 2 })
       expect(definitions.labels[0]?.title).toBe("priority")
       expect(definitions).toMatchObject({ total: 2, truncated: true })
-      expect((yield* listLeadLabels(target)).labels[0]).toMatchObject({ title: "priority", weight: 1 })
+      expect(allDefinitions.labels[1]?.refCount).toBeUndefined()
+      const attachedLabels = yield* listLeadLabels(target)
+      expect(attachedLabels.labels[0]).toMatchObject({ title: "priority", weight: 1 })
+      expect(attachedLabels.labels[1]?.weight).toBeUndefined()
       expect((yield* addLeadLabel({ ...target, label: tagIdentifier("priority"), weight: 2 })).attached).toBe(false)
-      expect((yield* updateLeadLabel({ ...target, label: tagIdentifier("priority"), weight: 3 })).updatedCount).toBe(1)
-      expect((yield* removeLeadLabel({ ...target, label: tagIdentifier("priority") })).detachedCount).toBe(1)
+      expect((yield* updateLeadLabel({ ...target, label: tagIdentifier("priority"), weight: 3 })).updatedCount).toBe(2)
+      expect((yield* removeLeadLabel({ ...target, label: tagIdentifier("priority") })).detachedCount).toBe(2)
       expect(fixture.updated.at(-1)?.value).toEqual({ weight: 3 })
-      expect(fixture.removed.at(-1)).toBe("label-ref-1")
+      expect(fixture.removed).toEqual(["label-ref-1", "label-ref-2"])
     }).pipe(Effect.provide(testLayer(fixture)))
   })
 
@@ -355,6 +387,9 @@ describe("lead collaboration", () => {
       const added = yield* addLeadLabel({ ...target, label: tagIdentifier("new"), color: colorCode(4) })
       expect(added).toMatchObject({ attached: true, labelCreated: true })
       const existingLabelFixture = state({ labels: [label()] })
+      const attached = yield* addLeadLabel({ ...target, label: tagIdentifier("priority") }).pipe(
+        Effect.provide(testLayer(existingLabelFixture))
+      )
       const update = yield* updateLeadLabel({ ...target, label: tagIdentifier("priority"), weight: 8 }).pipe(
         Effect.provide(testLayer(existingLabelFixture))
       )
@@ -363,6 +398,7 @@ describe("lead collaboration", () => {
       )
       expect(update).toMatchObject({ updated: false, updatedCount: 0 })
       expect(removed).toMatchObject({ detached: false, detachedCount: 0 })
+      expect(attached).toMatchObject({ attached: true, labelCreated: false })
     }).pipe(Effect.provide(testLayer(fixture)))
   })
 

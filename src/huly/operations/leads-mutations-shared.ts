@@ -14,9 +14,11 @@ import {
   type LeadDescriptionField,
   type LeadMutationDocument,
   type LeadOrganizationDocument,
-  type LeadPersonDocument
+  type LeadPersonDocument,
+  type LeadReadDocument
 } from "../../domain/schemas/leads-mutations.js"
 import {
+  Count,
   Email,
   NonEmptyString,
   PersonName,
@@ -34,9 +36,9 @@ import type {
   FunnelWorkflowInvalidError,
   LeadDeleteConflictError,
   LeadMoveConflictError,
-  LeadNotFoundError,
   LeadUpdateConflictError
 } from "../errors-leads.js"
+import { LeadIdentifierAmbiguousError, LeadNotFoundError } from "../errors-leads.js"
 import {
   type HulyDataInvalidError,
   HulyError,
@@ -60,16 +62,16 @@ import {
   type HulyFunnel
 } from "./funnels-shared.js"
 import { renderMarkdownWithNativeReferencesForWrite } from "./native-reference-markup.js"
-import { hulyQuery } from "./query-helpers.js"
+import { findResultTotal, hulyQuery } from "./query-helpers.js"
 import { markupBlobRefAsMarkupRef } from "./recruiting-shared.js"
 import { toClassRef, toMixinRef, toRef } from "./sdk-boundary.js"
 import {
   customerMixinWriteAttributes,
   type HulyLead,
   parseLeadPersonDocument,
+  parseLeadReadDocument,
   parseOptionalLeadPersonDocument,
   requireEmployee,
-  requireLeadDocument,
   resolveLeadCustomer,
   toMarkupBlobRef
 } from "./leads-mutations-boundary.js"
@@ -101,6 +103,7 @@ export type LeadMutationError =
   | FunnelIdentifierAmbiguousError
   | FunnelProjectTypeNotFoundError
   | FunnelWorkflowInvalidError
+  | LeadIdentifierAmbiguousError
   | LeadNotFoundError
   | LeadUpdateConflictError
   | LeadMoveConflictError
@@ -171,17 +174,41 @@ export const validatedFunnel = Effect.fn("Lead.validatedFunnel")(function* (
   return { funnel, workflow }
 })
 
-export const findLead = Effect.fn("Lead.findLead")(function* (
+export const findLeadReadDocument = Effect.fn("Lead.findLeadReadDocument")(function* (
   client: HulyClient["Service"],
   funnel: HulyFunnel,
   identifier: LeadIdentifier
-): Effect.fn.Return<HulyLead, HulyClientError | LeadNotFoundError | HulyDataInvalidError> {
-  const lead = yield* client.findOne<LeadMutationQueryDocument>(
+): Effect.fn.Return<
+  LeadReadDocument,
+  HulyClientError | LeadIdentifierAmbiguousError | LeadNotFoundError | HulyDataInvalidError
+> {
+  const leads = yield* client.findAll<LeadMutationQueryDocument>(
     leadClassIds.class.Lead,
-    hulyQuery<LeadMutationQueryDocument>({ space: funnelSpace(funnel), identifier })
+    hulyQuery<LeadMutationQueryDocument>({ space: funnelSpace(funnel), identifier }),
+    { limit: 2, total: true }
   )
-  return yield* requireLeadDocument(lead, identifier, FunnelIdentifier.make(funnel._id))
+  const funnelId = FunnelIdentifier.make(funnel._id)
+  if (leads.length > 1) {
+    return yield* new LeadIdentifierAmbiguousError({
+      identifier,
+      funnel: funnelId,
+      matches: Count.make(findResultTotal(leads))
+    })
+  }
+  if (leads[0] === undefined) return yield* new LeadNotFoundError({ identifier, funnel: funnelId })
+  return yield* parseLeadReadDocument(leads[0])
 })
+
+export const findLead = Effect.fn("Lead.findLead")(
+  (
+    client: HulyClient["Service"],
+    funnel: HulyFunnel,
+    identifier: LeadIdentifier
+  ): Effect.Effect<
+    HulyLead,
+    HulyClientError | LeadIdentifierAmbiguousError | LeadNotFoundError | HulyDataInvalidError
+  > => findLeadReadDocument(client, funnel, identifier)
+)
 
 export const workflowForLead = Effect.fn("Lead.workflowForLead")((
   workflow: ReadonlyArray<FunnelWorkflowTaskType>,

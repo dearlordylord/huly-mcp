@@ -24,7 +24,6 @@ import type {
   ListLeadsParams
 } from "../../domain/schemas/leads.js"
 import {
-  FunnelIdentifier,
   LeadIdentifier,
   LeadCollectionUnsupportedReason,
   LeadParentsUnsupportedReason,
@@ -33,12 +32,16 @@ import {
 } from "../../domain/schemas/leads.js"
 import { StatusName } from "../../domain/schemas/shared.js"
 import { LeadCustomerMetadataDegradedWarningCode } from "../../domain/schemas/tool-warnings.js"
-import { LeadCustomerMixinAttributesSchema } from "../../domain/schemas/leads-mutations.js"
+import { LeadCustomerMixinAttributesSchema, type LeadReadDocument } from "../../domain/schemas/leads-mutations.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { Diagnostics } from "../diagnostics.js"
-import type { FunnelIdentifierAmbiguousError, FunnelNotFoundError } from "../errors-leads.js"
-import { LeadNotFoundError } from "../errors-leads.js"
+import type {
+  FunnelIdentifierAmbiguousError,
+  FunnelNotFoundError,
+  LeadIdentifierAmbiguousError,
+  LeadNotFoundError
+} from "../errors-leads.js"
 import { HulyDataInvalidError, InvalidStatusError } from "../errors.js"
 import { contact, task } from "../huly-plugins.js"
 import { leadClassIds } from "../lead-plugin.js"
@@ -53,7 +56,7 @@ import {
 import { clampLimit, escapeLikeWildcards, hulyQuery } from "./query-helpers.js"
 import { toClassRef, toRef } from "./sdk-boundary.js"
 import { type HulyFunnel, resolveFunnel } from "./funnels-shared.js"
-import { parseLeadReadDocument } from "./leads-mutations-boundary.js"
+import { findLeadReadDocument } from "./leads-mutations-shared.js"
 
 export { listFunnels } from "./funnels.js"
 
@@ -273,6 +276,7 @@ type GetLeadError =
   | HulyDataInvalidError
   | FunnelNotFoundError
   | FunnelIdentifierAmbiguousError
+  | LeadIdentifierAmbiguousError
   | LeadNotFoundError
 
 const readCustomerDescription = Effect.fn("Lead.readCustomerDescription")(function* (
@@ -295,6 +299,47 @@ const readCustomerDescription = Effect.fn("Lead.readCustomerDescription")(functi
   )
 })
 
+const findLeadAssignee = (
+  client: HulyClient["Service"],
+  assignee: LeadReadDocument["assignee"]
+): Effect.Effect<Person | undefined, HulyClientError> =>
+  assignee === null
+    ? Effect.succeed(undefined)
+    : client.findOne<Person>(contact.class.Person, hulyQuery<Person>({ _id: toRef<Person>(assignee) }))
+
+const warnForMissingCustomer = Effect.fn("Lead.warnForMissingCustomer")(function* (
+  lead: LeadReadDocument,
+  customer: HulyCustomer | undefined
+) {
+  if (customer !== undefined) return
+  const diagnostics = yield* Diagnostics
+  yield* diagnostics.warnAgent({
+    code: LeadCustomerMetadataDegradedWarningCode,
+    message: `Lead '${lead.identifier}' references customer '${lead.attachedTo}', but its contact metadata could not be resolved. The result preserves customerId and reports customerType as unresolved.`
+  })
+})
+
+const readLeadDescription = (
+  client: HulyClient["Service"],
+  lead: LeadReadDocument
+): Effect.Effect<string | undefined, HulyClientError> =>
+  lead.description === null
+    ? Effect.succeed(undefined)
+    : client.fetchMarkup(
+        leadClassIds.class.Lead,
+        toRef<Doc>(lead._id),
+        "description",
+        markupBlobRefAsMarkupRef(toRef<Blob>(lead.description)),
+        "markdown"
+      )
+
+const leadCustomerProjection = (customer: HulyCustomer | undefined) => {
+  if (customer === undefined) return { customer: null, customerType: "unresolved" as const }
+  return String(customer._class) === String(contact.class.Organization)
+    ? { customer: customer.name, customerType: "organization" as const }
+    : { customer: customer.name, customerType: "person" as const }
+}
+
 export const getLead = (params: GetLeadParams): Effect.Effect<LeadDetail, GetLeadError, HulyClient | Diagnostics> =>
   Effect.gen(function* () {
     const client = yield* HulyClient
@@ -304,43 +349,16 @@ export const getLead = (params: GetLeadParams): Effect.Effect<LeadDetail, GetLea
       normalizeLeadIdentifier(params.identifier)
     ).pipe(Effect.orDie)
 
-    const rawLead = yield* client.findOne<HulyLead>(
-      leadClassIds.class.Lead,
-      hulyQuery<HulyLead>({ space: funnelAsSpace(funnel), identifier: leadIdentifier })
-    )
-
-    if (rawLead === undefined) {
-      return yield* new LeadNotFoundError({ identifier: params.identifier, funnel: FunnelIdentifier.make(funnel._id) })
-    }
-    const lead = yield* parseLeadReadDocument(rawLead)
+    const lead = yield* findLeadReadDocument(client, funnel, leadIdentifier)
 
     const status = yield* resolveStatusName(statuses, toRef<Status>(lead.status))
 
-    const person =
-      lead.assignee !== null
-        ? yield* client.findOne<Person>(contact.class.Person, hulyQuery<Person>({ _id: toRef<Person>(lead.assignee) }))
-        : undefined
-
+    const person = yield* findLeadAssignee(client, lead.assignee)
     const customer = yield* findCustomer(client, toRef<Contact>(lead.attachedTo))
-    if (customer === undefined) {
-      const diagnostics = yield* Diagnostics
-      yield* diagnostics.warnAgent({
-        code: LeadCustomerMetadataDegradedWarningCode,
-        message: `Lead '${lead.identifier}' references customer '${lead.attachedTo}', but its contact metadata could not be resolved. The result preserves customerId and reports customerType as unresolved.`
-      })
-    }
-
-    const description = lead.description
-      ? yield* client.fetchMarkup(
-          leadClassIds.class.Lead,
-          toRef<Doc>(lead._id),
-          "description",
-          markupBlobRefAsMarkupRef(toRef<Blob>(lead.description)),
-          "markdown"
-        )
-      : undefined
-
+    yield* warnForMissingCustomer(lead, customer)
+    const description = yield* readLeadDescription(client, lead)
     const customerDescription = yield* readCustomerDescription(client, customer)
+    const customerProjection = leadCustomerProjection(customer)
 
     return yield* parseLeadDetailSchema({
       id: lead._id,
@@ -353,14 +371,8 @@ export const getLead = (params: GetLeadParams): Effect.Effect<LeadDetail, GetLea
       dueDate: lead.dueDate,
       status,
       assignee: person?.name,
-      customer: customer?.name ?? null,
+      ...customerProjection,
       customerId: lead.attachedTo,
-      customerType:
-        customer === undefined
-          ? "unresolved"
-          : String(customer._class) === String(contact.class.Organization)
-            ? "organization"
-            : "person",
       taskType: lead.kind,
       rank: lead.rank,
       completed: lead.isDone ?? false,

@@ -156,6 +156,7 @@ import {
   IssueNotFoundError,
   IssueReferenceError,
   IssueTemplateNotFoundError,
+  LeadIdentifierAmbiguousError,
   LeadNotFoundError,
   LeadUpdateConflictError,
   MasterTagNotFoundError,
@@ -1381,6 +1382,8 @@ describe("Huly Errors", () => {
               return `funnel-account:${error.account}`
             case "LeadNotFoundError":
               return `lead:${error.identifier}`
+            case "LeadIdentifierAmbiguousError":
+              return `lead-ambiguous:${error.identifier}:${error.funnel}:${error.matches}`
             case "LeadUpdateConflictError":
               return `lead-update:${error.identifier}:${error.funnel}:${error.reason}`
             case "LeadMoveConflictError":
@@ -2276,6 +2279,15 @@ describe("Huly Errors", () => {
             new LeadNotFoundError({ identifier: leadIdentifier("LEAD-1"), funnel: funnelIdentifier("funnel-1") })
           )
         ).toBe("lead:LEAD-1")
+        expect(
+          matchError(
+            new LeadIdentifierAmbiguousError({
+              identifier: leadIdentifier("LEAD-1"),
+              funnel: funnelIdentifier("funnel-1"),
+              matches: Count.make(2)
+            })
+          )
+        ).toBe("lead-ambiguous:LEAD-1:funnel-1:2")
         expect(
           matchError(
             new LeadUpdateConflictError({

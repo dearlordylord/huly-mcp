@@ -58,6 +58,7 @@ import {
   InvalidFileDataError,
   InvalidStatusError,
   IssueNotFoundError,
+  LeadIdentifierAmbiguousError,
   LeadNotFoundError,
   OrganizationIdentifierAmbiguousError,
   OrganizationNotFoundError,
@@ -344,6 +345,22 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
           expect(assertAt(response.content, 0).text).toBe("Lead 'LEAD-9' not found in funnel 'funnel-1'")
+        })
+      )
+
+      it.effect("maps duplicate lead identifiers as an actionable ambiguity", () =>
+        Effect.sync(function () {
+          const error = new LeadIdentifierAmbiguousError({
+            identifier: leadIdentifier("LEAD-9"),
+            funnel: funnelIdentifier("funnel-1"),
+            matches: Count.make(2)
+          })
+          const response = mapDomainErrorToMcp(error)
+
+          expect(response.isError).toBe(true)
+          expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+          expect(classifyDomainFailure(error)).toBe("ambiguity")
+          expect(assertAt(response.content, 0).text).toContain("repair the duplicate LEAD identifier")
         })
       )
 

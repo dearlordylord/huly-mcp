@@ -166,6 +166,7 @@ const DOMAIN_FAILURE_KIND_BY_TAG = {
   LeadDeleteConflictError: "conflict",
   LeadCommentNotFoundError: "lookup",
   LeadMoveConflictError: "conflict",
+  LeadIdentifierAmbiguousError: "ambiguity",
   LeadNotFoundError: "lookup",
   LeadUpdateConflictError: "conflict",
   MasterTagNotFoundError: "lookup",

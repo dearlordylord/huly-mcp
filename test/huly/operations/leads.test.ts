@@ -8,8 +8,11 @@ import { assertAt } from "../../../src/utils/assertions.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { Diagnostics, makeDiagnosticsScope } from "../../../src/huly/diagnostics.js"
 import { HulyConnectionError } from "../../../src/huly/errors.js"
+import { LeadIdentifierAmbiguousError } from "../../../src/huly/errors-leads.js"
 import { contact, core, task } from "../../../src/huly/huly-plugins.js"
 import { leadClassIds } from "../../../src/huly/lead-plugin.js"
+import { parseLeadReadDocument } from "../../../src/huly/operations/leads-mutations-boundary.js"
+import { findLeadCustomer } from "../../../src/huly/operations/leads-mutations-shared.js"
 import { getLead, listFunnels, listLeads } from "../../../src/huly/operations/leads.js"
 import { email, funnelReference, leadIdentifier, statusName } from "../../helpers/brands.js"
 import { withDiagnostics } from "../../helpers/diagnostics.js"
@@ -215,14 +218,18 @@ const createTestLayer = (config: LeadMockConfig) => {
 
     if (_class === leadClassIds.class.Lead) {
       const q = readQuery(query)
-      const lookup = readQuery(options).lookup as Record<string, unknown> | undefined
+      const parsedOptions = readQuery(options)
+      const lookup = parsedOptions.lookup as Record<string, unknown> | undefined
+      const limit = typeof parsedOptions.limit === "number" ? parsedOptions.limit : undefined
       const filtered = leads
         .filter((lead) => q.space === undefined || lead.space === q.space)
+        .filter((lead) => q.identifier === undefined || lead.identifier === q.identifier)
         .filter((lead) => q.status === undefined || lead.status === q.status)
         .filter((lead) => q.assignee === undefined || lead.assignee === q.assignee)
         .map((lead) => createLookupLead(lead, persons, [...contacts, ...organizations], lookup))
-
-      return Effect.succeed(findResult(filtered))
+      const result = findResult(filtered.slice(0, limit))
+      result.total = filtered.length
+      return Effect.succeed(result)
     }
 
     if (_class === core.class.Status) {
@@ -658,6 +665,21 @@ describe("Lead Operations", () => {
       })
     )
 
+    it.effect("rejects duplicate exact lead identifiers", () =>
+      Effect.gen(function* () {
+        const duplicate = makeLead({ _id: docRef<MockLead>("lead-2") })
+        const error = yield* Effect.flip(
+          getLead({ funnel: funnelReference("funnel-1"), identifier: leadIdentifier("LEAD-1") }).pipe(
+            Effect.provide(createTestLayer({ leads: [makeLead(), duplicate] })),
+            withDiagnostics
+          )
+        )
+
+        expect(error).toBeInstanceOf(LeadIdentifierAmbiguousError)
+        if (error instanceof LeadIdentifierAmbiguousError) expect(error.matches).toBe(2)
+      })
+    )
+
     it.effect("fails with FunnelNotFoundError when funnel does not exist", () =>
       Effect.gen(function* () {
         const testLayer = createTestLayer({ funnels: [] })
@@ -850,6 +872,25 @@ describe("getLead branch coverage", () => {
     })
   )
 
+  it.effect("resolves both person and organization customers for lead mutations", () =>
+    Effect.gen(function* () {
+      const resolveWith = (layer: ReturnType<typeof createTestLayer>) =>
+        Effect.gen(function* () {
+          const client = yield* HulyClient
+          const lead = yield* parseLeadReadDocument(makeLead())
+          return yield* findLeadCustomer(client, lead)
+        }).pipe(Effect.provide(layer))
+
+      const person = yield* resolveWith(createTestLayer({ persons: [makePerson("customer-1", "Person customer")] }))
+      const organization = yield* resolveWith(
+        createTestLayer({ organizations: [makeOrganization("customer-1", "Organization customer")] })
+      )
+
+      expect(person.name).toBe("Person customer")
+      expect(organization.name).toBe("Organization customer")
+    })
+  )
+
   it.effect("returns a lead with no assignee", () =>
     Effect.gen(function* () {
       const lead = makeLead({ assignee: null })
@@ -858,6 +899,22 @@ describe("getLead branch coverage", () => {
         withDiagnostics
       )
       expect(result.assignee).toBeUndefined()
+    })
+  )
+
+  it.effect("defaults absent native completion and collection counters", () =>
+    Effect.gen(function* () {
+      const lead = makeLead()
+      delete lead.isDone
+      delete lead.comments
+      delete lead.attachments
+      delete lead.labels
+      const result = yield* getLead({ funnel: funnelReference("funnel-1"), identifier: leadIdentifier("LEAD-1") }).pipe(
+        Effect.provide(createTestLayer({ contacts: [makeContact("customer-1", "Acme")], leads: [lead] })),
+        withDiagnostics
+      )
+
+      expect(result).toMatchObject({ completed: false, comments: 0, attachments: 0, labels: 0 })
     })
   )
 
