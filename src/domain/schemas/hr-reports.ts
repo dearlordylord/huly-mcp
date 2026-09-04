@@ -10,7 +10,7 @@ import {
   HrRequestTypeLabel
 } from "./hr-requests.js"
 import { toDraft07JsonSchema, withJsonSchemaPropertyDescriptions } from "./json-schema.js"
-import { Count, LimitParam, PersonId, PersonName } from "./shared.js"
+import { Count, PersonId, PersonName } from "./shared.js"
 
 export const HrReportTimeZone = Schema.Literal("UTC")
 export const HrRangeSemantics = Schema.Literal("inclusive-calendar-dates")
@@ -24,8 +24,7 @@ export const HrReportParamsSchema = Schema.Struct({
   endDate: HrCalendarDate,
   department: Schema.optional(DepartmentIdentifier),
   includeSubdepartments: Schema.optional(Schema.Boolean),
-  includeInheritedHolidays: Schema.optional(Schema.Boolean),
-  scanPageSize: Schema.optional(LimitParam)
+  includeInheritedHolidays: Schema.optional(Schema.Boolean)
 }).pipe(Schema.check(Schema.makeFilter((p) => p.startDate <= p.endDate || "startDate must not be after endDate")))
 export type HrReportParams = Schema.Schema.Type<typeof HrReportParamsSchema>
 
@@ -71,7 +70,6 @@ export const HrTableRowSchema = Schema.Struct({
   netWorkdays: Schema.Number,
   requestTypes: Schema.Array(HrTableTypeTotalSchema)
 })
-export type HrTableRow = Schema.Schema.Type<typeof HrTableRowSchema>
 export const HrTableResultSchema = Schema.Struct({
   startDate: HrCalendarDate,
   endDate: HrCalendarDate,
@@ -110,9 +108,7 @@ export const hrReportParamsJsonSchema = withJsonSchemaPropertyDescriptions(toDra
   department: "Exact department ID or full slash-separated path; ambiguity is rejected.",
   includeSubdepartments: "Include employees and requests assigned to nested departments (default true).",
   includeInheritedHolidays:
-    "Apply holidays from each employee/request department and all of its ancestors (default true).",
-  scanPageSize:
-    "Backend scan batch size; it never limits returned rows. Normally omit. A smaller value is useful for deterministic pagination diagnostics."
+    "Apply holidays from each employee/request department and all of its ancestors (default true)."
 })
 export const parseHrReportParams = Schema.decodeUnknownEffect(HrReportParamsSchema)
 

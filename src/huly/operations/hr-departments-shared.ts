@@ -146,6 +146,19 @@ export const descendantsOf = (
   return catalog.departments.filter((item) => descendants.has(item._id))
 }
 
+export const ancestorDepartmentIds = (
+  department: HulyDepartment,
+  byId: ReadonlyMap<Ref<HulyDepartment>, HulyDepartment>
+): ReadonlySet<Ref<HulyDepartment>> => {
+  const ancestors = new Set<Ref<HulyDepartment>>([department._id])
+  let parent = department.parent
+  while (parent !== undefined && !ancestors.has(parent)) {
+    ancestors.add(parent)
+    parent = byId.get(parent)?.parent
+  }
+  return ancestors
+}
+
 export const validateDepartmentMove = (
   catalog: DepartmentCatalog,
   department: HulyDepartment,

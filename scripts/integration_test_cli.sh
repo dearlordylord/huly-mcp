@@ -288,12 +288,12 @@ run_hr_holiday_report_lifecycle() {
     hr holidays update "$HR_HOLIDAY_FIRST_ID" --title "Updated CLI holiday $RUN_ID"
   cover_cli_json "list_public_holidays" "public holiday list" \
     hr holidays list --department "$HR_DEPARTMENT_ID" --start-date 2026-09-08 --end-date 2026-09-09
-  cover_cli_json "get_hr_schedule" "HR schedule complete multi-page scan" \
-    hr reports schedule 2026-09-08 2026-09-09 --department "$HR_DEPARTMENT_ID" --scan-page-size 1
-  cover_cli_json "get_hr_table" "HR table complete multi-page scan" \
-    hr reports table 2026-09-08 2026-09-09 --department "$HR_DEPARTMENT_ID" --scan-page-size 1
-  cover_cli_json "get_hr_summary_report" "HR summary complete multi-page scan" \
-    hr reports summary 2026-09-08 2026-09-09 --department "$HR_DEPARTMENT_ID" --scan-page-size 1
+  cover_cli_json "get_hr_schedule" "HR schedule complete scan" \
+    hr reports schedule 2026-09-08 2026-09-09 --department "$HR_DEPARTMENT_ID"
+  cover_cli_json "get_hr_table" "HR table complete scan" \
+    hr reports table 2026-09-08 2026-09-09 --department "$HR_DEPARTMENT_ID"
+  cover_cli_json "get_hr_summary_report" "HR summary complete scan" \
+    hr reports summary 2026-09-08 2026-09-09 --department "$HR_DEPARTMENT_ID"
   for holiday_id in $HR_HOLIDAY_IDS; do
     cover_cli_json "delete_public_holiday" "public holiday cleanup" hr holidays delete "$holiday_id" --yes
     cover_cli_failure "get_public_holiday" "public holiday cleanup confirmation" "not found" \

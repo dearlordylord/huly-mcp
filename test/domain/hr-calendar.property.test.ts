@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import fc from "fast-check"
 import { describe, expect, it } from "vitest"
 
@@ -8,7 +8,7 @@ import {
   hrCalendarDateRange,
   hrTzDateFromCalendarDate
 } from "../../src/huly/operations/hr-calendar.js"
-import { collectHrPages } from "../../src/huly/operations/hr-pagination.js"
+import { collectHrPages, HrPageSize } from "../../src/huly/operations/hr-pagination.js"
 
 const calendarDate = (day: number): HrCalendarDate => {
   const value = new Date(Date.UTC(2000, 0, day + 1)).toISOString().slice(0, 10)
@@ -41,17 +41,22 @@ describe("HR calendar properties", () => {
 
   it("collects every cursor page without an implicit 200-row cap", async () => {
     await fc.assert(
-      fc.asyncProperty(fc.integer({ min: 0, max: 650 }), async (length) => {
+      fc.asyncProperty(fc.integer({ min: 0, max: 300 }), fc.integer({ min: 1, max: 50 }), async (length, size) => {
         const values = Array.from({ length }, (_, index) => String(index).padStart(4, "0"))
         const result = await Effect.runPromise(
           collectHrPages(
             (excluded, pageSize) =>
               Effect.succeed(values.filter((value) => !excluded.includes(value)).slice(0, pageSize)),
-            (value) => value
+            (value) => value,
+            Schema.decodeUnknownSync(HrPageSize)(size)
           )
         )
         expect(result).toEqual(values)
       })
     )
+  })
+
+  it("rejects a zero internal page size before pagination can start", () => {
+    expect(() => Schema.decodeUnknownSync(HrPageSize)(0)).toThrow()
   })
 })

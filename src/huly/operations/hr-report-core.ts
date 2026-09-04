@@ -10,6 +10,7 @@ import {
   type PublicHolidaySummary
 } from "../../domain/schemas.js"
 import { clipHrDateRange, hrCalendarDateRange, hrCalendarDaysInclusive, isHrWeekend } from "./hr-calendar.js"
+import { ancestorDepartmentIds } from "./hr-departments-shared.js"
 import { toRef } from "./sdk-boundary.js"
 
 export const applicableHolidayDates = (
@@ -18,16 +19,17 @@ export const applicableHolidayDates = (
   departments: ReadonlyMap<Ref<Department>, Department>,
   includeInherited: boolean
 ): ReadonlySet<HrCalendarDate> => {
-  const allowed = new Set<string>([departmentId])
-  let parent = departments.get(toRef<Department>(departmentId))?.parent
-  while (includeInherited && parent !== undefined && !allowed.has(parent)) {
-    allowed.add(parent)
-    parent = departments.get(parent)?.parent
-  }
-  return new Set(holidays.filter((holiday) => allowed.has(holiday.department.id)).map((holiday) => holiday.date))
+  const department = departments.get(toRef<Department>(departmentId))
+  const allowed =
+    includeInherited && department !== undefined
+      ? ancestorDepartmentIds(department, departments)
+      : new Set<Ref<Department>>([toRef<Department>(departmentId)])
+  return new Set(
+    holidays.filter((holiday) => allowed.has(toRef<Department>(holiday.department.id))).map((holiday) => holiday.date)
+  )
 }
 
-export interface HrRequestMeasures {
+interface HrRequestMeasures {
   readonly calendarDays: number
   readonly workdays: number
   readonly units: number

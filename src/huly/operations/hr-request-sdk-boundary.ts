@@ -49,8 +49,6 @@ export const HrTzDateRecordSchema = Schema.Struct({
     })
   )
 )
-export type HrTzDateRecord = Schema.Schema.Type<typeof HrTzDateRecordSchema>
-
 export const HrRequestTypeRecordSchema = Schema.Struct({
   _id: HrRequestTypeIdentifier,
   label: HrRequestTypeLabelResource,

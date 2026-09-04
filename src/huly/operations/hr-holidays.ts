@@ -25,9 +25,9 @@ import {
 } from "../errors.js"
 import { core, hr } from "../huly-plugins.js"
 import { hrCalendarDateFromTzDate, hrTzDateFromCalendarDate } from "./hr-calendar.js"
-import { loadDepartmentCatalog, resolveDepartment } from "./hr-departments-shared.js"
+import { ancestorDepartmentIds, loadDepartmentCatalog, resolveDepartment } from "./hr-departments-shared.js"
 import { parsePublicHolidayRecord, type PublicHolidayRecord } from "./hr-holiday-sdk-boundary.js"
-import { loadAllHrDocuments } from "./hr-pagination.js"
+import { DEFAULT_HR_PAGE_SIZE, type HrPageSize, loadAllHrDocuments } from "./hr-pagination.js"
 import { pageHrRequestResults } from "./hr-request-pagination.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
@@ -35,12 +35,14 @@ import { toRef } from "./sdk-boundary.js"
 const loadHolidayRecords = Effect.fn("HrHolidays.loadRecords")(function* (
   client: HulyClient["Service"],
   department?: Ref<Department>,
-  date?: HrCalendarDate
+  pageSize: HrPageSize = DEFAULT_HR_PAGE_SIZE
 ) {
-  const values = yield* loadAllHrDocuments(client, hr.class.PublicHoliday, {
-    ...(department === undefined ? {} : { department }),
-    ...(date === undefined ? {} : { date: hrTzDateFromCalendarDate(date) })
-  })
+  const values = yield* loadAllHrDocuments(
+    client,
+    hr.class.PublicHoliday,
+    { ...(department === undefined ? {} : { department }) },
+    pageSize
+  )
   return yield* Effect.forEach(values, parsePublicHolidayRecord)
 })
 
@@ -54,26 +56,6 @@ const resolveHolidayDepartment = Effect.fn("HrHolidays.resolveDepartment")(funct
   if (department === undefined) return yield* new DepartmentNotFoundError({ identifier })
   return { catalog, department }
 })
-
-const ancestorIds = (
-  department: Department,
-  byId: ReadonlyMap<Ref<Department>, Department>
-): ReadonlySet<Ref<Department>> => {
-  const ids = new Set<Ref<Department>>([department._id])
-  let parent = department.parent
-  while (parent !== undefined && !ids.has(parent)) {
-    ids.add(parent)
-    parent = byId.get(parent)?.parent
-  }
-  return ids
-}
-
-export const applicableHolidayDepartmentIds = (
-  department: Department,
-  byId: ReadonlyMap<Ref<Department>, Department>,
-  includeInherited: boolean
-): ReadonlySet<Ref<Department>> =>
-  includeInherited ? ancestorIds(department, byId) : new Set<Ref<Department>>([department._id])
 
 const summarizeHoliday = Effect.fn("HrHolidays.summarize")(function* (
   holiday: PublicHolidayRecord,
@@ -117,7 +99,9 @@ export const listPublicHolidays = Effect.fn("HrHolidays.list")(function* (params
   const allowed =
     resolved === undefined
       ? undefined
-      : applicableHolidayDepartmentIds(resolved.department, resolved.catalog.byId, params.includeInherited ?? false)
+      : (params.includeInherited ?? false)
+        ? ancestorDepartmentIds(resolved.department, resolved.catalog.byId)
+        : new Set<Ref<Department>>([resolved.department._id])
   const catalog = resolved?.catalog ?? (yield* loadDepartmentCatalog(client))
   const records = yield* loadHolidayRecords(client)
   const filtered = records.filter((holiday) => {
@@ -141,11 +125,11 @@ export const listPublicHolidays = Effect.fn("HrHolidays.list")(function* (params
 })
 
 export const loadAllPublicHolidaySummaries = Effect.fn("HrHolidays.loadAllSummaries")(function* (
-  scanPageSize?: number
+  pageSize: HrPageSize = DEFAULT_HR_PAGE_SIZE
 ) {
   const client = yield* HulyClient
   const catalog = yield* loadDepartmentCatalog(client)
-  const records = yield* loadAllHrDocuments(client, hr.class.PublicHoliday, {}, scanPageSize)
+  const records = yield* loadAllHrDocuments(client, hr.class.PublicHoliday, {}, pageSize)
   return yield* Effect.forEach(yield* Effect.forEach(records, parsePublicHolidayRecord), (holiday) =>
     summarizeHoliday(holiday, catalog.pathById)
   )
@@ -157,14 +141,20 @@ export const getPublicHoliday = Effect.fn("HrHolidays.get")(function* (params: G
   return yield* summarizeHoliday(yield* resolveHoliday(client, params.holiday), catalog.pathById)
 })
 
+export const publicHolidayDateConflicts = (
+  holidays: ReadonlyArray<PublicHolidayRecord>,
+  date: HrCalendarDate,
+  except?: GetPublicHolidayParams["holiday"]
+): boolean => holidays.some((holiday) => holiday._id !== except && hrCalendarDateFromTzDate(holiday.date) === date)
+
 const ensureHolidayDateAvailable = Effect.fn("HrHolidays.ensureDateAvailable")(function* (
   client: HulyClient["Service"],
   department: Department,
   date: CreatePublicHolidayParams["date"],
   except?: GetPublicHolidayParams["holiday"]
 ) {
-  const matches = yield* loadHolidayRecords(client, department._id, date)
-  if (matches.some((holiday) => holiday._id !== except)) {
+  const matches = yield* loadHolidayRecords(client, department._id)
+  if (publicHolidayDateConflicts(matches, date, except)) {
     return yield* new PublicHolidayConflictError({ date, department: DepartmentIdentifier.make(department._id) })
   }
 })

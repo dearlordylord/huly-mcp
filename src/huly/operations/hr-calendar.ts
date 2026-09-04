@@ -26,7 +26,7 @@ const utcDate = (value: HrCalendarDate): Date => {
   return date
 }
 
-export const hrCalendarDayNumber = (value: HrCalendarDate): number => utcDate(value).getTime() / MILLISECONDS_PER_DAY
+const hrCalendarDayNumber = (value: HrCalendarDate): number => utcDate(value).getTime() / MILLISECONDS_PER_DAY
 
 export const hrCalendarDaysInclusive = (startDate: HrCalendarDate, endDate: HrCalendarDate): number =>
   hrCalendarDayNumber(endDate) - hrCalendarDayNumber(startDate) + 1

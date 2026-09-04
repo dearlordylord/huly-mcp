@@ -1,16 +1,20 @@
 import type { Class, Doc, Ref } from "@hcengineering/core"
 import { SortingOrder } from "@hcengineering/core"
-import { Effect, Option, Stream } from "effect"
+import { Effect, Option, Schema, Stream } from "effect"
 
+import { PositiveInteger } from "../../domain/schemas.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import { hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
 
-const REPORT_PAGE_SIZE = 200
+export const HrPageSize = PositiveInteger.pipe(Schema.brand("HrPageSize"))
+export type HrPageSize = Schema.Schema.Type<typeof HrPageSize>
+const DEFAULT_HR_PAGE_SIZE_VALUE = 200
+export const DEFAULT_HR_PAGE_SIZE = HrPageSize.make(DEFAULT_HR_PAGE_SIZE_VALUE)
 
 export const collectHrPages = Effect.fn("HrPagination.collectPages")(function* <A, C, E>(
-  fetchPage: (excluded: ReadonlyArray<C>, pageSize: number) => Effect.Effect<ReadonlyArray<A>, E>,
+  fetchPage: (excluded: ReadonlyArray<C>, pageSize: HrPageSize) => Effect.Effect<ReadonlyArray<A>, E>,
   cursorOf: (value: A) => C,
-  pageSize = REPORT_PAGE_SIZE
+  pageSize: HrPageSize = DEFAULT_HR_PAGE_SIZE
 ): Effect.fn.Return<ReadonlyArray<A>, E> {
   const stream = Stream.paginate<ReadonlyArray<C>, A, E>([], (excluded) =>
     Effect.map(fetchPage(excluded, pageSize), (page) => {
@@ -31,7 +35,7 @@ export const loadAllHrDocuments = Effect.fn("HrPagination.loadAllDocuments")(fun
   client: HulyClient["Service"],
   classRef: Ref<Class<T>>,
   query: StrictDocumentQuery<T>,
-  pageSize = REPORT_PAGE_SIZE
+  pageSize: HrPageSize = DEFAULT_HR_PAGE_SIZE
 ): Effect.fn.Return<ReadonlyArray<T>, HulyClientError> {
   return yield* collectHrPages(
     (excluded, pageSize) => {

@@ -9,6 +9,7 @@ import {
   HR_REPORT_SEMANTICS,
   type HrReportParams,
   type HrRequestSummary,
+  type HrRequestTypeIdentifier,
   type HrScheduleResult,
   type HrSummaryReportResult,
   type HrTableResult
@@ -17,17 +18,22 @@ import { HulyClient } from "../client.js"
 import { DepartmentHierarchyError } from "../errors.js"
 import { hr } from "../huly-plugins.js"
 import { hrCalendarDateRange, isHrWeekend } from "./hr-calendar.js"
-import { descendantsOf, loadDepartmentCatalog, resolveDepartmentFromCatalog } from "./hr-departments-shared.js"
-import { applicableHolidayDepartmentIds, loadAllPublicHolidaySummaries } from "./hr-holidays.js"
-import { loadAllHrDocuments } from "./hr-pagination.js"
+import {
+  ancestorDepartmentIds,
+  descendantsOf,
+  loadDepartmentCatalog,
+  resolveDepartmentFromCatalog
+} from "./hr-departments-shared.js"
+import { loadAllPublicHolidaySummaries } from "./hr-holidays.js"
+import { DEFAULT_HR_PAGE_SIZE, type HrPageSize, loadAllHrDocuments } from "./hr-pagination.js"
 import { applicableHolidayDates, hrRequestMeasures, hrTypeTotals } from "./hr-report-core.js"
 import { type HrReportStaffRecord, parseHrReportStaffRecord } from "./hr-report-sdk-boundary.js"
 import { loadAllHrRequestSummaries } from "./hr-requests.js"
 import { toRef } from "./sdk-boundary.js"
 
-const loadReportStaff = Effect.fn("HrReports.loadStaff")(function* (scanPageSize?: number) {
+const loadReportStaff = Effect.fn("HrReports.loadStaff")(function* (pageSize: HrPageSize) {
   const client = yield* HulyClient
-  const raw = yield* loadAllHrDocuments(client, hr.mixin.Staff, {}, scanPageSize)
+  const raw = yield* loadAllHrDocuments(client, hr.mixin.Staff, {}, pageSize)
   return yield* Effect.forEach(raw, parseHrReportStaffRecord)
 })
 
@@ -42,17 +48,17 @@ const scopedDepartmentIds = Effect.fn("HrReports.scopedDepartmentIds")(function*
   return new Set(departments.map((item) => item._id))
 })
 
-const reportData = Effect.fn("HrReports.loadData")(function* (params: HrReportParams) {
+const reportData = Effect.fn("HrReports.loadData")(function* (params: HrReportParams, pageSize: HrPageSize) {
   const catalog = yield* loadDepartmentCatalog(yield* HulyClient)
   const scope = yield* scopedDepartmentIds(params, catalog)
-  const allRequests = yield* loadAllHrRequestSummaries({}, params.scanPageSize)
+  const allRequests = yield* loadAllHrRequestSummaries({}, pageSize)
   const requests = allRequests.filter(
     (request) =>
       (scope === undefined || scope.has(toRef<Department>(request.department.id))) &&
       request.startDate <= params.endDate &&
       request.endDate >= params.startDate
   )
-  const allHolidays = yield* loadAllPublicHolidaySummaries(params.scanPageSize)
+  const allHolidays = yield* loadAllPublicHolidaySummaries(pageSize)
   const holidayDepartmentIds = new Set<Ref<Department>>()
   if (scope !== undefined) {
     for (const departmentId of scope) {
@@ -62,11 +68,11 @@ const reportData = Effect.fn("HrReports.loadData")(function* (params: HrReportPa
           message: `Report scope references missing department '${departmentId}'`
         })
       }
-      for (const ownerId of applicableHolidayDepartmentIds(
-        department,
-        catalog.byId,
-        params.includeInheritedHolidays ?? true
-      )) {
+      const ownerIds =
+        (params.includeInheritedHolidays ?? true)
+          ? ancestorDepartmentIds(department, catalog.byId)
+          : new Set<Ref<Department>>([department._id])
+      for (const ownerId of ownerIds) {
         holidayDepartmentIds.add(ownerId)
       }
     }
@@ -91,8 +97,11 @@ const departmentPath = (
     : Effect.succeed(path)
 }
 
-export const getHrSchedule = Effect.fn("HrReports.getSchedule")(function* (params: HrReportParams) {
-  const data = yield* reportData(params)
+export const getHrSchedule = Effect.fn("HrReports.getSchedule")(function* (
+  params: HrReportParams,
+  pageSize: HrPageSize = DEFAULT_HR_PAGE_SIZE
+) {
+  const data = yield* reportData(params, pageSize)
   const days = hrCalendarDateRange(params.startDate, params.endDate).map((date) => ({
     date,
     weekend: isHrWeekend(date),
@@ -141,9 +150,12 @@ const makeTableRow = Effect.fn("HrReports.makeTableRow")(function* (
   }
 })
 
-export const getHrTable = Effect.fn("HrReports.getTable")(function* (params: HrReportParams) {
-  const data = yield* reportData(params)
-  const staff = (yield* loadReportStaff(params.scanPageSize)).filter(
+export const getHrTable = Effect.fn("HrReports.getTable")(function* (
+  params: HrReportParams,
+  pageSize: HrPageSize = DEFAULT_HR_PAGE_SIZE
+) {
+  const data = yield* reportData(params, pageSize)
+  const staff = (yield* loadReportStaff(pageSize)).filter(
     (item) => data.scope === undefined || data.scope.has(toRef<Department>(item.department))
   )
   const dates = hrCalendarDateRange(params.startDate, params.endDate)
@@ -201,7 +213,7 @@ const groupSummaryRequests = (
   params: HrReportParams,
   data: Effect.Success<ReturnType<typeof reportData>>
 ): ReadonlyArray<SummaryAccumulator> => {
-  const grouped = new Map<string, SummaryAccumulator>()
+  const grouped = new Map<DepartmentId, Map<HrRequestTypeIdentifier, SummaryAccumulator>>()
   for (const request of requests) {
     const holidayDates = applicableHolidayDates(
       request.department.id,
@@ -210,14 +222,21 @@ const groupSummaryRequests = (
       params.includeInheritedHolidays ?? true
     )
     const measures = hrRequestMeasures(request, params.startDate, params.endDate, holidayDates)
-    const key = `${request.department.id}\0${request.requestType.id}`
-    grouped.set(key, addSummaryRequest(grouped.get(key), request, measures))
+    const departmentGroups = grouped.get(request.department.id) ?? new Map()
+    departmentGroups.set(
+      request.requestType.id,
+      addSummaryRequest(departmentGroups.get(request.requestType.id), request, measures)
+    )
+    grouped.set(request.department.id, departmentGroups)
   }
-  return [...grouped.values()]
+  return [...grouped.values()].flatMap((departmentGroups) => [...departmentGroups.values()])
 }
 
-export const getHrSummaryReport = Effect.fn("HrReports.getSummary")(function* (params: HrReportParams) {
-  const data = yield* reportData(params)
+export const getHrSummaryReport = Effect.fn("HrReports.getSummary")(function* (
+  params: HrReportParams,
+  pageSize: HrPageSize = DEFAULT_HR_PAGE_SIZE
+) {
+  const data = yield* reportData(params, pageSize)
   const groups = groupSummaryRequests(data.requests, params, data).map((group) => ({
     ...group,
     requestCount: Count.make(group.requestCount),

@@ -45,7 +45,7 @@ import { contact, core, hr } from "../huly-plugins.js"
 import { loadDepartmentCatalog, resolveDepartment, resolveEmployee } from "./hr-departments-shared.js"
 import { hrCalendarDateFromTzDate, hrTzDateFromCalendarDate } from "./hr-calendar.js"
 import { pageHrRequestResults } from "./hr-request-pagination.js"
-import { loadAllHrDocuments } from "./hr-pagination.js"
+import { DEFAULT_HR_PAGE_SIZE, type HrPageSize, loadAllHrDocuments } from "./hr-pagination.js"
 import { markupToMarkdownString } from "./markup.js"
 import { renderMarkdownPreservingNativeReferences } from "./native-reference-markup.js"
 import { hulyQuery } from "./query-helpers.js"
@@ -245,7 +245,7 @@ const summarizeAll = (client: HulyClient["Service"], requests: ReadonlyArray<HrR
 
 export const loadAllHrRequestSummaries = Effect.fn("HrRequests.loadAllSummaries")(function* (
   params: Omit<ListHrRequestsParams, "limit" | "offset">,
-  scanPageSize?: number
+  pageSize: HrPageSize = DEFAULT_HR_PAGE_SIZE
 ) {
   const client = yield* HulyClient
   const employee = params.employee === undefined ? undefined : yield* resolveEmployee(client, params.employee)
@@ -261,7 +261,7 @@ export const loadAllHrRequestSummaries = Effect.fn("HrRequests.loadAllSummaries"
       ...(department === undefined ? {} : { department: department._id }),
       ...(requestType === undefined ? {} : { type: toRef<RequestType>(requestType._id) })
     },
-    scanPageSize
+    pageSize
   )
   const requests = yield* Effect.forEach(rawRequests, parseHrRequestRecord)
   const dates = requests.filter(
