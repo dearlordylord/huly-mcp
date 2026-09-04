@@ -48,4 +48,10 @@ describe("full integration HTTP fresh-session contract", () => {
     expect(hrPaginationAdapter).toContain("getHrTable(params, pageSize)")
     expect(hrPaginationAdapter).toContain("getHrSummaryReport(params, pageSize)")
   })
+
+  it("makes the page-two holiday affect the live employee table", () => {
+    expect(script).toContain('\\"title\\":\\"Child holiday\\",\\"date\\":\\"2026-09-07\\"')
+    expect(script).toContain('"$HR_CHILD_ID" "2026-09-04" "2026-09-07"')
+    expect(script).toContain('".table.rows[0].publicHolidayWorkdays" "2"')
+  })
 })

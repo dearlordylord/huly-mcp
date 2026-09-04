@@ -4302,7 +4302,7 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
       if [ -n "$HR_PARENT_HOLIDAY_ID" ]; then HR_CLEANUP_HOLIDAY_IDS="$HR_PARENT_HOLIDAY_ID"; fi
       restart_http_transport_if_needed "after parent public holiday create" || exit 1
       run_capture_to_var HR_CHILD_HOLIDAY_TEXT "create_public_holiday(child)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_public_holiday\",\"arguments\":{\"title\":\"Child holiday\",\"date\":\"2026-09-05\",\"department\":\"$HR_CHILD_ID\"}},\"id\":2}"
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_public_holiday\",\"arguments\":{\"title\":\"Child holiday\",\"date\":\"2026-09-07\",\"department\":\"$HR_CHILD_ID\"}},\"id\":2}"
       HR_CHILD_HOLIDAY_ID=$(echo "$HR_CHILD_HOLIDAY_TEXT" | jq -r '.holiday.id // empty' 2>/dev/null)
       if [ -n "$HR_CHILD_HOLIDAY_ID" ]; then HR_CLEANUP_HOLIDAY_IDS="$HR_CLEANUP_HOLIDAY_IDS $HR_CHILD_HOLIDAY_ID"; fi
       restart_http_transport_if_needed "after child public holiday create" || exit 1
@@ -4313,22 +4313,22 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
           "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_public_holiday\",\"arguments\":{\"holiday\":\"$HR_CHILD_HOLIDAY_ID\",\"title\":\"Updated child holiday\"}},\"id\":2}"
       fi
       run_capture_to_var HR_INHERITED_HOLIDAYS_TEXT "list_public_holidays(inherited)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_public_holidays\",\"arguments\":{\"department\":\"$HR_CHILD_ID\",\"includeInherited\":true,\"startDate\":\"2026-09-04\",\"endDate\":\"2026-09-05\",\"limit\":20}},\"id\":2}"
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_public_holidays\",\"arguments\":{\"department\":\"$HR_CHILD_ID\",\"includeInherited\":true,\"startDate\":\"2026-09-04\",\"endDate\":\"2026-09-07\",\"limit\":20}},\"id\":2}"
       assert_json_field_equals "nested department inherits both holiday documents" \
         "$HR_INHERITED_HOLIDAYS_TEXT" ".total" "2"
       run_capture_to_var HR_TABLE_TEXT "get_hr_table(complete scan)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_hr_table\",\"arguments\":{\"department\":\"$HR_CHILD_ID\",\"startDate\":\"2026-09-04\",\"endDate\":\"2026-09-05\"}},\"id\":2}"
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_hr_table\",\"arguments\":{\"department\":\"$HR_CHILD_ID\",\"startDate\":\"2026-09-04\",\"endDate\":\"2026-09-07\"}},\"id\":2}"
       assert_json_field_equals "HR table reports a complete scan" "$HR_TABLE_TEXT" ".complete" "true"
       capture_paginated_hr_reports HR_PAGINATED_REPORTS_BEFORE_REQUEST \
         "internal HR reports compose page-size-one holiday and Staff scans" \
-        "$HR_CHILD_ID" "2026-09-04" "2026-09-05"
+        "$HR_CHILD_ID" "2026-09-04" "2026-09-07"
       assert_json_field_equals "internal paginated schedule includes both inherited holidays" \
         "$HR_PAGINATED_REPORTS_BEFORE_REQUEST" ".schedule.holidays | length" "2"
       assert_json_field_equals "internal paginated table includes the assigned Staff employee" \
         "$HR_PAGINATED_REPORTS_BEFORE_REQUEST" ".table.totalEmployees" "1"
-      assert_json_field_equals "internal paginated table applies the inherited weekday holiday" \
-        "$HR_PAGINATED_REPORTS_BEFORE_REQUEST" ".table.rows[0].publicHolidayWorkdays" "1"
-      assert_json_field_equals "internal paginated table excludes the inherited holiday from base workdays" \
+      assert_json_field_equals "internal paginated table applies both inherited weekday holidays" \
+        "$HR_PAGINATED_REPORTS_BEFORE_REQUEST" ".table.rows[0].publicHolidayWorkdays" "2"
+      assert_json_field_equals "internal paginated table excludes both inherited holidays from base workdays" \
         "$HR_PAGINATED_REPORTS_BEFORE_REQUEST" ".table.rows[0].baseWorkdays" "0"
       HR_CHILD_PATH_JSON=$(json_string "$HR_DEPARTMENT_NAME/$HR_CHILD_NAME")
       HR_PROPAGATED_CHILD="{}"
@@ -4402,7 +4402,7 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
           restart_http_transport_if_needed "after HR request create" || exit 1
           capture_paginated_hr_reports HR_PAGINATED_REPORTS_WITH_REQUEST \
             "internal HR reports compose page-size-one request and holiday scans" \
-            "$HR_CHILD_ID" "2026-09-04" "2026-09-05"
+            "$HR_CHILD_ID" "2026-09-04" "2026-09-07"
           assert_json_field_equals "internal paginated schedule aggregates the request" \
             "$HR_PAGINATED_REPORTS_WITH_REQUEST" ".schedule.requests | length" "1"
           assert_json_field_equals "internal paginated schedule retains inherited holidays" \
@@ -4418,12 +4418,12 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
           assert_json_field_equals "internal paginated summary retains both holiday documents" \
             "$HR_PAGINATED_REPORTS_WITH_REQUEST" ".summary.publicHolidayDocuments" "2"
           run_capture_to_var HR_SCHEDULE_TEXT "get_hr_schedule(complete inherited holidays)" \
-            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_hr_schedule\",\"arguments\":{\"department\":\"$HR_CHILD_ID\",\"startDate\":\"2026-09-04\",\"endDate\":\"2026-09-05\"}},\"id\":2}"
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_hr_schedule\",\"arguments\":{\"department\":\"$HR_CHILD_ID\",\"startDate\":\"2026-09-04\",\"endDate\":\"2026-09-07\"}},\"id\":2}"
           assert_json_field_equals "HR schedule reports a complete scan" "$HR_SCHEDULE_TEXT" ".complete" "true"
           assert_json_field_equals "HR schedule includes both inherited holiday documents" \
             "$HR_SCHEDULE_TEXT" ".holidays | length" "2"
           run_capture_to_var HR_SUMMARY_TEXT "get_hr_summary_report(complete scan)" \
-            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_hr_summary_report\",\"arguments\":{\"department\":\"$HR_CHILD_ID\",\"startDate\":\"2026-09-04\",\"endDate\":\"2026-09-05\"}},\"id\":2}"
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_hr_summary_report\",\"arguments\":{\"department\":\"$HR_CHILD_ID\",\"startDate\":\"2026-09-04\",\"endDate\":\"2026-09-07\"}},\"id\":2}"
           assert_json_field_equals "HR summary reports a complete scan" "$HR_SUMMARY_TEXT" ".complete" "true"
           run_test "list_hr_requests(exact filters)" \
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_hr_requests\",\"arguments\":{\"employee\":\"$HR_STAFF_EMPLOYEE\",\"department\":\"$HR_CHILD_ID\",\"requestType\":$HR_REQUEST_TYPE_JSON,\"limit\":1}},\"id\":2}"
