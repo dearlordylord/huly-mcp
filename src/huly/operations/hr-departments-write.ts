@@ -30,7 +30,8 @@ import {
   resolveDepartment,
   resolveEmployee,
   resolveEmployees,
-  resolvePeople
+  resolvePeople,
+  validateDepartmentMove
 } from "./hr-departments-shared.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
@@ -95,19 +96,6 @@ export const createDepartment = (
     }
   })
 
-const validateNewParent = (
-  catalog: AwaitedCatalog,
-  department: HulyDepartment,
-  newParent: Ref<HulyDepartment>
-): Effect.Effect<void, DepartmentHierarchyError> =>
-  newParent === department._id || descendantsOf(catalog, department).some((item) => item._id === newParent)
-    ? Effect.fail(
-        new DepartmentHierarchyError({
-          message: `Department '${department.name}' cannot be moved under itself or a descendant`
-        })
-      )
-    : Effect.void
-
 type AwaitedCatalog = Effect.Success<ReturnType<typeof loadDepartmentCatalog>>
 
 type ResolvedRelationships = Effect.Success<ReturnType<typeof resolveRelationships>>
@@ -158,7 +146,7 @@ export const updateDepartment = (
     const client = yield* HulyClient
     const { catalog, department } = yield* resolveDepartment(client, params.department)
     const parent = yield* resolveUpdateParent(client, department, params.newParent)
-    yield* validateNewParent(catalog, department, parent)
+    yield* validateDepartmentMove(catalog, department, parent)
     yield* ensureNameAvailable(catalog, parent, params.name ?? department.name, department._id)
     const relationships = yield* resolveRelationships(client, params)
     const updates = departmentUpdates(params, parent, relationships)
@@ -222,10 +210,10 @@ export const assignStaffDepartment = (
     const target = yield* resolveAssignmentTarget(client, params.department)
     const targetId = target?.department._id ?? hr.ids.Head
     if ((current?.department ?? hr.ids.Head) === targetId) {
-      return assignmentResult(employee, target, false)
+      return yield* assignmentResult(employee, target, false)
     }
     yield* writeStaffAssignment(client, employee, current, targetId)
-    return assignmentResult(employee, target, true)
+    return yield* assignmentResult(employee, target, true)
   })
 
 type ResolvedDepartment = Effect.Success<ReturnType<typeof resolveDepartment>>
@@ -240,17 +228,22 @@ const assignmentResult = (
   employee: Employee,
   target: ResolvedDepartment | undefined,
   updated: boolean
-): AssignStaffDepartmentResult => ({
-  employeeId: PersonId.make(employee._id),
-  ...(target === undefined
-    ? {}
-    : {
-        departmentId: DepartmentId.make(target.department._id),
-        departmentPath: target.catalog.pathById.get(target.department._id)
-      }),
-  updated,
-  propagation: "server-derived"
-})
+): Effect.Effect<AssignStaffDepartmentResult, DepartmentHierarchyError> => {
+  const path = target === undefined ? undefined : target.catalog.pathById.get(target.department._id)
+  if (target !== undefined && path === undefined) {
+    return Effect.fail(
+      new DepartmentHierarchyError({ message: `Department '${target.department.name}' has no resolved hierarchy path` })
+    )
+  }
+  return Effect.succeed({
+    employeeId: PersonId.make(employee._id),
+    ...(target === undefined || path === undefined
+      ? {}
+      : { department: { id: DepartmentId.make(target.department._id), path } }),
+    updated,
+    propagation: "server-derived"
+  })
+}
 
 const writeStaffAssignment = (
   client: HulyClient["Service"],

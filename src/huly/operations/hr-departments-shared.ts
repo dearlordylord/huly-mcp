@@ -11,7 +11,9 @@ import {
   DepartmentName,
   DepartmentPath,
   type DepartmentPerson,
+  type DepartmentReference,
   type DepartmentSummary,
+  type PersonLocator,
   PersonId,
   Timestamp
 } from "../../domain/schemas.js"
@@ -61,8 +63,18 @@ const pathFor = (
   if (visiting.has(department._id)) {
     return Effect.fail(new DepartmentHierarchyError({ message: `Department '${department.name}' has a parent cycle` }))
   }
-  const parent = department.parent === undefined ? undefined : byId.get(department.parent)
-  if (parent === undefined || isHead(parent)) return Effect.succeed(DepartmentPath.make(department.name))
+  if (department.parent === undefined || department.parent === hr.ids.Head) {
+    return Effect.succeed(DepartmentPath.make(department.name))
+  }
+  const parent = byId.get(department.parent)
+  if (parent === undefined) {
+    return Effect.fail(
+      new DepartmentHierarchyError({
+        message: `Department '${department.name}' references missing parent '${department.parent}'`
+      })
+    )
+  }
+  if (isHead(parent)) return Effect.succeed(DepartmentPath.make(department.name))
   const next = new Set(visiting)
   next.add(department._id)
   return Effect.map(pathFor(parent, byId, next), (parentPath) =>
@@ -79,16 +91,10 @@ export const loadDepartmentCatalog = (
     })
     const byId = new Map(all.map((department) => [department._id, department]))
     const visible = all.filter((department) => !isHead(department))
-    const paths = yield* Effect.all(
-      visible.map((department) => pathFor(department, byId, new Set<Ref<HulyDepartment>>()))
+    const paths = yield* Effect.forEach(visible, (department) =>
+      Effect.map(pathFor(department, byId, new Set<Ref<HulyDepartment>>()), (path) => [department._id, path] as const)
     )
-    return {
-      departments: visible,
-      byId,
-      pathById: new Map(
-        visible.map((department, index) => [department._id, paths[index] ?? DepartmentPath.make(department.name)])
-      )
-    }
+    return { departments: visible, byId, pathById: new Map(paths) }
   })
 
 export const resolveDepartmentFromCatalog = (
@@ -101,7 +107,7 @@ export const resolveDepartmentFromCatalog = (
   const matches = catalog.departments.filter((department) => catalog.pathById.get(department._id) === normalized)
   if (isSingle(matches)) return Effect.succeed(matches[0])
   if (matches.length > 1) {
-    return Effect.fail(new DepartmentIdentifierAmbiguousError({ identifier, matches: matches.length }))
+    return Effect.fail(new DepartmentIdentifierAmbiguousError({ identifier, matches: Count.make(matches.length) }))
   }
   return Effect.fail(new DepartmentNotFoundError({ identifier }))
 }
@@ -133,9 +139,30 @@ export const descendantsOf = (
   return catalog.departments.filter((item) => descendants.has(item._id))
 }
 
+export const validateDepartmentMove = (
+  catalog: DepartmentCatalog,
+  department: HulyDepartment,
+  newParent: Ref<HulyDepartment>
+): Effect.Effect<void, DepartmentHierarchyError> => {
+  if (newParent === department._id || descendantsOf(catalog, department).some((item) => item._id === newParent)) {
+    return Effect.fail(
+      new DepartmentHierarchyError({
+        message: `Department '${department.name}' cannot be moved under itself or a descendant`
+      })
+    )
+  }
+  return (department.parent ?? hr.ids.Head) !== newParent && department.members.length > 0
+    ? Effect.fail(
+        new DepartmentHierarchyError({
+          message: `Department '${department.name}' cannot move while its subtree has server-derived members; clear Staff.department assignments first`
+        })
+      )
+    : Effect.void
+}
+
 export const resolveEmployee = (
   client: HulyClient["Service"],
-  identifier: string
+  identifier: PersonLocator
 ): Effect.Effect<Employee, HulyClientError | PersonIdentifierAmbiguousError | EmployeeNotFoundError> =>
   Effect.gen(function* () {
     const person = yield* findPersonByIdOrExactEmailOrName(client, exactPersonLocator(identifier))
@@ -149,7 +176,7 @@ export const resolveEmployee = (
 
 export const resolvePeople = (
   client: HulyClient["Service"],
-  identifiers: ReadonlyArray<string>
+  identifiers: ReadonlyArray<PersonLocator>
 ): Effect.Effect<ReadonlyArray<Person>, HulyClientError | PersonIdentifierAmbiguousError | EmployeeNotFoundError> =>
   Effect.forEach(identifiers, (identifier) =>
     Effect.gen(function* () {
@@ -160,7 +187,7 @@ export const resolvePeople = (
 
 export const resolveEmployees = (
   client: HulyClient["Service"],
-  identifiers: ReadonlyArray<string>
+  identifiers: ReadonlyArray<PersonLocator>
 ): Effect.Effect<ReadonlyArray<Employee>, HulyClientError | PersonIdentifierAmbiguousError | EmployeeNotFoundError> =>
   Effect.forEach(identifiers, (identifier) => resolveEmployee(client, identifier))
 
@@ -181,23 +208,40 @@ const personMap = (
       )
 }
 
-const personSummary = (ref: Ref<Person>, people: ReadonlyMap<Ref<Person>, Person>): DepartmentPerson => {
+const personSummary = (
+  department: HulyDepartment,
+  relationship: "team lead" | "manager" | "subscriber",
+  ref: Ref<Person>,
+  people: ReadonlyMap<Ref<Person>, Person>
+): Effect.Effect<DepartmentPerson, DepartmentHierarchyError> => {
   const person = people.get(ref)
-  return { id: PersonId.make(ref), ...(person === undefined ? {} : { name: PersonName.make(person.name) }) }
+  return person === undefined
+    ? Effect.fail(
+        new DepartmentHierarchyError({
+          message: `Department '${department.name}' references unresolved ${relationship} '${ref}'`
+        })
+      )
+    : Effect.succeed({ id: PersonId.make(ref), name: PersonName.make(person.name) })
 }
 
-const parentFields = (catalog: DepartmentCatalog, department: HulyDepartment) => {
-  const parent = department.parent === undefined ? undefined : catalog.byId.get(department.parent)
-  return parent === undefined || isHead(parent)
-    ? {}
-    : { parentId: DepartmentId.make(parent._id), parentPath: catalog.pathById.get(parent._id) }
+const parentReference = (
+  catalog: DepartmentCatalog,
+  department: HulyDepartment
+): Effect.Effect<DepartmentReference | undefined, DepartmentHierarchyError> => {
+  if (department.parent === undefined || department.parent === hr.ids.Head) return Effect.succeed(undefined)
+  const parent = catalog.byId.get(department.parent)
+  const path = catalog.pathById.get(department.parent)
+  return parent === undefined || path === undefined
+    ? Effect.fail(
+        new DepartmentHierarchyError({
+          message: `Department '${department.name}' has unresolved parent projection '${department.parent}'`
+        })
+      )
+    : Effect.succeed({ id: DepartmentId.make(parent._id), path })
 }
 
 const optionalAvatar = (department: HulyDepartment) =>
   department.avatar === undefined || department.avatar === null ? {} : { avatar: department.avatar }
-
-const optionalTeamLead = (department: HulyDepartment, people: ReadonlyMap<Ref<Person>, Person>) =>
-  department.teamLead === null ? {} : { teamLead: personSummary(toRef<Person>(department.teamLead), people) }
 
 const optionalCreatedOn = (department: HulyDepartment) =>
   department.createdOn === undefined ? {} : { createdOn: Timestamp.make(department.createdOn) }
@@ -208,24 +252,39 @@ export const toDepartmentSummary = (
   client: HulyClient["Service"],
   catalog: DepartmentCatalog,
   department: HulyDepartment
-): Effect.Effect<DepartmentSummary, HulyClientError> =>
+): Effect.Effect<DepartmentSummary, HulyClientError | DepartmentHierarchyError> =>
   Effect.gen(function* () {
     const [people, directStaff] = yield* Effect.all([
       personMap(client, department),
       client.findAll<HulyStaff>(hr.mixin.Staff, hulyQuery<HulyStaff>({ department: department._id }))
     ])
-    const knownPath = catalog.pathById.get(department._id)
-    const path = knownPath === undefined ? DepartmentPath.make(department.name) : knownPath
+    const path = catalog.pathById.get(department._id)
+    if (path === undefined) {
+      return yield* new DepartmentHierarchyError({
+        message: `Department '${department.name}' has no resolved hierarchy path`
+      })
+    }
+    const parent = yield* parentReference(catalog, department)
+    const teamLead =
+      department.teamLead === null
+        ? undefined
+        : yield* personSummary(department, "team lead", toRef<Person>(department.teamLead), people)
+    const managers = yield* Effect.forEach(department.managers, (ref) =>
+      personSummary(department, "manager", toRef<Person>(ref), people)
+    )
+    const subscribers = yield* Effect.forEach(department.subscribers ?? [], (ref) =>
+      personSummary(department, "subscriber", toRef<Person>(ref), people)
+    )
     return {
       id: DepartmentId.make(department._id),
       name: DepartmentName.make(department.name),
       path,
-      ...parentFields(catalog, department),
+      ...(parent === undefined ? {} : { parent }),
       description: department.description,
       ...optionalAvatar(department),
-      ...optionalTeamLead(department, people),
-      managers: department.managers.map((ref) => personSummary(toRef<Person>(ref), people)),
-      subscribers: (department.subscribers ?? []).map((ref) => personSummary(toRef<Person>(ref), people)),
+      ...(teamLead === undefined ? {} : { teamLead }),
+      managers,
+      subscribers,
       directStaff: Count.make(directStaff.length),
       derivedMembers: Count.make(department.members.length),
       subdepartments: Count.make(descendantsOf(catalog, department).length),

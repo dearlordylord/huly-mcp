@@ -71,7 +71,7 @@ export const hrDepartmentTools = [
     {
       name: "update_department",
       description:
-        "Rename, move, or replace department metadata and people. Rejects duplicate sibling names and parent cycles. newParent=null moves top-level; teamLead=null clears. Never writes Department.members.",
+        "Rename, move, or replace department metadata and people. Rejects duplicate sibling names, parent cycles, and moves of subtrees with server-derived members; clear Staff.department assignments before moving a populated subtree. newParent=null moves top-level; teamLead=null clears. Never writes Department.members.",
       category: CATEGORY,
       inputSchema: updateDepartmentParamsJsonSchema,
       resultSchema: DepartmentMutationResultSchema

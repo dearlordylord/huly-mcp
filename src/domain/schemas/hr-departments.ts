@@ -34,19 +34,22 @@ export type DepartmentName = Schema.Schema.Type<typeof DepartmentName>
 const PersonLocator = NonEmptyString.annotate({
   description: "Person or employee ID, exact email address, or exact Huly display name."
 })
+export type PersonLocator = Schema.Schema.Type<typeof PersonLocator>
 
-export const DepartmentPersonSchema = Schema.Struct({ id: PersonId, name: Schema.optional(PersonName) })
+export const DepartmentReferenceSchema = Schema.Struct({ id: DepartmentId, path: DepartmentPath })
+export type DepartmentReference = Schema.Schema.Type<typeof DepartmentReferenceSchema>
+
+export const DepartmentPersonSchema = Schema.Struct({ id: PersonId, name: PersonName })
 export type DepartmentPerson = Schema.Schema.Type<typeof DepartmentPersonSchema>
 
 export const DepartmentSummarySchema = Schema.Struct({
   id: DepartmentId,
   name: DepartmentName,
   path: DepartmentPath,
-  parentId: Schema.optional(DepartmentId),
-  parentPath: Schema.optional(DepartmentPath),
+  parent: Schema.optionalKey(DepartmentReferenceSchema),
   description: Schema.String,
-  avatar: Schema.optional(Schema.String),
-  teamLead: Schema.optional(DepartmentPersonSchema),
+  avatar: Schema.optionalKey(Schema.String),
+  teamLead: Schema.optionalKey(DepartmentPersonSchema),
   managers: Schema.Array(DepartmentPersonSchema),
   subscribers: Schema.Array(DepartmentPersonSchema),
   directStaff: Count,
@@ -55,7 +58,7 @@ export const DepartmentSummarySchema = Schema.Struct({
   attachments: Count,
   comments: Count,
   channels: Count,
-  createdOn: Schema.optional(Timestamp),
+  createdOn: Schema.optionalKey(Timestamp),
   modifiedOn: Timestamp
 })
 export type DepartmentSummary = Schema.Schema.Type<typeof DepartmentSummarySchema>
@@ -167,9 +170,8 @@ export const StaffSummarySchema = Schema.Struct({
   id: PersonId,
   name: PersonName,
   active: Schema.Boolean,
-  departmentId: Schema.optional(DepartmentId),
-  departmentPath: Schema.optional(DepartmentPath),
-  position: Schema.optional(Schema.String)
+  department: Schema.optionalKey(DepartmentReferenceSchema),
+  position: Schema.optionalKey(Schema.String)
 })
 export type StaffSummary = Schema.Schema.Type<typeof StaffSummarySchema>
 
@@ -196,8 +198,7 @@ export type AssignStaffDepartmentParams = Schema.Schema.Type<typeof AssignStaffD
 
 export const AssignStaffDepartmentResultSchema = Schema.Struct({
   employeeId: PersonId,
-  departmentId: Schema.optional(DepartmentId),
-  departmentPath: Schema.optional(DepartmentPath),
+  department: Schema.optionalKey(DepartmentReferenceSchema),
   updated: Schema.Boolean,
   propagation: Schema.Literal("server-derived")
 })

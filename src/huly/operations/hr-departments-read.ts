@@ -5,6 +5,7 @@ import { Effect } from "effect"
 import {
   Count,
   DepartmentId,
+  type DepartmentReference,
   type GetDepartmentParams,
   type ListDepartmentsParams,
   type ListDepartmentsResult,
@@ -15,6 +16,7 @@ import {
 } from "../../domain/schemas.js"
 import { PersonName } from "../../domain/schemas/shared.js"
 import { HulyClient } from "../client.js"
+import { DepartmentHierarchyError } from "../errors.js"
 import { hr } from "../huly-plugins.js"
 import { clampLimit, hulyQuery } from "./query-helpers.js"
 import {
@@ -54,28 +56,44 @@ export const getDepartment = (params: GetDepartmentParams) =>
     return yield* toDepartmentSummary(client, catalog, department)
   })
 
-const staffSummary = (catalog: DepartmentCatalog, staff: HulyStaff): StaffSummary => {
-  const department =
-    staff.department === undefined || staff.department === null || staff.department === hr.ids.Head
-      ? undefined
-      : catalog.byId.get(staff.department)
-  const departmentFields =
-    department === undefined
-      ? {}
-      : { departmentId: DepartmentId.make(department._id), ...staffDepartmentPath(catalog, department._id) }
-  return {
-    id: PersonId.make(staff._id),
-    name: PersonName.make(staff.name),
-    active: staff.active,
-    ...departmentFields,
-    ...staffPosition(staff)
+const staffDepartment = (
+  catalog: DepartmentCatalog,
+  staff: HulyStaff
+): Effect.Effect<DepartmentReference | undefined, DepartmentHierarchyError> => {
+  const departmentId = staff.department
+  if (departmentId === undefined || departmentId === null || departmentId === hr.ids.Head) {
+    return Effect.succeed(undefined)
   }
+  const department = catalog.byId.get(departmentId)
+  if (department === undefined) {
+    return Effect.fail(
+      new DepartmentHierarchyError({ message: `Staff '${staff.name}' references missing department '${departmentId}'` })
+    )
+  }
+  const path = catalog.pathById.get(departmentId)
+  return path === undefined
+    ? Effect.fail(
+        new DepartmentHierarchyError({
+          message: `Staff '${staff.name}' has unresolved department path '${departmentId}'`
+        })
+      )
+    : Effect.succeed({ id: DepartmentId.make(departmentId), path })
 }
 
-const staffDepartmentPath = (catalog: DepartmentCatalog, departmentId: HulyStaff["department"]) => {
-  const departmentPath = departmentId === null ? undefined : catalog.pathById.get(departmentId)
-  return departmentPath === undefined ? {} : { departmentPath }
-}
+const staffSummary = (
+  catalog: DepartmentCatalog,
+  staff: HulyStaff
+): Effect.Effect<StaffSummary, DepartmentHierarchyError> =>
+  Effect.gen(function* () {
+    const department = yield* staffDepartment(catalog, staff)
+    return {
+      id: PersonId.make(staff._id),
+      name: PersonName.make(staff.name),
+      active: staff.active,
+      ...(department === undefined ? {} : { department }),
+      ...staffPosition(staff)
+    }
+  })
 
 const staffPosition = (staff: HulyStaff) =>
   staff.position === undefined || staff.position === null ? {} : { position: staff.position }
@@ -103,6 +121,6 @@ export const listStaff = (params: ListStaffParams): Effect.Effect<ListStaffResul
       }),
       { sort: { name: SortingOrder.Ascending } }
     )
-    const summaries = staff.map((item) => staffSummary(catalog, item))
+    const summaries = yield* Effect.forEach(staff, (item) => staffSummary(catalog, item))
     return { staff: summaries.slice(0, clampLimit(params.limit)), total: Count.make(summaries.length) }
   })

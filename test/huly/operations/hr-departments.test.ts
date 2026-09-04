@@ -1,3 +1,4 @@
+import type { Employee } from "@hcengineering/contact"
 import type { Ref } from "@hcengineering/core"
 import type { Department as HulyDepartment } from "@hcengineering/hr"
 import { Effect, Schema } from "effect"
@@ -8,7 +9,8 @@ import { hr } from "../../../src/huly/huly-plugins.js"
 import {
   descendantsOf,
   type DepartmentCatalog,
-  resolveDepartmentFromCatalog
+  resolveDepartmentFromCatalog,
+  validateDepartmentMove
 } from "../../../src/huly/operations/hr-departments-shared.js"
 import { corePersonId, docRef, spaceRef } from "../../helpers/huly-sdk.js"
 
@@ -60,5 +62,22 @@ describe("HR department hierarchy", () => {
 
   it("returns every descendant once for destructive impact", () => {
     expect(descendantsOf(catalog, root).map((item) => item._id)).toEqual(["child", "nested"])
+  })
+
+  it("rejects moving a subtree whose server-derived members are populated", () => {
+    const populatedRoot: HulyDepartment = { ...root, members: [docRef<Employee>("employee-1")] }
+    const populatedCatalog = {
+      ...catalog,
+      departments: [populatedRoot, child, nested, duplicate],
+      byId: new Map([...catalog.byId, [populatedRoot._id, populatedRoot]])
+    }
+    expect(() => Effect.runSync(validateDepartmentMove(populatedCatalog, populatedRoot, duplicate._id))).toThrow(
+      "clear Staff.department assignments first"
+    )
+  })
+
+  it("permits an empty subtree move but still rejects descendant cycles", () => {
+    expect(Effect.runSync(validateDepartmentMove(catalog, child, duplicate._id))).toBeUndefined()
+    expect(() => Effect.runSync(validateDepartmentMove(catalog, root, nested._id))).toThrow("descendant")
   })
 })

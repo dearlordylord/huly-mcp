@@ -344,28 +344,40 @@ if [[ -z "$HR_DEPARTMENT_ID" ]]; then
 fi
 cover_cli_json "update_department" "HR department update" \
   hr departments update "$HR_DEPARTMENT_ID" --description "Updated CLI integration fixture"
-HR_STAFF_JSON="$(run_cli_json_output hr staff list)"
-HR_STAFF_EMPLOYEE="$(json_value "$HR_STAFF_JSON" '.staff[0].id // empty')"
-if [[ -n "$HR_STAFF_EMPLOYEE" ]]; then
-  HR_STAFF_ORIGINAL_DEPARTMENT="$(json_value "$HR_STAFF_JSON" '.staff[0].departmentId // empty')"
-  cover_cli_json "assign_staff_department" "HR staff department assignment" \
-    hr staff assign-department "$HR_STAFF_EMPLOYEE" "$HR_DEPARTMENT_ID" --yes
-  HR_STAFF_NEEDS_RESTORE=1
-  if [[ -n "$HR_STAFF_ORIGINAL_DEPARTMENT" ]]; then
-    cover_cli_json "assign_staff_department" "HR staff department restoration" \
-      hr staff assign-department "$HR_STAFF_EMPLOYEE" "$HR_STAFF_ORIGINAL_DEPARTMENT" --yes
-  else
-    cover_cli_json "assign_staff_department" "HR staff department restoration" \
-      hr staff assign-department "$HR_STAFF_EMPLOYEE" null --yes
-  fi
-  HR_STAFF_NEEDS_RESTORE=""
-else
-  cover_cli_failure "assign_staff_department" "HR staff assignment exact lookup" "not found" \
-    hr staff assign-department "missing-$RUN_ID" "$HR_DEPARTMENT_ID" --yes
+HR_STAFF_FIXTURE="$(pnpm exec tsx scripts/integration-hr-staff-fixture.ts)"
+HR_STAFF_EMPLOYEE="$(json_value "$HR_STAFF_FIXTURE" '.employeeId // empty')"
+HR_STAFF_ORIGINAL_DEPARTMENT="$(json_value "$HR_STAFF_FIXTURE" '.departmentId // empty')"
+if [[ -z "$HR_STAFF_EMPLOYEE" ]]; then
+  echo "Authenticated workspace user did not resolve to an Employee." >&2
+  exit 1
 fi
+cover_cli_json "assign_staff_department" "HR staff department assignment" \
+  hr staff assign-department "$HR_STAFF_EMPLOYEE" "$HR_DEPARTMENT_ID" --yes
+HR_STAFF_NEEDS_RESTORE=1
+if [[ -n "$HR_STAFF_ORIGINAL_DEPARTMENT" ]]; then
+  cover_cli_json "assign_staff_department" "HR staff department restoration" \
+    hr staff assign-department "$HR_STAFF_EMPLOYEE" "$HR_STAFF_ORIGINAL_DEPARTMENT" --yes
+else
+  cover_cli_json "assign_staff_department" "HR staff department restoration" \
+    hr staff assign-department "$HR_STAFF_EMPLOYEE" null --yes
+fi
+for _ in $(seq 1 20); do
+  HR_STAFF_JSON="$(run_cli_json_output hr staff list --limit 200)"
+  HR_RESTORED_DEPARTMENT="$(json_value "$HR_STAFF_JSON" ".staff[] | select(.id == \"$HR_STAFF_EMPLOYEE\") | .department.id // empty")"
+  HR_RESTORED_PRESENT="$(json_value "$HR_STAFF_JSON" "[.staff[] | select(.id == \"$HR_STAFF_EMPLOYEE\")] | length")"
+  [[ "$HR_RESTORED_PRESENT" == "1" && "$HR_RESTORED_DEPARTMENT" == "$HR_STAFF_ORIGINAL_DEPARTMENT" ]] && break
+  sleep 0.25
+done
+if [[ "$HR_RESTORED_PRESENT" != "1" || "$HR_RESTORED_DEPARTMENT" != "$HR_STAFF_ORIGINAL_DEPARTMENT" ]]; then
+  echo "HR Staff fixture restoration was not confirmed; cleanup marker retained." >&2
+  exit 1
+fi
+HR_STAFF_NEEDS_RESTORE=""
 cover_cli_json "delete_department" "HR department cleanup" \
   hr departments delete "$HR_DEPARTMENT_ID" --execute \
     --expected-subdepartments 0 --expected-assigned-staff 0 --yes
+cover_cli_failure "get_department" "HR department cleanup confirmation" "not found" \
+  hr departments get "$HR_DEPARTMENT_ID"
 HR_DEPARTMENT_ID=""
 cli_live_case_end "hr-department-lifecycle"
 
