@@ -749,14 +749,16 @@ describe("employee lifecycle operations", () => {
 
   it.effect("lists inactive employees with complete totals before pagination", () => {
     const secondUuid = toAccountUuid("00000000-0000-4000-8000-000000000252")
-    const second = employee(false, { id: "person-2", name: "Hopper,Grace", personUuid: secondUuid })
+    const second = employee(false, { id: "person-2", name: "Lovelace,Ada", personUuid: secondUuid })
+    const thirdUuid = toAccountUuid("00000000-0000-4000-8000-000000000253")
+    const third = employee(false, { id: "person-3", name: "Turing,Alan", personUuid: thirdUuid })
     return Effect.gen(function* () {
       const result = yield* listInactiveEmployees({ limit: 1, offset: 0 })
-      expect(result).toMatchObject({ total: 2, offset: 0, truncated: true, nextOffset: 1 })
+      expect(result).toMatchObject({ total: 3, offset: 0, truncated: true, nextOffset: 1 })
       expect(result.employees).toHaveLength(1)
-      expect(result.employees[0]?.personId).toBe("person-2")
-      expect(result.employees[0]?.workspaceMembership).toEqual({ state: "absent" })
-    }).pipe(Effect.provide(layer({ employees: [employee(false), second] }, { member: true })))
+      expect(result.employees[0]?.personId).toBe("person-1")
+      expect(result.employees[0]?.workspaceMembership).toEqual({ state: "member", role: "USER" })
+    }).pipe(Effect.provide(layer({ employees: [employee(false), second, third] }, { member: true })))
   })
 
   it.effect("projects an unlinked Employee only with absent workspace membership", () =>
@@ -853,6 +855,26 @@ describe("employee lifecycle operations", () => {
       expect(error.message).toContain("Preview and execute kick again")
       expect(updated).toEqual([{ active: false }])
 
+      const noProgress = yield* Effect.flip(
+        deactivateEmployee({
+          employee: { name: PersonName.make("Lovelace,Ada") },
+          action: "kick",
+          execute: true,
+          expected: {
+            relationship: "workspace-member",
+            personId: PersonId.make("person-1"),
+            personUuid: DOMAIN_PERSON_UUID,
+            employeeActive: false,
+            workspaceRole: "USER"
+          }
+        }).pipe(
+          Effect.provide(
+            layer({ people: [person("person-1", "Lovelace,Ada")], employees: [employee(false)] }, { failLeave: true })
+          )
+        )
+      )
+      expect(noProgress).toMatchObject({ completedChanges: [] })
+
       const retry = yield* deactivateEmployee({
         employee: { name: PersonName.make("Lovelace,Ada") },
         action: "kick",
@@ -893,7 +915,7 @@ describe("employee lifecycle operations", () => {
           expected: {
             relationship: "workspace-member",
             personId: PersonId.make("other"),
-            personUuid: DOMAIN_PERSON_UUID,
+            personUuid: PersonUuid.make("00000000-0000-4000-8000-000000000999"),
             employeeActive: true,
             workspaceRole: "USER"
           }
@@ -912,6 +934,22 @@ describe("employee lifecycle operations", () => {
         }
       })
       expect(result).toMatchObject({ outcome: "deactivated", changes: { employeeDeactivated: false } })
+      const preview = yield* deactivateEmployee({
+        employee: { email: Email.make("ada@example.test") },
+        action: "deactivate"
+      }).pipe(
+        Effect.provide(
+          layer(
+            {
+              people: [person("person-1", "Lovelace,Ada")],
+              employees: [employee(false)],
+              identities: [emailIdentity()]
+            },
+            { member: false }
+          )
+        )
+      )
+      expect(preview).toMatchObject({ outcome: "preview", executed: false })
       expect(updated).toEqual([])
     }).pipe(Effect.provide(provided))
   })
