@@ -251,6 +251,9 @@ importers:
       '@hcengineering/gmail':
         specifier: 0.7.0
         version: 0.7.0
+      '@hcengineering/hr':
+        specifier: 0.7.0
+        version: 0.7.0
       '@hcengineering/inventory':
         specifier: 0.7.0
         version: 0.7.0

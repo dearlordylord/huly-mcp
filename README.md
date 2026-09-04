@@ -764,6 +764,21 @@ When resolved tool exposure is `proxy`, clients see the built-in tools plus thes
 | `delete_department` | Preview destructive impact by default. Execution requires execute=true plus exact previewed descendant and assigned-Staff counts; Huly then cascades descendant deletion and clears affected Staff assignments. |
 | `list_staff` | List HR Staff and authoritative department assignments. Optionally scope by exact department path/ID, include descendants, and filter Employee active state. |
 | `assign_staff_department` | Assign an exact employee ID/email/display name by writing only authoritative Staff.department. Use department=null to clear. Department.members hierarchy propagation is performed asynchronously by Huly's server trigger. |
+| `list_hr_request_comments` | List comments directly attached to an exact HR request ID, with total and truncation metadata. |
+| `add_hr_request_comment` | Add a Markdown comment directly to an exact HR request ID. |
+| `update_hr_request_comment` | Update a comment that belongs directly to an exact HR request. |
+| `delete_hr_request_comment` | Delete a comment that belongs directly to an exact HR request. |
+| `list_hr_request_attachments` | List files directly attached to an exact HR request ID, with total and truncation metadata. |
+| `get_hr_request_attachment` | Get one file belonging directly to an exact HR request. |
+| `add_hr_request_attachment` | Attach a file to an exact HR request. Provide filename, contentType, and exactly one of filePath, fileUrl, or base64 data. |
+| `update_hr_request_attachment` | Update description and/or pinned state for a file belonging directly to an exact HR request. |
+| `delete_hr_request_attachment` | Delete one file belonging directly to an exact HR request. |
+| `list_hr_request_types` | Discover installed HR request types by stable ID and human-readable label. Exact labels may be used by request tools; ambiguous labels are rejected. Request-type mutation is intentionally unsupported because Huly installs these as model-space documents and exposes no stable runtime mutation contract. |
+| `list_hr_requests` | List HR requests with exact optional employee, department, and request-type filters. Calendar dates are inclusive YYYY-MM-DD values stored with UTC offset 0. Results include total, truncation, and nextOffset continuation metadata. |
+| `get_hr_request` | Get one HR request by the exact raw request ID returned by list_hr_requests. |
+| `create_hr_request` | Create an employee-attached HR request using exact employee, department, and request-type resolution. Dates are inclusive calendar dates in YYYY-MM-DD form and descriptions accept Markdown with native Huly references. |
+| `update_hr_request` | Update selected HR request fields by exact request ID. Department and type locators resolve exactly; omitted fields are preserved. Dates remain inclusive YYYY-MM-DD calendar dates. |
+| `delete_hr_request` | Delete one exact HR request. Its comments and attachments are Huly-owned attached collections and follow the request deletion lifecycle. |
 
 ### Inventory
 

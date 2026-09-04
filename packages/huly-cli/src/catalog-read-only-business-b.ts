@@ -2,8 +2,30 @@ import type { McpToolName } from "../../../src/mcp/tools/index.js"
 import type { CliCommandSpec } from "./catalog-types.js"
 
 export const businessReadOnlyCliCommandCatalogB = {
+  get_hr_request: { path: ["hr", "requests", "get"], positional: ["request"], description: "Get HR Request" },
+  get_hr_request_attachment: {
+    path: ["hr", "requests", "attachments", "get"],
+    positional: ["request", "attachmentId"],
+    description: "Get HR Request Attachment"
+  },
   get_department: { path: ["hr", "departments", "get"], positional: ["department"], description: "Get Department" },
   list_departments: { path: ["hr", "departments", "list"], positional: [], description: "List Departments" },
+  list_hr_request_types: {
+    path: ["hr", "request-types", "list"],
+    positional: [],
+    description: "List HR Request Types"
+  },
+  list_hr_requests: { path: ["hr", "requests", "list"], positional: [], description: "List HR Requests" },
+  list_hr_request_comments: {
+    path: ["hr", "requests", "comments", "list"],
+    positional: ["request"],
+    description: "List HR Request Comments"
+  },
+  list_hr_request_attachments: {
+    path: ["hr", "requests", "attachments", "list"],
+    positional: ["request"],
+    description: "List HR Request Attachments"
+  },
   list_events: { path: ["calendar", "events", "list"], positional: [], description: "List Events" },
   list_funnels: { path: ["leads", "funnels", "list"], positional: [], description: "List Funnels" },
   list_inventory_categories: {

@@ -2989,6 +2989,9 @@ export {
 
 export { ListContactChannelProvidersResultSchema } from "./contact-channels.js"
 
+export * from "./hr-requests.js"
+export * from "./hr-request-media.js"
+
 export {
   AddOrganizationMemberResultSchema,
   ListOrganizationsResultSchema,

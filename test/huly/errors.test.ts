@@ -133,6 +133,7 @@ import {
   HulyError,
   HulyStorageConfigError,
   HulyUnavailableError,
+  HrRequestMutationUnsupportedError,
   InvalidContactChannelLocatorError,
   InvalidContactChannelValueError,
   InvalidContactProviderError,
@@ -1689,6 +1690,18 @@ describe("Huly Errors", () => {
               return `workflow-category-in-use:${error.categoryId}:${error.statusIds.length}`
             case "WorkbenchApplicationAliasAmbiguousError":
               return `workbench-application-alias:${error.alias}:${error.matches}`
+            case "HrRequestNotFoundError":
+              return `hr-request:${error.request}`
+            case "HrRequestTypeNotFoundError":
+              return `hr-request-type:${error.requestType}`
+            case "HrRequestTypeIdentifierAmbiguousError":
+              return `hr-request-type-ambiguous:${error.requestType}:${error.matches}`
+            case "HrRequestDateRangeError":
+              return `hr-request-date:${error.startDate}:${error.endDate}`
+            case "HrRequestCommentNotFoundError":
+              return `hr-request-comment:${error.request}:${error.commentId}`
+            case "HrRequestMutationUnsupportedError":
+              return `hr-request-unsupported:${error.operation}`
             default: {
               const _exhaustive: never = error
               return _exhaustive
@@ -1697,6 +1710,9 @@ describe("Huly Errors", () => {
         }
 
         expect(matchError(new IssueNotFoundError({ identifier: "X", project: "Y" }))).toBe("issue:X")
+        expect(matchError(new HrRequestMutationUnsupportedError({ operation: NonEmptyString.make("deletion") }))).toBe(
+          "hr-request-unsupported:deletion"
+        )
         expect(matchError(new ApprovalRequestNotFoundError({ request: "request-1" }))).toBe(
           "approval-request:request-1"
         )

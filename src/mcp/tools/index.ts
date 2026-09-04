@@ -20,6 +20,8 @@ import { documentTools } from "./documents.js"
 import { driveTools } from "./drive.js"
 import { genericAssociationTools } from "./generic-associations.js"
 import { hrDepartmentTools } from "./hr-departments.js"
+import { hrRequestTools } from "./hr-requests.js"
+import { hrRequestMediaTools } from "./hr-request-media.js"
 import { inventoryMediaTools } from "./inventory-media.js"
 import { inventoryTools } from "./inventory.js"
 import { issueTools } from "./issues.js"
@@ -86,6 +88,8 @@ export const allTools = [
   ...driveTools,
   ...genericAssociationTools,
   ...hrDepartmentTools,
+  ...hrRequestTools,
+  ...hrRequestMediaTools,
   ...inventoryTools,
   ...inventoryMediaTools,
   ...spaceTools,

@@ -2,6 +2,24 @@ import type { McpToolName } from "../../../src/mcp/tools/index.js"
 import type { CliCommandSpec } from "./catalog-types.js"
 
 export const businessMutationCliCommandCatalogB = {
+  create_hr_request: {
+    path: ["hr", "requests", "create"],
+    positional: ["employee", "requestType", "startDate", "endDate"],
+    description: "Create HR Request",
+    behavior: { fileInput: { fields: ["description"] } }
+  },
+  add_hr_request_comment: {
+    path: ["hr", "requests", "comments", "add"],
+    positional: ["request", "body"],
+    description: "Add HR Request Comment",
+    behavior: { fileInput: { fields: ["body"] } }
+  },
+  add_hr_request_attachment: {
+    path: ["hr", "requests", "attachments", "add"],
+    positional: ["request", "filename", "contentType"],
+    description: "Add HR Request Attachment",
+    behavior: { base64FileInput: { fields: ["data"] } }
+  },
   assign_staff_department: {
     path: ["hr", "staff", "assign-department"],
     positional: ["employee", "department"],
@@ -14,6 +32,24 @@ export const businessMutationCliCommandCatalogB = {
     positional: ["department"],
     description: "Delete Department",
     behavior: { confirmation: { type: "requires-yes", message: "hr departments delete requires --yes." } }
+  },
+  delete_hr_request: {
+    path: ["hr", "requests", "delete"],
+    positional: ["request"],
+    description: "Delete HR Request",
+    behavior: { confirmation: { type: "requires-yes", message: "hr requests delete requires --yes." } }
+  },
+  delete_hr_request_comment: {
+    path: ["hr", "requests", "comments", "delete"],
+    positional: ["request", "commentId"],
+    description: "Delete HR Request Comment",
+    behavior: { confirmation: { type: "requires-yes", message: "hr requests comments delete requires --yes." } }
+  },
+  delete_hr_request_attachment: {
+    path: ["hr", "requests", "attachments", "delete"],
+    positional: ["request", "attachmentId"],
+    description: "Delete HR Request Attachment",
+    behavior: { confirmation: { type: "requires-yes", message: "hr requests attachments delete requires --yes." } }
   },
   delete_test_plan: {
     path: ["tests", "plan", "delete"],
@@ -54,6 +90,23 @@ export const businessMutationCliCommandCatalogB = {
     path: ["hr", "departments", "update"],
     positional: ["department"],
     description: "Update Department"
+  },
+  update_hr_request: {
+    path: ["hr", "requests", "update"],
+    positional: ["request"],
+    description: "Update HR Request",
+    behavior: { fileInput: { fields: ["description"] } }
+  },
+  update_hr_request_comment: {
+    path: ["hr", "requests", "comments", "update"],
+    positional: ["request", "commentId", "body"],
+    description: "Update HR Request Comment",
+    behavior: { fileInput: { fields: ["body"] } }
+  },
+  update_hr_request_attachment: {
+    path: ["hr", "requests", "attachments", "update"],
+    positional: ["request", "attachmentId"],
+    description: "Update HR Request Attachment"
   },
   remove_recruiting_candidate_skill: {
     path: ["recruiting", "candidate", "skill", "remove"],

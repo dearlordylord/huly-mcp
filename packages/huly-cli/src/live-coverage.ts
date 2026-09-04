@@ -20,7 +20,7 @@ export type CliIntegrationCoverageDecision =
       readonly type: "representative"
     }
 
-export const CLI_COVERAGE_REVIEWED_REGISTRY_OPERATIONS = 535
+export const CLI_COVERAGE_REVIEWED_REGISTRY_OPERATIONS = 550
 export const CLI_COVERAGE_REVIEWED_ROOT_COMMANDS = 55
 export const CLI_COVERAGE_REVIEWED_LOCAL_COMMANDS = 7
 
@@ -106,6 +106,19 @@ export const CLI_LIVE_COVERAGE_CASES: ReadonlyArray<CliLiveCoverageCase> = [
     risks: ["lifecycle"]
   },
   {
+    id: "hr-request-lifecycle",
+    tools: [
+      "list_hr_request_types",
+      "list_hr_requests",
+      "get_hr_request",
+      "create_hr_request",
+      "update_hr_request",
+      "delete_hr_request"
+    ],
+    behaviors: ["structured-json-input", "text-file-input", "consequential-confirmation"],
+    risks: ["lifecycle", "safety"]
+  },
+  {
     id: "funnel-administration-lifecycle",
     tools: ["get_funnel", "create_funnel", "update_funnel", "archive_funnel", "delete_funnel"],
     behaviors: ["structured-json-input", "nullable-clear-input", "text-file-input", "consequential-confirmation"],
@@ -159,6 +172,12 @@ export const CLI_UNIQUE_RISK_DECISIONS: ReadonlyArray<CliUniqueRiskDecision> = [
     tools: ["create_department", "update_department", "assign_staff_department", "delete_department"],
     risks: ["lifecycle"]
   },
+  {
+    caseId: "hr-request-lifecycle",
+    tools: ["create_hr_request", "update_hr_request", "delete_hr_request"],
+    risks: ["lifecycle"]
+  },
+  { caseId: "hr-request-lifecycle", tools: ["delete_hr_request"], risks: ["safety"] },
   {
     caseId: "funnel-administration-lifecycle",
     tools: ["create_funnel", "update_funnel", "archive_funnel", "delete_funnel"],

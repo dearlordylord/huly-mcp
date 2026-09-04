@@ -67,6 +67,7 @@ ISSUE_AGENT_CLEANUP_ISSUE_ID=""
 ISSUE_AGENT_CLEANUP_PROFILE_ID=""
 ISSUE_AGENT_CLEANUP_PERSON_ID=""
 HR_CLEANUP_DEPARTMENT_ID=""
+HR_CLEANUP_REQUEST_ID=""
 HR_STAFF_RESTORE_EMPLOYEE=""
 HR_STAFF_RESTORE_DEPARTMENT=""
 TM_TASK_TYPE_NAME=""
@@ -579,6 +580,18 @@ cleanup_issue_agent_assignee_artifacts() {
 
 cleanup_hr_artifacts() {
   local cleanup_failed=0
+  if [ -n "$HR_CLEANUP_REQUEST_ID" ]; then
+    local request_json request_readback
+    request_json=$(json_string "$HR_CLEANUP_REQUEST_ID")
+    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_hr_request\",\"arguments\":{\"request\":$request_json}},\"id\":2}" >/dev/null 2>&1 || true
+    restart_http_transport_if_needed "after HR request cleanup" >/dev/null 2>&1 || cleanup_failed=1
+    request_readback=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_hr_request\",\"arguments\":{\"request\":$request_json}},\"id\":2}" 2>/dev/null || true)
+    if [ "$(echo "$request_readback" | jq -r '(.result.isError // false) and ((.result.content[0].text // "") | contains("not found"))' 2>/dev/null)" = "true" ]; then
+      HR_CLEANUP_REQUEST_ID=""
+    else
+      cleanup_failed=1
+    fi
+  fi
   if [ -n "$HR_STAFF_RESTORE_EMPLOYEE" ]; then
     local employee_json restore_json restore_response staff_response staff_text restored_department restored_present
     employee_json=$(json_string "$HR_STAFF_RESTORE_EMPLOYEE")
@@ -4197,6 +4210,66 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
         HR_STAFF_RESTORE_DEPARTMENT=""
       else
         fail_test "HR Staff fixture restoration" "restored department was not confirmed; cleanup marker retained"
+      fi
+      run_capture_to_var HR_REQUEST_TYPES_TEXT "list_hr_request_types" \
+        '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_hr_request_types","arguments":{"limit":20}},"id":2}'
+      HR_REQUEST_TYPE_ID=$(echo "$HR_REQUEST_TYPES_TEXT" | jq -r '.requestTypes[0].id // empty' 2>/dev/null)
+      HR_REQUEST_TYPE_LABEL=$(echo "$HR_REQUEST_TYPES_TEXT" | jq -r '.requestTypes[0].label // empty' 2>/dev/null)
+      if [ -n "$HR_REQUEST_TYPE_ID" ] && [ -n "$HR_REQUEST_TYPE_LABEL" ]; then
+        HR_REQUEST_TYPE_JSON=$(json_string "$HR_REQUEST_TYPE_ID")
+        HR_REQUEST_TYPE_LABEL_JSON=$(json_string "$HR_REQUEST_TYPE_LABEL")
+        run_capture_to_var HR_REQUEST_CREATE_TEXT "create_hr_request" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_hr_request\",\"arguments\":{\"employee\":\"$HR_STAFF_EMPLOYEE\",\"department\":\"$HR_CHILD_ID\",\"requestType\":$HR_REQUEST_TYPE_LABEL_JSON,\"startDate\":\"2026-09-04\",\"endDate\":\"2026-09-04\",\"description\":\"Issue 254 **integration** fixture\"}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          HR_CLEANUP_REQUEST_ID=$(echo "$HR_REQUEST_CREATE_TEXT" | jq -r '.request.id // empty' 2>/dev/null)
+          restart_http_transport_if_needed "after HR request create" || exit 1
+          run_test "list_hr_requests(exact filters)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_hr_requests\",\"arguments\":{\"employee\":\"$HR_STAFF_EMPLOYEE\",\"department\":\"$HR_CHILD_ID\",\"requestType\":$HR_REQUEST_TYPE_JSON,\"limit\":1}},\"id\":2}"
+          run_capture_to_var HR_REQUEST_COMMENT_TEXT "add_hr_request_comment" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_hr_request_comment\",\"arguments\":{\"request\":\"$HR_CLEANUP_REQUEST_ID\",\"body\":\"Integration comment\"}},\"id\":2}"
+          HR_REQUEST_COMMENT_ID=$(echo "$HR_REQUEST_COMMENT_TEXT" | jq -r '.commentId // empty' 2>/dev/null)
+          restart_http_transport_if_needed "after HR request comment create" || exit 1
+          if [ -n "$HR_REQUEST_COMMENT_ID" ]; then
+            run_test "update_hr_request_comment" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_hr_request_comment\",\"arguments\":{\"request\":\"$HR_CLEANUP_REQUEST_ID\",\"commentId\":\"$HR_REQUEST_COMMENT_ID\",\"body\":\"Updated integration comment\"}},\"id\":2}"
+            restart_http_transport_if_needed "after HR request comment update" || exit 1
+          fi
+          run_test "list_hr_request_comments" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_hr_request_comments\",\"arguments\":{\"request\":\"$HR_CLEANUP_REQUEST_ID\"}},\"id\":2}"
+          run_capture_to_var HR_REQUEST_ATTACHMENT_TEXT "add_hr_request_attachment" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_hr_request_attachment\",\"arguments\":{\"request\":\"$HR_CLEANUP_REQUEST_ID\",\"filename\":\"issue-254.txt\",\"contentType\":\"text/plain\",\"data\":\"aXNzdWUtMjU0\"}},\"id\":2}"
+          HR_REQUEST_ATTACHMENT_ID=$(echo "$HR_REQUEST_ATTACHMENT_TEXT" | jq -r '.attachmentId // empty' 2>/dev/null)
+          restart_http_transport_if_needed "after HR request attachment create" || exit 1
+          if [ -n "$HR_REQUEST_ATTACHMENT_ID" ]; then
+            run_test "get_hr_request_attachment" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_hr_request_attachment\",\"arguments\":{\"request\":\"$HR_CLEANUP_REQUEST_ID\",\"attachmentId\":\"$HR_REQUEST_ATTACHMENT_ID\"}},\"id\":2}"
+            run_test "update_hr_request_attachment" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_hr_request_attachment\",\"arguments\":{\"request\":\"$HR_CLEANUP_REQUEST_ID\",\"attachmentId\":\"$HR_REQUEST_ATTACHMENT_ID\",\"pinned\":true}},\"id\":2}"
+            restart_http_transport_if_needed "after HR request attachment update" || exit 1
+          fi
+          run_test "list_hr_request_attachments" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_hr_request_attachments\",\"arguments\":{\"request\":\"$HR_CLEANUP_REQUEST_ID\"}},\"id\":2}"
+          if [ -n "$HR_REQUEST_COMMENT_ID" ]; then
+            run_test "delete_hr_request_comment" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_hr_request_comment\",\"arguments\":{\"request\":\"$HR_CLEANUP_REQUEST_ID\",\"commentId\":\"$HR_REQUEST_COMMENT_ID\"}},\"id\":2}"
+          fi
+          if [ -n "$HR_REQUEST_ATTACHMENT_ID" ]; then
+            run_test "delete_hr_request_attachment" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_hr_request_attachment\",\"arguments\":{\"request\":\"$HR_CLEANUP_REQUEST_ID\",\"attachmentId\":\"$HR_REQUEST_ATTACHMENT_ID\"}},\"id\":2}"
+          fi
+          restart_http_transport_if_needed "after HR request media deletion" || exit 1
+          run_test "update_hr_request" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_hr_request\",\"arguments\":{\"request\":\"$HR_CLEANUP_REQUEST_ID\",\"description\":\"Updated issue 254 fixture\"}},\"id\":2}"
+          restart_http_transport_if_needed "after HR request update" || exit 1
+          run_test "delete_hr_request" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_hr_request\",\"arguments\":{\"request\":\"$HR_CLEANUP_REQUEST_ID\"}},\"id\":2}"
+          restart_http_transport_if_needed "after HR request delete" || exit 1
+          run_expect_error_contains "get_hr_request(deleted fixture)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_hr_request\",\"arguments\":{\"request\":\"$HR_CLEANUP_REQUEST_ID\"}},\"id\":2}" "not found"
+          if [ $? -eq 0 ]; then HR_CLEANUP_REQUEST_ID=""; fi
+        fi
+      else
+        skip_test "HR request lifecycle" "no installed request type with a human-readable label available"
       fi
       if [ -z "$HR_STAFF_RESTORE_EMPLOYEE" ]; then
         restart_http_transport_if_needed "after HR Staff restoration before delete preview" || exit 1

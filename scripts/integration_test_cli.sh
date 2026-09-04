@@ -40,10 +40,19 @@ HR_DEPARTMENT_ID=""
 HR_STAFF_EMPLOYEE=""
 HR_STAFF_ORIGINAL_DEPARTMENT=""
 HR_STAFF_NEEDS_RESTORE=""
+HR_REQUEST_ID=""
 FUNNEL_ID=""
 
 cleanup() {
   set +e
+  if [[ -n "$HR_REQUEST_ID" ]]; then
+    HR_REQUEST_CLEANUP_STDERR="$TEST_TMPDIR/hr-request-cleanup-stderr"
+    "${CLI[@]}" hr requests delete "$HR_REQUEST_ID" --yes --json >/dev/null 2>&1 || true
+    if ! "${CLI[@]}" hr requests get "$HR_REQUEST_ID" --json >/dev/null 2>"$HR_REQUEST_CLEANUP_STDERR" \
+      && grep -Fq -- "not found" "$HR_REQUEST_CLEANUP_STDERR"; then
+      HR_REQUEST_ID=""
+    fi
+  fi
   if [[ -n "$FUNNEL_ID" ]]; then
     if "${CLI[@]}" leads funnels archive "$FUNNEL_ID" --yes --json >/dev/null 2>&1; then
       FUNNEL_CLEANUP_READ="$("${CLI[@]}" leads funnels get "$FUNNEL_ID" --json 2>/dev/null)"
@@ -441,6 +450,32 @@ cover_cli_failure "get_department" "HR department cleanup confirmation" "not fou
   hr departments get "$HR_DEPARTMENT_ID"
 HR_DEPARTMENT_ID=""
 cli_live_case_end "hr-department-lifecycle"
+
+cli_live_case_begin "hr-request-lifecycle"
+printf '%s\n' "CLI HR request $RUN_ID with **native Markdown**" >"$TEST_TMPDIR/hr-request-description.md"
+HR_REQUEST_TYPES_JSON="$(run_cli_json_output hr request-types list --limit 20)"
+cover_cli_json "list_hr_request_types" "HR request type discovery" hr request-types list --limit 20
+HR_REQUEST_TYPE_ID="$(json_value "$HR_REQUEST_TYPES_JSON" '.requestTypes[0].id // empty')"
+if [[ -z "$HR_REQUEST_TYPE_ID" ]]; then
+  echo "No installed HR request type available." >&2
+  exit 1
+fi
+capture_cli_json "create_hr_request" "HR request create" HR_REQUEST_JSON \
+  hr requests create "$HR_STAFF_EMPLOYEE" "$HR_REQUEST_TYPE_ID" 2026-09-04 2026-09-04 \
+  --description-file "$TEST_TMPDIR/hr-request-description.md"
+HR_REQUEST_ID="$(json_value "$HR_REQUEST_JSON" '.request.id // empty')"
+if [[ -z "$HR_REQUEST_ID" ]]; then
+  echo "create_hr_request did not return a request ID." >&2
+  exit 1
+fi
+cover_cli_json "list_hr_requests" "HR request list" hr requests list --employee "$HR_STAFF_EMPLOYEE" --limit 1
+cover_cli_json "get_hr_request" "HR request get" hr requests get "$HR_REQUEST_ID"
+cover_cli_json "update_hr_request" "HR request update" hr requests update "$HR_REQUEST_ID" \
+  --input-json '{"description":"Updated CLI HR request"}'
+cover_cli_json "delete_hr_request" "HR request cleanup" hr requests delete "$HR_REQUEST_ID" --yes
+cover_cli_failure "get_hr_request" "HR request cleanup confirmation" "not found" hr requests get "$HR_REQUEST_ID"
+HR_REQUEST_ID=""
+cli_live_case_end "hr-request-lifecycle"
 
 capture_cli_json "list_teamspaces" "teamspaces list" TEAMSPACES_JSON teamspaces list
 TEAMSPACE="$(json_value "$TEAMSPACES_JSON" '.teamspaces[0].name // .teamspaces[0].id // empty')"
