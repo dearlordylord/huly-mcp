@@ -41,7 +41,7 @@ const authoritativeRelationCount = Effect.fn("Lead.authoritativeRelationCount")(
   return Effect.succeed(Count.make(result.total))
 })
 
-export const deletionImpact = Effect.fn("Lead.deletionImpact")(function* (
+const deletionImpact = Effect.fn("Lead.deletionImpact")(function* (
   client: HulyClient["Service"],
   lead: HulyLead
 ): Effect.fn.Return<LeadImpact, HulyClientError | HulyDataInvalidError> {

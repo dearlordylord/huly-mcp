@@ -11,13 +11,13 @@ import {
   LimitParam,
   ListTotal,
   NonEmptyString,
+  PersonLocator,
   PersonName,
   PersonRefInput,
   StatusName,
   Timestamp,
   withAtLeastOneRequired
 } from "./shared.js"
-import { PersonLocator } from "./hr-departments.js"
 import { TaskTypeRefSchema } from "./task-management.js"
 import { toDraft07JsonSchema, withJsonSchemaPropertyDescriptions } from "./json-schema.js"
 
@@ -83,6 +83,9 @@ export const LeadDetailSchema = Schema.Struct({
   identifier: LeadIdentifier,
   title: Schema.String,
   description: Schema.optional(Schema.String),
+  customerDescription: Schema.NullOr(Schema.String),
+  startDate: Schema.NullOr(Timestamp),
+  dueDate: Schema.NullOr(Timestamp),
   status: StatusName,
   assignee: Schema.optional(PersonName),
   customer: Schema.optional(Schema.String),
@@ -230,7 +233,7 @@ export const UpdateLeadParamsSchema = Schema.Struct({
     })
   ),
   assignee: Schema.optional(
-    Schema.NullOr(PersonRefInput).annotateKey({
+    Schema.NullOr(PersonLocator).annotateKey({
       description: "Replacement employee ID, exact email address, or exact display name; null unassigns."
     })
   ),

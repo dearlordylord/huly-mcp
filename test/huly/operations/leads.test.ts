@@ -29,6 +29,8 @@ interface MockLead extends Doc {
   status: Ref<Status>
   assignee: Ref<Person> | null
   description: string | null
+  startDate: number | null
+  dueDate: number | null
   attachedTo: Ref<Contact>
   parents: ReadonlyArray<unknown>
   modifiedOn: number
@@ -68,6 +70,8 @@ const makeLead = (overrides: Partial<MockLead> = {}): MockLead => ({
   status: statusRef("status-1"),
   assignee: personRef("person-1"),
   description: null,
+  startDate: null,
+  dueDate: null,
   attachedTo: contactRef("customer-1"),
   parents: [],
   ...overrides
@@ -146,7 +150,9 @@ const makeProjectType = (statusIds: ReadonlyArray<string>) => ({
 
 interface LeadMockConfig {
   contacts?: ReadonlyArray<Contact>
+  customerDescriptionMarkup?: string
   fetchMarkupResult?: string
+  fetchMarkupCalls?: Array<{ readonly objectClass: string; readonly attribute: string }>
   funnels?: ReadonlyArray<MockFunnel>
   leads?: ReadonlyArray<MockLead>
   organizations?: ReadonlyArray<HulyOrganization>
@@ -272,11 +278,15 @@ const createTestLayer = (config: LeadMockConfig) => {
     return Effect.succeed(undefined)
   }) as HulyClientOperations["findOne"]
 
-  const fetchMarkupImpl: HulyClientOperations["fetchMarkup"] = (() =>
-    Effect.succeed(config.fetchMarkupResult ?? "# Description")) as HulyClientOperations["fetchMarkup"]
-
   return HulyClient.testLayer({
-    fetchMarkup: fetchMarkupImpl,
+    fetchMarkup: (objectClass, _id, attribute) => {
+      config.fetchMarkupCalls?.push({ objectClass: String(objectClass), attribute })
+      return Effect.succeed(
+        attribute === "customerDescription"
+          ? (config.customerDescriptionMarkup ?? "# Customer description")
+          : (config.fetchMarkupResult ?? "# Description")
+      )
+    },
     findAll: findAllImpl,
     findAllInModel: findAllInModelImpl,
     findOne: findOneImpl
@@ -499,12 +509,21 @@ describe("Lead Operations", () => {
         const lead = makeLead({
           assignee: personRef("person-1"),
           attachedTo: contactRef("customer-1"),
-          description: "blob-ref"
+          description: "blob-ref",
+          startDate: 10,
+          dueDate: 20
         })
+        const fetchMarkupCalls: Array<{ readonly objectClass: string; readonly attribute: string }> = []
+        const customerWithMixin = {
+          ...customer,
+          [leadClassIds.mixin.Customer]: { customerDescription: "customer-description-ref" }
+        }
 
         const testLayer = createTestLayer({
-          contacts: [customer],
+          contacts: [customerWithMixin],
+          customerDescriptionMarkup: "# Customer notes",
           fetchMarkupResult: "# Deal notes\nImportant details here.",
+          fetchMarkupCalls,
           leads: [lead],
           persons: [assignee]
         })
@@ -519,8 +538,15 @@ describe("Lead Operations", () => {
         expect(result.assignee).toBe("Smith,Jane")
         expect(result.customer).toBe("Acme,Corp")
         expect(result.description).toBe("# Deal notes\nImportant details here.")
+        expect(result.customerDescription).toBe("# Customer notes")
+        expect(result.startDate).toBe(10)
+        expect(result.dueDate).toBe(20)
         expect(result.funnel).toBe("funnel-1")
         expect(result.funnelName).toBe("Sales")
+        expect(fetchMarkupCalls).toContainEqual({
+          objectClass: String(leadClassIds.mixin.Customer),
+          attribute: "customerDescription"
+        })
       })
     )
 
@@ -755,6 +781,21 @@ describe("Lead funnel exact resolution and filter branches", () => {
 })
 
 describe("getLead branch coverage", () => {
+  it.effect("returns null for an explicitly cleared customer description", () =>
+    Effect.gen(function* () {
+      const customer = {
+        ...makeContact("customer-1", "Acme,Corp"),
+        [leadClassIds.mixin.Customer]: { customerDescription: null }
+      }
+      const result = yield* getLead({ funnel: funnelReference("funnel-1"), identifier: leadIdentifier("LEAD-1") }).pipe(
+        Effect.provide(createTestLayer({ contacts: [customer], leads: [makeLead()] })),
+        withDiagnostics
+      )
+
+      expect(result.customerDescription).toBeNull()
+    })
+  )
+
   it.effect("returns a lead with no assignee", () =>
     Effect.gen(function* () {
       const lead = makeLead({ assignee: null })
@@ -772,6 +813,22 @@ describe("getLead branch coverage", () => {
       const error = yield* Effect.flip(
         getLead({ funnel: funnelReference("funnel-1"), identifier: leadIdentifier("LEAD-1") }).pipe(
           Effect.provide(createTestLayer({ leads: [lead] })),
+          withDiagnostics
+        )
+      )
+      expect(error._tag).toBe("HulyDataInvalidError")
+    })
+  )
+
+  it.effect("rejects malformed customer mixin markup references", () =>
+    Effect.gen(function* () {
+      const malformedCustomer = {
+        ...makeContact("customer-1", "Acme,Corp"),
+        [leadClassIds.mixin.Customer]: { customerDescription: 42 }
+      }
+      const error = yield* Effect.flip(
+        getLead({ funnel: funnelReference("funnel-1"), identifier: leadIdentifier("LEAD-1") }).pipe(
+          Effect.provide(createTestLayer({ contacts: [malformedCustomer], leads: [makeLead()] })),
           withDiagnostics
         )
       )

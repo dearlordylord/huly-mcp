@@ -133,6 +133,9 @@ describe("Lead Schemas", () => {
           identifier: "LEAD-1",
           title: "Enterprise Deal",
           description: "# Big opportunity\n\nLots of potential.",
+          customerDescription: "# Customer context",
+          startDate: 1700000000000,
+          dueDate: null,
           status: "OfferPreparing",
           assignee: "Doe,Jane",
           customer: "Acme Corp",
@@ -142,6 +145,9 @@ describe("Lead Schemas", () => {
           createdOn: 1699000000000
         })
         expect(result.description).toContain("Big opportunity")
+        expect(result.customerDescription).toBe("# Customer context")
+        expect(result.startDate).toBe(1700000000000)
+        expect(result.dueDate).toBeNull()
         expect(result.funnel).toBe("funnel-1")
         expect(result.funnelName).toBe("Sales")
       })

@@ -12,7 +12,7 @@
  */
 import type { MarkupRef } from "@hcengineering/api-client"
 import type { Contact, Organization as HulyOrganization, Person } from "@hcengineering/contact"
-import type { Doc, DocumentQuery, MarkupBlobRef, Ref, Space, Status, WithLookup } from "@hcengineering/core"
+import type { Blob, Doc, DocumentQuery, MarkupBlobRef, Ref, Space, Status, WithLookup } from "@hcengineering/core"
 import { SortingOrder } from "@hcengineering/core"
 import { Effect, Schema } from "effect"
 
@@ -30,6 +30,7 @@ import {
   parseLeadDetail as parseLeadDetailSchema
 } from "../../domain/schemas/leads.js"
 import { StatusName } from "../../domain/schemas/shared.js"
+import { LeadCustomerMixinAttributesSchema } from "../../domain/schemas/leads-mutations.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
@@ -47,7 +48,7 @@ import {
   workflowStatusFromRef
 } from "./issues-shared.js"
 import { clampLimit, escapeLikeWildcards } from "./query-helpers.js"
-import { toRef } from "./sdk-boundary.js"
+import { toClassRef, toRef } from "./sdk-boundary.js"
 import { type HulyFunnel, resolveFunnel } from "./funnels-shared.js"
 
 export { listFunnels } from "./funnels.js"
@@ -59,6 +60,8 @@ interface HulyLead extends Doc {
   status: Ref<Status>
   assignee: Ref<Person> | null
   description: MarkupBlobRef | null
+  startDate: number | null
+  dueDate: number | null
   attachedTo: Ref<Contact>
   parents: ReadonlyArray<{ parentId: Ref<Doc>; identifier: string; parentTitle: string }>
   modifiedOn: number
@@ -261,6 +264,26 @@ type GetLeadError =
   | FunnelIdentifierAmbiguousError
   | LeadNotFoundError
 
+const readCustomerDescription = Effect.fn("Lead.readCustomerDescription")(function* (
+  client: HulyClient["Service"],
+  customer: HulyCustomer | undefined
+): Effect.fn.Return<string | null, HulyClientError | HulyDataInvalidError> {
+  if (customer === undefined) return null
+  const rawMixin = Reflect.get(customer, String(leadClassIds.mixin.Customer))
+  if (rawMixin === undefined) return null
+  const attributes = yield* Schema.decodeUnknownEffect(LeadCustomerMixinAttributesSchema)(rawMixin).pipe(
+    Effect.mapError((cause) => new HulyDataInvalidError({ operation: "getLead", entity: "customer mixin", cause }))
+  )
+  if (attributes.customerDescription === null) return null
+  return yield* client.fetchMarkup(
+    toClassRef<Doc>(String(leadClassIds.mixin.Customer)),
+    toRef<Doc>(customer._id),
+    "customerDescription",
+    markupBlobRefAsMarkupRef(toRef<Blob>(attributes.customerDescription)),
+    "markdown"
+  )
+})
+
 export const getLead = (params: GetLeadParams): Effect.Effect<LeadDetail, GetLeadError, HulyClient | Diagnostics> =>
   Effect.gen(function* () {
     const client = yield* HulyClient
@@ -296,10 +319,15 @@ export const getLead = (params: GetLeadParams): Effect.Effect<LeadDetail, GetLea
         )
       : undefined
 
+    const customerDescription = yield* readCustomerDescription(client, customer)
+
     return yield* parseLeadDetailSchema({
       identifier: lead.identifier,
       title: lead.title,
       description,
+      customerDescription,
+      startDate: lead.startDate,
+      dueDate: lead.dueDate,
       status,
       assignee: person?.name,
       customer: customer?.name,

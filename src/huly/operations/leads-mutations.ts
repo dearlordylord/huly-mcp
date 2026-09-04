@@ -16,6 +16,8 @@ import type {
   MoveLeadResult
 } from "../../domain/schemas/leads-mutations.js"
 import { NonEmptyString, StatusName } from "../../domain/schemas/shared.js"
+import { isSingle } from "../../utils/assertions.js"
+import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient } from "../client.js"
 import type { HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
@@ -32,23 +34,40 @@ import { funnelSpace, type FunnelWorkflowTaskType, type HulyFunnel } from "./fun
 import { applyPersonCustomer, deleteResolvedLead } from "./leads-mutation-actions.js"
 import {
   currentStatus,
+  executeCustomerDescription,
+  executeLeadDescription,
   type HulyLead,
   type LeadDocumentUpdate,
   findLead,
+  findLeadCustomer,
   resolveExactPerson,
   resolveEmployee,
+  prepareCustomerDescription,
+  prepareLeadDescription,
   type LeadMutationError,
-  updateLeadCustomerDescription,
-  updateLeadDescription,
   validatedFunnel,
   workflowForLead,
   statusByName
 } from "./leads-mutations-shared.js"
 import { toRef } from "./sdk-boundary.js"
 
-export { applyPersonCustomer, deleteResolvedLead, deletionImpact } from "./leads-mutation-actions.js"
+interface LeadMutationResolvers {
+  readonly validatedFunnel: typeof validatedFunnel
+  readonly findLead: typeof findLead
+  readonly resolveEmployee: typeof resolveEmployee
+  readonly resolveExactPerson: typeof resolveExactPerson
+  readonly findLeadCustomer: typeof findLeadCustomer
+}
 
-export const statusForLead = Effect.fn("Lead.statusForLead")(function* (
+const defaultLeadMutationResolvers: LeadMutationResolvers = {
+  validatedFunnel,
+  findLead,
+  resolveEmployee,
+  resolveExactPerson,
+  findLeadCustomer
+}
+
+const statusForLead = Effect.fn("Lead.statusForLead")(function* (
   workflow: Parameters<typeof workflowForLead>[0],
   lead: HulyLead,
   funnel: Parameters<typeof workflowForLead>[2],
@@ -61,7 +80,7 @@ export const statusForLead = Effect.fn("Lead.statusForLead")(function* (
 
 type LeadUpdateOperations = { readonly operations: LeadDocumentUpdate; readonly changed: boolean }
 
-export const rejectArchivedLeadUpdate = Effect.fn("Lead.rejectArchivedLeadUpdate")(function* (
+const rejectArchivedLeadUpdate = Effect.fn("Lead.rejectArchivedLeadUpdate")(function* (
   params: UpdateLeadParams,
   funnel: HulyFunnel
 ): Effect.fn.Return<void, LeadUpdateConflictError> {
@@ -73,18 +92,19 @@ export const rejectArchivedLeadUpdate = Effect.fn("Lead.rejectArchivedLeadUpdate
   })
 })
 
-export const assigneeUpdate = Effect.fn("Lead.assigneeUpdate")(function* (
+const assigneeUpdate = Effect.fn("Lead.assigneeUpdate")(function* (
   client: HulyClient["Service"],
   params: UpdateLeadParams,
-  lead: HulyLead
+  lead: HulyLead,
+  resolveAssignee: typeof resolveEmployee = resolveEmployee
 ): Effect.fn.Return<LeadUpdateOperations, LeadMutationError> {
   if (params.assignee === undefined) return { operations: {}, changed: false }
-  const assignee = params.assignee === null ? null : yield* resolveEmployee(client, params.assignee)
+  const assignee = params.assignee === null ? null : yield* resolveAssignee(client, params.assignee)
   const changed = String(assignee) !== String(lead.assignee)
   return { operations: changed ? { assignee } : {}, changed }
 })
 
-export const statusUpdate = Effect.fn("Lead.statusUpdate")(function* (
+const statusUpdate = Effect.fn("Lead.statusUpdate")(function* (
   workflow: ReadonlyArray<FunnelWorkflowTaskType>,
   lead: HulyLead,
   funnel: HulyFunnel,
@@ -107,33 +127,13 @@ const startDateUpdate = (
 const dueDateUpdate = (requested: UpdateLeadParams["dueDate"], current: HulyLead["dueDate"]): LeadDocumentUpdate =>
   requested === undefined || requested === current ? {} : { dueDate: requested }
 
-export const leadFieldUpdates = (params: UpdateLeadParams, lead: HulyLead): LeadDocumentUpdate => ({
+const leadFieldUpdates = (params: UpdateLeadParams, lead: HulyLead): LeadDocumentUpdate => ({
   ...titleUpdate(params.title, lead.title),
   ...startDateUpdate(params.startDate, lead.startDate),
   ...dueDateUpdate(params.dueDate, lead.dueDate)
 })
 
-export const descriptionUpdate = Effect.fn("Lead.descriptionUpdate")(function* (
-  client: HulyClient["Service"],
-  params: UpdateLeadParams,
-  lead: HulyLead
-): Effect.fn.Return<LeadUpdateOperations, HulyClientError | HulyError> {
-  return params.description === undefined
-    ? { operations: {}, changed: false }
-    : yield* updateLeadDescription(client, lead, params.description)
-})
-
-export const customerDescriptionUpdate = Effect.fn("Lead.customerDescriptionUpdate")(function* (
-  client: HulyClient["Service"],
-  params: UpdateLeadParams,
-  lead: HulyLead
-): Effect.fn.Return<boolean, LeadMutationError> {
-  return params.customerDescription === undefined
-    ? false
-    : yield* updateLeadCustomerDescription(client, lead, params.customerDescription)
-})
-
-export const persistLeadUpdate = Effect.fn("Lead.persistLeadUpdate")(function* (
+const persistLeadUpdate = Effect.fn("Lead.persistLeadUpdate")(function* (
   client: HulyClient["Service"],
   funnel: HulyFunnel,
   lead: HulyLead,
@@ -143,24 +143,33 @@ export const persistLeadUpdate = Effect.fn("Lead.persistLeadUpdate")(function* (
   yield* client.updateDoc(leadClassIds.class.Lead, funnelSpace(funnel), toRef<Doc>(lead._id), operations)
 })
 
-export const leadUpdateChanged = (
+const leadUpdateChanged = (
   operations: LeadDocumentUpdate,
   descriptionChanged: boolean,
   customerChanged: boolean
 ): boolean => Object.keys(operations).length > 0 || descriptionChanged || customerChanged
 
 export const updateLead = Effect.fn("Lead.updateLead")(function* (
-  params: UpdateLeadParams
+  params: UpdateLeadParams,
+  resolvers: LeadMutationResolvers = defaultLeadMutationResolvers
 ): Effect.fn.Return<LeadMutationResult, LeadMutationError, HulyClient | Diagnostics> {
   const client = yield* HulyClient
-  const source = yield* validatedFunnel(client, params.funnel)
+  const source = yield* resolvers.validatedFunnel(client, params.funnel)
   yield* rejectArchivedLeadUpdate(params, source.funnel)
-  const lead = yield* findLead(client, source.funnel, params.identifier)
+  const lead = yield* resolvers.findLead(client, source.funnel, params.identifier)
 
-  const assignee = yield* assigneeUpdate(client, params, lead)
+  const assignee = yield* assigneeUpdate(client, params, lead, resolvers.resolveEmployee)
   const status = yield* statusUpdate(source.workflow, lead, source.funnel, params)
-  const description = yield* descriptionUpdate(client, params, lead)
-  const customerChanged = yield* customerDescriptionUpdate(client, params, lead)
+  const descriptionPlan = yield* prepareLeadDescription(client, lead, params.description)
+  const customerPlan = yield* prepareCustomerDescription(
+    client,
+    lead,
+    params.customerDescription,
+    resolvers.findLeadCustomer
+  )
+
+  const description = yield* executeLeadDescription(client, lead, descriptionPlan)
+  const customerChanged = yield* executeCustomerDescription(client, customerPlan)
 
   const operations: LeadDocumentUpdate = {
     ...leadFieldUpdates(params, lead),
@@ -173,7 +182,7 @@ export const updateLead = Effect.fn("Lead.updateLead")(function* (
   return { identifier: LeadIdentifier.make(lead.identifier), updated: changed }
 })
 
-export const rejectInactiveMoveFunnels = Effect.fn("Lead.rejectInactiveMoveFunnels")(function* (
+const rejectInactiveMoveFunnels = Effect.fn("Lead.rejectInactiveMoveFunnels")(function* (
   identifier: LeadIdentifier,
   source: HulyFunnel,
   destination: HulyFunnel
@@ -187,14 +196,14 @@ export const rejectInactiveMoveFunnels = Effect.fn("Lead.rejectInactiveMoveFunne
   })
 })
 
-export const compatibleDestinationWorkflow = (
+const compatibleDestinationWorkflow = (
   workflow: ReadonlyArray<FunnelWorkflowTaskType>,
   lead: HulyLead
 ): FunnelWorkflowTaskType | undefined =>
   workflow.find((candidate) => String(candidate.taskType._id) === String(lead.kind)) ??
   (workflow.length === 1 ? workflow[0] : undefined)
 
-export const requireDestinationWorkflow = Effect.fn("Lead.requireDestinationWorkflow")(function* (
+const requireDestinationWorkflow = Effect.fn("Lead.requireDestinationWorkflow")(function* (
   workflow: FunnelWorkflowTaskType | undefined,
   identifier: LeadIdentifier,
   sourceFunnel: FunnelIdentifier,
@@ -209,36 +218,35 @@ export const requireDestinationWorkflow = Effect.fn("Lead.requireDestinationWork
   })
 })
 
-export const destinationStatusReason = (requested: MoveLeadParams["status"], current: StatusName): NonEmptyString =>
+const destinationStatusReason = (requested: MoveLeadParams["status"], current: StatusName): NonEmptyString =>
   NonEmptyString.make(
     requested === undefined
       ? `current status '${current}' has no compatible destination mapping`
       : `requested status '${requested}' is not valid in the destination workflow`
   )
 
-export const destinationStatus = Effect.fn("Lead.destinationStatus")(function* (
+const destinationStatus = Effect.fn("Lead.destinationStatus")(function* (
   workflow: FunnelWorkflowTaskType,
   params: MoveLeadParams,
   current: StatusName,
   identifier: LeadIdentifier,
   sourceFunnel: FunnelIdentifier,
   destinationFunnel: FunnelIdentifier
-): Effect.fn.Return<Ref<Status>, LeadMoveConflictError> {
+): Effect.fn.Return<{ readonly id: Ref<Status>; readonly name: StatusName }, LeadMoveConflictError> {
   const requestedStatus = params.status ?? current
-  return yield* statusByName(workflow.statuses, requestedStatus, params.destinationFunnel).pipe(
-    Effect.mapError(
-      () =>
-        new LeadMoveConflictError({
-          identifier,
-          sourceFunnel,
-          destinationFunnel,
-          reason: destinationStatusReason(params.status, current)
-        })
-    )
+  const matches = workflow.statuses.filter(
+    (status) => normalizeForComparison(status.name) === normalizeForComparison(requestedStatus)
   )
+  if (isSingle(matches)) return { id: matches[0].id, name: StatusName.make(matches[0].name) }
+  return yield* new LeadMoveConflictError({
+    identifier,
+    sourceFunnel,
+    destinationFunnel,
+    reason: destinationStatusReason(params.status, current)
+  })
 })
 
-export const moveRequired = (
+const moveRequired = (
   source: HulyFunnel,
   destination: HulyFunnel,
   destinationStatusId: Ref<Status>,
@@ -249,7 +257,7 @@ export const moveRequired = (
   String(destinationStatusId) !== String(lead.status) ||
   taskTypeChanged
 
-export const moveOperations = (
+const moveOperations = (
   destination: HulyFunnel,
   destinationStatusId: Ref<Status>,
   destinationWorkflow: FunnelWorkflowTaskType,
@@ -260,7 +268,7 @@ export const moveOperations = (
   ...(taskTypeChanged ? { kind: destinationWorkflow.taskType._id } : {})
 })
 
-export const persistLeadMove = Effect.fn("Lead.persistLeadMove")(function* (
+const persistLeadMove = Effect.fn("Lead.persistLeadMove")(function* (
   client: HulyClient["Service"],
   source: HulyFunnel,
   lead: HulyLead,
@@ -271,23 +279,14 @@ export const persistLeadMove = Effect.fn("Lead.persistLeadMove")(function* (
   yield* client.updateDoc(leadClassIds.class.Lead, funnelSpace(source), toRef<Doc>(lead._id), operations)
 })
 
-export const resolvedMoveStatusName = (
-  workflow: FunnelWorkflowTaskType,
-  destinationStatusId: Ref<Status>,
-  requested: MoveLeadParams["status"],
-  current: StatusName
-): StatusName => {
-  const resolved = workflow.statuses.find((status) => String(status.id) === String(destinationStatusId))?.name
-  return StatusName.make(resolved ?? requested ?? current)
-}
-
 export const moveLead = Effect.fn("Lead.moveLead")(function* (
-  params: MoveLeadParams
+  params: MoveLeadParams,
+  resolvers: LeadMutationResolvers = defaultLeadMutationResolvers
 ): Effect.fn.Return<MoveLeadResult, LeadMutationError, HulyClient | Diagnostics> {
   const client = yield* HulyClient
-  const source = yield* validatedFunnel(client, params.funnel)
-  const destination = yield* validatedFunnel(client, params.destinationFunnel)
-  const lead = yield* findLead(client, source.funnel, params.identifier)
+  const source = yield* resolvers.validatedFunnel(client, params.funnel)
+  const destination = yield* resolvers.validatedFunnel(client, params.destinationFunnel)
+  const lead = yield* resolvers.findLead(client, source.funnel, params.identifier)
   const sourceFunnel = FunnelIdentifier.make(source.funnel._id)
   const destinationFunnel = FunnelIdentifier.make(destination.funnel._id)
   const identifier = LeadIdentifier.make(lead.identifier)
@@ -301,7 +300,7 @@ export const moveLead = Effect.fn("Lead.moveLead")(function* (
     sourceFunnel,
     destinationFunnel
   )
-  const destinationStatusId = yield* destinationStatus(
+  const resolvedDestinationStatus = yield* destinationStatus(
     destinationWorkflow,
     params,
     current.name,
@@ -310,35 +309,36 @@ export const moveLead = Effect.fn("Lead.moveLead")(function* (
     destinationFunnel
   )
   const taskTypeChanged = String(destinationWorkflow.taskType._id) !== String(lead.kind)
-  const moved = moveRequired(source.funnel, destination.funnel, destinationStatusId, lead, taskTypeChanged)
-  const operations = moveOperations(destination.funnel, destinationStatusId, destinationWorkflow, taskTypeChanged)
+  const moved = moveRequired(source.funnel, destination.funnel, resolvedDestinationStatus.id, lead, taskTypeChanged)
+  const operations = moveOperations(
+    destination.funnel,
+    resolvedDestinationStatus.id,
+    destinationWorkflow,
+    taskTypeChanged
+  )
   yield* persistLeadMove(client, source.funnel, lead, operations, moved)
-  return {
-    identifier,
-    sourceFunnel,
-    destinationFunnel,
-    status: resolvedMoveStatusName(destinationWorkflow, destinationStatusId, params.status, current.name),
-    moved
-  }
+  return { identifier, sourceFunnel, destinationFunnel, status: resolvedDestinationStatus.name, moved }
 })
 
 export const deleteLead = Effect.fn("Lead.deleteLead")(function* (
-  params: DeleteLeadParams
+  params: DeleteLeadParams,
+  resolvers: LeadMutationResolvers = defaultLeadMutationResolvers
 ): Effect.fn.Return<DeleteLeadResult, LeadMutationError, HulyClient | Diagnostics> {
   const client = yield* HulyClient
-  const source = yield* validatedFunnel(client, params.funnel)
-  const lead = yield* findLead(client, source.funnel, params.identifier)
+  const source = yield* resolvers.validatedFunnel(client, params.funnel)
+  const lead = yield* resolvers.findLead(client, source.funnel, params.identifier)
   return yield* deleteResolvedLead(client, source, lead, params)
 })
 
 export const makePersonCustomer = Effect.fn("Lead.makePersonCustomer")(function* (
-  params: MakePersonCustomerParams
+  params: MakePersonCustomerParams,
+  resolvers: LeadMutationResolvers = defaultLeadMutationResolvers
 ): Effect.fn.Return<
   MakePersonCustomerResult,
   HulyClientError | PersonIdentifierAmbiguousError | PersonNotFoundError | HulyDataInvalidError,
   HulyClient
 > {
   const client = yield* HulyClient
-  const person = yield* resolveExactPerson(client, params.identifier)
+  const person = yield* resolvers.resolveExactPerson(client, params.identifier)
   return yield* applyPersonCustomer(client, person)
 })

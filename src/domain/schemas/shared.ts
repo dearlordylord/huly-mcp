@@ -153,6 +153,11 @@ export type StatusName = Schema.Schema.Type<typeof StatusName>
 export const PersonName = NonEmptyString.pipe(Schema.brand("PersonName"))
 export type PersonName = Schema.Schema.Type<typeof PersonName>
 
+export const PersonLocator = NonEmptyString.pipe(Schema.brand("PersonLocator")).annotate({
+  description: "Person or employee ID, exact email address, or exact Huly display name."
+})
+export type PersonLocator = Schema.Schema.Type<typeof PersonLocator>
+
 /**
  * Input schema for any field that accepts either an email address or a display
  * name as a person reference. Email validation stays strict for fields where

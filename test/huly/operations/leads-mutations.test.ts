@@ -1,133 +1,47 @@
 import { describe, it } from "@effect/vitest"
-import { AvatarType } from "@hcengineering/contact"
-import type { Person } from "@hcengineering/contact"
-import type { Class, Doc, DocumentQuery, FindOptions, Ref } from "@hcengineering/core"
+import type { Blob, Class, Doc, DocumentQuery, FindOptions, Ref } from "@hcengineering/core"
 import type { TaskType } from "@hcengineering/task"
-import { Effect, Schema } from "effect"
+import { Effect } from "effect"
 import { expect } from "vitest"
 
 import {
-  FunnelReference,
-  FunnelIdentifier,
   LeadIdentifier,
   parseDeleteLeadParams,
   parseMakePersonCustomerParams,
   parseMoveLeadParams,
   parseUpdateLeadParams
 } from "../../../src/domain/schemas/leads.js"
-import {
-  LeadMutationDocumentSchema,
-  type LeadOrganizationDocument,
-  type LeadPersonDocument
-} from "../../../src/domain/schemas/leads-mutations.js"
-import { PersonLocator } from "../../../src/domain/schemas/hr-departments.js"
+import type { LeadOrganizationDocument, LeadPersonDocument } from "../../../src/domain/schemas/leads-mutations.js"
 import {
   BlobId,
-  Count,
   DocId,
   NonEmptyString,
   OrganizationId,
   PersonId,
+  PersonLocator,
   PersonName,
   SpaceId,
-  StatusName,
   TaskTypeId,
   Timestamp,
   WorkflowStatusId
 } from "../../../src/domain/schemas/shared.js"
 import { HulyClient } from "../../../src/huly/client.js"
+import { HulyError } from "../../../src/huly/errors.js"
+import { contact, core, task } from "../../../src/huly/huly-plugins.js"
 import { leadClassIds } from "../../../src/huly/lead-plugin.js"
-import {
-  assigneeUpdate,
-  applyPersonCustomer,
-  compatibleDestinationWorkflow,
-  customerDescriptionUpdate,
-  deleteLead,
-  deleteResolvedLead,
-  deletionImpact,
-  descriptionUpdate,
-  destinationStatus,
-  destinationStatusReason,
-  leadFieldUpdates,
-  leadUpdateChanged,
-  makePersonCustomer,
-  moveLead,
-  moveOperations,
-  moveRequired,
-  persistLeadMove,
-  persistLeadUpdate,
-  rejectArchivedLeadUpdate,
-  rejectInactiveMoveFunnels,
-  resolvedMoveStatusName,
-  requireDestinationWorkflow,
-  statusForLead,
-  statusUpdate,
-  updateLead
-} from "../../../src/huly/operations/leads-mutations.js"
-import {
-  customerMixinWriteAttributes,
-  parseLeadMutationDocument,
-  parseLeadEmployeeDocument,
-  parseLeadOrganizationDocument,
-  parseLeadPersonDocument,
-  parseOptionalLeadPersonDocument,
-  requireEmployee,
-  requireLeadDocument,
-  resolveLeadCustomer,
-  toMarkupBlobRef
-} from "../../../src/huly/operations/leads-mutations-boundary.js"
-import {
-  currentStatus,
-  customerClass,
-  findLead,
-  hasCustomerMixin,
-  resolveExactPerson,
-  resolveEmployee,
-  statusByName,
-  uniquePersonMatch,
-  updateLeadCustomerDescription,
-  updateCustomerDescription,
-  updateLeadDescription,
-  validatedFunnel,
-  workflowForLead,
-  type HulyLead
-} from "../../../src/huly/operations/leads-mutations-shared.js"
+import { deleteLead, makePersonCustomer, moveLead, updateLead } from "../../../src/huly/operations/leads-mutations.js"
+import type { HulyLead } from "../../../src/huly/operations/leads-mutations-boundary.js"
+import { markupBlobRefAsMarkupRef } from "../../../src/huly/operations/recruiting-shared.js"
 import type { FunnelWorkflowTaskType, HulyFunnel } from "../../../src/huly/operations/funnels-shared.js"
-import { attachment, chunter, contact, core, tags, task } from "../../../src/huly/huly-plugins.js"
 import { testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
 import { renderMarkdownWithNativeReferencesForWrite } from "../../../src/huly/operations/native-reference-markup.js"
-import { toClassRef } from "../../../src/huly/operations/sdk-boundary.js"
-import { corePersonId, docRef, findResult, spaceRef, statusRef } from "../../helpers/huly-sdk.js"
+import { toClassRef, toRef } from "../../../src/huly/operations/sdk-boundary.js"
 import { withDiagnostics } from "../../helpers/diagnostics.js"
+import { corePersonId, docRef, findResult, spaceRef, statusRef } from "../../helpers/huly-sdk.js"
 
-const leadStatusId = WorkflowStatusId.make("lead:status:Incoming")
-const leadStatus = statusRef(String(leadStatusId))
-const leadTaskTypeId = TaskTypeId.make("lead:taskType:Lead")
-const leadTaskType = docRef<TaskType>(String(leadTaskTypeId))
-const lead: HulyLead = {
-  _id: DocId.make("lead-1"),
-  _class: DocId.make(leadClassIds.class.Lead),
-  space: SpaceId.make("funnel-1"),
-  attachedTo: DocId.make("person-1"),
-  attachedToClass: DocId.make(contact.class.Person),
-  collection: "leads",
-  title: NonEmptyString.make("A lead"),
-  identifier: LeadIdentifier.make("LEAD-1"),
-  status: leadStatusId,
-  kind: leadTaskTypeId,
-  assignee: null,
-  description: null,
-  startDate: null,
-  dueDate: null
-}
-
-const person = (id: PersonId, name: PersonName): LeadPersonDocument => ({
-  _id: id,
-  _class: DocId.make(contact.class.Person),
-  space: SpaceId.make(String(contact.space.Contacts)),
-  name
-})
-
+const incomingStatus = statusRef("lead:status:Incoming")
+const wonStatus = statusRef("lead:status:Won")
+const leadTaskType = docRef<TaskType>("lead:taskType:Lead")
 const workflow: FunnelWorkflowTaskType = {
   taskType: {
     _id: leadTaskType,
@@ -141,457 +55,670 @@ const workflow: FunnelWorkflowTaskType = {
     kind: "task",
     ofClass: leadClassIds.class.Lead,
     targetClass: docRef("lead:mixin:LeadTypeData"),
-    statuses: [leadStatus],
+    statuses: [incomingStatus, wonStatus],
     statusClass: core.class.Status,
     statusCategories: []
   },
-  statuses: [{ id: leadStatus, name: "Incoming" }]
+  statuses: [
+    { id: incomingStatus, name: "Incoming" },
+    { id: wonStatus, name: "Won" }
+  ]
 }
 
-const activeFunnel: HulyFunnel = {
-  _id: docRef("funnel-1"),
+const funnel = (id: string, name: string): HulyFunnel => ({
+  _id: docRef<HulyFunnel>(id),
   _class: toClassRef<HulyFunnel>(leadClassIds.class.Funnel),
   space: spaceRef("workspace"),
   modifiedBy: corePersonId("user-1"),
   modifiedOn: Timestamp.make(0),
-  name: "Sales",
+  name,
   description: "",
   private: false,
   members: [],
   archived: false,
   type: docRef("project-type-1")
+})
+
+const sourceFunnel = funnel("funnel-1", "Sales")
+const destinationFunnel = funnel("funnel-2", "Expansion")
+const lead: HulyLead = {
+  _id: DocId.make("lead-1"),
+  _class: DocId.make(leadClassIds.class.Lead),
+  space: SpaceId.make("funnel-1"),
+  attachedTo: DocId.make("person-1"),
+  attachedToClass: DocId.make(contact.class.Person),
+  collection: "leads",
+  title: NonEmptyString.make("A lead"),
+  identifier: LeadIdentifier.make("LEAD-1"),
+  status: WorkflowStatusId.make(String(incomingStatus)),
+  kind: TaskTypeId.make(String(leadTaskType)),
+  assignee: null,
+  description: BlobId.make("lead-description"),
+  startDate: null,
+  dueDate: null
 }
 
-describe("Lead mutation functional helpers", () => {
-  it.effect("parses each native lead mutation boundary and reports malformed documents", () =>
-    Effect.gen(function* () {
-      const leadPerson = person(PersonId.make("person-1"), PersonName.make("Prospect,Pat"))
-      const organization: LeadOrganizationDocument = {
-        _id: OrganizationId.make("organization-1"),
-        _class: DocId.make(contact.class.Organization),
-        space: SpaceId.make(String(contact.space.Contacts)),
-        name: NonEmptyString.make("Acme")
-      }
-      const employee = { ...leadPerson, _class: DocId.make(contact.mixin.Employee), position: "Sales" }
-      const nativePerson: Person = {
-        _id: docRef<Person>("person-1"),
-        _class: contact.class.Person,
-        space: contact.space.Contacts,
-        modifiedBy: corePersonId("user-1"),
-        modifiedOn: Timestamp.make(0),
-        name: "Prospect,Pat",
-        city: "",
-        avatarType: AvatarType.COLOR
-      }
+const person = (customerDescription?: string | null): LeadPersonDocument => ({
+  _id: PersonId.make("person-1"),
+  _class: DocId.make(contact.class.Person),
+  space: SpaceId.make(String(contact.space.Contacts)),
+  name: PersonName.make("Prospect,Pat"),
+  ...(customerDescription === undefined ? {} : { [leadClassIds.mixin.Customer]: { customerDescription } })
+})
 
-      expect(yield* parseLeadPersonDocument(leadPerson)).toEqual(leadPerson)
-      expect(yield* parseOptionalLeadPersonDocument(undefined)).toBeUndefined()
-      expect(yield* parseOptionalLeadPersonDocument(nativePerson)).toEqual(nativePerson)
-      expect(yield* parseLeadEmployeeDocument(employee)).toEqual(employee)
-      expect(yield* parseLeadOrganizationDocument(organization)).toEqual(organization)
-      expect(yield* customerMixinWriteAttributes({ customerDescription: null })).toEqual({ customerDescription: null })
-      expect(yield* customerMixinWriteAttributes({ customerDescription: "customer-markup" })).toEqual({
-        customerDescription: toMarkupBlobRef(NonEmptyString.make("customer-markup"))
+const organization = (customerDescription?: string | null): LeadOrganizationDocument => ({
+  _id: OrganizationId.make("organization-1"),
+  _class: DocId.make(contact.class.Organization),
+  space: SpaceId.make(String(contact.space.Contacts)),
+  name: NonEmptyString.make("Acme"),
+  ...(customerDescription === undefined ? {} : { [leadClassIds.mixin.Customer]: { customerDescription } })
+})
+
+type Resolvers = NonNullable<Parameters<typeof updateLead>[1]>
+const resolvers = (
+  customer: LeadPersonDocument | LeadOrganizationDocument = person(),
+  resolvedLead: HulyLead = lead,
+  exactPerson: LeadPersonDocument = person()
+): Resolvers => ({
+  validatedFunnel: (_client, identifier) =>
+    Effect.succeed({
+      funnel: String(identifier) === "funnel-2" ? destinationFunnel : sourceFunnel,
+      workflow: [workflow]
+    }),
+  findLead: () => Effect.succeed(resolvedLead),
+  resolveEmployee: () => Effect.succeed(docRef("employee-1")),
+  resolveExactPerson: () => Effect.succeed(exactPerson),
+  findLeadCustomer: () => Effect.succeed(customer)
+})
+
+interface Captures {
+  readonly writes: Array<string>
+  readonly markupClasses: Array<string>
+  readonly documentUpdates: Array<unknown>
+}
+
+const emptyCaptures = (): Captures => ({ writes: [], markupClasses: [], documentUpdates: [] })
+const makeLayer = (captures: Captures, currentCustomerMarkup = "old customer markup") =>
+  HulyClient.testLayer({
+    findAll: <T extends Doc>(_documentClass: Ref<Class<T>>, _query: DocumentQuery<T>, _options?: FindOptions<T>) =>
+      Effect.succeed(findResult<T>([])),
+    fetchMarkup: (_class, _id, attribute) =>
+      Effect.succeed(attribute === "customerDescription" ? currentCustomerMarkup : "old lead markup"),
+    uploadMarkup: (objectClass) => {
+      captures.writes.push("uploadMarkup")
+      captures.markupClasses.push(String(objectClass))
+      return Effect.succeed(markupBlobRefAsMarkupRef(toRef<Blob>(BlobId.make("uploaded-markup"))))
+    },
+    updateMarkup: () => {
+      captures.writes.push("updateMarkup")
+      return Effect.void
+    },
+    updateDoc: (_class, _space, _id, operations) => {
+      captures.writes.push("updateDoc")
+      captures.documentUpdates.push(operations)
+      return Effect.succeed({})
+    },
+    createMixin: () => {
+      captures.writes.push("createMixin")
+      return Effect.succeed({})
+    },
+    updateMixin: () => {
+      captures.writes.push("updateMixin")
+      return Effect.succeed({})
+    },
+    removeCollection: (_class, _space, _id, attachedTo) => {
+      captures.writes.push("removeCollection")
+      return Effect.succeed(attachedTo)
+    }
+  })
+
+const emptyLayer = (captures: Captures, total = 0, includeRemover = true) => {
+  const findAll = <T extends Doc>(
+    _documentClass: Ref<Class<T>>,
+    _query: DocumentQuery<T>,
+    _options?: FindOptions<T>
+  ) => {
+    const result = findResult<T>([])
+    result.total = total
+    return Effect.succeed(result)
+  }
+  return includeRemover
+    ? HulyClient.testLayer({
+        findAll,
+        removeCollection: (_class, _space, _id, attachedTo) => {
+          captures.writes.push("removeCollection")
+          return Effect.succeed(attachedTo)
+        }
       })
+    : HulyClient.testLayer({ findAll })
+}
 
-      const error = yield* Effect.flip(parseLeadPersonDocument({ _id: "missing-native-fields" }))
-      expect(error._tag).toBe("HulyDataInvalidError")
-      expect(error.entity).toBe("Person document")
-    })
-  )
-
-  it.effect("calculates deletion impact from authoritative native relations", () =>
+describe("lead mutation public operations", () => {
+  it.effect("plans every requested field before executing a multi-field update", () =>
     Effect.gen(function* () {
-      const calls: Array<{
-        readonly className: string
-        readonly limit: number | undefined
-        readonly total: boolean | undefined
-      }> = []
-      const client = yield* HulyClient.pipe(
-        Effect.provide(
-          HulyClient.testLayer({
-            findAll: <T extends Doc>(
-              documentClass: Ref<Class<T>>,
-              _query: DocumentQuery<T>,
-              options?: FindOptions<T>
-            ) => {
-              calls.push({ className: String(documentClass), limit: options?.limit, total: options?.total })
-              const total =
-                String(documentClass) === String(chunter.class.ChatMessage)
-                  ? 2
-                  : String(documentClass) === String(attachment.class.Attachment)
-                    ? 3
-                    : String(documentClass) === String(tags.class.TagReference)
-                      ? 1
-                      : 0
-              const result = findResult<T>([])
-              result.total = total
-              return Effect.succeed(result)
-            }
-          })
-        )
+      const captures = emptyCaptures()
+      const params = yield* parseUpdateLeadParams({
+        funnel: "funnel-1",
+        identifier: "LEAD-1",
+        title: "Changed",
+        description: "new lead markup",
+        customerDescription: "new customer markup",
+        assignee: "Prospect,Pat",
+        status: "Won",
+        startDate: 10,
+        dueDate: 20
+      })
+      const result = yield* updateLead(params, resolvers(person("customer-description"))).pipe(
+        Effect.provide(makeLayer(captures)),
+        withDiagnostics
       )
-      const impacted = yield* deletionImpact(client, lead)
 
-      expect(impacted).toEqual({
-        comments: Count.make(2),
-        attachments: Count.make(3),
-        labels: Count.make(1),
-        totalAffected: Count.make(6)
-      })
-      expect(calls).toEqual([
-        { className: String(chunter.class.ChatMessage), limit: 1, total: true },
-        { className: String(attachment.class.Attachment), limit: 1, total: true },
-        { className: String(tags.class.TagReference), limit: 1, total: true }
+      expect(result).toEqual({ identifier: "LEAD-1", updated: true })
+      expect(captures.writes).toEqual(["updateMarkup", "uploadMarkup", "updateMixin", "updateDoc"])
+      expect(captures.markupClasses).toEqual([String(leadClassIds.mixin.Customer)])
+      expect(captures.documentUpdates).toEqual([
+        { title: "Changed", status: wonStatus, assignee: "employee-1", startDate: 10, dueDate: 20 }
       ])
     })
   )
 
-  it.effect("reports zero-count impact when authoritative relation totals are zero", () =>
+  it.effect("performs zero writes when a late customer resolution fails", () =>
     Effect.gen(function* () {
-      const client = yield* HulyClient.pipe(
-        Effect.provide(
-          HulyClient.testLayer({
-            findAll: <T extends Doc>() => {
-              const result = findResult<T>([])
-              result.total = 0
-              return Effect.succeed(result)
-            }
-          })
-        )
-      )
-      const impacted = yield* deletionImpact(client, lead)
-
-      expect(impacted).toEqual({
-        comments: Count.make(0),
-        attachments: Count.make(0),
-        labels: Count.make(0),
-        totalAffected: Count.make(0)
-      })
-    })
-  )
-
-  it.effect("refuses deletion impact when a native relation total is unknown", () =>
-    Effect.gen(function* () {
-      const client = yield* HulyClient.pipe(
-        Effect.provide(
-          HulyClient.testLayer({
-            findAll: <T extends Doc>() => {
-              const result = findResult<T>([])
-              result.total = -1
-              return Effect.succeed(result)
-            }
-          })
-        )
-      )
-      const error = yield* Effect.flip(deletionImpact(client, lead))
-
-      expect(error._tag).toBe("HulyDataInvalidError")
-      if (error._tag === "HulyDataInvalidError") expect(error.entity).toContain("comments relation count")
-    })
-  )
-
-  it.effect("requires AttachedDoc collection metadata before lead deletion", () =>
-    Effect.gen(function* () {
-      const error = yield* Effect.flip(
-        Schema.decodeUnknownEffect(LeadMutationDocumentSchema)({ ...lead, attachedTo: undefined })
-      )
-
-      expect(error._tag).toBe("SchemaError")
-    })
-  )
-
-  it.effect("resolves a workflow status by normalized display name", () =>
-    Effect.gen(function* () {
-      const resolved = yield* statusByName(
-        workflow.statuses,
-        StatusName.make("incoming"),
-        FunnelReference.make("funnel-1")
-      )
-      expect(resolved).toBe(leadStatus)
-    })
-  )
-
-  it.effect("rejects missing and duplicate workflow status names", () =>
-    Effect.gen(function* () {
-      const missing = yield* Effect.flip(
-        statusByName(workflow.statuses, StatusName.make("Won"), FunnelReference.make("funnel-1"))
-      )
-      const duplicate = yield* Effect.flip(
-        statusByName(
-          [...workflow.statuses, { id: statusRef("lead:status:Incoming-2"), name: "Incoming" }],
-          StatusName.make("Incoming"),
-          FunnelReference.make("funnel-1")
-        )
-      )
-
-      expect(missing._tag).toBe("InvalidStatusError")
-      expect(duplicate._tag).toBe("InvalidStatusError")
-    })
-  )
-
-  it.effect("rejects cross-modality person collisions", () =>
-    Effect.gen(function* () {
-      const error = yield* Effect.flip(
-        uniquePersonMatch(PersonLocator.make("shared@example.com"), [
-          person(PersonId.make("person-by-id"), PersonName.make("Person by ID")),
-          person(PersonId.make("person-by-email"), PersonName.make("Person by email"))
-        ])
-      )
-      expect(error._tag).toBe("PersonIdentifierAmbiguousError")
-      if (error._tag === "PersonIdentifierAmbiguousError") expect(error.matches).toBe(2)
-    })
-  )
-
-  it.effect("rejects duplicate exact email matches", () =>
-    Effect.gen(function* () {
-      const error = yield* Effect.flip(
-        uniquePersonMatch(PersonLocator.make("duplicate@example.com"), [
-          person(PersonId.make("first"), PersonName.make("First")),
-          person(PersonId.make("second"), PersonName.make("Second"))
-        ])
-      )
-      expect(error._tag).toBe("PersonIdentifierAmbiguousError")
-      if (error._tag === "PersonIdentifierAmbiguousError") expect(error.matches).toBe(2)
-    })
-  )
-
-  it.effect("deduplicates the same person and reports an absent exact person", () =>
-    Effect.gen(function* () {
-      const samePerson = person(PersonId.make("person-1"), PersonName.make("Prospect,Pat"))
-      expect(yield* uniquePersonMatch(PersonLocator.make("person-1"), [samePerson, undefined, samePerson])).toEqual(
-        samePerson
-      )
-
-      const error = yield* Effect.flip(uniquePersonMatch(PersonLocator.make("missing"), []))
-      expect(error._tag).toBe("PersonNotFoundError")
-    })
-  )
-
-  it.effect("reports absent people and leads through the default client seam", () =>
-    Effect.gen(function* () {
-      const client = yield* HulyClient.pipe(Effect.provide(HulyClient.testLayer({})))
-      const plainIdentifier = yield* Effect.flip(resolveExactPerson(client, PersonLocator.make("Missing Person")))
-      const emailIdentifier = yield* Effect.flip(resolveExactPerson(client, PersonLocator.make("missing@example.com")))
-      const missingLead = yield* Effect.flip(findLead(client, activeFunnel, LeadIdentifier.make("LEAD-404")))
-
-      expect(plainIdentifier._tag).toBe("PersonNotFoundError")
-      expect(emailIdentifier._tag).toBe("PersonNotFoundError")
-      expect(missingLead._tag).toBe("LeadNotFoundError")
-    })
-  )
-
-  it.effect("selects the lead workflow and rejects missing task types and statuses", () =>
-    Effect.gen(function* () {
-      expect(yield* workflowForLead([workflow], lead, activeFunnel)).toEqual(workflow)
-
-      const missingWorkflow = yield* Effect.flip(workflowForLead([], lead, activeFunnel))
-      const missingStatus = yield* Effect.flip(currentStatus({ ...workflow, statuses: [] }, lead, activeFunnel))
-      expect(missingWorkflow._tag).toBe("HulyError")
-      expect(missingWorkflow.message).toContain("not configured")
-      expect(missingStatus._tag).toBe("HulyError")
-      expect(missingStatus.message).toContain("has status")
-    })
-  )
-
-  it.effect("computes lead field, assignee, and status update decisions without unnecessary writes", () =>
-    Effect.gen(function* () {
-      const client = yield* HulyClient.pipe(Effect.provide(HulyClient.testLayer({})))
-      const base = yield* parseUpdateLeadParams({ funnel: "funnel-1", identifier: "LEAD-1", title: "A lead" })
-      const changed = yield* parseUpdateLeadParams({
+      const captures = emptyCaptures()
+      const params = yield* parseUpdateLeadParams({
         funnel: "funnel-1",
         identifier: "LEAD-1",
-        title: "Changed",
-        startDate: 10,
-        dueDate: 20
+        description: "new lead markup",
+        customerDescription: "new customer markup",
+        status: "Won"
       })
-      const unassign = yield* parseUpdateLeadParams({ funnel: "funnel-1", identifier: "LEAD-1", assignee: null })
-      const clearExisting = { ...lead, assignee: PersonId.make("person-2") }
-
-      expect(leadFieldUpdates(base, lead)).toEqual({})
-      expect(leadFieldUpdates(changed, lead)).toEqual({ title: "Changed", startDate: 10, dueDate: 20 })
-      expect(yield* assigneeUpdate(client, base, lead)).toEqual({ operations: {}, changed: false })
-      expect(yield* assigneeUpdate(client, unassign, lead)).toEqual({ operations: {}, changed: false })
-      expect(yield* assigneeUpdate(client, unassign, clearExisting)).toEqual({
-        operations: { assignee: null },
-        changed: true
-      })
-      const assignMissing = yield* parseUpdateLeadParams({
-        funnel: "funnel-1",
-        identifier: "LEAD-1",
-        assignee: "missing"
-      })
-      expect((yield* Effect.flip(assigneeUpdate(client, assignMissing, lead)))._tag).toBe("PersonNotFoundError")
-      expect(yield* statusUpdate([workflow], lead, activeFunnel, base)).toEqual({ operations: {}, changed: false })
-
-      const sameStatus = yield* parseUpdateLeadParams({ funnel: "funnel-1", identifier: "LEAD-1", status: "Incoming" })
-      expect(yield* statusForLead([workflow], lead, activeFunnel, StatusName.make("Incoming"), sameStatus.funnel)).toBe(
-        leadStatus
-      )
-      expect(yield* statusUpdate([workflow], lead, activeFunnel, sameStatus)).toEqual({
-        operations: {},
-        changed: false
-      })
-      const wonStatus = statusRef("lead:status:Won")
-      const changedStatus = yield* parseUpdateLeadParams({ funnel: "funnel-1", identifier: "LEAD-1", status: "Won" })
-      expect(
-        yield* statusUpdate(
-          [{ ...workflow, statuses: [...workflow.statuses, { id: wonStatus, name: "Won" }] }],
-          lead,
-          activeFunnel,
-          changedStatus
-        )
-      ).toEqual({ operations: { status: wonStatus }, changed: true })
-    })
-  )
-
-  it.effect("rejects archived updates and inactive moves with typed conflicts", () =>
-    Effect.gen(function* () {
-      const update = yield* parseUpdateLeadParams({ funnel: "funnel-1", identifier: "LEAD-1", title: "Changed" })
-      yield* rejectArchivedLeadUpdate(update, activeFunnel)
-      const archivedUpdate = yield* Effect.flip(rejectArchivedLeadUpdate(update, { ...activeFunnel, archived: true }))
-      expect(archivedUpdate._tag).toBe("LeadUpdateConflictError")
-
-      yield* rejectInactiveMoveFunnels(lead.identifier, activeFunnel, { ...activeFunnel, _id: docRef("funnel-2") })
-      const archivedSource = yield* Effect.flip(
-        rejectInactiveMoveFunnels(
-          lead.identifier,
-          { ...activeFunnel, archived: true },
-          { ...activeFunnel, _id: docRef<HulyFunnel>("funnel-2") }
-        )
-      )
-      const archivedDestination = yield* Effect.flip(
-        rejectInactiveMoveFunnels(lead.identifier, activeFunnel, {
-          ...activeFunnel,
-          _id: docRef<HulyFunnel>("funnel-2"),
-          archived: true
-        })
-      )
-      expect(archivedSource._tag).toBe("LeadMoveConflictError")
-      expect(archivedDestination._tag).toBe("LeadMoveConflictError")
-    })
-  )
-
-  it.effect("computes destination workflow and status decisions for compatible lead moves", () =>
-    Effect.gen(function* () {
-      const alternateTaskType: FunnelWorkflowTaskType = {
-        ...workflow,
-        taskType: { ...workflow.taskType, _id: docRef<TaskType>("alternate-type") }
+      const lateFailure: Resolvers = {
+        ...resolvers(),
+        findLeadCustomer: () => Effect.fail(new HulyError({ message: "customer disappeared" }))
       }
-      const destinationFunnel: HulyFunnel = { ...activeFunnel, _id: docRef<HulyFunnel>("funnel-2"), name: "Expansion" }
-      expect(compatibleDestinationWorkflow([workflow], lead)).toEqual(workflow)
-      expect(compatibleDestinationWorkflow([alternateTaskType], lead)).toEqual(alternateTaskType)
-      expect(
-        compatibleDestinationWorkflow([workflow, alternateTaskType], { ...lead, kind: TaskTypeId.make("missing") })
-      ).toBeUndefined()
-      expect(
-        yield* requireDestinationWorkflow(
-          workflow,
-          lead.identifier,
-          FunnelIdentifier.make("funnel-1"),
-          FunnelIdentifier.make("funnel-2")
-        )
-      ).toEqual(workflow)
-
-      const missingWorkflow = yield* Effect.flip(
-        requireDestinationWorkflow(
-          undefined,
-          lead.identifier,
-          FunnelIdentifier.make("funnel-1"),
-          FunnelIdentifier.make("funnel-2")
-        )
+      const error = yield* Effect.flip(
+        updateLead(params, lateFailure).pipe(Effect.provide(makeLayer(captures)), withDiagnostics)
       )
-      expect(missingWorkflow._tag).toBe("LeadMoveConflictError")
+      expect(error._tag).toBe("HulyError")
+      expect(captures.writes).toEqual([])
+    })
+  )
 
-      const params = yield* parseMoveLeadParams({
+  it.effect("keeps repeated customer description content and null clears idempotent", () =>
+    Effect.gen(function* () {
+      const sameCaptures = emptyCaptures()
+      const rendered = renderMarkdownWithNativeReferencesForWrite(
+        "same customer markup",
+        testMarkupUrlConfig,
+        "customerDescription"
+      )
+      if (rendered._tag !== "success") return yield* Effect.die(new Error(rendered.reason))
+      const same = yield* parseUpdateLeadParams({
         funnel: "funnel-1",
         identifier: "LEAD-1",
-        destinationFunnel: "funnel-2"
+        customerDescription: "same customer markup"
       })
-      expect(
-        yield* destinationStatus(
-          workflow,
-          params,
-          StatusName.make("Incoming"),
-          lead.identifier,
-          FunnelIdentifier.make("funnel-1"),
-          FunnelIdentifier.make("funnel-2")
-        )
-      ).toBe(leadStatus)
-      const invalidStatus = yield* parseMoveLeadParams({
+      const sameResult = yield* updateLead(same, resolvers(person("customer-description"))).pipe(
+        Effect.provide(makeLayer(sameCaptures, rendered.rendered.markup)),
+        withDiagnostics
+      )
+      expect(sameResult.updated).toBe(false)
+      expect(sameCaptures.writes).toEqual([])
+
+      const clearCaptures = emptyCaptures()
+      const clear = yield* parseUpdateLeadParams({
+        funnel: "funnel-1",
+        identifier: "LEAD-1",
+        customerDescription: null
+      })
+      const clearResult = yield* updateLead(clear, resolvers(person(null))).pipe(
+        Effect.provide(makeLayer(clearCaptures)),
+        withDiagnostics
+      )
+      expect(clearResult.updated).toBe(false)
+      expect(clearCaptures.writes).toEqual([])
+    })
+  )
+
+  it.effect("reports unchanged when every requested scalar already matches", () =>
+    Effect.gen(function* () {
+      const captures = emptyCaptures()
+      const params = yield* parseUpdateLeadParams({
+        funnel: "funnel-1",
+        identifier: "LEAD-1",
+        title: "A lead",
+        assignee: null,
+        status: "Incoming",
+        startDate: null,
+        dueDate: null
+      })
+      const result = yield* updateLead(params, resolvers()).pipe(Effect.provide(makeLayer(captures)), withDiagnostics)
+      expect(result.updated).toBe(false)
+      expect(captures.writes).toEqual([])
+    })
+  )
+
+  it.effect("clears existing lead and customer descriptions", () =>
+    Effect.gen(function* () {
+      const captures = emptyCaptures()
+      const params = yield* parseUpdateLeadParams({
+        funnel: "funnel-1",
+        identifier: "LEAD-1",
+        description: null,
+        customerDescription: null
+      })
+      const result = yield* updateLead(params, resolvers(person("customer-description"))).pipe(
+        Effect.provide(makeLayer(captures)),
+        withDiagnostics
+      )
+      expect(result.updated).toBe(true)
+      expect(captures.writes).toEqual(["updateMixin", "updateDoc"])
+      expect(captures.documentUpdates).toEqual([{ description: null }])
+    })
+  )
+
+  it.effect("uploads descriptions when neither markup reference exists", () =>
+    Effect.gen(function* () {
+      const captures = emptyCaptures()
+      const params = yield* parseUpdateLeadParams({
+        funnel: "funnel-1",
+        identifier: "LEAD-1",
+        description: "new lead description",
+        customerDescription: "new customer description"
+      })
+      const result = yield* updateLead(params, resolvers(person(), { ...lead, description: null })).pipe(
+        Effect.provide(makeLayer(captures)),
+        withDiagnostics
+      )
+      expect(result.updated).toBe(true)
+      expect(captures.writes).toEqual(["uploadMarkup", "uploadMarkup", "createMixin", "updateDoc"])
+      expect(captures.markupClasses).toEqual([String(leadClassIds.class.Lead), String(leadClassIds.mixin.Customer)])
+    })
+  )
+
+  it.effect("keeps identical lead markup and an absent customer mixin clear unchanged", () =>
+    Effect.gen(function* () {
+      const captures = emptyCaptures()
+      const rendered = renderMarkdownWithNativeReferencesForWrite(
+        "same lead markup",
+        testMarkupUrlConfig,
+        "description"
+      )
+      if (rendered._tag !== "success") return yield* Effect.die(new Error(rendered.reason))
+      const params = yield* parseUpdateLeadParams({
+        funnel: "funnel-1",
+        identifier: "LEAD-1",
+        description: "same lead markup",
+        customerDescription: null
+      })
+      const result = yield* updateLead(params, resolvers(person())).pipe(
+        Effect.provide(makeLayer(captures, "old customer markup").pipe()),
+        withDiagnostics
+      )
+      expect(result.updated).toBe(true)
+      expect(captures.writes).toEqual(["updateMarkup"])
+
+      const sameCaptures = emptyCaptures()
+      const sameLayer = HulyClient.testLayer({
+        fetchMarkup: () => Effect.succeed(rendered.rendered.markup),
+        updateDoc: () => {
+          sameCaptures.writes.push("updateDoc")
+          return Effect.succeed({})
+        }
+      })
+      const sameResult = yield* updateLead(params, resolvers(person())).pipe(Effect.provide(sameLayer), withDiagnostics)
+      expect(sameResult.updated).toBe(false)
+      expect(sameCaptures.writes).toEqual([])
+    })
+  )
+
+  it.effect("updates an organization customer and rejects malformed mixin state before writes", () =>
+    Effect.gen(function* () {
+      const captures = emptyCaptures()
+      const params = yield* parseUpdateLeadParams({
+        funnel: "funnel-1",
+        identifier: "LEAD-1",
+        customerDescription: "organization notes"
+      })
+      const updated = yield* updateLead(params, resolvers(organization(null))).pipe(
+        Effect.provide(makeLayer(captures)),
+        withDiagnostics
+      )
+      expect(updated.updated).toBe(true)
+      expect(captures.writes).toEqual(["uploadMarkup", "updateMixin"])
+
+      const malformedCaptures = emptyCaptures()
+      const malformed = { ...person(), [leadClassIds.mixin.Customer]: { customerDescription: 42 } }
+      const malformedResolvers: Resolvers = { ...resolvers(), findLeadCustomer: () => Effect.succeed(malformed) }
+      const error = yield* Effect.flip(
+        updateLead(params, malformedResolvers).pipe(Effect.provide(makeLayer(malformedCaptures)), withDiagnostics)
+      )
+      expect(error._tag).toBe("HulyDataInvalidError")
+      expect(malformedCaptures.writes).toEqual([])
+    })
+  )
+
+  it.effect("rejects malformed native references before writes", () =>
+    Effect.gen(function* () {
+      const captures = emptyCaptures()
+      const params = yield* parseUpdateLeadParams({
+        funnel: "funnel-1",
+        identifier: "LEAD-1",
+        description: "Broken [Doc](https://test.invalid/browse?workspace=test&_id=doc-1)."
+      })
+      const error = yield* Effect.flip(
+        updateLead(params, resolvers()).pipe(Effect.provide(makeLayer(captures)), withDiagnostics)
+      )
+      expect(error._tag).toBe("HulyError")
+      expect(captures.writes).toEqual([])
+    })
+  )
+
+  it.effect("rejects updates to archived funnels before resolving the lead", () =>
+    Effect.gen(function* () {
+      const captures = emptyCaptures()
+      const params = yield* parseUpdateLeadParams({ funnel: "funnel-1", identifier: "LEAD-1", title: "Changed" })
+      const archivedResolvers: Resolvers = {
+        ...resolvers(),
+        validatedFunnel: () => Effect.succeed({ funnel: { ...sourceFunnel, archived: true }, workflow: [workflow] })
+      }
+      const error = yield* Effect.flip(
+        updateLead(params, archivedResolvers).pipe(Effect.provide(makeLayer(captures)), withDiagnostics)
+      )
+      expect(error._tag).toBe("LeadUpdateConflictError")
+      expect(captures.writes).toEqual([])
+    })
+  )
+
+  it.effect("rejects update statuses absent from the lead workflow", () =>
+    Effect.gen(function* () {
+      const captures = emptyCaptures()
+      const params = yield* parseUpdateLeadParams({ funnel: "funnel-1", identifier: "LEAD-1", status: "Missing" })
+      const invalidStatus = yield* Effect.flip(
+        updateLead(params, resolvers()).pipe(Effect.provide(makeLayer(captures)), withDiagnostics)
+      )
+      expect(invalidStatus._tag).toBe("InvalidStatusError")
+
+      const wrongWorkflowResolvers: Resolvers = {
+        ...resolvers(),
+        validatedFunnel: () => Effect.succeed({ funnel: sourceFunnel, workflow: [] })
+      }
+      const wrongWorkflow = yield* Effect.flip(
+        updateLead(params, wrongWorkflowResolvers).pipe(Effect.provide(makeLayer(captures)), withDiagnostics)
+      )
+      expect(wrongWorkflow._tag).toBe("HulyError")
+      expect(captures.writes).toEqual([])
+    })
+  )
+
+  it.effect("moves a lead through the public operation", () =>
+    Effect.gen(function* () {
+      const captures = emptyCaptures()
+      const params = yield* parseMoveLeadParams({
         funnel: "funnel-1",
         identifier: "LEAD-1",
         destinationFunnel: "funnel-2",
         status: "Won"
       })
+      const result = yield* moveLead(params, resolvers()).pipe(Effect.provide(makeLayer(captures)), withDiagnostics)
+      expect(result).toMatchObject({ destinationFunnel: "funnel-2", status: "Won", moved: true })
+      expect(captures.writes).toEqual(["updateDoc"])
+    })
+  )
+
+  it.effect("does not write when source, destination, status, and task type already match", () =>
+    Effect.gen(function* () {
+      const captures = emptyCaptures()
+      const params = yield* parseMoveLeadParams({
+        funnel: "funnel-1",
+        identifier: "LEAD-1",
+        destinationFunnel: "funnel-1"
+      })
+      const sameFunnelResolvers: Resolvers = {
+        ...resolvers(),
+        validatedFunnel: () => Effect.succeed({ funnel: sourceFunnel, workflow: [workflow] })
+      }
+      const result = yield* moveLead(params, sameFunnelResolvers).pipe(
+        Effect.provide(makeLayer(captures)),
+        withDiagnostics
+      )
+      expect(result).toMatchObject({ destinationFunnel: "funnel-1", status: "Incoming", moved: false })
+      expect(captures.writes).toEqual([])
+    })
+  )
+
+  it.effect("updates status without moving between funnels", () =>
+    Effect.gen(function* () {
+      const captures = emptyCaptures()
+      const params = yield* parseMoveLeadParams({
+        funnel: "funnel-1",
+        identifier: "LEAD-1",
+        destinationFunnel: "funnel-1",
+        status: "Won"
+      })
+      const sameFunnelResolvers: Resolvers = {
+        ...resolvers(),
+        validatedFunnel: () => Effect.succeed({ funnel: sourceFunnel, workflow: [workflow] })
+      }
+      const result = yield* moveLead(params, sameFunnelResolvers).pipe(
+        Effect.provide(makeLayer(captures)),
+        withDiagnostics
+      )
+      expect(result).toMatchObject({ destinationFunnel: "funnel-1", status: "Won", moved: true })
+      expect(captures.documentUpdates).toEqual([{ space: sourceFunnel._id, status: wonStatus }])
+    })
+  )
+
+  it.effect("moves to the sole destination task type when no exact task type exists", () =>
+    Effect.gen(function* () {
+      const captures = emptyCaptures()
+      const replacementTaskType = docRef<TaskType>("lead:taskType:Replacement")
+      const replacementWorkflow: FunnelWorkflowTaskType = {
+        ...workflow,
+        taskType: { ...workflow.taskType, _id: replacementTaskType },
+        statuses: [{ id: incomingStatus, name: "Incoming" }]
+      }
+      const params = yield* parseMoveLeadParams({
+        funnel: "funnel-1",
+        identifier: "LEAD-1",
+        destinationFunnel: "funnel-2"
+      })
+      const replacementResolvers: Resolvers = {
+        ...resolvers(),
+        validatedFunnel: (_client, identifier) =>
+          Effect.succeed(
+            String(identifier) === "funnel-2"
+              ? { funnel: destinationFunnel, workflow: [replacementWorkflow] }
+              : { funnel: sourceFunnel, workflow: [workflow] }
+          )
+      }
+      const result = yield* moveLead(params, replacementResolvers).pipe(
+        Effect.provide(makeLayer(captures)),
+        withDiagnostics
+      )
+      expect(result.moved).toBe(true)
+      expect(captures.documentUpdates).toEqual([
+        { space: destinationFunnel._id, status: incomingStatus, kind: replacementTaskType }
+      ])
+    })
+  )
+
+  it.effect("rejects archived and ambiguous destination workflows", () =>
+    Effect.gen(function* () {
+      const captures = emptyCaptures()
+      const params = yield* parseMoveLeadParams({
+        funnel: "funnel-1",
+        identifier: "LEAD-1",
+        destinationFunnel: "funnel-2"
+      })
+      const archived: Resolvers = {
+        ...resolvers(),
+        validatedFunnel: (_client, identifier) =>
+          Effect.succeed({
+            funnel: String(identifier) === "funnel-2" ? { ...destinationFunnel, archived: true } : sourceFunnel,
+            workflow: [workflow]
+          })
+      }
+      expect(
+        (yield* Effect.flip(moveLead(params, archived).pipe(Effect.provide(makeLayer(captures)), withDiagnostics)))._tag
+      ).toBe("LeadMoveConflictError")
+
+      const noDestinationWorkflow: Resolvers = {
+        ...resolvers(),
+        validatedFunnel: (_client, identifier) =>
+          Effect.succeed({
+            funnel: String(identifier) === "funnel-2" ? destinationFunnel : sourceFunnel,
+            workflow: String(identifier) === "funnel-2" ? [] : [workflow]
+          })
+      }
       expect(
         (yield* Effect.flip(
-          destinationStatus(
-            workflow,
-            invalidStatus,
-            StatusName.make("Incoming"),
-            lead.identifier,
-            FunnelIdentifier.make("funnel-1"),
-            FunnelIdentifier.make("funnel-2")
-          )
+          moveLead(params, noDestinationWorkflow).pipe(Effect.provide(makeLayer(captures)), withDiagnostics)
         ))._tag
       ).toBe("LeadMoveConflictError")
-      expect(destinationStatusReason(undefined, StatusName.make("Incoming"))).toContain("current status")
-      expect(destinationStatusReason(StatusName.make("Won"), StatusName.make("Incoming"))).toContain("requested status")
-      expect(moveRequired(activeFunnel, activeFunnel, leadStatus, lead, false)).toBe(false)
-      expect(moveRequired(activeFunnel, destinationFunnel, leadStatus, lead, false)).toBe(true)
-      expect(moveRequired(activeFunnel, activeFunnel, statusRef("other-status"), lead, false)).toBe(true)
-      expect(moveRequired(activeFunnel, activeFunnel, leadStatus, lead, true)).toBe(true)
-      expect(moveOperations(destinationFunnel, leadStatus, workflow, false)).toEqual({
-        space: destinationFunnel._id,
-        status: leadStatus
-      })
-      expect(moveOperations(destinationFunnel, leadStatus, alternateTaskType, true)).toEqual({
-        space: destinationFunnel._id,
-        status: leadStatus,
-        kind: alternateTaskType.taskType._id
-      })
+      expect(captures.writes).toEqual([])
     })
   )
 
-  it.effect("skips empty persistence and writes concrete update and move decisions", () =>
+  it.effect("rejects explicit and inherited statuses absent from the destination", () =>
     Effect.gen(function* () {
-      const writes: Array<unknown> = []
-      const client = yield* HulyClient.pipe(
-        Effect.provide(
-          HulyClient.testLayer({
-            updateDoc: (_class, _space, _id, operations) => {
-              writes.push(operations)
-              return Effect.succeed({})
-            }
+      const captures = emptyCaptures()
+      const destinationWithoutIncoming: FunnelWorkflowTaskType = {
+        ...workflow,
+        statuses: [{ id: wonStatus, name: "Won" }]
+      }
+      const destinationResolvers: Resolvers = {
+        ...resolvers(),
+        validatedFunnel: (_client, identifier) =>
+          Effect.succeed({
+            funnel: String(identifier) === "funnel-2" ? destinationFunnel : sourceFunnel,
+            workflow: String(identifier) === "funnel-2" ? [destinationWithoutIncoming] : [workflow]
           })
+      }
+      const requestedStatuses: ReadonlyArray<undefined | "Missing"> = [undefined, "Missing"]
+      for (const status of requestedStatuses) {
+        const params = yield* parseMoveLeadParams({
+          funnel: "funnel-1",
+          identifier: "LEAD-1",
+          destinationFunnel: "funnel-2",
+          ...(status === undefined ? {} : { status })
+        })
+        const error = yield* Effect.flip(
+          moveLead(params, destinationResolvers).pipe(Effect.provide(makeLayer(captures)), withDiagnostics)
+        )
+        expect(error._tag).toBe("LeadMoveConflictError")
+      }
+      expect(captures.writes).toEqual([])
+    })
+  )
+
+  it.effect("rejects a lead whose current status is absent from its source workflow", () =>
+    Effect.gen(function* () {
+      const captures = emptyCaptures()
+      const params = yield* parseMoveLeadParams({
+        funnel: "funnel-1",
+        identifier: "LEAD-1",
+        destinationFunnel: "funnel-2"
+      })
+      const unknownStatusLead = { ...lead, status: WorkflowStatusId.make("lead:status:Unknown") }
+      const error = yield* Effect.flip(
+        moveLead(params, resolvers(person(), unknownStatusLead)).pipe(
+          Effect.provide(makeLayer(captures)),
+          withDiagnostics
         )
       )
-      yield* persistLeadUpdate(client, activeFunnel, lead, {})
-      yield* persistLeadUpdate(client, activeFunnel, lead, { title: NonEmptyString.make("Changed") })
-      yield* persistLeadMove(client, activeFunnel, lead, { status: statusRef("new-status") }, false)
-      yield* persistLeadMove(client, activeFunnel, lead, { status: statusRef("new-status") }, true)
-      expect(writes).toEqual([{ title: "Changed" }, { status: "new-status" }])
+      expect(error._tag).toBe("HulyError")
+      expect(captures.writes).toEqual([])
     })
   )
 
-  it.effect("short-circuits omitted description fields before customer lookup", () =>
+  it.effect("previews and executes deletion through the public operation", () =>
     Effect.gen(function* () {
-      const client = yield* HulyClient.pipe(Effect.provide(HulyClient.testLayer({})))
-      const params = yield* parseUpdateLeadParams({ funnel: "funnel-1", identifier: "LEAD-1", title: "Changed" })
-      expect(yield* descriptionUpdate(client, params, lead)).toEqual({ operations: {}, changed: false })
-      expect(yield* customerDescriptionUpdate(client, params, lead)).toBe(false)
-      expect(yield* descriptionUpdate(client, { ...params, description: null }, lead)).toEqual({
-        operations: {},
-        changed: false
+      const captures = emptyCaptures()
+      const preview = yield* parseDeleteLeadParams({ funnel: "funnel-1", identifier: "LEAD-1" })
+      const previewed = yield* deleteLead(preview, resolvers()).pipe(
+        Effect.provide(makeLayer(captures)),
+        withDiagnostics
+      )
+      expect(previewed).toMatchObject({ deleted: false, impact: { totalAffected: 0 } })
+      expect(captures.writes).toEqual([])
+
+      const execute = yield* parseDeleteLeadParams({
+        funnel: "funnel-1",
+        identifier: "LEAD-1",
+        execute: true,
+        expectedComments: 0,
+        expectedAttachments: 0,
+        expectedLabels: 0
       })
-      expect(
-        (yield* Effect.flip(customerDescriptionUpdate(client, { ...params, customerDescription: null }, lead)))._tag
-      ).toBe("HulyError")
+      const deleted = yield* deleteLead(execute, resolvers()).pipe(Effect.provide(makeLayer(captures)), withDiagnostics)
+      expect(deleted.deleted).toBe(true)
+      expect(captures.writes).toEqual(["removeCollection"])
     })
   )
 
-  it.effect("covers mutation entrypoint lookup failures through the injected client", () =>
+  it.effect("rejects changed deletion impact and missing collection removal capability", () =>
+    Effect.gen(function* () {
+      const conflictCaptures = emptyCaptures()
+      for (const expectations of [
+        { expectedComments: 1, expectedAttachments: 0, expectedLabels: 0 },
+        { expectedComments: 0, expectedAttachments: 1, expectedLabels: 0 },
+        { expectedComments: 0, expectedAttachments: 0, expectedLabels: 1 }
+      ]) {
+        const conflict = yield* parseDeleteLeadParams({
+          funnel: "funnel-1",
+          identifier: "LEAD-1",
+          execute: true,
+          ...expectations
+        })
+        const conflictError = yield* Effect.flip(
+          deleteLead(conflict, resolvers()).pipe(Effect.provide(emptyLayer(conflictCaptures)), withDiagnostics)
+        )
+        expect(conflictError._tag).toBe("LeadDeleteConflictError")
+      }
+
+      const execute = yield* parseDeleteLeadParams({
+        funnel: "funnel-1",
+        identifier: "LEAD-1",
+        execute: true,
+        expectedComments: 0,
+        expectedAttachments: 0,
+        expectedLabels: 0
+      })
+      const missingRemoverError = yield* Effect.flip(
+        deleteLead(execute, resolvers()).pipe(Effect.provide(emptyLayer(emptyCaptures(), 0, false)), withDiagnostics)
+      )
+      expect(missingRemoverError._tag).toBe("HulyDataInvalidError")
+    })
+  )
+
+  it.effect("rejects invalid authoritative relation totals", () =>
+    Effect.gen(function* () {
+      const preview = yield* parseDeleteLeadParams({ funnel: "funnel-1", identifier: "LEAD-1" })
+      const error = yield* Effect.flip(
+        deleteLead(preview, resolvers()).pipe(Effect.provide(emptyLayer(emptyCaptures(), -1)), withDiagnostics)
+      )
+      expect(error._tag).toBe("HulyDataInvalidError")
+    })
+  )
+
+  it.effect("applies person customer conversion idempotently through the public operation", () =>
+    Effect.gen(function* () {
+      const captures = emptyCaptures()
+      const params = yield* parseMakePersonCustomerParams({ identifier: PersonLocator.make("Prospect,Pat") })
+      const applied = yield* makePersonCustomer(params, resolvers(person(), lead, person())).pipe(
+        Effect.provide(makeLayer(captures))
+      )
+      const unchanged = yield* makePersonCustomer(params, resolvers(person(null), lead, person(null))).pipe(
+        Effect.provide(makeLayer(captures))
+      )
+      expect(applied).toEqual({ id: "person-1", applied: true })
+      expect(unchanged).toEqual({ id: "person-1", applied: false })
+      expect(captures.writes).toEqual(["createMixin"])
+    })
+  )
+
+  it.effect("reports missing public mutation targets through default resolution", () =>
     Effect.gen(function* () {
       const layer = HulyClient.testLayer({})
       const update = yield* parseUpdateLeadParams({ funnel: "missing", identifier: "LEAD-1", title: "Changed" })
@@ -601,15 +728,8 @@ describe("Lead mutation functional helpers", () => {
         destinationFunnel: "also-missing"
       })
       const deletion = yield* parseDeleteLeadParams({ funnel: "missing", identifier: "LEAD-1" })
-      const customer = yield* parseMakePersonCustomerParams({ identifier: "missing" })
-      const client = yield* HulyClient.pipe(Effect.provide(layer))
+      const customer = yield* parseMakePersonCustomerParams({ identifier: PersonLocator.make("missing") })
 
-      expect((yield* Effect.flip(validatedFunnel(client, update.funnel).pipe(withDiagnostics)))._tag).toBe(
-        "FunnelNotFoundError"
-      )
-      expect((yield* Effect.flip(resolveEmployee(client, PersonName.make("Missing,Person"))))._tag).toBe(
-        "PersonNotFoundError"
-      )
       expect((yield* Effect.flip(updateLead(update).pipe(Effect.provide(layer), withDiagnostics)))._tag).toBe(
         "FunnelNotFoundError"
       )
@@ -622,272 +742,6 @@ describe("Lead mutation functional helpers", () => {
       expect((yield* Effect.flip(makePersonCustomer(customer).pipe(Effect.provide(layer))))._tag).toBe(
         "PersonNotFoundError"
       )
-    })
-  )
-
-  it.effect("applies and updates Customer descriptions for people and organizations", () =>
-    Effect.gen(function* () {
-      const mutations: Array<string> = []
-      const client = yield* HulyClient.pipe(
-        Effect.provide(
-          HulyClient.testLayer({
-            uploadMarkup: () => Effect.succeed(toMarkupBlobRef(NonEmptyString.make("customer-description"))),
-            createMixin: () => {
-              mutations.push("create")
-              return Effect.succeed({})
-            },
-            updateMixin: () => {
-              mutations.push("update")
-              return Effect.succeed({})
-            }
-          })
-        )
-      )
-      const plainPerson = person(PersonId.make("person-1"), PersonName.make("Prospect,Pat"))
-      const customerPerson = { ...plainPerson, [leadClassIds.mixin.Customer]: { customerDescription: null } }
-      const organization: LeadOrganizationDocument = {
-        _id: OrganizationId.make("organization-1"),
-        _class: DocId.make(contact.class.Organization),
-        space: SpaceId.make(String(contact.space.Contacts)),
-        name: NonEmptyString.make("Acme")
-      }
-      const customerOrganization = { ...organization, [leadClassIds.mixin.Customer]: { customerDescription: null } }
-
-      expect(String(customerClass(plainPerson))).toBe(String(contact.class.Person))
-      expect(String(customerClass(organization))).toBe(String(contact.class.Organization))
-      expect(yield* updateCustomerDescription(client, plainPerson, null)).toBe(false)
-      expect(yield* updateCustomerDescription(client, customerPerson, null)).toBe(true)
-      expect(yield* updateCustomerDescription(client, plainPerson, "new person notes")).toBe(true)
-      expect(yield* updateCustomerDescription(client, customerOrganization, "new organization notes")).toBe(true)
-      expect(mutations).toEqual(["update", "create", "update"])
-    })
-  )
-
-  it.effect("previews, conflicts, and executes resolved lead deletion with authoritative counts", () =>
-    Effect.gen(function* () {
-      const removals: Array<string> = []
-      const client = yield* HulyClient.pipe(
-        Effect.provide(
-          HulyClient.testLayer({
-            removeCollection: (_class, _space, _objectId, attachedTo) => {
-              removals.push("removed")
-              return Effect.succeed(attachedTo)
-            }
-          })
-        )
-      )
-      const preview = yield* parseDeleteLeadParams({ funnel: "funnel-1", identifier: "LEAD-1" })
-      const execute = yield* parseDeleteLeadParams({
-        funnel: "funnel-1",
-        identifier: "LEAD-1",
-        execute: true,
-        expectedComments: 0,
-        expectedAttachments: 0,
-        expectedLabels: 0
-      })
-      expect(yield* deleteResolvedLead(client, { funnel: activeFunnel }, lead, preview)).toMatchObject({
-        deleted: false,
-        impact: { totalAffected: 0 }
-      })
-
-      for (const expectations of [
-        { expectedComments: 1, expectedAttachments: 0, expectedLabels: 0 },
-        { expectedComments: 0, expectedAttachments: 1, expectedLabels: 0 },
-        { expectedComments: 0, expectedAttachments: 0, expectedLabels: 1 }
-      ]) {
-        const changed = yield* parseDeleteLeadParams({
-          funnel: "funnel-1",
-          identifier: "LEAD-1",
-          execute: true,
-          ...expectations
-        })
-        expect((yield* Effect.flip(deleteResolvedLead(client, { funnel: activeFunnel }, lead, changed)))._tag).toBe(
-          "LeadDeleteConflictError"
-        )
-      }
-
-      expect(yield* deleteResolvedLead(client, { funnel: activeFunnel }, lead, execute)).toMatchObject({
-        deleted: true
-      })
-      expect(removals).toEqual(["removed"])
-
-      const { removeCollection: _removeCollection, ...clientWithoutCollectionRemoval } = client
-      expect(
-        (yield* Effect.flip(
-          deleteResolvedLead(clientWithoutCollectionRemoval, { funnel: activeFunnel }, lead, execute)
-        ))._tag
-      ).toBe("HulyDataInvalidError")
-    })
-  )
-
-  it.effect("applies person Customer promotion idempotently", () =>
-    Effect.gen(function* () {
-      const mutations: Array<string> = []
-      const client = yield* HulyClient.pipe(
-        Effect.provide(
-          HulyClient.testLayer({
-            createMixin: () => {
-              mutations.push("create")
-              return Effect.succeed({})
-            }
-          })
-        )
-      )
-      const plain = person(PersonId.make("person-1"), PersonName.make("Prospect,Pat"))
-      const existing = { ...plain, [leadClassIds.mixin.Customer]: { customerDescription: null } }
-      expect(yield* applyPersonCustomer(client, plain)).toEqual({ id: PersonId.make("person-1"), applied: true })
-      expect(yield* applyPersonCustomer(client, existing)).toEqual({ id: PersonId.make("person-1"), applied: false })
-      expect(mutations).toEqual(["create"])
-    })
-  )
-
-  it.effect("decodes lead documents and preserves update and move result precedence", () =>
-    Effect.gen(function* () {
-      const nativeLead = { ...lead, modifiedBy: PersonId.make("user-1"), modifiedOn: Timestamp.make(0) }
-      expect(yield* parseLeadMutationDocument(nativeLead)).toEqual(lead)
-      expect((yield* Effect.flip(parseLeadMutationDocument({ _id: "broken" })))._tag).toBe("HulyDataInvalidError")
-      expect(yield* requireLeadDocument(nativeLead, lead.identifier, FunnelIdentifier.make("funnel-1"))).toEqual(lead)
-      expect(
-        (yield* Effect.flip(requireLeadDocument(undefined, lead.identifier, FunnelIdentifier.make("funnel-1"))))._tag
-      ).toBe("LeadNotFoundError")
-
-      const nativeEmployee = {
-        _id: PersonId.make("person-1"),
-        _class: DocId.make(contact.mixin.Employee),
-        space: SpaceId.make(String(contact.space.Contacts)),
-        name: PersonName.make("Prospect,Pat"),
-        position: "Sales"
-      }
-      expect(yield* requireEmployee(PersonName.make("Prospect,Pat"), nativeEmployee)).toBe("person-1")
-      expect((yield* Effect.flip(requireEmployee(PersonName.make("Prospect,Pat"), undefined)))._tag).toBe(
-        "PersonNotAnEmployeeError"
-      )
-
-      const nativePerson = {
-        _id: PersonId.make("person-1"),
-        _class: DocId.make(contact.class.Person),
-        space: SpaceId.make(String(contact.space.Contacts)),
-        name: PersonName.make("Prospect,Pat")
-      }
-      const nativeOrganization = {
-        _id: OrganizationId.make("organization-1"),
-        _class: DocId.make(contact.class.Organization),
-        space: SpaceId.make(String(contact.space.Contacts)),
-        name: NonEmptyString.make("Acme")
-      }
-      expect(yield* resolveLeadCustomer(nativePerson, undefined, lead)).toEqual(nativePerson)
-      expect(yield* resolveLeadCustomer(undefined, nativeOrganization, lead)).toEqual(nativeOrganization)
-      expect((yield* Effect.flip(resolveLeadCustomer(undefined, undefined, lead)))._tag).toBe("HulyError")
-
-      expect(leadUpdateChanged({ title: NonEmptyString.make("Changed") }, false, false)).toBe(true)
-      expect(leadUpdateChanged({}, true, false)).toBe(true)
-      expect(leadUpdateChanged({}, false, true)).toBe(true)
-      expect(leadUpdateChanged({}, false, false)).toBe(false)
-      expect(
-        resolvedMoveStatusName(workflow, leadStatus, StatusName.make("Requested"), StatusName.make("Current"))
-      ).toBe("Incoming")
-      expect(
-        resolvedMoveStatusName(workflow, statusRef("unknown"), StatusName.make("Requested"), StatusName.make("Current"))
-      ).toBe("Requested")
-      expect(resolvedMoveStatusName(workflow, statusRef("unknown"), undefined, StatusName.make("Current"))).toBe(
-        "Current"
-      )
-    })
-  )
-
-  it("detects native Customer mixins on either supported customer kind", () => {
-    const plain = person(PersonId.make("plain"), PersonName.make("Plain,Person"))
-    const customer = { ...plain, [leadClassIds.mixin.Customer]: { customerDescription: null } }
-    expect(hasCustomerMixin(plain)).toBe(false)
-    expect(hasCustomerMixin(customer)).toBe(true)
-  })
-
-  it.effect("resolves the current status from the configured workflow", () =>
-    Effect.gen(function* () {
-      const resolved = yield* currentStatus(workflow, lead, {
-        _id: docRef("funnel-1"),
-        _class: toClassRef<HulyFunnel>(leadClassIds.class.Funnel),
-        space: spaceRef("workspace"),
-        modifiedBy: corePersonId("user-1"),
-        modifiedOn: Timestamp.make(0),
-        name: "Sales",
-        description: "",
-        private: false,
-        members: [],
-        archived: false,
-        type: docRef("project-type-1")
-      })
-      expect(resolved).toEqual({ id: leadStatus, name: StatusName.make("Incoming") })
-    })
-  )
-
-  it.effect("models explicit description clear separately from an existing value", () =>
-    Effect.gen(function* () {
-      const client = yield* HulyClient.pipe(Effect.provide(HulyClient.testLayer({})))
-      const existing = yield* updateLeadDescription(client, { ...lead, description: BlobId.make("markup-ref") }, null)
-      const absent = yield* updateLeadDescription(client, lead, null)
-
-      expect(existing).toEqual({ operations: { description: null }, changed: true })
-      expect(absent).toEqual({ operations: {}, changed: false })
-    })
-  )
-
-  it.effect("does not write an existing description when native markup is unchanged", () =>
-    Effect.gen(function* () {
-      const rendered = renderMarkdownWithNativeReferencesForWrite("same", testMarkupUrlConfig, "description")
-      if (rendered._tag !== "success") throw new Error(rendered.reason)
-      const client = yield* HulyClient.pipe(
-        Effect.provide(HulyClient.testLayer({ fetchMarkup: () => Effect.succeed(rendered.rendered.markup) }))
-      )
-      const result = yield* updateLeadDescription(client, { ...lead, description: BlobId.make("markup-ref") }, "same")
-
-      expect(result).toEqual({ operations: {}, changed: false })
-    })
-  )
-
-  it.effect("uploads a new description and updates changed existing markup", () =>
-    Effect.gen(function* () {
-      const mutations: Array<string> = []
-      const client = yield* HulyClient.pipe(
-        Effect.provide(
-          HulyClient.testLayer({
-            uploadMarkup: () => {
-              mutations.push("upload")
-              return Effect.succeed(toMarkupBlobRef(NonEmptyString.make("uploaded-description")))
-            },
-            fetchMarkup: () => Effect.succeed("old-markup"),
-            updateMarkup: () => {
-              mutations.push("update")
-              return Effect.void
-            }
-          })
-        )
-      )
-      const created = yield* updateLeadDescription(client, lead, "new")
-      const updated = yield* updateLeadDescription(
-        client,
-        { ...lead, description: BlobId.make("existing-markup") },
-        "changed"
-      )
-
-      expect(created).toEqual({ operations: { description: "uploaded-description" }, changed: true })
-      expect(updated).toEqual({ operations: {}, changed: true })
-      expect(mutations).toEqual(["upload", "update"])
-    })
-  )
-
-  it.effect("rejects malformed description references and missing lead customers", () =>
-    Effect.gen(function* () {
-      const client = yield* HulyClient.pipe(Effect.provide(HulyClient.testLayer({})))
-      const malformed = yield* Effect.flip(
-        updateLeadDescription(client, lead, "Broken [Doc](https://test.invalid/browse?workspace=test&_id=doc-1).")
-      )
-      const missingCustomer = yield* Effect.flip(updateLeadCustomerDescription(client, lead, "customer notes"))
-
-      expect(malformed._tag).toBe("HulyError")
-      expect(malformed.message).toContain("malformed Huly native reference")
-      expect(missingCustomer._tag).toBe("HulyError")
-      expect(missingCustomer.message).toContain("missing customer")
     })
   )
 })

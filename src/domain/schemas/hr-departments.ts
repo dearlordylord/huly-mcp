@@ -11,6 +11,7 @@ import {
   ListTotal,
   NonEmptyString,
   PersonId,
+  PersonLocator,
   PersonName,
   Timestamp,
   withAtLeastOneRequired
@@ -31,10 +32,7 @@ export const DepartmentName = NonEmptyString.pipe(
 )
 export type DepartmentName = Schema.Schema.Type<typeof DepartmentName>
 
-export const PersonLocator = NonEmptyString.annotate({
-  description: "Person or employee ID, exact email address, or exact Huly display name."
-})
-export type PersonLocator = Schema.Schema.Type<typeof PersonLocator>
+export { PersonLocator } from "./shared.js"
 
 export const DepartmentReferenceSchema = Schema.Struct({ id: DepartmentId, path: DepartmentPath })
 export type DepartmentReference = Schema.Schema.Type<typeof DepartmentReferenceSchema>

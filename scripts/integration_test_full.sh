@@ -1254,7 +1254,9 @@ fail_test() {
 }
 
 wait_for_lead_projection() {
-  local name="$1" funnel="$2" identifier="$3" title="$4" description_mode="${5:-unchanged}" attempts=10 attempt=1 detail=""
+  local name="$1" funnel="$2" identifier="$3" title="$4" description_mode="${5:-unchanged}"
+  local expected_status="${6:-}" expected_assignee="${7:-}" expected_start_date="${8:-}" expected_due_date="${9:-}"
+  local expected_customer_description="${10:-}" attempts=10 attempt=1 detail=""
   local funnel_json identifier_json
   funnel_json=$(json_string "$funnel")
   identifier_json=$(json_string "$identifier")
@@ -1262,8 +1264,20 @@ wait_for_lead_projection() {
     detail=$(run_capture_only_fresh \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_lead\",\"arguments\":{\"funnel\":$funnel_json,\"identifier\":$identifier_json}},\"id\":2}" \
       2>/dev/null || true)
-    if [ -n "$detail" ] && printf '%s\n' "$detail" | jq -e --arg funnel "$funnel" --arg identifier "$identifier" --arg title "$title" --arg description_mode "$description_mode" \
-      '.funnel == $funnel and .identifier == $identifier and .title == $title and ($description_mode != "clear" or .description == null)' >/dev/null 2>&1; then
+    if [ -n "$detail" ] && printf '%s\n' "$detail" | jq -e \
+      --arg funnel "$funnel" --arg identifier "$identifier" --arg title "$title" \
+      --arg description_mode "$description_mode" --arg status "$expected_status" --arg assignee "$expected_assignee" \
+      --arg start_date "$expected_start_date" --arg due_date "$expected_due_date" \
+      --arg customer_description "$expected_customer_description" \
+      '.funnel == $funnel
+        and .identifier == $identifier
+        and .title == $title
+        and ($description_mode != "clear" or .description == null)
+        and ($status == "" or .status == $status)
+        and ($assignee == "" or .assignee == $assignee)
+        and ($start_date == "" or .startDate == ($start_date | tonumber))
+        and ($due_date == "" or .dueDate == ($due_date | tonumber))
+        and ($customer_description == "" or .customerDescription == $customer_description)' >/dev/null 2>&1; then
       echo "PASS: $name"
       PASSED=$((PASSED + 1))
       return 0
@@ -2311,6 +2325,8 @@ if [ $? -eq 0 ]; then
       if [ $? -eq 0 ]; then
         FUNNEL_PROJECT_TYPE=$(echo "$FUNNEL_DETAIL_TEXT" | jq -r '.projectType.id // empty' 2>/dev/null)
         FUNNEL_PROJECT_TYPE_JSON=$(json_string "$FUNNEL_PROJECT_TYPE")
+        LEAD_TASK_TYPE_ID=$(echo "$FUNNEL_DETAIL_TEXT" | jq -r '.workflow[0].id // empty' 2>/dev/null)
+        LEAD_TASK_TYPE_ID_JSON=$(json_string "$LEAD_TASK_TYPE_ID")
         FUNNEL_ADMIN_NAME="Integration funnel $RUN_ID-$$"
         FUNNEL_ADMIN_NAME_JSON=$(json_string "$FUNNEL_ADMIN_NAME")
         run_capture_to_var FUNNEL_CREATE_TEXT "create_funnel($FUNNEL_ADMIN_NAME)" \
@@ -2413,13 +2429,13 @@ if [ $? -eq 0 ]; then
       fi
       if [ -n "$LEAD_PERSON_ID" ]; then
       run_capture_to_var CREATED_PERSON_LEAD_TEXT "create_lead(person:$LEAD_PERSON_ID)" \
-          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_lead\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"customer\":{\"kind\":\"person\",\"identifier\":\"$LEAD_PERSON_ID\"},\"title\":$LEAD_PERSON_TITLE_JSON,\"description\":\"Created by the local Docker integration suite.\"}},\"id\":2}"
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_lead\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"customer\":{\"kind\":\"person\",\"identifier\":\"$LEAD_PERSON_ID\"},\"title\":$LEAD_PERSON_TITLE_JSON,\"description\":\"Created by the local Docker integration suite.\",\"taskType\":$LEAD_TASK_TYPE_ID_JSON}},\"id\":2}"
         if [ $? -eq 0 ]; then
           CREATED_PERSON_LEAD_IDENTIFIER=$(echo "$CREATED_PERSON_LEAD_TEXT" | jq -r '.identifier // empty' 2>/dev/null)
           assert_json_field_nonempty "create_lead(person) returns leadId" "$CREATED_PERSON_LEAD_TEXT" '.leadId'
           assert_json_field_nonempty "create_lead(person) returns identifier" "$CREATED_PERSON_LEAD_TEXT" '.identifier'
           sleep 2
-          run_test "get_lead(created_person:$CREATED_PERSON_LEAD_IDENTIFIER)" \
+          run_capture_to_var_fresh CREATED_PERSON_LEAD_DETAIL "get_lead(created_person:$CREATED_PERSON_LEAD_IDENTIFIER)" \
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_lead\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\"}},\"id\":2}"
           run_capture_to_var CREATED_PERSON_LEAD_LIST "list_leads(created_person)" \
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_leads\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"titleSearch\":$LEAD_PERSON_TITLE_JSON,\"limit\":5}},\"id\":2}"
@@ -2435,11 +2451,28 @@ if [ $? -eq 0 ]; then
             LEAD_PERSON_CLEANUP_ID="$LEAD_PERSON_ID"
             UPDATED_LEAD_TITLE="Updated person lead $LEAD_FIXTURE_SUFFIX"
             UPDATED_LEAD_TITLE_JSON=$(json_string "$UPDATED_LEAD_TITLE")
+            CREATED_PERSON_LEAD_STATUS=$(echo "$CREATED_PERSON_LEAD_DETAIL" | jq -r '.status // empty' 2>/dev/null)
+            LEAD_UPDATE_STATUS=$(echo "$FUNNEL_DETAIL_TEXT" | jq -r --arg task_type "$LEAD_TASK_TYPE_ID" --arg current "$CREATED_PERSON_LEAD_STATUS" \
+              '[.workflow[]? | select(.id == $task_type) | .statuses[]? | select(.name != $current) | .name] | first // empty' 2>/dev/null)
+            run_capture_to_var_fresh LEAD_EMPLOYEES_TEXT "list_employees(for_update_lead)" \
+              '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_employees","arguments":{"limit":200}},"id":2}'
+            LEAD_UPDATE_ASSIGNEE_ID=$(echo "$LEAD_EMPLOYEES_TEXT" | jq -r '[.[] | select(.active == true)] | first | .id // empty' 2>/dev/null)
+            LEAD_UPDATE_ASSIGNEE_NAME=$(echo "$LEAD_EMPLOYEES_TEXT" | jq -r --arg id "$LEAD_UPDATE_ASSIGNEE_ID" '.[] | select(.id == $id) | .name // empty' 2>/dev/null | head -n 1)
+            UPDATED_CUSTOMER_DESCRIPTION="Updated customer description $LEAD_FIXTURE_SUFFIX"
+            LEAD_UPDATE_STATUS_JSON=$(json_string "$LEAD_UPDATE_STATUS")
+            LEAD_UPDATE_ASSIGNEE_ID_JSON=$(json_string "$LEAD_UPDATE_ASSIGNEE_ID")
+            UPDATED_CUSTOMER_DESCRIPTION_JSON=$(json_string "$UPDATED_CUSTOMER_DESCRIPTION")
+            if [ -z "$LEAD_UPDATE_STATUS" ] || [ -z "$LEAD_UPDATE_ASSIGNEE_ID" ] || [ -z "$LEAD_UPDATE_ASSIGNEE_NAME" ]; then
+              fail_test "update_lead mutation fixtures" "requires a different funnel status and one active employee"
+            fi
             run_capture_to_var_fresh UPDATED_LEAD_TEXT "update_lead(nullable fields:$CREATED_PERSON_LEAD_IDENTIFIER)" \
-              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_lead\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"title\":$UPDATED_LEAD_TITLE_JSON,\"description\":null,\"startDate\":0,\"dueDate\":0,\"customerDescription\":\"Updated customer description $LEAD_FIXTURE_SUFFIX\"}},\"id\":2}"
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_lead\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"title\":$UPDATED_LEAD_TITLE_JSON,\"description\":null,\"status\":$LEAD_UPDATE_STATUS_JSON,\"assignee\":$LEAD_UPDATE_ASSIGNEE_ID_JSON,\"startDate\":0,\"dueDate\":0,\"customerDescription\":$UPDATED_CUSTOMER_DESCRIPTION_JSON}},\"id\":2}"
             if [ $? -eq 0 ]; then
               assert_json_field_equals "update_lead reports updated" "$UPDATED_LEAD_TEXT" '.updated' "true"
-              wait_for_lead_projection "update_lead persists title and clear" "$FIRST_FUNNEL_ID" "$CREATED_PERSON_LEAD_IDENTIFIER" "$UPDATED_LEAD_TITLE" clear
+              wait_for_lead_projection "update_lead persists mutable detail" "$FIRST_FUNNEL_ID" "$CREATED_PERSON_LEAD_IDENTIFIER" "$UPDATED_LEAD_TITLE" clear "$LEAD_UPDATE_STATUS" "$LEAD_UPDATE_ASSIGNEE_NAME" 0 0 "$UPDATED_CUSTOMER_DESCRIPTION"
+              run_capture_to_var_fresh IDEMPOTENT_LEAD_TEXT "update_lead(idempotent customer description:$CREATED_PERSON_LEAD_IDENTIFIER)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_lead\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"customerDescription\":$UPDATED_CUSTOMER_DESCRIPTION_JSON}},\"id\":2}"
+              assert_json_field_equals "update_lead repeated customer description is unchanged" "$IDEMPOTENT_LEAD_TEXT" '.updated' "false"
             fi
 
             LEAD_DESTINATION_FUNNEL_NAME="Integration lead destination $LEAD_FIXTURE_SUFFIX"
@@ -2455,7 +2488,7 @@ if [ $? -eq 0 ]; then
                 if [ $? -eq 0 ]; then
                   assert_json_field_equals "move_lead reports moved" "$MOVED_LEAD_TEXT" '.moved' "true"
                   LEAD_CLEANUP_FUNNEL_ID="$LEAD_DESTINATION_FUNNEL_CLEANUP_ID"
-                  wait_for_lead_projection "move_lead persists destination" "$LEAD_DESTINATION_FUNNEL_CLEANUP_ID" "$CREATED_PERSON_LEAD_IDENTIFIER" "$UPDATED_LEAD_TITLE"
+                  wait_for_lead_projection "move_lead preserves mutable detail" "$LEAD_DESTINATION_FUNNEL_CLEANUP_ID" "$CREATED_PERSON_LEAD_IDENTIFIER" "$UPDATED_LEAD_TITLE" clear "$LEAD_UPDATE_STATUS" "$LEAD_UPDATE_ASSIGNEE_NAME" 0 0 "$UPDATED_CUSTOMER_DESCRIPTION"
                 fi
 
                 if [ -n "$LEAD_CLEANUP_FUNNEL_ID" ]; then
