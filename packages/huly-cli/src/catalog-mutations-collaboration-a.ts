@@ -51,6 +51,12 @@ export const collaborationMutationCliCommandCatalogA = {
     description: "Restore Person Social Identities",
     behavior: { confirmation: { type: "requires-yes", message: "contacts persons identities repair requires --yes." } }
   },
+  merge_people: {
+    path: ["contacts", "persons", "merge"],
+    positional: [],
+    description: "Preview or Merge People",
+    behavior: { confirmation: { type: "requires-yes", message: "contacts persons merge requires --yes." } }
+  },
   add_person_comment: {
     path: ["contacts", "persons", "comments", "add"],
     positional: [],

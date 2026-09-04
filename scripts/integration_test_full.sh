@@ -99,6 +99,8 @@ PERSON_ADMIN_CLEANUP_ID=""
 PERSON_ADMIN_DUPLICATE_CLEANUP_ID=""
 PERSON_ADMIN_COMMENT_CLEANUP_ID=""
 PERSON_ADMIN_ATTACHMENT_CLEANUP_ID=""
+PERSON_MERGE_SOURCE_CLEANUP_ID=""
+PERSON_MERGE_SURVIVOR_CLEANUP_ID=""
 
 if [ -z "$HULY_URL" ]; then
   echo "ERROR: HULY_URL not set. Run: set -a && source .env.local && set +a"
@@ -830,6 +832,19 @@ cleanup_person_admin_artifacts() {
       cleanup_failed=1
     fi
   fi
+  for merge_person_var in PERSON_MERGE_SOURCE_CLEANUP_ID PERSON_MERGE_SURVIVOR_CLEANUP_ID; do
+    merge_person_id="${!merge_person_var}"
+    if [ -n "$merge_person_id" ]; then
+      person_json=$(json_string "$merge_person_id")
+      call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" >/dev/null 2>&1 || true
+      readback=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" 2>/dev/null || true)
+      if [ "$(printf '%s\n' "$readback" | jq -r '.result.isError // false' 2>/dev/null)" = "true" ]; then
+        printf -v "$merge_person_var" '%s' ""
+      else
+        cleanup_failed=1
+      fi
+    fi
+  done
   return "$cleanup_failed"
 }
 
@@ -5072,8 +5087,57 @@ if [ $? -eq 0 ]; then
 	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_person_channel\",\"arguments\":{\"person\":\"$PERSON_ID\",\"provider\":\"phone\",\"value\":$PERSON_PHONE_UPDATED_JSON}},\"id\":2}"
 	  fi
 	  if [ -z "$PERSON_ADMIN_COMMENT_CLEANUP_ID" ] && [ -z "$PERSON_ADMIN_ATTACHMENT_CLEANUP_ID" ]; then
-	    run_test "delete_person($PERSON_ID)" \
-	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":\"$PERSON_ID\"}},\"id\":2}"
+	    PERSON_MERGE_SURVIVOR_FIRST_NAME="MergeSurvivor-$RUN_ID"
+	    PERSON_MERGE_SURVIVOR_EMAIL="merge-survivor-$RUN_ID@test.local"
+	    run_capture_to_var_fresh PERSON_MERGE_SURVIVOR_TEXT "create_person(person merge survivor)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":\"$PERSON_MERGE_SURVIVOR_FIRST_NAME\",\"lastName\":\"Person\",\"email\":\"$PERSON_MERGE_SURVIVOR_EMAIL\"}},\"id\":2}"
+	    if [ $? -eq 0 ]; then
+	      PERSON_MERGE_SURVIVOR_ID=$(printf '%s\n' "$PERSON_MERGE_SURVIVOR_TEXT" | jq -r '.id' 2>/dev/null)
+	      PERSON_MERGE_SURVIVOR_CLEANUP_ID="$PERSON_MERGE_SURVIVOR_ID"
+	      run_capture_to_var_fresh PERSON_MERGE_COMMENT_TEXT "add_person_comment(person merge source)" \
+	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_person_comment\",\"arguments\":{\"person\":{\"id\":\"$PERSON_ID\"},\"body\":\"Merge-preserved note $RUN_ID\"}},\"id\":2}"
+	      PERSON_MERGE_COMMENT_ID=$(printf '%s\n' "$PERSON_MERGE_COMMENT_TEXT" | jq -r '.commentId // empty' 2>/dev/null)
+	      PERSON_ADMIN_COMMENT_CLEANUP_ID="$PERSON_MERGE_COMMENT_ID"
+	      run_capture_to_var_fresh PERSON_MERGE_ATTACHMENT_TEXT "add_person_attachment(person merge source)" \
+	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_person_attachment\",\"arguments\":{\"person\":{\"id\":\"$PERSON_ID\"},\"filename\":\"merge-$RUN_ID.txt\",\"contentType\":\"text/plain\",\"data\":\"bWVyZ2U=\"}},\"id\":2}"
+	      PERSON_MERGE_ATTACHMENT_ID=$(printf '%s\n' "$PERSON_MERGE_ATTACHMENT_TEXT" | jq -r '.attachmentId // empty' 2>/dev/null)
+	      PERSON_ADMIN_ATTACHMENT_CLEANUP_ID="$PERSON_MERGE_ATTACHMENT_ID"
+	      run_expect_error_contains "merge_people(self merge rejected)" \
+	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"merge_people\",\"arguments\":{\"source\":{\"id\":\"$PERSON_ID\"},\"survivor\":{\"id\":\"$PERSON_ID\"}}},\"id\":2}" \
+	        "Choose two distinct people"
+	      run_capture_to_var_fresh PERSON_MERGE_PREVIEW_TEXT "merge_people(preflight)" \
+	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"merge_people\",\"arguments\":{\"source\":{\"id\":\"$PERSON_ID\"},\"survivor\":{\"id\":\"$PERSON_MERGE_SURVIVOR_ID\"}}},\"id\":2}"
+	      if [ $? -eq 0 ]; then
+	        assert_json_field_equals "person merge preflight is non-destructive" "$PERSON_MERGE_PREVIEW_TEXT" ".executed" "false"
+	        assert_json_field_equals "person merge preflight reports comments" "$PERSON_MERGE_PREVIEW_TEXT" ".impact.comments >= 1" "true"
+	        assert_json_field_equals "person merge preflight reports attachments" "$PERSON_MERGE_PREVIEW_TEXT" ".impact.attachments >= 1" "true"
+	        assert_json_field_equals "person merge preflight reports channels" "$PERSON_MERGE_PREVIEW_TEXT" ".impact.channels >= 1" "true"
+	        PERSON_MERGE_TOKEN=$(printf '%s\n' "$PERSON_MERGE_PREVIEW_TEXT" | jq -r '.preflightToken' 2>/dev/null)
+	        run_expect_error_contains "merge_people(stale preflight rejected)" \
+	          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"merge_people\",\"arguments\":{\"source\":{\"id\":\"$PERSON_ID\"},\"survivor\":{\"id\":\"$PERSON_MERGE_SURVIVOR_ID\"},\"execute\":true,\"expectedPreflightToken\":\"stale\"}},\"id\":2}" \
+	          "changed since preflight"
+	        run_capture_to_var_fresh PERSON_MERGE_EXECUTE_TEXT "merge_people(execute)" \
+	          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"merge_people\",\"arguments\":{\"source\":{\"id\":\"$PERSON_ID\"},\"survivor\":{\"id\":\"$PERSON_MERGE_SURVIVOR_ID\"},\"execute\":true,\"expectedPreflightToken\":\"$PERSON_MERGE_TOKEN\"}},\"id\":2}"
+	        if [ $? -eq 0 ]; then
+	          assert_json_field_equals "person merge executed" "$PERSON_MERGE_EXECUTE_TEXT" ".executed" "true"
+	          PERSON_MERGE_SOURCE_CLEANUP_ID="$PERSON_ID"
+	          PERSON_ADMIN_CLEANUP_ID="$PERSON_MERGE_SURVIVOR_ID"
+	          PERSON_MERGE_SURVIVOR_CLEANUP_ID=""
+	          run_capture_to_var_fresh PERSON_MERGED_COMMENTS_TEXT "list_person_comments(person merge survivor)" \
+	            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_person_comments\",\"arguments\":{\"person\":{\"id\":\"$PERSON_MERGE_SURVIVOR_ID\"}}},\"id\":2}"
+	          assert_json_array_contains "person merge preserves native comment" "$PERSON_MERGED_COMMENTS_TEXT" ".comments | map(.id)" "$PERSON_MERGE_COMMENT_ID"
+	          run_capture_to_var_fresh PERSON_MERGED_ATTACHMENTS_TEXT "list_person_attachments(person merge survivor)" \
+	            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_person_attachments\",\"arguments\":{\"person\":{\"id\":\"$PERSON_MERGE_SURVIVOR_ID\"}}},\"id\":2}"
+	          assert_json_array_contains "person merge preserves native attachment" "$PERSON_MERGED_ATTACHMENTS_TEXT" ".attachments | map(.id)" "$PERSON_MERGE_ATTACHMENT_ID"
+	        fi
+	      fi
+	    fi
+	    cleanup_person_admin_artifacts || true
+	    if [ -n "$PERSON_MERGE_SOURCE_CLEANUP_ID" ]; then
+	      run_test "delete_person(person merge retained source:$PERSON_MERGE_SOURCE_CLEANUP_ID)" \
+	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":\"$PERSON_MERGE_SOURCE_CLEANUP_ID\"}},\"id\":2}"
+	      PERSON_MERGE_SOURCE_CLEANUP_ID=""
+	    fi
 	  else
 	    fail_test "delete_person($PERSON_ID)" "child cleanup was not confirmed; preserving parent for EXIT cleanup"
 	  fi

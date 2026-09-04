@@ -1177,6 +1177,12 @@ describe("Huly Errors", () => {
               return `person-comment:${error.personId}:${error.commentId}`
             case "PersonIdentityRepairUnsupportedError":
               return `person-identity-repair:${error.personId}:${error.reason}`
+            case "PersonMergeSelfError":
+              return `person-merge-self:${error.personId}`
+            case "PersonMergePreflightMismatchError":
+              return `person-merge-preflight:${error.expected}:${error.actual}`
+            case "PersonMergeAccountBlockedError":
+              return `person-merge-account:${error.sourceId}:${error.survivorId}`
             case "PersonIdentifierAmbiguousError":
               return `person-ambiguous:${error.identifier}:${error.matches}`
             case "DepartmentNotFoundError":

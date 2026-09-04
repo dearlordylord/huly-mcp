@@ -42,6 +42,7 @@ export const ISSUE_97_ADMINISTRATION_TOOL_NAMES: ReadonlySet<ToolNameType> = new
   ToolName.make("archive_funnel"),
   ToolName.make("delete_funnel"),
   ToolName.make("get_person_administration"),
+  ToolName.make("merge_people"),
   ToolName.make("list_social_identity_providers"),
   ToolName.make("repair_person_social_identities"),
   ToolName.make("list_person_comments"),

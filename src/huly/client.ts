@@ -41,9 +41,11 @@ import {
 import { absurd, Context, Effect, Layer, Redacted, Schedule } from "effect"
 
 import { type Auth, HulyConfigService } from "../config/config.js"
+import type { PersonMergeReferenceImpact } from "../domain/schemas/person-merge.js"
 import {
   type HulyConditionalWriteResult,
   type HulyTransactionScope,
+  type PersonId as DomainPersonId,
   UrlString,
   WorkspaceUrlSlug
 } from "../domain/schemas/shared.js"
@@ -52,6 +54,7 @@ import {
   HulyAuthError,
   type HulyConnectionOperation,
   type HulyConnectionError,
+  type HulyDataInvalidError,
   HulyUnavailableError,
   makeOperationConnectionError
 } from "./errors-base.js"
@@ -67,6 +70,7 @@ import { HulySdk, type HulySdkDependencies } from "./sdk-deps.js"
 import { acquireClosableClient } from "./scoped-client.js"
 import { classifyHulyUnavailableFailure, normalizeHulyOrigin } from "./unavailable-diagnostics.js"
 import { testWorkbenchUrlConfig, type WorkbenchUrlConfig } from "./url-builders.js"
+import { inspectNativePersonReferences, migrateNativePersonReferences } from "./person-reference-migration.js"
 
 // --- Connection helpers ---
 
@@ -339,6 +343,16 @@ export interface HulyClientOperations extends HulyClientContext {
   ) => Effect.Effect<TxResult, HulyClientError>
 
   readonly searchFulltext: (query: SearchQuery, options: SearchOptions) => Effect.Effect<SearchResult, HulyClientError>
+
+  readonly inspectPersonReferences?: (
+    source: DomainPersonId
+  ) => Effect.Effect<ReadonlyArray<PersonMergeReferenceImpact>, HulyClientError | HulyDataInvalidError>
+
+  readonly migratePersonReferences?: (
+    impacts: ReadonlyArray<PersonMergeReferenceImpact>,
+    source: DomainPersonId,
+    survivor: DomainPersonId
+  ) => Effect.Effect<void, HulyClientError | HulyDataInvalidError>
 }
 
 export class HulyClient extends Context.Service<HulyClient, HulyClientOperations>()("@hulymcp/HulyClient") {
@@ -536,7 +550,12 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
             }),
 
           searchFulltext: (query, options) =>
-            withClient((client) => client.searchFulltext(query, options), "searchFulltext")
+            withClient((client) => client.searchFulltext(query, options), "searchFulltext"),
+
+          inspectPersonReferences: (source) => inspectNativePersonReferences(client, source),
+
+          migratePersonReferences: (impacts, source, survivor) =>
+            migrateNativePersonReferences(client, impacts, source, survivor)
         }
 
         return operations

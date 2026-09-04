@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 
+import { PersonMergePreflightToken } from "../domain/schemas/person-merge.js"
 import { CommentId, NonEmptyString, PersonId } from "../domain/schemas/shared.js"
 
 export class PersonCommentNotFoundError extends Schema.TaggedError<PersonCommentNotFoundError>()(
@@ -20,7 +21,36 @@ export class PersonIdentityRepairUnsupportedError extends Schema.TaggedError<Per
   }
 }
 
+export class PersonMergeSelfError extends Schema.TaggedError<PersonMergeSelfError>()("PersonMergeSelfError", {
+  personId: PersonId
+}) {
+  override get message(): string {
+    return `Source and survivor both resolve to person '${this.personId}'. Choose two distinct people.`
+  }
+}
+
+export class PersonMergePreflightMismatchError extends Schema.TaggedError<PersonMergePreflightMismatchError>()(
+  "PersonMergePreflightMismatchError",
+  { expected: PersonMergePreflightToken, actual: PersonMergePreflightToken }
+) {
+  override get message(): string {
+    return "Person merge impact or account eligibility changed since preflight. Preview again and review the new token."
+  }
+}
+
+export class PersonMergeAccountBlockedError extends Schema.TaggedError<PersonMergeAccountBlockedError>()(
+  "PersonMergeAccountBlockedError",
+  { sourceId: PersonId, survivorId: PersonId, reason: NonEmptyString }
+) {
+  override get message(): string {
+    return `Huly cannot safely merge the global people behind source '${this.sourceId}' and survivor '${this.survivorId}': ${this.reason}`
+  }
+}
+
 export const PersonAdministrationDomainError = Schema.Union([
   PersonCommentNotFoundError,
-  PersonIdentityRepairUnsupportedError
+  PersonIdentityRepairUnsupportedError,
+  PersonMergeSelfError,
+  PersonMergePreflightMismatchError,
+  PersonMergeAccountBlockedError
 ])

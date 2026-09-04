@@ -44,6 +44,8 @@ HR_REQUEST_ID=""
 HR_HOLIDAY_IDS=""
 FUNNEL_ID=""
 PERSON_ADMIN_ID=""
+PERSON_MERGE_SOURCE_ID=""
+PERSON_MERGE_SURVIVOR_ID=""
 PERSON_ADMIN_COMMENT_ID=""
 PERSON_ADMIN_ATTACHMENT_ID=""
 
@@ -72,6 +74,12 @@ cleanup() {
     for holiday_id in $HR_HOLIDAY_IDS; do
       "${CLI[@]}" hr holidays delete "$holiday_id" --yes --json >/dev/null 2>&1 || true
     done
+  fi
+  if [[ -n "$PERSON_MERGE_SOURCE_ID" ]]; then
+    "${CLI[@]}" contacts persons delete "$PERSON_MERGE_SOURCE_ID" --yes --json >/dev/null 2>&1
+  fi
+  if [[ -n "$PERSON_MERGE_SURVIVOR_ID" ]]; then
+    "${CLI[@]}" contacts persons delete "$PERSON_MERGE_SURVIVOR_ID" --yes --json >/dev/null 2>&1
   fi
   if [[ -n "$FUNNEL_ID" ]]; then
     if "${CLI[@]}" leads funnels archive "$FUNNEL_ID" --yes --json >/dev/null 2>&1; then
@@ -594,6 +602,26 @@ cover_cli_json "get_person_attachment" "person attachment get" \
 cover_cli_json "update_person_attachment" "person attachment update" \
   contacts persons attachments update --person "$PERSON_ADMIN_TARGET" \
     --attachment-id "$PERSON_ADMIN_ATTACHMENT_ID" --pinned true
+capture_cli_json "create_person" "person merge survivor fixture" PERSON_MERGE_SURVIVOR_JSON \
+  contacts persons create "CLI-Survivor-$RUN_ID" Person --email "cli-survivor-$RUN_ID@example.test"
+PERSON_MERGE_SURVIVOR_ID="$(json_value "$PERSON_MERGE_SURVIVOR_JSON" '.id')"
+PERSON_MERGE_SOURCE_ID="$PERSON_ADMIN_ID"
+PERSON_MERGE_SURVIVOR_TARGET="{\"id\":\"$PERSON_MERGE_SURVIVOR_ID\"}"
+capture_cli_json "merge_people" "person merge preflight" PERSON_MERGE_PREVIEW_JSON \
+  contacts persons merge --source "$PERSON_ADMIN_TARGET" --survivor "$PERSON_MERGE_SURVIVOR_TARGET" --yes
+PERSON_MERGE_TOKEN="$(json_value "$PERSON_MERGE_PREVIEW_JSON" '.preflightToken')"
+assert_json "person merge preflight reports native comment" "$PERSON_MERGE_PREVIEW_JSON" '.executed == false and .impact.comments >= 1'
+assert_json "person merge preflight reports native attachment" "$PERSON_MERGE_PREVIEW_JSON" '.impact.attachments >= 1'
+cover_cli_json "merge_people" "person merge execution" \
+  contacts persons merge --source "$PERSON_ADMIN_TARGET" --survivor "$PERSON_MERGE_SURVIVOR_TARGET" \
+    --execute --expected-preflight-token "$PERSON_MERGE_TOKEN" --yes
+PERSON_ADMIN_ID="$PERSON_MERGE_SURVIVOR_ID"
+PERSON_ADMIN_TARGET="$PERSON_MERGE_SURVIVOR_TARGET"
+PERSON_MERGE_SURVIVOR_ID=""
+cover_cli_json "list_person_comments" "merged person comments remain attached" \
+  contacts persons comments list --person "$PERSON_ADMIN_TARGET"
+cover_cli_json "list_person_attachments" "merged person attachments remain attached" \
+  contacts persons attachments list --person "$PERSON_ADMIN_TARGET"
 cover_cli_json "delete_person_attachment" "person attachment delete" \
   contacts persons attachments delete --person "$PERSON_ADMIN_TARGET" \
     --attachment-id "$PERSON_ADMIN_ATTACHMENT_ID" --yes
@@ -603,6 +631,8 @@ cover_cli_json "delete_person_comment" "person comment delete" \
 PERSON_ADMIN_COMMENT_ID=""
 cover_cli_json "delete_person" "person administration cleanup" contacts persons delete "$PERSON_ADMIN_ID" --yes
 PERSON_ADMIN_ID=""
+cover_cli_json "delete_person" "person merge retained source cleanup" contacts persons delete "$PERSON_MERGE_SOURCE_ID" --yes
+PERSON_MERGE_SOURCE_ID=""
 cli_live_case_end "person-administration-lifecycle"
 
 printf '{"nodes":[{"id":"%s"}]}\n' "$RUN_ID" >"$TEST_TMPDIR/drawing.json"

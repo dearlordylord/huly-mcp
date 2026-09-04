@@ -1,4 +1,5 @@
 import * as PersonSchemas from "../../domain/schemas/person-administration.js"
+import * as PersonMergeSchemas from "../../domain/schemas/person-merge.js"
 import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas.js"
 import {
   addPersonAttachment,
@@ -10,6 +11,7 @@ import {
 import {
   getPersonAdministration,
   listSocialIdentityProviders,
+  mergePeople,
   repairPersonSocialIdentities
 } from "../../huly/operations/person-administration.js"
 import {
@@ -23,8 +25,22 @@ import { defineCombinedTool, defineHulyWorkspaceTool, defineTool, type Registere
 const CATEGORY = "contacts" as const
 const EXACT_PERSON =
   "person must contain exactly one exact locator: {id}, {email}, or {name}; duplicate email/name matches fail as ambiguous."
+const EXACT_MERGE_PEOPLE =
+  "source and survivor must each contain exactly one exact locator: {id}, {email}, or {name}; duplicate email/name matches fail as ambiguous."
 
 export const personAdministrationTools = [
+  defineHulyWorkspaceTool(
+    {
+      name: "merge_people",
+      description: `Preview or execute a native-reference-preserving person merge with an explicitly selected source and survivor; ${EXACT_MERGE_PEOPLE} Preview is the default and reports identities, channels, memberships, comments, attachments, every other model-declared Person/Contact/Employee reference, account eligibility, retained scalar fields, and an exact preflight token. Execution requires execute=true plus that current token, rewires scalar and array references without dropping other array members, and invokes Huly's global Person merge when applicable. The source workspace Person record is retained because Huly's native merge does not cascade-delete it.`,
+      category: CATEGORY,
+      inputSchema: PersonMergeSchemas.mergePeopleParamsJsonSchema,
+      resultSchema: PersonMergeSchemas.MergePeopleResultSchema,
+      annotations: { destructiveHint: true }
+    },
+    PersonMergeSchemas.parseMergePeopleParams,
+    mergePeople
+  ),
   defineHulyWorkspaceTool(
     {
       name: "get_person_administration",

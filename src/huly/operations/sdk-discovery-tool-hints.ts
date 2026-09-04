@@ -41,6 +41,7 @@ export const firstClassToolHints = new Map<string, ReadonlyArray<HulyClassToolHi
         "list_persons",
         "get_person",
         "get_person_administration",
+        "merge_people",
         "list_person_comments",
         "list_person_attachments",
         "create_person"
@@ -120,7 +121,7 @@ const trackerCoveredRationale =
 const documentCoveredRationale =
   "Current document tools cover non-controlled document teamspaces, document CRUD/content operations, and read-only snapshot/history listing plus markdown retrieval. Snapshot restore and document PDF/export remain deferred."
 const contactCoveredRationale =
-  "Current contacts tools expose person, organization, employee/member, channels, exact-locator person notes and attachments, and person administration. Person administration exposes avatar and birthday, derives contact/workspace status, social identities and channel activity, reads account profile data, and applies only Huly-native account-authoritative SocialIdentity projection repairs; arbitrary identity mutations remain explicitly unsupported. Employee summaries project stable Contact Employee fields including active, role, statuses, position, and personUuid."
+  "Current contacts tools expose person, organization, employee/member, channels, exact-locator person notes and attachments, person administration, and explicit source/survivor person merges with preview tokens and model-metadata-driven native reference migration. Person administration exposes avatar and birthday, derives contact/workspace status, social identities and channel activity, reads account profile data, and applies only Huly-native account-authoritative SocialIdentity projection repairs; arbitrary identity mutations remain explicitly unsupported. Employee summaries project stable Contact Employee fields including active, role, statuses, position, and personUuid."
 const cardCoveredRationale = "Current card tools cover card spaces, master tags, and card CRUD."
 const boardCoveredRationale =
   "Current board tools cover board discovery, board create/update/archive, board card list/get/create/update, workflow status/type resolution, assignees, members, location, cover, dates, archived-card deletion, board labels, saved views, menu pages, viewlets, and common board preference reads. Provider integrations and board deletion remain deferred."

@@ -59,6 +59,7 @@ export type WorkspaceMemberInfo = Schema.Schema.Type<typeof WorkspaceMemberInfoS
 
 const WorkspacePersonProjectionSchema = Schema.Struct({
   _id: PersonId,
+  name: NonEmptyString,
   personUuid: Schema.optionalKey(PersonUuid),
   birthday: Schema.optionalKey(Schema.NullOr(HistoricalInstant)),
   avatarType: Schema.Literals(["color", "image", "gravatar", "external"]),

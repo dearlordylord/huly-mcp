@@ -67,7 +67,11 @@ export const HulyConnectionOperation = Schema.Literals([
   "createAccessLink",
   "updateAllowReadOnlyGuests",
   "updateAllowGuestSignUp",
-  "getRegionInfo"
+  "getRegionInfo",
+  "inspectPersonReferences",
+  "migratePersonReferences",
+  "canMergeSpecifiedPersons",
+  "mergeSpecifiedPersons"
 ])
 export type HulyConnectionOperation = Schema.Schema.Type<typeof HulyConnectionOperation>
 

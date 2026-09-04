@@ -20,7 +20,7 @@ export type CliIntegrationCoverageDecision =
       readonly type: "representative"
     }
 
-export const CLI_COVERAGE_REVIEWED_REGISTRY_OPERATIONS = 574
+export const CLI_COVERAGE_REVIEWED_REGISTRY_OPERATIONS = 575
 export const CLI_COVERAGE_REVIEWED_ROOT_COMMANDS = 55
 export const CLI_COVERAGE_REVIEWED_LOCAL_COMMANDS = 7
 

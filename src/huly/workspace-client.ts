@@ -65,6 +65,14 @@ export interface WorkspaceClientOperations {
   readonly getCurrentPerson: () => Effect.Effect<Person, WorkspaceClientError>
   readonly getCurrentSocialIds: (includeDeleted?: boolean) => Effect.Effect<Array<SocialId>, WorkspaceClientError>
   readonly getPersonInfo: (account: PersonUuid) => Effect.Effect<PersonInfo, WorkspaceClientError>
+  readonly canMergeSpecifiedPersons?: (
+    primaryPerson: PersonUuid,
+    secondaryPerson: PersonUuid
+  ) => Effect.Effect<boolean, WorkspaceClientError>
+  readonly mergeSpecifiedPersons?: (
+    primaryPerson: PersonUuid,
+    secondaryPerson: PersonUuid
+  ) => Effect.Effect<void, WorkspaceClientError>
   readonly updateWorkspaceRole: (account: string, role: AccountRole) => Effect.Effect<void, WorkspaceClientError>
   readonly getWorkspaceInfo: (updateLastVisit?: boolean) => Effect.Effect<WorkspaceInfoWithStatus, WorkspaceClientError>
   readonly getUserWorkspaces: () => Effect.Effect<Array<WorkspaceInfoWithStatus>, WorkspaceClientError>
@@ -139,6 +147,10 @@ export class WorkspaceClient extends Context.Service<WorkspaceClient, WorkspaceC
         getCurrentSocialIds: (includeDeleted) =>
           withClient((c) => c.getSocialIds(includeDeleted), "getCurrentSocialIds"),
         getPersonInfo: (account) => withClient((c) => c.getPersonInfo(account), "getPersonInfo"),
+        canMergeSpecifiedPersons: (primaryPerson, secondaryPerson) =>
+          withClient((c) => c.canMergeSpecifiedPersons(primaryPerson, secondaryPerson), "canMergeSpecifiedPersons"),
+        mergeSpecifiedPersons: (primaryPerson, secondaryPerson) =>
+          withClient((c) => c.mergeSpecifiedPersons(primaryPerson, secondaryPerson), "mergeSpecifiedPersons"),
         updateWorkspaceRole: (account, role) =>
           withClient((c) => c.updateWorkspaceRole(account, role), "updateWorkspaceRole"),
         getWorkspaceInfo: (updateLastVisit) =>
