@@ -249,7 +249,9 @@ const liveClientLayer = HulyClient.layerWithDependencies.pipe(Layer.provide(Laye
 interface TestDoc extends Doc {
   title: string
 }
-interface TestAttachedDoc extends AttachedDoc {}
+interface TestAttachedDoc extends AttachedDoc {
+  readonly fixture?: string
+}
 
 describe("HulyClient Service", () => {
   beforeEach(() => {

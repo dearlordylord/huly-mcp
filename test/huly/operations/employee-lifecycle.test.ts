@@ -88,6 +88,7 @@ interface Fixture {
   readonly channels?: ReadonlyArray<Channel>
   readonly updated?: Array<unknown>
   readonly events?: Array<string>
+  readonly atomicMixins?: Array<unknown>
 }
 
 const field = (value: unknown, key: string): unknown =>
@@ -175,8 +176,9 @@ const clientLayer = (fixture: Fixture, accountUuid = ACTOR_UUID): Layer.Layer<Hu
         fixture.events?.push("employee-created")
         return {}
       }),
-    createDocWithCollectionAndMixin: () =>
+    createDocWithCollectionAndMixin: (...args) =>
       Effect.sync(() => {
+        fixture.atomicMixins?.push(args[9])
         fixture.events?.push("person-created", "email-identity-created", "employee-created")
       }),
     updateMixin: <D extends Doc, M extends D>(
@@ -235,6 +237,7 @@ describe("employee lifecycle operations", () => {
   it.effect("creates Person, email SocialIdentity, and active Employee before sending an invitation", () => {
     const sent: Array<string> = []
     const events: Array<string> = []
+    const atomicMixins: Array<unknown> = []
     return Effect.gen(function* () {
       expect(
         yield* inviteEmployee({
@@ -250,7 +253,22 @@ describe("employee lifecycle operations", () => {
       })
       expect(sent).toEqual(["new@example.test"])
       expect(events).toEqual(["person-created", "email-identity-created", "employee-created", "invitation-sent"])
-    }).pipe(Effect.provide(layer({ events }, { sent, events, member: false })))
+      expect(atomicMixins).toEqual([{ active: true, role: "USER" }])
+    }).pipe(Effect.provide(layer({ events, atomicMixins }, { sent, events, member: false })))
+  })
+
+  it.effect("persists the explicit GUEST Employee role", () => {
+    const atomicMixins: Array<unknown> = []
+    return Effect.gen(function* () {
+      const result = yield* inviteEmployee({
+        mode: "create-or-promote",
+        name: PersonName.make("Guest,New"),
+        email: Email.make("guest@example.test"),
+        role: "GUEST"
+      })
+      expect(result.role).toBe("GUEST")
+      expect(atomicMixins).toEqual([{ active: true, role: "GUEST" }])
+    }).pipe(Effect.provide(layer({ atomicMixins }, { member: false })))
   })
 
   it.effect("resends for an inactive exact employee and returns all lifecycle states", () => {
@@ -259,12 +277,12 @@ describe("employee lifecycle operations", () => {
       const result = yield* inviteEmployee({
         mode: "invite-existing",
         employee: { name: PersonName.make("Lovelace,Ada") },
-        role: "MAINTAINER"
+        role: "GUEST"
       })
       expect(result).toMatchObject({
         outcome: "invitation-resent",
         email: "ada@example.test",
-        role: "MAINTAINER",
+        role: "GUEST",
         employee: {
           account: { state: "linked", personUuid: DOMAIN_PERSON_UUID },
           workspaceMembership: { state: "member", role: "USER" },

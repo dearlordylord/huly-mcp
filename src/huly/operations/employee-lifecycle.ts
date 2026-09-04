@@ -9,13 +9,13 @@ import {
   EMPLOYEE_LIFECYCLE_DEFAULT_LIMIT,
   type EmployeeLifecycleLocator,
   type EmployeeLifecycleState,
+  type EmployeeInvitationRole,
   type InviteEmployeeParams,
   type InviteEmployeeResult,
   type ListInactiveEmployeesParams,
   type ListInactiveEmployeesResult
 } from "../../domain/schemas/employee-lifecycle.js"
-import { Count, Email, HulyTransactionScope, NonNegativeInteger, PersonId } from "../../domain/schemas/shared.js"
-import type { AccountRole } from "../../domain/schemas/workspace.js"
+import { Count, HulyTransactionScope, NonNegativeInteger, PersonId, type Email } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import {
   EmployeeLifecycleImpactMismatchError,
@@ -27,7 +27,7 @@ import {
   PersonNotFoundError
 } from "../errors.js"
 import { contact } from "../huly-plugins.js"
-import { WorkspaceClient, type WorkspaceClientError, type WorkspaceClientOperations } from "../workspace-client.js"
+import { WorkspaceClient, type WorkspaceClientOperations } from "../workspace-client.js"
 import { batchGetEmailsForPersons, findPersonByExactEmail, findPersonByExactName } from "./contacts-shared.js"
 import {
   decodeEmployeeLifecycleDocument,
@@ -52,7 +52,6 @@ type EmployeeLifecycleError =
   | PersonIdentifierAmbiguousError
   | PersonNotAnEmployeeError
   | PersonNotFoundError
-  | WorkspaceClientError
 
 const locatorText = (locator: EmployeeLifecycleLocator): string => ("email" in locator ? locator.email : locator.name)
 
@@ -111,7 +110,10 @@ const employeeState = Effect.fn("EmployeeLifecycle.projectState")(function* (
           ? { state: "unlinked" }
           : { state: "linked", personUuid: employee.personUuid },
       workspaceMembership: member === undefined ? { state: "absent" } : { state: "member", role: member.role },
-      employee: { state: employee.active ? "active" : "inactive" }
+      employee: {
+        state: employee.active ? "active" : "inactive",
+        ...(employee.role === undefined ? {} : { role: employee.role })
+      }
     },
     operation
   )
@@ -135,15 +137,13 @@ const loadState = Effect.fn("EmployeeLifecycle.loadState")(function* (
   return yield* employeeState(employee, email, members, operation)
 })
 
-const DEFAULT_INVITE_ROLE: AccountRole = "USER"
-
-const employeeRole = (role: AccountRole): "GUEST" | "USER" => (role === "GUEST" ? "GUEST" : "USER")
+const DEFAULT_INVITE_ROLE: EmployeeInvitationRole = "USER"
 
 const prepareEmployee = Effect.fn("EmployeeLifecycle.prepareEmployee")(function* (
   client: HulyClient["Service"],
   name: Extract<InviteEmployeeParams, { readonly mode: "create-or-promote" }>["name"],
   email: Email,
-  role: AccountRole
+  role: EmployeeInvitationRole
 ) {
   const [byEmail, byName] = yield* Effect.all([resolvePerson(client, { email }), resolvePerson(client, { name })])
   if (byEmail !== undefined && byName !== undefined && byEmail._id !== byName._id) {
@@ -159,7 +159,7 @@ const prepareEmployee = Effect.fn("EmployeeLifecycle.prepareEmployee")(function*
   const personCreated = existing === undefined
   const nameUpdated = existing !== undefined && existing.name !== name
   const emailIdentityCreated = byEmail === undefined
-  const targetRole = employeeRole(role)
+  const targetRole = role
   const employeeCreated = existingEmployee === undefined
   const employeeReactivated = existingEmployee !== undefined && !existingEmployee.active
   const employeeRoleUpdated = existingEmployee !== undefined && existingEmployee.role !== targetRole
@@ -187,7 +187,7 @@ const prepareEmployee = Effect.fn("EmployeeLifecycle.prepareEmployee")(function*
       identityData,
       toRef<SocialIdentity>(generateId<SocialIdentity>()),
       contact.mixin.Employee,
-      { active: true },
+      { active: true, role: targetRole },
       HulyTransactionScope.make(`huly-mcp:employee-lifecycle:${personId}`)
     )
   } else if (nameUpdated) {

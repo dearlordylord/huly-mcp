@@ -36,9 +36,14 @@ const WorkspaceMembershipStateSchema = Schema.Union([
   Schema.Struct({ state: Schema.Literal("absent") }),
   Schema.Struct({ state: Schema.Literal("member"), role: AccountRoleSchema })
 ])
+export const EmployeeInvitationRoleSchema = Schema.Literals(["USER", "GUEST"]).annotate({
+  identifier: "EmployeeInvitationRole",
+  description: "Employee role persisted by the Contact Employee model and used for the workspace invitation."
+})
+export type EmployeeInvitationRole = Schema.Schema.Type<typeof EmployeeInvitationRoleSchema>
 const EmployeeStateSchema = Schema.Union([
-  Schema.Struct({ state: Schema.Literal("active") }),
-  Schema.Struct({ state: Schema.Literal("inactive") })
+  Schema.Struct({ state: Schema.Literal("active"), role: Schema.optionalKey(EmployeeInvitationRoleSchema) }),
+  Schema.Struct({ state: Schema.Literal("inactive"), role: Schema.optionalKey(EmployeeInvitationRoleSchema) })
 ])
 
 export const EmployeeLifecycleStateSchema = Schema.Struct({
@@ -54,13 +59,13 @@ export type EmployeeLifecycleState = Schema.Schema.Type<typeof EmployeeLifecycle
 const InviteExistingEmployeeParamsSchema = Schema.Struct({
   mode: Schema.Literal("invite-existing"),
   employee: EmployeeLifecycleLocatorSchema,
-  role: Schema.optionalKey(AccountRoleSchema)
+  role: Schema.optionalKey(EmployeeInvitationRoleSchema)
 })
 const CreateOrPromoteEmployeeParamsSchema = Schema.Struct({
   mode: Schema.Literal("create-or-promote"),
   name: PersonName,
   email: Email,
-  role: Schema.optionalKey(AccountRoleSchema)
+  role: Schema.optionalKey(EmployeeInvitationRoleSchema)
 })
 export const InviteEmployeeParamsSchema = Schema.Union([
   InviteExistingEmployeeParamsSchema,
@@ -76,7 +81,7 @@ export const InviteEmployeeResultSchema = Schema.Union([
   Schema.Struct({
     outcome: Schema.Literal("employee-prepared-and-invited"),
     email: Email,
-    role: AccountRoleSchema,
+    role: EmployeeInvitationRoleSchema,
     personId: PersonId,
     changes: Schema.Struct({
       personCreated: Schema.Boolean,
@@ -90,7 +95,7 @@ export const InviteEmployeeResultSchema = Schema.Union([
   Schema.Struct({
     outcome: Schema.Literal("invitation-resent"),
     email: Email,
-    role: AccountRoleSchema,
+    role: EmployeeInvitationRoleSchema,
     employee: EmployeeLifecycleStateSchema
   })
 ])

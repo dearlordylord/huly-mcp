@@ -207,10 +207,30 @@ cleanup_generic_associations() {
 
 cleanup_employee_lifecycle_artifacts() {
   if [ -n "$EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID" ]; then
-    local person_json
+    local person_json email_json delete_result read_result employee_result attempt
     person_json=$(json_string "$EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID")
-    call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" >/dev/null 2>&1 || true
+    email_json=$(json_string "$EMPLOYEE_LIFECYCLE_EMAIL")
+    delete_result=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" 2>/dev/null) || return 1
+    if [ "$(printf '%s\n' "$delete_result" | jq -r '.result.isError // true' 2>/dev/null)" = "true" ]; then
+      return 1
+    fi
+    attempt=1
+    while [ "$attempt" -le 8 ]; do
+      read_result=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" 2>/dev/null || true)
+      employee_result=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"deactivate_employee\",\"arguments\":{\"employee\":{\"email\":$email_json},\"action\":\"deactivate\"}},\"id\":2}" 2>/dev/null || true)
+      if [ "$(printf '%s\n' "$read_result" | jq -r '.result.isError // false' 2>/dev/null)" = "true" ] \
+        && printf '%s\n' "$read_result" | jq -er '.result.content[0].text | test("not found"; "i")' >/dev/null 2>&1 \
+        && [ "$(printf '%s\n' "$employee_result" | jq -r '.result.isError // false' 2>/dev/null)" = "true" ] \
+        && printf '%s\n' "$employee_result" | jq -er '.result.content[0].text | test("not found"; "i")' >/dev/null 2>&1; then
+        EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID=""
+        return 0
+      fi
+      sleep 1
+      attempt=$((attempt + 1))
+    done
+    return 1
   fi
+  return 0
 }
 
 cleanup_drive_artifacts() {
@@ -921,7 +941,10 @@ cleanup_all() {
     FUNNEL_CLEANUP_ID="$saved_funnel_cleanup_id"
   fi
   cleanup_recruiting_artifacts || true
-  cleanup_employee_lifecycle_artifacts || true
+  if ! cleanup_employee_lifecycle_artifacts; then
+    fail_test "employee lifecycle cleanup" "delete/readback was not confirmed; cleanup marker retained"
+    cleanup_failed=1
+  fi
   cleanup_generic_associations
   cleanup_workflow_artifacts || true
   cleanup_inventory_artifacts || true
@@ -4620,6 +4643,7 @@ if [ $? -eq 0 ]; then
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"deactivate_employee\",\"arguments\":{\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON},\"action\":\"deactivate\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     EMPLOYEE_LIFECYCLE_CREATED_ID=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -c '.impact.personId')
+    EMPLOYEE_LIFECYCLE_CREATED_ID_VALUE=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -r '.impact.personId')
     EMPLOYEE_LIFECYCLE_CREATED_UUID=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -c '.impact.account.personUuid // null')
     EMPLOYEE_LIFECYCLE_CREATED_ACTIVE=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -c '.impact.employee.state == "active"')
     EMPLOYEE_LIFECYCLE_CREATED_ROLE=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -c '.impact.workspaceMembership.role // null')
@@ -4629,6 +4653,20 @@ if [ $? -eq 0 ]; then
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"invite_employee\",\"arguments\":{\"mode\":\"invite-existing\",\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON}}},\"id\":2}"
     run_employee_invitation_step EMPLOYEE_LIFECYCLE_REACTIVATED "invite_employee(reactivate and restore)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"invite_employee\",\"arguments\":{\"mode\":\"create-or-promote\",\"name\":$EMPLOYEE_LIFECYCLE_NAME_JSON,\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON}},\"id\":2}"
+    run_capture_to_var_fresh EMPLOYEE_LIFECYCLE_RESTORED "deactivate_employee(restoration readback)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"deactivate_employee\",\"arguments\":{\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON},\"action\":\"deactivate\"}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "employee lifecycle restoration is active" \
+        "$EMPLOYEE_LIFECYCLE_RESTORED" '.impact.employee.state' 'active'
+      assert_json_field_equals "employee lifecycle restoration keeps USER role" \
+        "$EMPLOYEE_LIFECYCLE_RESTORED" '.impact.employee.role' 'USER'
+      assert_json_field_equals "employee lifecycle disposable account remains unlinked" \
+        "$EMPLOYEE_LIFECYCLE_RESTORED" '.impact.account.state' 'unlinked'
+      assert_json_field_equals "employee lifecycle disposable member remains absent" \
+        "$EMPLOYEE_LIFECYCLE_RESTORED" '.impact.workspaceMembership.state' 'absent'
+      assert_json_field_equals "employee lifecycle restoration keeps Person identity" \
+        "$EMPLOYEE_LIFECYCLE_RESTORED" '.impact.personId' "$EMPLOYEE_LIFECYCLE_CREATED_ID_VALUE"
+    fi
   fi
 fi
 run_capture_to_var INACTIVE_EMPLOYEES_TEXT "list_inactive_employees" \

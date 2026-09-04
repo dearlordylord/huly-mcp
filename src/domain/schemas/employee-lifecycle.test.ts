@@ -21,6 +21,22 @@ describe("employee lifecycle schemas", () => {
         parseInviteEmployeeParams({ mode: "create-or-promote", name: "Lovelace,Ada", email: "new@example.test" })
       )
     ).toMatchObject({ mode: "create-or-promote" })
+    for (const role of ["READONLYGUEST", "DocGuest"]) {
+      expect(
+        Exit.isFailure(
+          Effect.runSync(
+            Effect.exit(
+              parseInviteEmployeeParams({
+                mode: "create-or-promote",
+                name: "Lovelace,Ada",
+                email: "new@example.test",
+                role
+              })
+            )
+          )
+        )
+      ).toBe(true)
+    }
     expect(
       Exit.isFailure(
         Effect.runSync(

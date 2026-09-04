@@ -31,6 +31,11 @@ export const toTx = (payload: unknown): Tx => payload as Tx
 // eslint-disable-next-line no-restricted-syntax -- see above
 export const toAccountUuid = (uuid: NonEmptyString | AccountUuid): AccountUuid => uuid as AccountUuid
 
+// Parsed non-empty social identity IDs are plain strings at runtime; this is the
+// centralized bridge into the SDK's structural PersonId brand.
+// eslint-disable-next-line no-restricted-syntax -- see above
+export const toCorePersonId = (id: NonEmptyString | HulyPersonId): HulyPersonId => id as HulyPersonId
+
 // Core person IDs and parsed non-empty identity IDs are plain strings at runtime.
 export const toSocialIdentityRef = (id: HulyPersonId | NonEmptyString): SocialIdentity["_id"] => {
   // eslint-disable-next-line no-restricted-syntax -- see above

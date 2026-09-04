@@ -44,9 +44,11 @@ import { type Auth, HulyConfigService } from "../config/config.js"
 import type { PersonAdministrationLocator } from "../domain/schemas/person-administration.js"
 import type { PersonMergeReferenceImpact } from "../domain/schemas/person-merge.js"
 import {
+  AccountUuid as ParsedAccountUuid,
   type HulyConditionalWriteResult,
   type HulyTransactionScope,
   type PersonId as DomainPersonId,
+  NonEmptyString,
   UrlString,
   WorkspaceUrlSlug
 } from "../domain/schemas/shared.js"
@@ -73,6 +75,7 @@ import {
   resolvePersonAdministrationTarget,
   type ResolvePersonAdministrationError
 } from "./operations/person-administration-shared.js"
+import { toAccountUuid, toCorePersonId } from "./operations/sdk-boundary.js"
 import { HulySdk, type HulySdkDependencies } from "./sdk-deps.js"
 import { acquireClosableClient } from "./scoped-client.js"
 import { classifyHulyUnavailableFailure, normalizeHulyOrigin } from "./unavailable-diagnostics.js"
@@ -635,15 +638,9 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
     const noopFetchMarkup = (): Effect.Effect<string, HulyClientError> => Effect.succeed("")
 
     const defaultOps: HulyClientOperations = {
-      // Brands are erased at runtime; AccountUuid is a string and has no public test constructor.
-      // eslint-disable-next-line no-restricted-syntax -- fixture value exercises test-layer defaults only
-      getAccountUuid: () => "00000000-0000-4000-8000-000000000000" as AccountUuid,
-      // Brands are erased at runtime; PersonId is a string and has no public test constructor.
-      // eslint-disable-next-line no-restricted-syntax -- fixture value exercises test-layer defaults only
-      getPrimarySocialId: () => "test-primary-social-id" as PersonId,
-      // Brands are erased at runtime; PersonId is a string and has no public test constructor.
-      // eslint-disable-next-line no-restricted-syntax -- fixture value exercises test-layer defaults only
-      getSocialIds: () => ["test-primary-social-id" as PersonId],
+      getAccountUuid: () => toAccountUuid(ParsedAccountUuid.make("00000000-0000-4000-8000-000000000000")),
+      getPrimarySocialId: () => toCorePersonId(NonEmptyString.make("test-primary-social-id")),
+      getSocialIds: () => [toCorePersonId(NonEmptyString.make("test-primary-social-id"))],
       markupUrlConfig: testMarkupUrlConfig,
       workbenchUrlConfig: testWorkbenchUrlConfig,
       findAll: noopFindAll,
