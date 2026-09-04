@@ -15,6 +15,7 @@ import {
 } from "./shared.js"
 import { FunnelIdentifier, FunnelReference } from "./leads.js"
 import { ProjectTypeRefSchema } from "./task-management.js"
+import { AccountRoleSchema } from "./workspace.js"
 
 export const FunnelImpactSchema = Schema.Struct({
   leads: ListTotal,
@@ -42,7 +43,7 @@ export const FunnelDetailSchema = Schema.Struct({
   members: Schema.Array(AccountUuid),
   owners: Schema.Array(AccountUuid),
   autoJoin: Schema.Boolean,
-  autoJoinForRoles: Schema.Array(NonEmptyString),
+  autoJoinForRoles: Schema.Array(AccountRoleSchema),
   restricted: Schema.Boolean,
   projectType: Schema.Struct({ id: NonEmptyString, name: NonEmptyString }),
   workflow: Schema.Array(FunnelWorkflowTaskTypeSchema),
@@ -107,14 +108,31 @@ export const UPDATE_FUNNEL_FIELDS = [
 ] as const
 
 export const UpdateFunnelParamsSchema = Schema.Struct({
-  funnel: FunnelReference,
-  name: Schema.optional(NonEmptyString),
-  description: Schema.optional(Schema.NullOr(Schema.String)),
-  fullDescription: Schema.optional(Schema.NullOr(Schema.String)),
-  private: Schema.optional(Schema.Boolean),
-  members: Schema.optional(Schema.Array(AccountUuid)),
-  owners: Schema.optional(Schema.Array(AccountUuid)),
-  autoJoin: Schema.optional(Schema.Boolean)
+  funnel: FunnelReference.annotateKey({ description: "Funnel _id or exact name; ambiguous names are rejected." }),
+  name: Schema.optional(NonEmptyString.annotateKey({ description: "Replacement exact funnel name." })),
+  description: Schema.optional(
+    Schema.NullOr(Schema.String).annotateKey({ description: "Replacement plain-text summary; null clears it." })
+  ),
+  fullDescription: Schema.optional(
+    Schema.NullOr(Schema.String).annotateKey({
+      description: `Replacement Markdown description; null clears it. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`
+    })
+  ),
+  private: Schema.optional(Schema.Boolean.annotateKey({ description: "Whether the funnel is private." })),
+  members: Schema.optional(
+    Schema.Array(AccountUuid).annotateKey({
+      description: "Complete replacement member list. UUIDs must be current workspace accounts; cannot be empty."
+    })
+  ),
+  owners: Schema.optional(
+    Schema.Array(AccountUuid).annotateKey({
+      description:
+        "Complete replacement owner list. UUIDs must be current workspace accounts and members; cannot be empty."
+    })
+  ),
+  autoJoin: Schema.optional(
+    Schema.Boolean.annotateKey({ description: "Whether new workspace members automatically join this funnel." })
+  )
 })
   .pipe(
     Schema.check(
@@ -132,6 +150,26 @@ assertUpdateFields<UpdateFunnelParams>()(["funnel"], UPDATE_FUNNEL_FIELDS)
 export const FunnelMutationParamsSchema = GetFunnelParamsSchema
 export type FunnelMutationParams = Schema.Schema.Type<typeof FunnelMutationParamsSchema>
 
+export const DeleteFunnelParamsSchema = Schema.Struct({
+  funnel: FunnelReference.annotateKey({
+    description: "Archived funnel _id or exact name; ambiguous names are rejected."
+  }),
+  expectedLeads: Count.annotateKey({
+    description: "Lead count observed during preflight; deletion fails if it changed."
+  }),
+  expectedComments: Count.annotateKey({
+    description: "Comment count observed during preflight; deletion fails if it changed."
+  }),
+  expectedAttachments: Count.annotateKey({
+    description: "Attachment count observed during preflight; deletion fails if it changed."
+  })
+}).annotate({
+  title: "DeleteFunnelParams",
+  description:
+    "Delete an archived, empty funnel only if its current impact still matches the caller's preflight snapshot."
+})
+export type DeleteFunnelParams = Schema.Schema.Type<typeof DeleteFunnelParamsSchema>
+
 export const getFunnelParamsJsonSchema = toDraft07JsonSchema(GetFunnelParamsSchema)
 export const createFunnelParamsJsonSchema = withJsonSchemaPropertyDescriptions(
   toDraft07JsonSchema(CreateFunnelParamsSchema),
@@ -144,6 +182,7 @@ export const updateFunnelParamsJsonSchema = withAtLeastOneRequired(
   UPDATE_FUNNEL_FIELDS
 )
 export const funnelMutationParamsJsonSchema = getFunnelParamsJsonSchema
+export const deleteFunnelParamsJsonSchema = toDraft07JsonSchema(DeleteFunnelParamsSchema)
 
 export const parseGetFunnelParams = Schema.decodeUnknownEffect(GetFunnelParamsSchema)
 export const parseCreateFunnelParams = Schema.decodeUnknownEffect(CreateFunnelParamsSchema, {
@@ -153,6 +192,9 @@ export const parseUpdateFunnelParams = Schema.decodeUnknownEffect(UpdateFunnelPa
   onExcessProperty: "error"
 })
 export const parseFunnelMutationParams = parseGetFunnelParams
+export const parseDeleteFunnelParams = Schema.decodeUnknownEffect(DeleteFunnelParamsSchema, {
+  onExcessProperty: "error"
+})
 
 export const CreateFunnelResultSchema = Schema.Struct({
   identifier: FunnelIdentifier,

@@ -10,11 +10,11 @@ the baseline was not regenerated.
 - Effect 3 baseline SHA-256:
   `02bb5e4bf2fdb0e4dd30f980810bd0fe70d5c91482c309b4621264c373d6adac`
 - Reviewed Effect 4 corpus SHA-256:
-  `9c6249928b1ad74f1be091245dd3591dcbe104bed1147a08ad2ba8d1ebe8823c`
-- Exact structural deltas: 21,092
-- Added: 8,837
-- Changed: 2,152
-- Removed: 10,103
+  `abeb3a1fe816b770a4d7102a19b21b4cb9a5d37e9038852f80a854a639fa76d3`
+- Exact structural deltas: 23,836
+- Added: 8,531
+- Changed: 6,380
+- Removed: 8,925
 
 Each category records its exact delta count and the SHA-256 of its sorted exact
 delta identities. The compact `behavioral-oracle-delta-review.json` certificate
@@ -26,10 +26,11 @@ stale categories, duplicate categories, and corpus hash drift.
 
 | Count | Classification | Evidence |
 | ---: | --- | --- |
-| 12,754 | Draft-07 structural dialect | Effect 4 refs, definitions, optional/null unions, refinements, and composition wrappers. All 524 native and 6 proxy schemas compile under strict Ajv Draft-07. |
-| 4,894 | Schema metadata | Authored descriptions restored by the central adapter and obsolete Effect 3 generator-default titles/descriptions removed. |
-| 3,428 | Authored-constraint projection | The same 522 ordered tools remain represented; generated ref/composition paths changed. Manual cross-field constraints remain in the corpus and representative runtime/Ajv agreement passes. |
+| 7,146 | Draft-07 structural dialect | Effect 4 refs, definitions, optional/null unions, refinements, and composition wrappers. All 529 native and 6 proxy schemas compile under strict Ajv Draft-07. |
+| 2,688 | Schema metadata | Authored descriptions restored by the central adapter and obsolete Effect 3 generator-default titles/descriptions removed. |
+| 1,674 | Authored-constraint projection | Pre-funnel tools remain represented; generated ref/composition paths changed. Manual cross-field constraints remain in the corpus and representative runtime/Ajv agreement passes. |
 | 6 | Direct issue-assignee descriptions | Direct issue create, update, and list advertise exact agent UserProfile titles in both their tool and assignee input descriptions (#245). |
+| 12,312 | Funnel administration | Five workflow-aware funnel operations and their schemas are attributed by tool identity across native, registry, and CLI ordered surfaces (#256). |
 | 6 | CLI JSON parse diagnostics | Effect 4 adds deterministic line/column context; code, hint, retryability, and exit status are unchanged. |
 | 4 | CLI help rendering | The Effect 4 CLI renderer intentionally uses concise help and omits patterns that are not shared by every string-capable union branch, while retaining string patterns across nullable alternatives. Route inventory and ordering remain unchanged. |
 
@@ -51,6 +52,6 @@ mise exec node@22.22.2 -- pnpm exec vitest run \
   test/scripts/effect4-oracle-parity.test.ts
 ```
 
-The full verifier re-renders the current bundled corpus and matches all 21,092
+The full verifier re-renders the current bundled corpus and matches all 23,836
 exact entries. Any future semantic or structural drift is unexpected; an
 accepted entry that stops occurring is stale and also fails verification.

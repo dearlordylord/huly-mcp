@@ -258,6 +258,16 @@ const provideCombinedClient: ProvideServices<HulyClient | HulyStorageClient> = (
     )
   )
 
+const provideHulyWorkspaceClient: ProvideServices<HulyClient | WorkspaceClient> = (args) => (effect) =>
+  args.workspaceClient === undefined
+    ? Result.fail(new HulyError({ message: "WorkspaceClient not available" }))
+    : Result.succeed(
+        effect.pipe(
+          Effect.provideService(HulyClient, args.hulyClient),
+          Effect.provideService(WorkspaceClient, args.workspaceClient)
+        )
+      )
+
 const provideWorkspaceClient: ProvideServices<WorkspaceClient> = (args) => (effect) =>
   args.workspaceClient !== undefined
     ? Result.succeed(effect.pipe(Effect.provideService(WorkspaceClient, args.workspaceClient)))
@@ -402,6 +412,12 @@ export const defineCombinedTool = <const Name extends string, P, S extends Resul
     params: P
   ) => Effect.Effect<SchemaResult<S>, HulyDomainError, HulyClient | HulyStorageClient | Diagnostics>
 ): RegisteredTool<Name> => defineProvidedTool(spec, provideCombinedClient, parse, operation)
+
+export const defineHulyWorkspaceTool = <const Name extends string, P, S extends ResultSchema>(
+  spec: ToolSpec<Name, S>,
+  parse: (input: unknown) => Effect.Effect<P, Schema.SchemaError>,
+  operation: (params: P) => Effect.Effect<SchemaResult<S>, HulyDomainError, HulyClient | WorkspaceClient | Diagnostics>
+): RegisteredTool<Name> => defineProvidedTool(spec, provideHulyWorkspaceClient, parse, operation)
 
 export const defineCombinedImageTool = <const Name extends string, P, S extends ResultSchema, R>(
   spec: ToolSpec<Name, S>,

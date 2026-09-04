@@ -113,6 +113,7 @@ const DOMAIN_FAILURE_KIND_BY_TAG = {
   FunnelProjectTypeIdentifierAmbiguousError: "ambiguity",
   FunnelWorkflowInvalidError: "integration",
   FunnelDeleteConflictError: "conflict",
+  FunnelAccountNotFoundError: "lookup",
   GenericObjectIdentifierAmbiguousError: "ambiguity",
   GenericObjectLocatorInvalidError: "input",
   GenericObjectNotFoundError: "lookup",

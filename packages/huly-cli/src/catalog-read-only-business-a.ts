@@ -36,7 +36,11 @@ export const businessReadOnlyCliCommandCatalogA = {
     positional: ["variant"],
     description: "Get Inventory Variant"
   },
-  get_funnel: { path: ["leads", "funnels", "get"], positional: ["funnel"], description: "Get Funnel" },
+  get_funnel: {
+    path: ["leads", "funnels", "get"],
+    positional: ["funnel"],
+    description: "Get an exact funnel, validated workflow, and deletion-impact snapshot"
+  },
   get_lead: { path: ["leads", "get"], positional: ["funnel", "identifier"], description: "Get Lead" },
   get_meeting_minutes: {
     path: ["office", "meeting-minutes", "get"],

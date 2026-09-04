@@ -60,7 +60,13 @@ const CandidateListToolsResponseSchema = Schema.Struct({
 type CandidateTool = Schema.Schema.Type<typeof CandidateToolSchema>
 type CandidateToolIdentities = ReadonlyMap<string, CandidateTool>
 const EMPTY_CANDIDATE_TOOL_IDENTITIES: CandidateToolIdentities = new Map()
-const FUNNEL_AUTHORED_CONSTRAINT_START_INDEX = 318
+const FUNNEL_TOOL_NAMES: ReadonlySet<ToolNameType> = new Set([
+  ToolName.make("get_funnel"),
+  ToolName.make("create_funnel"),
+  ToolName.make("update_funnel"),
+  ToolName.make("archive_funnel"),
+  ToolName.make("delete_funnel")
+])
 
 const candidateToolIdentityKey = (responseIndex: number, toolIndex: number): string => `${responseIndex}/${toolIndex}`
 
@@ -101,15 +107,10 @@ const isIssueAssigneeInputDescription = (path: string, candidateToolIdentities: 
 
 export const oracleDeltaReviewCategory = (
   delta: OracleDelta,
-  candidateToolIdentities: CandidateToolIdentities = EMPTY_CANDIDATE_TOOL_IDENTITIES
+  candidateToolIdentities: CandidateToolIdentities = EMPTY_CANDIDATE_TOOL_IDENTITIES,
+  isFunnelExpansionDelta: (path: string) => boolean = () => false
 ): ReviewCategory | undefined => {
-  const authoredConstraintPosition = /^\/registry\/authoredConstraints\/(\d+)(?:\/|$)/u.exec(delta.path)?.[1]
-  if (
-    authoredConstraintPosition !== undefined &&
-    Number(authoredConstraintPosition) >= FUNNEL_AUTHORED_CONSTRAINT_START_INDEX
-  ) {
-    return "funnel-administration"
-  }
+  if (isFunnelExpansionDelta(delta.path)) return "funnel-administration"
   if (delta.path.startsWith("/registry/authoredConstraints/")) return "authored-constraints"
   if (isIssueAssigneeInputDescription(delta.path, candidateToolIdentities)) return "issue-assignee-description"
   if (delta.path.includes("/inputSchema/") || delta.path.includes("/outputSchema/")) {
@@ -118,18 +119,9 @@ export const oracleDeltaReviewCategory = (
       : "draft07-structure"
   }
   const toolName = candidateToolName(delta.path, candidateToolIdentities)
+  if (toolName !== undefined && FUNNEL_TOOL_NAMES.has(toolName)) return "funnel-administration"
   if (toolName !== undefined && ISSUE_ASSIGNEE_TOOL_NAMES.has(toolName)) {
     return "issue-assignee-description"
-  }
-  if (
-    delta.path.startsWith("/bundledProcesses/stdio/native/") ||
-    delta.path.startsWith("/registry/rawOrder/") ||
-    delta.path.startsWith("/registry/operationOrder/") ||
-    delta.path.startsWith("/registry/tools/") ||
-    delta.path.startsWith("/cli/parity/live/") ||
-    delta.path.startsWith("/cli/routes/")
-  ) {
-    return "funnel-administration"
   }
   if (delta.path.includes("/help/") || delta.path.endsWith("Help/stdout")) return "cli-help"
   if (delta.path.includes("/cli/") && delta.path.endsWith("stderr")) return "cli-json-diagnostic"
@@ -199,7 +191,8 @@ const categoryMetadata = (category: ReviewCategory): { readonly issue: string; r
 
 const categorizeOracleDeltas = (
   deltas: ReadonlyArray<OracleDelta>,
-  candidateToolIdentities: CandidateToolIdentities = EMPTY_CANDIDATE_TOOL_IDENTITIES
+  candidateToolIdentities: CandidateToolIdentities = EMPTY_CANDIDATE_TOOL_IDENTITIES,
+  isFunnelExpansionDelta: (path: string) => boolean = () => false
 ): {
   readonly categorized: Map<ReviewCategory, Array<OracleDelta>>
   readonly unclassified: ReadonlyArray<OracleDelta>
@@ -207,7 +200,7 @@ const categorizeOracleDeltas = (
   const categorized = new Map<ReviewCategory, Array<OracleDelta>>()
   const unclassified: Array<OracleDelta> = []
   for (const delta of deltas) {
-    const category = oracleDeltaReviewCategory(delta, candidateToolIdentities)
+    const category = oracleDeltaReviewCategory(delta, candidateToolIdentities, isFunnelExpansionDelta)
     if (category === undefined) {
       unclassified.push(delta)
       continue
@@ -223,9 +216,10 @@ export const createOracleDeltaReview = (
   baselineJson: string,
   currentJson: string,
   deltas: ReadonlyArray<OracleDelta>,
-  candidateToolIdentities: CandidateToolIdentities = EMPTY_CANDIDATE_TOOL_IDENTITIES
+  candidateToolIdentities: CandidateToolIdentities = EMPTY_CANDIDATE_TOOL_IDENTITIES,
+  isFunnelExpansionDelta: (path: string) => boolean = () => false
 ): OracleDeltaReview => {
-  const { categorized, unclassified } = categorizeOracleDeltas(deltas, candidateToolIdentities)
+  const { categorized, unclassified } = categorizeOracleDeltas(deltas, candidateToolIdentities, isFunnelExpansionDelta)
   if (unclassified.length > 0) throw new Error("Cannot review unclassified oracle deltas.")
   return Schema.decodeUnknownSync(OracleDeltaReviewSchema)({
     formatVersion: 1,
@@ -261,6 +255,78 @@ const authoredConstraintIndex = (delta: OracleDelta): number => {
   return Number(match[1])
 }
 
+const sameToolOrder = (left: ReadonlyArray<ToolNameType>, right: ReadonlyArray<ToolNameType>): boolean =>
+  left.length === right.length && left.every((name, index) => name === right[index])
+
+const funnelExpansionStart = (
+  baseline: ReadonlyArray<ToolNameType>,
+  current: ReadonlyArray<ToolNameType>
+): number | undefined => {
+  const withoutFunnels = current.filter((name) => !FUNNEL_TOOL_NAMES.has(name))
+  if (!sameToolOrder(baseline, withoutFunnels)) return undefined
+  const start = current.findIndex((name) => FUNNEL_TOOL_NAMES.has(name))
+  return start < 0 ? undefined : start
+}
+
+const pathAtOrAfter = (path: string, prefix: string, start: number | undefined): boolean => {
+  if (start === undefined) return false
+  const match = new RegExp(`^${prefix}/(\\d+)(?:/|$)`, "u").exec(path)
+  return match?.[1] !== undefined && Number(match[1]) >= start
+}
+
+const nativeToolNames = (responses: ReadonlyArray<OracleJsonRpcResponse>, responseIndex: number) => {
+  const response = responses[responseIndex]
+  if (response === undefined) return []
+  const decoded = Schema.decodeUnknownOption(CandidateListToolsResponseSchema)(response)
+  return Option.isSome(decoded) ? decoded.value.result.tools.map((tool) => tool.name) : []
+}
+
+const makeFunnelExpansionClassifier = (
+  baseline: BehavioralOracle,
+  current: BehavioralOracle
+): ((path: string) => boolean) => {
+  const starts = {
+    authored: funnelExpansionStart(
+      baseline.registry.authoredConstraints.map((entry) => entry.toolName),
+      current.registry.authoredConstraints.map((entry) => entry.toolName)
+    ),
+    operationOrder: funnelExpansionStart(baseline.registry.operationOrder, current.registry.operationOrder),
+    rawOrder: funnelExpansionStart(baseline.registry.rawOrder, current.registry.rawOrder),
+    routes: funnelExpansionStart(
+      baseline.cli.routes.map((route) => route.toolName),
+      current.cli.routes.map((route) => route.toolName)
+    ),
+    tools: funnelExpansionStart(
+      baseline.registry.tools.map((entry) => entry.name),
+      current.registry.tools.map((entry) => entry.name)
+    )
+  }
+  const nativeStarts = current.bundledProcesses.stdio.native.map((_, responseIndex) =>
+    funnelExpansionStart(
+      nativeToolNames(baseline.bundledProcesses.stdio.native, responseIndex),
+      nativeToolNames(current.bundledProcesses.stdio.native, responseIndex)
+    )
+  )
+  const registryExpansion = starts.rawOrder !== undefined && starts.operationOrder !== undefined
+  const routeExpansion = starts.routes !== undefined
+  return (path) => {
+    if (pathAtOrAfter(path, "/registry/authoredConstraints", starts.authored)) return true
+    if (pathAtOrAfter(path, "/registry/operationOrder", starts.operationOrder)) return true
+    if (pathAtOrAfter(path, "/registry/rawOrder", starts.rawOrder)) return true
+    if (pathAtOrAfter(path, "/registry/tools", starts.tools)) return true
+    if (pathAtOrAfter(path, "/cli/routes", starts.routes)) return true
+    const native = /^\/bundledProcesses\/stdio\/native\/(\d+)\/result\/tools\/(\d+)(?:\/|$)/u.exec(path)
+    if (native?.[1] !== undefined && native[2] !== undefined) {
+      const start = nativeStarts[Number(native[1])]
+      if (start !== undefined && Number(native[2]) >= start) return true
+    }
+    return (
+      path.startsWith("/cli/parity/live/") &&
+      ((path.endsWith("/registryOperations") && registryExpansion) || (path.endsWith("/cliRoutes") && routeExpansion))
+    )
+  }
+}
+
 export const createOracleDeltaAuditReport = (
   baselineJson: string,
   currentJson: string,
@@ -269,7 +335,8 @@ export const createOracleDeltaAuditReport = (
   deltas: ReadonlyArray<OracleDelta>
 ): OracleDeltaAuditReport => {
   const candidateToolIdentities = parseCandidateToolIdentities(current.bundledProcesses.stdio.native)
-  const { categorized, unclassified } = categorizeOracleDeltas(deltas, candidateToolIdentities)
+  const isFunnelExpansionDelta = makeFunnelExpansionClassifier(baseline, current)
+  const { categorized, unclassified } = categorizeOracleDeltas(deltas, candidateToolIdentities, isFunnelExpansionDelta)
   if (unclassified.length > 0) throw new Error("Cannot report unclassified oracle deltas.")
   const byTool = new Map<string, Array<OracleDelta>>()
   for (const delta of categorized.get("authored-constraints") ?? []) {
@@ -284,7 +351,13 @@ export const createOracleDeltaAuditReport = (
     byTool.set(currentName, entries)
   }
   return Schema.decodeUnknownSync(OracleDeltaAuditReportSchema)({
-    certificate: createOracleDeltaReview(baselineJson, currentJson, deltas, candidateToolIdentities),
+    certificate: createOracleDeltaReview(
+      baselineJson,
+      currentJson,
+      deltas,
+      candidateToolIdentities,
+      isFunnelExpansionDelta
+    ),
     categories: REVIEW_CATEGORY_ORDER.flatMap((category) => {
       const entries = categorized.get(category) ?? []
       return entries.length === 0 ? [] : [{ category, deltas: entries }]
@@ -311,11 +384,17 @@ export const verifyReviewedOracleDeltas = (
   )
   if (duplicateCategories.length > 0) throw new Error("Oracle delta review contains duplicate categories.")
 
-  const candidate = Schema.decodeUnknownOption(Schema.fromJsonString(BehavioralOracleSchema))(currentJson)
+  const decodeOracle = Schema.decodeUnknownOption(Schema.fromJsonString(BehavioralOracleSchema))
+  const baseline = decodeOracle(baselineJson)
+  const candidate = decodeOracle(currentJson)
   const candidateToolIdentities = Option.isSome(candidate)
     ? parseCandidateToolIdentities(candidate.value.bundledProcesses.stdio.native)
     : EMPTY_CANDIDATE_TOOL_IDENTITIES
-  const { categorized, unclassified } = categorizeOracleDeltas(deltas, candidateToolIdentities)
+  const isFunnelExpansionDelta =
+    Option.isSome(baseline) && Option.isSome(candidate)
+      ? makeFunnelExpansionClassifier(baseline.value, candidate.value)
+      : () => false
+  const { categorized, unclassified } = categorizeOracleDeltas(deltas, candidateToolIdentities, isFunnelExpansionDelta)
   if (unclassified.length > 0) {
     throw new Error(`Oracle comparison contains ${unclassified.length} unclassified deltas.`)
   }

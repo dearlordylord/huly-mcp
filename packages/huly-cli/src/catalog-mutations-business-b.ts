@@ -150,7 +150,7 @@ export const businessMutationCliCommandCatalogB = {
   update_funnel: {
     path: ["leads", "funnels", "update"],
     positional: ["funnel"],
-    description: "Update Funnel",
+    description: "Update an exact funnel with validated workflow and workspace accounts",
     behavior: { fileInput: { fields: ["fullDescription"] } }
   },
   update_inventory_product_comment: {

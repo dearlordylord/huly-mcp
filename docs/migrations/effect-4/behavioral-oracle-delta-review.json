@@ -3,15 +3,15 @@
   "categories": [
     {
       "category": "draft07-structure",
-      "count": 11875,
-      "deltaSetSha256": "1ceadad182fe7f83838b76f565462d0b29ccfa18e085fdba3de3b16cd9829654",
+      "count": 7146,
+      "deltaSetSha256": "f21644177a632ac9a671542ef839959625e25b20797b4f5ed8a4c786d8c733b3",
       "issue": "#225",
       "rationale": "Reviewed Effect 4 Draft-07 structural dialect: refs, definitions, optional/null unions, refinements, and composition wrappers."
     },
     {
       "category": "schema-metadata",
-      "count": 3688,
-      "deltaSetSha256": "9e3da9e339dd586908239c07c05f35613b7c27cc32c353f8b511cf51d7ad1daf",
+      "count": 2688,
+      "deltaSetSha256": "cae51e2da9c2959b5314aabb6024d7ead799fe9c33ff2829db5f5152010dcb25",
       "issue": "#225",
       "rationale": "Reviewed schema metadata migration: authored descriptions are preserved and legacy generator-default metadata is replaced."
     },
@@ -31,8 +31,8 @@
     },
     {
       "category": "funnel-administration",
-      "count": 6575,
-      "deltaSetSha256": "55f7d971b8ca24c52f2fc7c393c74860fcee8f3603c86db213519d80f806cb9c",
+      "count": 12312,
+      "deltaSetSha256": "4de1c0166bd7407d4aa1b869aa0233194a8d51feab55ab410e17231f06dc73e4",
       "issue": "#256",
       "rationale": "Reviewed five workflow-aware funnel administration operations, their exact schemas and ordered registry/CLI exposure."
     },
@@ -52,5 +52,5 @@
     }
   ],
   "formatVersion": 1,
-  "reviewedCurrentSha256": "2b14e627f66bed17e6fa19340f09a2a8774bc8a4644e23c1f48f0ffabc3931c5"
+  "reviewedCurrentSha256": "abeb3a1fe816b770a4d7102a19b21b4cb9a5d37e9038852f80a854a639fa76d3"
 }

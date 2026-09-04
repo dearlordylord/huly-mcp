@@ -15,12 +15,14 @@ import {
 import {
   createFunnelParamsJsonSchema,
   CreateFunnelResultSchema,
+  deleteFunnelParamsJsonSchema,
   DeleteFunnelResultSchema,
   FunnelDetailSchema,
   funnelMutationParamsJsonSchema,
   FunnelMutationResultSchema,
   getFunnelParamsJsonSchema,
   parseCreateFunnelParams,
+  parseDeleteFunnelParams,
   parseFunnelMutationParams,
   parseGetFunnelParams,
   parseUpdateFunnelParams,
@@ -36,7 +38,7 @@ import {
   updateFunnel
 } from "../../huly/operations/funnels.js"
 import { getLead, listLeads } from "../../huly/operations/leads.js"
-import { defineTool, type RegisteredTool } from "./registry.js"
+import { defineHulyWorkspaceTool, defineTool, type RegisteredTool } from "./registry.js"
 
 const CATEGORY = "leads" as const
 
@@ -65,7 +67,7 @@ export const leadTools = [
     parseGetFunnelParams,
     getFunnel
   ),
-  defineTool(
+  defineHulyWorkspaceTool(
     {
       name: "create_funnel",
       description:
@@ -77,7 +79,7 @@ export const leadTools = [
     parseCreateFunnelParams,
     createFunnel
   ),
-  defineTool(
+  defineHulyWorkspaceTool(
     {
       name: "update_funnel",
       description:
@@ -105,12 +107,12 @@ export const leadTools = [
     {
       name: "delete_funnel",
       description:
-        "Permanently delete an exact funnel only after it is archived and its lead, comment, and attachment impact is empty. Use get_funnel for preflight and archive_funnel first. Non-empty funnels are rejected.",
+        "Permanently delete an exact funnel only after it is archived and empty. First call get_funnel or archive_funnel, then pass the observed impact counts as expectedLeads, expectedComments, and expectedAttachments. Deletion fails if any count changed after that preflight snapshot.",
       category: CATEGORY,
-      inputSchema: funnelMutationParamsJsonSchema,
+      inputSchema: deleteFunnelParamsJsonSchema,
       resultSchema: DeleteFunnelResultSchema
     },
-    parseFunnelMutationParams,
+    parseDeleteFunnelParams,
     deleteFunnel
   ),
   defineTool(

@@ -4,6 +4,7 @@ import { expect } from "vitest"
 
 import {
   parseCreateFunnelParams,
+  parseDeleteFunnelParams,
   parseFunnelMutationParams,
   parseGetFunnelParams,
   parseUpdateFunnelParams,
@@ -26,6 +27,24 @@ describe("funnel administration schemas", () => {
       expect(created.name).toBe("Enterprise Sales")
       expect((yield* parseGetFunnelParams({ funnel: "funnel-1" })).funnel).toBe("funnel-1")
       expect((yield* parseFunnelMutationParams({ funnel: "funnel-1" })).funnel).toBe("funnel-1")
+      const deletion = yield* parseDeleteFunnelParams({
+        funnel: "funnel-1",
+        expectedLeads: 0,
+        expectedComments: 0,
+        expectedAttachments: 0
+      })
+      expect(deletion.expectedLeads).toBe(0)
+    })
+  )
+
+  it.effect("requires a complete non-negative delete impact snapshot", () =>
+    Effect.gen(function* () {
+      const missing = yield* Effect.flip(parseDeleteFunnelParams({ funnel: "funnel-1", expectedLeads: 0 }))
+      const negative = yield* Effect.flip(
+        parseDeleteFunnelParams({ funnel: "funnel-1", expectedLeads: -1, expectedComments: 0, expectedAttachments: 0 })
+      )
+      expect(String(missing)).toContain("expectedComments")
+      expect(String(negative)).toContain("greater than or equal to 0")
     })
   )
 

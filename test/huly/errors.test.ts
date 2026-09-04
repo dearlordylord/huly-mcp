@@ -1359,6 +1359,8 @@ describe("Huly Errors", () => {
               return `funnel-workflow:${error.projectType}:${error.reason}`
             case "FunnelDeleteConflictError":
               return `funnel-delete:${error.identifier}:${error.reason}`
+            case "FunnelAccountNotFoundError":
+              return `funnel-account:${error.account}`
             case "LeadNotFoundError":
               return `lead:${error.identifier}`
             case "ProcessNotFoundError":

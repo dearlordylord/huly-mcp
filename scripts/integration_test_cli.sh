@@ -40,9 +40,15 @@ HR_DEPARTMENT_ID=""
 HR_STAFF_EMPLOYEE=""
 HR_STAFF_ORIGINAL_DEPARTMENT=""
 HR_STAFF_NEEDS_RESTORE=""
+FUNNEL_ID=""
 
 cleanup() {
   set +e
+  if [[ -n "$FUNNEL_ID" ]]; then
+    "${CLI[@]}" leads funnels archive "$FUNNEL_ID" --yes --json >/dev/null 2>&1
+    "${CLI[@]}" leads funnels delete "$FUNNEL_ID" --expected-leads 0 --expected-comments 0 \
+      --expected-attachments 0 --yes --json >/dev/null 2>&1
+  fi
   if [[ -n "$HR_STAFF_NEEDS_RESTORE" ]]; then
     if [[ -n "$HR_STAFF_ORIGINAL_DEPARTMENT" ]]; then
       "${CLI[@]}" hr staff assign-department "$HR_STAFF_EMPLOYEE" \
@@ -240,6 +246,36 @@ echo "Run: $RUN_ID"
 cli_live_case_begin "scalar-structured-read"
 cover_cli_json "list_projects" "projects list" projects list
 cli_live_case_end "scalar-structured-read"
+capture_cli_json "list_funnels" "funnels list for lifecycle fixture" FUNNELS_JSON leads funnels list
+EXISTING_FUNNEL_ID="$(json_value "$FUNNELS_JSON" '.funnels[0].identifier // empty')"
+if [[ -z "$EXISTING_FUNNEL_ID" ]]; then
+  echo "No existing funnel found for CLI funnel lifecycle." >&2
+  exit 1
+fi
+printf 'Funnel lifecycle description from file for %s\n' "$RUN_ID" >"$TEST_TMPDIR/funnel-description.md"
+cli_live_case_begin "funnel-administration-lifecycle"
+capture_cli_json "get_funnel" "funnel lifecycle project-type preflight" FUNNEL_PREFLIGHT_JSON \
+  leads funnels get "$EXISTING_FUNNEL_ID"
+FUNNEL_PROJECT_TYPE="$(json_value "$FUNNEL_PREFLIGHT_JSON" '.projectType.id // empty')"
+if [[ -z "$FUNNEL_PROJECT_TYPE" ]]; then
+  echo "get_funnel did not return a project type ID." >&2
+  exit 1
+fi
+capture_cli_json "create_funnel" "funnel lifecycle create with description file" FUNNEL_CREATE_JSON \
+  leads funnels create "CLI Integration Funnel $RUN_ID" --project-type "$FUNNEL_PROJECT_TYPE" \
+  --full-description-file "$TEST_TMPDIR/funnel-description.md"
+FUNNEL_ID="$(json_value "$FUNNEL_CREATE_JSON" '.identifier // empty')"
+if [[ -z "$FUNNEL_ID" ]]; then
+  echo "create_funnel did not return a funnel ID." >&2
+  exit 1
+fi
+cover_cli_json "update_funnel" "funnel lifecycle nullable structured update" leads funnels update "$FUNNEL_ID" \
+  --input-json '{"description":null}'
+cover_cli_json "archive_funnel" "funnel lifecycle archive" leads funnels archive "$FUNNEL_ID" --yes
+cover_cli_json "delete_funnel" "funnel lifecycle snapshot-confirmed delete" leads funnels delete "$FUNNEL_ID" \
+  --expected-leads 0 --expected-comments 0 --expected-attachments 0 --yes
+FUNNEL_ID=""
+cli_live_case_end "funnel-administration-lifecycle"
 capture_cli_json "get_project" "projects get" PROJECT_JSON projects get "$PROJECT"
 cover_cli_json "list_statuses" "projects statuses" projects statuses "$PROJECT"
 cover_cli_json "list_project_types" "project-types list" project-types list

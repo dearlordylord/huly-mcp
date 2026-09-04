@@ -1,13 +1,14 @@
 import { describe, it } from "@effect/vitest"
-import type { Class, Doc, DocumentQuery, Ref, Space, Status } from "@hcengineering/core"
-import { toFindResult } from "@hcengineering/core"
+import type { Class, Doc, Ref, Space, Status } from "@hcengineering/core"
+import { AccountRole, toFindResult } from "@hcengineering/core"
 import type { Project, ProjectType, Task, TaskType, TaskTypeDescriptor } from "@hcengineering/task"
 import { Effect } from "effect"
 import { expect } from "vitest"
 
-import { AccountUuid, NonEmptyString } from "../../../src/domain/schemas/shared.js"
+import { AccountUuid, Count, NonEmptyString } from "../../../src/domain/schemas/shared.js"
 import { FunnelReference } from "../../../src/domain/schemas/leads.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import { WorkspaceClient } from "../../../src/huly/workspace-client.js"
 import { Diagnostics, makeDiagnosticsScope } from "../../../src/huly/diagnostics.js"
 import { core, task } from "../../../src/huly/huly-plugins.js"
 import { leadClassIds } from "../../../src/huly/lead-plugin.js"
@@ -93,7 +94,7 @@ const makeFunnel = (overrides: Partial<HulyFunnel> = {}): HulyFunnel => ({
   ...overrides
 })
 
-const matches = <T extends Doc>(doc: T, query: DocumentQuery<T>): boolean =>
+const matches = (doc: Doc, query: object): boolean =>
   Object.entries(query).every(([key, expected]) => {
     const actual = Reflect.get(doc, key)
     if (expected !== null && typeof expected === "object" && "$in" in expected) {
@@ -107,7 +108,9 @@ interface FixtureOptions {
   readonly projectTypes?: ReadonlyArray<ProjectType>
   readonly taskTypes?: ReadonlyArray<TaskType>
   readonly statuses?: ReadonlyArray<Status>
+  readonly projectMixins?: ReadonlyArray<Doc>
   readonly leadCount?: number
+  readonly workspaceAccounts?: ReadonlyArray<AccountUuid>
 }
 
 const fixture = (options: FixtureOptions = {}) => {
@@ -115,6 +118,7 @@ const fixture = (options: FixtureOptions = {}) => {
   const projectTypes = [...(options.projectTypes ?? [projectType])]
   const taskTypes = [...(options.taskTypes ?? [taskType])]
   const statuses = [...(options.statuses ?? [status])]
+  const projectMixins = [...(options.projectMixins ?? [])]
   const updates: Array<unknown> = []
   const created: Array<{ readonly kind: string; readonly data: unknown }> = []
   const removed: Array<string> = []
@@ -129,14 +133,19 @@ const fixture = (options: FixtureOptions = {}) => {
             ? taskTypes
             : className === String(core.class.Status)
               ? statuses
-              : []
+              : className === String(core.class.Mixin)
+                ? projectMixins
+                : []
     if (className === String(leadClassIds.class.Lead)) {
       return Effect.succeed(toFindResult([], options.leadCount ?? 0))
     }
-    const found = source.filter((candidate) => matches(candidate, query as DocumentQuery<Doc>))
+    const found = source.filter((candidate) => matches(candidate, query))
     const limited = findOptions?.limit === undefined ? found : found.slice(0, findOptions.limit)
-    // SDK-shaped test port narrows the runtime-routed document class above.
-    // eslint-disable-next-line no-restricted-syntax
+    // Huly's generic class ref is a phantom runtime string, so TypeScript cannot
+    // express the class-to-document dependency after the exhaustive route above.
+    // A type guard cannot narrow caller-selected generic T. This boundary-only
+    // cast mirrors findAll's SDK contract after runtime routing and query matching
+    // have selected the requested class.
     return Effect.succeed(toFindResult(limited as Array<never>, found.length))
   }
   const layer = HulyClient.testLayer({
@@ -145,7 +154,8 @@ const fixture = (options: FixtureOptions = {}) => {
     findOne: (_class, query, findOptions) => Effect.map(findAll(_class, query, findOptions), (result) => result.at(0)),
     createDoc: (_class, _space, data, id) => {
       created.push({ kind: "doc", data })
-      return Effect.succeed(id as never)
+      if (id === undefined) return Effect.die(new Error("funnel fixture requires explicit create IDs"))
+      return Effect.succeed(id)
     },
     createMixin: (_id, _class, _space, _mixin, data) => {
       created.push({ kind: "mixin", data })
@@ -162,23 +172,36 @@ const fixture = (options: FixtureOptions = {}) => {
       return Effect.succeed({})
     }
   })
-  return { created, layer, removed, updates }
+  const workspaceLayer = WorkspaceClient.testLayer({
+    getWorkspaceMembers: () =>
+      Effect.succeed(
+        (options.workspaceAccounts ?? [account]).map((person) => ({
+          person: toAccountUuid(person),
+          role: AccountRole.User
+        }))
+      )
+  })
+  return { created, layer, removed, updates, workspaceLayer }
 }
 
 const provide = <A, E>(
-  effect: Effect.Effect<A, E, HulyClient | Diagnostics>,
-  layer: ReturnType<typeof HulyClient.testLayer>
+  effect: Effect.Effect<A, E, HulyClient | WorkspaceClient | Diagnostics>,
+  layers: Pick<ReturnType<typeof fixture>, "layer" | "workspaceLayer">
 ) =>
   Effect.gen(function* () {
     const scope = yield* makeDiagnosticsScope
-    return yield* effect.pipe(Effect.provideService(Diagnostics, scope.service), Effect.provide(layer))
+    return yield* effect.pipe(
+      Effect.provideService(Diagnostics, scope.service),
+      Effect.provide(layers.layer),
+      Effect.provide(layers.workspaceLayer)
+    )
   })
 
 describe("funnel administration operations", () => {
   it.effect("projects stable fields, validated workflow, impact, and unsupported classification", () =>
     Effect.gen(function* () {
       const test = fixture({ leadCount: 3 })
-      const result = yield* provide(getFunnel({ funnel: funnel("funnel-1") }), test.layer)
+      const result = yield* provide(getFunnel({ funnel: funnel("funnel-1") }), test)
       expect(result.fullDescription).toContain("# Full")
       expect(result.workflow[0]?.statuses[0]?.name).toBe("New")
       expect(result.impact).toMatchObject({ leads: 3, comments: 2, attachments: 1, totalAffected: 6 })
@@ -189,13 +212,60 @@ describe("funnel administration operations", () => {
   it.effect("rejects an ambiguous exact name and an invalid workflow before mutation", () =>
     Effect.gen(function* () {
       const duplicate = fixture({ funnels: [makeFunnel(), makeFunnel({ _id: toRef<HulyFunnel>("funnel-2") })] })
-      const ambiguous = yield* Effect.flip(provide(getFunnel({ funnel: funnel("Sales") }), duplicate.layer))
+      const ambiguous = yield* Effect.flip(provide(getFunnel({ funnel: funnel("Sales") }), duplicate))
       expect(ambiguous._tag).toBe("FunnelIdentifierAmbiguousError")
 
       const invalid = fixture({ taskTypes: [] })
-      const failed = yield* Effect.flip(provide(createFunnel({ name: NonEmptyString.make("New") }), invalid.layer))
+      const failed = yield* Effect.flip(provide(createFunnel({ name: NonEmptyString.make("New") }), invalid))
       expect(failed._tag).toBe("FunnelWorkflowInvalidError")
       expect(invalid.created).toHaveLength(0)
+    })
+  )
+
+  it.effect("accepts generated Funnel project mixins and rejects bidirectionally inconsistent workflows", () =>
+    Effect.gen(function* () {
+      const customTarget = toClassRef<Project>("custom-funnel:type:mixin")
+      const customType = { ...projectType, targetClass: customTarget }
+      const customMixin = {
+        ...docBase(toRef<Doc>(customTarget), core.class.Mixin, core.space.Model),
+        extends: leadClassIds.class.Funnel
+      }
+      const valid = fixture({ funnels: [], projectTypes: [customType], projectMixins: [customMixin] })
+      const created = yield* provide(createFunnel({ name: NonEmptyString.make("Custom") }), valid)
+      expect(created.created).toBe(true)
+
+      const foreignTaskType = toRef<TaskType>("foreign-task-type")
+      const extraMapping = fixture({
+        projectTypes: [
+          { ...projectType, statuses: [...projectType.statuses, { _id: statusId, taskType: foreignTaskType }] }
+        ]
+      })
+      const mappingError = yield* Effect.flip(provide(getFunnel({ funnel: funnel("funnel-1") }), extraMapping))
+      expect(mappingError._tag).toBe("FunnelWorkflowInvalidError")
+
+      const extraStatus = toRef<Status>("lead-status-extra")
+      const asymmetric = fixture({
+        projectTypes: [
+          { ...projectType, statuses: [...projectType.statuses, { _id: extraStatus, taskType: taskTypeId }] }
+        ]
+      })
+      const statusError = yield* Effect.flip(provide(getFunnel({ funnel: funnel("funnel-1") }), asymmetric))
+      expect(statusError._tag).toBe("FunnelWorkflowInvalidError")
+    })
+  )
+
+  it.effect("rejects unknown workspace member accounts before mutation", () =>
+    Effect.gen(function* () {
+      const unknown = AccountUuid.make("00000000-0000-4000-8000-000000000999")
+      const test = fixture({ funnels: [], workspaceAccounts: [account] })
+      const error = yield* Effect.flip(
+        provide(
+          createFunnel({ name: NonEmptyString.make("Unknown member"), members: [unknown], owners: [unknown] }),
+          test
+        )
+      )
+      expect(error._tag).toBe("FunnelAccountNotFoundError")
+      expect(test.created).toHaveLength(0)
     })
   )
 
@@ -208,7 +278,7 @@ describe("funnel administration operations", () => {
           fullDescription:
             "**Rich** [LEAD-1](https://test.invalid/browse?workspace=test&_class=lead%3Aclass%3ALead&_id=lead-1&label=LEAD-1)"
         }),
-        createTest.layer
+        createTest
       )
       expect(result.created).toBe(true)
       expect(result.archived).toBe(false)
@@ -220,14 +290,32 @@ describe("funnel administration operations", () => {
       })
 
       const active = fixture({ funnels: [makeFunnel({ comments: 0, attachments: 0 })] })
-      yield* provide(updateFunnel({ funnel: funnel("funnel-1"), description: null }), active.layer)
+      yield* provide(updateFunnel({ funnel: funnel("funnel-1"), description: null }), active)
       expect(active.updates[0]).toMatchObject({ description: "" })
-      const activeDelete = yield* Effect.flip(provide(deleteFunnel({ funnel: funnel("funnel-1") }), active.layer))
+      const activeDelete = yield* Effect.flip(
+        provide(
+          deleteFunnel({
+            funnel: funnel("funnel-1"),
+            expectedLeads: Count.make(0),
+            expectedComments: Count.make(0),
+            expectedAttachments: Count.make(0)
+          }),
+          active
+        )
+      )
       expect(activeDelete._tag).toBe("FunnelDeleteConflictError")
 
-      const archived = yield* provide(archiveFunnel({ funnel: funnel("funnel-1") }), active.layer)
+      const archived = yield* provide(archiveFunnel({ funnel: funnel("funnel-1") }), active)
       expect(archived.updated).toBe(true)
-      const deleted = yield* provide(deleteFunnel({ funnel: funnel("funnel-1") }), active.layer)
+      const deleted = yield* provide(
+        deleteFunnel({
+          funnel: funnel("funnel-1"),
+          expectedLeads: Count.make(0),
+          expectedComments: Count.make(0),
+          expectedAttachments: Count.make(0)
+        }),
+        active
+      )
       expect(deleted.deleted).toBe(true)
       expect(active.removed).toEqual(["funnel-1"])
     })
@@ -236,9 +324,39 @@ describe("funnel administration operations", () => {
   it.effect("reports impact and refuses to delete a non-empty archived funnel", () =>
     Effect.gen(function* () {
       const test = fixture({ funnels: [makeFunnel({ archived: true })], leadCount: 1 })
-      const error = yield* Effect.flip(provide(deleteFunnel({ funnel: funnel("funnel-1") }), test.layer))
+      const error = yield* Effect.flip(
+        provide(
+          deleteFunnel({
+            funnel: funnel("funnel-1"),
+            expectedLeads: Count.make(1),
+            expectedComments: Count.make(2),
+            expectedAttachments: Count.make(1)
+          }),
+          test
+        )
+      )
       expect(error._tag).toBe("FunnelDeleteConflictError")
       expect(error.message).toContain("1 leads, 2 comments, 1 attachments")
+      expect(test.removed).toHaveLength(0)
+    })
+  )
+
+  it.effect("rejects deletion when impact changed after the caller's snapshot", () =>
+    Effect.gen(function* () {
+      const test = fixture({ funnels: [makeFunnel({ archived: true, comments: 0, attachments: 0 })], leadCount: 1 })
+      const error = yield* Effect.flip(
+        provide(
+          deleteFunnel({
+            funnel: funnel("funnel-1"),
+            expectedLeads: Count.make(0),
+            expectedComments: Count.make(0),
+            expectedAttachments: Count.make(0)
+          }),
+          test
+        )
+      )
+      expect(error._tag).toBe("FunnelDeleteConflictError")
+      expect(error.message).toContain("impact changed since preflight")
       expect(test.removed).toHaveLength(0)
     })
   )
@@ -246,7 +364,7 @@ describe("funnel administration operations", () => {
   it.effect("reports archived idempotent creates and rejects update name collisions", () =>
     Effect.gen(function* () {
       const existing = fixture({ funnels: [makeFunnel({ archived: true })] })
-      const idempotent = yield* provide(createFunnel({ name: NonEmptyString.make("Sales") }), existing.layer)
+      const idempotent = yield* provide(createFunnel({ name: NonEmptyString.make("Sales") }), existing)
       expect(idempotent).toMatchObject({ created: false, archived: true, identifier: "funnel-1" })
       expect(existing.created).toHaveLength(0)
 
@@ -254,7 +372,7 @@ describe("funnel administration operations", () => {
         funnels: [makeFunnel(), makeFunnel({ _id: toRef<HulyFunnel>("funnel-2"), name: "Enterprise" })]
       })
       const failed = yield* Effect.flip(
-        provide(updateFunnel({ funnel: funnel("funnel-1"), name: NonEmptyString.make("Enterprise") }), collision.layer)
+        provide(updateFunnel({ funnel: funnel("funnel-1"), name: NonEmptyString.make("Enterprise") }), collision)
       )
       expect(failed._tag).toBe("FunnelIdentifierAmbiguousError")
       expect(collision.updates).toHaveLength(0)

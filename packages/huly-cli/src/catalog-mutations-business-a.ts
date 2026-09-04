@@ -51,7 +51,11 @@ export const businessMutationCliCommandCatalogA = {
     positional: ["vacancy"],
     description: "Archive Recruiting Vacancy"
   },
-  archive_funnel: { path: ["leads", "funnels", "archive"], positional: ["funnel"], description: "Archive Funnel" },
+  archive_funnel: {
+    path: ["leads", "funnels", "archive"],
+    positional: ["funnel"],
+    description: "Archive an exact funnel and return its deletion-impact snapshot"
+  },
   complete_todo: { path: ["planner", "todos", "complete"], positional: ["locator"], description: "Complete Todo" },
   create_card: {
     path: ["cards", "create"],
@@ -88,7 +92,7 @@ export const businessMutationCliCommandCatalogA = {
   create_funnel: {
     path: ["leads", "funnels", "create"],
     positional: ["name"],
-    description: "Create Funnel",
+    description: "Create a workflow-validated funnel with existing workspace accounts",
     behavior: { fileInput: { fields: ["fullDescription"] } }
   },
   create_lead: {
@@ -188,7 +192,7 @@ export const businessMutationCliCommandCatalogA = {
   delete_funnel: {
     path: ["leads", "funnels", "delete"],
     positional: ["funnel"],
-    description: "Delete Funnel",
+    description: "Delete an archived empty funnel matching caller-confirmed impact counts",
     behavior: { confirmation: { type: "requires-yes", message: "leads funnels delete requires --yes." } }
   },
   delete_event: {

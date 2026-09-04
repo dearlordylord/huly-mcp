@@ -6,6 +6,8 @@
 import { Schema } from "effect"
 
 import { FunnelIdentifier, FunnelReference, LeadIdentifier } from "../domain/schemas/leads.js"
+import { ProjectTypeRefSchema } from "../domain/schemas/task-management.js"
+import { AccountUuid } from "../domain/schemas/shared.js"
 
 /**
  * Funnel not found in the workspace.
@@ -29,7 +31,7 @@ export class FunnelIdentifierAmbiguousError extends Schema.TaggedError<FunnelIde
 
 export class FunnelProjectTypeNotFoundError extends Schema.TaggedError<FunnelProjectTypeNotFoundError>()(
   "FunnelProjectTypeNotFoundError",
-  { identifier: Schema.String }
+  { identifier: ProjectTypeRefSchema }
 ) {
   override get message(): string {
     return `Funnel project type '${this.identifier}' not found or is not compatible with the native Funnel model`
@@ -38,7 +40,7 @@ export class FunnelProjectTypeNotFoundError extends Schema.TaggedError<FunnelPro
 
 export class FunnelProjectTypeIdentifierAmbiguousError extends Schema.TaggedError<FunnelProjectTypeIdentifierAmbiguousError>()(
   "FunnelProjectTypeIdentifierAmbiguousError",
-  { identifier: Schema.String, matches: Schema.Number }
+  { identifier: ProjectTypeRefSchema, matches: Schema.Number }
 ) {
   override get message(): string {
     return `Funnel project type '${this.identifier}' matched ${this.matches} project types; pass the project type _id`
@@ -63,13 +65,23 @@ export class FunnelDeleteConflictError extends Schema.TaggedError<FunnelDeleteCo
   }
 }
 
+export class FunnelAccountNotFoundError extends Schema.TaggedError<FunnelAccountNotFoundError>()(
+  "FunnelAccountNotFoundError",
+  { account: AccountUuid }
+) {
+  override get message(): string {
+    return `Workspace account '${this.account}' does not exist; funnel members and owners must be current workspace accounts`
+  }
+}
+
 export const FunnelDomainError = Schema.Union([
   FunnelNotFoundError,
   FunnelIdentifierAmbiguousError,
   FunnelProjectTypeNotFoundError,
   FunnelProjectTypeIdentifierAmbiguousError,
   FunnelWorkflowInvalidError,
-  FunnelDeleteConflictError
+  FunnelDeleteConflictError,
+  FunnelAccountNotFoundError
 ])
 
 /**

@@ -6,6 +6,7 @@ import { Effect } from "effect"
 import type {
   CreateFunnelParams,
   CreateFunnelResult,
+  DeleteFunnelParams,
   DeleteFunnelResult,
   FunnelDetail,
   FunnelImpact,
@@ -22,6 +23,7 @@ import {
   type ListFunnelsResult
 } from "../../domain/schemas/leads.js"
 import { AccountUuid, Count, NonEmptyString, Timestamp, UNKNOWN_TOTAL } from "../../domain/schemas/shared.js"
+import { AccountRoleSchema } from "../../domain/schemas/workspace.js"
 import { isSingle } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
@@ -32,6 +34,7 @@ import {
   HulyDataInvalidError,
   type NoUpdateFieldsError
 } from "../errors.js"
+import { FunnelAccountNotFoundError } from "../errors-leads.js"
 import { core } from "../huly-plugins.js"
 import { leadClassIds } from "../lead-plugin.js"
 import { listTotal } from "./counts.js"
@@ -51,9 +54,15 @@ import { renderMarkdownWithNativeReferencesForWrite } from "./native-reference-m
 import { clampLimit, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
 import { toAccountUuid, toMixinRef } from "./sdk-boundary.js"
 import { requireUpdateFields } from "./update-guards.js"
+import { WorkspaceClient, type WorkspaceClientError } from "../workspace-client.js"
 
 type FunnelReadError = FunnelResolverError | FunnelModelError | HulyDataInvalidError
-type FunnelWriteError = FunnelReadError | NoUpdateFieldsError | FunnelDeleteConflictError
+type FunnelWriteError =
+  | FunnelReadError
+  | NoUpdateFieldsError
+  | FunnelDeleteConflictError
+  | FunnelAccountNotFoundError
+  | WorkspaceClientError
 
 const totalAffected = (impact: Omit<FunnelImpact, "totalAffected">): FunnelImpact["totalAffected"] =>
   impact.leads === UNKNOWN_TOTAL ? UNKNOWN_TOTAL : Count.make(impact.leads + impact.comments + impact.attachments)
@@ -108,8 +117,8 @@ const fullDescriptionForRead = (
       })
 
 const ensureMembership = (
-  members: ReadonlyArray<string>,
-  owners: ReadonlyArray<string>,
+  members: ReadonlyArray<AccountUuid>,
+  owners: ReadonlyArray<AccountUuid>,
   projectType: ProjectType
 ): Effect.Effect<void, FunnelWorkflowInvalidError> =>
   members.length > 0 && owners.length > 0 && owners.every((owner) => members.includes(owner))
@@ -140,7 +149,7 @@ const toFunnelDetail = (
       members: funnel.members.map((member) => AccountUuid.make(member)),
       owners: (funnel.owners ?? []).map((owner) => AccountUuid.make(owner)),
       autoJoin: funnel.autoJoin ?? false,
-      autoJoinForRoles: funnel.autoJoinForRoles ?? [],
+      autoJoinForRoles: (funnel.autoJoinForRoles ?? []).map((role) => AccountRoleSchema.make(role)),
       restricted: funnel.restricted ?? false,
       projectType: { id: NonEmptyString.make(projectType._id), name: NonEmptyString.make(projectType.name) },
       workflow: workflow.map(({ statuses, taskType }) => ({
@@ -186,8 +195,8 @@ const findExistingFunnelForCreate = (
 const createFunnelData = (
   params: CreateFunnelParams,
   projectType: ProjectType,
-  members: ReadonlyArray<string>,
-  owners: ReadonlyArray<string>,
+  members: ReadonlyArray<AccountUuid>,
+  owners: ReadonlyArray<AccountUuid>,
   fullDescription: string | undefined
 ): Data<HulyFunnel> => ({
   name: params.name,
@@ -232,8 +241,12 @@ export const createFunnel = (
   params: CreateFunnelParams
 ): Effect.Effect<
   CreateFunnelResult,
-  FunnelModelError | FunnelIdentifierAmbiguousError | HulyDataInvalidError,
-  HulyClient | Diagnostics
+  | FunnelModelError
+  | FunnelIdentifierAmbiguousError
+  | HulyDataInvalidError
+  | FunnelAccountNotFoundError
+  | WorkspaceClientError,
+  HulyClient | WorkspaceClient | Diagnostics
 > =>
   Effect.gen(function* () {
     const client = yield* HulyClient
@@ -248,10 +261,11 @@ export const createFunnel = (
     }
     const projectType = yield* resolveFunnelProjectType(client, params.projectType)
     yield* validatedWorkflow(client, projectType)
-    const account = client.getAccountUuid()
+    const account = AccountUuid.make(client.getAccountUuid())
     const members = params.members ?? [account]
     const owners = params.owners ?? [account]
     yield* ensureMembership(members, owners, projectType)
+    yield* ensureWorkspaceAccounts([...members, ...owners])
     const fullDescription = yield* fullDescriptionForWrite(client, params.fullDescription)
     const id: Ref<HulyFunnel> = generateId()
     const data = createFunnelData(params, projectType, members, owners, fullDescription)
@@ -299,16 +313,17 @@ const funnelMembershipUpdate = (params: UpdateFunnelParams): DocumentUpdate<Huly
 
 export const updateFunnel = (
   params: UpdateFunnelParams
-): Effect.Effect<FunnelMutationResult, FunnelWriteError, HulyClient | Diagnostics> =>
+): Effect.Effect<FunnelMutationResult, FunnelWriteError, HulyClient | WorkspaceClient | Diagnostics> =>
   Effect.gen(function* () {
     yield* requireUpdateFields("update_funnel", params, [...paramsFields])
     const { client, funnel } = yield* resolveFunnelFromContext(params.funnel)
     const projectType = yield* getFunnelProjectType(client, funnel)
     yield* validatedWorkflow(client, projectType)
     yield* rejectFunnelNameCollision(client, funnel, params.name)
-    const members = params.members ?? funnel.members
-    const owners = params.owners ?? funnel.owners ?? []
+    const members = params.members ?? funnel.members.map((member) => AccountUuid.make(member))
+    const owners = params.owners ?? (funnel.owners ?? []).map((owner) => AccountUuid.make(owner))
     yield* ensureMembership(members, owners, projectType)
+    yield* ensureWorkspaceAccounts([...members, ...owners])
     const fullDescription = yield* fullDescriptionForWrite(client, params.fullDescription)
     const update = funnelUpdate(params, fullDescription)
     yield* client.updateDoc(leadClassIds.class.Funnel, core.space.Space, funnel._id, update)
@@ -333,13 +348,23 @@ export const archiveFunnel = (
   })
 
 export const deleteFunnel = (
-  params: FunnelMutationParams
+  params: DeleteFunnelParams
 ): Effect.Effect<DeleteFunnelResult, FunnelWriteError, HulyClient | Diagnostics> =>
   Effect.gen(function* () {
     const { client, funnel } = yield* resolveFunnelFromContext(params.funnel)
     const projectType = yield* getFunnelProjectType(client, funnel)
     yield* validatedWorkflow(client, projectType)
     const impact = yield* funnelImpact(client, funnel)
+    if (
+      impact.leads !== params.expectedLeads ||
+      impact.comments !== params.expectedComments ||
+      impact.attachments !== params.expectedAttachments
+    ) {
+      return yield* new FunnelDeleteConflictError({
+        identifier: params.funnel,
+        reason: `impact changed since preflight; expected ${params.expectedLeads} leads, ${params.expectedComments} comments, ${params.expectedAttachments} attachments but found ${impact.leads}, ${impact.comments}, ${impact.attachments}`
+      })
+    }
     if (!funnel.archived) {
       return yield* new FunnelDeleteConflictError({
         identifier: params.funnel,
@@ -354,4 +379,14 @@ export const deleteFunnel = (
     }
     yield* client.removeDoc(leadClassIds.class.Funnel, core.space.Space, funnel._id)
     return { identifier: FunnelIdentifier.make(funnel._id), deleted: true, impact }
+  })
+
+const ensureWorkspaceAccounts = (
+  requested: ReadonlyArray<AccountUuid>
+): Effect.Effect<void, WorkspaceClientError | FunnelAccountNotFoundError, WorkspaceClient> =>
+  Effect.gen(function* () {
+    const workspace = yield* WorkspaceClient
+    const existing = new Set((yield* workspace.getWorkspaceMembers()).map((member) => AccountUuid.make(member.person)))
+    const missing = requested.find((account) => !existing.has(account))
+    if (missing !== undefined) return yield* new FunnelAccountNotFoundError({ account: missing })
   })
