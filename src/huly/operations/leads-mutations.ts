@@ -30,7 +30,7 @@ import { HulyDataInvalidError } from "../errors.js"
 import type { HulyError, InvalidStatusError, PersonIdentifierAmbiguousError, PersonNotFoundError } from "../errors.js"
 import { attachment, chunter, tags } from "../huly-plugins.js"
 import { leadClassIds } from "../lead-plugin.js"
-import { funnelSpace } from "./funnels-shared.js"
+import { funnelSpace, type FunnelWorkflowTaskType, type HulyFunnel } from "./funnels-shared.js"
 import { customerMixinWriteAttributes } from "./leads-mutations-boundary.js"
 import {
   currentStatus,
@@ -62,57 +62,210 @@ const statusForLead = Effect.fn("Lead.statusForLead")(function* (
   return yield* statusByName(leadWorkflow.statuses, name, project)
 })
 
+type LeadUpdateOperations = { readonly operations: LeadDocumentUpdate; readonly changed: boolean }
+
+const rejectArchivedLeadUpdate = Effect.fn("Lead.rejectArchivedLeadUpdate")(function* (
+  params: UpdateLeadParams,
+  funnel: HulyFunnel
+): Effect.fn.Return<void, LeadUpdateConflictError> {
+  if (!funnel.archived) return
+  return yield* new LeadUpdateConflictError({
+    identifier: params.identifier,
+    funnel: FunnelIdentifier.make(funnel._id),
+    reason: NonEmptyString.make("funnel is archived and cannot accept lead updates")
+  })
+})
+
+const assigneeUpdate = Effect.fn("Lead.assigneeUpdate")(function* (
+  client: HulyClient["Service"],
+  params: UpdateLeadParams,
+  lead: HulyLead
+): Effect.fn.Return<LeadUpdateOperations, LeadMutationError> {
+  if (params.assignee === undefined) return { operations: {}, changed: false }
+  const assignee = params.assignee === null ? null : yield* resolveEmployee(client, params.assignee)
+  const changed = String(assignee) !== String(lead.assignee)
+  return { operations: changed ? { assignee } : {}, changed }
+})
+
+const statusUpdate = Effect.fn("Lead.statusUpdate")(function* (
+  workflow: ReadonlyArray<FunnelWorkflowTaskType>,
+  lead: HulyLead,
+  funnel: HulyFunnel,
+  params: UpdateLeadParams
+): Effect.fn.Return<LeadUpdateOperations, LeadMutationError> {
+  if (params.status === undefined) return { operations: {}, changed: false }
+  const status = yield* statusForLead(workflow, lead, funnel, params.status, params.funnel)
+  const changed = String(status) !== String(lead.status)
+  return { operations: changed ? { status } : {}, changed }
+})
+
+const titleUpdate = (requested: UpdateLeadParams["title"], current: HulyLead["title"]): LeadDocumentUpdate =>
+  requested === undefined || requested === current ? {} : { title: requested }
+
+const startDateUpdate = (
+  requested: UpdateLeadParams["startDate"],
+  current: HulyLead["startDate"]
+): LeadDocumentUpdate => (requested === undefined || requested === current ? {} : { startDate: requested })
+
+const dueDateUpdate = (requested: UpdateLeadParams["dueDate"], current: HulyLead["dueDate"]): LeadDocumentUpdate =>
+  requested === undefined || requested === current ? {} : { dueDate: requested }
+
+const leadFieldUpdates = (params: UpdateLeadParams, lead: HulyLead): LeadDocumentUpdate => ({
+  ...titleUpdate(params.title, lead.title),
+  ...startDateUpdate(params.startDate, lead.startDate),
+  ...dueDateUpdate(params.dueDate, lead.dueDate)
+})
+
+const descriptionUpdate = Effect.fn("Lead.descriptionUpdate")(function* (
+  client: HulyClient["Service"],
+  params: UpdateLeadParams,
+  lead: HulyLead
+): Effect.fn.Return<LeadUpdateOperations, HulyClientError | HulyError> {
+  return params.description === undefined
+    ? { operations: {}, changed: false }
+    : yield* updateLeadDescription(client, lead, params.description)
+})
+
+const customerDescriptionUpdate = Effect.fn("Lead.customerDescriptionUpdate")(function* (
+  client: HulyClient["Service"],
+  params: UpdateLeadParams,
+  lead: HulyLead
+): Effect.fn.Return<boolean, LeadMutationError> {
+  return params.customerDescription === undefined
+    ? false
+    : yield* updateLeadCustomerDescription(client, lead, params.customerDescription)
+})
+
+const persistLeadUpdate = Effect.fn("Lead.persistLeadUpdate")(function* (
+  client: HulyClient["Service"],
+  funnel: HulyFunnel,
+  lead: HulyLead,
+  operations: LeadDocumentUpdate
+): Effect.fn.Return<void, HulyClientError> {
+  if (Object.keys(operations).length === 0) return
+  yield* client.updateDoc(leadClassIds.class.Lead, funnelSpace(funnel), toRef<Doc>(lead._id), operations)
+})
+
 export const updateLead = Effect.fn("Lead.updateLead")(function* (
   params: UpdateLeadParams
 ): Effect.fn.Return<LeadMutationResult, LeadMutationError, HulyClient | Diagnostics> {
   const client = yield* HulyClient
   const source = yield* validatedFunnel(client, params.funnel)
-  if (source.funnel.archived) {
-    return yield* new LeadUpdateConflictError({
-      identifier: params.identifier,
-      funnel: FunnelIdentifier.make(source.funnel._id),
-      reason: NonEmptyString.make("funnel is archived and cannot accept lead updates")
-    })
-  }
+  yield* rejectArchivedLeadUpdate(params, source.funnel)
   const lead = yield* findLead(client, source.funnel, params.identifier)
 
-  const assignee =
-    params.assignee === undefined
-      ? undefined
-      : params.assignee === null
-        ? null
-        : yield* resolveEmployee(client, params.assignee)
-  const assigneeChanged = params.assignee !== undefined && String(assignee) !== String(lead.assignee)
-
-  const status =
-    params.status === undefined
-      ? undefined
-      : yield* statusForLead(source.workflow, lead, source.funnel, params.status, params.funnel)
-  const statusChanged = status !== undefined && String(status) !== String(lead.status)
-  const assigneeOperation = assigneeChanged && assignee !== undefined ? { assignee } : {}
-  const statusOperation = statusChanged && status !== undefined ? { status } : {}
-  const description =
-    params.description === undefined
-      ? { operations: {}, changed: false }
-      : yield* updateLeadDescription(client, lead, params.description)
-  const customerChanged =
-    params.customerDescription === undefined
-      ? false
-      : yield* updateLeadCustomerDescription(client, lead, params.customerDescription)
+  const assignee = yield* assigneeUpdate(client, params, lead)
+  const status = yield* statusUpdate(source.workflow, lead, source.funnel, params)
+  const description = yield* descriptionUpdate(client, params, lead)
+  const customerChanged = yield* customerDescriptionUpdate(client, params, lead)
 
   const operations: LeadDocumentUpdate = {
-    ...(params.title !== undefined && params.title !== lead.title ? { title: params.title } : {}),
-    ...(params.startDate !== undefined && params.startDate !== lead.startDate ? { startDate: params.startDate } : {}),
-    ...(params.dueDate !== undefined && params.dueDate !== lead.dueDate ? { dueDate: params.dueDate } : {}),
-    ...assigneeOperation,
-    ...statusOperation,
+    ...leadFieldUpdates(params, lead),
+    ...assignee.operations,
+    ...status.operations,
     ...description.operations
   }
   const changed = Object.keys(operations).length > 0 || description.changed || customerChanged
-  if (Object.keys(operations).length > 0) {
-    yield* client.updateDoc(leadClassIds.class.Lead, funnelSpace(source.funnel), toRef<Doc>(lead._id), operations)
-  }
+  yield* persistLeadUpdate(client, source.funnel, lead, operations)
   return { identifier: LeadIdentifier.make(lead.identifier), updated: changed }
+})
+
+const rejectInactiveMoveFunnels = Effect.fn("Lead.rejectInactiveMoveFunnels")(function* (
+  identifier: LeadIdentifier,
+  source: HulyFunnel,
+  destination: HulyFunnel
+): Effect.fn.Return<void, LeadMoveConflictError> {
+  if (!source.archived && !destination.archived) return
+  return yield* new LeadMoveConflictError({
+    identifier,
+    sourceFunnel: FunnelIdentifier.make(source._id),
+    destinationFunnel: FunnelIdentifier.make(destination._id),
+    reason: NonEmptyString.make("source and destination funnels must both be active")
+  })
+})
+
+const compatibleDestinationWorkflow = (
+  workflow: ReadonlyArray<FunnelWorkflowTaskType>,
+  lead: HulyLead
+): FunnelWorkflowTaskType | undefined =>
+  workflow.find((candidate) => String(candidate.taskType._id) === String(lead.kind)) ??
+  (workflow.length === 1 ? workflow[0] : undefined)
+
+const requireDestinationWorkflow = Effect.fn("Lead.requireDestinationWorkflow")(function* (
+  workflow: FunnelWorkflowTaskType | undefined,
+  identifier: LeadIdentifier,
+  sourceFunnel: FunnelIdentifier,
+  destinationFunnel: FunnelIdentifier
+): Effect.fn.Return<FunnelWorkflowTaskType, LeadMoveConflictError> {
+  if (workflow !== undefined) return workflow
+  return yield* new LeadMoveConflictError({
+    identifier,
+    sourceFunnel,
+    destinationFunnel,
+    reason: NonEmptyString.make("the destination has no unambiguous compatible Lead task type")
+  })
+})
+
+const destinationStatusReason = (requested: MoveLeadParams["status"], current: StatusName): NonEmptyString =>
+  NonEmptyString.make(
+    requested === undefined
+      ? `current status '${current}' has no compatible destination mapping`
+      : `requested status '${requested}' is not valid in the destination workflow`
+  )
+
+const destinationStatus = Effect.fn("Lead.destinationStatus")(function* (
+  workflow: FunnelWorkflowTaskType,
+  params: MoveLeadParams,
+  current: StatusName,
+  identifier: LeadIdentifier,
+  sourceFunnel: FunnelIdentifier,
+  destinationFunnel: FunnelIdentifier
+): Effect.fn.Return<Ref<Status>, LeadMoveConflictError> {
+  const requestedStatus = params.status ?? current
+  return yield* statusByName(workflow.statuses, requestedStatus, params.destinationFunnel).pipe(
+    Effect.mapError(
+      () =>
+        new LeadMoveConflictError({
+          identifier,
+          sourceFunnel,
+          destinationFunnel,
+          reason: destinationStatusReason(params.status, current)
+        })
+    )
+  )
+})
+
+const moveRequired = (
+  source: HulyFunnel,
+  destination: HulyFunnel,
+  destinationStatusId: Ref<Status>,
+  lead: HulyLead,
+  taskTypeChanged: boolean
+): boolean =>
+  String(source._id) !== String(destination._id) ||
+  String(destinationStatusId) !== String(lead.status) ||
+  taskTypeChanged
+
+const moveOperations = (
+  destination: HulyFunnel,
+  destinationStatusId: Ref<Status>,
+  destinationWorkflow: FunnelWorkflowTaskType,
+  taskTypeChanged: boolean
+): LeadDocumentUpdate => ({
+  space: funnelSpace(destination),
+  status: destinationStatusId,
+  ...(taskTypeChanged ? { kind: destinationWorkflow.taskType._id } : {})
+})
+
+const persistLeadMove = Effect.fn("Lead.persistLeadMove")(function* (
+  client: HulyClient["Service"],
+  source: HulyFunnel,
+  lead: HulyLead,
+  operations: LeadDocumentUpdate,
+  moved: boolean
+): Effect.fn.Return<void, HulyClientError> {
+  if (!moved) return
+  yield* client.updateDoc(leadClassIds.class.Lead, funnelSpace(source), toRef<Doc>(lead._id), operations)
 })
 
 export const moveLead = Effect.fn("Lead.moveLead")(function* (
@@ -125,66 +278,38 @@ export const moveLead = Effect.fn("Lead.moveLead")(function* (
   const sourceFunnel = FunnelIdentifier.make(source.funnel._id)
   const destinationFunnel = FunnelIdentifier.make(destination.funnel._id)
   const identifier = LeadIdentifier.make(lead.identifier)
-  if (source.funnel.archived || destination.funnel.archived) {
-    return yield* new LeadMoveConflictError({
-      identifier,
-      sourceFunnel,
-      destinationFunnel,
-      reason: NonEmptyString.make("source and destination funnels must both be active")
-    })
-  }
+  yield* rejectInactiveMoveFunnels(identifier, source.funnel, destination.funnel)
 
   const sourceWorkflow = yield* workflowForLead(source.workflow, lead, source.funnel)
   const current = yield* currentStatus(sourceWorkflow, lead, source.funnel)
-  const destinationWorkflow =
-    destination.workflow.find((candidate) => String(candidate.taskType._id) === String(lead.kind)) ??
-    (destination.workflow.length === 1 ? destination.workflow[0] : undefined)
-  if (destinationWorkflow === undefined) {
-    return yield* new LeadMoveConflictError({
-      identifier,
-      sourceFunnel,
-      destinationFunnel,
-      reason: NonEmptyString.make("the destination has no unambiguous compatible Lead task type")
-    })
-  }
-
-  const requestedStatus = params.status ?? current.name
-  const destinationStatus = yield* statusByName(
-    destinationWorkflow.statuses,
-    requestedStatus,
-    params.destinationFunnel
-  ).pipe(
-    Effect.mapError(
-      () =>
-        new LeadMoveConflictError({
-          identifier,
-          sourceFunnel,
-          destinationFunnel,
-          reason: NonEmptyString.make(
-            params.status === undefined
-              ? `current status '${current.name}' has no compatible destination mapping`
-              : `requested status '${params.status}' is not valid in the destination workflow`
-          )
-        })
-    )
+  const destinationWorkflow = yield* requireDestinationWorkflow(
+    compatibleDestinationWorkflow(destination.workflow, lead),
+    identifier,
+    sourceFunnel,
+    destinationFunnel
+  )
+  const destinationStatusId = yield* destinationStatus(
+    destinationWorkflow,
+    params,
+    current.name,
+    identifier,
+    sourceFunnel,
+    destinationFunnel
   )
   const taskTypeChanged = String(destinationWorkflow.taskType._id) !== String(lead.kind)
-  const moved =
-    String(source.funnel._id) !== String(destination.funnel._id) ||
-    String(destinationStatus) !== String(lead.status) ||
-    taskTypeChanged
-  if (moved) {
-    const operations: LeadDocumentUpdate = {
-      space: funnelSpace(destination.funnel),
-      status: destinationStatus,
-      ...(taskTypeChanged ? { kind: destinationWorkflow.taskType._id } : {})
-    }
-    yield* client.updateDoc(leadClassIds.class.Lead, funnelSpace(source.funnel), toRef<Doc>(lead._id), operations)
-  }
+  const moved = moveRequired(source.funnel, destination.funnel, destinationStatusId, lead, taskTypeChanged)
+  const operations = moveOperations(destination.funnel, destinationStatusId, destinationWorkflow, taskTypeChanged)
+  yield* persistLeadMove(client, source.funnel, lead, operations, moved)
   const statusName = destinationWorkflow.statuses.find(
-    (status) => String(status.id) === String(destinationStatus)
+    (status) => String(status.id) === String(destinationStatusId)
   )?.name
-  return { identifier, sourceFunnel, destinationFunnel, status: StatusName.make(statusName ?? requestedStatus), moved }
+  return {
+    identifier,
+    sourceFunnel,
+    destinationFunnel,
+    status: StatusName.make(statusName ?? params.status ?? current.name),
+    moved
+  }
 })
 
 const authoritativeRelationCount = Effect.fn("Lead.authoritativeRelationCount")((
