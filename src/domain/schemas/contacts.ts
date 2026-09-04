@@ -203,7 +203,7 @@ export type ListEmployeesParams = Schema.Schema.Type<typeof ListEmployeesParamsS
 export const SetEmployeePositionParamsSchema = Schema.Struct({
   employee: EmployeeLocatorSchema.annotateKey({
     description:
-      "Structured exact employee locator. Provide exactly one of id, email, or name; combined locator modalities are rejected."
+      "Structured exact employee locator. Provide exactly one: exact employee ID, exact email address, or exact display name; combined locator modalities are rejected."
   }),
   position: Schema.NullOr(Schema.String).annotateKey({
     description: "Official position on contact.mixin.Employee. Pass null or an empty string to clear it."
@@ -254,7 +254,7 @@ export const setEmployeePositionParamsJsonSchema = withJsonSchemaPropertyDescrip
   toDraft07JsonSchema(SetEmployeePositionParamsSchema),
   {
     employee:
-      "Structured exact employee locator: provide exactly one of id, email, or name. Ambiguous names or emails and combined locator modalities are rejected.",
+      "Structured exact employee locator: provide exactly one of exact employee ID, exact email address, or exact display name. Ambiguous names or emails and combined locator modalities are rejected.",
     position:
       "Official position on contact.mixin.Employee. Pass null or an empty string to clear it; omit it to fail without mutating."
   }
