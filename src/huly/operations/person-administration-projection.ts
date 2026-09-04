@@ -1,4 +1,3 @@
-import { SocialIdentityId } from "../../domain/schemas/person-administration.js"
 import type {
   AccountProfile,
   WorkspaceMemberInfo,
@@ -77,7 +76,7 @@ const profileProjection = (profile: AccountProfile) => ({
 })
 
 const identityProjection = (identity: WorkspaceSocialIdentity) => ({
-  id: SocialIdentityId.make(identity._id),
+  id: identity._id,
   type: identity.type,
   value: identity.value,
   key: identity.key,

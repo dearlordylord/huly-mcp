@@ -5,7 +5,7 @@ import type { Attachment as HulyAttachment } from "@hcengineering/attachment"
 import type { ChatMessage } from "@hcengineering/chunter"
 import type { Blob, Class, Doc, DocumentUpdate, Ref, SocialId, Space } from "@hcengineering/core"
 import { AccountRole, SocialIdType } from "@hcengineering/core"
-import { Effect, Exit, Layer } from "effect"
+import { Effect, Exit, Layer, Schema } from "effect"
 import { expect } from "vitest"
 
 import {
@@ -17,6 +17,7 @@ import {
   parseGetPersonAttachmentParams,
   parseListPersonAttachmentsParams,
   parseListPersonCommentsParams,
+  GetPersonAdministrationResultSchema,
   SocialIdentityId,
   SocialIdentityTypeSchema,
   parseUpdatePersonAttachmentParams,
@@ -28,6 +29,7 @@ import {
   PersonId,
   PersonName,
   PersonUuid as DomainPersonUuid,
+  SpaceId,
   Timestamp
 } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
@@ -48,6 +50,8 @@ import {
   type AccountProfile,
   decodeAccountSocialIdentities,
   decodeAccountProfile,
+  decodeResolvedEmployee,
+  decodeResolvedPerson,
   decodeWorkspacePersonAdministrationProjectionData,
   decodeWorkspaceMembers,
   decodeWorkspaceSocialIdentitiesForRepair,
@@ -118,8 +122,8 @@ const workspaceIdentity = (overrides?: Partial<SocialIdentity>): WorkspaceSocial
   const identity = socialIdentity(overrides)
   return {
     _id: SocialIdentityId.make(identity._id),
-    space: NonEmptyString.make(identity.space),
-    attachedTo: NonEmptyString.make(identity.attachedTo),
+    space: SpaceId.make(identity.space),
+    attachedTo: PersonId.make(identity.attachedTo),
     type: SocialIdentityTypeSchema.make(identity.type),
     value: identity.value,
     key: NonEmptyString.make(identity.key),
@@ -239,43 +243,25 @@ const filterByQuery = <T extends Doc>(docs: ReadonlyArray<T>, query: unknown): A
     )
   })
 
+const fixtureDocs = (fixture: Fixture): ReadonlyArray<Doc> => [
+  ...(fixture.persons ?? [person()]),
+  ...(fixture.identities ?? []),
+  ...(fixture.providers ?? []),
+  ...(fixture.statuses ?? []),
+  ...(fixture.channels ?? []),
+  ...(fixture.employee === undefined ? [] : [fixture.employee]),
+  ...(fixture.messages ?? []),
+  ...(fixture.attachments ?? [])
+]
+
+const docsForClass = <T extends Doc>(_class: Ref<Class<T>>, docs: ReadonlyArray<Doc>): Array<T> =>
+  docs.filter((doc): doc is T => doc._class === _class)
+
 const testClient = (fixture: Fixture): Layer.Layer<HulyClient> => {
-  const findAll = (<T extends Doc>(_class: Ref<Class<T>>, query: unknown) => {
-    const docs: ReadonlyArray<Doc> =
-      _class === contact.class.Person
-        ? (fixture.persons ?? [person()])
-        : _class === contact.class.SocialIdentity
-          ? (fixture.identities ?? [])
-          : _class === contact.class.SocialIdentityProvider
-            ? (fixture.providers ?? [])
-            : _class === contact.class.Status
-              ? (fixture.statuses ?? [])
-              : _class === contact.class.Channel
-                ? (fixture.channels ?? [])
-                : _class === chunter.class.ChatMessage
-                  ? (fixture.messages ?? [])
-                  : _class === attachment.class.Attachment
-                    ? (fixture.attachments ?? [])
-                    : []
-    return Effect.succeed(findResult(filterByQuery(docs, query)))
-    // The generic SDK boundary returns T selected by _class; this in-memory fixture dispatches the same way.
-  }) as HulyClientOperations["findAll"]
-  const findOne = (<T extends Doc>(_class: Ref<Class<T>>, query: unknown) => {
-    const docs: ReadonlyArray<Doc> =
-      _class === contact.class.Person
-        ? (fixture.persons ?? [person()])
-        : _class === contact.class.SocialIdentity
-          ? (fixture.identities ?? [])
-          : _class === chunter.class.ChatMessage
-            ? (fixture.messages ?? [])
-            : _class === attachment.class.Attachment
-              ? (fixture.attachments ?? [])
-              : _class === contact.mixin.Employee && fixture.employee !== undefined
-                ? [fixture.employee]
-                : []
-    return Effect.succeed(filterByQuery(docs, query)[0])
-    // The generic SDK boundary returns T selected by _class; this fixture uses the matching collection above.
-  }) as HulyClientOperations["findOne"]
+  const findAll: HulyClientOperations["findAll"] = <T extends Doc>(_class: Ref<Class<T>>, query: unknown) =>
+    Effect.succeed(findResult(filterByQuery(docsForClass(_class, fixtureDocs(fixture)), query)))
+  const findOne: HulyClientOperations["findOne"] = <T extends Doc>(_class: Ref<Class<T>>, query: unknown) =>
+    Effect.succeed(filterByQuery(docsForClass(_class, fixtureDocs(fixture)), query)[0])
   return HulyClient.testLayer({
     findAll,
     findAllInModel: findAll,
@@ -437,6 +423,43 @@ describe("person administration schemas", () => {
     )
   )
 
+  it.effect("rejects malformed resolved Person and Employee targets through the typed error channel", () =>
+    Effect.gen(function* () {
+      const malformedPerson = yield* Effect.exit(
+        decodeResolvedPerson({ _id: "", space: "contacts", avatarType: "external" })
+      )
+      const malformedEmployee = yield* Effect.exit(decodeResolvedEmployee({ personUuid: "" }))
+
+      expect(Exit.isFailure(malformedPerson)).toBe(true)
+      expect(Exit.isFailure(malformedEmployee)).toBe(true)
+    })
+  )
+
+  it.effect("rejects impossible membership and partial profile result states", () => {
+    const baseResult = {
+      personId: "person-1",
+      avatar: { type: "external" },
+      contactStatuses: [],
+      socialIdentities: [],
+      channelActivity: [],
+      fieldClassifications: []
+    }
+    const decodeResult = Schema.decodeUnknownEffect(GetPersonAdministrationResultSchema)
+
+    return Effect.gen(function* () {
+      const normalizedMembership = yield* decodeResult({
+        ...baseResult,
+        workspaceMember: { member: false, role: "USER" }
+      })
+      const partialProfile = yield* Effect.exit(
+        decodeResult({ ...baseResult, workspaceMember: { member: false }, profile: { firstName: "Ada" } })
+      )
+
+      expect(normalizedMembership.workspaceMember).toEqual({ member: false })
+      expect(Exit.isFailure(partialProfile)).toBe(true)
+    })
+  })
+
   it.effect("accepts the sparse Employee mixin projection emitted by Huly", () =>
     Effect.gen(function* () {
       const projectionData = yield* decodeWorkspacePersonAdministrationProjectionData({
@@ -508,7 +531,7 @@ describe("person identity and profile administration", () => {
           { id: "social-2", displayValue: "Ada", isDeleted: true }
         ],
         channelActivity: [{ channelId: "channel-2" }],
-        profile: {}
+        profile: { firstName: "Ada", lastName: "Lovelace", isPublic: false }
       })
       expect(projection).not.toHaveProperty("socialIdentities.1.verifiedOn")
     })
@@ -655,6 +678,13 @@ describe("person identity and profile administration", () => {
       expect(error).toBeInstanceOf(HulyDataInvalidError)
     }).pipe(Effect.provide(Layer.merge(testClient({ statuses: [malformedStatus] }), workspace)))
   })
+
+  it.effect("rejects a malformed resolved Person before any administration reads", () =>
+    Effect.gen(function* () {
+      const error = yield* Effect.flip(getPersonAdministration({ person: { id: PersonId.make("person-1") } }))
+      expect(error).toBeInstanceOf(HulyDataInvalidError)
+    }).pipe(Effect.provide(Layer.merge(testClient({ persons: [person({ space: toRef<Space>("") })] }), workspace)))
+  )
 
   it.effect("lists installed native providers", () => {
     const provider: SocialIdentityProvider = {

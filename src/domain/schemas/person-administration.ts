@@ -6,6 +6,7 @@ import { AttachmentDescription, AttachmentFileName, Base64FileData, LocalFilePat
 import { CommentSchema } from "./comments.js"
 import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import { toDraft07JsonSchema, withJsonSchemaPropertyDescriptions } from "./json-schema.js"
+import { AccountRoleSchema } from "./workspace.js"
 import {
   AttachmentId,
   BlobId,
@@ -104,20 +105,19 @@ const AvatarMetadataSchema = Schema.Struct({
   externalUrl: Schema.optionalKey(UrlString)
 })
 const ContactStatusSchema = Schema.Struct({ name: NonEmptyString, dueDate: Timestamp })
-const WorkspaceMembershipSchema = Schema.Struct({
-  member: Schema.Boolean,
-  active: Schema.optionalKey(Schema.Boolean),
-  role: Schema.optionalKey(NonEmptyString)
-})
+const WorkspaceMembershipSchema = Schema.Union([
+  Schema.Struct({ member: Schema.Literal(false), active: Schema.optionalKey(Schema.Boolean) }),
+  Schema.Struct({ member: Schema.Literal(true), active: Schema.optionalKey(Schema.Boolean), role: AccountRoleSchema })
+])
 const PersonProfileSchema = Schema.Struct({
-  firstName: Schema.optionalKey(Schema.String),
-  lastName: Schema.optionalKey(Schema.String),
+  firstName: Schema.String,
+  lastName: Schema.String,
   bio: Schema.optionalKey(Schema.String),
   city: Schema.optionalKey(Schema.String),
   country: Schema.optionalKey(Schema.String),
   website: Schema.optionalKey(Schema.String),
   socialLinks: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-  isPublic: Schema.optionalKey(Schema.Boolean)
+  isPublic: Schema.Boolean
 })
 const ChannelActivitySchema = Schema.Struct({
   channelId: ChannelId,

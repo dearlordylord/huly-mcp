@@ -1,5 +1,5 @@
-import type { Person } from "@hcengineering/contact"
 import { Effect } from "effect"
+import type { Doc, Space } from "@hcengineering/core"
 
 import type {
   AddPersonCommentParams,
@@ -7,10 +7,14 @@ import type {
   ListPersonCommentsParams,
   UpdatePersonCommentParams
 } from "../../domain/schemas/person-administration.js"
-import { PersonId } from "../../domain/schemas/shared.js"
+import type { PersonId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import type { PersonIdentifierAmbiguousError, PersonNotFoundError } from "../errors.js"
-import { PersonCommentNotFoundError } from "../errors.js"
+import {
+  type HulyDataInvalidError,
+  PersonCommentNotFoundError,
+  type PersonIdentifierAmbiguousError,
+  type PersonNotFoundError
+} from "../errors.js"
 import { contact } from "../huly-plugins.js"
 import {
   addAttachedComment,
@@ -20,63 +24,60 @@ import {
   updateAttachedComment
 } from "./attached-comments.js"
 import { resolvePersonAdministrationTarget } from "./person-administration-shared.js"
+import type { ResolvedPerson } from "./person-administration-boundaries.js"
+import { toRef } from "./sdk-boundary.js"
 
-type PersonCommentError = HulyClientError | PersonIdentifierAmbiguousError | PersonNotFoundError
+type PersonCommentError = HulyClientError | HulyDataInvalidError | PersonIdentifierAmbiguousError | PersonNotFoundError
 
-const targetFor = (client: HulyClient["Service"], person: Person): AttachedCommentTarget => ({
+const targetFor = (client: HulyClient["Service"], person: ResolvedPerson): AttachedCommentTarget => ({
   client,
-  space: person.space,
-  attachedTo: person._id,
+  space: toRef<Space>(person.space),
+  attachedTo: toRef<Doc>(person._id),
   attachedToClass: contact.class.Person,
   collection: "comments"
 })
 
-const resolveTarget = (
+const resolveTarget = Effect.fn("PersonComments.resolveTarget")(function* (
   params: ListPersonCommentsParams
-): Effect.Effect<
+): Effect.fn.Return<
   { readonly target: AttachedCommentTarget; readonly personId: PersonId },
   PersonCommentError,
   HulyClient
-> =>
-  Effect.gen(function* () {
-    const client = yield* HulyClient
-    const person = yield* resolvePersonAdministrationTarget(client, params.person)
-    return { target: targetFor(client, person), personId: PersonId.make(person._id) }
-  })
+> {
+  const client = yield* HulyClient
+  const person = yield* resolvePersonAdministrationTarget(client, params.person)
+  return { target: targetFor(client, person), personId: person._id }
+})
 
-export const listPersonComments = (params: ListPersonCommentsParams) =>
-  Effect.gen(function* () {
-    const resolved = yield* resolveTarget(params)
-    const page = yield* listAttachedCommentsPage(resolved.target, params.limit, "Person")
-    return { personId: resolved.personId, comments: page.comments, total: page.total }
-  })
+export const listPersonComments = Effect.fn("PersonComments.list")(function* (params: ListPersonCommentsParams) {
+  const resolved = yield* resolveTarget(params)
+  const page = yield* listAttachedCommentsPage(resolved.target, params.limit, "Person")
+  return { personId: resolved.personId, comments: page.comments, total: page.total }
+})
 
-export const addPersonComment = (params: AddPersonCommentParams) =>
-  Effect.gen(function* () {
-    const resolved = yield* resolveTarget(params)
-    const commentId = yield* addAttachedComment(resolved.target, params.body)
-    return { personId: resolved.personId, commentId }
-  })
+export const addPersonComment = Effect.fn("PersonComments.add")(function* (params: AddPersonCommentParams) {
+  const resolved = yield* resolveTarget(params)
+  const commentId = yield* addAttachedComment(resolved.target, params.body)
+  return { personId: resolved.personId, commentId }
+})
 
 const notFound = (personId: PersonId, commentId: DeletePersonCommentParams["commentId"]) => () =>
   new PersonCommentNotFoundError({ personId, commentId })
 
-export const updatePersonComment = (params: UpdatePersonCommentParams) =>
-  Effect.gen(function* () {
-    const resolved = yield* resolveTarget(params)
-    const updated = yield* updateAttachedComment(
-      resolved.target,
-      params.commentId,
-      params.body,
-      notFound(resolved.personId, params.commentId)
-    )
-    return { personId: resolved.personId, commentId: params.commentId, updated }
-  })
+export const updatePersonComment = Effect.fn("PersonComments.update")(function* (params: UpdatePersonCommentParams) {
+  const resolved = yield* resolveTarget(params)
+  const updated = yield* updateAttachedComment(
+    resolved.target,
+    params.commentId,
+    params.body,
+    notFound(resolved.personId, params.commentId)
+  )
+  return { personId: resolved.personId, commentId: params.commentId, updated }
+})
 
-export const deletePersonComment = (params: DeletePersonCommentParams) =>
-  Effect.gen(function* () {
-    const resolved = yield* resolveTarget(params)
-    yield* deleteAttachedComment(resolved.target, params.commentId, notFound(resolved.personId, params.commentId))
-    const deleted: true = true
-    return { personId: resolved.personId, commentId: params.commentId, deleted }
-  })
+export const deletePersonComment = Effect.fn("PersonComments.delete")(function* (params: DeletePersonCommentParams) {
+  const resolved = yield* resolveTarget(params)
+  yield* deleteAttachedComment(resolved.target, params.commentId, notFound(resolved.personId, params.commentId))
+  const deleted: true = true
+  return { personId: resolved.personId, commentId: params.commentId, deleted }
+})

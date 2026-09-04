@@ -7,8 +7,7 @@ import type {
   RepairPersonSocialIdentitiesResult,
   SocialIdentityId
 } from "../../domain/schemas/person-administration.js"
-import { SocialIdentityId as SocialIdentityIdSchema } from "../../domain/schemas/person-administration.js"
-import { Count, NonEmptyString, PersonId, PersonUuid } from "../../domain/schemas/shared.js"
+import { Count, NonEmptyString } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import {
   type HulyDataInvalidError,
@@ -24,7 +23,9 @@ import {
   type AccountSocialIdentity,
   decodeAccountCurrentPerson,
   decodeAccountSocialIdentities,
+  decodeResolvedEmployee,
   decodeWorkspaceSocialIdentitiesForRepair,
+  type ResolvedPerson,
   type WorkspaceSocialIdentity
 } from "./person-administration-boundaries.js"
 import { resolvePersonAdministrationTarget } from "./person-administration-shared.js"
@@ -61,12 +62,12 @@ const activeIdentityDiffers = (identity: WorkspaceSocialIdentity, authoritative:
 const identityRepairOperations = (
   identity: WorkspaceSocialIdentity,
   authoritative: AccountSocialIdentity,
-  person: Person
+  person: ResolvedPerson
 ): DocumentUpdate<SocialIdentity> => ({
   ...(identity.verifiedOn === undefined && authoritative.verifiedOn !== undefined
     ? { verifiedOn: authoritative.verifiedOn }
     : {}),
-  ...(identity.attachedTo === person._id ? {} : { attachedTo: person._id }),
+  ...(identity.attachedTo === person._id ? {} : { attachedTo: toRef<Person>(person._id) }),
   ...(authoritative.isDeleted === true && identity.isDeleted !== true
     ? { value: authoritative.value, key: authoritative.key, isDeleted: true }
     : {})
@@ -75,7 +76,7 @@ const identityRepairOperations = (
 const existingIdentityDecision = (
   identity: WorkspaceSocialIdentity,
   authoritative: AccountSocialIdentity,
-  person: Person
+  person: ResolvedPerson
 ): ExistingIdentityDecision => {
   if (authoritative.isDeleted !== true && identity.isDeleted === true) {
     return {
@@ -109,150 +110,140 @@ type IdentityRepairOutcome =
   | { readonly _tag: "unchanged" }
   | { readonly _tag: "unsupported"; readonly identityId: SocialIdentityId; readonly reason: NonEmptyString }
 
-const repairAuthoritativeIdentity = (
+const repairAuthoritativeIdentity = Effect.fn("PersonAdministration.repairAuthoritativeIdentity")(function* (
   client: HulyClient["Service"],
-  person: Person,
+  person: ResolvedPerson,
   globalIdentities: ReadonlyArray<WorkspaceSocialIdentity>,
   existing: WorkspaceSocialIdentity | undefined,
   social: AccountSocialIdentity
-): Effect.Effect<IdentityRepairOutcome, HulyClientError> =>
-  Effect.gen(function* () {
-    if (existing !== undefined) {
-      const decision = existingIdentityDecision(existing, social, person)
-      if (decision._tag === "unsupported")
-        return { _tag: "unsupported", identityId: SocialIdentityIdSchema.make(social._id), reason: decision.reason }
-      if (decision._tag === "unchanged") return decision
-      yield* client.updateDoc(
-        contact.class.SocialIdentity,
-        toRef<Space>(existing.space),
-        toSocialIdentityRef(existing._id),
-        decision.operations
-      )
-      return { _tag: "updated" }
-    }
-    if (social.isDeleted === true) return { _tag: "unchanged" }
-    const expectedKey = identityKey(social)
-    if (globalIdentities.some((candidate) => candidate.key === social.key || candidate.key === expectedKey)) {
-      return {
-        _tag: "unsupported",
-        identityId: SocialIdentityIdSchema.make(social._id),
-        reason: NonEmptyString.make("workspace identity key already exists under a different native identity ID")
-      }
-    }
-    yield* client.addCollection(
+): Effect.fn.Return<IdentityRepairOutcome, HulyClientError> {
+  if (existing !== undefined) {
+    const decision = existingIdentityDecision(existing, social, person)
+    if (decision._tag === "unsupported") return { _tag: "unsupported", identityId: social._id, reason: decision.reason }
+    if (decision._tag === "unchanged") return decision
+    yield* client.updateDoc(
       contact.class.SocialIdentity,
-      contact.space.Contacts,
-      person._id,
-      contact.class.Person,
-      "socialIds",
-      {
-        type: nativeSocialIdentityTypes[social.type],
-        value: social.value,
-        key: expectedKey,
-        isDeleted: false,
-        ...(social.displayValue == null ? {} : { displayValue: social.displayValue }),
-        ...(social.verifiedOn === undefined ? {} : { verifiedOn: social.verifiedOn })
-      },
-      toSocialIdentityRef(social._id)
+      toRef<Space>(existing.space),
+      toSocialIdentityRef(existing._id),
+      decision.operations
     )
-    return { _tag: "created" }
-  })
+    return { _tag: "updated" }
+  }
+  if (social.isDeleted === true) return { _tag: "unchanged" }
+  const expectedKey = identityKey(social)
+  if (globalIdentities.some((candidate) => candidate.key === social.key || candidate.key === expectedKey)) {
+    return {
+      _tag: "unsupported",
+      identityId: social._id,
+      reason: NonEmptyString.make("workspace identity key already exists under a different native identity ID")
+    }
+  }
+  yield* client.addCollection(
+    contact.class.SocialIdentity,
+    contact.space.Contacts,
+    toRef<Person>(person._id),
+    contact.class.Person,
+    "socialIds",
+    {
+      type: nativeSocialIdentityTypes[social.type],
+      value: social.value,
+      key: expectedKey,
+      isDeleted: false,
+      ...(social.displayValue == null ? {} : { displayValue: social.displayValue }),
+      ...(social.verifiedOn === undefined ? {} : { verifiedOn: social.verifiedOn })
+    },
+    toSocialIdentityRef(social._id)
+  )
+  return { _tag: "created" }
+})
 
-export const repairPersonSocialIdentities = (
+export const repairPersonSocialIdentities = Effect.fn("PersonAdministration.repairSocialIdentities")(function* (
   params: RepairPersonSocialIdentitiesParams
-): Effect.Effect<
+): Effect.fn.Return<
   RepairPersonSocialIdentitiesResult,
   PersonAdministrationRepairError | PersonIdentityRepairUnsupportedError,
   HulyClient | WorkspaceClient
-> =>
-  Effect.gen(function* () {
-    const client = yield* HulyClient
-    const workspace = yield* WorkspaceClient
-    const person = yield* resolvePersonAdministrationTarget(client, params.person)
-    const employee = yield* client.findOne<Employee>(
-      contact.mixin.Employee,
-      hulyQuery<Employee>({ _id: toRef<Employee>(person._id) })
-    )
-    const personUuid = employee?.personUuid ?? person.personUuid
-    if (personUuid === undefined) {
-      return yield* new PersonIdentityRepairUnsupportedError({
-        personId: PersonId.make(person._id),
-        reason: NonEmptyString.make(
-          "the Person is not linked to an account personUuid, so no authoritative account identities exist"
-        )
-      })
-    }
-    const currentAccountPerson = yield* workspace.getCurrentPerson().pipe(Effect.flatMap(decodeAccountCurrentPerson))
-    if (currentAccountPerson.uuid !== PersonUuid.make(personUuid)) {
-      return yield* new PersonIdentityRepairUnsupportedError({
-        personId: PersonId.make(person._id),
-        reason: NonEmptyString.make(
-          "the account API only exposes authoritative identities for the authenticated person; this target belongs to another account"
-        )
-      })
-    }
-    const authoritativeSocials = yield* workspace
-      .getCurrentSocialIds(true)
-      .pipe(Effect.flatMap(decodeAccountSocialIdentities))
-    const currentDtos = yield* client.findAll<SocialIdentity>(
-      contact.class.SocialIdentity,
-      hulyQuery<SocialIdentity>({ attachedTo: person._id })
-    )
-    const current = yield* decodeWorkspaceSocialIdentitiesForRepair(currentDtos)
-    const authoritativeIds = authoritativeSocials.map((social) => toSocialIdentityRef(social._id))
-    const authoritativeKeys = [...new Set(authoritativeSocials.flatMap((social) => [social.key, identityKey(social)]))]
-    const globallyExistingByIdDtos =
-      authoritativeIds.length === 0
-        ? []
-        : yield* client.findAll<SocialIdentity>(
-            contact.class.SocialIdentity,
-            hulyQuery<SocialIdentity>({ _id: { $in: authoritativeIds } })
-          )
-    const globallyExistingByKeyDtos =
-      authoritativeKeys.length === 0
-        ? []
-        : yield* client.findAll<SocialIdentity>(
-            contact.class.SocialIdentity,
-            hulyQuery<SocialIdentity>({ key: { $in: authoritativeKeys } })
-          )
-    const globalIdentities = yield* decodeWorkspaceSocialIdentitiesForRepair([
-      ...new Map(
-        [...globallyExistingByIdDtos, ...globallyExistingByKeyDtos].map((identity) => [identity._id, identity])
-      ).values()
-    ])
-    const globallyExisting = globalIdentities.filter((identity) =>
-      authoritativeIds.includes(toSocialIdentityRef(identity._id))
-    )
-    const existingById = new Map(globallyExisting.map((identity) => [identity._id, identity]))
-    const outcomes = yield* Effect.forEach(authoritativeSocials, (social) =>
-      repairAuthoritativeIdentity(
-        client,
-        person,
-        globalIdentities,
-        existingById.get(SocialIdentityIdSchema.make(social._id)),
-        social
+> {
+  const client = yield* HulyClient
+  const workspace = yield* WorkspaceClient
+  const person = yield* resolvePersonAdministrationTarget(client, params.person)
+  const employeeDto = yield* client.findOne<Employee>(
+    contact.mixin.Employee,
+    hulyQuery<Employee>({ _id: toRef<Employee>(person._id) })
+  )
+  const employee = yield* decodeResolvedEmployee(employeeDto)
+  const personUuid = employee?.personUuid ?? person.personUuid
+  if (personUuid === undefined) {
+    return yield* new PersonIdentityRepairUnsupportedError({
+      personId: person._id,
+      reason: NonEmptyString.make(
+        "the Person is not linked to an account personUuid, so no authoritative account identities exist"
       )
-    )
-    const authoritativeIdSet = new Set<string>(authoritativeSocials.map((social) => social._id))
-    const workspaceOnlyUnsupported = current
-      .filter((identity) => !authoritativeIdSet.has(identity._id))
-      .map((identity) => ({
-        identityId: SocialIdentityIdSchema.make(identity._id),
-        reason: NonEmptyString.make(
-          "workspace identity is absent from the authoritative account record; removal is unsupported"
+    })
+  }
+  const currentAccountPerson = yield* workspace.getCurrentPerson().pipe(Effect.flatMap(decodeAccountCurrentPerson))
+  if (currentAccountPerson.uuid !== personUuid) {
+    return yield* new PersonIdentityRepairUnsupportedError({
+      personId: person._id,
+      reason: NonEmptyString.make(
+        "the account API only exposes authoritative identities for the authenticated person; this target belongs to another account"
+      )
+    })
+  }
+  const authoritativeSocials = yield* workspace
+    .getCurrentSocialIds(true)
+    .pipe(Effect.flatMap(decodeAccountSocialIdentities))
+  const currentDtos = yield* client.findAll<SocialIdentity>(
+    contact.class.SocialIdentity,
+    hulyQuery<SocialIdentity>({ attachedTo: toRef<Person>(person._id) })
+  )
+  const current = yield* decodeWorkspaceSocialIdentitiesForRepair(currentDtos)
+  const authoritativeIdSet = new Set(authoritativeSocials.map((social) => social._id))
+  const authoritativeIds = authoritativeSocials.map((social) => toSocialIdentityRef(social._id))
+  const authoritativeKeys = [...new Set(authoritativeSocials.flatMap((social) => [social.key, identityKey(social)]))]
+  const globallyExistingByIdDtos =
+    authoritativeIds.length === 0
+      ? []
+      : yield* client.findAll<SocialIdentity>(
+          contact.class.SocialIdentity,
+          hulyQuery<SocialIdentity>({ _id: { $in: authoritativeIds } })
         )
-      }))
-    const unsupported = [
-      ...outcomes.flatMap((outcome) =>
-        outcome._tag === "unsupported" ? [{ identityId: outcome.identityId, reason: outcome.reason }] : []
-      ),
-      ...workspaceOnlyUnsupported
-    ]
-    return {
-      personId: PersonId.make(person._id),
-      created: Count.make(outcomes.filter((outcome) => outcome._tag === "created").length),
-      updated: Count.make(outcomes.filter((outcome) => outcome._tag === "updated").length),
-      unchanged: Count.make(outcomes.filter((outcome) => outcome._tag === "unchanged").length),
-      unsupported
-    }
-  })
+  const globallyExistingByKeyDtos =
+    authoritativeKeys.length === 0
+      ? []
+      : yield* client.findAll<SocialIdentity>(
+          contact.class.SocialIdentity,
+          hulyQuery<SocialIdentity>({ key: { $in: authoritativeKeys } })
+        )
+  const globallyExistingById = yield* decodeWorkspaceSocialIdentitiesForRepair(globallyExistingByIdDtos)
+  const globallyExistingByKey = yield* decodeWorkspaceSocialIdentitiesForRepair(globallyExistingByKeyDtos)
+  const globalIdentities = [
+    ...new Map([...globallyExistingById, ...globallyExistingByKey].map((identity) => [identity._id, identity])).values()
+  ]
+  const globallyExisting = globalIdentities.filter((identity) => authoritativeIdSet.has(identity._id))
+  const existingById = new Map(globallyExisting.map((identity) => [identity._id, identity]))
+  const outcomes = yield* Effect.forEach(authoritativeSocials, (social) =>
+    repairAuthoritativeIdentity(client, person, globalIdentities, existingById.get(social._id), social)
+  )
+  const workspaceOnlyUnsupported = current
+    .filter((identity) => !authoritativeIdSet.has(identity._id))
+    .map((identity) => ({
+      identityId: identity._id,
+      reason: NonEmptyString.make(
+        "workspace identity is absent from the authoritative account record; removal is unsupported"
+      )
+    }))
+  const unsupported = [
+    ...outcomes.flatMap((outcome) =>
+      outcome._tag === "unsupported" ? [{ identityId: outcome.identityId, reason: outcome.reason }] : []
+    ),
+    ...workspaceOnlyUnsupported
+  ]
+  return {
+    personId: person._id,
+    created: Count.make(outcomes.filter((outcome) => outcome._tag === "created").length),
+    updated: Count.make(outcomes.filter((outcome) => outcome._tag === "updated").length),
+    unchanged: Count.make(outcomes.filter((outcome) => outcome._tag === "unchanged").length),
+    unsupported
+  }
+})

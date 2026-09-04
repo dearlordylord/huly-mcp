@@ -13,6 +13,7 @@ import {
   NonEmptyString,
   PersonId,
   PersonUuid,
+  SpaceId,
   Timestamp,
   UrlString
 } from "../../domain/schemas/shared.js"
@@ -40,8 +41,8 @@ export type AccountCurrentPerson = Schema.Schema.Type<typeof AccountCurrentPerso
 
 export const WorkspaceSocialIdentitySchema = Schema.Struct({
   _id: SocialIdentityId,
-  space: NonEmptyString,
-  attachedTo: NonEmptyString,
+  space: SpaceId,
+  attachedTo: PersonId,
   type: SocialIdentityTypeSchema,
   value: Schema.String,
   key: NonEmptyString,
@@ -66,6 +67,9 @@ const WorkspacePersonProjectionSchema = Schema.Struct({
   profile: Schema.optionalKey(NonEmptyString)
 })
 export type WorkspacePersonProjection = Schema.Schema.Type<typeof WorkspacePersonProjectionSchema>
+
+const ResolvedPersonSchema = Schema.Struct({ ...WorkspacePersonProjectionSchema.fields, space: SpaceId })
+export type ResolvedPerson = Schema.Schema.Type<typeof ResolvedPersonSchema>
 
 const WorkspaceEmployeeProjectionSchema = Schema.Struct({
   personUuid: Schema.optionalKey(PersonUuid),
@@ -151,6 +155,18 @@ export const decodeWorkspacePersonAdministrationProjectionData = (
 ): Effect.Effect<WorkspacePersonAdministrationProjectionData, HulyDataInvalidError> =>
   Schema.decodeUnknownEffect(WorkspacePersonAdministrationProjectionDataSchema)(input).pipe(
     Effect.mapError(invalidBoundary("getPersonAdministration", "workspace person administration projection"))
+  )
+
+export const decodeResolvedPerson = (input: unknown): Effect.Effect<ResolvedPerson, HulyDataInvalidError> =>
+  Schema.decodeUnknownEffect(ResolvedPersonSchema)(input).pipe(
+    Effect.mapError(invalidBoundary("resolvePersonAdministrationTarget", "workspace Person"))
+  )
+
+export const decodeResolvedEmployee = (
+  input: unknown
+): Effect.Effect<WorkspaceEmployeeProjection | undefined, HulyDataInvalidError> =>
+  Schema.decodeUnknownEffect(Schema.UndefinedOr(WorkspaceEmployeeProjectionSchema))(input).pipe(
+    Effect.mapError(invalidBoundary("resolvePersonAdministrationTarget", "workspace Employee mixin"))
   )
 
 export const decodeAccountProfile = (input: unknown): Effect.Effect<AccountProfile | null, HulyDataInvalidError> =>

@@ -22,6 +22,7 @@ import {
   decodeWorkspaceSocialIdentitiesForRead,
   type WorkspacePersonAdministrationProjectionData,
   type WorkspaceMemberInfo,
+  type ResolvedPerson,
   type WorkspaceSocialIdentity
 } from "./person-administration-boundaries.js"
 import { resolvePersonAdministrationTarget } from "./person-administration-shared.js"
@@ -55,56 +56,48 @@ interface PersonAdministrationData extends WorkspacePersonAdministrationProjecti
   readonly members: ReadonlyArray<WorkspaceMemberInfo>
 }
 
-const loadPersonAdministrationData = (
+const loadPersonAdministrationData = Effect.fn("PersonAdministration.loadReadData")(function* (
   client: HulyClient["Service"],
   workspace: WorkspaceClientOperations,
-  person: Person
-): Effect.Effect<PersonAdministrationData, HulyClientError | HulyDataInvalidError> =>
-  Effect.gen(function* () {
-    const [identityDtos, statuses, channels, employee, memberDtos] = yield* Effect.all([
-      client.findAll<SocialIdentity>(
-        contact.class.SocialIdentity,
-        hulyQuery<SocialIdentity>({ attachedTo: person._id })
-      ),
-      client.findAll<Status>(contact.class.Status, hulyQuery<Status>({ attachedTo: toRef<Employee>(person._id) })),
-      client.findAll<Channel>(contact.class.Channel, hulyQuery<Channel>({ attachedTo: person._id })),
-      client.findOne<Employee>(contact.mixin.Employee, hulyQuery<Employee>({ _id: toRef<Employee>(person._id) })),
-      workspace.getWorkspaceMembers()
-    ])
-    const identities = yield* decodeWorkspaceSocialIdentitiesForRead(identityDtos)
-    const members = yield* decodeWorkspaceMembers(memberDtos)
-    const projectionData = yield* decodeWorkspacePersonAdministrationProjectionData({
-      person,
-      statuses,
-      channels,
-      ...(employee === undefined ? {} : { employee })
-    })
-    return { ...projectionData, identities, members }
+  person: ResolvedPerson
+): Effect.fn.Return<PersonAdministrationData, HulyClientError | HulyDataInvalidError> {
+  const [identityDtos, statuses, channels, employee, memberDtos] = yield* Effect.all([
+    client.findAll<SocialIdentity>(
+      contact.class.SocialIdentity,
+      hulyQuery<SocialIdentity>({ attachedTo: toRef<Person>(person._id) })
+    ),
+    client.findAll<Status>(contact.class.Status, hulyQuery<Status>({ attachedTo: toRef<Employee>(person._id) })),
+    client.findAll<Channel>(contact.class.Channel, hulyQuery<Channel>({ attachedTo: toRef<Person>(person._id) })),
+    client.findOne<Employee>(contact.mixin.Employee, hulyQuery<Employee>({ _id: toRef<Employee>(person._id) })),
+    workspace.getWorkspaceMembers()
+  ])
+  const identities = yield* decodeWorkspaceSocialIdentitiesForRead(identityDtos)
+  const members = yield* decodeWorkspaceMembers(memberDtos)
+  const projectionData = yield* decodeWorkspacePersonAdministrationProjectionData({
+    person,
+    statuses,
+    channels,
+    ...(employee === undefined ? {} : { employee })
   })
+  return { ...projectionData, identities, members }
+})
 
-const readResolvedPersonAdministration = (
+const readResolvedPersonAdministration = Effect.fn("PersonAdministration.readResolved")(function* (
   client: HulyClient["Service"],
   workspace: WorkspaceClientOperations,
-  person: Person
-): Effect.Effect<GetPersonAdministrationResult, PersonAdministrationReadError> =>
-  loadPersonAdministrationData(client, workspace, person).pipe(
-    Effect.flatMap((data) => {
-      const personUuid = data.employee?.personUuid ?? data.person.personUuid
-      return loadProfile(workspace, personUuid).pipe(
-        Effect.flatMap((profile) =>
-          decodePersonAdministrationResult(makePersonAdministrationProjection({ ...data, profile }))
-        )
-      )
-    })
-  )
+  person: ResolvedPerson
+): Effect.fn.Return<GetPersonAdministrationResult, PersonAdministrationReadError> {
+  const data = yield* loadPersonAdministrationData(client, workspace, person)
+  const personUuid = data.employee?.personUuid ?? data.person.personUuid
+  const profile = yield* loadProfile(workspace, personUuid)
+  return yield* decodePersonAdministrationResult(makePersonAdministrationProjection({ ...data, profile }))
+})
 
-export const getPersonAdministration = (
+export const getPersonAdministration = Effect.fn("PersonAdministration.get")(function* (
   params: GetPersonAdministrationParams
-): Effect.Effect<GetPersonAdministrationResult, PersonAdministrationReadError, HulyClient | WorkspaceClient> =>
-  Effect.all([HulyClient, WorkspaceClient]).pipe(
-    Effect.flatMap(([client, workspace]) =>
-      resolvePersonAdministrationTarget(client, params.person).pipe(
-        Effect.flatMap((person) => readResolvedPersonAdministration(client, workspace, person))
-      )
-    )
-  )
+): Effect.fn.Return<GetPersonAdministrationResult, PersonAdministrationReadError, HulyClient | WorkspaceClient> {
+  const client = yield* HulyClient
+  const workspace = yield* WorkspaceClient
+  const person = yield* resolvePersonAdministrationTarget(client, params.person)
+  return yield* readResolvedPersonAdministration(client, workspace, person)
+})
