@@ -18,6 +18,7 @@ import {
   parseListPersonAttachmentsParams,
   parseListPersonCommentsParams,
   GetPersonAdministrationResultSchema,
+  RepairPersonSocialIdentitiesResultSchema,
   SocialIdentityId,
   SocialIdentityKey,
   SocialIdentityTypeSchema,
@@ -25,6 +26,7 @@ import {
   parseUpdatePersonCommentParams
 } from "../../../src/domain/schemas/person-administration.js"
 import {
+  type CardId,
   Email,
   PersonId,
   PersonName,
@@ -469,6 +471,19 @@ describe("person administration schemas", () => {
     })
   })
 
+  it.effect("requires identity IDs in unsupported repair results", () =>
+    Schema.decodeUnknownEffect(RepairPersonSocialIdentitiesResultSchema)({
+      personId: "person-1",
+      created: 0,
+      updated: 0,
+      unchanged: 0,
+      unsupported: [{ reason: "unsafe" }]
+    }).pipe(
+      Effect.exit,
+      Effect.map((result) => expect(Exit.isFailure(result)).toBe(true))
+    )
+  )
+
   it.effect("accepts the sparse Employee mixin projection emitted by Huly", () =>
     Effect.gen(function* () {
       const projectionData = yield* decodeWorkspacePersonAdministrationProjectionData({
@@ -658,8 +673,17 @@ describe("person identity and profile administration", () => {
       expect(result.contactStatuses[0]?.name).toBe("On leave")
       expect(result.profile?.bio).toBe("Mathematician")
       expect(result.avatar.externalUrl).toBe("https://example.test/avatar.png")
+      const profileCardId: CardId | undefined = result.profileCardId
+      expect(profileCardId).toBe("profile-1")
       expect(result.fieldClassifications.some((entry) => entry.classification === "unsupported")).toBe(true)
-    }).pipe(Effect.provide(Layer.merge(testClient({ identities, statuses: [status] }), workspace)))
+    }).pipe(
+      Effect.provide(
+        Layer.merge(
+          testClient({ identities, statuses: [status], persons: [person({ profile: toRef("profile-1") })] }),
+          workspace
+        )
+      )
+    )
   })
 
   it.effect("preserves birthdays before the Unix epoch", () =>

@@ -10,6 +10,7 @@ import { AccountRoleSchema } from "./workspace.js"
 import {
   AttachmentId,
   BlobId,
+  CardId,
   ChannelId,
   CommentId,
   Count,
@@ -143,7 +144,7 @@ export const GetPersonAdministrationResultSchema = Schema.Struct({
   contactStatuses: Schema.Array(ContactStatusSchema),
   workspaceMember: WorkspaceMembershipSchema,
   socialIdentities: Schema.Array(SocialIdentitySchema),
-  profileCardId: Schema.optionalKey(NonEmptyString),
+  profileCardId: Schema.optionalKey(CardId),
   profile: Schema.optionalKey(PersonProfileSchema),
   channelActivity: Schema.Array(ChannelActivitySchema),
   fieldClassifications: Schema.Array(FieldClassificationSchema)
@@ -155,10 +156,7 @@ export const ListSocialIdentityProvidersResultSchema = Schema.Array(SocialIdenti
 
 export const RepairPersonSocialIdentitiesParamsSchema = Schema.Struct({ person: PersonAdministrationLocatorSchema })
 export type RepairPersonSocialIdentitiesParams = Schema.Schema.Type<typeof RepairPersonSocialIdentitiesParamsSchema>
-const UnsupportedIdentityMutationSchema = Schema.Struct({
-  identityId: Schema.optionalKey(SocialIdentityId),
-  reason: NonEmptyString
-})
+const UnsupportedIdentityMutationSchema = Schema.Struct({ identityId: SocialIdentityId, reason: NonEmptyString })
 export const RepairPersonSocialIdentitiesResultSchema = Schema.Struct({
   personId: PersonId,
   created: Count,

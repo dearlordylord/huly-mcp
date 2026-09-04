@@ -9,6 +9,7 @@ import {
 import { AccountRoleSchema } from "../../domain/schemas/workspace.js"
 import {
   BlobId,
+  CardId,
   ChannelId,
   Count,
   NonEmptyString,
@@ -65,7 +66,7 @@ const WorkspacePersonProjectionSchema = Schema.Struct({
   avatarProps: Schema.optionalKey(
     Schema.Struct({ color: Schema.optionalKey(NonEmptyString), url: Schema.optionalKey(UrlString) })
   ),
-  profile: Schema.optionalKey(NonEmptyString)
+  profile: Schema.optionalKey(CardId)
 })
 export type WorkspacePersonProjection = Schema.Schema.Type<typeof WorkspacePersonProjectionSchema>
 

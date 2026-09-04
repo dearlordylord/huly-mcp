@@ -10,7 +10,7 @@ the baseline was not regenerated.
 - Effect 3 baseline SHA-256:
   `02bb5e4bf2fdb0e4dd30f980810bd0fe70d5c91482c309b4621264c373d6adac`
 - Reviewed Effect 4 corpus SHA-256:
-  `de4bcc925d790c0ea7a362c416ed98fa0668203cfe01b66fe7cd9ef1c2f5f10f`
+  `acb0207f0837ada07240c99ea335b208f91098477a284845c7273bbb38a0f466`
 - Exact structural deltas: 24,528
 - Added: 8,497
 - Changed: 8,855
