@@ -30,7 +30,11 @@ import { TestClock } from "effect/testing"
 import { beforeEach, expect } from "vitest"
 import { HulyConfigService } from "../../src/config/config.js"
 import { PersonMergeReferenceImpactSchema } from "../../src/domain/schemas/person-merge.js"
-import { HulyTransactionScope, PersonId as DomainPersonId } from "../../src/domain/schemas/shared.js"
+import {
+  HulyTransactionScope,
+  NonEmptyString,
+  PersonId as DomainPersonId
+} from "../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../../src/huly/client.js"
 import {
   HulyAuthError,
@@ -41,8 +45,8 @@ import {
 } from "../../src/huly/errors.js"
 import { INLINE_COMMENT_MARK_TYPE } from "../../src/huly/operations/inline-comment-mark.js"
 import { MARKDOWN_INPUT_REF_URL } from "../../src/huly/operations/markup.js"
-import { toClassRef, toRef } from "../../src/huly/operations/sdk-boundary.js"
 import { attachment, chunter, contact, core } from "../../src/huly/huly-plugins.js"
+import { toClassRef, toMixinRef, toRef } from "../../src/huly/operations/sdk-boundary.js"
 import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
 import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import { assertAt } from "../../src/utils/assertions.js"
@@ -251,6 +255,9 @@ interface TestDoc extends Doc {
 }
 interface TestAttachedDoc extends AttachedDoc {
   readonly fixture?: string
+}
+interface TestMixinDoc extends TestDoc {
+  readonly mixinValue: string
 }
 
 describe("HulyClient Service", () => {
@@ -1501,17 +1508,20 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         const createBundle = client.createDocWithCollectionAndMixin
         expect(createBundle).toBeDefined()
         if (createBundle === undefined) return
-        yield* createBundle(
-          "person-class" as DocRef<Class<TestDoc>>,
-          "space" as DocRef<Space>,
-          {} as Data<TestDoc>,
-          "person" as DocRef<TestDoc>,
-          "attached-class" as DocRef<Class<TestAttachedDoc>>,
+        const documentData: Data<TestDoc> = { title: "Employee bundle" }
+        const attachedData: AttachedData<TestAttachedDoc> = { fixture: "identity" }
+        const mixinData: MixinData<TestDoc, TestMixinDoc> = { mixinValue: "employee" }
+        yield* createBundle<TestDoc, TestAttachedDoc, TestMixinDoc>(
+          toClassRef<TestDoc>("person-class"),
+          toRef<Space>(NonEmptyString.make("space")),
+          documentData,
+          toRef<TestDoc>(NonEmptyString.make("person")),
+          toClassRef<TestAttachedDoc>("attached-class"),
           "identities",
-          {} as AttachedData<TestAttachedDoc>,
-          "identity" as DocRef<TestAttachedDoc>,
-          "mixin" as DocRef<Mixin<TestDoc>>,
-          {} as MixinData<TestDoc, TestDoc>,
+          attachedData,
+          toRef<TestAttachedDoc>(NonEmptyString.make("identity")),
+          toMixinRef<TestMixinDoc>("mixin"),
+          mixinData,
           HulyTransactionScope.make("employee-bundle")
         )
         expect(mockApplyCreateDoc.mock.calls).toHaveLength(1)
