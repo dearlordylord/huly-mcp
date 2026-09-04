@@ -97,6 +97,13 @@ const status: Status = {
   name: "New"
 }
 
+describe("mirrored Huly lead model references", () => {
+  it("matches the upstream and live default funnel identifiers", () => {
+    expect(leadClassIds.descriptor.FunnelType).toBe("lead:descriptors:FunnelType")
+    expect(leadClassIds.template.DefaultFunnel).toBe("lead:template:DefaultFunnel")
+  })
+})
+
 const makeFunnel = (overrides: Partial<HulyFunnel> = {}): HulyFunnel => ({
   ...docBase(funnelId, toClassRef<HulyFunnel>(leadClassIds.class.Funnel), core.space.Space),
   name: "Sales",

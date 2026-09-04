@@ -32,7 +32,7 @@ export const leadClassIds = {
     LeadTypeData: leadMixinRef<Doc>("lead:mixin:LeadTypeData")
   },
   attribute: { State: leadDocRef<Attribute<Status>>("lead:attribute:State") },
-  descriptor: { FunnelType: leadDocRef<ProjectTypeDescriptor>("lead:descriptor:FunnelType") },
+  descriptor: { FunnelType: leadDocRef<ProjectTypeDescriptor>("lead:descriptors:FunnelType") },
   taskType: { Lead: leadDocRef<TaskType>("lead:taskType:Lead") },
-  template: { DefaultFunnel: leadDocRef<ProjectType>("lead:projectType:DefaultFunnel") }
+  template: { DefaultFunnel: leadDocRef<ProjectType>("lead:template:DefaultFunnel") }
 } as const
