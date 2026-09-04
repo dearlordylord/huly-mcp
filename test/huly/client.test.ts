@@ -35,6 +35,7 @@ import { HulyClient, type HulyClientError } from "../../src/huly/client.js"
 import {
   HulyAuthError,
   HulyConnectionError,
+  PersonMergeSnapshotStaleError,
   HulyUnavailableError,
   makeOperationConnectionError
 } from "../../src/huly/errors.js"
@@ -49,6 +50,7 @@ import { mockFn } from "../helpers/mock-fn.js"
 
 // --- Mock setup ---
 
+const decodePersonMergeReferenceImpact = Schema.decodeSync(PersonMergeReferenceImpactSchema)
 const mockFindAll = mockFn()
 const mockFindOne = mockFn()
 const mockFindAllInModel = mockFn()
@@ -765,7 +767,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
     it.effect("discovers metadata-owned references and migrates them through Huly's native updater", () =>
       Effect.gen(function* () {
         mockFindAllInModel.mockReturnValue([singleAttribute])
-        mockFindAll.mockImplementationOnce(() => Promise.resolve(findResult([sourceComment])))
+        mockFindAll.mockImplementation(() => Promise.resolve(findResult([sourceComment])))
 
         const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
         if (client.inspectPersonReferences === undefined || client.migratePersonReferences === undefined) {
@@ -778,10 +780,12 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
             attributeId: "attribute-created-by",
             ownerClass: commentClass,
             concreteClass: commentClass,
+            targetClass: String(contact.class.Person),
             field: "createdByPerson",
             kind: "single",
             category: "comment",
-            count: 1
+            count: 1,
+            snapshotDigest: expect.stringMatching(/^[0-9a-f]{64}$/u)
           }
         ])
 
@@ -811,7 +815,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         }
         const message = { ...sourceComment, members: ["other", sourceId, survivorId] }
         mockFindAllInModel.mockReturnValue([arrayAttribute])
-        mockFindAll.mockImplementationOnce(() => Promise.resolve(findResult([message])))
+        mockFindAll.mockImplementation(() => Promise.resolve(findResult([message])))
 
         const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
         if (client.inspectPersonReferences === undefined || client.migratePersonReferences === undefined) {
@@ -828,6 +832,152 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
           expect.any(Number),
           undefined
         ])
+      })
+    )
+
+    it.effect("rejects equal-cardinality document churn before any write", () =>
+      Effect.gen(function* () {
+        const replacementComment = { ...sourceComment, _id: "comment-2" }
+        mockFindAllInModel.mockReturnValue([singleAttribute])
+        mockFindAll.mockImplementation(() => Promise.resolve(findResult([sourceComment])))
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        if (client.inspectPersonReferences === undefined || client.migratePersonReferences === undefined) {
+          return yield* Effect.die(new Error("live HulyClient omitted person-reference migration"))
+        }
+        const impacts = yield* client.inspectPersonReferences(sourceId)
+
+        mockFindAll.mockImplementation(() => Promise.resolve(findResult([replacementComment])))
+        const error = yield* Effect.flip(client.migratePersonReferences(impacts, sourceId, survivorId))
+
+        expect(error).toBeInstanceOf(PersonMergeSnapshotStaleError)
+        expect(error.message).toContain("changed after preflight")
+        expect(mockUpdate.mock.calls).toEqual([])
+      })
+    )
+
+    it.effect("canonicalizes snapshot document order", () =>
+      Effect.gen(function* () {
+        const secondComment = { ...sourceComment, _id: "comment-2" }
+        mockFindAllInModel.mockReturnValue([singleAttribute])
+        mockFindAll.mockImplementation((_class, _query, options) =>
+          Promise.resolve(
+            options?.limit === 1 ? findResult([sourceComment], 2) : findResult([secondComment, sourceComment])
+          )
+        )
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        if (client.inspectPersonReferences === undefined) {
+          return yield* Effect.die(new Error("live HulyClient omitted person-reference inspection"))
+        }
+        const first = yield* client.inspectPersonReferences(sourceId)
+
+        mockFindAll.mockImplementation((_class, _query, options) =>
+          Promise.resolve(
+            options?.limit === 1 ? findResult([sourceComment], 2) : findResult([sourceComment, secondComment])
+          )
+        )
+        const second = yield* client.inspectPersonReferences(sourceId)
+
+        expect(first[0]?.snapshotDigest).toBe(second[0]?.snapshotDigest)
+      })
+    )
+
+    it.effect("rejects array-value churn before any write", () =>
+      Effect.gen(function* () {
+        const arrayAttribute = {
+          _id: "attribute-members",
+          attributeOf: commentClass,
+          name: "members",
+          type: {
+            _class: String(core.class.ArrOf),
+            of: { _class: String(core.class.RefTo), to: String(contact.class.Person) }
+          }
+        }
+        const reviewed = { ...sourceComment, members: [sourceId, "reviewed-member"] }
+        const changed = { ...sourceComment, members: [sourceId, "changed-member"] }
+        mockFindAllInModel.mockReturnValue([arrayAttribute])
+        mockFindAll.mockImplementation(() => Promise.resolve(findResult([reviewed])))
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        if (client.inspectPersonReferences === undefined || client.migratePersonReferences === undefined) {
+          return yield* Effect.die(new Error("live HulyClient omitted person-reference migration"))
+        }
+        const impacts = yield* client.inspectPersonReferences(sourceId)
+
+        mockFindAll.mockImplementation(() => Promise.resolve(findResult([changed])))
+        const error = yield* Effect.flip(client.migratePersonReferences(impacts, sourceId, survivorId))
+
+        expect(error).toBeInstanceOf(PersonMergeSnapshotStaleError)
+        expect(mockUpdate.mock.calls).toEqual([])
+      })
+    )
+
+    it.effect("rejects reference metadata churn before any write", () =>
+      Effect.gen(function* () {
+        mockFindAllInModel.mockReturnValue([singleAttribute])
+        mockFindAll.mockImplementation(() => Promise.resolve(findResult([sourceComment])))
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        if (client.inspectPersonReferences === undefined || client.migratePersonReferences === undefined) {
+          return yield* Effect.die(new Error("live HulyClient omitted person-reference migration"))
+        }
+        const impacts = yield* client.inspectPersonReferences(sourceId)
+
+        mockFindAllInModel.mockReturnValue([{ ...singleAttribute, type: { _class: "core:class:TypeString" } }])
+        const error = yield* Effect.flip(client.migratePersonReferences(impacts, sourceId, survivorId))
+
+        expect(error).toBeInstanceOf(PersonMergeSnapshotStaleError)
+        expect(mockUpdate.mock.calls).toEqual([])
+      })
+    )
+
+    it.effect("rejects document write-routing churn before any write", () =>
+      Effect.gen(function* () {
+        mockFindAllInModel.mockReturnValue([singleAttribute])
+        mockFindAll.mockImplementation(() => Promise.resolve(findResult([sourceComment])))
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        if (client.inspectPersonReferences === undefined || client.migratePersonReferences === undefined) {
+          return yield* Effect.die(new Error("live HulyClient omitted person-reference migration"))
+        }
+        const impacts = yield* client.inspectPersonReferences(sourceId)
+
+        mockFindAll.mockImplementation(() =>
+          Promise.resolve(findResult([{ ...sourceComment, space: "changed-space" }]))
+        )
+        const error = yield* Effect.flip(client.migratePersonReferences(impacts, sourceId, survivorId))
+
+        expect(error).toBeInstanceOf(PersonMergeSnapshotStaleError)
+        expect(mockUpdate.mock.calls).toEqual([])
+      })
+    )
+
+    it.effect("validates every descriptor before applying an earlier prepared write", () =>
+      Effect.gen(function* () {
+        const arrayAttribute = {
+          _id: "attribute-members",
+          attributeOf: commentClass,
+          name: "members",
+          type: {
+            _class: String(core.class.ArrOf),
+            of: { _class: String(core.class.RefTo), to: String(contact.class.Person) }
+          }
+        }
+        const reviewedArray = { ...sourceComment, members: [sourceId, "reviewed-member"] }
+        const changedArray = { ...sourceComment, members: [sourceId, "changed-member"] }
+        mockFindAllInModel.mockReturnValue([singleAttribute, arrayAttribute])
+        mockFindAll.mockImplementation((_class, query) =>
+          Promise.resolve(findResult([Object.hasOwn(query, "members") ? reviewedArray : sourceComment]))
+        )
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        if (client.inspectPersonReferences === undefined || client.migratePersonReferences === undefined) {
+          return yield* Effect.die(new Error("live HulyClient omitted person-reference migration"))
+        }
+        const impacts = yield* client.inspectPersonReferences(sourceId)
+
+        mockFindAll.mockImplementation((_class, query) =>
+          Promise.resolve(findResult([Object.hasOwn(query, "members") ? changedArray : sourceComment]))
+        )
+        const error = yield* Effect.flip(client.migratePersonReferences(impacts, sourceId, survivorId))
+
+        expect(error).toBeInstanceOf(PersonMergeSnapshotStaleError)
+        expect(mockUpdate.mock.calls).toEqual([])
       })
     )
 
@@ -923,7 +1073,10 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
 
         mockFindAll.mockImplementation(() => Promise.resolve(findResult([], Number.NaN)))
         const invalidImpact = yield* Effect.flip(client.inspectPersonReferences(sourceId))
-        expect(invalidImpact).toMatchObject({ _tag: "HulyDataInvalidError", entity: "reference impact" })
+        expect(invalidImpact).toMatchObject({
+          _tag: "HulyDataInvalidError",
+          entity: `${commentClass}.createdByPerson cardinality changed during snapshot`
+        })
       })
     )
 
@@ -933,14 +1086,16 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         if (client.inspectPersonReferences === undefined || client.migratePersonReferences === undefined) {
           return yield* Effect.die(new Error("live HulyClient omitted person-reference migration"))
         }
-        const impact = Schema.decodeUnknownSync(PersonMergeReferenceImpactSchema)({
+        const impact = decodePersonMergeReferenceImpact({
           attributeId: "attribute-created-by",
           ownerClass: commentClass,
           concreteClass: commentClass,
+          targetClass: String(contact.class.Person),
           field: "createdByPerson",
           kind: "single",
           category: "comment",
-          count: 1
+          count: 1,
+          snapshotDigest: "0".repeat(64)
         })
 
         mockFindAllInModel.mockReturnValue([])
@@ -949,25 +1104,38 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
           entity: "Attribute 'attribute-created-by'"
         })
 
-        mockFindAllInModel.mockReturnValue([singleAttribute])
-        const emptyImpact = Schema.decodeUnknownSync(PersonMergeReferenceImpactSchema)({ ...impact, count: 0 })
-        yield* client.migratePersonReferences([emptyImpact], sourceId, survivorId)
-        expect(mockFindAll.mock.calls).toEqual([])
-        expect(mockUpdate.mock.calls).toEqual([])
+        mockFindAllInModel.mockReturnValue([{ _id: "attribute-created-by" }])
+        expect(yield* Effect.flip(client.migratePersonReferences([impact], sourceId, survivorId))).toMatchObject({
+          _tag: "HulyDataInvalidError",
+          entity: "Attribute 'attribute-created-by'"
+        })
 
+        mockFindAllInModel.mockReturnValue([singleAttribute])
         mockFindAll.mockImplementation(() => Promise.resolve(findResult([{ _id: "broken" }])))
         expect(yield* Effect.flip(client.migratePersonReferences([impact], sourceId, survivorId))).toMatchObject({
           _tag: "HulyDataInvalidError",
           entity: `${commentClass}.createdByPerson document`
         })
 
+        mockFindAll.mockImplementation(() => Promise.resolve(findResult([{ ...sourceComment, createdByPerson: 42 }])))
+        expect(yield* Effect.flip(client.migratePersonReferences([impact], sourceId, survivorId))).toMatchObject({
+          _tag: "HulyDataInvalidError",
+          entity: `${commentClass}.createdByPerson reference value`
+        })
+
         mockFindAll.mockImplementation(() => Promise.resolve(findResult([])))
         expect(yield* Effect.flip(client.migratePersonReferences([impact], sourceId, survivorId))).toMatchObject({
           _tag: "HulyDataInvalidError",
-          entity: `${commentClass}.createdByPerson cardinality changed after preflight`
+          entity: `${commentClass}.createdByPerson cardinality changed during snapshot`
         })
 
-        const duplicateImpact = Schema.decodeUnknownSync(PersonMergeReferenceImpactSchema)({ ...impact, count: 2 })
+        mockFindAll.mockImplementation(() => Promise.resolve(findResult([sourceComment], 2)))
+        expect(yield* Effect.flip(client.migratePersonReferences([impact], sourceId, survivorId))).toMatchObject({
+          _tag: "HulyDataInvalidError",
+          entity: `${commentClass}.createdByPerson cardinality changed during snapshot`
+        })
+
+        const duplicateImpact = decodePersonMergeReferenceImpact({ ...impact, count: 2 })
         mockFindAll.mockImplementation(() => Promise.resolve(findResult([sourceComment, sourceComment])))
         expect(
           yield* Effect.flip(client.migratePersonReferences([duplicateImpact], sourceId, survivorId))
@@ -991,14 +1159,16 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
             of: { _class: String(core.class.RefTo), to: String(contact.class.Person) }
           }
         }
-        const arrayImpact = Schema.decodeUnknownSync(PersonMergeReferenceImpactSchema)({
+        const arrayImpact = decodePersonMergeReferenceImpact({
           attributeId: "attribute-members",
           ownerClass: commentClass,
           concreteClass: commentClass,
+          targetClass: String(contact.class.Person),
           field: "members",
           kind: "array",
           category: "comment",
-          count: 1
+          count: 1,
+          snapshotDigest: "0".repeat(64)
         })
         mockFindAllInModel.mockReturnValue([arrayAttribute])
         mockFindAll.mockImplementation(() => Promise.resolve(findResult([{ ...sourceComment, members: 42 }])))
@@ -1007,7 +1177,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
           return yield* Effect.die(new Error("live HulyClient omitted person-reference migration"))
         }
         const error = yield* Effect.flip(client.migratePersonReferences([arrayImpact], sourceId, survivorId))
-        expect(error).toMatchObject({ _tag: "HulyDataInvalidError", entity: "array person reference" })
+        expect(error).toMatchObject({ _tag: "HulyDataInvalidError", entity: `${commentClass}.members reference value` })
       })
     )
   })

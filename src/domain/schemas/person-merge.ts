@@ -2,7 +2,17 @@ import { Schema } from "effect"
 
 import { toDraft07JsonSchema, withJsonSchemaPropertyDescriptions } from "./json-schema.js"
 import { PersonAdministrationLocatorSchema } from "./person-administration.js"
-import { Count, DocId, NonEmptyString, ObjectClassName, PersonId, PersonName, PersonUuid, SpaceId } from "./shared.js"
+import {
+  Count,
+  DocId,
+  NonEmptyString,
+  ObjectClassName,
+  PersonId,
+  PersonName,
+  PersonUuid,
+  PositiveInteger,
+  SpaceId
+} from "./shared.js"
 
 export const PersonMergeReferenceKindSchema = Schema.Literals(["single", "array"])
 export type PersonMergeReferenceKind = Schema.Schema.Type<typeof PersonMergeReferenceKindSchema>
@@ -17,14 +27,27 @@ export const PersonMergeReferenceCategorySchema = Schema.Literals([
 ])
 export type PersonMergeReferenceCategory = Schema.Schema.Type<typeof PersonMergeReferenceCategorySchema>
 
+export const PersonMergeSnapshotDigest = Schema.String.pipe(
+  Schema.check(Schema.isPattern(/^[0-9a-f]{64}$/u)),
+  Schema.brand("PersonMergeSnapshotDigest"),
+  Schema.annotate({
+    identifier: "PersonMergeSnapshotDigest",
+    description:
+      "SHA-256 digest of canonical affected document IDs, write-routing fields, and current reference values."
+  })
+)
+export type PersonMergeSnapshotDigest = Schema.Schema.Type<typeof PersonMergeSnapshotDigest>
+
 export const PersonMergeReferenceImpactSchema = Schema.Struct({
   attributeId: DocId,
   ownerClass: ObjectClassName,
   concreteClass: ObjectClassName,
+  targetClass: ObjectClassName,
   field: NonEmptyString,
   kind: PersonMergeReferenceKindSchema,
   category: PersonMergeReferenceCategorySchema,
-  count: Count
+  count: PositiveInteger,
+  snapshotDigest: PersonMergeSnapshotDigest
 })
 export type PersonMergeReferenceImpact = Schema.Schema.Type<typeof PersonMergeReferenceImpactSchema>
 

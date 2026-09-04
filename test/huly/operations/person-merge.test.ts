@@ -32,19 +32,22 @@ const resolvedPerson = (id: string, name: string, personUuid?: string) =>
 
 const source = resolvedPerson("source", "Source Person")
 const survivor = resolvedPerson("survivor", "Survivor Person")
+const decodePersonMergeReferenceImpact = Schema.decodeSync(PersonMergeReferenceImpactSchema)
 
 const reference = (
   category: "identity" | "channel" | "membership" | "comment" | "attachment" | "other",
   count: number
 ) =>
-  Schema.decodeUnknownSync(PersonMergeReferenceImpactSchema)({
+  decodePersonMergeReferenceImpact({
     attributeId: `attribute-${category}`,
     ownerClass: "core:class:Doc",
     concreteClass: `test:class:${category}`,
+    targetClass: "contact:class:Person",
     field: "person",
     kind: "single",
     category,
-    count
+    count,
+    snapshotDigest: "0".repeat(64)
   })
 
 const impacts = [
@@ -58,7 +61,11 @@ const impacts = [
 
 const previewParams = Effect.runSync(parseMergePeopleParams({ source: { id: "source" }, survivor: { id: "survivor" } }))
 
-const run = <A, E>(effect: Effect.Effect<A, E, HulyClient | WorkspaceClient>, accountMergeable = true) =>
+const run = <A, E>(
+  effect: Effect.Effect<A, E, HulyClient | WorkspaceClient>,
+  accountMergeable = true,
+  references = impacts
+) =>
   Effect.gen(function* () {
     const migrations = yield* Ref.make(0)
     const accountMerges = yield* Ref.make(0)
@@ -66,7 +73,7 @@ const run = <A, E>(effect: Effect.Effect<A, E, HulyClient | WorkspaceClient>, ac
       Effect.provide(
         Layer.merge(
           HulyClient.testLayer({
-            inspectPersonReferences: () => Effect.succeed(impacts),
+            inspectPersonReferences: () => Effect.succeed(references),
             migratePersonReferences: () => Ref.update(migrations, (count) => count + 1)
           }),
           WorkspaceClient.testLayer({
@@ -128,6 +135,37 @@ describe("person merge", () => {
       expect(outcome.result.executed).toBe(true)
       expect(outcome.migrations).toBe(1)
       expect(outcome.accountMerges).toBe(0)
+    })
+  )
+
+  it.effect("rejects equal-cardinality snapshot churn before migration", () =>
+    Effect.gen(function* () {
+      const preview = (yield* run(mergeResolvedPeople(previewParams, source, survivor))).result
+      const execute = yield* parseMergePeopleParams({
+        source: { id: "source" },
+        survivor: { id: "survivor" },
+        execute: true,
+        expectedPreflightToken: preview.preflightToken
+      })
+      const changedReferences = impacts.map((impact, index) =>
+        index === 0 ? decodePersonMergeReferenceImpact({ ...impact, snapshotDigest: "1".repeat(64) }) : impact
+      )
+      const migrations = yield* Ref.make(0)
+      const stale = yield* Effect.flip(
+        mergeResolvedPeople(execute, source, survivor).pipe(
+          Effect.provide(
+            Layer.merge(
+              HulyClient.testLayer({
+                inspectPersonReferences: () => Effect.succeed(changedReferences),
+                migratePersonReferences: () => Ref.update(migrations, (count) => count + 1)
+              }),
+              WorkspaceClient.testLayer({})
+            )
+          )
+        )
+      )
+      expect(stale).toBeInstanceOf(PersonMergePreflightMismatchError)
+      expect(yield* Ref.get(migrations)).toBe(0)
     })
   )
 

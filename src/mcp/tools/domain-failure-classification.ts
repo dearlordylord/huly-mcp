@@ -196,6 +196,7 @@ const DOMAIN_FAILURE_KIND_BY_TAG = {
   PersonMergeAccountBlockedError: "conflict",
   PersonMergePreflightMismatchError: "conflict",
   PersonMergeSelfError: "input",
+  PersonMergeSnapshotStaleError: "conflict",
   PlannerSchedulingPrerequisiteError: "integration",
   ProcessCardIdentifierAmbiguousError: "ambiguity",
   ProcessCardNotFoundError: "lookup",

@@ -1183,6 +1183,8 @@ describe("Huly Errors", () => {
               return `person-merge-preflight:${error.expected}:${error.actual}`
             case "PersonMergeAccountBlockedError":
               return `person-merge-account:${error.sourceId}:${error.survivorId}`
+            case "PersonMergeSnapshotStaleError":
+              return `person-merge-snapshot:${error.concreteClass}:${error.field}`
             case "PersonIdentifierAmbiguousError":
               return `person-ambiguous:${error.identifier}:${error.matches}`
             case "DepartmentNotFoundError":

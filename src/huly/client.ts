@@ -58,6 +58,7 @@ import {
   HulyUnavailableError,
   makeOperationConnectionError
 } from "./errors-base.js"
+import type { PersonMergeSnapshotStaleError } from "./errors-person-administration.js"
 import { PlatformError } from "./huly-platform.js"
 import {
   markdownInputUrlConfig,
@@ -352,7 +353,7 @@ export interface HulyClientOperations extends HulyClientContext {
     impacts: ReadonlyArray<PersonMergeReferenceImpact>,
     source: DomainPersonId,
     survivor: DomainPersonId
-  ) => Effect.Effect<void, HulyClientError | HulyDataInvalidError>
+  ) => Effect.Effect<void, HulyClientError | HulyDataInvalidError | PersonMergeSnapshotStaleError>
 }
 
 export class HulyClient extends Context.Service<HulyClient, HulyClientOperations>()("@hulymcp/HulyClient") {

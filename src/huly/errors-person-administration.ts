@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 
-import { PersonMergePreflightToken } from "../domain/schemas/person-merge.js"
-import { CommentId, NonEmptyString, PersonId } from "../domain/schemas/shared.js"
+import { PersonMergePreflightToken, PersonMergeSnapshotDigest } from "../domain/schemas/person-merge.js"
+import { CommentId, NonEmptyString, ObjectClassName, PersonId } from "../domain/schemas/shared.js"
 
 export class PersonCommentNotFoundError extends Schema.TaggedError<PersonCommentNotFoundError>()(
   "PersonCommentNotFoundError",
@@ -47,10 +47,25 @@ export class PersonMergeAccountBlockedError extends Schema.TaggedError<PersonMer
   }
 }
 
+export class PersonMergeSnapshotStaleError extends Schema.TaggedError<PersonMergeSnapshotStaleError>()(
+  "PersonMergeSnapshotStaleError",
+  {
+    concreteClass: ObjectClassName,
+    field: NonEmptyString,
+    expected: PersonMergeSnapshotDigest,
+    actual: PersonMergeSnapshotDigest
+  }
+) {
+  override get message(): string {
+    return `Person merge references changed after preflight for '${this.concreteClass}.${this.field}'. Preview again before executing.`
+  }
+}
+
 export const PersonAdministrationDomainError = Schema.Union([
   PersonCommentNotFoundError,
   PersonIdentityRepairUnsupportedError,
   PersonMergeSelfError,
   PersonMergePreflightMismatchError,
-  PersonMergeAccountBlockedError
+  PersonMergeAccountBlockedError,
+  PersonMergeSnapshotStaleError
 ])

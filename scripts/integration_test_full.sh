@@ -5112,6 +5112,7 @@ if [ $? -eq 0 ]; then
 	        assert_json_field_equals "person merge preflight reports comments" "$PERSON_MERGE_PREVIEW_TEXT" ".impact.comments >= 1" "true"
 	        assert_json_field_equals "person merge preflight reports attachments" "$PERSON_MERGE_PREVIEW_TEXT" ".impact.attachments >= 1" "true"
 	        assert_json_field_equals "person merge preflight reports channels" "$PERSON_MERGE_PREVIEW_TEXT" ".impact.channels >= 1" "true"
+	        assert_json_field_equals "person merge preflight binds canonical snapshot digests" "$PERSON_MERGE_PREVIEW_TEXT" ".impact.references | length > 0 and all(.snapshotDigest | test(\"^[0-9a-f]{64}$\"))" "true"
 	        PERSON_MERGE_TOKEN=$(printf '%s\n' "$PERSON_MERGE_PREVIEW_TEXT" | jq -r '.preflightToken' 2>/dev/null)
 	        run_expect_error_contains "merge_people(stale preflight rejected)" \
 	          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"merge_people\",\"arguments\":{\"source\":{\"id\":\"$PERSON_ID\"},\"survivor\":{\"id\":\"$PERSON_MERGE_SURVIVOR_ID\"},\"execute\":true,\"expectedPreflightToken\":\"stale\"}},\"id\":2}" \

@@ -20,6 +20,7 @@ import {
   PersonMergeAccountBlockedError,
   PersonMergePreflightMismatchError,
   PersonMergeSelfError,
+  type PersonMergeSnapshotStaleError,
   type PersonNotFoundError
 } from "../errors.js"
 import { WorkspaceClient, type WorkspaceClientError } from "../workspace-client.js"
@@ -35,6 +36,7 @@ type PersonMergeError =
   | PersonMergeSelfError
   | PersonMergePreflightMismatchError
   | PersonMergeAccountBlockedError
+  | PersonMergeSnapshotStaleError
 
 type AccountAction = Schema.Schema.Type<typeof PersonMergeAccountActionSchema>
 

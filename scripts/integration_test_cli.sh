@@ -612,6 +612,28 @@ capture_cli_json "merge_people" "person merge preflight" PERSON_MERGE_PREVIEW_JS
 PERSON_MERGE_TOKEN="$(json_value "$PERSON_MERGE_PREVIEW_JSON" '.preflightToken')"
 assert_json "person merge preflight reports native comment" "$PERSON_MERGE_PREVIEW_JSON" '.executed == false and .impact.comments >= 1'
 assert_json "person merge preflight reports native attachment" "$PERSON_MERGE_PREVIEW_JSON" '.impact.attachments >= 1'
+assert_json "person merge preflight binds canonical snapshot digests" "$PERSON_MERGE_PREVIEW_JSON" \
+  '.impact.references | length > 0 and all(.snapshotDigest | test("^[0-9a-f]{64}$"))'
+cover_cli_json "delete_person_comment" "person merge equal-cardinality churn removes reviewed comment" \
+  contacts persons comments delete --person "$PERSON_ADMIN_TARGET" --comment-id "$PERSON_ADMIN_COMMENT_ID" --yes
+PERSON_ADMIN_COMMENT_ID=""
+capture_cli_json "add_person_comment" "person merge equal-cardinality replacement comment" PERSON_MERGE_REPLACEMENT_COMMENT_JSON \
+  contacts persons comments add --person "$PERSON_ADMIN_TARGET" --body "CLI replacement person note $RUN_ID"
+PERSON_ADMIN_COMMENT_ID="$(json_value "$PERSON_MERGE_REPLACEMENT_COMMENT_JSON" '.commentId')"
+cover_cli_failure "merge_people" "person merge rejects equal-cardinality snapshot churn" "changed since preflight" \
+  contacts persons merge --source "$PERSON_ADMIN_TARGET" --survivor "$PERSON_MERGE_SURVIVOR_TARGET" \
+    --execute --expected-preflight-token "$PERSON_MERGE_TOKEN" --yes
+capture_cli_json "list_person_comments" "stale merge leaves replacement comment on source" PERSON_MERGE_SOURCE_COMMENTS_JSON \
+  contacts persons comments list --person "$PERSON_ADMIN_TARGET"
+assert_json "stale merge made zero source-comment writes" "$PERSON_MERGE_SOURCE_COMMENTS_JSON" \
+  ".comments | map(.id) | index(\"$PERSON_ADMIN_COMMENT_ID\") != null"
+capture_cli_json "list_person_comments" "stale merge leaves survivor comments unchanged" PERSON_MERGE_STALE_SURVIVOR_COMMENTS_JSON \
+  contacts persons comments list --person "$PERSON_MERGE_SURVIVOR_TARGET"
+assert_json "stale merge made zero survivor-comment writes" "$PERSON_MERGE_STALE_SURVIVOR_COMMENTS_JSON" \
+  ".comments | map(.id) | index(\"$PERSON_ADMIN_COMMENT_ID\") == null"
+capture_cli_json "merge_people" "person merge refreshed preflight" PERSON_MERGE_PREVIEW_JSON \
+  contacts persons merge --source "$PERSON_ADMIN_TARGET" --survivor "$PERSON_MERGE_SURVIVOR_TARGET" --yes
+PERSON_MERGE_TOKEN="$(json_value "$PERSON_MERGE_PREVIEW_JSON" '.preflightToken')"
 cover_cli_json "merge_people" "person merge execution" \
   contacts persons merge --source "$PERSON_ADMIN_TARGET" --survivor "$PERSON_MERGE_SURVIVOR_TARGET" \
     --execute --expected-preflight-token "$PERSON_MERGE_TOKEN" --yes
