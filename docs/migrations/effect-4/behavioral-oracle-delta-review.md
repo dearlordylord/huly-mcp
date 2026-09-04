@@ -10,11 +10,11 @@ the baseline was not regenerated.
 - Effect 3 baseline SHA-256:
   `02bb5e4bf2fdb0e4dd30f980810bd0fe70d5c91482c309b4621264c373d6adac`
 - Reviewed Effect 4 corpus SHA-256:
-  `acb0207f0837ada07240c99ea335b208f91098477a284845c7273bbb38a0f466`
-- Exact structural deltas: 24,528
-- Added: 8,497
-- Changed: 8,855
-- Removed: 7,176
+  `a096afa67e1cfefbcc5eaa61abc22e800aad7e21dd2edabf387b3cb674bf3574`
+- Exact structural deltas: 24,233
+- Added: 8,457
+- Changed: 8,642
+- Removed: 7,134
 
 Each category records its exact delta count and the SHA-256 of its sorted exact
 delta identities. The compact `behavioral-oracle-delta-review.json` certificate
@@ -26,13 +26,13 @@ stale categories, duplicate categories, and corpus hash drift.
 
 | Count | Classification | Evidence |
 | ---: | --- | --- |
-| 3,120 | Draft-07 structural dialect | Effect 4 refs, definitions, optional/null unions, refinements, and composition wrappers. All 564 native and 6 proxy schemas compile under strict Ajv Draft-07. |
+| 3,120 | Draft-07 structural dialect | Effect 4 refs, definitions, optional/null unions, refinements, and composition wrappers. All 572 native and 6 proxy schemas compile under strict Ajv Draft-07. |
 | 1,192 | Schema metadata | Authored descriptions restored by the central adapter and obsolete Effect 3 generator-default titles/descriptions removed. |
 | 977 | Authored-constraint projection | Pre-administration tools remain represented; generated ref/composition paths changed. Manual cross-field constraints remain in the corpus and representative runtime/Ajv agreement passes. |
 | 6 | Direct issue-assignee descriptions | Direct issue create, update, and list advertise exact agent UserProfile titles in both their tool and assignee input descriptions (#245). |
-| 19,223 | Issue #97 administration | Employee-position, HR-department, Staff-assignment, funnel, HR-request, and person-administration operations and their schemas are attributed by tool identity across native, registry, and CLI ordered surfaces (#97). |
+| 18,928 | Issue #97 administration | Employee-position, HR-department, Staff-assignment, funnel, HR-request, public-holiday, HR-report, and person-administration operations and their schemas are attributed by tool identity across native, registry, and CLI ordered surfaces (#97). |
 | 6 | CLI JSON parse diagnostics | Effect 4 adds deterministic line/column context; code, hint, retryability, and exit status are unchanged. |
-| 4 | CLI help rendering | The Effect 4 CLI renderer intentionally uses concise help and omits patterns that are not shared by every string-capable union branch, while retaining string patterns across nullable alternatives. Funnel, HR-request, and person-administration routes extend the inventory without changing other route behavior. |
+| 4 | CLI help rendering | The Effect 4 CLI renderer intentionally uses concise help and omits patterns that are not shared by every string-capable union branch, while retaining string patterns across nullable alternatives. Funnel, HR-request, public-holiday, HR-report, and person-administration routes extend the inventory without changing other route behavior. |
 
 The comparison deliberately retains public array order, descriptions, titles,
 refs, required fields, enums, patterns, bounds, compositions, help, and error
@@ -52,6 +52,6 @@ mise exec node@22.22.2 -- pnpm exec vitest run \
   test/scripts/effect4-oracle-parity.test.ts
 ```
 
-The full verifier re-renders the current bundled corpus and matches all 24,528
+The full verifier re-renders the current bundled corpus and matches all 24,233
 exact entries. Any future semantic or structural drift is unexpected; an
 accepted entry that stops occurring is stale and also fails verification.
