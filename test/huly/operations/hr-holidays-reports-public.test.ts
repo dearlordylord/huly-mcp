@@ -181,6 +181,8 @@ const queryValue = (query: unknown, key: string): unknown =>
 
 const matchesSelector = (actual: unknown, expected: unknown): boolean => {
   if (typeof expected !== "object" || expected === null) return actual === expected
+  const included = queryValue(expected, "$in")
+  if (Array.isArray(included)) return included.some((value) => value === actual)
   const excluded = queryValue(expected, "$nin")
   return !Array.isArray(excluded) || !excluded.some((value) => value === actual)
 }
@@ -496,6 +498,26 @@ describe("HR report operations", () => {
     expect(state.calls.pageExclusions.length).toBeGreaterThan(3)
   })
 
+  it("filters raw requests before resolving report summaries", () => {
+    const state = fixture()
+    const firstStaff = state.staff[0]
+    const firstType = state.requestTypes[0]
+    if (firstStaff === undefined || firstType === undefined) {
+      throw new Error("fixture request dependencies missing")
+    }
+    const dangling = makeRequest("request-dangling", firstStaff, docRef<Department>("missing"), firstType._id, 4, 4)
+    const contaminated = { ...state, requests: [...state.requests, dangling] }
+    const scoped = run(getHrSchedule({ ...range, department: DepartmentIdentifier.make("Product") }), contaminated)
+    expect(scoped.requests).toHaveLength(4)
+    expect(fail(getHrSchedule(range), contaminated)).toBeInstanceOf(DepartmentHierarchyError)
+
+    const outsideRange = {
+      ...state,
+      requests: [makeRequest("request-dangling-later", firstStaff, docRef<Department>("missing"), firstType._id, 9, 9)]
+    }
+    expect(run(getHrSchedule(range), outsideRange).requests).toHaveLength(0)
+  })
+
   it("calculates employee tables across inherited, direct, and unscoped branches", () => {
     const state = fixture()
     const inherited = run(
@@ -578,6 +600,15 @@ describe("HR report operations", () => {
     if (firstEmployee === undefined) throw new Error("fixture employee missing")
     const missingDepartment = { ...state, staff: [makeStaff(firstEmployee, docRef<Department>("missing"))] }
     expect(fail(getHrTable(range), missingDepartment)).toBeInstanceOf(DepartmentHierarchyError)
+    expect(
+      run(getHrTable({ ...range, department: DepartmentIdentifier.make("Product") }), {
+        ...state,
+        staff: [
+          ...state.staff,
+          makeStaff(makeEmployee("employee-unrelated", "Unrelated,User"), docRef<Department>("missing"))
+        ]
+      }).totalEmployees
+    ).toBe(2)
     const firstStaff = state.staff[0]
     if (firstStaff === undefined) throw new Error("fixture Staff missing")
     const malformedStaff: Fixture = { ...state, staff: [{ ...firstStaff, name: "" }] }

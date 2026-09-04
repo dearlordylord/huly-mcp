@@ -1295,19 +1295,17 @@ capture_paginated_hr_reports() {
 }
 
 wait_for_department_path() {
-  local output_var="$1" payload="$2" expected_id="$3" attempts=10 attempt=1 result="" text=""
+  local output_var="$1" payload="$2" expected_id="$3" name="${4:-get_department(path)}" attempts=10 attempt=1 result="" text=""
   while [ "$attempt" -le "$attempts" ]; do
-    # Huly does not guarantee immediate read-after-write visibility. Restart in
-    # the parent shell so HTTP_SERVER_PID continues to own the live listener.
-    restart_http_transport_if_needed "nested HR department readback" >&2 || return 1
-    result=$(call_tool "$payload" 2>/dev/null || true)
+    # One-shot stdio/CLI calls own a genuinely fresh Huly client without
+    # disturbing a parent HTTP transport that may serve the rest of the suite.
+    result=$(call_tool_fresh_session "$payload" 2>/dev/null || true)
     text=$(echo "$result" | jq -r '.result.content[0].text // empty' 2>/dev/null)
-    if [ "$(echo "$result" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
+    if [ "$(echo "$result" | jq -r '.result.isError == true or .error != null' 2>/dev/null)" = "false" ] \
       && [ "$(echo "$text" | jq -r '.id // empty' 2>/dev/null)" = "$expected_id" ]; then
       printf -v "$output_var" '%s' "$text"
-      echo "PASS: get_department(path)"
-      echo "PASS: get_department resolves nested path"
-      PASSED=$((PASSED + 2))
+      echo "PASS: $name"
+      PASSED=$((PASSED + 1))
       return 0
     fi
     if [ "$attempt" -lt "$attempts" ]; then
@@ -1316,7 +1314,7 @@ wait_for_department_path() {
     attempt=$((attempt + 1))
   done
   printf -v "$output_var" '%s' "$text"
-  fail_test "get_department(path)" "exact nested department was not visible after ${attempts} fresh-session attempts"
+  fail_test "$name" "exact department was not visible after ${attempts} fresh-session attempts"
 }
 
 run_result_to_var() {
@@ -4867,15 +4865,22 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_department\",\"arguments\":{\"name\":$HR_DEPARTMENT_NAME_JSON,\"description\":\"Issue 253 integration fixture\"}},\"id\":2}"
   if [ $? -eq 0 ]; then
     HR_CLEANUP_DEPARTMENT_ID=$(echo "$HR_CREATE_TEXT" | jq -r '.id' 2>/dev/null)
-    restart_http_transport_if_needed "after top-level HR department create" || exit 1
-    run_capture_to_var HR_CHILD_TEXT "create_department(nested)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_department\",\"arguments\":{\"name\":\"$HR_CHILD_NAME\",\"parent\":$HR_DEPARTMENT_NAME_JSON}},\"id\":2}"
+    HR_DEPARTMENT_ID_JSON=$(json_string "$HR_CLEANUP_DEPARTMENT_ID")
+    wait_for_department_path HR_PARENT_VISIBLE_TEXT \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_department\",\"arguments\":{\"department\":$HR_DEPARTMENT_ID_JSON}},\"id\":2}" \
+      "$HR_CLEANUP_DEPARTMENT_ID" "get_department(parent fresh-session visibility)" || exit 1
+    run_capture_to_var_with_runner call_tool_fresh_session HR_CHILD_TEXT "create_department(nested)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_department\",\"arguments\":{\"name\":\"$HR_CHILD_NAME\",\"parent\":$HR_DEPARTMENT_ID_JSON}},\"id\":2}"
     if [ $? -eq 0 ]; then
       HR_CHILD_ID=$(echo "$HR_CHILD_TEXT" | jq -r '.id' 2>/dev/null)
       restart_http_transport_if_needed "after nested HR department create" || exit 1
       wait_for_department_path HR_GET_TEXT \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_department\",\"arguments\":{\"department\":\"$HR_DEPARTMENT_NAME/$HR_CHILD_NAME\"}},\"id\":2}" \
         "$HR_CHILD_ID"
+      if [ $? -eq 0 ]; then
+        echo "PASS: get_department resolves nested path"
+        PASSED=$((PASSED + 1))
+      fi
       run_test "update_department(nested metadata)" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_department\",\"arguments\":{\"department\":\"$HR_DEPARTMENT_NAME/$HR_CHILD_NAME\",\"description\":\"Updated integration fixture\"}},\"id\":2}"
       restart_http_transport_if_needed "after nested HR department update" || exit 1

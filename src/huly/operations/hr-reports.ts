@@ -17,7 +17,7 @@ import {
 import { HulyClient } from "../client.js"
 import { DepartmentHierarchyError } from "../errors.js"
 import { hr } from "../huly-plugins.js"
-import { hrCalendarDateRange, isHrWeekend } from "./hr-calendar.js"
+import { hrCalendarDateFromTzDate, hrCalendarDateRange, isHrWeekend } from "./hr-calendar.js"
 import {
   ancestorDepartmentIds,
   descendantsOf,
@@ -28,13 +28,43 @@ import { loadAllPublicHolidaySummaries } from "./hr-holidays.js"
 import { DEFAULT_HR_PAGE_SIZE, type HrPageSize, loadAllHrDocuments } from "./hr-pagination.js"
 import { applicableHolidayDates, hrRequestMeasures, hrTypeTotals } from "./hr-report-core.js"
 import { type HrReportStaffRecord, parseHrReportStaffRecord } from "./hr-report-sdk-boundary.js"
-import { loadAllHrRequestSummaries } from "./hr-requests.js"
+import { parseHrRequestRecord } from "./hr-request-sdk-boundary.js"
+import { summarizeHrRequests } from "./hr-requests.js"
 import { toRef } from "./sdk-boundary.js"
 
-const loadReportStaff = Effect.fn("HrReports.loadStaff")(function* (pageSize: HrPageSize) {
+const loadReportStaff = Effect.fn("HrReports.loadStaff")(function* (
+  pageSize: HrPageSize,
+  departmentIds: ReadonlySet<Ref<Department>> | undefined
+) {
   const client = yield* HulyClient
-  const raw = yield* loadAllHrDocuments(client, hr.mixin.Staff, {}, pageSize)
+  const raw = yield* loadAllHrDocuments(
+    client,
+    hr.mixin.Staff,
+    departmentIds === undefined ? {} : { department: { $in: [...departmentIds] } },
+    pageSize
+  )
   return yield* Effect.forEach(raw, parseHrReportStaffRecord)
+})
+
+const loadReportRequests = Effect.fn("HrReports.loadRequests")(function* (
+  params: HrReportParams,
+  pageSize: HrPageSize,
+  departmentIds: ReadonlySet<Ref<Department>> | undefined
+) {
+  const client = yield* HulyClient
+  const raw = yield* loadAllHrDocuments(
+    client,
+    hr.class.Request,
+    departmentIds === undefined ? {} : { department: { $in: [...departmentIds] } },
+    pageSize
+  )
+  const requests = yield* Effect.forEach(raw, parseHrRequestRecord)
+  const overlapping = requests.filter(
+    (request) =>
+      hrCalendarDateFromTzDate(request.tzDate) <= params.endDate &&
+      hrCalendarDateFromTzDate(request.tzDueDate) >= params.startDate
+  )
+  return yield* summarizeHrRequests(client, overlapping)
 })
 
 const scopedDepartmentIds = Effect.fn("HrReports.scopedDepartmentIds")(function* (
@@ -51,13 +81,7 @@ const scopedDepartmentIds = Effect.fn("HrReports.scopedDepartmentIds")(function*
 const reportData = Effect.fn("HrReports.loadData")(function* (params: HrReportParams, pageSize: HrPageSize) {
   const catalog = yield* loadDepartmentCatalog(yield* HulyClient)
   const scope = yield* scopedDepartmentIds(params, catalog)
-  const allRequests = yield* loadAllHrRequestSummaries({}, pageSize)
-  const requests = allRequests.filter(
-    (request) =>
-      (scope === undefined || scope.has(toRef<Department>(request.department.id))) &&
-      request.startDate <= params.endDate &&
-      request.endDate >= params.startDate
-  )
+  const requests = yield* loadReportRequests(params, pageSize, scope)
   const allHolidays = yield* loadAllPublicHolidaySummaries(pageSize)
   const holidayDepartmentIds = new Set<Ref<Department>>()
   if (scope !== undefined) {
@@ -155,9 +179,7 @@ export const getHrTable = Effect.fn("HrReports.getTable")(function* (
   pageSize: HrPageSize = DEFAULT_HR_PAGE_SIZE
 ) {
   const data = yield* reportData(params, pageSize)
-  const staff = (yield* loadReportStaff(pageSize)).filter(
-    (item) => data.scope === undefined || data.scope.has(toRef<Department>(item.department))
-  )
+  const staff = yield* loadReportStaff(pageSize, data.scope)
   const dates = hrCalendarDateRange(params.startDate, params.endDate)
   const weekdays = dates.filter((date) => !isHrWeekend(date)).length
   const rows = yield* Effect.forEach(staff, (employee) => makeTableRow(employee, data, params, weekdays))

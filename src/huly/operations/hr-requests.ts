@@ -220,7 +220,7 @@ const summarize = (
     }
   })
 
-const summarizeAll = (client: HulyClient["Service"], requests: ReadonlyArray<HrRequestRecord>) =>
+export const summarizeHrRequests = (client: HulyClient["Service"], requests: ReadonlyArray<HrRequestRecord>) =>
   Effect.gen(function* () {
     const catalog = yield* loadDepartmentCatalog(client)
     const types = new Map((yield* loadRequestTypes(client)).map((item) => [item._id, item]))
@@ -269,7 +269,7 @@ export const loadAllHrRequestSummaries = Effect.fn("HrRequests.loadAllSummaries"
       (params.startOnOrAfter === undefined || hrCalendarDateFromTzDate(item.tzDate) >= params.startOnOrAfter) &&
       (params.endOnOrBefore === undefined || hrCalendarDateFromTzDate(item.tzDueDate) <= params.endOnOrBefore)
   )
-  return yield* summarizeAll(client, dates)
+  return yield* summarizeHrRequests(client, dates)
 })
 
 export const listHrRequests = Effect.fn("HrRequests.list")(function* (params: ListHrRequestsParams) {
@@ -288,7 +288,7 @@ export const listHrRequests = Effect.fn("HrRequests.list")(function* (params: Li
 export const getHrRequest = (params: GetHrRequestParams) =>
   Effect.gen(function* () {
     const client = yield* HulyClient
-    const summaries = yield* summarizeAll(client, [yield* resolveHrRequest(client, params.request)])
+    const summaries = yield* summarizeHrRequests(client, [yield* resolveHrRequest(client, params.request)])
     return assertAt(summaries, 0)
   })
 
@@ -412,7 +412,7 @@ export const updateHrRequest = (params: UpdateHrRequestParams) =>
       operations
     )
     const updated = yield* parseHrRequestRecord({ ...current, ...operations })
-    const summaries = yield* summarizeAll(client, [updated])
+    const summaries = yield* summarizeHrRequests(client, [updated])
     const result: UpdateHrRequestResult = { request: assertAt(summaries, 0), updated: true }
     return result
   })
