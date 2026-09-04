@@ -144,6 +144,7 @@ export const CLI_LIVE_COVERAGE_CASES: ReadonlyArray<CliLiveCoverageCase> = [
     tools: [
       "create_person",
       "get_person_administration",
+      "merge_people",
       "list_social_identity_providers",
       "repair_person_social_identities",
       "add_person_comment",
@@ -158,7 +159,7 @@ export const CLI_LIVE_COVERAGE_CASES: ReadonlyArray<CliLiveCoverageCase> = [
       "delete_person"
     ],
     behaviors: ["structured-json-input", "upload-input"],
-    risks: ["lifecycle", "transport"]
+    risks: ["lifecycle", "safety", "transport"]
   },
   { id: "text-file-input", tools: ["add_comment"], behaviors: ["text-file-input"], risks: [] },
   { id: "raw-upload", tools: ["add_attachment"], behaviors: ["upload-input"], risks: ["transport"] },
@@ -244,6 +245,7 @@ export const CLI_UNIQUE_RISK_DECISIONS: ReadonlyArray<CliUniqueRiskDecision> = [
     tools: ["add_person_attachment", "get_person_attachment"],
     risks: ["transport"]
   },
+  { caseId: "person-administration-lifecycle", tools: ["merge_people"], risks: ["safety"] },
   { caseId: "funnel-administration-lifecycle", tools: ["archive_funnel", "delete_funnel"], risks: ["safety"] },
   { caseId: "raw-upload", tools: ["add_attachment"], risks: ["transport"] },
   { caseId: "binary-download", tools: ["download_attachment"], risks: ["transport"] },
