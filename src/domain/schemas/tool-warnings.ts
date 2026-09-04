@@ -5,6 +5,7 @@ export const ExternalChannelRuntimeUnsupportedWarningCode = "external_channel_ru
 export const SupportRuntimeUnsupportedWarningCode = "support_runtime_unsupported" as const
 export const SupportStatusMetadataDegradedWarningCode = "support_status_metadata_degraded" as const
 export const WorkbenchNavigationMetadataDegradedWarningCode = "workbench_navigation_metadata_degraded" as const
+export const LeadCustomerMetadataDegradedWarningCode = "lead_customer_metadata_degraded" as const
 
 export const ToolWarningCodeSchema = Schema.Literals([
   "status_metadata_unresolved",
@@ -26,7 +27,8 @@ export const ToolWarningCodeSchema = Schema.Literals([
   ExternalChannelRuntimeUnsupportedWarningCode,
   SupportRuntimeUnsupportedWarningCode,
   SupportStatusMetadataDegradedWarningCode,
-  WorkbenchNavigationMetadataDegradedWarningCode
+  WorkbenchNavigationMetadataDegradedWarningCode,
+  LeadCustomerMetadataDegradedWarningCode
 ]).pipe(
   Schema.annotate({
     identifier: "ToolWarningCode",

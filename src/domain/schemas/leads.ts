@@ -80,8 +80,10 @@ export const LeadSummarySchema = Schema.Struct({
 export type LeadSummary = Schema.Schema.Type<typeof LeadSummarySchema>
 
 export const LeadDetailSchema = Schema.Struct({
+  id: DocId,
   identifier: LeadIdentifier,
-  title: Schema.String,
+  number: Schema.Int.pipe(Schema.check(Schema.isGreaterThanOrEqualTo(0))),
+  title: NonEmptyString,
   description: Schema.optional(Schema.String),
   customerDescription: Schema.NullOr(Schema.String),
   startDate: Schema.NullOr(Timestamp),
@@ -89,11 +91,25 @@ export const LeadDetailSchema = Schema.Struct({
   status: StatusName,
   assignee: Schema.optional(PersonName),
   customer: Schema.optional(Schema.String),
+  customerId: DocId,
+  customerType: Schema.Literals(["person", "organization", "unresolved"]),
+  taskType: TaskTypeRefSchema,
+  rank: NonEmptyString,
+  completed: Schema.Boolean,
+  comments: Count,
+  attachments: Count,
+  labels: Count,
   funnel: FunnelIdentifier,
   funnelName: Schema.String,
   modifiedOn: Schema.optional(Timestamp),
-  createdOn: Schema.optional(Timestamp)
-}).annotate({ title: "LeadDetail", description: "Full lead with all fields" })
+  modifiedBy: Schema.optional(NonEmptyString),
+  createdOn: Schema.optional(Timestamp),
+  createdBy: Schema.optional(NonEmptyString),
+  unsupportedFields: Schema.Array(Schema.Struct({ field: NonEmptyString, reason: NonEmptyString }))
+}).annotate({
+  title: "LeadDetail",
+  description: "Stable lead fields plus explicit classification of unsupported native fields"
+})
 
 export type LeadDetail = Schema.Schema.Type<typeof LeadDetailSchema>
 

@@ -431,6 +431,25 @@ describe("Effect 4 oracle structural parity", () => {
     expect(report.categories).toEqual([{ category: "issue-97-administration", deltas: [descriptionDelta] }])
   })
 
+  it("classifies issue-97 changes to existing lead and relation tool descriptions", async () => {
+    const baselineJson = await fs.readFile(EFFECT4_ORACLE_PATH, "utf8")
+    const source = Schema.decodeUnknownSync(Schema.fromJsonString(BehavioralOracleSchema))(baselineJson)
+    const native = candidateToolResponses(["get_lead", "list_relations", "create_relation", "delete_relation"])
+    const oracle = Schema.decodeUnknownSync(BehavioralOracleSchema)({
+      ...source,
+      bundledProcesses: { ...source.bundledProcesses, stdio: { ...source.bundledProcesses.stdio, native } }
+    })
+    const deltas = [0, 1, 2, 3].map((index) => ({
+      _tag: "Changed" as const,
+      path: `/bundledProcesses/stdio/native/0/result/tools/${index}/description`,
+      before: "old",
+      after: "new"
+    }))
+    const report = createOracleDeltaAuditReport("same", "same", oracle, oracle, deltas)
+
+    expect(report.categories).toEqual([{ category: "issue-97-administration", deltas }])
+  })
+
   it("verifies reviews when either or both oracle corpora decode for expansion classification", async () => {
     const baselineJson = await fs.readFile(EFFECT4_ORACLE_PATH, "utf8")
     const source = Schema.decodeUnknownSync(Schema.fromJsonString(BehavioralOracleSchema))(baselineJson)
@@ -600,7 +619,7 @@ describe("Effect 4 oracle Draft-07 validation", () => {
   const RuntimeFixtureJsonSchema = toDraft07JsonSchema(RuntimeFixture)
 
   it("compiles the complete current native and proxy corpora without CLI imports", () => {
-    expect(validateCurrentDraft07Corpora()).toEqual({ native: 580, proxy: 6 })
+    expect(validateCurrentDraft07Corpora()).toEqual({ native: 590, proxy: 6 })
   }, 60_000)
 
   it("compiles complete tool documents and rejects duplicate names or dialect leaks", () => {

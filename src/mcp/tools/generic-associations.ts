@@ -71,7 +71,7 @@ export const genericAssociationTools = [
     {
       name: "list_relations",
       description:
-        "List concrete Huly relation instances under an association, optionally filtered by source and target documents. Endpoint locators support raw, issue, document, and card. Requires at least one filter to avoid broad workspace scans.",
+        "List concrete Huly relation instances under an association, optionally filtered by source and target documents. Endpoint locators support raw, issue, document, card, and exact funnel-scoped lead targets. Requires at least one filter to avoid broad workspace scans.",
       category: CATEGORY,
       inputSchema: listRelationsParamsJsonSchema,
       resultSchema: ListRelationsResultSchema
@@ -83,7 +83,7 @@ export const genericAssociationTools = [
     {
       name: "create_relation",
       description:
-        "Idempotently create one concrete relation between two resolved documents for a writable association. Endpoint locators support raw, issue, document, and card. Enforces association endpoint classes, direction, duplicate handling, automation-only restrictions, and cardinality.",
+        "Idempotently create one concrete relation between two resolved documents for a writable association. Endpoint locators support raw, issue, document, card, and exact funnel-scoped lead targets. Enforces association endpoint classes, direction, duplicate handling, automation-only restrictions, and cardinality. Published Relation endpoints have no mutable field; replace a relation with delete_relation then create_relation.",
       category: CATEGORY,
       inputSchema: createRelationParamsJsonSchema,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -96,7 +96,7 @@ export const genericAssociationTools = [
     {
       name: "delete_relation",
       description:
-        "Idempotently delete one concrete relation by relation ID or by exact association/source/target triple. Triple endpoint locators support raw, issue, document, and card. Triple deletes use the same direction semantics as create_relation and fail if the selector is ambiguous.",
+        "Idempotently delete one concrete relation by relation ID or by exact association/source/target triple. Triple endpoint locators support raw, issue, document, card, and exact funnel-scoped lead targets. Triple deletes use the same direction semantics as create_relation and fail if the selector is ambiguous.",
       category: CATEGORY,
       inputSchema: deleteRelationParamsJsonSchema,
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },

@@ -4,7 +4,10 @@ import { Option, Schema } from "effect"
 
 import { canonicalJson } from "./effect4-oracle-canonical.js"
 import { oracleDeltaIdentity, type OracleDelta, OracleDeltaSchema } from "./effect4-oracle-delta.js"
-import { ISSUE_97_ADMINISTRATION_TOOL_NAMES } from "./effect4-oracle-issue97-tools.js"
+import {
+  ISSUE_97_ADMINISTRATION_TOOL_NAMES,
+  ISSUE_97_EXISTING_TOOL_CHANGE_NAMES
+} from "./effect4-oracle-issue97-tools.js"
 import { BehavioralOracleSchema, type BehavioralOracle, type OracleJsonRpcResponse } from "./effect4-oracle-schema.js"
 import { ToolName, type ToolName as ToolNameType } from "../src/mcp/tools/registry.js"
 
@@ -112,7 +115,12 @@ export const oracleDeltaReviewCategory = (
       : "draft07-structure"
   }
   const toolName = candidateToolName(delta.path, candidateToolIdentities)
-  if (toolName !== undefined && ISSUE_97_ADMINISTRATION_TOOL_NAMES.has(toolName)) return "issue-97-administration"
+  if (
+    toolName !== undefined &&
+    (ISSUE_97_ADMINISTRATION_TOOL_NAMES.has(toolName) || ISSUE_97_EXISTING_TOOL_CHANGE_NAMES.has(toolName))
+  ) {
+    return "issue-97-administration"
+  }
   if (toolName !== undefined && ISSUE_ASSIGNEE_TOOL_NAMES.has(toolName)) {
     return "issue-assignee-description"
   }
@@ -165,7 +173,7 @@ const categoryMetadata = (category: ReviewCategory): { readonly issue: string; r
       return {
         issue: "#97",
         rationale:
-          "Reviewed employee lifecycle, employee-position, HR-department, Staff-assignment, funnel-administration, lead-mutation, HR-request, public-holiday, HR-report, person-administration, and explicit person-merge operations with their exact schemas and ordered registry/CLI exposure."
+          "Reviewed employee lifecycle, employee-position, HR-department, Staff-assignment, funnel-administration, lead mutation/collaboration and relation-locator changes, HR-request, public-holiday, HR-report, person-administration, and explicit person-merge operations with their exact schemas and ordered registry/CLI exposure."
       }
     case "cli-json-diagnostic":
       return {

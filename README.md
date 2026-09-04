@@ -598,9 +598,9 @@ When resolved tool exposure is `proxy`, clients see the built-in tools plus thes
 | `list_associations` | List Huly association definitions: class-level typed links that define which document classes may be related. Use this before create_relation to discover association IDs, source/target classes, and whether relation writes are supported. |
 | `create_association` | Idempotently create one Huly association definition between two non-system classes. Use sourceClass/targetClass with sourceRole/targetRole and cardinality; returns an existing identical association by default. |
 | `delete_association` | Idempotently delete one Huly association definition only when no concrete relations reference it. If relations exist, delete_relation must clean them up first; deleting an already-missing association is a successful no-op. |
-| `list_relations` | List concrete Huly relation instances under an association, optionally filtered by source and target documents. Endpoint locators support raw, issue, document, and card. Requires at least one filter to avoid broad workspace scans. |
-| `create_relation` | Idempotently create one concrete relation between two resolved documents for a writable association. Endpoint locators support raw, issue, document, and card. Enforces association endpoint classes, direction, duplicate handling, automation-only restrictions, and cardinality. |
-| `delete_relation` | Idempotently delete one concrete relation by relation ID or by exact association/source/target triple. Triple endpoint locators support raw, issue, document, and card. Triple deletes use the same direction semantics as create_relation and fail if the selector is ambiguous. |
+| `list_relations` | List concrete Huly relation instances under an association, optionally filtered by source and target documents. Endpoint locators support raw, issue, document, card, and exact funnel-scoped lead targets. Requires at least one filter to avoid broad workspace scans. |
+| `create_relation` | Idempotently create one concrete relation between two resolved documents for a writable association. Endpoint locators support raw, issue, document, card, and exact funnel-scoped lead targets. Enforces association endpoint classes, direction, duplicate handling, automation-only restrictions, and cardinality. Published Relation endpoints have no mutable field; replace a relation with delete_relation then create_relation. |
+| `delete_relation` | Idempotently delete one concrete relation by relation ID or by exact association/source/target triple. Triple endpoint locators support raw, issue, document, card, and exact funnel-scoped lead targets. Triple deletes use the same direction semantics as create_relation and fail if the selector is ambiguous. |
 
 ### Activity
 
@@ -853,6 +853,20 @@ When resolved tool exposure is `proxy`, clients see the built-in tools plus thes
 
 | Tool | Description |
 |------|-------------|
+| `list_lead_comments` | List native comments on one lead resolved by exact funnel ID/name and LEAD-<number>. Returns Markdown with native Huly references preserved. |
+| `add_lead_comment` | Add a Markdown comment to one exact lead. Current-workspace Huly links are stored as native references. |
+| `update_lead_comment` | Update one comment belonging to an exact lead; comments attached elsewhere are rejected. Markdown native references are preserved. |
+| `delete_lead_comment` | Delete one comment only when it belongs to the exact lead target. |
+| `list_lead_attachments` | List native attachment references belonging to one exact lead. |
+| `add_lead_attachment` | Upload a local path, URL, or base64 payload and attach the native file reference to one exact lead. |
+| `get_lead_attachment` | Get metadata and a download URL for an attachment only when it belongs to one exact lead. |
+| `update_lead_attachment` | Update description or pinned state for an attachment only when it belongs to one exact lead. |
+| `delete_lead_attachment` | Delete an attachment only when it belongs to one exact lead. The native blob reference remains governed by Huly storage cleanup. |
+| `list_lead_label_definitions` | List reusable native label definitions whose target class is Lead, without raw class IDs. |
+| `list_lead_labels` | List native TagReference label relations attached to one exact lead. |
+| `add_lead_label` | Idempotently attach a label relation to one exact lead. Accepts a definition ID or exact title; a missing title creates the Lead label definition. |
+| `update_lead_label` | Update the published optional weight on every matching TagReference relation for one exact lead and label. |
+| `remove_lead_label` | Idempotently remove all matching TagReference relations from one exact lead without deleting the reusable label definition. |
 | `list_funnels` | List all Huly sales funnels (lead pipelines). Returns each funnel's stable ID and display name, sorted by name. Supports filtering by archived status. |
 | `get_funnel` | Get one funnel by stable _id or exact name. Ambiguous names are rejected. Returns the full stable Funnel/Project projection, validated Lead workflow, content counts, deletion impact, and explicit unsupported-field classifications. |
 | `create_funnel` | Create a native Huly funnel after validating its Funnel project type, Lead task types, workflow statuses, membership, and owners. Full description accepts Markdown and preserves current-workspace native references. Creation is idempotent only for one exact existing name; the result explicitly reports whether that existing funnel is archived, and ambiguous names are rejected. |
@@ -860,7 +874,7 @@ When resolved tool exposure is `proxy`, clients see the built-in tools plus thes
 | `archive_funnel` | Archive a funnel without deleting it. Returns lead/comment/attachment impact so the caller can assess the hidden native content. Already archived funnels are an idempotent no-op. |
 | `delete_funnel` | Permanently delete an exact funnel only after it is archived and empty. First call get_funnel or archive_funnel, then pass the observed impact counts as expectedLeads, expectedComments, and expectedAttachments. Deletion fails if any count changed after that preflight snapshot. |
 | `list_leads` | Query Huly leads in a funnel with optional filters. Pass the funnel ID returned by list_funnels, or a funnel name for convenience lookup. Returns leads sorted by modification date (newest first). Supports filtering by status, assignee, and title search. |
-| `get_lead` | Retrieve full details for a Huly lead including markdown description, customer name, funnel ID and funnel name, and status. Lead identifiers follow the upstream Huly format like 'LEAD-1'. |
+| `get_lead` | Retrieve one exact funnel-scoped Huly lead with Markdown descriptions, customer identity/type, workflow task type and status, rank/completion, native collection counts, actor timestamps, funnel identity, and explicit classifications for fields without stable published semantics. Lead identifiers use LEAD-<number>. |
 | `create_lead` | Create one native Huly lead in an active funnel for an existing person or organization. Resolve the funnel by ID or exact name; identify the customer explicitly as person or organization; optionally choose an employee assignee, a workflow status matched exactly after normalization (trimmed, case-insensitive, and ignoring spaces, hyphens, and underscores), and Markdown description. Automatically applies the Customer mixin when needed, preserves native Huly references, and returns both leadId and LEAD-<number>. This tool never creates a person or organization inline. |
 | `update_lead` | Update a native Huly lead by funnel ID or exact name and LEAD-<number> identifier. Supported fields are title, Markdown description, a workflow status matched exactly after normalization (trimmed, case-insensitive, and ignoring spaces, hyphens, and underscores), employee assignee, start date, due date, and Customer mixin description. Omitted fields are unchanged; pass null explicitly to clear description, assignee, dates, or customer description. Existing people are resolved exactly and ambiguous identifiers fail. |
 | `move_lead` | Move a native Huly lead to another active funnel after validating both native Funnel project types and Lead workflows. Pass a destination status matched exactly after normalization (trimmed, case-insensitive, and ignoring spaces, hyphens, and underscores), or omit status to map the current status name; incompatible or ambiguous mappings fail without writing. |

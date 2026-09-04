@@ -25,6 +25,7 @@ import {
   TeamspaceIdentifier,
   Timestamp
 } from "./shared.js"
+import { FunnelReference, LeadIdentifier } from "./leads.js"
 
 export const DEFAULT_INCLUDE_SYSTEM_ASSOCIATIONS = false
 export const DEFAULT_ASSOCIATION_AUTOMATION_ONLY = false
@@ -115,15 +116,22 @@ const CardObjectLocatorSchema = Schema.Struct({
   )
 })
 
+const LeadObjectLocatorSchema = Schema.Struct({
+  kind: Schema.Literal("lead"),
+  funnel: FunnelReference.annotate({ description: "Funnel stable ID or exact unambiguous name." }),
+  identifier: LeadIdentifier.annotate({ description: "Lead identifier, such as LEAD-1." })
+})
+
 export const GenericObjectLocatorSchema = Schema.Union([
   RawObjectLocatorSchema,
   IssueObjectLocatorSchema,
   DocumentObjectLocatorSchema,
-  CardObjectLocatorSchema
+  CardObjectLocatorSchema,
+  LeadObjectLocatorSchema
 ]).annotate({
   title: "GenericObjectLocator",
   description:
-    "Explicit locator for a Huly document endpoint. Use raw for known _id/class pairs, issue for tracker issues, document for Huly documents, or card for Huly cards."
+    "Explicit locator for a Huly document endpoint. Use raw for known _id/class pairs, issue for tracker issues, document for Huly documents, card for Huly cards, or lead for an exact funnel and LEAD-<number>."
 })
 export type GenericObjectLocator = Schema.Schema.Type<typeof GenericObjectLocatorSchema>
 
@@ -131,7 +139,7 @@ export const ResolvedObjectSummarySchema = Schema.Struct({
   id: DocId,
   class: ObjectClassName,
   display: NonEmptyString,
-  locatorKind: Schema.Literals(["raw", "issue", "document", "card"]),
+  locatorKind: Schema.Literals(["raw", "issue", "document", "card", "lead"]),
   warning: Schema.optional(Schema.String)
 })
 export type ResolvedObjectSummary = Schema.Schema.Type<typeof ResolvedObjectSummarySchema>

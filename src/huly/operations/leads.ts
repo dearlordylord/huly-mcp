@@ -30,10 +30,11 @@ import {
   parseLeadDetail as parseLeadDetailSchema
 } from "../../domain/schemas/leads.js"
 import { StatusName } from "../../domain/schemas/shared.js"
+import { LeadCustomerMetadataDegradedWarningCode } from "../../domain/schemas/tool-warnings.js"
 import { LeadCustomerMixinAttributesSchema } from "../../domain/schemas/leads-mutations.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import type { Diagnostics } from "../diagnostics.js"
+import { Diagnostics } from "../diagnostics.js"
 import type { FunnelIdentifierAmbiguousError, FunnelNotFoundError } from "../errors-leads.js"
 import { LeadNotFoundError } from "../errors-leads.js"
 import { HulyDataInvalidError, InvalidStatusError } from "../errors.js"
@@ -47,25 +48,33 @@ import {
   uniqueStatusRefs,
   workflowStatusFromRef
 } from "./issues-shared.js"
-import { clampLimit, escapeLikeWildcards } from "./query-helpers.js"
+import { clampLimit, escapeLikeWildcards, hulyQuery } from "./query-helpers.js"
 import { toClassRef, toRef } from "./sdk-boundary.js"
 import { type HulyFunnel, resolveFunnel } from "./funnels-shared.js"
+import { parseLeadReadDocument } from "./leads-mutations-boundary.js"
 
 export { listFunnels } from "./funnels.js"
 
+// SDK query typing requires a Doc-compatible shape with native Ref fields.
+// LeadReadDocumentSchema owns the boundary contract and decodes every getLead result before projection.
 interface HulyLead extends Doc {
-  title: string
-  identifier: string
-  number: number
-  status: Ref<Status>
-  assignee: Ref<Person> | null
-  description: MarkupBlobRef | null
-  startDate: number | null
-  dueDate: number | null
-  attachedTo: Ref<Contact>
-  parents: ReadonlyArray<{ parentId: Ref<Doc>; identifier: string; parentTitle: string }>
-  modifiedOn: number
-  createdOn: number
+  readonly title: string
+  readonly identifier: string
+  readonly number: number
+  readonly kind: Ref<Doc>
+  readonly rank: string
+  readonly isDone?: boolean
+  readonly comments?: number
+  readonly attachments?: number
+  readonly labels?: number
+  readonly status: Ref<Status>
+  readonly assignee: Ref<Person> | null
+  readonly description: MarkupBlobRef | null
+  readonly startDate: number | null
+  readonly dueDate: number | null
+  readonly attachedTo: Ref<Contact>
+  readonly attachedToClass: Ref<Doc>
+  readonly collection: "leads"
 }
 
 type StatusInfo = { _id: Ref<Status>; name: string }
@@ -293,28 +302,38 @@ export const getLead = (params: GetLeadParams): Effect.Effect<LeadDetail, GetLea
       normalizeLeadIdentifier(params.identifier)
     ).pipe(Effect.orDie)
 
-    const lead = yield* client.findOne<HulyLead>(leadClassIds.class.Lead, {
-      space: funnelAsSpace(funnel),
-      identifier: leadIdentifier
-    })
+    const rawLead = yield* client.findOne<HulyLead>(
+      leadClassIds.class.Lead,
+      hulyQuery<HulyLead>({ space: funnelAsSpace(funnel), identifier: leadIdentifier })
+    )
 
-    if (lead === undefined) {
+    if (rawLead === undefined) {
       return yield* new LeadNotFoundError({ identifier: params.identifier, funnel: FunnelIdentifier.make(funnel._id) })
     }
+    const lead = yield* parseLeadReadDocument(rawLead)
 
-    const status = yield* resolveStatusName(statuses, lead.status)
+    const status = yield* resolveStatusName(statuses, toRef<Status>(lead.status))
 
     const person =
-      lead.assignee !== null ? yield* client.findOne<Person>(contact.class.Person, { _id: lead.assignee }) : undefined
+      lead.assignee !== null
+        ? yield* client.findOne<Person>(contact.class.Person, { _id: toRef<Person>(lead.assignee) })
+        : undefined
 
     const customer = yield* findCustomer(client, toRef<Contact>(lead.attachedTo))
+    if (customer === undefined) {
+      const diagnostics = yield* Diagnostics
+      yield* diagnostics.warnAgent({
+        code: LeadCustomerMetadataDegradedWarningCode,
+        message: `Lead '${lead.identifier}' references customer '${lead.attachedTo}', but its contact metadata could not be resolved. The result preserves customerId and reports customerType as unresolved.`
+      })
+    }
 
     const description = lead.description
       ? yield* client.fetchMarkup(
           leadClassIds.class.Lead,
-          lead._id,
+          toRef<Doc>(lead._id),
           "description",
-          markupBlobRefAsMarkupRef(lead.description),
+          markupBlobRefAsMarkupRef(toRef<Blob>(lead.description)),
           "markdown"
         )
       : undefined
@@ -322,7 +341,9 @@ export const getLead = (params: GetLeadParams): Effect.Effect<LeadDetail, GetLea
     const customerDescription = yield* readCustomerDescription(client, customer)
 
     return yield* parseLeadDetailSchema({
+      id: lead._id,
       identifier: lead.identifier,
+      number: lead.number,
       title: lead.title,
       description,
       customerDescription,
@@ -331,10 +352,33 @@ export const getLead = (params: GetLeadParams): Effect.Effect<LeadDetail, GetLea
       status,
       assignee: person?.name,
       customer: customer?.name,
+      customerId: lead.attachedTo,
+      customerType:
+        customer === undefined
+          ? "unresolved"
+          : String(customer._class) === String(contact.class.Organization)
+            ? "organization"
+            : "person",
+      taskType: lead.kind,
+      rank: lead.rank,
+      completed: lead.isDone ?? false,
+      comments: lead.comments ?? 0,
+      attachments: lead.attachments ?? 0,
+      labels: lead.labels ?? 0,
       funnel: funnel._id,
       funnelName: funnel.name,
       modifiedOn: lead.modifiedOn,
-      createdOn: lead.createdOn
+      modifiedBy: lead.modifiedBy,
+      createdOn: lead.createdOn,
+      createdBy: lead.createdBy,
+      unsupportedFields: [
+        { field: "parents", reason: "The published Lead and Task contracts do not define a stable parents field." },
+        {
+          field: "collection",
+          reason:
+            "AttachedDoc collection is an internal storage discriminator; funnel and customer projections expose its stable meaning."
+        }
+      ]
     }).pipe(
       Effect.mapError(
         (parseError) => new HulyDataInvalidError({ operation: "getLead", entity: "lead", cause: parseError })

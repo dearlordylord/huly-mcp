@@ -228,6 +228,56 @@ export const businessMutationCliCommandCatalogB = {
     description: "Update Lead",
     behavior: { fileInput: { fields: ["description", "customerDescription"] } }
   },
+  add_lead_comment: {
+    path: ["leads", "comments", "add"],
+    positional: ["funnel", "identifier"],
+    description: "Add Lead Comment",
+    behavior: { fileInput: { fields: ["body"] } }
+  },
+  update_lead_comment: {
+    path: ["leads", "comments", "update"],
+    positional: ["funnel", "identifier", "commentId"],
+    description: "Update Lead Comment",
+    behavior: { fileInput: { fields: ["body"] } }
+  },
+  delete_lead_comment: {
+    path: ["leads", "comments", "delete"],
+    positional: ["funnel", "identifier", "commentId"],
+    description: "Delete Lead Comment",
+    behavior: { confirmation: { type: "requires-yes", message: "leads comments delete requires --yes." } }
+  },
+  add_lead_attachment: {
+    path: ["leads", "attachments", "add"],
+    positional: ["funnel", "identifier"],
+    description: "Add Lead Attachment",
+    behavior: { base64FileInput: { fields: ["data"] } }
+  },
+  update_lead_attachment: {
+    path: ["leads", "attachments", "update"],
+    positional: ["funnel", "identifier", "attachmentId"],
+    description: "Update Lead Attachment"
+  },
+  delete_lead_attachment: {
+    path: ["leads", "attachments", "delete"],
+    positional: ["funnel", "identifier", "attachmentId"],
+    description: "Delete Lead Attachment",
+    behavior: { confirmation: { type: "requires-yes", message: "leads attachments delete requires --yes." } }
+  },
+  add_lead_label: {
+    path: ["leads", "labels", "add"],
+    positional: ["funnel", "identifier", "label"],
+    description: "Add Lead Label"
+  },
+  update_lead_label: {
+    path: ["leads", "labels", "update"],
+    positional: ["funnel", "identifier", "label", "weight"],
+    description: "Update Lead Label"
+  },
+  remove_lead_label: {
+    path: ["leads", "labels", "remove"],
+    positional: ["funnel", "identifier", "label"],
+    description: "Remove Lead Label"
+  },
   move_lead: {
     path: ["leads", "move"],
     positional: ["funnel", "identifier", "destinationFunnel"],

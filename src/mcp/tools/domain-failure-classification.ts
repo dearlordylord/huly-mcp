@@ -164,6 +164,7 @@ const DOMAIN_FAILURE_KIND_BY_TAG = {
   IssueReferenceError: "input",
   IssueTemplateNotFoundError: "lookup",
   LeadDeleteConflictError: "conflict",
+  LeadCommentNotFoundError: "lookup",
   LeadMoveConflictError: "conflict",
   LeadNotFoundError: "lookup",
   LeadUpdateConflictError: "conflict",

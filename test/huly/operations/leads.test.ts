@@ -26,12 +26,20 @@ interface MockLead extends Doc {
   title: string
   identifier: string
   number: number
+  kind: Ref<Doc>
+  rank: string
+  isDone?: boolean
+  comments?: number
+  attachments?: number
+  labels?: number
   status: Ref<Status>
   assignee: Ref<Person> | null
   description: string | null
   startDate: number | null
   dueDate: number | null
   attachedTo: Ref<Contact>
+  attachedToClass: Ref<Doc>
+  collection: "leads"
   parents: ReadonlyArray<unknown>
   modifiedOn: number
   createdOn: number
@@ -67,12 +75,20 @@ const makeLead = (overrides: Partial<MockLead> = {}): MockLead => ({
   title: "Big Deal",
   identifier: "LEAD-1",
   number: 1,
+  kind: docRef<Doc>("lead:taskType:Lead"),
+  rank: "0|hzzzzz:",
+  isDone: false,
+  comments: 0,
+  attachments: 0,
+  labels: 0,
   status: statusRef("status-1"),
   assignee: personRef("person-1"),
   description: null,
   startDate: null,
   dueDate: null,
   attachedTo: contactRef("customer-1"),
+  attachedToClass: contact.class.Person,
+  collection: "leads",
   parents: [],
   ...overrides
 })
@@ -552,6 +568,19 @@ describe("Lead Operations", () => {
         }).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result.identifier).toBe("LEAD-1")
+        expect(result).toMatchObject({
+          id: "lead-1",
+          number: 1,
+          taskType: "lead:taskType:Lead",
+          rank: "0|hzzzzz:",
+          completed: false,
+          comments: 0,
+          attachments: 0,
+          labels: 0,
+          customerId: "customer-1",
+          customerType: "person"
+        })
+        expect(result.unsupportedFields.map((entry) => entry.field)).toEqual(["parents", "collection"])
         expect(result.status).toBe("Active")
         expect(result.assignee).toBe("Smith,Jane")
         expect(result.customer).toBe("Acme,Corp")
@@ -571,7 +600,7 @@ describe("Lead Operations", () => {
     it.effect("normalizes lowercase lead identifiers to upstream LEAD format", () =>
       Effect.gen(function* () {
         const lead = makeLead()
-        const testLayer = createTestLayer({ leads: [lead] })
+        const testLayer = createTestLayer({ contacts: [makeContact("customer-1", "Acme")], leads: [lead] })
 
         const result = yield* getLead({
           funnel: funnelReference("funnel-1"),
@@ -585,7 +614,11 @@ describe("Lead Operations", () => {
     it.effect("returns full lead detail with organization customer", () =>
       Effect.gen(function* () {
         const organization = makeOrganization("customer-1", "Acme Org")
-        const lead = makeLead({ attachedTo: contactRef("customer-1"), description: "blob-ref" })
+        const lead = makeLead({
+          attachedTo: contactRef("customer-1"),
+          attachedToClass: contact.class.Organization,
+          description: "blob-ref"
+        })
 
         const testLayer = createTestLayer({
           fetchMarkupResult: "# Deal notes\nImportant details here.",
@@ -599,6 +632,7 @@ describe("Lead Operations", () => {
         }).pipe(Effect.provide(testLayer), withDiagnostics)
 
         expect(result.customer).toBe("Acme Org")
+        expect(result.customerType).toBe("organization")
       })
     )
 
@@ -818,10 +852,26 @@ describe("getLead branch coverage", () => {
     Effect.gen(function* () {
       const lead = makeLead({ assignee: null })
       const result = yield* getLead({ funnel: funnelReference("funnel-1"), identifier: leadIdentifier("LEAD-1") }).pipe(
-        Effect.provide(createTestLayer({ leads: [lead] })),
+        Effect.provide(createTestLayer({ contacts: [makeContact("customer-1", "Acme")], leads: [lead] })),
         withDiagnostics
       )
       expect(result.assignee).toBeUndefined()
+    })
+  )
+
+  it.effect("warns when customer metadata cannot be resolved", () =>
+    Effect.gen(function* () {
+      const diagnostics = yield* makeDiagnosticsScope
+      const result = yield* getLead({ funnel: funnelReference("funnel-1"), identifier: leadIdentifier("LEAD-1") }).pipe(
+        Effect.provide(createTestLayer({ leads: [makeLead()] })),
+        Effect.provideService(Diagnostics, diagnostics.service)
+      )
+      const warnings = yield* diagnostics.drainWarnings
+      const customerWarnings = warnings.filter((warning) => warning.code === "lead_customer_metadata_degraded")
+
+      expect(result.customerType).toBe("unresolved")
+      expect(customerWarnings).toHaveLength(1)
+      expect(assertAt(customerWarnings, 0).message).toContain("customer-1")
     })
   )
 

@@ -77,6 +77,31 @@ export const businessReadOnlyCliCommandCatalogB = {
     description: "List Inventory Variants"
   },
   list_leads: { path: ["leads", "list"], positional: ["funnel"], description: "List Leads" },
+  list_lead_comments: {
+    path: ["leads", "comments", "list"],
+    positional: ["funnel", "identifier"],
+    description: "List Lead Comments"
+  },
+  list_lead_attachments: {
+    path: ["leads", "attachments", "list"],
+    positional: ["funnel", "identifier"],
+    description: "List Lead Attachments"
+  },
+  get_lead_attachment: {
+    path: ["leads", "attachments", "get"],
+    positional: ["funnel", "identifier", "attachmentId"],
+    description: "Get Lead Attachment"
+  },
+  list_lead_label_definitions: {
+    path: ["leads", "labels", "definitions"],
+    positional: [],
+    description: "List Lead Label Definitions"
+  },
+  list_lead_labels: {
+    path: ["leads", "labels", "list"],
+    positional: ["funnel", "identifier"],
+    description: "List Lead Labels"
+  },
   list_master_tags: {
     path: ["cards", "master-tags", "list"],
     positional: ["cardSpace"],

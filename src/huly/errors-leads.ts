@@ -7,7 +7,7 @@ import { Schema } from "effect"
 
 import { FunnelIdentifier, FunnelReference, LeadIdentifier } from "../domain/schemas/leads.js"
 import { ProjectTypeRefSchema } from "../domain/schemas/task-management.js"
-import { AccountUuid, Count, NonEmptyString } from "../domain/schemas/shared.js"
+import { AccountUuid, CommentId, Count, NonEmptyString } from "../domain/schemas/shared.js"
 
 /**
  * Funnel not found in the workspace.
@@ -127,8 +127,18 @@ export class LeadDeleteConflictError extends Schema.TaggedError<LeadDeleteConfli
   }
 }
 
+export class LeadCommentNotFoundError extends Schema.TaggedError<LeadCommentNotFoundError>()(
+  "LeadCommentNotFoundError",
+  { identifier: LeadIdentifier, commentId: CommentId }
+) {
+  override get message(): string {
+    return `Comment '${this.commentId}' was not found on lead '${this.identifier}'`
+  }
+}
+
 export const LeadMutationDomainError = Schema.Union([
   LeadUpdateConflictError,
   LeadMoveConflictError,
-  LeadDeleteConflictError
+  LeadDeleteConflictError,
+  LeadCommentNotFoundError
 ])

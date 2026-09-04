@@ -39,7 +39,7 @@ describe("CLI documentation contract", () => {
       description: spec.description
     }))
 
-    expect(entries).toHaveLength(578)
+    expect(entries).toHaveLength(588)
     expect(cliDescriptionProblems(entries)).toEqual([])
   })
 })

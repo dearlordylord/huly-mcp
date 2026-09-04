@@ -54,6 +54,20 @@ export const LeadMutationDocumentSchema = Schema.Struct({
 })
 export type LeadMutationDocument = Schema.Schema.Type<typeof LeadMutationDocumentSchema>
 
+export const LeadReadDocumentSchema = LeadMutationDocumentSchema.pipe(
+  Schema.fieldsAssign({
+    number: Schema.Int.pipe(Schema.check(Schema.isGreaterThanOrEqualTo(0))),
+    rank: NonEmptyString,
+    isDone: Schema.optional(Schema.Boolean),
+    createdBy: Schema.optional(PersonId),
+    createdOn: Schema.optional(Timestamp)
+  })
+).annotate({
+  title: "LeadReadDocument",
+  description: "Schema-owned native Lead fields required by the full stable read projection."
+})
+export type LeadReadDocument = Schema.Schema.Type<typeof LeadReadDocumentSchema>
+
 const LeadBoundaryRestSchema = [Schema.Record(Schema.String, Schema.Unknown)]
 
 export const LeadPersonDocumentSchema = Schema.StructWithRest(

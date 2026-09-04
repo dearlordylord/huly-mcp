@@ -130,7 +130,9 @@ describe("Lead Schemas", () => {
     it.effect("accepts full lead detail", () =>
       Effect.gen(function* () {
         const result = yield* Schema.decodeUnknownEffect(LeadDetailSchema)({
+          id: "lead-id",
           identifier: "LEAD-1",
+          number: 1,
           title: "Enterprise Deal",
           description: "# Big opportunity\n\nLots of potential.",
           customerDescription: "# Customer context",
@@ -139,10 +141,19 @@ describe("Lead Schemas", () => {
           status: "OfferPreparing",
           assignee: "Doe,Jane",
           customer: "Acme Corp",
+          customerId: "customer-id",
+          customerType: "organization",
+          taskType: "lead:taskType:Lead",
+          rank: "0|hzzzzz:",
+          completed: false,
+          comments: 0,
+          attachments: 0,
+          labels: 0,
           funnel: "funnel-1",
           funnelName: "Sales",
           modifiedOn: 1700000000000,
-          createdOn: 1699000000000
+          createdOn: 1699000000000,
+          unsupportedFields: []
         })
         expect(result.description).toContain("Big opportunity")
         expect(result.customerDescription).toBe("# Customer context")

@@ -143,7 +143,7 @@ export const leadTools = [
     {
       name: "get_lead",
       description:
-        "Retrieve full details for a Huly lead including markdown description, customer name, funnel ID and funnel name, and status. Lead identifiers follow the upstream Huly format like 'LEAD-1'.",
+        "Retrieve one exact funnel-scoped Huly lead with Markdown descriptions, customer identity/type, workflow task type and status, rank/completion, native collection counts, actor timestamps, funnel identity, and explicit classifications for fields without stable published semantics. Lead identifiers use LEAD-<number>.",
       category: CATEGORY,
       inputSchema: getLeadParamsJsonSchema,
       resultSchema: GetLeadResultSchema

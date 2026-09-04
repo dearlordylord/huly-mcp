@@ -1735,6 +1735,8 @@ describe("Huly Errors", () => {
               return `employee-deactivation-partial:${error.personId}`
             case "HrRequestMutationUnsupportedError":
               return `hr-request-unsupported:${error.operation}`
+            case "LeadCommentNotFoundError":
+              return `lead-comment:${error.identifier}:${error.commentId}`
             case "PublicHolidayNotFoundError":
               return `public-holiday:${error.holiday}`
             case "PublicHolidayConflictError":

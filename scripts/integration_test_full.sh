@@ -59,6 +59,7 @@ LEAD_CLEANUP_FUNNEL_ID=""
 LEAD_DESTINATION_FUNNEL_CLEANUP_ID=""
 LEAD_PERSON_CLEANUP_ID=""
 LEAD_PERSON_AMBIGUOUS_CLEANUP_ID=""
+LEAD_LABEL_DEFINITION_CLEANUP_ID=""
 CUSTOM_FIELD_DATE_CLEANUP_ISSUE_ID=""
 CUSTOM_FIELD_DATE_CLEANUP_FIELD_ID=""
 CUSTOM_FIELD_DATE_CLEANUP_FIELD_NAME=""
@@ -423,6 +424,16 @@ cleanup_lead_artifacts() {
     if [ "$(echo "$ambiguous_delete_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
       && [ "$(echo "$ambiguous_person_read" | jq -r '(.result.isError // false) and ((.result.content[0].text // "") | contains("not found"))' 2>/dev/null)" = "true" ]; then
       LEAD_PERSON_AMBIGUOUS_CLEANUP_ID=""
+    else
+      cleanup_failed=1
+    fi
+  fi
+  if [ -n "$LEAD_LABEL_DEFINITION_CLEANUP_ID" ]; then
+    local label_json label_delete_response
+    label_json=$(json_string "$LEAD_LABEL_DEFINITION_CLEANUP_ID")
+    label_delete_response=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_tag\",\"arguments\":{\"targetClass\":\"lead:class:Lead\",\"tag\":$label_json}},\"id\":2}" 2>/dev/null || true)
+    if [ "$(echo "$label_delete_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ]; then
+      LEAD_LABEL_DEFINITION_CLEANUP_ID=""
     else
       cleanup_failed=1
     fi
@@ -2528,11 +2539,19 @@ if [ $? -eq 0 ]; then
           "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_lead\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"customer\":{\"kind\":\"person\",\"identifier\":\"$LEAD_PERSON_ID\"},\"title\":$LEAD_PERSON_TITLE_JSON,\"description\":\"Created by the local Docker integration suite.\",\"taskType\":$LEAD_TASK_TYPE_ID_JSON}},\"id\":2}"
         if [ $? -eq 0 ]; then
           CREATED_PERSON_LEAD_IDENTIFIER=$(echo "$CREATED_PERSON_LEAD_TEXT" | jq -r '.identifier // empty' 2>/dev/null)
+          CREATED_PERSON_LEAD_ID=$(echo "$CREATED_PERSON_LEAD_TEXT" | jq -r '.leadId // empty' 2>/dev/null)
           assert_json_field_nonempty "create_lead(person) returns leadId" "$CREATED_PERSON_LEAD_TEXT" '.leadId'
           assert_json_field_nonempty "create_lead(person) returns identifier" "$CREATED_PERSON_LEAD_TEXT" '.identifier'
           sleep 2
           run_capture_to_var_fresh CREATED_PERSON_LEAD_DETAIL "get_lead(created_person:$CREATED_PERSON_LEAD_IDENTIFIER)" \
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_lead\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\"}},\"id\":2}"
+          if [ $? -eq 0 ]; then
+            assert_json_field_equals "get_lead exposes stable native id" "$CREATED_PERSON_LEAD_DETAIL" '.id' "$CREATED_PERSON_LEAD_ID"
+            assert_json_field_equals "get_lead classifies person customer" "$CREATED_PERSON_LEAD_DETAIL" '.customerType' 'person'
+            assert_json_field_equals "get_lead exposes native collection counts" "$CREATED_PERSON_LEAD_DETAIL" '([.comments, .attachments, .labels] | all(type == "number"))' 'true'
+            assert_json_field_equals "get_lead exposes stable task metadata" "$CREATED_PERSON_LEAD_DETAIL" '(.number | type == "number") and (.taskType | length > 0) and (.rank | length > 0)' 'true'
+            assert_json_field_equals "get_lead explicitly classifies unsupported fields" "$CREATED_PERSON_LEAD_DETAIL" '[.unsupportedFields[].field] | sort' '["collection","parents"]'
+          fi
           run_capture_to_var CREATED_PERSON_LEAD_LIST "list_leads(created_person)" \
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_leads\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"titleSearch\":$LEAD_PERSON_TITLE_JSON,\"limit\":5}},\"id\":2}"
           if [ $? -eq 0 ]; then
@@ -2569,6 +2588,132 @@ if [ $? -eq 0 ]; then
               run_capture_to_var_fresh IDEMPOTENT_LEAD_TEXT "update_lead(idempotent customer description:$CREATED_PERSON_LEAD_IDENTIFIER)" \
                 "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_lead\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"customerDescription\":$UPDATED_CUSTOMER_DESCRIPTION_JSON}},\"id\":2}"
               assert_json_field_equals "update_lead repeated customer description is unchanged" "$IDEMPOTENT_LEAD_TEXT" '.updated' "false"
+            fi
+
+            LEAD_WORKSPACE_TEXT=$(run_capture_only_fresh \
+              '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_workspace_info","arguments":{}},"id":2}')
+            LEAD_WORKSPACE_UUID=$(echo "$LEAD_WORKSPACE_TEXT" | jq -r '.uuid // empty' 2>/dev/null)
+            LEAD_REFERENCE_LABEL_ENCODED=$(url_encode "$CREATED_PERSON_LEAD_IDENTIFIER")
+            LEAD_REFERENCE_URL="${HULY_URL%/}/browse?workspace=${LEAD_WORKSPACE_UUID}&_class=lead%3Aclass%3ALead&_id=${CREATED_PERSON_LEAD_ID}&label=${LEAD_REFERENCE_LABEL_ENCODED}"
+            LEAD_COMMENT_BODY="Lead collaboration [${CREATED_PERSON_LEAD_IDENTIFIER}](${LEAD_REFERENCE_URL})"
+            LEAD_COMMENT_BODY_JSON=$(json_string "$LEAD_COMMENT_BODY")
+            run_capture_to_var_fresh LEAD_COMMENT_TEXT "add_lead_comment($CREATED_PERSON_LEAD_IDENTIFIER)" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_lead_comment\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"body\":$LEAD_COMMENT_BODY_JSON}},\"id\":2}"
+            if [ $? -eq 0 ]; then
+              LEAD_COMMENT_ID=$(echo "$LEAD_COMMENT_TEXT" | jq -r '.commentId // empty' 2>/dev/null)
+              run_capture_to_var_fresh LEAD_COMMENTS_TEXT "list_lead_comments(native reference)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_lead_comments\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\"}},\"id\":2}"
+              if [ $? -eq 0 ]; then
+                assert_json_array_contains "lead comments preserve native collection" "$LEAD_COMMENTS_TEXT" '.comments | map(.id)' "$LEAD_COMMENT_ID"
+                assert_json_field_contains "lead comments preserve native reference target" "$LEAD_COMMENTS_TEXT" '.comments[0].body' "$CREATED_PERSON_LEAD_ID"
+              fi
+              LEAD_COMMENT_UPDATED_JSON=$(json_string "Updated lead collaboration note")
+              run_capture_to_var_fresh LEAD_COMMENT_UPDATE_TEXT "update_lead_comment($LEAD_COMMENT_ID)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_lead_comment\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"commentId\":\"$LEAD_COMMENT_ID\",\"body\":$LEAD_COMMENT_UPDATED_JSON}},\"id\":2}"
+              assert_json_field_equals "update_lead_comment reports change" "$LEAD_COMMENT_UPDATE_TEXT" '.changed' 'true'
+              run_capture_to_var_fresh LEAD_COMMENT_DELETE_TEXT "delete_lead_comment($LEAD_COMMENT_ID)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_lead_comment\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"commentId\":\"$LEAD_COMMENT_ID\"}},\"id\":2}"
+              assert_json_field_equals "delete_lead_comment reports change" "$LEAD_COMMENT_DELETE_TEXT" '.changed' 'true'
+              if run_capture_to_var_fresh LEAD_COMMENTS_AFTER_DELETE_TEXT "list_lead_comments(after delete)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_lead_comments\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\"}},\"id\":2}"; then
+                if printf '%s\n' "$LEAD_COMMENTS_AFTER_DELETE_TEXT" | jq -e --arg id "$LEAD_COMMENT_ID" '.comments[]? | select(.id == $id)' >/dev/null 2>&1; then
+                  fail_test "delete_lead_comment fresh-session readback" "deleted comment remains visible"
+                else
+                  echo "PASS: delete_lead_comment fresh-session readback"
+                  PASSED=$((PASSED + 1))
+                fi
+              fi
+            fi
+
+            run_capture_to_var_fresh LEAD_ATTACHMENT_TEXT "add_lead_attachment($CREATED_PERSON_LEAD_IDENTIFIER)" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_lead_attachment\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"filename\":\"lead-$RUN_ID.txt\",\"contentType\":\"text/plain\",\"data\":\"aGVsbG8=\"}},\"id\":2}"
+            if [ $? -eq 0 ]; then
+              LEAD_ATTACHMENT_ID=$(echo "$LEAD_ATTACHMENT_TEXT" | jq -r '.attachmentId // empty' 2>/dev/null)
+              run_capture_to_var_fresh LEAD_ATTACHMENTS_TEXT "list_lead_attachments($CREATED_PERSON_LEAD_IDENTIFIER)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_lead_attachments\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\"}},\"id\":2}"
+              assert_json_array_contains "lead attachment retains native parent" "$LEAD_ATTACHMENTS_TEXT" '.attachments | map(.id)' "$LEAD_ATTACHMENT_ID"
+              run_capture_to_var_fresh LEAD_ATTACHMENT_GET_TEXT "get_lead_attachment($LEAD_ATTACHMENT_ID)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_lead_attachment\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"attachmentId\":\"$LEAD_ATTACHMENT_ID\"}},\"id\":2}"
+              assert_json_field_equals "get_lead_attachment preserves ID" "$LEAD_ATTACHMENT_GET_TEXT" '.attachment.id' "$LEAD_ATTACHMENT_ID"
+              run_capture_to_var_fresh LEAD_ATTACHMENT_UPDATE_TEXT "update_lead_attachment($LEAD_ATTACHMENT_ID)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_lead_attachment\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"attachmentId\":\"$LEAD_ATTACHMENT_ID\",\"pinned\":true}},\"id\":2}"
+              run_capture_to_var_fresh LEAD_ATTACHMENT_UPDATED_GET_TEXT "get_lead_attachment(updated:$LEAD_ATTACHMENT_ID)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_lead_attachment\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"attachmentId\":\"$LEAD_ATTACHMENT_ID\"}},\"id\":2}"
+              assert_json_field_equals "update_lead_attachment fresh-session readback" "$LEAD_ATTACHMENT_UPDATED_GET_TEXT" '.attachment.pinned' 'true'
+              run_capture_to_var_fresh LEAD_ATTACHMENT_DELETE_TEXT "delete_lead_attachment($LEAD_ATTACHMENT_ID)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_lead_attachment\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"attachmentId\":\"$LEAD_ATTACHMENT_ID\"}},\"id\":2}"
+              run_expect_error_contains_fresh "get_lead_attachment(deleted:$LEAD_ATTACHMENT_ID)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_lead_attachment\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"attachmentId\":\"$LEAD_ATTACHMENT_ID\"}},\"id\":2}" \
+                "not found"
+            fi
+
+            LEAD_LABEL_TITLE="lead-label-$LEAD_FIXTURE_SUFFIX"
+            LEAD_LABEL_TITLE_JSON=$(json_string "$LEAD_LABEL_TITLE")
+            run_capture_to_var_fresh LEAD_LABEL_TEXT "add_lead_label($LEAD_LABEL_TITLE)" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_lead_label\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"label\":$LEAD_LABEL_TITLE_JSON,\"color\":4,\"weight\":2}},\"id\":2}"
+            if [ $? -eq 0 ]; then
+              LEAD_LABEL_DEFINITION_CLEANUP_ID=$(echo "$LEAD_LABEL_TEXT" | jq -r '.label // empty' 2>/dev/null)
+              assert_json_field_equals "add_lead_label creates relation" "$LEAD_LABEL_TEXT" '.attached' 'true'
+              run_capture_to_var_fresh LEAD_LABELS_TEXT "list_lead_labels($CREATED_PERSON_LEAD_IDENTIFIER)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_lead_labels\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\"}},\"id\":2}"
+              assert_json_field_equals "list_lead_labels preserves weight" "$LEAD_LABELS_TEXT" ".labels[] | select(.label == \"$LEAD_LABEL_DEFINITION_CLEANUP_ID\") | .weight" '2'
+              run_test "list_lead_label_definitions($LEAD_LABEL_TITLE)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_lead_label_definitions\",\"arguments\":{\"titleSearch\":$LEAD_LABEL_TITLE_JSON}},\"id\":2}"
+              run_capture_to_var_fresh LEAD_LABEL_UPDATE_TEXT "update_lead_label($LEAD_LABEL_TITLE)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_lead_label\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"label\":$LEAD_LABEL_TITLE_JSON,\"weight\":7}},\"id\":2}"
+              assert_json_field_equals "update_lead_label reports one relation" "$LEAD_LABEL_UPDATE_TEXT" '.updatedCount' '1'
+              run_capture_to_var_fresh LEAD_LABELS_UPDATED_TEXT "list_lead_labels(updated weight)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_lead_labels\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\"}},\"id\":2}"
+              assert_json_field_equals "update_lead_label fresh-session readback" "$LEAD_LABELS_UPDATED_TEXT" ".labels[] | select(.label == \"$LEAD_LABEL_DEFINITION_CLEANUP_ID\") | .weight" '7'
+              run_capture_to_var_fresh LEAD_LABEL_REMOVE_TEXT "remove_lead_label($LEAD_LABEL_TITLE)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_lead_label\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"label\":$LEAD_LABEL_TITLE_JSON}},\"id\":2}"
+              assert_json_field_equals "remove_lead_label reports one relation" "$LEAD_LABEL_REMOVE_TEXT" '.detachedCount' '1'
+              if run_capture_to_var_fresh LEAD_LABELS_AFTER_REMOVE_TEXT "list_lead_labels(after remove)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_lead_labels\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\"}},\"id\":2}"; then
+                if printf '%s\n' "$LEAD_LABELS_AFTER_REMOVE_TEXT" | jq -e --arg id "$LEAD_LABEL_DEFINITION_CLEANUP_ID" '.labels[]? | select(.label == $id)' >/dev/null 2>&1; then
+                  fail_test "remove_lead_label fresh-session readback" "detached label remains visible"
+                else
+                  echo "PASS: remove_lead_label fresh-session readback"
+                  PASSED=$((PASSED + 1))
+                fi
+              fi
+              if run_capture_to_var_fresh LEAD_LABEL_DELETE_TEXT "delete_tag(lead label cleanup)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_tag\",\"arguments\":{\"targetClass\":\"lead:class:Lead\",\"tag\":\"$LEAD_LABEL_DEFINITION_CLEANUP_ID\"}},\"id\":2}"; then
+                LEAD_LABEL_DEFINITION_CLEANUP_ID=""
+              fi
+            fi
+
+            run_capture_to_var_fresh LEAD_RELATIONS_TEXT "list_relations(friendly lead locator)" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_relations\",\"arguments\":{\"source\":{\"kind\":\"lead\",\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\"},\"limit\":3}},\"id\":2}"
+            if [ $? -eq 0 ]; then
+              assert_json_field_nonempty "list_relations friendly lead returns total" "$LEAD_RELATIONS_TEXT" '.total'
+            fi
+            LEAD_RELATION_SOURCE_ROLE="lead source $LEAD_FIXTURE_SUFFIX"
+            LEAD_RELATION_TARGET_ROLE="lead customer $LEAD_FIXTURE_SUFFIX"
+            LEAD_RELATION_SOURCE_ROLE_JSON=$(json_string "$LEAD_RELATION_SOURCE_ROLE")
+            LEAD_RELATION_TARGET_ROLE_JSON=$(json_string "$LEAD_RELATION_TARGET_ROLE")
+            run_capture_to_var_fresh LEAD_ASSOCIATION_TEXT "create_association(lead to person)" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_association\",\"arguments\":{\"sourceClass\":\"lead:class:Lead\",\"targetClass\":\"contact:class:Person\",\"sourceRole\":$LEAD_RELATION_SOURCE_ROLE_JSON,\"targetRole\":$LEAD_RELATION_TARGET_ROLE_JSON,\"cardinality\":\"many-to-many\"}},\"id\":2}"
+            if [ $? -eq 0 ]; then
+              LEAD_ASSOCIATION_ID=$(echo "$LEAD_ASSOCIATION_TEXT" | jq -r '.association.associationId // empty' 2>/dev/null)
+              if [ -n "$LEAD_ASSOCIATION_ID" ]; then
+                GENERIC_ASSOCIATION_CLEANUP_IDS="$GENERIC_ASSOCIATION_CLEANUP_IDS $LEAD_ASSOCIATION_ID"
+                LEAD_RELATION_ARGS="{\"association\":\"$LEAD_ASSOCIATION_ID\",\"source\":{\"kind\":\"lead\",\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\"},\"target\":{\"kind\":\"raw\",\"id\":\"$LEAD_PERSON_ID\",\"class\":\"contact:class:Person\"}}"
+                run_capture_to_var_fresh LEAD_RELATION_CREATE_TEXT "create_relation(friendly lead endpoint)" \
+                  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_relation\",\"arguments\":$LEAD_RELATION_ARGS},\"id\":2}"
+                assert_json_field_equals "create_relation friendly lead reports created" "$LEAD_RELATION_CREATE_TEXT" '.created' 'true'
+                run_capture_to_var_fresh LEAD_RELATION_LIST_TEXT "list_relations(created friendly lead endpoint)" \
+                  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_relations\",\"arguments\":$LEAD_RELATION_ARGS},\"id\":2}"
+                assert_json_field_equals "list_relations friendly lead readback" "$LEAD_RELATION_LIST_TEXT" '.total' '1'
+                run_capture_to_var_fresh LEAD_RELATION_DELETE_TEXT "delete_relation(friendly lead endpoint)" \
+                  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_relation\",\"arguments\":$LEAD_RELATION_ARGS},\"id\":2}"
+                assert_json_field_equals "delete_relation friendly lead reports deleted" "$LEAD_RELATION_DELETE_TEXT" '.deleted' 'true'
+                run_capture_to_var_fresh LEAD_ASSOCIATION_DELETE_TEXT "delete_association(lead to person cleanup)" \
+                  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_association\",\"arguments\":{\"association\":\"$LEAD_ASSOCIATION_ID\"}},\"id\":2}"
+                assert_json_field_equals "delete_association lead fixture reports deleted" "$LEAD_ASSOCIATION_DELETE_TEXT" '.deleted' 'true'
+              else
+                fail_test "create_association(lead to person)" "created association returned no stable identifier"
+              fi
             fi
 
             LEAD_DESTINATION_FUNNEL_NAME="Integration lead destination $LEAD_FIXTURE_SUFFIX"

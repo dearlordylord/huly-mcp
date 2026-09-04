@@ -46,7 +46,7 @@ import {
   type CardIdentifier,
   type CardSpaceIdentifier,
   Count,
-  type DocId,
+  DocId,
   type ListTotal,
   MAX_LIMIT,
   NonEmptyString,
@@ -59,11 +59,13 @@ import { assertAt, isPair, isSingle } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError, type HulyClientOperations } from "../client.js"
 import type {
   DocumentNotFoundError,
+  HulyDataInvalidError,
   IssueNotFoundError,
   ProjectNotFoundError,
   RelationNotFoundError,
   TeamspaceNotFoundError
 } from "../errors.js"
+import type { FunnelIdentifierAmbiguousError, FunnelNotFoundError, LeadNotFoundError } from "../errors-leads.js"
 import type { HulyModelMetadataError } from "../errors-base.js"
 import {
   AssociationConflictError,
@@ -95,6 +97,8 @@ import {
 import { listTotal } from "./counts.js"
 import { findTeamspaceAndDocument } from "./documents.js"
 import { findIssueInProject, findProject, findProjectAndIssue } from "./issues-shared.js"
+import { resolveFunnel } from "./funnels-shared.js"
+import { findLead } from "./leads-mutations-shared.js"
 import { clampLimit, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
 import { toClassRef, toRef } from "./sdk-boundary.js"
 
@@ -120,6 +124,10 @@ type GenericAssociationsError =
   | GenericObjectLocatorInvalidError
   | GenericObjectNotFoundError
   | IssueNotFoundError
+  | FunnelNotFoundError
+  | FunnelIdentifierAmbiguousError
+  | LeadNotFoundError
+  | HulyDataInvalidError
   | HulyModelMetadataError
 
 type AssociationCandidate = {
@@ -976,8 +984,27 @@ const resolveDocumentLocator = (
     return summary
   })
 
+const resolveLeadLocator = (
+  client: HulyClient["Service"],
+  locator: Extract<GenericObjectLocator, { kind: "lead" }>,
+  expectedClass: ObjectClassName | undefined,
+  field: RelationEndpointField
+): Effect.Effect<ResolvedObjectSummary, GenericAssociationsError> =>
+  Effect.gen(function* () {
+    const funnel = yield* resolveFunnel(client, locator.funnel)
+    const lead = yield* findLead(client, funnel, locator.identifier)
+    const summary: ResolvedObjectSummary = {
+      id: DocId.make(lead._id),
+      class: ObjectClassName.make(lead._class),
+      display: NonEmptyString.make(lead.title),
+      locatorKind: "lead"
+    }
+    yield* validateExpectedClass(summary, expectedClass, field)
+    return summary
+  })
+
 const resolveGenericObject = (
-  client: HulyClientOperations,
+  client: HulyClient["Service"],
   locator: GenericObjectLocator,
   expectedClass: ObjectClassName | undefined,
   field: RelationEndpointField
@@ -998,6 +1025,8 @@ const resolveGenericObject = (
         yield* validateExpectedClass(summary, expectedClass, field)
         return summary
       }
+      case "lead":
+        return yield* resolveLeadLocator(client, locator, expectedClass, field)
     }
   })
 

@@ -39,6 +39,20 @@ export const ISSUE_97_ADMINISTRATION_TOOL_NAMES: ReadonlySet<ToolNameType> = new
   ToolName.make("update_lead"),
   ToolName.make("move_lead"),
   ToolName.make("delete_lead"),
+  ToolName.make("list_lead_comments"),
+  ToolName.make("add_lead_comment"),
+  ToolName.make("update_lead_comment"),
+  ToolName.make("delete_lead_comment"),
+  ToolName.make("list_lead_attachments"),
+  ToolName.make("add_lead_attachment"),
+  ToolName.make("get_lead_attachment"),
+  ToolName.make("update_lead_attachment"),
+  ToolName.make("delete_lead_attachment"),
+  ToolName.make("list_lead_label_definitions"),
+  ToolName.make("list_lead_labels"),
+  ToolName.make("add_lead_label"),
+  ToolName.make("update_lead_label"),
+  ToolName.make("remove_lead_label"),
   ToolName.make("get_funnel"),
   ToolName.make("create_funnel"),
   ToolName.make("update_funnel"),
@@ -57,4 +71,11 @@ export const ISSUE_97_ADMINISTRATION_TOOL_NAMES: ReadonlySet<ToolNameType> = new
   ToolName.make("get_person_attachment"),
   ToolName.make("update_person_attachment"),
   ToolName.make("delete_person_attachment")
+])
+
+export const ISSUE_97_EXISTING_TOOL_CHANGE_NAMES: ReadonlySet<ToolNameType> = new Set([
+  ToolName.make("get_lead"),
+  ToolName.make("list_relations"),
+  ToolName.make("create_relation"),
+  ToolName.make("delete_relation")
 ])
