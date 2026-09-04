@@ -135,6 +135,7 @@ const DOMAIN_FAILURE_KIND_BY_TAG = {
   HulyModelMetadataError: "integration",
   HulyStorageConfigError: "integration",
   HrRequestMutationUnsupportedError: "integration",
+  HrStaffNotFoundError: "lookup",
   HulyUnavailableError: "integration",
   InvalidContactChannelLocatorError: "input",
   InvalidContactChannelValueError: "input",

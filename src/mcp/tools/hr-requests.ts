@@ -3,10 +3,11 @@ import {
   deleteHrRequestParamsJsonSchema,
   DeleteHrRequestResultSchema,
   getHrRequestParamsJsonSchema,
-  HrRequestMutationResultSchema,
+  CreateHrRequestResultSchema,
   HrRequestSummarySchema,
   ListHrRequestsResultSchema,
   ListHrRequestTypesResultSchema,
+  UpdateHrRequestResultSchema,
   listHrRequestsParamsJsonSchema,
   listHrRequestTypesParamsJsonSchema,
   parseCreateHrRequestParams,
@@ -34,7 +35,7 @@ export const hrRequestTools = [
     {
       name: "list_hr_request_types",
       description:
-        "Discover installed HR request types by stable ID and human-readable label. Exact labels may be used by request tools; ambiguous labels are rejected. Request-type mutation is intentionally unsupported because Huly installs these as model-space documents and exposes no stable runtime mutation contract.",
+        "Discover installed HR request types by stable ID and Huly-translated human label. Set locale to a supported Huly locale such as fr; labels from any supported locale may be used by request tools, while ambiguous labels are rejected. Request-type mutation is intentionally unsupported because Huly installs these as model-space documents and exposes no stable runtime mutation contract.",
       category: CATEGORY,
       inputSchema: listHrRequestTypesParamsJsonSchema,
       resultSchema: ListHrRequestTypesResultSchema
@@ -72,7 +73,7 @@ export const hrRequestTools = [
         "Create an employee-attached HR request using exact employee, department, and request-type resolution. Dates are inclusive calendar dates in YYYY-MM-DD form and descriptions accept Markdown with native Huly references.",
       category: CATEGORY,
       inputSchema: createHrRequestParamsJsonSchema,
-      resultSchema: HrRequestMutationResultSchema
+      resultSchema: CreateHrRequestResultSchema
     },
     parseCreateHrRequestParams,
     createHrRequest
@@ -84,7 +85,7 @@ export const hrRequestTools = [
         "Update selected HR request fields by exact request ID. Department and type locators resolve exactly; omitted fields are preserved. Dates remain inclusive YYYY-MM-DD calendar dates.",
       category: CATEGORY,
       inputSchema: updateHrRequestParamsJsonSchema,
-      resultSchema: HrRequestMutationResultSchema
+      resultSchema: UpdateHrRequestResultSchema
     },
     parseUpdateHrRequestParams,
     updateHrRequest

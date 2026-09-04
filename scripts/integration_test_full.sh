@@ -4213,6 +4213,16 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
       fi
       run_capture_to_var HR_REQUEST_TYPES_TEXT "list_hr_request_types" \
         '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_hr_request_types","arguments":{"limit":20}},"id":2}'
+      run_capture_to_var HR_REQUEST_TYPES_FR_TEXT "list_hr_request_types(French labels)" \
+        '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_hr_request_types","arguments":{"locale":"fr","limit":20}},"id":2}'
+      if echo "$HR_REQUEST_TYPES_FR_TEXT" | jq -e \
+        '[.requestTypes[] | select(.labelResource == "hr:string:PTO" and .label == "Congé payé" and .labelLocale == "fr")] | length == 1' \
+        >/dev/null 2>&1; then
+        echo "PASS: French HR request type translation"
+        PASSED=$((PASSED + 1))
+      else
+        fail_test "French HR request type translation" "PTO was not localized through the Huly HR asset"
+      fi
       HR_REQUEST_TYPE_ID=$(echo "$HR_REQUEST_TYPES_TEXT" | jq -r '.requestTypes[0].id // empty' 2>/dev/null)
       HR_REQUEST_TYPE_LABEL=$(echo "$HR_REQUEST_TYPES_TEXT" | jq -r '.requestTypes[0].label // empty' 2>/dev/null)
       if [ -n "$HR_REQUEST_TYPE_ID" ] && [ -n "$HR_REQUEST_TYPE_LABEL" ]; then

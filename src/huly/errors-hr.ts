@@ -1,8 +1,8 @@
 import { Schema } from "effect"
 
 import { DepartmentIdentifier, PersonLocator } from "../domain/schemas/hr-departments.js"
-import { CommentId, Count, NonEmptyString } from "../domain/schemas/shared.js"
-import { HrRequestId, HrRequestTypeIdentifier } from "../domain/schemas/hr-requests.js"
+import { CommentId, Count, PersonId } from "../domain/schemas/shared.js"
+import { HrCalendarDate, HrRequestId, HrRequestTypeIdentifier } from "../domain/schemas/hr-requests.js"
 
 export class DepartmentNotFoundError extends Schema.TaggedError<DepartmentNotFoundError>()("DepartmentNotFoundError", {
   identifier: DepartmentIdentifier
@@ -52,6 +52,14 @@ export class EmployeeNotFoundError extends Schema.TaggedError<EmployeeNotFoundEr
   }
 }
 
+export class HrStaffNotFoundError extends Schema.TaggedError<HrStaffNotFoundError>()("HrStaffNotFoundError", {
+  employee: PersonId
+}) {
+  override get message(): string {
+    return `Employee '${this.employee}' has no HR Staff record; assign the employee to an HR department before creating a request`
+  }
+}
+
 export class HrRequestNotFoundError extends Schema.TaggedError<HrRequestNotFoundError>()("HrRequestNotFoundError", {
   request: HrRequestId
 }) {
@@ -79,8 +87,8 @@ export class HrRequestTypeIdentifierAmbiguousError extends Schema.TaggedError<Hr
 }
 
 export class HrRequestDateRangeError extends Schema.TaggedError<HrRequestDateRangeError>()("HrRequestDateRangeError", {
-  startDate: Schema.String,
-  endDate: Schema.String
+  startDate: HrCalendarDate,
+  endDate: HrCalendarDate
 }) {
   override get message(): string {
     return `HR request startDate '${this.startDate}' must not be after endDate '${this.endDate}'`
@@ -98,7 +106,7 @@ export class HrRequestCommentNotFoundError extends Schema.TaggedError<HrRequestC
 
 export class HrRequestMutationUnsupportedError extends Schema.TaggedError<HrRequestMutationUnsupportedError>()(
   "HrRequestMutationUnsupportedError",
-  { operation: NonEmptyString }
+  { operation: Schema.Literals(["update", "deletion", "attachment deletion"]) }
 ) {
   override get message(): string {
     return `HR request ${this.operation} is unavailable because the connected Huly client does not expose the required attached-collection operation`

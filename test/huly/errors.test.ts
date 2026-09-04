@@ -29,6 +29,7 @@ import {
   MeetingMinutesId,
   NonEmptyString,
   ObjectClassName,
+  PersonId,
   RelationId,
   RoleId,
   RoomId,
@@ -134,6 +135,7 @@ import {
   HulyStorageConfigError,
   HulyUnavailableError,
   HrRequestMutationUnsupportedError,
+  HrStaffNotFoundError,
   InvalidContactChannelLocatorError,
   InvalidContactChannelValueError,
   InvalidContactProviderError,
@@ -1184,6 +1186,8 @@ describe("Huly Errors", () => {
               return `department-impact:${error.actualSubdepartments}:${error.actualAssignedStaff}`
             case "EmployeeNotFoundError":
               return `employee:${error.identifier}`
+            case "HrStaffNotFoundError":
+              return `hr-staff:${error.employee}`
             case "OrganizationNotFoundError":
               return `organization:${error.identifier}`
             case "OrganizationIdentifierAmbiguousError":
@@ -1710,8 +1714,11 @@ describe("Huly Errors", () => {
         }
 
         expect(matchError(new IssueNotFoundError({ identifier: "X", project: "Y" }))).toBe("issue:X")
-        expect(matchError(new HrRequestMutationUnsupportedError({ operation: NonEmptyString.make("deletion") }))).toBe(
+        expect(matchError(new HrRequestMutationUnsupportedError({ operation: "deletion" }))).toBe(
           "hr-request-unsupported:deletion"
+        )
+        expect(matchError(new HrStaffNotFoundError({ employee: PersonId.make("employee-1") }))).toBe(
+          "hr-staff:employee-1"
         )
         expect(matchError(new ApprovalRequestNotFoundError({ request: "request-1" }))).toBe(
           "approval-request:request-1"

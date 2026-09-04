@@ -10,6 +10,7 @@ export const HrDomainError = Schema.Union([
   HrErrors.DepartmentConflictError,
   HrErrors.DepartmentImpactMismatchError,
   HrErrors.EmployeeNotFoundError,
+  HrErrors.HrStaffNotFoundError,
   HrErrors.HrRequestNotFoundError,
   HrErrors.HrRequestTypeNotFoundError,
   HrErrors.HrRequestTypeIdentifierAmbiguousError,

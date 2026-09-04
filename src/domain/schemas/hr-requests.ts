@@ -2,8 +2,18 @@ import { Schema } from "effect"
 
 import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
 import { toDraft07JsonSchema, withJsonSchemaPropertyDescriptions } from "./json-schema.js"
-import { Count, DEFAULT_LIMIT, LimitParam, NonEmptyString, NonNegativeInteger, Timestamp } from "./shared.js"
-import { DepartmentIdentifier, PersonLocator } from "./hr-departments.js"
+import {
+  ColorCode,
+  Count,
+  DEFAULT_LIMIT,
+  LimitParam,
+  NonEmptyString,
+  NonNegativeInteger,
+  PersonId,
+  PersonName,
+  Timestamp
+} from "./shared.js"
+import { DepartmentId, DepartmentIdentifier, DepartmentPath, PersonLocator } from "./hr-departments.js"
 
 export const HrRequestId = NonEmptyString.pipe(Schema.brand("HrRequestId"))
 export type HrRequestId = Schema.Schema.Type<typeof HrRequestId>
@@ -33,13 +43,30 @@ export const HrCalendarDate = Schema.String.pipe(
   Schema.brand("HrCalendarDate")
 ).annotate({ description: "Inclusive calendar date in YYYY-MM-DD form; stored as Huly TzDate with UTC offset 0." })
 export type HrCalendarDate = Schema.Schema.Type<typeof HrCalendarDate>
+export const HrLocale = Schema.Literals([
+  "cs",
+  "de",
+  "en",
+  "es",
+  "fr",
+  "it",
+  "ja",
+  "ko",
+  "pt-br",
+  "pt",
+  "ru",
+  "tr",
+  "zh"
+])
+export type HrLocale = Schema.Schema.Type<typeof HrLocale>
 
 export const HrRequestTypeSummarySchema = Schema.Struct({
   id: HrRequestTypeIdentifier,
   label: NonEmptyString,
+  labelLocale: HrLocale,
   labelResource: NonEmptyString,
   value: Schema.Number,
-  color: Schema.Number,
+  color: ColorCode,
   mutationSupported: Schema.Literal(false),
   mutationReason: NonEmptyString
 })
@@ -47,8 +74,8 @@ export type HrRequestTypeSummary = Schema.Schema.Type<typeof HrRequestTypeSummar
 
 export const HrRequestSummarySchema = Schema.Struct({
   id: HrRequestId,
-  employee: Schema.Struct({ id: NonEmptyString, name: NonEmptyString }),
-  department: Schema.Struct({ id: NonEmptyString, path: NonEmptyString }),
+  employee: Schema.Struct({ id: PersonId, name: PersonName }),
+  department: Schema.Struct({ id: DepartmentId, path: DepartmentPath }),
   requestType: HrRequestTypeSummarySchema,
   startDate: HrCalendarDate,
   endDate: HrCalendarDate,
@@ -61,7 +88,11 @@ export const HrRequestSummarySchema = Schema.Struct({
 export type HrRequestSummary = Schema.Schema.Type<typeof HrRequestSummarySchema>
 
 const paging = { limit: Schema.optional(LimitParam), offset: Schema.optional(NonNegativeInteger) }
-export const ListHrRequestTypesParamsSchema = Schema.Struct({ query: Schema.optional(NonEmptyString), ...paging })
+export const ListHrRequestTypesParamsSchema = Schema.Struct({
+  query: Schema.optional(NonEmptyString),
+  locale: Schema.optional(HrLocale),
+  ...paging
+})
 export type ListHrRequestTypesParams = Schema.Schema.Type<typeof ListHrRequestTypesParamsSchema>
 export const ListHrRequestTypesResultSchema = Schema.Struct({
   requestTypes: Schema.Array(HrRequestTypeSummarySchema),
@@ -131,11 +162,16 @@ export const UpdateHrRequestParamsSchema = Schema.Struct({
 export type UpdateHrRequestParams = Schema.Schema.Type<typeof UpdateHrRequestParamsSchema>
 export const DeleteHrRequestParamsSchema = GetHrRequestParamsSchema
 export type DeleteHrRequestParams = GetHrRequestParams
-export const HrRequestMutationResultSchema = Schema.Struct({
+export const CreateHrRequestResultSchema = Schema.Struct({
   request: HrRequestSummarySchema,
-  created: Schema.optionalKey(Schema.Boolean),
-  updated: Schema.optionalKey(Schema.Boolean)
+  created: Schema.Literal(true)
 })
+export type CreateHrRequestResult = Schema.Schema.Type<typeof CreateHrRequestResultSchema>
+export const UpdateHrRequestResultSchema = Schema.Struct({
+  request: HrRequestSummarySchema,
+  updated: Schema.Literal(true)
+})
+export type UpdateHrRequestResult = Schema.Schema.Type<typeof UpdateHrRequestResultSchema>
 export const DeleteHrRequestResultSchema = Schema.Struct({ id: HrRequestId, deleted: Schema.Boolean })
 export type ListHrRequestsResult = Schema.Schema.Type<typeof ListHrRequestsResultSchema>
 export type DeleteHrRequestResult = Schema.Schema.Type<typeof DeleteHrRequestResultSchema>
@@ -145,6 +181,7 @@ const descriptions = {
   employee: "Exact employee ID, email, or Huly display name; ambiguity is rejected.",
   department: "Exact department ID or full slash-separated path; ambiguity is rejected.",
   requestType: "Exact request-type ID or human-readable label returned by list_hr_request_types.",
+  locale: "Huly translation locale for request-type labels (default: en). Translated labels remain valid locators.",
   startDate: "Inclusive first calendar day in YYYY-MM-DD form; stored with UTC offset 0.",
   endDate: "Inclusive last calendar day in YYYY-MM-DD form; stored with UTC offset 0.",
   description: `Markdown description. ${HULY_NATIVE_REFERENCE_MARKDOWN_INPUT}`,

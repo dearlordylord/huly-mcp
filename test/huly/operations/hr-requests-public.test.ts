@@ -4,6 +4,7 @@ import { AvatarType, type Employee, type Person } from "@hcengineering/contact"
 import {
   type AttachedData,
   type AttachedDoc,
+  type Blob,
   type Class,
   type Doc,
   type DocumentQuery,
@@ -14,8 +15,8 @@ import {
   toFindResult
 } from "@hcengineering/core"
 import type { Department, Request as HulyRequest, RequestType, Staff } from "@hcengineering/hr"
-import type { IntlString } from "@hcengineering/platform"
-import { Effect, Layer, Schema } from "effect"
+import { getEmbeddedLabel } from "@hcengineering/platform"
+import { Effect, Layer } from "effect"
 import { TestClock } from "effect/testing"
 import { describe, expect, it } from "vitest"
 
@@ -31,10 +32,11 @@ import { AttachmentId, CommentId } from "../../../src/domain/schemas/shared.js"
 import {
   DepartmentHierarchyError,
   DepartmentNotFoundError,
-  EmployeeNotFoundError,
   HrRequestDateRangeError,
+  HulyDataInvalidError,
   HrRequestMutationUnsupportedError,
   HrRequestNotFoundError,
+  HrStaffNotFoundError,
   HrRequestTypeNotFoundError
 } from "../../../src/huly/errors.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
@@ -81,18 +83,6 @@ interface Fixture {
   readonly calls: Calls
 }
 
-const intlString = Schema.decodeUnknownSync(
-  Schema.declare((input): input is IntlString => typeof input === "string" && input.length > 0)
-)
-
-const decodeDoc = <T extends Doc>(input: unknown): T =>
-  Schema.decodeUnknownSync(
-    Schema.declare(
-      (value): value is T =>
-        typeof value === "object" && value !== null && typeof Reflect.get(value, "_id") === "string"
-    )
-  )(input)
-
 const makeDepartment = (id: string, name: string, parent = hr.ids.Head): Department => ({
   _id: docRef<Department>(id),
   _class: hr.class.Department,
@@ -111,7 +101,7 @@ const makeRequestType = (id: string, label: string): RequestType => ({
   _id: docRef<RequestType>(id),
   _class: hr.class.RequestType,
   space: core.space.Model,
-  label: intlString(`hr:string:${label}`),
+  label: getEmbeddedLabel(label),
   icon: hr.icon.PTO,
   value: -1,
   color: 2,
@@ -163,8 +153,8 @@ const fixture = (): Fixture => {
     modifiedOn: 3,
     createdOn: 2
   }
-  const comment = decodeDoc<ChatMessage>({
-    _id: "comment-1",
+  const comment: ChatMessage = {
+    _id: docRef<ChatMessage>("comment-1"),
     _class: chunter.class.ChatMessage,
     space: core.space.Workspace,
     attachedTo: request._id,
@@ -172,24 +162,24 @@ const fixture = (): Fixture => {
     collection: "comments",
     message: markdownToMarkupString("Initial", testMarkupUrlConfig),
     createdOn: 2,
-    modifiedBy: "actor",
+    modifiedBy: corePersonId("actor"),
     modifiedOn: 3
-  })
-  const media = decodeDoc<Attachment>({
-    _id: "attachment-1",
+  }
+  const media: Attachment = {
+    _id: docRef<Attachment>("attachment-1"),
     _class: attachment.class.Attachment,
     space: core.space.Workspace,
     attachedTo: request._id,
     attachedToClass: hr.class.Request,
     collection: "attachments",
     name: "request.txt",
-    file: "blob-1",
+    file: docRef<Blob>("blob-1"),
     type: "text/plain",
     size: 7,
     lastModified: 3,
-    modifiedBy: "actor",
+    modifiedBy: corePersonId("actor"),
     modifiedOn: 3
-  })
+  }
   return {
     departments: [makeDepartment(String(hr.ids.Head), "Head"), makeDepartment("department-product", "Product")],
     person,
@@ -212,36 +202,45 @@ const matches = (doc: Doc, query: unknown): boolean =>
     return expected === undefined || Reflect.get(doc, key) === expected
   })
 
-const decodeDocs = <T extends Doc>(input: unknown): Array<T> => [
-  ...Schema.decodeUnknownSync(
-    Schema.Array(
-      Schema.declare(
-        (value): value is T =>
-          typeof value === "object" && value !== null && typeof Reflect.get(value, "_id") === "string"
-      )
-    )
-  )(input)
-]
-
 interface Capabilities {
   readonly updateCollection?: boolean
   readonly removeCollection?: boolean
   readonly staff?: boolean
+  readonly departmentSnapshots?: ReadonlyArray<ReadonlyArray<Department>>
 }
 
 const layerFor = (state: Fixture, capabilities: Capabilities = {}) => {
-  const documentsFor = <T extends Doc>(classRef: Ref<Class<T>>): Array<T> => {
+  const pendingDepartmentSnapshots = [...(capabilities.departmentSnapshots ?? [])]
+  const fixtureMatchesClass = <T extends Doc>(classRef: Ref<Class<T>>, document: Doc): document is T => {
     const className = String(classRef)
-    let selected: ReadonlyArray<Doc> = []
-    if (className === String(hr.class.Department)) selected = state.departments
-    else if (className === String(hr.class.Request)) selected = state.requests
-    else if (className === String(chunter.class.ChatMessage)) selected = state.comments
-    else if (className === String(attachment.class.Attachment)) selected = state.attachments
-    else if (className === String(contact.class.Person)) selected = [state.person]
-    else if (className === String(contact.mixin.Employee)) selected = [state.employee]
-    else if (className === String(hr.mixin.Staff)) selected = capabilities.staff === false ? [] : [state.staff]
-    // Routing by the requested Huly class establishes the SDK generic; the schema keeps fixture values at the boundary.
-    return decodeDocs<T>(selected)
+    // The authoritative Huly class reference is the runtime witness for the SDK's class-indexed generic. Each
+    // branch also proves membership in its corresponding concrete, statically typed fixture collection.
+    if (className === String(hr.class.Department)) return state.departments.some((item) => item === document)
+    if (className === String(hr.class.Request)) return state.requests.some((item) => item === document)
+    if (className === String(hr.class.RequestType)) return state.requestTypes.some((item) => item === document)
+    if (className === String(chunter.class.ChatMessage)) return state.comments.some((item) => item === document)
+    if (className === String(attachment.class.Attachment)) return state.attachments.some((item) => item === document)
+    if (className === String(contact.class.Person)) return document === state.person
+    if (className === String(contact.mixin.Employee)) return document === state.employee
+    return className === String(hr.mixin.Staff) && capabilities.staff !== false && document === state.staff
+  }
+
+  const documentsFor = <T extends Doc>(classRef: Ref<Class<T>>): Array<T> => {
+    const departments =
+      String(classRef) === String(hr.class.Department)
+        ? (pendingDepartmentSnapshots.shift() ?? state.departments)
+        : state.departments
+    const documents: ReadonlyArray<Doc> = [
+      ...departments,
+      ...state.requests,
+      ...state.requestTypes,
+      ...state.comments,
+      ...state.attachments,
+      state.person,
+      state.employee,
+      state.staff
+    ]
+    return documents.filter((document) => fixtureMatchesClass(classRef, document))
   }
   const findAll: HulyClientOperations["findAll"] = <T extends Doc>(
     classRef: Ref<Class<T>>,
@@ -254,8 +253,10 @@ const layerFor = (state: Fixture, capabilities: Capabilities = {}) => {
   }
   const findOne: HulyClientOperations["findOne"] = <T extends Doc>(classRef: Ref<Class<T>>, query: DocumentQuery<T>) =>
     Effect.map(findAll(classRef, query), (rows) => rows[0])
-  const findAllInModel: HulyClientOperations["findAllInModel"] = <T extends Doc>(_classRef: Ref<Class<T>>) =>
-    Effect.succeed(toFindResult(decodeDocs<T>(state.requestTypes), state.requestTypes.length))
+  const findAllInModel: HulyClientOperations["findAllInModel"] = <T extends Doc>(classRef: Ref<Class<T>>) => {
+    const rows = documentsFor(classRef)
+    return Effect.succeed(toFindResult(rows, rows.length))
+  }
   const addCollection: HulyClientOperations["addCollection"] = <T extends Doc, P extends AttachedDoc>(
     _classRef: Ref<Class<P>>,
     _space: Ref<Space>,
@@ -342,7 +343,11 @@ describe("HR request public operations", () => {
     const state = fixture()
     const first = run(listHrRequestTypes({ limit: 1 }), state)
     expect(first).toMatchObject({ total: 2, returned: 1, truncated: true, nextOffset: 1 })
-    expect(first.requestTypes[0]).toMatchObject({ id: "type-pto", label: "PTO", labelResource: "hr:string:PTO" })
+    expect(first.requestTypes[0]).toMatchObject({
+      id: "type-pto",
+      label: "PTO",
+      labelResource: "embedded:embedded:PTO"
+    })
     expect(run(listHrRequestTypes({ query: "remote" }), state).requestTypes).toHaveLength(1)
     expect(run(listHrRequestTypes({ limit: 1, offset: 1 }), state)).toMatchObject({ returned: 1, truncated: false })
   })
@@ -379,11 +384,11 @@ describe("HR request public operations", () => {
     const base = fixture()
     const request = base.requests[0]
     if (request === undefined) throw new Error("fixture request missing")
-    const sparse = decodeDoc<HulyRequest>({
+    const sparse: HulyRequest = {
       _id: request._id,
       _class: request._class,
       space: request.space,
-      attachedTo: base.employee._id,
+      attachedTo: base.staff._id,
       attachedToClass: request.attachedToClass,
       collection: request.collection,
       department: hr.ids.Head,
@@ -391,20 +396,29 @@ describe("HR request public operations", () => {
       description: request.description,
       tzDate: request.tzDate,
       tzDueDate: request.tzDueDate,
-      modifiedBy: request.modifiedBy
-    })
-    const headState: Fixture = {
-      ...base,
-      person: { ...base.person, name: "" },
-      employee: { ...base.employee, name: "" },
-      staff: { ...base.staff, name: "" },
-      requests: [sparse, { ...sparse, _id: docRef<HulyRequest>("request-2") }]
+      modifiedBy: request.modifiedBy,
+      modifiedOn: 0
     }
+    const headState: Fixture = { ...base, requests: [sparse, { ...sparse, _id: docRef<HulyRequest>("request-2") }] }
     expect(run(listHrRequests({ limit: 1 }), headState)).toMatchObject({
       truncated: true,
       nextOffset: 1,
-      requests: [{ employee: { name: "employee-1" }, department: { path: "Head" }, comments: 0, attachments: 0 }]
+      requests: [{ employee: { name: "Alice,Agent" }, department: { path: "Head" }, comments: 0, attachments: 0 }]
     })
+
+    const blankEmployee: Fixture = {
+      ...base,
+      person: { ...base.person, name: "" },
+      employee: { ...base.employee, name: "" },
+      staff: { ...base.staff, name: "" }
+    }
+    expect(
+      Effect.runSync(
+        Effect.flip(
+          getHrRequest({ request: HrRequestId.make("request-1") }).pipe(Effect.provide(layerFor(blankEmployee)))
+        )
+      )
+    ).toBeInstanceOf(HulyDataInvalidError)
 
     const missingDepartment: Fixture = {
       ...base,
@@ -444,7 +458,7 @@ describe("HR request public operations", () => {
       Effect.runSync(
         Effect.flip(create.pipe(Effect.provide(Layer.merge(layerFor(state, { staff: false }), TestClock.layer()))))
       )
-    ).toBeInstanceOf(EmployeeNotFoundError)
+    ).toBeInstanceOf(HrStaffNotFoundError)
     const missingDepartment: Fixture = {
       ...state,
       staff: { ...state.staff, department: docRef<Department>("department-missing") }
@@ -454,6 +468,45 @@ describe("HR request public operations", () => {
         Effect.flip(create.pipe(Effect.provide(Layer.merge(layerFor(missingDepartment), TestClock.layer()))))
       )
     ).toBeInstanceOf(DepartmentNotFoundError)
+
+    const staffWithoutDepartment = fixture()
+    expect(Reflect.deleteProperty(staffWithoutDepartment.staff, "department")).toBe(true)
+    expect(
+      Effect.runSync(
+        Effect.flip(create.pipe(Effect.provide(Layer.merge(layerFor(staffWithoutDepartment), TestClock.layer()))))
+      )
+    ).toBeInstanceOf(HulyDataInvalidError)
+    expect(
+      run(
+        createHrRequest({
+          employee: PersonLocator.make("employee-1"),
+          department: DepartmentIdentifier.make("Product"),
+          requestType: HrRequestTypeIdentifier.make("PTO"),
+          startDate: HrCalendarDate.make("2026-09-06"),
+          endDate: HrCalendarDate.make("2026-09-07")
+        }),
+        staffWithoutDepartment
+      ).created
+    ).toBe(true)
+
+    const headOnly = state.departments.filter((department) => department._id === hr.ids.Head)
+    expect(
+      Effect.runSync(
+        Effect.flip(
+          createHrRequest({
+            employee: PersonLocator.make("employee-1"),
+            department: DepartmentIdentifier.make("Product"),
+            requestType: HrRequestTypeIdentifier.make("PTO"),
+            startDate: HrCalendarDate.make("2026-09-06"),
+            endDate: HrCalendarDate.make("2026-09-07")
+          }).pipe(
+            Effect.provide(
+              Layer.merge(layerFor(state, { departmentSnapshots: [state.departments, headOnly] }), TestClock.layer())
+            )
+          )
+        )
+      )
+    ).toBeInstanceOf(DepartmentHierarchyError)
     const missingHead: Fixture = {
       ...state,
       departments: state.departments.filter((department) => department._id !== hr.ids.Head)

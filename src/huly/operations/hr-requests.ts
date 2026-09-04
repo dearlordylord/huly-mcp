@@ -1,32 +1,40 @@
 import type { Employee } from "@hcengineering/contact"
-import type { AttachedData, DocumentUpdate } from "@hcengineering/core"
+import type { AttachedData, Class, DocumentUpdate, Space } from "@hcengineering/core"
 import { SortingOrder } from "@hcengineering/core"
-import type { Request as HulyRequest, RequestType, Staff, TzDate } from "@hcengineering/hr"
+import type { Department, Request as HulyRequest, RequestType, Staff, TzDate } from "@hcengineering/hr"
 import { Effect } from "effect"
 
 import {
   Count,
-  DEFAULT_LIMIT,
   HrCalendarDate,
+  type HrLocale,
   HrRequestId,
   DepartmentIdentifier,
   type CreateHrRequestParams,
+  type CreateHrRequestResult,
   type DeleteHrRequestParams,
   type GetHrRequestParams,
   HrRequestTypeIdentifier,
   type HrRequestTypeSummary,
   type ListHrRequestsParams,
   type ListHrRequestTypesParams,
-  type UpdateHrRequestParams
+  type UpdateHrRequestParams,
+  type UpdateHrRequestResult,
+  DepartmentId,
+  DepartmentPath,
+  NonEmptyString,
+  PersonId,
+  Timestamp
 } from "../../domain/schemas.js"
-import { NonEmptyString, NonNegativeInteger, PersonName, Timestamp } from "../../domain/schemas/shared.js"
+import { PersonName } from "../../domain/schemas/shared.js"
 import { assertAt } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import {
   DepartmentHierarchyError,
   DepartmentNotFoundError,
-  EmployeeNotFoundError,
+  HrStaffNotFoundError,
   HrRequestDateRangeError,
+  HulyDataInvalidError,
   HrRequestMutationUnsupportedError,
   HrRequestNotFoundError,
   HrRequestTypeIdentifierAmbiguousError,
@@ -34,48 +42,54 @@ import {
 } from "../errors.js"
 import { core, hr } from "../huly-plugins.js"
 import { loadDepartmentCatalog, resolveDepartment, resolveEmployee } from "./hr-departments-shared.js"
+import { pageHrRequestResults } from "./hr-request-pagination.js"
 import { markupToMarkdownString } from "./markup.js"
 import { renderMarkdownPreservingNativeReferences } from "./native-reference-markup.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
+import {
+  parseHrRequestRecord,
+  parseHrRequestTypeRecord,
+  parseHrStaffRecord,
+  type HrRequestRecord,
+  type HrRequestTypeRecord,
+  type HrStaffRecord
+} from "./hr-request-sdk-boundary.js"
+import {
+  allHrRequestTypeLabels,
+  normalizeRequestTypeLocator,
+  translateHrRequestTypeLabel
+} from "./hr-request-translations.js"
 
 const TYPE_MUTATION_REASON = NonEmptyString.make(
   "Request types are model-space documents installed by Huly; no stable supported runtime create/update/delete contract exists."
 )
-// Default English values from plugins/hr-assets/lang/en.json. The resource ID remains in every result so agents retain
-// the authoritative internationalized identity even when a future model adds a label unknown to this server version.
-const WELL_KNOWN_LABELS: Readonly<Record<string, string>> = {
-  Vacation: "Vacation",
-  Sick: "Sick",
-  PTO: "PTO",
-  PTO2: "PTO/2",
-  Remote: "Remote",
-  Overtime: "Overtime",
-  Overtime2: "Overtime/2"
-}
 const HUMAN_MONTH_OFFSET = 1
 const YEAR_DIGITS = 4
 const DATE_PART_DIGITS = 2
 
-const labelTail = (resource: string): NonEmptyString => {
-  const tail = resource.slice(resource.lastIndexOf(":") + 1)
-  return NonEmptyString.make(WELL_KNOWN_LABELS[tail] ?? tail)
-}
+export const toHrRequestTypeSummary = (requestType: HrRequestTypeRecord, locale: HrLocale = "en") =>
+  Effect.map(
+    translateHrRequestTypeLabel(requestType.label, locale),
+    (label): HrRequestTypeSummary => ({
+      id: requestType._id,
+      label,
+      labelLocale: locale,
+      labelResource: requestType.label,
+      value: requestType.value,
+      color: requestType.color,
+      mutationSupported: false,
+      mutationReason: TYPE_MUTATION_REASON
+    })
+  )
 
-export const toHrRequestTypeSummary = (requestType: RequestType): HrRequestTypeSummary => ({
-  id: HrRequestTypeIdentifier.make(requestType._id),
-  label: labelTail(String(requestType.label)),
-  labelResource: NonEmptyString.make(String(requestType.label)),
-  value: requestType.value,
-  color: requestType.color,
-  mutationSupported: false,
-  mutationReason: TYPE_MUTATION_REASON
-})
-
-const loadRequestTypes = (client: HulyClient["Service"]): Effect.Effect<ReadonlyArray<RequestType>, HulyClientError> =>
-  client.findAllInModel<RequestType>(hr.class.RequestType, hulyQuery<RequestType>({}), {
-    sort: { _id: SortingOrder.Ascending }
-  })
+const loadRequestTypes = (client: HulyClient["Service"]) =>
+  Effect.flatMap(
+    client.findAllInModel<RequestType>(hr.class.RequestType, hulyQuery<RequestType>({}), {
+      sort: { _id: SortingOrder.Ascending }
+    }),
+    (types) => Effect.forEach(types, parseHrRequestTypeRecord)
+  )
 
 const resolveRequestDepartment = (client: HulyClient["Service"], identifier: DepartmentIdentifier) =>
   identifier === String(hr.ids.Head)
@@ -88,22 +102,38 @@ const resolveRequestDepartment = (client: HulyClient["Service"], identifier: Dep
 export const resolveHrRequestType = (
   client: HulyClient["Service"],
   identifier: HrRequestTypeIdentifier
-): Effect.Effect<RequestType, HulyClientError | HrRequestTypeNotFoundError | HrRequestTypeIdentifierAmbiguousError> =>
+): Effect.Effect<
+  HrRequestTypeRecord,
+  HulyClientError | HulyDataInvalidError | HrRequestTypeNotFoundError | HrRequestTypeIdentifierAmbiguousError
+> =>
   Effect.gen(function* () {
     return yield* resolveHrRequestTypeFrom(yield* loadRequestTypes(client), identifier)
   })
 
 export const resolveHrRequestTypeFrom = (
-  types: ReadonlyArray<RequestType>,
+  types: ReadonlyArray<HrRequestTypeRecord>,
   identifier: HrRequestTypeIdentifier
-): Effect.Effect<RequestType, HrRequestTypeNotFoundError | HrRequestTypeIdentifierAmbiguousError> =>
+): Effect.Effect<
+  HrRequestTypeRecord,
+  HulyDataInvalidError | HrRequestTypeNotFoundError | HrRequestTypeIdentifierAmbiguousError
+> =>
   Effect.gen(function* () {
-    const normalized = identifier.trim().toLocaleLowerCase()
-    const matches = types.filter((item) =>
-      [String(item._id), String(item.label), labelTail(String(item.label))].some(
-        (candidate) => candidate.toLocaleLowerCase() === normalized
-      )
+    const normalized = normalizeRequestTypeLocator(identifier)
+    const idMatches = types.filter((item) => item._id.toLocaleLowerCase() === normalized)
+    if (idMatches.length === 1) return assertAt(idMatches, 0)
+    if (idMatches.length > 1)
+      return yield* new HulyDataInvalidError({
+        operation: "resolveHrRequestType",
+        entity: `duplicate request-type ID '${identifier}'`
+      })
+    const localized = yield* Effect.forEach(types, (item) =>
+      Effect.map(allHrRequestTypeLabels(item.label), (labels) => ({ item, labels }))
     )
+    const matches = localized
+      .filter(({ item, labels }) =>
+        [item.label, ...labels].some((candidate) => candidate.toLocaleLowerCase() === normalized)
+      )
+      .map(({ item }) => item)
     const unique = [...new Map(matches.map((item) => [item._id, item])).values()]
     if (unique.length === 1) return assertAt(unique, 0)
     if (unique.length > 1) {
@@ -115,25 +145,13 @@ export const resolveHrRequestTypeFrom = (
     return yield* new HrRequestTypeNotFoundError({ requestType: identifier })
   })
 
-const page = <T>(items: ReadonlyArray<T>, limitInput: number | undefined, offsetInput: number | undefined) => {
-  const limit = limitInput ?? DEFAULT_LIMIT
-  const offset = offsetInput ?? 0
-  const values = items.slice(offset, offset + limit)
-  const next = offset + values.length
-  return {
-    values,
-    total: Count.make(items.length),
-    offset: NonNegativeInteger.make(offset),
-    returned: Count.make(values.length),
-    truncated: next < items.length,
-    ...(next < items.length ? { nextOffset: NonNegativeInteger.make(next) } : {})
-  }
-}
-
 export const listHrRequestTypes = (params: ListHrRequestTypesParams) =>
   Effect.gen(function* () {
     const client = yield* HulyClient
-    const summaries = (yield* loadRequestTypes(client)).map(toHrRequestTypeSummary)
+    const locale = params.locale ?? "en"
+    const summaries = yield* Effect.forEach(yield* loadRequestTypes(client), (type) =>
+      toHrRequestTypeSummary(type, locale)
+    )
     const query = params.query?.toLocaleLowerCase()
     const filtered =
       query === undefined
@@ -141,7 +159,7 @@ export const listHrRequestTypes = (params: ListHrRequestTypesParams) =>
         : summaries.filter((item) =>
             [item.id, item.label, item.labelResource].some((value) => value.toLocaleLowerCase().includes(query))
           )
-    const result = page(filtered, params.limit, params.offset)
+    const result = pageHrRequestResults(filtered, params.limit, params.offset)
     return {
       requestTypes: result.values,
       total: result.total,
@@ -167,29 +185,36 @@ export const resolveHrRequest = (client: HulyClient["Service"], id: HrRequestId)
       hr.class.Request,
       hulyQuery<HulyRequest>({ _id: toRef<HulyRequest>(id) })
     )
-    return request ?? (yield* new HrRequestNotFoundError({ request: id }))
+    if (request === undefined) return yield* new HrRequestNotFoundError({ request: id })
+    return yield* parseHrRequestRecord(request)
   })
 
-const employeeName = (employee: Employee): NonEmptyString =>
-  NonEmptyString.make(employee.name.trim() === "" ? String(employee._id) : PersonName.make(employee.name))
+const employeeIdentity = (employee: Employee) =>
+  Effect.gen(function* () {
+    if (employee.name.trim() === "")
+      return yield* new HulyDataInvalidError({ operation: "readHrRequest", entity: `employee '${employee._id}' name` })
+    return { id: PersonId.make(employee._id), name: PersonName.make(employee.name) }
+  })
 
 const summarize = (
   client: HulyClient["Service"],
-  request: HulyRequest,
+  request: HrRequestRecord,
   employee: Employee,
-  departmentPath: string,
-  requestType: RequestType
+  departmentPath: DepartmentPath,
+  requestType: HrRequestTypeRecord
 ) =>
   Effect.gen(function* () {
     const description = yield* markupToMarkdownString(request.description, client.markupUrlConfig, {
       operation: "get_hr_request",
       entity: `HR request '${request._id}' description`
     })
+    const identity = yield* employeeIdentity(employee)
+    const typeSummary = yield* toHrRequestTypeSummary(requestType)
     return {
       id: HrRequestId.make(request._id),
-      employee: { id: NonEmptyString.make(employee._id), name: employeeName(employee) },
-      department: { id: NonEmptyString.make(request.department), path: NonEmptyString.make(departmentPath) },
-      requestType: toHrRequestTypeSummary(requestType),
+      employee: identity,
+      department: { id: DepartmentId.make(request.department), path: departmentPath },
+      requestType: typeSummary,
       startDate: calendarDate(request.tzDate),
       endDate: calendarDate(request.tzDueDate),
       description,
@@ -200,7 +225,7 @@ const summarize = (
     }
   })
 
-const summarizeAll = (client: HulyClient["Service"], requests: ReadonlyArray<HulyRequest>) =>
+const summarizeAll = (client: HulyClient["Service"], requests: ReadonlyArray<HrRequestRecord>) =>
   Effect.gen(function* () {
     const catalog = yield* loadDepartmentCatalog(client)
     const types = new Map((yield* loadRequestTypes(client)).map((item) => [item._id, item]))
@@ -208,7 +233,9 @@ const summarizeAll = (client: HulyClient["Service"], requests: ReadonlyArray<Hul
       Effect.gen(function* () {
         const employee = yield* resolveEmployee(client, PersonName.make(String(request.attachedTo)))
         const departmentPath =
-          request.department === hr.ids.Head ? NonEmptyString.make("Head") : catalog.pathById.get(request.department)
+          String(request.department) === String(hr.ids.Head)
+            ? DepartmentPath.make("Head")
+            : catalog.pathById.get(toRef<Department>(request.department))
         if (departmentPath === undefined)
           return yield* new DepartmentHierarchyError({
             message: `HR request '${request._id}' references missing department '${request.department}'`
@@ -229,22 +256,23 @@ export const listHrRequests = (params: ListHrRequestsParams) =>
       params.department === undefined ? undefined : yield* resolveRequestDepartment(client, params.department)
     const requestType =
       params.requestType === undefined ? undefined : yield* resolveHrRequestType(client, params.requestType)
-    const requests = yield* client.findAll<HulyRequest>(
+    const rawRequests = yield* client.findAll<HulyRequest>(
       hr.class.Request,
       hulyQuery<HulyRequest>({
         ...(employee === undefined ? {} : { attachedTo: toRef<Staff>(employee._id) }),
         ...(department === undefined ? {} : { department: department._id }),
-        ...(requestType === undefined ? {} : { type: requestType._id })
+        ...(requestType === undefined ? {} : { type: toRef<RequestType>(requestType._id) })
       }),
       { sort: { modifiedOn: SortingOrder.Descending } }
     )
+    const requests = yield* Effect.forEach(rawRequests, parseHrRequestRecord)
     const dates = requests.filter(
       (item) =>
         (params.startOnOrAfter === undefined || calendarDate(item.tzDate) >= params.startOnOrAfter) &&
         (params.endOnOrBefore === undefined || calendarDate(item.tzDueDate) <= params.endOnOrBefore)
     )
     const summaries = yield* summarizeAll(client, dates)
-    const result = page(summaries, params.limit, params.offset)
+    const result = pageHrRequestResults(summaries, params.limit, params.offset)
     return {
       requests: result.values,
       total: result.total,
@@ -266,18 +294,24 @@ const resolveStaff = (client: HulyClient["Service"], identifier: CreateHrRequest
   Effect.gen(function* () {
     const employee = yield* resolveEmployee(client, identifier)
     const staff = yield* client.findOne<Staff>(hr.mixin.Staff, hulyQuery<Staff>({ _id: toRef<Staff>(employee._id) }))
-    return { employee, staff: staff ?? (yield* new EmployeeNotFoundError({ identifier })) }
+    if (staff === undefined) return yield* new HrStaffNotFoundError({ employee: PersonId.make(employee._id) })
+    return { employee, staff: yield* parseHrStaffRecord(staff) }
   })
 
 const resolveCreateDepartment = (
   client: HulyClient["Service"],
-  staff: Staff,
+  staff: HrStaffRecord,
   identifier: CreateHrRequestParams["department"]
 ) =>
   Effect.gen(function* () {
     if (identifier !== undefined) return yield* resolveRequestDepartment(client, identifier)
+    if (staff.department === undefined)
+      return yield* new HulyDataInvalidError({
+        operation: "createHrRequest",
+        entity: `Staff record '${staff._id}' department`
+      })
     const catalog = yield* loadDepartmentCatalog(client)
-    const department = catalog.byId.get(staff.department)
+    const department = catalog.byId.get(toRef<Department>(staff.department))
     return (
       department ?? (yield* new DepartmentNotFoundError({ identifier: DepartmentIdentifier.make(staff.department) }))
     )
@@ -291,7 +325,7 @@ export const createHrRequest = (params: CreateHrRequestParams) =>
     const requestType = yield* resolveHrRequestType(client, params.requestType)
     const catalog = yield* loadDepartmentCatalog(client)
     const departmentPath =
-      department._id === hr.ids.Head ? NonEmptyString.make("Head") : catalog.pathById.get(department._id)
+      department._id === hr.ids.Head ? DepartmentPath.make("Head") : catalog.pathById.get(department._id)
     if (departmentPath === undefined)
       return yield* new DepartmentHierarchyError({
         message: `HR request department '${department._id}' has no resolvable path`
@@ -303,7 +337,7 @@ export const createHrRequest = (params: CreateHrRequestParams) =>
     })
     const data: AttachedData<HulyRequest> = {
       department: department._id,
-      type: requestType._id,
+      type: toRef<RequestType>(requestType._id),
       description: rendered.markup,
       tzDate: tzDate(params.startDate),
       tzDueDate: tzDate(params.endDate)
@@ -312,16 +346,16 @@ export const createHrRequest = (params: CreateHrRequestParams) =>
       hr.class.Request,
       core.space.Workspace,
       toRef<Staff>(employee._id),
-      staff._class,
+      toRef<Class<Staff>>(staff._class),
       "requests",
       data
     )
-    return {
+    const result: CreateHrRequestResult = {
       request: {
         id: HrRequestId.make(id),
-        employee: { id: NonEmptyString.make(employee._id), name: employeeName(employee) },
-        department: { id: NonEmptyString.make(department._id), path: departmentPath },
-        requestType: toHrRequestTypeSummary(requestType),
+        employee: yield* employeeIdentity(employee),
+        department: { id: DepartmentId.make(department._id), path: departmentPath },
+        requestType: yield* toHrRequestTypeSummary(requestType),
         startDate: params.startDate,
         endDate: params.endDate,
         description,
@@ -330,6 +364,7 @@ export const createHrRequest = (params: CreateHrRequestParams) =>
       },
       created: true
     }
+    return result
   })
 
 const resolveHrRequestUpdates = (client: HulyClient["Service"], params: UpdateHrRequestParams) =>
@@ -347,7 +382,7 @@ const buildHrRequestUpdate = (
   resolved: Effect.Success<ReturnType<typeof resolveHrRequestUpdates>>
 ): DocumentUpdate<HulyRequest> => ({
   ...(resolved.department === undefined ? {} : { department: resolved.department._id }),
-  ...(resolved.requestType === undefined ? {} : { type: resolved.requestType._id }),
+  ...(resolved.requestType === undefined ? {} : { type: toRef<RequestType>(resolved.requestType._id) }),
   ...(params.startDate === undefined ? {} : { tzDate: tzDate(params.startDate) }),
   ...(params.endDate === undefined ? {} : { tzDueDate: tzDate(params.endDate) }),
   ...(params.description === undefined
@@ -360,24 +395,24 @@ export const updateHrRequest = (params: UpdateHrRequestParams) =>
     const client = yield* HulyClient
     const current = yield* resolveHrRequest(client, params.request)
     const updateCollection = client.updateCollection
-    if (updateCollection === undefined)
-      return yield* new HrRequestMutationUnsupportedError({ operation: NonEmptyString.make("update") })
+    if (updateCollection === undefined) return yield* new HrRequestMutationUnsupportedError({ operation: "update" })
     const startDate = params.startDate ?? calendarDate(current.tzDate)
     const endDate = params.endDate ?? calendarDate(current.tzDueDate)
     if (startDate > endDate) return yield* new HrRequestDateRangeError({ startDate, endDate })
     const operations = buildHrRequestUpdate(client, params, yield* resolveHrRequestUpdates(client, params))
     yield* updateCollection(
       hr.class.Request,
-      current.space,
-      current._id,
-      current.attachedTo,
-      current.attachedToClass,
+      toRef<Space>(current.space),
+      toRef<HulyRequest>(current._id),
+      toRef<Staff>(current.attachedTo),
+      toRef<Class<Staff>>(current.attachedToClass),
       current.collection,
       operations
     )
-    const updated = { ...current, ...operations }
+    const updated = yield* parseHrRequestRecord({ ...current, ...operations })
     const summaries = yield* summarizeAll(client, [updated])
-    return { request: assertAt(summaries, 0), updated: true }
+    const result: UpdateHrRequestResult = { request: assertAt(summaries, 0), updated: true }
+    return result
   })
 
 export const deleteHrRequest = (params: DeleteHrRequestParams) =>
@@ -385,14 +420,13 @@ export const deleteHrRequest = (params: DeleteHrRequestParams) =>
     const client = yield* HulyClient
     const request = yield* resolveHrRequest(client, params.request)
     const removeCollection = client.removeCollection
-    if (removeCollection === undefined)
-      return yield* new HrRequestMutationUnsupportedError({ operation: NonEmptyString.make("deletion") })
+    if (removeCollection === undefined) return yield* new HrRequestMutationUnsupportedError({ operation: "deletion" })
     yield* removeCollection(
       hr.class.Request,
-      request.space,
-      request._id,
-      request.attachedTo,
-      request.attachedToClass,
+      toRef<Space>(request.space),
+      toRef<HulyRequest>(request._id),
+      toRef<Staff>(request.attachedTo),
+      toRef<Class<Staff>>(request.attachedToClass),
       request.collection
     )
     return { id: HrRequestId.make(request._id), deleted: true }

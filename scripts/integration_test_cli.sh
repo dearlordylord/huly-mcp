@@ -455,6 +455,13 @@ cli_live_case_begin "hr-request-lifecycle"
 printf '%s\n' "CLI HR request $RUN_ID with **native Markdown**" >"$TEST_TMPDIR/hr-request-description.md"
 HR_REQUEST_TYPES_JSON="$(run_cli_json_output hr request-types list --limit 20)"
 cover_cli_json "list_hr_request_types" "HR request type discovery" hr request-types list --limit 20
+HR_REQUEST_TYPES_FR_JSON="$(run_cli_json_output hr request-types list --locale fr --limit 20)"
+if ! jq -e \
+  '[.requestTypes[] | select(.labelResource == "hr:string:PTO" and .label == "Congé payé" and .labelLocale == "fr")] | length == 1' \
+  >/dev/null 2>&1 <<<"$HR_REQUEST_TYPES_FR_JSON"; then
+  echo "French HR request type discovery did not localize PTO through the Huly HR asset." >&2
+  exit 1
+fi
 HR_REQUEST_TYPE_ID="$(json_value "$HR_REQUEST_TYPES_JSON" '.requestTypes[0].id // empty')"
 if [[ -z "$HR_REQUEST_TYPE_ID" ]]; then
   echo "No installed HR request type available." >&2
@@ -462,7 +469,7 @@ if [[ -z "$HR_REQUEST_TYPE_ID" ]]; then
 fi
 capture_cli_json "create_hr_request" "HR request create" HR_REQUEST_JSON \
   hr requests create "$HR_STAFF_EMPLOYEE" "$HR_REQUEST_TYPE_ID" 2026-09-04 2026-09-04 \
-  --description-file "$TEST_TMPDIR/hr-request-description.md"
+  --department "hr:ids:Head" --description-file "$TEST_TMPDIR/hr-request-description.md"
 HR_REQUEST_ID="$(json_value "$HR_REQUEST_JSON" '.request.id // empty')"
 if [[ -z "$HR_REQUEST_ID" ]]; then
   echo "create_hr_request did not return a request ID." >&2
