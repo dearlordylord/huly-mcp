@@ -58,14 +58,12 @@ const lead: HulyLead = {
   dueDate: null
 }
 
-const person = (id: string): LeadPersonDocument => ({
-  _id: PersonId.make(id),
+const person = (id: PersonId, name: PersonName): LeadPersonDocument => ({
+  _id: id,
   _class: DocId.make(contact.class.Person),
   space: SpaceId.make(String(contact.space.Contacts)),
-  name: PersonName.make(id)
+  name
 })
-
-const personLocator = (value: string): PersonLocator => PersonLocator.make(value)
 
 const workflow: FunnelWorkflowTaskType = {
   taskType: {
@@ -221,7 +219,10 @@ describe("Lead mutation functional helpers", () => {
   it.effect("rejects cross-modality person collisions", () =>
     Effect.gen(function* () {
       const error = yield* Effect.flip(
-        uniquePersonMatch(personLocator("shared@example.com"), [person("person-by-id"), person("person-by-email")])
+        uniquePersonMatch(PersonLocator.make("shared@example.com"), [
+          person(PersonId.make("person-by-id"), PersonName.make("Person by ID")),
+          person(PersonId.make("person-by-email"), PersonName.make("Person by email"))
+        ])
       )
       expect(error._tag).toBe("PersonIdentifierAmbiguousError")
       if (error._tag === "PersonIdentifierAmbiguousError") expect(error.matches).toBe(2)
@@ -231,7 +232,10 @@ describe("Lead mutation functional helpers", () => {
   it.effect("rejects duplicate exact email matches", () =>
     Effect.gen(function* () {
       const error = yield* Effect.flip(
-        uniquePersonMatch(personLocator("duplicate@example.com"), [person("first"), person("second")])
+        uniquePersonMatch(PersonLocator.make("duplicate@example.com"), [
+          person(PersonId.make("first"), PersonName.make("First")),
+          person(PersonId.make("second"), PersonName.make("Second"))
+        ])
       )
       expect(error._tag).toBe("PersonIdentifierAmbiguousError")
       if (error._tag === "PersonIdentifierAmbiguousError") expect(error.matches).toBe(2)
