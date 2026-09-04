@@ -45,9 +45,15 @@ FUNNEL_ID=""
 cleanup() {
   set +e
   if [[ -n "$FUNNEL_ID" ]]; then
-    "${CLI[@]}" leads funnels archive "$FUNNEL_ID" --yes --json >/dev/null 2>&1
-    "${CLI[@]}" leads funnels delete "$FUNNEL_ID" --expected-leads 0 --expected-comments 0 \
-      --expected-attachments 0 --yes --json >/dev/null 2>&1
+    if "${CLI[@]}" leads funnels archive "$FUNNEL_ID" --yes --json >/dev/null 2>&1; then
+      FUNNEL_CLEANUP_READ="$("${CLI[@]}" leads funnels get "$FUNNEL_ID" --json 2>/dev/null)"
+      if jq -e '.archived == true' >/dev/null <<<"$FUNNEL_CLEANUP_READ" \
+        && "${CLI[@]}" leads funnels delete "$FUNNEL_ID" --expected-leads 0 --expected-comments 0 \
+          --expected-attachments 0 --yes --json >/dev/null 2>&1 \
+        && ! "${CLI[@]}" leads funnels get "$FUNNEL_ID" --json >/dev/null 2>&1; then
+        FUNNEL_ID=""
+      fi
+    fi
   fi
   if [[ -n "$HR_STAFF_NEEDS_RESTORE" ]]; then
     if [[ -n "$HR_STAFF_ORIGINAL_DEPARTMENT" ]]; then
@@ -271,9 +277,16 @@ if [[ -z "$FUNNEL_ID" ]]; then
 fi
 cover_cli_json "update_funnel" "funnel lifecycle nullable structured update" leads funnels update "$FUNNEL_ID" \
   --input-json '{"description":null}'
+capture_cli_json "get_funnel" "funnel lifecycle updated-state fresh-session read" FUNNEL_UPDATED_JSON \
+  leads funnels get "$FUNNEL_ID"
+assert_json "updated funnel cleared summary" "$FUNNEL_UPDATED_JSON" '.description == ""'
 cover_cli_json "archive_funnel" "funnel lifecycle archive" leads funnels archive "$FUNNEL_ID" --yes
+capture_cli_json "get_funnel" "funnel lifecycle archived-state fresh-session read" FUNNEL_ARCHIVED_JSON \
+  leads funnels get "$FUNNEL_ID"
+assert_json "archived funnel is visible before deletion" "$FUNNEL_ARCHIVED_JSON" '.archived == true'
 cover_cli_json "delete_funnel" "funnel lifecycle snapshot-confirmed delete" leads funnels delete "$FUNNEL_ID" \
   --expected-leads 0 --expected-comments 0 --expected-attachments 0 --yes
+cover_cli_failure "get_funnel" "funnel lifecycle post-delete absence" "not found" leads funnels get "$FUNNEL_ID"
 FUNNEL_ID=""
 cli_live_case_end "funnel-administration-lifecycle"
 capture_cli_json "get_project" "projects get" PROJECT_JSON projects get "$PROJECT"

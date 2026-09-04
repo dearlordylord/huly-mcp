@@ -23,6 +23,7 @@ import {
   type ListFunnelsResult
 } from "../../domain/schemas/leads.js"
 import { AccountUuid, Count, NonEmptyString, Timestamp, UNKNOWN_TOTAL } from "../../domain/schemas/shared.js"
+import { ProjectTypeRefSchema } from "../../domain/schemas/task-management.js"
 import { AccountRoleSchema } from "../../domain/schemas/workspace.js"
 import { isSingle } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
@@ -125,8 +126,8 @@ const ensureMembership = (
     ? Effect.void
     : Effect.fail(
         new FunnelWorkflowInvalidError({
-          projectType: String(projectType._id),
-          reason: "members and owners must be non-empty, and every owner must be a member"
+          projectType: ProjectTypeRefSchema.make(projectType._id),
+          reason: NonEmptyString.make("members and owners must be non-empty, and every owner must be a member")
         })
       )
 
@@ -143,7 +144,7 @@ const toFunnelDetail = (
       identifier: FunnelIdentifier.make(funnel._id),
       name: NonEmptyString.make(funnel.name),
       description: funnel.description,
-      fullDescription,
+      ...(fullDescription === undefined ? {} : { fullDescription }),
       archived: funnel.archived,
       private: funnel.private,
       members: funnel.members.map((member) => AccountUuid.make(member)),
@@ -161,8 +162,8 @@ const toFunnelDetail = (
         }))
       })),
       impact,
-      createdOn: funnel.createdOn === undefined ? undefined : Timestamp.make(funnel.createdOn),
-      createdBy: funnel.createdBy === undefined ? undefined : NonEmptyString.make(funnel.createdBy),
+      ...(funnel.createdOn === undefined ? {} : { createdOn: Timestamp.make(funnel.createdOn) }),
+      ...(funnel.createdBy === undefined ? {} : { createdBy: NonEmptyString.make(funnel.createdBy) }),
       modifiedOn: Timestamp.make(funnel.modifiedOn),
       modifiedBy: NonEmptyString.make(funnel.modifiedBy),
       unsupportedFields: [
@@ -186,7 +187,7 @@ const findExistingFunnelForCreate = (
     if (existing.length > 1) {
       return yield* new FunnelIdentifierAmbiguousError({
         identifier: FunnelReference.make(name),
-        matches: existing.length
+        matches: Count.make(existing.length)
       })
     }
     return undefined
@@ -291,7 +292,7 @@ const rejectFunnelNameCollision = (
     if (collisions.some((candidate) => candidate._id !== funnel._id)) {
       return yield* new FunnelIdentifierAmbiguousError({
         identifier: FunnelReference.make(name),
-        matches: collisions.length + 1
+        matches: Count.make(collisions.filter((candidate) => candidate._id !== funnel._id).length)
       })
     }
   })
@@ -362,19 +363,23 @@ export const deleteFunnel = (
     ) {
       return yield* new FunnelDeleteConflictError({
         identifier: params.funnel,
-        reason: `impact changed since preflight; expected ${params.expectedLeads} leads, ${params.expectedComments} comments, ${params.expectedAttachments} attachments but found ${impact.leads}, ${impact.comments}, ${impact.attachments}`
+        reason: NonEmptyString.make(
+          `impact changed since preflight; expected ${params.expectedLeads} leads, ${params.expectedComments} comments, ${params.expectedAttachments} attachments but found ${impact.leads}, ${impact.comments}, ${impact.attachments}`
+        )
       })
     }
     if (!funnel.archived) {
       return yield* new FunnelDeleteConflictError({
         identifier: params.funnel,
-        reason: "archive it first with archive_funnel"
+        reason: NonEmptyString.make("archive it first with archive_funnel")
       })
     }
     if (impact.totalAffected !== 0) {
       return yield* new FunnelDeleteConflictError({
         identifier: params.funnel,
-        reason: `impact is not empty (${impact.leads} leads, ${impact.comments} comments, ${impact.attachments} attachments)`
+        reason: NonEmptyString.make(
+          `impact is not empty (${impact.leads} leads, ${impact.comments} comments, ${impact.attachments} attachments)`
+        )
       })
     }
     yield* client.removeDoc(leadClassIds.class.Funnel, core.space.Space, funnel._id)

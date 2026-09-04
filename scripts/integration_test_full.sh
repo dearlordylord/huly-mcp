@@ -304,12 +304,26 @@ cleanup_board_artifacts() {
 
 cleanup_funnel_artifacts() {
   if [ -n "$FUNNEL_CLEANUP_ID" ]; then
-    local funnel_json
+    local funnel_json archive_response archive_read archive_text delete_response delete_read
     funnel_json=$(json_string "$FUNNEL_CLEANUP_ID")
-    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_funnel\",\"arguments\":{\"funnel\":$funnel_json}},\"id\":2}" >/dev/null 2>&1 || true
-    if call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_funnel\",\"arguments\":{\"funnel\":$funnel_json,\"expectedLeads\":0,\"expectedComments\":0,\"expectedAttachments\":0}},\"id\":2}" >/dev/null 2>&1; then
-      FUNNEL_CLEANUP_ID=""
+    archive_response=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_funnel\",\"arguments\":{\"funnel\":$funnel_json}},\"id\":2}" 2>/dev/null || true)
+    restart_http_transport_if_needed "after funnel cleanup archive" >/dev/null 2>&1 || return 1
+    archive_read=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_funnel\",\"arguments\":{\"funnel\":$funnel_json}},\"id\":2}" 2>/dev/null || true)
+    archive_text=$(echo "$archive_read" | jq -r '.result.content[0].text // "{}"' 2>/dev/null)
+    if [ -n "$archive_response" ] && [ "$(echo "$archive_text" | jq -r '.archived // false' 2>/dev/null)" = "true" ]; then
+      delete_response=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_funnel\",\"arguments\":{\"funnel\":$funnel_json,\"expectedLeads\":0,\"expectedComments\":0,\"expectedAttachments\":0}},\"id\":2}" 2>/dev/null || true)
+      restart_http_transport_if_needed "after funnel cleanup delete" >/dev/null 2>&1 || return 1
+      delete_read=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_funnel\",\"arguments\":{\"funnel\":$funnel_json}},\"id\":2}" 2>/dev/null || true)
+    else
+      delete_response=""
+      delete_read=""
     fi
+    if [ "$(echo "$delete_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
+      && [ "$(echo "$delete_read" | jq -r '(.result.isError // false) and ((.result.content[0].text // "") | contains("not found"))' 2>/dev/null)" = "true" ]; then
+      FUNNEL_CLEANUP_ID=""
+      return 0
+    fi
+    return 1
   fi
 }
 
@@ -1924,15 +1938,26 @@ if [ $? -eq 0 ]; then
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_funnel\",\"arguments\":{\"funnel\":$FUNNEL_CLEANUP_ID_JSON}},\"id\":2}"
           run_test "update_funnel($FUNNEL_CLEANUP_ID)" \
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_funnel\",\"arguments\":{\"funnel\":$FUNNEL_CLEANUP_ID_JSON,\"description\":null}},\"id\":2}"
+          restart_http_transport_if_needed "after update_funnel" || exit 1
           run_capture_to_var FUNNEL_ARCHIVE_TEXT "archive_funnel($FUNNEL_CLEANUP_ID)" \
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_funnel\",\"arguments\":{\"funnel\":$FUNNEL_CLEANUP_ID_JSON}},\"id\":2}"
           if [ $? -eq 0 ]; then
             restart_http_transport_if_needed "after archive_funnel" || exit 1
-            run_capture_to_var FUNNEL_DELETE_TEXT "delete_funnel($FUNNEL_CLEANUP_ID)" \
-              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_funnel\",\"arguments\":{\"funnel\":$FUNNEL_CLEANUP_ID_JSON,\"expectedLeads\":0,\"expectedComments\":0,\"expectedAttachments\":0}},\"id\":2}"
-            if [ $? -eq 0 ]; then
-              FUNNEL_CLEANUP_ID=""
-              assert_json_field_equals "delete_funnel reports deleted" "$FUNNEL_DELETE_TEXT" '.deleted' "true"
+            run_capture_to_var FUNNEL_ARCHIVED_DETAIL "get_funnel(archived:$FUNNEL_CLEANUP_ID)" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_funnel\",\"arguments\":{\"funnel\":$FUNNEL_CLEANUP_ID_JSON}},\"id\":2}"
+            if assert_json_field_equals "archive_funnel is visible before deletion" "$FUNNEL_ARCHIVED_DETAIL" '.archived' "true"; then
+              run_capture_to_var FUNNEL_DELETE_TEXT "delete_funnel($FUNNEL_CLEANUP_ID)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_funnel\",\"arguments\":{\"funnel\":$FUNNEL_CLEANUP_ID_JSON,\"expectedLeads\":0,\"expectedComments\":0,\"expectedAttachments\":0}},\"id\":2}"
+              if [ $? -eq 0 ]; then
+                assert_json_field_equals "delete_funnel reports deleted" "$FUNNEL_DELETE_TEXT" '.deleted' "true"
+                restart_http_transport_if_needed "after delete_funnel" || exit 1
+                run_expect_error_contains "get_funnel(deleted:$FUNNEL_CLEANUP_ID)" \
+                  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_funnel\",\"arguments\":{\"funnel\":$FUNNEL_CLEANUP_ID_JSON}},\"id\":2}" \
+                  "not found"
+                if [ $? -eq 0 ]; then
+                  FUNNEL_CLEANUP_ID=""
+                fi
+              fi
             fi
           fi
         fi

@@ -1,9 +1,10 @@
 import type { Class, Doc, Ref, Space, Status } from "@hcengineering/core"
-import type { Project, ProjectType, TaskType } from "@hcengineering/task"
+import type { Project, ProjectType, ProjectTypeClass, TaskType, TaskTypeClass } from "@hcengineering/task"
 import { Effect } from "effect"
 
 import type { FunnelReference } from "../../domain/schemas/leads.js"
 import { ProjectTypeRefSchema, type ProjectTypeRef } from "../../domain/schemas/task-management.js"
+import { Count, NonEmptyString } from "../../domain/schemas/shared.js"
 import type { AccountRole } from "../../domain/schemas/workspace.js"
 import { isSingle } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
@@ -17,7 +18,7 @@ import {
 } from "../errors-leads.js"
 import { core, task } from "../huly-plugins.js"
 import { leadClassIds } from "../lead-plugin.js"
-import { findStatusDocs, resolveByStatusRef, uniqueStatusRefs, workflowStatusFromRef } from "./issues-shared.js"
+import { resolveByStatusRef, uniqueStatusRefs, workflowStatusFromRef } from "./issues-shared.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
@@ -54,6 +55,10 @@ interface FunnelProjectMixin extends Doc {
   readonly extends: Ref<Class<Project>>
 }
 
+interface FunnelTaskMixin extends Doc {
+  readonly extends: Ref<Class<Doc>>
+}
+
 const isFunnelDescriptor = (projectType: ProjectType): boolean =>
   projectType.descriptor === leadClassIds.descriptor.FunnelType
 
@@ -64,13 +69,50 @@ const hasFunnelTargetClass = (
   if (!isFunnelDescriptor(projectType)) return Effect.succeed(false)
   if (projectType.targetClass === leadClassIds.mixin.DefaultFunnelTypeData) return Effect.succeed(true)
   return Effect.map(
-    client.findAllInModel<FunnelProjectMixin>(
-      core.class.Mixin,
-      hulyQuery<FunnelProjectMixin>({ _id: toRef<FunnelProjectMixin>(projectType.targetClass) })
-    ),
-    (mixins) => mixins.some((mixin) => mixin.extends === leadClassIds.class.Funnel)
+    Effect.all([
+      client.findAllInModel<FunnelProjectMixin>(
+        core.class.Mixin,
+        hulyQuery<FunnelProjectMixin>({ _id: toRef<FunnelProjectMixin>(projectType.targetClass) })
+      ),
+      client.findAllInModel<ProjectTypeClass>(
+        task.mixin.ProjectTypeClass,
+        hulyQuery<ProjectTypeClass>({
+          _id: toRef<ProjectTypeClass>(projectType.targetClass),
+          projectType: projectType._id
+        })
+      )
+    ]),
+    ([mixins, bindings]) => mixins.some((mixin) => mixin.extends === leadClassIds.class.Funnel) && bindings.length === 1
   )
 }
+
+const hasValidTaskTargetClass = (
+  client: HulyClient["Service"],
+  projectType: ProjectType,
+  taskType: TaskType
+): Effect.Effect<boolean, HulyClientError> => {
+  if (String(taskType.targetClass) === String(leadClassIds.mixin.LeadTypeData)) return Effect.succeed(true)
+  return Effect.map(
+    Effect.all([
+      client.findAllInModel<FunnelTaskMixin>(
+        core.class.Mixin,
+        hulyQuery<FunnelTaskMixin>({ _id: toRef<FunnelTaskMixin>(taskType.targetClass) })
+      ),
+      client.findAllInModel<TaskTypeClass>(
+        task.mixin.TaskTypeClass,
+        hulyQuery<TaskTypeClass>({
+          _id: toRef<TaskTypeClass>(taskType.targetClass),
+          taskType: taskType._id,
+          projectType: projectType._id
+        })
+      )
+    ]),
+    ([mixins, bindings]) => mixins.some((mixin) => mixin.extends === leadClassIds.class.Lead) && bindings.length === 1
+  )
+}
+
+const workflowInvalid = (projectType: ProjectType, reason: NonEmptyString): FunnelWorkflowInvalidError =>
+  new FunnelWorkflowInvalidError({ projectType: ProjectTypeRefSchema.make(projectType._id), reason })
 
 export const resolveFunnel = (
   client: HulyClient["Service"],
@@ -81,17 +123,17 @@ export const resolveFunnel = (
       leadClassIds.class.Funnel,
       hulyQuery<HulyFunnel>({ _id: toRef<HulyFunnel>(identifier) })
     )
-    if (isSingle(idMatches)) return idMatches[0]
     if (idMatches.length > 1) {
-      return yield* new FunnelIdentifierAmbiguousError({ identifier, matches: idMatches.length })
+      return yield* new FunnelIdentifierAmbiguousError({ identifier, matches: Count.make(idMatches.length) })
     }
     const nameMatches = yield* client.findAll<HulyFunnel>(
       leadClassIds.class.Funnel,
       hulyQuery<HulyFunnel>({ name: identifier })
     )
-    if (isSingle(nameMatches)) return nameMatches[0]
-    if (nameMatches.length > 1) {
-      return yield* new FunnelIdentifierAmbiguousError({ identifier, matches: nameMatches.length })
+    const matches = [...new Map([...idMatches, ...nameMatches].map((funnel) => [funnel._id, funnel])).values()]
+    if (isSingle(matches)) return matches[0]
+    if (matches.length > 1) {
+      return yield* new FunnelIdentifierAmbiguousError({ identifier, matches: Count.make(matches.length) })
     }
     return yield* new FunnelNotFoundError({ identifier })
   })
@@ -122,7 +164,7 @@ export const resolveFunnelProjectType = (
     if (matches.length === 0) return yield* new FunnelProjectTypeNotFoundError({ identifier: reportedIdentifier })
     return yield* new FunnelProjectTypeIdentifierAmbiguousError({
       identifier: reportedIdentifier,
-      matches: matches.length
+      matches: Count.make(matches.length)
     })
   })
 
@@ -155,10 +197,12 @@ export const resolveFunnelWorkflow = (
     const taskRefSet = new Set(projectType.tasks)
     const unsupportedMapping = projectType.statuses.find((status) => !taskRefSet.has(status.taskType))
     if (unsupportedMapping !== undefined) {
-      return yield* new FunnelWorkflowInvalidError({
-        projectType: String(projectType._id),
-        reason: `status mapping references task type '${unsupportedMapping.taskType}' outside projectType.tasks`
-      })
+      return yield* workflowInvalid(
+        projectType,
+        NonEmptyString.make(
+          `status mapping references task type '${unsupportedMapping.taskType}' outside projectType.tasks`
+        )
+      )
     }
     const taskTypes =
       projectType.tasks.length === 0
@@ -168,28 +212,28 @@ export const resolveFunnelWorkflow = (
             hulyQuery<TaskType>({ _id: { $in: [...projectType.tasks] } })
           )
     if (taskTypes.length !== projectType.tasks.length || taskTypes.length === 0) {
-      return yield* new FunnelWorkflowInvalidError({
-        projectType: String(projectType._id),
-        reason: "configured task type references are missing"
-      })
+      return yield* workflowInvalid(projectType, NonEmptyString.make("configured task type references are missing"))
     }
     const incompatible = taskTypes.find(
       (candidate) => candidate.ofClass !== leadClassIds.class.Lead || candidate.parent !== projectType._id
     )
     if (incompatible !== undefined) {
-      return yield* new FunnelWorkflowInvalidError({
-        projectType: String(projectType._id),
-        reason: `task type '${incompatible._id}' is not a Lead task owned by this project type`
-      })
+      return yield* workflowInvalid(
+        projectType,
+        NonEmptyString.make(`task type '${incompatible._id}' is not a Lead task owned by this project type`)
+      )
     }
     return yield* Effect.forEach(taskTypes, (taskType) =>
       Effect.gen(function* () {
+        if (!(yield* hasValidTaskTargetClass(client, projectType, taskType))) {
+          return yield* workflowInvalid(
+            projectType,
+            NonEmptyString.make(`task type '${taskType._id}' has an invalid Lead target class`)
+          )
+        }
         const refs = taskTypeStatusRefs(projectType, taskType)
         if (refs.length === 0) {
-          return yield* new FunnelWorkflowInvalidError({
-            projectType: String(projectType._id),
-            reason: `task type '${taskType._id}' has no statuses`
-          })
+          return yield* workflowInvalid(projectType, NonEmptyString.make(`task type '${taskType._id}' has no statuses`))
         }
         const projectStatusRefs = projectType.statuses
           .filter((status) => status.taskType === taskType._id)
@@ -200,17 +244,27 @@ export const resolveFunnelWorkflow = (
           refs.some((statusRef) => !projectStatusRefs.includes(statusRef)) ||
           projectStatusRefs.some((statusRef) => !refs.includes(statusRef))
         ) {
-          return yield* new FunnelWorkflowInvalidError({
-            projectType: String(projectType._id),
-            reason: `task type '${taskType._id}' statuses are inconsistent with the project workflow`
-          })
+          return yield* workflowInvalid(
+            projectType,
+            NonEmptyString.make(`task type '${taskType._id}' statuses are inconsistent with the project workflow`)
+          )
         }
-        const docs = yield* findStatusDocs(client, refs)
+        const docs = yield* client.findAllInModel<Status>(
+          core.class.Status,
+          hulyQuery<Status>({ _id: { $in: [...refs] } })
+        )
         if (docs.length !== refs.length) {
-          return yield* new FunnelWorkflowInvalidError({
-            projectType: String(projectType._id),
-            reason: `task type '${taskType._id}' references missing status documents`
-          })
+          return yield* workflowInvalid(
+            projectType,
+            NonEmptyString.make(`task type '${taskType._id}' references missing status documents`)
+          )
+        }
+        const wrongAttribute = docs.find((status) => status.ofAttribute !== leadClassIds.attribute.State)
+        if (wrongAttribute !== undefined) {
+          return yield* workflowInvalid(
+            projectType,
+            NonEmptyString.make(`status '${wrongAttribute._id}' is not owned by the native Lead state attribute`)
+          )
         }
         const statuses = resolveByStatusRef(
           refs,

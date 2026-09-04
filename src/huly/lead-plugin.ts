@@ -12,7 +12,7 @@
  * @module
  */
 import type { Contact } from "@hcengineering/contact"
-import type { Class, Doc, Mixin, Ref } from "@hcengineering/core"
+import type { Attribute, Class, Doc, Mixin, Ref, Status } from "@hcengineering/core"
 import type { Project, ProjectType, ProjectTypeDescriptor, TaskType } from "@hcengineering/task"
 
 // Lead plugin refs are opaque strings from upstream Huly. There is no published
@@ -28,8 +28,10 @@ export const leadClassIds = {
   class: { Lead: leadRef("lead:class:Lead"), Funnel: leadRef("lead:class:Funnel") },
   mixin: {
     Customer: leadMixinRef<Contact>("lead:mixin:Customer"),
-    DefaultFunnelTypeData: leadMixinRef<Project>("lead:mixin:DefaultFunnelTypeData")
+    DefaultFunnelTypeData: leadMixinRef<Project>("lead:mixin:DefaultFunnelTypeData"),
+    LeadTypeData: leadMixinRef<Doc>("lead:mixin:LeadTypeData")
   },
+  attribute: { State: leadDocRef<Attribute<Status>>("lead:attribute:State") },
   descriptor: { FunnelType: leadDocRef<ProjectTypeDescriptor>("lead:descriptor:FunnelType") },
   taskType: { Lead: leadDocRef<TaskType>("lead:taskType:Lead") },
   template: { DefaultFunnel: leadDocRef<ProjectType>("lead:projectType:DefaultFunnel") }

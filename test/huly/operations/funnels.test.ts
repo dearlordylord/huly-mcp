@@ -108,9 +108,15 @@ interface FixtureOptions {
   readonly projectTypes?: ReadonlyArray<ProjectType>
   readonly taskTypes?: ReadonlyArray<TaskType>
   readonly statuses?: ReadonlyArray<Status>
-  readonly projectMixins?: ReadonlyArray<Doc>
+  readonly modelDocs?: ReadonlyArray<TestModelDoc>
   readonly leadCount?: number
   readonly workspaceAccounts?: ReadonlyArray<AccountUuid>
+}
+
+interface TestModelDoc extends Doc {
+  readonly extends?: Ref<Class<Doc>>
+  readonly projectType?: Ref<ProjectType>
+  readonly taskType?: Ref<TaskType>
 }
 
 const fixture = (options: FixtureOptions = {}) => {
@@ -118,7 +124,7 @@ const fixture = (options: FixtureOptions = {}) => {
   const projectTypes = [...(options.projectTypes ?? [projectType])]
   const taskTypes = [...(options.taskTypes ?? [taskType])]
   const statuses = [...(options.statuses ?? [status])]
-  const projectMixins = [...(options.projectMixins ?? [])]
+  const modelDocs = [...(options.modelDocs ?? [])]
   const updates: Array<unknown> = []
   const created: Array<{ readonly kind: string; readonly data: unknown }> = []
   const removed: Array<string> = []
@@ -134,8 +140,12 @@ const fixture = (options: FixtureOptions = {}) => {
             : className === String(core.class.Status)
               ? statuses
               : className === String(core.class.Mixin)
-                ? projectMixins
-                : []
+                ? modelDocs.filter((doc) => Reflect.has(doc, "extends"))
+                : className === String(task.mixin.ProjectTypeClass)
+                  ? modelDocs.filter((doc) => Reflect.has(doc, "projectType") && !Reflect.has(doc, "taskType"))
+                  : className === String(task.mixin.TaskTypeClass)
+                    ? modelDocs.filter((doc) => Reflect.has(doc, "taskType"))
+                    : []
     if (className === String(leadClassIds.class.Lead)) {
       return Effect.succeed(toFindResult([], options.leadCount ?? 0))
     }
@@ -209,6 +219,22 @@ describe("funnel administration operations", () => {
     })
   )
 
+  it.effect("omits unavailable exact-optional projection fields", () =>
+    Effect.gen(function* () {
+      const {
+        fullDescription: _fullDescription,
+        createdOn: _createdOn,
+        createdBy: _createdBy,
+        ...withoutOptionalFields
+      } = makeFunnel()
+      const test = fixture({ funnels: [withoutOptionalFields] })
+      const result = yield* provide(getFunnel({ funnel: funnel("funnel-1") }), test)
+      expect(Object.hasOwn(result, "fullDescription")).toBe(false)
+      expect(Object.hasOwn(result, "createdOn")).toBe(false)
+      expect(Object.hasOwn(result, "createdBy")).toBe(false)
+    })
+  )
+
   it.effect("rejects an ambiguous exact name and an invalid workflow before mutation", () =>
     Effect.gen(function* () {
       const duplicate = fixture({ funnels: [makeFunnel(), makeFunnel({ _id: toRef<HulyFunnel>("funnel-2") })] })
@@ -228,11 +254,27 @@ describe("funnel administration operations", () => {
       const customType = { ...projectType, targetClass: customTarget }
       const customMixin = {
         ...docBase(toRef<Doc>(customTarget), core.class.Mixin, core.space.Model),
-        extends: leadClassIds.class.Funnel
+        extends: leadClassIds.class.Funnel,
+        projectType: projectTypeId
       }
-      const valid = fixture({ funnels: [], projectTypes: [customType], projectMixins: [customMixin] })
+      const valid = fixture({ funnels: [], projectTypes: [customType], modelDocs: [customMixin] })
       const created = yield* provide(createFunnel({ name: NonEmptyString.make("Custom") }), valid)
       expect(created.created).toBe(true)
+
+      const missingBinding = fixture({
+        funnels: [],
+        projectTypes: [customType],
+        modelDocs: [
+          {
+            ...docBase(toRef<Doc>(customTarget), core.class.Mixin, core.space.Model),
+            extends: leadClassIds.class.Funnel
+          }
+        ]
+      })
+      const bindingError = yield* Effect.flip(
+        provide(createFunnel({ name: NonEmptyString.make("Missing binding") }), missingBinding)
+      )
+      expect(bindingError._tag).toBe("FunnelProjectTypeNotFoundError")
 
       const foreignTaskType = toRef<TaskType>("foreign-task-type")
       const extraMapping = fixture({
@@ -251,6 +293,14 @@ describe("funnel administration operations", () => {
       })
       const statusError = yield* Effect.flip(provide(getFunnel({ funnel: funnel("funnel-1") }), asymmetric))
       expect(statusError._tag).toBe("FunnelWorkflowInvalidError")
+
+      const invalidTarget = fixture({ taskTypes: [{ ...taskType, targetClass: toClassRef<Task>("wrong:target") }] })
+      const targetError = yield* Effect.flip(provide(getFunnel({ funnel: funnel("funnel-1") }), invalidTarget))
+      expect(targetError._tag).toBe("FunnelWorkflowInvalidError")
+
+      const wrongAttribute = fixture({ statuses: [{ ...status, ofAttribute: toRef("wrong:attribute") }] })
+      const attributeError = yield* Effect.flip(provide(getFunnel({ funnel: funnel("funnel-1") }), wrongAttribute))
+      expect(attributeError._tag).toBe("FunnelWorkflowInvalidError")
     })
   )
 
@@ -375,7 +425,19 @@ describe("funnel administration operations", () => {
         provide(updateFunnel({ funnel: funnel("funnel-1"), name: NonEmptyString.make("Enterprise") }), collision)
       )
       expect(failed._tag).toBe("FunnelIdentifierAmbiguousError")
+      if (failed._tag === "FunnelIdentifierAmbiguousError") expect(failed.matches).toBe(1)
       expect(collision.updates).toHaveLength(0)
+    })
+  )
+
+  it.effect("rejects a locator matching one funnel ID and another funnel name", () =>
+    Effect.gen(function* () {
+      const test = fixture({
+        funnels: [makeFunnel(), makeFunnel({ _id: toRef<HulyFunnel>("funnel-2"), name: "funnel-1" })]
+      })
+      const error = yield* Effect.flip(provide(getFunnel({ funnel: funnel("funnel-1") }), test))
+      expect(error._tag).toBe("FunnelIdentifierAmbiguousError")
+      if (error._tag === "FunnelIdentifierAmbiguousError") expect(error.matches).toBe(2)
     })
   )
 })
