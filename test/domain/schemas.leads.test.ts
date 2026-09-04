@@ -4,21 +4,29 @@ import { expect } from "vitest"
 import {
   createLeadParamsJsonSchema,
   CreateLeadResultSchema,
+  deleteLeadParamsJsonSchema,
   FunnelSummarySchema,
   getLeadParamsJsonSchema,
   LeadDetailSchema,
   LeadSummarySchema,
   listFunnelsParamsJsonSchema,
   listLeadsParamsJsonSchema,
+  makePersonCustomerParamsJsonSchema,
   parseCreateLeadParams,
+  parseDeleteLeadParams,
   parseGetLeadParams,
   parseListFunnelsParams,
-  parseListLeadsParams
+  parseListLeadsParams,
+  parseMakePersonCustomerParams,
+  parseMoveLeadParams,
+  parseUpdateLeadParams,
+  updateLeadParamsJsonSchema
 } from "../../src/domain/schemas/leads.js"
 
 type JsonSchemaObject = {
   $schema?: string
   type?: string
+  anyOf?: ReadonlyArray<unknown>
   required?: Array<string>
   properties?: Record<string, { description?: string }>
 }
@@ -273,6 +281,77 @@ describe("Lead Schemas", () => {
       const schema = createLeadParamsJsonSchema as JsonSchemaObject
       expect(schema.required).toEqual(expect.arrayContaining(["funnel", "customer", "title"]))
       expect(schema.properties?.customer?.description).toMatch(/existing/i)
+    })
+  })
+
+  describe("Lead mutation params", () => {
+    it.effect("distinguishes omitted fields from explicit null clears", () =>
+      Effect.gen(function* () {
+        const omitted = yield* parseUpdateLeadParams({ funnel: "funnel-1", identifier: "LEAD-1", title: "Updated" })
+        const cleared = yield* parseUpdateLeadParams({ funnel: "funnel-1", identifier: "LEAD-1", description: null })
+
+        expect(omitted).not.toHaveProperty("description")
+        expect(cleared).toHaveProperty("description", null)
+      })
+    )
+
+    it.effect("requires a real update field and rejects unknown fields", () =>
+      Effect.gen(function* () {
+        const empty = yield* Effect.flip(parseUpdateLeadParams({ funnel: "funnel-1", identifier: "LEAD-1" }))
+        const unknown = yield* Effect.flip(
+          parseUpdateLeadParams({ funnel: "funnel-1", identifier: "LEAD-1", title: "Updated", unknown: true })
+        )
+
+        expect(empty._tag).toBe("SchemaError")
+        expect(unknown._tag).toBe("SchemaError")
+      })
+    )
+
+    it.effect("parses destination and impact-safe deletion variants", () =>
+      Effect.gen(function* () {
+        const move = yield* parseMoveLeadParams({
+          funnel: "source",
+          identifier: "LEAD-2",
+          destinationFunnel: "destination"
+        })
+        const preview = yield* parseDeleteLeadParams({ funnel: "source", identifier: "LEAD-2" })
+        const execute = yield* parseDeleteLeadParams({
+          funnel: "source",
+          identifier: "LEAD-2",
+          execute: true,
+          expectedComments: 0,
+          expectedAttachments: 1
+        })
+
+        expect(move.destinationFunnel).toBe("destination")
+        expect(preview.execute).toBeUndefined()
+        expect(execute.execute).toBe(true)
+      })
+    )
+
+    it.effect("requires expected counts for destructive execution", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          parseDeleteLeadParams({ funnel: "source", identifier: "LEAD-2", execute: true })
+        )
+        expect(error._tag).toBe("SchemaError")
+      })
+    )
+
+    it.effect("parses standalone person customer promotion", () =>
+      Effect.gen(function* () {
+        const result = yield* parseMakePersonCustomerParams({ identifier: "person@example.com" })
+        expect(result.identifier).toBe("person@example.com")
+      })
+    )
+
+    it("describes nullable and exact mutation contracts in JSON schemas", () => {
+      const update = updateLeadParamsJsonSchema as JsonSchemaObject
+      const deleteSchema = deleteLeadParamsJsonSchema as JsonSchemaObject
+      const customer = makePersonCustomerParamsJsonSchema as JsonSchemaObject
+      expect(update.properties?.description?.description).toContain("null clears")
+      expect(deleteSchema.anyOf).toBeDefined()
+      expect(customer.properties?.identifier?.description).toContain("exact email address")
     })
   })
 })

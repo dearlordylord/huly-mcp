@@ -54,6 +54,10 @@ BOARD_CLEANUP_BOARD_ID=""
 BOARD_CLEANUP_LABEL_ID=""
 BOARD_CLEANUP_CARD_LABEL_ID=""
 FUNNEL_CLEANUP_ID=""
+LEAD_CLEANUP_ID=""
+LEAD_CLEANUP_FUNNEL_ID=""
+LEAD_DESTINATION_FUNNEL_CLEANUP_ID=""
+LEAD_PERSON_CLEANUP_ID=""
 CUSTOM_FIELD_DATE_CLEANUP_ISSUE_ID=""
 CUSTOM_FIELD_DATE_CLEANUP_FIELD_ID=""
 CUSTOM_FIELD_DATE_CLEANUP_FIELD_NAME=""
@@ -336,6 +340,48 @@ cleanup_funnel_artifacts() {
     fi
     return 1
   fi
+  return 0
+}
+
+cleanup_lead_artifacts() {
+  local cleanup_failed=0
+  if [ -n "$LEAD_CLEANUP_ID" ] && [ -n "$LEAD_CLEANUP_FUNNEL_ID" ]; then
+    local lead_json funnel_json preview preview_text comments attachments delete_response delete_read
+    lead_json=$(json_string "$LEAD_CLEANUP_ID")
+    funnel_json=$(json_string "$LEAD_CLEANUP_FUNNEL_ID")
+    preview=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_lead\",\"arguments\":{\"funnel\":$funnel_json,\"identifier\":$lead_json}},\"id\":2}" 2>/dev/null || true)
+    preview_text=$(echo "$preview" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+    comments=$(echo "$preview_text" | jq -r '.impact.comments // empty' 2>/dev/null)
+    attachments=$(echo "$preview_text" | jq -r '.impact.attachments // empty' 2>/dev/null)
+    if [ -n "$comments" ] && [ -n "$attachments" ]; then
+      delete_response=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_lead\",\"arguments\":{\"funnel\":$funnel_json,\"identifier\":$lead_json,\"execute\":true,\"expectedComments\":$comments,\"expectedAttachments\":$attachments}},\"id\":2}" 2>/dev/null || true)
+      restart_http_transport_if_needed "after lead cleanup delete" >/dev/null 2>&1 || cleanup_failed=1
+      delete_read=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_lead\",\"arguments\":{\"funnel\":$funnel_json,\"identifier\":$lead_json}},\"id\":2}" 2>/dev/null || true)
+      if [ "$(echo "$delete_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
+        && [ "$(echo "$delete_read" | jq -r '(.result.isError // false) and ((.result.content[0].text // "") | contains("not found"))' 2>/dev/null)" = "true" ]; then
+        LEAD_CLEANUP_ID=""
+        LEAD_CLEANUP_FUNNEL_ID=""
+      else
+        cleanup_failed=1
+      fi
+    else
+      cleanup_failed=1
+    fi
+  fi
+  if [ -n "$LEAD_PERSON_CLEANUP_ID" ] && [ -z "$LEAD_CLEANUP_ID" ]; then
+    local person_json delete_person_response person_read
+    person_json=$(json_string "$LEAD_PERSON_CLEANUP_ID")
+    delete_person_response=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" 2>/dev/null || true)
+    restart_http_transport_if_needed "after lead person cleanup delete" >/dev/null 2>&1 || cleanup_failed=1
+    person_read=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" 2>/dev/null || true)
+    if [ "$(echo "$delete_person_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
+      && [ "$(echo "$person_read" | jq -r '(.result.isError // false) and ((.result.content[0].text // "") | contains("not found"))' 2>/dev/null)" = "true" ]; then
+      LEAD_PERSON_CLEANUP_ID=""
+    else
+      cleanup_failed=1
+    fi
+  fi
+  return "$cleanup_failed"
 }
 
 cleanup_custom_field_date_artifacts() {
@@ -798,7 +844,24 @@ cleanup_all() {
   cleanup_telegram_message_artifacts || true
   cleanup_custom_field_date_artifacts || true
   cleanup_board_artifacts || true
-  cleanup_funnel_artifacts || true
+  if ! cleanup_lead_artifacts; then
+    fail_test "lead fixture cleanup" "deletion or person cleanup failed; lead markers retained"
+    cleanup_failed=1
+  fi
+  if ! cleanup_funnel_artifacts; then
+    fail_test "funnel fixture cleanup" "deletion failed; funnel marker retained"
+    cleanup_failed=1
+  fi
+  if [ -n "$LEAD_DESTINATION_FUNNEL_CLEANUP_ID" ]; then
+    local saved_funnel_cleanup_id="$FUNNEL_CLEANUP_ID"
+    FUNNEL_CLEANUP_ID="$LEAD_DESTINATION_FUNNEL_CLEANUP_ID"
+    if ! cleanup_funnel_artifacts; then
+      fail_test "lead destination funnel cleanup" "deletion failed; destination funnel marker retained"
+      cleanup_failed=1
+    fi
+    LEAD_DESTINATION_FUNNEL_CLEANUP_ID="$FUNNEL_CLEANUP_ID"
+    FUNNEL_CLEANUP_ID="$saved_funnel_cleanup_id"
+  fi
   cleanup_recruiting_artifacts || true
   cleanup_generic_associations
   cleanup_workflow_artifacts || true
@@ -1173,6 +1236,53 @@ fail_test() {
   echo "FAIL: $name ($reason)"
   FAILED=$((FAILED + 1))
   ERRORS="${ERRORS}\n  - ${name}: ${reason}"
+}
+
+wait_for_lead_projection() {
+  local name="$1" funnel="$2" identifier="$3" title="$4" description_mode="${5:-unchanged}" attempts=10 attempt=1 detail=""
+  local funnel_json identifier_json
+  funnel_json=$(json_string "$funnel")
+  identifier_json=$(json_string "$identifier")
+  while [ "$attempt" -le "$attempts" ]; do
+    detail=$(run_capture_only_fresh \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_lead\",\"arguments\":{\"funnel\":$funnel_json,\"identifier\":$identifier_json}},\"id\":2}" \
+      2>/dev/null || true)
+    if [ -n "$detail" ] && printf '%s\n' "$detail" | jq -e --arg funnel "$funnel" --arg identifier "$identifier" --arg title "$title" --arg description_mode "$description_mode" \
+      '.funnel == $funnel and .identifier == $identifier and .title == $title and ($description_mode != "clear" or .description == null)' >/dev/null 2>&1; then
+      echo "PASS: $name"
+      PASSED=$((PASSED + 1))
+      return 0
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      sleep 1
+    fi
+    attempt=$((attempt + 1))
+  done
+  fail_test "$name" "lead projection did not persist after ${attempts} attempts"
+  return 1
+}
+
+wait_for_lead_deleted() {
+  local name="$1" funnel="$2" identifier="$3" attempts=10 attempt=1 response=""
+  local funnel_json identifier_json
+  funnel_json=$(json_string "$funnel")
+  identifier_json=$(json_string "$identifier")
+  while [ "$attempt" -le "$attempts" ]; do
+    response=$(call_tool_fresh_session \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_lead\",\"arguments\":{\"funnel\":$funnel_json,\"identifier\":$identifier_json}},\"id\":2}" \
+      2>/dev/null || true)
+    if [ "$(echo "$response" | jq -r '(.result.isError // false) and ((.result.content[0].text // "") | contains("not found"))' 2>/dev/null)" = "true" ]; then
+      echo "PASS: $name"
+      PASSED=$((PASSED + 1))
+      return 0
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      sleep 1
+    fi
+    attempt=$((attempt + 1))
+  done
+  fail_test "$name" "deleted lead remained visible after ${attempts} attempts"
+  return 1
 }
 
 verify_http_tool_discovery() {
@@ -2159,7 +2269,7 @@ fi
 echo ""
 
 ##############################
-# 1b. LEADS (read-only, uses existing workspace data)
+# 1b. LEADS (read and mutation coverage)
 ##############################
 echo "=== 1b. Leads ==="
 FUNNELS_TEXT=$(run_capture_only \
@@ -2239,6 +2349,61 @@ if [ $? -eq 0 ]; then
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_leads\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"titleSearch\":$LEAD_PERSON_TITLE_JSON,\"limit\":5}},\"id\":2}"
           if [ $? -eq 0 ]; then
             assert_json_array_contains "list_leads includes created person lead" "$CREATED_PERSON_LEAD_LIST" "map(.identifier)" "$CREATED_PERSON_LEAD_IDENTIFIER"
+          fi
+
+          if [ -n "$CREATED_PERSON_LEAD_IDENTIFIER" ] && [ -n "$LEAD_PERSON_ID" ]; then
+            # Register every cleanup marker before the first mutation so an
+            # interrupted run can remove the exact fixture it created.
+            LEAD_CLEANUP_ID="$CREATED_PERSON_LEAD_IDENTIFIER"
+            LEAD_CLEANUP_FUNNEL_ID="$FIRST_FUNNEL_ID"
+            LEAD_PERSON_CLEANUP_ID="$LEAD_PERSON_ID"
+            UPDATED_LEAD_TITLE="Updated person lead $LEAD_FIXTURE_SUFFIX"
+            UPDATED_LEAD_TITLE_JSON=$(json_string "$UPDATED_LEAD_TITLE")
+            run_capture_to_var_fresh UPDATED_LEAD_TEXT "update_lead(nullable fields:$CREATED_PERSON_LEAD_IDENTIFIER)" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_lead\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"title\":$UPDATED_LEAD_TITLE_JSON,\"description\":null,\"startDate\":0,\"dueDate\":0,\"customerDescription\":\"Updated customer description $LEAD_FIXTURE_SUFFIX\"}},\"id\":2}"
+            if [ $? -eq 0 ]; then
+              assert_json_field_equals "update_lead reports updated" "$UPDATED_LEAD_TEXT" '.updated' "true"
+              wait_for_lead_projection "update_lead persists title and clear" "$FIRST_FUNNEL_ID" "$CREATED_PERSON_LEAD_IDENTIFIER" "$UPDATED_LEAD_TITLE" clear
+            fi
+
+            LEAD_DESTINATION_FUNNEL_NAME="Integration lead destination $LEAD_FIXTURE_SUFFIX"
+            LEAD_DESTINATION_FUNNEL_NAME_JSON=$(json_string "$LEAD_DESTINATION_FUNNEL_NAME")
+            run_capture_to_var_fresh LEAD_DESTINATION_FUNNEL_TEXT "create_funnel(for_move_lead)" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_funnel\",\"arguments\":{\"name\":$LEAD_DESTINATION_FUNNEL_NAME_JSON,\"projectType\":$FUNNEL_PROJECT_TYPE_JSON}},\"id\":2}"
+            if [ $? -eq 0 ]; then
+              LEAD_DESTINATION_FUNNEL_CLEANUP_ID=$(echo "$LEAD_DESTINATION_FUNNEL_TEXT" | jq -r '.identifier // empty' 2>/dev/null)
+              if [ -n "$LEAD_DESTINATION_FUNNEL_CLEANUP_ID" ]; then
+                DESTINATION_FUNNEL_JSON=$(json_string "$LEAD_DESTINATION_FUNNEL_CLEANUP_ID")
+                run_capture_to_var_fresh MOVED_LEAD_TEXT "move_lead($CREATED_PERSON_LEAD_IDENTIFIER)" \
+                  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"move_lead\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"destinationFunnel\":$DESTINATION_FUNNEL_JSON}},\"id\":2}"
+                if [ $? -eq 0 ]; then
+                  assert_json_field_equals "move_lead reports moved" "$MOVED_LEAD_TEXT" '.moved' "true"
+                  LEAD_CLEANUP_FUNNEL_ID="$LEAD_DESTINATION_FUNNEL_CLEANUP_ID"
+                  wait_for_lead_projection "move_lead persists destination" "$LEAD_DESTINATION_FUNNEL_CLEANUP_ID" "$CREATED_PERSON_LEAD_IDENTIFIER" "$UPDATED_LEAD_TITLE"
+                fi
+
+                if [ -n "$LEAD_CLEANUP_FUNNEL_ID" ]; then
+                  CLEANUP_LEAD_FUNNEL_JSON=$(json_string "$LEAD_CLEANUP_FUNNEL_ID")
+                  run_capture_to_var_fresh LEAD_DELETE_PREVIEW "delete_lead preview($CREATED_PERSON_LEAD_IDENTIFIER)" \
+                    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_lead\",\"arguments\":{\"funnel\":$CLEANUP_LEAD_FUNNEL_JSON,\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\"}},\"id\":2}"
+                  LEAD_DELETE_COMMENTS=$(echo "$LEAD_DELETE_PREVIEW" | jq -r '.impact.comments // empty' 2>/dev/null)
+                  LEAD_DELETE_ATTACHMENTS=$(echo "$LEAD_DELETE_PREVIEW" | jq -r '.impact.attachments // empty' 2>/dev/null)
+                  if [ -n "$LEAD_DELETE_COMMENTS" ] && [ -n "$LEAD_DELETE_ATTACHMENTS" ]; then
+                    run_capture_to_var_fresh LEAD_DELETE_TEXT "delete_lead execute($CREATED_PERSON_LEAD_IDENTIFIER)" \
+                      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_lead\",\"arguments\":{\"funnel\":$CLEANUP_LEAD_FUNNEL_JSON,\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"execute\":true,\"expectedComments\":$LEAD_DELETE_COMMENTS,\"expectedAttachments\":$LEAD_DELETE_ATTACHMENTS}},\"id\":2}"
+                    if [ $? -eq 0 ]; then
+                      assert_json_field_equals "delete_lead reports deleted" "$LEAD_DELETE_TEXT" '.deleted' "true"
+                      if wait_for_lead_deleted "delete_lead persists deletion" "$LEAD_CLEANUP_FUNNEL_ID" "$CREATED_PERSON_LEAD_IDENTIFIER"; then
+                        LEAD_CLEANUP_ID=""
+                        LEAD_CLEANUP_FUNNEL_ID=""
+                      fi
+                    fi
+                  fi
+                fi
+              else
+                fail_test "create_funnel(for_move_lead)" "created destination funnel returned no stable identifier"
+              fi
+            fi
           fi
         fi
       else

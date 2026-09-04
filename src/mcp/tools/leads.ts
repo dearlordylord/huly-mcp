@@ -1,6 +1,8 @@
 import {
   createLeadParamsJsonSchema,
   CreateLeadResultSchema,
+  deleteLeadParamsJsonSchema,
+  DeleteLeadResultSchema,
   getLeadParamsJsonSchema,
   GetLeadResultSchema,
   listFunnelsParamsJsonSchema,
@@ -8,9 +10,16 @@ import {
   listLeadsParamsJsonSchema,
   ListLeadsResultSchema,
   parseCreateLeadParams,
+  parseDeleteLeadParams,
   parseGetLeadParams,
   parseListFunnelsParams,
-  parseListLeadsParams
+  parseListLeadsParams,
+  parseMoveLeadParams,
+  parseUpdateLeadParams,
+  moveLeadParamsJsonSchema,
+  MoveLeadResultSchema,
+  updateLeadParamsJsonSchema,
+  LeadMutationResultSchema
 } from "../../domain/schemas/leads.js"
 import {
   createFunnelParamsJsonSchema,
@@ -29,6 +38,7 @@ import {
   updateFunnelParamsJsonSchema
 } from "../../domain/schemas/funnels.js"
 import { createLead } from "../../huly/operations/leads-create.js"
+import { deleteLead, moveLead, updateLead } from "../../huly/operations/leads-mutations.js"
 import {
   archiveFunnel,
   createFunnel,
@@ -150,5 +160,41 @@ export const leadTools = [
     },
     parseCreateLeadParams,
     createLead
+  ),
+  defineTool(
+    {
+      name: "update_lead",
+      description:
+        "Update a native Huly lead by funnel ID or exact name and LEAD-<number> identifier. Supported fields are title, Markdown description, exact workflow status, employee assignee, start date, due date, and Customer mixin description. Omitted fields are unchanged; pass null explicitly to clear description, assignee, dates, or customer description. Existing people are resolved exactly and ambiguous identifiers fail.",
+      category: CATEGORY,
+      inputSchema: updateLeadParamsJsonSchema,
+      resultSchema: LeadMutationResultSchema
+    },
+    parseUpdateLeadParams,
+    updateLead
+  ),
+  defineTool(
+    {
+      name: "move_lead",
+      description:
+        "Move a native Huly lead to another active funnel after validating both native Funnel project types and Lead workflows. Pass an exact destination status, or omit status to map the current status name; incompatible or ambiguous mappings fail without writing.",
+      category: CATEGORY,
+      inputSchema: moveLeadParamsJsonSchema,
+      resultSchema: MoveLeadResultSchema
+    },
+    parseMoveLeadParams,
+    moveLead
+  ),
+  defineTool(
+    {
+      name: "delete_lead",
+      description:
+        "Preview native lead deletion impact by default. To permanently delete, pass execute=true together with the exact comment and attachment counts returned by the preview; deletion fails if impact changed.",
+      category: CATEGORY,
+      inputSchema: deleteLeadParamsJsonSchema,
+      resultSchema: DeleteLeadResultSchema
+    },
+    parseDeleteLeadParams,
+    deleteLead
   )
 ] as const satisfies ReadonlyArray<RegisteredTool>

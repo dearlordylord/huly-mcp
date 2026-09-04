@@ -237,6 +237,11 @@ export const collaborationMutationCliCommandCatalogA = {
     positional: ["identifier"],
     description: "Make Organization Customer"
   },
+  make_person_customer: {
+    path: ["contacts", "persons", "customer", "make"],
+    positional: ["identifier"],
+    description: "Make Person Customer"
+  },
   mark_notification_read: {
     path: ["notifications", "read", "mark"],
     positional: ["notificationId"],

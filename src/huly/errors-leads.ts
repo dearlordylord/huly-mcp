@@ -95,3 +95,34 @@ export class LeadNotFoundError extends Schema.TaggedError<LeadNotFoundError>()("
     return `Lead '${this.identifier}' not found in funnel '${this.funnel}'`
   }
 }
+
+export class LeadUpdateConflictError extends Schema.TaggedError<LeadUpdateConflictError>()("LeadUpdateConflictError", {
+  identifier: LeadIdentifier,
+  funnel: FunnelIdentifier,
+  reason: NonEmptyString
+}) {
+  override get message(): string {
+    return `Lead '${this.identifier}' in funnel '${this.funnel}' cannot be updated: ${this.reason}`
+  }
+}
+
+export class LeadMoveConflictError extends Schema.TaggedError<LeadMoveConflictError>()("LeadMoveConflictError", {
+  identifier: LeadIdentifier,
+  sourceFunnel: FunnelIdentifier,
+  destinationFunnel: FunnelIdentifier,
+  reason: NonEmptyString
+}) {
+  override get message(): string {
+    return `Lead '${this.identifier}' cannot move from funnel '${this.sourceFunnel}' to funnel '${this.destinationFunnel}': ${this.reason}`
+  }
+}
+
+export class LeadDeleteConflictError extends Schema.TaggedError<LeadDeleteConflictError>()("LeadDeleteConflictError", {
+  identifier: LeadIdentifier,
+  funnel: FunnelIdentifier,
+  reason: NonEmptyString
+}) {
+  override get message(): string {
+    return `Lead '${this.identifier}' in funnel '${this.funnel}' cannot be deleted: ${this.reason}`
+  }
+}

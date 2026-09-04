@@ -77,9 +77,24 @@ describe("Lead MCP Tools", () => {
     })
   )
 
-  it.effect("has exactly 9 tools", () =>
+  it.effect("registers lead mutation tools with clear mutation contracts", () =>
     Effect.sync(function () {
-      expect(leadTools).toHaveLength(9)
+      for (const name of ["update_lead", "move_lead", "delete_lead"]) {
+        const tool = leadTools.find((candidate) => candidate.name === name)
+        expect(tool, `${name} is registered`).toBeDefined()
+        expect(tool?.category).toBe("leads")
+        expect(tool?.inputSchema).toBeDefined()
+        expect(typeof tool?.handler).toBe("function")
+      }
+      expect(leadTools.find((candidate) => candidate.name === "update_lead")?.description).toContain("null")
+      expect(leadTools.find((candidate) => candidate.name === "move_lead")?.description).toContain("destination")
+      expect(leadTools.find((candidate) => candidate.name === "delete_lead")?.description).toContain("impact")
+    })
+  )
+
+  it.effect("has exactly 12 tools", () =>
+    Effect.sync(function () {
+      expect(leadTools).toHaveLength(12)
     })
   )
 

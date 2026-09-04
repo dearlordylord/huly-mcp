@@ -16,6 +16,8 @@ import {
   listPersonChannelsParamsJsonSchema,
   listPersonOrganizationsParamsJsonSchema,
   listPersonsParamsJsonSchema,
+  makePersonCustomerParamsJsonSchema,
+  MakePersonCustomerResultSchema,
   parseAddOrganizationChannelParams,
   parseAddOrganizationMemberParams,
   parseAddPersonChannelParams,
@@ -32,6 +34,7 @@ import {
   parseListPersonChannelsParams,
   parseListPersonOrganizationsParams,
   parseListPersonsParams,
+  parseMakePersonCustomerParams,
   parseRemoveOrganizationChannelParams,
   parseRemoveOrganizationMemberParams,
   parseRemovePersonChannelParams,
@@ -108,6 +111,7 @@ import {
   ListPersonsResultSchema,
   UpdatePersonResultSchema
 } from "../../domain/schemas/contacts.js"
+import { makePersonCustomer } from "../../huly/operations/leads-mutations.js"
 import { contactEmployeeTools } from "./contact-employee-tools.js"
 import { personAdministrationTools } from "./person-administration.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
@@ -306,6 +310,18 @@ export const contactTools = [
     },
     parseGetOrganizationParams,
     makeOrganizationCustomer
+  ),
+  defineTool(
+    {
+      name: "make_person_customer",
+      description:
+        "Apply the native Customer mixin to one existing person so it appears in Huly Leads > Customers. Resolve by person ID, exact email address, or exact display name; ambiguous identifiers fail, no person is created, and repeated calls are idempotent.",
+      category: CATEGORY,
+      inputSchema: makePersonCustomerParamsJsonSchema,
+      resultSchema: MakePersonCustomerResultSchema
+    },
+    parseMakePersonCustomerParams,
+    makePersonCustomer
   ),
   defineTool(
     {

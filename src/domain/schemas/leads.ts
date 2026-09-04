@@ -1,17 +1,24 @@
 import { Effect, Schema, SchemaGetter, SchemaIssue } from "effect"
 
 import {
+  assertUpdateFields,
+  atLeastOneUpdateFieldMessage,
   DEFAULT_INCLUDE_ARCHIVED,
   DEFAULT_LIMIT,
   DocId,
+  Count,
+  hasAtLeastOneDefined,
   LimitParam,
   ListTotal,
   NonEmptyString,
   PersonName,
+  PersonId,
   PersonRefInput,
   StatusName,
-  Timestamp
+  Timestamp,
+  withAtLeastOneRequired
 } from "./shared.js"
+import { PersonLocator } from "./hr-departments.js"
 import { TaskTypeRefSchema } from "./task-management.js"
 import { toDraft07JsonSchema, withJsonSchemaPropertyDescriptions } from "./json-schema.js"
 
@@ -193,6 +200,105 @@ export const CreateLeadParamsSchema = Schema.Struct({
 
 export type CreateLeadParams = Schema.Schema.Type<typeof CreateLeadParamsSchema>
 
+export const UPDATE_LEAD_FIELDS = [
+  "title",
+  "description",
+  "status",
+  "assignee",
+  "startDate",
+  "dueDate",
+  "customerDescription"
+] as const satisfies ReadonlyArray<
+  "title" | "description" | "status" | "assignee" | "startDate" | "dueDate" | "customerDescription"
+>
+
+const updateLeadFieldMessage = atLeastOneUpdateFieldMessage(UPDATE_LEAD_FIELDS)
+
+export const UpdateLeadParamsSchema = Schema.Struct({
+  funnel: FunnelReference.annotateKey({ description: "Source funnel ID or exact funnel name." }),
+  identifier: LeadIdentifier.annotateKey({ description: "Lead identifier, such as LEAD-1." }),
+  title: Schema.optional(NonEmptyString.annotateKey({ description: "Replacement non-empty lead title." })),
+  description: Schema.optional(
+    Schema.NullOr(Schema.String).annotateKey({ description: "Replacement Markdown description; null clears it." })
+  ),
+  status: Schema.optional(StatusName.annotateKey({ description: "Replacement exact workflow status name." })),
+  assignee: Schema.optional(
+    Schema.NullOr(PersonRefInput).annotateKey({
+      description: "Replacement employee ID, exact email address, or exact display name; null unassigns."
+    })
+  ),
+  startDate: Schema.optional(
+    Schema.NullOr(Timestamp).annotateKey({ description: "Start timestamp in milliseconds; null clears it." })
+  ),
+  dueDate: Schema.optional(
+    Schema.NullOr(Timestamp).annotateKey({ description: "Due timestamp in milliseconds; null clears it." })
+  ),
+  customerDescription: Schema.optional(
+    Schema.NullOr(Schema.String).annotateKey({
+      description: "Replacement Markdown customer description; null clears it."
+    })
+  )
+})
+  .pipe(
+    Schema.check(
+      Schema.makeFilter((params) =>
+        hasAtLeastOneDefined(params, UPDATE_LEAD_FIELDS) ? undefined : updateLeadFieldMessage
+      )
+    )
+  )
+  .annotate({ title: "UpdateLeadParams", description: `Update a native Huly lead. ${updateLeadFieldMessage}` })
+
+export type UpdateLeadParams = Schema.Schema.Type<typeof UpdateLeadParamsSchema>
+assertUpdateFields<UpdateLeadParams>()(["funnel", "identifier"], UPDATE_LEAD_FIELDS)
+
+export const MoveLeadParamsSchema = Schema.Struct({
+  funnel: FunnelReference.annotateKey({ description: "Current funnel ID or exact funnel name." }),
+  identifier: LeadIdentifier.annotateKey({ description: "Lead identifier, such as LEAD-1." }),
+  destinationFunnel: FunnelReference.annotateKey({ description: "Destination funnel ID or exact funnel name." }),
+  status: Schema.optional(
+    StatusName.annotateKey({ description: "Optional exact destination workflow status; omit to map by status name." })
+  )
+}).annotate({
+  title: "MoveLeadParams",
+  description:
+    "Move a native lead between validated Lead funnels. When status is omitted, the current status name must exist in the destination workflow."
+})
+
+export type MoveLeadParams = Schema.Schema.Type<typeof MoveLeadParamsSchema>
+
+const DeleteLeadPreviewSchema = Schema.Struct({
+  funnel: FunnelReference.annotateKey({ description: "Funnel ID or exact funnel name." }),
+  identifier: LeadIdentifier.annotateKey({ description: "Lead identifier, such as LEAD-1." }),
+  execute: Schema.optional(Schema.Literal(false))
+})
+
+const DeleteLeadExecuteSchema = Schema.Struct({
+  funnel: FunnelReference.annotateKey({ description: "Funnel ID or exact funnel name." }),
+  identifier: LeadIdentifier.annotateKey({ description: "Lead identifier, such as LEAD-1." }),
+  execute: Schema.Literal(true),
+  expectedComments: Count.annotateKey({ description: "Comment count observed during deletion preflight." }),
+  expectedAttachments: Count.annotateKey({ description: "Attachment count observed during deletion preflight." })
+})
+
+export const DeleteLeadParamsSchema = Schema.Union([DeleteLeadPreviewSchema, DeleteLeadExecuteSchema]).annotate({
+  title: "DeleteLeadParams",
+  description:
+    "Preview lead deletion impact by default. To execute, pass execute=true and the exact observed comment and attachment counts."
+})
+
+export type DeleteLeadParams = Schema.Schema.Type<typeof DeleteLeadParamsSchema>
+
+export const MakePersonCustomerParamsSchema = Schema.Struct({
+  identifier: PersonLocator.annotateKey({
+    description: "Existing person ID, exact email address, or exact display name. No person is created."
+  })
+}).annotate({
+  title: "MakePersonCustomerParams",
+  description: "Apply the native Customer mixin to one exact existing person, idempotently."
+})
+
+export type MakePersonCustomerParams = Schema.Schema.Type<typeof MakePersonCustomerParamsSchema>
+
 // --- JSON Schemas & Parsers ---
 
 export const listFunnelsParamsJsonSchema = withJsonSchemaPropertyDescriptions(
@@ -228,11 +334,30 @@ export const createLeadParamsJsonSchema = withJsonSchemaPropertyDescriptions(
     taskType: "Optional native Lead task type ID or exact display name."
   }
 )
+export const updateLeadParamsJsonSchema = withJsonSchemaPropertyDescriptions(
+  withAtLeastOneRequired(toDraft07JsonSchema(UpdateLeadParamsSchema), UPDATE_LEAD_FIELDS),
+  {
+    description: "Replacement Markdown description; null clears it.",
+    customerDescription: "Replacement Markdown customer description; null clears it.",
+    assignee: "Replacement employee ID, exact email address, or exact display name; null unassigns.",
+    startDate: "Start timestamp in milliseconds; null clears it.",
+    dueDate: "Due timestamp in milliseconds; null clears it."
+  }
+)
+export const moveLeadParamsJsonSchema = toDraft07JsonSchema(MoveLeadParamsSchema)
+export const deleteLeadParamsJsonSchema = toDraft07JsonSchema(DeleteLeadParamsSchema)
+export const makePersonCustomerParamsJsonSchema = toDraft07JsonSchema(MakePersonCustomerParamsSchema)
 
 export const parseListFunnelsParams = Schema.decodeUnknownEffect(ListFunnelsParamsSchema)
 export const parseListLeadsParams = Schema.decodeUnknownEffect(ListLeadsParamsSchema)
 export const parseGetLeadParams = Schema.decodeUnknownEffect(GetLeadParamsSchema)
 export const parseCreateLeadParams = Schema.decodeUnknownEffect(CreateLeadParamsSchema, { onExcessProperty: "error" })
+export const parseUpdateLeadParams = Schema.decodeUnknownEffect(UpdateLeadParamsSchema, { onExcessProperty: "error" })
+export const parseMoveLeadParams = Schema.decodeUnknownEffect(MoveLeadParamsSchema, { onExcessProperty: "error" })
+export const parseDeleteLeadParams = Schema.decodeUnknownEffect(DeleteLeadParamsSchema, { onExcessProperty: "error" })
+export const parseMakePersonCustomerParams = Schema.decodeUnknownEffect(MakePersonCustomerParamsSchema, {
+  onExcessProperty: "error"
+})
 export const parseLeadDetail = Schema.decodeUnknownEffect(LeadDetailSchema)
 export const parseLeadSummary = Schema.decodeUnknownEffect(LeadSummarySchema)
 export const ListFunnelsResultSchema = Schema.Struct({ funnels: Schema.Array(FunnelSummarySchema), total: ListTotal })
@@ -247,3 +372,37 @@ export const CreateLeadResultSchema = Schema.Struct({
 }).annotate({ title: "CreateLeadResult", description: "Identifiers for the newly created native Huly lead." })
 
 export type CreateLeadResult = Schema.Schema.Type<typeof CreateLeadResultSchema>
+
+export const LeadMutationResultSchema = Schema.Struct({ identifier: LeadIdentifier, updated: Schema.Boolean }).annotate(
+  { title: "LeadMutationResult", description: "Result of a native lead update." }
+)
+export type LeadMutationResult = Schema.Schema.Type<typeof LeadMutationResultSchema>
+
+export const MoveLeadResultSchema = Schema.Struct({
+  identifier: LeadIdentifier,
+  sourceFunnel: FunnelIdentifier,
+  destinationFunnel: FunnelIdentifier,
+  status: StatusName,
+  moved: Schema.Boolean
+}).annotate({ title: "MoveLeadResult", description: "Result of moving a native lead between funnels." })
+export type MoveLeadResult = Schema.Schema.Type<typeof MoveLeadResultSchema>
+
+export const LeadImpactSchema = Schema.Struct({ comments: Count, attachments: Count, totalAffected: Count }).annotate({
+  title: "LeadImpact",
+  description: "Known native lead content affected by deletion."
+})
+export type LeadImpact = Schema.Schema.Type<typeof LeadImpactSchema>
+
+export const DeleteLeadResultSchema = Schema.Struct({
+  identifier: LeadIdentifier,
+  funnel: FunnelIdentifier,
+  impact: LeadImpactSchema,
+  deleted: Schema.Boolean
+}).annotate({ title: "DeleteLeadResult", description: "Lead deletion preview or execution result." })
+export type DeleteLeadResult = Schema.Schema.Type<typeof DeleteLeadResultSchema>
+
+export const MakePersonCustomerResultSchema = Schema.Struct({ id: PersonId, applied: Schema.Boolean }).annotate({
+  title: "MakePersonCustomerResult",
+  description: "Result of applying the Customer mixin to a person."
+})
+export type MakePersonCustomerResult = Schema.Schema.Type<typeof MakePersonCustomerResultSchema>

@@ -222,6 +222,23 @@ export const businessMutationCliCommandCatalogB = {
     description: "Update an exact funnel with validated workflow and workspace accounts",
     behavior: { fileInput: { fields: ["fullDescription"] } }
   },
+  update_lead: {
+    path: ["leads", "update"],
+    positional: ["funnel", "identifier"],
+    description: "Update Lead",
+    behavior: { fileInput: { fields: ["description", "customerDescription"] } }
+  },
+  move_lead: {
+    path: ["leads", "move"],
+    positional: ["funnel", "identifier", "destinationFunnel"],
+    description: "Move Lead"
+  },
+  delete_lead: {
+    path: ["leads", "delete"],
+    positional: ["funnel", "identifier"],
+    description: "Delete Lead",
+    behavior: { confirmation: { type: "requires-yes", message: "leads delete requires --yes." } }
+  },
   update_inventory_product_comment: {
     path: ["inventory", "product", "comment", "update"],
     positional: ["product", "commentId", "body"],

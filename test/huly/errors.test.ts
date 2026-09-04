@@ -156,7 +156,10 @@ import {
   IssueNotFoundError,
   IssueReferenceError,
   IssueTemplateNotFoundError,
+  LeadDeleteConflictError,
+  LeadMoveConflictError,
   LeadNotFoundError,
+  LeadUpdateConflictError,
   MasterTagNotFoundError,
   MeetingMinutesNotFoundError,
   MessageNotFoundError,
@@ -1372,6 +1375,12 @@ describe("Huly Errors", () => {
               return `funnel-account:${error.account}`
             case "LeadNotFoundError":
               return `lead:${error.identifier}`
+            case "LeadUpdateConflictError":
+              return `lead-update:${error.identifier}:${error.funnel}:${error.reason}`
+            case "LeadMoveConflictError":
+              return `lead-move:${error.identifier}:${error.sourceFunnel}:${error.destinationFunnel}:${error.reason}`
+            case "LeadDeleteConflictError":
+              return `lead-delete:${error.identifier}:${error.funnel}:${error.reason}`
             case "ProcessNotFoundError":
               return `process:${error.identifier}:${error.candidates.length}`
             case "ProcessIdentifierAmbiguousError":
@@ -2249,6 +2258,15 @@ describe("Huly Errors", () => {
             new LeadNotFoundError({ identifier: leadIdentifier("LEAD-1"), funnel: funnelIdentifier("funnel-1") })
           )
         ).toBe("lead:LEAD-1")
+        expect(
+          matchError(
+            new LeadUpdateConflictError({
+              identifier: leadIdentifier("LEAD-1"),
+              funnel: funnelIdentifier("funnel-1"),
+              reason: NonEmptyString.make("funnel is archived")
+            })
+          )
+        ).toBe("lead-update:LEAD-1:funnel-1:funnel is archived")
         expect(matchError(new AssociationNotFoundError({ identifier: "blocks" }))).toBe("association:blocks")
         expect(
           matchError(
