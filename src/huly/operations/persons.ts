@@ -31,7 +31,15 @@ import type {
 import type { ListPersonOrganizationsResult } from "../../domain/schemas/contact-organizations.js"
 import type { CreatePersonResult, DeletePersonResult, UpdatePersonResult } from "../../domain/schemas/contacts.js"
 import { UPDATE_PERSON_FIELDS } from "../../domain/schemas/contacts.js"
-import { Email, NonEmptyString, OrganizationId, PersonId, PersonName } from "../../domain/schemas/shared.js"
+import {
+  AccountUuid,
+  Count,
+  Email,
+  NonEmptyString,
+  OrganizationId,
+  PersonId,
+  PersonName
+} from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { InvalidContactProviderError, NoUpdateFieldsError, PersonIdentifierAmbiguousError } from "../errors.js"
 import { PersonNotFoundError } from "../errors.js"
@@ -44,7 +52,7 @@ import {
   findPersonById,
   findPersonIdsByEmailSearch
 } from "./contacts-shared.js"
-import { clampLimit, escapeLikeWildcards } from "./query-helpers.js"
+import { clampLimit, escapeLikeWildcards, hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import {
   type CoveredUpdateEntry,
@@ -288,11 +296,10 @@ export const listEmployees = (
     const client = yield* HulyClient
     const limit = clampLimit(params.limit)
 
-    const employees = yield* client.findAll<HulyEmployee>(
-      contact.mixin.Employee,
-      {},
-      { limit, sort: { modifiedOn: SortingOrder.Descending } }
-    )
+    const employees = yield* client.findAll<HulyEmployee>(contact.mixin.Employee, hulyQuery<HulyEmployee>({}), {
+      limit,
+      sort: { modifiedOn: SortingOrder.Descending }
+    })
 
     const employeeIds = employees.map((e) => e._id)
     const emailMap = yield* batchGetEmailsForPersons(client, employeeIds)
@@ -303,11 +310,15 @@ export const listEmployees = (
       return {
         id,
         name: PersonName.make(emp.name),
-        email: emailValue !== undefined ? Email.make(emailValue) : undefined,
-        position: emp.position ?? undefined,
+        ...(emp.city === undefined ? {} : { city: emp.city }),
+        ...(emailValue === undefined ? {} : { email: Email.make(emailValue) }),
+        ...(emp.role === undefined ? {} : { role: emp.role }),
+        ...(emp.statuses === undefined ? {} : { statuses: Count.make(emp.statuses) }),
+        ...(emp.personUuid === undefined ? {} : { personUuid: AccountUuid.make(emp.personUuid) }),
+        ...(emp.position === undefined || emp.position === null ? {} : { position: emp.position }),
         active: emp.active,
         url: buildContactUrlFromConfig(client.workbenchUrlConfig, id),
-        modifiedOn: emp.modifiedOn
+        ...(emp.modifiedOn === undefined ? {} : { modifiedOn: emp.modifiedOn })
       }
     })
   })

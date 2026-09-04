@@ -10,13 +10,16 @@ import {
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
+  AccountUuid,
   DEFAULT_LIMIT,
+  Count,
   Email,
   hasAtLeastOneDefined,
   LimitParam,
   NonEmptyString,
   PersonId,
   PersonName,
+  PersonRefInput,
   UrlString,
   withAtLeastOneRequired
 } from "./shared.js"
@@ -43,14 +46,30 @@ export const PersonSchema = Schema.Struct({
   createdOn: Schema.optional(Schema.Number)
 })
 export type Person = Schema.Schema.Type<typeof PersonSchema>
+
+export const EmployeeRoleSchema = Schema.Literals(["USER", "GUEST"]).annotate({
+  identifier: "EmployeeRole",
+  title: "EmployeeRole",
+  description: "Huly Contact Employee role."
+})
+export type EmployeeRole = Schema.Schema.Type<typeof EmployeeRoleSchema>
+
 export const EmployeeSummarySchema = Schema.Struct({
   id: PersonId,
   name: PersonName,
-  email: Schema.optional(Email),
-  position: Schema.optional(Schema.String),
+  city: Schema.optionalKey(Schema.String),
+  email: Schema.optionalKey(Email),
+  role: Schema.optionalKey(EmployeeRoleSchema),
+  statuses: Schema.optionalKey(Count),
+  personUuid: Schema.optionalKey(AccountUuid),
+  position: Schema.optionalKey(Schema.String),
   active: Schema.Boolean,
   url: UrlString,
-  modifiedOn: Schema.optional(Schema.Number)
+  modifiedOn: Schema.optionalKey(Schema.Number)
+}).annotate({
+  title: "EmployeeSummary",
+  description:
+    "Stable Employee projection. SDK avatarType/avatar/avatarProps are provider/blob metadata, attachment/comment/channel counters and socialIds are derived collections, birthday/profile need separate contracts, and createdOn/createdBy/modifiedBy plus class/space refs are internal audit or SDK metadata; these fields are intentionally unsupported here."
 })
 export type EmployeeSummary = Schema.Schema.Type<typeof EmployeeSummarySchema>
 
@@ -152,6 +171,19 @@ export const ListEmployeesParamsSchema = Schema.Struct({
 
 export type ListEmployeesParams = Schema.Schema.Type<typeof ListEmployeesParamsSchema>
 
+export const SetEmployeePositionParamsSchema = Schema.Struct({
+  employee: PersonRefInput.annotateKey({ description: "Employee ID, exact email address, or exact display name." }),
+  position: Schema.NullOr(Schema.String).annotateKey({
+    description: "Official position on contact.mixin.Employee. Pass null or an empty string to clear it."
+  })
+}).annotate({
+  title: "SetEmployeePositionParams",
+  description:
+    "Set an employee's Contact Employee-mixin position. The position field is required; omit it to perform no mutation."
+})
+
+export type SetEmployeePositionParams = Schema.Schema.Type<typeof SetEmployeePositionParamsSchema>
+
 export const listPersonsParamsJsonSchema = withJsonSchemaPropertyDescriptions(
   toDraft07JsonSchema(ListPersonsParamsSchema),
   {
@@ -186,6 +218,14 @@ export const listEmployeesParamsJsonSchema = withJsonSchemaPropertyDescriptions(
   toDraft07JsonSchema(ListEmployeesParamsSchema),
   { limit: `Maximum number of employees to return (default: ${DEFAULT_LIMIT})` }
 )
+export const setEmployeePositionParamsJsonSchema = withJsonSchemaPropertyDescriptions(
+  toDraft07JsonSchema(SetEmployeePositionParamsSchema),
+  {
+    employee: "Employee ID, exact email address, or exact display name. Ambiguous names or emails are rejected.",
+    position:
+      "Official position on contact.mixin.Employee. Pass null or an empty string to clear it; omit it to fail without mutating."
+  }
+)
 
 export const parseListPersonsParams = Schema.decodeUnknownEffect(ListPersonsParamsSchema)
 export const parseGetPersonParams = Schema.decodeUnknownEffect(GetPersonParamsSchema)
@@ -193,6 +233,7 @@ export const parseCreatePersonParams = Schema.decodeUnknownEffect(CreatePersonPa
 export const parseUpdatePersonParams = Schema.decodeUnknownEffect(UpdatePersonParamsSchema)
 export const parseDeletePersonParams = Schema.decodeUnknownEffect(DeletePersonParamsSchema)
 export const parseListEmployeesParams = Schema.decodeUnknownEffect(ListEmployeesParamsSchema)
+export const parseSetEmployeePositionParams = Schema.decodeUnknownEffect(SetEmployeePositionParamsSchema)
 export const CreatePersonResultSchema = Schema.Struct({ id: PersonId })
 export type CreatePersonResult = Schema.Schema.Type<typeof CreatePersonResultSchema>
 export const UpdatePersonResultSchema = Schema.Struct({ id: PersonId, updated: Schema.Boolean })
@@ -203,3 +244,9 @@ export type DeletePersonResult = Schema.Schema.Type<typeof DeletePersonResultSch
 export const ListPersonsResultSchema = Schema.Array(PersonSummarySchema)
 export const GetPersonResultSchema = PersonSchema
 export const ListEmployeesResultSchema = Schema.Array(EmployeeSummarySchema)
+export const SetEmployeePositionResultSchema = Schema.Struct({
+  id: PersonId,
+  updated: Schema.Boolean,
+  position: Schema.NullOr(Schema.String)
+})
+export type SetEmployeePositionResult = Schema.Schema.Type<typeof SetEmployeePositionResultSchema>

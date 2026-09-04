@@ -17,6 +17,9 @@ import {
   parseCreatePersonParams,
   parseGetPersonParams,
   parseListPersonsParams,
+  parseSetEmployeePositionParams,
+  setEmployeePositionParamsJsonSchema,
+  SetEmployeePositionParamsSchema,
   updatePersonParamsJsonSchema,
   UpdatePersonParamsSchema
 } from "./contacts.js"
@@ -186,6 +189,33 @@ describe("Contact Schemas", () => {
         Effect.result(Schema.decodeUnknownEffect(UpdatePersonParamsSchema)({ personId: "abc123", firstName: "" }))
       )
       expect(Result.isFailure(result)).toBe(true)
+    })
+  })
+
+  describe("SetEmployeePositionParamsSchema", () => {
+    it("requires a position so omission cannot be confused with clearing", () => {
+      const missingPosition = Schema.decodeUnknownResult(SetEmployeePositionParamsSchema)({ employee: "employee-1" })
+      expect(missingPosition._tag).toBe("Failure")
+
+      const clear = Schema.decodeUnknownSync(SetEmployeePositionParamsSchema)({
+        employee: "employee-1",
+        position: null
+      })
+      expect(clear).toEqual({ employee: "employee-1", position: null })
+    })
+
+    it("documents exact locator resolution and the required position field", () => {
+      const jsonSchema = expectJsonSchemaObject(setEmployeePositionParamsJsonSchema)
+      expect(jsonSchema.properties?.employee?.description).toContain("exact email address")
+      expect(jsonSchema.properties?.position?.description).toContain("clear")
+      expect(jsonSchema).toMatchObject({ required: ["employee", "position"] })
+    })
+
+    it("parses a position update through the public parser", () => {
+      const result = Effect.runSync(
+        parseSetEmployeePositionParams({ employee: "Jane Smith", position: " Engineering Lead " })
+      )
+      expect(result).toEqual({ employee: "Jane Smith", position: " Engineering Lead " })
     })
   })
 

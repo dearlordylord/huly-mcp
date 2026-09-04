@@ -8,20 +8,33 @@ import type {
   Person as HulyPerson,
   SocialIdentity
 } from "@hcengineering/contact"
-import type { Doc, FindResult, PersonId as CorePersonId, Ref } from "@hcengineering/core"
+import type {
+  Class,
+  Doc,
+  FindResult,
+  Mixin,
+  MixinUpdate,
+  PersonId as CorePersonId,
+  Ref,
+  Space,
+  TxResult
+} from "@hcengineering/core"
 import { SocialIdType } from "@hcengineering/core"
-import { Effect } from "effect"
+import { Effect, Result } from "effect"
 import { expect } from "vitest"
-import { Email, PersonId } from "../../../src/domain/schemas/shared.js"
+import { parseSetEmployeePositionParams } from "../../../src/domain/schemas/contacts.js"
+import { Email, NonEmptyString, PersonId } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { contact } from "../../../src/huly/huly-plugins.js"
 import { findPersonByEmailOrName, findPersonByExactEmailOrName } from "../../../src/huly/operations/contacts-shared.js"
+import { setEmployeePosition } from "../../../src/huly/operations/employee-position.js"
 import { createOrganization, listOrganizations } from "../../../src/huly/operations/organizations.js"
 import { getPerson, listEmployees, listPersons, updatePerson } from "../../../src/huly/operations/persons.js"
 import { resolveAssignee } from "../../../src/huly/operations/test-management-shared.js"
 import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import { memberReference } from "../../helpers/brands.js"
 import { docRef } from "../../helpers/huly-sdk.js"
+import { toAccountUuid } from "../../../src/huly/operations/sdk-boundary.js"
 
 const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   const result = docs as FindResult<T>
@@ -148,6 +161,7 @@ interface MockConfig {
   captureCreateDoc?: { data?: Record<string, unknown>; id?: string; class?: unknown }
   captureAddCollection?: { attributes?: Record<string, unknown>; attachedTo?: string; class?: unknown }
   captureUpdateDoc?: { operations?: Record<string, unknown> }
+  captureUpdateMixin?: { attributes?: unknown; objectId?: unknown; objectClass?: unknown; mixin?: unknown }
   captureRemoveDoc?: { id?: string }
 }
 
@@ -182,6 +196,8 @@ const createTestLayer = (config: MockConfig) => {
         const nameFilter = q.name as { $like?: string } | string
         if (typeof nameFilter === "object" && "$like" in nameFilter) {
           filtered = filtered.filter((p) => matchesLike(p.name, assertExists(nameFilter.$like)))
+        } else {
+          filtered = filtered.filter((p) => p.name === nameFilter)
         }
       }
       const opts = (options ?? {}) as { limit?: number }
@@ -276,6 +292,11 @@ const createTestLayer = (config: MockConfig) => {
       const found = persons.find((p) => p._id === q._id)
       return Effect.succeed(found)
     }
+    if (_class === contact.mixin.Employee) {
+      const q = query as Record<string, unknown>
+      const found = employees.find((employee) => employee._id === q._id)
+      return Effect.succeed(found)
+    }
     if (_class === contact.class.SocialIdentity) {
       const q = query as Record<string, unknown>
       const found = socialIdentities.find((identity) => identity.type === q.type && identity.value === q.value)
@@ -348,13 +369,30 @@ const createTestLayer = (config: MockConfig) => {
     return Effect.succeed({})
   }) as HulyClientOperations["removeDoc"]
 
+  const updateMixinImpl = <D extends Doc, M extends D>(
+    _objectId: Ref<D>,
+    objectClass: Ref<Class<D>>,
+    _objectSpace: Ref<Space>,
+    mixin: Ref<Mixin<M>>,
+    attributes: MixinUpdate<D, M>
+  ): Effect.Effect<TxResult, never> => {
+    if (config.captureUpdateMixin !== undefined) {
+      config.captureUpdateMixin.attributes = attributes
+      config.captureUpdateMixin.objectId = _objectId
+      config.captureUpdateMixin.objectClass = objectClass
+      config.captureUpdateMixin.mixin = mixin
+    }
+    return Effect.succeed({})
+  }
+
   return HulyClient.testLayer({
     findAll: findAllImpl,
     findOne: findOneImpl,
     createDoc: createDocImpl,
     addCollection: addCollectionImpl,
     updateDoc: updateDocImpl,
-    removeDoc: removeDocImpl
+    removeDoc: removeDocImpl,
+    updateMixin: updateMixinImpl
   })
 }
 
@@ -803,7 +841,10 @@ describe("Contacts Extended Coverage", () => {
           _id: "employee-1" as Ref<HulyEmployee>,
           name: "Smith,Jane",
           active: true,
-          position: "Developer"
+          position: "Developer",
+          role: "USER",
+          statuses: 2,
+          personUuid: toAccountUuid(NonEmptyString.make("11111111-1111-4111-8111-111111111111"))
         })
         const empChannel = createMockChannel({ attachedTo: "employee-1" as Ref<Doc>, value: "jane@company.com" })
 
@@ -814,6 +855,10 @@ describe("Contacts Extended Coverage", () => {
         expect(result).toHaveLength(1)
         expect(assertAt(result, 0).name).toBe("Smith,Jane")
         expect(assertAt(result, 0).email).toBe("jane@company.com")
+        expect(assertAt(result, 0).city).toBe("LA")
+        expect(assertAt(result, 0).role).toBe("USER")
+        expect(assertAt(result, 0).statuses).toBe(2)
+        expect(assertAt(result, 0).personUuid).toBe("11111111-1111-4111-8111-111111111111")
         expect(assertAt(result, 0).active).toBe(true)
         expect(assertAt(result, 0).position).toBe("Developer")
       })
@@ -857,6 +902,109 @@ describe("Contacts Extended Coverage", () => {
         const result = yield* listEmployees({}).pipe(Effect.provide(testLayer))
 
         expect(result).toEqual([])
+      })
+    )
+  })
+
+  describe("setEmployeePosition", () => {
+    it.effect("updates the Contact Employee mixin when addressed by employee ID", () =>
+      Effect.gen(function* () {
+        const employee = createMockEmployee({ _id: "employee-id" as Ref<HulyEmployee>, position: "Developer" })
+        const capture: MockConfig["captureUpdateMixin"] = {}
+        const params = yield* parseSetEmployeePositionParams({ employee: "employee-id", position: "Engineering Lead" })
+
+        const result = yield* setEmployeePosition(params).pipe(
+          Effect.provide(createTestLayer({ employees: [employee], captureUpdateMixin: capture }))
+        )
+
+        expect(result).toEqual({ id: "employee-id", updated: true, position: "Engineering Lead" })
+        expect(capture.attributes).toEqual({ position: "Engineering Lead" })
+        expect(capture.objectId).toBe("employee-id")
+        expect(capture.objectClass).toBe(contact.class.Person)
+        expect(capture.mixin).toBe(contact.mixin.Employee)
+      })
+    )
+
+    it.effect("resolves an exact email and clears whitespace as null", () =>
+      Effect.gen(function* () {
+        const employee = createMockEmployee({ _id: "employee-email" as Ref<HulyEmployee>, position: "Developer" })
+        const person = createMockPerson({ _id: "employee-email" as Ref<HulyPerson>, name: employee.name })
+        const channel = createMockChannel({ attachedTo: docRef<Doc>("employee-email"), value: "jane@example.com" })
+        const capture: MockConfig["captureUpdateMixin"] = {}
+        const params = yield* parseSetEmployeePositionParams({ employee: "jane@example.com", position: "   " })
+
+        const result = yield* setEmployeePosition(params).pipe(
+          Effect.provide(
+            createTestLayer({
+              persons: [person],
+              channels: [channel],
+              employees: [employee],
+              captureUpdateMixin: capture
+            })
+          )
+        )
+
+        expect(result).toEqual({ id: "employee-email", updated: true, position: null })
+        expect(capture.attributes).toEqual({ position: null })
+      })
+    )
+
+    it.effect("resolves an exact display name", () =>
+      Effect.gen(function* () {
+        const employee = createMockEmployee({ _id: "employee-name" as Ref<HulyEmployee>, name: "Name,Employee" })
+        const person = createMockPerson({ _id: "employee-name" as Ref<HulyPerson>, name: employee.name })
+        const capture: MockConfig["captureUpdateMixin"] = {}
+        const params = yield* parseSetEmployeePositionParams({ employee: "Name,Employee", position: "Manager" })
+
+        const result = yield* setEmployeePosition(params).pipe(
+          Effect.provide(createTestLayer({ persons: [person], employees: [employee], captureUpdateMixin: capture }))
+        )
+
+        expect(result).toEqual({ id: "employee-name", updated: true, position: "Manager" })
+        expect(capture.objectId).toBe("employee-name")
+      })
+    )
+
+    it.effect("does not write when the normalized position is already current", () =>
+      Effect.gen(function* () {
+        const employee = createMockEmployee({ _id: "employee-current" as Ref<HulyEmployee>, position: "Developer" })
+        const capture: MockConfig["captureUpdateMixin"] = {}
+        const params = yield* parseSetEmployeePositionParams({ employee: "employee-current", position: " Developer " })
+
+        const result = yield* setEmployeePosition(params).pipe(
+          Effect.provide(createTestLayer({ employees: [employee], captureUpdateMixin: capture }))
+        )
+
+        expect(result).toEqual({ id: "employee-current", updated: false, position: "Developer" })
+        expect(capture.attributes).toBeUndefined()
+      })
+    )
+
+    it.effect("rejects an ambiguous exact display name before mutating", () =>
+      Effect.gen(function* () {
+        const employeeOne = createMockEmployee({ _id: "employee-one" as Ref<HulyEmployee>, name: "Same,Person" })
+        const employeeTwo = createMockEmployee({ _id: "employee-two" as Ref<HulyEmployee>, name: "Same,Person" })
+        const personOne = createMockPerson({ _id: "employee-one" as Ref<HulyPerson>, name: "Same,Person" })
+        const personTwo = createMockPerson({ _id: "employee-two" as Ref<HulyPerson>, name: "Same,Person" })
+        const capture: MockConfig["captureUpdateMixin"] = {}
+        const params = yield* parseSetEmployeePositionParams({ employee: "Same,Person", position: "Lead" })
+
+        const result = Effect.runSync(
+          Effect.result(
+            setEmployeePosition(params).pipe(
+              Effect.provide(
+                createTestLayer({
+                  persons: [personOne, personTwo],
+                  employees: [employeeOne, employeeTwo],
+                  captureUpdateMixin: capture
+                })
+              )
+            )
+          )
+        )
+
+        expect(Result.isFailure(result)).toBe(true)
+        expect(capture.attributes).toBeUndefined()
       })
     )
   })

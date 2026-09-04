@@ -4012,7 +4012,7 @@ echo ""
 echo "=== 10. Contacts ==="
 run_test "list_persons" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_persons","arguments":{"limit":3}},"id":2}'
-run_test "list_employees" \
+run_capture_to_var EMPLOYEES_TEXT "list_employees" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_employees","arguments":{"limit":3}},"id":2}'
 HR_STAFF_FIXTURE=$(pnpm exec tsx scripts/integration-hr-staff-fixture.ts 2>/dev/null)
 HR_STAFF_EMPLOYEE=$(echo "$HR_STAFF_FIXTURE" | jq -r '.employeeId // empty' 2>/dev/null)
@@ -4118,6 +4118,35 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
   fi
 else
   fail_test "HR Staff fixture" "authenticated workspace user did not resolve to an Employee"
+if [ $? -eq 0 ]; then
+  EMPLOYEE_ID=$(printf '%s\n' "$EMPLOYEES_TEXT" | jq -r '[.[] | select(.active == true)][0].id // empty' 2>/dev/null)
+  EMPLOYEE_ORIGINAL_POSITION=$(printf '%s\n' "$EMPLOYEES_TEXT" | jq -r '[.[] | select(.active == true)][0].position // empty' 2>/dev/null)
+  if [ -n "$EMPLOYEE_ID" ]; then
+    EMPLOYEE_ID_JSON=$(json_string "$EMPLOYEE_ID")
+    run_expect_error "set_employee_position(requires position)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_employee_position\",\"arguments\":{\"employee\":$EMPLOYEE_ID_JSON}},\"id\":2}"
+
+    EMPLOYEE_TEST_POSITION_JSON=$(json_string "MCP Integration Position $RUN_ID")
+    if run_capture_to_var EMPLOYEE_SET_TEXT "set_employee_position($EMPLOYEE_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_employee_position\",\"arguments\":{\"employee\":$EMPLOYEE_ID_JSON,\"position\":$EMPLOYEE_TEST_POSITION_JSON}},\"id\":2}"; then
+      assert_json_field_equals "set_employee_position returns employee id" "$EMPLOYEE_SET_TEXT" ".id" "$EMPLOYEE_ID"
+      assert_json_field_equals "set_employee_position sets position" "$EMPLOYEE_SET_TEXT" ".position" "MCP Integration Position $RUN_ID"
+
+      run_capture_to_var EMPLOYEE_CLEAR_TEXT "set_employee_position($EMPLOYEE_ID clear)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_employee_position\",\"arguments\":{\"employee\":$EMPLOYEE_ID_JSON,\"position\":null}},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "set_employee_position clears position" "$EMPLOYEE_CLEAR_TEXT" ".position" "null"
+      fi
+
+      if [ -n "$EMPLOYEE_ORIGINAL_POSITION" ]; then
+        EMPLOYEE_ORIGINAL_POSITION_JSON=$(json_string "$EMPLOYEE_ORIGINAL_POSITION")
+        run_test "set_employee_position($EMPLOYEE_ID restore)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_employee_position\",\"arguments\":{\"employee\":$EMPLOYEE_ID_JSON,\"position\":$EMPLOYEE_ORIGINAL_POSITION_JSON}},\"id\":2}"
+      fi
+    fi
+  else
+    skip_test "set_employee_position lifecycle" "no active employee returned by list_employees"
+  fi
 fi
 run_test "list_organizations" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_organizations","arguments":{"limit":3}},"id":2}'

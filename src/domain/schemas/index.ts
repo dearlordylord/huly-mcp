@@ -1573,6 +1573,8 @@ export {
   deletePersonParamsJsonSchema,
   DeletePersonParamsSchema,
   type DeletePersonResult,
+  type EmployeeRole,
+  EmployeeRoleSchema,
   type EmployeeSummary,
   type GetPersonParams,
   getPersonParamsJsonSchema,
@@ -1588,6 +1590,11 @@ export {
   parseGetPersonParams,
   parseListEmployeesParams,
   parseListPersonsParams,
+  parseSetEmployeePositionParams,
+  type SetEmployeePositionParams,
+  setEmployeePositionParamsJsonSchema,
+  SetEmployeePositionParamsSchema,
+  type SetEmployeePositionResult,
   parseUpdatePersonParams,
   type Person,
   type PersonSummary,
@@ -2971,7 +2978,12 @@ export { ListChannelsResultSchema } from "./channels.js"
 
 export { ListCommentsResultSchema } from "./comments.js"
 
-export { GetPersonResultSchema, ListEmployeesResultSchema, ListPersonsResultSchema } from "./contacts.js"
+export {
+  GetPersonResultSchema,
+  ListEmployeesResultSchema,
+  ListPersonsResultSchema,
+  SetEmployeePositionResultSchema
+} from "./contacts.js"
 
 export { ListContactChannelProvidersResultSchema } from "./contact-channels.js"
 

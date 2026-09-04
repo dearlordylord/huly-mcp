@@ -149,6 +149,11 @@ export const collaborationMutationCliCommandCatalogB = {
     description: "Update Organization Channel"
   },
   update_person: { path: ["contacts", "persons", "update"], positional: ["personId"], description: "Update Person" },
+  set_employee_position: {
+    path: ["contacts", "employees", "position", "set"],
+    positional: ["employee", "position"],
+    description: "Set Employee Position"
+  },
   update_person_channel: {
     path: ["contacts", "persons", "channels", "update"],
     positional: ["person"],

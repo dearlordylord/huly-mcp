@@ -34,6 +34,7 @@ import {
   parseListPersonChannelsParams,
   parseListPersonOrganizationsParams,
   parseListPersonsParams,
+  parseSetEmployeePositionParams,
   parseRemoveOrganizationChannelParams,
   parseRemoveOrganizationMemberParams,
   parseRemovePersonChannelParams,
@@ -44,6 +45,7 @@ import {
   removeOrganizationChannelParamsJsonSchema,
   removeOrganizationMemberParamsJsonSchema,
   removePersonChannelParamsJsonSchema,
+  setEmployeePositionParamsJsonSchema,
   updateOrganizationChannelParamsJsonSchema,
   updateOrganizationParamsJsonSchema,
   updatePersonChannelParamsJsonSchema,
@@ -80,6 +82,7 @@ import {
   listPersons,
   updatePerson
 } from "../../huly/operations/persons.js"
+import { setEmployeePosition } from "../../huly/operations/employee-position.js"
 
 import {
   AddOrganizationChannelResultSchema,
@@ -110,6 +113,7 @@ import {
   GetPersonResultSchema,
   ListEmployeesResultSchema,
   ListPersonsResultSchema,
+  SetEmployeePositionResultSchema,
   UpdatePersonResultSchema
 } from "../../domain/schemas/contacts.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
@@ -178,13 +182,26 @@ export const contactTools = [
     {
       name: "list_employees",
       description:
-        "List employees (persons who are team members). Returns employees sorted by modification date (newest first).",
+        "List employees (persons who are team members), sorted by modification date (newest first). Each summary exposes stable Contact Employee fields city, email, role, statuses count, personUuid, position, active, and modifiedOn. SDK avatarType/avatar/avatarProps are provider/blob metadata; attachment/comment/channel counters and social identity collections are derived; birthday/profile need separate contracts; createdOn/createdBy/modifiedBy and class/space refs are internal metadata and intentionally unsupported in this projection.",
       category: CATEGORY,
       inputSchema: listEmployeesParamsJsonSchema,
       resultSchema: ListEmployeesResultSchema
     },
     parseListEmployeesParams,
     listEmployees
+  ),
+  defineTool(
+    {
+      name: "set_employee_position",
+      description:
+        "Idempotently set an employee's official position on contact.mixin.Employee. Identify the employee by exact ID, exact email address, or exact display name; ambiguous names or emails are rejected. The position field is required: pass a string to set it, or null/an empty string to clear it. Omitting position fails schema parsing and performs no mutation. This updates the Contact Employee mixin, not an HR Staff record.",
+      category: CATEGORY,
+      inputSchema: setEmployeePositionParamsJsonSchema,
+      resultSchema: SetEmployeePositionResultSchema,
+      annotations: { idempotentHint: true }
+    },
+    parseSetEmployeePositionParams,
+    setEmployeePosition
   ),
   defineTool(
     {

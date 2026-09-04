@@ -355,6 +355,7 @@ describe("TOOL_DEFINITIONS", () => {
       expect(tools).toContain("update_person")
       expect(tools).toContain("delete_person")
       expect(tools).toContain("list_employees")
+      expect(tools).toContain("set_employee_position")
       expect(tools).toContain("list_organizations")
       expect(tools).toContain("create_organization")
       expect(tools).toContain("list_channels")
