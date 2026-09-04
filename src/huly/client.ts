@@ -41,10 +41,7 @@ import {
 import { absurd, Context, Effect, Layer, Redacted, Schedule } from "effect"
 
 import { type Auth, HulyConfigService } from "../config/config.js"
-import {
-  type PersonAdministrationLocator,
-  SocialIdentityId
-} from "../domain/schemas/person-administration.js"
+import { type PersonAdministrationLocator, SocialIdentityId } from "../domain/schemas/person-administration.js"
 import type { PersonMergeReferenceImpact } from "../domain/schemas/person-merge.js"
 import {
   AccountUuid as ParsedAccountUuid,

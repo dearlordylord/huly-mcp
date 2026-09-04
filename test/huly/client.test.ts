@@ -32,13 +32,7 @@ import { beforeEach, expect } from "vitest"
 import { HulyConfigService } from "../../src/config/config.js"
 import { SocialIdentityId } from "../../src/domain/schemas/person-administration.js"
 import { PersonMergeReferenceImpactSchema } from "../../src/domain/schemas/person-merge.js"
-import {
-  Email,
-  HulyTransactionScope,
-  NonEmptyString,
-  PersonId as DomainPersonId,
-  PersonName
-} from "../../src/domain/schemas/shared.js"
+import { Email, HulyTransactionScope, PersonId as DomainPersonId, PersonName } from "../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../../src/huly/client.js"
 import type { EmployeePreparationPlan } from "../../src/huly/employee-preparation.js"
 import {
@@ -51,7 +45,7 @@ import {
 import { INLINE_COMMENT_MARK_TYPE } from "../../src/huly/operations/inline-comment-mark.js"
 import { MARKDOWN_INPUT_REF_URL } from "../../src/huly/operations/markup.js"
 import { attachment, chunter, contact, core } from "../../src/huly/huly-plugins.js"
-import { toClassRef, toMixinRef, toRef } from "../../src/huly/operations/sdk-boundary.js"
+import { toClassRef, toRef } from "../../src/huly/operations/sdk-boundary.js"
 import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
 import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import { assertAt } from "../../src/utils/assertions.js"
