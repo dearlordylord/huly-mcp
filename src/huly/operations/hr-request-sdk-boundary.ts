@@ -29,7 +29,12 @@ const MAX_TZ_DAY = 31
 const TzYear = boundedInt(0, MAX_TZ_YEAR, "year").pipe(Schema.brand("HrTzYear"))
 const TzMonth = boundedInt(0, MAX_TZ_MONTH, "month").pipe(Schema.brand("HrTzMonth"))
 const TzDay = boundedInt(1, MAX_TZ_DAY, "day").pipe(Schema.brand("HrTzDay"))
-const TzDateSchema = Schema.Struct({ year: TzYear, month: TzMonth, day: TzDay, offset: Schema.Int }).pipe(
+export const HrTzDateRecordSchema = Schema.Struct({
+  year: TzYear,
+  month: TzMonth,
+  day: TzDay,
+  offset: Schema.Int
+}).pipe(
   Schema.check(
     Schema.makeFilter((value) => {
       const date = new Date(0)
@@ -44,6 +49,7 @@ const TzDateSchema = Schema.Struct({ year: TzYear, month: TzMonth, day: TzDay, o
     })
   )
 )
+export type HrTzDateRecord = Schema.Schema.Type<typeof HrTzDateRecordSchema>
 
 export const HrRequestTypeRecordSchema = Schema.Struct({
   _id: HrRequestTypeIdentifier,
@@ -72,8 +78,8 @@ export const HrRequestRecordSchema = Schema.Struct({
   department: DepartmentId,
   type: HrRequestTypeIdentifier,
   description: Schema.String,
-  tzDate: TzDateSchema,
-  tzDueDate: TzDateSchema,
+  tzDate: HrTzDateRecordSchema,
+  tzDueDate: HrTzDateRecordSchema,
   comments: Schema.optional(Count),
   attachments: Schema.optional(Count),
   createdOn: Schema.optional(Timestamp),

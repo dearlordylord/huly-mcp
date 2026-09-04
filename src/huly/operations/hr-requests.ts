@@ -1,12 +1,11 @@
 import type { Employee } from "@hcengineering/contact"
 import type { AttachedData, Class, DocumentUpdate, Space } from "@hcengineering/core"
 import { SortingOrder } from "@hcengineering/core"
-import type { Department, Request as HulyRequest, RequestType, Staff, TzDate } from "@hcengineering/hr"
+import type { Department, Request as HulyRequest, RequestType, Staff } from "@hcengineering/hr"
 import { Effect } from "effect"
 
 import {
   Count,
-  HrCalendarDate,
   type HrLocale,
   HrRequestId,
   DepartmentIdentifier,
@@ -44,7 +43,9 @@ import {
 } from "../errors.js"
 import { contact, core, hr } from "../huly-plugins.js"
 import { loadDepartmentCatalog, resolveDepartment, resolveEmployee } from "./hr-departments-shared.js"
+import { hrCalendarDateFromTzDate, hrTzDateFromCalendarDate } from "./hr-calendar.js"
 import { pageHrRequestResults } from "./hr-request-pagination.js"
+import { loadAllHrDocuments } from "./hr-pagination.js"
 import { markupToMarkdownString } from "./markup.js"
 import { renderMarkdownPreservingNativeReferences } from "./native-reference-markup.js"
 import { hulyQuery } from "./query-helpers.js"
@@ -68,9 +69,6 @@ import {
 const TYPE_MUTATION_REASON = NonEmptyString.make(
   "Request types are model-space documents installed by Huly; no stable supported runtime create/update/delete contract exists."
 )
-const HUMAN_MONTH_OFFSET = 1
-const YEAR_DIGITS = 4
-const DATE_PART_DIGITS = 2
 
 export const toHrRequestTypeSummary = (requestType: HrRequestTypeRecord, locale: HrLocale = "en") =>
   Effect.map(
@@ -174,15 +172,6 @@ export const listHrRequestTypes = (params: ListHrRequestTypesParams) =>
     }
   })
 
-const tzDate = (value: HrCalendarDate): TzDate => {
-  const [year = 0, month = 1, day = 0] = value.split("-").map(Number)
-  return { year, month: month - HUMAN_MONTH_OFFSET, day, offset: 0 }
-}
-const calendarDate = (value: TzDate): HrCalendarDate =>
-  HrCalendarDate.make(
-    `${String(value.year).padStart(YEAR_DIGITS, "0")}-${String(value.month + HUMAN_MONTH_OFFSET).padStart(DATE_PART_DIGITS, "0")}-${String(value.day).padStart(DATE_PART_DIGITS, "0")}`
-  )
-
 export const resolveHrRequest = (client: HulyClient["Service"], id: HrRequestId) =>
   Effect.gen(function* () {
     const request = yield* client.findOne<HulyRequest>(
@@ -221,8 +210,8 @@ const summarize = (
       employee: { id: employee._id, name: employee.name },
       department: { id: DepartmentId.make(request.department), path: departmentPath },
       requestType: typeSummary,
-      startDate: calendarDate(request.tzDate),
-      endDate: calendarDate(request.tzDueDate),
+      startDate: hrCalendarDateFromTzDate(request.tzDate),
+      endDate: hrCalendarDateFromTzDate(request.tzDueDate),
       description,
       comments: Count.make(request.comments ?? 0),
       attachments: Count.make(request.attachments ?? 0),
@@ -254,40 +243,47 @@ const summarizeAll = (client: HulyClient["Service"], requests: ReadonlyArray<HrR
     )
   })
 
-export const listHrRequests = (params: ListHrRequestsParams) =>
-  Effect.gen(function* () {
-    const client = yield* HulyClient
-    const employee = params.employee === undefined ? undefined : yield* resolveEmployee(client, params.employee)
-    const department =
-      params.department === undefined ? undefined : yield* resolveRequestDepartment(client, params.department)
-    const requestType =
-      params.requestType === undefined ? undefined : yield* resolveHrRequestType(client, params.requestType)
-    const rawRequests = yield* client.findAll<HulyRequest>(
-      hr.class.Request,
-      hulyQuery<HulyRequest>({
-        ...(employee === undefined ? {} : { attachedTo: toRef<Staff>(employee._id) }),
-        ...(department === undefined ? {} : { department: department._id }),
-        ...(requestType === undefined ? {} : { type: toRef<RequestType>(requestType._id) })
-      }),
-      { sort: { modifiedOn: SortingOrder.Descending } }
-    )
-    const requests = yield* Effect.forEach(rawRequests, parseHrRequestRecord)
-    const dates = requests.filter(
-      (item) =>
-        (params.startOnOrAfter === undefined || calendarDate(item.tzDate) >= params.startOnOrAfter) &&
-        (params.endOnOrBefore === undefined || calendarDate(item.tzDueDate) <= params.endOnOrBefore)
-    )
-    const summaries = yield* summarizeAll(client, dates)
-    const result = pageHrRequestResults(summaries, params.limit, params.offset)
-    return {
-      requests: result.values,
-      total: result.total,
-      offset: result.offset,
-      returned: result.returned,
-      truncated: result.truncated,
-      ...(result.nextOffset === undefined ? {} : { nextOffset: result.nextOffset })
-    }
-  })
+export const loadAllHrRequestSummaries = Effect.fn("HrRequests.loadAllSummaries")(function* (
+  params: Omit<ListHrRequestsParams, "limit" | "offset">,
+  scanPageSize?: number
+) {
+  const client = yield* HulyClient
+  const employee = params.employee === undefined ? undefined : yield* resolveEmployee(client, params.employee)
+  const department =
+    params.department === undefined ? undefined : yield* resolveRequestDepartment(client, params.department)
+  const requestType =
+    params.requestType === undefined ? undefined : yield* resolveHrRequestType(client, params.requestType)
+  const rawRequests = yield* loadAllHrDocuments(
+    client,
+    hr.class.Request,
+    {
+      ...(employee === undefined ? {} : { attachedTo: toRef<Staff>(employee._id) }),
+      ...(department === undefined ? {} : { department: department._id }),
+      ...(requestType === undefined ? {} : { type: toRef<RequestType>(requestType._id) })
+    },
+    scanPageSize
+  )
+  const requests = yield* Effect.forEach(rawRequests, parseHrRequestRecord)
+  const dates = requests.filter(
+    (item) =>
+      (params.startOnOrAfter === undefined || hrCalendarDateFromTzDate(item.tzDate) >= params.startOnOrAfter) &&
+      (params.endOnOrBefore === undefined || hrCalendarDateFromTzDate(item.tzDueDate) <= params.endOnOrBefore)
+  )
+  return yield* summarizeAll(client, dates)
+})
+
+export const listHrRequests = Effect.fn("HrRequests.list")(function* (params: ListHrRequestsParams) {
+  const summaries = yield* loadAllHrRequestSummaries(params)
+  const result = pageHrRequestResults(summaries, params.limit, params.offset)
+  return {
+    requests: result.values,
+    total: result.total,
+    offset: result.offset,
+    returned: result.returned,
+    truncated: result.truncated,
+    ...(result.nextOffset === undefined ? {} : { nextOffset: result.nextOffset })
+  }
+})
 
 export const getHrRequest = (params: GetHrRequestParams) =>
   Effect.gen(function* () {
@@ -345,8 +341,8 @@ export const createHrRequest = (params: CreateHrRequestParams) =>
       department: department._id,
       type: toRef<RequestType>(requestType._id),
       description: rendered.markup,
-      tzDate: tzDate(params.startDate),
-      tzDueDate: tzDate(params.endDate)
+      tzDate: hrTzDateFromCalendarDate(params.startDate),
+      tzDueDate: hrTzDateFromCalendarDate(params.endDate)
     }
     const id = yield* client.addCollection(
       hr.class.Request,
@@ -389,8 +385,8 @@ const buildHrRequestUpdate = (
 ): DocumentUpdate<HulyRequest> => ({
   ...(resolved.department === undefined ? {} : { department: resolved.department._id }),
   ...(resolved.requestType === undefined ? {} : { type: toRef<RequestType>(resolved.requestType._id) }),
-  ...(params.startDate === undefined ? {} : { tzDate: tzDate(params.startDate) }),
-  ...(params.endDate === undefined ? {} : { tzDueDate: tzDate(params.endDate) }),
+  ...(params.startDate === undefined ? {} : { tzDate: hrTzDateFromCalendarDate(params.startDate) }),
+  ...(params.endDate === undefined ? {} : { tzDueDate: hrTzDateFromCalendarDate(params.endDate) }),
   ...(params.description === undefined
     ? {}
     : { description: renderMarkdownPreservingNativeReferences(params.description, client.markupUrlConfig).markup })
@@ -402,8 +398,8 @@ export const updateHrRequest = (params: UpdateHrRequestParams) =>
     const current = yield* resolveHrRequest(client, params.request)
     const updateCollection = client.updateCollection
     if (updateCollection === undefined) return yield* new HrRequestMutationUnsupportedError({ operation: "update" })
-    const startDate = params.startDate ?? calendarDate(current.tzDate)
-    const endDate = params.endDate ?? calendarDate(current.tzDueDate)
+    const startDate = params.startDate ?? hrCalendarDateFromTzDate(current.tzDate)
+    const endDate = params.endDate ?? hrCalendarDateFromTzDate(current.tzDueDate)
     if (startDate > endDate) return yield* new HrRequestDateRangeError({ startDate, endDate })
     const operations = buildHrRequestUpdate(client, params, yield* resolveHrRequestUpdates(client, params))
     yield* updateCollection(

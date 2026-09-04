@@ -2,6 +2,18 @@ import type { McpToolName } from "../../../src/mcp/tools/index.js"
 import type { CliCommandSpec } from "./catalog-types.js"
 
 export const businessReadOnlyCliCommandCatalogB = {
+  get_hr_schedule: {
+    path: ["hr", "reports", "schedule"],
+    positional: ["startDate", "endDate"],
+    description: "Get HR Schedule"
+  },
+  get_hr_summary_report: {
+    path: ["hr", "reports", "summary"],
+    positional: ["startDate", "endDate"],
+    description: "Get HR Summary Report"
+  },
+  get_hr_table: { path: ["hr", "reports", "table"], positional: ["startDate", "endDate"], description: "Get HR Table" },
+  get_public_holiday: { path: ["hr", "holidays", "get"], positional: ["holiday"], description: "Get Public Holiday" },
   get_hr_request: { path: ["hr", "requests", "get"], positional: ["request"], description: "Get HR Request" },
   get_hr_request_attachment: {
     path: ["hr", "requests", "attachments", "get"],
@@ -16,6 +28,7 @@ export const businessReadOnlyCliCommandCatalogB = {
     description: "List HR Request Types"
   },
   list_hr_requests: { path: ["hr", "requests", "list"], positional: [], description: "List HR Requests" },
+  list_public_holidays: { path: ["hr", "holidays", "list"], positional: [], description: "List Public Holidays" },
   list_hr_request_comments: {
     path: ["hr", "requests", "comments", "list"],
     positional: ["request"],

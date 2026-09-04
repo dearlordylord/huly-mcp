@@ -202,6 +202,8 @@ const DOMAIN_FAILURE_KIND_BY_TAG = {
   ProcessNotFoundError: "lookup",
   ProcessParallelExecutionForbiddenError: "authorization",
   ProjectNotFoundError: "lookup",
+  PublicHolidayConflictError: "conflict",
+  PublicHolidayNotFoundError: "lookup",
   ReactionNotFoundError: "lookup",
   RecruitingApplicantIdentifierAmbiguousError: "ambiguity",
   RecruitingApplicantMatchNotFoundError: "lookup",

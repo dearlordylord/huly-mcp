@@ -3,6 +3,7 @@ import { Schema } from "effect"
 import { DepartmentIdentifier, PersonLocator } from "../domain/schemas/hr-departments.js"
 import { CommentId, Count, PersonId } from "../domain/schemas/shared.js"
 import { HrCalendarDate, HrRequestId, HrRequestTypeIdentifier } from "../domain/schemas/hr-requests.js"
+import { PublicHolidayId } from "../domain/schemas/hr-holidays.js"
 
 export class DepartmentNotFoundError extends Schema.TaggedError<DepartmentNotFoundError>()("DepartmentNotFoundError", {
   identifier: DepartmentIdentifier
@@ -110,5 +111,23 @@ export class HrRequestMutationUnsupportedError extends Schema.TaggedError<HrRequ
 ) {
   override get message(): string {
     return `HR request ${this.operation} is unavailable because the connected Huly client does not expose the required attached-collection operation`
+  }
+}
+
+export class PublicHolidayNotFoundError extends Schema.TaggedError<PublicHolidayNotFoundError>()(
+  "PublicHolidayNotFoundError",
+  { holiday: PublicHolidayId }
+) {
+  override get message(): string {
+    return `Public holiday '${this.holiday}' not found`
+  }
+}
+
+export class PublicHolidayConflictError extends Schema.TaggedError<PublicHolidayConflictError>()(
+  "PublicHolidayConflictError",
+  { date: HrCalendarDate, department: DepartmentIdentifier }
+) {
+  override get message(): string {
+    return `A public holiday already exists on '${this.date}' for department '${this.department}'`
   }
 }

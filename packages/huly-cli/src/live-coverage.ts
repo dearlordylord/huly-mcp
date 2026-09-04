@@ -20,7 +20,7 @@ export type CliIntegrationCoverageDecision =
       readonly type: "representative"
     }
 
-export const CLI_COVERAGE_REVIEWED_REGISTRY_OPERATIONS = 562
+export const CLI_COVERAGE_REVIEWED_REGISTRY_OPERATIONS = 570
 export const CLI_COVERAGE_REVIEWED_ROOT_COMMANDS = 55
 export const CLI_COVERAGE_REVIEWED_LOCAL_COMMANDS = 7
 
@@ -119,6 +119,21 @@ export const CLI_LIVE_COVERAGE_CASES: ReadonlyArray<CliLiveCoverageCase> = [
     risks: ["lifecycle", "safety"]
   },
   {
+    id: "hr-holiday-report-lifecycle",
+    tools: [
+      "list_public_holidays",
+      "get_public_holiday",
+      "create_public_holiday",
+      "update_public_holiday",
+      "delete_public_holiday",
+      "get_hr_schedule",
+      "get_hr_table",
+      "get_hr_summary_report"
+    ],
+    behaviors: ["structured-json-input", "consequential-confirmation"],
+    risks: ["lifecycle", "safety"]
+  },
+  {
     id: "funnel-administration-lifecycle",
     tools: ["get_funnel", "create_funnel", "update_funnel", "archive_funnel", "delete_funnel"],
     behaviors: ["structured-json-input", "nullable-clear-input", "text-file-input", "consequential-confirmation"],
@@ -199,6 +214,12 @@ export const CLI_UNIQUE_RISK_DECISIONS: ReadonlyArray<CliUniqueRiskDecision> = [
     risks: ["lifecycle"]
   },
   { caseId: "hr-request-lifecycle", tools: ["delete_hr_request"], risks: ["safety"] },
+  {
+    caseId: "hr-holiday-report-lifecycle",
+    tools: ["create_public_holiday", "update_public_holiday", "delete_public_holiday"],
+    risks: ["lifecycle"]
+  },
+  { caseId: "hr-holiday-report-lifecycle", tools: ["delete_public_holiday"], risks: ["safety"] },
   {
     caseId: "funnel-administration-lifecycle",
     tools: ["create_funnel", "update_funnel", "archive_funnel", "delete_funnel"],

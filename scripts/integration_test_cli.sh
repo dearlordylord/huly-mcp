@@ -41,6 +41,7 @@ HR_STAFF_EMPLOYEE=""
 HR_STAFF_ORIGINAL_DEPARTMENT=""
 HR_STAFF_NEEDS_RESTORE=""
 HR_REQUEST_ID=""
+HR_HOLIDAY_IDS=""
 FUNNEL_ID=""
 PERSON_ADMIN_ID=""
 PERSON_ADMIN_COMMENT_ID=""
@@ -66,6 +67,11 @@ cleanup() {
   fi
   if [[ -n "$PERSON_ADMIN_ID" ]]; then
     "${CLI[@]}" contacts persons delete "$PERSON_ADMIN_ID" --yes --json >/dev/null 2>&1
+  fi
+  if [[ -n "$HR_HOLIDAY_IDS" ]]; then
+    for holiday_id in $HR_HOLIDAY_IDS; do
+      "${CLI[@]}" hr holidays delete "$holiday_id" --yes --json >/dev/null 2>&1 || true
+    done
   fi
   if [[ -n "$FUNNEL_ID" ]]; then
     if "${CLI[@]}" leads funnels archive "$FUNNEL_ID" --yes --json >/dev/null 2>&1; then
@@ -267,6 +273,36 @@ json_value() {
   jq -r "$jq_filter" <<<"$json"
 }
 
+run_hr_holiday_report_lifecycle() {
+  cli_live_case_begin "hr-holiday-report-lifecycle"
+  capture_cli_json "create_public_holiday" "public holiday create first" HR_HOLIDAY_FIRST_JSON \
+    hr holidays create "CLI holiday one $RUN_ID" 2026-09-08 "$HR_DEPARTMENT_ID"
+  HR_HOLIDAY_FIRST_ID="$(json_value "$HR_HOLIDAY_FIRST_JSON" '.holiday.id // empty')"
+  HR_HOLIDAY_IDS="$HR_HOLIDAY_FIRST_ID"
+  capture_cli_json "create_public_holiday" "public holiday create second" HR_HOLIDAY_SECOND_JSON \
+    hr holidays create "CLI holiday two $RUN_ID" 2026-09-09 "$HR_DEPARTMENT_ID"
+  HR_HOLIDAY_SECOND_ID="$(json_value "$HR_HOLIDAY_SECOND_JSON" '.holiday.id // empty')"
+  HR_HOLIDAY_IDS="$HR_HOLIDAY_IDS $HR_HOLIDAY_SECOND_ID"
+  cover_cli_json "get_public_holiday" "public holiday get" hr holidays get "$HR_HOLIDAY_FIRST_ID"
+  cover_cli_json "update_public_holiday" "public holiday update" \
+    hr holidays update "$HR_HOLIDAY_FIRST_ID" --title "Updated CLI holiday $RUN_ID"
+  cover_cli_json "list_public_holidays" "public holiday list" \
+    hr holidays list --department "$HR_DEPARTMENT_ID" --start-date 2026-09-08 --end-date 2026-09-09
+  cover_cli_json "get_hr_schedule" "HR schedule complete multi-page scan" \
+    hr reports schedule 2026-09-08 2026-09-09 --department "$HR_DEPARTMENT_ID" --scan-page-size 1
+  cover_cli_json "get_hr_table" "HR table complete multi-page scan" \
+    hr reports table 2026-09-08 2026-09-09 --department "$HR_DEPARTMENT_ID" --scan-page-size 1
+  cover_cli_json "get_hr_summary_report" "HR summary complete multi-page scan" \
+    hr reports summary 2026-09-08 2026-09-09 --department "$HR_DEPARTMENT_ID" --scan-page-size 1
+  for holiday_id in $HR_HOLIDAY_IDS; do
+    cover_cli_json "delete_public_holiday" "public holiday cleanup" hr holidays delete "$holiday_id" --yes
+    cover_cli_failure "get_public_holiday" "public holiday cleanup confirmation" "not found" \
+      hr holidays get "$holiday_id"
+  done
+  HR_HOLIDAY_IDS=""
+  cli_live_case_end "hr-holiday-report-lifecycle"
+}
+
 echo "=== CLI Integration Suite ==="
 echo "URL: ${HULY_URL:-<unset>}"
 echo "Project: $PROJECT"
@@ -457,6 +493,7 @@ if [[ "$HR_RESTORED_PRESENT" != "1" || "$HR_RESTORED_DEPARTMENT" != "$HR_STAFF_O
   exit 1
 fi
 HR_STAFF_NEEDS_RESTORE=""
+run_hr_holiday_report_lifecycle
 cover_cli_json "delete_department" "HR department cleanup" \
   hr departments delete "$HR_DEPARTMENT_ID" --execute \
     --expected-subdepartments 0 --expected-assigned-staff 0 --yes

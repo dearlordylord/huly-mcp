@@ -84,6 +84,14 @@ const ISSUE_97_TOOL_NAMES: ReadonlySet<ToolNameType> = new Set([
   ToolName.make("add_hr_request_attachment"),
   ToolName.make("update_hr_request_attachment"),
   ToolName.make("delete_hr_request_attachment"),
+  ToolName.make("list_public_holidays"),
+  ToolName.make("get_public_holiday"),
+  ToolName.make("create_public_holiday"),
+  ToolName.make("update_public_holiday"),
+  ToolName.make("delete_public_holiday"),
+  ToolName.make("get_hr_schedule"),
+  ToolName.make("get_hr_table"),
+  ToolName.make("get_hr_summary_report"),
   ToolName.make("get_funnel"),
   ToolName.make("create_funnel"),
   ToolName.make("update_funnel"),
@@ -207,7 +215,7 @@ const categoryMetadata = (category: ReviewCategory): { readonly issue: string; r
       return {
         issue: "#97",
         rationale:
-          "Reviewed employee-position, HR-department, Staff-assignment, funnel-administration, HR-request, and person-administration operations with their exact schemas and ordered registry/CLI exposure."
+          "Reviewed employee-position, HR-department, Staff-assignment, funnel-administration, HR-request, public-holiday, HR-report, and person-administration operations with their exact schemas and ordered registry/CLI exposure."
       }
     case "cli-json-diagnostic":
       return {
@@ -219,7 +227,7 @@ const categoryMetadata = (category: ReviewCategory): { readonly issue: string; r
       return {
         issue: "#228",
         rationale:
-          "Reviewed concise Effect 4 CLI help rendering; funnel, HR-request, and person-administration routes are added without changing other route behavior."
+          "Reviewed concise Effect 4 CLI help rendering; funnel, HR-request, public-holiday, HR-report, and person-administration routes are added without changing other route behavior."
       }
   }
 }

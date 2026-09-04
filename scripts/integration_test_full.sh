@@ -68,6 +68,7 @@ ISSUE_AGENT_CLEANUP_PROFILE_ID=""
 ISSUE_AGENT_CLEANUP_PERSON_ID=""
 HR_CLEANUP_DEPARTMENT_ID=""
 HR_CLEANUP_REQUEST_ID=""
+HR_CLEANUP_HOLIDAY_IDS=""
 HR_STAFF_RESTORE_EMPLOYEE=""
 HR_STAFF_RESTORE_DEPARTMENT=""
 TM_TASK_TYPE_NAME=""
@@ -595,6 +596,20 @@ cleanup_hr_artifacts() {
     else
       cleanup_failed=1
     fi
+  fi
+  if [ -n "$HR_CLEANUP_HOLIDAY_IDS" ]; then
+    local remaining_holidays="" holiday_id holiday_json holiday_readback
+    for holiday_id in $HR_CLEANUP_HOLIDAY_IDS; do
+      holiday_json=$(json_string "$holiday_id")
+      call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_public_holiday\",\"arguments\":{\"holiday\":$holiday_json}},\"id\":2}" >/dev/null 2>&1 || true
+      restart_http_transport_if_needed "after public holiday cleanup" >/dev/null 2>&1 || cleanup_failed=1
+      holiday_readback=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_public_holiday\",\"arguments\":{\"holiday\":$holiday_json}},\"id\":2}" 2>/dev/null || true)
+      if [ "$(echo "$holiday_readback" | jq -r '(.result.isError // false) and ((.result.content[0].text // "") | contains("not found"))' 2>/dev/null)" != "true" ]; then
+        remaining_holidays="$remaining_holidays $holiday_id"
+        cleanup_failed=1
+      fi
+    done
+    HR_CLEANUP_HOLIDAY_IDS="${remaining_holidays# }"
   fi
   if [ -n "$HR_STAFF_RESTORE_EMPLOYEE" ]; then
     local employee_json restore_json restore_response staff_response staff_text restored_department restored_present
@@ -4262,6 +4277,29 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
       run_test "assign_staff_department(authoritative)" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"assign_staff_department\",\"arguments\":{\"employee\":\"$HR_STAFF_EMPLOYEE\",\"department\":\"$HR_CHILD_ID\"}},\"id\":2}"
       restart_http_transport_if_needed "after HR Staff assignment" || exit 1
+      run_capture_to_var HR_PARENT_HOLIDAY_TEXT "create_public_holiday(parent)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_public_holiday\",\"arguments\":{\"title\":\"Parent holiday\",\"date\":\"2026-09-04\",\"department\":\"$HR_CLEANUP_DEPARTMENT_ID\"}},\"id\":2}"
+      HR_PARENT_HOLIDAY_ID=$(echo "$HR_PARENT_HOLIDAY_TEXT" | jq -r '.holiday.id // empty' 2>/dev/null)
+      if [ -n "$HR_PARENT_HOLIDAY_ID" ]; then HR_CLEANUP_HOLIDAY_IDS="$HR_PARENT_HOLIDAY_ID"; fi
+      restart_http_transport_if_needed "after parent public holiday create" || exit 1
+      run_capture_to_var HR_CHILD_HOLIDAY_TEXT "create_public_holiday(child)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_public_holiday\",\"arguments\":{\"title\":\"Child holiday\",\"date\":\"2026-09-05\",\"department\":\"$HR_CHILD_ID\"}},\"id\":2}"
+      HR_CHILD_HOLIDAY_ID=$(echo "$HR_CHILD_HOLIDAY_TEXT" | jq -r '.holiday.id // empty' 2>/dev/null)
+      if [ -n "$HR_CHILD_HOLIDAY_ID" ]; then HR_CLEANUP_HOLIDAY_IDS="$HR_CLEANUP_HOLIDAY_IDS $HR_CHILD_HOLIDAY_ID"; fi
+      restart_http_transport_if_needed "after child public holiday create" || exit 1
+      if [ -n "$HR_CHILD_HOLIDAY_ID" ]; then
+        run_test "get_public_holiday" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_public_holiday\",\"arguments\":{\"holiday\":\"$HR_CHILD_HOLIDAY_ID\"}},\"id\":2}"
+        run_test "update_public_holiday" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_public_holiday\",\"arguments\":{\"holiday\":\"$HR_CHILD_HOLIDAY_ID\",\"title\":\"Updated child holiday\"}},\"id\":2}"
+      fi
+      run_capture_to_var HR_INHERITED_HOLIDAYS_TEXT "list_public_holidays(inherited)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_public_holidays\",\"arguments\":{\"department\":\"$HR_CHILD_ID\",\"includeInherited\":true,\"startDate\":\"2026-09-04\",\"endDate\":\"2026-09-05\",\"limit\":20}},\"id\":2}"
+      assert_json_field_equals "nested department inherits both holiday documents" \
+        "$HR_INHERITED_HOLIDAYS_TEXT" ".total" "2"
+      run_capture_to_var HR_TABLE_TEXT "get_hr_table(multi-page scan)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_hr_table\",\"arguments\":{\"department\":\"$HR_CHILD_ID\",\"startDate\":\"2026-09-04\",\"endDate\":\"2026-09-05\",\"scanPageSize\":1}},\"id\":2}"
+      assert_json_field_equals "HR table reports a complete multi-page scan" "$HR_TABLE_TEXT" ".complete" "true"
       HR_CHILD_PATH_JSON=$(json_string "$HR_DEPARTMENT_NAME/$HR_CHILD_NAME")
       HR_PROPAGATED_CHILD="{}"
       HR_PROPAGATED_PARENT="{}"
@@ -4332,6 +4370,14 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
         if [ $? -eq 0 ]; then
           HR_CLEANUP_REQUEST_ID=$(echo "$HR_REQUEST_CREATE_TEXT" | jq -r '.request.id // empty' 2>/dev/null)
           restart_http_transport_if_needed "after HR request create" || exit 1
+          run_capture_to_var HR_SCHEDULE_TEXT "get_hr_schedule(multi-page inherited holidays)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_hr_schedule\",\"arguments\":{\"department\":\"$HR_CHILD_ID\",\"startDate\":\"2026-09-04\",\"endDate\":\"2026-09-05\",\"scanPageSize\":1}},\"id\":2}"
+          assert_json_field_equals "HR schedule reports a complete multi-page scan" "$HR_SCHEDULE_TEXT" ".complete" "true"
+          assert_json_field_equals "HR schedule includes both inherited holiday documents" \
+            "$HR_SCHEDULE_TEXT" ".holidays | length" "2"
+          run_capture_to_var HR_SUMMARY_TEXT "get_hr_summary_report(multi-page)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_hr_summary_report\",\"arguments\":{\"department\":\"$HR_CHILD_ID\",\"startDate\":\"2026-09-04\",\"endDate\":\"2026-09-05\",\"scanPageSize\":1}},\"id\":2}"
+          assert_json_field_equals "HR summary reports a complete multi-page scan" "$HR_SUMMARY_TEXT" ".complete" "true"
           run_test "list_hr_requests(exact filters)" \
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_hr_requests\",\"arguments\":{\"employee\":\"$HR_STAFF_EMPLOYEE\",\"department\":\"$HR_CHILD_ID\",\"requestType\":$HR_REQUEST_TYPE_JSON,\"limit\":1}},\"id\":2}"
           run_capture_to_var HR_REQUEST_COMMENT_TEXT "add_hr_request_comment" \
@@ -4379,6 +4425,22 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
         fi
       else
         skip_test "HR request lifecycle" "no installed request type with a human-readable label available"
+      fi
+      if [ -n "$HR_CHILD_HOLIDAY_ID" ]; then
+        run_test "delete_public_holiday(child)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_public_holiday\",\"arguments\":{\"holiday\":\"$HR_CHILD_HOLIDAY_ID\"}},\"id\":2}"
+        restart_http_transport_if_needed "after child public holiday delete" || exit 1
+        run_expect_error_contains "get_public_holiday(deleted fixture)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_public_holiday\",\"arguments\":{\"holiday\":\"$HR_CHILD_HOLIDAY_ID\"}},\"id\":2}" "not found"
+        if [ $? -eq 0 ]; then HR_CLEANUP_HOLIDAY_IDS="$HR_PARENT_HOLIDAY_ID"; fi
+      fi
+      if [ -n "$HR_PARENT_HOLIDAY_ID" ]; then
+        run_test "delete_public_holiday(parent cleanup)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_public_holiday\",\"arguments\":{\"holiday\":\"$HR_PARENT_HOLIDAY_ID\"}},\"id\":2}"
+        restart_http_transport_if_needed "after parent public holiday cleanup" || exit 1
+        run_expect_error_contains "get_public_holiday(parent cleanup confirmation)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_public_holiday\",\"arguments\":{\"holiday\":\"$HR_PARENT_HOLIDAY_ID\"}},\"id\":2}" "not found"
+        if [ $? -eq 0 ]; then HR_CLEANUP_HOLIDAY_IDS=""; fi
       fi
       if [ -z "$HR_STAFF_RESTORE_EMPLOYEE" ]; then
         restart_http_transport_if_needed "after HR Staff restoration before delete preview" || exit 1

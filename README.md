@@ -786,11 +786,19 @@ When resolved tool exposure is `proxy`, clients see the built-in tools plus thes
 | `update_hr_request_attachment` | Update description and/or pinned state for a file belonging directly to an exact HR request. |
 | `delete_hr_request_attachment` | Delete one file belonging directly to an exact HR request. |
 | `list_hr_request_types` | Discover installed HR request types by stable ID and Huly-translated human label. Set locale to a supported Huly locale such as fr; labels from any supported locale may be used by request tools, while ambiguous labels are rejected. Request-type mutation is intentionally unsupported because Huly installs these as model-space documents and exposes no stable runtime mutation contract. |
-| `list_hr_requests` | List HR requests with exact optional employee, department, and request-type filters. Calendar dates are inclusive YYYY-MM-DD values stored with UTC offset 0. Results include total, truncation, and nextOffset continuation metadata. |
+| `list_hr_requests` | List HR requests with exact optional employee, department, and request-type filters. Calendar dates are inclusive YYYY-MM-DD values stored with UTC offset 0. Every match is loaded from Huly before the intentional output page is applied; results include total, truncation, and nextOffset continuation metadata. |
 | `get_hr_request` | Get one HR request by the exact raw request ID returned by list_hr_requests. |
 | `create_hr_request` | Create an employee-attached HR request using exact employee, department, and request-type resolution. Dates are inclusive calendar dates in YYYY-MM-DD form and descriptions accept Markdown with native Huly references. |
 | `update_hr_request` | Update selected HR request fields by exact request ID. Department and type locators resolve exactly; omitted fields are preserved. Dates remain inclusive YYYY-MM-DD calendar dates. |
 | `delete_hr_request` | Delete one exact HR request. Its comments and attachments are Huly-owned attached collections and follow the request deletion lifecycle. |
+| `list_public_holidays` | List public-holiday documents with exact optional department and inclusive date filters. includeInherited adds every ancestor department explicitly; it never adds descendants. Results are loaded completely from Huly before the intentional output page is applied, and include total, truncated, and nextOffset metadata. |
+| `get_public_holiday` | Get one public-holiday document by the exact raw ID returned by list_public_holidays. |
+| `create_public_holiday` | Create one public holiday for an exact department ID or full path. The date is a timezone-independent Gregorian calendar day stored as Huly TzDate with UTC offset 0; duplicate department/date pairs are rejected. |
+| `update_public_holiday` | Update selected fields of one exact public-holiday ID. Department paths resolve exactly and duplicate department/date pairs are rejected. Omitted fields are preserved without a read-after-write query. |
+| `delete_public_holiday` | Permanently delete one public-holiday document by exact raw ID. |
+| `get_hr_schedule` | Return every HR request overlapping an inclusive UTC calendar-date range, every applicable holiday document, and one day cell per date. Department scope includes nested departments by default; holiday inheritance walks upward from each scoped department by default. No result cap is applied and complete=true certifies full cursor pagination. |
+| `get_hr_table` | Return a complete employee table for an inclusive UTC calendar-date range. Base workdays are Monday-Friday minus applicable inherited holiday dates; negative request types consume non-holiday workdays, positive types add calendar-day units, and zero types add none. No result cap is applied. |
+| `get_hr_summary_report` | Return complete request totals grouped by exact department and request type for an inclusive UTC date range. Requests are clipped to the range; calendar days include weekends, workdays exclude weekends and applicable inherited holidays, and signed units follow Huly request-type values. No result cap is applied. |
 
 ### Inventory
 

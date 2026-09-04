@@ -16,5 +16,7 @@ export const HrDomainError = Schema.Union([
   HrErrors.HrRequestTypeIdentifierAmbiguousError,
   HrErrors.HrRequestDateRangeError,
   HrErrors.HrRequestCommentNotFoundError,
-  HrErrors.HrRequestMutationUnsupportedError
+  HrErrors.HrRequestMutationUnsupportedError,
+  HrErrors.PublicHolidayNotFoundError,
+  HrErrors.PublicHolidayConflictError
 ])

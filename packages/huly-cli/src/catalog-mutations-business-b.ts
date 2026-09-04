@@ -2,6 +2,11 @@ import type { McpToolName } from "../../../src/mcp/tools/index.js"
 import type { CliCommandSpec } from "./catalog-types.js"
 
 export const businessMutationCliCommandCatalogB = {
+  create_public_holiday: {
+    path: ["hr", "holidays", "create"],
+    positional: ["title", "date", "department"],
+    description: "Create Public Holiday"
+  },
   create_hr_request: {
     path: ["hr", "requests", "create"],
     positional: ["employee", "requestType", "startDate", "endDate"],
@@ -38,6 +43,12 @@ export const businessMutationCliCommandCatalogB = {
     positional: ["request"],
     description: "Delete HR Request",
     behavior: { confirmation: { type: "requires-yes", message: "hr requests delete requires --yes." } }
+  },
+  delete_public_holiday: {
+    path: ["hr", "holidays", "delete"],
+    positional: ["holiday"],
+    description: "Delete Public Holiday",
+    behavior: { confirmation: { type: "requires-yes", message: "hr holidays delete requires --yes." } }
   },
   delete_hr_request_comment: {
     path: ["hr", "requests", "comments", "delete"],
@@ -90,6 +101,11 @@ export const businessMutationCliCommandCatalogB = {
     path: ["hr", "departments", "update"],
     positional: ["department"],
     description: "Update Department"
+  },
+  update_public_holiday: {
+    path: ["hr", "holidays", "update"],
+    positional: ["holiday"],
+    description: "Update Public Holiday"
   },
   update_hr_request: {
     path: ["hr", "requests", "update"],

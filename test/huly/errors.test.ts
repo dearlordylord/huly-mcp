@@ -1710,6 +1710,10 @@ describe("Huly Errors", () => {
               return `hr-request-comment:${error.request}:${error.commentId}`
             case "HrRequestMutationUnsupportedError":
               return `hr-request-unsupported:${error.operation}`
+            case "PublicHolidayNotFoundError":
+              return `public-holiday:${error.holiday}`
+            case "PublicHolidayConflictError":
+              return `public-holiday-conflict:${error.department}:${error.date}`
             default: {
               const _exhaustive: never = error
               return _exhaustive
