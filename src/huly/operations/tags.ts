@@ -31,7 +31,13 @@ import type {
 } from "../errors.js"
 import { core, tags } from "../huly-plugins.js"
 import { clearTextAsEmptyString } from "./clear-field-updates.js"
-import { clampLimit, escapeLikeWildcards, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
+import {
+  clampLimit,
+  escapeLikeWildcards,
+  findResultTotal,
+  hulyQuery,
+  type StrictDocumentQuery
+} from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import {
   attachTagReference,
@@ -92,7 +98,12 @@ const buildUpdateTagOperations = (
     return mergeUpdateEntries(Object.values(updateEntries))
   })
 
-export const listTags = (params: ListTagsParams): Effect.Effect<Array<TagSummary>, ListTagsError, HulyClient> =>
+interface TagSummaryPage {
+  readonly tags: Array<TagSummary>
+  readonly total: Count
+}
+
+export const listTagsPage = (params: ListTagsParams): Effect.Effect<TagSummaryPage, ListTagsError, HulyClient> =>
   Effect.gen(function* () {
     const client = yield* HulyClient
     const limit = clampLimit(params.limit)
@@ -110,11 +121,15 @@ export const listTags = (params: ListTagsParams): Effect.Effect<Array<TagSummary
 
     const elements = yield* client.findAll<HulyTagElement>(tags.class.TagElement, hulyQuery(query), {
       limit,
-      sort: { modifiedOn: SortingOrder.Descending }
+      sort: { modifiedOn: SortingOrder.Descending },
+      total: true
     })
 
-    return elements.map(toTagSummary)
+    return { tags: elements.map(toTagSummary), total: Count.make(findResultTotal(elements)) }
   })
+
+export const listTags = (params: ListTagsParams): Effect.Effect<Array<TagSummary>, ListTagsError, HulyClient> =>
+  listTagsPage(params).pipe(Effect.map((page) => page.tags))
 
 export const createTag = (params: CreateTagParams): Effect.Effect<CreateTagResult, CreateTagError, HulyClient> =>
   Effect.gen(function* () {

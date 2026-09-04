@@ -11,6 +11,7 @@ import {
   LimitParam,
   ListTotal,
   NonEmptyString,
+  PersonId,
   PersonLocator,
   PersonName,
   PersonRefInput,
@@ -79,7 +80,17 @@ export const LeadSummarySchema = Schema.Struct({
 
 export type LeadSummary = Schema.Schema.Type<typeof LeadSummarySchema>
 
-export const LeadDetailSchema = Schema.Struct({
+export const LeadParentsUnsupportedReason =
+  "The published Lead and Task contracts do not define a stable parents field."
+export const LeadCollectionUnsupportedReason =
+  "AttachedDoc collection is an internal storage discriminator; funnel and customer projections expose its stable meaning."
+
+const LeadUnsupportedFieldsSchema = Schema.Tuple([
+  Schema.Struct({ field: Schema.Literal("parents"), reason: Schema.Literal(LeadParentsUnsupportedReason) }),
+  Schema.Struct({ field: Schema.Literal("collection"), reason: Schema.Literal(LeadCollectionUnsupportedReason) })
+])
+
+const LeadDetailFields = {
   id: DocId,
   identifier: LeadIdentifier,
   number: Schema.Int.pipe(Schema.check(Schema.isGreaterThanOrEqualTo(0))),
@@ -90,9 +101,7 @@ export const LeadDetailSchema = Schema.Struct({
   dueDate: Schema.NullOr(Timestamp),
   status: StatusName,
   assignee: Schema.optional(PersonName),
-  customer: Schema.optional(Schema.String),
   customerId: DocId,
-  customerType: Schema.Literals(["person", "organization", "unresolved"]),
   taskType: TaskTypeRefSchema,
   rank: NonEmptyString,
   completed: Schema.Boolean,
@@ -101,12 +110,18 @@ export const LeadDetailSchema = Schema.Struct({
   labels: Count,
   funnel: FunnelIdentifier,
   funnelName: Schema.String,
-  modifiedOn: Schema.optional(Timestamp),
-  modifiedBy: Schema.optional(NonEmptyString),
+  modifiedOn: Timestamp,
+  modifiedBy: PersonId,
   createdOn: Schema.optional(Timestamp),
-  createdBy: Schema.optional(NonEmptyString),
-  unsupportedFields: Schema.Array(Schema.Struct({ field: NonEmptyString, reason: NonEmptyString }))
-}).annotate({
+  createdBy: Schema.optional(PersonId),
+  unsupportedFields: LeadUnsupportedFieldsSchema
+}
+
+export const LeadDetailSchema = Schema.Union([
+  Schema.Struct({ ...LeadDetailFields, customer: NonEmptyString, customerType: Schema.Literal("person") }),
+  Schema.Struct({ ...LeadDetailFields, customer: NonEmptyString, customerType: Schema.Literal("organization") }),
+  Schema.Struct({ ...LeadDetailFields, customer: Schema.Null, customerType: Schema.Literal("unresolved") })
+]).annotate({
   title: "LeadDetail",
   description: "Stable lead fields plus explicit classification of unsupported native fields"
 })

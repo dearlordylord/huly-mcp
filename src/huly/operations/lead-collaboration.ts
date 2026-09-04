@@ -53,14 +53,14 @@ import {
   toAttachedTagSummary,
   toResolvedTagElement
 } from "./tags-shared.js"
-import { listTags } from "./tags.js"
+import { listTagsPage } from "./tags.js"
 
 type LeadTargetLocator = Pick<ListLeadCommentsParams, "funnel" | "identifier">
 
 const LEAD_LABEL_TARGET_CLASS = TagTargetClass.make(String(leadClassIds.class.Lead))
 const TRUE: true = true
 const FALSE: false = false
-const ZERO: 0 = 0
+const ZERO = 0 as const
 
 const resolveLeadTarget = Effect.fn("LeadCollaboration.resolveTarget")(function* (params: LeadTargetLocator) {
   const client = yield* HulyClient
@@ -101,7 +101,7 @@ export const listLeadComments = Effect.fn("LeadCollaboration.listComments")(func
 export const addLeadComment = Effect.fn("LeadCollaboration.addComment")(function* (params: AddLeadCommentParams) {
   const target = yield* resolveLeadTarget(params)
   const commentId = yield* addAttachedComment(commentTarget(target.client, target.lead), params.body)
-  return { identifier: target.lead.identifier, commentId, changed: true }
+  return { identifier: target.lead.identifier, commentId, changed: TRUE }
 })
 
 const commentNotFound = (lead: HulyLead, commentId: DeleteLeadCommentParams["commentId"]) => () =>
@@ -129,7 +129,7 @@ export const deleteLeadComment = Effect.fn("LeadCollaboration.deleteComment")(fu
     params.commentId,
     commentNotFound(target.lead, params.commentId)
   )
-  return { identifier: target.lead.identifier, commentId: params.commentId, changed: true }
+  return { identifier: target.lead.identifier, commentId: params.commentId, changed: TRUE }
 })
 
 export const listLeadAttachments = Effect.fn("LeadCollaboration.listAttachments")(function* (
@@ -182,9 +182,9 @@ export const deleteLeadAttachment = Effect.fn("LeadCollaboration.deleteAttachmen
 export const listLeadLabelDefinitions = Effect.fn("LeadCollaboration.listLabelDefinitions")(function* (
   params: ListLeadLabelDefinitionsParams
 ) {
-  const labels = yield* listTags({ targetClass: LEAD_LABEL_TARGET_CLASS, ...params })
+  const page = yield* listTagsPage({ targetClass: LEAD_LABEL_TARGET_CLASS, ...params })
   return {
-    labels: labels.map(
+    labels: page.tags.map(
       (label): ModuleLabelDefinition => ({
         id: label.id,
         title: label.title,
@@ -192,7 +192,9 @@ export const listLeadLabelDefinitions = Effect.fn("LeadCollaboration.listLabelDe
         color: label.color,
         ...(label.refCount === undefined ? {} : { refCount: label.refCount })
       })
-    )
+    ),
+    total: page.total,
+    truncated: page.tags.length < page.total
   }
 })
 

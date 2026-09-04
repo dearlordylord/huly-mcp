@@ -578,7 +578,9 @@ describe("Lead Operations", () => {
           attachments: 0,
           labels: 0,
           customerId: "customer-1",
-          customerType: "person"
+          customerType: "person",
+          modifiedOn: 1700000000000,
+          modifiedBy: "user"
         })
         expect(result.unsupportedFields.map((entry) => entry.field)).toEqual(["parents", "collection"])
         expect(result.status).toBe("Active")
@@ -870,6 +872,7 @@ describe("getLead branch coverage", () => {
       const customerWarnings = warnings.filter((warning) => warning.code === "lead_customer_metadata_degraded")
 
       expect(result.customerType).toBe("unresolved")
+      expect(result.customer).toBeNull()
       expect(customerWarnings).toHaveLength(1)
       expect(assertAt(customerWarnings, 0).message).toContain("customer-1")
     })

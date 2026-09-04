@@ -862,7 +862,7 @@ When resolved tool exposure is `proxy`, clients see the built-in tools plus thes
 | `get_lead_attachment` | Get metadata and a download URL for an attachment only when it belongs to one exact lead. |
 | `update_lead_attachment` | Update description or pinned state for an attachment only when it belongs to one exact lead. |
 | `delete_lead_attachment` | Delete an attachment only when it belongs to one exact lead. The native blob reference remains governed by Huly storage cleanup. |
-| `list_lead_label_definitions` | List reusable native label definitions whose target class is Lead, without raw class IDs. |
+| `list_lead_label_definitions` | List reusable native label definitions whose target class is Lead, without raw class IDs. Returns the full matching total and whether the limited page is truncated. |
 | `list_lead_labels` | List native TagReference label relations attached to one exact lead. |
 | `add_lead_label` | Idempotently attach a label relation to one exact lead. Accepts a definition ID or exact title; a missing title creates the Lead label definition. |
 | `update_lead_label` | Update the published optional weight on every matching TagReference relation for one exact lead and label. |

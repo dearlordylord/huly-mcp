@@ -7,6 +7,8 @@ import {
   parseAddLeadCommentParams,
   parseAddLeadLabelParams,
   AddLeadLabelResultSchema,
+  LeadCommentCreatedOrDeletedResultSchema,
+  LeadCommentUpdateResultSchema,
   RemoveLeadLabelResultSchema,
   UpdateLeadLabelResultSchema,
   parseUpdateLeadAttachmentParams,
@@ -108,6 +110,22 @@ describe("lead collaboration schemas", () => {
           )
         )
       ).toBe(true)
+    })
+  )
+
+  it.effect("distinguishes guaranteed comment mutations from idempotent updates", () =>
+    Effect.gen(function* () {
+      const identity = { identifier: "LEAD-1", commentId: "comment-1" }
+      const impossibleCreate = yield* Effect.exit(
+        Schema.decodeUnknownEffect(LeadCommentCreatedOrDeletedResultSchema)({ ...identity, changed: false })
+      )
+      const unchangedUpdate = yield* Schema.decodeUnknownEffect(LeadCommentUpdateResultSchema)({
+        ...identity,
+        changed: false
+      })
+
+      expect(Exit.isFailure(impossibleCreate)).toBe(true)
+      expect(unchangedUpdate.changed).toBe(false)
     })
   )
 })

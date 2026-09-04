@@ -9,6 +9,7 @@ import type {
   Doc,
   DocumentQuery,
   DocumentUpdate,
+  FindOptions,
   Ref,
   Space
 } from "@hcengineering/core"
@@ -63,7 +64,7 @@ const funnel = {
   modifiedOn: 10
 }
 
-const LEAD_COLLECTION: "leads" = "leads"
+const LEAD_COLLECTION = "leads" as const
 
 const lead = {
   _id: toRef<Doc>("lead-1"),
@@ -117,7 +118,7 @@ const file = (): HulyAttachment => ({
   createdOn: 9
 })
 
-const label = (): TagElement => ({
+const label = (overrides?: Partial<TagElement>): TagElement => ({
   _id: toRef<TagElement>("label-1"),
   _class: tags.class.TagElement,
   space: core.space.Workspace,
@@ -130,7 +131,8 @@ const label = (): TagElement => ({
   modifiedBy: corePersonId("actor"),
   modifiedOn: 10,
   createdBy: corePersonId("actor"),
-  createdOn: 9
+  createdOn: 9,
+  ...overrides
 })
 
 const labelRef = (): TagReference => ({
@@ -190,8 +192,16 @@ const testLayer = (state: State) => {
     ...state.labels,
     ...state.references
   ]
-  const findAll: HulyClientOperations["findAll"] = <T extends Doc>(_class: Ref<Class<T>>, rawQuery: DocumentQuery<T>) =>
-    Effect.succeed(findResult(docsForClass(_class, docs()).filter((doc) => matchesQuery(doc, rawQuery))))
+  const findAll: HulyClientOperations["findAll"] = <T extends Doc>(
+    _class: Ref<Class<T>>,
+    rawQuery: DocumentQuery<T>,
+    options?: FindOptions<T>
+  ) => {
+    const matches = docsForClass(_class, docs()).filter((doc) => matchesQuery(doc, rawQuery))
+    const result = findResult(matches.slice(0, options?.limit))
+    result.total = matches.length
+    return Effect.succeed(result)
+  }
 
   const findOne: HulyClientOperations["findOne"] = <T extends Doc>(_class: Ref<Class<T>>, rawQuery: DocumentQuery<T>) =>
     Effect.succeed(docsForClass(_class, docs()).find((doc) => matchesQuery(doc, rawQuery)))
@@ -322,9 +332,14 @@ describe("lead collaboration", () => {
   })
 
   it.effect("lists definitions and manages native label relations", () => {
-    const fixture = state({ labels: [label()], references: [labelRef()] })
+    const fixture = state({
+      labels: [label(), label({ _id: toRef<TagElement>("label-2"), title: "secondary" })],
+      references: [labelRef()]
+    })
     return Effect.gen(function* () {
-      expect((yield* listLeadLabelDefinitions({})).labels[0]?.title).toBe("priority")
+      const definitions = yield* listLeadLabelDefinitions({ limit: 1 })
+      expect(definitions.labels[0]?.title).toBe("priority")
+      expect(definitions).toMatchObject({ total: 2, truncated: true })
       expect((yield* listLeadLabels(target)).labels[0]).toMatchObject({ title: "priority", weight: 1 })
       expect((yield* addLeadLabel({ ...target, label: tagIdentifier("priority"), weight: 2 })).attached).toBe(false)
       expect((yield* updateLeadLabel({ ...target, label: tagIdentifier("priority"), weight: 3 })).updatedCount).toBe(1)

@@ -9,7 +9,8 @@ import {
   getLeadAttachmentParamsJsonSchema,
   GetLeadAttachmentResultSchema,
   LeadAttachmentMutationResultSchema,
-  LeadCommentMutationResultSchema,
+  LeadCommentCreatedOrDeletedResultSchema,
+  LeadCommentUpdateResultSchema,
   ListLeadAttachmentsResultSchema,
   listLeadAttachmentsParamsJsonSchema,
   ListLeadCommentsResultSchema,
@@ -79,7 +80,7 @@ export const leadCollaborationTools = [
         "Add a Markdown comment to one exact lead. Current-workspace Huly links are stored as native references.",
       category: CATEGORY,
       inputSchema: addLeadCommentParamsJsonSchema,
-      resultSchema: LeadCommentMutationResultSchema
+      resultSchema: LeadCommentCreatedOrDeletedResultSchema
     },
     parseAddLeadCommentParams,
     addLeadComment
@@ -91,7 +92,7 @@ export const leadCollaborationTools = [
         "Update one comment belonging to an exact lead; comments attached elsewhere are rejected. Markdown native references are preserved.",
       category: CATEGORY,
       inputSchema: updateLeadCommentParamsJsonSchema,
-      resultSchema: LeadCommentMutationResultSchema
+      resultSchema: LeadCommentUpdateResultSchema
     },
     parseUpdateLeadCommentParams,
     updateLeadComment
@@ -102,7 +103,7 @@ export const leadCollaborationTools = [
       description: "Delete one comment only when it belongs to the exact lead target.",
       category: CATEGORY,
       inputSchema: deleteLeadCommentParamsJsonSchema,
-      resultSchema: LeadCommentMutationResultSchema
+      resultSchema: LeadCommentCreatedOrDeletedResultSchema
     },
     parseDeleteLeadCommentParams,
     deleteLeadComment
@@ -167,7 +168,8 @@ export const leadCollaborationTools = [
   defineTool(
     {
       name: "list_lead_label_definitions",
-      description: "List reusable native label definitions whose target class is Lead, without raw class IDs.",
+      description:
+        "List reusable native label definitions whose target class is Lead, without raw class IDs. Returns the full matching total and whether the limited page is truncated.",
       category: CATEGORY,
       inputSchema: listLeadLabelDefinitionsParamsJsonSchema,
       resultSchema: ListLeadLabelDefinitionsResultSchema

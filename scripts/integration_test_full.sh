@@ -2657,8 +2657,10 @@ if [ $? -eq 0 ]; then
               run_capture_to_var_fresh LEAD_LABELS_TEXT "list_lead_labels($CREATED_PERSON_LEAD_IDENTIFIER)" \
                 "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_lead_labels\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\"}},\"id\":2}"
               assert_json_field_equals "list_lead_labels preserves weight" "$LEAD_LABELS_TEXT" ".labels[] | select(.label == \"$LEAD_LABEL_DEFINITION_CLEANUP_ID\") | .weight" '2'
-              run_test "list_lead_label_definitions($LEAD_LABEL_TITLE)" \
-                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_lead_label_definitions\",\"arguments\":{\"titleSearch\":$LEAD_LABEL_TITLE_JSON}},\"id\":2}"
+              run_capture_to_var_fresh LEAD_LABEL_DEFINITIONS_TEXT "list_lead_label_definitions($LEAD_LABEL_TITLE)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_lead_label_definitions\",\"arguments\":{\"titleSearch\":$LEAD_LABEL_TITLE_JSON,\"limit\":1}},\"id\":2}"
+              assert_json_field_equals "list_lead_label_definitions reports exact total" "$LEAD_LABEL_DEFINITIONS_TEXT" '.total' '1'
+              assert_json_field_equals "list_lead_label_definitions reports complete page" "$LEAD_LABEL_DEFINITIONS_TEXT" '.truncated' 'false'
               run_capture_to_var_fresh LEAD_LABEL_UPDATE_TEXT "update_lead_label($LEAD_LABEL_TITLE)" \
                 "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_lead_label\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"label\":$LEAD_LABEL_TITLE_JSON,\"weight\":7}},\"id\":2}"
               assert_json_field_equals "update_lead_label reports one relation" "$LEAD_LABEL_UPDATE_TEXT" '.updatedCount' '1'

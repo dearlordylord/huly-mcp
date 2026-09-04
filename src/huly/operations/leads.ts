@@ -26,6 +26,8 @@ import type {
 import {
   FunnelIdentifier,
   LeadIdentifier,
+  LeadCollectionUnsupportedReason,
+  LeadParentsUnsupportedReason,
   LeadSummarySchema,
   parseLeadDetail as parseLeadDetailSchema
 } from "../../domain/schemas/leads.js"
@@ -316,7 +318,7 @@ export const getLead = (params: GetLeadParams): Effect.Effect<LeadDetail, GetLea
 
     const person =
       lead.assignee !== null
-        ? yield* client.findOne<Person>(contact.class.Person, { _id: toRef<Person>(lead.assignee) })
+        ? yield* client.findOne<Person>(contact.class.Person, hulyQuery<Person>({ _id: toRef<Person>(lead.assignee) }))
         : undefined
 
     const customer = yield* findCustomer(client, toRef<Contact>(lead.attachedTo))
@@ -351,7 +353,7 @@ export const getLead = (params: GetLeadParams): Effect.Effect<LeadDetail, GetLea
       dueDate: lead.dueDate,
       status,
       assignee: person?.name,
-      customer: customer?.name,
+      customer: customer?.name ?? null,
       customerId: lead.attachedTo,
       customerType:
         customer === undefined
@@ -372,12 +374,8 @@ export const getLead = (params: GetLeadParams): Effect.Effect<LeadDetail, GetLea
       createdOn: lead.createdOn,
       createdBy: lead.createdBy,
       unsupportedFields: [
-        { field: "parents", reason: "The published Lead and Task contracts do not define a stable parents field." },
-        {
-          field: "collection",
-          reason:
-            "AttachedDoc collection is an internal storage discriminator; funnel and customer projections expose its stable meaning."
-        }
+        { field: "parents", reason: LeadParentsUnsupportedReason },
+        { field: "collection", reason: LeadCollectionUnsupportedReason }
       ]
     }).pipe(
       Effect.mapError(

@@ -198,9 +198,13 @@ export const ListLeadCommentsResultSchema = Schema.Struct({
   comments: Schema.Array(CommentSchema),
   total: Count
 })
-export const LeadCommentMutationResultSchema = Schema.Struct({
-  ...LeadIdentity,
-  commentId: CommentId,
+const LeadCommentMutationResultFields = { ...LeadIdentity, commentId: CommentId }
+export const LeadCommentCreatedOrDeletedResultSchema = Schema.Struct({
+  ...LeadCommentMutationResultFields,
+  changed: Schema.Literal(true)
+})
+export const LeadCommentUpdateResultSchema = Schema.Struct({
+  ...LeadCommentMutationResultFields,
   changed: Schema.Boolean
 })
 export const ListLeadAttachmentsResultSchema = Schema.Struct({
@@ -220,7 +224,11 @@ export const LeadAttachmentMutationResultSchema = Schema.Struct({
   attachmentId: AttachmentId,
   changed: Schema.Literal(true)
 })
-export const ListLeadLabelDefinitionsResultSchema = Schema.Struct({ labels: Schema.Array(ModuleLabelDefinitionSchema) })
+export const ListLeadLabelDefinitionsResultSchema = Schema.Struct({
+  labels: Schema.Array(ModuleLabelDefinitionSchema),
+  total: Count,
+  truncated: Schema.Boolean
+})
 export const AttachedLeadLabelSchema = Schema.Struct({
   id: TagReferenceId,
   label: TagElementId,

@@ -1,5 +1,5 @@
 import { describe, it } from "@effect/vitest"
-import { Effect, Schema } from "effect"
+import { Effect, Exit, Schema } from "effect"
 import { expect } from "vitest"
 import {
   createLeadParamsJsonSchema,
@@ -33,6 +33,41 @@ const JsonSchemaObjectSchema = Schema.Struct({
   )
 })
 type JsonSchemaObject = Schema.Schema.Type<typeof JsonSchemaObjectSchema>
+
+const leadDetailInput = () => ({
+  id: "lead-id",
+  identifier: "LEAD-1",
+  number: 1,
+  title: "Enterprise Deal",
+  description: "# Big opportunity\n\nLots of potential.",
+  customerDescription: "# Customer context",
+  startDate: 1700000000000,
+  dueDate: null,
+  status: "OfferPreparing",
+  assignee: "Doe,Jane",
+  customer: "Acme Corp",
+  customerId: "customer-id",
+  customerType: "organization",
+  taskType: "lead:taskType:Lead",
+  rank: "0|hzzzzz:",
+  completed: false,
+  comments: 0,
+  attachments: 0,
+  labels: 0,
+  funnel: "funnel-1",
+  funnelName: "Sales",
+  modifiedOn: 1700000000000,
+  modifiedBy: "person-1",
+  createdOn: 1699000000000,
+  unsupportedFields: [
+    { field: "parents", reason: "The published Lead and Task contracts do not define a stable parents field." },
+    {
+      field: "collection",
+      reason:
+        "AttachedDoc collection is an internal storage discriminator; funnel and customer projections expose its stable meaning."
+    }
+  ]
+})
 
 const expectJsonSchemaObject = (value: unknown): JsonSchemaObject =>
   Schema.decodeUnknownSync(JsonSchemaObjectSchema)(value)
@@ -129,38 +164,27 @@ describe("Lead Schemas", () => {
   describe("LeadDetailSchema", () => {
     it.effect("accepts full lead detail", () =>
       Effect.gen(function* () {
-        const result = yield* Schema.decodeUnknownEffect(LeadDetailSchema)({
-          id: "lead-id",
-          identifier: "LEAD-1",
-          number: 1,
-          title: "Enterprise Deal",
-          description: "# Big opportunity\n\nLots of potential.",
-          customerDescription: "# Customer context",
-          startDate: 1700000000000,
-          dueDate: null,
-          status: "OfferPreparing",
-          assignee: "Doe,Jane",
-          customer: "Acme Corp",
-          customerId: "customer-id",
-          customerType: "organization",
-          taskType: "lead:taskType:Lead",
-          rank: "0|hzzzzz:",
-          completed: false,
-          comments: 0,
-          attachments: 0,
-          labels: 0,
-          funnel: "funnel-1",
-          funnelName: "Sales",
-          modifiedOn: 1700000000000,
-          createdOn: 1699000000000,
-          unsupportedFields: []
-        })
+        const result = yield* Schema.decodeUnknownEffect(LeadDetailSchema)(leadDetailInput())
         expect(result.description).toContain("Big opportunity")
         expect(result.customerDescription).toBe("# Customer context")
         expect(result.startDate).toBe(1700000000000)
         expect(result.dueDate).toBeNull()
         expect(result.funnel).toBe("funnel-1")
         expect(result.funnelName).toBe("Sales")
+      })
+    )
+
+    it.effect("rejects impossible customer classifications and empty unsupported classifications", () =>
+      Effect.gen(function* () {
+        const impossibleCustomer = yield* Effect.exit(
+          Schema.decodeUnknownEffect(LeadDetailSchema)({ ...leadDetailInput(), customerType: "unresolved" })
+        )
+        const emptyUnsupported = yield* Effect.exit(
+          Schema.decodeUnknownEffect(LeadDetailSchema)({ ...leadDetailInput(), unsupportedFields: [] })
+        )
+
+        expect(Exit.isFailure(impossibleCustomer)).toBe(true)
+        expect(Exit.isFailure(emptyUnsupported)).toBe(true)
       })
     )
   })
