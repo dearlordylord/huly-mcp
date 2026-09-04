@@ -89,6 +89,8 @@ const mockAccountClient: AccountClient = {
   getPerson: mockGetCurrentPerson,
   getSocialIds: mockGetCurrentSocialIds,
   getPersonInfo: mockGetPersonInfo,
+  canMergeSpecifiedPersons: async () => true,
+  mergeSpecifiedPersons: async () => {},
   updateWorkspaceRole: mockUpdateWorkspaceRole,
   getWorkspaceInfo: mockGetWorkspaceInfo,
   getUserWorkspaces: mockGetUserWorkspaces,
@@ -161,6 +163,20 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
       expect(result).toEqual(personInfo)
       expect(mockGetPersonInfo.mock.calls).toContainEqual(["person-1"])
+    }).pipe(Effect.provide(liveLayer))
+  )
+
+  it.effect("delegates global Person merge eligibility and execution", () =>
+    Effect.gen(function* () {
+      const source = toAccountUuid(NonEmptyString.make("00000000-0000-4000-8000-000000000250"))
+      const survivor = toAccountUuid(NonEmptyString.make("00000000-0000-4000-8000-000000000251"))
+      const client = yield* WorkspaceClient
+      if (client.canMergeSpecifiedPersons === undefined || client.mergeSpecifiedPersons === undefined) {
+        return yield* Effect.die(new Error("live WorkspaceClient omitted global Person merge operations"))
+      }
+
+      expect(yield* client.canMergeSpecifiedPersons(survivor, source)).toBe(true)
+      yield* client.mergeSpecifiedPersons(survivor, source)
     }).pipe(Effect.provide(liveLayer))
   )
 

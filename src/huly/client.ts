@@ -617,8 +617,7 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
       createMixin: notImplemented("createMixin"),
       updateMixin: notImplemented("updateMixin"),
       updateMarkup: notImplemented("updateMarkup"),
-      searchFulltext: notImplemented("searchFulltext"),
-      resolvePersonAdministrationTarget: (locator) => resolvePersonAdministrationTarget(defaultOps, locator)
+      searchFulltext: notImplemented("searchFulltext")
     }
 
     return Layer.succeed(HulyClient, { ...defaultOps, ...mockOperations })

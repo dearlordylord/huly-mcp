@@ -78,22 +78,29 @@ const personRecord = (person: ResolvedPerson): PersonMergeRecord => ({
   ...(person.personUuid === undefined ? {} : { personUuid: person.personUuid })
 })
 
+type AccountPreflightPlan =
+  | { readonly accountAction: Exclude<PersonMergePreflightAccountAction, "ready"> }
+  | {
+      readonly accountAction: "ready"
+      readonly sourceUuid: ReturnType<typeof toAccountUuid>
+      readonly survivorUuid: ReturnType<typeof toAccountUuid>
+    }
+
 const inspectAccountAction = Effect.fn("PersonMerge.inspectAccountAction")(function* (
   workspace: WorkspaceClient["Service"],
   source: ResolvedPerson,
   survivor: ResolvedPerson
-): Effect.fn.Return<PersonMergePreflightAccountAction, WorkspaceClientError | HulyDataInvalidError> {
-  if (source.personUuid === undefined || survivor.personUuid === undefined) return "not-needed"
-  if (source.personUuid === survivor.personUuid) return "already-unified"
+): Effect.fn.Return<AccountPreflightPlan, WorkspaceClientError | HulyDataInvalidError> {
+  if (source.personUuid === undefined || survivor.personUuid === undefined) return { accountAction: "not-needed" }
+  if (source.personUuid === survivor.personUuid) return { accountAction: "already-unified" }
   if (workspace.canMergeSpecifiedPersons === undefined) {
     return yield* new HulyDataInvalidError({ operation: "mergePeople", entity: "account client merge capability" })
   }
-  return (yield* workspace.canMergeSpecifiedPersons(
-    toAccountUuid(survivor.personUuid),
-    toAccountUuid(source.personUuid)
-  ))
-    ? "ready"
-    : "blocked"
+  const sourceUuid = toAccountUuid(source.personUuid)
+  const survivorUuid = toAccountUuid(survivor.personUuid)
+  return (yield* workspace.canMergeSpecifiedPersons(survivorUuid, sourceUuid))
+    ? { accountAction: "ready", sourceUuid, survivorUuid }
+    : { accountAction: "blocked" }
 })
 
 const preflightToken = (
@@ -138,7 +145,7 @@ interface PreparedPersonMerge {
   readonly source: PersonMergeRecord
   readonly survivor: PersonMergeRecord
   readonly impact: PersonMergeImpact
-  readonly accountAction: PersonMergePreflightAccountAction
+  readonly accountPlan: AccountPreflightPlan
   readonly preflightToken: PersonMergePreflightToken
   readonly migrateReferences: NonNullable<HulyClient["Service"]["migratePersonReferences"]>
 }
@@ -157,15 +164,15 @@ const preparePersonMerge = Effect.fn("PersonMerge.prepare")(function* (
     })
   }
   const impact = personMergeImpact(yield* client.inspectPersonReferences(PersonId.make(source._id)))
-  const accountAction = yield* inspectAccountAction(workspace, source, survivor)
+  const accountPlan = yield* inspectAccountAction(workspace, source, survivor)
   const sourceRecord = personRecord(source)
   const survivorRecord = personRecord(survivor)
-  const token = preflightToken(sourceRecord, survivorRecord, impact, accountAction)
+  const token = preflightToken(sourceRecord, survivorRecord, impact, accountPlan.accountAction)
   return {
     source: sourceRecord,
     survivor: survivorRecord,
     impact,
-    accountAction,
+    accountPlan,
     preflightToken: token,
     migrateReferences: client.migratePersonReferences
   }
@@ -180,24 +187,24 @@ const prepareGlobalMerge = Effect.fn("PersonMerge.prepareGlobalMerge")(function*
   workspace: WorkspaceClient["Service"],
   prepared: PreparedPersonMerge
 ): Effect.fn.Return<PreparedGlobalMerge, PersonMergeAccountBlockedError | HulyDataInvalidError> {
-  if (prepared.accountAction === "blocked") {
+  if (prepared.accountPlan.accountAction === "blocked") {
     return yield* new PersonMergeAccountBlockedError({
       sourceId: prepared.source.id,
       survivorId: prepared.survivor.id,
       reason: "the account service reported that the source global Person cannot be merged safely"
     })
   }
-  if (prepared.accountAction !== "ready") return { accountAction: prepared.accountAction, merge: undefined }
+  if (prepared.accountPlan.accountAction !== "ready") {
+    return { accountAction: prepared.accountPlan.accountAction, merge: undefined }
+  }
   if (workspace.mergeSpecifiedPersons === undefined) {
     return yield* new HulyDataInvalidError({ operation: "mergePeople", entity: "account merge capability" })
   }
-  if (prepared.source.personUuid === undefined || prepared.survivor.personUuid === undefined) {
-    return yield* new HulyDataInvalidError({ operation: "mergePeople", entity: "global Person identifiers" })
-  }
   const mergeSpecifiedPersons = workspace.mergeSpecifiedPersons
-  const sourceUuid = toAccountUuid(prepared.source.personUuid)
-  const survivorUuid = toAccountUuid(prepared.survivor.personUuid)
-  return { accountAction: "merged", merge: mergeSpecifiedPersons(survivorUuid, sourceUuid) }
+  return {
+    accountAction: "merged",
+    merge: mergeSpecifiedPersons(prepared.accountPlan.survivorUuid, prepared.accountPlan.sourceUuid)
+  }
 })
 
 interface ResultCommon {
@@ -217,12 +224,12 @@ const resultCommon = (prepared: PreparedPersonMerge): ResultCommon => ({
 })
 
 const previewResult = (prepared: PreparedPersonMerge): MergePeopleResult =>
-  prepared.accountAction === "blocked"
+  prepared.accountPlan.accountAction === "blocked"
     ? { ...resultCommon(prepared), executed: false, accountAction: "blocked", unmigrated: blockedUnmigratedItems() }
     : {
         ...resultCommon(prepared),
         executed: false,
-        accountAction: prepared.accountAction,
+        accountAction: prepared.accountPlan.accountAction,
         unmigrated: baseUnmigratedItems()
       }
 

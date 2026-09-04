@@ -742,6 +742,26 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
         ])
       })
     )
+
+    it.effect("resolves an exact Person through the live client operation", () =>
+      Effect.gen(function* () {
+        mockFindOne.mockResolvedValue({
+          _id: "person-1",
+          _class: String(contact.class.Person),
+          space: String(contact.space.Contacts),
+          name: "Ada Lovelace",
+          avatarType: "color"
+        })
+
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        if (client.resolvePersonAdministrationTarget === undefined) {
+          return yield* Effect.die(new Error("live HulyClient omitted person administration resolution"))
+        }
+        const person = yield* client.resolvePersonAdministrationTarget({ id: DomainPersonId.make("person-1") })
+
+        expect(person).toMatchObject({ _id: "person-1", name: "Ada Lovelace" })
+      })
+    )
   })
 
   describe("native person-reference migration", () => {
