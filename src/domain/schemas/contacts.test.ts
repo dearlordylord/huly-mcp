@@ -2,6 +2,7 @@ import { Effect, Result, Schema } from "effect"
 import { describe, expect, it } from "vitest"
 
 import { addObjectCollaboratorParamsJsonSchema } from "./collaborators.js"
+import { toDraft07JsonSchema } from "./json-schema.js"
 import {
   AddOrganizationChannelParamsSchema,
   createOrganizationParamsJsonSchema,
@@ -10,6 +11,7 @@ import {
 import {
   CreatePersonParamsSchema,
   createPersonParamsJsonSchema,
+  EmployeeLocatorSchema,
   GetPersonParamsSchema,
   getPersonParamsJsonSchema,
   ListPersonsParamsSchema,
@@ -26,6 +28,7 @@ import {
 
 type JsonSchemaObject = {
   readonly anyOf?: ReadonlyArray<{ readonly required?: ReadonlyArray<string> }>
+  readonly oneOf?: ReadonlyArray<{ readonly required?: ReadonlyArray<string> }>
   readonly properties?: Readonly<Record<string, { readonly description?: string }>>
 }
 
@@ -194,14 +197,16 @@ describe("Contact Schemas", () => {
 
   describe("SetEmployeePositionParamsSchema", () => {
     it("requires a position so omission cannot be confused with clearing", () => {
-      const missingPosition = Schema.decodeUnknownResult(SetEmployeePositionParamsSchema)({ employee: "employee-1" })
+      const missingPosition = Schema.decodeUnknownResult(SetEmployeePositionParamsSchema)({
+        employee: { id: "employee-1" }
+      })
       expect(missingPosition._tag).toBe("Failure")
 
       const clear = Schema.decodeUnknownSync(SetEmployeePositionParamsSchema)({
-        employee: "employee-1",
+        employee: { id: "employee-1" },
         position: null
       })
-      expect(clear).toEqual({ employee: "employee-1", position: null })
+      expect(clear).toEqual({ employee: { id: "employee-1" }, position: null })
     })
 
     it("documents exact locator resolution and the required position field", () => {
@@ -211,11 +216,36 @@ describe("Contact Schemas", () => {
       expect(jsonSchema).toMatchObject({ required: ["employee", "position"] })
     })
 
-    it("parses a position update through the public parser", () => {
+    it("accepts one structured locator modality", () => {
       const result = Effect.runSync(
-        parseSetEmployeePositionParams({ employee: "Jane Smith", position: " Engineering Lead " })
+        parseSetEmployeePositionParams({ employee: { name: "Jane Smith" }, position: " Engineering Lead " })
       )
-      expect(result).toEqual({ employee: "Jane Smith", position: " Engineering Lead " })
+      expect(result).toEqual({ employee: { name: "Jane Smith" }, position: " Engineering Lead " })
+    })
+
+    it("rejects combined locator modalities at the schema boundary", () => {
+      const result = Effect.runSync(
+        Effect.result(
+          parseSetEmployeePositionParams({
+            employee: { id: "employee-1", email: "jane@example.com" },
+            position: "Engineering Lead"
+          })
+        )
+      )
+      expect(Result.isFailure(result)).toBe(true)
+    })
+
+    it("rejects the legacy primitive locator shape", () => {
+      const result = Schema.decodeUnknownResult(SetEmployeePositionParamsSchema)({
+        employee: "employee-1",
+        position: null
+      })
+      expect(result._tag).toBe("Failure")
+    })
+
+    it("advertises one-of locator fields in JSON Schema", () => {
+      const schema = expectJsonSchemaObject(toDraft07JsonSchema(EmployeeLocatorSchema))
+      expect(schema).toMatchObject({ oneOf: [{ required: ["id"] }, { required: ["email"] }, { required: ["name"] }] })
     })
   })
 

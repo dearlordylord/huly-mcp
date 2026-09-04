@@ -27,6 +27,13 @@ set -a && source .env.local && set +a
 
 # Required: HULY_URL, HULY_WORKSPACE, and either HULY_TOKEN or (HULY_EMAIL + HULY_PASSWORD)
 
+# Employee position lifecycle fixture (required by the full suite):
+# HULY_EMPLOYEE_ID=<active Employee/Person id> is preferred; otherwise set
+# HULY_EMPLOYEE_EMAIL=<exact email returned by list_employees>. Password-based
+# runs may use HULY_EMAIL as the fallback employee email. The suite fails if
+# this selector does not resolve to exactly one active employee; it does not skip
+# the lifecycle. The original position is restored after set + clear verification.
+
 # Optional for DM message integration:
 # HULY_TEST_DM_ID=<existing direct-message conversation id>
 # If unset, the suite uses the first conversation returned by list_direct_messages.

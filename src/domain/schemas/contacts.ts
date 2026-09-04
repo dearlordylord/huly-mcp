@@ -19,7 +19,6 @@ import {
   NonEmptyString,
   PersonId,
   PersonName,
-  PersonRefInput,
   UrlString,
   withAtLeastOneRequired
 } from "./shared.js"
@@ -53,6 +52,36 @@ export const EmployeeRoleSchema = Schema.Literals(["USER", "GUEST"]).annotate({
   description: "Huly Contact Employee role."
 })
 export type EmployeeRole = Schema.Schema.Type<typeof EmployeeRoleSchema>
+
+const EMPLOYEE_LOCATOR_FIELDS = ["id", "email", "name"] as const
+
+const employeeLocatorFieldCount = (locator: {
+  readonly id?: unknown
+  readonly email?: unknown
+  readonly name?: unknown
+}): number => EMPLOYEE_LOCATOR_FIELDS.filter((field) => locator[field] !== undefined).length
+
+export const EmployeeLocatorSchema = Schema.Struct({
+  id: Schema.optionalKey(PersonId).annotateKey({ description: "Exact Huly Employee/Person ID." }),
+  email: Schema.optionalKey(Email).annotateKey({ description: "Exact employee email address." }),
+  name: Schema.optionalKey(PersonName).annotateKey({ description: "Exact employee display name." })
+})
+  .annotate({
+    title: "EmployeeLocator",
+    description:
+      "Structured exact employee locator. Provide exactly one of id, email, or name; combining modalities is rejected.",
+    jsonSchema: { oneOf: [{ required: ["id"] }, { required: ["email"] }, { required: ["name"] }] }
+  })
+  .pipe(
+    Schema.check(
+      Schema.makeFilter((locator) =>
+        employeeLocatorFieldCount(locator) === 1
+          ? undefined
+          : "Provide exactly one employee locator field: id, email, or name."
+      )
+    )
+  )
+export type EmployeeLocator = Schema.Schema.Type<typeof EmployeeLocatorSchema>
 
 export const EmployeeSummarySchema = Schema.Struct({
   id: PersonId,
@@ -172,7 +201,10 @@ export const ListEmployeesParamsSchema = Schema.Struct({
 export type ListEmployeesParams = Schema.Schema.Type<typeof ListEmployeesParamsSchema>
 
 export const SetEmployeePositionParamsSchema = Schema.Struct({
-  employee: PersonRefInput.annotateKey({ description: "Employee ID, exact email address, or exact display name." }),
+  employee: EmployeeLocatorSchema.annotateKey({
+    description:
+      "Structured exact employee locator. Provide exactly one of id, email, or name; combined locator modalities are rejected."
+  }),
   position: Schema.NullOr(Schema.String).annotateKey({
     description: "Official position on contact.mixin.Employee. Pass null or an empty string to clear it."
   })
@@ -221,7 +253,8 @@ export const listEmployeesParamsJsonSchema = withJsonSchemaPropertyDescriptions(
 export const setEmployeePositionParamsJsonSchema = withJsonSchemaPropertyDescriptions(
   toDraft07JsonSchema(SetEmployeePositionParamsSchema),
   {
-    employee: "Employee ID, exact email address, or exact display name. Ambiguous names or emails are rejected.",
+    employee:
+      "Structured exact employee locator: provide exactly one of id, email, or name. Ambiguous names or emails and combined locator modalities are rejected.",
     position:
       "Official position on contact.mixin.Employee. Pass null or an empty string to clear it; omit it to fail without mutating."
   }

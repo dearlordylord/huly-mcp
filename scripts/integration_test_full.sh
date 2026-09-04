@@ -2,7 +2,9 @@
 # Full integration test suite for Huly MCP server.
 # Usage: set -a && source .env.local && set +a && bash scripts/integration_test_full.sh
 # This suite defaults HULY_TOOL_MODE to native because it calls native Huly tools directly.
-# Requires: jq, node, HULY_URL/HULY_WORKSPACE/HULY_EMAIL+HULY_PASSWORD env vars
+# Requires: jq, node, HULY_URL/HULY_WORKSPACE and HULY_TOKEN or HULY_EMAIL+HULY_PASSWORD.
+# Employee position lifecycle selection uses HULY_EMPLOYEE_ID (preferred),
+# HULY_EMPLOYEE_EMAIL, or the password-auth HULY_EMAIL fallback.
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -83,6 +85,9 @@ SPACE_ROLE_CLEANUP_ROLE=""
 SPACE_ROLE_CLEANUP_PERMISSIONS_JSON=""
 SPACE_ROLE_CREATED_CLEANUP_SPACE_TYPE=""
 SPACE_ROLE_CREATED_CLEANUP_ROLE=""
+EMPLOYEE_POSITION_CLEANUP_ID=""
+EMPLOYEE_POSITION_CLEANUP_ORIGINAL_POSITION_JSON=""
+EMPLOYEE_POSITION_CLEANUP_PENDING=false
 
 if [ -z "$HULY_URL" ]; then
   echo "ERROR: HULY_URL not set. Run: set -a && source .env.local && set +a"
@@ -615,7 +620,84 @@ cleanup_hr_artifacts() {
   return "$cleanup_failed"
 }
 
+call_tool_fresh_session() {
+  local payload="$1"
+  if [ "$INTEGRATION_TRANSPORT" = "http" ]; then
+    restart_http_transport_if_needed "employee position verification" >&2 || return 1
+  fi
+  call_tool "$payload"
+}
+
+run_capture_only_fresh() {
+  local payload="$1"
+  local result
+  result=$(call_tool_fresh_session "$payload")
+  if [ -z "$result" ]; then
+    return 1
+  fi
+  local is_error
+  is_error=$(echo "$result" | jq -r '.result.isError // false' 2>/dev/null)
+  if [ "$is_error" = "true" ]; then
+    return 1
+  fi
+  echo "$result" | jq -r '.result.content[0].text' 2>/dev/null
+  return 0
+}
+
+employee_position_read_payload() {
+  printf '%s\n' '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_employees","arguments":{"limit":200}},"id":2}'
+}
+
+wait_for_employee_position() {
+  local name="$1" expected_json="$2" count_result="${3:-true}" attempts=10 attempt=1 text=""
+  while [ "$attempt" -le "$attempts" ]; do
+    text=$(run_capture_only_fresh "$(employee_position_read_payload)" 2>/dev/null || true)
+    if [ -n "$text" ] && printf '%s\n' "$text" | jq -e --arg id "$EMPLOYEE_POSITION_CLEANUP_ID" \
+      --argjson expected "$expected_json" \
+      '([.[] | select(.id == $id) | (.position // null)]) as $positions | (($positions | length) == 1 and $positions[0] == $expected)' >/dev/null 2>&1; then
+      if [ "$count_result" = "true" ]; then
+        echo "PASS: $name"
+        PASSED=$((PASSED + 1))
+      fi
+      return 0
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      sleep 1
+    fi
+    attempt=$((attempt + 1))
+  done
+  if [ "$count_result" = "true" ]; then
+    echo "FAIL: $name (position did not persist after ${attempts} attempts)"
+    FAILED=$((FAILED + 1))
+    ERRORS="${ERRORS}\\n  - ${name}: position did not persist after ${attempts} attempts"
+  fi
+  return 1
+}
+
+restore_employee_position() {
+  if [ "$EMPLOYEE_POSITION_CLEANUP_PENDING" != "true" ]; then
+    return 0
+  fi
+  local employee_json restore_payload restore_result
+  employee_json=$(json_string "$EMPLOYEE_POSITION_CLEANUP_ID")
+  restore_payload="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_employee_position\",\"arguments\":{\"employee\":{\"id\":$employee_json},\"position\":$EMPLOYEE_POSITION_CLEANUP_ORIGINAL_POSITION_JSON}},\"id\":2}"
+  restore_result=$(call_tool_fresh_session "$restore_payload" 2>/dev/null || true)
+  if [ -z "$restore_result" ] || [ "$(printf '%s\n' "$restore_result" | jq -r '.result.isError // false' 2>/dev/null)" = "true" ]; then
+    echo "WARNING: employee position restore did not return success; cleanup marker retained" >&2
+    return 1
+  fi
+  if wait_for_employee_position "set_employee_position restore persisted" "$EMPLOYEE_POSITION_CLEANUP_ORIGINAL_POSITION_JSON" false; then
+    EMPLOYEE_POSITION_CLEANUP_ID=""
+    EMPLOYEE_POSITION_CLEANUP_ORIGINAL_POSITION_JSON=""
+    EMPLOYEE_POSITION_CLEANUP_PENDING=false
+    return 0
+  fi
+  echo "WARNING: employee position restore was not confirmed; cleanup marker retained" >&2
+  return 1
+}
+
 cleanup_all() {
+  restore_employee_position || true
   cleanup_hr_artifacts || true
   cleanup_issue_agent_assignee_artifacts || true
   cleanup_security_administration_artifacts
@@ -866,10 +948,10 @@ run_capture() {
   return 0
 }
 
-run_capture_to_var() {
-  local output_var="$1" name="$2" payload="$3"
+run_capture_to_var_with_runner() {
+  local runner="$1" output_var="$2" name="$3" payload="$4"
   local result
-  result=$(call_tool "$payload")
+  result=$("$runner" "$payload")
   if [ -z "$result" ]; then
     echo "FAIL: $name (no response)" >&2
     FAILED=$((FAILED + 1))
@@ -901,6 +983,14 @@ run_capture_to_var() {
   PASSED=$((PASSED + 1))
   printf -v "$output_var" '%s' "$(echo "$result" | jq -r '.result.content[0].text' 2>/dev/null)"
   return 0
+}
+
+run_capture_to_var() {
+  run_capture_to_var_with_runner call_tool "$@"
+}
+
+run_capture_to_var_fresh() {
+  run_capture_to_var_with_runner call_tool_fresh_session "$@"
 }
 
 run_result_to_var() {
@@ -4118,35 +4208,55 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
   fi
 else
   fail_test "HR Staff fixture" "authenticated workspace user did not resolve to an Employee"
+fi
+run_capture_to_var EMPLOYEES_TEXT "list_employees(employee position fixture)" \
+  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_employees","arguments":{"limit":200}},"id":2}'
 if [ $? -eq 0 ]; then
-  EMPLOYEE_ID=$(printf '%s\n' "$EMPLOYEES_TEXT" | jq -r '[.[] | select(.active == true)][0].id // empty' 2>/dev/null)
-  EMPLOYEE_ORIGINAL_POSITION=$(printf '%s\n' "$EMPLOYEES_TEXT" | jq -r '[.[] | select(.active == true)][0].position // empty' 2>/dev/null)
-  if [ -n "$EMPLOYEE_ID" ]; then
+  EMPLOYEE_POSITION_FIXTURE_ID="${HULY_EMPLOYEE_ID:-}"
+  EMPLOYEE_POSITION_FIXTURE_EMAIL="${HULY_EMPLOYEE_EMAIL:-${HULY_EMAIL:-}}"
+  if [ -n "$EMPLOYEE_POSITION_FIXTURE_ID" ]; then
+    EMPLOYEE_POSITION_FIXTURE_MATCHES=$(printf '%s\n' "$EMPLOYEES_TEXT" | jq -r --arg id "$EMPLOYEE_POSITION_FIXTURE_ID" \
+      '[.[] | select(.id == $id and .active == true)] | length' 2>/dev/null)
+  elif [ -n "$EMPLOYEE_POSITION_FIXTURE_EMAIL" ]; then
+    EMPLOYEE_POSITION_FIXTURE_MATCHES=$(printf '%s\n' "$EMPLOYEES_TEXT" | jq -r --arg email "$EMPLOYEE_POSITION_FIXTURE_EMAIL" \
+      '[.[] | select(.email == $email and .active == true)] | length' 2>/dev/null)
+  else
+    EMPLOYEE_POSITION_FIXTURE_MATCHES=0
+  fi
+
+  if [ "$EMPLOYEE_POSITION_FIXTURE_MATCHES" != "1" ]; then
+    fail_test "set_employee_position deterministic fixture" \
+      "expected one active fixture selected by HULY_EMPLOYEE_ID or HULY_EMPLOYEE_EMAIL/HULY_EMAIL, found ${EMPLOYEE_POSITION_FIXTURE_MATCHES:-0}"
+  else
+    EMPLOYEE_ID=$(printf '%s\n' "$EMPLOYEES_TEXT" | jq -r --arg id "$EMPLOYEE_POSITION_FIXTURE_ID" --arg email "$EMPLOYEE_POSITION_FIXTURE_EMAIL" \
+      '([.[] | select((($id != "" and .id == $id) or ($id == "" and .email == $email)) and .active == true)] | first | .id) // empty' 2>/dev/null)
+    EMPLOYEE_ORIGINAL_POSITION_JSON=$(printf '%s\n' "$EMPLOYEES_TEXT" | jq -c --arg id "$EMPLOYEE_ID" \
+      '([.[] | select(.id == $id and .active == true)] | first | (.position // null)) | if . == "" then null else . end' 2>/dev/null)
+    EMPLOYEE_POSITION_CLEANUP_ID="$EMPLOYEE_ID"
+    EMPLOYEE_POSITION_CLEANUP_ORIGINAL_POSITION_JSON="$EMPLOYEE_ORIGINAL_POSITION_JSON"
+    EMPLOYEE_POSITION_CLEANUP_PENDING=true
     EMPLOYEE_ID_JSON=$(json_string "$EMPLOYEE_ID")
+
     run_expect_error "set_employee_position(requires position)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_employee_position\",\"arguments\":{\"employee\":$EMPLOYEE_ID_JSON}},\"id\":2}"
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_employee_position\",\"arguments\":{\"employee\":{\"id\":$EMPLOYEE_ID_JSON}}},\"id\":2}"
 
     EMPLOYEE_TEST_POSITION_JSON=$(json_string "MCP Integration Position $RUN_ID")
-    if run_capture_to_var EMPLOYEE_SET_TEXT "set_employee_position($EMPLOYEE_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_employee_position\",\"arguments\":{\"employee\":$EMPLOYEE_ID_JSON,\"position\":$EMPLOYEE_TEST_POSITION_JSON}},\"id\":2}"; then
+    if run_capture_to_var_fresh EMPLOYEE_SET_TEXT "set_employee_position($EMPLOYEE_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_employee_position\",\"arguments\":{\"employee\":{\"id\":$EMPLOYEE_ID_JSON},\"position\":$EMPLOYEE_TEST_POSITION_JSON}},\"id\":2}"; then
       assert_json_field_equals "set_employee_position returns employee id" "$EMPLOYEE_SET_TEXT" ".id" "$EMPLOYEE_ID"
       assert_json_field_equals "set_employee_position sets position" "$EMPLOYEE_SET_TEXT" ".position" "MCP Integration Position $RUN_ID"
-
-      run_capture_to_var EMPLOYEE_CLEAR_TEXT "set_employee_position($EMPLOYEE_ID clear)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_employee_position\",\"arguments\":{\"employee\":$EMPLOYEE_ID_JSON,\"position\":null}},\"id\":2}"
-      if [ $? -eq 0 ]; then
-        assert_json_field_equals "set_employee_position clears position" "$EMPLOYEE_CLEAR_TEXT" ".position" "null"
-      fi
-
-      if [ -n "$EMPLOYEE_ORIGINAL_POSITION" ]; then
-        EMPLOYEE_ORIGINAL_POSITION_JSON=$(json_string "$EMPLOYEE_ORIGINAL_POSITION")
-        run_test "set_employee_position($EMPLOYEE_ID restore)" \
-          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_employee_position\",\"arguments\":{\"employee\":$EMPLOYEE_ID_JSON,\"position\":$EMPLOYEE_ORIGINAL_POSITION_JSON}},\"id\":2}"
+      if wait_for_employee_position "set_employee_position set persisted" "$EMPLOYEE_TEST_POSITION_JSON"; then
+        if run_capture_to_var_fresh EMPLOYEE_CLEAR_TEXT "set_employee_position($EMPLOYEE_ID clear)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_employee_position\",\"arguments\":{\"employee\":{\"id\":$EMPLOYEE_ID_JSON},\"position\":null}},\"id\":2}"; then
+          assert_json_field_equals "set_employee_position clears position" "$EMPLOYEE_CLEAR_TEXT" ".position" "null"
+          wait_for_employee_position "set_employee_position clear persisted" "null"
+        fi
       fi
     fi
-  else
-    skip_test "set_employee_position lifecycle" "no active employee returned by list_employees"
+    restore_employee_position
   fi
+else
+  fail_test "set_employee_position deterministic fixture" "list_employees did not return a fixture source"
 fi
 run_test "list_organizations" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_organizations","arguments":{"limit":3}},"id":2}'

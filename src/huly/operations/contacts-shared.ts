@@ -165,7 +165,7 @@ const findPersonBySocialIdentityEmail = (
     return yield* client.findOne<HulyPerson>(contact.class.Person, { _id: identity.attachedTo })
   })
 
-const findPersonByExactEmail = (
+export const findPersonByExactEmail = (
   client: HulyClient["Service"],
   email: Email
 ): Effect.Effect<HulyPerson | undefined, HulyClientError | PersonIdentifierAmbiguousError> =>
@@ -180,7 +180,7 @@ const findPersonByExactEmail = (
     )
   })
 
-const findPersonByExactName = (
+export const findPersonByExactName = (
   client: HulyClient["Service"],
   name: PersonName
 ): Effect.Effect<HulyPerson | undefined, HulyClientError | PersonIdentifierAmbiguousError> =>

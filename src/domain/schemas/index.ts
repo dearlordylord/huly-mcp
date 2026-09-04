@@ -1573,6 +1573,8 @@ export {
   deletePersonParamsJsonSchema,
   DeletePersonParamsSchema,
   type DeletePersonResult,
+  type EmployeeLocator,
+  EmployeeLocatorSchema,
   type EmployeeRole,
   EmployeeRoleSchema,
   type EmployeeSummary,

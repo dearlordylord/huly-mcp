@@ -194,7 +194,7 @@ export const contactTools = [
     {
       name: "set_employee_position",
       description:
-        "Idempotently set an employee's official position on contact.mixin.Employee. Identify the employee by exact ID, exact email address, or exact display name; ambiguous names or emails are rejected. The position field is required: pass a string to set it, or null/an empty string to clear it. Omitting position fails schema parsing and performs no mutation. This updates the Contact Employee mixin, not an HR Staff record.",
+        "Idempotently set an employee's official position on contact.mixin.Employee. employee must be an object with exactly one locator field: {id}, {email}, or {name}; combined locator modalities are rejected. The selected ID, email, or display name is exact, and duplicate email/name matches are rejected. The position field is required: pass a string to set it, or null/an empty string to clear it. Omitting position fails schema parsing and performs no mutation. This updates the Contact Employee mixin, not an HR Staff record.",
       category: CATEGORY,
       inputSchema: setEmployeePositionParamsJsonSchema,
       resultSchema: SetEmployeePositionResultSchema,
