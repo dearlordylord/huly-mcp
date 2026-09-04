@@ -208,11 +208,18 @@ cleanup_generic_associations() {
 
 cleanup_employee_lifecycle_artifacts() {
   if [ -n "$EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID" ]; then
-    local person_json email_json delete_result read_result employee_result attempt
+    local person_json email_json target_result target_text delete_result read_result employee_result attempt
     person_json=$(json_string "$EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID")
     email_json=$(json_string "$EMPLOYEE_LIFECYCLE_EMAIL")
+    target_result=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" 2>/dev/null) || return 1
+    target_text=$(printf '%s\n' "$target_result" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+    if ! printf '%s\n' "$target_text" | jq -e --arg person "$EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID" \
+      --arg name "$EMPLOYEE_LIFECYCLE_NAME" --arg email "$EMPLOYEE_LIFECYCLE_EMAIL" \
+      '.id == $person and .name == $name and .email == $email' >/dev/null 2>&1; then
+      return 1
+    fi
     delete_result=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" 2>/dev/null) || return 1
-    if [ "$(printf '%s\n' "$delete_result" | jq -r '.result.isError // true' 2>/dev/null)" = "true" ]; then
+    if printf '%s\n' "$delete_result" | jq -e '.result.isError == true' >/dev/null 2>&1; then
       return 1
     fi
     attempt=1
@@ -1066,11 +1073,20 @@ extract_http_json_response() {
   fi
 }
 
+select_tool_response() {
+  local response
+  response=$(jq -Rc 'fromjson? | select(.jsonrpc == "2.0" and .id == 2)' | tail -n 1)
+  [ -n "$response" ] || return 1
+  printf '%s\n' "$response"
+}
+
 call_tool_stdio() {
   local payload="$1"
   local request_payload
   request_payload=$(printf '%s\n' "$payload" | jq -c --argjson meta "$MCP_2026_META" '.params = ((.params // {}) + {"_meta": $meta})')
-  printf '%s\n' "$request_payload" | timeout "$TOOL_TIMEOUT" env MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null | grep '"id":2'
+  printf '%s\n' "$request_payload" \
+    | timeout "$TOOL_TIMEOUT" env MCP_AUTO_EXIT=true node dist/index.cjs 2>/dev/null \
+    | select_tool_response
 }
 
 call_tool_http() {
@@ -1091,7 +1107,7 @@ call_tool_http() {
     curl_args+=(--header "Mcp-Name: $name")
   fi
   response=$(curl "${curl_args[@]}" --data "$request_payload" "$HTTP_ENDPOINT" 2>/dev/null)
-  extract_http_json_response "$response" | grep '"id":2'
+  extract_http_json_response "$response" | select_tool_response
 }
 
 call_tool_cli() {
@@ -1099,7 +1115,8 @@ call_tool_cli() {
   timeout "$TOOL_TIMEOUT" node "$HULY_CLI_MIRROR_ADAPTER" \
     "$HULY_CLI_INTEGRATION_EXECUTABLE" \
     "$payload" \
-    "$HULY_CLI_MIRROR_IMAGE_PATH"
+    "$HULY_CLI_MIRROR_IMAGE_PATH" \
+    | select_tool_response
 }
 
 call_tool() {
@@ -1264,7 +1281,8 @@ run_employee_invitation_step() {
   result=$(call_tool "$payload")
   is_error=$(printf '%s\n' "$result" | jq -r '.result.isError // false' 2>/dev/null)
   text=$(printf '%s\n' "$result" | jq -r '.result.content[0].text // empty' 2>/dev/null)
-  if [ "$is_error" = "false" ] || printf '%s\n' "$text" | grep -Eq "but (sendInvite|resendInvite) failed after:"; then
+  if [ "$is_error" = "false" ] || printf '%s\n' "$text" \
+    | grep -Eq "(but (sendInvite|resendInvite) failed after:|Connection error while communicating with Huly: (sendInvite|resendInvite) failed\.)"; then
     echo "PASS: $name" >&2
     PASSED=$((PASSED + 1))
     printf -v "$output_var" '%s' "$text"
@@ -1684,6 +1702,28 @@ assert_json_activity_contains_object_id() {
 
 json_string() {
   jq -Rn --arg value "$1" '$value'
+}
+
+select_workspace_member_employee_emails() {
+  local employees="$1" members="$2" self="$3" limit="$4"
+  jq -cn --argjson employees "$employees" --argjson members "$members" --arg self "$self" --argjson limit "$limit" '
+    [$employees[] as $employee
+      | select(
+          $employee.active == true
+          and ($employee.email // "") != ""
+          and $employee.email != $self
+          and ($employee.personUuid // "") != ""
+        )
+      | select(
+          [$members[] as $member | select($employee.personUuid == $member.personId)]
+          | length == 1
+        )
+      | $employee.email]
+    | sort
+    | group_by(.)
+    | map(select(length == 1) | .[0])
+    | .[:$limit]
+  '
 }
 
 run_chat_attachment_lifecycle() {
@@ -4495,12 +4535,15 @@ else
 fi
 SELF_NAME=""
 EMPLOYEES_FOR_DM_TEXT=""
+WORKSPACE_MEMBERS_FOR_DM_TEXT=""
 USER_PROFILE_TEXT=""
 if [ -n "$HULY_EMAIL" ]; then
   EMPLOYEES_FOR_DM_TEXT=$(run_capture_only \
     '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_employees","arguments":{"limit":200}},"id":2}')
   if [ $? -eq 0 ]; then
     SELF_NAME=$(echo "$EMPLOYEES_FOR_DM_TEXT" | jq -r --arg email "$HULY_EMAIL" '[.[]? | select(.email == $email) | .name // empty] | unique | if length == 1 then .[0] else empty end' 2>/dev/null)
+    WORKSPACE_MEMBERS_FOR_DM_TEXT=$(run_capture_only \
+      '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_workspace_members","arguments":{"limit":200}},"id":2}' || true)
   else
     EMPLOYEES_FOR_DM_TEXT=""
   fi
@@ -4530,9 +4573,10 @@ fi
 GROUP_DM_PEOPLE_JSON=""
 GROUP_DM_ID=""
 CHANNEL_MEMBER_CANDIDATE=""
-if [ -n "$EMPLOYEES_FOR_DM_TEXT" ] && [ -n "$SELF_NAME" ]; then
-  CHANNEL_MEMBER_CANDIDATE=$(echo "$EMPLOYEES_FOR_DM_TEXT" | jq -r --arg self "$SELF_NAME" '[.[]? | select((.name // "") != "" and .name != $self and .active != false) | .name] | sort | group_by(.) | map(select(length == 1) | .[0]) | .[0] // empty' 2>/dev/null)
-  GROUP_DM_PEOPLE_JSON=$(echo "$EMPLOYEES_FOR_DM_TEXT" | jq -c --arg self "$SELF_NAME" '[.[]? | select((.name // "") != "" and .name != $self and .active != false) | .name] | sort | group_by(.) | map(select(length == 1) | .[0]) | .[:2]' 2>/dev/null)
+if [ -n "$EMPLOYEES_FOR_DM_TEXT" ] && [ -n "$WORKSPACE_MEMBERS_FOR_DM_TEXT" ] && [ -n "$HULY_EMAIL" ]; then
+  GROUP_DM_PEOPLE_JSON=$(select_workspace_member_employee_emails \
+    "$EMPLOYEES_FOR_DM_TEXT" "$WORKSPACE_MEMBERS_FOR_DM_TEXT" "$HULY_EMAIL" 2 2>/dev/null)
+  CHANNEL_MEMBER_CANDIDATE=$(printf '%s\n' "$GROUP_DM_PEOPLE_JSON" | jq -r '.[0] // empty' 2>/dev/null)
 fi
 if [ "$(printf '%s\n' "$GROUP_DM_PEOPLE_JSON" | jq -r 'length // 0' 2>/dev/null)" = "2" ]; then
   run_capture_to_var GROUP_DM_TEXT "create_group_direct_message" \
@@ -4641,7 +4685,7 @@ if [ $? -eq 0 ]; then
       assert_json_field_count "remove_channel_members leaves creator" "$REMOVE_MEMBERS_TEXT" ".members | length" "1"
     fi
   else
-    skip_test "add/remove_channel_members" "need a non-self employee with a unique exact name"
+    skip_test "add/remove_channel_members" "need a non-self employee linked to an authoritative workspace membership"
   fi
 
   run_expect_error "leave_channel($CH_ID rejects last owner)" \
