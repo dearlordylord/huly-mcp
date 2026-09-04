@@ -179,7 +179,7 @@ const preparePersonMerge = Effect.fn("PersonMerge.prepare")(function* (
 })
 
 type PreparedGlobalMerge =
-  | { readonly accountAction: Exclude<PersonMergeFinalAccountAction, "merged">; readonly merge: undefined }
+  | { readonly accountAction: Exclude<PersonMergeFinalAccountAction, "merged"> }
   | { readonly accountAction: "merged"; readonly merge: Effect.Effect<void, WorkspaceClientError> }
 
 const prepareGlobalMerge = Effect.fn("PersonMerge.prepareGlobalMerge")(function* (
@@ -194,7 +194,7 @@ const prepareGlobalMerge = Effect.fn("PersonMerge.prepareGlobalMerge")(function*
     })
   }
   if (prepared.accountPlan.accountAction !== "ready") {
-    return { accountAction: prepared.accountPlan.accountAction, merge: undefined }
+    return { accountAction: prepared.accountPlan.accountAction }
   }
   if (workspace.mergeSpecifiedPersons === undefined) {
     return yield* new HulyDataInvalidError({ operation: "mergePeople", entity: "account merge capability" })

@@ -64,6 +64,7 @@ const sdkEffect = <A>(operation: ReferenceOperation, run: () => Promise<A>) =>
   Effect.tryPromise({ try: run, catch: (cause) => makeOperationConnectionError(operation, cause) })
 
 const decodePositiveInteger = Schema.decodeUnknownEffect(PositiveInteger)
+const decodeDocId = Schema.decodeUnknownEffect(DocId)
 
 const targetsPerson = (client: TxOperations, target: ObjectClassName): boolean => {
   const hierarchy = client.getHierarchy()
@@ -334,7 +335,6 @@ const replacementArray = (
 ): ReadonlyArray<PersonId> => [...new Set(values.map((value) => (value === source ? survivor : value)))]
 
 interface PreparedReferenceWrite {
-  readonly operation: ReferenceOperation
   readonly concreteClass: ObjectClassName
   readonly field: NonEmptyString
   readonly attribute: AnyAttribute
@@ -348,7 +348,7 @@ interface PreparedReferenceWrite {
 
 const loadImpactDocuments = Effect.fn("PersonReferenceMigration.loadImpactDocuments")(function* (
   client: TxOperations,
-  attributes: ReadonlyMap<string, AnyAttribute>,
+  attributes: ReadonlyMap<DocId, AnyAttribute>,
   impact: PersonMergeReferenceImpact,
   source: PersonId,
   survivor: PersonId
@@ -388,7 +388,6 @@ const loadImpactDocuments = Effect.fn("PersonReferenceMigration.loadImpactDocume
     })
   }
   return snapshot.documents.map((document) => ({
-    operation: "migratePersonReferences",
     concreteClass: impact.concreteClass,
     field: impact.field,
     attribute: rawAttribute,
@@ -401,7 +400,7 @@ const applyPreparedWrite = Effect.fn("PersonReferenceMigration.applyPreparedWrit
   client: TxOperations,
   prepared: PreparedReferenceWrite
 ): Effect.fn.Return<void, HulyConnectionError | HulyDataInvalidError> {
-  yield* sdkEffect(prepared.operation, () =>
+  yield* sdkEffect("migratePersonReferences", () =>
     updateAttribute(
       client,
       prepared.document,
@@ -419,7 +418,13 @@ export const migrateNativePersonReferences = Effect.fn("PersonReferenceMigration
   survivor: PersonId
 ): Effect.fn.Return<void, HulyConnectionError | HulyDataInvalidError | PersonMergeSnapshotStaleError> {
   const rawAttributes = client.getModel().findAllSync<AnyAttribute>(core.class.Attribute, {})
-  const attributes = new Map(rawAttributes.map((attribute) => [String(attribute._id), attribute]))
+  const attributeEntries = yield* Effect.forEach(rawAttributes, (attribute) =>
+    decodeDocId(attribute._id).pipe(
+      Effect.map((id): readonly [DocId, AnyAttribute] => [id, attribute]),
+      Effect.mapError((cause) => invalidReferenceData("migratePersonReferences", "Attribute identifier", cause))
+    )
+  )
+  const attributes: ReadonlyMap<DocId, AnyAttribute> = new Map(attributeEntries)
   // Resolve and parse the entire preflight snapshot before the first write. This
   // avoids relying on read-your-writes and prevents known cardinality drift from
   // producing a partial merge.
