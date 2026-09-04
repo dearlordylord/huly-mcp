@@ -6,6 +6,7 @@ import { expect } from "vitest"
 
 import { FunnelReference, LeadIdentifier } from "../../../src/domain/schemas/leads.js"
 import { LeadMutationDocumentSchema, type LeadPersonDocument } from "../../../src/domain/schemas/leads-mutations.js"
+import { PersonLocator } from "../../../src/domain/schemas/hr-departments.js"
 import {
   BlobId,
   Count,
@@ -63,6 +64,8 @@ const person = (id: string): LeadPersonDocument => ({
   space: SpaceId.make(String(contact.space.Contacts)),
   name: PersonName.make(id)
 })
+
+const personLocator = (value: string): PersonLocator => PersonLocator.make(value)
 
 const workflow: FunnelWorkflowTaskType = {
   taskType: {
@@ -218,7 +221,7 @@ describe("Lead mutation functional helpers", () => {
   it.effect("rejects cross-modality person collisions", () =>
     Effect.gen(function* () {
       const error = yield* Effect.flip(
-        uniquePersonMatch("shared@example.com", [person("person-by-id"), person("person-by-email")])
+        uniquePersonMatch(personLocator("shared@example.com"), [person("person-by-id"), person("person-by-email")])
       )
       expect(error._tag).toBe("PersonIdentifierAmbiguousError")
       if (error._tag === "PersonIdentifierAmbiguousError") expect(error.matches).toBe(2)
@@ -227,7 +230,9 @@ describe("Lead mutation functional helpers", () => {
 
   it.effect("rejects duplicate exact email matches", () =>
     Effect.gen(function* () {
-      const error = yield* Effect.flip(uniquePersonMatch("duplicate@example.com", [person("first"), person("second")]))
+      const error = yield* Effect.flip(
+        uniquePersonMatch(personLocator("duplicate@example.com"), [person("first"), person("second")])
+      )
       expect(error._tag).toBe("PersonIdentifierAmbiguousError")
       if (error._tag === "PersonIdentifierAmbiguousError") expect(error.matches).toBe(2)
     })

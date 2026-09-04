@@ -31,9 +31,9 @@ import type { HulyError, InvalidStatusError, PersonIdentifierAmbiguousError, Per
 import { attachment, chunter, tags } from "../huly-plugins.js"
 import { leadClassIds } from "../lead-plugin.js"
 import { funnelSpace } from "./funnels-shared.js"
+import { customerMixinWriteAttributes } from "./leads-mutations-boundary.js"
 import {
   currentStatus,
-  customerMixinWriteAttributes,
   type HulyLead,
   type LeadDocumentUpdate,
   findLead,

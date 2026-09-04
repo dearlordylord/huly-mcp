@@ -1,6 +1,6 @@
 import type { MarkupFormat } from "@hcengineering/api-client"
 import type { Contact, Employee, Organization, Person } from "@hcengineering/contact"
-import type { Blob, Class, Doc, DocumentUpdate, MarkupBlobRef, Ref, Space, Status } from "@hcengineering/core"
+import type { Class, Doc, DocumentUpdate, MarkupBlobRef, Ref, Space, Status } from "@hcengineering/core"
 import type { TaskType } from "@hcengineering/task"
 import { Effect, Option, Schema } from "effect"
 
@@ -11,13 +11,8 @@ import {
   type UpdateLeadParams
 } from "../../domain/schemas/leads.js"
 import {
-  LeadCustomerMixinAttributesSchema,
-  LeadEmployeeDocumentSchema,
   LeadMutationDocumentSchema,
-  LeadOrganizationDocumentSchema,
-  LeadPersonDocumentSchema,
   type LeadDescriptionField,
-  type LeadEmployeeDocument,
   type LeadMutationDocument,
   type LeadOrganizationDocument,
   type LeadPersonDocument
@@ -70,6 +65,14 @@ import { renderMarkdownWithNativeReferencesForWrite } from "./native-reference-m
 import { hulyQuery } from "./query-helpers.js"
 import { markupBlobRefAsMarkupRef } from "./recruiting-shared.js"
 import { toClassRef, toMixinRef, toRef } from "./sdk-boundary.js"
+import {
+  customerMixinWriteAttributes,
+  parseLeadEmployeeDocument,
+  parseLeadOrganizationDocument,
+  parseLeadPersonDocument,
+  parseOptionalLeadPersonDocument,
+  toMarkupBlobRef
+} from "./leads-mutations-boundary.js"
 
 // Parsed native Lead projection. The SDK response is decoded by
 // LeadMutationDocumentSchema before this internal representation is created;
@@ -130,49 +133,6 @@ export type LeadMutationError =
   | OrganizationNotFoundError
   | HulyDataInvalidError
 
-const toMarkupBlobRef = (value: NonEmptyString): MarkupBlobRef => toRef<Blob>(value)
-
-const parseBoundaryDocument = <S extends Schema.Constraint>(
-  schema: S,
-  value: unknown,
-  entity: string
-): Effect.Effect<S["Type"], HulyDataInvalidError, S["DecodingServices"]> =>
-  Schema.decodeUnknownEffect(schema)(value).pipe(
-    Effect.mapError((cause) => new HulyDataInvalidError({ operation: "leadMutation", entity, cause }))
-  )
-
-const parseLeadPersonDocument = Effect.fn("Lead.parsePersonDocument")(
-  (value: unknown): Effect.Effect<LeadPersonDocument, HulyDataInvalidError> =>
-    parseBoundaryDocument(LeadPersonDocumentSchema, value, "Person document")
-)
-
-const parseOptionalLeadPersonDocument = Effect.fn("Lead.parseOptionalPersonDocument")(
-  (value: Person | undefined): Effect.Effect<LeadPersonDocument | undefined, HulyDataInvalidError> =>
-    value === undefined ? Effect.succeed(undefined) : parseLeadPersonDocument(value)
-)
-
-const parseLeadEmployeeDocument = Effect.fn("Lead.parseEmployeeDocument")(
-  (value: unknown): Effect.Effect<LeadEmployeeDocument, HulyDataInvalidError> =>
-    parseBoundaryDocument(LeadEmployeeDocumentSchema, value, "Employee document")
-)
-
-const parseLeadOrganizationDocument = Effect.fn("Lead.parseOrganizationDocument")(
-  (value: unknown): Effect.Effect<LeadOrganizationDocument, HulyDataInvalidError> =>
-    parseBoundaryDocument(LeadOrganizationDocumentSchema, value, "Organization document")
-)
-
-export const customerMixinWriteAttributes = Effect.fn("Lead.customerMixinWriteAttributes")(function* (
-  value: unknown
-): Effect.fn.Return<Pick<CustomerMixinWrite, "customerDescription">, HulyDataInvalidError> {
-  const attributes = yield* parseBoundaryDocument<typeof LeadCustomerMixinAttributesSchema>(
-    LeadCustomerMixinAttributesSchema,
-    value,
-    "Customer mixin attributes"
-  )
-  const customerDescription = attributes.customerDescription
-  return { customerDescription: customerDescription === null ? null : toMarkupBlobRef(customerDescription) }
-})
-
 const parseLeadMutationDocument = Effect.fn("Lead.parseMutationDocument")(
   (value: unknown): Effect.Effect<HulyLead, HulyDataInvalidError> =>
     Schema.decodeUnknownEffect(LeadMutationDocumentSchema)(value).pipe(
@@ -207,7 +167,7 @@ export const hasCustomerMixin = (customer: HulyCustomer): boolean =>
   Object.hasOwn(customer, String(leadClassIds.mixin.Customer))
 
 export const uniquePersonMatch = Effect.fn("Lead.uniquePersonMatch")((
-  identifier: string,
+  identifier: PersonLocator,
   candidates: ReadonlyArray<LeadPersonDocument | undefined>
 ): Effect.Effect<LeadPersonDocument, PersonIdentifierAmbiguousError | PersonNotFoundError> => {
   const uniqueMatches = [
