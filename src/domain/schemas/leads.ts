@@ -58,6 +58,33 @@ export const LeadIdentifier = Schema.String.pipe(
 ).annotate({ jsonSchema: { type: "string", pattern: "^LEAD-[0-9]+$" } })
 export type LeadIdentifier = Schema.Schema.Type<typeof LeadIdentifier>
 
+export const LeadMutationDocumentSchema = Schema.Struct({
+  _id: DocId,
+  _class: DocId,
+  space: DocId,
+  modifiedBy: DocId,
+  modifiedOn: Timestamp,
+  title: NonEmptyString,
+  identifier: LeadIdentifier,
+  status: DocId,
+  kind: DocId,
+  assignee: Schema.NullOr(DocId),
+  description: Schema.NullOr(DocId),
+  startDate: Schema.NullOr(Timestamp),
+  dueDate: Schema.NullOr(Timestamp),
+  attachedTo: Schema.optional(DocId),
+  attachedToClass: Schema.optional(DocId),
+  collection: Schema.optional(Schema.Literal("leads")),
+  comments: Schema.optional(Count),
+  attachments: Schema.optional(Count),
+  labels: Schema.optional(Count)
+}).annotate({
+  title: "LeadMutationDocument",
+  description: "Schema-owned native Lead fields used by mutation operations."
+})
+
+export type LeadMutationDocument = Schema.Schema.Type<typeof LeadMutationDocumentSchema>
+
 // --- Output Schemas ---
 
 export const FunnelSummarySchema = Schema.Struct({
@@ -185,7 +212,10 @@ export const CreateLeadParamsSchema = Schema.Struct({
     })
   ),
   status: Schema.optional(
-    StatusName.annotateKey({ description: "Optional exact status name within the selected task type workflow." })
+    StatusName.annotateKey({
+      description:
+        "Optional status name matched exactly after normalization (trimmed, case-insensitive, and ignoring spaces, hyphens, and underscores)."
+    })
   ),
   taskType: Schema.optional(
     TaskTypeRefSchema.annotateKey({
@@ -221,7 +251,12 @@ export const UpdateLeadParamsSchema = Schema.Struct({
   description: Schema.optional(
     Schema.NullOr(Schema.String).annotateKey({ description: "Replacement Markdown description; null clears it." })
   ),
-  status: Schema.optional(StatusName.annotateKey({ description: "Replacement exact workflow status name." })),
+  status: Schema.optional(
+    StatusName.annotateKey({
+      description:
+        "Replacement workflow status name matched exactly after normalization (trimmed, case-insensitive, and ignoring spaces, hyphens, and underscores)."
+    })
+  ),
   assignee: Schema.optional(
     Schema.NullOr(PersonRefInput).annotateKey({
       description: "Replacement employee ID, exact email address, or exact display name; null unassigns."
@@ -256,7 +291,10 @@ export const MoveLeadParamsSchema = Schema.Struct({
   identifier: LeadIdentifier.annotateKey({ description: "Lead identifier, such as LEAD-1." }),
   destinationFunnel: FunnelReference.annotateKey({ description: "Destination funnel ID or exact funnel name." }),
   status: Schema.optional(
-    StatusName.annotateKey({ description: "Optional exact destination workflow status; omit to map by status name." })
+    StatusName.annotateKey({
+      description:
+        "Optional destination workflow status matched exactly after normalization (trimmed, case-insensitive, and ignoring spaces, hyphens, and underscores); omit to map by status name."
+    })
   )
 }).annotate({
   title: "MoveLeadParams",
@@ -277,13 +315,14 @@ const DeleteLeadExecuteSchema = Schema.Struct({
   identifier: LeadIdentifier.annotateKey({ description: "Lead identifier, such as LEAD-1." }),
   execute: Schema.Literal(true),
   expectedComments: Count.annotateKey({ description: "Comment count observed during deletion preflight." }),
-  expectedAttachments: Count.annotateKey({ description: "Attachment count observed during deletion preflight." })
+  expectedAttachments: Count.annotateKey({ description: "Attachment count observed during deletion preflight." }),
+  expectedLabels: Count.annotateKey({ description: "Label count observed during deletion preflight." })
 })
 
 export const DeleteLeadParamsSchema = Schema.Union([DeleteLeadPreviewSchema, DeleteLeadExecuteSchema]).annotate({
   title: "DeleteLeadParams",
   description:
-    "Preview lead deletion impact by default. To execute, pass execute=true and the exact observed comment and attachment counts."
+    "Preview lead deletion impact by default. To execute, pass execute=true and the exact observed comment, attachment, and label counts."
 })
 
 export type DeleteLeadParams = Schema.Schema.Type<typeof DeleteLeadParamsSchema>
@@ -312,7 +351,8 @@ export const listLeadsParamsJsonSchema = withJsonSchemaPropertyDescriptions(
   toDraft07JsonSchema(ListLeadsParamsSchema),
   {
     funnel: "Funnel ID returned by list_funnels, or exact funnel name.",
-    status: "Filter by exact status name.",
+    status:
+      "Filter by a status name matched exactly after normalization (trimmed, case-insensitive, and ignoring spaces, hyphens, and underscores).",
     assignee: "Filter by assignee email or display name.",
     titleSearch: "Search leads by title substring (case-insensitive).",
     limit: `Maximum number of leads to return (default: ${DEFAULT_LIMIT}).`
@@ -330,7 +370,8 @@ export const createLeadParamsJsonSchema = withJsonSchemaPropertyDescriptions(
     title: "Non-empty lead title.",
     description: "Optional Markdown description.",
     assignee: "Optional employee assignee by ID, exact email, or exact display name.",
-    status: "Optional exact workflow status name.",
+    status:
+      "Optional workflow status name matched exactly after normalization (trimmed, case-insensitive, and ignoring spaces, hyphens, and underscores).",
     taskType: "Optional native Lead task type ID or exact display name."
   }
 )
@@ -387,10 +428,12 @@ export const MoveLeadResultSchema = Schema.Struct({
 }).annotate({ title: "MoveLeadResult", description: "Result of moving a native lead between funnels." })
 export type MoveLeadResult = Schema.Schema.Type<typeof MoveLeadResultSchema>
 
-export const LeadImpactSchema = Schema.Struct({ comments: Count, attachments: Count, totalAffected: Count }).annotate({
-  title: "LeadImpact",
-  description: "Known native lead content affected by deletion."
-})
+export const LeadImpactSchema = Schema.Struct({
+  comments: Count,
+  attachments: Count,
+  labels: Count,
+  totalAffected: Count
+}).annotate({ title: "LeadImpact", description: "Authoritative native lead content counts affected by deletion." })
 export type LeadImpact = Schema.Schema.Type<typeof LeadImpactSchema>
 
 export const DeleteLeadResultSchema = Schema.Struct({

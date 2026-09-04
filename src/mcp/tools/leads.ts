@@ -153,7 +153,7 @@ export const leadTools = [
     {
       name: "create_lead",
       description:
-        "Create one native Huly lead in an active funnel for an existing person or organization. Resolve the funnel by ID or exact name; identify the customer explicitly as person or organization; optionally choose an employee assignee, Lead-compatible task type, exact workflow status, and Markdown description. Automatically applies the Customer mixin when needed, preserves native Huly references, and returns both leadId and LEAD-<number>. This tool never creates a person or organization inline.",
+        "Create one native Huly lead in an active funnel for an existing person or organization. Resolve the funnel by ID or exact name; identify the customer explicitly as person or organization; optionally choose an employee assignee, a workflow status matched exactly after normalization (trimmed, case-insensitive, and ignoring spaces, hyphens, and underscores), and Markdown description. Automatically applies the Customer mixin when needed, preserves native Huly references, and returns both leadId and LEAD-<number>. This tool never creates a person or organization inline.",
       category: CATEGORY,
       inputSchema: createLeadParamsJsonSchema,
       resultSchema: CreateLeadResultSchema
@@ -165,7 +165,7 @@ export const leadTools = [
     {
       name: "update_lead",
       description:
-        "Update a native Huly lead by funnel ID or exact name and LEAD-<number> identifier. Supported fields are title, Markdown description, exact workflow status, employee assignee, start date, due date, and Customer mixin description. Omitted fields are unchanged; pass null explicitly to clear description, assignee, dates, or customer description. Existing people are resolved exactly and ambiguous identifiers fail.",
+        "Update a native Huly lead by funnel ID or exact name and LEAD-<number> identifier. Supported fields are title, Markdown description, a workflow status matched exactly after normalization (trimmed, case-insensitive, and ignoring spaces, hyphens, and underscores), employee assignee, start date, due date, and Customer mixin description. Omitted fields are unchanged; pass null explicitly to clear description, assignee, dates, or customer description. Existing people are resolved exactly and ambiguous identifiers fail.",
       category: CATEGORY,
       inputSchema: updateLeadParamsJsonSchema,
       resultSchema: LeadMutationResultSchema
@@ -177,7 +177,7 @@ export const leadTools = [
     {
       name: "move_lead",
       description:
-        "Move a native Huly lead to another active funnel after validating both native Funnel project types and Lead workflows. Pass an exact destination status, or omit status to map the current status name; incompatible or ambiguous mappings fail without writing.",
+        "Move a native Huly lead to another active funnel after validating both native Funnel project types and Lead workflows. Pass a destination status matched exactly after normalization (trimmed, case-insensitive, and ignoring spaces, hyphens, and underscores), or omit status to map the current status name; incompatible or ambiguous mappings fail without writing.",
       category: CATEGORY,
       inputSchema: moveLeadParamsJsonSchema,
       resultSchema: MoveLeadResultSchema
@@ -189,7 +189,7 @@ export const leadTools = [
     {
       name: "delete_lead",
       description:
-        "Preview native lead deletion impact by default. To permanently delete, pass execute=true together with the exact comment and attachment counts returned by the preview; deletion fails if impact changed.",
+        "Preview native lead deletion impact by default. The preview reads authoritative comment, attachment, and label relation counts. To permanently delete, pass execute=true together with the exact counts returned by the preview; deletion fails if impact changed.",
       category: CATEGORY,
       inputSchema: deleteLeadParamsJsonSchema,
       resultSchema: DeleteLeadResultSchema

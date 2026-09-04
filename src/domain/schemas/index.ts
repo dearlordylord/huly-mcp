@@ -2794,6 +2794,8 @@ export {
   type LeadImpact,
   LeadImpactSchema,
   LeadIdentifier,
+  type LeadMutationDocument,
+  LeadMutationDocumentSchema,
   type LeadMutationResult,
   LeadMutationResultSchema,
   type LeadSummary,

@@ -156,8 +156,6 @@ import {
   IssueNotFoundError,
   IssueReferenceError,
   IssueTemplateNotFoundError,
-  LeadDeleteConflictError,
-  LeadMoveConflictError,
   LeadNotFoundError,
   LeadUpdateConflictError,
   MasterTagNotFoundError,

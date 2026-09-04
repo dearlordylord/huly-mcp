@@ -58,6 +58,7 @@ LEAD_CLEANUP_ID=""
 LEAD_CLEANUP_FUNNEL_ID=""
 LEAD_DESTINATION_FUNNEL_CLEANUP_ID=""
 LEAD_PERSON_CLEANUP_ID=""
+LEAD_PERSON_AMBIGUOUS_CLEANUP_ID=""
 CUSTOM_FIELD_DATE_CLEANUP_ISSUE_ID=""
 CUSTOM_FIELD_DATE_CLEANUP_FIELD_ID=""
 CUSTOM_FIELD_DATE_CLEANUP_FIELD_NAME=""
@@ -346,15 +347,16 @@ cleanup_funnel_artifacts() {
 cleanup_lead_artifacts() {
   local cleanup_failed=0
   if [ -n "$LEAD_CLEANUP_ID" ] && [ -n "$LEAD_CLEANUP_FUNNEL_ID" ]; then
-    local lead_json funnel_json preview preview_text comments attachments delete_response delete_read
+    local lead_json funnel_json preview preview_text comments attachments labels delete_response delete_read
     lead_json=$(json_string "$LEAD_CLEANUP_ID")
     funnel_json=$(json_string "$LEAD_CLEANUP_FUNNEL_ID")
     preview=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_lead\",\"arguments\":{\"funnel\":$funnel_json,\"identifier\":$lead_json}},\"id\":2}" 2>/dev/null || true)
     preview_text=$(echo "$preview" | jq -r '.result.content[0].text // empty' 2>/dev/null)
     comments=$(echo "$preview_text" | jq -r '.impact.comments // empty' 2>/dev/null)
     attachments=$(echo "$preview_text" | jq -r '.impact.attachments // empty' 2>/dev/null)
-    if [ -n "$comments" ] && [ -n "$attachments" ]; then
-      delete_response=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_lead\",\"arguments\":{\"funnel\":$funnel_json,\"identifier\":$lead_json,\"execute\":true,\"expectedComments\":$comments,\"expectedAttachments\":$attachments}},\"id\":2}" 2>/dev/null || true)
+    labels=$(echo "$preview_text" | jq -r '.impact.labels // empty' 2>/dev/null)
+    if [ -n "$comments" ] && [ -n "$attachments" ] && [ -n "$labels" ]; then
+      delete_response=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_lead\",\"arguments\":{\"funnel\":$funnel_json,\"identifier\":$lead_json,\"execute\":true,\"expectedComments\":$comments,\"expectedAttachments\":$attachments,\"expectedLabels\":$labels}},\"id\":2}" 2>/dev/null || true)
       restart_http_transport_if_needed "after lead cleanup delete" >/dev/null 2>&1 || cleanup_failed=1
       delete_read=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_lead\",\"arguments\":{\"funnel\":$funnel_json,\"identifier\":$lead_json}},\"id\":2}" 2>/dev/null || true)
       if [ "$(echo "$delete_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
@@ -377,6 +379,19 @@ cleanup_lead_artifacts() {
     if [ "$(echo "$delete_person_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
       && [ "$(echo "$person_read" | jq -r '(.result.isError // false) and ((.result.content[0].text // "") | contains("not found"))' 2>/dev/null)" = "true" ]; then
       LEAD_PERSON_CLEANUP_ID=""
+    else
+      cleanup_failed=1
+    fi
+  fi
+  if [ -n "$LEAD_PERSON_AMBIGUOUS_CLEANUP_ID" ]; then
+    local ambiguous_person_json ambiguous_delete_response ambiguous_person_read
+    ambiguous_person_json=$(json_string "$LEAD_PERSON_AMBIGUOUS_CLEANUP_ID")
+    ambiguous_delete_response=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$ambiguous_person_json}},\"id\":2}" 2>/dev/null || true)
+    restart_http_transport_if_needed "after ambiguous lead person cleanup delete" >/dev/null 2>&1 || cleanup_failed=1
+    ambiguous_person_read=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":$ambiguous_person_json}},\"id\":2}" 2>/dev/null || true)
+    if [ "$(echo "$ambiguous_delete_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
+      && [ "$(echo "$ambiguous_person_read" | jq -r '(.result.isError // false) and ((.result.content[0].text // "") | contains("not found"))' 2>/dev/null)" = "true" ]; then
+      LEAD_PERSON_AMBIGUOUS_CLEANUP_ID=""
     else
       cleanup_failed=1
     fi
@@ -1656,12 +1671,10 @@ run_expect_error() {
   return 1
 }
 
-run_expect_error_contains() {
-  local name="$1"
-  local payload="$2"
-  local expected="$3"
+run_expect_error_contains_with_runner() {
+  local runner="$1" name="$2" payload="$3" expected="$4"
   local result
-  result=$(call_tool "$payload")
+  result=$("$runner" "$payload")
   if [ -z "$result" ]; then
     echo "FAIL: $name (no response, expected error)"
     FAILED=$((FAILED + 1))
@@ -1704,6 +1717,14 @@ wait_for_error_contains() {
   done
   fail_test "$name" "expected error containing '$expected' after $attempts fresh-session attempts"
   return 1
+}
+
+run_expect_error_contains() {
+  run_expect_error_contains_with_runner call_tool "$@"
+}
+
+run_expect_error_contains_fresh() {
+  run_expect_error_contains_with_runner call_tool_fresh_session "$@"
 }
 
 # Fetch doc content, assert substring present. Args: test_name teamspace doc_id substring
@@ -2330,13 +2351,68 @@ if [ $? -eq 0 ]; then
       LEAD_FIXTURE_SUFFIX="$RUN_ID-$$"
       LEAD_PERSON_EMAIL="lead-person-$LEAD_FIXTURE_SUFFIX@test.local"
       LEAD_PERSON_EMAIL_JSON=$(json_string "$LEAD_PERSON_EMAIL")
+      LEAD_PERSON_ID=""
       LEAD_PERSON_TITLE="Integration person lead $LEAD_FIXTURE_SUFFIX"
       LEAD_PERSON_TITLE_JSON=$(json_string "$LEAD_PERSON_TITLE")
       run_capture_to_var LEAD_PERSON_TEXT "create_person(for_create_lead)" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":\"Lead\",\"lastName\":\"Person $LEAD_FIXTURE_SUFFIX\",\"email\":$LEAD_PERSON_EMAIL_JSON}},\"id\":2}"
       if [ $? -eq 0 ]; then
-        LEAD_PERSON_ID=$(echo "$LEAD_PERSON_TEXT" | jq -r '.id // empty' 2>/dev/null)
-        run_capture_to_var CREATED_PERSON_LEAD_TEXT "create_lead(person:$LEAD_PERSON_ID)" \
+      LEAD_PERSON_ID=$(echo "$LEAD_PERSON_TEXT" | jq -r '.id // empty' 2>/dev/null)
+      LEAD_PERSON_NAME="Lead Person $LEAD_FIXTURE_SUFFIX"
+      LEAD_PERSON_NAME_JSON=$(json_string "$LEAD_PERSON_NAME")
+      if [ -n "$LEAD_PERSON_ID" ]; then
+        # Register the person before any Customer-mixin or lead mutation so an
+        # interrupted run can remove the exact fixture it created.
+        LEAD_PERSON_CLEANUP_ID="$LEAD_PERSON_ID"
+        run_capture_to_var_fresh PERSON_CUSTOMER_BY_ID_TEXT "make_person_customer(id:$LEAD_PERSON_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"make_person_customer\",\"arguments\":{\"identifier\":$(json_string \"$LEAD_PERSON_ID\")}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          assert_json_field_equals "make_person_customer first application" "$PERSON_CUSTOMER_BY_ID_TEXT" '.applied' "true"
+          run_capture_to_var_fresh PERSON_CUSTOMER_SECOND_TEXT "make_person_customer second idempotent call" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"make_person_customer\",\"arguments\":{\"identifier\":$(json_string \"$LEAD_PERSON_ID\")}},\"id\":2}"
+          if [ $? -eq 0 ]; then
+            assert_json_field_equals "make_person_customer second application is no-op" "$PERSON_CUSTOMER_SECOND_TEXT" '.applied' "false"
+          fi
+        fi
+        run_capture_to_var_fresh PERSON_CUSTOMER_BY_EMAIL_TEXT "make_person_customer exact email" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"make_person_customer\",\"arguments\":{\"identifier\":$LEAD_PERSON_EMAIL_JSON}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          assert_json_field_equals "make_person_customer email resolves existing person" "$PERSON_CUSTOMER_BY_EMAIL_TEXT" '.applied' "false"
+        fi
+        run_capture_to_var_fresh PERSON_CUSTOMER_BY_NAME_TEXT "make_person_customer exact display name" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"make_person_customer\",\"arguments\":{\"identifier\":$LEAD_PERSON_NAME_JSON}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          assert_json_field_equals "make_person_customer name resolves existing person" "$PERSON_CUSTOMER_BY_NAME_TEXT" '.applied' "false"
+        fi
+        run_capture_to_var_fresh PERSON_CUSTOMER_PERSONS_TEXT "list_persons confirms no inline person creation" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_persons\",\"arguments\":{\"emailSearch\":$LEAD_PERSON_EMAIL_JSON,\"limit\":10}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          assert_json_field_equals "make_person_customer keeps one exact person" "$PERSON_CUSTOMER_PERSONS_TEXT" 'length' "1"
+          assert_json_field_equals "make_person_customer preserves person ID" "$PERSON_CUSTOMER_PERSONS_TEXT" '.[0].id' "$LEAD_PERSON_ID"
+          assert_json_field_equals "make_person_customer preserves person name" "$PERSON_CUSTOMER_PERSONS_TEXT" '.[0].name' "$LEAD_PERSON_NAME"
+        fi
+
+        LEAD_AMBIGUOUS_EMAIL="lead-person-ambiguous-$LEAD_FIXTURE_SUFFIX@test.local"
+        LEAD_AMBIGUOUS_EMAIL_JSON=$(json_string "$LEAD_AMBIGUOUS_EMAIL")
+        run_capture_to_var LEAD_AMBIGUOUS_PERSON_TEXT "create_person(duplicate lead display name)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":\"Lead\",\"lastName\":\"Person $LEAD_FIXTURE_SUFFIX\",\"email\":$LEAD_AMBIGUOUS_EMAIL_JSON}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          LEAD_PERSON_AMBIGUOUS_CLEANUP_ID=$(echo "$LEAD_AMBIGUOUS_PERSON_TEXT" | jq -r '.id // empty' 2>/dev/null)
+          if [ -n "$LEAD_PERSON_AMBIGUOUS_CLEANUP_ID" ]; then
+            # Register the second exact-name fixture before the ambiguity probe
+            # so interrupted runs can remove it without guessing.
+            run_expect_error_contains_fresh "make_person_customer rejects ambiguous display name" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"make_person_customer\",\"arguments\":{\"identifier\":$LEAD_PERSON_NAME_JSON}},\"id\":2}" \
+              "matched 2 people"
+          else
+            fail_test "duplicate lead display name fixture" "create_person returned no stable person ID"
+          fi
+        fi
+      else
+        fail_test "make_person_customer fixture" "create_person returned no stable person ID"
+      fi
+      if [ -n "$LEAD_PERSON_ID" ]; then
+      run_capture_to_var CREATED_PERSON_LEAD_TEXT "create_lead(person:$LEAD_PERSON_ID)" \
           "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_lead\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"customer\":{\"kind\":\"person\",\"identifier\":\"$LEAD_PERSON_ID\"},\"title\":$LEAD_PERSON_TITLE_JSON,\"description\":\"Created by the local Docker integration suite.\"}},\"id\":2}"
         if [ $? -eq 0 ]; then
           CREATED_PERSON_LEAD_IDENTIFIER=$(echo "$CREATED_PERSON_LEAD_TEXT" | jq -r '.identifier // empty' 2>/dev/null)
@@ -2388,9 +2464,10 @@ if [ $? -eq 0 ]; then
                     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_lead\",\"arguments\":{\"funnel\":$CLEANUP_LEAD_FUNNEL_JSON,\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\"}},\"id\":2}"
                   LEAD_DELETE_COMMENTS=$(echo "$LEAD_DELETE_PREVIEW" | jq -r '.impact.comments // empty' 2>/dev/null)
                   LEAD_DELETE_ATTACHMENTS=$(echo "$LEAD_DELETE_PREVIEW" | jq -r '.impact.attachments // empty' 2>/dev/null)
-                  if [ -n "$LEAD_DELETE_COMMENTS" ] && [ -n "$LEAD_DELETE_ATTACHMENTS" ]; then
+                  LEAD_DELETE_LABELS=$(echo "$LEAD_DELETE_PREVIEW" | jq -r '.impact.labels // empty' 2>/dev/null)
+                  if [ -n "$LEAD_DELETE_COMMENTS" ] && [ -n "$LEAD_DELETE_ATTACHMENTS" ] && [ -n "$LEAD_DELETE_LABELS" ]; then
                     run_capture_to_var_fresh LEAD_DELETE_TEXT "delete_lead execute($CREATED_PERSON_LEAD_IDENTIFIER)" \
-                      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_lead\",\"arguments\":{\"funnel\":$CLEANUP_LEAD_FUNNEL_JSON,\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"execute\":true,\"expectedComments\":$LEAD_DELETE_COMMENTS,\"expectedAttachments\":$LEAD_DELETE_ATTACHMENTS}},\"id\":2}"
+                      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_lead\",\"arguments\":{\"funnel\":$CLEANUP_LEAD_FUNNEL_JSON,\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"execute\":true,\"expectedComments\":$LEAD_DELETE_COMMENTS,\"expectedAttachments\":$LEAD_DELETE_ATTACHMENTS,\"expectedLabels\":$LEAD_DELETE_LABELS}},\"id\":2}"
                     if [ $? -eq 0 ]; then
                       assert_json_field_equals "delete_lead reports deleted" "$LEAD_DELETE_TEXT" '.deleted' "true"
                       if wait_for_lead_deleted "delete_lead persists deletion" "$LEAD_CLEANUP_FUNNEL_ID" "$CREATED_PERSON_LEAD_IDENTIFIER"; then
@@ -2406,8 +2483,9 @@ if [ $? -eq 0 ]; then
             fi
           fi
         fi
+      fi
       else
-        skip_test "create_lead(person)" "could not create person fixture"
+        fail_test "create_lead(person)" "could not create person fixture"
       fi
 
       LEAD_ORG_NAME="Integration Lead Org $LEAD_FIXTURE_SUFFIX"

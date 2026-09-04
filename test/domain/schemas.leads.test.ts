@@ -8,6 +8,7 @@ import {
   FunnelSummarySchema,
   getLeadParamsJsonSchema,
   LeadDetailSchema,
+  LeadMutationDocumentSchema,
   LeadSummarySchema,
   listFunnelsParamsJsonSchema,
   listLeadsParamsJsonSchema,
@@ -31,7 +32,44 @@ type JsonSchemaObject = {
   properties?: Record<string, { description?: string }>
 }
 
+const isJsonSchemaObject = (value: unknown): value is JsonSchemaObject => typeof value === "object" && value !== null
+
+const expectJsonSchemaObject = (value: unknown): JsonSchemaObject => {
+  if (isJsonSchemaObject(value)) return value
+  throw new Error("Expected a JSON Schema object")
+}
+
 describe("Lead Schemas", () => {
+  it.effect("decodes the schema-owned native lead mutation boundary", () =>
+    Effect.gen(function* () {
+      const result = yield* Schema.decodeUnknownEffect(LeadMutationDocumentSchema)({
+        _id: "lead-document-1",
+        _class: "lead:class:Lead",
+        space: "funnel-1",
+        modifiedBy: "person-1",
+        modifiedOn: 1700000000000,
+        title: "Qualified opportunity",
+        identifier: "lead-7",
+        status: "status-incoming",
+        kind: "task-type-lead",
+        assignee: null,
+        description: "markup-ref-1",
+        startDate: null,
+        dueDate: 1700000000000,
+        attachedTo: "person-1",
+        attachedToClass: "contact:class:Person",
+        collection: "leads",
+        comments: 2,
+        attachments: 1,
+        labels: 3
+      })
+
+      expect(result.identifier).toBe("LEAD-7")
+      expect(result.description).toBe("markup-ref-1")
+      expect(result.labels).toBe(3)
+    })
+  )
+
   describe("FunnelSummarySchema", () => {
     it.effect("accepts valid funnel summary", () =>
       Effect.gen(function* () {
@@ -135,7 +173,7 @@ describe("Lead Schemas", () => {
     )
 
     it("generates valid JSON schema", () => {
-      const schema = listFunnelsParamsJsonSchema as JsonSchemaObject
+      const schema = expectJsonSchemaObject(listFunnelsParamsJsonSchema)
       expect(schema.type).toBe("object")
     })
   })
@@ -169,7 +207,7 @@ describe("Lead Schemas", () => {
     )
 
     it("generates valid JSON schema", () => {
-      const schema = listLeadsParamsJsonSchema as JsonSchemaObject
+      const schema = expectJsonSchemaObject(listLeadsParamsJsonSchema)
       expect(schema.type).toBe("object")
       expect(schema.required).toContain("funnel")
     })
@@ -206,7 +244,7 @@ describe("Lead Schemas", () => {
     )
 
     it("generates valid JSON schema", () => {
-      const schema = getLeadParamsJsonSchema as JsonSchemaObject
+      const schema = expectJsonSchemaObject(getLeadParamsJsonSchema)
       expect(schema.type).toBe("object")
       expect(schema.required).toContain("funnel")
       expect(schema.required).toContain("identifier")
@@ -278,7 +316,7 @@ describe("Lead Schemas", () => {
     )
 
     it("generates an LLM-readable JSON schema", () => {
-      const schema = createLeadParamsJsonSchema as JsonSchemaObject
+      const schema = expectJsonSchemaObject(createLeadParamsJsonSchema)
       expect(schema.required).toEqual(expect.arrayContaining(["funnel", "customer", "title"]))
       expect(schema.properties?.customer?.description).toMatch(/existing/i)
     })
@@ -320,7 +358,8 @@ describe("Lead Schemas", () => {
           identifier: "LEAD-2",
           execute: true,
           expectedComments: 0,
-          expectedAttachments: 1
+          expectedAttachments: 1,
+          expectedLabels: 0
         })
 
         expect(move.destinationFunnel).toBe("destination")
@@ -346,9 +385,9 @@ describe("Lead Schemas", () => {
     )
 
     it("describes nullable and exact mutation contracts in JSON schemas", () => {
-      const update = updateLeadParamsJsonSchema as JsonSchemaObject
-      const deleteSchema = deleteLeadParamsJsonSchema as JsonSchemaObject
-      const customer = makePersonCustomerParamsJsonSchema as JsonSchemaObject
+      const update = expectJsonSchemaObject(updateLeadParamsJsonSchema)
+      const deleteSchema = expectJsonSchemaObject(deleteLeadParamsJsonSchema)
+      const customer = expectJsonSchemaObject(makePersonCustomerParamsJsonSchema)
       expect(update.properties?.description?.description).toContain("null clears")
       expect(deleteSchema.anyOf).toBeDefined()
       expect(customer.properties?.identifier?.description).toContain("exact email address")
