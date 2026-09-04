@@ -5,12 +5,15 @@ import { Effect } from "effect"
 import type {
   AddHrRequestAttachmentParams,
   AddHrRequestCommentParams,
+  DeleteHrRequestAttachmentResult,
   DeleteHrRequestAttachmentParams,
+  DeleteHrRequestCommentResult,
   DeleteHrRequestCommentParams,
   GetHrRequestAttachmentParams,
   ListHrRequestAttachmentsParams,
   ListHrRequestCommentsParams,
   UpdateHrRequestAttachmentParams,
+  UpdateHrRequestAttachmentResult,
   UpdateHrRequestCommentParams
 } from "../../domain/schemas.js"
 import { HrRequestId } from "../../domain/schemas.js"
@@ -97,7 +100,12 @@ export const deleteHrRequestComment = (params: DeleteHrRequestCommentParams) =>
       params.commentId,
       commentMissing(params.request, params.commentId)
     )
-    return { request: HrRequestId.make(request._id), commentId: params.commentId, deleted: true }
+    const result: DeleteHrRequestCommentResult = {
+      request: HrRequestId.make(request._id),
+      commentId: params.commentId,
+      deleted: true
+    }
+    return result
   })
 export const listHrRequestAttachments = (params: ListHrRequestAttachmentsParams) =>
   Effect.gen(function* () {
@@ -145,7 +153,12 @@ export const updateHrRequestAttachment = (params: UpdateHrRequestAttachmentParam
     const client = yield* HulyClient
     const request = yield* resolveHrRequest(client, params.request)
     yield* updateAttachmentForScope(client, params.attachmentId, params, scopeFor(request))
-    return { request: HrRequestId.make(request._id), attachmentId: params.attachmentId, updated: true }
+    const result: UpdateHrRequestAttachmentResult = {
+      request: HrRequestId.make(request._id),
+      attachmentId: params.attachmentId,
+      updated: true
+    }
+    return result
   })
 export const deleteHrRequestAttachment = (params: DeleteHrRequestAttachmentParams) =>
   Effect.gen(function* () {
@@ -163,5 +176,10 @@ export const deleteHrRequestAttachment = (params: DeleteHrRequestAttachmentParam
       hr.class.Request,
       "attachments"
     )
-    return { request: HrRequestId.make(request._id), attachmentId: params.attachmentId, deleted: true }
+    const result: DeleteHrRequestAttachmentResult = {
+      request: HrRequestId.make(request._id),
+      attachmentId: params.attachmentId,
+      deleted: true
+    }
+    return result
   })

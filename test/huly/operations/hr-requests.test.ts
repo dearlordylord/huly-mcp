@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   HrRequestTypeIdentifier,
-  NonEmptyString,
+  HrRequestTypeLabelResource,
   parseAddHrRequestAttachmentParams,
   parseCreateHrRequestParams,
   parseListHrRequestsParams,
@@ -20,6 +20,7 @@ import {
 import { resolveHrRequestTypeFrom, toHrRequestTypeSummary } from "../../../src/huly/operations/hr-requests.js"
 import {
   parseHrRequestRecord,
+  parseHrRequestEmployeeRecord,
   parseHrRequestTypeRecord,
   parseHrStaffRecord,
   type HrRequestTypeRecord
@@ -27,13 +28,13 @@ import {
 
 const requestType = (id: string, label: string): HrRequestTypeRecord => ({
   _id: HrRequestTypeIdentifier.make(id),
-  label: NonEmptyString.make(getEmbeddedLabel(label)),
+  label: HrRequestTypeLabelResource.make(getEmbeddedLabel(label)),
   value: -1,
   color: ColorCode.make(2)
 })
 const localizedRequestType = (id: string, labelResource: string): HrRequestTypeRecord => ({
   ...requestType(id, "unused"),
-  label: NonEmptyString.make(labelResource)
+  label: HrRequestTypeLabelResource.make(labelResource)
 })
 
 describe("HR request contracts", () => {
@@ -131,8 +132,8 @@ describe("HR request contracts", () => {
       Effect.runSync(toHrRequestTypeSummary(localizedRequestType("type-remote", "hr:string:Remote"), "fr")).label
     ).toBe("Télétravail")
     expect(
-      Effect.runSync(toHrRequestTypeSummary(localizedRequestType("type-external", "other:string:OnCall"))).label
-    ).toBe("other:string:OnCall")
+      Effect.runSync(Effect.flip(toHrRequestTypeSummary(localizedRequestType("type-external", "other:string:OnCall"))))
+    ).toBeInstanceOf(HulyDataInvalidError)
     expect(
       Effect.runSync(
         Effect.flip(toHrRequestTypeSummary(localizedRequestType("type-missing", "hr:string:MissingLabel"), "fr"))
@@ -173,7 +174,7 @@ describe("HR request contracts", () => {
 
   it("rejects corrupt Huly request, request-type, and Staff boundary records", () => {
     const malformedRequestType: unknown = { _id: "type-1", label: "hr:string:PTO", value: -1, color: "red" }
-    const malformedRequest: unknown = {
+    const malformedRequest = {
       _id: "request-1",
       space: "workspace",
       attachedTo: "employee-1",
@@ -186,12 +187,46 @@ describe("HR request contracts", () => {
       tzDueDate: { year: 2026, month: 8, day: 5, offset: 0 }
     }
     const malformedStaff: unknown = { _id: "employee-1", _class: "hr:mixin:Staff", department: "" }
+    const malformedEmployee: unknown = { _id: "employee-1", name: "" }
     const staffWithoutDepartment: unknown = { _id: "employee-1", _class: "hr:mixin:Staff" }
     expect(Effect.runSync(Effect.flip(parseHrRequestTypeRecord(malformedRequestType)))).toBeInstanceOf(
       HulyDataInvalidError
     )
     expect(Effect.runSync(Effect.flip(parseHrRequestRecord(malformedRequest)))).toBeInstanceOf(HulyDataInvalidError)
+    for (const tzDate of [
+      { year: 2026, month: 12, day: 1, offset: 0 },
+      { year: 2026, month: 1, day: 30, offset: 0 },
+      { year: 2026, month: 1, day: 1, offset: 60 },
+      { year: 2026, month: 1, day: Number.POSITIVE_INFINITY, offset: 0 }
+    ]) {
+      expect(
+        Effect.runSync(
+          Effect.flip(
+            parseHrRequestRecord({
+              ...malformedRequest,
+              tzDate,
+              tzDueDate: { year: 2026, month: 1, day: 1, offset: 0 }
+            })
+          )
+        )
+      ).toBeInstanceOf(HulyDataInvalidError)
+    }
+    expect(
+      Effect.runSync(
+        Effect.flip(
+          parseHrRequestRecord({
+            ...malformedRequest,
+            collection: "comments",
+            tzDate: { year: 2026, month: 1, day: 1, offset: 0 },
+            tzDueDate: { year: 2026, month: 1, day: 1, offset: 0 }
+          })
+        )
+      )
+    ).toBeInstanceOf(HulyDataInvalidError)
     expect(Effect.runSync(Effect.flip(parseHrStaffRecord(malformedStaff)))).toBeInstanceOf(HulyDataInvalidError)
+    expect(Effect.runSync(Effect.flip(parseHrRequestEmployeeRecord(malformedEmployee)))).toBeInstanceOf(
+      HulyDataInvalidError
+    )
     expect(Effect.runSync(parseHrStaffRecord(staffWithoutDepartment))).toEqual(staffWithoutDepartment)
   })
 

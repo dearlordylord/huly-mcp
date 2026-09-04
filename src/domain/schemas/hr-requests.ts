@@ -19,6 +19,12 @@ export const HrRequestId = NonEmptyString.pipe(Schema.brand("HrRequestId"))
 export type HrRequestId = Schema.Schema.Type<typeof HrRequestId>
 export const HrRequestTypeIdentifier = NonEmptyString.pipe(Schema.brand("HrRequestTypeIdentifier"))
 export type HrRequestTypeIdentifier = Schema.Schema.Type<typeof HrRequestTypeIdentifier>
+export const HrRequestTypeNormalizedLocator = NonEmptyString.pipe(Schema.brand("HrRequestTypeNormalizedLocator"))
+export type HrRequestTypeNormalizedLocator = Schema.Schema.Type<typeof HrRequestTypeNormalizedLocator>
+export const HrRequestTypeLabel = NonEmptyString.pipe(Schema.brand("HrRequestTypeLabel"))
+export type HrRequestTypeLabel = Schema.Schema.Type<typeof HrRequestTypeLabel>
+export const HrRequestTypeLabelResource = NonEmptyString.pipe(Schema.brand("HrRequestTypeLabelResource"))
+export type HrRequestTypeLabelResource = Schema.Schema.Type<typeof HrRequestTypeLabelResource>
 const CALENDAR_MONTH_OFFSET = 1
 const isRealIsoCalendarDate = (value: string): boolean => {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
@@ -62,9 +68,9 @@ export type HrLocale = Schema.Schema.Type<typeof HrLocale>
 
 export const HrRequestTypeSummarySchema = Schema.Struct({
   id: HrRequestTypeIdentifier,
-  label: NonEmptyString,
+  label: HrRequestTypeLabel,
   labelLocale: HrLocale,
-  labelResource: NonEmptyString,
+  labelResource: HrRequestTypeLabelResource,
   value: Schema.Number,
   color: ColorCode,
   mutationSupported: Schema.Literal(false),
@@ -172,7 +178,7 @@ export const UpdateHrRequestResultSchema = Schema.Struct({
   updated: Schema.Literal(true)
 })
 export type UpdateHrRequestResult = Schema.Schema.Type<typeof UpdateHrRequestResultSchema>
-export const DeleteHrRequestResultSchema = Schema.Struct({ id: HrRequestId, deleted: Schema.Boolean })
+export const DeleteHrRequestResultSchema = Schema.Struct({ id: HrRequestId, deleted: Schema.Literal(true) })
 export type ListHrRequestsResult = Schema.Schema.Type<typeof ListHrRequestsResultSchema>
 export type DeleteHrRequestResult = Schema.Schema.Type<typeof DeleteHrRequestResultSchema>
 

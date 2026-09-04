@@ -633,18 +633,10 @@ cleanup_hr_artifacts() {
   return "$cleanup_failed"
 }
 
-call_tool_fresh_session() {
-  local payload="$1"
-  if [ "$INTEGRATION_TRANSPORT" = "http" ]; then
-    restart_http_transport_if_needed "employee position verification" >&2 || return 1
-  fi
-  call_tool "$payload"
-}
-
 run_capture_only_fresh() {
   local payload="$1"
   local result
-  result=$(call_tool_fresh_session "$payload")
+  result=$(call_tool "$payload")
   if [ -z "$result" ]; then
     return 1
   fi
@@ -664,6 +656,9 @@ employee_position_read_payload() {
 wait_for_employee_position() {
   local name="$1" expected_json="$2" count_result="${3:-true}" attempts=10 attempt=1 text=""
   while [ "$attempt" -le "$attempts" ]; do
+    # Restart in the parent shell so HTTP_SERVER_PID tracks the replacement.
+    # A restart inside text=$(...) would be lost with the command subshell.
+    restart_http_transport_if_needed "employee position verification" >&2 || return 1
     text=$(run_capture_only_fresh "$(employee_position_read_payload)" 2>/dev/null || true)
     if [ -n "$text" ] && printf '%s\n' "$text" | jq -e --arg id "$EMPLOYEE_POSITION_CLEANUP_ID" \
       --argjson expected "$expected_json" \
@@ -694,7 +689,8 @@ restore_employee_position() {
   local employee_json restore_payload restore_result
   employee_json=$(json_string "$EMPLOYEE_POSITION_CLEANUP_ID")
   restore_payload="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_employee_position\",\"arguments\":{\"employee\":{\"id\":$employee_json},\"position\":$EMPLOYEE_POSITION_CLEANUP_ORIGINAL_POSITION_JSON}},\"id\":2}"
-  restore_result=$(call_tool_fresh_session "$restore_payload" 2>/dev/null || true)
+  restart_http_transport_if_needed "employee position restoration" >&2 || return 1
+  restore_result=$(call_tool "$restore_payload" 2>/dev/null || true)
   if [ -z "$restore_result" ] || [ "$(printf '%s\n' "$restore_result" | jq -r '.result.isError // false' 2>/dev/null)" = "true" ]; then
     echo "WARNING: employee position restore did not return success; cleanup marker retained" >&2
     return 1
@@ -1019,7 +1015,33 @@ run_capture_to_var() {
 }
 
 run_capture_to_var_fresh() {
-  run_capture_to_var_with_runner call_tool_fresh_session "$@"
+  restart_http_transport_if_needed "employee position mutation" >&2 || return 1
+  run_capture_to_var_with_runner call_tool "$@"
+}
+
+wait_for_department_path() {
+  local output_var="$1" payload="$2" expected_id="$3" attempts=10 attempt=1 result="" text=""
+  while [ "$attempt" -le "$attempts" ]; do
+    # Huly does not guarantee immediate read-after-write visibility. Restart in
+    # the parent shell so HTTP_SERVER_PID continues to own the live listener.
+    restart_http_transport_if_needed "nested HR department readback" >&2 || return 1
+    result=$(call_tool "$payload" 2>/dev/null || true)
+    text=$(echo "$result" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+    if [ "$(echo "$result" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
+      && [ "$(echo "$text" | jq -r '.id // empty' 2>/dev/null)" = "$expected_id" ]; then
+      printf -v "$output_var" '%s' "$text"
+      echo "PASS: get_department(path)"
+      echo "PASS: get_department resolves nested path"
+      PASSED=$((PASSED + 2))
+      return 0
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      sleep 1
+    fi
+    attempt=$((attempt + 1))
+  done
+  printf -v "$output_var" '%s' "$text"
+  fail_test "get_department(path)" "exact nested department was not visible after ${attempts} fresh-session attempts"
 }
 
 run_result_to_var() {
@@ -4150,11 +4172,9 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
     if [ $? -eq 0 ]; then
       HR_CHILD_ID=$(echo "$HR_CHILD_TEXT" | jq -r '.id' 2>/dev/null)
       restart_http_transport_if_needed "after nested HR department create" || exit 1
-      run_capture_to_var HR_GET_TEXT "get_department(path)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_department\",\"arguments\":{\"department\":\"$HR_DEPARTMENT_NAME/$HR_CHILD_NAME\"}},\"id\":2}"
-      if [ $? -eq 0 ]; then
-        assert_json_field_equals "get_department resolves nested path" "$HR_GET_TEXT" ".id" "$HR_CHILD_ID"
-      fi
+      wait_for_department_path HR_GET_TEXT \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_department\",\"arguments\":{\"department\":\"$HR_DEPARTMENT_NAME/$HR_CHILD_NAME\"}},\"id\":2}" \
+        "$HR_CHILD_ID"
       run_test "update_department(nested metadata)" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_department\",\"arguments\":{\"department\":\"$HR_DEPARTMENT_NAME/$HR_CHILD_NAME\",\"description\":\"Updated integration fixture\"}},\"id\":2}"
       restart_http_transport_if_needed "after nested HR department update" || exit 1

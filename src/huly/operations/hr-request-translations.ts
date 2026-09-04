@@ -1,7 +1,14 @@
 import { Effect } from "effect"
 
-import { HrLocale, type HrRequestTypeIdentifier } from "../../domain/schemas/hr-requests.js"
-import { NonEmptyString, type NonEmptyString as NonEmptyStringType } from "../../domain/schemas/shared.js"
+import {
+  HrLocale,
+  HrRequestTypeLabel,
+  type HrRequestTypeLabel as HrRequestTypeLabelType,
+  type HrRequestTypeLabelResource,
+  type HrRequestTypeIdentifier,
+  HrRequestTypeNormalizedLocator,
+  type HrRequestTypeNormalizedLocator as HrRequestTypeNormalizedLocatorType
+} from "../../domain/schemas/hr-requests.js"
 import { HulyDataInvalidError } from "../errors.js"
 
 export const HR_LOCALES = HrLocale.literals
@@ -138,21 +145,27 @@ const isRequestTypeLabelKey = (key: string): key is RequestTypeLabelKey =>
   RequestTypeLabelKey.some((candidate) => candidate === key)
 
 export const translateHrRequestTypeLabel = (
-  resource: NonEmptyStringType,
+  resource: HrRequestTypeLabelResource,
   locale: HrLocale
-): Effect.Effect<NonEmptyStringType, HulyDataInvalidError> => {
+): Effect.Effect<HrRequestTypeLabelType, HulyDataInvalidError> => {
   if (resource.startsWith(EMBEDDED_PREFIX)) {
     const embedded = resource.slice(EMBEDDED_PREFIX.length)
     return embedded.trim() === ""
       ? Effect.fail(
           new HulyDataInvalidError({ operation: "translateHrRequestType", entity: "empty embedded request-type label" })
         )
-      : Effect.succeed(NonEmptyString.make(embedded))
+      : Effect.succeed(HrRequestTypeLabel.make(embedded))
   }
-  if (!resource.startsWith(HR_STRING_PREFIX)) return Effect.succeed(resource)
+  if (!resource.startsWith(HR_STRING_PREFIX))
+    return Effect.fail(
+      new HulyDataInvalidError({
+        operation: "translateHrRequestType",
+        entity: `unsupported request-type label resource '${resource}'`
+      })
+    )
   const key = resource.slice(HR_STRING_PREFIX.length)
   return isRequestTypeLabelKey(key)
-    ? Effect.succeed(NonEmptyString.make(translations[locale][key]))
+    ? Effect.succeed(HrRequestTypeLabel.make(translations[locale][key]))
     : Effect.fail(
         new HulyDataInvalidError({
           operation: "translateHrRequestType",
@@ -161,8 +174,8 @@ export const translateHrRequestTypeLabel = (
       )
 }
 
-export const allHrRequestTypeLabels = (resource: NonEmptyStringType) =>
+export const allHrRequestTypeLabels = (resource: HrRequestTypeLabelResource) =>
   Effect.forEach(HR_LOCALES, (locale) => translateHrRequestTypeLabel(resource, locale))
 
-export const normalizeRequestTypeLocator = (identifier: HrRequestTypeIdentifier): string =>
-  identifier.trim().toLocaleLowerCase()
+export const normalizeRequestTypeLocator = (identifier: HrRequestTypeIdentifier): HrRequestTypeNormalizedLocatorType =>
+  HrRequestTypeNormalizedLocator.make(identifier.trim().toLocaleLowerCase())

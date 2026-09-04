@@ -54,8 +54,9 @@ export const UpdateHrRequestCommentResultSchema = Schema.Struct({
 export const DeleteHrRequestCommentResultSchema = Schema.Struct({
   ...commentResultBase,
   commentId: CommentId,
-  deleted: Schema.Boolean
+  deleted: Schema.Literal(true)
 })
+export type DeleteHrRequestCommentResult = Schema.Schema.Type<typeof DeleteHrRequestCommentResultSchema>
 
 const AttachmentIdField = {
   attachmentId: AttachmentId.annotate({ description: "Attachment ID belonging directly to the HR request." })
@@ -113,13 +114,15 @@ export const AddHrRequestAttachmentResultSchema = Schema.Struct({
 export const UpdateHrRequestAttachmentResultSchema = Schema.Struct({
   request: HrRequestId,
   attachmentId: AttachmentId,
-  updated: Schema.Boolean
+  updated: Schema.Literal(true)
 })
+export type UpdateHrRequestAttachmentResult = Schema.Schema.Type<typeof UpdateHrRequestAttachmentResultSchema>
 export const DeleteHrRequestAttachmentResultSchema = Schema.Struct({
   request: HrRequestId,
   attachmentId: AttachmentId,
-  deleted: Schema.Boolean
+  deleted: Schema.Literal(true)
 })
+export type DeleteHrRequestAttachmentResult = Schema.Schema.Type<typeof DeleteHrRequestAttachmentResultSchema>
 
 const descriptions = {
   request: "Exact HR request ID.",

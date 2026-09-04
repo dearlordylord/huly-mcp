@@ -32,6 +32,7 @@ import { AttachmentId, CommentId } from "../../../src/domain/schemas/shared.js"
 import {
   DepartmentHierarchyError,
   DepartmentNotFoundError,
+  EmployeeNotFoundError,
   HrRequestDateRangeError,
   HulyDataInvalidError,
   HrRequestMutationUnsupportedError,
@@ -65,6 +66,7 @@ import { markdownToMarkupString, testMarkupUrlConfig } from "../../../src/huly/o
 import { corePersonId, docRef } from "../../helpers/huly-sdk.js"
 
 interface Calls {
+  readonly finds: Array<string>
   readonly additions: Array<{ readonly collection: string; readonly data: unknown }>
   readonly updates: Array<{ readonly collection: string; readonly operations: unknown }>
   readonly documentUpdates: Array<{ readonly id: string; readonly operations: unknown }>
@@ -189,7 +191,7 @@ const fixture = (): Fixture => {
     requests: [request],
     comments: [comment, { ...comment, _id: docRef<ChatMessage>("comment-2") }],
     attachments: [media, { ...media, _id: docRef<Attachment>("attachment-2") }],
-    calls: { additions: [], updates: [], documentUpdates: [], removals: [] }
+    calls: { finds: [], additions: [], updates: [], documentUpdates: [], removals: [] }
   }
 }
 
@@ -203,6 +205,7 @@ const matches = (doc: Doc, query: unknown): boolean =>
   })
 
 interface Capabilities {
+  readonly employee?: boolean
   readonly updateCollection?: boolean
   readonly removeCollection?: boolean
   readonly staff?: boolean
@@ -221,7 +224,8 @@ const layerFor = (state: Fixture, capabilities: Capabilities = {}) => {
     if (className === String(chunter.class.ChatMessage)) return state.comments.some((item) => item === document)
     if (className === String(attachment.class.Attachment)) return state.attachments.some((item) => item === document)
     if (className === String(contact.class.Person)) return document === state.person
-    if (className === String(contact.mixin.Employee)) return document === state.employee
+    if (className === String(contact.mixin.Employee))
+      return capabilities.employee !== false && document === state.employee
     return className === String(hr.mixin.Staff) && capabilities.staff !== false && document === state.staff
   }
 
@@ -247,6 +251,7 @@ const layerFor = (state: Fixture, capabilities: Capabilities = {}) => {
     query: DocumentQuery<T>,
     _options?: FindOptions<T>
   ) => {
+    state.calls.finds.push(String(classRef))
     const matchesQuery = documentsFor(classRef).filter((doc) => matches(doc, query))
     const rows = _options?.limit === undefined ? matchesQuery : matchesQuery.slice(0, _options.limit)
     return Effect.succeed(toFindResult(rows, matchesQuery.length))
@@ -405,6 +410,7 @@ describe("HR request public operations", () => {
       nextOffset: 1,
       requests: [{ employee: { name: "Alice,Agent" }, department: { path: "Head" }, comments: 0, attachments: 0 }]
     })
+    expect(headState.calls.finds).not.toContain(String(contact.class.Person))
 
     const blankEmployee: Fixture = {
       ...base,
@@ -444,6 +450,15 @@ describe("HR request public operations", () => {
         Effect.flip(getHrRequest({ request: HrRequestId.make("request-absent") }).pipe(Effect.provide(layerFor(base))))
       )
     ).toBeInstanceOf(HrRequestNotFoundError)
+    expect(
+      Effect.runSync(
+        Effect.flip(
+          getHrRequest({ request: HrRequestId.make("request-1") }).pipe(
+            Effect.provide(layerFor(base, { employee: false }))
+          )
+        )
+      )
+    ).toBeInstanceOf(EmployeeNotFoundError)
   })
 
   it("rejects employees without Staff data and Staff departments absent from the catalog", () => {

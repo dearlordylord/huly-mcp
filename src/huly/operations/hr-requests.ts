@@ -13,6 +13,7 @@ import {
   type CreateHrRequestParams,
   type CreateHrRequestResult,
   type DeleteHrRequestParams,
+  type DeleteHrRequestResult,
   type GetHrRequestParams,
   HrRequestTypeIdentifier,
   type HrRequestTypeSummary,
@@ -24,14 +25,15 @@ import {
   DepartmentPath,
   NonEmptyString,
   PersonId,
+  PersonLocator,
   Timestamp
 } from "../../domain/schemas.js"
-import { PersonName } from "../../domain/schemas/shared.js"
 import { assertAt } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import {
   DepartmentHierarchyError,
   DepartmentNotFoundError,
+  EmployeeNotFoundError,
   HrStaffNotFoundError,
   HrRequestDateRangeError,
   HulyDataInvalidError,
@@ -40,7 +42,7 @@ import {
   HrRequestTypeIdentifierAmbiguousError,
   HrRequestTypeNotFoundError
 } from "../errors.js"
-import { core, hr } from "../huly-plugins.js"
+import { contact, core, hr } from "../huly-plugins.js"
 import { loadDepartmentCatalog, resolveDepartment, resolveEmployee } from "./hr-departments-shared.js"
 import { pageHrRequestResults } from "./hr-request-pagination.js"
 import { markupToMarkdownString } from "./markup.js"
@@ -49,9 +51,11 @@ import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import {
   parseHrRequestRecord,
+  parseHrRequestEmployeeRecord,
   parseHrRequestTypeRecord,
   parseHrStaffRecord,
   type HrRequestRecord,
+  type HrRequestEmployeeRecord,
   type HrRequestTypeRecord,
   type HrStaffRecord
 } from "./hr-request-sdk-boundary.js"
@@ -189,17 +193,20 @@ export const resolveHrRequest = (client: HulyClient["Service"], id: HrRequestId)
     return yield* parseHrRequestRecord(request)
   })
 
-const employeeIdentity = (employee: Employee) =>
+const resolveRequestEmployee = (client: HulyClient["Service"], employeeId: PersonId) =>
   Effect.gen(function* () {
-    if (employee.name.trim() === "")
-      return yield* new HulyDataInvalidError({ operation: "readHrRequest", entity: `employee '${employee._id}' name` })
-    return { id: PersonId.make(employee._id), name: PersonName.make(employee.name) }
+    const employee = yield* client.findOne<Employee>(
+      contact.mixin.Employee,
+      hulyQuery<Employee>({ _id: toRef<Employee>(employeeId) })
+    )
+    if (employee === undefined) return yield* new EmployeeNotFoundError({ identifier: PersonLocator.make(employeeId) })
+    return yield* parseHrRequestEmployeeRecord(employee)
   })
 
 const summarize = (
   client: HulyClient["Service"],
   request: HrRequestRecord,
-  employee: Employee,
+  employee: HrRequestEmployeeRecord,
   departmentPath: DepartmentPath,
   requestType: HrRequestTypeRecord
 ) =>
@@ -208,11 +215,10 @@ const summarize = (
       operation: "get_hr_request",
       entity: `HR request '${request._id}' description`
     })
-    const identity = yield* employeeIdentity(employee)
     const typeSummary = yield* toHrRequestTypeSummary(requestType)
     return {
       id: HrRequestId.make(request._id),
-      employee: identity,
+      employee: { id: employee._id, name: employee.name },
       department: { id: DepartmentId.make(request.department), path: departmentPath },
       requestType: typeSummary,
       startDate: calendarDate(request.tzDate),
@@ -231,7 +237,7 @@ const summarizeAll = (client: HulyClient["Service"], requests: ReadonlyArray<HrR
     const types = new Map((yield* loadRequestTypes(client)).map((item) => [item._id, item]))
     return yield* Effect.forEach(requests, (request) =>
       Effect.gen(function* () {
-        const employee = yield* resolveEmployee(client, PersonName.make(String(request.attachedTo)))
+        const employee = yield* resolveRequestEmployee(client, request.attachedTo)
         const departmentPath =
           String(request.department) === String(hr.ids.Head)
             ? DepartmentPath.make("Head")
@@ -295,7 +301,7 @@ const resolveStaff = (client: HulyClient["Service"], identifier: CreateHrRequest
     const employee = yield* resolveEmployee(client, identifier)
     const staff = yield* client.findOne<Staff>(hr.mixin.Staff, hulyQuery<Staff>({ _id: toRef<Staff>(employee._id) }))
     if (staff === undefined) return yield* new HrStaffNotFoundError({ employee: PersonId.make(employee._id) })
-    return { employee, staff: yield* parseHrStaffRecord(staff) }
+    return { employee: yield* parseHrRequestEmployeeRecord(employee), staff: yield* parseHrStaffRecord(staff) }
   })
 
 const resolveCreateDepartment = (
@@ -353,7 +359,7 @@ export const createHrRequest = (params: CreateHrRequestParams) =>
     const result: CreateHrRequestResult = {
       request: {
         id: HrRequestId.make(id),
-        employee: yield* employeeIdentity(employee),
+        employee: { id: employee._id, name: employee.name },
         department: { id: DepartmentId.make(department._id), path: departmentPath },
         requestType: yield* toHrRequestTypeSummary(requestType),
         startDate: params.startDate,
@@ -429,5 +435,6 @@ export const deleteHrRequest = (params: DeleteHrRequestParams) =>
       toRef<Class<Staff>>(request.attachedToClass),
       request.collection
     )
-    return { id: HrRequestId.make(request._id), deleted: true }
+    const result: DeleteHrRequestResult = { id: HrRequestId.make(request._id), deleted: true }
+    return result
   })
