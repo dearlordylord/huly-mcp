@@ -6,6 +6,7 @@ import {
   HrRequestId,
   HrRequestTypeLabelResource,
   HrRequestTypeIdentifier,
+  HrRequestTypeValue,
   ObjectClassName,
   PersonId,
   SpaceId,
@@ -28,7 +29,7 @@ const MAX_TZ_DAY = 31
 const TzYear = boundedInt(0, MAX_TZ_YEAR, "year").pipe(Schema.brand("HrTzYear"))
 const TzMonth = boundedInt(0, MAX_TZ_MONTH, "month").pipe(Schema.brand("HrTzMonth"))
 const TzDay = boundedInt(1, MAX_TZ_DAY, "day").pipe(Schema.brand("HrTzDay"))
-const TzDateSchema = Schema.Struct({ year: TzYear, month: TzMonth, day: TzDay, offset: Schema.Literal(0) }).pipe(
+const TzDateSchema = Schema.Struct({ year: TzYear, month: TzMonth, day: TzDay, offset: Schema.Int }).pipe(
   Schema.check(
     Schema.makeFilter((value) => {
       const date = new Date(0)
@@ -47,7 +48,7 @@ const TzDateSchema = Schema.Struct({ year: TzYear, month: TzMonth, day: TzDay, o
 export const HrRequestTypeRecordSchema = Schema.Struct({
   _id: HrRequestTypeIdentifier,
   label: HrRequestTypeLabelResource,
-  value: Schema.Number,
+  value: HrRequestTypeValue,
   color: ColorCode
 })
 export type HrRequestTypeRecord = Schema.Schema.Type<typeof HrRequestTypeRecordSchema>

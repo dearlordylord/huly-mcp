@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest"
 import {
   HrRequestTypeIdentifier,
   HrRequestTypeLabelResource,
+  HrRequestTypeValue,
   parseAddHrRequestAttachmentParams,
   parseCreateHrRequestParams,
   parseListHrRequestsParams,
@@ -29,7 +30,7 @@ import {
 const requestType = (id: string, label: string): HrRequestTypeRecord => ({
   _id: HrRequestTypeIdentifier.make(id),
   label: HrRequestTypeLabelResource.make(getEmbeddedLabel(label)),
-  value: -1,
+  value: HrRequestTypeValue.make(-1),
   color: ColorCode.make(2)
 })
 const localizedRequestType = (id: string, labelResource: string): HrRequestTypeRecord => ({
@@ -192,11 +193,26 @@ describe("HR request contracts", () => {
     expect(Effect.runSync(Effect.flip(parseHrRequestTypeRecord(malformedRequestType)))).toBeInstanceOf(
       HulyDataInvalidError
     )
+    for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      expect(
+        Effect.runSync(
+          Effect.flip(parseHrRequestTypeRecord({ _id: "type-1", label: "hr:string:PTO", value, color: 2 }))
+        )
+      ).toBeInstanceOf(HulyDataInvalidError)
+    }
+    const nonUtcOffsets = Effect.runSync(
+      parseHrRequestRecord({
+        ...malformedRequest,
+        tzDate: { year: 2026, month: 8, day: 4, offset: -240 },
+        tzDueDate: { year: 2026, month: 8, day: 5, offset: 330 }
+      })
+    )
+    expect(nonUtcOffsets).toMatchObject({ tzDate: { offset: -240 }, tzDueDate: { offset: 330 } })
     expect(Effect.runSync(Effect.flip(parseHrRequestRecord(malformedRequest)))).toBeInstanceOf(HulyDataInvalidError)
     for (const tzDate of [
       { year: 2026, month: 12, day: 1, offset: 0 },
       { year: 2026, month: 1, day: 30, offset: 0 },
-      { year: 2026, month: 1, day: 1, offset: 60 },
+      { year: 2026, month: 1, day: 1, offset: 60.5 },
       { year: 2026, month: 1, day: Number.POSITIVE_INFINITY, offset: 0 }
     ]) {
       expect(

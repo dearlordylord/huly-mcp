@@ -25,6 +25,11 @@ export const HrRequestTypeLabel = NonEmptyString.pipe(Schema.brand("HrRequestTyp
 export type HrRequestTypeLabel = Schema.Schema.Type<typeof HrRequestTypeLabel>
 export const HrRequestTypeLabelResource = NonEmptyString.pipe(Schema.brand("HrRequestTypeLabelResource"))
 export type HrRequestTypeLabelResource = Schema.Schema.Type<typeof HrRequestTypeLabelResource>
+export const HrRequestTypeValue = Schema.Number.pipe(
+  Schema.check(Schema.isFinite()),
+  Schema.brand("HrRequestTypeValue")
+)
+export type HrRequestTypeValue = Schema.Schema.Type<typeof HrRequestTypeValue>
 const CALENDAR_MONTH_OFFSET = 1
 const isRealIsoCalendarDate = (value: string): boolean => {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
@@ -71,7 +76,7 @@ export const HrRequestTypeSummarySchema = Schema.Struct({
   label: HrRequestTypeLabel,
   labelLocale: HrLocale,
   labelResource: HrRequestTypeLabelResource,
-  value: Schema.Number,
+  value: HrRequestTypeValue,
   color: ColorCode,
   mutationSupported: Schema.Literal(false),
   mutationReason: NonEmptyString
