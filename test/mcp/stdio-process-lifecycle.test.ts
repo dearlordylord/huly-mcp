@@ -129,7 +129,7 @@ const ensureStopped = (server: SpawnedServer): void => {
   if (processExists(server.pid)) server.child.kill("SIGKILL")
 }
 
-describe("built stdio process lifecycle", () => {
+describe("built stdio process lifecycle", { timeout: PROCESS_BOUND_MS + 1_000 }, () => {
   beforeAll(() => {
     const child = spawn("pnpm", ["build:mcp"], { cwd: process.cwd(), stdio: "ignore" })
     return withBound(
