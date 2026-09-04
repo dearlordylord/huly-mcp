@@ -40,6 +40,7 @@ export const CONSEQUENTIAL_CLI_TOOLS = [
   "link_document_to_issue",
   "unlink_document_from_issue",
   "make_organization_customer",
+  "make_person_customer",
   "join_channel",
   "leave_channel",
   "unarchive_channel",

@@ -126,3 +126,9 @@ export class LeadDeleteConflictError extends Schema.TaggedError<LeadDeleteConfli
     return `Lead '${this.identifier}' in funnel '${this.funnel}' cannot be deleted: ${this.reason}`
   }
 }
+
+export const LeadMutationDomainError = Schema.Union([
+  LeadUpdateConflictError,
+  LeadMoveConflictError,
+  LeadDeleteConflictError
+])

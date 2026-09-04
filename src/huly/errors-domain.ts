@@ -128,13 +128,7 @@ import {
   InventoryVariantNotFoundError
 } from "./errors-inventory.js"
 import { LabelDomainError } from "./errors-labels.js"
-import {
-  FunnelDomainError,
-  LeadDeleteConflictError,
-  LeadMoveConflictError,
-  LeadNotFoundError,
-  LeadUpdateConflictError
-} from "./errors-leads.js"
+import { FunnelDomainError, LeadMutationDomainError, LeadNotFoundError } from "./errors-leads.js"
 import { FloorNotFoundError, MeetingMinutesNotFoundError, RoomNotFoundError } from "./errors-love.js"
 import { AdministrationDomainError } from "./errors-administration-domain.js"
 import {
@@ -337,9 +331,7 @@ export const HulyDomainError = Schema.Union([
   InvalidPersonUuidError,
   FunnelDomainError,
   LeadNotFoundError,
-  LeadUpdateConflictError,
-  LeadMoveConflictError,
-  LeadDeleteConflictError,
+  LeadMutationDomainError,
   FloorNotFoundError,
   RoomNotFoundError,
   MeetingMinutesNotFoundError,
