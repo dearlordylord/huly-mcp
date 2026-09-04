@@ -461,6 +461,24 @@ describe("Lead Operations", () => {
       })
     )
 
+    it.effect("falls back to the workflow status reference when status metadata is absent", () =>
+      Effect.gen(function* () {
+        const status = "lead:status:Active"
+        const result = yield* listLeads({ funnel: funnelReference("funnel-1") }).pipe(
+          Effect.provide(
+            createTestLayer({
+              leads: [makeLead({ status: statusRef(status) })],
+              projectType: makeProjectType([status]),
+              statuses: []
+            })
+          ),
+          withDiagnostics
+        )
+
+        expect(assertAt(result, 0).status).toBe("Active")
+      })
+    )
+
     it.effect("propagates a server connection failure when model status metadata is unavailable", () =>
       Effect.gen(function* () {
         const lead = makeLead({ status: statusRef("plainstatus") })
