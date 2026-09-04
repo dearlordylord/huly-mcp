@@ -20,7 +20,9 @@ type SetEmployeePositionError =
   | PersonNotAnEmployeeError
   | PersonNotFoundError
 
-type EmployeeTextLocator = NonNullable<EmployeeLocator["email"]> | NonNullable<EmployeeLocator["name"]>
+type EmployeeTextLocator =
+  | Extract<EmployeeLocator, { readonly email: string }>["email"]
+  | Extract<EmployeeLocator, { readonly name: string }>["name"]
 
 const resolveEmployeeByTextLocator = <T extends EmployeeTextLocator>(
   client: HulyClient["Service"],
@@ -69,10 +71,7 @@ const resolveEmployee = (
 
     if (locator.email !== undefined)
       return yield* resolveEmployeeByTextLocator(client, locator.email, findPersonByExactEmail)
-    if (locator.name !== undefined)
-      return yield* resolveEmployeeByTextLocator(client, locator.name, findPersonByExactName)
-
-    return yield* new PersonNotFoundError({ identifier: "" })
+    return yield* resolveEmployeeByTextLocator(client, locator.name, findPersonByExactName)
   })
 
 const normalizePosition = (position: string | null): string | null => {

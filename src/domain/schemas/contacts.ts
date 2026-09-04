@@ -53,34 +53,34 @@ export const EmployeeRoleSchema = Schema.Literals(["USER", "GUEST"]).annotate({
 })
 export type EmployeeRole = Schema.Schema.Type<typeof EmployeeRoleSchema>
 
-const EMPLOYEE_LOCATOR_FIELDS = ["id", "email", "name"] as const
-
-const employeeLocatorFieldCount = (locator: {
-  readonly id?: unknown
-  readonly email?: unknown
-  readonly name?: unknown
-}): number => EMPLOYEE_LOCATOR_FIELDS.filter((field) => locator[field] !== undefined).length
-
-export const EmployeeLocatorSchema = Schema.Struct({
-  id: Schema.optionalKey(PersonId).annotateKey({ description: "Exact Huly Employee/Person ID." }),
-  email: Schema.optionalKey(Email).annotateKey({ description: "Exact employee email address." }),
-  name: Schema.optionalKey(PersonName).annotateKey({ description: "Exact employee display name." })
+const EmployeeIdLocatorSchema = Schema.Struct({
+  id: PersonId.annotateKey({ description: "Exact Huly Employee/Person ID." }),
+  email: Schema.optionalKey(Schema.Never),
+  name: Schema.optionalKey(Schema.Never)
 })
-  .annotate({
-    title: "EmployeeLocator",
-    description:
-      "Structured exact employee locator. Provide exactly one of id, email, or name; combining modalities is rejected.",
-    jsonSchema: { oneOf: [{ required: ["id"] }, { required: ["email"] }, { required: ["name"] }] }
-  })
-  .pipe(
-    Schema.check(
-      Schema.makeFilter((locator) =>
-        employeeLocatorFieldCount(locator) === 1
-          ? undefined
-          : "Provide exactly one employee locator field: id, email, or name."
-      )
-    )
-  )
+
+const EmployeeEmailLocatorSchema = Schema.Struct({
+  email: Email.annotateKey({ description: "Exact employee email address." }),
+  id: Schema.optionalKey(Schema.Never),
+  name: Schema.optionalKey(Schema.Never)
+})
+
+const EmployeeNameLocatorSchema = Schema.Struct({
+  name: PersonName.annotateKey({ description: "Exact employee display name." }),
+  id: Schema.optionalKey(Schema.Never),
+  email: Schema.optionalKey(Schema.Never)
+})
+
+export const EmployeeLocatorSchema = Schema.Union([
+  EmployeeIdLocatorSchema,
+  EmployeeEmailLocatorSchema,
+  EmployeeNameLocatorSchema
+]).annotate({
+  title: "EmployeeLocator",
+  description:
+    "Structured exact employee locator. Provide exactly one of id, email, or name; combining modalities is rejected.",
+  jsonSchema: { oneOf: [{ required: ["id"] }, { required: ["email"] }, { required: ["name"] }] }
+})
 export type EmployeeLocator = Schema.Schema.Type<typeof EmployeeLocatorSchema>
 
 export const EmployeeSummarySchema = Schema.Struct({

@@ -42,6 +42,9 @@ const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
   return result
 }
 
+const queryValue = (query: unknown, key: string): unknown =>
+  typeof query === "object" && query !== null ? Reflect.get(query, key) : undefined
+
 const createMockPerson = (overrides: Partial<HulyPerson> = {}): HulyPerson => {
   const data = {
     _id: "person-123" as Ref<HulyPerson>,
@@ -293,8 +296,7 @@ const createTestLayer = (config: MockConfig) => {
       return Effect.succeed(found)
     }
     if (_class === contact.mixin.Employee) {
-      const q = query as Record<string, unknown>
-      const found = employees.find((employee) => employee._id === q._id)
+      const found = employees.find((employee) => employee._id === queryValue(query, "_id"))
       return Effect.succeed(found)
     }
     if (_class === contact.class.SocialIdentity) {
@@ -880,7 +882,7 @@ describe("Contacts Extended Coverage", () => {
 
     it.effect("returns employees with position undefined when not set", () =>
       Effect.gen(function* () {
-        const emp = createMockEmployee({ _id: "employee-3" as Ref<HulyEmployee>, position: null })
+        const emp = createMockEmployee({ _id: docRef<HulyEmployee>("employee-3"), position: null })
 
         const testLayer = createTestLayer({ employees: [emp], channels: [] })
 
@@ -905,7 +907,7 @@ describe("Contacts Extended Coverage", () => {
   describe("setEmployeePosition", () => {
     it.effect("updates the Contact Employee mixin when addressed by employee ID", () =>
       Effect.gen(function* () {
-        const employee = createMockEmployee({ _id: "employee-id" as Ref<HulyEmployee>, position: "Developer" })
+        const employee = createMockEmployee({ _id: docRef<HulyEmployee>("employee-id"), position: "Developer" })
         const capture: MockConfig["captureUpdateMixin"] = {}
         const params = yield* parseSetEmployeePositionParams({
           employee: { id: "employee-id" },
@@ -926,8 +928,8 @@ describe("Contacts Extended Coverage", () => {
 
     it.effect("resolves an exact email and clears whitespace as null", () =>
       Effect.gen(function* () {
-        const employee = createMockEmployee({ _id: "employee-email" as Ref<HulyEmployee>, position: "Developer" })
-        const person = createMockPerson({ _id: "employee-email" as Ref<HulyPerson>, name: employee.name })
+        const employee = createMockEmployee({ _id: docRef<HulyEmployee>("employee-email"), position: "Developer" })
+        const person = createMockPerson({ _id: docRef<HulyPerson>("employee-email"), name: employee.name })
         const channel = createMockChannel({ attachedTo: docRef<Doc>("employee-email"), value: "jane@example.com" })
         const capture: MockConfig["captureUpdateMixin"] = {}
         const params = yield* parseSetEmployeePositionParams({
@@ -953,8 +955,8 @@ describe("Contacts Extended Coverage", () => {
 
     it.effect("resolves an exact display name", () =>
       Effect.gen(function* () {
-        const employee = createMockEmployee({ _id: "employee-name" as Ref<HulyEmployee>, name: "Name,Employee" })
-        const person = createMockPerson({ _id: "employee-name" as Ref<HulyPerson>, name: employee.name })
+        const employee = createMockEmployee({ _id: docRef<HulyEmployee>("employee-name"), name: "Name,Employee" })
+        const person = createMockPerson({ _id: docRef<HulyPerson>("employee-name"), name: employee.name })
         const capture: MockConfig["captureUpdateMixin"] = {}
         const params = yield* parseSetEmployeePositionParams({
           employee: { name: "Name,Employee" },
@@ -973,10 +975,10 @@ describe("Contacts Extended Coverage", () => {
     it.effect("honors the explicit name modality when the value resembles an email", () =>
       Effect.gen(function* () {
         const employee = createMockEmployee({
-          _id: "employee-email-shaped-name" as Ref<HulyEmployee>,
+          _id: docRef<HulyEmployee>("employee-email-shaped-name"),
           name: "name@example.com"
         })
-        const person = createMockPerson({ _id: "employee-email-shaped-name" as Ref<HulyPerson>, name: employee.name })
+        const person = createMockPerson({ _id: docRef<HulyPerson>("employee-email-shaped-name"), name: employee.name })
         const capture: MockConfig["captureUpdateMixin"] = {}
         const params = yield* parseSetEmployeePositionParams({
           employee: { name: "name@example.com" },
@@ -994,7 +996,7 @@ describe("Contacts Extended Coverage", () => {
 
     it.effect("does not write when the normalized position is already current", () =>
       Effect.gen(function* () {
-        const employee = createMockEmployee({ _id: "employee-current" as Ref<HulyEmployee>, position: "Developer" })
+        const employee = createMockEmployee({ _id: docRef<HulyEmployee>("employee-current"), position: "Developer" })
         const capture: MockConfig["captureUpdateMixin"] = {}
         const params = yield* parseSetEmployeePositionParams({
           employee: { id: "employee-current" },
@@ -1012,10 +1014,10 @@ describe("Contacts Extended Coverage", () => {
 
     it.effect("rejects an ambiguous exact display name before mutating", () =>
       Effect.gen(function* () {
-        const employeeOne = createMockEmployee({ _id: "employee-one" as Ref<HulyEmployee>, name: "Same,Person" })
-        const employeeTwo = createMockEmployee({ _id: "employee-two" as Ref<HulyEmployee>, name: "Same,Person" })
-        const personOne = createMockPerson({ _id: "employee-one" as Ref<HulyPerson>, name: "Same,Person" })
-        const personTwo = createMockPerson({ _id: "employee-two" as Ref<HulyPerson>, name: "Same,Person" })
+        const employeeOne = createMockEmployee({ _id: docRef<HulyEmployee>("employee-one"), name: "Same,Person" })
+        const employeeTwo = createMockEmployee({ _id: docRef<HulyEmployee>("employee-two"), name: "Same,Person" })
+        const personOne = createMockPerson({ _id: docRef<HulyPerson>("employee-one"), name: "Same,Person" })
+        const personTwo = createMockPerson({ _id: docRef<HulyPerson>("employee-two"), name: "Same,Person" })
         const capture: MockConfig["captureUpdateMixin"] = {}
         const params = yield* parseSetEmployeePositionParams({ employee: { name: "Same,Person" }, position: "Lead" })
 
@@ -1040,16 +1042,16 @@ describe("Contacts Extended Coverage", () => {
 
     it.effect("rejects duplicate exact email matches before mutating", () =>
       Effect.gen(function* () {
-        const employeeOne = createMockEmployee({ _id: "employee-one" as Ref<HulyEmployee>, name: "One,Person" })
-        const employeeTwo = createMockEmployee({ _id: "employee-two" as Ref<HulyEmployee>, name: "Two,Person" })
-        const personOne = createMockPerson({ _id: "employee-one" as Ref<HulyPerson>, name: employeeOne.name })
-        const personTwo = createMockPerson({ _id: "employee-two" as Ref<HulyPerson>, name: employeeTwo.name })
+        const employeeOne = createMockEmployee({ _id: docRef<HulyEmployee>("employee-one"), name: "One,Person" })
+        const employeeTwo = createMockEmployee({ _id: docRef<HulyEmployee>("employee-two"), name: "Two,Person" })
+        const personOne = createMockPerson({ _id: docRef<HulyPerson>("employee-one"), name: employeeOne.name })
+        const personTwo = createMockPerson({ _id: docRef<HulyPerson>("employee-two"), name: employeeTwo.name })
         const channelOne = createMockChannel({
           attachedTo: docRef<Doc>("employee-one"),
           value: "duplicate@example.com"
         })
         const channelTwo = createMockChannel({
-          _id: "channel-2" as Ref<Channel>,
+          _id: docRef<Channel>("channel-2"),
           attachedTo: docRef<Doc>("employee-two"),
           value: "duplicate@example.com"
         })

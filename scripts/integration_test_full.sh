@@ -697,8 +697,16 @@ restore_employee_position() {
 }
 
 cleanup_all() {
-  restore_employee_position || true
-  cleanup_hr_artifacts || true
+  local original_exit_status=$?
+  local cleanup_failed=0
+  if ! restore_employee_position; then
+    fail_test "set_employee_position restore cleanup" "employee position restore failed; cleanup marker retained"
+    cleanup_failed=1
+  fi
+  if ! cleanup_hr_artifacts; then
+    fail_test "HR fixture cleanup" "restoration or deletion failed; cleanup markers retained"
+    cleanup_failed=1
+  fi
   cleanup_issue_agent_assignee_artifacts || true
   cleanup_security_administration_artifacts
   cleanup_sequence_administration_artifacts
@@ -717,6 +725,14 @@ cleanup_all() {
   cleanup_inventory_artifacts || true
   cleanup_drive_artifacts || true
   cleanup_http_transport
+  trap - EXIT
+  if [ "$original_exit_status" -ne 0 ]; then
+    exit "$original_exit_status"
+  fi
+  if [ "$cleanup_failed" -ne 0 ]; then
+    exit 1
+  fi
+  exit 0
 }
 trap cleanup_all EXIT
 
@@ -4253,7 +4269,9 @@ if [ $? -eq 0 ]; then
         fi
       fi
     fi
-    restore_employee_position
+    if ! restore_employee_position; then
+      fail_test "set_employee_position restore" "employee position restore failed; exit cleanup will retry"
+    fi
   fi
 else
   fail_test "set_employee_position deterministic fixture" "list_employees did not return a fixture source"
