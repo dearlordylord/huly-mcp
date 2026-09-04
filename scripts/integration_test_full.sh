@@ -1090,6 +1090,25 @@ run_capture_to_var_fresh() {
   run_capture_to_var_with_runner call_tool "$@"
 }
 
+capture_paginated_hr_reports() {
+  local output_var="$1" name="$2" department="$3" start_date="$4" end_date="$5" output
+  if ! output=$(timeout 90 pnpm exec tsx scripts/integration-hr-report-pagination-fixture.ts \
+    "$department" "$start_date" "$end_date" 2>/dev/null); then
+    printf -v "$output_var" '%s' ""
+    fail_test "$name" "internal page-size-one report adapter failed"
+    return 1
+  fi
+  if ! printf '%s\n' "$output" | jq -e \
+    '.schedule.complete == true and .table.complete == true and .summary.complete == true' >/dev/null 2>&1; then
+    printf -v "$output_var" '%s' "$output"
+    fail_test "$name" "internal report adapter returned an invalid or incomplete result"
+    return 1
+  fi
+  printf -v "$output_var" '%s' "$output"
+  echo "PASS: $name"
+  PASSED=$((PASSED + 1))
+}
+
 wait_for_department_path() {
   local output_var="$1" payload="$2" expected_id="$3" attempts=10 attempt=1 result="" text=""
   while [ "$attempt" -le "$attempts" ]; do
@@ -4300,6 +4319,17 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
       run_capture_to_var HR_TABLE_TEXT "get_hr_table(complete scan)" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_hr_table\",\"arguments\":{\"department\":\"$HR_CHILD_ID\",\"startDate\":\"2026-09-04\",\"endDate\":\"2026-09-05\"}},\"id\":2}"
       assert_json_field_equals "HR table reports a complete scan" "$HR_TABLE_TEXT" ".complete" "true"
+      capture_paginated_hr_reports HR_PAGINATED_REPORTS_BEFORE_REQUEST \
+        "internal HR reports compose page-size-one holiday and Staff scans" \
+        "$HR_CHILD_ID" "2026-09-04" "2026-09-05"
+      assert_json_field_equals "internal paginated schedule includes both inherited holidays" \
+        "$HR_PAGINATED_REPORTS_BEFORE_REQUEST" ".schedule.holidays | length" "2"
+      assert_json_field_equals "internal paginated table includes the assigned Staff employee" \
+        "$HR_PAGINATED_REPORTS_BEFORE_REQUEST" ".table.totalEmployees" "1"
+      assert_json_field_equals "internal paginated table applies the inherited weekday holiday" \
+        "$HR_PAGINATED_REPORTS_BEFORE_REQUEST" ".table.rows[0].publicHolidayWorkdays" "1"
+      assert_json_field_equals "internal paginated table excludes the inherited holiday from base workdays" \
+        "$HR_PAGINATED_REPORTS_BEFORE_REQUEST" ".table.rows[0].baseWorkdays" "0"
       HR_CHILD_PATH_JSON=$(json_string "$HR_DEPARTMENT_NAME/$HR_CHILD_NAME")
       HR_PROPAGATED_CHILD="{}"
       HR_PROPAGATED_PARENT="{}"
@@ -4370,6 +4400,23 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
         if [ $? -eq 0 ]; then
           HR_CLEANUP_REQUEST_ID=$(echo "$HR_REQUEST_CREATE_TEXT" | jq -r '.request.id // empty' 2>/dev/null)
           restart_http_transport_if_needed "after HR request create" || exit 1
+          capture_paginated_hr_reports HR_PAGINATED_REPORTS_WITH_REQUEST \
+            "internal HR reports compose page-size-one request and holiday scans" \
+            "$HR_CHILD_ID" "2026-09-04" "2026-09-05"
+          assert_json_field_equals "internal paginated schedule aggregates the request" \
+            "$HR_PAGINATED_REPORTS_WITH_REQUEST" ".schedule.requests | length" "1"
+          assert_json_field_equals "internal paginated schedule retains inherited holidays" \
+            "$HR_PAGINATED_REPORTS_WITH_REQUEST" ".schedule.holidays | length" "2"
+          assert_json_field_equals "internal paginated summary aggregates one request group" \
+            "$HR_PAGINATED_REPORTS_WITH_REQUEST" ".summary.groups | length" "1"
+          assert_json_field_equals "internal paginated summary reports the complete request total" \
+            "$HR_PAGINATED_REPORTS_WITH_REQUEST" ".summary.totalRequests" "1"
+          assert_json_field_equals "internal paginated summary clips the request to one calendar day" \
+            "$HR_PAGINATED_REPORTS_WITH_REQUEST" ".summary.totalCalendarDays" "1"
+          assert_json_field_equals "internal paginated summary excludes the inherited holiday workday" \
+            "$HR_PAGINATED_REPORTS_WITH_REQUEST" ".summary.totalWorkdays" "0"
+          assert_json_field_equals "internal paginated summary retains both holiday documents" \
+            "$HR_PAGINATED_REPORTS_WITH_REQUEST" ".summary.publicHolidayDocuments" "2"
           run_capture_to_var HR_SCHEDULE_TEXT "get_hr_schedule(complete inherited holidays)" \
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_hr_schedule\",\"arguments\":{\"department\":\"$HR_CHILD_ID\",\"startDate\":\"2026-09-04\",\"endDate\":\"2026-09-05\"}},\"id\":2}"
           assert_json_field_equals "HR schedule reports a complete scan" "$HR_SCHEDULE_TEXT" ".complete" "true"
