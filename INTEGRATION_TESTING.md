@@ -48,6 +48,19 @@ zero-skip integration coverage.
 
 Known incomplete fixture:
 
+- The local account service persists employee invitations but its configured mail
+  provider can reject delivery. Employee lifecycle coverage accepts only the
+  typed `EmployeeInvitationPartialFailureError` for that provider boundary,
+  then verifies the persisted Person/SocialIdentity/Employee transitions through
+  fresh sessions and deletes the unique disposable Person. This certifies safe
+  retry and lifecycle state, but a successful outbound delivery requires a
+  configured local mail sink.
+- A cleanup-safe kick needs a disposable accepted account with credentials. The
+  inverse account operation, `assignWorkspace`, is service-token-only; owner
+  credentials cannot restore a kicked member. Do not run kick coverage against
+  the owner, actor, or reviewer fixtures until automated invite consumption and
+  post-test membership restoration are available.
+
 - A second workspace member is needed to deterministically test notification
   write tools. Huly does not normally create inbox notifications for actions
   performed by the same account that later reads the inbox, so a one-member
