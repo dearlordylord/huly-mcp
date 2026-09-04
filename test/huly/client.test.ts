@@ -64,6 +64,8 @@ const mockApply = mockFn()
 const mockApplyNotMatch = mockFn()
 const mockApplyMatch = mockFn()
 const mockApplyCreateDoc = mockFn()
+const mockApplyAddCollection = mockFn()
+const mockApplyCreateMixin = mockFn()
 const mockApplyUpdateDoc = mockFn()
 const mockApplyRemoveDoc = mockFn()
 const mockApplyCommit = mockFn()
@@ -126,6 +128,8 @@ const clearAllMockFns = () => {
   mockApplyNotMatch.mockClear()
   mockApplyMatch.mockClear()
   mockApplyCreateDoc.mockClear()
+  mockApplyAddCollection.mockClear()
+  mockApplyCreateMixin.mockClear()
   mockApplyUpdateDoc.mockClear()
   mockApplyRemoveDoc.mockClear()
   mockApplyCommit.mockClear()
@@ -149,6 +153,8 @@ const clearAllMockFns = () => {
 
 const resetApplyDefaults = () => {
   mockApplyCreateDoc.mockResolvedValue(undefined)
+  mockApplyAddCollection.mockResolvedValue(undefined)
+  mockApplyCreateMixin.mockResolvedValue(undefined)
   mockApplyUpdateDoc.mockResolvedValue(undefined)
   mockApplyRemoveDoc.mockResolvedValue(undefined)
   mockApplyCommit.mockResolvedValue({ result: true })
@@ -156,6 +162,8 @@ const resetApplyDefaults = () => {
     notMatch: mockApplyNotMatch,
     match: mockApplyMatch,
     createDoc: mockApplyCreateDoc,
+    addCollection: mockApplyAddCollection,
+    createMixin: mockApplyCreateMixin,
     updateDoc: mockApplyUpdateDoc,
     removeDoc: mockApplyRemoveDoc,
     commit: mockApplyCommit
@@ -241,6 +249,7 @@ const liveClientLayer = HulyClient.layerWithDependencies.pipe(Layer.provide(Laye
 interface TestDoc extends Doc {
   title: string
 }
+interface TestAttachedDoc extends AttachedDoc {}
 
 describe("HulyClient Service", () => {
   beforeEach(() => {
@@ -1481,6 +1490,32 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
           {} as MixinUpdate<TestDoc, TestDoc>
         )
         expect(mockUpdateMixin.mock.calls[0]?.[0]).toBe("obj")
+      })
+    )
+
+    it.effect("commits a document, attached identity, and mixin in one apply operation", () =>
+      Effect.gen(function* () {
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        const createBundle = client.createDocWithCollectionAndMixin
+        expect(createBundle).toBeDefined()
+        if (createBundle === undefined) return
+        yield* createBundle(
+          "person-class" as DocRef<Class<TestDoc>>,
+          "space" as DocRef<Space>,
+          {} as Data<TestDoc>,
+          "person" as DocRef<TestDoc>,
+          "attached-class" as DocRef<Class<TestAttachedDoc>>,
+          "identities",
+          {} as AttachedData<TestAttachedDoc>,
+          "identity" as DocRef<TestAttachedDoc>,
+          "mixin" as DocRef<Mixin<TestDoc>>,
+          {} as MixinData<TestDoc, TestDoc>,
+          HulyTransactionScope.make("employee-bundle")
+        )
+        expect(mockApplyCreateDoc.mock.calls).toHaveLength(1)
+        expect(mockApplyAddCollection.mock.calls).toHaveLength(1)
+        expect(mockApplyCreateMixin.mock.calls).toHaveLength(1)
+        expect(mockApplyCommit.mock.calls).toHaveLength(1)
       })
     )
 

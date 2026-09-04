@@ -48,6 +48,7 @@ export const HulyConnectionOperation = Schema.Literals([
   "removeDoc",
   "conditionalRemoveDoc",
   "createMixin",
+  "createDocWithCollectionAndMixin",
   "updateMixin",
   "uploadMarkup",
   "fetchMarkup",

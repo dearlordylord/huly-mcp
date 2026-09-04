@@ -1727,6 +1727,8 @@ describe("Huly Errors", () => {
               return `employee-lifecycle:${error.identifier}`
             case "EmployeeLifecycleImpactMismatchError":
               return `employee-lifecycle-impact:${error.identifier}`
+            case "EmployeeInvitationPartialFailureError":
+              return `employee-invitation-partial:${error.personId}`
             case "HrRequestMutationUnsupportedError":
               return `hr-request-unsupported:${error.operation}`
             case "PublicHolidayNotFoundError":

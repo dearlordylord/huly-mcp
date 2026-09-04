@@ -51,14 +51,42 @@ export const EmployeeLifecycleStateSchema = Schema.Struct({
 })
 export type EmployeeLifecycleState = Schema.Schema.Type<typeof EmployeeLifecycleStateSchema>
 
-export const InviteEmployeeParamsSchema = Schema.Struct({
+const InviteExistingEmployeeParamsSchema = Schema.Struct({
+  mode: Schema.Literal("invite-existing"),
   employee: EmployeeLifecycleLocatorSchema,
   role: Schema.optionalKey(AccountRoleSchema)
+})
+const CreateOrPromoteEmployeeParamsSchema = Schema.Struct({
+  mode: Schema.Literal("create-or-promote"),
+  name: PersonName,
+  email: Email,
+  role: Schema.optionalKey(AccountRoleSchema)
+})
+export const InviteEmployeeParamsSchema = Schema.Union([
+  InviteExistingEmployeeParamsSchema,
+  CreateOrPromoteEmployeeParamsSchema
+]).annotate({
+  title: "InviteEmployeeParams",
+  description:
+    "Use invite-existing to resend an inactive employee invitation by exact locator. Use create-or-promote with an exact Huly display name and email to create or promote a Person before sending the invitation."
 })
 export type InviteEmployeeParams = Schema.Schema.Type<typeof InviteEmployeeParamsSchema>
 
 export const InviteEmployeeResultSchema = Schema.Union([
-  Schema.Struct({ outcome: Schema.Literal("invitation-sent"), email: Email, role: AccountRoleSchema }),
+  Schema.Struct({
+    outcome: Schema.Literal("employee-prepared-and-invited"),
+    email: Email,
+    role: AccountRoleSchema,
+    personId: PersonId,
+    changes: Schema.Struct({
+      personCreated: Schema.Boolean,
+      nameUpdated: Schema.Boolean,
+      emailIdentityCreated: Schema.Boolean,
+      employeeCreated: Schema.Boolean,
+      employeeReactivated: Schema.Boolean,
+      employeeRoleUpdated: Schema.Boolean
+    })
+  }),
   Schema.Struct({
     outcome: Schema.Literal("invitation-resent"),
     email: Email,

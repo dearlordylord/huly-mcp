@@ -4,8 +4,8 @@ import type { CliCommandSpec } from "./catalog-types.js"
 export const collaborationMutationCliCommandCatalogB = {
   invite_employee: {
     path: ["contacts", "employees", "invite"],
-    positional: ["employee"],
-    description: "Send Employee Invitation or Reinvitation"
+    positional: ["mode"],
+    description: "Create Employee or Send Employee Invitation"
   },
   deactivate_employee: {
     path: ["contacts", "employees", "deactivate"],

@@ -10,16 +10,26 @@ import {
 
 describe("employee lifecycle schemas", () => {
   it("accepts exact email/name locators and rejects combined locators", () => {
-    expect(Effect.runSync(parseInviteEmployeeParams({ employee: { email: "new@example.test" } }))).toEqual({
-      employee: { email: "new@example.test" }
-    })
-    expect(Effect.runSync(parseInviteEmployeeParams({ employee: { name: "Lovelace,Ada" } }))).toEqual({
-      employee: { name: "Lovelace,Ada" }
-    })
+    expect(
+      Effect.runSync(parseInviteEmployeeParams({ mode: "invite-existing", employee: { email: "new@example.test" } }))
+    ).toEqual({ mode: "invite-existing", employee: { email: "new@example.test" } })
+    expect(
+      Effect.runSync(parseInviteEmployeeParams({ mode: "invite-existing", employee: { name: "Lovelace,Ada" } }))
+    ).toEqual({ mode: "invite-existing", employee: { name: "Lovelace,Ada" } })
+    expect(
+      Effect.runSync(
+        parseInviteEmployeeParams({ mode: "create-or-promote", name: "Lovelace,Ada", email: "new@example.test" })
+      )
+    ).toMatchObject({ mode: "create-or-promote" })
     expect(
       Exit.isFailure(
         Effect.runSync(
-          Effect.exit(parseInviteEmployeeParams({ employee: { email: "new@example.test", name: "Lovelace,Ada" } }))
+          Effect.exit(
+            parseInviteEmployeeParams({
+              mode: "invite-existing",
+              employee: { email: "new@example.test", name: "Lovelace,Ada" }
+            })
+          )
         )
       )
     ).toBe(true)

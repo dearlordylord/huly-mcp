@@ -341,6 +341,21 @@ export interface HulyClientOperations extends HulyClientContext {
     attributes: MixinData<D, M>
   ) => Effect.Effect<TxResult, HulyClientError>
 
+  /** Commit a new root document, one attached document, and one mixin atomically. */
+  readonly createDocWithCollectionAndMixin?: <D extends Doc, A extends AttachedDoc, M extends D>(
+    documentClass: Ref<Class<D>>,
+    space: Ref<Space>,
+    documentData: Data<D>,
+    documentId: Ref<D>,
+    attachedClass: Ref<Class<A>>,
+    collection: string,
+    attachedData: AttachedData<A>,
+    attachedId: Ref<A>,
+    mixin: Ref<Mixin<M>>,
+    mixinData: MixinData<D, M>,
+    scope: HulyTransactionScope
+  ) => Effect.Effect<void, HulyClientError>
+
   readonly updateMixin: <D extends Doc, M extends D>(
     objectId: Ref<D>,
     objectClass: Ref<Class<D>>,
@@ -530,6 +545,35 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
               "createMixin"
             ),
 
+          createDocWithCollectionAndMixin: <D extends Doc, A extends AttachedDoc, M extends D>(
+            documentClass: Ref<Class<D>>,
+            space: Ref<Space>,
+            documentData: Data<D>,
+            documentId: Ref<D>,
+            attachedClass: Ref<Class<A>>,
+            collection: string,
+            attachedData: AttachedData<A>,
+            attachedId: Ref<A>,
+            mixin: Ref<Mixin<M>>,
+            mixinData: MixinData<D, M>,
+            scope: HulyTransactionScope
+          ) =>
+            withClient(async (client) => {
+              const apply = client.apply(scope)
+              await apply.createDoc(documentClass, space, documentData, documentId)
+              await apply.addCollection(
+                attachedClass,
+                space,
+                documentId,
+                documentClass,
+                collection,
+                attachedData,
+                attachedId
+              )
+              await apply.createMixin(documentId, documentClass, space, mixin, mixinData)
+              await apply.commit()
+            }, "createDocWithCollectionAndMixin"),
+
           updateMixin: <D extends Doc, M extends D>(
             objectId: Ref<D>,
             objectClass: Ref<Class<D>>,
@@ -615,6 +659,7 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
       uploadMarkup: notImplemented("uploadMarkup"),
       fetchMarkup: noopFetchMarkup,
       createMixin: notImplemented("createMixin"),
+      createDocWithCollectionAndMixin: notImplemented("createDocWithCollectionAndMixin"),
       updateMixin: notImplemented("updateMixin"),
       updateMarkup: notImplemented("updateMarkup"),
       searchFulltext: notImplemented("searchFulltext")

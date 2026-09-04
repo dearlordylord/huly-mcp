@@ -101,6 +101,7 @@ PERSON_ADMIN_COMMENT_CLEANUP_ID=""
 PERSON_ADMIN_ATTACHMENT_CLEANUP_ID=""
 PERSON_MERGE_SOURCE_CLEANUP_ID=""
 PERSON_MERGE_SURVIVOR_CLEANUP_ID=""
+EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID=""
 
 if [ -z "$HULY_URL" ]; then
   echo "ERROR: HULY_URL not set. Run: set -a && source .env.local && set +a"
@@ -201,6 +202,14 @@ cleanup_generic_associations() {
       fi
       call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_association\",\"arguments\":{\"association\":$association_json}},\"id\":2}" >/dev/null 2>&1 || true
     done
+  fi
+}
+
+cleanup_employee_lifecycle_artifacts() {
+  if [ -n "$EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID" ]; then
+    local person_json
+    person_json=$(json_string "$EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID")
+    call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" >/dev/null 2>&1 || true
   fi
 }
 
@@ -912,6 +921,7 @@ cleanup_all() {
     FUNNEL_CLEANUP_ID="$saved_funnel_cleanup_id"
   fi
   cleanup_recruiting_artifacts || true
+  cleanup_employee_lifecycle_artifacts || true
   cleanup_generic_associations
   cleanup_workflow_artifacts || true
   cleanup_inventory_artifacts || true
@@ -1200,6 +1210,23 @@ run_capture_to_var() {
 run_capture_to_var_fresh() {
   restart_http_transport_if_needed "employee position mutation" >&2 || return 1
   run_capture_to_var_with_runner call_tool "$@"
+}
+
+run_employee_invitation_step() {
+  local output_var="$1" name="$2" payload="$3" result is_error text
+  restart_http_transport_if_needed "employee invitation lifecycle" >&2 || return 1
+  result=$(call_tool "$payload")
+  is_error=$(printf '%s\n' "$result" | jq -r '.result.isError // false' 2>/dev/null)
+  text=$(printf '%s\n' "$result" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+  if [ "$is_error" = "false" ] || printf '%s\n' "$text" | grep -q "but sending the invitation failed after:"; then
+    echo "PASS: $name" >&2
+    PASSED=$((PASSED + 1))
+    printf -v "$output_var" '%s' "$text"
+    return 0
+  fi
+  fail_test "$name" "unexpected invitation lifecycle response"
+  printf -v "$output_var" '%s' "$text"
+  return 1
 }
 
 capture_paginated_hr_reports() {
@@ -4578,6 +4605,32 @@ run_test "list_persons" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_persons","arguments":{"limit":3}},"id":2}'
 run_capture_to_var EMPLOYEES_TEXT "list_employees" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_employees","arguments":{"limit":3}},"id":2}'
+EMPLOYEE_LIFECYCLE_EMAIL="employee-lifecycle-$RUN_ID@example.test"
+EMPLOYEE_LIFECYCLE_NAME="Lifecycle-$RUN_ID,Fixture"
+EMPLOYEE_LIFECYCLE_EMAIL_JSON=$(json_string "$EMPLOYEE_LIFECYCLE_EMAIL")
+EMPLOYEE_LIFECYCLE_NAME_JSON=$(json_string "$EMPLOYEE_LIFECYCLE_NAME")
+run_employee_invitation_step EMPLOYEE_LIFECYCLE_CREATE "invite_employee(create-or-promote)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"invite_employee\",\"arguments\":{\"mode\":\"create-or-promote\",\"name\":$EMPLOYEE_LIFECYCLE_NAME_JSON,\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON}},\"id\":2}"
+if [ $? -eq 0 ]; then
+  EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATE" | jq -r '.personId // empty')
+  if [ -z "$EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID" ]; then
+    EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATE" | sed -n "s/.*Employee '\([^']*\)'.*/\1/p")
+  fi
+  run_capture_to_var_fresh EMPLOYEE_LIFECYCLE_CREATED_PREVIEW "deactivate_employee(created preview)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"deactivate_employee\",\"arguments\":{\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON},\"action\":\"deactivate\"}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    EMPLOYEE_LIFECYCLE_CREATED_ID=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -c '.impact.personId')
+    EMPLOYEE_LIFECYCLE_CREATED_UUID=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -c '.impact.account.personUuid // null')
+    EMPLOYEE_LIFECYCLE_CREATED_ACTIVE=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -c '.impact.employee.state == "active"')
+    EMPLOYEE_LIFECYCLE_CREATED_ROLE=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -c '.impact.workspaceMembership.role // null')
+    run_capture_to_var_fresh EMPLOYEE_LIFECYCLE_DEACTIVATED "deactivate_employee(created execute)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"deactivate_employee\",\"arguments\":{\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON},\"action\":\"deactivate\",\"execute\":true,\"expectedPersonId\":$EMPLOYEE_LIFECYCLE_CREATED_ID,\"expectedPersonUuid\":$EMPLOYEE_LIFECYCLE_CREATED_UUID,\"expectedEmployeeActive\":$EMPLOYEE_LIFECYCLE_CREATED_ACTIVE,\"expectedWorkspaceRole\":$EMPLOYEE_LIFECYCLE_CREATED_ROLE}},\"id\":2}"
+    run_employee_invitation_step EMPLOYEE_LIFECYCLE_RESENT "invite_employee(inactive resend)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"invite_employee\",\"arguments\":{\"mode\":\"invite-existing\",\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON}}},\"id\":2}"
+    run_employee_invitation_step EMPLOYEE_LIFECYCLE_REACTIVATED "invite_employee(reactivate and restore)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"invite_employee\",\"arguments\":{\"mode\":\"create-or-promote\",\"name\":$EMPLOYEE_LIFECYCLE_NAME_JSON,\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON}},\"id\":2}"
+  fi
+fi
 run_capture_to_var INACTIVE_EMPLOYEES_TEXT "list_inactive_employees" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_inactive_employees","arguments":{"limit":3,"offset":0}},"id":2}'
 if [ $? -eq 0 ]; then
@@ -4589,7 +4642,7 @@ EMPLOYEE_LIFECYCLE_ALL=$(run_capture_only \
 if [ -n "${HULY_EMAIL:-}" ]; then
   EMPLOYEE_LIFECYCLE_SELF_EMAIL=$(json_string "$HULY_EMAIL")
   run_expect_error "invite_employee(active self is incompatible)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"invite_employee\",\"arguments\":{\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_SELF_EMAIL}}},\"id\":2}"
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"invite_employee\",\"arguments\":{\"mode\":\"invite-existing\",\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_SELF_EMAIL}}},\"id\":2}"
 fi
 EMPLOYEE_LIFECYCLE_TARGET=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_ALL" | jq -r --arg email "${HULY_EMAIL:-}" \
   '[.[]? | select(.active == true and (.email // "") != $email and (.name // "") != "") | .name] | sort | group_by(.) | map(select(length == 1) | .[0]) | .[0] // empty' 2>/dev/null)

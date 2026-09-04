@@ -53,7 +53,7 @@ export const contactEmployeeTools = [
     {
       name: "invite_employee",
       description:
-        "Invite a new employee by exact email, or resend an invitation to an existing inactive Employee resolved by exact email or exact display name. Active employees and existing non-Employee persons are rejected. Returns no invitation link, credential, or token.",
+        "Create or promote and invite an employee, or resend an inactive employee invitation. mode=create-or-promote requires the exact Huly display name and email; it resolves both before writing, creates or updates the Person, creates the email SocialIdentity, then applies an active Employee mixin before sending. mode=invite-existing requires an exact email/name locator and rejects active or non-Employee targets. Returns no invitation link, credential, or token; an invitation-provider failure reports completed preparation for safe exact-input retry.",
       category: CATEGORY,
       inputSchema: inviteEmployeeParamsJsonSchema,
       resultSchema: InviteEmployeeResultSchema

@@ -428,7 +428,7 @@ cli_live_case_begin "consequential-refusals"
 cover_cli_failure "create_workspace" "workspace creation confirmation" "requires --yes" \
   workspace create "CLI Guard $RUN_ID"
 cover_cli_failure "invite_employee" "employee invitation confirmation" "requires --yes" \
-  contacts employees invite '{"email":"cli-guard@example.test"}'
+  contacts employees invite create-or-promote --name "Guard,CLI" --email "cli-guard@example.test"
 cover_cli_failure "approve_approval_request" "approval confirmation" "requires --yes" approvals approve "missing-$RUN_ID"
 cover_cli_failure "add_space_members" "space membership confirmation" "requires --yes" \
   spaces members add "missing-$RUN_ID" '["missing@example.com"]'

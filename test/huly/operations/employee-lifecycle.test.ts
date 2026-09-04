@@ -1,7 +1,20 @@
 import { describe, it } from "@effect/vitest"
 import type { Channel, Employee, Person } from "@hcengineering/contact"
 import { AvatarType } from "@hcengineering/contact"
-import type { Class, Doc, FindOptions, Mixin, MixinUpdate, Ref, Space } from "@hcengineering/core"
+import type {
+  AttachedData,
+  AttachedDoc,
+  Class,
+  Data,
+  Doc,
+  DocumentUpdate,
+  FindOptions,
+  Mixin,
+  MixinData,
+  MixinUpdate,
+  Ref,
+  Space
+} from "@hcengineering/core"
 import { AccountRole } from "@hcengineering/core"
 import { Effect, Layer } from "effect"
 import { expect } from "vitest"
@@ -21,6 +34,7 @@ import {
   inviteEmployee,
   listInactiveEmployees
 } from "../../../src/huly/operations/employee-lifecycle.js"
+import { decodeEmployeeLifecycleDocument } from "../../../src/huly/operations/employee-lifecycle-boundaries.js"
 import { toAccountUuid, toRef } from "../../../src/huly/operations/sdk-boundary.js"
 import { WorkspaceClient } from "../../../src/huly/workspace-client.js"
 import { corePersonId, findResult } from "../../helpers/huly-sdk.js"
@@ -51,6 +65,7 @@ const employee = (active: boolean, overrides?: EmployeeOverrides): Employee => (
   _class: toRef<Class<Employee>>(contact.class.Person),
   name: overrides?.name ?? "Lovelace,Ada",
   active,
+  role: "USER",
   personUuid: overrides?.personUuid ?? PERSON_UUID
 })
 
@@ -72,6 +87,7 @@ interface Fixture {
   readonly employees?: ReadonlyArray<Employee>
   readonly channels?: ReadonlyArray<Channel>
   readonly updated?: Array<unknown>
+  readonly events?: Array<string>
 }
 
 const field = (value: unknown, key: string): unknown =>
@@ -124,6 +140,45 @@ const clientLayer = (fixture: Fixture, accountUuid = ACTOR_UUID): Layer.Layer<Hu
     getAccountUuid: () => accountUuid,
     findAll,
     findOne,
+    createDoc: <T extends Doc>(_class: Ref<Class<T>>, _space: Ref<Space>, _data: Data<T>, id?: Ref<T>) =>
+      Effect.sync(() => {
+        fixture.events?.push("person-created")
+        return id ?? toRef<T>("created-person")
+      }),
+    updateDoc: <T extends Doc>(
+      _class: Ref<Class<T>>,
+      _space: Ref<Space>,
+      _id: Ref<T>,
+      _operations: DocumentUpdate<T>
+    ) => Effect.succeed({}),
+    addCollection: <T extends Doc, P extends AttachedDoc>(
+      _class: Ref<Class<P>>,
+      _space: Ref<Space>,
+      _attachedTo: Ref<T>,
+      _attachedToClass: Ref<Class<T>>,
+      _collection: string,
+      _attributes: AttachedData<P>,
+      id?: Ref<P>
+    ) =>
+      Effect.sync(() => {
+        fixture.events?.push("email-identity-created")
+        return id ?? toRef<P>("created-social-identity")
+      }),
+    createMixin: <D extends Doc, M extends D>(
+      _objectId: Ref<D>,
+      _objectClass: Ref<Class<D>>,
+      _objectSpace: Ref<Space>,
+      _mixin: Ref<Mixin<M>>,
+      _attributes: MixinData<D, M>
+    ) =>
+      Effect.sync(() => {
+        fixture.events?.push("employee-created")
+        return {}
+      }),
+    createDocWithCollectionAndMixin: () =>
+      Effect.sync(() => {
+        fixture.events?.push("person-created", "email-identity-created", "employee-created")
+      }),
     updateMixin: <D extends Doc, M extends D>(
       _objectId: Ref<D>,
       _objectClass: Ref<Class<D>>,
@@ -142,13 +197,18 @@ interface WorkspaceFixture {
   readonly resent?: Array<string>
   readonly left?: Array<string>
   readonly member?: boolean
+  readonly events?: Array<string>
 }
 
 const workspaceLayer = (fixture: WorkspaceFixture): Layer.Layer<WorkspaceClient> =>
   WorkspaceClient.testLayer({
     getWorkspaceMembers: () =>
       Effect.succeed(fixture.member === false ? [] : [{ person: PERSON_UUID, role: AccountRole.User }]),
-    sendInvite: (email) => Effect.sync(() => fixture.sent?.push(email)).pipe(Effect.asVoid),
+    sendInvite: (email) =>
+      Effect.sync(() => {
+        fixture.sent?.push(email)
+        fixture.events?.push("invitation-sent")
+      }),
     resendInvite: (email) => Effect.sync(() => fixture.resent?.push(email)).pipe(Effect.asVoid),
     leaveWorkspace: (account) => Effect.sync(() => fixture.left?.push(account)).pipe(Effect.asVoid)
   })
@@ -157,22 +217,50 @@ const layer = (huly: Fixture, workspace: WorkspaceFixture, accountUuid = ACTOR_U
   Layer.merge(clientLayer(huly, accountUuid), workspaceLayer(workspace))
 
 describe("employee lifecycle operations", () => {
-  it.effect("sends a new invitation only when exact email has no Person", () => {
+  it.effect("projects the native nested Employee mixin returned for newly promoted People", () =>
+    Effect.gen(function* () {
+      const projected = yield* decodeEmployeeLifecycleDocument(
+        {
+          _id: "person-nested",
+          space: "contact:space:Contacts",
+          name: "Nested,Employee",
+          "contact:mixin:Employee": { active: true, role: "USER" }
+        },
+        "test"
+      )
+      expect(projected).toMatchObject({ _id: "person-nested", active: true, role: "USER" })
+    })
+  )
+
+  it.effect("creates Person, email SocialIdentity, and active Employee before sending an invitation", () => {
     const sent: Array<string> = []
+    const events: Array<string> = []
     return Effect.gen(function* () {
-      expect(yield* inviteEmployee({ employee: { email: Email.make("new@example.test") } })).toEqual({
-        outcome: "invitation-sent",
+      expect(
+        yield* inviteEmployee({
+          mode: "create-or-promote",
+          name: PersonName.make("Person,New"),
+          email: Email.make("new@example.test")
+        })
+      ).toMatchObject({
+        outcome: "employee-prepared-and-invited",
         email: "new@example.test",
-        role: "USER"
+        role: "USER",
+        changes: { personCreated: true, emailIdentityCreated: true, employeeCreated: true }
       })
       expect(sent).toEqual(["new@example.test"])
-    }).pipe(Effect.provide(layer({}, { sent, member: false })))
+      expect(events).toEqual(["person-created", "email-identity-created", "employee-created", "invitation-sent"])
+    }).pipe(Effect.provide(layer({ events }, { sent, events, member: false })))
   })
 
   it.effect("resends for an inactive exact employee and returns all lifecycle states", () => {
     const resent: Array<string> = []
     return Effect.gen(function* () {
-      const result = yield* inviteEmployee({ employee: { name: PersonName.make("Lovelace,Ada") }, role: "MAINTAINER" })
+      const result = yield* inviteEmployee({
+        mode: "invite-existing",
+        employee: { name: PersonName.make("Lovelace,Ada") },
+        role: "MAINTAINER"
+      })
       expect(result).toMatchObject({
         outcome: "invitation-resent",
         email: "ada@example.test",
@@ -194,6 +282,47 @@ describe("employee lifecycle operations", () => {
     )
   })
 
+  it.effect("promotes an exact Person and reactivates an inactive Employee through the create mode", () => {
+    const promotedEvents: Array<string> = []
+    const updated: Array<unknown> = []
+    return Effect.gen(function* () {
+      const promoted = yield* inviteEmployee({
+        mode: "create-or-promote",
+        name: PersonName.make("Lovelace,Ada"),
+        email: Email.make("ada@example.test")
+      }).pipe(
+        Effect.provide(
+          layer(
+            { people: [person("person-1", "Lovelace,Ada")], channels: [emailChannel()], events: promotedEvents },
+            { events: promotedEvents }
+          )
+        )
+      )
+      expect(promoted).toMatchObject({ changes: { personCreated: false, employeeCreated: true } })
+      expect(promotedEvents).toEqual(["employee-created", "invitation-sent"])
+
+      const reactivated = yield* inviteEmployee({
+        mode: "create-or-promote",
+        name: PersonName.make("Lovelace,Ada"),
+        email: Email.make("ada@example.test")
+      }).pipe(
+        Effect.provide(
+          layer(
+            {
+              people: [person("person-1", "Lovelace,Ada")],
+              employees: [employee(false)],
+              channels: [emailChannel()],
+              updated
+            },
+            {}
+          )
+        )
+      )
+      expect(reactivated).toMatchObject({ changes: { employeeCreated: false, employeeReactivated: true } })
+      expect(updated).toEqual([{ active: true, role: "USER" }])
+    })
+  })
+
   it.effect("rejects active, non-employee, missing-name, and email-less reinvite states", () => {
     const activeLayer = layer(
       { people: [person("person-1", "Lovelace,Ada")], employees: [employee(true)], channels: [emailChannel()] },
@@ -207,22 +336,30 @@ describe("employee lifecycle operations", () => {
     return Effect.gen(function* () {
       expect(
         yield* Effect.flip(
-          inviteEmployee({ employee: { name: PersonName.make("Lovelace,Ada") } }).pipe(Effect.provide(activeLayer))
+          inviteEmployee({ mode: "invite-existing", employee: { name: PersonName.make("Lovelace,Ada") } }).pipe(
+            Effect.provide(activeLayer)
+          )
         )
       ).toBeInstanceOf(EmployeeLifecycleStateError)
       expect(
         yield* Effect.flip(
-          inviteEmployee({ employee: { name: PersonName.make("Lovelace,Ada") } }).pipe(Effect.provide(nonEmployeeLayer))
+          inviteEmployee({ mode: "invite-existing", employee: { name: PersonName.make("Lovelace,Ada") } }).pipe(
+            Effect.provide(nonEmployeeLayer)
+          )
         )
       ).toBeInstanceOf(PersonNotAnEmployeeError)
       expect(
         yield* Effect.flip(
-          inviteEmployee({ employee: { name: PersonName.make("Missing,Person") } }).pipe(Effect.provide(layer({}, {})))
+          inviteEmployee({ mode: "invite-existing", employee: { name: PersonName.make("Missing,Person") } }).pipe(
+            Effect.provide(layer({}, {}))
+          )
         )
       ).toBeInstanceOf(PersonNotFoundError)
       expect(
         yield* Effect.flip(
-          inviteEmployee({ employee: { name: PersonName.make("Lovelace,Ada") } }).pipe(Effect.provide(emailLessLayer))
+          inviteEmployee({ mode: "invite-existing", employee: { name: PersonName.make("Lovelace,Ada") } }).pipe(
+            Effect.provide(emailLessLayer)
+          )
         )
       ).toBeInstanceOf(EmployeeLifecycleStateError)
     })

@@ -17,3 +17,17 @@ export class EmployeeLifecycleImpactMismatchError extends Schema.TaggedError<Emp
     return `Employee lifecycle state changed for '${this.identifier}' after preview: ${this.reason}. Preview again before executing.`
   }
 }
+
+export class EmployeeInvitationPartialFailureError extends Schema.TaggedError<EmployeeInvitationPartialFailureError>()(
+  "EmployeeInvitationPartialFailureError",
+  {
+    personId: Schema.String,
+    email: Schema.String,
+    completedChanges: Schema.Array(Schema.String),
+    reason: Schema.String
+  }
+) {
+  override get message(): string {
+    return `Employee '${this.personId}' was prepared for '${this.email}', but sending the invitation failed after: ${this.completedChanges.join(", ")}. Retry create-or-promote with the same exact name and email; preparation is convergent. ${this.reason}`
+  }
+}

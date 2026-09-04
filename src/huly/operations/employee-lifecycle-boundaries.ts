@@ -6,16 +6,31 @@ import { AccountRoleSchema } from "../../domain/schemas/workspace.js"
 import { Email, PersonId, PersonName, PersonUuid, SpaceId } from "../../domain/schemas/shared.js"
 import { HulyDataInvalidError } from "../errors.js"
 
-export const EmployeeLifecycleDocumentSchema = Schema.Struct({
+const EmployeeLifecycleDocumentFields = {
   _id: PersonId,
   space: SpaceId,
   name: PersonName,
-  active: Schema.Boolean,
   personUuid: Schema.optionalKey(PersonUuid)
+}
+const EmployeeRole = Schema.Literals(["USER", "GUEST"])
+const EMPLOYEE_MIXIN_KEY = "contact:mixin:Employee"
+export const EmployeeLifecycleDocumentSchema = Schema.Struct({
+  ...EmployeeLifecycleDocumentFields,
+  active: Schema.Boolean,
+  role: Schema.optionalKey(EmployeeRole)
 })
 export type EmployeeLifecycleDocument = Schema.Schema.Type<typeof EmployeeLifecycleDocumentSchema>
 
-export const EmployeeLifecyclePersonSchema = Schema.Struct({ _id: PersonId })
+const NestedEmployeeLifecycleDocumentSchema = Schema.Struct({
+  ...EmployeeLifecycleDocumentFields,
+  [EMPLOYEE_MIXIN_KEY]: Schema.Struct({ active: Schema.Boolean, role: Schema.optionalKey(EmployeeRole) })
+})
+const RawEmployeeLifecycleDocumentSchema = Schema.Union([
+  EmployeeLifecycleDocumentSchema,
+  NestedEmployeeLifecycleDocumentSchema
+])
+
+export const EmployeeLifecyclePersonSchema = Schema.Struct({ _id: PersonId, name: PersonName })
 export type EmployeeLifecyclePerson = Schema.Schema.Type<typeof EmployeeLifecyclePersonSchema>
 
 export const EmployeeLifecycleMemberSchema = Schema.Struct({ person: PersonUuid, role: AccountRoleSchema })
@@ -30,7 +45,18 @@ export const decodeEmployeeLifecycleDocument = (
   input: unknown,
   operation: string
 ): Effect.Effect<EmployeeLifecycleDocument, HulyDataInvalidError> =>
-  Schema.decodeUnknownEffect(EmployeeLifecycleDocumentSchema)(input).pipe(
+  Schema.decodeUnknownEffect(RawEmployeeLifecycleDocumentSchema)(input).pipe(
+    Effect.map((document) =>
+      "active" in document
+        ? document
+        : {
+            _id: document._id,
+            space: document.space,
+            name: document.name,
+            ...(document.personUuid === undefined ? {} : { personUuid: document.personUuid }),
+            ...document[EMPLOYEE_MIXIN_KEY]
+          }
+    ),
     Effect.mapError(invalid(operation, "Employee mixin"))
   )
 
@@ -38,7 +64,20 @@ export const decodeEmployeeLifecycleDocuments = (
   input: unknown,
   operation: string
 ): Effect.Effect<ReadonlyArray<EmployeeLifecycleDocument>, HulyDataInvalidError> =>
-  Schema.decodeUnknownEffect(Schema.Array(EmployeeLifecycleDocumentSchema))(input).pipe(
+  Schema.decodeUnknownEffect(Schema.Array(RawEmployeeLifecycleDocumentSchema))(input).pipe(
+    Effect.map((documents) =>
+      documents.map((document) =>
+        "active" in document
+          ? document
+          : {
+              _id: document._id,
+              space: document.space,
+              name: document.name,
+              ...(document.personUuid === undefined ? {} : { personUuid: document.personUuid }),
+              ...document[EMPLOYEE_MIXIN_KEY]
+            }
+      )
+    ),
     Effect.mapError(invalid(operation, "Employee mixins"))
   )
 

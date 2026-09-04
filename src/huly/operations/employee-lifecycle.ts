@@ -1,5 +1,6 @@
-import type { Employee as HulyEmployee, Person as HulyPerson } from "@hcengineering/contact"
-import type { Space } from "@hcengineering/core"
+import type { Employee as HulyEmployee, Person as HulyPerson, SocialIdentity } from "@hcengineering/contact"
+import { AvatarType } from "@hcengineering/contact"
+import { buildSocialIdString, generateId, SocialIdType, type Space } from "@hcengineering/core"
 import { Effect } from "effect"
 
 import {
@@ -13,11 +14,12 @@ import {
   type ListInactiveEmployeesParams,
   type ListInactiveEmployeesResult
 } from "../../domain/schemas/employee-lifecycle.js"
-import { Count, Email, NonNegativeInteger, PersonId } from "../../domain/schemas/shared.js"
+import { Count, Email, HulyTransactionScope, NonNegativeInteger, PersonId } from "../../domain/schemas/shared.js"
 import type { AccountRole } from "../../domain/schemas/workspace.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import {
   EmployeeLifecycleImpactMismatchError,
+  EmployeeInvitationPartialFailureError,
   EmployeeLifecycleStateError,
   type HulyDataInvalidError,
   type PersonIdentifierAmbiguousError,
@@ -43,6 +45,7 @@ import { toHulyAccountRole } from "./workspace.js"
 
 type EmployeeLifecycleError =
   | EmployeeLifecycleImpactMismatchError
+  | EmployeeInvitationPartialFailureError
   | EmployeeLifecycleStateError
   | HulyClientError
   | HulyDataInvalidError
@@ -134,19 +137,137 @@ const loadState = Effect.fn("EmployeeLifecycle.loadState")(function* (
 
 const DEFAULT_INVITE_ROLE: AccountRole = "USER"
 
+const employeeRole = (role: AccountRole): "GUEST" | "USER" => (role === "GUEST" ? "GUEST" : "USER")
+
+const prepareEmployee = Effect.fn("EmployeeLifecycle.prepareEmployee")(function* (
+  client: HulyClient["Service"],
+  name: Extract<InviteEmployeeParams, { readonly mode: "create-or-promote" }>["name"],
+  email: Email,
+  role: AccountRole
+) {
+  const [byEmail, byName] = yield* Effect.all([resolvePerson(client, { email }), resolvePerson(client, { name })])
+  if (byEmail !== undefined && byName !== undefined && byEmail._id !== byName._id) {
+    return yield* new EmployeeLifecycleStateError({
+      identifier: email,
+      reason: `the exact email and exact name resolve to different People ('${byEmail._id}' and '${byName._id}')`
+    })
+  }
+
+  const existing = byEmail ?? byName
+  const personId = existing?._id ?? PersonId.make(generateId<HulyPerson>())
+  const existingEmployee = existing === undefined ? undefined : yield* findEmployeeForPerson(client, personId)
+  const personCreated = existing === undefined
+  const nameUpdated = existing !== undefined && existing.name !== name
+  const emailIdentityCreated = byEmail === undefined
+  const targetRole = employeeRole(role)
+  const employeeCreated = existingEmployee === undefined
+  const employeeReactivated = existingEmployee !== undefined && !existingEmployee.active
+  const employeeRoleUpdated = existingEmployee !== undefined && existingEmployee.role !== targetRole
+  const identityData = {
+    type: SocialIdType.EMAIL,
+    value: email,
+    key: buildSocialIdString({ type: SocialIdType.EMAIL, value: email }),
+    isDeleted: false
+  }
+  if (personCreated) {
+    const createBundle = client.createDocWithCollectionAndMixin
+    if (createBundle === undefined) {
+      return yield* new EmployeeLifecycleStateError({
+        identifier: email,
+        reason: "the connected Huly adapter does not support atomic Person, SocialIdentity, and Employee creation"
+      })
+    }
+    yield* createBundle<HulyPerson, SocialIdentity, HulyEmployee>(
+      contact.class.Person,
+      contact.space.Contacts,
+      { name, city: "", avatarType: AvatarType.COLOR },
+      toRef<HulyPerson>(personId),
+      contact.class.SocialIdentity,
+      "socialIds",
+      identityData,
+      toRef<SocialIdentity>(generateId<SocialIdentity>()),
+      contact.mixin.Employee,
+      { active: true },
+      HulyTransactionScope.make(`huly-mcp:employee-lifecycle:${personId}`)
+    )
+  } else if (nameUpdated) {
+    yield* client.updateDoc(contact.class.Person, contact.space.Contacts, toRef<HulyPerson>(personId), { name })
+  }
+  if (!personCreated && emailIdentityCreated) {
+    yield* client.addCollection<HulyPerson, SocialIdentity>(
+      contact.class.SocialIdentity,
+      contact.space.Contacts,
+      toRef<HulyPerson>(personId),
+      contact.class.Person,
+      "socialIds",
+      identityData
+    )
+  }
+  if (!personCreated && employeeCreated) {
+    yield* client.createMixin<HulyPerson, HulyEmployee>(
+      toRef<HulyPerson>(personId),
+      contact.class.Person,
+      contact.space.Contacts,
+      contact.mixin.Employee,
+      { active: true, role: targetRole }
+    )
+  } else if (employeeReactivated || employeeRoleUpdated) {
+    yield* client.updateMixin<HulyPerson, HulyEmployee>(
+      toRef<HulyPerson>(personId),
+      contact.class.Person,
+      contact.space.Contacts,
+      contact.mixin.Employee,
+      { active: true, role: targetRole }
+    )
+  }
+  return {
+    personId,
+    changes: {
+      personCreated,
+      nameUpdated,
+      emailIdentityCreated,
+      employeeCreated,
+      employeeReactivated,
+      employeeRoleUpdated
+    }
+  }
+})
+
 export const inviteEmployee = Effect.fn("EmployeeLifecycle.invite")(function* (
   params: InviteEmployeeParams
 ): Effect.fn.Return<InviteEmployeeResult, EmployeeLifecycleError, HulyClient | WorkspaceClient> {
   const client = yield* HulyClient
   const workspace = yield* WorkspaceClient
   const role = params.role ?? DEFAULT_INVITE_ROLE
+  if (params.mode === "create-or-promote") {
+    const prepared = yield* prepareEmployee(client, params.name, params.email, role)
+    const completedChanges = Object.entries(prepared.changes)
+      .filter(([, changed]) => changed)
+      .map(([change]) => change)
+    yield* workspace
+      .sendInvite(params.email, toHulyAccountRole(role))
+      .pipe(
+        Effect.mapError(
+          (error) =>
+            new EmployeeInvitationPartialFailureError({
+              personId: prepared.personId,
+              email: params.email,
+              completedChanges,
+              reason: error.message
+            })
+        )
+      )
+    return {
+      outcome: "employee-prepared-and-invited",
+      email: params.email,
+      role,
+      personId: prepared.personId,
+      changes: prepared.changes
+    }
+  }
   const person = yield* resolvePerson(client, params.employee)
   if (person === undefined) {
-    if (!("email" in params.employee)) {
-      return yield* new PersonNotFoundError({ identifier: params.employee.name })
-    }
-    yield* workspace.sendInvite(params.employee.email, toHulyAccountRole(role))
-    return { outcome: "invitation-sent", email: params.employee.email, role }
+    return yield* new PersonNotFoundError({ identifier: locatorText(params.employee) })
   }
 
   const identifier = locatorText(params.employee)
