@@ -1,8 +1,4 @@
-import type { Contact } from "@hcengineering/contact"
-import type { Attachment } from "@hcengineering/attachment"
-import type { ChatMessage } from "@hcengineering/chunter"
-import type { AttachedDoc, Doc, Ref, Space, Status } from "@hcengineering/core"
-import type { TagReference } from "@hcengineering/tags"
+import type { Doc, Ref, Status } from "@hcengineering/core"
 import { Effect } from "effect"
 
 import type {
@@ -15,30 +11,30 @@ import type {
 import { FunnelIdentifier, LeadIdentifier } from "../../domain/schemas/leads.js"
 import type {
   DeleteLeadResult,
-  LeadImpact,
   LeadMutationResult,
-  LeadRelationCollection,
   MakePersonCustomerResult,
   MoveLeadResult
 } from "../../domain/schemas/leads-mutations.js"
-import { Count, NonEmptyString, PersonId, StatusName } from "../../domain/schemas/shared.js"
+import { NonEmptyString, StatusName } from "../../domain/schemas/shared.js"
 import { HulyClient } from "../client.js"
 import type { HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
-import { LeadDeleteConflictError, LeadMoveConflictError, LeadUpdateConflictError } from "../errors-leads.js"
-import { HulyDataInvalidError } from "../errors.js"
-import type { HulyError, InvalidStatusError, PersonIdentifierAmbiguousError, PersonNotFoundError } from "../errors.js"
-import { attachment, chunter, tags } from "../huly-plugins.js"
+import { LeadMoveConflictError, LeadUpdateConflictError } from "../errors-leads.js"
+import type {
+  HulyDataInvalidError,
+  HulyError,
+  InvalidStatusError,
+  PersonIdentifierAmbiguousError,
+  PersonNotFoundError
+} from "../errors.js"
 import { leadClassIds } from "../lead-plugin.js"
 import { funnelSpace, type FunnelWorkflowTaskType, type HulyFunnel } from "./funnels-shared.js"
-import { customerMixinWriteAttributes } from "./leads-mutations-boundary.js"
+import { applyPersonCustomer, deleteResolvedLead } from "./leads-mutation-actions.js"
 import {
   currentStatus,
   type HulyLead,
   type LeadDocumentUpdate,
   findLead,
-  hasCustomerMixin,
-  type CustomerMixinWrite,
   resolveExactPerson,
   resolveEmployee,
   type LeadMutationError,
@@ -48,10 +44,11 @@ import {
   workflowForLead,
   statusByName
 } from "./leads-mutations-shared.js"
-import { hulyQuery } from "./query-helpers.js"
-import { toClassRef, toMixinRef, toRef } from "./sdk-boundary.js"
+import { toRef } from "./sdk-boundary.js"
 
-const statusForLead = Effect.fn("Lead.statusForLead")(function* (
+export { applyPersonCustomer, deleteResolvedLead, deletionImpact } from "./leads-mutation-actions.js"
+
+export const statusForLead = Effect.fn("Lead.statusForLead")(function* (
   workflow: Parameters<typeof workflowForLead>[0],
   lead: HulyLead,
   funnel: Parameters<typeof workflowForLead>[2],
@@ -64,7 +61,7 @@ const statusForLead = Effect.fn("Lead.statusForLead")(function* (
 
 type LeadUpdateOperations = { readonly operations: LeadDocumentUpdate; readonly changed: boolean }
 
-const rejectArchivedLeadUpdate = Effect.fn("Lead.rejectArchivedLeadUpdate")(function* (
+export const rejectArchivedLeadUpdate = Effect.fn("Lead.rejectArchivedLeadUpdate")(function* (
   params: UpdateLeadParams,
   funnel: HulyFunnel
 ): Effect.fn.Return<void, LeadUpdateConflictError> {
@@ -76,7 +73,7 @@ const rejectArchivedLeadUpdate = Effect.fn("Lead.rejectArchivedLeadUpdate")(func
   })
 })
 
-const assigneeUpdate = Effect.fn("Lead.assigneeUpdate")(function* (
+export const assigneeUpdate = Effect.fn("Lead.assigneeUpdate")(function* (
   client: HulyClient["Service"],
   params: UpdateLeadParams,
   lead: HulyLead
@@ -87,7 +84,7 @@ const assigneeUpdate = Effect.fn("Lead.assigneeUpdate")(function* (
   return { operations: changed ? { assignee } : {}, changed }
 })
 
-const statusUpdate = Effect.fn("Lead.statusUpdate")(function* (
+export const statusUpdate = Effect.fn("Lead.statusUpdate")(function* (
   workflow: ReadonlyArray<FunnelWorkflowTaskType>,
   lead: HulyLead,
   funnel: HulyFunnel,
@@ -110,13 +107,13 @@ const startDateUpdate = (
 const dueDateUpdate = (requested: UpdateLeadParams["dueDate"], current: HulyLead["dueDate"]): LeadDocumentUpdate =>
   requested === undefined || requested === current ? {} : { dueDate: requested }
 
-const leadFieldUpdates = (params: UpdateLeadParams, lead: HulyLead): LeadDocumentUpdate => ({
+export const leadFieldUpdates = (params: UpdateLeadParams, lead: HulyLead): LeadDocumentUpdate => ({
   ...titleUpdate(params.title, lead.title),
   ...startDateUpdate(params.startDate, lead.startDate),
   ...dueDateUpdate(params.dueDate, lead.dueDate)
 })
 
-const descriptionUpdate = Effect.fn("Lead.descriptionUpdate")(function* (
+export const descriptionUpdate = Effect.fn("Lead.descriptionUpdate")(function* (
   client: HulyClient["Service"],
   params: UpdateLeadParams,
   lead: HulyLead
@@ -126,7 +123,7 @@ const descriptionUpdate = Effect.fn("Lead.descriptionUpdate")(function* (
     : yield* updateLeadDescription(client, lead, params.description)
 })
 
-const customerDescriptionUpdate = Effect.fn("Lead.customerDescriptionUpdate")(function* (
+export const customerDescriptionUpdate = Effect.fn("Lead.customerDescriptionUpdate")(function* (
   client: HulyClient["Service"],
   params: UpdateLeadParams,
   lead: HulyLead
@@ -136,7 +133,7 @@ const customerDescriptionUpdate = Effect.fn("Lead.customerDescriptionUpdate")(fu
     : yield* updateLeadCustomerDescription(client, lead, params.customerDescription)
 })
 
-const persistLeadUpdate = Effect.fn("Lead.persistLeadUpdate")(function* (
+export const persistLeadUpdate = Effect.fn("Lead.persistLeadUpdate")(function* (
   client: HulyClient["Service"],
   funnel: HulyFunnel,
   lead: HulyLead,
@@ -145,6 +142,12 @@ const persistLeadUpdate = Effect.fn("Lead.persistLeadUpdate")(function* (
   if (Object.keys(operations).length === 0) return
   yield* client.updateDoc(leadClassIds.class.Lead, funnelSpace(funnel), toRef<Doc>(lead._id), operations)
 })
+
+export const leadUpdateChanged = (
+  operations: LeadDocumentUpdate,
+  descriptionChanged: boolean,
+  customerChanged: boolean
+): boolean => Object.keys(operations).length > 0 || descriptionChanged || customerChanged
 
 export const updateLead = Effect.fn("Lead.updateLead")(function* (
   params: UpdateLeadParams
@@ -165,12 +168,12 @@ export const updateLead = Effect.fn("Lead.updateLead")(function* (
     ...status.operations,
     ...description.operations
   }
-  const changed = Object.keys(operations).length > 0 || description.changed || customerChanged
+  const changed = leadUpdateChanged(operations, description.changed, customerChanged)
   yield* persistLeadUpdate(client, source.funnel, lead, operations)
   return { identifier: LeadIdentifier.make(lead.identifier), updated: changed }
 })
 
-const rejectInactiveMoveFunnels = Effect.fn("Lead.rejectInactiveMoveFunnels")(function* (
+export const rejectInactiveMoveFunnels = Effect.fn("Lead.rejectInactiveMoveFunnels")(function* (
   identifier: LeadIdentifier,
   source: HulyFunnel,
   destination: HulyFunnel
@@ -184,14 +187,14 @@ const rejectInactiveMoveFunnels = Effect.fn("Lead.rejectInactiveMoveFunnels")(fu
   })
 })
 
-const compatibleDestinationWorkflow = (
+export const compatibleDestinationWorkflow = (
   workflow: ReadonlyArray<FunnelWorkflowTaskType>,
   lead: HulyLead
 ): FunnelWorkflowTaskType | undefined =>
   workflow.find((candidate) => String(candidate.taskType._id) === String(lead.kind)) ??
   (workflow.length === 1 ? workflow[0] : undefined)
 
-const requireDestinationWorkflow = Effect.fn("Lead.requireDestinationWorkflow")(function* (
+export const requireDestinationWorkflow = Effect.fn("Lead.requireDestinationWorkflow")(function* (
   workflow: FunnelWorkflowTaskType | undefined,
   identifier: LeadIdentifier,
   sourceFunnel: FunnelIdentifier,
@@ -206,14 +209,14 @@ const requireDestinationWorkflow = Effect.fn("Lead.requireDestinationWorkflow")(
   })
 })
 
-const destinationStatusReason = (requested: MoveLeadParams["status"], current: StatusName): NonEmptyString =>
+export const destinationStatusReason = (requested: MoveLeadParams["status"], current: StatusName): NonEmptyString =>
   NonEmptyString.make(
     requested === undefined
       ? `current status '${current}' has no compatible destination mapping`
       : `requested status '${requested}' is not valid in the destination workflow`
   )
 
-const destinationStatus = Effect.fn("Lead.destinationStatus")(function* (
+export const destinationStatus = Effect.fn("Lead.destinationStatus")(function* (
   workflow: FunnelWorkflowTaskType,
   params: MoveLeadParams,
   current: StatusName,
@@ -235,7 +238,7 @@ const destinationStatus = Effect.fn("Lead.destinationStatus")(function* (
   )
 })
 
-const moveRequired = (
+export const moveRequired = (
   source: HulyFunnel,
   destination: HulyFunnel,
   destinationStatusId: Ref<Status>,
@@ -246,7 +249,7 @@ const moveRequired = (
   String(destinationStatusId) !== String(lead.status) ||
   taskTypeChanged
 
-const moveOperations = (
+export const moveOperations = (
   destination: HulyFunnel,
   destinationStatusId: Ref<Status>,
   destinationWorkflow: FunnelWorkflowTaskType,
@@ -257,7 +260,7 @@ const moveOperations = (
   ...(taskTypeChanged ? { kind: destinationWorkflow.taskType._id } : {})
 })
 
-const persistLeadMove = Effect.fn("Lead.persistLeadMove")(function* (
+export const persistLeadMove = Effect.fn("Lead.persistLeadMove")(function* (
   client: HulyClient["Service"],
   source: HulyFunnel,
   lead: HulyLead,
@@ -267,6 +270,16 @@ const persistLeadMove = Effect.fn("Lead.persistLeadMove")(function* (
   if (!moved) return
   yield* client.updateDoc(leadClassIds.class.Lead, funnelSpace(source), toRef<Doc>(lead._id), operations)
 })
+
+export const resolvedMoveStatusName = (
+  workflow: FunnelWorkflowTaskType,
+  destinationStatusId: Ref<Status>,
+  requested: MoveLeadParams["status"],
+  current: StatusName
+): StatusName => {
+  const resolved = workflow.statuses.find((status) => String(status.id) === String(destinationStatusId))?.name
+  return StatusName.make(resolved ?? requested ?? current)
+}
 
 export const moveLead = Effect.fn("Lead.moveLead")(function* (
   params: MoveLeadParams
@@ -300,81 +313,12 @@ export const moveLead = Effect.fn("Lead.moveLead")(function* (
   const moved = moveRequired(source.funnel, destination.funnel, destinationStatusId, lead, taskTypeChanged)
   const operations = moveOperations(destination.funnel, destinationStatusId, destinationWorkflow, taskTypeChanged)
   yield* persistLeadMove(client, source.funnel, lead, operations, moved)
-  const statusName = destinationWorkflow.statuses.find(
-    (status) => String(status.id) === String(destinationStatusId)
-  )?.name
   return {
     identifier,
     sourceFunnel,
     destinationFunnel,
-    status: StatusName.make(statusName ?? params.status ?? current.name),
+    status: resolvedMoveStatusName(destinationWorkflow, destinationStatusId, params.status, current.name),
     moved
-  }
-})
-
-const authoritativeRelationCount = Effect.fn("Lead.authoritativeRelationCount")((
-  relation: LeadRelationCollection,
-  result: { readonly total: number }
-): Effect.Effect<Count, HulyDataInvalidError> => {
-  if (!Number.isSafeInteger(result.total) || result.total < 0) {
-    return Effect.fail(
-      new HulyDataInvalidError({
-        operation: "deleteLead",
-        entity: `Lead ${relation} relation count`,
-        cause: result.total
-      })
-    )
-  }
-  return Effect.succeed(Count.make(result.total))
-})
-
-export const deletionImpact = Effect.fn("Lead.deletionImpact")(function* (
-  client: HulyClient["Service"],
-  lead: HulyLead
-): Effect.fn.Return<LeadImpact, HulyClientError | HulyDataInvalidError> {
-  const objectId = toRef<Doc>(lead._id)
-  const objectClass = toClassRef<Doc>(lead._class)
-  const objectSpace = toRef<Space>(lead.space)
-  const [comments, attachments] = yield* Effect.all([
-    client.findAll<ChatMessage>(
-      chunter.class.ChatMessage,
-      hulyQuery<ChatMessage>({
-        attachedTo: objectId,
-        attachedToClass: objectClass,
-        space: objectSpace,
-        collection: "comments"
-      }),
-      { limit: 1, total: true }
-    ),
-    client.findAll<Attachment>(
-      attachment.class.Attachment,
-      hulyQuery<Attachment>({
-        attachedTo: objectId,
-        attachedToClass: objectClass,
-        space: objectSpace,
-        collection: "attachments"
-      }),
-      { limit: 1, total: true }
-    )
-  ])
-  const labels = yield* client.findAll<TagReference>(
-    tags.class.TagReference,
-    hulyQuery<TagReference>({
-      attachedTo: objectId,
-      attachedToClass: objectClass,
-      space: objectSpace,
-      collection: "labels"
-    }),
-    { limit: 1, total: true }
-  )
-  const commentsCount = yield* authoritativeRelationCount("comments", comments)
-  const attachmentsCount = yield* authoritativeRelationCount("attachments", attachments)
-  const labelsCount = yield* authoritativeRelationCount("labels", labels)
-  return {
-    comments: commentsCount,
-    attachments: attachmentsCount,
-    labels: labelsCount,
-    totalAffected: Count.make(commentsCount + attachmentsCount + labelsCount)
   }
 })
 
@@ -384,35 +328,7 @@ export const deleteLead = Effect.fn("Lead.deleteLead")(function* (
   const client = yield* HulyClient
   const source = yield* validatedFunnel(client, params.funnel)
   const lead = yield* findLead(client, source.funnel, params.identifier)
-  const identifier = LeadIdentifier.make(lead.identifier)
-  const funnel = FunnelIdentifier.make(source.funnel._id)
-  const impact = yield* deletionImpact(client, lead)
-  if (params.execute !== true) return { identifier, funnel, impact, deleted: false }
-  if (
-    params.expectedComments !== impact.comments ||
-    params.expectedAttachments !== impact.attachments ||
-    params.expectedLabels !== impact.labels
-  ) {
-    return yield* new LeadDeleteConflictError({
-      identifier,
-      funnel,
-      reason: NonEmptyString.make(
-        `deletion impact changed; expected comments=${params.expectedComments}, attachments=${params.expectedAttachments}, labels=${params.expectedLabels}, current comments=${impact.comments}, attachments=${impact.attachments}, labels=${impact.labels}`
-      )
-    })
-  }
-  if (client.removeCollection === undefined) {
-    return yield* new HulyDataInvalidError({ operation: "deleteLead", entity: "Huly Lead collection remover" })
-  }
-  yield* client.removeCollection(
-    toClassRef<AttachedDoc>(String(leadClassIds.class.Lead)),
-    funnelSpace(source.funnel),
-    toRef<AttachedDoc>(lead._id),
-    toRef<Doc>(lead.attachedTo),
-    toClassRef<Doc>(lead.attachedToClass),
-    lead.collection
-  )
-  return { identifier, funnel, impact, deleted: true }
+  return yield* deleteResolvedLead(client, source, lead, params)
 })
 
 export const makePersonCustomer = Effect.fn("Lead.makePersonCustomer")(function* (
@@ -424,14 +340,5 @@ export const makePersonCustomer = Effect.fn("Lead.makePersonCustomer")(function*
 > {
   const client = yield* HulyClient
   const person = yield* resolveExactPerson(client, params.identifier)
-  if (hasCustomerMixin(person)) return { id: PersonId.make(person._id), applied: false }
-  const attributes = yield* customerMixinWriteAttributes({ customerDescription: null })
-  yield* client.createMixin<Contact, CustomerMixinWrite>(
-    toRef<Contact>(person._id),
-    toClassRef<Contact>(person._class),
-    toRef<Space>(person.space),
-    toMixinRef<CustomerMixinWrite>(leadClassIds.mixin.Customer),
-    attributes
-  )
-  return { id: PersonId.make(person._id), applied: true }
+  return yield* applyPersonCustomer(client, person)
 })

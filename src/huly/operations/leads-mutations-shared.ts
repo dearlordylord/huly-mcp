@@ -11,7 +11,6 @@ import {
   type UpdateLeadParams
 } from "../../domain/schemas/leads.js"
 import {
-  LeadMutationDocumentSchema,
   type LeadDescriptionField,
   type LeadMutationDocument,
   type LeadOrganizationDocument,
@@ -38,18 +37,19 @@ import type {
   FunnelWorkflowInvalidError,
   LeadDeleteConflictError,
   LeadMoveConflictError,
+  LeadNotFoundError,
   LeadUpdateConflictError
 } from "../errors-leads.js"
-import { LeadNotFoundError } from "../errors-leads.js"
 import {
-  HulyDataInvalidError,
+  type HulyDataInvalidError,
   HulyError,
   InvalidStatusError,
+  type OrganizationIdentifierAmbiguousError,
+  type OrganizationNotFoundError,
   PersonIdentifierAmbiguousError,
-  PersonNotAnEmployeeError,
+  type PersonNotAnEmployeeError,
   PersonNotFoundError
 } from "../errors.js"
-import type { OrganizationIdentifierAmbiguousError, OrganizationNotFoundError } from "../errors.js"
 import { contact } from "../huly-plugins.js"
 import { leadClassIds } from "../lead-plugin.js"
 import { findPersonByExactEmail, findPersonByExactName, findPersonById } from "./contacts-shared.js"
@@ -67,33 +67,16 @@ import { markupBlobRefAsMarkupRef } from "./recruiting-shared.js"
 import { toClassRef, toMixinRef, toRef } from "./sdk-boundary.js"
 import {
   customerMixinWriteAttributes,
-  parseLeadEmployeeDocument,
-  parseLeadOrganizationDocument,
+  type HulyLead,
   parseLeadPersonDocument,
   parseOptionalLeadPersonDocument,
+  requireEmployee,
+  requireLeadDocument,
+  resolveLeadCustomer,
   toMarkupBlobRef
 } from "./leads-mutations-boundary.js"
 
-// Parsed native Lead projection. The SDK response is decoded by
-// LeadMutationDocumentSchema before this internal representation is created;
-// this alias keeps every selected field schema-derived.
-export type HulyLead = Pick<
-  LeadMutationDocument,
-  | "_id"
-  | "_class"
-  | "space"
-  | "title"
-  | "identifier"
-  | "status"
-  | "kind"
-  | "assignee"
-  | "description"
-  | "startDate"
-  | "dueDate"
-  | "attachedTo"
-  | "attachedToClass"
-  | "collection"
->
+export type { HulyLead } from "./leads-mutations-boundary.js"
 
 type LeadMutationQueryDocument = Doc & Pick<LeadMutationDocument, "identifier">
 
@@ -133,32 +116,7 @@ export type LeadMutationError =
   | OrganizationNotFoundError
   | HulyDataInvalidError
 
-const parseLeadMutationDocument = Effect.fn("Lead.parseMutationDocument")(
-  (value: unknown): Effect.Effect<HulyLead, HulyDataInvalidError> =>
-    Schema.decodeUnknownEffect(LeadMutationDocumentSchema)(value).pipe(
-      Effect.mapError(
-        (cause) => new HulyDataInvalidError({ operation: "leadMutation", entity: "Lead document", cause })
-      ),
-      Effect.map((lead) => ({
-        _id: lead._id,
-        _class: lead._class,
-        space: lead.space,
-        title: lead.title,
-        identifier: lead.identifier,
-        status: lead.status,
-        kind: lead.kind,
-        assignee: lead.assignee,
-        description: lead.description,
-        startDate: lead.startDate,
-        dueDate: lead.dueDate,
-        attachedTo: lead.attachedTo,
-        attachedToClass: lead.attachedToClass,
-        collection: lead.collection
-      }))
-    )
-)
-
-const customerClass = (customer: HulyCustomer): Ref<Class<Contact>> =>
+export const customerClass = (customer: HulyCustomer): Ref<Class<Contact>> =>
   String(customer._class) === String(contact.class.Organization)
     ? toClassRef<Contact>(contact.class.Organization)
     : toClassRef<Contact>(contact.class.Person)
@@ -220,10 +178,7 @@ export const resolveEmployee = Effect.fn("Lead.resolveEmployee")(function* (
     contact.mixin.Employee,
     hulyQuery<Employee>({ _id: toRef<Employee>(person._id) })
   )
-  const parsedEmployee = employee === undefined ? undefined : yield* parseLeadEmployeeDocument(employee)
-  return parsedEmployee === undefined
-    ? yield* new PersonNotAnEmployeeError({ identifier })
-    : toRef<Person>(parsedEmployee._id)
+  return yield* requireEmployee(identifier, employee)
 })
 
 export const validatedFunnel = Effect.fn("Lead.validatedFunnel")(function* (
@@ -245,9 +200,7 @@ export const findLead = Effect.fn("Lead.findLead")(function* (
     leadClassIds.class.Lead,
     hulyQuery<LeadMutationQueryDocument>({ space: funnelSpace(funnel), identifier })
   )
-  return lead === undefined
-    ? yield* new LeadNotFoundError({ identifier, funnel: FunnelIdentifier.make(funnel._id) })
-    : yield* parseLeadMutationDocument(lead)
+  return yield* requireLeadDocument(lead, identifier, FunnelIdentifier.make(funnel._id))
 })
 
 export const workflowForLead = Effect.fn("Lead.workflowForLead")((
@@ -355,12 +308,10 @@ const findLeadCustomer = Effect.fn("Lead.findLeadCustomer")(function* (
     contact.class.Organization,
     hulyQuery<Organization>({ _id: toRef<Organization>(customerId) })
   )
-  return organization === undefined
-    ? yield* new HulyError({ message: `Lead '${lead.identifier}' references a missing customer` })
-    : yield* parseLeadOrganizationDocument(organization)
+  return yield* resolveLeadCustomer(person, organization, lead)
 })
 
-const updateCustomerDescription = Effect.fn("Lead.updateCustomerDescription")(function* (
+export const updateCustomerDescription = Effect.fn("Lead.updateCustomerDescription")(function* (
   client: HulyClient["Service"],
   customer: HulyCustomer,
   content: string | null
