@@ -1,23 +1,26 @@
 import type { Contact } from "@hcengineering/contact"
 import type { Attachment } from "@hcengineering/attachment"
 import type { ChatMessage } from "@hcengineering/chunter"
-import type { AttachedDoc, Class, Doc, Ref, Space, Status } from "@hcengineering/core"
+import type { AttachedDoc, Doc, Ref, Space, Status } from "@hcengineering/core"
 import type { TagReference } from "@hcengineering/tags"
 import { Effect } from "effect"
 
 import type {
   DeleteLeadParams,
-  DeleteLeadResult,
   FunnelReference,
-  LeadImpact,
   MakePersonCustomerParams,
-  MakePersonCustomerResult,
   MoveLeadParams,
-  MoveLeadResult,
-  UpdateLeadParams,
-  LeadMutationResult
+  UpdateLeadParams
 } from "../../domain/schemas/leads.js"
 import { FunnelIdentifier, LeadIdentifier } from "../../domain/schemas/leads.js"
+import type {
+  DeleteLeadResult,
+  LeadImpact,
+  LeadMutationResult,
+  LeadRelationCollection,
+  MakePersonCustomerResult,
+  MoveLeadResult
+} from "../../domain/schemas/leads-mutations.js"
 import { Count, NonEmptyString, PersonId, StatusName } from "../../domain/schemas/shared.js"
 import { HulyClient } from "../client.js"
 import type { HulyClientError } from "../client.js"
@@ -30,6 +33,7 @@ import { leadClassIds } from "../lead-plugin.js"
 import { funnelSpace } from "./funnels-shared.js"
 import {
   currentStatus,
+  customerMixinWriteAttributes,
   type HulyLead,
   type LeadDocumentUpdate,
   findLead,
@@ -184,7 +188,7 @@ export const moveLead = Effect.fn("Lead.moveLead")(function* (
 })
 
 const authoritativeRelationCount = Effect.fn("Lead.authoritativeRelationCount")((
-  relation: string,
+  relation: LeadRelationCollection,
   result: { readonly total: number }
 ): Effect.Effect<Count, HulyDataInvalidError> => {
   if (!Number.isSafeInteger(result.total) || result.total < 0) {
@@ -203,9 +207,9 @@ export const deletionImpact = Effect.fn("Lead.deletionImpact")(function* (
   client: HulyClient["Service"],
   lead: HulyLead
 ): Effect.fn.Return<LeadImpact, HulyClientError | HulyDataInvalidError> {
-  const objectId = toRef<Doc>(String(lead._id))
-  const objectClass = toClassRef<Doc>(String(lead._class))
-  const objectSpace = toRef<Space>(String(lead.space))
+  const objectId = toRef<Doc>(lead._id)
+  const objectClass = toClassRef<Doc>(lead._class)
+  const objectSpace = toRef<Space>(lead.space)
   const [comments, attachments] = yield* Effect.all([
     client.findAll<ChatMessage>(
       chunter.class.ChatMessage,
@@ -214,7 +218,8 @@ export const deletionImpact = Effect.fn("Lead.deletionImpact")(function* (
         attachedToClass: objectClass,
         space: objectSpace,
         collection: "comments"
-      })
+      }),
+      { limit: 1, total: true }
     ),
     client.findAll<Attachment>(
       attachment.class.Attachment,
@@ -223,7 +228,8 @@ export const deletionImpact = Effect.fn("Lead.deletionImpact")(function* (
         attachedToClass: objectClass,
         space: objectSpace,
         collection: "attachments"
-      })
+      }),
+      { limit: 1, total: true }
     )
   ])
   const labels = yield* client.findAll<TagReference>(
@@ -233,35 +239,18 @@ export const deletionImpact = Effect.fn("Lead.deletionImpact")(function* (
       attachedToClass: objectClass,
       space: objectSpace,
       collection: "labels"
-    })
+    }),
+    { limit: 1, total: true }
   )
-  const commentsCount = yield* authoritativeRelationCount("comment", comments)
-  const attachmentsCount = yield* authoritativeRelationCount("attachment", attachments)
-  const labelsCount = yield* authoritativeRelationCount("label", labels)
+  const commentsCount = yield* authoritativeRelationCount("comments", comments)
+  const attachmentsCount = yield* authoritativeRelationCount("attachments", attachments)
+  const labelsCount = yield* authoritativeRelationCount("labels", labels)
   return {
     comments: commentsCount,
     attachments: attachmentsCount,
     labels: labelsCount,
     totalAffected: Count.make(commentsCount + attachmentsCount + labelsCount)
   }
-})
-
-export const leadCollectionTarget = Effect.fn("Lead.leadCollectionTarget")((
-  lead: HulyLead
-): Effect.Effect<
-  { readonly attachedTo: Ref<Doc>; readonly attachedToClass: Ref<Class<Doc>>; readonly collection: "leads" },
-  HulyDataInvalidError
-> => {
-  if (lead.attachedTo === undefined || lead.attachedToClass === undefined || lead.collection === undefined) {
-    return Effect.fail(
-      new HulyDataInvalidError({ operation: "deleteLead", entity: `Lead '${lead.identifier}' collection metadata` })
-    )
-  }
-  return Effect.succeed({
-    attachedTo: toRef<Doc>(lead.attachedTo),
-    attachedToClass: toClassRef<Doc>(lead.attachedToClass),
-    collection: lead.collection
-  })
 })
 
 export const deleteLead = Effect.fn("Lead.deleteLead")(function* (
@@ -287,7 +276,6 @@ export const deleteLead = Effect.fn("Lead.deleteLead")(function* (
       )
     })
   }
-  const target = yield* leadCollectionTarget(lead)
   if (client.removeCollection === undefined) {
     return yield* new HulyDataInvalidError({ operation: "deleteLead", entity: "Huly Lead collection remover" })
   }
@@ -295,9 +283,9 @@ export const deleteLead = Effect.fn("Lead.deleteLead")(function* (
     toClassRef<AttachedDoc>(String(leadClassIds.class.Lead)),
     funnelSpace(source.funnel),
     toRef<AttachedDoc>(lead._id),
-    target.attachedTo,
-    target.attachedToClass,
-    target.collection
+    toRef<Doc>(lead.attachedTo),
+    toClassRef<Doc>(lead.attachedToClass),
+    lead.collection
   )
   return { identifier, funnel, impact, deleted: true }
 })
@@ -306,18 +294,19 @@ export const makePersonCustomer = Effect.fn("Lead.makePersonCustomer")(function*
   params: MakePersonCustomerParams
 ): Effect.fn.Return<
   MakePersonCustomerResult,
-  HulyClientError | PersonIdentifierAmbiguousError | PersonNotFoundError,
+  HulyClientError | PersonIdentifierAmbiguousError | PersonNotFoundError | HulyDataInvalidError,
   HulyClient
 > {
   const client = yield* HulyClient
   const person = yield* resolveExactPerson(client, params.identifier)
   if (hasCustomerMixin(person)) return { id: PersonId.make(person._id), applied: false }
+  const attributes = yield* customerMixinWriteAttributes({ customerDescription: null })
   yield* client.createMixin<Contact, CustomerMixinWrite>(
     toRef<Contact>(person._id),
     toClassRef<Contact>(person._class),
-    person.space,
+    toRef<Space>(person.space),
     toMixinRef<CustomerMixinWrite>(leadClassIds.mixin.Customer),
-    { customerDescription: null }
+    attributes
   )
   return { id: PersonId.make(person._id), applied: true }
 })

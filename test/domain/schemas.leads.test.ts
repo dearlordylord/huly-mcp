@@ -8,7 +8,6 @@ import {
   FunnelSummarySchema,
   getLeadParamsJsonSchema,
   LeadDetailSchema,
-  LeadMutationDocumentSchema,
   LeadSummarySchema,
   listFunnelsParamsJsonSchema,
   listLeadsParamsJsonSchema,
@@ -23,21 +22,20 @@ import {
   parseUpdateLeadParams,
   updateLeadParamsJsonSchema
 } from "../../src/domain/schemas/leads.js"
+import { LeadMutationDocumentSchema } from "../../src/domain/schemas/leads-mutations.js"
 
-type JsonSchemaObject = {
-  $schema?: string
-  type?: string
-  anyOf?: ReadonlyArray<unknown>
-  required?: Array<string>
-  properties?: Record<string, { description?: string }>
-}
+const JsonSchemaObjectSchema = Schema.Struct({
+  type: Schema.optional(Schema.String),
+  anyOf: Schema.optional(Schema.Array(Schema.Unknown)),
+  required: Schema.optional(Schema.Array(Schema.String)),
+  properties: Schema.optional(
+    Schema.Record(Schema.String, Schema.Struct({ description: Schema.optional(Schema.String) }))
+  )
+})
+type JsonSchemaObject = Schema.Schema.Type<typeof JsonSchemaObjectSchema>
 
-const isJsonSchemaObject = (value: unknown): value is JsonSchemaObject => typeof value === "object" && value !== null
-
-const expectJsonSchemaObject = (value: unknown): JsonSchemaObject => {
-  if (isJsonSchemaObject(value)) return value
-  throw new Error("Expected a JSON Schema object")
-}
+const expectJsonSchemaObject = (value: unknown): JsonSchemaObject =>
+  Schema.decodeUnknownSync(JsonSchemaObjectSchema)(value)
 
 describe("Lead Schemas", () => {
   it.effect("decodes the schema-owned native lead mutation boundary", () =>

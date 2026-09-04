@@ -1,19 +1,30 @@
 import type { MarkupFormat } from "@hcengineering/api-client"
 import type { Contact, Employee, Organization, Person } from "@hcengineering/contact"
-import type { Blob, Class, Doc, DocumentUpdate, MarkupBlobRef, Ref, Status } from "@hcengineering/core"
+import type { Blob, Class, Doc, DocumentUpdate, MarkupBlobRef, Ref, Space, Status } from "@hcengineering/core"
 import type { TaskType } from "@hcengineering/task"
 import { Effect, Option, Schema } from "effect"
 
 import {
   FunnelIdentifier,
-  LeadMutationDocumentSchema,
-  type LeadMutationDocument,
   type FunnelReference,
   type LeadIdentifier,
   type UpdateLeadParams
 } from "../../domain/schemas/leads.js"
+import {
+  LeadCustomerMixinAttributesSchema,
+  LeadEmployeeDocumentSchema,
+  LeadMutationDocumentSchema,
+  LeadOrganizationDocumentSchema,
+  LeadPersonDocumentSchema,
+  type LeadDescriptionField,
+  type LeadEmployeeDocument,
+  type LeadMutationDocument,
+  type LeadOrganizationDocument,
+  type LeadPersonDocument
+} from "../../domain/schemas/leads-mutations.js"
 import type { PersonLocator } from "../../domain/schemas/hr-departments.js"
 import {
+  BlobId,
   Count,
   Email,
   NonEmptyString,
@@ -94,10 +105,10 @@ export type LeadDocumentUpdate = DocumentUpdate<Doc> & {
 }
 
 // This is an internal SDK write port. Raw contacts are supplied by the SDK and
-// the only extra field is constructed from a validated native markup reference.
+// the only extra field is constructed from schema-decoded native markup data.
 export type CustomerMixinWrite = Contact & { readonly customerDescription: MarkupBlobRef | null }
 
-export type HulyCustomer = Person | Organization
+export type HulyCustomer = LeadPersonDocument | LeadOrganizationDocument
 export type ValidatedFunnel = { readonly funnel: HulyFunnel; readonly workflow: ReadonlyArray<FunnelWorkflowTaskType> }
 
 export type LeadMutationError =
@@ -120,6 +131,47 @@ export type LeadMutationError =
   | HulyDataInvalidError
 
 const toMarkupBlobRef = (value: NonEmptyString): MarkupBlobRef => toRef<Blob>(value)
+
+const parseBoundaryDocument = <S extends Schema.Constraint>(
+  schema: S,
+  value: unknown,
+  entity: string
+): Effect.Effect<S["Type"], HulyDataInvalidError, S["DecodingServices"]> =>
+  Schema.decodeUnknownEffect(schema)(value).pipe(
+    Effect.mapError((cause) => new HulyDataInvalidError({ operation: "leadMutation", entity, cause }))
+  )
+
+const parseLeadPersonDocument = Effect.fn("Lead.parsePersonDocument")(
+  (value: unknown): Effect.Effect<LeadPersonDocument, HulyDataInvalidError> =>
+    parseBoundaryDocument(LeadPersonDocumentSchema, value, "Person document")
+)
+
+const parseOptionalLeadPersonDocument = Effect.fn("Lead.parseOptionalPersonDocument")(
+  (value: Person | undefined): Effect.Effect<LeadPersonDocument | undefined, HulyDataInvalidError> =>
+    value === undefined ? Effect.succeed(undefined) : parseLeadPersonDocument(value)
+)
+
+const parseLeadEmployeeDocument = Effect.fn("Lead.parseEmployeeDocument")(
+  (value: unknown): Effect.Effect<LeadEmployeeDocument, HulyDataInvalidError> =>
+    parseBoundaryDocument(LeadEmployeeDocumentSchema, value, "Employee document")
+)
+
+const parseLeadOrganizationDocument = Effect.fn("Lead.parseOrganizationDocument")(
+  (value: unknown): Effect.Effect<LeadOrganizationDocument, HulyDataInvalidError> =>
+    parseBoundaryDocument(LeadOrganizationDocumentSchema, value, "Organization document")
+)
+
+export const customerMixinWriteAttributes = Effect.fn("Lead.customerMixinWriteAttributes")(function* (
+  value: unknown
+): Effect.fn.Return<Pick<CustomerMixinWrite, "customerDescription">, HulyDataInvalidError> {
+  const attributes = yield* parseBoundaryDocument<typeof LeadCustomerMixinAttributesSchema>(
+    LeadCustomerMixinAttributesSchema,
+    value,
+    "Customer mixin attributes"
+  )
+  const customerDescription = attributes.customerDescription
+  return { customerDescription: customerDescription === null ? null : toMarkupBlobRef(customerDescription) }
+})
 
 const parseLeadMutationDocument = Effect.fn("Lead.parseMutationDocument")(
   (value: unknown): Effect.Effect<HulyLead, HulyDataInvalidError> =>
@@ -147,7 +199,7 @@ const parseLeadMutationDocument = Effect.fn("Lead.parseMutationDocument")(
 )
 
 const customerClass = (customer: HulyCustomer): Ref<Class<Contact>> =>
-  customer._class === contact.class.Organization
+  String(customer._class) === String(contact.class.Organization)
     ? toClassRef<Contact>(contact.class.Organization)
     : toClassRef<Contact>(contact.class.Person)
 
@@ -156,12 +208,12 @@ export const hasCustomerMixin = (customer: HulyCustomer): boolean =>
 
 export const uniquePersonMatch = Effect.fn("Lead.uniquePersonMatch")((
   identifier: string,
-  candidates: ReadonlyArray<Person | undefined>
-): Effect.Effect<Person, PersonIdentifierAmbiguousError | PersonNotFoundError> => {
+  candidates: ReadonlyArray<LeadPersonDocument | undefined>
+): Effect.Effect<LeadPersonDocument, PersonIdentifierAmbiguousError | PersonNotFoundError> => {
   const uniqueMatches = [
     ...new Map(
       candidates
-        .filter((person): person is Person => person !== undefined)
+        .filter((person): person is LeadPersonDocument => person !== undefined)
         .map((person) => [String(person._id), person])
     ).values()
   ]
@@ -176,15 +228,18 @@ export const uniquePersonMatch = Effect.fn("Lead.uniquePersonMatch")((
 export const resolveExactPerson = Effect.fn("Lead.resolveExactPerson")(function* (
   client: HulyClient["Service"],
   identifier: PersonLocator
-): Effect.fn.Return<Person, HulyClientError | PersonIdentifierAmbiguousError | PersonNotFoundError> {
+): Effect.fn.Return<
+  LeadPersonDocument,
+  HulyClientError | PersonIdentifierAmbiguousError | PersonNotFoundError | HulyDataInvalidError
+> {
   const byEmail = Option.match(Schema.decodeUnknownOption(Email)(identifier), {
     onNone: () => Effect.succeed<Person | undefined>(undefined),
     onSome: (email) => findPersonByExactEmail(client, email)
   })
   const [byId, byEmailPerson, byName] = yield* Effect.all([
-    findPersonById(client, identifier),
-    byEmail,
-    findPersonByExactName(client, PersonName.make(identifier))
+    findPersonById(client, identifier).pipe(Effect.flatMap(parseOptionalLeadPersonDocument)),
+    byEmail.pipe(Effect.flatMap(parseOptionalLeadPersonDocument)),
+    findPersonByExactName(client, PersonName.make(identifier)).pipe(Effect.flatMap(parseOptionalLeadPersonDocument))
   ])
   return yield* uniquePersonMatch(identifier, [byId, byEmailPerson, byName])
 })
@@ -194,14 +249,21 @@ export const resolveEmployee = Effect.fn("Lead.resolveEmployee")(function* (
   identifier: PersonRefInput
 ): Effect.fn.Return<
   Ref<Person>,
-  HulyClientError | PersonIdentifierAmbiguousError | PersonNotFoundError | PersonNotAnEmployeeError
+  | HulyClientError
+  | PersonIdentifierAmbiguousError
+  | PersonNotFoundError
+  | PersonNotAnEmployeeError
+  | HulyDataInvalidError
 > {
   const person = yield* resolveExactPerson(client, identifier)
   const employee = yield* client.findOne<Employee>(
     contact.mixin.Employee,
     hulyQuery<Employee>({ _id: toRef<Employee>(person._id) })
   )
-  return employee === undefined ? yield* new PersonNotAnEmployeeError({ identifier }) : toRef<Person>(employee._id)
+  const parsedEmployee = employee === undefined ? undefined : yield* parseLeadEmployeeDocument(employee)
+  return parsedEmployee === undefined
+    ? yield* new PersonNotAnEmployeeError({ identifier })
+    : toRef<Person>(parsedEmployee._id)
 })
 
 export const validatedFunnel = Effect.fn("Lead.validatedFunnel")(function* (
@@ -272,7 +334,7 @@ export const currentStatus = Effect.fn("Lead.currentStatus")((
 const renderMarkup = Effect.fn("Lead.renderMarkup")((
   client: HulyClient["Service"],
   content: string,
-  field: string
+  field: LeadDescriptionField
 ): Effect.Effect<{ readonly markup: string; readonly format: MarkupFormat }, HulyError> => {
   const rendered = renderMarkdownWithNativeReferencesForWrite(content, client.markupUrlConfig, field)
   return rendered._tag === "success"
@@ -326,37 +388,32 @@ const findLeadCustomer = Effect.fn("Lead.findLeadCustomer")(function* (
   client: HulyClient["Service"],
   lead: HulyLead
 ): Effect.fn.Return<HulyCustomer, HulyClientError | HulyError | HulyDataInvalidError> {
-  if (lead.attachedTo === undefined) {
-    return yield* new HulyDataInvalidError({
-      operation: "updateLead",
-      entity: `Lead '${lead.identifier}' customer reference`
-    })
-  }
   const customerId = toRef<Contact>(lead.attachedTo)
   const person = yield* client.findOne<Person>(contact.class.Person, hulyQuery<Person>({ _id: customerId }))
-  if (person !== undefined) return person
+  if (person !== undefined) return yield* parseLeadPersonDocument(person)
   const organization = yield* client.findOne<Organization>(
     contact.class.Organization,
     hulyQuery<Organization>({ _id: toRef<Organization>(customerId) })
   )
   return organization === undefined
     ? yield* new HulyError({ message: `Lead '${lead.identifier}' references a missing customer` })
-    : organization
+    : yield* parseLeadOrganizationDocument(organization)
 })
 
 const updateCustomerDescription = Effect.fn("Lead.updateCustomerDescription")(function* (
   client: HulyClient["Service"],
   customer: HulyCustomer,
   content: string | null
-): Effect.fn.Return<boolean, HulyClientError | HulyError> {
+): Effect.fn.Return<boolean, HulyClientError | HulyError | HulyDataInvalidError> {
   if (content === null && !hasCustomerMixin(customer)) return false
   if (content === null) {
+    const attributes = yield* customerMixinWriteAttributes({ customerDescription: null })
     yield* client.updateMixin<Contact, CustomerMixinWrite>(
       toRef<Contact>(customer._id),
       customerClass(customer),
-      customer.space,
+      toRef<Space>(customer.space),
       toMixinRef<CustomerMixinWrite>(leadClassIds.mixin.Customer),
-      { customerDescription: null }
+      attributes
     )
     return true
   }
@@ -369,12 +426,12 @@ const updateCustomerDescription = Effect.fn("Lead.updateCustomerDescription")(fu
     rendered.markup,
     rendered.format
   )
-  const attributes = { customerDescription: toMarkupBlobRef(NonEmptyString.make(uploaded)) }
+  const attributes = yield* customerMixinWriteAttributes({ customerDescription: BlobId.make(uploaded) })
   if (hasCustomerMixin(customer)) {
     yield* client.updateMixin<Contact, CustomerMixinWrite>(
       toRef<Contact>(customer._id),
       customerClass(customer),
-      customer.space,
+      toRef<Space>(customer.space),
       toMixinRef<CustomerMixinWrite>(leadClassIds.mixin.Customer),
       attributes
     )
@@ -382,7 +439,7 @@ const updateCustomerDescription = Effect.fn("Lead.updateCustomerDescription")(fu
     yield* client.createMixin<Contact, CustomerMixinWrite>(
       toRef<Contact>(customer._id),
       customerClass(customer),
-      customer.space,
+      toRef<Space>(customer.space),
       toMixinRef<CustomerMixinWrite>(leadClassIds.mixin.Customer),
       attributes
     )

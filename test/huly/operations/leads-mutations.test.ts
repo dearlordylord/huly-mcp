@@ -1,15 +1,27 @@
 import { describe, it } from "@effect/vitest"
-import { AvatarType, type Person } from "@hcengineering/contact"
-import type { Class, Doc, Ref } from "@hcengineering/core"
+import type { Class, Doc, DocumentQuery, FindOptions, Ref } from "@hcengineering/core"
 import type { TaskType } from "@hcengineering/task"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import { expect } from "vitest"
 
 import { FunnelReference, LeadIdentifier } from "../../../src/domain/schemas/leads.js"
-import { Count, DocId, NonEmptyString, StatusName, Timestamp } from "../../../src/domain/schemas/shared.js"
+import { LeadMutationDocumentSchema, type LeadPersonDocument } from "../../../src/domain/schemas/leads-mutations.js"
+import {
+  BlobId,
+  Count,
+  DocId,
+  NonEmptyString,
+  PersonId,
+  PersonName,
+  SpaceId,
+  StatusName,
+  TaskTypeId,
+  Timestamp,
+  WorkflowStatusId
+} from "../../../src/domain/schemas/shared.js"
 import { HulyClient } from "../../../src/huly/client.js"
 import { leadClassIds } from "../../../src/huly/lead-plugin.js"
-import { deletionImpact, leadCollectionTarget } from "../../../src/huly/operations/leads-mutations.js"
+import { deletionImpact } from "../../../src/huly/operations/leads-mutations.js"
 import {
   currentStatus,
   statusByName,
@@ -24,33 +36,32 @@ import { renderMarkdownWithNativeReferencesForWrite } from "../../../src/huly/op
 import { toClassRef } from "../../../src/huly/operations/sdk-boundary.js"
 import { corePersonId, docRef, findResult, spaceRef, statusRef } from "../../helpers/huly-sdk.js"
 
-const leadStatus = statusRef("lead:status:Incoming")
-const leadTaskType = docRef<TaskType>("lead:taskType:Lead")
+const leadStatusId = WorkflowStatusId.make("lead:status:Incoming")
+const leadStatus = statusRef(String(leadStatusId))
+const leadTaskTypeId = TaskTypeId.make("lead:taskType:Lead")
+const leadTaskType = docRef<TaskType>(String(leadTaskTypeId))
 const lead: HulyLead = {
   _id: DocId.make("lead-1"),
   _class: DocId.make(leadClassIds.class.Lead),
-  space: DocId.make("funnel-1"),
+  space: SpaceId.make("funnel-1"),
   attachedTo: DocId.make("person-1"),
   attachedToClass: DocId.make(contact.class.Person),
   collection: "leads",
   title: NonEmptyString.make("A lead"),
   identifier: LeadIdentifier.make("LEAD-1"),
-  status: DocId.make(leadStatus),
-  kind: DocId.make(leadTaskType),
+  status: leadStatusId,
+  kind: leadTaskTypeId,
   assignee: null,
   description: null,
   startDate: null,
   dueDate: null
 }
 
-const person = (id: string): Person => ({
-  _id: docRef<Person>(id),
-  _class: contact.class.Person,
-  space: contact.space.Contacts,
-  modifiedBy: corePersonId("user-1"),
-  modifiedOn: Timestamp.make(0),
-  name: id,
-  avatarType: AvatarType.COLOR
+const person = (id: string): LeadPersonDocument => ({
+  _id: PersonId.make(id),
+  _class: DocId.make(contact.class.Person),
+  space: SpaceId.make(String(contact.space.Contacts)),
+  name: PersonName.make(id)
 })
 
 const workflow: FunnelWorkflowTaskType = {
@@ -76,10 +87,20 @@ const workflow: FunnelWorkflowTaskType = {
 describe("Lead mutation functional helpers", () => {
   it.effect("calculates deletion impact from authoritative native relations", () =>
     Effect.gen(function* () {
+      const calls: Array<{
+        readonly className: string
+        readonly limit: number | undefined
+        readonly total: boolean | undefined
+      }> = []
       const client = yield* HulyClient.pipe(
         Effect.provide(
           HulyClient.testLayer({
-            findAll: <T extends Doc>(documentClass: Ref<Class<T>>) => {
+            findAll: <T extends Doc>(
+              documentClass: Ref<Class<T>>,
+              _query: DocumentQuery<T>,
+              options?: FindOptions<T>
+            ) => {
+              calls.push({ className: String(documentClass), limit: options?.limit, total: options?.total })
               const total =
                 String(documentClass) === String(chunter.class.ChatMessage)
                   ? 2
@@ -103,6 +124,35 @@ describe("Lead mutation functional helpers", () => {
         labels: Count.make(1),
         totalAffected: Count.make(6)
       })
+      expect(calls).toEqual([
+        { className: String(chunter.class.ChatMessage), limit: 1, total: true },
+        { className: String(attachment.class.Attachment), limit: 1, total: true },
+        { className: String(tags.class.TagReference), limit: 1, total: true }
+      ])
+    })
+  )
+
+  it.effect("reports zero-count impact when authoritative relation totals are zero", () =>
+    Effect.gen(function* () {
+      const client = yield* HulyClient.pipe(
+        Effect.provide(
+          HulyClient.testLayer({
+            findAll: <T extends Doc>() => {
+              const result = findResult<T>([])
+              result.total = 0
+              return Effect.succeed(result)
+            }
+          })
+        )
+      )
+      const impacted = yield* deletionImpact(client, lead)
+
+      expect(impacted).toEqual({
+        comments: Count.make(0),
+        attachments: Count.make(0),
+        labels: Count.make(0),
+        totalAffected: Count.make(0)
+      })
     })
   )
 
@@ -122,18 +172,17 @@ describe("Lead mutation functional helpers", () => {
       const error = yield* Effect.flip(deletionImpact(client, lead))
 
       expect(error._tag).toBe("HulyDataInvalidError")
-      if (error._tag === "HulyDataInvalidError") expect(error.entity).toContain("comment relation count")
+      if (error._tag === "HulyDataInvalidError") expect(error.entity).toContain("comments relation count")
     })
   )
 
   it.effect("requires AttachedDoc collection metadata before lead deletion", () =>
     Effect.gen(function* () {
-      const target = yield* leadCollectionTarget(lead)
-      const error = yield* Effect.flip(leadCollectionTarget({ ...lead, attachedTo: undefined }))
+      const error = yield* Effect.flip(
+        Schema.decodeUnknownEffect(LeadMutationDocumentSchema)({ ...lead, attachedTo: undefined })
+      )
 
-      expect(target.collection).toBe("leads")
-      expect(target.attachedTo).toBe(lead.attachedTo)
-      expect(error._tag).toBe("HulyDataInvalidError")
+      expect(error._tag).toBe("SchemaError")
     })
   )
 
@@ -186,23 +235,19 @@ describe("Lead mutation functional helpers", () => {
 
   it.effect("resolves the current status from the configured workflow", () =>
     Effect.gen(function* () {
-      const resolved = yield* currentStatus(
-        workflow,
-        { ...lead, status: DocId.make(leadStatus) },
-        {
-          _id: docRef("funnel-1"),
-          _class: toClassRef<HulyFunnel>(leadClassIds.class.Funnel),
-          space: spaceRef("workspace"),
-          modifiedBy: corePersonId("user-1"),
-          modifiedOn: Timestamp.make(0),
-          name: "Sales",
-          description: "",
-          private: false,
-          members: [],
-          archived: false,
-          type: docRef("project-type-1")
-        }
-      )
+      const resolved = yield* currentStatus(workflow, lead, {
+        _id: docRef("funnel-1"),
+        _class: toClassRef<HulyFunnel>(leadClassIds.class.Funnel),
+        space: spaceRef("workspace"),
+        modifiedBy: corePersonId("user-1"),
+        modifiedOn: Timestamp.make(0),
+        name: "Sales",
+        description: "",
+        private: false,
+        members: [],
+        archived: false,
+        type: docRef("project-type-1")
+      })
       expect(resolved).toEqual({ id: leadStatus, name: StatusName.make("Incoming") })
     })
   )
@@ -210,7 +255,7 @@ describe("Lead mutation functional helpers", () => {
   it.effect("models explicit description clear separately from an existing value", () =>
     Effect.gen(function* () {
       const client = yield* HulyClient.pipe(Effect.provide(HulyClient.testLayer({})))
-      const existing = yield* updateLeadDescription(client, { ...lead, description: DocId.make("markup-ref") }, null)
+      const existing = yield* updateLeadDescription(client, { ...lead, description: BlobId.make("markup-ref") }, null)
       const absent = yield* updateLeadDescription(client, lead, null)
 
       expect(existing).toEqual({ operations: { description: null }, changed: true })
@@ -225,7 +270,7 @@ describe("Lead mutation functional helpers", () => {
       const client = yield* HulyClient.pipe(
         Effect.provide(HulyClient.testLayer({ fetchMarkup: () => Effect.succeed(rendered.rendered.markup) }))
       )
-      const result = yield* updateLeadDescription(client, { ...lead, description: DocId.make("markup-ref") }, "same")
+      const result = yield* updateLeadDescription(client, { ...lead, description: BlobId.make("markup-ref") }, "same")
 
       expect(result).toEqual({ operations: {}, changed: false })
     })

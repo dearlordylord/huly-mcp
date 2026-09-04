@@ -2,7 +2,6 @@ import {
   createLeadParamsJsonSchema,
   CreateLeadResultSchema,
   deleteLeadParamsJsonSchema,
-  DeleteLeadResultSchema,
   getLeadParamsJsonSchema,
   GetLeadResultSchema,
   listFunnelsParamsJsonSchema,
@@ -17,10 +16,13 @@ import {
   parseMoveLeadParams,
   parseUpdateLeadParams,
   moveLeadParamsJsonSchema,
-  MoveLeadResultSchema,
-  updateLeadParamsJsonSchema,
-  LeadMutationResultSchema
+  updateLeadParamsJsonSchema
 } from "../../domain/schemas/leads.js"
+import {
+  DeleteLeadResultSchema,
+  MoveLeadResultSchema,
+  LeadMutationResultSchema
+} from "../../domain/schemas/leads-mutations.js"
 import {
   createFunnelParamsJsonSchema,
   CreateFunnelResultSchema,

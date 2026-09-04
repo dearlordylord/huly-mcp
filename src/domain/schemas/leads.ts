@@ -12,7 +12,6 @@ import {
   ListTotal,
   NonEmptyString,
   PersonName,
-  PersonId,
   PersonRefInput,
   StatusName,
   Timestamp,
@@ -57,33 +56,6 @@ export const LeadIdentifier = Schema.String.pipe(
   })
 ).annotate({ jsonSchema: { type: "string", pattern: "^LEAD-[0-9]+$" } })
 export type LeadIdentifier = Schema.Schema.Type<typeof LeadIdentifier>
-
-export const LeadMutationDocumentSchema = Schema.Struct({
-  _id: DocId,
-  _class: DocId,
-  space: DocId,
-  modifiedBy: DocId,
-  modifiedOn: Timestamp,
-  title: NonEmptyString,
-  identifier: LeadIdentifier,
-  status: DocId,
-  kind: DocId,
-  assignee: Schema.NullOr(DocId),
-  description: Schema.NullOr(DocId),
-  startDate: Schema.NullOr(Timestamp),
-  dueDate: Schema.NullOr(Timestamp),
-  attachedTo: Schema.optional(DocId),
-  attachedToClass: Schema.optional(DocId),
-  collection: Schema.optional(Schema.Literal("leads")),
-  comments: Schema.optional(Count),
-  attachments: Schema.optional(Count),
-  labels: Schema.optional(Count)
-}).annotate({
-  title: "LeadMutationDocument",
-  description: "Schema-owned native Lead fields used by mutation operations."
-})
-
-export type LeadMutationDocument = Schema.Schema.Type<typeof LeadMutationDocumentSchema>
 
 // --- Output Schemas ---
 
@@ -413,39 +385,3 @@ export const CreateLeadResultSchema = Schema.Struct({
 }).annotate({ title: "CreateLeadResult", description: "Identifiers for the newly created native Huly lead." })
 
 export type CreateLeadResult = Schema.Schema.Type<typeof CreateLeadResultSchema>
-
-export const LeadMutationResultSchema = Schema.Struct({ identifier: LeadIdentifier, updated: Schema.Boolean }).annotate(
-  { title: "LeadMutationResult", description: "Result of a native lead update." }
-)
-export type LeadMutationResult = Schema.Schema.Type<typeof LeadMutationResultSchema>
-
-export const MoveLeadResultSchema = Schema.Struct({
-  identifier: LeadIdentifier,
-  sourceFunnel: FunnelIdentifier,
-  destinationFunnel: FunnelIdentifier,
-  status: StatusName,
-  moved: Schema.Boolean
-}).annotate({ title: "MoveLeadResult", description: "Result of moving a native lead between funnels." })
-export type MoveLeadResult = Schema.Schema.Type<typeof MoveLeadResultSchema>
-
-export const LeadImpactSchema = Schema.Struct({
-  comments: Count,
-  attachments: Count,
-  labels: Count,
-  totalAffected: Count
-}).annotate({ title: "LeadImpact", description: "Authoritative native lead content counts affected by deletion." })
-export type LeadImpact = Schema.Schema.Type<typeof LeadImpactSchema>
-
-export const DeleteLeadResultSchema = Schema.Struct({
-  identifier: LeadIdentifier,
-  funnel: FunnelIdentifier,
-  impact: LeadImpactSchema,
-  deleted: Schema.Boolean
-}).annotate({ title: "DeleteLeadResult", description: "Lead deletion preview or execution result." })
-export type DeleteLeadResult = Schema.Schema.Type<typeof DeleteLeadResultSchema>
-
-export const MakePersonCustomerResultSchema = Schema.Struct({ id: PersonId, applied: Schema.Boolean }).annotate({
-  title: "MakePersonCustomerResult",
-  description: "Result of applying the Customer mixin to a person."
-})
-export type MakePersonCustomerResult = Schema.Schema.Type<typeof MakePersonCustomerResultSchema>
