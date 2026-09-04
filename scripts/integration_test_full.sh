@@ -90,6 +90,7 @@ EMPLOYEE_POSITION_CLEANUP_ID=""
 EMPLOYEE_POSITION_CLEANUP_ORIGINAL_POSITION_JSON=""
 EMPLOYEE_POSITION_CLEANUP_PENDING=false
 PERSON_ADMIN_CLEANUP_ID=""
+PERSON_ADMIN_DUPLICATE_CLEANUP_ID=""
 PERSON_ADMIN_COMMENT_CLEANUP_ID=""
 PERSON_ADMIN_ATTACHMENT_CLEANUP_ID=""
 
@@ -739,6 +740,16 @@ cleanup_person_admin_artifacts() {
     readback=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" 2>/dev/null || true)
     if [ "$(printf '%s\n' "$readback" | jq -r '.result.isError // false' 2>/dev/null)" = "true" ]; then
       PERSON_ADMIN_CLEANUP_ID=""
+    else
+      cleanup_failed=1
+    fi
+  fi
+  if [ -n "$PERSON_ADMIN_DUPLICATE_CLEANUP_ID" ]; then
+    person_json=$(json_string "$PERSON_ADMIN_DUPLICATE_CLEANUP_ID")
+    call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" >/dev/null 2>&1 || true
+    readback=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" 2>/dev/null || true)
+    if [ "$(printf '%s\n' "$readback" | jq -r '.result.isError // false' 2>/dev/null)" = "true" ]; then
+      PERSON_ADMIN_DUPLICATE_CLEANUP_ID=""
     else
       cleanup_failed=1
     fi
@@ -1525,6 +1536,29 @@ run_expect_error_contains() {
   echo "FAIL: $name (expected error containing: $expected)"
   FAILED=$((FAILED + 1))
   ERRORS="${ERRORS}\n  - ${name}: expected error containing ${expected}"
+  return 1
+}
+
+wait_for_error_contains() {
+  local name="$1"
+  local payload="$2"
+  local expected="$3"
+  local attempts="${4:-20}"
+  local result="" attempt=1 is_error err_text
+  while [ "$attempt" -le "$attempts" ]; do
+    restart_http_transport_if_needed "$name readback attempt $attempt" >/dev/null 2>&1 || return 1
+    result=$(call_tool "$payload" 2>/dev/null || true)
+    is_error=$(echo "$result" | jq -r '.result.isError // false' 2>/dev/null)
+    err_text=$(echo "$result" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+    if [ "$is_error" = "true" ] && printf '%s\n' "$err_text" | grep -qF -- "$expected"; then
+      echo "PASS: $name (got expected error)"
+      PASSED=$((PASSED + 1))
+      return 0
+    fi
+    sleep 0.25
+    attempt=$((attempt + 1))
+  done
+  fail_test "$name" "expected error containing '$expected' after $attempts fresh-session attempts"
   return 1
 }
 
@@ -4474,6 +4508,34 @@ if [ $? -eq 0 ]; then
   assert_json_field_equals "list_external_channel_messages Telegram messages array" "$TELEGRAM_MESSAGES_TEXT" ".messages | type" "array"
 fi
 
+if [ -n "$HR_STAFF_EMPLOYEE" ]; then
+  run_capture_to_var_fresh PERSON_REPAIR_SUPPORTED_TEXT "repair_person_social_identities(linked Staff)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"repair_person_social_identities\",\"arguments\":{\"person\":{\"id\":\"$HR_STAFF_EMPLOYEE\"}}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    assert_json_field_equals "supported identity repair resolves linked Staff" "$PERSON_REPAIR_SUPPORTED_TEXT" ".personId" "$HR_STAFF_EMPLOYEE"
+    assert_json_field_equals "supported identity repair starts from a cleanup-safe projection" "$PERSON_REPAIR_SUPPORTED_TEXT" ".created + .updated" "0"
+    run_capture_to_var_fresh PERSON_REPAIR_IDEMPOTENT_TEXT "repair_person_social_identities(linked Staff second call)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"repair_person_social_identities\",\"arguments\":{\"person\":{\"id\":\"$HR_STAFF_EMPLOYEE\"}}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "supported identity repair second call creates nothing" "$PERSON_REPAIR_IDEMPOTENT_TEXT" ".created" "0"
+      assert_json_field_equals "supported identity repair second call updates nothing" "$PERSON_REPAIR_IDEMPOTENT_TEXT" ".updated" "0"
+    fi
+  fi
+  run_capture_to_var_fresh PERSON_LINKED_ADMIN_TEXT "get_person_administration(linked Staff profile)" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person_administration\",\"arguments\":{\"person\":{\"id\":\"$HR_STAFF_EMPLOYEE\"}}},\"id\":2}"
+  if [ $? -eq 0 ]; then
+    assert_json_field_equals "linked Staff administration projects workspace membership" "$PERSON_LINKED_ADMIN_TEXT" ".workspaceMember.member" "true"
+    assert_json_field_equals "linked Staff administration projects account profile" "$PERSON_LINKED_ADMIN_TEXT" ".profile.firstName | type" "string"
+    if [ "$(printf '%s\n' "$PERSON_LINKED_ADMIN_TEXT" | jq -r '.contactStatuses | length' 2>/dev/null)" -gt 0 ]; then
+      assert_json_field_equals "linked Staff administration projects populated contact status" "$PERSON_LINKED_ADMIN_TEXT" ".contactStatuses[0].name | type" "string"
+    else
+      skip_test "person administration populated contact status projection" "deterministic linked Staff has no Contact Status rows, and no first-class status creation tool exists for a cleanup-safe fixture"
+    fi
+  fi
+else
+  fail_test "person administration linked Staff fixture" "the deterministic authenticated Staff fixture was unavailable"
+fi
+
 PERSON_FIRST_NAME="IntTest-$RUN_ID"
 PERSON_EMAIL="inttest-$RUN_ID@test.local"
 PERSON_FIRST_NAME_JSON=$(json_string "$PERSON_FIRST_NAME")
@@ -4509,6 +4571,38 @@ if [ $? -eq 0 ]; then
 	    assert_json_field_equals "person administration resolves exact ID" "$PERSON_ADMIN_TEXT" ".personId" "$PERSON_ID"
 	    assert_json_field_equals "person administration classifies identity mutation" "$PERSON_ADMIN_TEXT" '[.fieldClassifications[] | select(.field == "socialIdentityMutation") | .classification] | first' "unsupported"
 	  fi
+	  PERSON_EXACT_NAME="Person,$PERSON_FIRST_NAME"
+	  PERSON_EXACT_NAME_JSON=$(json_string "$PERSON_EXACT_NAME")
+	  run_capture_to_var_fresh PERSON_ADMIN_EMAIL_TEXT "get_person_administration(exact email)" \
+	    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person_administration\",\"arguments\":{\"person\":{\"email\":$PERSON_EMAIL_JSON}}},\"id\":2}"
+	  if [ $? -eq 0 ]; then
+	    assert_json_field_equals "person administration exact email resolves fixture" "$PERSON_ADMIN_EMAIL_TEXT" ".personId" "$PERSON_ID"
+	  fi
+	  run_capture_to_var_fresh PERSON_ADMIN_NAME_TEXT "get_person_administration(exact name)" \
+	    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person_administration\",\"arguments\":{\"person\":{\"name\":$PERSON_EXACT_NAME_JSON}}},\"id\":2}"
+	  if [ $? -eq 0 ]; then
+	    assert_json_field_equals "person administration exact name resolves fixture" "$PERSON_ADMIN_NAME_TEXT" ".personId" "$PERSON_ID"
+	  fi
+	  run_capture_to_var_fresh PERSON_DUPLICATE_TEXT "create_person(person administration ambiguity fixture)" \
+	    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":$PERSON_FIRST_NAME_JSON,\"lastName\":\"Person\",\"email\":$PERSON_EMAIL_JSON}},\"id\":2}"
+	  if [ $? -eq 0 ]; then
+	    PERSON_DUPLICATE_ID=$(echo "$PERSON_DUPLICATE_TEXT" | jq -r '.id' 2>/dev/null)
+	    PERSON_ADMIN_DUPLICATE_CLEANUP_ID="$PERSON_DUPLICATE_ID"
+	    wait_for_error_contains "get_person_administration(ambiguous email)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person_administration\",\"arguments\":{\"person\":{\"email\":$PERSON_EMAIL_JSON}}},\"id\":2}" \
+	      "matched 2 people"
+	    wait_for_error_contains "get_person_administration(ambiguous name)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person_administration\",\"arguments\":{\"person\":{\"name\":$PERSON_EXACT_NAME_JSON}}},\"id\":2}" \
+	      "matched 2 people"
+	    if run_capture_to_var_fresh PERSON_DUPLICATE_DELETE_TEXT "delete_person(ambiguity fixture:$PERSON_DUPLICATE_ID)" \
+	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":\"$PERSON_DUPLICATE_ID\"}},\"id\":2}"; then
+	      if wait_for_error_contains "get_person(deleted ambiguity fixture:$PERSON_DUPLICATE_ID)" \
+	        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":\"$PERSON_DUPLICATE_ID\"}},\"id\":2}" \
+	        "not found"; then
+	        PERSON_ADMIN_DUPLICATE_CLEANUP_ID=""
+	      fi
+	    fi
+	  fi
 	  restart_http_transport_if_needed "before person identity repair verification" >/dev/null 2>&1
 	  run_expect_error_contains "repair_person_social_identities(unlinked person)" \
 	    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"repair_person_social_identities\",\"arguments\":{\"person\":{\"id\":\"$PERSON_ID\"}}},\"id\":2}" \
@@ -4518,7 +4612,12 @@ if [ $? -eq 0 ]; then
 	  if [ $? -eq 0 ]; then
 	    assert_json_field_equals "social identity providers are discoverable" "$SOCIAL_PROVIDER_TEXT" "length > 0" "true"
 	  fi
-	  PERSON_NOTE_BODY="Person note $RUN_ID"
+	  run_capture_to_var PERSON_NOTE_WORKSPACE_TEXT "get_workspace_info(person native-reference note)" \
+	    '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_workspace_info","arguments":{}},"id":2}'
+	  PERSON_NOTE_WORKSPACE_UUID=$(echo "$PERSON_NOTE_WORKSPACE_TEXT" | jq -r '.uuid // empty' 2>/dev/null)
+	  PERSON_NOTE_LABEL_ENCODED=$(url_encode "$PERSON_EXACT_NAME")
+	  PERSON_NOTE_URL="${HULY_URL%/}/browse?workspace=${PERSON_NOTE_WORKSPACE_UUID}&_class=contact%3Aclass%3APerson&_id=${PERSON_ID}&label=${PERSON_NOTE_LABEL_ENCODED}"
+	  PERSON_NOTE_BODY="Person note [${PERSON_EXACT_NAME}](${PERSON_NOTE_URL})"
 	  PERSON_NOTE_BODY_JSON=$(json_string "$PERSON_NOTE_BODY")
 	  run_capture_to_var_fresh PERSON_COMMENT_TEXT "add_person_comment($PERSON_ID)" \
 	    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_person_comment\",\"arguments\":{\"person\":{\"id\":\"$PERSON_ID\"},\"body\":$PERSON_NOTE_BODY_JSON}},\"id\":2}"
@@ -4529,6 +4628,8 @@ if [ $? -eq 0 ]; then
 	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_person_comments\",\"arguments\":{\"person\":{\"id\":\"$PERSON_ID\"}}},\"id\":2}"
 	    if [ $? -eq 0 ]; then
 	      assert_json_array_contains "person notes preserve native attachment" "$PERSON_COMMENTS_TEXT" ".comments | map(.id)" "$PERSON_COMMENT_ID"
+	      assert_json_field_contains "person notes round-trip native reference label" "$PERSON_COMMENTS_TEXT" ".comments[0].body" "$PERSON_EXACT_NAME"
+	      assert_json_field_contains "person notes round-trip native reference target" "$PERSON_COMMENTS_TEXT" ".comments[0].body" "$PERSON_ID"
 	    fi
 	    if run_capture_to_var_fresh PERSON_COMMENT_DELETE_TEXT "delete_person_comment($PERSON_COMMENT_ID)" \
 	      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person_comment\",\"arguments\":{\"person\":{\"id\":\"$PERSON_ID\"},\"commentId\":\"$PERSON_COMMENT_ID\"}},\"id\":2}"; then

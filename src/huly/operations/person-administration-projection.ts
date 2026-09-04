@@ -1,18 +1,10 @@
-import type { Channel, Employee, Person, SocialIdentity, Status } from "@hcengineering/contact"
-import type { WorkspaceMemberInfo } from "@hcengineering/core"
-
 import { SocialIdentityId } from "../../domain/schemas/person-administration.js"
-import {
-  BlobId,
-  ChannelId,
-  Count,
-  NonEmptyString,
-  PersonId,
-  PersonUuid,
-  Timestamp,
-  UrlString
-} from "../../domain/schemas/shared.js"
-import type { WorkspaceClientUserProfile } from "../workspace-client.js"
+import type {
+  AccountProfile,
+  WorkspaceMemberInfo,
+  WorkspacePersonAdministrationProjectionData,
+  WorkspaceSocialIdentity
+} from "./person-administration-boundaries.js"
 
 const fieldClassifications = [
   { field: "birthday", classification: "exposed", reason: "Stored directly on Contact Person." },
@@ -48,47 +40,43 @@ const fieldClassifications = [
   }
 ] as const
 
-interface PersonAdministrationProjectionInput {
-  readonly person: Person
-  readonly identities: ReadonlyArray<SocialIdentity>
-  readonly statuses: ReadonlyArray<Status>
-  readonly channels: ReadonlyArray<Channel>
-  readonly employee: Employee | undefined
+interface PersonAdministrationProjectionInput extends WorkspacePersonAdministrationProjectionData {
+  readonly identities: ReadonlyArray<WorkspaceSocialIdentity>
   readonly members: ReadonlyArray<WorkspaceMemberInfo>
-  readonly profile: WorkspaceClientUserProfile | null
+  readonly profile: AccountProfile | null
 }
 
-const avatarProjection = (person: Person) => ({
+const avatarProjection = (person: PersonAdministrationProjectionInput["person"]) => ({
   type: person.avatarType,
-  ...(person.avatar === undefined || person.avatar === null ? {} : { blobId: BlobId.make(person.avatar) }),
-  ...(person.avatarProps?.color === undefined ? {} : { color: NonEmptyString.make(person.avatarProps.color) }),
-  ...(person.avatarProps?.url === undefined ? {} : { externalUrl: UrlString.make(person.avatarProps.url) })
+  ...(person.avatar === undefined || person.avatar === null ? {} : { blobId: person.avatar }),
+  ...(person.avatarProps?.color === undefined ? {} : { color: person.avatarProps.color }),
+  ...(person.avatarProps?.url === undefined ? {} : { externalUrl: person.avatarProps.url })
 })
 
-const profileIdentityProjection = (profile: WorkspaceClientUserProfile) => ({
+const profileIdentityProjection = (profile: AccountProfile) => ({
   firstName: profile.firstName,
   lastName: profile.lastName,
   isPublic: profile.isPublic
 })
 
-const profileLocationProjection = (profile: WorkspaceClientUserProfile) => ({
+const profileLocationProjection = (profile: AccountProfile) => ({
   ...(profile.city === undefined || profile.city === null ? {} : { city: profile.city }),
   ...(profile.country === undefined || profile.country === null ? {} : { country: profile.country }),
   ...(profile.website === undefined || profile.website === null ? {} : { website: profile.website })
 })
 
-const profileDetailsProjection = (profile: WorkspaceClientUserProfile) => ({
+const profileDetailsProjection = (profile: AccountProfile) => ({
   ...(profile.bio === undefined || profile.bio === null ? {} : { bio: profile.bio }),
   ...(profile.socialLinks === undefined || profile.socialLinks === null ? {} : { socialLinks: profile.socialLinks })
 })
 
-const profileProjection = (profile: WorkspaceClientUserProfile) => ({
+const profileProjection = (profile: AccountProfile) => ({
   ...profileIdentityProjection(profile),
   ...profileLocationProjection(profile),
   ...profileDetailsProjection(profile)
 })
 
-const identityProjection = (identity: SocialIdentity) => ({
+const identityProjection = (identity: WorkspaceSocialIdentity) => ({
   id: SocialIdentityId.make(identity._id),
   type: identity.type,
   value: identity.value,
@@ -98,26 +86,30 @@ const identityProjection = (identity: SocialIdentity) => ({
   isDeleted: identity.isDeleted === true
 })
 
-const channelProjection = (channel: Channel) => ({
-  channelId: ChannelId.make(channel._id),
-  ...(channel.items === undefined ? {} : { items: Count.make(channel.items) }),
-  ...(channel.lastMessage === undefined ? {} : { lastMessage: Timestamp.make(channel.lastMessage) })
+const channelProjection = (channel: PersonAdministrationProjectionInput["channels"][number]) => ({
+  channelId: channel._id,
+  ...(channel.items === undefined ? {} : { items: channel.items }),
+  ...(channel.lastMessage === undefined ? {} : { lastMessage: channel.lastMessage })
 })
 
-const workspaceMemberProjection = (employee: Employee | undefined, member: WorkspaceMemberInfo | undefined) => ({
+const workspaceMemberProjection = (
+  employee: PersonAdministrationProjectionInput["employee"],
+  member: WorkspaceMemberInfo | undefined
+) => ({
   member: member !== undefined,
-  ...(employee === undefined ? {} : { active: employee.active }),
-  ...(member === undefined ? {} : { role: NonEmptyString.make(member.role) })
+  ...(employee?.active === undefined ? {} : { active: employee.active }),
+  ...(member === undefined ? {} : { role: member.role })
 })
 
-const personMetadataProjection = (person: Person, personUuid: Person["personUuid"]) => ({
-  personId: PersonId.make(person._id),
-  ...(personUuid === undefined ? {} : { personUuid: PersonUuid.make(personUuid) }),
-  ...(person.birthday === undefined
-    ? {}
-    : { birthday: person.birthday === null ? null : Timestamp.make(person.birthday) }),
+const personMetadataProjection = (
+  person: PersonAdministrationProjectionInput["person"],
+  personUuid: PersonAdministrationProjectionInput["person"]["personUuid"]
+) => ({
+  personId: person._id,
+  ...(personUuid === undefined ? {} : { personUuid }),
+  ...(person.birthday === undefined ? {} : { birthday: person.birthday }),
   avatar: avatarProjection(person),
-  ...(person.profile === undefined ? {} : { profileCardId: NonEmptyString.make(person.profile) })
+  ...(person.profile === undefined ? {} : { profileCardId: person.profile })
 })
 
 export const makePersonAdministrationProjection = (input: PersonAdministrationProjectionInput): unknown => {
@@ -126,7 +118,7 @@ export const makePersonAdministrationProjection = (input: PersonAdministrationPr
   return {
     ...personMetadataProjection(input.person, personUuid),
     contactStatuses: input.statuses
-      .map((status) => ({ name: NonEmptyString.make(status.name), dueDate: Timestamp.make(status.dueDate) }))
+      .map((status) => ({ name: status.name, dueDate: status.dueDate }))
       .sort((left, right) => left.dueDate - right.dueDate || left.name.localeCompare(right.name)),
     workspaceMember: workspaceMemberProjection(input.employee, member),
     socialIdentities: input.identities

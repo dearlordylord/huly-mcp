@@ -51,7 +51,7 @@ export const personAdministrationTools = [
   defineHulyWorkspaceTool(
     {
       name: "repair_person_social_identities",
-      description: `Apply only Huly's native safe, idempotent SocialIdentity repairs from the authoritative account record: recreate missing active projections, promote verification, reassign an unverified identity after an account merge, and propagate authoritative deletion; ${EXACT_PERSON} Verified cross-person reassignment, arbitrary active type/value/key changes, removal of workspace-only identities, and key collisions return a Huly-specific unsupported reason instead of being overwritten.`,
+      description: `Apply only Huly's native safe, idempotent SocialIdentity repairs from the authenticated person's authoritative account record: recreate missing active projections, promote verification, reassign an unverified identity after an account merge, and propagate authoritative deletion; ${EXACT_PERSON} Another account-linked person, verified cross-person reassignment, arbitrary active type/value/key changes, removal of workspace-only identities, and key collisions return a Huly-specific unsupported reason instead of being overwritten.`,
       category: CATEGORY,
       inputSchema: PersonSchemas.repairPersonSocialIdentitiesParamsJsonSchema,
       resultSchema: PersonSchemas.RepairPersonSocialIdentitiesResultSchema,

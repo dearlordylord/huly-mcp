@@ -1,5 +1,5 @@
 import type { Employee, Person, SocialIdentity } from "@hcengineering/contact"
-import { buildSocialIdString, type DocumentUpdate, type SocialId } from "@hcengineering/core"
+import { buildSocialIdString, SocialIdType, type DocumentUpdate, type Space } from "@hcengineering/core"
 import { Effect } from "effect"
 
 import type {
@@ -8,7 +8,7 @@ import type {
   SocialIdentityId
 } from "../../domain/schemas/person-administration.js"
 import { SocialIdentityId as SocialIdentityIdSchema } from "../../domain/schemas/person-administration.js"
-import { Count, NonEmptyString, PersonId } from "../../domain/schemas/shared.js"
+import { Count, NonEmptyString, PersonId, PersonUuid } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import {
   type HulyDataInvalidError,
@@ -19,7 +19,14 @@ import {
 import { contact } from "../huly-plugins.js"
 import { WorkspaceClient } from "../workspace-client.js"
 import { hulyQuery } from "./query-helpers.js"
-import { toAccountUuid, toRef, toSocialIdentityRef } from "./sdk-boundary.js"
+import { toRef, toSocialIdentityRef } from "./sdk-boundary.js"
+import {
+  type AccountSocialIdentity,
+  decodeAccountCurrentPerson,
+  decodeAccountSocialIdentities,
+  decodeWorkspaceSocialIdentitiesForRepair,
+  type WorkspaceSocialIdentity
+} from "./person-administration-boundaries.js"
 import { resolvePersonAdministrationTarget } from "./person-administration-shared.js"
 
 type PersonAdministrationRepairError =
@@ -32,14 +39,28 @@ type ExistingIdentityDecision =
   | { readonly _tag: "updated"; readonly operations: DocumentUpdate<SocialIdentity> }
   | { readonly _tag: "unsupported"; readonly reason: NonEmptyString }
 
-const activeIdentityDiffers = (identity: SocialIdentity, authoritative: SocialId): boolean =>
+const nativeSocialIdentityTypes: Record<AccountSocialIdentity["type"], SocialIdType> = {
+  email: SocialIdType.EMAIL,
+  github: SocialIdType.GITHUB,
+  google: SocialIdType.GOOGLE,
+  phone: SocialIdType.PHONE,
+  oidc: SocialIdType.OIDC,
+  huly: SocialIdType.HULY,
+  telegram: SocialIdType.TELEGRAM,
+  "huly-assistant": SocialIdType.HULY_ASSISTANT
+}
+
+const identityKey = (identity: AccountSocialIdentity): string =>
+  buildSocialIdString({ type: nativeSocialIdentityTypes[identity.type], value: identity.value })
+
+const activeIdentityDiffers = (identity: WorkspaceSocialIdentity, authoritative: AccountSocialIdentity): boolean =>
   identity.type !== authoritative.type ||
   identity.value !== authoritative.value ||
-  identity.key !== buildSocialIdString(authoritative)
+  identity.key !== identityKey(authoritative)
 
 const identityRepairOperations = (
-  identity: SocialIdentity,
-  authoritative: SocialId,
+  identity: WorkspaceSocialIdentity,
+  authoritative: AccountSocialIdentity,
   person: Person
 ): DocumentUpdate<SocialIdentity> => ({
   ...(identity.verifiedOn === undefined && authoritative.verifiedOn !== undefined
@@ -52,10 +73,18 @@ const identityRepairOperations = (
 })
 
 const existingIdentityDecision = (
-  identity: SocialIdentity,
-  authoritative: SocialId,
+  identity: WorkspaceSocialIdentity,
+  authoritative: AccountSocialIdentity,
   person: Person
 ): ExistingIdentityDecision => {
+  if (authoritative.isDeleted !== true && identity.isDeleted === true) {
+    return {
+      _tag: "unsupported",
+      reason: NonEmptyString.make(
+        "the workspace identity is deleted while the account identity is active; native repair does not reactivate identities"
+      )
+    }
+  }
   if (identity.attachedTo !== person._id && identity.verifiedOn !== undefined) {
     return {
       _tag: "unsupported",
@@ -83,9 +112,9 @@ type IdentityRepairOutcome =
 const repairAuthoritativeIdentity = (
   client: HulyClient["Service"],
   person: Person,
-  current: ReadonlyArray<SocialIdentity>,
-  existing: SocialIdentity | undefined,
-  social: SocialId
+  globalIdentities: ReadonlyArray<WorkspaceSocialIdentity>,
+  existing: WorkspaceSocialIdentity | undefined,
+  social: AccountSocialIdentity
 ): Effect.Effect<IdentityRepairOutcome, HulyClientError> =>
   Effect.gen(function* () {
     if (existing !== undefined) {
@@ -93,12 +122,17 @@ const repairAuthoritativeIdentity = (
       if (decision._tag === "unsupported")
         return { _tag: "unsupported", identityId: SocialIdentityIdSchema.make(social._id), reason: decision.reason }
       if (decision._tag === "unchanged") return decision
-      yield* client.updateDoc(contact.class.SocialIdentity, existing.space, existing._id, decision.operations)
+      yield* client.updateDoc(
+        contact.class.SocialIdentity,
+        toRef<Space>(existing.space),
+        toSocialIdentityRef(existing._id),
+        decision.operations
+      )
       return { _tag: "updated" }
     }
     if (social.isDeleted === true) return { _tag: "unchanged" }
-    const expectedKey = buildSocialIdString(social)
-    if (current.some((candidate) => candidate.key === social.key || candidate.key === expectedKey)) {
+    const expectedKey = identityKey(social)
+    if (globalIdentities.some((candidate) => candidate.key === social.key || candidate.key === expectedKey)) {
       return {
         _tag: "unsupported",
         identityId: SocialIdentityIdSchema.make(social._id),
@@ -112,11 +146,11 @@ const repairAuthoritativeIdentity = (
       contact.class.Person,
       "socialIds",
       {
-        type: social.type,
+        type: nativeSocialIdentityTypes[social.type],
         value: social.value,
         key: expectedKey,
         isDeleted: false,
-        ...(social.displayValue === undefined ? {} : { displayValue: social.displayValue }),
+        ...(social.displayValue == null ? {} : { displayValue: social.displayValue }),
         ...(social.verifiedOn === undefined ? {} : { verifiedOn: social.verifiedOn })
       },
       toSocialIdentityRef(social._id)
@@ -148,25 +182,58 @@ export const repairPersonSocialIdentities = (
         )
       })
     }
-    const accountPerson = yield* workspace.getPersonInfo(toAccountUuid(personUuid))
-    const current = yield* client.findAll<SocialIdentity>(
+    const currentAccountPerson = yield* workspace.getCurrentPerson().pipe(Effect.flatMap(decodeAccountCurrentPerson))
+    if (currentAccountPerson.uuid !== PersonUuid.make(personUuid)) {
+      return yield* new PersonIdentityRepairUnsupportedError({
+        personId: PersonId.make(person._id),
+        reason: NonEmptyString.make(
+          "the account API only exposes authoritative identities for the authenticated person; this target belongs to another account"
+        )
+      })
+    }
+    const authoritativeSocials = yield* workspace
+      .getCurrentSocialIds(true)
+      .pipe(Effect.flatMap(decodeAccountSocialIdentities))
+    const currentDtos = yield* client.findAll<SocialIdentity>(
       contact.class.SocialIdentity,
       hulyQuery<SocialIdentity>({ attachedTo: person._id })
     )
-    const authoritativeSocials = accountPerson.socialIds
+    const current = yield* decodeWorkspaceSocialIdentitiesForRepair(currentDtos)
     const authoritativeIds = authoritativeSocials.map((social) => toSocialIdentityRef(social._id))
-    const globallyExisting =
+    const authoritativeKeys = [...new Set(authoritativeSocials.flatMap((social) => [social.key, identityKey(social)]))]
+    const globallyExistingByIdDtos =
       authoritativeIds.length === 0
         ? []
         : yield* client.findAll<SocialIdentity>(
             contact.class.SocialIdentity,
             hulyQuery<SocialIdentity>({ _id: { $in: authoritativeIds } })
           )
+    const globallyExistingByKeyDtos =
+      authoritativeKeys.length === 0
+        ? []
+        : yield* client.findAll<SocialIdentity>(
+            contact.class.SocialIdentity,
+            hulyQuery<SocialIdentity>({ key: { $in: authoritativeKeys } })
+          )
+    const globalIdentities = yield* decodeWorkspaceSocialIdentitiesForRepair([
+      ...new Map(
+        [...globallyExistingByIdDtos, ...globallyExistingByKeyDtos].map((identity) => [identity._id, identity])
+      ).values()
+    ])
+    const globallyExisting = globalIdentities.filter((identity) =>
+      authoritativeIds.includes(toSocialIdentityRef(identity._id))
+    )
     const existingById = new Map(globallyExisting.map((identity) => [identity._id, identity]))
     const outcomes = yield* Effect.forEach(authoritativeSocials, (social) =>
-      repairAuthoritativeIdentity(client, person, current, existingById.get(toSocialIdentityRef(social._id)), social)
+      repairAuthoritativeIdentity(
+        client,
+        person,
+        globalIdentities,
+        existingById.get(SocialIdentityIdSchema.make(social._id)),
+        social
+      )
     )
-    const authoritativeIdSet = new Set(authoritativeSocials.map((social) => social._id))
+    const authoritativeIdSet = new Set<string>(authoritativeSocials.map((social) => social._id))
     const workspaceOnlyUnsupported = current
       .filter((identity) => !authoritativeIdSet.has(identity._id))
       .map((identity) => ({

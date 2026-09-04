@@ -1,5 +1,4 @@
 import type { Channel, Employee, Person, SocialIdentity, Status } from "@hcengineering/contact"
-import type { WorkspaceMemberInfo } from "@hcengineering/core"
 import { Effect, Schema } from "effect"
 
 import type {
@@ -7,17 +6,24 @@ import type {
   GetPersonAdministrationResult
 } from "../../domain/schemas/person-administration.js"
 import { GetPersonAdministrationResultSchema } from "../../domain/schemas/person-administration.js"
+import type { PersonUuid } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { PersonIdentifierAmbiguousError, PersonNotFoundError } from "../errors.js"
 import { HulyDataInvalidError } from "../errors.js"
 import { contact } from "../huly-plugins.js"
-import {
-  WorkspaceClient,
-  type WorkspaceClientOperations,
-  type WorkspaceClientUserProfile
-} from "../workspace-client.js"
+import { WorkspaceClient, type WorkspaceClientOperations } from "../workspace-client.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toAccountUuid, toRef } from "./sdk-boundary.js"
+import {
+  type AccountProfile,
+  decodeAccountProfile,
+  decodeWorkspaceMembers,
+  decodeWorkspacePersonAdministrationProjectionData,
+  decodeWorkspaceSocialIdentitiesForRead,
+  type WorkspacePersonAdministrationProjectionData,
+  type WorkspaceMemberInfo,
+  type WorkspaceSocialIdentity
+} from "./person-administration-boundaries.js"
 import { resolvePersonAdministrationTarget } from "./person-administration-shared.js"
 import { makePersonAdministrationProjection } from "./person-administration-projection.js"
 
@@ -38,16 +44,14 @@ const decodePersonAdministrationResult = (
 
 const loadProfile = (
   workspace: WorkspaceClientOperations,
-  personUuid: Person["personUuid"]
-): Effect.Effect<WorkspaceClientUserProfile | null, HulyClientError> =>
-  personUuid === undefined ? Effect.succeed(null) : workspace.getUserProfile(toAccountUuid(personUuid))
+  personUuid: PersonUuid | undefined
+): Effect.Effect<AccountProfile | null, HulyClientError | HulyDataInvalidError> =>
+  personUuid === undefined
+    ? Effect.succeed(null)
+    : workspace.getUserProfile(toAccountUuid(personUuid)).pipe(Effect.flatMap(decodeAccountProfile))
 
-interface PersonAdministrationData {
-  readonly person: Person
-  readonly identities: ReadonlyArray<SocialIdentity>
-  readonly statuses: ReadonlyArray<Status>
-  readonly channels: ReadonlyArray<Channel>
-  readonly employee: Employee | undefined
+interface PersonAdministrationData extends WorkspacePersonAdministrationProjectionData {
+  readonly identities: ReadonlyArray<WorkspaceSocialIdentity>
   readonly members: ReadonlyArray<WorkspaceMemberInfo>
 }
 
@@ -55,23 +59,28 @@ const loadPersonAdministrationData = (
   client: HulyClient["Service"],
   workspace: WorkspaceClientOperations,
   person: Person
-): Effect.Effect<PersonAdministrationData, HulyClientError> =>
-  Effect.all([
-    client.findAll<SocialIdentity>(contact.class.SocialIdentity, hulyQuery<SocialIdentity>({ attachedTo: person._id })),
-    client.findAll<Status>(contact.class.Status, hulyQuery<Status>({ attachedTo: toRef<Employee>(person._id) })),
-    client.findAll<Channel>(contact.class.Channel, hulyQuery<Channel>({ attachedTo: person._id })),
-    client.findOne<Employee>(contact.mixin.Employee, hulyQuery<Employee>({ _id: toRef<Employee>(person._id) })),
-    workspace.getWorkspaceMembers()
-  ]).pipe(
-    Effect.map(([identities, statuses, channels, employee, members]) => ({
+): Effect.Effect<PersonAdministrationData, HulyClientError | HulyDataInvalidError> =>
+  Effect.gen(function* () {
+    const [identityDtos, statuses, channels, employee, memberDtos] = yield* Effect.all([
+      client.findAll<SocialIdentity>(
+        contact.class.SocialIdentity,
+        hulyQuery<SocialIdentity>({ attachedTo: person._id })
+      ),
+      client.findAll<Status>(contact.class.Status, hulyQuery<Status>({ attachedTo: toRef<Employee>(person._id) })),
+      client.findAll<Channel>(contact.class.Channel, hulyQuery<Channel>({ attachedTo: person._id })),
+      client.findOne<Employee>(contact.mixin.Employee, hulyQuery<Employee>({ _id: toRef<Employee>(person._id) })),
+      workspace.getWorkspaceMembers()
+    ])
+    const identities = yield* decodeWorkspaceSocialIdentitiesForRead(identityDtos)
+    const members = yield* decodeWorkspaceMembers(memberDtos)
+    const projectionData = yield* decodeWorkspacePersonAdministrationProjectionData({
       person,
-      identities,
       statuses,
       channels,
-      employee,
-      members
-    }))
-  )
+      ...(employee === undefined ? {} : { employee })
+    })
+    return { ...projectionData, identities, members }
+  })
 
 const readResolvedPersonAdministration = (
   client: HulyClient["Service"],
@@ -80,7 +89,7 @@ const readResolvedPersonAdministration = (
 ): Effect.Effect<GetPersonAdministrationResult, PersonAdministrationReadError> =>
   loadPersonAdministrationData(client, workspace, person).pipe(
     Effect.flatMap((data) => {
-      const personUuid = data.employee?.personUuid ?? person.personUuid
+      const personUuid = data.employee?.personUuid ?? data.person.personUuid
       return loadProfile(workspace, personUuid).pipe(
         Effect.flatMap((profile) =>
           decodePersonAdministrationResult(makePersonAdministrationProjection({ ...data, profile }))

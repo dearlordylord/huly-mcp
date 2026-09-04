@@ -73,6 +73,14 @@ export const SocialIdentityId = NonEmptyString.pipe(
   Schema.annotate({ identifier: "SocialIdentityId", description: "Exact Huly SocialIdentity document ID." })
 )
 export type SocialIdentityId = Schema.Schema.Type<typeof SocialIdentityId>
+export const HistoricalInstant = Schema.Int.pipe(
+  Schema.brand("HistoricalInstant"),
+  Schema.annotate({
+    identifier: "HistoricalInstant",
+    description: "Signed Unix instant in milliseconds; negative values represent dates before 1970."
+  })
+)
+export type HistoricalInstant = Schema.Schema.Type<typeof HistoricalInstant>
 export const SocialIdentitySchema = Schema.Struct({
   id: SocialIdentityId,
   type: SocialIdentityTypeSchema,
@@ -122,7 +130,7 @@ export type GetPersonAdministrationParams = Schema.Schema.Type<typeof GetPersonA
 export const GetPersonAdministrationResultSchema = Schema.Struct({
   personId: PersonId,
   personUuid: Schema.optionalKey(PersonUuid),
-  birthday: Schema.optionalKey(Schema.NullOr(Timestamp)),
+  birthday: Schema.optionalKey(Schema.NullOr(HistoricalInstant)),
   avatar: AvatarMetadataSchema,
   contactStatuses: Schema.Array(ContactStatusSchema),
   workspaceMember: WorkspaceMembershipSchema,

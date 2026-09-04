@@ -54,6 +54,8 @@ export const HulyConnectionOperation = Schema.Literals([
   "updateMarkup",
   "searchFulltext",
   "getWorkspaceMembers",
+  "getCurrentPerson",
+  "getCurrentSocialIds",
   "getPersonInfo",
   "updateWorkspaceRole",
   "getWorkspaceInfo",

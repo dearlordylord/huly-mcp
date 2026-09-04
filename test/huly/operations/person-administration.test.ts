@@ -3,7 +3,7 @@ import type { Channel, Employee, Person, SocialIdentity, SocialIdentityProvider,
 import { AvatarType } from "@hcengineering/contact"
 import type { Attachment as HulyAttachment } from "@hcengineering/attachment"
 import type { ChatMessage } from "@hcengineering/chunter"
-import type { Blob, Class, Doc, DocumentUpdate, Ref, Space } from "@hcengineering/core"
+import type { Blob, Class, Doc, DocumentUpdate, Ref, SocialId, Space } from "@hcengineering/core"
 import { AccountRole, SocialIdType } from "@hcengineering/core"
 import { Effect, Exit, Layer } from "effect"
 import { expect } from "vitest"
@@ -17,12 +17,26 @@ import {
   parseGetPersonAttachmentParams,
   parseListPersonAttachmentsParams,
   parseListPersonCommentsParams,
+  SocialIdentityId,
+  SocialIdentityTypeSchema,
   parseUpdatePersonAttachmentParams,
   parseUpdatePersonCommentParams
 } from "../../../src/domain/schemas/person-administration.js"
-import { Email, PersonId, PersonName } from "../../../src/domain/schemas/shared.js"
+import {
+  Email,
+  NonEmptyString,
+  PersonId,
+  PersonName,
+  PersonUuid as DomainPersonUuid,
+  Timestamp
+} from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
-import { PersonIdentifierAmbiguousError, PersonIdentityRepairUnsupportedError } from "../../../src/huly/errors.js"
+import {
+  HulyConnectionError,
+  HulyDataInvalidError,
+  PersonIdentifierAmbiguousError,
+  PersonIdentityRepairUnsupportedError
+} from "../../../src/huly/errors.js"
 import { attachment, chunter, contact } from "../../../src/huly/huly-plugins.js"
 import {
   getPersonAdministration,
@@ -30,6 +44,16 @@ import {
   repairPersonSocialIdentities
 } from "../../../src/huly/operations/person-administration.js"
 import { makePersonAdministrationProjection } from "../../../src/huly/operations/person-administration-projection.js"
+import {
+  type AccountProfile,
+  decodeAccountSocialIdentities,
+  decodeAccountProfile,
+  decodeWorkspacePersonAdministrationProjectionData,
+  decodeWorkspaceMembers,
+  decodeWorkspaceSocialIdentitiesForRepair,
+  type WorkspaceMemberInfo,
+  type WorkspaceSocialIdentity
+} from "../../../src/huly/operations/person-administration-boundaries.js"
 import {
   addPersonAttachment,
   deletePersonAttachment,
@@ -89,6 +113,40 @@ const unverifiedSocialIdentity = (overrides?: Partial<SocialIdentity>): SocialId
   void verifiedOn
   return unverified
 }
+
+const workspaceIdentity = (overrides?: Partial<SocialIdentity>): WorkspaceSocialIdentity => {
+  const identity = socialIdentity(overrides)
+  return {
+    _id: SocialIdentityId.make(identity._id),
+    space: NonEmptyString.make(identity.space),
+    attachedTo: NonEmptyString.make(identity.attachedTo),
+    type: SocialIdentityTypeSchema.make(identity.type),
+    value: identity.value,
+    key: NonEmptyString.make(identity.key),
+    ...(identity.displayValue === undefined ? {} : { displayValue: identity.displayValue }),
+    ...(identity.verifiedOn === undefined ? {} : { verifiedOn: Timestamp.make(identity.verifiedOn) }),
+    ...(identity.isDeleted === undefined ? {} : { isDeleted: identity.isDeleted })
+  }
+}
+
+const workspaceUnverifiedIdentity = (overrides?: Partial<SocialIdentity>): WorkspaceSocialIdentity => {
+  const { verifiedOn, ...identity } = workspaceIdentity(overrides)
+  void verifiedOn
+  return identity
+}
+
+const accountProfile = (overrides?: Partial<AccountProfile>): AccountProfile => ({
+  uuid: DomainPersonUuid.make(PERSON_UUID),
+  firstName: "Ada",
+  lastName: "Lovelace",
+  isPublic: true,
+  ...overrides
+})
+
+const workspaceMember = (role: WorkspaceMemberInfo["role"]): WorkspaceMemberInfo => ({
+  person: DomainPersonUuid.make(PERSON_UUID),
+  role
+})
 
 const personWithoutUuid = (): Person => {
   const { personUuid, ...withoutUuid } = person()
@@ -171,11 +229,13 @@ const filterByQuery = <T extends Doc>(docs: ReadonlyArray<T>, query: unknown): A
     const attachedTo = queryField(query, "attachedTo")
     const name = queryField(query, "name")
     const user = queryField(query, "user")
+    const key = queryField(query, "key")
     return (
       matchesQueryValue(doc._id, id) &&
       matchesQueryValue(queryField(doc, "attachedTo"), attachedTo) &&
       matchesQueryValue(queryField(doc, "name"), name) &&
-      matchesQueryValue(queryField(doc, "user"), user)
+      matchesQueryValue(queryField(doc, "user"), user) &&
+      matchesQueryValue(queryField(doc, "key"), key)
     )
   })
 
@@ -241,25 +301,33 @@ const testClient = (fixture: Fixture): Layer.Layer<HulyClient> => {
   })
 }
 
+const authoritativeSocialIds: ReadonlyArray<SocialId> = [
+  {
+    _id: corePersonId("social-1"),
+    type: SocialIdType.EMAIL,
+    value: "ada@example.test",
+    key: "email:ada@example.test",
+    verifiedOn: 10
+  },
+  { _id: corePersonId("social-2"), type: SocialIdType.GITHUB, value: "ada", key: "github:ada" }
+]
+
+const accountAuthorityLayer = (
+  socialIds: ReadonlyArray<SocialId>,
+  currentPersonUuid = PERSON_UUID
+): Layer.Layer<WorkspaceClient> =>
+  WorkspaceClient.testLayer({
+    getCurrentPerson: () => Effect.succeed({ uuid: currentPersonUuid, firstName: "Ada", lastName: "Lovelace" }),
+    getCurrentSocialIds: () => Effect.succeed([...socialIds])
+  })
+
 const workspace = WorkspaceClient.testLayer({
   getWorkspaceMembers: () => Effect.succeed([{ person: PERSON_UUID, role: AccountRole.User }]),
+  getCurrentPerson: () => Effect.succeed({ uuid: PERSON_UUID, firstName: "Ada", lastName: "Lovelace" }),
+  getCurrentSocialIds: () => Effect.succeed([...authoritativeSocialIds]),
   getUserProfile: () =>
     Effect.succeed({ uuid: PERSON_UUID, firstName: "Ada", lastName: "Lovelace", bio: "Mathematician", isPublic: true }),
-  getPersonInfo: () =>
-    Effect.succeed({
-      uuid: PERSON_UUID,
-      name: "Lovelace,Ada",
-      socialIds: [
-        {
-          _id: corePersonId("social-1"),
-          type: SocialIdType.EMAIL,
-          value: "ada@example.test",
-          key: "email:ada@example.test",
-          verifiedOn: 10
-        },
-        { _id: corePersonId("social-2"), type: SocialIdType.GITHUB, value: "ada", key: "github:ada" }
-      ]
-    })
+  getPersonInfo: () => Effect.succeed({ name: "Lovelace,Ada", socialIds: [...authoritativeSocialIds] })
 })
 
 describe("person administration schemas", () => {
@@ -306,10 +374,92 @@ describe("person administration schemas", () => {
       expect(Exit.isFailure(result)).toBe(true)
     })
   )
+
+  it.effect("decodes the account PostgreSQL social-identity wire shape", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeAccountSocialIdentities([
+        {
+          _id: "social-live",
+          type: "email",
+          value: "ada@example.test",
+          key: "email:ada@example.test",
+          personUuid: PERSON_UUID,
+          createdOn: 10,
+          verifiedOn: 20,
+          isDeleted: false,
+          displayValue: null
+        }
+      ])
+
+      expect(decoded).toEqual([
+        {
+          _id: "social-live",
+          type: "email",
+          value: "ada@example.test",
+          key: "email:ada@example.test",
+          verifiedOn: 20,
+          isDeleted: false,
+          displayValue: null
+        }
+      ])
+    })
+  )
+
+  it.effect("rejects a malformed account profile as a typed Huly data failure", () =>
+    decodeAccountProfile({ uuid: PERSON_UUID, firstName: "Ada" }).pipe(
+      Effect.flip,
+      Effect.map((error) => expect(error).toBeInstanceOf(HulyDataInvalidError))
+    )
+  )
+
+  it.effect("rejects a malformed workspace member as a typed Huly data failure", () =>
+    decodeWorkspaceMembers([{ person: PERSON_UUID, role: "INVENTED" }]).pipe(
+      Effect.flip,
+      Effect.map((error) => expect(error).toBeInstanceOf(HulyDataInvalidError))
+    )
+  )
+
+  it.effect("rejects a malformed workspace identity as a typed Huly data failure", () =>
+    decodeWorkspaceSocialIdentitiesForRepair([{ _id: "social-1", key: "email:ada@example.test" }]).pipe(
+      Effect.flip,
+      Effect.map((error) => expect(error).toBeInstanceOf(HulyDataInvalidError))
+    )
+  )
+
+  it.effect("rejects malformed raw projection data as a typed Huly data failure", () =>
+    decodeWorkspacePersonAdministrationProjectionData({
+      person: { _id: "", avatarType: "external" },
+      statuses: [],
+      channels: []
+    }).pipe(
+      Effect.flip,
+      Effect.map((error) => expect(error).toBeInstanceOf(HulyDataInvalidError))
+    )
+  )
+
+  it.effect("accepts the sparse Employee mixin projection emitted by Huly", () =>
+    Effect.gen(function* () {
+      const projectionData = yield* decodeWorkspacePersonAdministrationProjectionData({
+        person: sparsePerson(),
+        statuses: [],
+        channels: [],
+        employee: { personUuid: PERSON_UUID }
+      })
+      const projection = makePersonAdministrationProjection({
+        ...projectionData,
+        identities: [],
+        members: [workspaceMember(AccountRole.User)],
+        profile: null
+      })
+
+      expect(projection).toMatchObject({ workspaceMember: { member: true, role: "USER" } })
+      expect(projection).not.toHaveProperty("workspaceMember.active")
+    })
+  )
 })
 
 describe("person identity and profile administration", () => {
-  it("projects sparse and nullable native profile fields without inventing values", () => {
+  it.effect("projects sparse and nullable native profile fields without inventing values", () => {
     const sparseIdentity = unverifiedSocialIdentity({
       _id: toSocialIdentityRef("social-2"),
       displayValue: "Ada",
@@ -330,39 +480,41 @@ describe("person identity and profile administration", () => {
       modifiedBy: corePersonId("actor"),
       modifiedOn: 10
     }
-    const projection = makePersonAdministrationProjection({
-      person: sparsePerson(),
-      identities: [sparseIdentity, socialIdentity()],
-      statuses: [],
-      channels: [emptyChannel],
-      employee: undefined,
-      members: [],
-      profile: {
-        uuid: PERSON_UUID,
-        firstName: "Ada",
-        lastName: "Lovelace",
-        isPublic: false,
-        city: null,
-        country: null,
-        website: null,
-        bio: null,
-        socialLinks: null
-      }
-    })
-    expect(projection).toMatchObject({
-      personId: "person-1",
-      avatar: { type: AvatarType.EXTERNAL },
-      workspaceMember: { member: false },
-      socialIdentities: [
-        { id: "social-1", isDeleted: false },
-        { id: "social-2", displayValue: "Ada", isDeleted: true }
-      ],
-      channelActivity: [{ channelId: "channel-2" }],
-      profile: {}
+    return Effect.gen(function* () {
+      const projectionData = yield* decodeWorkspacePersonAdministrationProjectionData({
+        person: sparsePerson(),
+        statuses: [],
+        channels: [emptyChannel]
+      })
+      const projection = makePersonAdministrationProjection({
+        ...projectionData,
+        identities: [workspaceUnverifiedIdentity(sparseIdentity), workspaceIdentity()],
+        members: [],
+        profile: accountProfile({
+          isPublic: false,
+          city: null,
+          country: null,
+          website: null,
+          bio: null,
+          socialLinks: null
+        })
+      })
+      expect(projection).toMatchObject({
+        personId: "person-1",
+        avatar: { type: AvatarType.EXTERNAL },
+        workspaceMember: { member: false },
+        socialIdentities: [
+          { id: "social-1", isDeleted: false },
+          { id: "social-2", displayValue: "Ada", isDeleted: true }
+        ],
+        channelActivity: [{ channelId: "channel-2" }],
+        profile: {}
+      })
+      expect(projection).not.toHaveProperty("socialIdentities.1.verifiedOn")
     })
   })
 
-  it("projects all optional profile and channel values and deterministic sort tie-breakers", () => {
+  it.effect("projects all optional profile and channel values and deterministic sort tie-breakers", () => {
     const firstChannel: Channel = {
       _id: toRef<Channel>("channel-b"),
       _class: contact.class.Channel,
@@ -378,64 +530,78 @@ describe("person identity and profile administration", () => {
       modifiedOn: 10
     }
     const secondChannel: Channel = { ...firstChannel, _id: toRef<Channel>("channel-a"), value: "a@example.test" }
-    const projection = makePersonAdministrationProjection({
-      person: person({ avatar: toRef<Blob>("avatar-1"), profile: toRef("profile-1"), birthday: null }),
-      identities: [
-        socialIdentity({ _id: toSocialIdentityRef("social-b"), key: "email:b@example.test" }),
-        socialIdentity({ _id: toSocialIdentityRef("social-a"), key: "email:a@example.test" })
-      ],
-      statuses: [
-        {
-          _id: toRef<Status>("status-b"),
-          _class: contact.class.Status,
-          space: contact.space.Contacts,
-          attachedTo: toRef<Employee>(PERSON_ID),
-          attachedToClass: contact.mixin.Employee,
-          collection: "statuses",
-          name: "B",
-          dueDate: 10,
-          modifiedBy: corePersonId("actor"),
-          modifiedOn: 10
-        },
-        {
-          _id: toRef<Status>("status-a"),
-          _class: contact.class.Status,
-          space: contact.space.Contacts,
-          attachedTo: toRef<Employee>(PERSON_ID),
-          attachedToClass: contact.mixin.Employee,
-          collection: "statuses",
-          name: "A",
-          dueDate: 10,
-          modifiedBy: corePersonId("actor"),
-          modifiedOn: 10
-        }
-      ],
-      channels: [firstChannel, secondChannel],
-      employee: undefined,
-      members: [{ person: PERSON_UUID, role: AccountRole.User }],
-      profile: {
-        uuid: PERSON_UUID,
-        firstName: "Ada",
-        lastName: "Lovelace",
-        isPublic: false,
-        city: "London",
-        country: "UK",
-        website: "https://example.test",
-        bio: "Mathematician",
-        socialLinks: { github: "ada" }
+    const statuses: ReadonlyArray<Status> = [
+      {
+        _id: toRef<Status>("status-b"),
+        _class: contact.class.Status,
+        space: contact.space.Contacts,
+        attachedTo: toRef<Employee>(PERSON_ID),
+        attachedToClass: contact.mixin.Employee,
+        collection: "statuses",
+        name: "B",
+        dueDate: 10,
+        modifiedBy: corePersonId("actor"),
+        modifiedOn: 10
+      },
+      {
+        _id: toRef<Status>("status-a"),
+        _class: contact.class.Status,
+        space: contact.space.Contacts,
+        attachedTo: toRef<Employee>(PERSON_ID),
+        attachedToClass: contact.mixin.Employee,
+        collection: "statuses",
+        name: "A",
+        dueDate: 10,
+        modifiedBy: corePersonId("actor"),
+        modifiedOn: 10
       }
-    })
-    expect(projection).toMatchObject({
-      birthday: null,
-      avatar: { blobId: "avatar-1", color: "blue", externalUrl: "https://example.test/avatar.png" },
-      profileCardId: "profile-1",
-      contactStatuses: [{ name: "A" }, { name: "B" }],
-      workspaceMember: { member: true, role: "USER" },
-      channelActivity: [
-        { channelId: "channel-a", items: 2, lastMessage: 20 },
-        { channelId: "channel-b", items: 2, lastMessage: 20 }
-      ],
-      profile: { city: "London", country: "UK", website: "https://example.test", socialLinks: { github: "ada" } }
+    ]
+    const employee: Employee = {
+      _id: toRef<Employee>("person-1"),
+      _class: contact.mixin.Employee,
+      space: contact.space.Contacts,
+      name: "Lovelace,Ada",
+      avatarType: AvatarType.EXTERNAL,
+      active: true,
+      personUuid: PERSON_UUID,
+      modifiedBy: corePersonId("actor"),
+      modifiedOn: 10
+    }
+    return Effect.gen(function* () {
+      const projectionData = yield* decodeWorkspacePersonAdministrationProjectionData({
+        person: person({ avatar: toRef<Blob>("avatar-1"), profile: toRef("profile-1"), birthday: null }),
+        statuses,
+        channels: [firstChannel, secondChannel],
+        employee
+      })
+      const projection = makePersonAdministrationProjection({
+        ...projectionData,
+        identities: [
+          workspaceIdentity({ _id: toSocialIdentityRef("social-b"), key: "email:b@example.test" }),
+          workspaceIdentity({ _id: toSocialIdentityRef("social-a"), key: "email:a@example.test" })
+        ],
+        members: [workspaceMember(AccountRole.User)],
+        profile: accountProfile({
+          isPublic: false,
+          city: "London",
+          country: "UK",
+          website: "https://example.test",
+          bio: "Mathematician",
+          socialLinks: { github: "ada" }
+        })
+      })
+      expect(projection).toMatchObject({
+        birthday: null,
+        avatar: { blobId: "avatar-1", color: "blue", externalUrl: "https://example.test/avatar.png" },
+        profileCardId: "profile-1",
+        contactStatuses: [{ name: "A" }, { name: "B" }],
+        workspaceMember: { member: true, active: true, role: "USER" },
+        channelActivity: [
+          { channelId: "channel-a", items: 2, lastMessage: 20 },
+          { channelId: "channel-b", items: 2, lastMessage: 20 }
+        ],
+        profile: { city: "London", country: "UK", website: "https://example.test", socialLinks: { github: "ada" } }
+      })
     })
   })
 
@@ -464,6 +630,32 @@ describe("person identity and profile administration", () => {
     }).pipe(Effect.provide(Layer.merge(testClient({ identities, statuses: [status] }), workspace)))
   })
 
+  it.effect("preserves birthdays before the Unix epoch", () =>
+    Effect.gen(function* () {
+      const result = yield* getPersonAdministration({ person: { id: PersonId.make("person-1") } })
+      expect(result.birthday).toBe(-2_208_988_800_000)
+    }).pipe(Effect.provide(Layer.merge(testClient({ persons: [person({ birthday: -2_208_988_800_000 })] }), workspace)))
+  )
+
+  it.effect("reports malformed SDK projection fields through the typed error channel", () => {
+    const malformedStatus: Status = {
+      _id: toRef<Status>("status-malformed"),
+      _class: contact.class.Status,
+      space: contact.space.Contacts,
+      attachedTo: toRef<Employee>(PERSON_ID),
+      attachedToClass: contact.mixin.Employee,
+      collection: "statuses",
+      name: "",
+      dueDate: 10,
+      modifiedBy: corePersonId("actor"),
+      modifiedOn: 10
+    }
+    return Effect.gen(function* () {
+      const error = yield* Effect.flip(getPersonAdministration({ person: { id: PersonId.make("person-1") } }))
+      expect(error).toBeInstanceOf(HulyDataInvalidError)
+    }).pipe(Effect.provide(Layer.merge(testClient({ statuses: [malformedStatus] }), workspace)))
+  })
+
   it.effect("lists installed native providers", () => {
     const provider: SocialIdentityProvider = {
       _id: contact.socialIdentityProvider.Email,
@@ -478,6 +670,32 @@ describe("person identity and profile administration", () => {
       expect(yield* listSocialIdentityProviders()).toEqual([
         { id: contact.socialIdentityProvider.Email, type: "email" }
       ])
+    }).pipe(Effect.provide(testClient({ providers: [provider] })))
+  })
+
+  it.effect("preserves provider connection failures without misclassifying them as invalid data", () => {
+    const connectionError = new HulyConnectionError({ message: "provider query unavailable" })
+    const layer = HulyClient.testLayer({ findAllInModel: () => Effect.fail(connectionError) })
+    return Effect.gen(function* () {
+      const error = yield* Effect.flip(listSocialIdentityProviders())
+      expect(error).toBe(connectionError)
+      expect(error).not.toBeInstanceOf(HulyDataInvalidError)
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect("classifies malformed provider records as typed Huly data failures", () => {
+    const provider: SocialIdentityProvider = {
+      _id: toRef<SocialIdentityProvider>(""),
+      _class: contact.class.SocialIdentityProvider,
+      space: contact.space.Contacts,
+      type: SocialIdType.EMAIL,
+      label: contact.string.Email,
+      modifiedBy: corePersonId("actor"),
+      modifiedOn: 10
+    }
+    return Effect.gen(function* () {
+      const error = yield* Effect.flip(listSocialIdentityProviders())
+      expect(error).toBeInstanceOf(HulyDataInvalidError)
     }).pipe(Effect.provide(testClient({ providers: [provider] })))
   })
 
@@ -554,30 +772,23 @@ describe("person identity and profile administration", () => {
   it.effect("creates complete authoritative projections and promotes native verification", () => {
     const addedData: Array<unknown> = []
     const updated: Array<string> = []
-    const authoritativeWorkspace = WorkspaceClient.testLayer({
-      getPersonInfo: () =>
-        Effect.succeed({
-          uuid: PERSON_UUID,
-          name: "Lovelace,Ada",
-          socialIds: [
-            {
-              _id: corePersonId("social-1"),
-              type: SocialIdType.EMAIL,
-              value: "ada@example.test",
-              key: "email:ada@example.test",
-              verifiedOn: 20
-            },
-            {
-              _id: corePersonId("social-2"),
-              type: SocialIdType.GITHUB,
-              value: "ada",
-              key: "github:ada",
-              displayValue: "Ada Lovelace",
-              verifiedOn: 20
-            }
-          ]
-        })
-    })
+    const authoritativeWorkspace = accountAuthorityLayer([
+      {
+        _id: corePersonId("social-1"),
+        type: SocialIdType.EMAIL,
+        value: "ada@example.test",
+        key: "email:ada@example.test",
+        verifiedOn: 20
+      },
+      {
+        _id: corePersonId("social-2"),
+        type: SocialIdType.GITHUB,
+        value: "ada",
+        key: "github:ada",
+        displayValue: "Ada Lovelace",
+        verifiedOn: 20
+      }
+    ])
     return Effect.gen(function* () {
       const result = yield* repairPersonSocialIdentities({ person: { id: PersonId.make("person-1") } })
       expect(result).toMatchObject({ created: 1, updated: 1 })
@@ -593,23 +804,29 @@ describe("person identity and profile administration", () => {
     )
   })
 
+  it.effect("uses Huly's canonical social key format when values contain colons", () => {
+    const addedData: Array<unknown> = []
+    const authoritativeWorkspace = accountAuthorityLayer([
+      { _id: corePersonId("social-oidc"), type: SocialIdType.OIDC, value: "issuer:subject", key: "oidc:issuer:subject" }
+    ])
+    return Effect.gen(function* () {
+      expect(yield* repairPersonSocialIdentities({ person: { id: PersonId.make("person-1") } })).toMatchObject({
+        created: 1
+      })
+      expect(addedData[0]).toMatchObject({ key: "oidc:issuer:subject", value: "issuer:subject" })
+    }).pipe(Effect.provide(Layer.merge(testClient({ addedData }), authoritativeWorkspace)))
+  })
+
   it.effect("ignores an already-deleted authoritative identity that has no workspace projection", () => {
-    const deletedOnlyWorkspace = WorkspaceClient.testLayer({
-      getPersonInfo: () =>
-        Effect.succeed({
-          uuid: PERSON_UUID,
-          name: "Lovelace,Ada",
-          socialIds: [
-            {
-              _id: corePersonId("social-deleted"),
-              type: SocialIdType.EMAIL,
-              value: "old@example.test",
-              key: "email:old@example.test",
-              isDeleted: true
-            }
-          ]
-        })
-    })
+    const deletedOnlyWorkspace = accountAuthorityLayer([
+      {
+        _id: corePersonId("social-deleted"),
+        type: SocialIdType.EMAIL,
+        value: "old@example.test",
+        key: "email:old@example.test",
+        isDeleted: true
+      }
+    ])
     return Effect.gen(function* () {
       expect(yield* repairPersonSocialIdentities({ person: { id: PersonId.make("person-1") } })).toMatchObject({
         created: 0,
@@ -620,9 +837,7 @@ describe("person identity and profile administration", () => {
   })
 
   it.effect("reports workspace-only identities when the account has no authoritative identities", () => {
-    const emptyWorkspace = WorkspaceClient.testLayer({
-      getPersonInfo: () => Effect.succeed({ uuid: PERSON_UUID, name: "Lovelace,Ada", socialIds: [] })
-    })
+    const emptyWorkspace = accountAuthorityLayer([])
     return Effect.gen(function* () {
       const result = yield* repairPersonSocialIdentities({ person: { id: PersonId.make("person-1") } })
       expect(result.unsupported[0]?.reason).toContain("absent from the authoritative account record")
@@ -636,6 +851,37 @@ describe("person identity and profile administration", () => {
       expect(result.created).toBe(0)
       expect(result.unsupported[0]?.reason).toContain("different native identity ID")
     }).pipe(Effect.provide(Layer.merge(testClient({ identities: [socialIdentity(), collision] }), workspace)))
+  })
+
+  it.effect("detects an identity-key collision attached to another person before create", () => {
+    const added: Array<string> = []
+    const globalCollision = socialIdentity({
+      _id: toSocialIdentityRef("other-social"),
+      attachedTo: toRef<Person>("person-elsewhere"),
+      type: SocialIdType.GITHUB,
+      value: "ada",
+      key: "github:ada"
+    })
+    return Effect.gen(function* () {
+      const result = yield* repairPersonSocialIdentities({ person: { id: PersonId.make("person-1") } })
+      expect(result.created).toBe(0)
+      expect(result.unsupported[0]?.reason).toContain("workspace identity key already exists")
+      expect(added).toEqual([])
+    }).pipe(
+      Effect.provide(Layer.merge(testClient({ identities: [socialIdentity(), globalCollision], added }), workspace))
+    )
+  })
+
+  it.effect("refuses to reactivate a workspace-deleted identity from an active account identity", () => {
+    const updated: Array<string> = []
+    return Effect.gen(function* () {
+      const result = yield* repairPersonSocialIdentities({ person: { id: PersonId.make("person-1") } })
+      expect(result.updated).toBe(0)
+      expect(result.unsupported[0]?.reason).toContain("does not reactivate identities")
+      expect(updated).toEqual([])
+    }).pipe(
+      Effect.provide(Layer.merge(testClient({ identities: [socialIdentity({ isDeleted: true })], updated }), workspace))
+    )
   })
 
   it.effect("refuses to overwrite a changed native identity", () => {
@@ -682,22 +928,15 @@ describe("person identity and profile administration", () => {
 
   it.effect("propagates an account-authoritative identity deletion", () => {
     const updated: Array<string> = []
-    const deletedWorkspace = WorkspaceClient.testLayer({
-      getPersonInfo: () =>
-        Effect.succeed({
-          uuid: PERSON_UUID,
-          name: "Lovelace,Ada",
-          socialIds: [
-            {
-              _id: corePersonId("social-1"),
-              type: SocialIdType.EMAIL,
-              value: "deleted@example.test",
-              key: "email:deleted@example.test",
-              isDeleted: true
-            }
-          ]
-        })
-    })
+    const deletedWorkspace = accountAuthorityLayer([
+      {
+        _id: corePersonId("social-1"),
+        type: SocialIdType.EMAIL,
+        value: "deleted@example.test",
+        key: "email:deleted@example.test",
+        isDeleted: true
+      }
+    ])
     return Effect.gen(function* () {
       const result = yield* repairPersonSocialIdentities({ person: { id: PersonId.make("person-1") } })
       expect(result.updated).toBe(1)
@@ -715,6 +954,18 @@ describe("person identity and profile administration", () => {
       }
     }).pipe(Effect.provide(Layer.merge(testClient({ persons: [personWithoutUuid()] }), workspace)))
   )
+
+  it.effect("returns typed unsupported for an account-linked person other than the authenticated person", () => {
+    const otherAccount = accountAuthorityLayer(
+      authoritativeSocialIds,
+      toAccountUuid("00000000-0000-4000-8000-000000000250")
+    )
+    return Effect.gen(function* () {
+      const error = yield* Effect.flip(repairPersonSocialIdentities({ person: { id: PersonId.make("person-1") } }))
+      expect(error).toBeInstanceOf(PersonIdentityRepairUnsupportedError)
+      expect(error.message).toContain("authenticated person")
+    }).pipe(Effect.provide(Layer.merge(testClient({}), otherAccount)))
+  })
 
   it.effect("rejects an ambiguous exact name", () =>
     Effect.gen(function* () {

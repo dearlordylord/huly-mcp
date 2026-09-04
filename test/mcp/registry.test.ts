@@ -107,6 +107,8 @@ const noopStorageClient: HulyStorageOperations = {
 
 const noopWorkspaceClient: WorkspaceClientOperations = {
   getWorkspaceMembers: () => Effect.succeed([]),
+  getCurrentPerson: () => Effect.die(new Error("not implemented")),
+  getCurrentSocialIds: () => Effect.die(new Error("not implemented")),
   getPersonInfo: () => Effect.die(new Error("not implemented")),
   updateWorkspaceRole: () => Effect.die(new Error("not implemented")),
   getWorkspaceInfo: () => Effect.die(new Error("not implemented")),

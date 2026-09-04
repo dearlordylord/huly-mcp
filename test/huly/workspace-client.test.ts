@@ -15,7 +15,9 @@ import { Cause, Effect, Exit, Layer } from "effect"
 import { beforeEach, expect } from "vitest"
 
 import { HulyConfigService } from "../../src/config/config.js"
+import { NonEmptyString } from "../../src/domain/schemas/shared.js"
 import { HulyAuthError, HulyConnectionError, HulyUnavailableError } from "../../src/huly/errors.js"
+import { toAccountUuid } from "../../src/huly/operations/sdk-boundary.js"
 import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
 import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import { WorkspaceClient, type WorkspaceClientError } from "../../src/huly/workspace-client.js"
@@ -33,6 +35,8 @@ const serverConfig = { ACCOUNTS_URL: "http://accounts.test" }
 // --- mocks for external Huly SDK modules ---
 
 const mockGetWorkspaceMembers = mockFn<() => Promise<Array<WorkspaceMemberInfo>>>()
+const mockGetCurrentPerson = mockFn<() => Promise<Person>>()
+const mockGetCurrentSocialIds = mockFn<(includeDeleted?: boolean) => Promise<Array<SocialId>>>()
 const mockGetPersonInfo = mockFn<(account: PersonUuid) => Promise<PersonInfo>>()
 const mockUpdateWorkspaceRole = mockFn<(account: string, role: AccountRole) => Promise<void>>()
 const mockGetWorkspaceInfo = mockFn<(updateLastVisit?: boolean) => Promise<WorkspaceInfoWithStatus>>()
@@ -63,6 +67,8 @@ const mockGetRegionInfo = mockFn<() => Promise<Array<RegionInfo>>>()
 
 const clearAllMockFns = () => {
   mockGetWorkspaceMembers.mockClear()
+  mockGetCurrentPerson.mockClear()
+  mockGetCurrentSocialIds.mockClear()
   mockGetPersonInfo.mockClear()
   mockUpdateWorkspaceRole.mockClear()
   mockGetWorkspaceInfo.mockClear()
@@ -80,6 +86,8 @@ const clearAllMockFns = () => {
 // eslint-disable-next-line no-restricted-syntax -- partial mock: mockFn() methods don't overlap with AccountClient signatures
 const mockAccountClient: AccountClient = {
   getWorkspaceMembers: mockGetWorkspaceMembers,
+  getPerson: mockGetCurrentPerson,
+  getSocialIds: mockGetCurrentSocialIds,
   getPersonInfo: mockGetPersonInfo,
   updateWorkspaceRole: mockUpdateWorkspaceRole,
   getWorkspaceInfo: mockGetWorkspaceInfo,
@@ -153,6 +161,24 @@ describe("WorkspaceClient.layer (real layer)", () => {
 
       expect(result).toEqual(personInfo)
       expect(mockGetPersonInfo.mock.calls).toContainEqual(["person-1"])
+    }).pipe(Effect.provide(liveLayer))
+  )
+
+  it.effect("authenticated person and social identity reads delegate to AccountClient", () =>
+    Effect.gen(function* () {
+      const currentPerson: Person = {
+        uuid: toAccountUuid(NonEmptyString.make("00000000-0000-4000-8000-000000000249")),
+        firstName: "Ada",
+        lastName: "Lovelace"
+      }
+      const socialIds: Array<SocialId> = []
+      mockGetCurrentPerson.mockResolvedValue(currentPerson)
+      mockGetCurrentSocialIds.mockResolvedValue(socialIds)
+
+      const client = yield* WorkspaceClient
+      expect(yield* client.getCurrentPerson()).toEqual(currentPerson)
+      expect(yield* client.getCurrentSocialIds(true)).toEqual(socialIds)
+      expect(mockGetCurrentSocialIds.mock.calls).toContainEqual([true])
     }).pipe(Effect.provide(liveLayer))
   )
 
@@ -507,6 +533,8 @@ describe("WorkspaceClient.testLayer", () => {
       const client = yield* WorkspaceClient.pipe(Effect.provide(WorkspaceClient.testLayer({})))
 
       expect(client.getWorkspaceMembers).toBeDefined()
+      expect(client.getCurrentPerson).toBeDefined()
+      expect(client.getCurrentSocialIds).toBeDefined()
       expect(client.getPersonInfo).toBeDefined()
       expect(client.updateWorkspaceRole).toBeDefined()
       expect(client.getWorkspaceInfo).toBeDefined()

@@ -250,22 +250,22 @@
         "Contact",
         "Member",
         "Organization",
-        "Person"
+        "Person",
+        "SocialIdentity",
+        "SocialIdentityProvider",
+        "Status"
       ]
     },
     {
       "package": "@hcengineering/contact",
       "status": "gap",
       "matrixLocation": "Contact channels and identities",
-      "rationale": "Contact channels, identities, providers, statuses, person spaces, user profiles, and related contact administration remain matrix gaps.",
+      "rationale": "Channel-item internals, person spaces, workspace UserProfile card administration, and remaining contact administration are not first-class MCP surfaces. Channel and ChannelProvider are partially exposed through contact channel tools and remain tracked as gaps until their full model contracts are covered.",
       "exports": [
         "Channel",
         "ChannelItem",
         "ChannelProvider",
         "PersonSpace",
-        "SocialIdentity",
-        "SocialIdentityProvider",
-        "Status",
         "UserProfile"
       ]
     },

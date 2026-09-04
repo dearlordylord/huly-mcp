@@ -62,6 +62,8 @@ export type WorkspaceClientUserProfile = Omit<
 
 export interface WorkspaceClientOperations {
   readonly getWorkspaceMembers: () => Effect.Effect<Array<WorkspaceMemberInfo>, WorkspaceClientError>
+  readonly getCurrentPerson: () => Effect.Effect<Person, WorkspaceClientError>
+  readonly getCurrentSocialIds: (includeDeleted?: boolean) => Effect.Effect<Array<SocialId>, WorkspaceClientError>
   readonly getPersonInfo: (account: PersonUuid) => Effect.Effect<PersonInfo, WorkspaceClientError>
   readonly updateWorkspaceRole: (account: string, role: AccountRole) => Effect.Effect<void, WorkspaceClientError>
   readonly getWorkspaceInfo: (updateLastVisit?: boolean) => Effect.Effect<WorkspaceInfoWithStatus, WorkspaceClientError>
@@ -133,6 +135,9 @@ export class WorkspaceClient extends Context.Service<WorkspaceClient, WorkspaceC
 
       const operations: WorkspaceClientOperations = {
         getWorkspaceMembers: () => withClient((c) => c.getWorkspaceMembers(), "getWorkspaceMembers"),
+        getCurrentPerson: () => withClient((c) => c.getPerson(), "getCurrentPerson"),
+        getCurrentSocialIds: (includeDeleted) =>
+          withClient((c) => c.getSocialIds(includeDeleted), "getCurrentSocialIds"),
         getPersonInfo: (account) => withClient((c) => c.getPersonInfo(account), "getPersonInfo"),
         updateWorkspaceRole: (account, role) =>
           withClient((c) => c.updateWorkspaceRole(account, role), "updateWorkspaceRole"),
@@ -165,6 +170,8 @@ export class WorkspaceClient extends Context.Service<WorkspaceClient, WorkspaceC
 
     const defaultOps: WorkspaceClientOperations = {
       getWorkspaceMembers: () => Effect.succeed([]),
+      getCurrentPerson: notImplemented("getCurrentPerson"),
+      getCurrentSocialIds: notImplemented("getCurrentSocialIds"),
       getPersonInfo: notImplemented("getPersonInfo"),
       updateWorkspaceRole: notImplemented("updateWorkspaceRole"),
       getWorkspaceInfo: notImplemented("getWorkspaceInfo"),
