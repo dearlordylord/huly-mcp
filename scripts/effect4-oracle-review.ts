@@ -4,6 +4,7 @@ import { Option, Schema } from "effect"
 
 import { canonicalJson } from "./effect4-oracle-canonical.js"
 import { oracleDeltaIdentity, type OracleDelta, OracleDeltaSchema } from "./effect4-oracle-delta.js"
+import { ISSUE_97_ADMINISTRATION_TOOL_NAMES } from "./effect4-oracle-issue97-tools.js"
 import { BehavioralOracleSchema, type BehavioralOracle, type OracleJsonRpcResponse } from "./effect4-oracle-schema.js"
 import { ToolName, type ToolName as ToolNameType } from "../src/mcp/tools/registry.js"
 
@@ -60,57 +61,6 @@ const CandidateListToolsResponseSchema = Schema.Struct({
 type CandidateTool = Schema.Schema.Type<typeof CandidateToolSchema>
 type CandidateToolIdentities = ReadonlyMap<string, CandidateTool>
 const EMPTY_CANDIDATE_TOOL_IDENTITIES: CandidateToolIdentities = new Map()
-const ISSUE_97_TOOL_NAMES: ReadonlySet<ToolNameType> = new Set([
-  ToolName.make("set_employee_position"),
-  ToolName.make("list_departments"),
-  ToolName.make("get_department"),
-  ToolName.make("create_department"),
-  ToolName.make("update_department"),
-  ToolName.make("delete_department"),
-  ToolName.make("list_staff"),
-  ToolName.make("assign_staff_department"),
-  ToolName.make("list_hr_request_types"),
-  ToolName.make("list_hr_requests"),
-  ToolName.make("get_hr_request"),
-  ToolName.make("create_hr_request"),
-  ToolName.make("update_hr_request"),
-  ToolName.make("delete_hr_request"),
-  ToolName.make("list_hr_request_comments"),
-  ToolName.make("add_hr_request_comment"),
-  ToolName.make("update_hr_request_comment"),
-  ToolName.make("delete_hr_request_comment"),
-  ToolName.make("list_hr_request_attachments"),
-  ToolName.make("get_hr_request_attachment"),
-  ToolName.make("add_hr_request_attachment"),
-  ToolName.make("update_hr_request_attachment"),
-  ToolName.make("delete_hr_request_attachment"),
-  ToolName.make("list_public_holidays"),
-  ToolName.make("get_public_holiday"),
-  ToolName.make("create_public_holiday"),
-  ToolName.make("update_public_holiday"),
-  ToolName.make("delete_public_holiday"),
-  ToolName.make("get_hr_schedule"),
-  ToolName.make("get_hr_table"),
-  ToolName.make("get_hr_summary_report"),
-  ToolName.make("get_funnel"),
-  ToolName.make("create_funnel"),
-  ToolName.make("update_funnel"),
-  ToolName.make("archive_funnel"),
-  ToolName.make("delete_funnel"),
-  ToolName.make("get_person_administration"),
-  ToolName.make("list_social_identity_providers"),
-  ToolName.make("repair_person_social_identities"),
-  ToolName.make("list_person_comments"),
-  ToolName.make("add_person_comment"),
-  ToolName.make("update_person_comment"),
-  ToolName.make("delete_person_comment"),
-  ToolName.make("list_person_attachments"),
-  ToolName.make("add_person_attachment"),
-  ToolName.make("get_person_attachment"),
-  ToolName.make("update_person_attachment"),
-  ToolName.make("delete_person_attachment")
-])
-
 const candidateToolIdentityKey = (responseIndex: number, toolIndex: number): string => `${responseIndex}/${toolIndex}`
 
 export const parseCandidateToolIdentities = (
@@ -162,7 +112,7 @@ export const oracleDeltaReviewCategory = (
       : "draft07-structure"
   }
   const toolName = candidateToolName(delta.path, candidateToolIdentities)
-  if (toolName !== undefined && ISSUE_97_TOOL_NAMES.has(toolName)) return "issue-97-administration"
+  if (toolName !== undefined && ISSUE_97_ADMINISTRATION_TOOL_NAMES.has(toolName)) return "issue-97-administration"
   if (toolName !== undefined && ISSUE_ASSIGNEE_TOOL_NAMES.has(toolName)) {
     return "issue-assignee-description"
   }
@@ -305,9 +255,9 @@ const issue97ExpansionStart = (
   baseline: ReadonlyArray<ToolNameType>,
   current: ReadonlyArray<ToolNameType>
 ): number | undefined => {
-  const withoutIssue97Tools = current.filter((name) => !ISSUE_97_TOOL_NAMES.has(name))
+  const withoutIssue97Tools = current.filter((name) => !ISSUE_97_ADMINISTRATION_TOOL_NAMES.has(name))
   if (!sameToolOrder(baseline, withoutIssue97Tools)) return undefined
-  const start = current.findIndex((name) => ISSUE_97_TOOL_NAMES.has(name))
+  const start = current.findIndex((name) => ISSUE_97_ADMINISTRATION_TOOL_NAMES.has(name))
   return start < 0 ? undefined : start
 }
 
