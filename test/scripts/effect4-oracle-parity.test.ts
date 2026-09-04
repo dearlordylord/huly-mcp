@@ -619,7 +619,7 @@ describe("Effect 4 oracle Draft-07 validation", () => {
   const RuntimeFixtureJsonSchema = toDraft07JsonSchema(RuntimeFixture)
 
   it("compiles the complete current native and proxy corpora without CLI imports", () => {
-    expect(validateCurrentDraft07Corpora()).toEqual({ native: 590, proxy: 6 })
+    expect(validateCurrentDraft07Corpora()).toEqual({ native: 594, proxy: 6 })
   }, 60_000)
 
   it("compiles complete tool documents and rejects duplicate names or dialect leaks", () => {

@@ -185,7 +185,7 @@ const categoryMetadata = (category: ReviewCategory): { readonly issue: string; r
       return {
         issue: "#228",
         rationale:
-          "Reviewed concise Effect 4 CLI help rendering; employee lifecycle, funnel, HR-request, public-holiday, HR-report, and person-administration routes are added without changing other route behavior."
+          "Reviewed concise Effect 4 CLI help rendering; employee lifecycle, funnel, lead collaboration, HR-request, public-holiday, HR-report, and person-administration routes are added without changing other route behavior."
       }
   }
 }

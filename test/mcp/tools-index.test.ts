@@ -49,12 +49,12 @@ const noopStorageClient: HulyStorageOperations = {
 }
 
 describe("CATEGORY_NAMES", () => {
-  it("preserves the certified 588-operation registry cardinality", () => {
-    expect(toolRegistry.definitions).toHaveLength(588)
-    expect(toolRegistry.tools.size).toBe(588)
-    expect(operationRegistry.definitions).toHaveLength(588)
-    expect(operationRegistry.operations.size).toBe(588)
-    expect(new Set(toolRegistry.definitions.map((tool) => tool.name)).size).toBe(588)
+  it("preserves the certified 592-operation registry cardinality", () => {
+    expect(toolRegistry.definitions).toHaveLength(592)
+    expect(toolRegistry.tools.size).toBe(592)
+    expect(operationRegistry.definitions).toHaveLength(592)
+    expect(operationRegistry.operations.size).toBe(592)
+    expect(new Set(toolRegistry.definitions.map((tool) => tool.name)).size).toBe(592)
   })
 
   it.effect("contains expected categories", () =>

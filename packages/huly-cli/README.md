@@ -271,7 +271,7 @@ pnpm add --global @firfi/huly-cli@latest
 <!-- Generated from cliCommandCatalog and shared operation schemas. Run `pnpm update-cli-readme`. -->
 ## Complete command reference
 
-This release provides 588 native commands for 588 shared Huly operations.
+This release provides 592 native commands for 592 shared Huly operations.
 
 All commands also accept `--json`, `--input-json <object>`, and `--input-file <path>`. Explicit field flags override JSON sources. Structured fields accept JSON. Named positionals are required and are not duplicated as flags. Required non-positional inputs may instead be supplied through either JSON source.
 
