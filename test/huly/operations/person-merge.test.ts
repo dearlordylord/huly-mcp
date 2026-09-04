@@ -1,12 +1,14 @@
 import { describe, it } from "@effect/vitest"
-import { Effect, Layer, Ref, Schema } from "effect"
+import { Effect, Layer, Option, Ref, Schema } from "effect"
 import { expect } from "vitest"
 
 import {
   type MergePeopleParams,
+  MergePeopleResultSchema,
   parseMergePeopleParams,
   PersonMergeReferenceImpactSchema
 } from "../../../src/domain/schemas/person-merge.js"
+import type { PersonAdministrationLocator } from "../../../src/domain/schemas/person-administration.js"
 import { HulyClient } from "../../../src/huly/client.js"
 import {
   HulyDataInvalidError,
@@ -16,7 +18,7 @@ import {
   PersonNotFoundError
 } from "../../../src/huly/errors.js"
 import { decodeResolvedPerson } from "../../../src/huly/operations/person-administration-boundaries.js"
-import { mergePeople, mergeResolvedPeople, personMergeImpact } from "../../../src/huly/operations/person-merge.js"
+import { mergePeople, personMergeImpact } from "../../../src/huly/operations/person-merge.js"
 import { WorkspaceClient } from "../../../src/huly/workspace-client.js"
 
 const resolvedPerson = (id: string, name: string, personUuid?: string) =>
@@ -61,10 +63,21 @@ const impacts = [
 
 const previewParams = Effect.runSync(parseMergePeopleParams({ source: { id: "source" }, survivor: { id: "survivor" } }))
 
+interface PersonFixtures {
+  readonly source: typeof source
+  readonly survivor: typeof survivor
+}
+
+const defaultPeople: PersonFixtures = { source, survivor }
+
+const fixtureResolver = (people: PersonFixtures) => (locator: PersonAdministrationLocator) =>
+  Effect.succeed("id" in locator && locator.id === people.source._id ? people.source : people.survivor)
+
 const run = <A, E>(
   effect: Effect.Effect<A, E, HulyClient | WorkspaceClient>,
   accountMergeable = true,
-  references = impacts
+  references = impacts,
+  people: PersonFixtures = defaultPeople
 ) =>
   Effect.gen(function* () {
     const migrations = yield* Ref.make(0)
@@ -73,6 +86,7 @@ const run = <A, E>(
       Effect.provide(
         Layer.merge(
           HulyClient.testLayer({
+            resolvePersonAdministrationTarget: fixtureResolver(people),
             inspectPersonReferences: () => Effect.succeed(references),
             migratePersonReferences: () => Ref.update(migrations, (count) => count + 1)
           }),
@@ -108,30 +122,60 @@ describe("person merge", () => {
     ])
   })
 
+  it("sorts structured reference tuples injectively without locale collation", () => {
+    const first = decodePersonMergeReferenceImpact({
+      ...reference("other", 1),
+      concreteClass: "test:class:a\u0000b",
+      field: "c"
+    })
+    const second = decodePersonMergeReferenceImpact({
+      ...reference("other", 1),
+      concreteClass: "test:class:a",
+      field: "b\u0000c"
+    })
+
+    expect(personMergeImpact([first, second]).references).toEqual(personMergeImpact([second, first]).references)
+    expect(personMergeImpact([first, first]).references).toEqual([first, first])
+  })
+
   it.effect("previews workspace-only people without mutating", () =>
     Effect.gen(function* () {
-      const outcome = yield* run(mergeResolvedPeople(previewParams, source, survivor))
+      const outcome = yield* run(mergePeople(previewParams))
       expect(outcome.result).toMatchObject({
         executed: false,
         accountAction: "not-needed",
         sourceRecordRetained: true,
         impact: { totalReferences: 21 }
       })
+      expect(outcome.result.unmigrated).toHaveLength(2)
       expect(outcome.result.preflightToken).toHaveLength(64)
+      expect(outcome.result.preflightToken).toMatch(/^[0-9a-f]{64}$/u)
       expect(outcome.migrations).toBe(0)
+    })
+  )
+
+  it.effect("rejects impossible result discriminator and account-action combinations", () =>
+    Effect.gen(function* () {
+      const preview = (yield* run(mergePeople(previewParams))).result
+      const decode = Schema.decodeUnknownOption(MergePeopleResultSchema)
+
+      expect(Option.isNone(decode({ ...preview, executed: true, accountAction: "ready" }))).toBe(true)
+      expect(
+        Option.isNone(decode({ ...preview, accountAction: "blocked", unmigrated: preview.unmigrated.slice(0, 2) }))
+      ).toBe(true)
     })
   )
 
   it.effect("executes only with the exact current preflight token", () =>
     Effect.gen(function* () {
-      const preview = (yield* run(mergeResolvedPeople(previewParams, source, survivor))).result
+      const preview = (yield* run(mergePeople(previewParams))).result
       const executeParams = yield* parseMergePeopleParams({
         source: { id: "source" },
         survivor: { id: "survivor" },
         execute: true,
         expectedPreflightToken: preview.preflightToken
       })
-      const outcome = yield* run(mergeResolvedPeople(executeParams, source, survivor))
+      const outcome = yield* run(mergePeople(executeParams))
       expect(outcome.result.executed).toBe(true)
       expect(outcome.migrations).toBe(1)
       expect(outcome.accountMerges).toBe(0)
@@ -140,7 +184,7 @@ describe("person merge", () => {
 
   it.effect("rejects equal-cardinality snapshot churn before migration", () =>
     Effect.gen(function* () {
-      const preview = (yield* run(mergeResolvedPeople(previewParams, source, survivor))).result
+      const preview = (yield* run(mergePeople(previewParams))).result
       const execute = yield* parseMergePeopleParams({
         source: { id: "source" },
         survivor: { id: "survivor" },
@@ -152,10 +196,11 @@ describe("person merge", () => {
       )
       const migrations = yield* Ref.make(0)
       const stale = yield* Effect.flip(
-        mergeResolvedPeople(execute, source, survivor).pipe(
+        mergePeople(execute).pipe(
           Effect.provide(
             Layer.merge(
               HulyClient.testLayer({
+                resolvePersonAdministrationTarget: fixtureResolver(defaultPeople),
                 inspectPersonReferences: () => Effect.succeed(changedReferences),
                 migratePersonReferences: () => Ref.update(migrations, (count) => count + 1)
               }),
@@ -171,7 +216,7 @@ describe("person merge", () => {
 
   it.effect("rejects self merges and stale tokens", () =>
     Effect.gen(function* () {
-      const selfError = yield* Effect.flip(run(mergeResolvedPeople(previewParams, source, source)))
+      const selfError = yield* Effect.flip(run(mergePeople(previewParams), true, impacts, { source, survivor: source }))
       expect(selfError).toBeInstanceOf(PersonMergeSelfError)
       expect(selfError.message).toContain("Choose two distinct people")
 
@@ -179,9 +224,9 @@ describe("person merge", () => {
         source: { id: "source" },
         survivor: { id: "survivor" },
         execute: true,
-        expectedPreflightToken: "stale"
+        expectedPreflightToken: "f".repeat(64)
       })
-      const staleError = yield* Effect.flip(run(mergeResolvedPeople(stale, source, survivor)))
+      const staleError = yield* Effect.flip(run(mergePeople(stale)))
       expect(staleError).toBeInstanceOf(PersonMergePreflightMismatchError)
       expect(staleError.message).toContain("changed since preflight")
     })
@@ -191,15 +236,17 @@ describe("person merge", () => {
     Effect.gen(function* () {
       const globalSource = resolvedPerson("source", "Source Person", "source-uuid")
       const globalSurvivor = resolvedPerson("survivor", "Survivor Person", "survivor-uuid")
-      const preview = (yield* run(mergeResolvedPeople(previewParams, globalSource, globalSurvivor), false)).result
+      const people = { source: globalSource, survivor: globalSurvivor }
+      const preview = (yield* run(mergePeople(previewParams), false, impacts, people)).result
       expect(preview.accountAction).toBe("blocked")
+      expect(preview.unmigrated).toHaveLength(3)
       const execute = yield* parseMergePeopleParams({
         source: { id: "source" },
         survivor: { id: "survivor" },
         execute: true,
         expectedPreflightToken: preview.preflightToken
       })
-      const error = yield* Effect.flip(run(mergeResolvedPeople(execute, globalSource, globalSurvivor), false))
+      const error = yield* Effect.flip(run(mergePeople(execute), false, impacts, people))
       expect(error).toBeInstanceOf(PersonMergeAccountBlockedError)
       expect(error.message).toContain("cannot safely merge")
     })
@@ -209,7 +256,8 @@ describe("person merge", () => {
     Effect.gen(function* () {
       const globalSource = resolvedPerson("source", "Source Person", "source-uuid")
       const globalSurvivor = resolvedPerson("survivor", "Survivor Person", "survivor-uuid")
-      const preview = (yield* run(mergeResolvedPeople(previewParams, globalSource, globalSurvivor))).result
+      const people = { source: globalSource, survivor: globalSurvivor }
+      const preview = (yield* run(mergePeople(previewParams), true, impacts, people)).result
       expect(preview.accountAction).toBe("ready")
       const execute: MergePeopleParams = yield* parseMergePeopleParams({
         source: { id: "source" },
@@ -217,7 +265,7 @@ describe("person merge", () => {
         execute: true,
         expectedPreflightToken: preview.preflightToken
       })
-      const outcome = yield* run(mergeResolvedPeople(execute, globalSource, globalSurvivor))
+      const outcome = yield* run(mergePeople(execute), true, impacts, people)
       expect(outcome.result.accountAction).toBe("merged")
       expect(outcome.migrations).toBe(1)
       expect(outcome.accountMerges).toBe(1)
@@ -228,7 +276,8 @@ describe("person merge", () => {
     Effect.gen(function* () {
       const globalSource = resolvedPerson("source", "Source Person", "shared-uuid")
       const globalSurvivor = resolvedPerson("survivor", "Survivor Person", "shared-uuid")
-      const preview = (yield* run(mergeResolvedPeople(previewParams, globalSource, globalSurvivor))).result
+      const people = { source: globalSource, survivor: globalSurvivor }
+      const preview = (yield* run(mergePeople(previewParams), true, impacts, people)).result
       expect(preview.accountAction).toBe("already-unified")
       const execute = yield* parseMergePeopleParams({
         source: { id: "source" },
@@ -236,7 +285,7 @@ describe("person merge", () => {
         execute: true,
         expectedPreflightToken: preview.preflightToken
       })
-      const outcome = yield* run(mergeResolvedPeople(execute, globalSource, globalSurvivor))
+      const outcome = yield* run(mergePeople(execute), true, impacts, people)
       expect(outcome.result.accountAction).toBe("already-unified")
       expect(outcome.migrations).toBe(1)
       expect(outcome.accountMerges).toBe(0)
@@ -246,8 +295,13 @@ describe("person merge", () => {
   it.effect("fails before mutation when a required native or account merge capability is unavailable", () =>
     Effect.gen(function* () {
       const missingNative = yield* Effect.flip(
-        mergeResolvedPeople(previewParams, source, survivor).pipe(
-          Effect.provide(Layer.merge(HulyClient.testLayer({}), WorkspaceClient.testLayer({})))
+        mergePeople(previewParams).pipe(
+          Effect.provide(
+            Layer.merge(
+              HulyClient.testLayer({ resolvePersonAdministrationTarget: fixtureResolver(defaultPeople) }),
+              WorkspaceClient.testLayer({})
+            )
+          )
         )
       )
       expect(missingNative).toBeInstanceOf(HulyDataInvalidError)
@@ -255,11 +309,13 @@ describe("person merge", () => {
 
       const globalSource = resolvedPerson("source", "Source Person", "source-uuid")
       const globalSurvivor = resolvedPerson("survivor", "Survivor Person", "survivor-uuid")
+      const globalPeople = { source: globalSource, survivor: globalSurvivor }
       const missingEligibility = yield* Effect.flip(
-        mergeResolvedPeople(previewParams, globalSource, globalSurvivor).pipe(
+        mergePeople(previewParams).pipe(
           Effect.provide(
             Layer.merge(
               HulyClient.testLayer({
+                resolvePersonAdministrationTarget: fixtureResolver(globalPeople),
                 inspectPersonReferences: () => Effect.succeed(impacts),
                 migratePersonReferences: () => Effect.void
               }),
@@ -271,7 +327,7 @@ describe("person merge", () => {
       expect(missingEligibility).toBeInstanceOf(HulyDataInvalidError)
       expect(missingEligibility).toMatchObject({ entity: "account client merge capability" })
 
-      const preview = (yield* run(mergeResolvedPeople(previewParams, globalSource, globalSurvivor))).result
+      const preview = (yield* run(mergePeople(previewParams), true, impacts, globalPeople)).result
       const execute = yield* parseMergePeopleParams({
         source: { id: "source" },
         survivor: { id: "survivor" },
@@ -280,10 +336,11 @@ describe("person merge", () => {
       })
       const migrations = yield* Ref.make(0)
       const missingMerge = yield* Effect.flip(
-        mergeResolvedPeople(execute, globalSource, globalSurvivor).pipe(
+        mergePeople(execute).pipe(
           Effect.provide(
             Layer.merge(
               HulyClient.testLayer({
+                resolvePersonAdministrationTarget: fixtureResolver(globalPeople),
                 inspectPersonReferences: () => Effect.succeed(impacts),
                 migratePersonReferences: () => Ref.update(migrations, (count) => count + 1)
               }),

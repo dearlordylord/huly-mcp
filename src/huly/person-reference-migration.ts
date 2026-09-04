@@ -2,7 +2,7 @@ import { createHash } from "node:crypto"
 
 import type { AnyAttribute, Class, Doc, DocumentQuery, Ref, TxOperations } from "@hcengineering/core"
 import { updateAttribute } from "@hcengineering/core"
-import { Effect, Option, Schema } from "effect"
+import { Effect, Schema } from "effect"
 
 import {
   type PersonMergeReferenceCategory,
@@ -10,65 +10,49 @@ import {
   type PersonMergeReferenceKind,
   PersonMergeSnapshotDigest
 } from "../domain/schemas/person-merge.js"
-import {
-  DocId,
-  NonEmptyString,
-  ObjectClassName,
-  type PersonId,
-  PositiveInteger,
-  SpaceId
-} from "../domain/schemas/shared.js"
+import { DocId, NonEmptyString, ObjectClassName, PersonId, PositiveInteger, SpaceId } from "../domain/schemas/shared.js"
 import {
   type HulyConnectionError,
-  HulyDataInvalidError,
+  type HulyDataInvalidError,
   PersonMergeSnapshotStaleError,
   makeOperationConnectionError
 } from "./errors.js"
 import { attachment, chunter, contact, core } from "./huly-plugins.js"
 import { toClassRef, toRef } from "./operations/sdk-boundary.js"
+import {
+  type ParsedReferenceAttribute,
+  type ReferenceAttribute,
+  type ReferenceDescriptor,
+  type ReferenceOperation,
+  invalidReferenceData,
+  parseReferenceAttribute,
+  parseReferenceAttributes,
+  referenceDescriptor
+} from "./person-reference-metadata.js"
 
-const ReferenceTypeSchema = Schema.Struct({
-  _class: ObjectClassName,
-  to: Schema.optionalKey(Schema.Unknown),
-  of: Schema.optionalKey(Schema.Unknown)
-})
-
-const PersonReferenceTargetSchema = Schema.Struct({ _class: ObjectClassName, to: ObjectClassName })
-
-const ReferenceAttributeSchema = Schema.Struct({
-  _id: DocId,
-  attributeOf: ObjectClassName,
-  name: NonEmptyString,
-  type: ReferenceTypeSchema
-})
-type ReferenceAttribute = Schema.Schema.Type<typeof ReferenceAttributeSchema>
-
-const ReferenceDocumentSchema = Schema.Struct({
+const ReferenceDocumentSchema = Schema.Struct({ _id: DocId, _class: ObjectClassName, space: SpaceId })
+const AttachedReferenceDocumentSchema = Schema.Struct({
   _id: DocId,
   _class: ObjectClassName,
   space: SpaceId,
-  attachedTo: Schema.optionalKey(NonEmptyString),
-  attachedToClass: Schema.optionalKey(ObjectClassName),
-  collection: Schema.optionalKey(NonEmptyString)
+  attachedTo: DocId,
+  attachedToClass: ObjectClassName,
+  collection: NonEmptyString
 })
-type ReferenceDocument = Schema.Schema.Type<typeof ReferenceDocumentSchema>
+const ReferenceDocumentRouteSchema = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("document"), document: ReferenceDocumentSchema }),
+  Schema.Struct({ kind: Schema.Literal("attached"), document: AttachedReferenceDocumentSchema })
+])
+type ReferenceDocumentRoute = Schema.Schema.Type<typeof ReferenceDocumentRouteSchema>
 
-interface ParsedAttribute {
-  // The raw SDK document is retained only for Huly's native updateAttribute API;
-  // ReferenceAttribute is the schema-owned shape used for every decision.
-  readonly raw: AnyAttribute
-  readonly parsed: ReferenceAttribute
-}
-
-type ReferenceOperation = "inspectPersonReferences" | "migratePersonReferences"
 const DOCUMENT_ID_BEFORE = -1
 type PreparedReferenceDocument =
-  | { readonly raw: Doc; readonly parsed: ReferenceDocument; readonly kind: "single"; readonly value: NonEmptyString }
+  | { readonly raw: Doc; readonly route: ReferenceDocumentRoute; readonly kind: "single"; readonly value: PersonId }
   | {
       readonly raw: Doc
-      readonly parsed: ReferenceDocument
+      readonly route: ReferenceDocumentRoute
       readonly kind: "array"
-      readonly value: ReadonlyArray<NonEmptyString>
+      readonly value: ReadonlyArray<PersonId>
     }
 
 interface ReferenceSnapshot {
@@ -76,48 +60,10 @@ interface ReferenceSnapshot {
   readonly digest: PersonMergeSnapshotDigest
 }
 
-const invalidData = (operation: string, entity: string, cause?: unknown): HulyDataInvalidError =>
-  new HulyDataInvalidError({ operation, entity, ...(cause === undefined ? {} : { cause }) })
-
 const sdkEffect = <A>(operation: ReferenceOperation, run: () => Promise<A>) =>
   Effect.tryPromise({ try: run, catch: (cause) => makeOperationConnectionError(operation, cause) })
 
-const decodeReferenceAttribute = Schema.decodeUnknownEffect(ReferenceAttributeSchema)
-
-const parseReferenceAttribute = (
-  input: unknown,
-  operation: ReferenceOperation,
-  entity: string
-): Effect.Effect<ReferenceAttribute, HulyDataInvalidError> =>
-  decodeReferenceAttribute(input).pipe(Effect.mapError((cause) => invalidData(operation, entity, cause)))
-
-const parseAttributes = (
-  attributes: ReadonlyArray<AnyAttribute>
-): Effect.Effect<ReadonlyArray<ParsedAttribute>, HulyDataInvalidError> =>
-  Effect.forEach(attributes, (raw) =>
-    parseReferenceAttribute(raw, "inspectPersonReferences", "model Attribute").pipe(
-      Effect.map((parsed) => ({ raw, parsed }))
-    )
-  )
-
-interface ReferenceDescriptor {
-  readonly kind: PersonMergeReferenceKind
-  readonly target: ObjectClassName
-}
-
-const decodeReferenceTarget = Schema.decodeUnknownOption(PersonReferenceTargetSchema)
-
-const referenceDescriptor = (attribute: ReferenceAttribute): ReferenceDescriptor | undefined => {
-  const candidate =
-    attribute.type._class === String(core.class.RefTo)
-      ? decodeReferenceTarget(attribute.type)
-      : attribute.type._class === String(core.class.ArrOf)
-        ? decodeReferenceTarget(attribute.type.of)
-        : Option.none()
-  return Option.isNone(candidate)
-    ? undefined
-    : { kind: attribute.type._class === String(core.class.RefTo) ? "single" : "array", target: candidate.value.to }
-}
+const decodePositiveInteger = Schema.decodeUnknownEffect(PositiveInteger)
 
 const targetsPerson = (client: TxOperations, target: ObjectClassName): boolean => {
   const hierarchy = client.getHierarchy()
@@ -162,35 +108,59 @@ const exactPersonReferenceQuery = (
   source: PersonId
 ): DocumentQuery<Doc> => ({ ...personReferenceQuery(field, source), _class: concreteClass })
 
-const parseReferenceDocument = (
+const decodeReferenceDocumentRoute = Schema.decodeUnknownEffect(ReferenceDocumentRouteSchema)
+
+const parseReferenceDocumentRoute = (
   input: unknown,
+  kind: ReferenceDocumentRoute["kind"],
   concreteClass: ObjectClassName,
   field: NonEmptyString,
   operation: ReferenceOperation
-): Effect.Effect<ReferenceDocument, HulyDataInvalidError> =>
-  Schema.decodeUnknownEffect(ReferenceDocumentSchema)(input).pipe(
-    Effect.mapError((cause) => invalidData(operation, `${concreteClass}.${field} document`, cause))
+): Effect.Effect<ReferenceDocumentRoute, HulyDataInvalidError> =>
+  decodeReferenceDocumentRoute({ kind, document: input }).pipe(
+    Effect.mapError((cause) => invalidReferenceData(operation, `${concreteClass}.${field} document`, cause))
   )
+
+const referenceDocumentRouteKind = (
+  client: TxOperations,
+  attribute: ReferenceAttribute,
+  concreteClass: ObjectClassName
+): ReferenceDocumentRoute["kind"] => {
+  const hierarchy = client.getHierarchy()
+  return !hierarchy.isMixin(toClassRef<Doc>(attribute.attributeOf)) &&
+    hierarchy.isDerived(toClassRef<Doc>(concreteClass), toClassRef<Doc>(String(core.class.AttachedDoc)))
+    ? "attached"
+    : "document"
+}
 
 const prepareReferenceDocument = Effect.fn("PersonReferenceMigration.prepareDocument")(function* (
   raw: Doc,
   kind: PersonMergeReferenceKind,
+  routeKind: ReferenceDocumentRoute["kind"],
   concreteClass: ObjectClassName,
   field: NonEmptyString,
+  source: PersonId,
   operation: ReferenceOperation
 ): Effect.fn.Return<PreparedReferenceDocument, HulyDataInvalidError> {
-  const parsed = yield* parseReferenceDocument(raw, concreteClass, field, operation)
+  const route = yield* parseReferenceDocumentRoute(raw, routeKind, concreteClass, field, operation)
+  if (route.document._class !== concreteClass) {
+    return yield* invalidReferenceData(operation, `${concreteClass}.${field} document class correlation`)
+  }
   const valueInput = Reflect.get(raw, field)
   if (kind === "single") {
-    const value = yield* Schema.decodeUnknownEffect(NonEmptyString)(valueInput).pipe(
-      Effect.mapError((cause) => invalidData(operation, `${concreteClass}.${field} reference value`, cause))
+    const value = yield* Schema.decodeUnknownEffect(PersonId)(valueInput).pipe(
+      Effect.mapError((cause) => invalidReferenceData(operation, `${concreteClass}.${field} reference value`, cause))
     )
-    return { raw, parsed, kind, value }
+    if (value !== source) return yield* invalidReferenceData(operation, `${concreteClass}.${field} source correlation`)
+    return { raw, route, kind, value }
   }
-  const value = yield* Schema.decodeUnknownEffect(Schema.Array(NonEmptyString))(valueInput).pipe(
-    Effect.mapError((cause) => invalidData(operation, `${concreteClass}.${field} reference value`, cause))
+  const value = yield* Schema.decodeUnknownEffect(Schema.Array(PersonId))(valueInput).pipe(
+    Effect.mapError((cause) => invalidReferenceData(operation, `${concreteClass}.${field} reference value`, cause))
   )
-  return { raw, parsed, kind, value }
+  if (!value.includes(source)) {
+    return yield* invalidReferenceData(operation, `${concreteClass}.${field} source correlation`)
+  }
+  return { raw, route, kind, value }
 })
 
 const snapshotDigest = (
@@ -198,10 +168,10 @@ const snapshotDigest = (
   documents: ReadonlyArray<PreparedReferenceDocument>
 ): PersonMergeSnapshotDigest => {
   const entries = documents
-    .map(({ parsed, value }) => ({ document: parsed, value }))
+    .map(({ route, value }) => ({ route, value }))
     // Duplicates are rejected before hashing, so a locale-independent binary
     // comparison is sufficient and stable across Node/ICU installations.
-    .sort((left, right) => (left.document._id < right.document._id ? DOCUMENT_ID_BEFORE : 1))
+    .sort((left, right) => (left.route.document._id < right.route.document._id ? DOCUMENT_ID_BEFORE : 1))
   return PersonMergeSnapshotDigest.make(
     createHash("sha256")
       .update(JSON.stringify({ metadata, documents: entries }))
@@ -213,15 +183,17 @@ const prepareReferenceSnapshot = Effect.fn("PersonReferenceMigration.prepareSnap
   rawDocuments: ReadonlyArray<Doc>,
   metadata: Readonly<Record<string, unknown>>,
   kind: PersonMergeReferenceKind,
+  routeKind: ReferenceDocumentRoute["kind"],
   concreteClass: ObjectClassName,
   field: NonEmptyString,
+  source: PersonId,
   operation: ReferenceOperation
 ): Effect.fn.Return<ReferenceSnapshot, HulyDataInvalidError> {
   const documents = yield* Effect.forEach(rawDocuments, (raw) =>
-    prepareReferenceDocument(raw, kind, concreteClass, field, operation)
+    prepareReferenceDocument(raw, kind, routeKind, concreteClass, field, source, operation)
   )
-  if (new Set(documents.map(({ parsed }) => parsed._id)).size !== documents.length) {
-    return yield* invalidData(operation, `${concreteClass}.${field} duplicate document`)
+  if (new Set(documents.map(({ route }) => route.document._id)).size !== documents.length) {
+    return yield* invalidReferenceData(operation, `${concreteClass}.${field} duplicate document`)
   }
   return { documents, digest: snapshotDigest(metadata, documents) }
 })
@@ -245,8 +217,9 @@ const fetchReferenceSnapshot = Effect.fn("PersonReferenceMigration.fetchSnapshot
   concreteClass: ObjectClassName,
   field: NonEmptyString,
   kind: PersonMergeReferenceKind,
+  routeKind: ReferenceDocumentRoute["kind"],
   source: PersonId,
-  count: number,
+  count: PositiveInteger,
   operation: ReferenceOperation
 ): Effect.fn.Return<ReferenceSnapshot, HulyConnectionError | HulyDataInvalidError> {
   const classRef = toClassRef<Doc>(concreteClass)
@@ -254,18 +227,28 @@ const fetchReferenceSnapshot = Effect.fn("PersonReferenceMigration.fetchSnapshot
     client.findAll(classRef, exactPersonReferenceQuery(classRef, field, source), { limit: count, total: true })
   )
   if (rawDocuments.total !== count || rawDocuments.length !== count) {
-    return yield* invalidData(operation, `${concreteClass}.${field} cardinality changed during snapshot`)
+    return yield* invalidReferenceData(operation, `${concreteClass}.${field} cardinality changed during snapshot`)
   }
-  return yield* prepareReferenceSnapshot(rawDocuments, metadata, kind, concreteClass, field, operation)
+  return yield* prepareReferenceSnapshot(
+    rawDocuments,
+    metadata,
+    kind,
+    routeKind,
+    concreteClass,
+    field,
+    source,
+    operation
+  )
 })
 
 const inspectAttribute = Effect.fn("PersonReferenceMigration.inspectAttribute")(function* (
   client: TxOperations,
-  attribute: ParsedAttribute,
+  attribute: ParsedReferenceAttribute,
   source: PersonId
 ): Effect.fn.Return<ReadonlyArray<PersonMergeReferenceImpact>, HulyConnectionError | HulyDataInvalidError> {
-  const descriptor = referenceDescriptor(attribute.parsed)
-  if (attribute.parsed.name === "_id" || descriptor === undefined || !targetsPerson(client, descriptor.target)) {
+  if (attribute.parsed.name === "_id") return []
+  const descriptor = yield* referenceDescriptor(attribute.parsed, "inspectPersonReferences")
+  if (descriptor === undefined || !targetsPerson(client, descriptor.target)) {
     return []
   }
 
@@ -278,19 +261,29 @@ const inspectAttribute = Effect.fn("PersonReferenceMigration.inspectAttribute")(
         })
       )
       if (documents.total < 0) {
-        return yield* invalidData("inspectPersonReferences", `${String(concreteClass)}.${attribute.parsed.name} total`)
+        return yield* invalidReferenceData(
+          "inspectPersonReferences",
+          `${String(concreteClass)}.${attribute.parsed.name} total`
+        )
       }
       if (documents.total === 0) return undefined
       const concreteClassName = ObjectClassName.make(String(concreteClass))
+      const count = yield* decodePositiveInteger(documents.total).pipe(
+        Effect.mapError((cause) =>
+          invalidReferenceData("inspectPersonReferences", `${concreteClassName}.${attribute.parsed.name} total`, cause)
+        )
+      )
       const metadata = referenceMetadata(attribute.parsed, concreteClassName, descriptor)
+      const routeKind = referenceDocumentRouteKind(client, attribute.parsed, concreteClassName)
       const snapshot = yield* fetchReferenceSnapshot(
         client,
         metadata,
         concreteClassName,
         attribute.parsed.name,
         descriptor.kind,
+        routeKind,
         source,
-        documents.total,
+        count,
         "inspectPersonReferences"
       )
       const impact: PersonMergeReferenceImpact = {
@@ -301,7 +294,7 @@ const inspectAttribute = Effect.fn("PersonReferenceMigration.inspectAttribute")(
         field: attribute.parsed.name,
         kind: descriptor.kind,
         category: referenceCategory(client, concreteClass),
-        count: PositiveInteger.make(documents.total),
+        count,
         snapshotDigest: snapshot.digest
       }
       return impact
@@ -315,7 +308,7 @@ export const inspectNativePersonReferences = Effect.fn("PersonReferenceMigration
   source: PersonId
 ): Effect.fn.Return<ReadonlyArray<PersonMergeReferenceImpact>, HulyConnectionError | HulyDataInvalidError> {
   const attributes = client.getModel().findAllSync<AnyAttribute>(core.class.Attribute, {})
-  const parsed = yield* parseAttributes(attributes)
+  const parsed = yield* parseReferenceAttributes(attributes)
   const impacts = (yield* Effect.forEach(parsed, (attribute) => inspectAttribute(client, attribute, source))).flat()
   const hierarchy = client.getHierarchy()
   const exactOwnerSpecificity = 2
@@ -327,7 +320,7 @@ export const inspectNativePersonReferences = Effect.fn("PersonReferenceMigration
         : 0
   const deduplicated = new Map<string, PersonMergeReferenceImpact>()
   for (const impact of impacts) {
-    const key = `${impact.concreteClass}\u0000${impact.field}\u0000${impact.kind}`
+    const key = JSON.stringify([impact.concreteClass, impact.field, impact.kind])
     const current = deduplicated.get(key)
     if (current === undefined || specificity(impact) > specificity(current)) deduplicated.set(key, impact)
   }
@@ -335,43 +328,53 @@ export const inspectNativePersonReferences = Effect.fn("PersonReferenceMigration
 })
 
 const replacementArray = (
-  values: ReadonlyArray<NonEmptyString>,
+  values: ReadonlyArray<PersonId>,
   source: PersonId,
   survivor: PersonId
-): ReadonlyArray<string> => [...new Set(values.map((value) => (value === source ? survivor : value)))]
+): ReadonlyArray<PersonId> => [...new Set(values.map((value) => (value === source ? survivor : value)))]
 
-interface PreparedReferenceMigration {
-  readonly impact: PersonMergeReferenceImpact
+interface PreparedReferenceWrite {
+  readonly operation: ReferenceOperation
+  readonly source: PersonId
+  readonly survivor: PersonId
+  readonly descriptorCount: PositiveInteger
+  readonly concreteClass: ObjectClassName
+  readonly field: NonEmptyString
   readonly attribute: AnyAttribute
-  readonly documents: ReadonlyArray<PreparedReferenceDocument>
+  readonly document: Doc
+  readonly route: ReferenceDocumentRoute
+  readonly replacement: PersonId | ReadonlyArray<PersonId>
 }
 
 const loadImpactDocuments = Effect.fn("PersonReferenceMigration.loadImpactDocuments")(function* (
   client: TxOperations,
   attributes: ReadonlyMap<string, AnyAttribute>,
   impact: PersonMergeReferenceImpact,
-  source: PersonId
+  source: PersonId,
+  survivor: PersonId
 ): Effect.fn.Return<
-  PreparedReferenceMigration,
+  ReadonlyArray<PreparedReferenceWrite>,
   HulyConnectionError | HulyDataInvalidError | PersonMergeSnapshotStaleError
 > {
   const rawAttribute = attributes.get(impact.attributeId)
   if (rawAttribute === undefined) {
-    return yield* invalidData("migratePersonReferences", `Attribute '${impact.attributeId}'`)
+    return yield* invalidReferenceData("migratePersonReferences", `Attribute '${impact.attributeId}'`)
   }
   const parsedAttribute = yield* parseReferenceAttribute(
     rawAttribute,
     "migratePersonReferences",
     `Attribute '${impact.attributeId}'`
   )
-  const descriptor = referenceDescriptor(parsedAttribute)
+  const descriptor = yield* referenceDescriptor(parsedAttribute, "migratePersonReferences")
   const metadata = referenceMetadata(parsedAttribute, impact.concreteClass, descriptor)
+  const routeKind = referenceDocumentRouteKind(client, parsedAttribute, impact.concreteClass)
   const snapshot = yield* fetchReferenceSnapshot(
     client,
     metadata,
     impact.concreteClass,
     impact.field,
     impact.kind,
+    routeKind,
     source,
     impact.count,
     "migratePersonReferences"
@@ -384,29 +387,33 @@ const loadImpactDocuments = Effect.fn("PersonReferenceMigration.loadImpactDocume
       actual: snapshot.digest
     })
   }
-  return { impact, attribute: rawAttribute, documents: snapshot.documents }
+  return snapshot.documents.map((document) => ({
+    operation: "migratePersonReferences",
+    source,
+    survivor,
+    descriptorCount: impact.count,
+    concreteClass: impact.concreteClass,
+    field: impact.field,
+    attribute: rawAttribute,
+    document: document.raw,
+    route: document.route,
+    replacement: document.kind === "single" ? survivor : replacementArray(document.value, source, survivor)
+  }))
 })
 
-const applyPreparedMigration = Effect.fn("PersonReferenceMigration.applyPrepared")(function* (
+const applyPreparedWrite = Effect.fn("PersonReferenceMigration.applyPreparedWrite")(function* (
   client: TxOperations,
-  prepared: PreparedReferenceMigration,
-  source: PersonId,
-  survivor: PersonId
+  prepared: PreparedReferenceWrite
 ): Effect.fn.Return<void, HulyConnectionError | HulyDataInvalidError> {
-  const concreteClass = toClassRef<Doc>(prepared.impact.concreteClass)
-  for (const document of prepared.documents) {
-    const replacement =
-      document.kind === "single" ? toRef<Doc>(survivor) : replacementArray(document.value, source, survivor)
-    yield* sdkEffect("migratePersonReferences", () =>
-      updateAttribute(
-        client,
-        document.raw,
-        concreteClass,
-        { key: prepared.impact.field, attr: prepared.attribute },
-        replacement
-      )
+  yield* sdkEffect(prepared.operation, () =>
+    updateAttribute(
+      client,
+      prepared.document,
+      toClassRef<Doc>(prepared.concreteClass),
+      { key: prepared.field, attr: prepared.attribute },
+      prepared.replacement
     )
-  }
+  )
 })
 
 export const migrateNativePersonReferences = Effect.fn("PersonReferenceMigration.migrate")(function* (
@@ -420,11 +427,10 @@ export const migrateNativePersonReferences = Effect.fn("PersonReferenceMigration
   // Resolve and parse the entire preflight snapshot before the first write. This
   // avoids relying on read-your-writes and prevents known cardinality drift from
   // producing a partial merge.
-  const prepared = yield* Effect.forEach(impacts, (impact) => loadImpactDocuments(client, attributes, impact, source), {
-    concurrency: 1
-  })
-  yield* Effect.forEach(prepared, (migration) => applyPreparedMigration(client, migration, source, survivor), {
-    concurrency: 1,
-    discard: true
-  })
+  const prepared = (yield* Effect.forEach(
+    impacts,
+    (impact) => loadImpactDocuments(client, attributes, impact, source, survivor),
+    { concurrency: 1 }
+  )).flat()
+  yield* Effect.forEach(prepared, (write) => applyPreparedWrite(client, write), { concurrency: 1, discard: true })
 })

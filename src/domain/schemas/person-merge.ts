@@ -11,6 +11,7 @@ import {
   PersonName,
   PersonUuid,
   PositiveInteger,
+  Sha256Hex,
   SpaceId
 } from "./shared.js"
 
@@ -27,8 +28,7 @@ export const PersonMergeReferenceCategorySchema = Schema.Literals([
 ])
 export type PersonMergeReferenceCategory = Schema.Schema.Type<typeof PersonMergeReferenceCategorySchema>
 
-export const PersonMergeSnapshotDigest = Schema.String.pipe(
-  Schema.check(Schema.isPattern(/^[0-9a-f]{64}$/u)),
+export const PersonMergeSnapshotDigest = Sha256Hex.pipe(
   Schema.brand("PersonMergeSnapshotDigest"),
   Schema.annotate({
     identifier: "PersonMergeSnapshotDigest",
@@ -71,7 +71,7 @@ export const PersonMergeRecordSchema = Schema.Struct({
 })
 export type PersonMergeRecord = Schema.Schema.Type<typeof PersonMergeRecordSchema>
 
-export const PersonMergePreflightToken = NonEmptyString.pipe(
+export const PersonMergePreflightToken = Sha256Hex.pipe(
   Schema.brand("PersonMergePreflightToken"),
   Schema.annotate({
     identifier: "PersonMergePreflightToken",
@@ -104,26 +104,64 @@ export const MergePeopleParamsSchema = Schema.Union([
 })
 export type MergePeopleParams = Schema.Schema.Type<typeof MergePeopleParamsSchema>
 
-export const PersonMergeAccountActionSchema = Schema.Literals([
+export const PersonMergePreflightAccountActionSchema = Schema.Literals([
   "not-needed",
   "already-unified",
   "ready",
-  "merged",
   "blocked"
 ])
+export type PersonMergePreflightAccountAction = Schema.Schema.Type<typeof PersonMergePreflightAccountActionSchema>
 
-const PersonMergeUnmigratedSchema = Schema.Struct({ subject: NonEmptyString, reason: NonEmptyString })
+export const PersonMergeFinalAccountActionSchema = Schema.Literals(["not-needed", "already-unified", "merged"])
+export type PersonMergeFinalAccountAction = Schema.Schema.Type<typeof PersonMergeFinalAccountActionSchema>
 
-export const MergePeopleResultSchema = Schema.Struct({
+export const PersonMergeUnmigratedSchema = Schema.Struct({ subject: NonEmptyString, reason: NonEmptyString })
+export type PersonMergeUnmigrated = Schema.Schema.Type<typeof PersonMergeUnmigratedSchema>
+
+export const PersonMergeBaseUnmigratedSchema = Schema.Tuple([PersonMergeUnmigratedSchema, PersonMergeUnmigratedSchema])
+export type PersonMergeBaseUnmigrated = Schema.Schema.Type<typeof PersonMergeBaseUnmigratedSchema>
+
+export const PersonMergeBlockedUnmigratedSchema = Schema.Tuple([
+  PersonMergeUnmigratedSchema,
+  PersonMergeUnmigratedSchema,
+  PersonMergeUnmigratedSchema
+])
+export type PersonMergeBlockedUnmigrated = Schema.Schema.Type<typeof PersonMergeBlockedUnmigratedSchema>
+
+const MergePeopleResultCommon = {
   source: PersonMergeRecordSchema,
   survivor: PersonMergeRecordSchema,
   impact: PersonMergeImpactSchema,
   preflightToken: PersonMergePreflightToken,
-  executed: Schema.Boolean,
-  sourceRecordRetained: Schema.Literal(true),
-  accountAction: PersonMergeAccountActionSchema,
-  unmigrated: Schema.Array(PersonMergeUnmigratedSchema)
+  sourceRecordRetained: Schema.Literal(true)
+}
+
+const MergePeoplePreviewResultSchema = Schema.Struct({
+  ...MergePeopleResultCommon,
+  executed: Schema.Literal(false),
+  accountAction: Schema.Literals(["not-needed", "already-unified", "ready"]),
+  unmigrated: PersonMergeBaseUnmigratedSchema
 })
+
+const MergePeopleBlockedPreviewResultSchema = Schema.Struct({
+  ...MergePeopleResultCommon,
+  executed: Schema.Literal(false),
+  accountAction: Schema.Literal("blocked"),
+  unmigrated: PersonMergeBlockedUnmigratedSchema
+})
+
+const MergePeopleExecutedResultSchema = Schema.Struct({
+  ...MergePeopleResultCommon,
+  executed: Schema.Literal(true),
+  accountAction: PersonMergeFinalAccountActionSchema,
+  unmigrated: PersonMergeBaseUnmigratedSchema
+})
+
+export const MergePeopleResultSchema = Schema.Union([
+  MergePeoplePreviewResultSchema,
+  MergePeopleBlockedPreviewResultSchema,
+  MergePeopleExecutedResultSchema
+])
 export type MergePeopleResult = Schema.Schema.Type<typeof MergePeopleResultSchema>
 
 export const mergePeopleParamsJsonSchema = withJsonSchemaPropertyDescriptions(

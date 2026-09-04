@@ -54,6 +54,16 @@ export type HulyTransactionScope = Schema.Schema.Type<typeof HulyTransactionScop
 export const HulyConditionalWriteResult = Schema.Literals(["applied", "condition-not-met"])
 export type HulyConditionalWriteResult = Schema.Schema.Type<typeof HulyConditionalWriteResult>
 
+export const Sha256Hex = Schema.String.pipe(
+  Schema.check(Schema.isPattern(/^[0-9a-f]{64}$/u)),
+  Schema.brand("Sha256Hex")
+).annotate({
+  identifier: "Sha256Hex",
+  title: "Sha256Hex",
+  description: "Lowercase 64-character hexadecimal SHA-256 digest."
+})
+export type Sha256Hex = Schema.Schema.Type<typeof Sha256Hex>
+
 export const Timestamp = NonNegativeInteger.pipe(Schema.brand("Timestamp")).annotate({
   identifier: "Timestamp",
   title: "Timestamp",

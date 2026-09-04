@@ -12,7 +12,7 @@ describe("person merge schemas", () => {
         source: { name: "Source" },
         survivor: { id: "survivor" },
         execute: true,
-        expectedPreflightToken: "snapshot"
+        expectedPreflightToken: "a".repeat(64)
       })
       expect(preview.execute).toBeUndefined()
       expect(execution.execute).toBe(true)
@@ -27,8 +27,17 @@ describe("person merge schemas", () => {
       const ambiguousLocator = yield* Effect.result(
         parseMergePeopleParams({ source: { id: "source", name: "Source" }, survivor: { id: "survivor" } })
       )
+      const malformedToken = yield* Effect.result(
+        parseMergePeopleParams({
+          source: { id: "source" },
+          survivor: { id: "survivor" },
+          execute: true,
+          expectedPreflightToken: "not-a-sha256"
+        })
+      )
       expect(missingToken._tag).toBe("Failure")
       expect(ambiguousLocator._tag).toBe("Failure")
+      expect(malformedToken._tag).toBe("Failure")
     })
   )
 })

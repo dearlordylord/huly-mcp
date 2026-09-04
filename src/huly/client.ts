@@ -41,6 +41,7 @@ import {
 import { absurd, Context, Effect, Layer, Redacted, Schedule } from "effect"
 
 import { type Auth, HulyConfigService } from "../config/config.js"
+import type { PersonAdministrationLocator } from "../domain/schemas/person-administration.js"
 import type { PersonMergeReferenceImpact } from "../domain/schemas/person-merge.js"
 import {
   type HulyConditionalWriteResult,
@@ -67,6 +68,11 @@ import {
   testMarkupUrlConfig,
   transformMarkupNodeNativeReferenceLinks
 } from "./operations/markup.js"
+import type { ResolvedPerson } from "./operations/person-administration-boundaries.js"
+import {
+  resolvePersonAdministrationTarget,
+  type ResolvePersonAdministrationError
+} from "./operations/person-administration-shared.js"
 import { HulySdk, type HulySdkDependencies } from "./sdk-deps.js"
 import { acquireClosableClient } from "./scoped-client.js"
 import { classifyHulyUnavailableFailure, normalizeHulyOrigin } from "./unavailable-diagnostics.js"
@@ -345,6 +351,10 @@ export interface HulyClientOperations extends HulyClientContext {
 
   readonly searchFulltext: (query: SearchQuery, options: SearchOptions) => Effect.Effect<SearchResult, HulyClientError>
 
+  readonly resolvePersonAdministrationTarget?: (
+    locator: PersonAdministrationLocator
+  ) => Effect.Effect<ResolvedPerson, ResolvePersonAdministrationError>
+
   readonly inspectPersonReferences?: (
     source: DomainPersonId
   ) => Effect.Effect<ReadonlyArray<PersonMergeReferenceImpact>, HulyClientError | HulyDataInvalidError>
@@ -553,6 +563,8 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
           searchFulltext: (query, options) =>
             withClient((client) => client.searchFulltext(query, options), "searchFulltext"),
 
+          resolvePersonAdministrationTarget: (locator) => resolvePersonAdministrationTarget(operations, locator),
+
           inspectPersonReferences: (source) => inspectNativePersonReferences(client, source),
 
           migratePersonReferences: (impacts, source, survivor) =>
@@ -605,7 +617,8 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
       createMixin: notImplemented("createMixin"),
       updateMixin: notImplemented("updateMixin"),
       updateMarkup: notImplemented("updateMarkup"),
-      searchFulltext: notImplemented("searchFulltext")
+      searchFulltext: notImplemented("searchFulltext"),
+      resolvePersonAdministrationTarget: (locator) => resolvePersonAdministrationTarget(defaultOps, locator)
     }
 
     return Layer.succeed(HulyClient, { ...defaultOps, ...mockOperations })

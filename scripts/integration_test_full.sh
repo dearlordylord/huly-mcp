@@ -5115,7 +5115,7 @@ if [ $? -eq 0 ]; then
 	        assert_json_field_equals "person merge preflight binds canonical snapshot digests" "$PERSON_MERGE_PREVIEW_TEXT" ".impact.references | length > 0 and all(.snapshotDigest | test(\"^[0-9a-f]{64}$\"))" "true"
 	        PERSON_MERGE_TOKEN=$(printf '%s\n' "$PERSON_MERGE_PREVIEW_TEXT" | jq -r '.preflightToken' 2>/dev/null)
 	        run_expect_error_contains "merge_people(stale preflight rejected)" \
-	          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"merge_people\",\"arguments\":{\"source\":{\"id\":\"$PERSON_ID\"},\"survivor\":{\"id\":\"$PERSON_MERGE_SURVIVOR_ID\"},\"execute\":true,\"expectedPreflightToken\":\"stale\"}},\"id\":2}" \
+	          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"merge_people\",\"arguments\":{\"source\":{\"id\":\"$PERSON_ID\"},\"survivor\":{\"id\":\"$PERSON_MERGE_SURVIVOR_ID\"},\"execute\":true,\"expectedPreflightToken\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\"}},\"id\":2}" \
 	          "changed since preflight"
 	        run_capture_to_var_fresh PERSON_MERGE_EXECUTE_TEXT "merge_people(execute)" \
 	          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"merge_people\",\"arguments\":{\"source\":{\"id\":\"$PERSON_ID\"},\"survivor\":{\"id\":\"$PERSON_MERGE_SURVIVOR_ID\"},\"execute\":true,\"expectedPreflightToken\":\"$PERSON_MERGE_TOKEN\"}},\"id\":2}"
