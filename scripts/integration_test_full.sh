@@ -1402,9 +1402,12 @@ extract_employee_lifecycle_person_id() {
 }
 
 capture_paginated_hr_reports() {
-  local output_var="$1" name="$2" department="$3" start_date="$4" end_date="$5" output
-  if ! output=$(timeout 90 pnpm exec tsx scripts/integration-hr-report-pagination-fixture.ts \
-    "$department" "$start_date" "$end_date" 2>/dev/null); then
+  local output_var="$1" name="$2" department="$3" start_date="$4" end_date="$5" output adapter_status
+  output=$(timeout 90 node scripts/run-bundled.mjs scripts/integration-hr-report-pagination-fixture.ts \
+    "$department" "$start_date" "$end_date" 2>/dev/null)
+  adapter_status=$?
+  if [ "$adapter_status" -ne 0 ]; then
+    echo "DIAGNOSTIC: page-size-one report adapter exited with status $adapter_status; output suppressed" >&2
     printf -v "$output_var" '%s' ""
     fail_test "$name" "internal page-size-one report adapter failed"
     return 1

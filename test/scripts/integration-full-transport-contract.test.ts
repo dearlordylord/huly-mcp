@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest"
 
 const script = readFileSync("scripts/integration_test_full.sh", "utf8")
 const hrPaginationAdapter = readFileSync("scripts/integration-hr-report-pagination-fixture.ts", "utf8")
+const cleanShellEnv = { ...process.env, LC_ALL: "C" }
 
 const functionBody = (name: string): string => {
   const match = script.match(new RegExp(`\\n${name}\\(\\) \\{([\\s\\S]*?)\\n\\}`))
@@ -90,7 +91,7 @@ INTEGRATION_SURFACE=mcp
 INTEGRATION_TRANSPORT=http
 call_list_projects_with_http_retry`
       ],
-      { encoding: "utf8" }
+      { encoding: "utf8", env: cleanShellEnv }
     )
     expect(execution).toMatchObject({
       status: 0,
@@ -108,7 +109,7 @@ INTEGRATION_SURFACE=mcp
 INTEGRATION_TRANSPORT=http
 call_list_projects_with_http_retry '{"params":{"name":"delete_project"}}'`
       ],
-      { encoding: "utf8" }
+      { encoding: "utf8", env: cleanShellEnv }
     )
     expect(rejected).toMatchObject({
       status: 2,
@@ -193,7 +194,6 @@ call_list_projects_with_http_retry '{"params":{"name":"delete_project"}}'`
     )
     expect(script).toContain('fail_test "invite_employee(create-or-promote cleanup identity)"')
     const command = `${shellFunction("extract_employee_lifecycle_person_id")}\nextract_employee_lifecycle_person_id "$1"`
-    const cleanShellEnv = { ...process.env, LC_ALL: "C" }
     const structured = spawnSync("bash", ["-c", command, "lifecycle-id", '{"personId":"person-success"}'], {
       encoding: "utf8",
       env: cleanShellEnv
@@ -265,7 +265,7 @@ call_list_projects_with_http_retry '{"params":{"name":"delete_project"}}'`
         members,
         "self@example.test"
       ],
-      { encoding: "utf8" }
+      { encoding: "utf8", env: cleanShellEnv }
     )
     expect(JSON.parse(output)).toEqual(["member@example.test"])
     expect(script).toContain(
@@ -363,7 +363,33 @@ call_list_projects_with_http_retry '{"params":{"name":"delete_project"}}'`
   })
 
   it("keeps page-size-one live HR report composition behind the internal adapter", () => {
-    expect(script).toContain("scripts/integration-hr-report-pagination-fixture.ts")
+    const capture = functionBody("capture_paginated_hr_reports")
+    expect(capture).toContain("node scripts/run-bundled.mjs scripts/integration-hr-report-pagination-fixture.ts")
+    expect(capture).not.toContain("pnpm exec tsx scripts/integration-hr-report-pagination-fixture.ts")
+    const failure = spawnSync(
+      "bash",
+      [
+        "-c",
+        `${shellFunction("capture_paginated_hr_reports")}
+timeout() { shift; "$@"; }
+node() {
+  printf 'stdout-secret-marker-%010000d' 0
+  printf 'stderr-secret-marker-%010000d' 0 >&2
+  return 23
+}
+fail_test() { printf 'FAIL: %s (%s)\\n' "$1" "$2"; }
+PASSED=0
+FAILED=0
+ERRORS=''
+capture_paginated_hr_reports result 'forced pagination' department 2026-09-04 2026-09-07`
+      ],
+      { encoding: "utf8", env: cleanShellEnv }
+    )
+    expect(failure.status).toBe(1)
+    expect(failure.stdout).toBe("FAIL: forced pagination (internal page-size-one report adapter failed)\n")
+    expect(failure.stderr).toBe("DIAGNOSTIC: page-size-one report adapter exited with status 23; output suppressed\n")
+    expect(failure.stderr).not.toContain("stdout-secret-marker")
+    expect(failure.stderr).not.toContain("stderr-secret-marker")
     expect(script).not.toContain("scanPageSize")
     expect(hrPaginationAdapter).toContain("Schema.decodeUnknownEffect(HrPageSize)(1)")
     expect(hrPaginationAdapter).toContain("getHrSchedule(params, pageSize)")
