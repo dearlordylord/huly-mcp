@@ -161,12 +161,19 @@
       "package": "@hcengineering/calendar",
       "status": "gap",
       "matrixLocation": "Calendar schedules and integrations",
-      "rationale": "Calendar configuration, primary-calendar preferences, external calendars, presenter metadata, and invite/RSVP response state are tracked as remaining gaps. Current 0.7.0 calendar declarations expose no RSVP response model.",
+      "rationale": "Issue #266 tracks caller-scoped Calendar settings and PrimaryCalendar preference operations. ExternalCalendar provider identifiers, defaults, synchronized names/access, and lifecycle are provider-owned; only local hidden/visibility settings are in scope. Current 0.7.0 calendar declarations expose no RSVP response model.",
       "exports": [
         "Calendar",
-        "CalendarEventPresenter",
         "ExternalCalendar",
         "PrimaryCalendar"
+      ]
+    },
+    {
+      "package": "@hcengineering/calendar",
+      "status": "not-mcp-facing",
+      "rationale": "CalendarEventPresenter is UI presentation metadata rather than a first-class LLM-facing resource.",
+      "exports": [
+        "CalendarEventPresenter"
       ]
     },
     {
@@ -188,7 +195,7 @@
       "package": "@hcengineering/love",
       "status": "gap",
       "matrixLocation": "Virtual office / meetings",
-      "rationale": "Live meeting join/leave/start/stop writes, meeting schedule room writes, transcripts/recordings as first-class artifacts, and room/floor/office CRUD are deferred until transient session/LiveKit behavior and storage-backed recording/transcript models are implemented in a safe integration slice.",
+      "rationale": "Issues #267 and #268 track bounded durable Floor/Room administration and room-aware Meeting/MeetingSchedule composition. Raw transient state, join/leave, LiveKit device/session behavior, transcription, and recording remain excluded or blocked on published provider contracts and deterministic cleanup.",
       "exports": [
         "Meeting"
       ]
@@ -631,19 +638,11 @@
     },
     {
       "package": "@hcengineering/time",
-      "status": "gap",
-      "matrixLocation": "Planner / ToDos",
-      "rationale": "Document-attached action items, automation helper visibility, and richer team planner/reporting remain matrix gaps.",
-      "exports": [
-        "TodoAutomationHelper"
-      ]
-    },
-    {
-      "package": "@hcengineering/time",
       "status": "not-mcp-facing",
-      "rationale": "Presenter and priority type support objects are not first-class MCP resources by themselves.",
+      "rationale": "TodoAutomationHelper contains executable server Resource metadata used internally for issue-status automation. It has no human-readable diagnostics or user workflow and must not be exposed. Presenter and priority type support objects are also not first-class MCP resources by themselves.",
       "exports": [
         "ItemPresenter",
+        "TodoAutomationHelper",
         "TypeToDoPriority"
       ]
     },
