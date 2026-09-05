@@ -19,7 +19,6 @@ The backlog is driven by SDK parity and the project principle that this server s
 - Products and product versions: product spaces, members, descriptions, attachments, versions, version state transitions, and change-control links.
 - Trainings, questions, and assessments: training revisions, releases, requests, due dates, max attempts, question banks, answer options, correct-answer data, submissions, scoring, and reporting.
 - Drive: first slice covers listing/getting drives, path traversal/list/get items, idempotent folder creation, uploads with parent creation, version listing, and restoring existing versions. Remaining gaps are drive create/update/delete, item move/rename/delete, adding new versions to existing files, comments/activity, and permissions/members.
-- HR: departments, nested departments, staff mixins, managers, subscribers, team leads, request types, PTO/sick/overtime/remote requests, public holidays, and schedule/table reports.
 - Recruiting: vacancies, talents/candidates, applications, matches, reviews, verdicts/opinions, vacancy-company lists, skills, and recruiting-specific custom fields/relations.
 - Surveys and polls: survey CRUD, poll creation/attachment, survey question data, completion status, and results.
 - Generic approval requests: create/list/approve/reject/cancel approval requests, decision comments, required approval counts, request status, and requested/approved/rejected people.

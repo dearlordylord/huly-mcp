@@ -16,6 +16,7 @@
         "core",
         "document",
         "drive",
+        "hr",
         "inventory",
         "notification",
         "process",
@@ -39,7 +40,6 @@
         "communication",
         "controlled-documents",
         "gmail",
-        "hr",
         "lead",
         "love",
         "preference",
@@ -423,21 +423,13 @@
       "package": "@hcengineering/hr",
       "status": "covered",
       "matrixLocation": "Human Resources",
-      "rationale": "Department hierarchy CRUD, department membership and manager/subscriber/team-lead updates, and employee department assignment through the Staff mixin are covered by the HR department tools added for issue #253.",
+      "rationale": "Department hierarchy CRUD, manager/subscriber/team-lead metadata, authoritative Staff.department assignment, request-type discovery, request CRUD with comments and attachments, public-holiday CRUD, TzDate handling, and complete schedule/table/summary projections cover the installed HR SDK surface. Department.members remains server-derived and is never rewritten by the client.",
       "exports": [
         "Department",
-        "Staff"
-      ]
-    },
-    {
-      "package": "@hcengineering/hr",
-      "status": "gap",
-      "matrixLocation": "Human Resources",
-      "rationale": "HR request types and requests remain assigned to issue #254; public holidays and timezone-date schedule data remain assigned to issue #255.",
-      "exports": [
         "PublicHoliday",
         "Request",
         "RequestType",
+        "Staff",
         "TzDate"
       ]
     },
