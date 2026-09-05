@@ -60,6 +60,7 @@ LEAD_DESTINATION_FUNNEL_CLEANUP_ID=""
 LEAD_PERSON_CLEANUP_ID=""
 LEAD_PERSON_AMBIGUOUS_CLEANUP_ID=""
 LEAD_LABEL_DEFINITION_CLEANUP_ID=""
+LEAD_LABEL_TITLE=""
 CUSTOM_FIELD_DATE_CLEANUP_ISSUE_ID=""
 CUSTOM_FIELD_DATE_CLEANUP_FIELD_ID=""
 CUSTOM_FIELD_DATE_CLEANUP_FIELD_NAME=""
@@ -393,6 +394,15 @@ tool_response_succeeded() {
   ' >/dev/null 2>&1
 }
 
+wait_for_lead_label_absence_quiet() {
+  local label_id="$1" label_title="$2" attempts="${3:-20}" label_id_json label_title_json payload jq_expr
+  label_id_json=$(json_string "$label_id")
+  label_title_json=$(json_string "$label_title")
+  payload="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_lead_label_definitions\",\"arguments\":{\"titleSearch\":$label_title_json,\"limit\":1}},\"id\":2}"
+  jq_expr="(.truncated == false) and ((.labels | length) == .total) and (all(.labels[]; .id != $label_id_json))"
+  wait_for_tool_field_quiet "$payload" "$jq_expr" 'true' "$attempts"
+}
+
 cleanup_funnel_artifacts() {
   if [ -n "$FUNNEL_CLEANUP_ID" ]; then
     local funnel_json archive_response delete_response read_payload
@@ -481,14 +491,16 @@ cleanup_lead_artifacts() {
     fi
   fi
   if [ -n "$LEAD_LABEL_DEFINITION_CLEANUP_ID" ]; then
-    local label_json label_delete_response label_read_payload label_absent_expr
+    local label_json label_delete_response
+    if [ -z "$LEAD_LABEL_TITLE" ]; then
+      return 1
+    fi
     label_json=$(json_string "$LEAD_LABEL_DEFINITION_CLEANUP_ID")
-    label_read_payload='{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_tags","arguments":{"targetClass":"lead:class:Lead"}},"id":2}'
-    label_absent_expr="any(.[]; .id == $label_json) | not"
     label_delete_response=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_tag\",\"arguments\":{\"targetClass\":\"lead:class:Lead\",\"tag\":$label_json}},\"id\":2}" 2>/dev/null || true)
     if tool_response_succeeded "$label_delete_response" \
-      && wait_for_tool_field_quiet "$label_read_payload" "$label_absent_expr" 'true'; then
+      && wait_for_lead_label_absence_quiet "$LEAD_LABEL_DEFINITION_CLEANUP_ID" "$LEAD_LABEL_TITLE"; then
       LEAD_LABEL_DEFINITION_CLEANUP_ID=""
+      LEAD_LABEL_TITLE=""
     else
       cleanup_failed=1
     fi
@@ -2808,7 +2820,13 @@ if [ $? -eq 0 ]; then
               fi
               if run_capture_to_var_fresh LEAD_LABEL_DELETE_TEXT "delete_tag(lead label cleanup)" \
                 "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_tag\",\"arguments\":{\"targetClass\":\"lead:class:Lead\",\"tag\":\"$LEAD_LABEL_DEFINITION_CLEANUP_ID\"}},\"id\":2}"; then
-                LEAD_LABEL_DEFINITION_CLEANUP_ID=""
+                if wait_for_lead_label_absence_quiet "$LEAD_LABEL_DEFINITION_CLEANUP_ID" "$LEAD_LABEL_TITLE"; then
+                  LEAD_LABEL_DEFINITION_CLEANUP_ID=""
+                  LEAD_LABEL_TITLE=""
+                else
+                  fail_test "delete_tag(lead label cleanup) fresh-session readback" \
+                    "label definition remains visible; cleanup marker retained"
+                fi
               fi
             fi
 

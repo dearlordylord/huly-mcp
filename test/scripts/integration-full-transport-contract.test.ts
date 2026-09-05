@@ -29,6 +29,30 @@ const toolResponseSucceeded = (response: unknown): boolean => {
   }
 }
 
+const leadLabelAbsenceSucceeded = (responseText: string, labelId: string, title: string): boolean => {
+  const response = JSON.stringify({
+    jsonrpc: "2.0",
+    id: 2,
+    result: { content: [{ type: "text", text: responseText }] }
+  })
+  try {
+    execFileSync(
+      "bash",
+      [
+        "-c",
+        `${shellFunction("wait_for_tool_field_quiet")}\n${shellFunction("wait_for_lead_label_absence_quiet")}\njson_string() { jq -Rn --arg value "$1" '$value'; }\ncall_tool_fresh_session() { printf '%s\\n' "$RESPONSE"; }\nsleep() { :; }\nwait_for_lead_label_absence_quiet "$1" "$2" 1`,
+        "label-readback",
+        labelId,
+        title
+      ],
+      { env: { ...process.env, RESPONSE: response }, stdio: "ignore" }
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
 const expectRestartBeforeCapture = (body: string, capture: string): void => {
   const restartIndex = body.indexOf("restart_http_transport_if_needed")
   const captureIndex = body.indexOf(capture)
@@ -127,8 +151,25 @@ describe("full integration HTTP fresh-session contract", () => {
     const funnelCleanup = functionBody("cleanup_funnel_artifacts")
     expect(leadCleanup.match(/tool_response_succeeded/gu)).toHaveLength(4)
     expect(funnelCleanup.match(/tool_response_succeeded/gu)).toHaveLength(2)
-    expect(leadCleanup).toContain("label_absent_expr")
-    expect(leadCleanup).toContain("wait_for_tool_field_quiet")
+    expect(leadCleanup).toContain("wait_for_lead_label_absence_quiet")
+  })
+
+  it("uses an exact, complete, bounded label-definition readback before normal-path marker clearing", () => {
+    const labelId = "label-123"
+    expect(leadLabelAbsenceSucceeded('{"labels":[],"total":0,"truncated":false}', labelId, "unique-title")).toBe(true)
+    expect(
+      leadLabelAbsenceSucceeded('{"labels":[{"id":"label-123"}],"total":1,"truncated":false}', labelId, "unique-title")
+    ).toBe(false)
+    expect(leadLabelAbsenceSucceeded('{"labels":[],"total":2,"truncated":true}', labelId, "unique-title")).toBe(false)
+    expect(leadLabelAbsenceSucceeded('{"labels":[],"total":1,"truncated":false}', labelId, "unique-title")).toBe(false)
+    const normalPath = script.slice(
+      script.indexOf('LEAD_LABEL_TITLE="lead-label-'),
+      script.indexOf("LEAD_RELATIONS_TEXT")
+    )
+    expect(normalPath.indexOf("wait_for_lead_label_absence_quiet")).toBeGreaterThanOrEqual(0)
+    expect(normalPath.indexOf('LEAD_LABEL_DEFINITION_CLEANUP_ID=""')).toBeGreaterThan(
+      normalPath.indexOf("wait_for_lead_label_absence_quiet")
+    )
   })
 
   it("keeps page-size-one live HR report composition behind the internal adapter", () => {
