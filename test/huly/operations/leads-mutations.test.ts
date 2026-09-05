@@ -403,6 +403,7 @@ describe("lead mutation public operations", () => {
       }).pipe(Effect.provide(HulyClient.testLayer({ findOne })), withDiagnostics)
 
       expect(error._tag).toBe("HulyError")
+      expect(error.message).toBe("Lead 'LEAD-1' references a missing customer")
       expect(findOne.mock.calls.map((call) => call[0])).toEqual([contact.class.Contact, contact.class.Organization])
       expect(findOne.mock.calls.map((call) => call[1])).toEqual([{ _id: "person-1" }, { _id: "person-1" }])
     })
@@ -416,7 +417,12 @@ describe("lead mutation public operations", () => {
         return yield* Effect.flip(findLeadCustomer(yield* HulyClient, lead))
       }).pipe(Effect.provide(HulyClient.testLayer({ findOne })), withDiagnostics)
 
-      expect(error._tag).toBe("HulyDataInvalidError")
+      if (error._tag !== "HulyDataInvalidError") {
+        return yield* Effect.die(new Error(`Expected HulyDataInvalidError, received ${error._tag}`))
+      }
+      expect(error.operation).toBe("leadMutation")
+      expect(error.entity).toBe("Lead 'LEAD-1' customer")
+      expect(error.cause).toEqual(malformedCustomer)
       expect(findOne.mock.calls).toHaveLength(1)
     })
   )
