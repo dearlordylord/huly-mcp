@@ -57,6 +57,7 @@ import { clampLimit, escapeLikeWildcards, hulyQuery } from "./query-helpers.js"
 import { toClassRef, toRef } from "./sdk-boundary.js"
 import { type HulyFunnel, resolveFunnel } from "./funnels-shared.js"
 import { findLeadReadDocument } from "./leads-mutations-shared.js"
+import { findLeadCustomerDocument } from "./leads-customer-lookup.js"
 
 export { listFunnels } from "./funnels.js"
 
@@ -178,21 +179,6 @@ const resolveStatusByName = (
   }
   return Effect.succeed(matchingStatus._id)
 }
-
-const findCustomer = (
-  client: HulyClient["Service"],
-  customerId: Ref<Contact>
-): Effect.Effect<HulyCustomer | undefined, HulyClientError> =>
-  Effect.gen(function* () {
-    const contactCustomer = yield* client.findOne<Contact>(contact.class.Contact, { _id: customerId })
-    if (contactCustomer !== undefined) {
-      return contactCustomer
-    }
-
-    return yield* client.findOne<HulyOrganization>(contact.class.Organization, {
-      _id: toRef<HulyOrganization>(customerId)
-    })
-  })
 
 type ListLeadsError =
   | HulyClientError
@@ -354,7 +340,7 @@ export const getLead = (params: GetLeadParams): Effect.Effect<LeadDetail, GetLea
     const status = yield* resolveStatusName(statuses, toRef<Status>(lead.status))
 
     const person = yield* findLeadAssignee(client, lead.assignee)
-    const customer = yield* findCustomer(client, toRef<Contact>(lead.attachedTo))
+    const customer = yield* findLeadCustomerDocument(client, toRef<Contact>(lead.attachedTo))
     yield* warnForMissingCustomer(lead, customer)
     const description = yield* readLeadDescription(client, lead)
     const customerDescription = yield* readCustomerDescription(client, customer)

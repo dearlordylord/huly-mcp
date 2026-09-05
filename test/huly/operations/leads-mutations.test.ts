@@ -1,4 +1,5 @@
 import { describe, it } from "@effect/vitest"
+import type { MarkupFormat, MarkupRef } from "@hcengineering/api-client"
 import type { Blob, Class, Doc, DocumentQuery, FindOptions, Ref } from "@hcengineering/core"
 import type { TaskType } from "@hcengineering/task"
 import { Effect, Ref as EffectRef } from "effect"
@@ -136,16 +137,41 @@ const resolvers = (
 interface Captures {
   readonly writes: Array<string>
   readonly markupClasses: Array<string>
+  readonly markupFetches: Array<{
+    readonly objectClass: Ref<Class<Doc>>
+    readonly objectId: Ref<Doc>
+    readonly attribute: string
+    readonly id: MarkupRef
+    readonly format: MarkupFormat
+  }>
+  readonly markupUpdates: Array<{
+    readonly objectClass: Ref<Class<Doc>>
+    readonly objectId: Ref<Doc>
+    readonly attribute: string
+    readonly markup: string
+    readonly format: MarkupFormat
+  }>
   readonly documentUpdates: Array<unknown>
 }
 
-const emptyCaptures = (): Captures => ({ writes: [], markupClasses: [], documentUpdates: [] })
-const makeLayer = (
-  captures: Captures,
-  currentCustomerMarkup = "old customer markup",
-  persistedCustomerDescription?: string | null,
-  customerMarkupState?: EffectRef.Ref<string>
-) => {
+const emptyCaptures = (): Captures => ({
+  writes: [],
+  markupClasses: [],
+  markupFetches: [],
+  markupUpdates: [],
+  documentUpdates: []
+})
+
+interface MakeLayerOptions {
+  readonly currentCustomerMarkup?: string
+  readonly persistedCustomerDescription?: string | null
+  readonly customerMarkupState?: EffectRef.Ref<string>
+}
+
+const makeLayer = (captures: Captures, options: MakeLayerOptions = {}) => {
+  const currentCustomerMarkup = options.currentCustomerMarkup ?? "old customer markup"
+  const persistedCustomerDescription = options.persistedCustomerDescription
+  const customerMarkupState = options.customerMarkupState
   const findOne = mockFn().mockReturnValue(
     Effect.succeed(persistedCustomerDescription === undefined ? undefined : person(persistedCustomerDescription))
   )
@@ -153,17 +179,20 @@ const makeLayer = (
     findOne,
     findAll: <T extends Doc>(_documentClass: Ref<Class<T>>, _query: DocumentQuery<T>, _options?: FindOptions<T>) =>
       Effect.succeed(findResult<T>([])),
-    fetchMarkup: (_class, _id, attribute) =>
-      attribute === "customerDescription" && customerMarkupState !== undefined
+    fetchMarkup: (objectClass, objectId, attribute, id, format) => {
+      captures.markupFetches.push({ objectClass, objectId, attribute, id, format })
+      return attribute === "customerDescription" && customerMarkupState !== undefined
         ? EffectRef.get(customerMarkupState)
-        : Effect.succeed(attribute === "customerDescription" ? currentCustomerMarkup : "old lead markup"),
+        : Effect.succeed(attribute === "customerDescription" ? currentCustomerMarkup : "old lead markup")
+    },
     uploadMarkup: (objectClass) => {
       captures.writes.push("uploadMarkup")
       captures.markupClasses.push(String(objectClass))
       return Effect.succeed(markupBlobRefAsMarkupRef(toRef<Blob>(BlobId.make("uploaded-markup"))))
     },
-    updateMarkup: (_class, _id, attribute, markup) => {
+    updateMarkup: (objectClass, objectId, attribute, markup, format) => {
       captures.writes.push("updateMarkup")
+      captures.markupUpdates.push({ objectClass, objectId, attribute, markup, format })
       return attribute === "customerDescription" && customerMarkupState !== undefined
         ? markupToMarkdownString(markup, testMarkupUrlConfig, {
             operation: "testUpdateLead",
@@ -281,7 +310,7 @@ describe("lead mutation public operations", () => {
         customerDescription: "same customer markup"
       })
       const sameResult = yield* updateLead(same, resolvers(person("customer-description"))).pipe(
-        Effect.provide(makeLayer(sameCaptures, "same customer markup")),
+        Effect.provide(makeLayer(sameCaptures, { currentCustomerMarkup: "same customer markup" })),
         withDiagnostics
       )
       expect(sameResult.updated).toBe(false)
@@ -317,7 +346,12 @@ describe("lead mutation public operations", () => {
         customerDescription: "persisted customer markup"
       })
       const result = yield* updateLead(params, resolvers(person())).pipe(
-        Effect.provide(makeLayer(captures, "persisted customer markup", "customer-description")),
+        Effect.provide(
+          makeLayer(captures, {
+            currentCustomerMarkup: "persisted customer markup",
+            persistedCustomerDescription: "customer-description"
+          })
+        ),
         withDiagnostics
       )
 
@@ -346,12 +380,18 @@ describe("lead mutation public operations", () => {
     Effect.gen(function* () {
       const captures = emptyCaptures()
       const markupState = yield* EffectRef.make("old customer markup")
+      const rendered = renderMarkdownWithNativeReferencesForWrite(
+        "stable customer markup",
+        testMarkupUrlConfig,
+        "customerDescription"
+      )
+      if (rendered._tag !== "success") return yield* Effect.die(new Error(rendered.reason))
       const params = yield* parseUpdateLeadParams({
         funnel: "funnel-1",
         identifier: "LEAD-1",
         customerDescription: "stable customer markup"
       })
-      const layer = makeLayer(captures, "old customer markup", undefined, markupState)
+      const layer = makeLayer(captures, { customerMarkupState: markupState })
 
       const first = yield* updateLead(params, resolvers(person("customer-description"))).pipe(
         Effect.provide(layer),
@@ -365,6 +405,31 @@ describe("lead mutation public operations", () => {
       expect(first.updated).toBe(true)
       expect(repeated.updated).toBe(false)
       expect(captures.writes).toEqual(["updateMarkup"])
+      expect(captures.markupUpdates).toEqual([
+        {
+          objectClass: leadClassIds.mixin.Customer,
+          objectId: "person-1",
+          attribute: "customerDescription",
+          markup: rendered.rendered.markup,
+          format: "markup"
+        }
+      ])
+      expect(captures.markupFetches).toEqual([
+        {
+          objectClass: leadClassIds.mixin.Customer,
+          objectId: "person-1",
+          attribute: "customerDescription",
+          id: "customer-description",
+          format: "markdown"
+        },
+        {
+          objectClass: leadClassIds.mixin.Customer,
+          objectId: "person-1",
+          attribute: "customerDescription",
+          id: "customer-description",
+          format: "markdown"
+        }
+      ])
     })
   )
 
@@ -440,7 +505,7 @@ describe("lead mutation public operations", () => {
         customerDescription: null
       })
       const result = yield* updateLead(params, resolvers(person())).pipe(
-        Effect.provide(makeLayer(captures, "old customer markup").pipe()),
+        Effect.provide(makeLayer(captures, { currentCustomerMarkup: "old customer markup" }).pipe()),
         withDiagnostics
       )
       expect(result.updated).toBe(true)

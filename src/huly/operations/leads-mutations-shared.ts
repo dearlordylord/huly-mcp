@@ -1,5 +1,5 @@
 import type { MarkupFormat } from "@hcengineering/api-client"
-import type { Contact, Employee, Organization, Person } from "@hcengineering/contact"
+import type { Contact, Employee, Person } from "@hcengineering/contact"
 import type { Class, Doc, DocumentUpdate, MarkupBlobRef, Ref, Status } from "@hcengineering/core"
 import type { TaskType } from "@hcengineering/task"
 import { Effect, Option, Schema } from "effect"
@@ -53,6 +53,7 @@ import { contact } from "../huly-plugins.js"
 import { leadClassIds } from "../lead-plugin.js"
 import { findPersonByExactEmail, findPersonByExactName, findPersonById } from "./contacts-shared.js"
 import { selectUniquePerson } from "./leads-mutation-decisions.js"
+import { findLeadCustomerDocument } from "./leads-customer-lookup.js"
 import {
   funnelSpace,
   getFunnelProjectType,
@@ -250,7 +251,7 @@ export const currentStatus = Effect.fn("Lead.currentStatus")((
     : Effect.succeed({ id: status.id, name: StatusName.make(status.name) })
 })
 
-export const renderLeadMutationMarkup = Effect.fn("Lead.renderMarkup")((
+export const renderLeadMutationMarkup = Effect.fn("Lead.renderLeadMutationMarkup")((
   client: HulyClient["Service"],
   content: string,
   field: LeadDescriptionField
@@ -317,13 +318,9 @@ export const findLeadCustomer = Effect.fn("Lead.findLeadCustomer")(function* (
   lead: HulyLead
 ): Effect.fn.Return<HulyCustomer, HulyClientError | HulyError | HulyDataInvalidError> {
   const customerId = toRef<Contact>(lead.attachedTo)
-  const customer = yield* client.findOne<Contact>(contact.class.Contact, hulyQuery<Contact>({ _id: customerId }))
+  const customer = yield* findLeadCustomerDocument(client, customerId)
   if (customer === undefined) {
-    const organization = yield* client.findOne<Organization>(
-      contact.class.Organization,
-      hulyQuery<Organization>({ _id: toRef<Organization>(customerId) })
-    )
-    return yield* resolveLeadCustomer(undefined, organization, lead)
+    return yield* resolveLeadCustomer(undefined, undefined, lead)
   }
   if (String(customer._class) === String(contact.class.Person)) return yield* parseLeadPersonDocument(customer)
   if (String(customer._class) === String(contact.class.Organization)) {
