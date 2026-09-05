@@ -1,5 +1,20 @@
 # @firfi/huly-cli
 
+## 0.49.0
+
+### Minor Changes
+
+- 8006570: Add exact-locator employee creation, promotion, invitation and reinvitation, inactive lifecycle discovery, and guarded deactivate/kick administration. Employee preparation commits as one checked transaction, resend roles remain consistent with the Employee model, and partial invitation or kick failures report completed changes with safe recovery guidance.
+- 8f77919: Add workflow-validated funnel get, create, update, archive, and cleanup-safe delete operations with exact locators and impact reporting.
+- 9e49f27: Add complete public-holiday administration and inherited, paginated HR schedule, table, and summary reports.
+- 73b9b41: Add human-readable HR request-type discovery and complete request, comment, attachment, and pagination workflows.
+- 1cd1d2b: Expose stable Contact Employee fields and an idempotent `set_employee_position` mutation with exact employee locators and explicit clear semantics through MCP and CLI.
+- deab41a: Add exact lead comments, attachments, labels, and friendly generic-relation endpoints, and expose remaining stable Lead fields.
+- 187d0d1: Add workflow-aware native Lead update, move, impact-safe delete, and idempotent person Customer promotion operations with exact locators.
+- 36c80bf: Add explicit source/survivor person merge previews and token-confirmed execution that binds canonical affected document IDs, write-routing fields, and reference values, rejects snapshot drift before writing, preserves Huly person references, and reports unsupported scalar-field migration.
+- f4e82d8: Add exact-locator person identity/profile administration, safe social-identity projection repair, and first-class person notes and attachments.
+- 7254a4f: Add path-aware HR department administration and authoritative Staff department assignment.
+
 ## 0.48.3
 
 ### Patch Changes
