@@ -165,6 +165,7 @@ const emptyCaptures = (): Captures => ({
 interface MakeLayerOptions {
   readonly currentCustomerMarkup?: string
   readonly persistedCustomerDescription?: string | null
+  readonly persistedCustomerShape?: "embedded" | "flattened"
   readonly customerMarkupState?: EffectRef.Ref<string>
 }
 
@@ -172,9 +173,13 @@ const makeLayer = (captures: Captures, options: MakeLayerOptions = {}) => {
   const currentCustomerMarkup = options.currentCustomerMarkup ?? "old customer markup"
   const persistedCustomerDescription = options.persistedCustomerDescription
   const customerMarkupState = options.customerMarkupState
-  const findOne = mockFn().mockReturnValue(
-    Effect.succeed(persistedCustomerDescription === undefined ? undefined : person(persistedCustomerDescription))
-  )
+  const persistedCustomer =
+    persistedCustomerDescription === undefined
+      ? undefined
+      : options.persistedCustomerShape === "flattened"
+        ? { ...person(), customerDescription: persistedCustomerDescription }
+        : person(persistedCustomerDescription)
+  const findOne = mockFn().mockReturnValue(Effect.succeed(persistedCustomer))
   return HulyClient.testLayer({
     findOne,
     findAll: <T extends Doc>(_documentClass: Ref<Class<T>>, _query: DocumentQuery<T>, _options?: FindOptions<T>) =>
@@ -357,6 +362,20 @@ describe("lead mutation public operations", () => {
 
       expect(result.updated).toBe(false)
       expect(captures.writes).toEqual([])
+
+      const flattenedCaptures = emptyCaptures()
+      const flattenedResult = yield* updateLead(params, resolvers(person())).pipe(
+        Effect.provide(
+          makeLayer(flattenedCaptures, {
+            currentCustomerMarkup: "persisted customer markup",
+            persistedCustomerDescription: "customer-description",
+            persistedCustomerShape: "flattened"
+          })
+        ),
+        withDiagnostics
+      )
+      expect(flattenedResult.updated).toBe(false)
+      expect(flattenedCaptures.writes).toEqual([])
     })
   )
 
@@ -373,6 +392,38 @@ describe("lead mutation public operations", () => {
       expect(findOne.mock.calls).toHaveLength(1)
       expect(findOne.mock.calls[0]?.[0]).toBe(contact.class.Contact)
       expect(findOne.mock.calls[0]?.[1]).toEqual({ _id: "person-1" })
+    })
+  )
+
+  it.effect("reports a missing customer after both authoritative lookup classes miss", () =>
+    Effect.gen(function* () {
+      const findOne = mockFn().mockReturnValue(Effect.succeed(undefined))
+      const error = yield* Effect.gen(function* () {
+        return yield* Effect.flip(findLeadCustomer(yield* HulyClient, lead))
+      }).pipe(Effect.provide(HulyClient.testLayer({ findOne })), withDiagnostics)
+
+      expect(error._tag).toBe("HulyError")
+      expect(error.message).toBe("Lead 'LEAD-1' references a missing customer")
+      expect(findOne.mock.calls.map((call) => call[0])).toEqual([contact.class.Contact, contact.class.Organization])
+      expect(findOne.mock.calls.map((call) => call[1])).toEqual([{ _id: "person-1" }, { _id: "person-1" }])
+    })
+  )
+
+  it.effect("rejects an unexpected customer class at the mutation boundary", () =>
+    Effect.gen(function* () {
+      const malformedCustomer = { ...person(), _class: DocId.make("contact:class:Unexpected") }
+      const findOne = mockFn().mockReturnValue(Effect.succeed(malformedCustomer))
+      const error = yield* Effect.gen(function* () {
+        return yield* Effect.flip(findLeadCustomer(yield* HulyClient, lead))
+      }).pipe(Effect.provide(HulyClient.testLayer({ findOne })), withDiagnostics)
+
+      if (error._tag !== "HulyDataInvalidError") {
+        return yield* Effect.die(new Error(`Expected HulyDataInvalidError, received ${error._tag}`))
+      }
+      expect(error.operation).toBe("leadMutation")
+      expect(error.entity).toBe("Lead 'LEAD-1' customer")
+      expect(error.cause).toEqual(malformedCustomer)
+      expect(findOne.mock.calls).toHaveLength(1)
     })
   )
 
