@@ -60,6 +60,45 @@ const expectRestartBeforeCapture = (body: string, capture: string): void => {
 }
 
 describe("full integration HTTP fresh-session contract", () => {
+  it("retries only the initial read-only HTTP probe after an empty transport response", () => {
+    const retry = functionBody("call_read_tool_with_http_retry")
+    expect(retry).toContain('result=$(call_tool "$payload")')
+    expect(retry).toContain('[ "$INTEGRATION_TRANSPORT" != "http" ]')
+    expect(retry).toContain('echo "RETRY: read-only HTTP tool call returned no response; retrying once" >&2')
+    expect(script).toContain('run_read_test "list_projects"')
+    expect(script).not.toContain('run_read_test "get_project($PROJECT)"')
+    expect(functionBody("call_tool_http")).not.toContain("2>/dev/null")
+    expect(functionBody("verify_http_tool_discovery")).not.toContain("2>/dev/null")
+
+    const execution = spawnSync(
+      "bash",
+      [
+        "-c",
+        `${shellFunction("call_read_tool_with_http_retry")}
+marker=$(mktemp)
+trap 'rm -f "$marker"' EXIT
+printf '0' >"$marker"
+call_tool() {
+  count=$(cat "$marker")
+  count=$((count + 1))
+  printf '%s' "$count" >"$marker"
+  if [ "$count" -eq 1 ]; then return 0; fi
+  printf '%s\\n' '{"jsonrpc":"2.0","id":2,"result":{"isError":false}}'
+}
+sleep() { :; }
+INTEGRATION_SURFACE=mcp
+INTEGRATION_TRANSPORT=http
+call_read_tool_with_http_retry '{}'`
+      ],
+      { encoding: "utf8" }
+    )
+    expect(execution).toMatchObject({
+      status: 0,
+      stdout: '{"jsonrpc":"2.0","id":2,"result":{"isError":false}}\n',
+      stderr: "RETRY: read-only HTTP tool call returned no response; retrying once\n"
+    })
+  })
+
   it("restarts in each parent-shell capture wrapper before entering command substitution", () => {
     expectRestartBeforeCapture(functionBody("wait_for_employee_position"), "text=$(run_capture_only_fresh")
     expectRestartBeforeCapture(functionBody("restore_employee_position"), "restore_result=$(call_tool")

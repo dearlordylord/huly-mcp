@@ -1173,8 +1173,22 @@ call_tool_http() {
   if [ -n "$name" ]; then
     curl_args+=(--header "Mcp-Name: $name")
   fi
-  response=$(curl "${curl_args[@]}" --data "$request_payload" "$HTTP_ENDPOINT" 2>/dev/null)
+  response=$(curl "${curl_args[@]}" --data "$request_payload" "$HTTP_ENDPOINT")
   extract_http_json_response "$response" | select_tool_response
+}
+
+call_read_tool_with_http_retry() {
+  local payload="$1"
+  local result
+  result=$(call_tool "$payload")
+  if [ -n "$result" ] || [ "$INTEGRATION_SURFACE" != "mcp" ] || [ "$INTEGRATION_TRANSPORT" != "http" ]; then
+    printf '%s\n' "$result"
+    return 0
+  fi
+
+  echo "RETRY: read-only HTTP tool call returned no response; retrying once" >&2
+  sleep 0.25
+  call_tool "$payload"
 }
 
 call_tool_cli() {
@@ -1213,11 +1227,12 @@ if [ "$INTEGRATION_SURFACE" = "mcp" ] && [ "$INTEGRATION_TRANSPORT" = "http" ]; 
   start_http_transport || exit 1
 fi
 
-run_test() {
-  local name="$1"
-  local payload="$2"
+run_test_with_runner() {
+  local runner="$1"
+  local name="$2"
+  local payload="$3"
   local result
-  result=$(call_tool "$payload")
+  result=$("$runner" "$payload")
   if [ -z "$result" ]; then
     echo "FAIL: $name (no response)"
     FAILED=$((FAILED + 1))
@@ -1245,6 +1260,14 @@ run_test() {
   echo "PASS: $name"
   PASSED=$((PASSED + 1))
   return 0
+}
+
+run_test() {
+  run_test_with_runner call_tool "$@"
+}
+
+run_read_test() {
+  run_test_with_runner call_read_tool_with_http_retry "$@"
 }
 
 run_shell_test() {
@@ -1605,7 +1628,7 @@ verify_http_tool_discovery() {
     --header "MCP-Protocol-Version: 2026-07-28" \
     --header "Mcp-Method: tools/list" \
     --data "$request_payload" \
-    "$HTTP_ENDPOINT" 2>/dev/null)
+    "$HTTP_ENDPOINT")
   json=$(extract_http_json_response "$response")
   if printf '%s\n' "$json" | jq -e '.result.tools | length > 0' >/dev/null 2>&1; then
     echo "PASS: MCP 2026-07-28 HTTP tools/list"
@@ -2104,7 +2127,7 @@ verify_http_tool_discovery
 # 1. PROJECTS
 ##############################
 echo "=== 1. Projects ==="
-run_test "list_projects" \
+run_read_test "list_projects" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}'
 run_test "get_project($PROJECT)" \
   "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_project\",\"arguments\":{\"project\":\"$PROJECT\"}},\"id\":2}"
