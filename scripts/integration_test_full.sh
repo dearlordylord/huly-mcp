@@ -1277,8 +1277,9 @@ run_employee_invitation_step() {
 
 capture_paginated_hr_reports() {
   local output_var="$1" name="$2" department="$3" start_date="$4" end_date="$5" output
-  if ! output=$(timeout 90 pnpm exec tsx scripts/integration-hr-report-pagination-fixture.ts \
-    "$department" "$start_date" "$end_date" 2>/dev/null); then
+  if ! output=$(timeout 90 node scripts/run-bundled.mjs scripts/integration-hr-report-pagination-fixture.ts \
+    "$department" "$start_date" "$end_date"); then
+    printf '%s\n' "$output" | tail -n 40 >&2
     printf -v "$output_var" '%s' ""
     fail_test "$name" "internal page-size-one report adapter failed"
     return 1

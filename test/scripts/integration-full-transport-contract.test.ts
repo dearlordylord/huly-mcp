@@ -87,7 +87,10 @@ describe("full integration HTTP fresh-session contract", () => {
   })
 
   it("keeps page-size-one live HR report composition behind the internal adapter", () => {
-    expect(script).toContain("scripts/integration-hr-report-pagination-fixture.ts")
+    const capture = functionBody("capture_paginated_hr_reports")
+    expect(capture).toContain("node scripts/run-bundled.mjs scripts/integration-hr-report-pagination-fixture.ts")
+    expect(capture).not.toContain("pnpm exec tsx scripts/integration-hr-report-pagination-fixture.ts")
+    expect(capture).toContain(`printf '%s\\n' "$output" | tail -n 40 >&2`)
     expect(script).not.toContain("scanPageSize")
     expect(hrPaginationAdapter).toContain("Schema.decodeUnknownEffect(HrPageSize)(1)")
     expect(hrPaginationAdapter).toContain("getHrSchedule(params, pageSize)")
