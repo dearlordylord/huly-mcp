@@ -1104,7 +1104,12 @@ start_http_transport() {
   for _ in $(seq 1 100); do
     if grep -q "MCP HTTP server listening" "$HTTP_SERVER_STDERR"; then
       echo "HTTP integration transport listening at $HTTP_ENDPOINT (config: $INTEGRATION_HTTP_CONFIG)"
-      return 0
+      if call_list_projects_with_http_retry >/dev/null; then
+        echo "HTTP integration transport Huly readiness confirmed"
+        return 0
+      fi
+      cleanup_http_transport
+      return 1
     fi
     if ! kill -0 "$HTTP_SERVER_PID" 2>/dev/null; then
       echo "ERROR: HTTP integration transport exited during startup"
@@ -1184,16 +1189,24 @@ call_list_projects_with_http_retry() {
   fi
 
   local payload='{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}'
-  local result
-  result=$(call_tool "$payload")
-  if [ -n "$result" ] || [ "$INTEGRATION_SURFACE" != "mcp" ] || [ "$INTEGRATION_TRANSPORT" != "http" ]; then
-    printf '%s\n' "$result"
-    return 0
-  fi
+  local attempts=2 attempt=1 result succeeded
+  while [ "$attempt" -le "$attempts" ]; do
+    result=$(call_tool "$payload")
+    succeeded=$(printf '%s\n' "$result" | jq -r \
+      '.result != null and (.result.isError // false) == false and .error == null' 2>/dev/null)
+    if [ -n "$result" ] && [ "$succeeded" = "true" ]; then
+      printf '%s\n' "$result"
+      return 0
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      echo "RETRY: HTTP Huly readiness probe failed on attempt $attempt of $attempts" >&2
+      sleep 0.25
+    fi
+    attempt=$((attempt + 1))
+  done
 
-  echo "RETRY: read-only HTTP tool call returned no response; retrying once" >&2
-  sleep 0.25
-  call_tool "$payload"
+  echo "ERROR: HTTP Huly readiness failed after $attempts attempts" >&2
+  return 1
 }
 
 call_tool_cli() {

@@ -61,11 +61,19 @@ const expectRestartBeforeCapture = (body: string, capture: string): void => {
 }
 
 describe("full integration HTTP fresh-session contract", () => {
-  it("retries only the initial read-only HTTP probe after an empty transport response", () => {
+  it("establishes Huly-backed readiness after every HTTP transport start", () => {
     const retry = functionBody("call_list_projects_with_http_retry")
     expect(retry).toContain('result=$(call_tool "$payload")')
-    expect(retry).toContain('[ "$INTEGRATION_TRANSPORT" != "http" ]')
-    expect(retry).toContain('echo "RETRY: read-only HTTP tool call returned no response; retrying once" >&2')
+    expect(retry).toContain(".result != null and (.result.isError // false) == false and .error == null")
+    expect(retry).toContain('echo "RETRY: HTTP Huly readiness probe failed on attempt $attempt of $attempts" >&2')
+    expect(retry).toContain('echo "ERROR: HTTP Huly readiness failed after $attempts attempts" >&2')
+    const start = functionBody("start_http_transport")
+    expect(start).toContain("if call_list_projects_with_http_retry >/dev/null; then")
+    expect(start.indexOf("call_list_projects_with_http_retry")).toBeLessThan(start.indexOf("return 0"))
+    expect(start.indexOf("cleanup_http_transport", start.indexOf("call_list_projects_with_http_retry"))).toBeLessThan(
+      start.indexOf("return 1", start.indexOf("call_list_projects_with_http_retry"))
+    )
+    expect(functionBody("restart_http_transport_if_needed")).toContain("start_http_transport")
     expect(script).toContain("run_list_projects_test")
     expect(functionBody("call_tool_http")).not.toContain("2>/dev/null")
     expect(functionBody("verify_http_tool_discovery")).not.toContain("2>/dev/null")
@@ -83,7 +91,10 @@ call_tool() {
   count=$(cat "$marker")
   count=$((count + 1))
   printf '%s' "$count" >"$marker"
-  if [ "$count" -eq 1 ]; then return 0; fi
+  if [ "$count" -eq 1 ]; then
+    printf '%s\\n' '{"jsonrpc":"2.0","id":2,"result":{"isError":true}}'
+    return 0
+  fi
   printf '%s\\n' '{"jsonrpc":"2.0","id":2,"result":{"isError":false}}'
 }
 sleep() { :; }
@@ -96,7 +107,27 @@ call_list_projects_with_http_retry`
     expect(execution).toMatchObject({
       status: 0,
       stdout: '{"jsonrpc":"2.0","id":2,"result":{"isError":false}}\n',
-      stderr: "RETRY: read-only HTTP tool call returned no response; retrying once\n"
+      stderr: "RETRY: HTTP Huly readiness probe failed on attempt 1 of 2\n"
+    })
+
+    const exhausted = spawnSync(
+      "bash",
+      [
+        "-c",
+        `${shellFunction("call_list_projects_with_http_retry")}
+call_tool() { return 0; }
+sleep() { :; }
+INTEGRATION_SURFACE=mcp
+INTEGRATION_TRANSPORT=http
+call_list_projects_with_http_retry`
+      ],
+      { encoding: "utf8", env: cleanShellEnv }
+    )
+    expect(exhausted).toMatchObject({
+      status: 1,
+      stdout: "",
+      stderr:
+        "RETRY: HTTP Huly readiness probe failed on attempt 1 of 2\nERROR: HTTP Huly readiness failed after 2 attempts\n"
     })
 
     const rejected = spawnSync(
