@@ -339,11 +339,20 @@ type PreparedCustomerDescription =
     }
 
 const customerDescriptionRef = Effect.fn("Lead.customerDescriptionRef")(function* (
+  client: HulyClient["Service"],
   customer: HulyCustomer
-): Effect.fn.Return<MarkupBlobRef | null | undefined, HulyDataInvalidError> {
-  if (!hasCustomerMixin(customer)) return undefined
-  const rawMixin = Reflect.get(customer, String(leadClassIds.mixin.Customer))
-  const attributes = yield* customerMixinWriteAttributes(rawMixin)
+): Effect.fn.Return<MarkupBlobRef | null | undefined, HulyClientError | HulyDataInvalidError> {
+  if (hasCustomerMixin(customer)) {
+    const projectedMixin = Reflect.get(customer, String(leadClassIds.mixin.Customer))
+    const attributes = yield* customerMixinWriteAttributes(projectedMixin)
+    return attributes.customerDescription
+  }
+  const persistedMixin = yield* client.findOne<CustomerMixinWrite>(
+    toMixinRef<CustomerMixinWrite>(leadClassIds.mixin.Customer),
+    hulyQuery<CustomerMixinWrite>({ _id: toRef<CustomerMixinWrite>(customer._id) })
+  )
+  if (persistedMixin === undefined) return undefined
+  const attributes = yield* customerMixinWriteAttributes(persistedMixin)
   return attributes.customerDescription
 })
 
@@ -361,7 +370,7 @@ export const prepareCustomerDescription = Effect.fn("Lead.prepareCustomerDescrip
 ): Effect.fn.Return<PreparedCustomerDescription, HulyClientError | HulyError | HulyDataInvalidError> {
   if (content === undefined) return { _tag: "unchanged" }
   const customer = yield* resolveCustomer(client, lead)
-  const existing = yield* customerDescriptionRef(customer)
+  const existing = yield* customerDescriptionRef(client, customer)
   if (content === null) return clearedCustomerDescriptionPlan(customer, existing)
   const rendered = yield* renderMarkup(client, content, "customerDescription")
   if (existing !== undefined && existing !== null) {
