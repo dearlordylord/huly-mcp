@@ -28,7 +28,7 @@ import { loadAllPublicHolidaySummaries } from "./hr-holidays.js"
 import { DEFAULT_HR_PAGE_SIZE, type HrPageSize, loadAllHrDocuments } from "./hr-pagination.js"
 import { applicableHolidayDates, hrRequestMeasures, hrTypeTotals } from "./hr-report-core.js"
 import { type HrReportStaffRecord, parseHrReportStaffRecord } from "./hr-report-sdk-boundary.js"
-import { parseHrRequestRecord } from "./hr-request-sdk-boundary.js"
+import { parseHrRequestDateWindowRecord, parseHrRequestRecord } from "./hr-request-sdk-boundary.js"
 import { summarizeHrRequests } from "./hr-requests.js"
 import { toRef } from "./sdk-boundary.js"
 
@@ -58,13 +58,16 @@ const loadReportRequests = Effect.fn("HrReports.loadRequests")(function* (
     departmentIds === undefined ? {} : { department: { $in: [...departmentIds] } },
     pageSize
   )
-  const requests = yield* Effect.forEach(raw, parseHrRequestRecord)
-  const overlapping = requests.filter(
-    (request) =>
-      hrCalendarDateFromTzDate(request.tzDate) <= params.endDate &&
-      hrCalendarDateFromTzDate(request.tzDueDate) >= params.startDate
+  const windows = yield* Effect.forEach(raw, (request) =>
+    Effect.map(parseHrRequestDateWindowRecord(request), (window) => ({ request, window }))
   )
-  return yield* summarizeHrRequests(client, overlapping)
+  const overlapping = windows.filter(
+    ({ window }) =>
+      hrCalendarDateFromTzDate(window.tzDate) <= params.endDate &&
+      hrCalendarDateFromTzDate(window.tzDueDate) >= params.startDate
+  )
+  const requests = yield* Effect.forEach(overlapping, ({ request }) => parseHrRequestRecord(request))
+  return yield* summarizeHrRequests(client, requests)
 })
 
 const scopedDepartmentIds = Effect.fn("HrReports.scopedDepartmentIds")(function* (

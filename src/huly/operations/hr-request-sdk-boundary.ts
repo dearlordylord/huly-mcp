@@ -67,6 +67,12 @@ export type HrStaffRecord = Schema.Schema.Type<typeof HrStaffRecordSchema>
 export const HrRequestEmployeeRecordSchema = Schema.Struct({ _id: PersonId, name: PersonName })
 export type HrRequestEmployeeRecord = Schema.Schema.Type<typeof HrRequestEmployeeRecordSchema>
 
+const HrRequestDateWindowRecordSchema = Schema.Struct({
+  _id: HrRequestId,
+  tzDate: HrTzDateRecordSchema,
+  tzDueDate: HrTzDateRecordSchema
+})
+
 export const HrRequestRecordSchema = Schema.Struct({
   _id: HrRequestId,
   space: SpaceId,
@@ -98,5 +104,10 @@ export const parseHrRequestEmployeeRecord = parseRecord(
   HrRequestEmployeeRecordSchema,
   "readHrRequestEmployee",
   "Employee record"
+)
+export const parseHrRequestDateWindowRecord = parseRecord(
+  HrRequestDateWindowRecordSchema,
+  "readHrRequestDateWindow",
+  "HR request date window"
 )
 export const parseHrRequestRecord = parseRecord(HrRequestRecordSchema, "readHrRequest", "HR request")

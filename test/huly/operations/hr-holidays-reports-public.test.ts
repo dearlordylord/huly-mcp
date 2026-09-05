@@ -510,12 +510,43 @@ describe("HR report operations", () => {
     const scoped = run(getHrSchedule({ ...range, department: DepartmentIdentifier.make("Product") }), contaminated)
     expect(scoped.requests).toHaveLength(4)
     expect(fail(getHrSchedule(range), contaminated)).toBeInstanceOf(DepartmentHierarchyError)
+  })
 
+  it("preparses date windows before fully parsing report requests", () => {
+    const state = fixture()
+    const firstStaff = state.staff[0]
+    const firstType = state.requestTypes[0]
+    if (firstStaff === undefined || firstType === undefined) {
+      throw new Error("fixture request dependencies missing")
+    }
     const outsideRange = {
       ...state,
-      requests: [makeRequest("request-dangling-later", firstStaff, docRef<Department>("missing"), firstType._id, 9, 9)]
+      requests: [
+        {
+          ...makeRequest("request-dangling-later", firstStaff, docRef<Department>("missing"), firstType._id, 9, 9),
+          comments: -1
+        }
+      ]
     }
     expect(run(getHrSchedule(range), outsideRange).requests).toHaveLength(0)
+
+    const malformedInRange = {
+      ...state,
+      requests: [
+        {
+          ...makeRequest(
+            "request-malformed",
+            firstStaff,
+            docRef<Department>("department-product"),
+            firstType._id,
+            4,
+            4
+          ),
+          comments: -1
+        }
+      ]
+    }
+    expect(fail(getHrSchedule(range), malformedInRange)).toBeInstanceOf(HulyDataInvalidError)
   })
 
   it("calculates employee tables across inherited, direct, and unscoped branches", () => {
