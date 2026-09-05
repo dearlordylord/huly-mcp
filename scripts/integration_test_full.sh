@@ -761,6 +761,78 @@ cleanup_issue_agent_assignee_artifacts() {
   return "$cleanup_failed"
 }
 
+restore_hr_staff_fixture() {
+  local employee_json restore_json restore_response restore_text staff_response staff_text
+  local restored_department restored_present restore_matches confirmations=0
+  employee_json=$(json_string "$HR_STAFF_RESTORE_EMPLOYEE")
+  if [ -n "$HR_STAFF_RESTORE_DEPARTMENT" ]; then
+    restore_json=$(json_string "$HR_STAFF_RESTORE_DEPARTMENT")
+  else
+    restore_json="null"
+  fi
+  for _ in $(seq 1 20); do
+    restore_response=$(call_tool_fresh_session \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"assign_staff_department\",\"arguments\":{\"employee\":$employee_json,\"department\":$restore_json}},\"id\":2}" \
+      2>/dev/null || true)
+    restore_text=$(echo "$restore_response" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+    restore_matches=$(echo "$restore_text" | jq -r --arg employee "$HR_STAFF_RESTORE_EMPLOYEE" \
+      --arg department "$HR_STAFF_RESTORE_DEPARTMENT" \
+      'type == "object" and .employeeId == $employee and .propagation == "server-derived" and
+       (if $department == "" then (has("department") | not) else .department.id == $department end)' 2>/dev/null)
+    staff_response=$(call_tool_fresh_session \
+      '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_staff","arguments":{"limit":200}},"id":2}' \
+      2>/dev/null || true)
+    staff_text=$(echo "$staff_response" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+    restored_department=$(echo "$staff_text" | jq -r --arg employee "$HR_STAFF_RESTORE_EMPLOYEE" \
+      '.staff[]? | select(.id == $employee) | .department.id // empty' 2>/dev/null)
+    restored_present=$(echo "$staff_text" | jq -r --arg employee "$HR_STAFF_RESTORE_EMPLOYEE" \
+      '[.staff[]? | select(.id == $employee)] | length' 2>/dev/null)
+    if tool_response_succeeded "$restore_response" && tool_response_succeeded "$staff_response" \
+      && [ "$restore_matches" = "true" ] && [ "$restored_present" = "1" ] \
+      && [ "$restored_department" = "$HR_STAFF_RESTORE_DEPARTMENT" ]; then
+      confirmations=$((confirmations + 1))
+      if [ "$confirmations" -ge 3 ]; then
+        HR_STAFF_RESTORE_EMPLOYEE=""
+        HR_STAFF_RESTORE_DEPARTMENT=""
+        return 0
+      fi
+    else
+      confirmations=0
+    fi
+    sleep 0.5
+  done
+  return 1
+}
+
+wait_for_hr_staff_hierarchy_visibility() {
+  local attempt attempts="${HR_STAFF_VISIBILITY_ATTEMPTS:-20}"
+  HR_PROPAGATED_STAFF="{}"
+  HR_PROPAGATED_CHILD="{}"
+  HR_PROPAGATED_PARENT="{}"
+  for attempt in $(seq 1 "$attempts"); do
+    HR_STAFF_RESPONSE=$(call_tool_fresh_session \
+      '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_staff","arguments":{"limit":200}},"id":2}' \
+      2>/dev/null || true)
+    HR_CHILD_RESPONSE=$(call_tool_fresh_session \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_department\",\"arguments\":{\"department\":$HR_CHILD_PATH_JSON}},\"id\":2}" \
+      2>/dev/null || true)
+    HR_PARENT_RESPONSE=$(call_tool_fresh_session \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_department\",\"arguments\":{\"department\":$HR_DEPARTMENT_NAME_JSON}},\"id\":2}" \
+      2>/dev/null || true)
+    HR_PROPAGATED_STAFF=$(echo "$HR_STAFF_RESPONSE" | jq -r '.result.content[0].text // "{}"' 2>/dev/null)
+    HR_PROPAGATED_CHILD=$(echo "$HR_CHILD_RESPONSE" | jq -r '.result.content[0].text // "{}"' 2>/dev/null)
+    HR_PROPAGATED_PARENT=$(echo "$HR_PARENT_RESPONSE" | jq -r '.result.content[0].text // "{}"' 2>/dev/null)
+    if [ "$(echo "$HR_PROPAGATED_STAFF" | jq -r --arg employee "$HR_STAFF_EMPLOYEE" --arg department "$HR_CHILD_ID" \
+      '[.staff[]? | select(.id == $employee and .department.id == $department)] | length')" -eq 1 ] \
+      && [ "$(echo "$HR_PROPAGATED_CHILD" | jq -r '.derivedMembers // 0')" -ge 1 ] \
+      && [ "$(echo "$HR_PROPAGATED_PARENT" | jq -r '.derivedMembers // 0')" -ge 1 ]; then
+      return 0
+    fi
+    sleep 0.25
+  done
+  return 1
+}
+
 cleanup_hr_artifacts() {
   local cleanup_failed=0
   if [ -n "$HR_CLEANUP_REQUEST_ID" ]; then
@@ -790,25 +862,7 @@ cleanup_hr_artifacts() {
     HR_CLEANUP_HOLIDAY_IDS="${remaining_holidays# }"
   fi
   if [ -n "$HR_STAFF_RESTORE_EMPLOYEE" ]; then
-    local employee_json restore_json restore_response staff_response staff_text restored_department restored_present
-    employee_json=$(json_string "$HR_STAFF_RESTORE_EMPLOYEE")
-    if [ -n "$HR_STAFF_RESTORE_DEPARTMENT" ]; then
-      restore_json=$(json_string "$HR_STAFF_RESTORE_DEPARTMENT")
-    else
-      restore_json="null"
-    fi
-    restore_response=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"assign_staff_department\",\"arguments\":{\"employee\":$employee_json,\"department\":$restore_json}},\"id\":2}" 2>/dev/null || true)
-    restart_http_transport_if_needed "after HR Staff restoration" >/dev/null 2>&1 || cleanup_failed=1
-    staff_response=$(call_tool '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_staff","arguments":{"limit":200}},"id":2}' 2>/dev/null || true)
-    staff_text=$(echo "$staff_response" | jq -r '.result.content[0].text // empty' 2>/dev/null)
-    restored_department=$(echo "$staff_text" | jq -r --arg employee "$HR_STAFF_RESTORE_EMPLOYEE" '.staff[] | select(.id == $employee) | .department.id // empty' 2>/dev/null)
-    restored_present=$(echo "$staff_text" | jq -r --arg employee "$HR_STAFF_RESTORE_EMPLOYEE" '[.staff[] | select(.id == $employee)] | length' 2>/dev/null)
-    if [ -n "$restore_response" ] && [ "$restored_present" = "1" ] && [ "$restored_department" = "$HR_STAFF_RESTORE_DEPARTMENT" ]; then
-      HR_STAFF_RESTORE_EMPLOYEE=""
-      HR_STAFF_RESTORE_DEPARTMENT=""
-    else
-      cleanup_failed=1
-    fi
+    restore_hr_staff_fixture || cleanup_failed=1
   fi
   if [ -z "$HR_STAFF_RESTORE_EMPLOYEE" ] && [ -n "$HR_CLEANUP_DEPARTMENT_ID" ]; then
     local department_json preview preview_text descendants staff delete_response readback
@@ -5154,32 +5208,7 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
       assert_json_field_equals "nested department inherits both holiday documents" \
         "$HR_INHERITED_HOLIDAYS_TEXT" ".total" "2"
       HR_CHILD_PATH_JSON=$(json_string "$HR_DEPARTMENT_NAME/$HR_CHILD_NAME")
-      HR_PROPAGATED_STAFF="{}"
-      HR_PROPAGATED_CHILD="{}"
-      HR_PROPAGATED_PARENT="{}"
-      for _ in $(seq 1 20); do
-        restart_http_transport_if_needed "HR hierarchy propagation poll" || exit 1
-        HR_STAFF_RESPONSE=$(call_tool \
-          '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_staff","arguments":{"limit":200}},"id":2}' 2>/dev/null) || true
-        HR_CHILD_RESPONSE=$(call_tool \
-          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_department\",\"arguments\":{\"department\":$HR_CHILD_PATH_JSON}},\"id\":2}" 2>/dev/null) || true
-        HR_PARENT_RESPONSE=$(call_tool \
-          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_department\",\"arguments\":{\"department\":$HR_DEPARTMENT_NAME_JSON}},\"id\":2}" 2>/dev/null) || true
-        HR_PROPAGATED_STAFF=$(echo "$HR_STAFF_RESPONSE" | jq -r '.result.content[0].text // "{}"' 2>/dev/null)
-        HR_PROPAGATED_CHILD=$(echo "$HR_CHILD_RESPONSE" | jq -r '.result.content[0].text // "{}"' 2>/dev/null)
-        HR_PROPAGATED_PARENT=$(echo "$HR_PARENT_RESPONSE" | jq -r '.result.content[0].text // "{}"' 2>/dev/null)
-        if [ "$(echo "$HR_PROPAGATED_STAFF" | jq -r --arg employee "$HR_STAFF_EMPLOYEE" --arg department "$HR_CHILD_ID" \
-          '[.staff[]? | select(.id == $employee and .department.id == $department)] | length')" -eq 1 ] \
-          && [ "$(echo "$HR_PROPAGATED_CHILD" | jq -r '.derivedMembers // 0')" -ge 1 ] \
-          && [ "$(echo "$HR_PROPAGATED_PARENT" | jq -r '.derivedMembers // 0')" -ge 1 ]; then
-          break
-        fi
-        sleep 0.25
-      done
-      if [ "$(echo "$HR_PROPAGATED_STAFF" | jq -r --arg employee "$HR_STAFF_EMPLOYEE" --arg department "$HR_CHILD_ID" \
-        '[.staff[]? | select(.id == $employee and .department.id == $department)] | length')" -ne 1 ] \
-        || [ "$(echo "$HR_PROPAGATED_CHILD" | jq -r '.derivedMembers // 0')" -lt 1 ] \
-        || [ "$(echo "$HR_PROPAGATED_PARENT" | jq -r '.derivedMembers // 0')" -lt 1 ]; then
+      if ! wait_for_hr_staff_hierarchy_visibility; then
         fail_test "HR Staff hierarchy visibility barrier" "assigned Staff was not visible after 20 fresh-session attempts"
         exit 1
       fi
@@ -5207,24 +5236,9 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
       fi
       run_test "assign_staff_department(restore fixture)" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"assign_staff_department\",\"arguments\":{\"employee\":\"$HR_STAFF_EMPLOYEE\",\"department\":$HR_RESTORE_DEPARTMENT_JSON}},\"id\":2}"
-      HR_RESTORED_DEPARTMENT="__unconfirmed__"
-      for _ in $(seq 1 20); do
-        restart_http_transport_if_needed "HR Staff restoration poll" || exit 1
-        HR_RESTORE_RESPONSE=$(call_tool \
-          '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_staff","arguments":{"limit":200}},"id":2}' 2>/dev/null) || true
-        HR_RESTORE_TEXT=$(echo "$HR_RESTORE_RESPONSE" | jq -r '.result.content[0].text // "{}"' 2>/dev/null)
-        HR_RESTORED_DEPARTMENT=$(echo "$HR_RESTORE_TEXT" | jq -r --arg employee "$HR_STAFF_EMPLOYEE" '.staff[] | select(.id == $employee) | .department.id // empty' 2>/dev/null)
-        HR_RESTORED_PRESENT=$(echo "$HR_RESTORE_TEXT" | jq -r --arg employee "$HR_STAFF_EMPLOYEE" '[.staff[] | select(.id == $employee)] | length' 2>/dev/null)
-        if [ "$HR_RESTORED_PRESENT" = "1" ] && [ "$HR_RESTORED_DEPARTMENT" = "$HR_STAFF_ORIGINAL_DEPARTMENT" ]; then
-          break
-        fi
-        sleep 0.25
-      done
-      if [ "$HR_RESTORED_PRESENT" = "1" ] && [ "$HR_RESTORED_DEPARTMENT" = "$HR_STAFF_ORIGINAL_DEPARTMENT" ]; then
+      if restore_hr_staff_fixture; then
         echo "PASS: HR Staff fixture restoration confirmed"
         PASSED=$((PASSED + 1))
-        HR_STAFF_RESTORE_EMPLOYEE=""
-        HR_STAFF_RESTORE_DEPARTMENT=""
       else
         fail_test "HR Staff fixture restoration" "restored department was not confirmed; cleanup marker retained"
       fi
