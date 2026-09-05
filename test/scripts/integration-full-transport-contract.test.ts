@@ -114,6 +114,32 @@ describe("full integration HTTP fresh-session contract", () => {
       { encoding: "utf8" }
     )
     expect(partial).toMatchObject({ status: 0, stdout: "person-partial\n", stderr: "" })
+
+    const unknownJson = spawnSync("bash", ["-c", command, "lifecycle-id", '{"message":"missing identity"}'], {
+      encoding: "utf8"
+    })
+    expect(unknownJson).toMatchObject({ status: 0, stdout: "", stderr: "" })
+
+    const unknownProviderText = spawnSync(
+      "bash",
+      ["-c", command, "lifecycle-id", "Connection error while communicating with Huly: sendInvite failed."],
+      { encoding: "utf8" }
+    )
+    expect(unknownProviderText).toMatchObject({ status: 0, stdout: "", stderr: "" })
+
+    const extraction = script.indexOf(
+      'EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID=$(extract_employee_lifecycle_person_id "$EMPLOYEE_LIFECYCLE_CREATE")'
+    )
+    const emptyGuard = script.indexOf('if [ -z "$EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID" ]; then', extraction)
+    const failedClosed = script.indexOf('fail_test "invite_employee(create-or-promote cleanup identity)"', emptyGuard)
+    const guardedContinuation = script.indexOf(
+      "run_capture_to_var_fresh EMPLOYEE_LIFECYCLE_CREATED_PREVIEW",
+      failedClosed
+    )
+    expect(emptyGuard).toBeGreaterThan(extraction)
+    expect(failedClosed).toBeGreaterThan(emptyGuard)
+    expect(guardedContinuation).toBeGreaterThan(failedClosed)
+    expect(script.slice(failedClosed, guardedContinuation)).toContain("else")
   })
 
   it("selects messaging fixtures only from authoritative workspace memberships", () => {
@@ -144,6 +170,12 @@ describe("full integration HTTP fresh-session contract", () => {
       { encoding: "utf8" }
     )
     expect(JSON.parse(output)).toEqual(["member@example.test"])
+    expect(script).toContain(
+      'skip_test "create_group_direct_message" "need at least two non-self employees with unique exact emails linked to authoritative workspace memberships"'
+    )
+    expect(script).toContain(
+      'skip_test "add/remove_channel_members" "need a non-self employee linked to an authoritative workspace membership"'
+    )
   })
 
   it("polls nested department readback with parent-owned fresh sessions", () => {

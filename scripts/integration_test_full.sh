@@ -4608,7 +4608,7 @@ if [ "$(printf '%s\n' "$GROUP_DM_PEOPLE_JSON" | jq -r 'length // 0' 2>/dev/null)
     fi
   fi
 else
-  skip_test "create_group_direct_message" "need at least two non-self employees with unique exact names"
+  skip_test "create_group_direct_message" "need at least two non-self employees with unique exact emails linked to authoritative workspace memberships"
 fi
 DM_ID="${HULY_TEST_DM_ID:-}"
 if [ -z "$DM_ID" ]; then
