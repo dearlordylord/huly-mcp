@@ -169,6 +169,7 @@ SKIPPED=0
 ERRORS=""
 
 TOOL_TIMEOUT=30
+readonly LIST_PROJECTS_REQUEST='{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}'
 
 cleanup_http_transport() {
   if [ -n "$HTTP_SERVER_PID" ]; then
@@ -1104,7 +1105,7 @@ start_http_transport() {
   for _ in $(seq 1 100); do
     if grep -q "MCP HTTP server listening" "$HTTP_SERVER_STDERR"; then
       echo "HTTP integration transport listening at $HTTP_ENDPOINT (config: $INTEGRATION_HTTP_CONFIG)"
-      if call_list_projects_with_http_retry >/dev/null; then
+      if await_http_huly_readiness >/dev/null; then
         echo "HTTP integration transport Huly readiness confirmed"
         return 0
       fi
@@ -1182,19 +1183,16 @@ call_tool_http() {
   extract_http_json_response "$response" | select_tool_response
 }
 
-call_list_projects_with_http_retry() {
+await_http_huly_readiness() {
   if [ "$#" -ne 0 ]; then
-    echo "ERROR: call_list_projects_with_http_retry does not accept arguments" >&2
+    echo "ERROR: await_http_huly_readiness does not accept arguments" >&2
     return 2
   fi
 
-  local payload='{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}'
-  local attempts=2 attempt=1 result succeeded
+  local attempts=2 attempt=1 result
   while [ "$attempt" -le "$attempts" ]; do
-    result=$(call_tool "$payload")
-    succeeded=$(printf '%s\n' "$result" | jq -r \
-      '.result != null and (.result.isError // false) == false and .error == null' 2>/dev/null)
-    if [ -n "$result" ] && [ "$succeeded" = "true" ]; then
+    result=$(call_tool_http "$LIST_PROJECTS_REQUEST")
+    if [ -n "$result" ] && tool_response_succeeded "$result"; then
       printf '%s\n' "$result"
       return 0
     fi
@@ -1287,7 +1285,7 @@ run_test() {
 }
 
 run_list_projects_test() {
-  run_test_with_runner call_list_projects_with_http_retry "list_projects"
+  run_test "list_projects" "$LIST_PROJECTS_REQUEST"
 }
 
 run_shell_test() {

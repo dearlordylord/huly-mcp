@@ -61,32 +61,23 @@ const expectRestartBeforeCapture = (body: string, capture: string): void => {
 }
 
 describe("full integration HTTP fresh-session contract", () => {
-  it("establishes Huly-backed readiness after every HTTP transport start", () => {
-    const retry = functionBody("call_list_projects_with_http_retry")
-    expect(retry).toContain('result=$(call_tool "$payload")')
-    expect(retry).toContain(".result != null and (.result.isError // false) == false and .error == null")
+  it("retries only the exact internal HTTP readiness probe", () => {
+    const retry = functionBody("await_http_huly_readiness")
+    expect(retry).toContain('result=$(call_tool_http "$LIST_PROJECTS_REQUEST")')
+    expect(retry).toContain('tool_response_succeeded "$result"')
     expect(retry).toContain('echo "RETRY: HTTP Huly readiness probe failed on attempt $attempt of $attempts" >&2')
     expect(retry).toContain('echo "ERROR: HTTP Huly readiness failed after $attempts attempts" >&2')
-    const start = functionBody("start_http_transport")
-    expect(start).toContain("if call_list_projects_with_http_retry >/dev/null; then")
-    expect(start.indexOf("call_list_projects_with_http_retry")).toBeLessThan(start.indexOf("return 0"))
-    expect(start.indexOf("cleanup_http_transport", start.indexOf("call_list_projects_with_http_retry"))).toBeLessThan(
-      start.indexOf("return 1", start.indexOf("call_list_projects_with_http_retry"))
-    )
-    expect(functionBody("restart_http_transport_if_needed")).toContain("start_http_transport")
-    expect(script).toContain("run_list_projects_test")
-    expect(functionBody("call_tool_http")).not.toContain("2>/dev/null")
-    expect(functionBody("verify_http_tool_discovery")).not.toContain("2>/dev/null")
 
     const execution = spawnSync(
       "bash",
       [
         "-c",
-        `${shellFunction("call_list_projects_with_http_retry")}
+        `${shellFunction("tool_response_succeeded")}
+${shellFunction("await_http_huly_readiness")}
 marker=$(mktemp)
 trap 'rm -f "$marker"' EXIT
 printf '0' >"$marker"
-call_tool() {
+call_tool_http() {
   printf '%s\n' "$1" | jq -e '.method == "tools/call" and .params.name == "list_projects" and .params.arguments == {}' >/dev/null || return 9
   count=$(cat "$marker")
   count=$((count + 1))
@@ -98,9 +89,8 @@ call_tool() {
   printf '%s\\n' '{"jsonrpc":"2.0","id":2,"result":{"isError":false}}'
 }
 sleep() { :; }
-INTEGRATION_SURFACE=mcp
-INTEGRATION_TRANSPORT=http
-call_list_projects_with_http_retry`
+LIST_PROJECTS_REQUEST='{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}'
+await_http_huly_readiness`
       ],
       { encoding: "utf8", env: cleanShellEnv }
     )
@@ -114,12 +104,12 @@ call_list_projects_with_http_retry`
       "bash",
       [
         "-c",
-        `${shellFunction("call_list_projects_with_http_retry")}
-call_tool() { return 0; }
+        `${shellFunction("tool_response_succeeded")}
+${shellFunction("await_http_huly_readiness")}
+call_tool_http() { return 0; }
 sleep() { :; }
-INTEGRATION_SURFACE=mcp
-INTEGRATION_TRANSPORT=http
-call_list_projects_with_http_retry`
+LIST_PROJECTS_REQUEST='{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}'
+await_http_huly_readiness`
       ],
       { encoding: "utf8", env: cleanShellEnv }
     )
@@ -134,18 +124,71 @@ call_list_projects_with_http_retry`
       "bash",
       [
         "-c",
-        `${shellFunction("call_list_projects_with_http_retry")}
-call_tool() { printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"isError":false}}'; }
-INTEGRATION_SURFACE=mcp
-INTEGRATION_TRANSPORT=http
-call_list_projects_with_http_retry '{"params":{"name":"delete_project"}}'`
+        `${shellFunction("await_http_huly_readiness")}
+call_tool_http() { printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"isError":false}}'; }
+LIST_PROJECTS_REQUEST='{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}'
+await_http_huly_readiness '{"params":{"name":"delete_project"}}'`
       ],
       { encoding: "utf8", env: cleanShellEnv }
     )
     expect(rejected).toMatchObject({
       status: 2,
       stdout: "",
-      stderr: "ERROR: call_list_projects_with_http_retry does not accept arguments\n"
+      stderr: "ERROR: await_http_huly_readiness does not accept arguments\n"
+    })
+  })
+
+  it("preserves ordinary list_projects errors and startup cleanup accounting", () => {
+    const ordinary = spawnSync(
+      "bash",
+      [
+        "-c",
+        `${shellFunction("run_test_with_runner")}
+${shellFunction("run_test")}
+${shellFunction("run_list_projects_test")}
+call_tool() { printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"isError":true,"content":[{"text":"cold failure"}]}}'; }
+LIST_PROJECTS_REQUEST='{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}'
+PASSED=0
+FAILED=0
+ERRORS=''
+run_list_projects_test
+status=$?
+printf 'status=%s passed=%s failed=%s\n' "$status" "$PASSED" "$FAILED"`
+      ],
+      { encoding: "utf8", env: cleanShellEnv }
+    )
+    expect(ordinary).toMatchObject({
+      status: 0,
+      stdout: "FAIL: list_projects => cold failure\nstatus=1 passed=0 failed=1\n",
+      stderr: ""
+    })
+
+    const startCommand = (readinessStatus: 0 | 1): string => `${shellFunction("start_http_transport")}
+mktemp() { printf '/dev/null\n'; }
+write_http_header_config() { :; }
+env() { :; }
+grep() { return 0; }
+await_http_huly_readiness() { return ${String(readinessStatus)}; }
+cleanup_http_transport() { printf 'cleanup\n'; }
+INTEGRATION_HTTP_CONFIG=env
+INTEGRATION_HTTP_PORT=19888
+INTEGRATION_HTTP_HOST=127.0.0.1
+HTTP_ENDPOINT=http://127.0.0.1:19888/mcp
+start_http_transport
+status=$?
+printf 'status=%s\n' "$status"`
+    const failedStart = spawnSync("bash", ["-c", startCommand(1)], { encoding: "utf8", env: cleanShellEnv })
+    expect(failedStart).toMatchObject({
+      status: 0,
+      stdout: "HTTP integration transport listening at http://127.0.0.1:19888/mcp (config: env)\ncleanup\nstatus=1\n",
+      stderr: ""
+    })
+    const successfulStart = spawnSync("bash", ["-c", startCommand(0)], { encoding: "utf8", env: cleanShellEnv })
+    expect(successfulStart).toMatchObject({
+      status: 0,
+      stdout:
+        "HTTP integration transport listening at http://127.0.0.1:19888/mcp (config: env)\nHTTP integration transport Huly readiness confirmed\nstatus=0\n",
+      stderr: ""
     })
   })
 
