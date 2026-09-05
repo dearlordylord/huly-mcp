@@ -9,6 +9,7 @@
       "areas": [
         "activity",
         "attachment",
+        "board",
         "calendar",
         "card",
         "chunter",
@@ -20,6 +21,7 @@
         "inventory",
         "notification",
         "process",
+        "request",
         "tags",
         "task",
         "test-management",
@@ -36,7 +38,6 @@
         "analytics-collector",
         "billing",
         "bitrix",
-        "board",
         "communication",
         "controlled-documents",
         "gmail",
@@ -47,7 +48,6 @@
         "questions",
         "rating",
         "recruit",
-        "request",
         "setting",
         "support",
         "survey",
@@ -324,7 +324,6 @@
       "package": "@hcengineering/core",
       "status": "gap",
       "matrixLocation": "Core classes, attributes, enums; Core spaces, permissions, roles",
-      "backlogIssue": 92,
       "rationale": "Remaining core gaps are specialized AttributePermission/ClassPermission definitions, configuration internals, raw system-space types, and built-in model mutation. Generic space discovery/creation, guarded base permission writes, typed-space role creation and permission replacement, class collaborator metadata, safe existing-space metadata updates, member/owner/role-member mutations, object collaborators, guarded enum/custom-attribute CRUD, read-only plugin configuration, domain index configuration, sequence discovery, and generic workflow status/category CRUD are covered.",
       "exports": [
         "AttributePermission",
@@ -515,9 +514,9 @@
     },
     {
       "package": "@hcengineering/request",
-      "status": "gap",
+      "status": "covered",
       "matrixLocation": "Generic approval requests",
-      "rationale": "Generic Request documents are now exposed read-only through list_approval_requests and get_approval_request. Approval mutations, cancellation, and decision comments remain tracked as first-class gaps.",
+      "rationale": "Generic Request documents are exposed through list/get plus create, comment, approve, reject, and cancel workflows. The tools preserve request status, requested/approved/rejected people, decision comments, approval dates, opaque transaction payloads, and authorization checks. Friendly attached-target resolution remains an LLM-first workflow enhancement rather than a missing Request model export.",
       "exports": [
         "Request"
       ]
@@ -545,7 +544,7 @@
       "package": "@hcengineering/templates",
       "status": "covered",
       "matrixLocation": "Message templates",
-      "rationale": "Read-only message template discovery tools expose global template categories, message template summaries/details, template fields, placeholder field IDs, and field category summaries. Write, render/copy, and provider execution semantics remain tracked in the matrix row.",
+      "rationale": "Read-only message template discovery tools expose global template categories, message template summaries/details, template fields, placeholder field IDs, and field category summaries. Caller-provided rendering is covered; writes and provider-backed execution semantics remain tracked in the matrix row.",
       "exports": [
         "MessageTemplate",
         "TemplateCategory",
