@@ -41,12 +41,7 @@ const loadReportStaff = Effect.fn("HrReports.loadStaff")(function* (
   departmentIds: ReadonlySet<Ref<Department>> | undefined
 ) {
   const client = yield* HulyClient
-  const raw = yield* loadAllHrDocuments(
-    client,
-    hr.mixin.Staff,
-    departmentIds === undefined ? {} : { department: { $in: [...departmentIds] } },
-    pageSize
-  )
+  const raw = yield* loadAllHrDocuments(client, hr.mixin.Staff, {}, pageSize)
   const scoped = yield* Effect.forEach(raw, (staff) =>
     Effect.map(parseHrReportStaffScopeRecord(staff), (scope) => ({ staff, scope }))
   )

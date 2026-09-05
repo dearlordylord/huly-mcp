@@ -51,6 +51,7 @@ interface Fixture {
   readonly staff: ReadonlyArray<Staff | Omit<Staff, "department">>
   readonly requestTypes: ReadonlyArray<RequestType>
   readonly requests: ReadonlyArray<HulyRequest>
+  readonly staffDepartmentQueryReturnsEmpty: boolean
   readonly calls: Calls
 }
 
@@ -172,6 +173,7 @@ const fixture = (): Fixture => {
       makeRequest("request-sales", caraStaff, sales._id, leave._id, 4, 4),
       makeRequest("request-outside", aliceStaff, design._id, leave._id, 9, 9)
     ],
+    staffDepartmentQueryReturnsEmpty: false,
     calls: { creates: [], updates: [], removals: [], pageExclusions: [] }
   }
 }
@@ -221,7 +223,13 @@ const layerFor = (state: Fixture) => {
   ) => {
     const excluded = queryValue(queryValue(query, "_id"), "$nin")
     if (Array.isArray(excluded)) state.calls.pageExclusions.push(excluded)
-    const matches = documentsFor(classRef).filter((document) => matchesQuery(document, query))
+    const staffDepartmentQueryUnsupported =
+      state.staffDepartmentQueryReturnsEmpty &&
+      String(classRef) === String(hr.mixin.Staff) &&
+      queryValue(query, "department") !== undefined
+    const matches = staffDepartmentQueryUnsupported
+      ? []
+      : documentsFor(classRef).filter((document) => matchesQuery(document, query))
     const rows = options?.limit === undefined ? matches : matches.slice(0, options.limit)
     return Effect.succeed(toFindResult(rows, matches.length))
   }
@@ -663,5 +671,12 @@ describe("HR report operations", () => {
     expect(
       run(getHrTable({ ...range, department: DepartmentIdentifier.make("Product") }), contaminated).totalEmployees
     ).toBe(2)
+  })
+
+  it("scopes Staff locally when Huly returns no rows for a mixin department query", () => {
+    const state = { ...fixture(), staffDepartmentQueryReturnsEmpty: true }
+    expect(run(getHrTable({ ...range, department: DepartmentIdentifier.make("Product") }), state).totalEmployees).toBe(
+      2
+    )
   })
 })

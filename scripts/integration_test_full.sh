@@ -5153,6 +5153,40 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_public_holidays\",\"arguments\":{\"department\":\"$HR_CHILD_ID\",\"includeInherited\":true,\"startDate\":\"2026-09-04\",\"endDate\":\"2026-09-07\",\"limit\":20}},\"id\":2}"
       assert_json_field_equals "nested department inherits both holiday documents" \
         "$HR_INHERITED_HOLIDAYS_TEXT" ".total" "2"
+      HR_CHILD_PATH_JSON=$(json_string "$HR_DEPARTMENT_NAME/$HR_CHILD_NAME")
+      HR_PROPAGATED_STAFF="{}"
+      HR_PROPAGATED_CHILD="{}"
+      HR_PROPAGATED_PARENT="{}"
+      for _ in $(seq 1 20); do
+        restart_http_transport_if_needed "HR hierarchy propagation poll" || exit 1
+        HR_STAFF_RESPONSE=$(call_tool \
+          '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_staff","arguments":{"limit":200}},"id":2}' 2>/dev/null) || true
+        HR_CHILD_RESPONSE=$(call_tool \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_department\",\"arguments\":{\"department\":$HR_CHILD_PATH_JSON}},\"id\":2}" 2>/dev/null) || true
+        HR_PARENT_RESPONSE=$(call_tool \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_department\",\"arguments\":{\"department\":$HR_DEPARTMENT_NAME_JSON}},\"id\":2}" 2>/dev/null) || true
+        HR_PROPAGATED_STAFF=$(echo "$HR_STAFF_RESPONSE" | jq -r '.result.content[0].text // "{}"' 2>/dev/null)
+        HR_PROPAGATED_CHILD=$(echo "$HR_CHILD_RESPONSE" | jq -r '.result.content[0].text // "{}"' 2>/dev/null)
+        HR_PROPAGATED_PARENT=$(echo "$HR_PARENT_RESPONSE" | jq -r '.result.content[0].text // "{}"' 2>/dev/null)
+        if [ "$(echo "$HR_PROPAGATED_STAFF" | jq -r --arg employee "$HR_STAFF_EMPLOYEE" --arg department "$HR_CHILD_ID" \
+          '[.staff[]? | select(.id == $employee and .department.id == $department)] | length')" -eq 1 ] \
+          && [ "$(echo "$HR_PROPAGATED_CHILD" | jq -r '.derivedMembers // 0')" -ge 1 ] \
+          && [ "$(echo "$HR_PROPAGATED_PARENT" | jq -r '.derivedMembers // 0')" -ge 1 ]; then
+          break
+        fi
+        sleep 0.25
+      done
+      if [ "$(echo "$HR_PROPAGATED_STAFF" | jq -r --arg employee "$HR_STAFF_EMPLOYEE" --arg department "$HR_CHILD_ID" \
+        '[.staff[]? | select(.id == $employee and .department.id == $department)] | length')" -ne 1 ] \
+        || [ "$(echo "$HR_PROPAGATED_CHILD" | jq -r '.derivedMembers // 0')" -lt 1 ] \
+        || [ "$(echo "$HR_PROPAGATED_PARENT" | jq -r '.derivedMembers // 0')" -lt 1 ]; then
+        fail_test "HR Staff hierarchy visibility barrier" "assigned Staff was not visible after 20 fresh-session attempts"
+        exit 1
+      fi
+      assert_json_field_equals "Staff assignment propagates to child members" \
+        "$HR_PROPAGATED_CHILD" ".derivedMembers >= 1" "true"
+      assert_json_field_equals "Staff assignment propagates to ancestor members" \
+        "$HR_PROPAGATED_PARENT" ".derivedMembers >= 1" "true"
       run_capture_to_var HR_TABLE_TEXT "get_hr_table(complete scan)" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_hr_table\",\"arguments\":{\"department\":\"$HR_CHILD_ID\",\"startDate\":\"2026-09-04\",\"endDate\":\"2026-09-07\"}},\"id\":2}"
       assert_json_field_equals "HR table reports a complete scan" "$HR_TABLE_TEXT" ".complete" "true"
@@ -5167,27 +5201,6 @@ if [ -n "$HR_STAFF_EMPLOYEE" ]; then
         "$HR_PAGINATED_REPORTS_BEFORE_REQUEST" ".table.rows[0].publicHolidayWorkdays" "2"
       assert_json_field_equals "internal paginated table excludes both inherited holidays from base workdays" \
         "$HR_PAGINATED_REPORTS_BEFORE_REQUEST" ".table.rows[0].baseWorkdays" "0"
-      HR_CHILD_PATH_JSON=$(json_string "$HR_DEPARTMENT_NAME/$HR_CHILD_NAME")
-      HR_PROPAGATED_CHILD="{}"
-      HR_PROPAGATED_PARENT="{}"
-      for _ in $(seq 1 20); do
-        restart_http_transport_if_needed "HR hierarchy propagation poll" || exit 1
-        HR_CHILD_RESPONSE=$(call_tool \
-          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_department\",\"arguments\":{\"department\":$HR_CHILD_PATH_JSON}},\"id\":2}" 2>/dev/null) || true
-        HR_PARENT_RESPONSE=$(call_tool \
-          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_department\",\"arguments\":{\"department\":$HR_DEPARTMENT_NAME_JSON}},\"id\":2}" 2>/dev/null) || true
-        HR_PROPAGATED_CHILD=$(echo "$HR_CHILD_RESPONSE" | jq -r '.result.content[0].text // "{}"' 2>/dev/null)
-        HR_PROPAGATED_PARENT=$(echo "$HR_PARENT_RESPONSE" | jq -r '.result.content[0].text // "{}"' 2>/dev/null)
-        if [ "$(echo "$HR_PROPAGATED_CHILD" | jq -r '.derivedMembers // 0')" -ge 1 ] \
-          && [ "$(echo "$HR_PROPAGATED_PARENT" | jq -r '.derivedMembers // 0')" -ge 1 ]; then
-          break
-        fi
-        sleep 0.25
-      done
-      assert_json_field_equals "Staff assignment propagates to child members" \
-        "$HR_PROPAGATED_CHILD" ".derivedMembers >= 1" "true"
-      assert_json_field_equals "Staff assignment propagates to ancestor members" \
-        "$HR_PROPAGATED_PARENT" ".derivedMembers >= 1" "true"
       HR_RESTORE_DEPARTMENT_JSON="null"
       if [ -n "$HR_STAFF_ORIGINAL_DEPARTMENT" ]; then
         HR_RESTORE_DEPARTMENT_JSON=$(json_string "$HR_STAFF_ORIGINAL_DEPARTMENT")

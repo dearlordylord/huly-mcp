@@ -476,4 +476,29 @@ capture_paginated_hr_reports result 'forced pagination' department 2026-09-04 20
     expect(script).toContain('"$HR_CHILD_ID" "2026-09-04" "2026-09-07"')
     expect(script).toContain('".table.rows[0].publicHolidayWorkdays" "2"')
   })
+
+  it("waits for fresh Staff hierarchy readback before public and forced-page table probes", () => {
+    const assignment = script.indexOf('run_test "assign_staff_department(authoritative)"')
+    const barrier = script.indexOf('restart_http_transport_if_needed "HR hierarchy propagation poll"')
+    const staffReadback = script.indexOf('HR_PROPAGATED_STAFF=$(echo "$HR_STAFF_RESPONSE"', barrier)
+    const childReadback = script.indexOf('"Staff assignment propagates to child members"')
+    const parentReadback = script.indexOf('"Staff assignment propagates to ancestor members"')
+    const barrierFailure = script.indexOf('fail_test "HR Staff hierarchy visibility barrier"')
+    const publicTable = script.indexOf('run_capture_to_var HR_TABLE_TEXT "get_hr_table(complete scan)"')
+    const paginatedTable = script.indexOf("capture_paginated_hr_reports HR_PAGINATED_REPORTS_BEFORE_REQUEST")
+    const restoration = script.indexOf('run_test "assign_staff_department(restore fixture)"')
+
+    expect(assignment).toBeGreaterThanOrEqual(0)
+    expect(barrier).toBeGreaterThan(assignment)
+    expect(staffReadback).toBeGreaterThan(barrier)
+    expect(barrierFailure).toBeGreaterThan(barrier)
+    expect(childReadback).toBeGreaterThan(barrierFailure)
+    expect(parentReadback).toBeGreaterThan(childReadback)
+    expect(publicTable).toBeGreaterThan(parentReadback)
+    expect(paginatedTable).toBeGreaterThan(publicTable)
+    expect(restoration).toBeGreaterThan(paginatedTable)
+    expect(script.slice(barrier, publicTable)).toContain(
+      "[.staff[]? | select(.id == $employee and .department.id == $department)] | length"
+    )
+  })
 })
