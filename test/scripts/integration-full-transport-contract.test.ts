@@ -476,4 +476,102 @@ capture_paginated_hr_reports result 'forced pagination' department 2026-09-04 20
     expect(script).toContain('"$HR_CHILD_ID" "2026-09-04" "2026-09-07"')
     expect(script).toContain('".table.rows[0].publicHolidayWorkdays" "2"')
   })
+
+  it("waits for fresh Staff hierarchy readback before public and forced-page table probes", () => {
+    const assignment = script.indexOf('run_test "assign_staff_department(authoritative)"')
+    const barrier = script.indexOf("if ! wait_for_hr_staff_hierarchy_visibility", assignment)
+    const childReadback = script.indexOf('"Staff assignment propagates to child members"')
+    const parentReadback = script.indexOf('"Staff assignment propagates to ancestor members"')
+    const barrierFailure = script.indexOf('fail_test "HR Staff hierarchy visibility barrier"')
+    const publicTable = script.indexOf('run_capture_to_var HR_TABLE_TEXT "get_hr_table(complete scan)"')
+    const paginatedTable = script.indexOf("capture_paginated_hr_reports HR_PAGINATED_REPORTS_BEFORE_REQUEST")
+    const restoration = script.indexOf('run_test "assign_staff_department(restore fixture)"')
+
+    expect(assignment).toBeGreaterThanOrEqual(0)
+    expect(barrier).toBeGreaterThan(assignment)
+    expect(barrierFailure).toBeGreaterThan(barrier)
+    expect(childReadback).toBeGreaterThan(barrierFailure)
+    expect(parentReadback).toBeGreaterThan(childReadback)
+    expect(publicTable).toBeGreaterThan(parentReadback)
+    expect(paginatedTable).toBeGreaterThan(publicTable)
+    expect(restoration).toBeGreaterThan(paginatedTable)
+    expect(functionBody("wait_for_hr_staff_hierarchy_visibility")).toContain(
+      "[.staff[]? | select(.id == $employee and .department.id == $department)] | length"
+    )
+    expect(functionBody("wait_for_hr_staff_hierarchy_visibility").match(/call_tool_fresh_session/gu)).toHaveLength(3)
+  })
+
+  it("fails closed and restores Staff through fresh authoritative confirmations when the barrier exhausts", () => {
+    const execution = spawnSync(
+      "bash",
+      [
+        "-c",
+        `${shellFunction("tool_response_succeeded")}
+${shellFunction("restore_hr_staff_fixture")}
+${shellFunction("cleanup_hr_artifacts")}
+${shellFunction("wait_for_hr_staff_hierarchy_visibility")}
+trace=$(mktemp)
+on_exit() {
+  status=$?
+  trap - EXIT
+  cleanup_hr_artifacts
+  cleanup_status=$?
+  printf 'final marker=%s cleanup=%s\n' "$HR_STAFF_RESTORE_EMPLOYEE" "$cleanup_status"
+  cat "$trace"
+  rm -f "$trace"
+  exit "$status"
+}
+trap on_exit EXIT
+json_string() { jq -Rn --arg value "$1" '$value'; }
+sleep() { :; }
+call_tool_fresh_session() {
+  name=$(printf '%s\n' "$1" | jq -r '.params.name')
+  if [ "$name" = assign_staff_department ]; then
+    department=$(printf '%s\n' "$1" | jq -r '.params.arguments.department // empty')
+    printf 'restore marker=%s department=%s\n' "$HR_STAFF_RESTORE_EMPLOYEE" "$department" >>"$trace"
+    text=$(jq -nc --arg employee "$HR_STAFF_RESTORE_EMPLOYEE" --arg department "$department" \
+      '{employeeId:$employee,department:{id:$department,name:"Original",path:"Original"},updated:false,propagation:"server-derived"}')
+  elif [ "$name" = list_staff ]; then
+    restores=$(grep -c '^restore ' "$trace" || true)
+    if [ "$restores" -eq 0 ]; then
+      text='{"staff":[],"total":0}'
+    elif [ "$restores" -eq 1 ]; then
+      text='{"staff":[{"id":"employee-1","department":{"id":"assigned-department"}}],"total":1}'
+    else
+      text='{"staff":[{"id":"employee-1","department":{"id":"original-department"}}],"total":1}'
+    fi
+  elif [ "$name" = get_department ]; then
+    text='{"derivedMembers":0}'
+  else
+    printf 'report-probe=%s\n' "$name" >>"$trace"
+    text='{}'
+  fi
+  jq -nc --arg text "$text" '{jsonrpc:"2.0",id:2,result:{isError:false,content:[{type:"text",text:$text}]}}'
+}
+fail_test() { printf 'failed=%s\n' "$1"; }
+HR_STAFF_EMPLOYEE=employee-1
+HR_CHILD_ID=assigned-department
+HR_CHILD_PATH_JSON='"Parent/Child"'
+HR_DEPARTMENT_NAME_JSON='"Parent"'
+HR_STAFF_RESTORE_EMPLOYEE=employee-1
+HR_STAFF_RESTORE_DEPARTMENT=original-department
+HR_STAFF_VISIBILITY_ATTEMPTS=2
+HR_CLEANUP_REQUEST_ID=''
+HR_CLEANUP_HOLIDAY_IDS=''
+HR_CLEANUP_DEPARTMENT_ID=''
+if ! wait_for_hr_staff_hierarchy_visibility; then
+  fail_test 'HR Staff hierarchy visibility barrier'
+  exit 1
+fi
+call_tool_fresh_session '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_hr_table","arguments":{}},"id":2}'`
+      ],
+      { encoding: "utf8", env: cleanShellEnv }
+    )
+    expect(execution.status).toBe(1)
+    expect(execution.stdout).toContain("failed=HR Staff hierarchy visibility barrier\n")
+    expect(execution.stdout).toContain("final marker= cleanup=0\n")
+    expect(execution.stdout.match(/restore marker=employee-1 department=original-department/gu)).toHaveLength(4)
+    expect(execution.stdout).not.toContain("report-probe=")
+    expect(execution.stderr).toBe("")
+  })
 })
