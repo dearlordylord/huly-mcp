@@ -22,7 +22,8 @@ That command versions packages from pending changesets when they exist and pushe
 
 - Start from `master`.
 - Confirm the worktree is clean.
-- Confirm `gh auth status` and npm publish access before the final publish step.
+- Confirm the active GitHub account and npm publish access before the final publish step. Inactive
+  accounts saved by `gh` may have expired tokens and do not affect the release.
 - Keep OTP/2FA values out of shell history and logs.
 - Confirm the expected changesets only bump the intended package. A CLI-only changeset should publish `@firfi/huly-cli` without bumping or rebuilding `@firfi/huly-mcp`.
 
@@ -30,7 +31,7 @@ That command versions packages from pending changesets when they exist and pushe
 git checkout master
 git pull --ff-only origin master
 git status --short
-gh auth status
+gh api user --jq '.login'
 npm whoami
 npm dist-tag ls @firfi/huly-mcp
 npm dist-tag ls @firfi/huly-cli || true

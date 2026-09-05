@@ -223,7 +223,8 @@ fi
 # not have node_modules yet, so make the one-command release path self-contained.
 CI=true pnpm install --frozen-lockfile --prod=false
 
-gh auth status >/dev/null
+active_github_login="$(gh api user --jq '.login')"
+echo "Authenticated to GitHub as $active_github_login."
 npm whoami >/dev/null
 show_dist_tags "$MCP_PACKAGE_NAME" false
 show_dist_tags "$CLI_PACKAGE_NAME" true
