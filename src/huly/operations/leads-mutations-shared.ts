@@ -1,6 +1,6 @@
 import type { MarkupFormat } from "@hcengineering/api-client"
-import type { Contact, Employee, Organization, Person } from "@hcengineering/contact"
-import type { Class, Doc, DocumentUpdate, MarkupBlobRef, Ref, Space, Status } from "@hcengineering/core"
+import type { Contact, Employee, Person } from "@hcengineering/contact"
+import type { Class, Doc, DocumentUpdate, MarkupBlobRef, Ref, Status } from "@hcengineering/core"
 import type { TaskType } from "@hcengineering/task"
 import { Effect, Option, Schema } from "effect"
 
@@ -40,7 +40,7 @@ import type {
 } from "../errors-leads.js"
 import { LeadIdentifierAmbiguousError, LeadNotFoundError } from "../errors-leads.js"
 import {
-  type HulyDataInvalidError,
+  HulyDataInvalidError,
   HulyError,
   InvalidStatusError,
   type OrganizationIdentifierAmbiguousError,
@@ -53,6 +53,7 @@ import { contact } from "../huly-plugins.js"
 import { leadClassIds } from "../lead-plugin.js"
 import { findPersonByExactEmail, findPersonByExactName, findPersonById } from "./contacts-shared.js"
 import { selectUniquePerson } from "./leads-mutation-decisions.js"
+import { findLeadCustomerDocument } from "./leads-customer-lookup.js"
 import {
   funnelSpace,
   getFunnelProjectType,
@@ -64,9 +65,8 @@ import {
 import { renderMarkdownWithNativeReferencesForWrite } from "./native-reference-markup.js"
 import { findResultTotal, hulyQuery } from "./query-helpers.js"
 import { markupBlobRefAsMarkupRef } from "./recruiting-shared.js"
-import { toClassRef, toMixinRef, toRef } from "./sdk-boundary.js"
+import { toClassRef, toRef } from "./sdk-boundary.js"
 import {
-  customerMixinWriteAttributes,
   type HulyLead,
   parseLeadPersonDocument,
   parseLeadReadDocument,
@@ -251,7 +251,7 @@ export const currentStatus = Effect.fn("Lead.currentStatus")((
     : Effect.succeed({ id: status.id, name: StatusName.make(status.name) })
 })
 
-const renderMarkup = Effect.fn("Lead.renderMarkup")((
+export const renderLeadMutationMarkup = Effect.fn("Lead.renderLeadMutationMarkup")((
   client: HulyClient["Service"],
   content: string,
   field: LeadDescriptionField
@@ -275,7 +275,7 @@ export const prepareLeadDescription = Effect.fn("Lead.prepareLeadDescription")(f
 ): Effect.fn.Return<PreparedLeadDescription, HulyClientError | HulyError> {
   if (content === undefined || (content === null && lead.description === null)) return { _tag: "unchanged" }
   if (content === null) return { _tag: "clear" }
-  const rendered = yield* renderMarkup(client, content, "description")
+  const rendered = yield* renderLeadMutationMarkup(client, content, "description")
   if (lead.description === null) return { _tag: "upload", ...rendered }
   const currentMarkup = yield* client.fetchMarkup(
     leadClassIds.class.Lead,
@@ -318,103 +318,17 @@ export const findLeadCustomer = Effect.fn("Lead.findLeadCustomer")(function* (
   lead: HulyLead
 ): Effect.fn.Return<HulyCustomer, HulyClientError | HulyError | HulyDataInvalidError> {
   const customerId = toRef<Contact>(lead.attachedTo)
-  const person = yield* client.findOne<Person>(contact.class.Person, hulyQuery<Person>({ _id: customerId }))
-  if (person !== undefined) return yield* parseLeadPersonDocument(person)
-  const organization = yield* client.findOne<Organization>(
-    contact.class.Organization,
-    hulyQuery<Organization>({ _id: toRef<Organization>(customerId) })
-  )
-  return yield* resolveLeadCustomer(person, organization, lead)
-})
-
-type PreparedCustomerDescription =
-  | { readonly _tag: "unchanged" }
-  | { readonly _tag: "clear"; readonly customer: HulyCustomer }
-  | {
-      readonly _tag: "upload"
-      readonly customer: HulyCustomer
-      readonly markup: string
-      readonly format: MarkupFormat
-      readonly updateExisting: boolean
-    }
-
-const customerDescriptionRef = Effect.fn("Lead.customerDescriptionRef")(function* (
-  client: HulyClient["Service"],
-  customer: HulyCustomer
-): Effect.fn.Return<MarkupBlobRef | null | undefined, HulyClientError | HulyDataInvalidError> {
-  if (hasCustomerMixin(customer)) {
-    const projectedMixin = Reflect.get(customer, String(leadClassIds.mixin.Customer))
-    const attributes = yield* customerMixinWriteAttributes(projectedMixin)
-    return attributes.customerDescription
+  const customer = yield* findLeadCustomerDocument(client, customerId)
+  if (customer === undefined) {
+    return yield* resolveLeadCustomer(undefined, undefined, lead)
   }
-  const persistedMixin = yield* client.findOne<CustomerMixinWrite>(
-    toMixinRef<CustomerMixinWrite>(leadClassIds.mixin.Customer),
-    hulyQuery<CustomerMixinWrite>({ _id: toRef<CustomerMixinWrite>(customer._id) })
-  )
-  if (persistedMixin === undefined) return undefined
-  const attributes = yield* customerMixinWriteAttributes(persistedMixin)
-  return attributes.customerDescription
-})
-
-const clearedCustomerDescriptionPlan = (
-  customer: HulyCustomer,
-  existing: MarkupBlobRef | null | undefined
-): PreparedCustomerDescription =>
-  existing === undefined || existing === null ? { _tag: "unchanged" } : { _tag: "clear", customer }
-
-export const prepareCustomerDescription = Effect.fn("Lead.prepareCustomerDescription")(function* (
-  client: HulyClient["Service"],
-  lead: HulyLead,
-  content: string | null | undefined,
-  resolveCustomer: typeof findLeadCustomer = findLeadCustomer
-): Effect.fn.Return<PreparedCustomerDescription, HulyClientError | HulyError | HulyDataInvalidError> {
-  if (content === undefined) return { _tag: "unchanged" }
-  const customer = yield* resolveCustomer(client, lead)
-  const existing = yield* customerDescriptionRef(client, customer)
-  if (content === null) return clearedCustomerDescriptionPlan(customer, existing)
-  const rendered = yield* renderMarkup(client, content, "customerDescription")
-  if (existing !== undefined && existing !== null) {
-    const currentMarkup = yield* client.fetchMarkup(
-      toClassRef<Doc>(String(leadClassIds.mixin.Customer)),
-      toRef<Doc>(customer._id),
-      "customerDescription",
-      markupBlobRefAsMarkupRef(existing),
-      rendered.format
-    )
-    if (currentMarkup === rendered.markup) return { _tag: "unchanged" }
+  if (String(customer._class) === String(contact.class.Person)) return yield* parseLeadPersonDocument(customer)
+  if (String(customer._class) === String(contact.class.Organization)) {
+    return yield* resolveLeadCustomer(undefined, customer, lead)
   }
-  return { _tag: "upload", customer, updateExisting: existing !== undefined, ...rendered }
-})
-
-export const executeCustomerDescription = Effect.fn("Lead.executeCustomerDescription")(function* (
-  client: HulyClient["Service"],
-  plan: PreparedCustomerDescription
-): Effect.fn.Return<boolean, HulyClientError> {
-  if (plan._tag === "unchanged") return false
-  const attributes =
-    plan._tag === "clear"
-      ? { customerDescription: null }
-      : {
-          customerDescription: toMarkupBlobRef(
-            NonEmptyString.make(
-              yield* client.uploadMarkup(
-                toClassRef<Doc>(String(leadClassIds.mixin.Customer)),
-                toRef<Doc>(plan.customer._id),
-                "customerDescription",
-                plan.markup,
-                plan.format
-              )
-            )
-          )
-        }
-  const updateExisting = plan._tag === "clear" || plan.updateExisting
-  const writeMixin = updateExisting ? client.updateMixin : client.createMixin
-  yield* writeMixin<Contact, CustomerMixinWrite>(
-    toRef<Contact>(plan.customer._id),
-    customerClass(plan.customer),
-    toRef<Space>(plan.customer.space),
-    toMixinRef<CustomerMixinWrite>(leadClassIds.mixin.Customer),
-    attributes
-  )
-  return true
+  return yield* new HulyDataInvalidError({
+    operation: "leadMutation",
+    entity: `Lead '${lead.identifier}' customer`,
+    cause: customer
+  })
 })

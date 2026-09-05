@@ -291,7 +291,7 @@ const createTestLayer = (config: LeadMockConfig) => {
     }
 
     if (_class === contact.class.Contact) {
-      return Effect.succeed(contacts.find((customer) => customer._id === q._id))
+      return Effect.succeed([...contacts, ...persons].find((customer) => customer._id === q._id))
     }
 
     if (_class === contact.class.Organization) {

@@ -32,9 +32,9 @@ import type {
 import { leadClassIds } from "../lead-plugin.js"
 import { funnelSpace, type FunnelWorkflowTaskType, type HulyFunnel } from "./funnels-shared.js"
 import { applyPersonCustomer, deleteResolvedLead } from "./leads-mutation-actions.js"
+import { executeCustomerDescription, prepareCustomerDescription } from "./leads-customer-description.js"
 import {
   currentStatus,
-  executeCustomerDescription,
   executeLeadDescription,
   type HulyLead,
   type LeadDocumentUpdate,
@@ -42,7 +42,6 @@ import {
   findLeadCustomer,
   resolveExactPerson,
   resolveEmployee,
-  prepareCustomerDescription,
   prepareLeadDescription,
   type LeadMutationError,
   validatedFunnel,
