@@ -139,8 +139,20 @@ interface Captures {
 }
 
 const emptyCaptures = (): Captures => ({ writes: [], markupClasses: [], documentUpdates: [] })
-const makeLayer = (captures: Captures, currentCustomerMarkup = "old customer markup") =>
-  HulyClient.testLayer({
+const makeLayer = (
+  captures: Captures,
+  currentCustomerMarkup = "old customer markup",
+  persistedCustomerDescription?: string | null
+) => {
+  const findOne = mockFn().mockReturnValue(
+    Effect.succeed(
+      persistedCustomerDescription === undefined
+        ? undefined
+        : { ...person(), customerDescription: persistedCustomerDescription }
+    )
+  )
+  return HulyClient.testLayer({
+    findOne,
     findAll: <T extends Doc>(_documentClass: Ref<Class<T>>, _query: DocumentQuery<T>, _options?: FindOptions<T>) =>
       Effect.succeed(findResult<T>([])),
     fetchMarkup: (_class, _id, attribute) =>
@@ -172,6 +184,7 @@ const makeLayer = (captures: Captures, currentCustomerMarkup = "old customer mar
       return Effect.succeed(attachedTo)
     }
   })
+}
 
 const emptyLayer = (captures: Captures, total = 0, includeRemover = true) => {
   const findAll = <T extends Doc>(
@@ -278,6 +291,30 @@ describe("lead mutation public operations", () => {
       )
       expect(clearResult.updated).toBe(false)
       expect(clearCaptures.writes).toEqual([])
+    })
+  )
+
+  it.effect("reads the persisted Customer mixin when the base customer projection omits it", () =>
+    Effect.gen(function* () {
+      const captures = emptyCaptures()
+      const rendered = renderMarkdownWithNativeReferencesForWrite(
+        "persisted customer markup",
+        testMarkupUrlConfig,
+        "customerDescription"
+      )
+      if (rendered._tag !== "success") return yield* Effect.die(new Error(rendered.reason))
+      const params = yield* parseUpdateLeadParams({
+        funnel: "funnel-1",
+        identifier: "LEAD-1",
+        customerDescription: "persisted customer markup"
+      })
+      const result = yield* updateLead(params, resolvers(person())).pipe(
+        Effect.provide(makeLayer(captures, rendered.rendered.markup, "customer-description")),
+        withDiagnostics
+      )
+
+      expect(result.updated).toBe(false)
+      expect(captures.writes).toEqual([])
     })
   )
 
