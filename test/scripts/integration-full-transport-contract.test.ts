@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs"
-import { execFileSync } from "node:child_process"
+import { execFileSync, spawnSync } from "node:child_process"
 
 import { describe, expect, it } from "vitest"
 
@@ -90,6 +90,30 @@ describe("full integration HTTP fresh-session contract", () => {
     expect(body).toContain(
       'grep -Eq "(but (sendInvite|resendInvite) failed after:|Connection error while communicating with Huly: (sendInvite|resendInvite) failed\\.)"'
     )
+  })
+
+  it("extracts lifecycle cleanup IDs without parsing plain provider failures as JSON", () => {
+    expect(script).toContain(
+      'EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID=$(extract_employee_lifecycle_person_id "$EMPLOYEE_LIFECYCLE_CREATE")'
+    )
+    expect(script).toContain('fail_test "invite_employee(create-or-promote cleanup identity)"')
+    const command = `${shellFunction("extract_employee_lifecycle_person_id")}\nextract_employee_lifecycle_person_id "$1"`
+    const structured = spawnSync("bash", ["-c", command, "lifecycle-id", '{"personId":"person-success"}'], {
+      encoding: "utf8"
+    })
+    expect(structured).toMatchObject({ status: 0, stdout: "person-success\n", stderr: "" })
+
+    const partial = spawnSync(
+      "bash",
+      [
+        "-c",
+        command,
+        "lifecycle-id",
+        "Employee 'person-partial' was prepared for 'fixture@example.test', but sendInvite failed after: personCreated. Retry safely."
+      ],
+      { encoding: "utf8" }
+    )
+    expect(partial).toMatchObject({ status: 0, stdout: "person-partial\n", stderr: "" })
   })
 
   it("selects messaging fixtures only from authoritative workspace memberships", () => {

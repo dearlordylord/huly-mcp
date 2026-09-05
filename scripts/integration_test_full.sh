@@ -1293,6 +1293,17 @@ run_employee_invitation_step() {
   return 1
 }
 
+extract_employee_lifecycle_person_id() {
+  local text="$1"
+  if printf '%s\n' "$text" | jq -e \
+    'type == "object" and (.personId | type == "string" and length > 0)' >/dev/null 2>&1; then
+    printf '%s\n' "$text" | jq -r '.personId'
+    return 0
+  fi
+  printf '%s\n' "$text" \
+    | sed -n "s/^Employee '\([^']\+\)' was prepared for '[^']\+', but \(sendInvite\|resendInvite\) failed after:.*$/\1/p"
+}
+
 capture_paginated_hr_reports() {
   local output_var="$1" name="$2" department="$3" start_date="$4" end_date="$5" output
   if ! output=$(timeout 90 pnpm exec tsx scripts/integration-hr-report-pagination-fixture.ts \
@@ -4838,35 +4849,36 @@ EMPLOYEE_LIFECYCLE_NAME_JSON=$(json_string "$EMPLOYEE_LIFECYCLE_NAME")
 run_employee_invitation_step EMPLOYEE_LIFECYCLE_CREATE "invite_employee(create-or-promote)" \
   "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"invite_employee\",\"arguments\":{\"mode\":\"create-or-promote\",\"name\":$EMPLOYEE_LIFECYCLE_NAME_JSON,\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON}},\"id\":2}"
 if [ $? -eq 0 ]; then
-  EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATE" | jq -r '.personId // empty')
+  EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID=$(extract_employee_lifecycle_person_id "$EMPLOYEE_LIFECYCLE_CREATE")
   if [ -z "$EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID" ]; then
-    EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATE" | sed -n "s/.*Employee '\([^']*\)'.*/\1/p")
-  fi
-  run_capture_to_var_fresh EMPLOYEE_LIFECYCLE_CREATED_PREVIEW "deactivate_employee(created preview)" \
-    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"deactivate_employee\",\"arguments\":{\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON},\"action\":\"deactivate\"}},\"id\":2}"
-  if [ $? -eq 0 ]; then
-    EMPLOYEE_LIFECYCLE_CREATED_ID_VALUE=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -r '.impact.personId')
-    EMPLOYEE_LIFECYCLE_CREATED_EXPECTED=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -c \
-      '.impact | {relationship, personId, employeeActive: (.employee.state == "active")} + (if .relationship == "unlinked" then {} else {personUuid: .account.personUuid} end) + (if .relationship == "workspace-member" then {workspaceRole: .workspaceMembership.role} else {} end)')
-    run_capture_to_var_fresh EMPLOYEE_LIFECYCLE_DEACTIVATED "deactivate_employee(created execute)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"deactivate_employee\",\"arguments\":{\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON},\"action\":\"deactivate\",\"execute\":true,\"expected\":$EMPLOYEE_LIFECYCLE_CREATED_EXPECTED}},\"id\":2}"
-    run_employee_invitation_step EMPLOYEE_LIFECYCLE_RESENT "invite_employee(inactive resend)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"invite_employee\",\"arguments\":{\"mode\":\"invite-existing\",\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON}}},\"id\":2}"
-    run_employee_invitation_step EMPLOYEE_LIFECYCLE_REACTIVATED "invite_employee(reactivate and restore)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"invite_employee\",\"arguments\":{\"mode\":\"create-or-promote\",\"name\":$EMPLOYEE_LIFECYCLE_NAME_JSON,\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON}},\"id\":2}"
-    run_capture_to_var_fresh EMPLOYEE_LIFECYCLE_RESTORED "deactivate_employee(restoration readback)" \
+    fail_test "invite_employee(create-or-promote cleanup identity)" "response did not contain an exact lifecycle Person ID"
+  else
+    run_capture_to_var_fresh EMPLOYEE_LIFECYCLE_CREATED_PREVIEW "deactivate_employee(created preview)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"deactivate_employee\",\"arguments\":{\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON},\"action\":\"deactivate\"}},\"id\":2}"
     if [ $? -eq 0 ]; then
-      assert_json_field_equals "employee lifecycle restoration is active" \
-        "$EMPLOYEE_LIFECYCLE_RESTORED" '.impact.employee.state' 'active'
-      assert_json_field_equals "employee lifecycle restoration keeps USER role" \
-        "$EMPLOYEE_LIFECYCLE_RESTORED" '.impact.employee.role' 'USER'
-      assert_json_field_equals "employee lifecycle disposable account remains unlinked" \
-        "$EMPLOYEE_LIFECYCLE_RESTORED" '.impact.account.state' 'unlinked'
-      assert_json_field_equals "employee lifecycle disposable member remains absent" \
-        "$EMPLOYEE_LIFECYCLE_RESTORED" '.impact.workspaceMembership.state' 'absent'
-      assert_json_field_equals "employee lifecycle restoration keeps Person identity" \
-        "$EMPLOYEE_LIFECYCLE_RESTORED" '.impact.personId' "$EMPLOYEE_LIFECYCLE_CREATED_ID_VALUE"
+      EMPLOYEE_LIFECYCLE_CREATED_ID_VALUE=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -r '.impact.personId')
+      EMPLOYEE_LIFECYCLE_CREATED_EXPECTED=$(printf '%s\n' "$EMPLOYEE_LIFECYCLE_CREATED_PREVIEW" | jq -c \
+        '.impact | {relationship, personId, employeeActive: (.employee.state == "active")} + (if .relationship == "unlinked" then {} else {personUuid: .account.personUuid} end) + (if .relationship == "workspace-member" then {workspaceRole: .workspaceMembership.role} else {} end)')
+      run_capture_to_var_fresh EMPLOYEE_LIFECYCLE_DEACTIVATED "deactivate_employee(created execute)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"deactivate_employee\",\"arguments\":{\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON},\"action\":\"deactivate\",\"execute\":true,\"expected\":$EMPLOYEE_LIFECYCLE_CREATED_EXPECTED}},\"id\":2}"
+      run_employee_invitation_step EMPLOYEE_LIFECYCLE_RESENT "invite_employee(inactive resend)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"invite_employee\",\"arguments\":{\"mode\":\"invite-existing\",\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON}}},\"id\":2}"
+      run_employee_invitation_step EMPLOYEE_LIFECYCLE_REACTIVATED "invite_employee(reactivate and restore)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"invite_employee\",\"arguments\":{\"mode\":\"create-or-promote\",\"name\":$EMPLOYEE_LIFECYCLE_NAME_JSON,\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON}},\"id\":2}"
+      run_capture_to_var_fresh EMPLOYEE_LIFECYCLE_RESTORED "deactivate_employee(restoration readback)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"deactivate_employee\",\"arguments\":{\"employee\":{\"email\":$EMPLOYEE_LIFECYCLE_EMAIL_JSON},\"action\":\"deactivate\"}},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "employee lifecycle restoration is active" \
+          "$EMPLOYEE_LIFECYCLE_RESTORED" '.impact.employee.state' 'active'
+        assert_json_field_equals "employee lifecycle restoration keeps USER role" \
+          "$EMPLOYEE_LIFECYCLE_RESTORED" '.impact.employee.role' 'USER'
+        assert_json_field_equals "employee lifecycle disposable account remains unlinked" \
+          "$EMPLOYEE_LIFECYCLE_RESTORED" '.impact.account.state' 'unlinked'
+        assert_json_field_equals "employee lifecycle disposable member remains absent" \
+          "$EMPLOYEE_LIFECYCLE_RESTORED" '.impact.workspaceMembership.state' 'absent'
+        assert_json_field_equals "employee lifecycle restoration keeps Person identity" \
+          "$EMPLOYEE_LIFECYCLE_RESTORED" '.impact.personId' "$EMPLOYEE_LIFECYCLE_CREATED_ID_VALUE"
+      fi
     fi
   fi
 fi
