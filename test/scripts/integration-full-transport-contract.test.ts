@@ -122,12 +122,24 @@ describe("full integration HTTP fresh-session contract", () => {
     expect(JSON.parse(output)).toEqual(["member@example.test"])
   })
 
-  it("polls nested department readback with parent-owned fresh sessions", () => {
+  it("polls department visibility through bounded one-shot sessions", () => {
     const body = functionBody("wait_for_department_path")
-    expectRestartBeforeCapture(body, 'result=$(call_tool "$payload"')
+    expect(body).toContain('result=$(call_tool_fresh_session "$payload"')
     expect(body).toContain('while [ "$attempt" -le "$attempts" ]')
+    expect(body).toContain(".result.isError == true or .error != null")
     expect(body).toContain("jq -r '.id // empty'")
+    expect(body).not.toContain("restart_http_transport_if_needed")
     expect(body).not.toContain("run_capture_to_var")
+  })
+
+  it("waits for the parent before creating a nested department exactly once in a fresh session", () => {
+    const parentWait = script.indexOf("get_department(parent fresh-session visibility)")
+    const childCreate = script.indexOf(
+      'run_capture_to_var_with_runner call_tool_fresh_session HR_CHILD_TEXT "create_department(nested)"'
+    )
+    expect(parentWait).toBeGreaterThanOrEqual(0)
+    expect(childCreate).toBeGreaterThan(parentWait)
+    expect(script.slice(childCreate, childCreate + 500)).toContain('\\"parent\\":$HR_DEPARTMENT_ID_JSON')
   })
 
   it("retains the person merge source cleanup marker until fresh readback confirms deletion", () => {
