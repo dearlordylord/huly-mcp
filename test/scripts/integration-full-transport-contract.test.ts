@@ -74,6 +74,27 @@ describe("full integration HTTP fresh-session contract", () => {
     expect(body).toContain("cleanup marker retained")
   })
 
+  it("waits for canonical lead-person projections and idempotent mixin visibility", () => {
+    expect(functionBody("wait_for_person_detail")).toContain("call_tool_fresh_session")
+    expect(functionBody("wait_for_person_customer_noop")).toContain("call_tool_fresh_session")
+    expect(functionBody("wait_for_lead_update_noop")).toContain("call_tool_fresh_session")
+    expect(script).toContain('LEAD_PERSON_ID_JSON=$(json_string "$LEAD_PERSON_ID")')
+    expect(script).not.toContain('$(json_string \\"$LEAD_PERSON_ID\\")')
+    expect(script).toContain("LEAD_PERSON_NAME=$(printf '%s\\n' \"$LEAD_PERSON_DETAIL\" | jq -r '.name // empty'")
+    expect(script).toContain('[.unsupportedFields[].field] | sort | join(",")')
+  })
+
+  it("polls lead, person, and funnel cleanup readback before clearing exact markers", () => {
+    const leadCleanup = functionBody("cleanup_lead_artifacts")
+    const funnelCleanup = functionBody("cleanup_funnel_artifacts")
+    expect(leadCleanup).toContain("wait_for_tool_error_quiet")
+    expect(leadCleanup).toContain("call_tool_fresh_session")
+    expect(funnelCleanup).toContain("wait_for_tool_field_quiet")
+    expect(funnelCleanup).toContain("wait_for_tool_error_quiet")
+    expect(functionBody("wait_for_tool_error_quiet")).toContain("sleep 0.5")
+    expect(functionBody("wait_for_tool_field_quiet")).toContain("sleep 0.5")
+  })
+
   it("keeps page-size-one live HR report composition behind the internal adapter", () => {
     expect(script).toContain("scripts/integration-hr-report-pagination-fixture.ts")
     expect(script).not.toContain("scanPageSize")

@@ -133,6 +133,11 @@ export const applyPersonCustomer = Effect.fn("Lead.applyPersonCustomer")(functio
   person: Parameters<typeof hasCustomerMixin>[0]
 ): Effect.fn.Return<MakePersonCustomerResult, HulyClientError | HulyDataInvalidError> {
   if (hasCustomerMixin(person)) return { id: PersonId.make(person._id), applied: false }
+  const persistedCustomer = yield* client.findOne<CustomerMixinWrite>(
+    toMixinRef<CustomerMixinWrite>(leadClassIds.mixin.Customer),
+    hulyQuery<CustomerMixinWrite>({ _id: toRef<CustomerMixinWrite>(person._id) })
+  )
+  if (persistedCustomer !== undefined) return { id: PersonId.make(person._id), applied: false }
   const attributes = yield* customerMixinWriteAttributes({ customerDescription: null })
   yield* client.createMixin<Contact, CustomerMixinWrite>(
     toRef<Contact>(person._id),

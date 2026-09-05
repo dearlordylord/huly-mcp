@@ -38,6 +38,7 @@ import { renderMarkdownWithNativeReferencesForWrite } from "../../../src/huly/op
 import { toClassRef, toRef } from "../../../src/huly/operations/sdk-boundary.js"
 import { withDiagnostics } from "../../helpers/diagnostics.js"
 import { corePersonId, docRef, findResult, spaceRef, statusRef } from "../../helpers/huly-sdk.js"
+import { mockFn } from "../../helpers/mock-fn.js"
 
 const incomingStatus = statusRef("lead:status:Incoming")
 const wonStatus = statusRef("lead:status:Won")
@@ -715,6 +716,21 @@ describe("lead mutation public operations", () => {
       expect(applied).toEqual({ id: "person-1", applied: true })
       expect(unchanged).toEqual({ id: "person-1", applied: false })
       expect(captures.writes).toEqual(["createMixin"])
+    })
+  )
+
+  it.effect("recognizes a persisted Customer mixin omitted from the base Person projection", () =>
+    Effect.gen(function* () {
+      const findOne = mockFn().mockReturnValue(Effect.succeed(person(null)))
+      const params = yield* parseMakePersonCustomerParams({ identifier: PersonLocator.make("person-1") })
+      const result = yield* makePersonCustomer(params, resolvers()).pipe(
+        Effect.provide(HulyClient.testLayer({ findOne })),
+        withDiagnostics
+      )
+
+      expect(result).toEqual({ id: "person-1", applied: false })
+      expect(findOne.mock.calls[0]?.[0]).toBe(leadClassIds.mixin.Customer)
+      expect(findOne.mock.calls[0]?.[1]).toEqual({ _id: "person-1" })
     })
   )
 

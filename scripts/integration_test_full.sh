@@ -350,24 +350,57 @@ cleanup_board_artifacts() {
   fi
 }
 
+wait_for_tool_error_quiet() {
+  local payload="$1" expected="$2" attempts="${3:-20}" attempt=1 response is_error text
+  while [ "$attempt" -le "$attempts" ]; do
+    response=$(call_tool_fresh_session "$payload" 2>/dev/null || true)
+    is_error=$(echo "$response" | jq -r '.result.isError // false' 2>/dev/null)
+    text=$(echo "$response" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+    if [ "$is_error" = "true" ] && printf '%s\n' "$text" | grep -qF -- "$expected"; then
+      return 0
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      sleep 0.5
+    fi
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
+wait_for_tool_field_quiet() {
+  local payload="$1" jq_expr="$2" expected="$3" attempts="${4:-20}" attempt=1 response text value
+  while [ "$attempt" -le "$attempts" ]; do
+    response=$(call_tool_fresh_session "$payload" 2>/dev/null || true)
+    text=$(echo "$response" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+    value=$(printf '%s\n' "$text" | jq -r "$jq_expr // empty" 2>/dev/null)
+    if [ "$value" = "$expected" ]; then
+      return 0
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      sleep 0.5
+    fi
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
 cleanup_funnel_artifacts() {
   if [ -n "$FUNNEL_CLEANUP_ID" ]; then
-    local funnel_json archive_response archive_read archive_text delete_response delete_read
+    local funnel_json archive_response delete_response read_payload
     funnel_json=$(json_string "$FUNNEL_CLEANUP_ID")
-    archive_response=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_funnel\",\"arguments\":{\"funnel\":$funnel_json}},\"id\":2}" 2>/dev/null || true)
-    restart_http_transport_if_needed "after funnel cleanup archive" >/dev/null 2>&1 || return 1
-    archive_read=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_funnel\",\"arguments\":{\"funnel\":$funnel_json}},\"id\":2}" 2>/dev/null || true)
-    archive_text=$(echo "$archive_read" | jq -r '.result.content[0].text // "{}"' 2>/dev/null)
-    if [ -n "$archive_response" ] && [ "$(echo "$archive_text" | jq -r '.archived // false' 2>/dev/null)" = "true" ]; then
-      delete_response=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_funnel\",\"arguments\":{\"funnel\":$funnel_json,\"expectedLeads\":0,\"expectedComments\":0,\"expectedAttachments\":0}},\"id\":2}" 2>/dev/null || true)
-      restart_http_transport_if_needed "after funnel cleanup delete" >/dev/null 2>&1 || return 1
-      delete_read=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_funnel\",\"arguments\":{\"funnel\":$funnel_json}},\"id\":2}" 2>/dev/null || true)
-    else
-      delete_response=""
-      delete_read=""
+    read_payload="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_funnel\",\"arguments\":{\"funnel\":$funnel_json}},\"id\":2}"
+    if wait_for_tool_error_quiet "$read_payload" "not found" 1; then
+      FUNNEL_CLEANUP_ID=""
+      return 0
     fi
+    archive_response=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_funnel\",\"arguments\":{\"funnel\":$funnel_json}},\"id\":2}" 2>/dev/null || true)
+    if [ "$(echo "$archive_response" | jq -r '.result.isError // true' 2>/dev/null)" != "false" ] \
+      || ! wait_for_tool_field_quiet "$read_payload" '.archived' 'true'; then
+      return 1
+    fi
+    delete_response=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_funnel\",\"arguments\":{\"funnel\":$funnel_json,\"expectedLeads\":0,\"expectedComments\":0,\"expectedAttachments\":0}},\"id\":2}" 2>/dev/null || true)
     if [ "$(echo "$delete_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
-      && [ "$(echo "$delete_read" | jq -r '(.result.isError // false) and ((.result.content[0].text // "") | contains("not found"))' 2>/dev/null)" = "true" ]; then
+      && wait_for_tool_error_quiet "$read_payload" "not found"; then
       FUNNEL_CLEANUP_ID=""
       return 0
     fi
@@ -379,53 +412,63 @@ cleanup_funnel_artifacts() {
 cleanup_lead_artifacts() {
   local cleanup_failed=0
   if [ -n "$LEAD_CLEANUP_ID" ] && [ -n "$LEAD_CLEANUP_FUNNEL_ID" ]; then
-    local lead_json funnel_json preview preview_text comments attachments labels delete_response delete_read
+    local lead_json funnel_json preview preview_text comments attachments labels delete_response read_payload
     lead_json=$(json_string "$LEAD_CLEANUP_ID")
     funnel_json=$(json_string "$LEAD_CLEANUP_FUNNEL_ID")
-    preview=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_lead\",\"arguments\":{\"funnel\":$funnel_json,\"identifier\":$lead_json}},\"id\":2}" 2>/dev/null || true)
-    preview_text=$(echo "$preview" | jq -r '.result.content[0].text // empty' 2>/dev/null)
-    comments=$(echo "$preview_text" | jq -r '.impact.comments // empty' 2>/dev/null)
-    attachments=$(echo "$preview_text" | jq -r '.impact.attachments // empty' 2>/dev/null)
-    labels=$(echo "$preview_text" | jq -r '.impact.labels // empty' 2>/dev/null)
-    if [ -n "$comments" ] && [ -n "$attachments" ] && [ -n "$labels" ]; then
-      delete_response=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_lead\",\"arguments\":{\"funnel\":$funnel_json,\"identifier\":$lead_json,\"execute\":true,\"expectedComments\":$comments,\"expectedAttachments\":$attachments,\"expectedLabels\":$labels}},\"id\":2}" 2>/dev/null || true)
-      restart_http_transport_if_needed "after lead cleanup delete" >/dev/null 2>&1 || cleanup_failed=1
-      delete_read=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_lead\",\"arguments\":{\"funnel\":$funnel_json,\"identifier\":$lead_json}},\"id\":2}" 2>/dev/null || true)
-      if [ "$(echo "$delete_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
-        && [ "$(echo "$delete_read" | jq -r '(.result.isError // false) and ((.result.content[0].text // "") | contains("not found"))' 2>/dev/null)" = "true" ]; then
-        LEAD_CLEANUP_ID=""
-        LEAD_CLEANUP_FUNNEL_ID=""
+    read_payload="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_lead\",\"arguments\":{\"funnel\":$funnel_json,\"identifier\":$lead_json}},\"id\":2}"
+    if wait_for_tool_error_quiet "$read_payload" "not found" 1; then
+      LEAD_CLEANUP_ID=""
+      LEAD_CLEANUP_FUNNEL_ID=""
+    else
+      preview=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_lead\",\"arguments\":{\"funnel\":$funnel_json,\"identifier\":$lead_json}},\"id\":2}" 2>/dev/null || true)
+      preview_text=$(echo "$preview" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+      comments=$(echo "$preview_text" | jq -r '.impact.comments // empty' 2>/dev/null)
+      attachments=$(echo "$preview_text" | jq -r '.impact.attachments // empty' 2>/dev/null)
+      labels=$(echo "$preview_text" | jq -r '.impact.labels // empty' 2>/dev/null)
+      if [ -n "$comments" ] && [ -n "$attachments" ] && [ -n "$labels" ]; then
+        delete_response=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_lead\",\"arguments\":{\"funnel\":$funnel_json,\"identifier\":$lead_json,\"execute\":true,\"expectedComments\":$comments,\"expectedAttachments\":$attachments,\"expectedLabels\":$labels}},\"id\":2}" 2>/dev/null || true)
+        if [ "$(echo "$delete_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
+          && wait_for_tool_error_quiet "$read_payload" "not found"; then
+          LEAD_CLEANUP_ID=""
+          LEAD_CLEANUP_FUNNEL_ID=""
+        else
+          cleanup_failed=1
+        fi
       else
         cleanup_failed=1
       fi
-    else
-      cleanup_failed=1
     fi
   fi
   if [ -n "$LEAD_PERSON_CLEANUP_ID" ] && [ -z "$LEAD_CLEANUP_ID" ]; then
-    local person_json delete_person_response person_read
+    local person_json delete_person_response person_read_payload
     person_json=$(json_string "$LEAD_PERSON_CLEANUP_ID")
-    delete_person_response=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" 2>/dev/null || true)
-    restart_http_transport_if_needed "after lead person cleanup delete" >/dev/null 2>&1 || cleanup_failed=1
-    person_read=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" 2>/dev/null || true)
-    if [ "$(echo "$delete_person_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
-      && [ "$(echo "$person_read" | jq -r '(.result.isError // false) and ((.result.content[0].text // "") | contains("not found"))' 2>/dev/null)" = "true" ]; then
+    person_read_payload="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}"
+    if wait_for_tool_error_quiet "$person_read_payload" "not found" 1; then
       LEAD_PERSON_CLEANUP_ID=""
     else
-      cleanup_failed=1
+      delete_person_response=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" 2>/dev/null || true)
+      if [ "$(echo "$delete_person_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
+        && wait_for_tool_error_quiet "$person_read_payload" "not found"; then
+        LEAD_PERSON_CLEANUP_ID=""
+      else
+        cleanup_failed=1
+      fi
     fi
   fi
   if [ -n "$LEAD_PERSON_AMBIGUOUS_CLEANUP_ID" ]; then
-    local ambiguous_person_json ambiguous_delete_response ambiguous_person_read
+    local ambiguous_person_json ambiguous_delete_response ambiguous_person_read_payload
     ambiguous_person_json=$(json_string "$LEAD_PERSON_AMBIGUOUS_CLEANUP_ID")
-    ambiguous_delete_response=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$ambiguous_person_json}},\"id\":2}" 2>/dev/null || true)
-    restart_http_transport_if_needed "after ambiguous lead person cleanup delete" >/dev/null 2>&1 || cleanup_failed=1
-    ambiguous_person_read=$(call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":$ambiguous_person_json}},\"id\":2}" 2>/dev/null || true)
-    if [ "$(echo "$ambiguous_delete_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
-      && [ "$(echo "$ambiguous_person_read" | jq -r '(.result.isError // false) and ((.result.content[0].text // "") | contains("not found"))' 2>/dev/null)" = "true" ]; then
+    ambiguous_person_read_payload="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":$ambiguous_person_json}},\"id\":2}"
+    if wait_for_tool_error_quiet "$ambiguous_person_read_payload" "not found" 1; then
       LEAD_PERSON_AMBIGUOUS_CLEANUP_ID=""
     else
-      cleanup_failed=1
+      ambiguous_delete_response=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$ambiguous_person_json}},\"id\":2}" 2>/dev/null || true)
+      if [ "$(echo "$ambiguous_delete_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
+        && wait_for_tool_error_quiet "$ambiguous_person_read_payload" "not found"; then
+        LEAD_PERSON_AMBIGUOUS_CLEANUP_ID=""
+      else
+        cleanup_failed=1
+      fi
     fi
   fi
   if [ -n "$LEAD_LABEL_DEFINITION_CLEANUP_ID" ]; then
@@ -1358,6 +1401,82 @@ fail_test() {
   echo "FAIL: $name ($reason)"
   FAILED=$((FAILED + 1))
   ERRORS="${ERRORS}\n  - ${name}: ${reason}"
+}
+
+wait_for_person_detail() {
+  local output_var="$1" name="$2" person_id="$3" expected_email="$4"
+  local attempts=20 attempt=1 person_json response text=""
+  person_json=$(json_string "$person_id")
+  while [ "$attempt" -le "$attempts" ]; do
+    response=$(call_tool_fresh_session \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" \
+      2>/dev/null || true)
+    text=$(echo "$response" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+    if [ "$(printf '%s\n' "$text" | jq -r '.id // empty' 2>/dev/null)" = "$person_id" ] \
+      && [ "$(printf '%s\n' "$text" | jq -r '.email // empty' 2>/dev/null)" = "$expected_email" ]; then
+      printf -v "$output_var" '%s' "$text"
+      echo "PASS: $name"
+      PASSED=$((PASSED + 1))
+      return 0
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      sleep 0.5
+    fi
+    attempt=$((attempt + 1))
+  done
+  printf -v "$output_var" '%s' "$text"
+  fail_test "$name" "person and exact email were not visible after $attempts fresh-session attempts"
+  return 1
+}
+
+wait_for_person_customer_noop() {
+  local output_var="$1" name="$2" identifier="$3" attempts=20 attempt=1 identifier_json response text=""
+  identifier_json=$(json_string "$identifier")
+  # Repeating createMixin before its projection settles can keep advancing the
+  # same document. Give the first committed write a read-only visibility window.
+  sleep 3
+  while [ "$attempt" -le "$attempts" ]; do
+    response=$(call_tool_fresh_session \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"make_person_customer\",\"arguments\":{\"identifier\":$identifier_json}},\"id\":2}" \
+      2>/dev/null || true)
+    text=$(echo "$response" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+    if [ "$(printf '%s\n' "$text" | jq -r '.applied' 2>/dev/null)" = "false" ]; then
+      printf -v "$output_var" '%s' "$text"
+      echo "PASS: $name"
+      PASSED=$((PASSED + 1))
+      return 0
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      sleep 2
+    fi
+    attempt=$((attempt + 1))
+  done
+  printf -v "$output_var" '%s' "$text"
+  fail_test "$name" "Customer mixin was not visible after $attempts fresh-session attempts"
+  return 1
+}
+
+wait_for_lead_update_noop() {
+  local output_var="$1" name="$2" payload="$3" attempts=20 attempt=1 response text=""
+  # Customer markup and its mixin reference settle independently.
+  sleep 3
+  while [ "$attempt" -le "$attempts" ]; do
+    response=$(call_tool_fresh_session "$payload" 2>/dev/null || true)
+    text=$(echo "$response" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+    if [ "$(printf '%s\n' "$text" | jq -r '.updated' 2>/dev/null)" = "false" ]; then
+      printf -v "$output_var" '%s' "$text"
+      echo "PASS: $name"
+      PASSED=$((PASSED + 1))
+      return 0
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      sleep 2
+    fi
+    attempt=$((attempt + 1))
+  done
+  printf -v "$output_var" '%s' "$text"
+  fail_test "$name" "idempotent update remained changed after $attempts fresh-session attempts"
+  return 1
 }
 
 wait_for_lead_projection() {
@@ -2481,32 +2600,26 @@ if [ $? -eq 0 ]; then
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":\"Lead\",\"lastName\":\"Person $LEAD_FIXTURE_SUFFIX\",\"email\":$LEAD_PERSON_EMAIL_JSON}},\"id\":2}"
       if [ $? -eq 0 ]; then
       LEAD_PERSON_ID=$(echo "$LEAD_PERSON_TEXT" | jq -r '.id // empty' 2>/dev/null)
-      LEAD_PERSON_NAME="Lead Person $LEAD_FIXTURE_SUFFIX"
-      LEAD_PERSON_NAME_JSON=$(json_string "$LEAD_PERSON_NAME")
       if [ -n "$LEAD_PERSON_ID" ]; then
         # Register the person before any Customer-mixin or lead mutation so an
         # interrupted run can remove the exact fixture it created.
         LEAD_PERSON_CLEANUP_ID="$LEAD_PERSON_ID"
+        wait_for_person_detail LEAD_PERSON_DETAIL "create_person exact person/email visibility" \
+          "$LEAD_PERSON_ID" "$LEAD_PERSON_EMAIL"
+        LEAD_PERSON_NAME=$(printf '%s\n' "$LEAD_PERSON_DETAIL" | jq -r '.name // empty' 2>/dev/null)
+        LEAD_PERSON_NAME_JSON=$(json_string "$LEAD_PERSON_NAME")
+        LEAD_PERSON_ID_JSON=$(json_string "$LEAD_PERSON_ID")
         run_capture_to_var_fresh PERSON_CUSTOMER_BY_ID_TEXT "make_person_customer(id:$LEAD_PERSON_ID)" \
-          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"make_person_customer\",\"arguments\":{\"identifier\":$(json_string \"$LEAD_PERSON_ID\")}},\"id\":2}"
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"make_person_customer\",\"arguments\":{\"identifier\":$LEAD_PERSON_ID_JSON}},\"id\":2}"
         if [ $? -eq 0 ]; then
           assert_json_field_equals "make_person_customer first application" "$PERSON_CUSTOMER_BY_ID_TEXT" '.applied' "true"
-          run_capture_to_var_fresh PERSON_CUSTOMER_SECOND_TEXT "make_person_customer second idempotent call" \
-            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"make_person_customer\",\"arguments\":{\"identifier\":$(json_string \"$LEAD_PERSON_ID\")}},\"id\":2}"
-          if [ $? -eq 0 ]; then
-            assert_json_field_equals "make_person_customer second application is no-op" "$PERSON_CUSTOMER_SECOND_TEXT" '.applied' "false"
-          fi
+          wait_for_person_customer_noop PERSON_CUSTOMER_SECOND_TEXT \
+            "make_person_customer second application is no-op" "$LEAD_PERSON_ID"
         fi
-        run_capture_to_var_fresh PERSON_CUSTOMER_BY_EMAIL_TEXT "make_person_customer exact email" \
-          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"make_person_customer\",\"arguments\":{\"identifier\":$LEAD_PERSON_EMAIL_JSON}},\"id\":2}"
-        if [ $? -eq 0 ]; then
-          assert_json_field_equals "make_person_customer email resolves existing person" "$PERSON_CUSTOMER_BY_EMAIL_TEXT" '.applied' "false"
-        fi
-        run_capture_to_var_fresh PERSON_CUSTOMER_BY_NAME_TEXT "make_person_customer exact display name" \
-          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"make_person_customer\",\"arguments\":{\"identifier\":$LEAD_PERSON_NAME_JSON}},\"id\":2}"
-        if [ $? -eq 0 ]; then
-          assert_json_field_equals "make_person_customer name resolves existing person" "$PERSON_CUSTOMER_BY_NAME_TEXT" '.applied' "false"
-        fi
+        wait_for_person_customer_noop PERSON_CUSTOMER_BY_EMAIL_TEXT \
+          "make_person_customer email resolves existing person" "$LEAD_PERSON_EMAIL"
+        wait_for_person_customer_noop PERSON_CUSTOMER_BY_NAME_TEXT \
+          "make_person_customer canonical name resolves existing person" "$LEAD_PERSON_NAME"
         run_capture_to_var_fresh PERSON_CUSTOMER_PERSONS_TEXT "list_persons confirms no inline person creation" \
           "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_persons\",\"arguments\":{\"emailSearch\":$LEAD_PERSON_EMAIL_JSON,\"limit\":10}},\"id\":2}"
         if [ $? -eq 0 ]; then
@@ -2524,9 +2637,11 @@ if [ $? -eq 0 ]; then
           if [ -n "$LEAD_PERSON_AMBIGUOUS_CLEANUP_ID" ]; then
             # Register the second exact-name fixture before the ambiguity probe
             # so interrupted runs can remove it without guessing.
-            run_expect_error_contains_fresh "make_person_customer rejects ambiguous display name" \
+            wait_for_person_detail LEAD_AMBIGUOUS_PERSON_DETAIL \
+              "duplicate lead person exact visibility" "$LEAD_PERSON_AMBIGUOUS_CLEANUP_ID" "$LEAD_AMBIGUOUS_EMAIL"
+            wait_for_error_contains "make_person_customer rejects ambiguous canonical display name" \
               "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"make_person_customer\",\"arguments\":{\"identifier\":$LEAD_PERSON_NAME_JSON}},\"id\":2}" \
-              "matched 2 people"
+              "matched 2 people" 40
           else
             fail_test "duplicate lead display name fixture" "create_person returned no stable person ID"
           fi
@@ -2550,7 +2665,7 @@ if [ $? -eq 0 ]; then
             assert_json_field_equals "get_lead classifies person customer" "$CREATED_PERSON_LEAD_DETAIL" '.customerType' 'person'
             assert_json_field_equals "get_lead exposes native collection counts" "$CREATED_PERSON_LEAD_DETAIL" '([.comments, .attachments, .labels] | all(type == "number"))' 'true'
             assert_json_field_equals "get_lead exposes stable task metadata" "$CREATED_PERSON_LEAD_DETAIL" '(.number | type == "number") and (.taskType | length > 0) and (.rank | length > 0)' 'true'
-            assert_json_field_equals "get_lead explicitly classifies unsupported fields" "$CREATED_PERSON_LEAD_DETAIL" '[.unsupportedFields[].field] | sort' '["collection","parents"]'
+            assert_json_field_equals "get_lead explicitly classifies unsupported fields" "$CREATED_PERSON_LEAD_DETAIL" '[.unsupportedFields[].field] | sort | join(",")' 'collection,parents'
           fi
           run_capture_to_var CREATED_PERSON_LEAD_LIST "list_leads(created_person)" \
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_leads\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"titleSearch\":$LEAD_PERSON_TITLE_JSON,\"limit\":5}},\"id\":2}"
@@ -2585,9 +2700,9 @@ if [ $? -eq 0 ]; then
             if [ $? -eq 0 ]; then
               assert_json_field_equals "update_lead reports updated" "$UPDATED_LEAD_TEXT" '.updated' "true"
               wait_for_lead_projection "update_lead persists mutable detail" "$FIRST_FUNNEL_ID" "$CREATED_PERSON_LEAD_IDENTIFIER" "$UPDATED_LEAD_TITLE" clear "$LEAD_UPDATE_STATUS" "$LEAD_UPDATE_ASSIGNEE_NAME" 0 0 "$UPDATED_CUSTOMER_DESCRIPTION"
-              run_capture_to_var_fresh IDEMPOTENT_LEAD_TEXT "update_lead(idempotent customer description:$CREATED_PERSON_LEAD_IDENTIFIER)" \
+              wait_for_lead_update_noop IDEMPOTENT_LEAD_TEXT \
+                "update_lead repeated customer description is unchanged" \
                 "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_lead\",\"arguments\":{\"funnel\":\"$FIRST_FUNNEL_ID\",\"identifier\":\"$CREATED_PERSON_LEAD_IDENTIFIER\",\"customerDescription\":$UPDATED_CUSTOMER_DESCRIPTION_JSON}},\"id\":2}"
-              assert_json_field_equals "update_lead repeated customer description is unchanged" "$IDEMPOTENT_LEAD_TEXT" '.updated' "false"
             fi
 
             LEAD_WORKSPACE_TEXT=$(run_capture_only_fresh \
