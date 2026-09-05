@@ -27,7 +27,11 @@ import {
 import { loadAllPublicHolidaySummaries } from "./hr-holidays.js"
 import { DEFAULT_HR_PAGE_SIZE, type HrPageSize, loadAllHrDocuments } from "./hr-pagination.js"
 import { applicableHolidayDates, hrRequestMeasures, hrTypeTotals } from "./hr-report-core.js"
-import { type HrReportStaffRecord, parseHrReportStaffRecord } from "./hr-report-sdk-boundary.js"
+import {
+  type HrReportStaffRecord,
+  parseHrReportStaffRecord,
+  parseHrReportStaffScopeRecord
+} from "./hr-report-sdk-boundary.js"
 import { parseHrRequestDateWindowRecord, parseHrRequestRecord } from "./hr-request-sdk-boundary.js"
 import { summarizeHrRequests } from "./hr-requests.js"
 import { toRef } from "./sdk-boundary.js"
@@ -43,7 +47,15 @@ const loadReportStaff = Effect.fn("HrReports.loadStaff")(function* (
     departmentIds === undefined ? {} : { department: { $in: [...departmentIds] } },
     pageSize
   )
-  return yield* Effect.forEach(raw, parseHrReportStaffRecord)
+  const scoped = yield* Effect.forEach(raw, (staff) =>
+    Effect.map(parseHrReportStaffScopeRecord(staff), (scope) => ({ staff, scope }))
+  )
+  const included = scoped.filter(
+    ({ scope }) =>
+      scope.department !== undefined &&
+      (departmentIds === undefined || departmentIds.has(toRef<Department>(scope.department)))
+  )
+  return yield* Effect.forEach(included, ({ staff }) => parseHrReportStaffRecord(staff))
 })
 
 const loadReportRequests = Effect.fn("HrReports.loadRequests")(function* (
