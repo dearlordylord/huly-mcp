@@ -72,6 +72,11 @@ describe("HR report calendar semantics", () => {
   it("counts only the portion overlapping the requested report range", () => {
     const result = hrRequestMeasures(request(-1), date("2026-09-07"), date("2026-09-08"), new Set<HrCalendarDate>())
     expect(result).toEqual({ calendarDays: 1, workdays: 1, units: -1 })
+    expect(hrRequestMeasures(request(-1), date("2026-09-03"), date("2026-09-04"), new Set<HrCalendarDate>())).toEqual({
+      calendarDays: 1,
+      workdays: 1,
+      units: -1
+    })
   })
 
   it("returns zero measures outside the report range and for zero-valued request types", () => {
