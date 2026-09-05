@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process"
 import { readFileSync } from "node:fs"
 
 import { describe, expect, it } from "vitest"
@@ -9,6 +10,23 @@ const functionBody = (name: string): string => {
   const match = script.match(new RegExp(`\\n${name}\\(\\) \\{([\\s\\S]*?)\\n\\}`))
   expect(match, `${name} must remain a top-level shell function`).not.toBeNull()
   return match?.[1] ?? ""
+}
+
+const shellFunction = (name: string): string => `${name}() {${functionBody(name)}\n}`
+
+const toolResponseSucceeded = (response: unknown): boolean => {
+  const encodedResponse = JSON.stringify(response)
+  if (encodedResponse === undefined) return false
+  try {
+    execFileSync(
+      "bash",
+      ["-c", `${shellFunction("tool_response_succeeded")}\ntool_response_succeeded "$1"`, "predicate", encodedResponse],
+      { stdio: "ignore" }
+    )
+    return true
+  } catch {
+    return false
+  }
 }
 
 const expectRestartBeforeCapture = (body: string, capture: string): void => {
@@ -93,6 +111,24 @@ describe("full integration HTTP fresh-session contract", () => {
     expect(funnelCleanup).toContain("wait_for_tool_error_quiet")
     expect(functionBody("wait_for_tool_error_quiet")).toContain("sleep 0.5")
     expect(functionBody("wait_for_tool_field_quiet")).toContain("sleep 0.5")
+  })
+
+  it("accepts successful tool envelopes when isError is omitted and rejects structural failures", () => {
+    expect(toolResponseSucceeded({ jsonrpc: "2.0", id: 2, result: { content: [] } })).toBe(true)
+    expect(toolResponseSucceeded({ jsonrpc: "2.0", id: 2, result: { content: [], isError: false } })).toBe(true)
+    expect(toolResponseSucceeded({ jsonrpc: "2.0", id: 2, result: { content: [], isError: true } })).toBe(false)
+    expect(toolResponseSucceeded({ jsonrpc: "2.0", id: 2, error: { code: -32_603, message: "failure" } })).toBe(false)
+    expect(toolResponseSucceeded({ jsonrpc: "2.0", id: 2 })).toBe(false)
+    expect(toolResponseSucceeded("not-json")).toBe(false)
+  })
+
+  it("requires mutation success and readback before clearing lead cleanup markers", () => {
+    const leadCleanup = functionBody("cleanup_lead_artifacts")
+    const funnelCleanup = functionBody("cleanup_funnel_artifacts")
+    expect(leadCleanup.match(/tool_response_succeeded/gu)).toHaveLength(4)
+    expect(funnelCleanup.match(/tool_response_succeeded/gu)).toHaveLength(2)
+    expect(leadCleanup).toContain("label_absent_expr")
+    expect(leadCleanup).toContain("wait_for_tool_field_quiet")
   })
 
   it("keeps page-size-one live HR report composition behind the internal adapter", () => {

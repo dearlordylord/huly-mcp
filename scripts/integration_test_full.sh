@@ -384,6 +384,15 @@ wait_for_tool_field_quiet() {
   return 1
 }
 
+tool_response_succeeded() {
+  local response="$1"
+  printf '%s\n' "$response" | jq -e '
+    (has("error") | not)
+      and ((.result | type) == "object")
+      and (.result.isError != true)
+  ' >/dev/null 2>&1
+}
+
 cleanup_funnel_artifacts() {
   if [ -n "$FUNNEL_CLEANUP_ID" ]; then
     local funnel_json archive_response delete_response read_payload
@@ -394,12 +403,12 @@ cleanup_funnel_artifacts() {
       return 0
     fi
     archive_response=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_funnel\",\"arguments\":{\"funnel\":$funnel_json}},\"id\":2}" 2>/dev/null || true)
-    if [ "$(echo "$archive_response" | jq -r '.result.isError // true' 2>/dev/null)" != "false" ] \
+    if ! tool_response_succeeded "$archive_response" \
       || ! wait_for_tool_field_quiet "$read_payload" '.archived' 'true'; then
       return 1
     fi
     delete_response=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_funnel\",\"arguments\":{\"funnel\":$funnel_json,\"expectedLeads\":0,\"expectedComments\":0,\"expectedAttachments\":0}},\"id\":2}" 2>/dev/null || true)
-    if [ "$(echo "$delete_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
+    if tool_response_succeeded "$delete_response" \
       && wait_for_tool_error_quiet "$read_payload" "not found"; then
       FUNNEL_CLEANUP_ID=""
       return 0
@@ -427,7 +436,7 @@ cleanup_lead_artifacts() {
       labels=$(echo "$preview_text" | jq -r '.impact.labels // empty' 2>/dev/null)
       if [ -n "$comments" ] && [ -n "$attachments" ] && [ -n "$labels" ]; then
         delete_response=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_lead\",\"arguments\":{\"funnel\":$funnel_json,\"identifier\":$lead_json,\"execute\":true,\"expectedComments\":$comments,\"expectedAttachments\":$attachments,\"expectedLabels\":$labels}},\"id\":2}" 2>/dev/null || true)
-        if [ "$(echo "$delete_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
+        if tool_response_succeeded "$delete_response" \
           && wait_for_tool_error_quiet "$read_payload" "not found"; then
           LEAD_CLEANUP_ID=""
           LEAD_CLEANUP_FUNNEL_ID=""
@@ -447,7 +456,7 @@ cleanup_lead_artifacts() {
       LEAD_PERSON_CLEANUP_ID=""
     else
       delete_person_response=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" 2>/dev/null || true)
-      if [ "$(echo "$delete_person_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
+      if tool_response_succeeded "$delete_person_response" \
         && wait_for_tool_error_quiet "$person_read_payload" "not found"; then
         LEAD_PERSON_CLEANUP_ID=""
       else
@@ -463,7 +472,7 @@ cleanup_lead_artifacts() {
       LEAD_PERSON_AMBIGUOUS_CLEANUP_ID=""
     else
       ambiguous_delete_response=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$ambiguous_person_json}},\"id\":2}" 2>/dev/null || true)
-      if [ "$(echo "$ambiguous_delete_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ] \
+      if tool_response_succeeded "$ambiguous_delete_response" \
         && wait_for_tool_error_quiet "$ambiguous_person_read_payload" "not found"; then
         LEAD_PERSON_AMBIGUOUS_CLEANUP_ID=""
       else
@@ -472,10 +481,13 @@ cleanup_lead_artifacts() {
     fi
   fi
   if [ -n "$LEAD_LABEL_DEFINITION_CLEANUP_ID" ]; then
-    local label_json label_delete_response
+    local label_json label_delete_response label_read_payload label_absent_expr
     label_json=$(json_string "$LEAD_LABEL_DEFINITION_CLEANUP_ID")
+    label_read_payload='{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_tags","arguments":{"targetClass":"lead:class:Lead"}},"id":2}'
+    label_absent_expr="any(.[]; .id == $label_json) | not"
     label_delete_response=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_tag\",\"arguments\":{\"targetClass\":\"lead:class:Lead\",\"tag\":$label_json}},\"id\":2}" 2>/dev/null || true)
-    if [ "$(echo "$label_delete_response" | jq -r '.result.isError // true' 2>/dev/null)" = "false" ]; then
+    if tool_response_succeeded "$label_delete_response" \
+      && wait_for_tool_field_quiet "$label_read_payload" "$label_absent_expr" 'true'; then
       LEAD_LABEL_DEFINITION_CLEANUP_ID=""
     else
       cleanup_failed=1
