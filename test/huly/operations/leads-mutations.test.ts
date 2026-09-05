@@ -1,7 +1,7 @@
 import { describe, it } from "@effect/vitest"
 import type { Blob, Class, Doc, DocumentQuery, FindOptions, Ref } from "@hcengineering/core"
 import type { TaskType } from "@hcengineering/task"
-import { Effect } from "effect"
+import { Effect, Ref as EffectRef } from "effect"
 import { expect } from "vitest"
 
 import {
@@ -31,9 +31,10 @@ import { contact, core, task } from "../../../src/huly/huly-plugins.js"
 import { leadClassIds } from "../../../src/huly/lead-plugin.js"
 import { deleteLead, makePersonCustomer, moveLead, updateLead } from "../../../src/huly/operations/leads-mutations.js"
 import type { HulyLead } from "../../../src/huly/operations/leads-mutations-boundary.js"
+import { findLeadCustomer } from "../../../src/huly/operations/leads-mutations-shared.js"
 import { markupBlobRefAsMarkupRef } from "../../../src/huly/operations/recruiting-shared.js"
 import type { FunnelWorkflowTaskType, HulyFunnel } from "../../../src/huly/operations/funnels-shared.js"
-import { testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
+import { markupToMarkdownString, testMarkupUrlConfig } from "../../../src/huly/operations/markup.js"
 import { renderMarkdownWithNativeReferencesForWrite } from "../../../src/huly/operations/native-reference-markup.js"
 import { toClassRef, toRef } from "../../../src/huly/operations/sdk-boundary.js"
 import { withDiagnostics } from "../../helpers/diagnostics.js"
@@ -142,29 +143,36 @@ const emptyCaptures = (): Captures => ({ writes: [], markupClasses: [], document
 const makeLayer = (
   captures: Captures,
   currentCustomerMarkup = "old customer markup",
-  persistedCustomerDescription?: string | null
+  persistedCustomerDescription?: string | null,
+  customerMarkupState?: EffectRef.Ref<string>
 ) => {
   const findOne = mockFn().mockReturnValue(
-    Effect.succeed(
-      persistedCustomerDescription === undefined
-        ? undefined
-        : { ...person(), customerDescription: persistedCustomerDescription }
-    )
+    Effect.succeed(persistedCustomerDescription === undefined ? undefined : person(persistedCustomerDescription))
   )
   return HulyClient.testLayer({
     findOne,
     findAll: <T extends Doc>(_documentClass: Ref<Class<T>>, _query: DocumentQuery<T>, _options?: FindOptions<T>) =>
       Effect.succeed(findResult<T>([])),
     fetchMarkup: (_class, _id, attribute) =>
-      Effect.succeed(attribute === "customerDescription" ? currentCustomerMarkup : "old lead markup"),
+      attribute === "customerDescription" && customerMarkupState !== undefined
+        ? EffectRef.get(customerMarkupState)
+        : Effect.succeed(attribute === "customerDescription" ? currentCustomerMarkup : "old lead markup"),
     uploadMarkup: (objectClass) => {
       captures.writes.push("uploadMarkup")
       captures.markupClasses.push(String(objectClass))
       return Effect.succeed(markupBlobRefAsMarkupRef(toRef<Blob>(BlobId.make("uploaded-markup"))))
     },
-    updateMarkup: () => {
+    updateMarkup: (_class, _id, attribute, markup) => {
       captures.writes.push("updateMarkup")
-      return Effect.void
+      return attribute === "customerDescription" && customerMarkupState !== undefined
+        ? markupToMarkdownString(markup, testMarkupUrlConfig, {
+            operation: "testUpdateLead",
+            entity: "customerDescription"
+          }).pipe(
+            Effect.orDie,
+            Effect.flatMap((markdown) => EffectRef.set(customerMarkupState, markdown))
+          )
+        : Effect.void
     },
     updateDoc: (_class, _space, _id, operations) => {
       captures.writes.push("updateDoc")
@@ -228,8 +236,8 @@ describe("lead mutation public operations", () => {
       )
 
       expect(result).toEqual({ identifier: "LEAD-1", updated: true })
-      expect(captures.writes).toEqual(["updateMarkup", "uploadMarkup", "updateMixin", "updateDoc"])
-      expect(captures.markupClasses).toEqual([String(leadClassIds.mixin.Customer)])
+      expect(captures.writes).toEqual(["updateMarkup", "updateMarkup", "updateDoc"])
+      expect(captures.markupClasses).toEqual([])
       expect(captures.documentUpdates).toEqual([
         { title: "Changed", status: wonStatus, assignee: "employee-1", startDate: 10, dueDate: 20 }
       ])
@@ -273,7 +281,7 @@ describe("lead mutation public operations", () => {
         customerDescription: "same customer markup"
       })
       const sameResult = yield* updateLead(same, resolvers(person("customer-description"))).pipe(
-        Effect.provide(makeLayer(sameCaptures, rendered.rendered.markup)),
+        Effect.provide(makeLayer(sameCaptures, "same customer markup")),
         withDiagnostics
       )
       expect(sameResult.updated).toBe(false)
@@ -309,12 +317,54 @@ describe("lead mutation public operations", () => {
         customerDescription: "persisted customer markup"
       })
       const result = yield* updateLead(params, resolvers(person())).pipe(
-        Effect.provide(makeLayer(captures, rendered.rendered.markup, "customer-description")),
+        Effect.provide(makeLayer(captures, "persisted customer markup", "customer-description")),
         withDiagnostics
       )
 
       expect(result.updated).toBe(false)
       expect(captures.writes).toEqual([])
+    })
+  )
+
+  it.effect("loads mutation customers through the same Contact projection as lead reads", () =>
+    Effect.gen(function* () {
+      const customer = person("customer-description")
+      const findOne = mockFn().mockReturnValue(Effect.succeed(customer))
+      const layer = HulyClient.testLayer({ findOne })
+      const result = yield* Effect.gen(function* () {
+        return yield* findLeadCustomer(yield* HulyClient, lead)
+      }).pipe(Effect.provide(layer), withDiagnostics)
+
+      expect(result).toEqual(customer)
+      expect(findOne.mock.calls).toHaveLength(1)
+      expect(findOne.mock.calls[0]?.[0]).toBe(contact.class.Contact)
+      expect(findOne.mock.calls[0]?.[1]).toEqual({ _id: "person-1" })
+    })
+  )
+
+  it.effect("updates an existing customer markup document without churning its mixin reference", () =>
+    Effect.gen(function* () {
+      const captures = emptyCaptures()
+      const markupState = yield* EffectRef.make("old customer markup")
+      const params = yield* parseUpdateLeadParams({
+        funnel: "funnel-1",
+        identifier: "LEAD-1",
+        customerDescription: "stable customer markup"
+      })
+      const layer = makeLayer(captures, "old customer markup", undefined, markupState)
+
+      const first = yield* updateLead(params, resolvers(person("customer-description"))).pipe(
+        Effect.provide(layer),
+        withDiagnostics
+      )
+      const repeated = yield* updateLead(params, resolvers(person("customer-description"))).pipe(
+        Effect.provide(layer),
+        withDiagnostics
+      )
+
+      expect(first.updated).toBe(true)
+      expect(repeated.updated).toBe(false)
+      expect(captures.writes).toEqual(["updateMarkup"])
     })
   )
 
