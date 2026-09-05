@@ -36,25 +36,35 @@ const runGeneratedBundle = (bundlePath, args) =>
       removeSignalHandlers()
       rejectExit(error)
     })
-    child.once("close", (code) => {
+    child.once("close", (code, signal) => {
       removeSignalHandlers()
-      resolveExit(code ?? 1)
+      resolveExit(
+        code !== null ? { kind: "code", code } : signal !== null ? { kind: "signal", signal } : { kind: "code", code: 1 }
+      )
     })
   })
 
-try {
-  const result = await build({
-    bundle: true,
-    entryPoints: [entryPath],
-    external: ["ws"],
-    format: "cjs",
-    platform: "node",
-    write: false
-  })
-  const bundled = result.outputFiles[0]
-  if (bundled === undefined) throw new Error(`Bundling ${entry} produced no output.`)
-  await writeFile(output, bundled.contents)
-  process.exitCode = await runGeneratedBundle(output, forwardedArguments)
-} finally {
-  await rm(directory, { force: true, recursive: true })
+const outcome = await (async () => {
+  try {
+    const result = await build({
+      bundle: true,
+      entryPoints: [entryPath],
+      external: ["ws"],
+      format: "cjs",
+      platform: "node",
+      write: false
+    })
+    const bundled = result.outputFiles[0]
+    if (bundled === undefined) throw new Error(`Bundling ${entry} produced no output.`)
+    await writeFile(output, bundled.contents)
+    return await runGeneratedBundle(output, forwardedArguments)
+  } finally {
+    await rm(directory, { force: true, recursive: true })
+  }
+})()
+
+if (outcome.kind === "signal") {
+  process.kill(process.pid, outcome.signal)
+} else {
+  process.exitCode = outcome.code
 }

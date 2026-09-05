@@ -19,4 +19,19 @@ describe("run-bundled", () => {
       rmSync(fixtureDirectory, { force: true, recursive: true })
     }
   })
+
+  it.each(["SIGTERM", "SIGINT"])("propagates %s after removing its generated bundle", (signal) => {
+    const fixtureDirectory = mkdtempSync(join(tmpdir(), "huly-run-bundled-signal-test-"))
+    const entry = join(fixtureDirectory, "signal.ts")
+    writeFileSync(entry, `process.kill(process.pid, ${JSON.stringify(signal)})\n`)
+
+    try {
+      const execution = spawnSync(process.execPath, ["scripts/run-bundled.mjs", entry], { encoding: "utf8" })
+      expect(execution.status).toBeNull()
+      expect(execution.signal).toBe(signal)
+      expect(readdirSync(fixtureDirectory)).toEqual(["signal.ts"])
+    } finally {
+      rmSync(fixtureDirectory, { force: true, recursive: true })
+    }
+  })
 })

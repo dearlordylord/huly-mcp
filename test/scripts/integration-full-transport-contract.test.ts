@@ -99,7 +99,11 @@ describe("full integration HTTP fresh-session contract", () => {
         "-c",
         `${shellFunction("capture_paginated_hr_reports")}
 timeout() { shift; "$@"; }
-node() { printf 'secret-marker-%010000d' 0; return 23; }
+node() {
+  printf 'stdout-secret-marker-%010000d' 0
+  printf 'stderr-secret-marker-%010000d' 0 >&2
+  return 23
+}
 fail_test() { printf 'FAIL: %s (%s)\\n' "$1" "$2"; }
 PASSED=0
 FAILED=0
@@ -111,7 +115,8 @@ capture_paginated_hr_reports result 'forced pagination' department 2026-09-04 20
     expect(failure.status).toBe(1)
     expect(failure.stdout).toBe("FAIL: forced pagination (internal page-size-one report adapter failed)\n")
     expect(failure.stderr).toBe("DIAGNOSTIC: page-size-one report adapter exited with status 23; output suppressed\n")
-    expect(failure.stderr).not.toContain("secret-marker")
+    expect(failure.stderr).not.toContain("stdout-secret-marker")
+    expect(failure.stderr).not.toContain("stderr-secret-marker")
     expect(script).not.toContain("scanPageSize")
     expect(hrPaginationAdapter).toContain("Schema.decodeUnknownEffect(HrPageSize)(1)")
     expect(hrPaginationAdapter).toContain("getHrSchedule(params, pageSize)")
