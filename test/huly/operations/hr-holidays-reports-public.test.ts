@@ -48,7 +48,7 @@ interface Fixture {
   readonly departments: ReadonlyArray<Department>
   readonly holidays: ReadonlyArray<PublicHoliday>
   readonly employees: ReadonlyArray<Employee>
-  readonly staff: ReadonlyArray<Staff>
+  readonly staff: ReadonlyArray<Staff | Omit<Staff, "department">>
   readonly requestTypes: ReadonlyArray<RequestType>
   readonly requests: ReadonlyArray<HulyRequest>
   readonly calls: Calls
@@ -502,7 +502,7 @@ describe("HR report operations", () => {
     const state = fixture()
     const firstStaff = state.staff[0]
     const firstType = state.requestTypes[0]
-    if (firstStaff === undefined || firstType === undefined) {
+    if (firstStaff === undefined || !("department" in firstStaff) || firstType === undefined) {
       throw new Error("fixture request dependencies missing")
     }
     const dangling = makeRequest("request-dangling", firstStaff, docRef<Department>("missing"), firstType._id, 4, 4)
@@ -516,7 +516,7 @@ describe("HR report operations", () => {
     const state = fixture()
     const firstStaff = state.staff[0]
     const firstType = state.requestTypes[0]
-    if (firstStaff === undefined || firstType === undefined) {
+    if (firstStaff === undefined || !("department" in firstStaff) || firstType === undefined) {
       throw new Error("fixture request dependencies missing")
     }
     const outsideRange = {
@@ -631,19 +631,12 @@ describe("HR report operations", () => {
     if (firstEmployee === undefined) throw new Error("fixture employee missing")
     const missingDepartment = { ...state, staff: [makeStaff(firstEmployee, docRef<Department>("missing"))] }
     expect(fail(getHrTable(range), missingDepartment)).toBeInstanceOf(DepartmentHierarchyError)
-    expect(
-      run(getHrTable({ ...range, department: DepartmentIdentifier.make("Product") }), {
-        ...state,
-        staff: [
-          ...state.staff,
-          makeStaff(makeEmployee("employee-unrelated", "Unrelated,User"), docRef<Department>("missing"))
-        ]
-      }).totalEmployees
-    ).toBe(2)
     const firstStaff = state.staff[0]
-    if (firstStaff === undefined) throw new Error("fixture Staff missing")
+    if (firstStaff === undefined || !("department" in firstStaff)) throw new Error("fixture Staff missing")
     const malformedStaff: Fixture = { ...state, staff: [{ ...firstStaff, name: "" }] }
-    expect(fail(getHrTable(range), malformedStaff)).toBeInstanceOf(HulyDataInvalidError)
+    expect(
+      fail(getHrTable({ ...range, department: DepartmentIdentifier.make("Product") }), malformedStaff)
+    ).toBeInstanceOf(HulyDataInvalidError)
     const headEmployee = makeEmployee("employee-head", "Harold,Head")
     const headState: Fixture = {
       ...state,
@@ -653,5 +646,22 @@ describe("HR report operations", () => {
     expect(run(getHrTable(range), headState).rows).toEqual(
       expect.arrayContaining([expect.objectContaining({ department: { id: String(hr.ids.Head), path: "Head" } })])
     )
+  })
+
+  it("excludes missing and out-of-scope Staff projections before full parsing", () => {
+    const state = fixture()
+    const unrelated = makeStaff(makeEmployee("employee-unrelated", "Unrelated,User"), docRef<Department>("missing"))
+    const { department: _department, ...missingDepartmentProjection } = unrelated
+    expect(
+      run(getHrTable(range), { ...state, staff: [...state.staff, { ...missingDepartmentProjection, name: "" }] })
+        .totalEmployees
+    ).toBe(3)
+    const contaminated: Fixture = {
+      ...state,
+      staff: [...state.staff, { ...unrelated, name: "" }, { ...missingDepartmentProjection, name: "" }]
+    }
+    expect(
+      run(getHrTable({ ...range, department: DepartmentIdentifier.make("Product") }), contaminated).totalEmployees
+    ).toBe(2)
   })
 })

@@ -12,6 +12,18 @@ export const HrReportStaffRecordSchema = Schema.Struct({
 })
 export type HrReportStaffRecord = Schema.Schema.Type<typeof HrReportStaffRecordSchema>
 
+const HrReportStaffScopeRecordSchema = Schema.Struct({ _id: PersonId, department: Schema.optionalKey(DepartmentId) })
+
+export const parseHrReportStaffScopeRecord = Effect.fn("HrReportBoundary.parseStaffScopeRecord")(function* (
+  input: unknown
+) {
+  return yield* Schema.decodeUnknownEffect(HrReportStaffScopeRecordSchema)(input).pipe(
+    Effect.mapError(
+      (cause) => new HulyDataInvalidError({ operation: "readHrReportStaffScope", entity: "Staff scope", cause })
+    )
+  )
+})
+
 export const parseHrReportStaffRecord = Effect.fn("HrReportBoundary.parseStaffRecord")(function* (
   input: unknown
 ): Effect.fn.Return<HrReportStaffRecord, HulyDataInvalidError> {
