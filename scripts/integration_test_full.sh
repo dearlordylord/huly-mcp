@@ -1177,8 +1177,13 @@ call_tool_http() {
   extract_http_json_response "$response" | select_tool_response
 }
 
-call_read_tool_with_http_retry() {
-  local payload="$1"
+call_list_projects_with_http_retry() {
+  if [ "$#" -ne 0 ]; then
+    echo "ERROR: call_list_projects_with_http_retry does not accept arguments" >&2
+    return 2
+  fi
+
+  local payload='{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}'
   local result
   result=$(call_tool "$payload")
   if [ -n "$result" ] || [ "$INTEGRATION_SURFACE" != "mcp" ] || [ "$INTEGRATION_TRANSPORT" != "http" ]; then
@@ -1230,9 +1235,9 @@ fi
 run_test_with_runner() {
   local runner="$1"
   local name="$2"
-  local payload="$3"
+  shift 2
   local result
-  result=$("$runner" "$payload")
+  result=$("$runner" "$@")
   if [ -z "$result" ]; then
     echo "FAIL: $name (no response)"
     FAILED=$((FAILED + 1))
@@ -1263,11 +1268,13 @@ run_test_with_runner() {
 }
 
 run_test() {
-  run_test_with_runner call_tool "$@"
+  local name="$1"
+  local payload="$2"
+  run_test_with_runner call_tool "$name" "$payload"
 }
 
-run_read_test() {
-  run_test_with_runner call_read_tool_with_http_retry "$@"
+run_list_projects_test() {
+  run_test_with_runner call_list_projects_with_http_retry "list_projects"
 }
 
 run_shell_test() {
@@ -2127,8 +2134,7 @@ verify_http_tool_discovery
 # 1. PROJECTS
 ##############################
 echo "=== 1. Projects ==="
-run_read_test "list_projects" \
-  '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}'
+run_list_projects_test
 run_test "get_project($PROJECT)" \
   "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_project\",\"arguments\":{\"project\":\"$PROJECT\"}},\"id\":2}"
 LIST_STATUSES_RESULT=""

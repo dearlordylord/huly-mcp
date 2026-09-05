@@ -61,12 +61,11 @@ const expectRestartBeforeCapture = (body: string, capture: string): void => {
 
 describe("full integration HTTP fresh-session contract", () => {
   it("retries only the initial read-only HTTP probe after an empty transport response", () => {
-    const retry = functionBody("call_read_tool_with_http_retry")
+    const retry = functionBody("call_list_projects_with_http_retry")
     expect(retry).toContain('result=$(call_tool "$payload")')
     expect(retry).toContain('[ "$INTEGRATION_TRANSPORT" != "http" ]')
     expect(retry).toContain('echo "RETRY: read-only HTTP tool call returned no response; retrying once" >&2')
-    expect(script).toContain('run_read_test "list_projects"')
-    expect(script).not.toContain('run_read_test "get_project($PROJECT)"')
+    expect(script).toContain("run_list_projects_test")
     expect(functionBody("call_tool_http")).not.toContain("2>/dev/null")
     expect(functionBody("verify_http_tool_discovery")).not.toContain("2>/dev/null")
 
@@ -74,11 +73,12 @@ describe("full integration HTTP fresh-session contract", () => {
       "bash",
       [
         "-c",
-        `${shellFunction("call_read_tool_with_http_retry")}
+        `${shellFunction("call_list_projects_with_http_retry")}
 marker=$(mktemp)
 trap 'rm -f "$marker"' EXIT
 printf '0' >"$marker"
 call_tool() {
+  printf '%s\n' "$1" | jq -e '.method == "tools/call" and .params.name == "list_projects" and .params.arguments == {}' >/dev/null || return 9
   count=$(cat "$marker")
   count=$((count + 1))
   printf '%s' "$count" >"$marker"
@@ -88,7 +88,7 @@ call_tool() {
 sleep() { :; }
 INTEGRATION_SURFACE=mcp
 INTEGRATION_TRANSPORT=http
-call_read_tool_with_http_retry '{}'`
+call_list_projects_with_http_retry`
       ],
       { encoding: "utf8" }
     )
@@ -96,6 +96,24 @@ call_read_tool_with_http_retry '{}'`
       status: 0,
       stdout: '{"jsonrpc":"2.0","id":2,"result":{"isError":false}}\n',
       stderr: "RETRY: read-only HTTP tool call returned no response; retrying once\n"
+    })
+
+    const rejected = spawnSync(
+      "bash",
+      [
+        "-c",
+        `${shellFunction("call_list_projects_with_http_retry")}
+call_tool() { printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"isError":false}}'; }
+INTEGRATION_SURFACE=mcp
+INTEGRATION_TRANSPORT=http
+call_list_projects_with_http_retry '{"params":{"name":"delete_project"}}'`
+      ],
+      { encoding: "utf8" }
+    )
+    expect(rejected).toMatchObject({
+      status: 2,
+      stdout: "",
+      stderr: "ERROR: call_list_projects_with_http_retry does not accept arguments\n"
     })
   })
 
