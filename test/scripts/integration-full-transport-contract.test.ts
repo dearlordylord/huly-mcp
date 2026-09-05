@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process"
 import { readFileSync } from "node:fs"
 
 import { describe, expect, it } from "vitest"
@@ -10,6 +11,8 @@ const functionBody = (name: string): string => {
   expect(match, `${name} must remain a top-level shell function`).not.toBeNull()
   return match?.[1] ?? ""
 }
+
+const shellFunction = (name: string): string => `${name}() {${functionBody(name)}\n}`
 
 const expectRestartBeforeCapture = (body: string, capture: string): void => {
   const restartIndex = body.indexOf("restart_http_transport_if_needed")
@@ -90,7 +93,25 @@ describe("full integration HTTP fresh-session contract", () => {
     const capture = functionBody("capture_paginated_hr_reports")
     expect(capture).toContain("node scripts/run-bundled.mjs scripts/integration-hr-report-pagination-fixture.ts")
     expect(capture).not.toContain("pnpm exec tsx scripts/integration-hr-report-pagination-fixture.ts")
-    expect(capture).toContain(`printf '%s\\n' "$output" | tail -n 40 >&2`)
+    const failure = spawnSync(
+      "bash",
+      [
+        "-c",
+        `${shellFunction("capture_paginated_hr_reports")}
+timeout() { shift; "$@"; }
+node() { printf 'secret-marker-%010000d' 0; return 23; }
+fail_test() { printf 'FAIL: %s (%s)\\n' "$1" "$2"; }
+PASSED=0
+FAILED=0
+ERRORS=''
+capture_paginated_hr_reports result 'forced pagination' department 2026-09-04 2026-09-07`
+      ],
+      { encoding: "utf8" }
+    )
+    expect(failure.status).toBe(1)
+    expect(failure.stdout).toBe("FAIL: forced pagination (internal page-size-one report adapter failed)\n")
+    expect(failure.stderr).toBe("DIAGNOSTIC: page-size-one report adapter exited with status 23; output suppressed\n")
+    expect(failure.stderr).not.toContain("secret-marker")
     expect(script).not.toContain("scanPageSize")
     expect(hrPaginationAdapter).toContain("Schema.decodeUnknownEffect(HrPageSize)(1)")
     expect(hrPaginationAdapter).toContain("getHrSchedule(params, pageSize)")

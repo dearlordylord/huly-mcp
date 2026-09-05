@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
+import { spawn } from "node:child_process"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
-import { pathToFileURL } from "node:url"
 
 import { build } from "esbuild"
 import { Schema } from "effect"
@@ -21,6 +21,27 @@ const entryPath = resolve(entry)
 const directory = await mkdtemp(join(dirname(entryPath), ".huly-cli-script-"))
 const output = join(directory, "script.cjs")
 
+const runGeneratedBundle = (bundlePath, args) =>
+  new Promise((resolveExit, rejectExit) => {
+    const child = spawn(process.execPath, [bundlePath, ...args], { stdio: "inherit" })
+    const forwardInterrupt = () => child.kill("SIGINT")
+    const forwardTermination = () => child.kill("SIGTERM")
+    const removeSignalHandlers = () => {
+      process.off("SIGINT", forwardInterrupt)
+      process.off("SIGTERM", forwardTermination)
+    }
+    process.on("SIGINT", forwardInterrupt)
+    process.on("SIGTERM", forwardTermination)
+    child.once("error", (error) => {
+      removeSignalHandlers()
+      rejectExit(error)
+    })
+    child.once("close", (code) => {
+      removeSignalHandlers()
+      resolveExit(code ?? 1)
+    })
+  })
+
 try {
   const result = await build({
     bundle: true,
@@ -33,8 +54,7 @@ try {
   const bundled = result.outputFiles[0]
   if (bundled === undefined) throw new Error(`Bundling ${entry} produced no output.`)
   await writeFile(output, bundled.contents)
-  process.argv = [process.argv[0] ?? "node", output, ...forwardedArguments]
-  await import(pathToFileURL(output).href)
+  process.exitCode = await runGeneratedBundle(output, forwardedArguments)
 } finally {
   await rm(directory, { force: true, recursive: true })
 }
