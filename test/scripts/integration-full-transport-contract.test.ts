@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs"
 import { execFileSync } from "node:child_process"
+import { readFileSync } from "node:fs"
 
 import { describe, expect, it } from "vitest"
 
@@ -14,6 +14,44 @@ const functionBody = (name: string): string => {
 
 const shellFunction = (name: string): string => `${name}() {${functionBody(name)}\n}`
 
+const toolResponseSucceeded = (response: unknown): boolean => {
+  const encodedResponse = JSON.stringify(response)
+  if (encodedResponse === undefined) return false
+  try {
+    execFileSync(
+      "bash",
+      ["-c", `${shellFunction("tool_response_succeeded")}\ntool_response_succeeded "$1"`, "predicate", encodedResponse],
+      { stdio: "ignore" }
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
+const leadLabelAbsenceSucceeded = (responseText: string, labelId: string, title: string): boolean => {
+  const response = JSON.stringify({
+    jsonrpc: "2.0",
+    id: 2,
+    result: { content: [{ type: "text", text: responseText }] }
+  })
+  try {
+    execFileSync(
+      "bash",
+      [
+        "-c",
+        `${shellFunction("wait_for_tool_field_quiet")}\n${shellFunction("wait_for_lead_label_absence_quiet")}\njson_string() { jq -Rn --arg value "$1" '$value'; }\ncall_tool_fresh_session() { printf '%s\\n' "$RESPONSE"; }\nsleep() { :; }\nwait_for_lead_label_absence_quiet "$1" "$2" 1`,
+        "label-readback",
+        labelId,
+        title
+      ],
+      { env: { ...process.env, RESPONSE: response }, stdio: "ignore" }
+    )
+    return true
+  } catch {
+    return false
+  }
+}
 const expectRestartBeforeCapture = (body: string, capture: string): void => {
   const restartIndex = body.indexOf("restart_http_transport_if_needed")
   const captureIndex = body.indexOf(capture)
@@ -150,6 +188,62 @@ describe("full integration HTTP fresh-session contract", () => {
     expect(readbackIndex).toBeGreaterThanOrEqual(0)
     expect(clearIndex).toBeGreaterThan(readbackIndex)
     expect(body).toContain("cleanup marker retained")
+  })
+
+  it("waits for canonical lead-person projections and idempotent mixin visibility", () => {
+    expect(functionBody("wait_for_person_detail")).toContain("call_tool_fresh_session")
+    expect(functionBody("wait_for_person_customer_noop")).toContain("call_tool_fresh_session")
+    expect(functionBody("wait_for_lead_update_noop")).toContain("call_tool_fresh_session")
+    expect(script).toContain('LEAD_PERSON_ID_JSON=$(json_string "$LEAD_PERSON_ID")')
+    expect(script).not.toContain('$(json_string \\"$LEAD_PERSON_ID\\")')
+    expect(script).toContain("LEAD_PERSON_NAME=$(printf '%s\\n' \"$LEAD_PERSON_DETAIL\" | jq -r '.name // empty'")
+    expect(script).toContain('[.unsupportedFields[].field] | sort | join(",")')
+  })
+
+  it("polls lead, person, and funnel cleanup readback before clearing exact markers", () => {
+    const leadCleanup = functionBody("cleanup_lead_artifacts")
+    const funnelCleanup = functionBody("cleanup_funnel_artifacts")
+    expect(leadCleanup).toContain("wait_for_tool_error_quiet")
+    expect(leadCleanup).toContain("call_tool_fresh_session")
+    expect(funnelCleanup).toContain("wait_for_tool_field_quiet")
+    expect(funnelCleanup).toContain("wait_for_tool_error_quiet")
+    expect(functionBody("wait_for_tool_error_quiet")).toContain("sleep 0.5")
+    expect(functionBody("wait_for_tool_field_quiet")).toContain("sleep 0.5")
+  })
+
+  it("accepts successful tool envelopes when isError is omitted and rejects structural failures", () => {
+    expect(toolResponseSucceeded({ jsonrpc: "2.0", id: 2, result: { content: [] } })).toBe(true)
+    expect(toolResponseSucceeded({ jsonrpc: "2.0", id: 2, result: { content: [], isError: false } })).toBe(true)
+    expect(toolResponseSucceeded({ jsonrpc: "2.0", id: 2, result: { content: [], isError: true } })).toBe(false)
+    expect(toolResponseSucceeded({ jsonrpc: "2.0", id: 2, error: { code: -32_603, message: "failure" } })).toBe(false)
+    expect(toolResponseSucceeded({ jsonrpc: "2.0", id: 2 })).toBe(false)
+    expect(toolResponseSucceeded("not-json")).toBe(false)
+  })
+
+  it("requires mutation success and readback before clearing lead cleanup markers", () => {
+    const leadCleanup = functionBody("cleanup_lead_artifacts")
+    const funnelCleanup = functionBody("cleanup_funnel_artifacts")
+    expect(leadCleanup.match(/tool_response_succeeded/gu)).toHaveLength(4)
+    expect(funnelCleanup.match(/tool_response_succeeded/gu)).toHaveLength(2)
+    expect(leadCleanup).toContain("wait_for_lead_label_absence_quiet")
+  })
+
+  it("uses an exact, complete, bounded label-definition readback before normal-path marker clearing", () => {
+    const labelId = "label-123"
+    expect(leadLabelAbsenceSucceeded('{"labels":[],"total":0,"truncated":false}', labelId, "unique-title")).toBe(true)
+    expect(
+      leadLabelAbsenceSucceeded('{"labels":[{"id":"label-123"}],"total":1,"truncated":false}', labelId, "unique-title")
+    ).toBe(false)
+    expect(leadLabelAbsenceSucceeded('{"labels":[],"total":2,"truncated":true}', labelId, "unique-title")).toBe(false)
+    expect(leadLabelAbsenceSucceeded('{"labels":[],"total":1,"truncated":false}', labelId, "unique-title")).toBe(false)
+    const normalPath = script.slice(
+      script.indexOf('LEAD_LABEL_TITLE="lead-label-'),
+      script.indexOf("LEAD_RELATIONS_TEXT")
+    )
+    expect(normalPath.indexOf("wait_for_lead_label_absence_quiet")).toBeGreaterThanOrEqual(0)
+    expect(normalPath.indexOf('LEAD_LABEL_DEFINITION_CLEANUP_ID=""')).toBeGreaterThan(
+      normalPath.indexOf("wait_for_lead_label_absence_quiet")
+    )
   })
 
   it("keeps page-size-one live HR report composition behind the internal adapter", () => {
