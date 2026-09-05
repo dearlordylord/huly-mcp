@@ -169,6 +169,7 @@ SKIPPED=0
 ERRORS=""
 
 TOOL_TIMEOUT=30
+readonly LIST_PROJECTS_REQUEST='{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}'
 
 cleanup_http_transport() {
   if [ -n "$HTTP_SERVER_PID" ]; then
@@ -1104,7 +1105,12 @@ start_http_transport() {
   for _ in $(seq 1 100); do
     if grep -q "MCP HTTP server listening" "$HTTP_SERVER_STDERR"; then
       echo "HTTP integration transport listening at $HTTP_ENDPOINT (config: $INTEGRATION_HTTP_CONFIG)"
-      return 0
+      if await_http_huly_readiness >/dev/null; then
+        echo "HTTP integration transport Huly readiness confirmed"
+        return 0
+      fi
+      cleanup_http_transport
+      return 1
     fi
     if ! kill -0 "$HTTP_SERVER_PID" 2>/dev/null; then
       echo "ERROR: HTTP integration transport exited during startup"
@@ -1177,23 +1183,28 @@ call_tool_http() {
   extract_http_json_response "$response" | select_tool_response
 }
 
-call_list_projects_with_http_retry() {
+await_http_huly_readiness() {
   if [ "$#" -ne 0 ]; then
-    echo "ERROR: call_list_projects_with_http_retry does not accept arguments" >&2
+    echo "ERROR: await_http_huly_readiness does not accept arguments" >&2
     return 2
   fi
 
-  local payload='{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}'
-  local result
-  result=$(call_tool "$payload")
-  if [ -n "$result" ] || [ "$INTEGRATION_SURFACE" != "mcp" ] || [ "$INTEGRATION_TRANSPORT" != "http" ]; then
-    printf '%s\n' "$result"
-    return 0
-  fi
+  local attempts=2 attempt=1 result
+  while [ "$attempt" -le "$attempts" ]; do
+    result=$(call_tool_http "$LIST_PROJECTS_REQUEST")
+    if [ -n "$result" ] && tool_response_succeeded "$result"; then
+      printf '%s\n' "$result"
+      return 0
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      echo "RETRY: HTTP Huly readiness probe failed on attempt $attempt of $attempts" >&2
+      sleep 0.25
+    fi
+    attempt=$((attempt + 1))
+  done
 
-  echo "RETRY: read-only HTTP tool call returned no response; retrying once" >&2
-  sleep 0.25
-  call_tool "$payload"
+  echo "ERROR: HTTP Huly readiness failed after $attempts attempts" >&2
+  return 1
 }
 
 call_tool_cli() {
@@ -1274,7 +1285,7 @@ run_test() {
 }
 
 run_list_projects_test() {
-  run_test_with_runner call_list_projects_with_http_retry "list_projects"
+  run_test "list_projects" "$LIST_PROJECTS_REQUEST"
 }
 
 run_shell_test() {
