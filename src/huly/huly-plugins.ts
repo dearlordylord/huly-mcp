@@ -3,6 +3,7 @@
 // All requires are collected here so consumers import typed values without eslint suppression.
 
 import { createRequire } from "node:module"
+import settingPlugin from "@hcengineering/setting"
 
 /* eslint-disable @typescript-eslint/consistent-type-imports, no-restricted-syntax -- CJS interop boundary: require().default needs `as typeof import(…).default` */
 
@@ -38,7 +39,14 @@ export const notification = load("@hcengineering/notification")
 export const preference = load("@hcengineering/preference")
   .default as typeof import("@hcengineering/preference").default
 export const request = load("@hcengineering/request").default as typeof import("@hcengineering/request").default
-export const setting = load("@hcengineering/setting").default as typeof import("@hcengineering/setting").default
+// Bundle this plugin instead of loading it from the consumer installation. The
+// 0.7.382 package supplies the native OfficeSettings contract, but its published
+// manifest contains workspace: dependency ranges that external installs cannot
+// resolve. A static import lets esbuild retain the official plugin implementation
+// without exposing that broken manifest as a runtime dependency.
+// NodeNext types the static CommonJS default as the module namespace even though
+// both Node and esbuild expose the declared default plugin at runtime.
+export const setting = settingPlugin as unknown as typeof import("@hcengineering/setting").default
 export const support = load("@hcengineering/support").default as typeof import("@hcengineering/support").default
 export const tags = load("@hcengineering/tags").default as typeof import("@hcengineering/tags").default
 export const task = load("@hcengineering/task").default as typeof import("@hcengineering/task").default

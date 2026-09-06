@@ -71,9 +71,6 @@ importers:
       '@hcengineering/request':
         specifier: 0.7.0
         version: 0.7.0
-      '@hcengineering/setting':
-        specifier: 0.7.382
-        version: 0.7.382
       '@hcengineering/support':
         specifier: 0.7.0
         version: 0.7.0
@@ -135,6 +132,9 @@ importers:
       '@hcengineering/rank':
         specifier: 0.7.18
         version: 0.7.18
+      '@hcengineering/setting':
+        specifier: 0.7.382
+        version: 0.7.382
       '@hcengineering/text':
         specifier: 0.7.19
         version: 0.7.19(prosemirror-inputrules@1.5.1)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.6)
