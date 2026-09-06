@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.52.1
+
+### Patch Changes
+
+- 4e62687: Fix bundled OfficeSettings plugin interop and reject cross-platform integration dependency trees before fixture writes.
+
 ## 0.52.0
 
 ### Minor Changes

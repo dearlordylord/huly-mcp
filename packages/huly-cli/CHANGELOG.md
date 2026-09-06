@@ -1,5 +1,11 @@
 # @firfi/huly-cli
 
+## 0.50.1
+
+### Patch Changes
+
+- 4e62687: Fix bundled OfficeSettings plugin interop and reject cross-platform integration dependency trees before fixture writes.
+
 ## 0.50.0
 
 ### Minor Changes
