@@ -3,7 +3,7 @@
 // All requires are collected here so consumers import typed values without eslint suppression.
 
 import { createRequire } from "node:module"
-import settingPlugin from "@hcengineering/setting"
+import settingModule from "@hcengineering/setting"
 
 /* eslint-disable @typescript-eslint/consistent-type-imports, no-restricted-syntax -- CJS interop boundary: require().default needs `as typeof import(…).default` */
 
@@ -44,9 +44,27 @@ export const request = load("@hcengineering/request").default as typeof import("
 // manifest contains workspace: dependency ranges that external installs cannot
 // resolve. A static import lets esbuild retain the official plugin implementation
 // without exposing that broken manifest as a runtime dependency.
-// NodeNext types the static CommonJS default as the module namespace even though
-// both Node and esbuild expose the declared default plugin at runtime.
-export const setting = settingPlugin as unknown as typeof import("@hcengineering/setting").default
+export const isSettingPlugin = (value: unknown): value is typeof import("@hcengineering/setting").default =>
+  typeof value === "object" &&
+  value !== null &&
+  "class" in value &&
+  typeof value.class === "object" &&
+  value.class !== null &&
+  "OfficeSettings" in value.class &&
+  value.class.OfficeSettings === "setting:class:OfficeSettings"
+
+export const resolveSettingPlugin = (
+  candidate: unknown = settingModule
+): typeof import("@hcengineering/setting").default => {
+  const direct: unknown = candidate
+  if (isSettingPlugin(direct)) return direct
+  if (typeof direct === "object" && direct !== null && "default" in direct && isSettingPlugin(direct.default)) {
+    return direct.default
+  }
+  throw new Error("@hcengineering/setting did not expose its declared default plugin")
+}
+
+export const setting = resolveSettingPlugin()
 export const support = load("@hcengineering/support").default as typeof import("@hcengineering/support").default
 export const tags = load("@hcengineering/tags").default as typeof import("@hcengineering/tags").default
 export const task = load("@hcengineering/task").default as typeof import("@hcengineering/task").default

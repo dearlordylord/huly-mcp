@@ -53,6 +53,8 @@ set -a && source .env.local && set +a
 HULY_URL="${HULY_URL/localhost/host.docker.internal}" bash scripts/integration_test_full.sh
 ```
 
+Integration preflight rejects cross-platform `node_modules` before fixture writes.
+
 If the container has instead been attached to the Huly Docker network, the `NODE_OPTIONS="-r ./scripts/container-patch.cjs"` path documented in `INTEGRATION_TESTING.md` is also valid.
 
 ## Type Safety

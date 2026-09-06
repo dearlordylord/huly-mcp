@@ -20,6 +20,15 @@ if ! command -v jq &>/dev/null; then
   exit 1
 fi
 
+# The suite invokes TypeScript fixture helpers throughout the run. Detect a
+# host/container node_modules mismatch before the first durable Huly write so a
+# macOS-native esbuild installation cannot contaminate integration evidence.
+if ! node -e 'require("esbuild").transformSync("const integrationPreflight = true")' >/dev/null 2>&1; then
+  echo "ERROR: local esbuild cannot run on this platform; integration fixtures were not created."
+  echo "Install dependencies for the current OS/architecture before retrying (for example: pnpm install --force)."
+  exit 1
+fi
+
 INTEGRATION_TRANSPORT="${INTEGRATION_TRANSPORT:-stdio}"
 INTEGRATION_SURFACE="${INTEGRATION_SURFACE:-mcp}"
 INTEGRATION_HTTP_CONFIG="${INTEGRATION_HTTP_CONFIG:-env}"

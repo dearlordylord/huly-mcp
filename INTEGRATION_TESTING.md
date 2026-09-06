@@ -160,6 +160,12 @@ docker network connect <huly_network> <container_id>
 
 ### Running tests from the container
 
+The suite uses TypeScript fixture helpers in addition to the MCP executable. If
+`node_modules` was last installed on another OS or architecture, create a
+platform-local dependency installation first. The suite checks esbuild before
+its first durable Huly write and exits with repair guidance if the native binary
+does not match the current platform.
+
 ```bash
 set -a && source .env.local && set +a
 NODE_OPTIONS="-r ./scripts/container-patch.cjs" bash scripts/integration_test_full.sh
