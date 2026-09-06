@@ -17,6 +17,7 @@ import {
   ChannelIdentifier,
   Count,
   DocId,
+  EventId,
   IssueIdentifier,
   MasterTagId,
   NonEmptyString,
@@ -60,6 +61,7 @@ import {
   IssueNotFoundError,
   LeadIdentifierAmbiguousError,
   LeadNotFoundError,
+  MeetingCompositionMutationError,
   OrganizationIdentifierAmbiguousError,
   OrganizationNotFoundError,
   PersonIdentifierAmbiguousError,
@@ -617,6 +619,44 @@ describe("Error Mapping to MCP", () => {
         })
       )
 
+      it.effect("renders a schema-owned connection operation when no HTTP status is available", () =>
+        Effect.sync(function () {
+          const error = makeOperationConnectionError("updateMarkup", new Error("socket closed"))
+          const response = mapDomainErrorToMcp(error)
+
+          expect(assertAt(response.content, 0).text).toBe(
+            "Connection error while communicating with Huly: updateMarkup failed. Verify HULY_URL, workspace, and network connectivity before retrying."
+          )
+        })
+      )
+
+      it.effect("includes the schema-owned meeting-composition recovery record", () =>
+        Effect.sync(function () {
+          const error = new MeetingCompositionMutationError({
+            failedStep: { _tag: "UpdateEventBase", operation: "update_event" },
+            diagnostics: [{ _tag: "TypedFailure", errorTag: NonEmptyString.make("HulyConnectionError") }],
+            recovery: {
+              _tag: "Unconfirmed",
+              residuals: [
+                { _tag: "BaseFields", target: "event", documentId: DocId.make("event-document-1") },
+                { _tag: "SiblingSet", target: "event", eventId: EventId.make("event-group-1") }
+              ]
+            }
+          })
+          const response = mapDomainErrorToMcp(error)
+          const text = assertAt(response.content, 0).text
+          const prefix = `${error.message}\nRecovery record: `
+
+          expect(text.startsWith(prefix)).toBe(true)
+          const recoveryRecord = Schema.decodeUnknownSync(Schema.fromJsonString(MeetingCompositionMutationError))(
+            text.slice(prefix.length)
+          )
+          expect(recoveryRecord.failedStep).toEqual(error.failedStep)
+          expect(recoveryRecord.diagnostics).toEqual(error.diagnostics)
+          expect(recoveryRecord.recovery).toEqual(error.recovery)
+        })
+      )
+
       it.effect("preserves known resolver failures and hides arbitrary resolver rejections", () =>
         Effect.sync(function () {
           const unavailable = mapClientResolutionErrorToMcp(
@@ -837,6 +877,25 @@ describe("Error Mapping to MCP", () => {
           expect(assertAt(response.content, 0).text).toBe("An unexpected error occurred")
           expect(JSON.stringify(response)).not.toContain("SECRET-1")
           expect(JSON.stringify(response)).not.toContain("token=secret")
+        })
+      )
+
+      it.effect("surfaces only a safe meeting-composition record from a mixed defect cause", () =>
+        Effect.sync(function () {
+          const error = new MeetingCompositionMutationError({
+            failedStep: { _tag: "UpdateScheduleBase", operation: "update_schedule" },
+            diagnostics: [{ _tag: "Defect" }],
+            recovery: {
+              _tag: "Unconfirmed",
+              residuals: [{ _tag: "BaseFields", target: "schedule", documentId: DocId.make("s1") }]
+            }
+          })
+          const response = mapDomainCauseToMcp(Cause.combine(Cause.fail(error), Cause.die("token=operator-secret")))
+
+          expect(response._meta.errorTag).toBe("MeetingCompositionMutationError")
+          expect(assertAt(response.content, 0).text).toContain('"diagnostics":[{"_tag":"Defect"}]')
+          expect(assertAt(response.content, 0).text).toContain('"documentId":"s1"')
+          expect(JSON.stringify(response)).not.toContain("operator-secret")
         })
       )
     })

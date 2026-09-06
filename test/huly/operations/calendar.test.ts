@@ -9,12 +9,13 @@ import {
 import type { Contact, Person } from "@hcengineering/contact"
 import { type Class, type Doc, type MarkupBlobRef, type Ref, type Space, toFindResult } from "@hcengineering/core"
 import type { Meeting as HulyMeeting, Room as HulyRoom } from "@hcengineering/love"
-import { Effect } from "effect"
+import { Effect, Layer } from "effect"
 import { expect } from "vitest"
 import { CalendarEventTitle, CalendarName } from "../../../src/domain/schemas/calendar.js"
 import { RecurrenceCount, RecurrenceInterval } from "../../../src/domain/schemas/recurrence-primitives.js"
 import { CalendarId, Email, PersonId, PersonName, Timestamp, TimeZoneId } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import { Diagnostics, makeDiagnosticsScope } from "../../../src/huly/diagnostics.js"
 import type { EventNotFoundError, RecurringEventNotFoundError } from "../../../src/huly/errors.js"
 import {
   createEvent,
@@ -165,6 +166,7 @@ interface MockConfig {
   captureAddCollection?: { attributes?: Record<string, unknown> }
   captureUpdateMarkup?: { called?: boolean; markup?: string }
   captureUploadMarkup?: { called?: boolean; markup?: string }
+  diagnostics?: Diagnostics["Service"]
 }
 
 const createTestLayer = (config: MockConfig) => {
@@ -311,16 +313,19 @@ const createTestLayer = (config: MockConfig) => {
     return Effect.succeed(undefined)
   }) as HulyClientOperations["updateMarkup"]
 
-  return HulyClient.testLayer({
-    findAll: findAllImpl,
-    findOne: findOneImpl,
-    fetchMarkup: fetchMarkupImpl,
-    updateDoc: updateDocImpl,
-    removeDoc: removeDocImpl,
-    addCollection: addCollectionImpl,
-    uploadMarkup: uploadMarkupImpl,
-    updateMarkup: updateMarkupImpl
-  })
+  return Layer.merge(
+    HulyClient.testLayer({
+      findAll: findAllImpl,
+      findOne: findOneImpl,
+      fetchMarkup: fetchMarkupImpl,
+      updateDoc: updateDocImpl,
+      removeDoc: removeDocImpl,
+      addCollection: addCollectionImpl,
+      uploadMarkup: uploadMarkupImpl,
+      updateMarkup: updateMarkupImpl
+    }),
+    Layer.succeed(Diagnostics, config.diagnostics ?? { warnAgent: () => Effect.void, trail: () => Effect.void })
+  )
 }
 
 // --- Tests ---
@@ -447,20 +452,29 @@ describe("getEvent", () => {
     })
   )
 
-  it.effect("maps event meeting room from love meeting mixin", () =>
+  it.effect("keeps a missing meeting room row as a partial result with a warning", () =>
     Effect.gen(function* () {
       const event = makeEvent({ _id: "event-1" as Ref<HulyEvent>, eventId: "evt-1" })
+      const diagnostics = yield* makeDiagnosticsScope
       const result = yield* getEvent({ eventId: eventBrandId("evt-1") }).pipe(
         Effect.provide(
           createTestLayer({
             events: [event],
             meetings: [makeMeeting({ _id: "event-1" as Ref<HulyMeeting> })],
-            rooms: []
+            rooms: [],
+            diagnostics: diagnostics.service
           })
         )
       )
 
-      expect(result.meetingRoom).toEqual({ roomId: "room-1", name: undefined })
+      expect(result.meetingRoom).toEqual({ roomId: "room-1" })
+      expect(yield* diagnostics.drainWarnings).toEqual([
+        {
+          code: "calendar_meeting_room_metadata_degraded",
+          message:
+            "Calendar meeting-room metadata was partially resolved: 1 referenced room(s) were unavailable, 0 room name(s) were blank."
+        }
+      ])
     })
   )
 

@@ -297,6 +297,7 @@ const updateSchemaCases: ReadonlyArray<UpdateSchemaCase> = [
       dueDate: 1,
       externalParticipants: ["guest@example.com"],
       location: "Updated",
+      meetingRoom: { room: "room-1" },
       participants: ["john@example.com"],
       reminders: [1],
       removeExternalParticipants: ["guest@example.com"],

@@ -13,6 +13,16 @@ export const businessMutationCliCommandCatalogB = {
     description: "Create HR Request",
     behavior: { fileInput: { fields: ["description"] } }
   },
+  create_office_floor: {
+    path: ["office", "floors", "create"],
+    positional: ["name"],
+    description: "Create a virtual-office floor"
+  },
+  create_office_room: {
+    path: ["office", "rooms", "create"],
+    positional: ["floor", "kind"],
+    description: "Create a virtual-office room or private office"
+  },
   add_hr_request_comment: {
     path: ["hr", "requests", "comments", "add"],
     positional: ["request", "body"],
@@ -102,6 +112,16 @@ export const businessMutationCliCommandCatalogB = {
     positional: ["department"],
     description: "Update Department"
   },
+  set_primary_calendar: {
+    path: ["calendar", "settings", "primary", "set"],
+    positional: [],
+    description: "Set Primary Calendar"
+  },
+  update_calendar_settings: {
+    path: ["calendar", "settings", "update"],
+    positional: [],
+    description: "Update Calendar Settings"
+  },
   update_public_holiday: {
     path: ["hr", "holidays", "update"],
     positional: ["holiday"],
@@ -123,6 +143,12 @@ export const businessMutationCliCommandCatalogB = {
     path: ["hr", "requests", "attachments", "update"],
     positional: ["request", "attachmentId"],
     description: "Update HR Request Attachment"
+  },
+  update_office_room: {
+    path: ["office", "rooms", "update"],
+    positional: ["roomId"],
+    description: "Update durable virtual-office room settings",
+    behavior: { fileInput: { fields: ["description"] } }
   },
   remove_recruiting_candidate_skill: {
     path: ["recruiting", "candidate", "skill", "remove"],
@@ -169,6 +195,11 @@ export const businessMutationCliCommandCatalogB = {
     path: ["recruiting", "candidate", "profile", "set"],
     positional: ["candidate"],
     description: "Set Recruiting Candidate Profile"
+  },
+  set_recruiting_candidate_custom_field: {
+    path: ["recruiting", "candidate", "custom-fields", "set"],
+    positional: ["candidate", "fieldId", "value"],
+    description: "Set Recruiting Candidate Custom Field"
   },
   unarchive_recruiting_vacancy: {
     path: ["recruiting", "vacancy", "unarchive"],

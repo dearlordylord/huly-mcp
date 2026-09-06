@@ -5,15 +5,16 @@
  *
  * @module
  */
-import type {
-  Calendar as HulyCalendar,
-  Event as HulyEvent,
-  PrimaryCalendar as HulyPrimaryCalendar,
-  Visibility as HulyVisibility
+import {
+  AccessLevel,
+  type Calendar as HulyCalendar,
+  type ExternalCalendar as HulyExternalCalendar,
+  type Event as HulyEvent,
+  type PrimaryCalendar as HulyPrimaryCalendar,
+  type Visibility as HulyVisibility
 } from "@hcengineering/calendar"
-import { AccessLevel, getPrimaryCalendar } from "@hcengineering/calendar"
 import type { Contact, Person } from "@hcengineering/contact"
-import type { Class, Doc, MarkupBlobRef, Ref } from "@hcengineering/core"
+import type { Class, Doc, MarkupBlobRef, PersonId as HulyPersonId, Ref } from "@hcengineering/core"
 import { Array as Arr, Effect } from "effect"
 
 import type {
@@ -24,8 +25,7 @@ import type {
   WritableCalendarAccess
 } from "../../domain/schemas/calendar.js"
 import { DEFAULT_EVENT_DURATION_MS } from "../../domain/schemas/calendar.js"
-import type { CalendarId } from "../../domain/schemas/shared.js"
-import { PersonId, PersonName } from "../../domain/schemas/shared.js"
+import { CalendarId, PersonId, PersonName } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { PersonIdentifierAmbiguousError, PersonNotFoundError } from "../errors.js"
 import { CalendarNotAccessibleError, PersonNotFoundError as PersonMissing } from "../errors.js"
@@ -36,6 +36,9 @@ import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
 // --- SDK Type Bridges ---
+
+const isExternalCalendar = (row: HulyCalendar): row is HulyExternalCalendar =>
+  row._class === calendar.class.ExternalCalendar
 
 // SDK: HulyEvent["description"] is Markup | MarkupBlobRef | null; fetchMarkup expects MarkupBlobRef.
 // Brands are erased at runtime; non-empty stored event descriptions are markup blob refs, both represented as string.
@@ -104,11 +107,41 @@ export const ONE_HOUR_MS = DEFAULT_EVENT_DURATION_MS
 const findWritablePersonalCalendars = (
   client: HulyClient["Service"]
 ): Effect.Effect<Array<HulyCalendar>, HulyClientError> =>
-  client.findAll<HulyCalendar>(calendar.class.Calendar, {
-    user: client.getPrimarySocialId(),
-    hidden: false,
-    access: { $in: [AccessLevel.Owner, AccessLevel.Writer] }
-  })
+  client.findAll<HulyCalendar>(
+    calendar.class.Calendar,
+    hulyQuery<HulyCalendar>({
+      user: callerCalendarUserQuery(client),
+      hidden: false,
+      access: { $in: [AccessLevel.Owner, AccessLevel.Writer] }
+    })
+  )
+
+const callerSocialIds = (client: HulyClient["Service"]): Array<HulyPersonId> => {
+  const primarySocialId = client.getPrimarySocialId()
+  const socialIds = client.getSocialIds?.() ?? []
+  return [...new Set([primarySocialId, ...socialIds])]
+}
+
+const callerCalendarUserQuery = (
+  client: HulyClient["Service"]
+): HulyPersonId | { readonly $in: Array<HulyPersonId> } => {
+  const socialIds = callerSocialIds(client)
+  const [firstSocialId] = socialIds
+  return socialIds.length === 1 && firstSocialId !== undefined ? firstSocialId : { $in: socialIds }
+}
+
+/**
+ * Find every Calendar row owned by one of the caller's social identities.
+ * Hidden and read-only rows are intentional: settings administration needs to
+ * display them even though event target discovery remains writable-only.
+ */
+export const findCallerCalendars = (
+  client: HulyClient["Service"]
+): Effect.Effect<Array<HulyCalendar>, HulyClientError> =>
+  client.findAll<HulyCalendar>(
+    calendar.class.Calendar,
+    hulyQuery<HulyCalendar>({ user: callerCalendarUserQuery(client) })
+  )
 
 export const findWritableCalendars = (
   client: HulyClient["Service"]
@@ -123,10 +156,86 @@ export const getDefaultCalendarRef = (
 ): Effect.Effect<Ref<HulyCalendar>, HulyClientError> =>
   Effect.gen(function* () {
     const calendars = yield* findWritablePersonalCalendars(client)
-    const preference = yield* client.findOne<HulyPrimaryCalendar>(calendar.class.PrimaryCalendar, {})
+    const preference = yield* client.findOne<HulyPrimaryCalendar>(
+      calendar.class.PrimaryCalendar,
+      hulyQuery<HulyPrimaryCalendar>({})
+    )
 
-    return getPrimaryCalendar(calendars, preference, client.getAccountUuid())
+    return toRef<HulyCalendar>(
+      selectPrimaryCalendar(
+        calendars.map(toPrimaryCalendarCandidate),
+        toPrimaryCalendarPreference(preference),
+        client.getAccountUuid()
+      )
+    )
   })
+
+type InternalPrimaryCalendarCandidate = {
+  readonly _id: CalendarId
+  readonly _class: typeof calendar.class.Calendar
+  readonly hidden: boolean
+  readonly access: CalendarAccess
+  readonly default: false
+}
+
+type ExternalPrimaryCalendarCandidate = {
+  readonly _id: CalendarId
+  readonly _class: typeof calendar.class.ExternalCalendar
+  readonly hidden: boolean
+  readonly access: CalendarAccess
+  readonly default: boolean
+}
+
+export type PrimaryCalendarCandidate = InternalPrimaryCalendarCandidate | ExternalPrimaryCalendarCandidate
+
+export type PrimaryCalendarPreference = { readonly attachedTo: CalendarId }
+
+const toPrimaryCalendarCandidate = (row: HulyCalendar): PrimaryCalendarCandidate =>
+  isExternalCalendar(row)
+    ? {
+        _id: CalendarId.make(row._id),
+        _class: calendar.class.ExternalCalendar,
+        hidden: row.hidden,
+        access: accessToString(row.access),
+        default: row.default
+      }
+    : {
+        _id: CalendarId.make(row._id),
+        _class: calendar.class.Calendar,
+        hidden: row.hidden,
+        access: accessToString(row.access),
+        default: false
+      }
+
+const toPrimaryCalendarPreference = (
+  preference: HulyPrimaryCalendar | undefined
+): PrimaryCalendarPreference | undefined =>
+  preference === undefined ? undefined : { attachedTo: CalendarId.make(preference.attachedTo) }
+
+/**
+ * Apply the Calendar primary preference and fallback rules to caller-owned
+ * writable rows. A stale, hidden, or read-only preference target is ignored;
+ * provider defaults are considered only after that filtering.
+ */
+export const selectPrimaryCalendar = (
+  calendars: ReadonlyArray<PrimaryCalendarCandidate>,
+  preference: PrimaryCalendarPreference | undefined,
+  accountUuid: ReturnType<HulyClient["Service"]["getAccountUuid"]>
+): CalendarId => {
+  const eligibleCalendars = calendars.filter(
+    (calendarRow) =>
+      !calendarRow.hidden && (calendarRow.access === AccessLevel.Owner || calendarRow.access === AccessLevel.Writer)
+  )
+  const preferred =
+    preference === undefined
+      ? undefined
+      : eligibleCalendars.find((calendarRow) => calendarRow._id === preference.attachedTo)
+  if (preferred !== undefined) return preferred._id
+  const providerDefault = eligibleCalendars.find(
+    (calendarRow) => calendarRow._class === calendar.class.ExternalCalendar && calendarRow.default
+  )
+  return providerDefault?._id ?? CalendarId.make(`${accountUuid}_calendar`)
+}
 
 export const resolveCalendarRef = (
   client: HulyClient["Service"],
@@ -235,11 +344,32 @@ export const buildParticipants = (
     return persons.map((p) => ({ id: PersonId.make(p._id), name: PersonName.make(p.name) }))
   })
 
-interface ResolvedEventInputs {
+export interface ResolvedEventReferences {
   calendarRef: Ref<HulyCalendar>
   participantRefs: Array<Ref<Contact>>
+}
+
+interface ResolvedEventInputs extends ResolvedEventReferences {
   descriptionRef: MarkupBlobRef | null
 }
+
+export const resolveEventReferences = Effect.fn("Calendar.resolveEventReferences")(function* (
+  client: HulyClient["Service"],
+  params: {
+    readonly participants?: ReadonlyArray<EventParticipantLocator> | undefined
+    readonly calendarId?: CalendarId | undefined
+    readonly calendarName?: string | undefined
+  }
+): Effect.fn.Return<
+  ResolvedEventReferences,
+  HulyClientError | CalendarNotAccessibleError | PersonIdentifierAmbiguousError | PersonNotFoundError
+> {
+  const calendarRef = yield* resolveCalendarRef(client, params.calendarId, params.calendarName)
+  const participantRefs = Arr.isReadonlyArrayNonEmpty(params.participants ?? [])
+    ? yield* resolveParticipantLocators(client, params.participants)
+    : []
+  return { calendarRef, participantRefs }
+})
 
 export const resolveEventInputs = (
   client: HulyClient["Service"],
@@ -256,11 +386,7 @@ export const resolveEventInputs = (
   HulyClientError | CalendarNotAccessibleError | PersonIdentifierAmbiguousError | PersonNotFoundError
 > =>
   Effect.gen(function* () {
-    const calendarRef = yield* resolveCalendarRef(client, params.calendarId, params.calendarName)
-
-    const participantRefs = Arr.isReadonlyArrayNonEmpty(params.participants ?? [])
-      ? yield* resolveParticipantLocators(client, params.participants)
-      : []
+    const { calendarRef, participantRefs } = yield* resolveEventReferences(client, params)
 
     const description = params.description
     const descriptionRef: MarkupBlobRef | null =

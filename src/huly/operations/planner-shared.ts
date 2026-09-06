@@ -2,6 +2,7 @@ import type { Visibility as HulyVisibility } from "@hcengineering/calendar"
 import type { Employee, Person } from "@hcengineering/contact"
 import type { Class, Doc, DocumentQuery, MarkupBlobRef, Ref, Space, WithLookup } from "@hcengineering/core"
 import { SortingOrder } from "@hcengineering/core"
+import type { Document as HulyDocument } from "@hcengineering/document"
 import { makeRank } from "@hcengineering/rank"
 import { type ToDo as HulyToDo, ToDoPriority } from "@hcengineering/time"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
@@ -36,11 +37,16 @@ import {
 import { assertAt, isExistent } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type {
+  DocumentNotFoundError,
+  HulyDataInvalidError,
   IssueNotFoundError,
   PersonIdentifierAmbiguousError,
   PersonNotAnEmployeeError,
   PersonNotFoundError,
   ProjectNotFoundError,
+  TeamspaceNotFoundError,
+  TodoDocumentTargetAmbiguousError,
+  TodoDocumentTargetNotWritableError,
   TodoIdentifierAmbiguousError
 } from "../errors.js"
 import {
@@ -49,10 +55,16 @@ import {
   TodoIdentifierAmbiguousError as AmbiguousTodo,
   TodoNotFoundError
 } from "../errors.js"
-import { contact, time, tracker } from "../huly-plugins.js"
+import { contact, documentPlugin, time, tracker } from "../huly-plugins.js"
 import { findPersonByExactEmailOrName } from "./contacts-shared.js"
 import { findProjectAndIssue } from "./issues-shared.js"
 import { hulyNonEmptyTextOrFallback } from "./non-empty-text.js"
+import {
+  type ResolvedDocumentTodoAttachment,
+  type ResolveDocumentTodoAttachmentOptions,
+  resolveDocumentTodoAttachment
+} from "./planner-document-shared.js"
+import type { TodoDocumentMetadata } from "./planner-document-metadata.js"
 import { hulyQuery, type StrictDocumentQuery, withLookup } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
@@ -62,22 +74,30 @@ export type HulyTodoWithLookup = WithLookup<HulyToDo> & {
 
 export const todoLookup = { user: contact.class.Person, attachedTo: tracker.class.Issue } as const
 
-interface ResolvedTodoAttachment {
-  readonly type: "none" | "issue"
-  readonly attachedTo: Ref<Doc>
-  readonly attachedToClass: Ref<Class<Doc>>
-  readonly attachedSpace?: Ref<Space> | undefined
-  readonly project?: HulyProject | undefined
-  readonly issue?: HulyIssue | undefined
-}
+type ResolvedTodoAttachment =
+  | { readonly type: "none"; readonly attachedTo: Ref<Doc>; readonly attachedToClass: Ref<Class<Doc>> }
+  | {
+      readonly type: "issue"
+      readonly attachedTo: Ref<Doc>
+      readonly attachedToClass: Ref<Class<Doc>>
+      readonly attachedSpace: Ref<Space>
+      readonly project: HulyProject
+      readonly issue: HulyIssue
+    }
+  | ResolvedDocumentTodoAttachment
 
 export type PlannerLookupError =
   | HulyClientError
+  | HulyDataInvalidError
   | ProjectNotFoundError
   | IssueNotFoundError
   | PersonIdentifierAmbiguousError
   | PersonNotFoundError
   | PersonNotAnEmployeeError
+  | TeamspaceNotFoundError
+  | DocumentNotFoundError
+  | TodoDocumentTargetAmbiguousError
+  | TodoDocumentTargetNotWritableError
   | TodoIdentifierAmbiguousError
   | TodoNotFoundError
 
@@ -175,8 +195,9 @@ export const resolveTodoOwner = (
 
 export const resolveTodoAttachment = (
   client: HulyClient["Service"],
-  attachment?: TodoAttachmentInput
-): Effect.Effect<ResolvedTodoAttachment, HulyClientError | ProjectNotFoundError | IssueNotFoundError, never> =>
+  attachment?: TodoAttachmentInput,
+  options?: ResolveDocumentTodoAttachmentOptions
+): Effect.Effect<ResolvedTodoAttachment, PlannerLookupError, never> =>
   Effect.gen(function* () {
     if (attachment?.type === "issue") {
       const { issue, project } = yield* findProjectAndIssue({
@@ -192,6 +213,8 @@ export const resolveTodoAttachment = (
         issue
       }
     }
+
+    if (attachment?.type === "document") return yield* resolveDocumentTodoAttachment(client, attachment, options)
 
     return { type: "none", attachedTo: time.ids.NotAttached, attachedToClass: time.class.ToDo }
   })
@@ -338,7 +361,10 @@ const todoOwnerSummary = (
   }
 }
 
-const todoAttachmentSummary = (todo: HulyTodoWithLookup): TodoAttachmentSummary => {
+const todoAttachmentSummary = (
+  todo: HulyTodoWithLookup,
+  documentMetadata: ReadonlyMap<Ref<HulyDocument>, TodoDocumentMetadata> | undefined
+): TodoAttachmentSummary => {
   if (todo.attachedTo === time.ids.NotAttached) return { type: "none" }
   const issue = todo.$lookup?.attachedTo
   if (todo.attachedToClass === tracker.class.Issue && issue !== undefined) {
@@ -353,6 +379,18 @@ const todoAttachmentSummary = (todo: HulyTodoWithLookup): TodoAttachmentSummary 
       title: attachmentTitleOrFallback(issue.title, issue.identifier)
     }
   }
+  if (todo.attachedToClass === documentPlugin.class.Document && documentMetadata !== undefined) {
+    const document = documentMetadata.get(toRef<HulyDocument>(todo.attachedTo))
+    if (document !== undefined) {
+      return {
+        type: "document",
+        id: document.id,
+        title: document.title,
+        teamspaceId: document.teamspaceId,
+        teamspaceName: document.teamspaceName
+      }
+    }
+  }
   return { type: "unknown", id: DocId.make(todo.attachedTo), class: ObjectClassName.make(todo.attachedToClass) }
 }
 
@@ -363,7 +401,8 @@ const runtimeTimestampOrNull = (value: unknown): Timestamp | null | undefined =>
 
 export const todoSummary = (
   todo: HulyTodoWithLookup,
-  emailByPersonId: ReadonlyMap<Ref<Person>, Email>
+  emailByPersonId: ReadonlyMap<Ref<Person>, Email>,
+  documentMetadata?: ReadonlyMap<Ref<HulyDocument>, TodoDocumentMetadata>
 ): TodoSummary => {
   const labels = Reflect.get(todo, "labels")
   return {
@@ -372,7 +411,7 @@ export const todoSummary = (
     priority: todoPriorityToString(todo.priority),
     visibility: todoVisibilityToString(todo.visibility),
     owner: todoOwnerSummary(todo, emailByPersonId),
-    attachedTo: todoAttachmentSummary(todo),
+    attachedTo: todoAttachmentSummary(todo, documentMetadata),
     workslots: runtimeCount(Reflect.get(todo, "workslots")),
     ...(todo.dueDate === undefined ? {} : { dueDate: runtimeTimestampOrNull(todo.dueDate) }),
     doneOn: runtimeTimestampOrNull(todo.doneOn),

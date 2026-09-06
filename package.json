@@ -110,6 +110,7 @@
     "@hcengineering/notification": "0.7.0",
     "@hcengineering/preference": "0.7.0",
     "@hcengineering/request": "0.7.0",
+    "@hcengineering/setting": "0.7.382",
     "@hcengineering/support": "0.7.0",
     "@hcengineering/tags": "0.7.0",
     "@hcengineering/task": "0.7.0",
@@ -136,6 +137,13 @@
       "unrs-resolver",
       "dprint"
     ],
+    "overrides": {
+      "@hcengineering/setting@0.7.382>@hcengineering/account-client": "0.7.25",
+      "@hcengineering/setting@0.7.382>@hcengineering/core": "0.7.26",
+      "@hcengineering/setting@0.7.382>@hcengineering/platform": "0.7.20",
+      "@hcengineering/setting@0.7.382>@hcengineering/templates": "0.7.0",
+      "@hcengineering/setting@0.7.382>@hcengineering/ui": "0.7.0"
+    },
     "patchedDependencies": {
       "@hcengineering/api-client@0.7.19": "patches/@hcengineering__api-client@0.7.19.patch"
     }
@@ -166,6 +174,7 @@
     "@hcengineering/preference": "0.7.0",
     "@hcengineering/rank": "0.7.18",
     "@hcengineering/request": "0.7.0",
+    "@hcengineering/setting": "0.7.382",
     "@hcengineering/tags": "0.7.0",
     "@hcengineering/task": "0.7.0",
     "@hcengineering/templates": "0.7.0",

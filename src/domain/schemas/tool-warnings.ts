@@ -6,6 +6,11 @@ export const SupportRuntimeUnsupportedWarningCode = "support_runtime_unsupported
 export const SupportStatusMetadataDegradedWarningCode = "support_status_metadata_degraded" as const
 export const WorkbenchNavigationMetadataDegradedWarningCode = "workbench_navigation_metadata_degraded" as const
 export const LeadCustomerMetadataDegradedWarningCode = "lead_customer_metadata_degraded" as const
+export const CalendarMeetingRoomMetadataDegradedWarningCode = "calendar_meeting_room_metadata_degraded" as const
+export const PlannerDocumentMetadataDegradedWarningCode = "planner_document_metadata_degraded" as const
+export const RecruitingCandidateCustomFieldMetadataDegradedWarningCode =
+  "recruiting_candidate_custom_field_metadata_degraded" as const
+export const CustomFieldMetadataDegradedWarningCode = "custom_field_metadata_degraded" as const
 
 export const ToolWarningCodeSchema = Schema.Literals([
   "status_metadata_unresolved",
@@ -24,11 +29,15 @@ export const ToolWarningCodeSchema = Schema.Literals([
   "recruiting_review_metadata_degraded",
   "issue_relation_metadata_degraded",
   "class_collaborator_metadata_degraded",
+  PlannerDocumentMetadataDegradedWarningCode,
   ExternalChannelRuntimeUnsupportedWarningCode,
   SupportRuntimeUnsupportedWarningCode,
   SupportStatusMetadataDegradedWarningCode,
   WorkbenchNavigationMetadataDegradedWarningCode,
-  LeadCustomerMetadataDegradedWarningCode
+  LeadCustomerMetadataDegradedWarningCode,
+  CalendarMeetingRoomMetadataDegradedWarningCode,
+  RecruitingCandidateCustomFieldMetadataDegradedWarningCode,
+  CustomFieldMetadataDegradedWarningCode
 ]).pipe(
   Schema.annotate({
     identifier: "ToolWarningCode",

@@ -159,9 +159,9 @@
     },
     {
       "package": "@hcengineering/calendar",
-      "status": "gap",
+      "status": "covered",
       "matrixLocation": "Calendar schedules and integrations",
-      "rationale": "Issue #266 tracks caller-scoped Calendar settings and PrimaryCalendar preference operations. ExternalCalendar provider identifiers, defaults, synchronized names/access, and lifecycle are provider-owned; only local hidden/visibility settings are in scope. Current 0.7.0 calendar declarations expose no RSVP response model.",
+      "rationale": "Caller-scoped calendar settings, PrimaryCalendar preference replacement, and local ExternalCalendar hidden/visibility updates cover the durable user-owned administration surface. Provider identifiers, defaults, synchronized names/access, and lifecycle remain provider-owned, and the current declarations expose no RSVP response model.",
       "exports": [
         "Calendar",
         "ExternalCalendar",
@@ -180,24 +180,17 @@
       "package": "@hcengineering/love",
       "status": "covered",
       "matrixLocation": "Virtual office / meetings",
-      "rationale": "Read-only virtual-office tools cover floors, rooms, offices, transient room info, transient participant info, meeting minutes, device preferences, and room recording/transcription defaults. Meeting and MeetingSchedule mixin data is exposed as room-aware calendar event/schedule summaries instead of raw mixin internals.",
+      "rationale": "Virtual-office tools cover durable Floor/Room creation, bounded Room updates, and read-only floors, rooms, offices, transient room/participant info, meeting minutes, device preferences, and room defaults. Meeting and MeetingSchedule composition is exposed through room-aware calendar event/schedule operations instead of raw mixin mechanics.",
       "exports": [
         "DevicesPreference",
         "Floor",
+        "Meeting",
+        "MeetingSchedule",
         "MeetingMinutes",
         "Office",
         "ParticipantInfo",
         "Room",
         "RoomInfo"
-      ]
-    },
-    {
-      "package": "@hcengineering/love",
-      "status": "gap",
-      "matrixLocation": "Virtual office / meetings",
-      "rationale": "Issues #267 and #268 track bounded durable Floor/Room administration and room-aware Meeting/MeetingSchedule composition. Raw transient state, join/leave, LiveKit device/session behavior, transcription, and recording remain excluded or blocked on published provider contracts and deterministic cleanup.",
-      "exports": [
-        "Meeting"
       ]
     },
     {
@@ -218,6 +211,8 @@
       "rationale": "Card favorites, roles, sections, editor sections, and advanced tag/schema metadata remain matrix gaps.",
       "exports": [
         "CardSection",
+        "CardViewDefaults",
+        "CreateCardExtension",
         "FavoriteCard",
         "MasterTagEditorSection",
         "Role",
@@ -255,6 +250,7 @@
       "rationale": "Current contacts tools expose person, organization, employee/member, channels, exact-locator person notes and attachments, person administration, explicit source/survivor person merges with preview tokens and model-metadata-driven native reference migration, and employee invitation/deactivation lifecycle administration. Person administration exposes avatar and birthday, derives contact/workspace status, social identities and channel activity, reads account profile data, and applies only Huly-native account-authoritative SocialIdentity projection repairs; arbitrary identity mutations remain explicitly unsupported. Employee summaries project stable Contact Employee fields including active, role, statuses, position, and personUuid. Lifecycle tools distinguish Person, Employee.active, account linkage, and workspace membership; new-email invitation, inactive-employee reinvitation, guarded deactivation, and guarded workspace kick use Huly's published account and Contact contracts.",
       "exports": [
         "Contact",
+        "Employee",
         "Member",
         "Organization",
         "Person",
@@ -313,6 +309,7 @@
         "Sequence",
         "SpaceType",
         "SpaceTypeDescriptor",
+        "SpacesTypeData",
         "Status",
         "StatusCategory",
         "UserStatus"
@@ -338,6 +335,7 @@
         "Configuration",
         "ConfigurationElement",
         "EnumOf",
+        "IndexConfiguration",
         "MigrationState",
         "Space",
         "SystemSpace",
@@ -399,6 +397,7 @@
       "matrixLocation": "Document preferences and history",
       "rationale": "Current document tools cover non-controlled document teamspaces, document CRUD/content operations, and read-only snapshot/history listing plus markdown retrieval. Snapshot restore and document PDF/export remain deferred.",
       "exports": [
+        "DefaultTeamspaceTypeData",
         "Document",
         "DocumentSnapshot",
         "Teamspace"
@@ -520,12 +519,48 @@
       ]
     },
     {
+      "package": "@hcengineering/setting",
+      "status": "covered",
+      "matrixLocation": "Virtual office / meetings",
+      "rationale": "Virtual-office room creation reads the native singleton OfficeSettings document through the published SDK declaration and applies its recording/transcription booleans as video-room defaults. The MCP does not expose raw settings-document mechanics.",
+      "exports": [
+        "OfficeSettings"
+      ]
+    },
+    {
+      "package": "@hcengineering/setting",
+      "status": "gap",
+      "matrixLocation": "Settings / integrations registry",
+      "rationale": "Integration discovery and lifecycle, invite policy, role-capability policy, and workspace-setting metadata are durable agent-facing administration surfaces, but the current MCP has no focused safe operations for these records.",
+      "exports": [
+        "Integration",
+        "IntegrationType",
+        "InviteSettings",
+        "RoleCapabilitySettings",
+        "WorkspaceSetting"
+      ]
+    },
+    {
+      "package": "@hcengineering/setting",
+      "status": "not-mcp-facing",
+      "rationale": "SettingsCategory and WorkspaceSettingCategory describe settings UI registration, while Editable and UserMixin are model mixins used by platform class-management behavior. They are not standalone LLM-facing resources.",
+      "exports": [
+        "Editable",
+        "SettingsCategory",
+        "SpaceTypeCreator",
+        "SpaceTypeEditor",
+        "UserMixin",
+        "WorkspaceSettingCategory"
+      ]
+    },
+    {
       "package": "@hcengineering/request",
       "status": "covered",
       "matrixLocation": "Generic approval requests",
       "rationale": "Generic Request documents are exposed through list/get plus create, comment, approve, reject, and cancel workflows. The tools preserve request status, requested/approved/rejected people, decision comments, approval dates, opaque transaction payloads, and authorization checks. Friendly attached-target resolution remains an LLM-first workflow enhancement rather than a missing Request model export.",
       "exports": [
-        "Request"
+        "Request",
+        "RequestDecisionComment"
       ]
     },
     {
@@ -629,7 +664,7 @@
       "package": "@hcengineering/time",
       "status": "covered",
       "matrixLocation": "Planner / ToDos",
-      "rationale": "Current time and planner tools cover work slots, issue time reporting, Planner ToDo list/get/create/update/delete, complete/reopen, schedule/unschedule, owner, due date, priority, visibility, and personal/issue attachment support.",
+      "rationale": "Current time and planner tools cover work slots, issue time reporting, Planner ToDo list/get/create/update/delete, complete/reopen, schedule/unschedule, owner, due date, priority, visibility, and personal, issue, and document attachment support.",
       "exports": [
         "ProjectToDo",
         "ToDo",
@@ -673,7 +708,8 @@
         "ClassSortFuncs",
         "FilterMode",
         "Groupping",
-        "IgnoreActions"
+        "IgnoreActions",
+        "SortFuncs"
       ]
     },
     {
@@ -721,10 +757,12 @@
       "matrixLocation": "`@hcengineering/tracker` package row",
       "rationale": "Current project, issue, component, milestone, issue-template, status, relation, related-issue target, project target preference, and time-reporting tools cover core tracker resources. GitHub sync metadata, PDF export, saved views, and broader workflow automation remain deferred.",
       "exports": [
+        "ClassicProjectTypeData",
         "Component",
         "Issue",
         "IssueStatus",
         "IssueTemplate",
+        "IssueTypeData",
         "Milestone",
         "Project",
         "ProjectTargetPreference",

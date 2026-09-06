@@ -16,19 +16,34 @@ import {
   type Space,
   toFindResult
 } from "@hcengineering/core"
+import type { Document as HulyDocument, Teamspace as HulyTeamspace } from "@hcengineering/document"
 import { type ToDo as HulyToDo, ToDoPriority, type WorkSlot as HulyWorkSlot } from "@hcengineering/time"
 import type { Issue as HulyIssue, IssueStatus, Project as HulyProject } from "@hcengineering/tracker"
 import { IssuePriority, TimeReportDayType } from "@hcengineering/tracker"
-import { Effect, Result, Schema } from "effect"
+import { Effect, Layer, Result, Schema } from "effect"
 import { TestClock } from "effect/testing"
 import { expect } from "vitest"
 import { assertAt } from "../../../src/utils/assertions.js"
 
 import { TodoTitle } from "../../../src/domain/schemas/planner.js"
-import { Email, NonEmptyString, Timestamp, WorkSlotId } from "../../../src/domain/schemas/shared.js"
+import {
+  DocumentIdentifier,
+  Email,
+  NonEmptyString,
+  TeamspaceIdentifier,
+  Timestamp,
+  WorkSlotId
+} from "../../../src/domain/schemas/shared.js"
+import { PlannerDocumentMetadataDegradedWarningCode } from "../../../src/domain/schemas/tool-warnings.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
-import { PlannerSchedulingPrerequisiteError } from "../../../src/huly/errors-planner.js"
-import { calendar, contact, time, tracker } from "../../../src/huly/huly-plugins.js"
+import { Diagnostics, makeDiagnosticsScope, type DiagnosticsOperations } from "../../../src/huly/diagnostics.js"
+import {
+  PlannerSchedulingPrerequisiteError,
+  TodoDocumentTargetAmbiguousError,
+  TodoDocumentTargetNotWritableError
+} from "../../../src/huly/errors-planner.js"
+import { HulyDataInvalidError } from "../../../src/huly/errors.js"
+import { calendar, contact, documentPlugin, time, tracker } from "../../../src/huly/huly-plugins.js"
 import {
   markupRefAsTodoDescription,
   queryFromListFilters,
@@ -45,9 +60,9 @@ import {
   unscheduleTodo,
   updateTodo
 } from "../../../src/huly/operations/planner.js"
-import { toClassRef, toRef, toSocialIdentityRef } from "../../../src/huly/operations/sdk-boundary.js"
+import { toAccountUuid, toClassRef, toRef, toSocialIdentityRef } from "../../../src/huly/operations/sdk-boundary.js"
 import { issueIdentifier, projectIdentifier, todoId } from "../../helpers/brands.js"
-import { personRef } from "../../helpers/huly-sdk.js"
+import { corePersonId, docRef, personRef, spaceRef } from "../../helpers/huly-sdk.js"
 import { capturedMarkupChildNodes, capturedMarkupReferenceNodes } from "../../helpers/markup-capture.js"
 
 const asProject = (v: unknown) => v as HulyProject
@@ -122,6 +137,38 @@ const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue =>
     createdOn: 1,
     ...overrides
   })
+
+const makeTeamspace = (overrides?: Partial<HulyTeamspace>): HulyTeamspace => ({
+  _id: docRef<HulyTeamspace>("teamspace-1"),
+  _class: documentPlugin.class.Teamspace,
+  space: spaceRef("space-1"),
+  name: "Planner Documents",
+  description: "Planner document target",
+  private: false,
+  members: [toAccountUuid("00000000-0000-4000-8000-000000000001")],
+  archived: false,
+  type: documentPlugin.spaceType.DefaultTeamspaceType,
+  modifiedBy: corePersonId("user-1"),
+  modifiedOn: 10,
+  createdBy: corePersonId("user-1"),
+  createdOn: 1,
+  ...overrides
+})
+
+const makeDocument = (overrides?: Partial<HulyDocument>): HulyDocument => ({
+  _id: docRef<HulyDocument>("document-1"),
+  _class: documentPlugin.class.Document,
+  space: docRef<HulyTeamspace>("teamspace-1"),
+  title: "Planner Specification",
+  content: null,
+  parent: documentPlugin.ids.NoParent,
+  rank: "0|aaa",
+  modifiedBy: corePersonId("user-1"),
+  modifiedOn: 10,
+  createdBy: corePersonId("user-1"),
+  createdOn: 1,
+  ...overrides
+})
 
 const makePerson = (overrides?: Partial<Person>): Person =>
   asPerson({
@@ -278,6 +325,8 @@ interface Captures {
 }
 
 interface TestConfig {
+  readonly teamspaces?: ReadonlyArray<HulyTeamspace>
+  readonly documents?: ReadonlyArray<HulyDocument>
   readonly projects?: ReadonlyArray<HulyProject>
   readonly issues?: ReadonlyArray<HulyIssue>
   readonly todos?: ReadonlyArray<HulyToDo>
@@ -288,9 +337,12 @@ interface TestConfig {
   readonly workSlots?: ReadonlyArray<HulyWorkSlot>
   readonly captures?: Captures
   readonly removeCollectionAvailable?: boolean
+  readonly diagnostics?: DiagnosticsOperations
 }
 
 const createLayer = (config: TestConfig) => {
+  const teamspaces = [...(config.teamspaces ?? [])]
+  const documents = [...(config.documents ?? [])]
   const projects = [...(config.projects ?? [])]
   const issues = [...(config.issues ?? [])]
   const todos = [...(config.todos ?? [])]
@@ -330,6 +382,26 @@ const createLayer = (config: TestConfig) => {
 
   const findOne: HulyClientOperations["findOne"] = ((_class: unknown, query: unknown) => {
     const q = query as Record<string, unknown>
+    if (_class === documentPlugin.class.Teamspace) {
+      return Effect.succeed(
+        teamspaces.find(
+          (teamspace) =>
+            (q.name === undefined || teamspace.name === q.name) &&
+            (q._id === undefined || teamspace._id === q._id) &&
+            (q.archived === undefined || teamspace.archived === q.archived)
+        )
+      )
+    }
+    if (_class === documentPlugin.class.Document) {
+      return Effect.succeed(
+        documents.find(
+          (document) =>
+            (q.space === undefined || document.space === q.space) &&
+            (q.title === undefined || document.title === q.title) &&
+            (q._id === undefined || document._id === q._id)
+        )
+      )
+    }
     if (_class === tracker.class.Project) return Effect.succeed(projects.find((p) => p.identifier === q.identifier))
     if (_class === tracker.class.Issue) {
       return Effect.succeed(
@@ -372,6 +444,40 @@ const createLayer = (config: TestConfig) => {
 
   const findAll: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown, options: unknown) => {
     const q = query as Record<string, unknown>
+    if (_class === documentPlugin.class.Teamspace) {
+      const ids =
+        typeof q._id === "object" && q._id !== null && "$in" in q._id && Array.isArray(q._id.$in)
+          ? q._id.$in
+          : undefined
+      const filtered = teamspaces.filter(
+        (teamspace) =>
+          (q.name === undefined || teamspace.name === q.name) &&
+          (q._id === undefined || teamspace._id === q._id || ids?.includes(teamspace._id)) &&
+          (q.archived === undefined || teamspace.archived === q.archived)
+      )
+      const limit =
+        typeof options === "object" && options !== null && "limit" in options && typeof options.limit === "number"
+          ? options.limit
+          : filtered.length
+      return Effect.succeed(toFindResult(filtered.slice(0, limit)))
+    }
+    if (_class === documentPlugin.class.Document) {
+      const ids =
+        typeof q._id === "object" && q._id !== null && "$in" in q._id && Array.isArray(q._id.$in)
+          ? q._id.$in
+          : undefined
+      const filtered = documents.filter(
+        (document) =>
+          (q.space === undefined || document.space === q.space) &&
+          (q.title === undefined || document.title === q.title) &&
+          (q._id === undefined || document._id === q._id || ids?.includes(document._id))
+      )
+      const limit =
+        typeof options === "object" && options !== null && "limit" in options && typeof options.limit === "number"
+          ? options.limit
+          : filtered.length
+      return Effect.succeed(toFindResult(filtered.slice(0, limit)))
+    }
     if (_class === time.class.ToDo) {
       const filtered = todos.filter(
         (todo) =>
@@ -506,19 +612,22 @@ const createLayer = (config: TestConfig) => {
     return Effect.succeed(undefined)
   }) as HulyClientOperations["updateMarkup"]
 
-  return HulyClient.testLayer({
-    getAccountUuid: () => "00000000-0000-4000-8000-000000000001" as AccountUuid,
-    getPrimarySocialId: () => "test-primary-social-id" as PersonId,
-    findOne,
-    findAll,
-    addCollection,
-    updateDoc,
-    ...(config.removeCollectionAvailable === false ? {} : { removeCollection }),
-    removeDoc,
-    fetchMarkup: () => Effect.succeed("Fetched description"),
-    uploadMarkup,
-    updateMarkup
-  })
+  return Layer.merge(
+    HulyClient.testLayer({
+      getAccountUuid: () => "00000000-0000-4000-8000-000000000001" as AccountUuid,
+      getPrimarySocialId: () => "test-primary-social-id" as PersonId,
+      findOne,
+      findAll,
+      addCollection,
+      updateDoc,
+      ...(config.removeCollectionAvailable === false ? {} : { removeCollection }),
+      removeDoc,
+      fetchMarkup: () => Effect.succeed("Fetched description"),
+      uploadMarkup,
+      updateMarkup
+    }),
+    Layer.succeed(Diagnostics, config.diagnostics ?? { warnAgent: () => Effect.void, trail: () => Effect.void })
+  )
 }
 
 describe("planner operations", () => {
@@ -689,6 +798,232 @@ describe("planner operations", () => {
     })
   )
 
+  it.effect("creates a document-attached native ToDo with private visibility", () =>
+    Effect.gen(function* () {
+      const captures: Captures = {}
+      const teamspace = makeTeamspace()
+      const document = makeDocument()
+
+      yield* createTodo({
+        title: todoTitle("Document task"),
+        attachedTo: {
+          type: "document",
+          teamspace: TeamspaceIdentifier.make("Planner Documents"),
+          document: DocumentIdentifier.make("Planner Specification")
+        }
+      }).pipe(
+        Effect.provide(
+          createLayer({ teamspaces: [teamspace], documents: [document], employees: [makeEmployee()], captures })
+        )
+      )
+
+      expect(captures.addCollection?.classId).toBe(time.class.ToDo)
+      expect(captures.addCollection?.space).toBe(time.space.ToDos)
+      expect(captures.addCollection?.attachedTo).toBe(document._id)
+      expect(captures.addCollection?.attachedToClass).toBe(documentPlugin.class.Document)
+      expect(captures.addCollection?.attributes.attachedSpace).toBe(teamspace._id)
+      expect(captures.addCollection?.attributes.visibility).toBe("private")
+    })
+  )
+
+  it.effect("rejects an ambiguous document teamspace before creating a ToDo", () =>
+    Effect.gen(function* () {
+      const captures: Captures = {}
+      const result = yield* Effect.result(
+        createTodo({
+          title: todoTitle("Ambiguous document task"),
+          attachedTo: {
+            type: "document",
+            teamspace: TeamspaceIdentifier.make("Planner Documents"),
+            document: DocumentIdentifier.make("Planner Specification")
+          }
+        }).pipe(
+          Effect.provide(
+            createLayer({
+              teamspaces: [makeTeamspace(), makeTeamspace({ _id: docRef<HulyTeamspace>("teamspace-2") })],
+              documents: [makeDocument()],
+              employees: [makeEmployee()],
+              captures
+            })
+          )
+        )
+      )
+
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isSuccess(result)) return
+      const error = yield* Schema.decodeUnknownEffect(TodoDocumentTargetAmbiguousError)(result.failure)
+      expect(error.target).toEqual({ type: "teamspace", identifier: "Planner Documents" })
+      expect(captures.addCollection).toBeUndefined()
+    })
+  )
+
+  it.effect("rejects an ambiguous document within a teamspace before creating a ToDo", () =>
+    Effect.gen(function* () {
+      const captures: Captures = {}
+      const teamspace = makeTeamspace()
+      const document = makeDocument()
+      const duplicate = makeDocument({ _id: docRef<HulyDocument>("document-2") })
+      const third = makeDocument({ _id: docRef<HulyDocument>("document-3") })
+      const result = yield* Effect.result(
+        createTodo({
+          title: todoTitle("Ambiguous document task"),
+          attachedTo: {
+            type: "document",
+            teamspace: TeamspaceIdentifier.make("Planner Documents"),
+            document: DocumentIdentifier.make("Planner Specification")
+          }
+        }).pipe(
+          Effect.provide(
+            createLayer({
+              teamspaces: [teamspace],
+              documents: [document, duplicate, third],
+              employees: [makeEmployee()],
+              captures
+            })
+          )
+        )
+      )
+
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isSuccess(result)) return
+      const error = yield* Schema.decodeUnknownEffect(TodoDocumentTargetAmbiguousError)(result.failure)
+      expect(error.target).toEqual({
+        type: "document",
+        identifier: "Planner Specification",
+        teamspace: "Planner Documents"
+      })
+      expect(error.matches).toBe(3)
+      expect(captures.addCollection).toBeUndefined()
+    })
+  )
+
+  it.effect("rejects a non-member document target before creating a ToDo", () =>
+    Effect.gen(function* () {
+      const captures: Captures = {}
+      const result = yield* Effect.result(
+        createTodo({
+          title: todoTitle("Forbidden document task"),
+          attachedTo: {
+            type: "document",
+            teamspace: TeamspaceIdentifier.make("Planner Documents"),
+            document: DocumentIdentifier.make("Planner Specification")
+          }
+        }).pipe(
+          Effect.provide(
+            createLayer({
+              teamspaces: [makeTeamspace({ members: [] })],
+              documents: [makeDocument()],
+              employees: [makeEmployee()],
+              captures
+            })
+          )
+        )
+      )
+
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isSuccess(result)) return
+      const error = yield* Schema.decodeUnknownEffect(TodoDocumentTargetNotWritableError)(result.failure)
+      expect(error.reason).toBe("not-member")
+      expect(captures.addCollection).toBeUndefined()
+    })
+  )
+
+  it.effect("rejects malformed teamspace projection before creating a document ToDo", () =>
+    Effect.gen(function* () {
+      const captures: Captures = {}
+      const teamspace = makeTeamspace()
+      Reflect.deleteProperty(teamspace, "members")
+      const result = yield* Effect.result(
+        createTodo({
+          title: todoTitle("Malformed teamspace task"),
+          attachedTo: {
+            type: "document",
+            teamspace: TeamspaceIdentifier.make("Planner Documents"),
+            document: DocumentIdentifier.make("Planner Specification")
+          }
+        }).pipe(
+          Effect.provide(
+            createLayer({ teamspaces: [teamspace], documents: [makeDocument()], employees: [makeEmployee()], captures })
+          )
+        )
+      )
+
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isSuccess(result)) return
+      expect(result.failure).toBeInstanceOf(HulyDataInvalidError)
+      expect(captures.addCollection).toBeUndefined()
+    })
+  )
+
+  it.effect("rejects a malformed teamspace member UUID before creating a document ToDo", () =>
+    Effect.gen(function* () {
+      const captures: Captures = {}
+      const teamspace = makeTeamspace()
+      Reflect.set(teamspace, "members", ["not-an-account-uuid"])
+      const result = yield* Effect.result(
+        createTodo({
+          title: todoTitle("Malformed teamspace member task"),
+          attachedTo: {
+            type: "document",
+            teamspace: TeamspaceIdentifier.make("Planner Documents"),
+            document: DocumentIdentifier.make("Planner Specification")
+          }
+        }).pipe(
+          Effect.provide(
+            createLayer({ teamspaces: [teamspace], documents: [makeDocument()], employees: [makeEmployee()], captures })
+          )
+        )
+      )
+
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isSuccess(result)) return
+      expect(result.failure).toBeInstanceOf(HulyDataInvalidError)
+      expect(captures.addCollection).toBeUndefined()
+    })
+  )
+
+  it.effect("rejects malformed document projection before resolving a document ToDo", () =>
+    Effect.gen(function* () {
+      const document = makeDocument()
+      Reflect.deleteProperty(document, "title")
+      const result = yield* Effect.result(
+        listTodos({
+          document: {
+            teamspace: TeamspaceIdentifier.make("Planner Documents"),
+            document: DocumentIdentifier.make("document-1")
+          }
+        }).pipe(
+          Effect.provide(createLayer({ teamspaces: [makeTeamspace()], documents: [document], todos: [], captures: {} }))
+        )
+      )
+
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isSuccess(result)) return
+      expect(result.failure).toBeInstanceOf(HulyDataInvalidError)
+    })
+  )
+
+  it.effect("rejects a malformed document lock owner before resolving a document ToDo", () =>
+    Effect.gen(function* () {
+      const document = makeDocument()
+      Reflect.set(document, "lockedBy", "not-an-account-uuid")
+      const result = yield* Effect.result(
+        listTodos({
+          document: {
+            teamspace: TeamspaceIdentifier.make("Planner Documents"),
+            document: DocumentIdentifier.make("document-1")
+          }
+        }).pipe(
+          Effect.provide(createLayer({ teamspaces: [makeTeamspace()], documents: [document], todos: [], captures: {} }))
+        )
+      )
+
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isSuccess(result)) return
+      expect(result.failure).toBeInstanceOf(HulyDataInvalidError)
+    })
+  )
+
   it.effect("creates an issue-attached ProjectToDo with due date", () =>
     Effect.gen(function* () {
       const captures: Captures = {}
@@ -748,6 +1083,245 @@ describe("planner operations", () => {
       expect(result.attachedTo.type).toBe("issue")
       expect(result.attachedTo.type === "issue" ? result.attachedTo.identifier : undefined).toBe("HULY-94")
       expect(result.visibility).toBe("public")
+    })
+  )
+
+  it.effect("gets a document ToDo detail with document and teamspace attachment summary", () =>
+    Effect.gen(function* () {
+      const teamspace = makeTeamspace()
+      const document = makeDocument()
+      const todo = makeTodo({
+        attachedTo: document._id,
+        attachedToClass: documentPlugin.class.Document,
+        attachedSpace: teamspace._id
+      })
+
+      const result = yield* getTodo({ locator: { todoId: todoId("todo-1") } }).pipe(
+        Effect.provide(
+          createLayer({
+            teamspaces: [teamspace],
+            documents: [document],
+            todos: [todo],
+            persons: [makePerson()],
+            captures: {}
+          })
+        )
+      )
+
+      expect(result.attachedTo).toEqual({
+        type: "document",
+        id: "document-1",
+        title: "Planner Specification",
+        teamspaceId: "teamspace-1",
+        teamspaceName: "Planner Documents"
+      })
+    })
+  )
+
+  it.effect("gets a document ToDo by its document attachment locator", () =>
+    Effect.gen(function* () {
+      const teamspace = makeTeamspace()
+      const document = makeDocument()
+      const todo = makeTodo({
+        title: todoTitle("Document task"),
+        attachedTo: document._id,
+        attachedToClass: documentPlugin.class.Document,
+        attachedSpace: teamspace._id
+      })
+
+      const result = yield* getTodo({
+        locator: {
+          title: todoTitle("Document task"),
+          attachedTo: {
+            type: "document",
+            teamspace: TeamspaceIdentifier.make("Planner Documents"),
+            document: DocumentIdentifier.make("Planner Specification")
+          }
+        }
+      }).pipe(
+        Effect.provide(
+          createLayer({
+            teamspaces: [teamspace],
+            documents: [document],
+            todos: [todo],
+            persons: [makePerson()],
+            captures: {}
+          })
+        )
+      )
+
+      expect(result.id).toBe("todo-1")
+      expect(result.attachedTo.type).toBe("document")
+    })
+  )
+
+  it.effect("lists only document ToDos and includes document attachment metadata", () =>
+    Effect.gen(function* () {
+      const teamspace = makeTeamspace()
+      const document = makeDocument()
+      const todo = makeTodo({
+        title: todoTitle("Document task"),
+        attachedTo: document._id,
+        attachedToClass: documentPlugin.class.Document,
+        attachedSpace: teamspace._id
+      })
+      const result = yield* listTodos({
+        document: {
+          teamspace: TeamspaceIdentifier.make("Planner Documents"),
+          document: DocumentIdentifier.make("Planner Specification")
+        }
+      }).pipe(
+        Effect.provide(
+          createLayer({
+            teamspaces: [teamspace],
+            documents: [document],
+            todos: [todo],
+            persons: [makePerson()],
+            captures: {}
+          })
+        )
+      )
+
+      expect(result).toHaveLength(1)
+      expect(assertAt(result, 0).attachedTo).toEqual({
+        type: "document",
+        id: "document-1",
+        title: "Planner Specification",
+        teamspaceId: "teamspace-1",
+        teamspaceName: "Planner Documents"
+      })
+    })
+  )
+
+  it.effect("allows reading locked document ToDos while rejecting document creation", () =>
+    Effect.gen(function* () {
+      const teamspace = makeTeamspace()
+      const document = makeDocument({ lockedBy: toAccountUuid("00000000-0000-4000-8000-000000000002") })
+      const todo = makeTodo({
+        attachedTo: document._id,
+        attachedToClass: documentPlugin.class.Document,
+        attachedSpace: teamspace._id
+      })
+      const layer = createLayer({
+        teamspaces: [teamspace],
+        documents: [document],
+        todos: [todo],
+        employees: [makeEmployee()],
+        captures: {}
+      })
+      const locator = {
+        teamspace: TeamspaceIdentifier.make("Planner Documents"),
+        document: DocumentIdentifier.make("Planner Specification")
+      }
+
+      const listed = yield* listTodos({ document: locator }).pipe(Effect.provide(layer))
+      expect(listed).toHaveLength(1)
+      const detail = yield* getTodo({ locator: { todoId: todoId("todo-1") } }).pipe(Effect.provide(layer))
+      expect(detail.attachedTo.type).toBe("document")
+
+      const creation = yield* Effect.result(
+        createTodo({ title: todoTitle("Locked document task"), attachedTo: { type: "document", ...locator } }).pipe(
+          Effect.provide(layer)
+        )
+      )
+      expect(Result.isFailure(creation)).toBe(true)
+      if (Result.isSuccess(creation)) return
+      const error = yield* Schema.decodeUnknownEffect(TodoDocumentTargetNotWritableError)(creation.failure)
+      expect(error.reason).toBe("locked")
+    })
+  )
+
+  it.effect("warns when document ToDo metadata uses synthesized names", () =>
+    Effect.gen(function* () {
+      const diagnostics = yield* makeDiagnosticsScope
+      const teamspace = makeTeamspace({ name: "" })
+      const document = makeDocument({ title: "" })
+      const todo = makeTodo({ attachedTo: document._id, attachedToClass: documentPlugin.class.Document })
+      const result = yield* listTodos({}).pipe(
+        Effect.provide(
+          createLayer({
+            teamspaces: [teamspace],
+            documents: [document],
+            todos: [todo],
+            captures: {},
+            diagnostics: diagnostics.service
+          })
+        )
+      )
+      const warnings = yield* diagnostics.drainWarnings
+
+      expect(result[0]?.attachedTo).toMatchObject({
+        type: "document",
+        title: "document-1",
+        teamspaceName: "Untitled teamspace"
+      })
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0]).toEqual(expect.objectContaining({ code: PlannerDocumentMetadataDegradedWarningCode }))
+      expect(warnings[0]?.message).toContain("synthesized document title")
+      expect(warnings[0]?.message).toContain("synthesized teamspace name")
+    })
+  )
+
+  it.effect("warns for skipped teamspaces and unresolved document attachments", () =>
+    Effect.gen(function* () {
+      const diagnostics = yield* makeDiagnosticsScope
+      const unresolvedTodo = makeTodo({
+        _id: docRef<HulyToDo>("todo-unresolved"),
+        attachedTo: docRef<HulyDocument>("document-missing"),
+        attachedToClass: documentPlugin.class.Document
+      })
+      const skippedDocument = makeDocument({ _id: docRef<HulyDocument>("document-skipped") })
+      const skippedTodo = makeTodo({
+        _id: docRef<HulyToDo>("todo-skipped"),
+        attachedTo: skippedDocument._id,
+        attachedToClass: documentPlugin.class.Document
+      })
+      const result = yield* listTodos({}).pipe(
+        Effect.provide(
+          createLayer({
+            documents: [skippedDocument],
+            todos: [unresolvedTodo, skippedTodo],
+            captures: {},
+            diagnostics: diagnostics.service
+          })
+        )
+      )
+      const warnings = yield* diagnostics.drainWarnings
+
+      expect(result).toHaveLength(2)
+      expect(result.every((todo) => todo.attachedTo.type === "unknown")).toBe(true)
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0]?.message).toContain("skipped teamspace")
+      expect(warnings[0]?.message).toContain("unresolved document attachment")
+    })
+  )
+
+  it.effect("keeps an entirely unresolved document attachment visible as unknown metadata", () =>
+    Effect.gen(function* () {
+      const diagnostics = yield* makeDiagnosticsScope
+      const todo = makeTodo({
+        attachedTo: docRef<HulyDocument>("document-missing"),
+        attachedToClass: documentPlugin.class.Document
+      })
+      const result = yield* listTodos({}).pipe(
+        Effect.provide(createLayer({ todos: [todo], documents: [], captures: {}, diagnostics: diagnostics.service }))
+      )
+      const warnings = yield* diagnostics.drainWarnings
+
+      expect(result[0]?.attachedTo).toMatchObject({ type: "unknown", id: "document-missing" })
+      expect(warnings[0]?.message).toContain("1 unresolved document attachment")
+    })
+  )
+
+  it.effect("rejects malformed persisted document metadata through the typed boundary", () =>
+    Effect.gen(function* () {
+      const malformedDocument = Object.assign(makeDocument(), { title: 42 })
+      const todo = makeTodo({ attachedTo: malformedDocument._id, attachedToClass: documentPlugin.class.Document })
+      const error = yield* Effect.flip(
+        listTodos({}).pipe(Effect.provide(createLayer({ todos: [todo], documents: [malformedDocument], captures: {} })))
+      )
+
+      expect(error).toBeInstanceOf(HulyDataInvalidError)
     })
   )
 
@@ -1452,6 +2026,27 @@ describe("planner operations", () => {
       expect(captures.updateDoc?.classId).toBe(tracker.class.Issue)
       expect(captures.updateDoc?.objectId).toBe("issue-1")
       expect(captures.updateDoc?.operations).toEqual({ $inc: { todos: -1 } })
+    })
+  )
+
+  it.effect("removes document-attached ToDos generically without changing a parent counter", () =>
+    Effect.gen(function* () {
+      const captures: Captures = {}
+      const document = makeDocument()
+
+      yield* deleteTodo({ locator: { todoId: todoId("todo-1") } }).pipe(
+        Effect.provide(
+          createLayer({
+            documents: [document],
+            todos: [makeTodo({ attachedTo: document._id, attachedToClass: documentPlugin.class.Document })],
+            captures
+          })
+        )
+      )
+
+      expect(captures.removeDoc?.classId).toBe(time.class.ToDo)
+      expect(captures.removeDoc?.objectId).toBe("todo-1")
+      expect(captures.updateDoc).toBeUndefined()
     })
   )
 

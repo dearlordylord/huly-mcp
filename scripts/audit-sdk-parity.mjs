@@ -72,7 +72,7 @@ const walkFiles = (directory, predicate) => {
 }
 
 const extractPluginModelNames = (text) =>
-  [...text.matchAll(/(?:class|tag):\s*\{([\s\S]*?)\n\s*};/g)].flatMap((block) =>
+  [...text.matchAll(/(?:class|mixin|tag):\s*\{([\s\S]*?)\n\s*};/g)].flatMap((block) =>
     [...block[1].matchAll(/^\s*([A-Za-z0-9_]+):/gm)].map((match) => match[1])
   )
 

@@ -3,6 +3,7 @@ import { Schema } from "effect"
 import { toDraft07JsonSchema } from "./json-schema.js"
 
 import { CalendarName as CalendarNameSchema, ParticipantSchema, RoomReferenceSchema } from "./calendar.js"
+import { MeetingRoomLocatorSchema } from "./calendar-meeting-rooms.js"
 import { clearableText } from "./clearable.js"
 import {
   assertUpdateFields,
@@ -185,6 +186,12 @@ export const CreateScheduleParamsSchema = Schema.Struct({
     CalendarNameSchema.annotate({
       description: "Optional target calendar name for booked events. Do not provide with calendarId."
     })
+  ),
+  meetingRoom: Schema.optionalKey(
+    MeetingRoomLocatorSchema.annotateKey({
+      description:
+        "Optional virtual-office meeting room. Resolution tries ID first, then exact name; use floor to disambiguate duplicate names."
+    })
   )
 })
   .pipe(
@@ -205,7 +212,8 @@ export const UPDATE_SCHEDULE_FIELDS = [
   "availability",
   "timeZone",
   "calendarId",
-  "calendarName"
+  "calendarName",
+  "meetingRoom"
 ] as const satisfies ReadonlyArray<
   | "owner"
   | "title"
@@ -216,6 +224,7 @@ export const UPDATE_SCHEDULE_FIELDS = [
   | "timeZone"
   | "calendarId"
   | "calendarName"
+  | "meetingRoom"
 >
 
 export const UpdateScheduleParamsSchema = Schema.Struct({
@@ -245,6 +254,12 @@ export const UpdateScheduleParamsSchema = Schema.Struct({
   calendarName: Schema.optional(
     CalendarNameSchema.annotate({
       description: "Move schedule booking target to this calendar name. Do not provide with calendarId."
+    })
+  ),
+  meetingRoom: Schema.optionalKey(
+    MeetingRoomLocatorSchema.annotateKey({
+      description:
+        "Assign a different virtual-office room to an existing MeetingSchedule. Ordinary schedules without MeetingSchedule composition are rejected; omission preserves the current assignment and null is not accepted."
     })
   )
 })

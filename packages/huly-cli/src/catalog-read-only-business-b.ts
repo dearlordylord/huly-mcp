@@ -141,6 +141,11 @@ export const businessReadOnlyCliCommandCatalogB = {
     positional: ["candidate"],
     description: "List Recruiting Candidate Skills"
   },
+  list_recruiting_candidate_custom_fields: {
+    path: ["recruiting", "candidate", "custom-fields", "list"],
+    positional: ["candidate"],
+    description: "List Recruiting Candidate Custom Fields"
+  },
   list_recruiting_candidates: {
     path: ["recruiting", "candidates", "list"],
     positional: [],

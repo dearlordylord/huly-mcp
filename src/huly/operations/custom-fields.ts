@@ -1,44 +1,88 @@
-import type { AnyAttribute, Class, Doc, Ref } from "@hcengineering/core"
+import type { AnyAttribute, Doc } from "@hcengineering/core"
 import { ClassifierKind, SortingOrder } from "@hcengineering/core"
-import { Data, Effect, Result } from "effect"
+import { Data, Effect } from "effect"
 
 import type { CustomFieldDateTimestamp } from "../../domain/schemas/custom-field-date.js"
 import type {
-  ArrayCustomFieldTypeDetails,
   CustomFieldInfo,
   CustomFieldTypeName,
   CustomFieldValue,
-  EmptyCustomFieldTypeDetails,
-  EnumCustomFieldTypeDetails,
   GetCustomFieldValuesParams,
   ListCustomFieldsParams,
-  PrimitiveCustomFieldTypeName,
-  RefCustomFieldTypeDetails,
   SetCustomFieldParams,
-  SetCustomFieldResult,
-  UnknownCustomFieldTypeDetails
+  SetCustomFieldResult
 } from "../../domain/schemas/custom-fields.js"
 import { CUSTOM_FIELDS_DEFAULT_LIMIT } from "../../domain/schemas/custom-fields.js"
-import { CustomFieldId, ObjectClassName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
+import {
+  InvalidCustomFieldBooleanValueError,
+  CustomFieldNotFoundError,
+  CustomFieldObjectNotFoundError,
+  CustomFieldMetadataMalformedError,
+  InvalidCustomFieldNumberValueError
+} from "../errors-custom-fields.js"
 import type { InvalidCustomFieldDateValueError } from "../errors-custom-fields.js"
-import { CustomFieldNotFoundError, CustomFieldObjectNotFoundError } from "../errors-custom-fields.js"
-import { hulyCustomFieldTypeNameFromClass } from "../huly-attribute-types.js"
-import { decodeHulyModelLabelTail } from "../huly-labels.js"
+import { Diagnostics } from "../diagnostics.js"
 import { core } from "../huly-plugins.js"
+import { CustomFieldMetadataDegradedWarningCode } from "../../domain/schemas/tool-warnings.js"
 import { parseCustomFieldDateValue } from "./custom-field-date.js"
-import { clampLimit } from "./query-helpers.js"
-import { toRef } from "./sdk-boundary.js"
+import { clampLimit, hulyQuery } from "./query-helpers.js"
+import {
+  getCustomFieldDefinitionProjection,
+  listCustomFieldDefinitionProjectionsForOwners,
+  readCustomFieldValue,
+  resolveClassInfo,
+  toCustomFieldInfoProjections,
+  toCustomFieldInfos,
+  type CustomFieldInfoProjection,
+  type CustomFieldMetadataDegradationReason
+} from "./custom-fields-metadata.js"
+import {
+  decodeCustomFieldAttribute,
+  decodeTypeDescriptor,
+  modelLabelOrDefault,
+  type CustomFieldTypeDescriptor
+} from "./custom-fields-metadata-decode.js"
+import { toClassRef, toRef } from "./sdk-boundary.js"
 
-type ListCustomFieldsError = HulyClientError
-type GetCustomFieldValuesError = HulyClientError | CustomFieldObjectNotFoundError
+export {
+  decodeCustomFieldAttribute,
+  decodeTypeDescriptor,
+  getCustomFieldDefinitionProjection,
+  listCustomFieldDefinitionProjectionsForOwners,
+  modelLabelOrDefault,
+  readCustomFieldValue,
+  resolveClassInfo,
+  toCustomFieldInfoProjections,
+  toCustomFieldInfos
+}
+export type { CustomFieldInfoProjection, CustomFieldMetadataDegradationReason, CustomFieldTypeDescriptor }
+
+const warnCustomFieldMetadataDegraded = (
+  diagnostics: Diagnostics["Service"],
+  projections: ReadonlyArray<CustomFieldInfoProjection>
+): Effect.Effect<void> => {
+  const degraded = projections.filter((projection) => projection.degradationReasons.length > 0)
+  if (degraded.length === 0) return Effect.void
+  const details = degraded
+    .map(({ degradationReasons, info }) => `${info.id} (${degradationReasons.join(", ")})`)
+    .join(", ")
+  return diagnostics.warnAgent({
+    code: CustomFieldMetadataDegradedWarningCode,
+    message:
+      `Custom-field metadata fidelity was degraded for ${degraded.length} field(s): ${details}. ` +
+      "Fallback labels or owners are included; inspect the Huly class and attribute metadata if exact names are required."
+  })
+}
+
+type ListCustomFieldsError = HulyClientError | CustomFieldMetadataMalformedError
+type GetCustomFieldValuesError = HulyClientError | CustomFieldObjectNotFoundError | CustomFieldMetadataMalformedError
 type SetCustomFieldError =
   | HulyClientError
+  | CustomFieldMetadataMalformedError
   | CustomFieldNotFoundError
   | CustomFieldObjectNotFoundError
   | InvalidCustomFieldDateValueError
-
-type JsonMap = Record<string, unknown>
 
 type ScalarCustomFieldWriteValue = string | number | boolean
 type ParsedCustomFieldValue = Data.TaggedEnum<{
@@ -47,282 +91,188 @@ type ParsedCustomFieldValue = Data.TaggedEnum<{
 }>
 const ParsedCustomFieldValue = Data.taggedEnum<ParsedCustomFieldValue>()
 
-type TypeDescriptor =
-  | { readonly typeName: PrimitiveCustomFieldTypeName; readonly typeDetails: EmptyCustomFieldTypeDetails }
-  | { readonly typeName: "enum"; readonly typeDetails: EnumCustomFieldTypeDetails }
-  | { readonly typeName: "array"; readonly typeDetails: ArrayCustomFieldTypeDetails }
-  | { readonly typeName: "ref"; readonly typeDetails: RefCustomFieldTypeDetails }
-  | { readonly typeName: "unknown"; readonly typeDetails: UnknownCustomFieldTypeDetails }
-
-interface DecodedCustomFieldAttribute {
-  readonly id: CustomFieldId
-  readonly name: string
-  readonly label: string
-  readonly ownerClassId: ObjectClassName
-  readonly typeDescriptor: TypeDescriptor
-}
-
-interface DecodedClassInfo {
-  readonly label: string
-  readonly kind: number
-}
-
-interface DecodedCustomFieldDocument {
-  readonly values: JsonMap
-  readonly space: Doc["space"]
-}
-
-// Huly plugin constants are compatible with Ref<Class<Doc>> at runtime; the SDK types are narrower than usage here.
-// eslint-disable-next-line no-restricted-syntax -- SDK boundary cast for class document queries
-const classRef = core.class.Class as Ref<Class<Doc>>
-
-const decodeSdkRecord = (value: unknown): JsonMap => {
-  // Huly SDK documents expose dynamic metadata fields not represented in the generated TS types.
-  // This cast is contained here so feature logic does not operate on raw unknown values directly.
-  // eslint-disable-next-line no-restricted-syntax -- SDK boundary cast contained in one adapter
-  return value as JsonMap
-}
-
-const modelLabelOrDefault = (value: unknown, fallback: string): string =>
-  Result.getOrElse(decodeHulyModelLabelTail(value), () => fallback)
-
-type SimpleCustomFieldType = "boolean" | "date" | "markup" | "number" | "string"
-
-const simpleCustomFieldType = (
-  typeName: ReturnType<typeof hulyCustomFieldTypeNameFromClass>
-): SimpleCustomFieldType | undefined => {
-  switch (typeName) {
-    case "string":
-    case "number":
-    case "boolean":
-    case "date":
-    case "markup":
-      return typeName
-    default:
-      return undefined
-  }
-}
-
-const decodeTypeDescriptor = (value: unknown): TypeDescriptor => {
-  const record = decodeSdkRecord(value)
-  const typeName = hulyCustomFieldTypeNameFromClass(record._class)
-  const simpleType = simpleCustomFieldType(typeName)
-  if (simpleType !== undefined) return { typeName: simpleType, typeDetails: {} }
-
-  switch (typeName) {
-    case "enum":
-      return { typeName, typeDetails: { ...record, enumRef: record.of } }
-    case "array":
-      return { typeName, typeDetails: { ...record, of: record.of } }
-    case "ref":
-      return { typeName, typeDetails: { ...record, to: record.to } }
-    case "unknown":
-      return { typeName, typeDetails: record }
-    default:
-      return { typeName, typeDetails: {} }
-  }
-}
-
-const decodeCustomFieldAttribute = (attr: AnyAttribute): DecodedCustomFieldAttribute => ({
-  id: CustomFieldId.make(String(attr._id)),
-  name: attr.name,
-  label: modelLabelOrDefault(attr.label, attr.name),
-  ownerClassId: ObjectClassName.make(String(attr.attributeOf)),
-  typeDescriptor: decodeTypeDescriptor(attr.type)
-})
-
-const decodeClassInfo = (value: Doc): DecodedClassInfo => {
-  const record = decodeSdkRecord(value)
-  const kind = typeof record.kind === "number" ? record.kind : ClassifierKind.CLASS
-  return { label: modelLabelOrDefault(record.label, String(value._id)), kind }
-}
-
-const decodeCustomFieldDocument = (doc: Doc): DecodedCustomFieldDocument => ({
-  values: decodeSdkRecord(doc),
-  space: doc.space
-})
-
-const resolveClassInfo = (
-  client: HulyClient["Service"],
-  classId: ObjectClassName
-): Effect.Effect<DecodedClassInfo, HulyClientError> =>
-  Effect.gen(function* () {
-    const cls = yield* client.findOne<Doc>(classRef, { _id: toRef<Doc>(classId) })
-    return cls !== undefined ? decodeClassInfo(cls) : { label: classId, kind: ClassifierKind.CLASS }
-  })
-
-const batchResolveClassLabels = (
-  client: HulyClient["Service"],
-  classIds: ReadonlyArray<ObjectClassName>
-): Effect.Effect<Map<ObjectClassName, string>, HulyClientError> =>
-  Effect.gen(function* () {
-    if (classIds.length === 0) return new Map()
-
-    const classes = yield* client.findAll<Doc>(classRef, { _id: { $in: classIds.map(toRef<Doc>) } })
-
-    const labels = new Map<ObjectClassName, string>()
-    for (const cls of classes) {
-      const classId = ObjectClassName.make(String(cls._id))
-      labels.set(classId, decodeClassInfo(cls).label)
-    }
-    for (const classId of classIds) {
-      if (!labels.has(classId)) {
-        labels.set(classId, classId)
-      }
-    }
-    return labels
-  })
-
-const parseValueForType = (
+const parseValueForType = Effect.fn("CustomFields.parseValueForType")(function* (
   value: string,
   typeName: CustomFieldTypeName
-): Effect.Effect<ParsedCustomFieldValue, InvalidCustomFieldDateValueError> => {
+): Effect.fn.Return<ParsedCustomFieldValue, InvalidCustomFieldDateValueError> {
   switch (typeName) {
     case "number": {
-      const num = Number(value)
-      return Effect.succeed(ParsedCustomFieldValue.Scalar({ value: Number.isNaN(num) ? value : num }))
+      const numberValue = Number(value)
+      return ParsedCustomFieldValue.Scalar({ value: Number.isNaN(numberValue) ? value : numberValue })
     }
     case "date":
-      return parseCustomFieldDateValue(value).pipe(Effect.map((date) => ParsedCustomFieldValue.Date({ value: date })))
+      return ParsedCustomFieldValue.Date({ value: yield* parseCustomFieldDateValue(value) })
     case "boolean":
-      return Effect.succeed(ParsedCustomFieldValue.Scalar({ value: value.toLowerCase() === "true" }))
+      return ParsedCustomFieldValue.Scalar({ value: value.toLowerCase() === "true" })
     default:
-      return Effect.succeed(ParsedCustomFieldValue.Scalar({ value }))
+      return ParsedCustomFieldValue.Scalar({ value })
   }
-}
+})
 
-// batchResolveClassLabels returns a label for every requested owner id (a decoded class label, or
-// the id itself as a fallback), and callers only look up owner ids drawn from that same requested
-// set, so the nullish branch here is a type-guard for `Map.get`'s `| undefined` return.
-const labelForOwner = (labels: ReadonlyMap<ObjectClassName, string>, ownerClassId: ObjectClassName): string => {
-  const label = labels.get(ownerClassId)
-  /* v8 ignore start -- unreachable: every owner id is a key in the resolved label map */
-  if (label === undefined) return ownerClassId
-  /* v8 ignore stop */
-  return label
-}
+export type StrictCustomFieldValue = string | number | boolean | CustomFieldDateTimestamp
+type StrictCustomFieldValueError =
+  | InvalidCustomFieldBooleanValueError
+  | InvalidCustomFieldDateValueError
+  | InvalidCustomFieldNumberValueError
 
-const toCustomFieldInfo = (attr: DecodedCustomFieldAttribute, ownerLabel: string): CustomFieldInfo => {
-  const base = { id: attr.id, name: attr.name, label: attr.label, ownerClassId: attr.ownerClassId, ownerLabel }
+const parseStrictNumber = Effect.fn("CustomFields.parseStrictNumber")(function* (
+  value: string
+): Effect.fn.Return<number, InvalidCustomFieldNumberValueError> {
+  if (value.length === 0 || value.trim() !== value) {
+    return yield* new InvalidCustomFieldNumberValueError({ value })
+  }
+  const numberValue = Number(value)
+  return Number.isFinite(numberValue) ? numberValue : yield* new InvalidCustomFieldNumberValueError({ value })
+})
 
-  switch (attr.typeDescriptor.typeName) {
-    case "enum":
-      return { ...base, type: "enum", typeDetails: attr.typeDescriptor.typeDetails }
-    case "array":
-      return { ...base, type: "array", typeDetails: attr.typeDescriptor.typeDetails }
-    case "ref":
-      return { ...base, type: "ref", typeDetails: attr.typeDescriptor.typeDetails }
-    case "unknown":
-      return { ...base, type: "unknown", typeDetails: attr.typeDescriptor.typeDetails }
+const parseStrictBoolean = Effect.fn("CustomFields.parseStrictBoolean")(function* (
+  value: string
+): Effect.fn.Return<boolean, InvalidCustomFieldBooleanValueError> {
+  const normalized = value.toLowerCase()
+  if (normalized === "true") return true
+  if (normalized === "false") return false
+  return yield* new InvalidCustomFieldBooleanValueError({ value })
+})
+
+const parseStrictCustomFieldValue = Effect.fn("CustomFields.parseValue")(function* (
+  value: string,
+  typeName: CustomFieldTypeName
+): Effect.fn.Return<StrictCustomFieldValue, StrictCustomFieldValueError> {
+  switch (typeName) {
+    case "number":
+      return yield* parseStrictNumber(value)
+    case "date":
+      return yield* parseCustomFieldDateValue(value)
+    case "boolean":
+      return yield* parseStrictBoolean(value)
     default:
-      return { ...base, type: attr.typeDescriptor.typeName, typeDetails: {} }
+      return value
   }
+})
+
+export function parseCustomFieldValue(
+  value: string,
+  typeName: "number"
+): Effect.Effect<number, InvalidCustomFieldNumberValueError>
+export function parseCustomFieldValue(
+  value: string,
+  typeName: "date"
+): Effect.Effect<CustomFieldDateTimestamp, InvalidCustomFieldDateValueError>
+export function parseCustomFieldValue(
+  value: string,
+  typeName: "boolean"
+): Effect.Effect<boolean, InvalidCustomFieldBooleanValueError>
+export function parseCustomFieldValue(
+  value: string,
+  typeName: "string" | "markup" | "enum"
+): Effect.Effect<string, never>
+export function parseCustomFieldValue(
+  value: string,
+  typeName: CustomFieldTypeName
+): Effect.Effect<StrictCustomFieldValue, StrictCustomFieldValueError>
+export function parseCustomFieldValue(
+  value: string,
+  typeName: CustomFieldTypeName
+): Effect.Effect<StrictCustomFieldValue, StrictCustomFieldValueError> {
+  return parseStrictCustomFieldValue(value, typeName)
 }
 
-export const listCustomFields = (
+export const listCustomFields = Effect.fn("CustomFields.list")(function* (
   params: ListCustomFieldsParams
-): Effect.Effect<Array<CustomFieldInfo>, ListCustomFieldsError, HulyClient> =>
-  Effect.gen(function* () {
-    const client = yield* HulyClient
-    const limit = clampLimit(params.limit ?? CUSTOM_FIELDS_DEFAULT_LIMIT)
+): Effect.fn.Return<ReadonlyArray<CustomFieldInfo>, ListCustomFieldsError, HulyClient | Diagnostics> {
+  const client = yield* HulyClient
+  const diagnostics = yield* Diagnostics
+  const limit = clampLimit(params.limit ?? CUSTOM_FIELDS_DEFAULT_LIMIT)
+  const customAttrs = yield* client.findAll<AnyAttribute>(
+    core.class.Attribute,
+    hulyQuery<AnyAttribute>({
+      isCustom: true,
+      ...(params.targetClass === undefined ? {} : { attributeOf: toClassRef<Doc>(params.targetClass) })
+    }),
+    { limit, sort: { modifiedOn: SortingOrder.Descending } }
+  )
+  const projections = yield* toCustomFieldInfoProjections(client, customAttrs)
+  yield* warnCustomFieldMetadataDegraded(diagnostics, projections)
+  return projections.map((projection) => projection.info)
+})
 
-    const query: Record<string, unknown> = { isCustom: true }
-    if (params.targetClass !== undefined) {
-      query.attributeOf = params.targetClass
-    }
-
-    const customAttrs = yield* client.findAll<AnyAttribute>(core.class.Attribute, query, {
-      limit,
-      sort: { modifiedOn: SortingOrder.Descending }
-    })
-
-    const decodedAttrs = customAttrs.map(decodeCustomFieldAttribute)
-    const ownerLabels = yield* batchResolveClassLabels(client, [
-      ...new Set(decodedAttrs.map((attr) => attr.ownerClassId))
-    ])
-
-    return decodedAttrs.map((attr) => toCustomFieldInfo(attr, labelForOwner(ownerLabels, attr.ownerClassId)))
-  })
-
-export const getCustomFieldValues = (
+export const getCustomFieldValues = Effect.fn("CustomFields.getValues")(function* (
   params: GetCustomFieldValuesParams
-): Effect.Effect<Array<CustomFieldValue>, GetCustomFieldValuesError, HulyClient> =>
-  Effect.gen(function* () {
-    const client = yield* HulyClient
-    const objectClassRef = toRef<Class<Doc>>(params.objectClass)
-    const objectRef = toRef<Doc>(params.objectId)
+): Effect.fn.Return<ReadonlyArray<CustomFieldValue>, GetCustomFieldValuesError, HulyClient | Diagnostics> {
+  const client = yield* HulyClient
+  const diagnostics = yield* Diagnostics
+  const objectClassRef = toClassRef<Doc>(params.objectClass)
+  const objectRef = toRef<Doc>(params.objectId)
 
-    const [doc, customAttrs] = yield* Effect.all([
-      client.findOne<Doc>(objectClassRef, { _id: objectRef }),
-      client.findAll<AnyAttribute>(core.class.Attribute, { isCustom: true })
-    ])
+  const [doc, customAttrs] = yield* Effect.all([
+    client.findOne<Doc>(objectClassRef, hulyQuery<Doc>({ _id: objectRef })),
+    client.findAll<AnyAttribute>(core.class.Attribute, hulyQuery<AnyAttribute>({ isCustom: true }))
+  ])
 
-    if (doc === undefined) {
-      return yield* new CustomFieldObjectNotFoundError({ objectId: params.objectId, objectClass: params.objectClass })
-    }
+  if (doc === undefined) {
+    return yield* new CustomFieldObjectNotFoundError({ objectId: params.objectId, objectClass: params.objectClass })
+  }
 
-    const decodedDoc = decodeCustomFieldDocument(doc)
-    const docKeys = new Set(Object.keys(decodedDoc.values))
+  const projections = yield* toCustomFieldInfoProjections(client, customAttrs)
+  yield* warnCustomFieldMetadataDegraded(diagnostics, projections)
+  const values: Array<CustomFieldValue> = []
+  for (const { info } of projections) {
+    const value = readCustomFieldValue(doc, info.ownerClassId, info.name)
+    if (value === undefined) continue
+    values.push({ fieldId: info.id, label: info.label, value, type: info.type })
+  }
+  return values
+})
 
-    return customAttrs
-      .map(decodeCustomFieldAttribute)
-      .filter((attr) => docKeys.has(attr.name))
-      .map((attr) => ({
-        fieldId: attr.id,
-        label: attr.label,
-        value: decodedDoc.values[attr.name],
-        type: attr.typeDescriptor.typeName
-      }))
-  })
-
-export const setCustomField = (
+export const setCustomField = Effect.fn("CustomFields.set")(function* (
   params: SetCustomFieldParams
-): Effect.Effect<SetCustomFieldResult, SetCustomFieldError, HulyClient> =>
-  Effect.gen(function* () {
-    const client = yield* HulyClient
-    const objectClassRef = toRef<Class<Doc>>(params.objectClass)
-    const objectRef = toRef<Doc>(params.objectId)
+): Effect.fn.Return<SetCustomFieldResult, SetCustomFieldError, HulyClient | Diagnostics> {
+  const client = yield* HulyClient
+  const diagnostics = yield* Diagnostics
+  const objectClassRef = toClassRef<Doc>(params.objectClass)
+  const objectRef = toRef<Doc>(params.objectId)
 
-    const [attr, doc] = yield* Effect.all([
-      client.findOne<AnyAttribute>(core.class.Attribute, { _id: toRef<AnyAttribute>(params.fieldId), isCustom: true }),
-      client.findOne<Doc>(objectClassRef, { _id: objectRef })
-    ])
+  const [attr, doc] = yield* Effect.all([
+    client.findOne<AnyAttribute>(
+      core.class.Attribute,
+      hulyQuery<AnyAttribute>({ _id: toRef<AnyAttribute>(params.fieldId), isCustom: true })
+    ),
+    client.findOne<Doc>(objectClassRef, hulyQuery<Doc>({ _id: objectRef }))
+  ])
 
-    if (attr === undefined) {
-      return yield* new CustomFieldNotFoundError({ identifier: params.fieldId })
-    }
+  if (attr === undefined) {
+    return yield* new CustomFieldNotFoundError({ identifier: params.fieldId })
+  }
 
-    if (doc === undefined) {
-      return yield* new CustomFieldObjectNotFoundError({ objectId: params.objectId, objectClass: params.objectClass })
-    }
+  if (doc === undefined) {
+    return yield* new CustomFieldObjectNotFoundError({ objectId: params.objectId, objectClass: params.objectClass })
+  }
 
-    const decodedAttr = decodeCustomFieldAttribute(attr)
-    const parsedValue = yield* parseValueForType(params.value, decodedAttr.typeDescriptor.typeName)
-    const writeValue = ParsedCustomFieldValue.$match(parsedValue, {
-      Scalar: ({ value }) => value,
-      Date: ({ value }) => value
+  const projections = yield* toCustomFieldInfoProjections(client, [attr])
+  const projection = projections[0]
+  /* v8 ignore start -- one decoded attribute always yields one mapped projection */
+  if (projection === undefined) {
+    return yield* new CustomFieldMetadataMalformedError({
+      identifier: params.fieldId,
+      reason: "custom field metadata did not produce a definition"
     })
-    const decodedDoc = decodeCustomFieldDocument(doc)
-    const ownerInfo = yield* resolveClassInfo(client, decodedAttr.ownerClassId)
-
-    if (ownerInfo.kind === ClassifierKind.MIXIN) {
-      // Huly updateMixin expects the mixin class as Ref<Class<Doc>>. Brands are erased at runtime.
-      // eslint-disable-next-line no-restricted-syntax -- SDK boundary cast for mixin class ref
-      const mixinRef = toRef<Doc>(decodedAttr.ownerClassId) as Ref<Class<Doc>>
-      yield* client.updateMixin(objectRef, objectClassRef, decodedDoc.space, mixinRef, {
-        [decodedAttr.name]: writeValue
-      })
-    } else {
-      yield* client.updateDoc(toRef<Class<Doc>>(decodedAttr.ownerClassId), decodedDoc.space, objectRef, {
-        [decodedAttr.name]: writeValue
-      })
-    }
-
-    return {
-      objectId: params.objectId,
-      fieldId: decodedAttr.id,
-      label: decodedAttr.label,
-      value: writeValue,
-      updated: true
-    }
+  }
+  /* v8 ignore stop */
+  yield* warnCustomFieldMetadataDegraded(diagnostics, [projection])
+  const field = projection.info
+  const parsedValue = yield* parseValueForType(params.value, field.type)
+  const writeValue = ParsedCustomFieldValue.$match(parsedValue, {
+    Scalar: ({ value }) => value,
+    Date: ({ value }) => value
   })
+  const ownerInfo = yield* resolveClassInfo(client, field.ownerClassId)
+
+  if (ownerInfo.kind === ClassifierKind.MIXIN) {
+    const mixinRef = toClassRef<Doc>(field.ownerClassId)
+    yield* client.updateMixin(objectRef, objectClassRef, doc.space, mixinRef, { [field.name]: writeValue })
+  } else {
+    yield* client.updateDoc(toClassRef<Doc>(field.ownerClassId), doc.space, objectRef, { [field.name]: writeValue })
+  }
+
+  return { objectId: params.objectId, fieldId: field.id, label: field.label, value: writeValue, updated: true }
+})

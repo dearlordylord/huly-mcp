@@ -4,6 +4,13 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@hcengineering/setting@0.7.382>@hcengineering/account-client': 0.7.25
+  '@hcengineering/setting@0.7.382>@hcengineering/core': 0.7.26
+  '@hcengineering/setting@0.7.382>@hcengineering/platform': 0.7.20
+  '@hcengineering/setting@0.7.382>@hcengineering/templates': 0.7.0
+  '@hcengineering/setting@0.7.382>@hcengineering/ui': 0.7.0
+
 patchedDependencies:
   '@hcengineering/api-client@0.7.19':
     hash: 6448e9bb0f5199b362ab285ce912e132868029db2e5eda9873e20fc233314c09
@@ -64,6 +71,9 @@ importers:
       '@hcengineering/request':
         specifier: 0.7.0
         version: 0.7.0
+      '@hcengineering/setting':
+        specifier: 0.7.382
+        version: 0.7.382
       '@hcengineering/support':
         specifier: 0.7.0
         version: 0.7.0
@@ -977,6 +987,9 @@ packages:
 
   '@hcengineering/setting@0.7.0':
     resolution: {integrity: sha512-HQAyYjHZeE0k29i5M8uzrCgM8VpbmHx+4J0uJiDrFT0Zlt75NEud6IZJ+1OmQ6+PAXpqrieK8ISYxSlvU/zrzw==}
+
+  '@hcengineering/setting@0.7.382':
+    resolution: {integrity: sha512-gUj9qSy7UF0vuI6Xlou6hGUgAFvQP42l5jlzU4fBc1QT8iIgWoy9GWpibu1gcPMgiZ9Hfy/LkSLvduaTX6UIpA==}
 
   '@hcengineering/support@0.7.0':
     resolution: {integrity: sha512-oCjuiWWXEOghutzY9Bpc+vkIIEd/arlFVBmaXzFfM/XeR4J8tZ8ynYKBYoXwV+UFaGczidLdEBYda9HqFU1mHg==}
@@ -4079,6 +4092,14 @@ snapshots:
       msgpackr: 1.11.8
 
   '@hcengineering/setting@0.7.0':
+    dependencies:
+      '@hcengineering/account-client': 0.7.25
+      '@hcengineering/core': 0.7.26
+      '@hcengineering/platform': 0.7.20
+      '@hcengineering/templates': 0.7.0
+      '@hcengineering/ui': 0.7.0
+
+  '@hcengineering/setting@0.7.382':
     dependencies:
       '@hcengineering/account-client': 0.7.25
       '@hcengineering/core': 0.7.26

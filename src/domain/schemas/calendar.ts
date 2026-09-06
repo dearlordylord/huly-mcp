@@ -5,6 +5,7 @@ import { toDraft07JsonSchema } from "./json-schema.js"
 
 import { clearableText } from "./clearable.js"
 import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "./document-native-references.js"
+import { MeetingRoomLocatorSchema } from "./calendar-meeting-rooms.js"
 import {
   assertUpdateFields,
   atLeastOneUpdateFieldMessage,
@@ -255,6 +256,12 @@ export const CreateEventParamsSchema = Schema.Struct({
       description:
         "Target writable calendar name. Use when you know the calendar's displayed name but not its ID. Do not provide with calendarId."
     })
+  ),
+  meetingRoom: Schema.optionalKey(
+    MeetingRoomLocatorSchema.annotateKey({
+      description:
+        "Optional virtual-office meeting room. Room resolution tries ID first, then exact name; use floor to disambiguate duplicate names."
+    })
   )
 })
   .pipe(
@@ -285,7 +292,8 @@ export const UPDATE_EVENT_FIELDS = [
   "timeZone",
   "blockTime",
   "calendarId",
-  "calendarName"
+  "calendarName",
+  "meetingRoom"
 ] as const satisfies ReadonlyArray<
   | "title"
   | "description"
@@ -306,6 +314,7 @@ export const UPDATE_EVENT_FIELDS = [
   | "blockTime"
   | "calendarId"
   | "calendarName"
+  | "meetingRoom"
 >
 
 export const UpdateEventParamsSchema = Schema.Struct({
@@ -361,6 +370,12 @@ export const UpdateEventParamsSchema = Schema.Struct({
   calendarName: Schema.optional(
     CalendarName.annotate({
       description: "Move the event to this writable calendar name. Do not provide with calendarId."
+    })
+  ),
+  meetingRoom: Schema.optionalKey(
+    MeetingRoomLocatorSchema.annotateKey({
+      description:
+        "Assign a different virtual-office room to an existing meeting. Ordinary events without Meeting composition are rejected; omission preserves the current assignment and null is not accepted."
     })
   )
 })

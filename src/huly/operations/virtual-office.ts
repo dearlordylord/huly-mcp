@@ -15,11 +15,7 @@ import type {
   Room,
   RoomInfo
 } from "@hcengineering/love"
-import {
-  MeetingStatus as HulyMeetingStatus,
-  RoomAccess as HulyRoomAccess,
-  RoomType as HulyRoomType
-} from "@hcengineering/love"
+import { MeetingStatus as HulyMeetingStatus, RoomType as HulyRoomType } from "@hcengineering/love"
 import { Effect } from "effect"
 
 import {
@@ -62,7 +58,6 @@ import type {
   MeetingStatus,
   OfficeDefaultsSummary,
   OfficeSummary,
-  RoomAccess,
   RoomDetails,
   RoomSummary,
   RoomType
@@ -74,6 +69,7 @@ import { contact, love } from "../huly-plugins.js"
 import { hulyNonEmptyTextOrFallback } from "./non-empty-text.js"
 import { clampLimit, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
+import { nativeRoomAccessToMcp } from "./virtual-office-room-mapping.js"
 
 type ListOfficeFloorsError = HulyClientError
 type GetOfficeFloorError = HulyClientError | FloorNotFoundError
@@ -87,12 +83,6 @@ type ListMeetingMinutesError = HulyClientError
 type GetMeetingMinutesError = HulyClientError | MeetingMinutesNotFoundError
 type ListDevicePreferencesError = HulyClientError
 type ListOfficeDefaultsError = HulyClientError
-
-const ROOM_ACCESS_TO_STRING = {
-  [HulyRoomAccess.Open]: "open",
-  [HulyRoomAccess.Knock]: "knock",
-  [HulyRoomAccess.DND]: "dnd"
-} as const satisfies Record<HulyRoomAccess, RoomAccess>
 
 const ROOM_TYPE_TO_STRING = {
   [HulyRoomType.Video]: "video",
@@ -110,11 +100,9 @@ type ExactMappedValues<M extends Readonly<Record<PropertyKey, string>>, Expected
 
 const exactMappedValues = <T extends true>(_value: T): void => {}
 
-exactMappedValues<ExactMappedValues<typeof ROOM_ACCESS_TO_STRING, RoomAccess>>(true)
 exactMappedValues<ExactMappedValues<typeof ROOM_TYPE_TO_STRING, RoomType>>(true)
 exactMappedValues<ExactMappedValues<typeof MEETING_STATUS_TO_STRING, MeetingStatus>>(true)
 
-const roomAccessToString = (access: HulyRoomAccess): RoomAccess => ROOM_ACCESS_TO_STRING[access]
 const roomTypeToString = (type: HulyRoomType): RoomType => ROOM_TYPE_TO_STRING[type]
 const meetingStatusToString = (status: HulyMeetingStatus): MeetingStatus => MEETING_STATUS_TO_STRING[status]
 
@@ -147,7 +135,7 @@ const summarizeRoom = (room: Room): RoomSummary => ({
   roomId: RoomId.make(room._id),
   name: optionalRoomName(room.name),
   type: roomTypeToString(room.type),
-  access: roomAccessToString(room.access),
+  access: nativeRoomAccessToMcp(room.access),
   floorId: FloorId.make(room.floor),
   position: {
     x: VirtualOfficeCoordinate.make(room.x),
@@ -416,3 +404,5 @@ export const listOfficeDefaults = (
       startWithRecording: room.startWithRecording
     }))
   })
+
+export { createOfficeFloor, createOfficeRoom, updateOfficeRoom } from "./virtual-office-administration.js"

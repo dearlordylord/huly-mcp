@@ -79,3 +79,56 @@ export const ISSUE_97_EXISTING_TOOL_CHANGE_NAMES: ReadonlySet<ToolNameType> = ne
   ToolName.make("create_relation"),
   ToolName.make("delete_relation")
 ])
+
+export const ISSUE_264_OPERATION_TOOL_NAMES: ReadonlySet<ToolNameType> = new Set([
+  ToolName.make("list_recruiting_candidate_custom_fields"),
+  ToolName.make("get_recruiting_candidate_custom_field_values"),
+  ToolName.make("set_recruiting_candidate_custom_field")
+])
+
+export const ISSUE_266_OPERATION_TOOL_NAMES: ReadonlySet<ToolNameType> = new Set([
+  ToolName.make("list_calendar_settings"),
+  ToolName.make("set_primary_calendar"),
+  ToolName.make("update_calendar_settings")
+])
+
+export const ISSUE_267_OPERATION_TOOL_NAMES: ReadonlySet<ToolNameType> = new Set([
+  ToolName.make("create_office_floor"),
+  ToolName.make("create_office_room"),
+  ToolName.make("update_office_room")
+])
+
+export const POST_BASELINE_FEATURE_OPERATION_TOOL_NAMES: ReadonlySet<ToolNameType> = new Set([
+  ...ISSUE_264_OPERATION_TOOL_NAMES,
+  ...ISSUE_266_OPERATION_TOOL_NAMES,
+  ...ISSUE_267_OPERATION_TOOL_NAMES
+])
+
+export const ISSUE_265_EXISTING_TOOL_CHANGE_NAMES: ReadonlySet<ToolNameType> = new Set([
+  ToolName.make("list_todos"),
+  ToolName.make("get_todo"),
+  ToolName.make("create_todo"),
+  ToolName.make("update_todo")
+])
+
+export const ISSUE_268_EXISTING_TOOL_CHANGE_NAMES: ReadonlySet<ToolNameType> = new Set([
+  ToolName.make("list_events"),
+  ToolName.make("get_event"),
+  ToolName.make("create_event"),
+  ToolName.make("update_event"),
+  ToolName.make("list_schedules"),
+  ToolName.make("get_schedule"),
+  ToolName.make("create_schedule"),
+  ToolName.make("update_schedule")
+])
+
+export const POST_BASELINE_EXISTING_TOOL_CHANGE_NAMES: ReadonlySet<ToolNameType> = new Set([
+  ...ISSUE_97_EXISTING_TOOL_CHANGE_NAMES,
+  ...ISSUE_265_EXISTING_TOOL_CHANGE_NAMES,
+  ...ISSUE_268_EXISTING_TOOL_CHANGE_NAMES
+])
+
+export const POST_BASELINE_OPERATION_TOOL_NAMES: ReadonlySet<ToolNameType> = new Set([
+  ...ISSUE_97_ADMINISTRATION_TOOL_NAMES,
+  ...POST_BASELINE_FEATURE_OPERATION_TOOL_NAMES
+])

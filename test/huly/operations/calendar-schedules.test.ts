@@ -7,7 +7,7 @@ import type { Employee, Person } from "@hcengineering/contact"
 import type { Data, Doc, PersonId as HulyPersonId, Ref, Space } from "@hcengineering/core"
 import { toFindResult } from "@hcengineering/core"
 import type { MeetingSchedule as HulyMeetingSchedule, Room as HulyRoom } from "@hcengineering/love"
-import { Effect } from "effect"
+import { Effect, Layer } from "effect"
 import { expect } from "vitest"
 
 import { ScheduleTitle } from "../../../src/domain/schemas/calendar-schedules.js"
@@ -22,6 +22,7 @@ import {
 } from "../../../src/domain/schemas/shared.js"
 import type { HulyClientOperations } from "../../../src/huly/client.js"
 import { HulyClient } from "../../../src/huly/client.js"
+import { Diagnostics, makeDiagnosticsScope } from "../../../src/huly/diagnostics.js"
 import { calendar, contact, love } from "../../../src/huly/huly-plugins.js"
 import {
   createSchedule,
@@ -115,6 +116,7 @@ const createLayer = (config: {
   readonly captureCreate?: { attributes?: Data<HulySchedule> }
   readonly captureUpdate?: { operations?: Record<string, unknown> }
   readonly captureRemove?: { id?: string }
+  readonly diagnostics?: Diagnostics["Service"]
 }) => {
   const schedules = config.schedules ?? []
   const meetingSchedules = config.meetingSchedules ?? []
@@ -166,7 +168,10 @@ const createLayer = (config: {
     return Effect.succeed({})
   }) as HulyClientOperations["removeDoc"]
 
-  return HulyClient.testLayer({ createDoc, findAll, findOne, removeDoc, updateDoc })
+  return Layer.merge(
+    HulyClient.testLayer({ createDoc, findAll, findOne, removeDoc, updateDoc }),
+    Layer.succeed(Diagnostics, config.diagnostics ?? { warnAgent: () => Effect.void, trail: () => Effect.void })
+  )
 }
 
 describe("calendar schedules", () => {
@@ -218,20 +223,29 @@ describe("calendar schedules", () => {
     })
   )
 
-  it.effect("keeps missing room names absent in room-aware schedules", () =>
+  it.effect("keeps a blank meeting room name absent with a warning", () =>
     Effect.gen(function* () {
       const { calendar: _calendar, ...scheduleWithoutCalendar } = makeSchedule()
+      const diagnostics = yield* makeDiagnosticsScope
       const result = yield* listSchedules({ owner: "person-1" }).pipe(
         Effect.provide(
           createLayer({
             schedules: [scheduleWithoutCalendar],
             meetingSchedules: [makeMeetingSchedule({ calendar: undefined })],
-            rooms: []
+            rooms: [makeRoom({ name: " " })],
+            diagnostics: diagnostics.service
           })
         )
       )
 
-      expect(assertAt(result, 0).meetingRoom).toEqual({ roomId: "room-1", name: undefined })
+      expect(assertAt(result, 0).meetingRoom).toEqual({ roomId: "room-1" })
+      expect(yield* diagnostics.drainWarnings).toEqual([
+        {
+          code: "calendar_meeting_room_metadata_degraded",
+          message:
+            "Calendar meeting-room metadata was partially resolved: 0 referenced room(s) were unavailable, 1 room name(s) were blank."
+        }
+      ])
     })
   )
 

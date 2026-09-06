@@ -579,10 +579,12 @@ authored-constraint projection changes, 6 richer CLI JSON parse diagnostics, and
 4 concise CLI help-renderer changes.
 
 These counts describe the #225 checkpoint, not the current bundled corpus. The
-current certificate supersedes this checkpoint with 21,092 deltas: metadata is
-4,894 and a separate six-entry #245 direct issue-assignee description
-category is present. `behavioral-oracle-delta-review.md` and its JSON certificate
-are authoritative for current totals and hashes.
+current certificate supersedes this checkpoint with 29,431 deltas: 16,010
+Draft-07 structural and feature-schema changes, 2,328 schema-metadata changes,
+968 authored-constraint projections, 6 direct #245 issue-assignee descriptions,
+10,109 post-baseline operation-surface changes, 6 CLI JSON diagnostics, and 4
+CLI help changes. `behavioral-oracle-delta-review.md` and its JSON certificate
+are authoritative for current totals, owning issues, and hashes.
 
 Each category records an exact count and SHA-256 of its sorted exact delta identities
 in `behavioral-oracle-delta-review.json`, avoiding duplication of baseline/current
@@ -594,8 +596,8 @@ hash, and verification commands are recorded in
 
 `mise exec node@22.22.2 -- pnpm verify:effect4-oracle:built` passes against the
 full bundled MCP and CLI corpus. Strict Ajv Draft-07 compilation remains green
-for all 524 native and 6 proxy tool schemas; the registry remains 522 ordered,
-unique operations and the authored-constraint corpus retains all 522 tools.
+for all 603 native and 6 proxy tool schemas; the registry contains 601 ordered,
+unique operations and the authored-constraint corpus retains all 601 tools.
 
 ## Ticket #229 packed CLI and generated documentation checkpoint
 
@@ -707,7 +709,7 @@ certified lifecycle implementation.
 At the #232 checkpoint, the final parity report linked the unchanged Effect 3
 baseline to the then-current reviewed 21,086-delta certificate and the #225,
 #229, and #231 schema, CLI, artifact, and clean-consumer evidence. That count is
-historical and is superseded by the current 21,092-delta certificate documented
+historical and is superseded by the current 29,431-delta certificate documented
 in `behavioral-oracle-delta-review.md` and `final-parity-report.md`. The archival
 decision is explicit: `.reference/effect-v3.22.1` remains historical parity
 provenance only; setup does not provision or verify it, it is outside the active

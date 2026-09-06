@@ -4,9 +4,10 @@
 
 This report certifies the direct cutover of `@firfi/huly-mcp` and
 `@firfi/huly-cli` to the installed `effect@4.0.0-rc.108` cohort. It covers the
-final state of the integration branch for issues #209 and #232. No Effect 3
-runtime, compatibility layer, diagnostic suppression, or weakened quality gate
-is part of the released artifacts.
+final state of the integration branch for issues #209 and #232 and subsequent
+certified maintenance through #264-#268. No Effect 3 runtime, compatibility
+layer, diagnostic suppression, or weakened quality gate is part of the released
+artifacts.
 
 ## Local-Huly certification
 
@@ -49,15 +50,16 @@ Four live-only defects were repaired during certification:
 
 The immutable Effect 3 oracle was not regenerated. The final Effect 4 corpus is
 verified by the compact reviewed certificate described in
-`behavioral-oracle-delta-review.md`: 21,092 exact differences are divided into
-12,754 Draft-07 structural dialect changes, 4,894 schema-metadata changes, 3,428
-authored-constraint projections, 6 direct issue-assignee description
-changes, 6 richer CLI JSON diagnostics, and 4 concise CLI help changes. Counts,
-current/baseline hashes, and sorted delta-set hashes
-reject unreviewed, changed, duplicate, or stale classifications.
+`behavioral-oracle-delta-review.md`: 29,431 exact differences are divided into
+16,010 Draft-07 structural and feature-schema changes, 2,328 schema-metadata
+changes, 968 authored-constraint projections, 6 direct issue-assignee
+description changes, 10,109 post-baseline operation-surface changes, 6 richer
+CLI JSON diagnostics, and 4 concise CLI help changes. Counts, current/baseline
+hashes, sorted delta-set hashes, and non-empty owning-issue sets reject
+unreviewed, changed, duplicate, stale, or misattributed classifications.
 
-The certified registry remains 522 ordered unique operations. Strict Ajv
-Draft-07 compilation passes for all 524 native and 6 proxy schemas. Discovery,
+The certified registry contains 601 ordered unique operations. Strict Ajv
+Draft-07 compilation passes for all 603 native and 6 proxy schemas. Discovery,
 resources, CLI routing/help, transport behavior, package closure, executable
 modes, clean-consumer installs, and artifact-size evidence are covered by the
 oracle and #225/#229/#231 certificates referenced from the migration ledger.

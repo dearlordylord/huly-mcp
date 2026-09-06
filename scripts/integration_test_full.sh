@@ -50,6 +50,9 @@ RECRUITING_CLEANUP_RELATED_ISSUE_ID=""
 RECRUITING_CLEANUP_PERSON_ID=""
 RECRUITING_CLEANUP_PERSON_EMAIL=""
 RECRUITING_CLEANUP_SKILL=""
+RECRUITING_CLEANUP_CANDIDATE_FIELD_ID=""
+RECRUITING_CLEANUP_PERSON_FIELD_ID=""
+RECRUITING_CLEANUP_UNRELATED_FIELD_ID=""
 BOARD_CLEANUP_BOARD_ID=""
 BOARD_CLEANUP_LABEL_ID=""
 BOARD_CLEANUP_CARD_LABEL_ID=""
@@ -104,6 +107,30 @@ PERSON_ADMIN_ATTACHMENT_CLEANUP_ID=""
 PERSON_MERGE_SOURCE_CLEANUP_ID=""
 PERSON_MERGE_SURVIVOR_CLEANUP_ID=""
 EMPLOYEE_LIFECYCLE_CLEANUP_PERSON_ID=""
+PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID=""
+PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID=""
+PLANNER_DOCUMENT_CLEANUP_TODO_ID=""
+CALENDAR_SETTINGS_CLEANUP_ID=""
+CALENDAR_SETTINGS_CLEANUP_KIND=""
+CALENDAR_SETTINGS_CLEANUP_HIDDEN=""
+CALENDAR_SETTINGS_CLEANUP_VISIBILITY=""
+CALENDAR_SETTINGS_PRIMARY_SNAPSHOT=""
+PLANNER_DOCUMENT_CLEANUP_TODO_TITLE=""
+CALENDAR_MEETING_CLEANUP_FLOOR_ID=""
+CALENDAR_MEETING_CLEANUP_FLOOR_NAME=""
+CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID=""
+CALENDAR_MEETING_CLEANUP_ROOM_ONE_NAME=""
+CALENDAR_MEETING_CLEANUP_ROOM_TWO_ID=""
+CALENDAR_MEETING_CLEANUP_ROOM_TWO_NAME=""
+CALENDAR_MEETING_CLEANUP_EVENT_ID=""
+CALENDAR_MEETING_CLEANUP_EVENT_TITLE=""
+CALENDAR_MEETING_CLEANUP_SCHEDULE_ID=""
+CALENDAR_MEETING_CLEANUP_SCHEDULE_TITLE=""
+VIRTUAL_OFFICE_CLEANUP_FLOOR_ID=""
+VIRTUAL_OFFICE_CLEANUP_ROOM_ID=""
+VIRTUAL_OFFICE_CLEANUP_FLOOR_NAME=""
+VIRTUAL_OFFICE_CLEANUP_ROOM_NAME=""
+VIRTUAL_OFFICE_CLEANUP_UPDATED_ROOM_NAME=""
 
 if [ -z "$HULY_URL" ]; then
   echo "ERROR: HULY_URL not set. Run: set -a && source .env.local && set +a"
@@ -168,7 +195,7 @@ FAILED=0
 SKIPPED=0
 ERRORS=""
 
-TOOL_TIMEOUT=30
+TOOL_TIMEOUT="${TOOL_TIMEOUT:-30}"
 readonly LIST_PROJECTS_REQUEST='{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}'
 
 cleanup_http_transport() {
@@ -338,10 +365,22 @@ cleanup_recruiting_artifacts() {
     vacancy_json=$(json_string "$RECRUITING_CLEANUP_VACANCY_ID")
     call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"archive_recruiting_vacancy\",\"arguments\":{\"vacancy\":$vacancy_json}},\"id\":2}" >/dev/null 2>&1 || true
   fi
-  if [ -n "$RECRUITING_CLEANUP_PERSON_ID" ]; then
-    person_json=$(json_string "$RECRUITING_CLEANUP_PERSON_ID")
-    call_tool "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" >/dev/null 2>&1 || true
+  # Delete field definitions after their temporary Person/Candidate document so
+  # delete_huly_attribute's in-use guard cannot retain a fixture marker.
+  local cleanup_failed=0
+  if ! cleanup_recruiting_person; then
+    cleanup_failed=1
   fi
+  if ! cleanup_recruiting_attribute "$RECRUITING_CLEANUP_CANDIDATE_FIELD_ID" "Candidate"; then
+    cleanup_failed=1
+  fi
+  if ! cleanup_recruiting_attribute "$RECRUITING_CLEANUP_PERSON_FIELD_ID" "Person"; then
+    cleanup_failed=1
+  fi
+  if ! cleanup_recruiting_attribute "$RECRUITING_CLEANUP_UNRELATED_FIELD_ID" "Unrelated"; then
+    cleanup_failed=1
+  fi
+  return "$cleanup_failed"
 }
 
 cleanup_board_artifacts() {
@@ -390,6 +429,91 @@ wait_for_tool_field_quiet() {
     fi
     attempt=$((attempt + 1))
   done
+  return 1
+}
+
+wait_for_huly_attribute_absence_quiet() {
+  local attribute_id="$1" attempts="${2:-3}" attempt=1 attribute_json payload response text
+  attribute_json=$(json_string "$attribute_id")
+  payload="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_huly_attributes\",\"arguments\":{\"query\":$attribute_json,\"limit\":200}},\"id\":2}"
+  while [ "$attempt" -le "$attempts" ]; do
+    response=$(call_tool_fresh_session "$payload" 2>/dev/null || true)
+    text=$(printf '%s\n' "$response" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+    if tool_response_succeeded "$response" \
+      && printf '%s\n' "$text" | jq -e --arg id "$attribute_id" 'all(.attributes[]?; .attributeId != $id)' >/dev/null 2>&1; then
+      return 0
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      sleep 1
+    fi
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
+cleanup_recruiting_person() {
+  if [ -z "$RECRUITING_CLEANUP_PERSON_ID" ]; then
+    return 0
+  fi
+  local person_json read_payload read_response delete_response attempt
+  person_json=$(json_string "$RECRUITING_CLEANUP_PERSON_ID")
+  read_payload="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}"
+  for attempt in 1 2 3; do
+    read_response=$(call_tool_fresh_session "$read_payload" 2>/dev/null || true)
+    if [ "$(printf '%s\n' "$read_response" | jq -r '.result.isError // false' 2>/dev/null)" = "true" ] \
+      && printf '%s\n' "$read_response" | jq -er '.result.content[0].text | test("not found"; "i")' >/dev/null 2>&1; then
+      RECRUITING_CLEANUP_PERSON_ID=""
+      return 0
+    fi
+    delete_response=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$person_json}},\"id\":2}" 2>/dev/null || true)
+    if tool_response_succeeded "$delete_response" \
+      && wait_for_tool_error_quiet "$read_payload" "not found" 1; then
+      RECRUITING_CLEANUP_PERSON_ID=""
+      return 0
+    fi
+    if [ "$attempt" -lt 3 ]; then
+      sleep 1
+    fi
+  done
+  echo "WARNING: Recruiting person cleanup failed after 3 fresh-session attempts; marker retained" >&2
+  return 1
+}
+
+cleanup_recruiting_attribute() {
+  local attribute_id="$1" label="$2"
+  if [ -z "$attribute_id" ]; then
+    return 0
+  fi
+  local attribute_json delete_response attempt
+  attribute_json=$(json_string "$attribute_id")
+  for attempt in 1 2 3; do
+    if wait_for_huly_attribute_absence_quiet "$attribute_id" 1; then
+      if [ "$label" = "Candidate" ]; then
+        RECRUITING_CLEANUP_CANDIDATE_FIELD_ID=""
+      elif [ "$label" = "Person" ]; then
+        RECRUITING_CLEANUP_PERSON_FIELD_ID=""
+      else
+        RECRUITING_CLEANUP_UNRELATED_FIELD_ID=""
+      fi
+      return 0
+    fi
+    delete_response=$(call_tool_fresh_session "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_huly_attribute\",\"arguments\":{\"attribute\":$attribute_json,\"confirm\":true}},\"id\":2}" 2>/dev/null || true)
+    if tool_response_succeeded "$delete_response" \
+      && wait_for_huly_attribute_absence_quiet "$attribute_id" 1; then
+      if [ "$label" = "Candidate" ]; then
+        RECRUITING_CLEANUP_CANDIDATE_FIELD_ID=""
+      elif [ "$label" = "Person" ]; then
+        RECRUITING_CLEANUP_PERSON_FIELD_ID=""
+      else
+        RECRUITING_CLEANUP_UNRELATED_FIELD_ID=""
+      fi
+      return 0
+    fi
+    if [ "$attempt" -lt 3 ]; then
+      sleep 1
+    fi
+  done
+  echo "WARNING: Recruiting $label custom-field cleanup failed after 3 fresh-session attempts; marker retained" >&2
   return 1
 }
 
@@ -887,7 +1011,7 @@ cleanup_hr_artifacts() {
 run_capture_only_fresh() {
   local payload="$1"
   local result
-  result=$(call_tool "$payload")
+  result=$(call_tool_fresh_session "$payload")
   if [ -z "$result" ]; then
     return 1
   fi
@@ -1036,6 +1160,287 @@ cleanup_retained_merge_source() {
   return 1
 }
 
+cleanup_planner_document_artifacts() {
+  local cleanup_failed=0 cleanup_attempt response todo_json document_json teamspace_json read_payload
+  if [ -n "$PLANNER_DOCUMENT_CLEANUP_TODO_ID" ]; then
+    todo_json=$(json_string "$PLANNER_DOCUMENT_CLEANUP_TODO_ID")
+    read_payload="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":$todo_json}}},\"id\":2}"
+    if wait_for_tool_error_quiet "$read_payload" "not found" 1; then
+      PLANNER_DOCUMENT_CLEANUP_TODO_ID=""
+    else
+      for cleanup_attempt in 1 2 3; do
+        if wait_for_tool_error_quiet "$read_payload" "not found" 1; then
+          PLANNER_DOCUMENT_CLEANUP_TODO_ID=""
+          break
+        fi
+        response=$(call_tool_fresh_session \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_todo\",\"arguments\":{\"locator\":{\"todoId\":$todo_json}}},\"id\":2}" \
+          2>/dev/null || true)
+        if tool_response_succeeded "$response" \
+          && wait_for_tool_error_quiet "$read_payload" "not found" 1; then
+          PLANNER_DOCUMENT_CLEANUP_TODO_ID=""
+          break
+        fi
+        [ "$cleanup_attempt" -lt 3 ] && sleep 1
+      done
+    fi
+    [ -z "$PLANNER_DOCUMENT_CLEANUP_TODO_ID" ] || cleanup_failed=1
+  fi
+  if [ -n "$PLANNER_DOCUMENT_CLEANUP_TODO_TITLE" ]; then
+    local title_json title_payload title_text title_id title_id_json title_absent=false
+    title_json=$(json_string "$PLANNER_DOCUMENT_CLEANUP_TODO_TITLE")
+    if [ -n "$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID" ] && [ -n "$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID" ]; then
+      document_json=$(json_string "$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID")
+      teamspace_json=$(json_string "$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID")
+      title_payload="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"title\":$title_json,\"attachedTo\":{\"type\":\"document\",\"teamspace\":$teamspace_json,\"document\":$document_json}}}},\"id\":2}"
+      for cleanup_attempt in 1 2 3; do
+        response=$(call_tool_fresh_session "$title_payload" 2>/dev/null || true)
+        title_text=$(printf '%s\n' "$response" | jq -r '.result.content[0].text // empty' 2>/dev/null)
+        if tool_response_succeeded "$response"; then
+          title_id=$(printf '%s\n' "$title_text" | jq -r \
+            --arg title "$PLANNER_DOCUMENT_CLEANUP_TODO_TITLE" \
+            --arg document "$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID" \
+            'select(.title == $title and .attachedTo.type == "document" and .attachedTo.id == $document) | .id // empty' \
+            2>/dev/null)
+          if [ -n "$title_id" ]; then
+            title_id_json=$(json_string "$title_id")
+            response=$(call_tool_fresh_session \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_todo\",\"arguments\":{\"locator\":{\"todoId\":$title_id_json}}},\"id\":2}" \
+              2>/dev/null || true)
+            read_payload="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":$title_id_json}}},\"id\":2}"
+            if tool_response_succeeded "$response" \
+              && wait_for_tool_error_quiet "$read_payload" "not found" 8; then
+              title_absent=true
+              PLANNER_DOCUMENT_CLEANUP_TODO_ID=""
+              break
+            fi
+          fi
+        elif printf '%s\n' "$title_text" | grep -qF -- "not found"; then
+          title_absent=true
+          break
+        fi
+        [ "$cleanup_attempt" -lt 3 ] && sleep 1
+      done
+    else
+      echo "WARNING: Planner document ToDo title cleanup lacks its document target; marker retained" >&2
+      cleanup_failed=1
+    fi
+    if [ "$title_absent" = true ]; then
+      PLANNER_DOCUMENT_CLEANUP_TODO_TITLE=""
+    else
+      if [ -n "$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID" ] && [ -n "$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID" ]; then
+        echo "WARNING: Planner document ToDo title cleanup was not confirmed; marker retained" >&2
+      fi
+      cleanup_failed=1
+    fi
+  fi
+  if [ -n "$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID" ] && {
+    [ -n "$PLANNER_DOCUMENT_CLEANUP_TODO_ID" ] || [ -n "$PLANNER_DOCUMENT_CLEANUP_TODO_TITLE" ];
+  }; then
+    echo "WARNING: Planner document cleanup retains a ToDo marker; document deletion is deferred" >&2
+    cleanup_failed=1
+  fi
+  if [ -n "$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID" ] && [ -n "$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID" ] \
+    && [ -z "$PLANNER_DOCUMENT_CLEANUP_TODO_ID" ] && [ -z "$PLANNER_DOCUMENT_CLEANUP_TODO_TITLE" ]; then
+    document_json=$(json_string "$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID")
+    read_payload="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID\",\"document\":$document_json}},\"id\":2}"
+    if wait_for_tool_error_quiet "$read_payload" "not found" 1; then
+      PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID=""
+    else
+      for cleanup_attempt in 1 2 3; do
+        if wait_for_tool_error_quiet "$read_payload" "not found" 1; then
+          PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID=""
+          break
+        fi
+        response=$(call_tool_fresh_session \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_document\",\"arguments\":{\"teamspace\":\"$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID\",\"document\":$document_json}},\"id\":2}" \
+          2>/dev/null || true)
+        if tool_response_succeeded "$response" \
+          && wait_for_tool_error_quiet "$read_payload" "not found" 1; then
+          PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID=""
+          break
+        fi
+        [ "$cleanup_attempt" -lt 3 ] && sleep 1
+      done
+    fi
+    [ -z "$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID" ] || cleanup_failed=1
+  fi
+  if [ -n "$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID" ] && [ -n "$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID" ]; then
+    echo "WARNING: Planner document cleanup retains a document marker; teamspace deletion is deferred" >&2
+    cleanup_failed=1
+  fi
+  if [ -n "$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID" ] \
+    && [ -z "$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID" ] \
+    && [ -z "$PLANNER_DOCUMENT_CLEANUP_TODO_ID" ] && [ -z "$PLANNER_DOCUMENT_CLEANUP_TODO_TITLE" ]; then
+    teamspace_json=$(json_string "$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID")
+    read_payload="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_teamspace\",\"arguments\":{\"teamspace\":$teamspace_json}},\"id\":2}"
+    if wait_for_tool_error_quiet "$read_payload" "not found" 1; then
+      PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID=""
+    else
+      for cleanup_attempt in 1 2 3; do
+        if wait_for_tool_error_quiet "$read_payload" "not found" 1; then
+          PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID=""
+          break
+        fi
+        response=$(call_tool_fresh_session \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_teamspace\",\"arguments\":{\"teamspace\":$teamspace_json}},\"id\":2}" \
+          2>/dev/null || true)
+        if tool_response_succeeded "$response" \
+          && wait_for_tool_error_quiet "$read_payload" "not found" 1; then
+          PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID=""
+          break
+        fi
+        [ "$cleanup_attempt" -lt 3 ] && sleep 1
+      done
+    fi
+    [ -z "$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID" ] || cleanup_failed=1
+  fi
+  return "$cleanup_failed"
+}
+
+cleanup_calendar_settings_artifacts() {
+  local cleanup_failed=0
+  if [ -n "$CALENDAR_SETTINGS_CLEANUP_ID" ]; then
+    local calendar_id_json visibility_json payload response read_payload expected_hidden settings_restored=false
+    calendar_id_json=$(json_string "$CALENDAR_SETTINGS_CLEANUP_ID")
+    visibility_json=$(json_string "$CALENDAR_SETTINGS_CLEANUP_VISIBILITY")
+    payload="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_calendar_settings\",\"arguments\":{\"calendarId\":$calendar_id_json,\"visibility\":$visibility_json"
+    if [ "$CALENDAR_SETTINGS_CLEANUP_KIND" = "external" ]; then
+      payload="$payload,\"hidden\":$CALENDAR_SETTINGS_CLEANUP_HIDDEN"
+    fi
+    payload="$payload}},\"id\":2}"
+    expected_hidden="$CALENDAR_SETTINGS_CLEANUP_HIDDEN"
+    read_payload='{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_calendar_settings","arguments":{}},"id":2}'
+    for cleanup_attempt in 1 2 3; do
+      # A lost update response does not prove that the mutation failed; fresh
+      # readback is authoritative and also makes this retry safe.
+      call_tool_fresh_session "$payload" >/dev/null 2>&1 || true
+      if wait_for_tool_field_quiet "$read_payload" \
+        ".[] | select(.calendarId == \"$CALENDAR_SETTINGS_CLEANUP_ID\") | .visibility" \
+        "$CALENDAR_SETTINGS_CLEANUP_VISIBILITY" 8 \
+        && { [ "$CALENDAR_SETTINGS_CLEANUP_KIND" != "external" ] \
+          || wait_for_tool_field_quiet "$read_payload" \
+            ".[] | select(.calendarId == \"$CALENDAR_SETTINGS_CLEANUP_ID\") | .hidden" \
+            "$expected_hidden" 8; }; then
+        settings_restored=true
+        break
+      fi
+      [ "$cleanup_attempt" -lt 3 ] && sleep 1
+    done
+    if [ "$settings_restored" = true ]; then
+      CALENDAR_SETTINGS_CLEANUP_ID=""
+      CALENDAR_SETTINGS_CLEANUP_KIND=""
+      CALENDAR_SETTINGS_CLEANUP_HIDDEN=""
+      CALENDAR_SETTINGS_CLEANUP_VISIBILITY=""
+    else
+      cleanup_failed=1
+    fi
+  fi
+
+  if [ -n "$CALENDAR_SETTINGS_PRIMARY_SNAPSHOT" ]; then
+    local primary_restore_result
+    primary_restore_result=$(timeout 120 pnpm exec tsx scripts/integration-calendar-settings.ts \
+      --mode restore --snapshot "$CALENDAR_SETTINGS_PRIMARY_SNAPSHOT" 2>/dev/null || true)
+    if printf '%s\n' "$primary_restore_result" | jq -e \
+      '.status == "restored" and .verified == true' >/dev/null 2>&1; then
+      CALENDAR_SETTINGS_PRIMARY_SNAPSHOT=""
+    else
+      cleanup_failed=1
+    fi
+  fi
+  return "$cleanup_failed"
+}
+
+cleanup_calendar_meeting_room_artifacts() {
+  if [ -z "$CALENDAR_MEETING_CLEANUP_FLOOR_NAME" ]; then
+    return 0
+  fi
+
+  local cleanup_args=(
+    --mode cleanup
+    --floorName "$CALENDAR_MEETING_CLEANUP_FLOOR_NAME"
+    --roomOneName "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_NAME"
+    --roomTwoName "$CALENDAR_MEETING_CLEANUP_ROOM_TWO_NAME"
+    --eventTitle "$CALENDAR_MEETING_CLEANUP_EVENT_TITLE"
+    --scheduleTitle "$CALENDAR_MEETING_CLEANUP_SCHEDULE_TITLE"
+  )
+  if [ -n "$CALENDAR_MEETING_CLEANUP_FLOOR_ID" ]; then
+    cleanup_args+=(--floorId "$CALENDAR_MEETING_CLEANUP_FLOOR_ID")
+  fi
+  if [ -n "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID" ]; then
+    cleanup_args+=(--roomOneId "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID")
+  fi
+  if [ -n "$CALENDAR_MEETING_CLEANUP_ROOM_TWO_ID" ]; then
+    cleanup_args+=(--roomTwoId "$CALENDAR_MEETING_CLEANUP_ROOM_TWO_ID")
+  fi
+  if [ -n "$CALENDAR_MEETING_CLEANUP_EVENT_ID" ]; then
+    cleanup_args+=(--eventId "$CALENDAR_MEETING_CLEANUP_EVENT_ID")
+  fi
+  if [ -n "$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID" ]; then
+    cleanup_args+=(--scheduleId "$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID")
+  fi
+
+  local cleanup_result
+  if cleanup_result=$(timeout 60 pnpm exec tsx scripts/integration-calendar-meeting-rooms.ts \
+    "${cleanup_args[@]}" 2>/dev/null) \
+    && printf '%s\n' "$cleanup_result" | jq -e \
+      '.eventAbsent == true and .scheduleAbsent == true and .roomsAbsent == true and .floorAbsent == true' \
+      >/dev/null 2>&1; then
+    CALENDAR_MEETING_CLEANUP_FLOOR_ID=""
+    CALENDAR_MEETING_CLEANUP_FLOOR_NAME=""
+    CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID=""
+    CALENDAR_MEETING_CLEANUP_ROOM_ONE_NAME=""
+    CALENDAR_MEETING_CLEANUP_ROOM_TWO_ID=""
+    CALENDAR_MEETING_CLEANUP_ROOM_TWO_NAME=""
+    CALENDAR_MEETING_CLEANUP_EVENT_ID=""
+    CALENDAR_MEETING_CLEANUP_EVENT_TITLE=""
+    CALENDAR_MEETING_CLEANUP_SCHEDULE_ID=""
+    CALENDAR_MEETING_CLEANUP_SCHEDULE_TITLE=""
+    return 0
+  fi
+
+  echo "WARNING: calendar meeting-room fixture cleanup was not confirmed; cleanup markers retained" >&2
+  return 1
+}
+
+cleanup_virtual_office_artifacts() {
+  if [ -z "$VIRTUAL_OFFICE_CLEANUP_FLOOR_NAME" ] || [ -z "$VIRTUAL_OFFICE_CLEANUP_ROOM_NAME" ]; then
+    return 0
+  fi
+
+  local cleanup_args=(
+    --mode cleanup
+    --floorName "$VIRTUAL_OFFICE_CLEANUP_FLOOR_NAME"
+    --roomName "$VIRTUAL_OFFICE_CLEANUP_ROOM_NAME"
+  )
+  if [ -n "$VIRTUAL_OFFICE_CLEANUP_UPDATED_ROOM_NAME" ]; then
+    cleanup_args+=(--updatedRoomName "$VIRTUAL_OFFICE_CLEANUP_UPDATED_ROOM_NAME")
+  fi
+  if [ -n "$VIRTUAL_OFFICE_CLEANUP_FLOOR_ID" ]; then
+    cleanup_args+=(--floorId "$VIRTUAL_OFFICE_CLEANUP_FLOOR_ID")
+  fi
+  if [ -n "$VIRTUAL_OFFICE_CLEANUP_ROOM_ID" ]; then
+    cleanup_args+=(--roomId "$VIRTUAL_OFFICE_CLEANUP_ROOM_ID")
+  fi
+
+  local cleanup_result
+  if cleanup_result=$(timeout 45 pnpm exec tsx scripts/integration-virtual-office-administration.ts \
+    "${cleanup_args[@]}" 2>/dev/null) \
+    && printf '%s\n' "$cleanup_result" | jq -e \
+      'type == "object" and .status == "confirmed" and (.removedRoom | type == "boolean") and (.removedFloor | type == "boolean") and .roomAbsent == true and .floorAbsent == true' \
+      >/dev/null 2>&1; then
+    VIRTUAL_OFFICE_CLEANUP_FLOOR_ID=""
+    VIRTUAL_OFFICE_CLEANUP_ROOM_ID=""
+    VIRTUAL_OFFICE_CLEANUP_FLOOR_NAME=""
+    VIRTUAL_OFFICE_CLEANUP_ROOM_NAME=""
+    VIRTUAL_OFFICE_CLEANUP_UPDATED_ROOM_NAME=""
+    return 0
+  fi
+
+  echo "WARNING: virtual-office fixture deletion was not confirmed; cleanup markers retained" >&2
+  return 1
+}
+
 cleanup_all() {
   local original_exit_status=$?
   local cleanup_failed=0
@@ -1080,12 +1485,31 @@ cleanup_all() {
     LEAD_DESTINATION_FUNNEL_CLEANUP_ID="$FUNNEL_CLEANUP_ID"
     FUNNEL_CLEANUP_ID="$saved_funnel_cleanup_id"
   fi
-  cleanup_recruiting_artifacts || true
+  if ! cleanup_recruiting_artifacts; then
+    fail_test "Recruiting fixture cleanup" "person or custom-field deletion/readback failed; cleanup markers retained"
+    cleanup_failed=1
+  fi
   if ! cleanup_employee_lifecycle_artifacts; then
     fail_test "employee lifecycle cleanup" "delete/readback was not confirmed; cleanup marker retained"
     cleanup_failed=1
   fi
   cleanup_generic_associations
+  if ! cleanup_calendar_settings_artifacts; then
+    fail_test "calendar settings fixture cleanup" "settings or primary preference restoration was not confirmed"
+    cleanup_failed=1
+  fi
+  if ! cleanup_calendar_meeting_room_artifacts; then
+    fail_test "calendar meeting-room cleanup" "Event, Schedule, Room, or Floor absence was not confirmed"
+    cleanup_failed=1
+  fi
+  if ! cleanup_virtual_office_artifacts; then
+    fail_test "virtual-office administration cleanup" "Room/Floor deletion or absence readback was not confirmed"
+    cleanup_failed=1
+  fi
+  if ! cleanup_planner_document_artifacts; then
+    fail_test "planner document fixture cleanup" "ToDo, document, or teamspace deletion was not confirmed"
+    cleanup_failed=1
+  fi
   cleanup_workflow_artifacts || true
   cleanup_inventory_artifacts || true
   cleanup_drive_artifacts || true
@@ -1791,10 +2215,10 @@ assert_json_array_contains() {
 
 wait_for_json_array_contains_to_var() {
   local output_var="$1" name="$2" payload="$3" jq_expr="$4" expected="$5"
-  local attempts="${6:-10}" delay="${7:-1}"
+  local attempts="${6:-10}" delay="${7:-1}" runner="${8:-run_capture_only}"
   local attempt=1 text=""
   while [ "$attempt" -le "$attempts" ]; do
-    text=$(run_capture_only "$payload" 2>/dev/null || true)
+    text=$("$runner" "$payload" 2>/dev/null || true)
     if [ -n "$text" ] && printf '%s\n' "$text" | jq -e --arg expected "$expected" "($jq_expr) | any(.[]?; . == \$expected)" >/dev/null 2>&1; then
       echo "PASS: $name"
       PASSED=$((PASSED + 1))
@@ -1811,6 +2235,106 @@ wait_for_json_array_contains_to_var() {
   ERRORS="${ERRORS}\n  - ${name}: array ${jq_expr} does not contain ${expected} after ${attempts} attempts"
   printf -v "$output_var" '%s' "$text"
   return 1
+}
+
+wait_for_json_array_not_contains_to_var() {
+  local output_var="$1" name="$2" payload="$3" jq_expr="$4" expected="$5"
+  local attempts="${6:-10}" delay="${7:-1}" runner="${8:-run_capture_only}"
+  local attempt=1 text=""
+  while [ "$attempt" -le "$attempts" ]; do
+    text=$("$runner" "$payload" 2>/dev/null || true)
+    if [ -n "$text" ] && printf '%s\n' "$text" | jq -e --arg expected "$expected" "($jq_expr) | all(.[]?; . != \$expected)" >/dev/null 2>&1; then
+      echo "PASS: $name"
+      PASSED=$((PASSED + 1))
+      printf -v "$output_var" '%s' "$text"
+      return 0
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      sleep "$delay"
+    fi
+    attempt=$((attempt + 1))
+  done
+  echo "FAIL: $name (array $jq_expr contains $expected after ${attempts} attempts)"
+  FAILED=$((FAILED + 1))
+  ERRORS="${ERRORS}\n  - ${name}: array ${jq_expr} contains ${expected} after ${attempts} attempts"
+  printf -v "$output_var" '%s' "$text"
+  return 1
+}
+
+work_slots_read_payload() {
+  local from="$1" to="$2"
+  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_work_slots\",\"arguments\":{\"from\":$from,\"to\":$to,\"limit\":200}},\"id\":2}"
+}
+
+wait_for_work_slot_exact() {
+  local name="$1" slot_id="$2" todo_id="$3" date="$4" due_date="$5" expected_state="$6"
+  local attempts="${7:-20}" delay="${8:-0.5}" runner="${9:-run_capture_only_fresh}"
+  local attempt=1 text="" payload
+  payload=$(work_slots_read_payload "$date" "$date")
+  while [ "$attempt" -le "$attempts" ]; do
+    text=$("$runner" "$payload" 2>/dev/null || true)
+    if [ "$expected_state" = "present" ] && [ -n "$text" ] \
+      && printf '%s\n' "$text" | jq -e \
+        --arg slot "$slot_id" --arg todo "$todo_id" --argjson date "$date" --argjson dueDate "$due_date" \
+        'any(.[]?; .id == $slot and .todoId == $todo and .date == $date and .dueDate == $dueDate)' \
+        >/dev/null 2>&1; then
+      echo "PASS: $name"
+      PASSED=$((PASSED + 1))
+      return 0
+    fi
+    if [ "$expected_state" = "absent" ] && [ -n "$text" ] \
+      && printf '%s\n' "$text" | jq -e --arg slot "$slot_id" 'all(.[]?; .id != $slot)' >/dev/null 2>&1; then
+      echo "PASS: $name"
+      PASSED=$((PASSED + 1))
+      return 0
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      sleep "$delay"
+    fi
+    attempt=$((attempt + 1))
+  done
+  echo "FAIL: $name (work slot $slot_id was not $expected_state after ${attempts} attempts)"
+  FAILED=$((FAILED + 1))
+  ERRORS="${ERRORS}\n  - ${name}: work slot ${slot_id} was not ${expected_state} after ${attempts} attempts"
+  return 1
+}
+
+find_work_slot_id_to_var() {
+  local output_var="$1" name="$2" todo_id="$3" date="$4" due_date="$5" title="$6"
+  local attempts="${7:-20}" delay="${8:-0.5}" runner="${9:-run_capture_only_fresh}"
+  local attempt=1 text="" payload slot_id
+  payload=$(work_slots_read_payload "$date" "$date")
+  while [ "$attempt" -le "$attempts" ]; do
+    text=$("$runner" "$payload" 2>/dev/null || true)
+    slot_id=$(printf '%s\n' "$text" | jq -r \
+      --arg todo "$todo_id" --argjson date "$date" --argjson dueDate "$due_date" --arg title "$title" \
+      'map(select(.todoId == $todo and .date == $date and .dueDate == $dueDate and (.title // "") == $title)) | if length == 1 then .[0].id else empty end' \
+      2>/dev/null)
+    if [ -n "$slot_id" ]; then
+      printf -v "$output_var" '%s' "$slot_id"
+      echo "  => recovered $name WorkSlot $slot_id" >&2
+      return 0
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      sleep "$delay"
+    fi
+    attempt=$((attempt + 1))
+  done
+  printf -v "$output_var" '%s' ""
+  return 1
+}
+
+unschedule_work_slot_and_confirm() {
+  local output_var="$1" name="$2" slot_id="$3" todo_id="$4" date="$5" due_date="$6"
+  local slot_json mutation_status=0
+  slot_json=$(json_string "$slot_id")
+  run_capture_to_var "$output_var" "$name" \
+    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unschedule_todo\",\"arguments\":{\"workSlotId\":$slot_json}},\"id\":2}" \
+    || mutation_status=$?
+  if [ "$mutation_status" -eq 0 ]; then
+    assert_json_field_equals "$name removed one" "${!output_var}" ".removed" "1"
+  fi
+  wait_for_work_slot_exact "$name fresh absence" "$slot_id" "$todo_id" "$date" "$due_date" absent 20 0.5 run_capture_only_fresh
 }
 
 assert_json_array_not_contains() {
@@ -3350,6 +3874,60 @@ else
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_recruiting_candidate_profile\",\"arguments\":{\"candidate\":$RECRUITING_PERSON_EMAIL_JSON,\"title\":\"Integration Candidate\",\"remote\":true}},\"id\":2}"
           assert_json_field_equals "set_recruiting_candidate_profile created" "$RECRUITING_PROFILE_TEXT" ".created" "true"
 
+          # Candidate custom fields are native Huly attributes. Keep the
+          # creation sequence explicit: create_person, then enable Candidate
+          # with set_recruiting_candidate_profile before reading or writing
+          # Candidate/Person-owned custom fields.
+          RECRUITING_CANDIDATE_FIELD_NAME="mcpCandidateYears${RUN_ID//[^a-zA-Z0-9]/}"
+          RECRUITING_PERSON_FIELD_NAME="mcpPersonNickname${RUN_ID//[^a-zA-Z0-9]/}"
+          RECRUITING_UNRELATED_FIELD_NAME="mcpUnrelatedCandidateField${RUN_ID//[^a-zA-Z0-9]/}"
+          RECRUITING_CANDIDATE_FIELD_NAME_JSON=$(json_string "$RECRUITING_CANDIDATE_FIELD_NAME")
+          RECRUITING_PERSON_FIELD_NAME_JSON=$(json_string "$RECRUITING_PERSON_FIELD_NAME")
+          RECRUITING_UNRELATED_FIELD_NAME_JSON=$(json_string "$RECRUITING_UNRELATED_FIELD_NAME")
+          run_capture_to_var RECRUITING_CANDIDATE_FIELD_TEXT "create_huly_attribute(Candidate custom field)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_huly_attribute\",\"arguments\":{\"class\":\"recruit:mixin:Candidate\",\"name\":$RECRUITING_CANDIDATE_FIELD_NAME_JSON,\"label\":\"Integration Candidate Years\",\"type\":{\"kind\":\"number\"},\"confirm\":true}},\"id\":2}"
+          RECRUITING_CLEANUP_CANDIDATE_FIELD_ID=$(echo "$RECRUITING_CANDIDATE_FIELD_TEXT" | jq -r '.attribute.attributeId // empty' 2>/dev/null)
+          run_capture_to_var RECRUITING_PERSON_FIELD_TEXT "create_huly_attribute(Person custom field)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_huly_attribute\",\"arguments\":{\"class\":\"contact:class:Person\",\"name\":$RECRUITING_PERSON_FIELD_NAME_JSON,\"label\":\"Integration Person Nickname\",\"type\":{\"kind\":\"string\"},\"confirm\":true}},\"id\":2}"
+          RECRUITING_CLEANUP_PERSON_FIELD_ID=$(echo "$RECRUITING_PERSON_FIELD_TEXT" | jq -r '.attribute.attributeId // empty' 2>/dev/null)
+          run_capture_to_var RECRUITING_UNRELATED_FIELD_TEXT "create_huly_attribute(unrelated custom field)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_huly_attribute\",\"arguments\":{\"class\":\"tracker:class:Issue\",\"name\":$RECRUITING_UNRELATED_FIELD_NAME_JSON,\"label\":\"Integration Unrelated Field\",\"type\":{\"kind\":\"string\"},\"confirm\":true}},\"id\":2}"
+          RECRUITING_CLEANUP_UNRELATED_FIELD_ID=$(echo "$RECRUITING_UNRELATED_FIELD_TEXT" | jq -r '.attribute.attributeId // empty' 2>/dev/null)
+          if [ -n "$RECRUITING_CLEANUP_CANDIDATE_FIELD_ID" ] && [ -n "$RECRUITING_CLEANUP_PERSON_FIELD_ID" ]; then
+            sleep 1
+            RECRUITING_CANDIDATE_FIELD_ID_JSON=$(json_string "$RECRUITING_CLEANUP_CANDIDATE_FIELD_ID")
+            RECRUITING_PERSON_FIELD_ID_JSON=$(json_string "$RECRUITING_CLEANUP_PERSON_FIELD_ID")
+            run_capture_to_var_fresh RECRUITING_CANDIDATE_FIELDS_TEXT "list_recruiting_candidate_custom_fields" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_recruiting_candidate_custom_fields\",\"arguments\":{\"candidate\":$RECRUITING_PERSON_EMAIL_JSON,\"limit\":20}},\"id\":2}"
+            assert_json_field_equals "list_recruiting_candidate_custom_fields includes Candidate field" "$RECRUITING_CANDIDATE_FIELDS_TEXT" \
+              "any(.[]?; .id == \"$RECRUITING_CLEANUP_CANDIDATE_FIELD_ID\")" "true"
+            assert_json_field_equals "list_recruiting_candidate_custom_fields includes Person field" "$RECRUITING_CANDIDATE_FIELDS_TEXT" \
+              "any(.[]?; .id == \"$RECRUITING_CLEANUP_PERSON_FIELD_ID\")" "true"
+            run_capture_to_var_fresh RECRUITING_SET_CANDIDATE_FIELD_TEXT "set_recruiting_candidate_custom_field(Candidate)" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_recruiting_candidate_custom_field\",\"arguments\":{\"candidate\":$RECRUITING_PERSON_EMAIL_JSON,\"fieldId\":$RECRUITING_CANDIDATE_FIELD_ID_JSON,\"value\":\"8\"}},\"id\":2}"
+            assert_json_field_equals "set_recruiting_candidate_custom_field writes Candidate value" "$RECRUITING_SET_CANDIDATE_FIELD_TEXT" ".value" "8"
+            run_capture_to_var_fresh RECRUITING_SET_PERSON_FIELD_TEXT "set_recruiting_candidate_custom_field(Person)" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_recruiting_candidate_custom_field\",\"arguments\":{\"candidate\":$RECRUITING_PERSON_EMAIL_JSON,\"fieldId\":$RECRUITING_PERSON_FIELD_ID_JSON,\"value\":\"Ada\"}},\"id\":2}"
+            assert_json_field_equals "set_recruiting_candidate_custom_field writes Person value" "$RECRUITING_SET_PERSON_FIELD_TEXT" ".value" "Ada"
+            sleep 2
+            run_capture_to_var_fresh RECRUITING_CANDIDATE_FIELD_VALUES_TEXT "get_recruiting_candidate_custom_field_values" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_recruiting_candidate_custom_field_values\",\"arguments\":{\"candidate\":$RECRUITING_PERSON_EMAIL_JSON}},\"id\":2}"
+            assert_json_field_equals "get_recruiting_candidate_custom_field_values reads Candidate value" "$RECRUITING_CANDIDATE_FIELD_VALUES_TEXT" \
+              ".[] | select(.fieldId == \"$RECRUITING_CLEANUP_CANDIDATE_FIELD_ID\") | .value" "8"
+            assert_json_field_equals "get_recruiting_candidate_custom_field_values reads Person value" "$RECRUITING_CANDIDATE_FIELD_VALUES_TEXT" \
+              ".[] | select(.fieldId == \"$RECRUITING_CLEANUP_PERSON_FIELD_ID\") | .value" "Ada"
+          else
+            skip_test "Recruiting Candidate custom-field definitions and values" "create_huly_attribute did not return both fixture IDs"
+          fi
+          if [ -n "$RECRUITING_CLEANUP_UNRELATED_FIELD_ID" ]; then
+            RECRUITING_UNRELATED_FIELD_ID_JSON=$(json_string "$RECRUITING_CLEANUP_UNRELATED_FIELD_ID")
+            run_expect_error_contains_fresh "set_recruiting_candidate_custom_field rejects unrelated owner" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_recruiting_candidate_custom_field\",\"arguments\":{\"candidate\":$RECRUITING_PERSON_EMAIL_JSON,\"fieldId\":$RECRUITING_UNRELATED_FIELD_ID_JSON,\"value\":\"x\"}},\"id\":2}" \
+              "must be owned by"
+          else
+            skip_test "set_recruiting_candidate_custom_field rejects unrelated owner" "create_huly_attribute did not return unrelated fixture ID"
+          fi
+
           sleep 1
           run_capture_to_var RECRUITING_CANDIDATE_TEXT "get_recruiting_candidate($RECRUITING_PERSON_EMAIL)" \
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_recruiting_candidate\",\"arguments\":{\"candidate\":$RECRUITING_PERSON_EMAIL_JSON}},\"id\":2}"
@@ -3474,7 +4052,10 @@ else
       RECRUITING_PERSON_ID_JSON=$(json_string "$RECRUITING_CLEANUP_PERSON_ID")
       run_test "delete_person(recruiting:$RECRUITING_CLEANUP_PERSON_ID)" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_person\",\"arguments\":{\"personId\":$RECRUITING_PERSON_ID_JSON}},\"id\":2}"
-      RECRUITING_CLEANUP_PERSON_ID=""
+      if ! cleanup_recruiting_person; then
+        fail_test "delete_person(recruiting:$RECRUITING_CLEANUP_PERSON_ID)" \
+          "fresh absence was not confirmed; cleanup marker retained"
+      fi
     fi
   fi
 fi
@@ -5828,6 +6409,197 @@ if [ $? -eq 0 ]; then
   fi
 fi
 
+# Caller-scoped Calendar settings. Arm the exact native preference snapshot
+# before any mutation; cleanup restores it with fresh SDK clients.
+CALENDAR_SETTINGS_PRIMARY_SNAPSHOT=$(timeout 60 pnpm exec tsx scripts/integration-calendar-settings.ts \
+  --mode snapshot 2>/dev/null || true)
+if [ -z "$CALENDAR_SETTINGS_PRIMARY_SNAPSHOT" ]; then
+  fail_test "calendar settings PrimaryCalendar snapshot" "typed SDK snapshot could not be armed before mutation"
+else
+  run_capture_to_var CALENDAR_SETTINGS_TEXT "list_calendar_settings" \
+    '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_calendar_settings","arguments":{}},"id":2}'
+  if [ $? -eq 0 ]; then
+    # Keep every calendar mutation on one snapshotted row. Prefer a visible
+    # ExternalCalendar, then any writable ExternalCalendar (including hidden
+    # rows), then a visible writable calendar, and finally any writable
+    # calendar. The visible-target marker is claimed only after a fresh
+    # readback confirms that the selected row is visible.
+    CALENDAR_SETTINGS_TARGET_ID=$(printf '%s\n' "$CALENDAR_SETTINGS_TEXT" | jq -r \
+      '([.[] | select(.hidden == false and (.access == "owner" or .access == "writer") and .kind == "external")] +
+        [.[] | select((.access == "owner" or .access == "writer") and .kind == "external")] +
+        [.[] | select(.hidden == false and (.access == "owner" or .access == "writer"))] +
+        [.[] | select((.access == "owner" or .access == "writer"))]) |
+        .[0].calendarId // empty' 2>/dev/null)
+    CALENDAR_SETTINGS_VISIBLE_TARGET_ID=""
+    CALENDAR_SETTINGS_INTERNAL_ID=$(printf '%s\n' "$CALENDAR_SETTINGS_TEXT" | jq -r \
+      '[.[] | select(.kind == "internal" and (.access == "owner" or .access == "writer"))][0].calendarId // empty' 2>/dev/null)
+    if [ -n "$CALENDAR_SETTINGS_TARGET_ID" ]; then
+      CALENDAR_SETTINGS_CLEANUP_ID="$CALENDAR_SETTINGS_TARGET_ID"
+      CALENDAR_SETTINGS_CLEANUP_KIND=$(printf '%s\n' "$CALENDAR_SETTINGS_TEXT" | jq -r --arg id "$CALENDAR_SETTINGS_TARGET_ID" \
+        '.[] | select(.calendarId == $id) | .kind' 2>/dev/null)
+      CALENDAR_SETTINGS_CLEANUP_HIDDEN=$(printf '%s\n' "$CALENDAR_SETTINGS_TEXT" | jq -r --arg id "$CALENDAR_SETTINGS_TARGET_ID" \
+        '.[] | select(.calendarId == $id) | .hidden' 2>/dev/null)
+      CALENDAR_SETTINGS_CLEANUP_VISIBILITY=$(printf '%s\n' "$CALENDAR_SETTINGS_TEXT" | jq -r --arg id "$CALENDAR_SETTINGS_TARGET_ID" \
+        '.[] | select(.calendarId == $id) | .visibility' 2>/dev/null)
+      CALENDAR_SETTINGS_TARGET_JSON=$(json_string "$CALENDAR_SETTINGS_TARGET_ID")
+      CALENDAR_SETTINGS_NEW_VISIBILITY="public"
+      if [ "$CALENDAR_SETTINGS_CLEANUP_VISIBILITY" = "public" ]; then
+        CALENDAR_SETTINGS_NEW_VISIBILITY="freeBusy"
+      fi
+      CALENDAR_SETTINGS_NEW_VISIBILITY_JSON=$(json_string "$CALENDAR_SETTINGS_NEW_VISIBILITY")
+      run_capture_to_var_fresh CALENDAR_SETTINGS_UPDATE_TEXT "update_calendar_settings(visibility:$CALENDAR_SETTINGS_TARGET_ID)" \
+        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_calendar_settings\",\"arguments\":{\"calendarId\":$CALENDAR_SETTINGS_TARGET_JSON,\"visibility\":$CALENDAR_SETTINGS_NEW_VISIBILITY_JSON}},\"id\":2}"
+      if [ $? -eq 0 ]; then
+        assert_json_field_equals "update_calendar_settings changes visibility" "$CALENDAR_SETTINGS_UPDATE_TEXT" ".updated" "true"
+        run_capture_to_var_fresh CALENDAR_SETTINGS_AFTER_VISIBILITY_TEXT "list_calendar_settings(after visibility)" \
+          '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_calendar_settings","arguments":{}},"id":2}'
+        if [ $? -eq 0 ]; then
+          assert_json_field_equals "list_calendar_settings sees changed visibility" "$CALENDAR_SETTINGS_AFTER_VISIBILITY_TEXT" \
+            ".[] | select(.calendarId == \"$CALENDAR_SETTINGS_TARGET_ID\") | .visibility" "$CALENDAR_SETTINGS_NEW_VISIBILITY"
+        fi
+      fi
+
+      if [ "$CALENDAR_SETTINGS_CLEANUP_KIND" = "external" ]; then
+        CALENDAR_SETTINGS_NEW_HIDDEN=true
+        if [ "$CALENDAR_SETTINGS_CLEANUP_HIDDEN" = "true" ]; then
+          CALENDAR_SETTINGS_NEW_HIDDEN=false
+        fi
+        CALENDAR_SETTINGS_NEW_HIDDEN_JSON=$(printf '%s' "$CALENDAR_SETTINGS_NEW_HIDDEN" | tr '[:upper:]' '[:lower:]')
+        run_capture_to_var_fresh CALENDAR_SETTINGS_HIDE_TEXT "update_calendar_settings(hidden:$CALENDAR_SETTINGS_TARGET_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_calendar_settings\",\"arguments\":{\"calendarId\":$CALENDAR_SETTINGS_TARGET_JSON,\"hidden\":$CALENDAR_SETTINGS_NEW_HIDDEN_JSON}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          assert_json_field_equals "update_calendar_settings toggles writable external" "$CALENDAR_SETTINGS_HIDE_TEXT" ".updated" "true"
+          run_capture_to_var_fresh CALENDAR_SETTINGS_AFTER_HIDDEN_TEXT "list_calendar_settings(after hidden toggle)" \
+            '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_calendar_settings","arguments":{}},"id":2}'
+          if [ $? -eq 0 ]; then
+            assert_json_field_equals "list_calendar_settings sees hidden toggle" "$CALENDAR_SETTINGS_AFTER_HIDDEN_TEXT" \
+              ".[] | select(.calendarId == \"$CALENDAR_SETTINGS_TARGET_ID\") | .hidden" "$CALENDAR_SETTINGS_NEW_HIDDEN"
+          fi
+          # A hidden calendar cannot be selected as primary. Make the same
+          # caller-owned row visible before primary tests; cleanup restores the
+          # originally captured hidden value. Claim the visible target only
+          # after a fresh readback confirms the resulting visibility.
+          if [ "$CALENDAR_SETTINGS_NEW_HIDDEN" = "true" ]; then
+            run_capture_to_var_fresh CALENDAR_SETTINGS_UNHIDE_TEXT "update_calendar_settings(unhide:$CALENDAR_SETTINGS_TARGET_ID)" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_calendar_settings\",\"arguments\":{\"calendarId\":$CALENDAR_SETTINGS_TARGET_JSON,\"hidden\":false}},\"id\":2}"
+            if [ $? -eq 0 ]; then
+              run_capture_to_var_fresh CALENDAR_SETTINGS_AFTER_UNHIDE_TEXT "list_calendar_settings(after unhide)" \
+                '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_calendar_settings","arguments":{}},"id":2}'
+              if [ $? -eq 0 ] && printf '%s\n' "$CALENDAR_SETTINGS_AFTER_UNHIDE_TEXT" | jq -e \
+                --arg id "$CALENDAR_SETTINGS_TARGET_ID" \
+                '[.[] | select(.calendarId == $id and .hidden == false and (.access == "owner" or .access == "writer") and .kind == "external")] | length == 1' \
+                >/dev/null 2>&1; then
+                CALENDAR_SETTINGS_VISIBLE_TARGET_ID="$CALENDAR_SETTINGS_TARGET_ID"
+              fi
+            fi
+          elif printf '%s\n' "$CALENDAR_SETTINGS_AFTER_HIDDEN_TEXT" | jq -e \
+            --arg id "$CALENDAR_SETTINGS_TARGET_ID" \
+            '[.[] | select(.calendarId == $id and .hidden == false and (.access == "owner" or .access == "writer") and .kind == "external")] | length == 1' \
+            >/dev/null 2>&1; then
+            CALENDAR_SETTINGS_VISIBLE_TARGET_ID="$CALENDAR_SETTINGS_TARGET_ID"
+          fi
+        fi
+      else
+        skip_test "update_calendar_settings(hidden)" "no caller-owned ExternalCalendar row exists"
+      fi
+
+      if [ "$CALENDAR_SETTINGS_CLEANUP_KIND" != "external" ]; then
+        run_capture_to_var_fresh CALENDAR_SETTINGS_AFTER_TARGET_VISIBILITY_TEXT "list_calendar_settings(target visibility)" \
+          '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_calendar_settings","arguments":{}},"id":2}'
+        if [ $? -eq 0 ] && printf '%s\n' "$CALENDAR_SETTINGS_AFTER_TARGET_VISIBILITY_TEXT" | jq -e \
+          --arg id "$CALENDAR_SETTINGS_TARGET_ID" \
+          '[.[] | select(.calendarId == $id and .hidden == false and (.access == "owner" or .access == "writer"))] | length == 1' \
+          >/dev/null 2>&1; then
+          CALENDAR_SETTINGS_VISIBLE_TARGET_ID="$CALENDAR_SETTINGS_TARGET_ID"
+        fi
+      fi
+
+      if [ -n "$CALENDAR_SETTINGS_VISIBLE_TARGET_ID" ]; then
+        CALENDAR_SETTINGS_VISIBLE_TARGET_JSON=$(json_string "$CALENDAR_SETTINGS_VISIBLE_TARGET_ID")
+        # Clear only the preference, if one existed, so the public tool must
+        # deliberately create it. The original exact row remains the cleanup marker.
+        if printf '%s\n' "$CALENDAR_SETTINGS_PRIMARY_SNAPSHOT" | jq -e '.status == "present"' >/dev/null 2>&1; then
+          CALENDAR_SETTINGS_CLEAR_RESULT=$(timeout 120 pnpm exec tsx scripts/integration-calendar-settings.ts \
+            --mode restore --snapshot '{"status":"absent"}' 2>/dev/null || true)
+          if ! printf '%s\n' "$CALENDAR_SETTINGS_CLEAR_RESULT" | jq -e '.status == "restored" and .verified == true' >/dev/null 2>&1; then
+            fail_test "set_primary_calendar deliberate creation setup" "existing preference could not be cleared and verified"
+          fi
+        fi
+        run_capture_to_var_fresh CALENDAR_SETTINGS_PRIMARY_TEXT "set_primary_calendar(deliberate creation)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_primary_calendar\",\"arguments\":{\"calendarId\":$CALENDAR_SETTINGS_VISIBLE_TARGET_JSON}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          assert_json_field_equals "set_primary_calendar reports creation" "$CALENDAR_SETTINGS_PRIMARY_TEXT" ".action" "created"
+          run_capture_to_var_fresh CALENDAR_SETTINGS_PRIMARY_READ_TEXT "list_calendar_settings(after preference creation)" \
+            '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_calendar_settings","arguments":{}},"id":2}'
+          if [ $? -eq 0 ]; then
+            assert_json_field_equals "created preference selects requested calendar" "$CALENDAR_SETTINGS_PRIMARY_READ_TEXT" \
+              ".[] | select(.calendarId == \"$CALENDAR_SETTINGS_VISIBLE_TARGET_ID\") | .isPrimary" true
+          fi
+
+          CALENDAR_SETTINGS_PROVIDER_DEFAULT_RESULT=$(timeout 60 pnpm exec tsx scripts/integration-calendar-settings.ts \
+            --mode provider-default 2>/dev/null || true)
+          CALENDAR_SETTINGS_PROVIDER_DEFAULT_ID=$(printf '%s\n' "$CALENDAR_SETTINGS_PROVIDER_DEFAULT_RESULT" | jq -r \
+            'select(.status == "found") | .calendarId // empty' 2>/dev/null)
+          CALENDAR_SETTINGS_STALE_ID="calendar-settings-stale-$RUN_ID"
+          CALENDAR_SETTINGS_STALE_RESULT=$(timeout 120 pnpm exec tsx scripts/integration-calendar-settings.ts \
+            --mode set-attached --attachedTo "$CALENDAR_SETTINGS_STALE_ID" 2>/dev/null || true)
+          if printf '%s\n' "$CALENDAR_SETTINGS_STALE_RESULT" | jq -e '.status == "updated" and .verified == true' >/dev/null 2>&1; then
+            run_capture_to_var_fresh CALENDAR_SETTINGS_STALE_READ_TEXT "list_calendar_settings(stale preference fallback)" \
+              '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_calendar_settings","arguments":{}},"id":2}'
+            if [ $? -eq 0 ]; then
+              assert_json_field_equals "stale preference falls back to one caller calendar" "$CALENDAR_SETTINGS_STALE_READ_TEXT" \
+                '[.[] | select(.isPrimary == true)] | length' 1
+              if [ -n "$CALENDAR_SETTINGS_PROVIDER_DEFAULT_ID" ]; then
+                assert_json_field_equals "stale preference uses writable provider default" "$CALENDAR_SETTINGS_STALE_READ_TEXT" \
+                  ".[] | select(.isPrimary == true) | .calendarId" "$CALENDAR_SETTINGS_PROVIDER_DEFAULT_ID"
+              else
+                skip_test "stale preference provider-default fallback" "no writable visible provider default exists"
+              fi
+            fi
+          else
+            fail_test "stale preference fallback" "typed SDK stale-target mutation was not verified"
+          fi
+
+          run_capture_to_var_fresh CALENDAR_SETTINGS_PRIMARY_RESET_TEXT "set_primary_calendar(reset before hide fallback)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_primary_calendar\",\"arguments\":{\"calendarId\":$CALENDAR_SETTINGS_VISIBLE_TARGET_JSON}},\"id\":2}"
+          CALENDAR_SETTINGS_VISIBLE_TARGET_KIND=$(printf '%s\n' "$CALENDAR_SETTINGS_TEXT" | jq -r --arg id "$CALENDAR_SETTINGS_VISIBLE_TARGET_ID" \
+            '.[] | select(.calendarId == $id) | .kind' 2>/dev/null)
+          if [ "$CALENDAR_SETTINGS_VISIBLE_TARGET_KIND" = "external" ]; then
+            run_capture_to_var_fresh CALENDAR_SETTINGS_HIDE_PRIMARY_TEXT "update_calendar_settings(hide primary)" \
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_calendar_settings\",\"arguments\":{\"calendarId\":$CALENDAR_SETTINGS_VISIBLE_TARGET_JSON,\"hidden\":true}},\"id\":2}"
+            if [ $? -eq 0 ]; then
+              run_capture_to_var_fresh CALENDAR_SETTINGS_AFTER_HIDE_PRIMARY_TEXT "list_calendar_settings(after hiding primary)" \
+                '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_calendar_settings","arguments":{}},"id":2}'
+              if [ $? -eq 0 ]; then
+                assert_json_field_equals "hiding primary selects fallback" "$CALENDAR_SETTINGS_AFTER_HIDE_PRIMARY_TEXT" \
+                  ".[] | select(.calendarId == \"$CALENDAR_SETTINGS_VISIBLE_TARGET_ID\") | .isPrimary" false
+                assert_json_field_equals "hiding primary leaves one fallback" "$CALENDAR_SETTINGS_AFTER_HIDE_PRIMARY_TEXT" \
+                  '[.[] | select(.isPrimary == true)] | length' 1
+              fi
+            fi
+          else
+            skip_test "fallback after hiding primary" "no visible writable ExternalCalendar row exists"
+          fi
+        fi
+      else
+        skip_test "set_primary_calendar" "no visible writable caller-owned calendar exists"
+      fi
+
+      if [ -n "$CALENDAR_SETTINGS_INTERNAL_ID" ]; then
+        CALENDAR_SETTINGS_INTERNAL_JSON=$(json_string "$CALENDAR_SETTINGS_INTERNAL_ID")
+        run_expect_error_contains "update_calendar_settings rejects internal hide" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_calendar_settings\",\"arguments\":{\"calendarId\":$CALENDAR_SETTINGS_INTERNAL_JSON,\"hidden\":true}},\"id\":2}" \
+          "cannot be hidden"
+      else
+        skip_test "update_calendar_settings rejects internal hide" "no caller-owned internal calendar exists"
+      fi
+    else
+      skip_test "update_calendar_settings" "no caller-owned calendar exists"
+      skip_test "set_primary_calendar" "no caller-owned calendar exists"
+    fi
+  fi
+fi
+
 # Event CRUD
 run_capture_to_var EVT_TEXT "create_event" \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_event","arguments":{"title":"IntTest Event","date":1777000000000,"dueDate":1777003600000}},"id":2}'
@@ -5869,6 +6641,201 @@ if [ -n "$CALENDAR_ID" ]; then
       skip_test "delete_event(explicit_calendar)" "no eventId in response"
     fi
   fi
+fi
+
+# Native meeting-room composition lifecycle. Fixture setup and readback use a
+# separate SDK helper so Event sibling mixins and Schedule composition are
+# verified independently from the MCP result projection.
+CALENDAR_MEETING_CLEANUP_FLOOR_NAME="MCP Meeting Floor $RUN_ID"
+CALENDAR_MEETING_CLEANUP_ROOM_ONE_NAME="MCP Meeting Room A $RUN_ID"
+CALENDAR_MEETING_CLEANUP_ROOM_TWO_NAME="MCP Meeting Room B $RUN_ID"
+CALENDAR_MEETING_CLEANUP_EVENT_TITLE="MCP Meeting Event $RUN_ID"
+CALENDAR_MEETING_CLEANUP_SCHEDULE_TITLE="MCP Meeting Schedule $RUN_ID"
+CALENDAR_MEETING_LOCATION="Physical location $RUN_ID"
+
+if CALENDAR_MEETING_FIXTURE=$(timeout 45 pnpm exec tsx scripts/integration-calendar-meeting-rooms.ts \
+  --mode setup --fixture "$RUN_ID" 2>/dev/null); then
+  CALENDAR_MEETING_CLEANUP_FLOOR_ID=$(printf '%s\n' "$CALENDAR_MEETING_FIXTURE" | jq -r '.floorId // empty')
+  CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID=$(printf '%s\n' "$CALENDAR_MEETING_FIXTURE" | jq -r '.roomOneId // empty')
+  CALENDAR_MEETING_CLEANUP_ROOM_TWO_ID=$(printf '%s\n' "$CALENDAR_MEETING_FIXTURE" | jq -r '.roomTwoId // empty')
+  echo "PASS: calendar meeting-room fixture setup and fresh readback"
+  PASSED=$((PASSED + 1))
+else
+  fail_test "calendar meeting-room fixture setup" "SDK fixture setup/readback failed"
+fi
+
+if [ -n "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID" ] && [ -n "$CALENDAR_MEETING_CLEANUP_ROOM_TWO_ID" ]; then
+  CALENDAR_MEETING_EVENT_PARTICIPANT="${CHANNEL_MEMBER_CANDIDATE:-}"
+  CALENDAR_MEETING_EXPECT_SIBLING=false
+  if [ -n "$CALENDAR_MEETING_EVENT_PARTICIPANT" ]; then
+    CALENDAR_MEETING_EXPECT_SIBLING=true
+  else
+    fail_test "create_event native Meeting sibling propagation" "no safe linked non-self workspace member was available"
+  fi
+
+  CALENDAR_MEETING_EVENT_PAYLOAD=$(jq -cn \
+    --arg title "$CALENDAR_MEETING_CLEANUP_EVENT_TITLE" \
+    --arg location "$CALENDAR_MEETING_LOCATION" \
+    --arg room "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_NAME" \
+    --arg floor "$CALENDAR_MEETING_CLEANUP_FLOOR_NAME" \
+    --arg participant "$CALENDAR_MEETING_EVENT_PARTICIPANT" \
+    '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_event","arguments":({
+      title:$title,
+      date:1777070000000,
+      dueDate:1777073600000,
+      location:$location,
+      meetingRoom:{room:$room,floor:$floor}
+    } + (if $participant == "" then {} else {participants:[$participant]} end))},"id":2}')
+  run_capture_to_var_fresh CALENDAR_MEETING_EVENT_CREATE_TEXT \
+    "create_event(native Meeting by exact room/floor name)" "$CALENDAR_MEETING_EVENT_PAYLOAD"
+  if [ $? -eq 0 ]; then
+    CALENDAR_MEETING_CLEANUP_EVENT_ID=$(printf '%s\n' "$CALENDAR_MEETING_EVENT_CREATE_TEXT" | jq -r '.eventId // empty')
+  fi
+
+  if [ -n "$CALENDAR_MEETING_CLEANUP_EVENT_ID" ]; then
+    CALENDAR_MEETING_EVENT_INSPECT_ARGS=(
+      --mode inspect-event
+      --eventId "$CALENDAR_MEETING_CLEANUP_EVENT_ID"
+      --eventTitle "$CALENDAR_MEETING_CLEANUP_EVENT_TITLE"
+      --roomId "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID"
+      --location "$CALENDAR_MEETING_LOCATION"
+    )
+    if [ "$CALENDAR_MEETING_EXPECT_SIBLING" = true ]; then
+      CALENDAR_MEETING_EVENT_INSPECT_ARGS+=(--expectSibling)
+    fi
+    if CALENDAR_MEETING_EVENT_STATE=$(timeout 45 pnpm exec tsx \
+      scripts/integration-calendar-meeting-rooms.ts "${CALENDAR_MEETING_EVENT_INSPECT_ARGS[@]}" 2>/dev/null); then
+      echo "PASS: create_event creates native Meeting on every eventId sibling and preserves location"
+      PASSED=$((PASSED + 1))
+      assert_json_field_equals "native Event Meetings cover every sibling" "$CALENDAR_MEETING_EVENT_STATE" \
+        '.meetingCount == .siblingCount' "true"
+      assert_json_field_equals "native Event Meeting preserves physical location" "$CALENDAR_MEETING_EVENT_STATE" \
+        '.locationPreserved' "true"
+      if [ "$CALENDAR_MEETING_EXPECT_SIBLING" = true ]; then
+        assert_json_field_equals "native Event Meeting propagated to a participant sibling" \
+          "$CALENDAR_MEETING_EVENT_STATE" '.siblingCount >= 2' "true"
+      fi
+    else
+      fail_test "create_event native Meeting composition" "sibling mixin readback did not converge"
+    fi
+
+    run_capture_to_var_fresh CALENDAR_MEETING_EVENT_READ_TEXT \
+      "get_event(native Meeting:$CALENDAR_MEETING_CLEANUP_EVENT_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_event\",\"arguments\":{\"eventId\":\"$CALENDAR_MEETING_CLEANUP_EVENT_ID\"}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "get_event returns native meeting room identity" "$CALENDAR_MEETING_EVENT_READ_TEXT" \
+        '.meetingRoom.roomId' "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID"
+      assert_json_field_equals "get_event keeps location separate from meeting room" "$CALENDAR_MEETING_EVENT_READ_TEXT" \
+        '.location' "$CALENDAR_MEETING_LOCATION"
+    fi
+
+    run_capture_to_var_fresh CALENDAR_MEETING_EVENT_UPDATE_TEXT \
+      "update_event(all sibling Meetings:$CALENDAR_MEETING_CLEANUP_EVENT_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_event\",\"arguments\":{\"eventId\":\"$CALENDAR_MEETING_CLEANUP_EVENT_ID\",\"meetingRoom\":{\"room\":\"$CALENDAR_MEETING_CLEANUP_ROOM_TWO_ID\"}}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      CALENDAR_MEETING_EVENT_UPDATED_INSPECT_ARGS=(
+        --mode inspect-event
+        --eventId "$CALENDAR_MEETING_CLEANUP_EVENT_ID"
+        --eventTitle "$CALENDAR_MEETING_CLEANUP_EVENT_TITLE"
+        --roomId "$CALENDAR_MEETING_CLEANUP_ROOM_TWO_ID"
+        --location "$CALENDAR_MEETING_LOCATION"
+      )
+      if [ "$CALENDAR_MEETING_EXPECT_SIBLING" = true ]; then
+        CALENDAR_MEETING_EVENT_UPDATED_INSPECT_ARGS+=(--expectSibling)
+      fi
+      if CALENDAR_MEETING_EVENT_UPDATED_STATE=$(timeout 45 pnpm exec tsx \
+        scripts/integration-calendar-meeting-rooms.ts \
+        "${CALENDAR_MEETING_EVENT_UPDATED_INSPECT_ARGS[@]}" 2>/dev/null); then
+        echo "PASS: update_event changes every sibling Meeting and preserves location"
+        PASSED=$((PASSED + 1))
+        assert_json_field_equals "updated native Event Meetings cover every sibling" \
+          "$CALENDAR_MEETING_EVENT_UPDATED_STATE" '.meetingCount == .siblingCount' "true"
+      else
+        fail_test "update_event native Meeting composition" "all-sibling room update readback did not converge"
+      fi
+    fi
+  else
+    fail_test "create_event native Meeting cleanup identity" "create_event returned no eventId"
+  fi
+
+  CALENDAR_MEETING_SCHEDULE_PAYLOAD=$(jq -cn \
+    --arg title "$CALENDAR_MEETING_CLEANUP_SCHEDULE_TITLE" \
+    --arg room "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_NAME" \
+    --arg floor "$CALENDAR_MEETING_CLEANUP_FLOOR_NAME" \
+    '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"create_schedule","arguments":{
+      title:$title,
+      meetingDuration:30,
+      meetingInterval:0,
+      availability:{monday:[{start:540,end:600}]},
+      timeZone:"UTC",
+      meetingRoom:{room:$room,floor:$floor}
+    }},"id":2}')
+  run_capture_to_var_fresh CALENDAR_MEETING_SCHEDULE_CREATE_TEXT \
+    "create_schedule(native MeetingSchedule by exact room/floor name)" "$CALENDAR_MEETING_SCHEDULE_PAYLOAD"
+  if [ $? -eq 0 ]; then
+    CALENDAR_MEETING_CLEANUP_SCHEDULE_ID=$(printf '%s\n' "$CALENDAR_MEETING_SCHEDULE_CREATE_TEXT" | jq -r \
+      '.scheduleId // empty')
+  fi
+
+  if [ -n "$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID" ]; then
+    if CALENDAR_MEETING_SCHEDULE_STATE=$(timeout 45 pnpm exec tsx \
+      scripts/integration-calendar-meeting-rooms.ts \
+      --mode inspect-schedule \
+      --scheduleId "$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID" \
+      --scheduleTitle "$CALENDAR_MEETING_CLEANUP_SCHEDULE_TITLE" \
+      --roomId "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID" 2>/dev/null); then
+      echo "PASS: create_schedule creates native MeetingSchedule composition"
+      PASSED=$((PASSED + 1))
+    else
+      fail_test "create_schedule native MeetingSchedule composition" "native mixin readback did not converge"
+    fi
+    run_capture_to_var_fresh CALENDAR_MEETING_SCHEDULE_READ_TEXT \
+      "get_schedule(native MeetingSchedule:$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_schedule\",\"arguments\":{\"scheduleId\":\"$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID\"}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "get_schedule returns native meeting room identity" \
+        "$CALENDAR_MEETING_SCHEDULE_READ_TEXT" '.meetingRoom.roomId' "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID"
+    fi
+
+    run_capture_to_var_fresh CALENDAR_MEETING_SCHEDULE_UPDATE_TEXT \
+      "update_schedule(native MeetingSchedule:$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_schedule\",\"arguments\":{\"scheduleId\":\"$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID\",\"meetingRoom\":{\"room\":\"$CALENDAR_MEETING_CLEANUP_ROOM_TWO_ID\"}}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      if CALENDAR_MEETING_SCHEDULE_UPDATED_STATE=$(timeout 45 pnpm exec tsx \
+        scripts/integration-calendar-meeting-rooms.ts \
+        --mode inspect-schedule \
+        --scheduleId "$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID" \
+        --scheduleTitle "$CALENDAR_MEETING_CLEANUP_SCHEDULE_TITLE" \
+        --roomId "$CALENDAR_MEETING_CLEANUP_ROOM_TWO_ID" 2>/dev/null); then
+        echo "PASS: update_schedule changes native MeetingSchedule room"
+        PASSED=$((PASSED + 1))
+      else
+        fail_test "update_schedule native MeetingSchedule composition" "room update readback did not converge"
+      fi
+    fi
+  else
+    fail_test "create_schedule native MeetingSchedule cleanup identity" "create_schedule returned no scheduleId"
+  fi
+
+  if [ -n "$CALENDAR_MEETING_CLEANUP_EVENT_ID" ]; then
+    run_test_with_runner call_tool_fresh_session \
+      "delete_event(native Meeting:$CALENDAR_MEETING_CLEANUP_EVENT_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_event\",\"arguments\":{\"eventId\":\"$CALENDAR_MEETING_CLEANUP_EVENT_ID\"}},\"id\":2}"
+  fi
+  if [ -n "$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID" ]; then
+    run_test_with_runner call_tool_fresh_session \
+      "delete_schedule(native MeetingSchedule:$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_schedule\",\"arguments\":{\"scheduleId\":\"$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID\"}},\"id\":2}"
+  fi
+else
+  fail_test "calendar meeting-room fixture identities" "setup returned incomplete Room IDs"
+fi
+
+if cleanup_calendar_meeting_room_artifacts; then
+  echo "PASS: calendar meeting-room lifecycle cleanup and fresh absence readback"
+  PASSED=$((PASSED + 1))
+else
+  fail_test "calendar meeting-room lifecycle cleanup" "fixture absence was not confirmed"
 fi
 
 # Planner ToDo lifecycle + work slots
@@ -5937,6 +6904,12 @@ if [ $? -eq 0 ]; then
     run_capture_to_var SCHEDULE_TEXT "schedule_todo($TODO_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"schedule_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"date\":1777020000000,\"dueDate\":1777023600000}},\"id\":2}"
     SCHEDULE_SLOT_ID=$(echo "$SCHEDULE_TEXT" | jq -r '.workSlotId // empty' 2>/dev/null)
+    if [ -z "$SCHEDULE_SLOT_ID" ]; then
+      # A lost schedule response does not prove that Huly rolled back the
+      # write. Recover the exact fixture slot from a fresh list before cleanup.
+      find_work_slot_id_to_var SCHEDULE_SLOT_ID "schedule_todo($TODO_ID)" "$TODO_ID" \
+        1777020000000 1777023600000 "$TODO_TITLE" 20 0.5 run_capture_only_fresh || true
+    fi
     if [ -n "$SCHEDULE_SLOT_ID" ]; then
       if PLANNER_SLOT_RESULT=$(pnpm exec tsx scripts/integration-planner-work-slot.ts \
         --slot "$SCHEDULE_SLOT_ID" --todo "$TODO_ID" --calendar "$CALENDAR_ID" \
@@ -5947,11 +6920,10 @@ if [ $? -eq 0 ]; then
       else
         fail_test "schedule_todo Planner-native slot shape" "Planner visibility verification helper failed"
       fi
-      run_capture_to_var UNSCHEDULE_SLOT_TEXT "unschedule_todo(workSlotId:$SCHEDULE_SLOT_ID)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unschedule_todo\",\"arguments\":{\"workSlotId\":\"$SCHEDULE_SLOT_ID\"}},\"id\":2}"
-      if [ $? -eq 0 ]; then
-        assert_json_field_equals "unschedule_todo(workSlotId:$SCHEDULE_SLOT_ID) removed one" "$UNSCHEDULE_SLOT_TEXT" ".removed" "1"
-      fi
+      wait_for_work_slot_exact "schedule_todo($TODO_ID) fresh presence" "$SCHEDULE_SLOT_ID" "$TODO_ID" \
+        1777020000000 1777023600000 present 20 0.5 run_capture_only_fresh
+      unschedule_work_slot_and_confirm UNSCHEDULE_SLOT_TEXT "unschedule_todo(workSlotId:$SCHEDULE_SLOT_ID)" \
+        "$SCHEDULE_SLOT_ID" "$TODO_ID" 1777020000000 1777023600000
     else
       skip_test "unschedule_todo(workSlotId)" "schedule_todo did not return a workSlotId"
     fi
@@ -5959,12 +6931,15 @@ if [ $? -eq 0 ]; then
     run_capture_to_var RAW_SLOT_TEXT "schedule_todo(raw_id:$TODO_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"schedule_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"date\":1777027200000,\"dueDate\":1777030800000}},\"id\":2}"
     RAW_SLOT_ID=$(echo "$RAW_SLOT_TEXT" | jq -r '.workSlotId // empty' 2>/dev/null)
+    if [ -z "$RAW_SLOT_ID" ]; then
+      find_work_slot_id_to_var RAW_SLOT_ID "schedule_todo(raw_id:$TODO_ID)" "$TODO_ID" \
+        1777027200000 1777030800000 "$TODO_TITLE" 20 0.5 run_capture_only_fresh || true
+    fi
     if [ -n "$RAW_SLOT_ID" ]; then
-      run_capture_to_var UNSCHEDULE_RAW_SLOT_TEXT "unschedule_todo(raw_workSlotId:$RAW_SLOT_ID)" \
-        "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unschedule_todo\",\"arguments\":{\"workSlotId\":\"$RAW_SLOT_ID\"}},\"id\":2}"
-      if [ $? -eq 0 ]; then
-        assert_json_field_equals "unschedule_todo(raw_workSlotId:$RAW_SLOT_ID) removed one" "$UNSCHEDULE_RAW_SLOT_TEXT" ".removed" "1"
-      fi
+      wait_for_work_slot_exact "schedule_todo(raw_id:$TODO_ID) fresh presence" "$RAW_SLOT_ID" "$TODO_ID" \
+        1777027200000 1777030800000 present 20 0.5 run_capture_only_fresh
+      unschedule_work_slot_and_confirm UNSCHEDULE_RAW_SLOT_TEXT "unschedule_todo(raw_workSlotId:$RAW_SLOT_ID)" \
+        "$RAW_SLOT_ID" "$TODO_ID" 1777027200000 1777030800000
     else
       skip_test "unschedule_todo(raw_workSlotId)" "schedule_todo raw-id locator did not return a workSlotId"
     fi
@@ -5972,12 +6947,20 @@ if [ $? -eq 0 ]; then
     run_capture_to_var SCHEDULE_SCOPE_TEXT "schedule_todo(scope_cleanup:$TODO_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"schedule_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"date\":1777034400000,\"dueDate\":1777038000000}},\"id\":2}"
     SCHEDULE_SCOPE_SLOT_ID=$(echo "$SCHEDULE_SCOPE_TEXT" | jq -r '.workSlotId // empty' 2>/dev/null)
+    if [ -z "$SCHEDULE_SCOPE_SLOT_ID" ]; then
+      find_work_slot_id_to_var SCHEDULE_SCOPE_SLOT_ID "schedule_todo(scope_cleanup:$TODO_ID)" "$TODO_ID" \
+        1777034400000 1777038000000 "$TODO_TITLE" 20 0.5 run_capture_only_fresh || true
+    fi
     if [ -n "$SCHEDULE_SCOPE_SLOT_ID" ]; then
+      wait_for_work_slot_exact "schedule_todo(scope_cleanup:$TODO_ID) fresh presence" "$SCHEDULE_SCOPE_SLOT_ID" "$TODO_ID" \
+        1777034400000 1777038000000 present 20 0.5 run_capture_only_fresh
       run_capture_to_var UNSCHEDULE_SCOPE_TEXT "unschedule_todo(scope_all:$TODO_ID)" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unschedule_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$TODO_ID\"},\"scope\":\"all\"}},\"id\":2}"
       if [ $? -eq 0 ]; then
         assert_json_field_equals "unschedule_todo(scope_all:$TODO_ID) removed one" "$UNSCHEDULE_SCOPE_TEXT" ".removed" "1"
       fi
+      wait_for_work_slot_exact "unschedule_todo(scope_all:$TODO_ID) fresh absence" "$SCHEDULE_SCOPE_SLOT_ID" "$TODO_ID" \
+        1777034400000 1777038000000 absent 20 0.5 run_capture_only_fresh
     else
       skip_test "unschedule_todo(scope_all)" "schedule_todo did not return a workSlotId"
     fi
@@ -6012,6 +6995,165 @@ if [ $? -eq 0 ]; then
   else
     skip_test "planner_todo_lifecycle" "create_todo did not return a todoId"
   fi
+fi
+
+##############################
+# Planner document-attached ToDo lifecycle
+##############################
+PLANNER_DOCUMENT_TEAMSPACE_NAME="IntTest Planner Documents $RUN_ID"
+PLANNER_DOCUMENT_TEAMSPACE_NAME_JSON=$(json_string "$PLANNER_DOCUMENT_TEAMSPACE_NAME")
+PLANNER_DOCUMENT_TITLE="IntTest Planner Document $RUN_ID"
+PLANNER_DOCUMENT_TITLE_JSON=$(json_string "$PLANNER_DOCUMENT_TITLE")
+PLANNER_DOCUMENT_TODO_TITLE="IntTest Document Planner Todo $RUN_ID"
+PLANNER_DOCUMENT_TODO_TITLE_JSON=$(json_string "$PLANNER_DOCUMENT_TODO_TITLE")
+PLANNER_DOCUMENT_UPDATED_TODO_TITLE="Updated $PLANNER_DOCUMENT_TODO_TITLE"
+PLANNER_DOCUMENT_UPDATED_TODO_TITLE_JSON=$(json_string "$PLANNER_DOCUMENT_UPDATED_TODO_TITLE")
+
+run_capture_to_var PLANNER_DOCUMENT_TEAMSPACE_TEXT "create_teamspace(planner_document_todo)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_teamspace\",\"arguments\":{\"name\":$PLANNER_DOCUMENT_TEAMSPACE_NAME_JSON,\"description\":\"Planner document ToDo integration fixture\"}},\"id\":2}"
+if [ $? -eq 0 ]; then
+  PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID=$(echo "$PLANNER_DOCUMENT_TEAMSPACE_TEXT" | jq -r '.id // empty' 2>/dev/null)
+  echo "  => planner document teamspace: $PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID"
+  if [ -n "$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID" ]; then
+    run_capture_to_var PLANNER_DOCUMENT_TEXT "create_document(planner_document_todo)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_document\",\"arguments\":{\"teamspace\":\"$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID\",\"title\":$PLANNER_DOCUMENT_TITLE_JSON}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID=$(echo "$PLANNER_DOCUMENT_TEXT" | jq -r '.id // empty' 2>/dev/null)
+      echo "  => planner document: $PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID"
+      PLANNER_DOCUMENT_ATTACHMENT_JSON="{\"type\":\"document\",\"teamspace\":\"$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID\",\"document\":\"$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID\"}"
+    fi
+  fi
+fi
+
+if [ -n "$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID" ] && [ -n "$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID" ]; then
+  PLANNER_DOCUMENT_READY=false
+  for planner_document_attempt in $(seq 1 20); do
+    if PLANNER_DOCUMENT_READ_TEXT=$(run_capture_only_fresh \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID\",\"document\":\"$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID\"}},\"id\":2}" \
+      2>/dev/null); then
+      PLANNER_DOCUMENT_READY=true
+      break
+    fi
+    [ "$planner_document_attempt" -lt 20 ] && sleep 1
+  done
+  if [ "$PLANNER_DOCUMENT_READY" = true ]; then
+    # Arm the title locator only after the fixture is readable and immediately
+    # before creation, so a lost create response remains recoverable by title.
+    PLANNER_DOCUMENT_CLEANUP_TODO_TITLE="$PLANNER_DOCUMENT_TODO_TITLE"
+    run_capture_to_var PLANNER_DOCUMENT_TODO_TEXT "create_todo(document:$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_todo\",\"arguments\":{\"title\":$PLANNER_DOCUMENT_TODO_TITLE_JSON,\"attachedTo\":{\"type\":\"document\",\"teamspace\":\"$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID\",\"document\":\"$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID\"}}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      PLANNER_DOCUMENT_CLEANUP_TODO_ID=$(echo "$PLANNER_DOCUMENT_TODO_TEXT" | jq -r '.todoId // empty' 2>/dev/null)
+      echo "  => document todo: $PLANNER_DOCUMENT_CLEANUP_TODO_ID"
+      if [ -n "$PLANNER_DOCUMENT_CLEANUP_TODO_ID" ]; then
+        PLANNER_DOCUMENT_TODO_RAW_READ_PAYLOAD="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$PLANNER_DOCUMENT_CLEANUP_TODO_ID\"}}},\"id\":2}"
+        PLANNER_DOCUMENT_TODO_HUMAN_LOCATOR_PAYLOAD="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"title\":$PLANNER_DOCUMENT_TODO_TITLE_JSON,\"attachedTo\":$PLANNER_DOCUMENT_ATTACHMENT_JSON}}},\"id\":2}"
+        if PLANNER_DOCUMENT_TODO_STATE=$(pnpm exec tsx scripts/integration-planner-document-todo.ts \
+          --teamspace "$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID" \
+          --document "$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID" \
+          --todo "$PLANNER_DOCUMENT_CLEANUP_TODO_ID"); then
+          assert_json_field_equals "document ToDo native class" "$PLANNER_DOCUMENT_TODO_STATE" ".todoClass" "time:class:ToDo"
+          assert_json_field_equals "document ToDo attached class" "$PLANNER_DOCUMENT_TODO_STATE" ".attachedToClass" "document:class:Document"
+          assert_json_field_equals "document ToDo attached document" "$PLANNER_DOCUMENT_TODO_STATE" ".attachedTo" "$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID"
+        else
+          fail_test "document ToDo native shape" "SDK readback helper failed"
+        fi
+
+        wait_for_json_array_contains_to_var PLANNER_DOCUMENT_TODO_LIST_TEXT \
+          "list_todos(document:$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID) includes document todo" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_todos\",\"arguments\":{\"document\":{\"teamspace\":\"$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID\",\"document\":\"$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID\"},\"limit\":10}},\"id\":2}" \
+          "map(.id)" "$PLANNER_DOCUMENT_CLEANUP_TODO_ID" 20 1 run_capture_only_fresh
+
+        if ! wait_for_tool_field_quiet "$PLANNER_DOCUMENT_TODO_HUMAN_LOCATOR_PAYLOAD" '.id' "$PLANNER_DOCUMENT_CLEANUP_TODO_ID" 20; then
+          fail_test "get_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID) human locator became visible" "document locator was not visible after bounded polling"
+        fi
+        run_capture_to_var PLANNER_DOCUMENT_TODO_GET_TEXT "get_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID)" \
+          "$PLANNER_DOCUMENT_TODO_HUMAN_LOCATOR_PAYLOAD"
+        if [ $? -eq 0 ]; then
+          assert_json_field_equals "get_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID) attached type" "$PLANNER_DOCUMENT_TODO_GET_TEXT" ".attachedTo.type" "document"
+          assert_json_field_equals "get_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID) document id" "$PLANNER_DOCUMENT_TODO_GET_TEXT" ".attachedTo.id" "$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID"
+          assert_json_field_equals "get_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID) teamspace id" "$PLANNER_DOCUMENT_TODO_GET_TEXT" ".attachedTo.teamspaceId" "$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID"
+          assert_json_field_equals "get_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID) private default" "$PLANNER_DOCUMENT_TODO_GET_TEXT" ".visibility" "private"
+        fi
+
+        run_capture_to_var PLANNER_DOCUMENT_TODO_UPDATE_TEXT "update_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_todo\",\"arguments\":{\"locator\":{\"title\":$PLANNER_DOCUMENT_TODO_TITLE_JSON,\"attachedTo\":$PLANNER_DOCUMENT_ATTACHMENT_JSON},\"title\":$PLANNER_DOCUMENT_UPDATED_TODO_TITLE_JSON,\"visibility\":\"public\"}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          PLANNER_DOCUMENT_CLEANUP_TODO_TITLE="$PLANNER_DOCUMENT_UPDATED_TODO_TITLE"
+          assert_json_field_equals "update_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID) updated" "$PLANNER_DOCUMENT_TODO_UPDATE_TEXT" ".updated" "true"
+          if ! wait_for_tool_field_quiet "$PLANNER_DOCUMENT_TODO_RAW_READ_PAYLOAD" '.title' "$PLANNER_DOCUMENT_UPDATED_TODO_TITLE" 20; then
+            fail_test "get_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID) update became visible" "updated title was not visible after bounded polling"
+          fi
+          if ! wait_for_tool_field_quiet "$PLANNER_DOCUMENT_TODO_RAW_READ_PAYLOAD" '.visibility' "public" 20; then
+            fail_test "get_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID) visibility update became visible" "public visibility was not visible after bounded polling"
+          fi
+        fi
+
+        run_capture_to_var PLANNER_DOCUMENT_TODO_SCHEDULE_TEXT "schedule_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"schedule_todo\",\"arguments\":{\"locator\":{\"title\":$PLANNER_DOCUMENT_UPDATED_TODO_TITLE_JSON,\"attachedTo\":$PLANNER_DOCUMENT_ATTACHMENT_JSON},\"date\":1777050000000,\"dueDate\":1777053600000}},\"id\":2}"
+        PLANNER_DOCUMENT_TODO_SLOT_ID=$(echo "$PLANNER_DOCUMENT_TODO_SCHEDULE_TEXT" | jq -r '.workSlotId // empty' 2>/dev/null)
+        if [ -z "$PLANNER_DOCUMENT_TODO_SLOT_ID" ]; then
+          find_work_slot_id_to_var PLANNER_DOCUMENT_TODO_SLOT_ID \
+            "schedule_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID)" \
+            "$PLANNER_DOCUMENT_CLEANUP_TODO_ID" 1777050000000 1777053600000 \
+            "$PLANNER_DOCUMENT_UPDATED_TODO_TITLE" 20 0.5 run_capture_only_fresh || true
+        fi
+        if [ -n "$PLANNER_DOCUMENT_TODO_SLOT_ID" ]; then
+          wait_for_work_slot_exact \
+            "schedule_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID) fresh presence" \
+            "$PLANNER_DOCUMENT_TODO_SLOT_ID" "$PLANNER_DOCUMENT_CLEANUP_TODO_ID" \
+            1777050000000 1777053600000 present 20 0.5 run_capture_only_fresh
+          run_capture_to_var PLANNER_DOCUMENT_TODO_UNSCHEDULE_TEXT "unschedule_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"unschedule_todo\",\"arguments\":{\"locator\":{\"title\":$PLANNER_DOCUMENT_UPDATED_TODO_TITLE_JSON,\"attachedTo\":$PLANNER_DOCUMENT_ATTACHMENT_JSON},\"scope\":\"all\"}},\"id\":2}"
+          if [ $? -eq 0 ]; then
+            assert_json_field_equals "unschedule_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID) removed slot" "$PLANNER_DOCUMENT_TODO_UNSCHEDULE_TEXT" ".removed" "1"
+          fi
+          wait_for_work_slot_exact \
+            "unschedule_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID) fresh absence" \
+            "$PLANNER_DOCUMENT_TODO_SLOT_ID" "$PLANNER_DOCUMENT_CLEANUP_TODO_ID" \
+            1777050000000 1777053600000 absent 20 0.5 run_capture_only_fresh
+        else
+          skip_test "schedule_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID)" "no writable personal calendar slot returned"
+        fi
+
+        run_capture_to_var PLANNER_DOCUMENT_TODO_COMPLETE_TEXT "complete_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"complete_todo\",\"arguments\":{\"locator\":{\"title\":$PLANNER_DOCUMENT_UPDATED_TODO_TITLE_JSON,\"attachedTo\":$PLANNER_DOCUMENT_ATTACHMENT_JSON},\"doneOn\":1777060000000}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          assert_json_field_equals "complete_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID) updated" "$PLANNER_DOCUMENT_TODO_COMPLETE_TEXT" ".updated" "true"
+          if ! wait_for_tool_field_quiet "$PLANNER_DOCUMENT_TODO_RAW_READ_PAYLOAD" '.doneOn' "1777060000000" 20; then
+            fail_test "get_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID) completion became visible" "doneOn was not visible after bounded polling"
+          fi
+        fi
+        run_capture_to_var PLANNER_DOCUMENT_TODO_REOPEN_TEXT "reopen_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"reopen_todo\",\"arguments\":{\"locator\":{\"title\":$PLANNER_DOCUMENT_UPDATED_TODO_TITLE_JSON,\"attachedTo\":$PLANNER_DOCUMENT_ATTACHMENT_JSON}}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          assert_json_field_equals "reopen_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID) updated" "$PLANNER_DOCUMENT_TODO_REOPEN_TEXT" ".updated" "true"
+          if ! wait_for_tool_field_quiet "$PLANNER_DOCUMENT_TODO_RAW_READ_PAYLOAD" 'if .doneOn == null then "null" else (.doneOn | tostring) end' "null" 20; then
+            fail_test "get_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID) reopen became visible" "doneOn was not cleared after bounded polling"
+          fi
+        fi
+        run_capture_to_var PLANNER_DOCUMENT_TODO_DELETE_TEXT "delete_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_todo\",\"arguments\":{\"locator\":{\"title\":$PLANNER_DOCUMENT_UPDATED_TODO_TITLE_JSON,\"attachedTo\":$PLANNER_DOCUMENT_ATTACHMENT_JSON}}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          assert_json_field_equals "delete_todo(document:$PLANNER_DOCUMENT_CLEANUP_TODO_ID) deleted" "$PLANNER_DOCUMENT_TODO_DELETE_TEXT" ".deleted" "true"
+          wait_for_json_array_not_contains_to_var PLANNER_DOCUMENT_TODO_AFTER_DELETE_LIST_TEXT \
+            "list_todos(document:$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID) no deleted document todo" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_todos\",\"arguments\":{\"document\":{\"teamspace\":\"$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID\",\"document\":\"$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID\"},\"limit\":10}},\"id\":2}" \
+            "map(.id)" "$PLANNER_DOCUMENT_CLEANUP_TODO_ID" 20 1 run_capture_only_fresh
+          run_capture_to_var PLANNER_DOCUMENT_AFTER_DELETE_TEXT \
+            "get_document($PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID) remains after ToDo deletion" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID\",\"document\":\"$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID\"}},\"id\":2}"
+          if [ $? -eq 0 ]; then
+            assert_json_field_equals "get_document($PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID) remains after ToDo deletion" "$PLANNER_DOCUMENT_AFTER_DELETE_TEXT" ".id" "$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID"
+          fi
+        fi
+      fi
+    fi
+  else
+    skip_test "planner_document_todo_lifecycle" "document target was not visible after bounded polling"
+  fi
+else
+  skip_test "planner_document_todo_lifecycle" "could not create dedicated teamspace/document fixture"
 fi
 
 PLANNER_ISSUE_TITLE="Planner Attached ToDo $RUN_ID"
@@ -6069,6 +7211,142 @@ fi
 # Recurring event — no delete_recurring_event tool, so skip create to avoid leaking
 skip_test "create_recurring_event" "no delete tool — would leak data"
 skip_test "list_event_instances" "requires recurring event"
+echo ""
+
+##############################
+# 11a. VIRTUAL-OFFICE ADMINISTRATION
+##############################
+echo "=== 11a. Virtual-office administration ==="
+VIRTUAL_OFFICE_CLEANUP_FLOOR_NAME="MCP Office Floor $RUN_ID"
+VIRTUAL_OFFICE_CLEANUP_ROOM_NAME="MCP Office Room $RUN_ID"
+VIRTUAL_OFFICE_CLEANUP_UPDATED_ROOM_NAME="Updated MCP Office Room $RUN_ID"
+VIRTUAL_OFFICE_FLOOR_NAME_JSON=$(json_string "$VIRTUAL_OFFICE_CLEANUP_FLOOR_NAME")
+VIRTUAL_OFFICE_ROOM_NAME_JSON=$(json_string "$VIRTUAL_OFFICE_CLEANUP_ROOM_NAME")
+VIRTUAL_OFFICE_UPDATED_ROOM_NAME_JSON=$(json_string "$VIRTUAL_OFFICE_CLEANUP_UPDATED_ROOM_NAME")
+
+run_capture_to_var VIRTUAL_OFFICE_FLOOR_CREATE_TEXT "create_office_floor($VIRTUAL_OFFICE_CLEANUP_FLOOR_NAME)" \
+  "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_office_floor\",\"arguments\":{\"name\":$VIRTUAL_OFFICE_FLOOR_NAME_JSON}},\"id\":2}"
+if [ $? -eq 0 ]; then
+  VIRTUAL_OFFICE_CLEANUP_FLOOR_ID=$(printf '%s\n' "$VIRTUAL_OFFICE_FLOOR_CREATE_TEXT" | jq -r '.floorId // empty' 2>/dev/null)
+fi
+
+if [ -n "$VIRTUAL_OFFICE_CLEANUP_FLOOR_ID" ]; then
+  VIRTUAL_OFFICE_FLOOR_ID_JSON=$(json_string "$VIRTUAL_OFFICE_CLEANUP_FLOOR_ID")
+  VIRTUAL_OFFICE_FLOOR_READ_PAYLOAD="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_office_floor\",\"arguments\":{\"floorId\":$VIRTUAL_OFFICE_FLOOR_ID_JSON}},\"id\":2}"
+  if wait_for_tool_field_quiet "$VIRTUAL_OFFICE_FLOOR_READ_PAYLOAD" '.name' \
+    "$VIRTUAL_OFFICE_CLEANUP_FLOOR_NAME" 20; then
+    run_capture_to_var_fresh VIRTUAL_OFFICE_FLOOR_READ_TEXT \
+      "get_office_floor($VIRTUAL_OFFICE_CLEANUP_FLOOR_ID)" "$VIRTUAL_OFFICE_FLOOR_READ_PAYLOAD"
+    if [ $? -eq 0 ]; then
+      assert_json_field_equals "get_office_floor returns fixture identity" "$VIRTUAL_OFFICE_FLOOR_READ_TEXT" \
+        '.floorId' "$VIRTUAL_OFFICE_CLEANUP_FLOOR_ID"
+    fi
+
+    restart_http_transport_if_needed "after virtual-office Floor creation" || exit 1
+    run_capture_to_var VIRTUAL_OFFICE_ROOM_CREATE_TEXT \
+      "create_office_room($VIRTUAL_OFFICE_CLEANUP_ROOM_NAME by floor name)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_office_room\",\"arguments\":{\"floor\":$VIRTUAL_OFFICE_FLOOR_NAME_JSON,\"kind\":\"video\",\"name\":$VIRTUAL_OFFICE_ROOM_NAME_JSON}},\"id\":2}"
+    if [ $? -eq 0 ]; then
+      VIRTUAL_OFFICE_CLEANUP_ROOM_ID=$(printf '%s\n' "$VIRTUAL_OFFICE_ROOM_CREATE_TEXT" | jq -r \
+        '.roomId // empty' 2>/dev/null)
+      assert_json_field_equals "create_office_room returns resolved floor" "$VIRTUAL_OFFICE_ROOM_CREATE_TEXT" \
+        '.floorId' "$VIRTUAL_OFFICE_CLEANUP_FLOOR_ID"
+      assert_json_field_equals "create_office_room derives video kind" "$VIRTUAL_OFFICE_ROOM_CREATE_TEXT" \
+        '.kind' "video"
+      assert_json_field_equals "create_office_room derives open access" "$VIRTUAL_OFFICE_ROOM_CREATE_TEXT" \
+        '.access' "open"
+      assert_json_field_equals "create_office_room chooses initial free x" "$VIRTUAL_OFFICE_ROOM_CREATE_TEXT" \
+        '.position.x' "0"
+      assert_json_field_equals "create_office_room chooses initial free y" "$VIRTUAL_OFFICE_ROOM_CREATE_TEXT" \
+        '.position.y' "0"
+    fi
+
+    if [ -n "$VIRTUAL_OFFICE_CLEANUP_ROOM_ID" ]; then
+      VIRTUAL_OFFICE_ROOM_ID_JSON=$(json_string "$VIRTUAL_OFFICE_CLEANUP_ROOM_ID")
+      VIRTUAL_OFFICE_ROOM_READ_PAYLOAD="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_office_room\",\"arguments\":{\"roomId\":$VIRTUAL_OFFICE_ROOM_ID_JSON}},\"id\":2}"
+      if wait_for_tool_field_quiet "$VIRTUAL_OFFICE_ROOM_READ_PAYLOAD" '.roomId' \
+        "$VIRTUAL_OFFICE_CLEANUP_ROOM_ID" 20; then
+        if VIRTUAL_OFFICE_NATIVE_STATE=$(timeout 45 pnpm exec tsx \
+          scripts/integration-virtual-office-administration.ts \
+          --mode inspect \
+          --floorId "$VIRTUAL_OFFICE_CLEANUP_FLOOR_ID" \
+          --roomId "$VIRTUAL_OFFICE_CLEANUP_ROOM_ID" \
+          --floorName "$VIRTUAL_OFFICE_CLEANUP_FLOOR_NAME" \
+          --roomName "$VIRTUAL_OFFICE_CLEANUP_ROOM_NAME" 2>/dev/null); then
+          echo "PASS: virtual-office native class, workspace defaults, and empty occupancy"
+          PASSED=$((PASSED + 1))
+          assert_json_field_equals "virtual-office fixture uses native Room class" "$VIRTUAL_OFFICE_NATIVE_STATE" \
+            '.roomClass' "love:class:Room"
+          assert_json_field_equals "virtual-office fixture has no manufactured participants" \
+            "$VIRTUAL_OFFICE_NATIVE_STATE" '.participantCount' "0"
+          assert_json_field_equals "virtual-office fixture derives 2x1 width" "$VIRTUAL_OFFICE_NATIVE_STATE" \
+            '.position.width' "2"
+          assert_json_field_equals "virtual-office fixture derives 2x1 height" "$VIRTUAL_OFFICE_NATIVE_STATE" \
+            '.position.height' "1"
+        else
+          fail_test "virtual-office native fixture readback" "SDK verification helper failed"
+        fi
+
+        restart_http_transport_if_needed "before virtual-office Room update" || exit 1
+        run_capture_to_var VIRTUAL_OFFICE_ROOM_UPDATE_TEXT \
+          "update_office_room($VIRTUAL_OFFICE_CLEANUP_ROOM_ID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_office_room\",\"arguments\":{\"roomId\":$VIRTUAL_OFFICE_ROOM_ID_JSON,\"name\":$VIRTUAL_OFFICE_UPDATED_ROOM_NAME_JSON,\"description\":\"Durable **virtual-office** fixture $RUN_ID\",\"access\":\"dnd\",\"startWithTranscription\":true,\"startWithRecording\":true}},\"id\":2}"
+        if [ $? -eq 0 ]; then
+          assert_json_array_contains "update_office_room reports name" "$VIRTUAL_OFFICE_ROOM_UPDATE_TEXT" \
+            '.updatedFields' "name"
+          assert_json_array_contains "update_office_room reports Markdown description" \
+            "$VIRTUAL_OFFICE_ROOM_UPDATE_TEXT" '.updatedFields' "description"
+          assert_json_array_contains "update_office_room reports access" "$VIRTUAL_OFFICE_ROOM_UPDATE_TEXT" \
+            '.updatedFields' "access"
+
+          if wait_for_tool_field_quiet "$VIRTUAL_OFFICE_ROOM_READ_PAYLOAD" '.name' \
+            "$VIRTUAL_OFFICE_CLEANUP_UPDATED_ROOM_NAME" 20; then
+            run_capture_to_var_fresh VIRTUAL_OFFICE_ROOM_READ_TEXT \
+              "get_office_room($VIRTUAL_OFFICE_CLEANUP_ROOM_ID after update)" \
+              "$VIRTUAL_OFFICE_ROOM_READ_PAYLOAD"
+            if [ $? -eq 0 ]; then
+              assert_json_field_equals "update_office_room persists dnd access" "$VIRTUAL_OFFICE_ROOM_READ_TEXT" \
+                '.access' "dnd"
+              assert_json_field_equals "update_office_room persists transcription default" \
+                "$VIRTUAL_OFFICE_ROOM_READ_TEXT" '.startWithTranscription' "true"
+              assert_json_field_equals "update_office_room persists recording default" \
+                "$VIRTUAL_OFFICE_ROOM_READ_TEXT" '.startWithRecording' "true"
+              assert_json_field_equals "update_office_room preserves floor" "$VIRTUAL_OFFICE_ROOM_READ_TEXT" \
+                '.floorId' "$VIRTUAL_OFFICE_CLEANUP_FLOOR_ID"
+              assert_json_field_contains "update_office_room renders Markdown description" \
+                "$VIRTUAL_OFFICE_ROOM_READ_TEXT" '.description' "virtual-office"
+            fi
+          else
+            fail_test "get_office_room update visibility" "updated Room was not visible after bounded polling"
+          fi
+
+          run_capture_to_var_fresh VIRTUAL_OFFICE_PARTICIPANTS_TEXT \
+            "list_active_room_participants($VIRTUAL_OFFICE_CLEANUP_ROOM_ID)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_active_room_participants\",\"arguments\":{\"roomId\":$VIRTUAL_OFFICE_ROOM_ID_JSON}},\"id\":2}"
+          if [ $? -eq 0 ]; then
+            assert_json_field_equals "durable defaults do not start a participant session" \
+              "$VIRTUAL_OFFICE_PARTICIPANTS_TEXT" 'length' "0"
+          fi
+        fi
+      else
+        fail_test "get_office_room creation visibility" "created Room was not visible after bounded polling"
+      fi
+    else
+      fail_test "create_office_room cleanup identity" "created Room response did not contain roomId"
+    fi
+  else
+    fail_test "get_office_floor creation visibility" "created Floor was not visible after bounded polling"
+  fi
+else
+  fail_test "create_office_floor cleanup identity" "created Floor response did not contain floorId"
+fi
+
+if cleanup_virtual_office_artifacts; then
+  echo "PASS: virtual-office fixture failure-safe cleanup and absence readback"
+  PASSED=$((PASSED + 1))
+else
+  fail_test "virtual-office administration cleanup" "Room/Floor deletion or absence readback was not confirmed"
+fi
 echo ""
 
 ##############################

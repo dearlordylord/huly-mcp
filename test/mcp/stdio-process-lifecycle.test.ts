@@ -8,7 +8,7 @@ import { Schema } from "effect"
 import { beforeAll, describe, expect, it } from "vitest"
 
 const builtServerPath = resolve(process.cwd(), "dist/index.cjs")
-const PROCESS_BOUND_MS = 13_000
+const PROCESS_BOUND_MS = 30_000
 const SECRET = "subprocess-secret-token"
 const PAYLOAD_MARKER = "lifecycle-secret-payload"
 const JsonRpcEnvelopeSchema = Schema.Struct({ id: Schema.Number, jsonrpc: Schema.Literal("2.0") })

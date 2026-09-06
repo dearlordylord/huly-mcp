@@ -122,4 +122,20 @@ describe("CustomFieldInfoWireSchema typeDetails refinements", () => {
   it("accepts an enum custom field carrying enumRef", () => {
     assertDecodeSuccess(CustomFieldInfoWireSchema, { ...base, type: "enum", typeDetails: { enumRef: "enum-1" } })
   })
+
+  it("rejects null, numeric, and malformed nested type details", () => {
+    const malformed = [
+      { type: "enum", typeDetails: { enumRef: null } },
+      { type: "enum", typeDetails: { enumRef: 42 } },
+      { type: "array", typeDetails: { of: null } },
+      { type: "array", typeDetails: { of: 42 } },
+      { type: "array", typeDetails: { of: { _class: 42 } } },
+      { type: "ref", typeDetails: { to: null } },
+      { type: "ref", typeDetails: { to: 42 } }
+    ]
+
+    for (const details of malformed) {
+      expect(() => decode({ ...base, ...details })).toThrow()
+    }
+  })
 })

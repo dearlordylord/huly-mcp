@@ -1,4 +1,15 @@
 import {
+  createOfficeFloorParamsJsonSchema,
+  CreateOfficeFloorResultSchema,
+  createOfficeRoomParamsJsonSchema,
+  CreateOfficeRoomResultSchema,
+  parseCreateOfficeFloorParams,
+  parseCreateOfficeRoomParams,
+  parseUpdateOfficeRoomParams,
+  updateOfficeRoomParamsJsonSchema,
+  UpdateOfficeRoomResultSchema
+} from "../../domain/schemas/virtual-office-administration.js"
+import {
   getMeetingMinutesParamsJsonSchema,
   GetMeetingMinutesResultSchema,
   getOfficeFloorParamsJsonSchema,
@@ -37,6 +48,8 @@ import {
   parseListOfficesParams
 } from "../../domain/schemas/virtual-office.js"
 import {
+  createOfficeFloor,
+  createOfficeRoom,
   getMeetingMinutes,
   getOffice,
   getOfficeFloor,
@@ -48,7 +61,8 @@ import {
   listOfficeDefaults,
   listOfficeFloors,
   listOfficeRooms,
-  listOffices
+  listOffices,
+  updateOfficeRoom
 } from "../../huly/operations/virtual-office.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 
@@ -79,6 +93,18 @@ export const virtualOfficeTools = [
   ),
   defineTool(
     {
+      name: "create_office_floor",
+      description:
+        "Create one durable virtual-office Floor with a nonblank name. Returns the generated floorId immediately. Floor rename and deletion are intentionally unavailable.",
+      category: CATEGORY,
+      inputSchema: createOfficeFloorParamsJsonSchema,
+      resultSchema: CreateOfficeFloorResultSchema
+    },
+    parseCreateOfficeFloorParams,
+    createOfficeFloor
+  ),
+  defineTool(
+    {
       name: "list_office_rooms",
       description:
         "List virtual office rooms, including access mode, type, floor, floor-plan position/size, language, and recording/transcription defaults.",
@@ -99,6 +125,30 @@ export const virtualOfficeTools = [
     },
     parseGetOfficeRoomParams,
     getOfficeRoom
+  ),
+  defineTool(
+    {
+      name: "create_office_room",
+      description:
+        "Create one durable video, audio, reception, or personal office on a Floor resolved from an exact ID or unambiguous exact name. Video/audio/reception require a nonblank name; office uses Huly's native empty name and person=null. Huly class, access, language, 2x1 free floor-plan position, and recording/transcription defaults are derived internally; video inherits workspace OfficeSettings while other kinds default both flags to false. This does not create participants or start recording/transcription.",
+      category: CATEGORY,
+      inputSchema: createOfficeRoomParamsJsonSchema,
+      resultSchema: CreateOfficeRoomResultSchema
+    },
+    parseCreateOfficeRoomParams,
+    createOfficeRoom
+  ),
+  defineTool(
+    {
+      name: "update_office_room",
+      description:
+        "Update one durable Room or Office by roomId. Accepts only name, Markdown description, access, startWithTranscription, and startWithRecording. Personal offices reject open access; Huly's protected Reception cannot be renamed. Floor, geometry, person assignment, language, ACLs, occupancy, and active provider state are preserved. Default flags affect future sessions and do not start or stop recording/transcription.",
+      category: CATEGORY,
+      inputSchema: updateOfficeRoomParamsJsonSchema,
+      resultSchema: UpdateOfficeRoomResultSchema
+    },
+    parseUpdateOfficeRoomParams,
+    updateOfficeRoom
   ),
   defineTool(
     {

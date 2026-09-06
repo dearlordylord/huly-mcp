@@ -1,104 +1,119 @@
 import { describe, it } from "@effect/vitest"
-import type { AnyAttribute, Doc, FindResult, PersonId, Ref, Space } from "@hcengineering/core"
+import type { AnyAttribute, Class, Doc, DocumentQuery, FindOptions, Ref } from "@hcengineering/core"
 import { ClassifierKind } from "@hcengineering/core"
-import { Effect, Schema } from "effect"
+import { Effect, Layer, Schema } from "effect"
 import { expect } from "vitest"
 
 import { ListCustomFieldsResultSchema } from "../../../src/domain/schemas/custom-fields.js"
 import { NonEmptyString } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import { Diagnostics } from "../../../src/huly/diagnostics.js"
 import { core } from "../../../src/huly/huly-plugins.js"
-import { getCustomFieldValues, listCustomFields, setCustomField } from "../../../src/huly/operations/custom-fields.js"
+import {
+  getCustomFieldValues,
+  listCustomFields,
+  parseCustomFieldValue,
+  readCustomFieldValue,
+  setCustomField
+} from "../../../src/huly/operations/custom-fields.js"
 import { customFieldId, docId, objectClassName } from "../../helpers/brands.js"
+import { CustomFieldMetadataDegradedWarningCode, type ToolWarning } from "../../../src/domain/schemas/tool-warnings.js"
+import {
+  customFieldAttribute,
+  customFieldDocument,
+  type CustomFieldAttributeFixture,
+  type CustomFieldDocumentFixture,
+  documentForTestClass,
+  findResultForTestClass
+} from "../../helpers/huly-sdk.js"
 
-const toFindResult = <T extends Doc>(docs: Array<T>): FindResult<T> => {
-  const result = docs as FindResult<T>
-  result.total = docs.length
-  return result
-}
-
-const makeAttribute = (overrides: Record<string, unknown> = {}): AnyAttribute =>
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test fixture for SDK-shaped custom attribute
-  ({
+const makeAttribute = (overrides: Partial<CustomFieldAttributeFixture> = {}): AnyAttribute =>
+  customFieldAttribute({
     _id: "attr-1",
     _class: core.class.Attribute,
-    space: "space-1" as Ref<Space>,
+    space: "space-1",
     name: "storyPoints",
     label: "tracker:field:Story Points",
     attributeOf: "tracker:mixin:IssueTypeData",
     type: { _class: "core:class:TypeNumber" },
     isCustom: true,
-    modifiedBy: "user-1" as PersonId,
+    modifiedBy: "user-1",
     modifiedOn: 0,
-    createdBy: "user-1" as PersonId,
+    createdBy: "user-1",
     createdOn: 0,
     ...overrides
-  }) as AnyAttribute
+  })
 
-const makeDoc = (overrides: Record<string, unknown> = {}): Doc =>
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test fixture for SDK-shaped dynamic document
-  ({
+const makeDoc = (overrides: Partial<CustomFieldDocumentFixture> = {}): Doc =>
+  customFieldDocument({
     _id: "doc-1",
     _class: "tracker:class:Issue",
-    space: "space-1" as Ref<Space>,
-    modifiedBy: "user-1" as PersonId,
+    space: "space-1",
+    modifiedBy: "user-1",
     modifiedOn: 0,
-    createdBy: "user-1" as PersonId,
+    createdBy: "user-1",
     createdOn: 0,
     ...overrides
-  }) as Doc
+  })
 
 interface MockConfig {
   readonly attributes?: ReadonlyArray<AnyAttribute>
   readonly doc?: Doc | undefined
   readonly classDocs?: ReadonlyArray<Doc>
-  readonly captureUpdateDoc?: { readonly operations?: Record<string, unknown> }
-  readonly captureUpdateMixin?: { readonly mixin?: string; readonly attributes?: Record<string, unknown> }
+  readonly captureUpdateDoc?: { operations?: unknown }
+  readonly captureUpdateMixin?: { mixin?: string; attributes?: unknown }
+  readonly warnings?: Array<ToolWarning>
 }
 
 const createTestLayer = (config: MockConfig) => {
   const attributes = config.attributes ?? []
   const classDocs = config.classDocs ?? []
 
-  const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown) => {
+  const findAllImpl: HulyClientOperations["findAll"] = <T extends Doc>(
+    _class: Ref<Class<T>>,
+    _query: DocumentQuery<T>,
+    _options?: FindOptions<T>
+  ) => {
     if (_class === core.class.Attribute) {
-      return Effect.succeed(toFindResult([...attributes]))
+      return Effect.succeed(findResultForTestClass<T>(attributes))
     }
     if (_class === core.class.Class) {
-      const ids = ((query as Record<string, unknown>)._id as { $in?: Array<string> } | undefined)?.$in ?? []
-      return Effect.succeed(toFindResult(classDocs.filter((doc) => ids.includes(String(doc._id)))))
+      return Effect.succeed(findResultForTestClass<T>(classDocs))
     }
-    return Effect.succeed(toFindResult([]))
-  }) as HulyClientOperations["findAll"]
+    return Effect.succeed(findResultForTestClass<T>([]))
+  }
 
-  const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown, query: unknown) => {
+  const findOneImpl: HulyClientOperations["findOne"] = <T extends Doc>(
+    _class: Ref<Class<T>>,
+    query: DocumentQuery<T>,
+    _options?: FindOptions<T>
+  ) => {
     if (_class === core.class.Attribute) {
-      const id = String((query as Record<string, unknown>)._id)
-      return Effect.succeed(attributes.find((attr) => String(attr._id) === id))
+      const queryId = query["_id"]
+      const id = typeof queryId === "string" ? queryId : undefined
+      return Effect.succeed(findResultForTestClass<T>(attributes.filter((attr) => String(attr._id) === id))[0])
     }
     if (_class === core.class.Class) {
-      const id = String((query as Record<string, unknown>)._id)
-      return Effect.succeed(classDocs.find((doc) => String(doc._id) === id))
+      const queryId = query["_id"]
+      const id = typeof queryId === "string" ? queryId : undefined
+      return Effect.succeed(findResultForTestClass<T>(classDocs.filter((doc) => String(doc._id) === id))[0])
     }
-    return Effect.succeed(config.doc)
-  }) as HulyClientOperations["findOne"]
+    return Effect.succeed(documentForTestClass<T>(config.doc))
+  }
 
-  const updateDocImpl: HulyClientOperations["updateDoc"] = ((
+  const updateDocImpl: HulyClientOperations["updateDoc"] = (
     _class: unknown,
     _space: unknown,
     _objectId: unknown,
     operations: unknown
   ) => {
     if (config.captureUpdateDoc) {
-      ;(config.captureUpdateDoc as { operations?: Record<string, unknown> }).operations = operations as Record<
-        string,
-        unknown
-      >
+      config.captureUpdateDoc.operations = operations
     }
-    return Effect.succeed({} as never)
-  }) as HulyClientOperations["updateDoc"]
+    return Effect.succeed({})
+  }
 
-  const updateMixinImpl: HulyClientOperations["updateMixin"] = ((
+  const updateMixinImpl: HulyClientOperations["updateMixin"] = (
     _objectId: unknown,
     _objectClass: unknown,
     _objectSpace: unknown,
@@ -106,19 +121,25 @@ const createTestLayer = (config: MockConfig) => {
     attributesUpdate: unknown
   ) => {
     if (config.captureUpdateMixin) {
-      ;(config.captureUpdateMixin as { mixin?: string; attributes?: Record<string, unknown> }).mixin = String(mixin)
-      ;(config.captureUpdateMixin as { mixin?: string; attributes?: Record<string, unknown> }).attributes =
-        attributesUpdate as Record<string, unknown>
+      config.captureUpdateMixin.mixin = String(mixin)
+      config.captureUpdateMixin.attributes = attributesUpdate
     }
-    return Effect.succeed({} as never)
-  }) as HulyClientOperations["updateMixin"]
+    return Effect.succeed({})
+  }
 
-  return HulyClient.testLayer({
-    findAll: findAllImpl,
-    findOne: findOneImpl,
-    updateDoc: updateDocImpl,
-    updateMixin: updateMixinImpl
-  })
+  const warnings = config.warnings ?? []
+  return Layer.mergeAll(
+    HulyClient.testLayer({
+      findAll: findAllImpl,
+      findOne: findOneImpl,
+      updateDoc: updateDocImpl,
+      updateMixin: updateMixinImpl
+    }),
+    Layer.succeed(Diagnostics, {
+      warnAgent: (warning) => Effect.sync(() => warnings.push(warning)),
+      trail: (_message: string) => Effect.void
+    })
+  )
 }
 
 describe("custom-fields operations", () => {
@@ -240,7 +261,7 @@ describe("custom-fields operations", () => {
         label: "tracker:field:QA Approved",
         type: { _class: "core:class:TypeBoolean" }
       })
-      const doc = makeDoc({ _id: "issue-1", space: "space-1" as Ref<Space> })
+      const doc = makeDoc({ _id: "issue-1", space: "space-1" })
       const ownerClass = makeDoc({
         _id: "tracker:mixin:IssueTypeData",
         label: "tracker:class:Issue Type Data",
@@ -394,6 +415,31 @@ describe("custom-fields branch coverage", () => {
     })
   )
 
+  it.effect("routes generic metadata fallback degradation through Diagnostics", () =>
+    Effect.gen(function* () {
+      const warnings: Array<ToolWarning> = []
+      const attr = makeAttribute({
+        _id: "attr-warning",
+        name: "raw",
+        label: 12345,
+        type: { _class: "core:class:TypeString" }
+      })
+      const result = yield* listCustomFields({}).pipe(Effect.provide(createTestLayer({ attributes: [attr], warnings })))
+
+      expect(result[0]?.label).toBe("raw")
+      expect(warnings).toEqual([expect.objectContaining({ code: CustomFieldMetadataDegradedWarningCode })])
+      expect(warnings[0]?.message).toContain("field_label_fallback")
+    })
+  )
+
+  it("does not read inherited custom-field values", () => {
+    const mixinValues: Record<string, unknown> = {}
+    Object.setPrototypeOf(mixinValues, { toString: "inherited-value" })
+    const doc = makeDoc({ [String(objectClassName("tracker:mixin:IssueTypeData"))]: mixinValues })
+
+    expect(readCustomFieldValue(doc, objectClassName("tracker:mixin:IssueTypeData"), "toString")).toBeUndefined()
+  })
+
   it.effect("defaults a non-numeric class kind to CLASS when resolving owner labels", () =>
     Effect.gen(function* () {
       const attr = makeAttribute({
@@ -458,7 +504,7 @@ describe("custom-fields branch coverage", () => {
         attributeOf: "tracker:class:Issue",
         type: { _class: "core:class:TypeString" }
       })
-      const doc = makeDoc({ _id: "issue-1", space: "space-1" as Ref<Space> })
+      const doc = makeDoc({ _id: "issue-1", space: "space-1" })
       const captureUpdateDoc: { operations?: Record<string, unknown> } = {}
       const result = yield* setCustomField({
         objectId: docId("issue-1"),
@@ -481,7 +527,7 @@ describe("custom-fields branch coverage", () => {
       })
       const baseConfig = {
         attributes: [attr],
-        doc: makeDoc({ _id: "issue-1", space: "space-1" as Ref<Space> }),
+        doc: makeDoc({ _id: "issue-1", space: "space-1" }),
         classDocs: [ownerClass]
       }
       const parsed = yield* setCustomField({
@@ -499,6 +545,28 @@ describe("custom-fields branch coverage", () => {
         value: "not-a-number"
       }).pipe(Effect.provide(createTestLayer(baseConfig)))
       expect(fallback.value).toBe("not-a-number")
+    })
+  )
+
+  it.effect("strictly rejects padded numbers and accepts the false boolean literal", () =>
+    Effect.gen(function* () {
+      const paddedNumberError = yield* Effect.flip(parseCustomFieldValue(" 42", "number"))
+      const falseValue = yield* parseCustomFieldValue("false", "boolean")
+
+      expect(paddedNumberError).toMatchObject({ _tag: "InvalidCustomFieldNumberValueError", value: " 42" })
+      expect(falseValue).toBe(false)
+    })
+  )
+
+  it.effect("omits definitions whose document has no runtime value", () =>
+    Effect.gen(function* () {
+      const attr = makeAttribute({ _id: "attr-unset", name: "unsetValue", type: { _class: "core:class:TypeString" } })
+      const result = yield* getCustomFieldValues({
+        objectId: docId("issue-1"),
+        objectClass: objectClassName("tracker:class:Issue")
+      }).pipe(Effect.provide(createTestLayer({ attributes: [attr], doc: makeDoc({ _id: "issue-1" }) })))
+
+      expect(result).toEqual([])
     })
   )
 })

@@ -3,7 +3,9 @@
 Research date: 2026-09-05  
 Issues: [#262](https://github.com/dearlordylord/huly-mcp/issues/262), [#263](https://github.com/dearlordylord/huly-mcp/issues/263)  
 Upstream source revision inspected: hcengineering/platform@2a985b31e314c0793dd965e5a1d8abe28f262f34  
-Published Huly packages inspected: @hcengineering/calendar@0.7.0, @hcengineering/love@0.7.0, and the installed transitive @hcengineering/setting@0.7.0
+Published Huly packages inspected during research: @hcengineering/calendar@0.7.0, @hcengineering/love@0.7.0, and the then-transitive @hcengineering/setting@0.7.0
+
+Implementation update (2026-09-05): issues #266-#268 implemented the narrow durable slices described below. The project now declares `@hcengineering/setting@0.7.382`, whose published declarations include `OfficeSettings`; video-room creation reads that native singleton for defaults. This resolves the type-publication blocker without adding a handwritten bridge. Workspace OfficeSettings mutation remains outside the implemented surface.
 
 ## Decision summary
 
@@ -13,7 +15,7 @@ Issues #262 and #263 are useful research umbrellas, but neither is a safe single
 2. **Calendar provider lifecycle, calendar deletion, and attendee RSVP should stay excluded or blocked.** The published SDK has no provider disconnect operation on the Calendar document model and no RSVP field or operation. Disconnect is an account/provider integration action, not deletion of a Calendar document.
 3. **Virtual-office durable metadata has a bounded implementation slice.** Room/Floor creation and selected Room fields have official document write paths. Meeting/MeetingSchedule room assignment is a composed operation that must hide love.mixin.* mechanics. Meeting-minutes title and description are ordinary edits; meeting lifecycle and status are server/provider-owned.
 4. **Transient office state and LiveKit/AI/recording operations must not be exposed as ordinary CRUD.** ParticipantInfo and RoomInfo are transient projections maintained by server triggers. Join/leave, transcription, and recording combine document mutations with external services and asynchronous callbacks; their safe MCP contract is not present.
-5. **OfficeSettings is blocked by the dependency boundary.** The local runtime has the class, and the upstream UI has a singleton workspace setting, but the installed @hcengineering/setting@0.7.0 declarations do not export OfficeSettings. Do not invent a local class/type bridge or depend on a raw class identifier.
+5. **OfficeSettings required a compatible dependency.** The local runtime has the class, and the upstream UI has a singleton workspace setting, but the package version installed during research did not export OfficeSettings. The implementation resolved this by declaring a compatible package version with the native type; it did not invent a local class/type bridge or depend on a raw class identifier.
 
 Recommended bookkeeping is to close each research umbrella only after creating narrow follow-up tasks for the implementation-ready slices and recording the blocked/excluded decisions in the issue. Neither issue should be marked ready-for-agent in its current broad form.
 
@@ -37,7 +39,7 @@ The installed Calendar package exports Calendar, ExternalCalendar, PrimaryCalend
 
 The installed Love package exports Room/Floor/Office, transient ParticipantInfo/RoomInfo, the Meeting and MeetingSchedule mixins, DevicesPreference, and MeetingMinutes. Meeting minutes expose title, description, status, meeting end, and collection counts; there is no recording entity and no transcript text field in this package ([installed Love declarations](../../node_modules/@hcengineering/love/types/types.d.ts#L15-L87)).
 
-The installed setting package is present only transitively at 0.7.0 and has no OfficeSettings declaration. The official source does define that class and interface, but importing or encoding it is not SDK parity with the current dependency graph. This is a real publication/dependency blocker, not a reason to hand-write a type ([installed setting declarations](../../node_modules/.pnpm/@hcengineering+setting@0.7.0/node_modules/@hcengineering/setting/types/index.d.ts), [official interface](https://github.com/hcengineering/platform/blob/2a985b31e314c0793dd965e5a1d8abe28f262f34/plugins/setting/src/index.ts#L150-L165)).
+The setting package available during research was present only transitively at 0.7.0 and had no OfficeSettings declaration. The implementation now declares `@hcengineering/setting@0.7.382`, which publishes the native interface and class reference used by the bounded read path. The original finding remains important: importing or encoding a handwritten substitute would not be SDK parity ([installed setting declarations](../../node_modules/@hcengineering/setting/types/index.d.ts), [official interface](https://github.com/hcengineering/platform/blob/2a985b31e314c0793dd965e5a1d8abe28f262f34/plugins/setting/src/index.ts#L150-L165)).
 
 The current MCP implementation already exposes Calendar event/schedule CRUD and a **narrow** list_calendars that returns only writable, non-hidden targets ([Calendar tools](../../src/mcp/tools/calendar.ts#L72-L204), [calendar target resolution](../../src/huly/operations/calendar-shared.ts#L104-L177)). It exposes read-only Floor/Room/Office, active transient state, MeetingMinutes, device preferences, and room defaults ([virtual-office tools](../../src/mcp/tools/virtual-office.ts#L57-L192), [virtual-office operations](../../src/huly/operations/virtual-office.ts#L224-L404)). Schedule reads already inspect a MeetingSchedule mixin, while current schedule create/update only writes the base Calendar Schedule ([schedule room lookup](../../src/huly/operations/calendar-schedules.ts#L164-L185), [schedule writes](../../src/huly/operations/calendar-schedules.ts#L318-L360)).
 
@@ -140,7 +142,8 @@ Meeting minutes are created as part of the join workflow, not as arbitrary notes
 | Start/stop transcription | Browser code calls the AI-bot love/connect/love/disconnect endpoint; the AI bot calls the Love service and maintains in-memory connected-room state ([AI requests](https://github.com/hcengineering/platform/blob/2a985b31e314c0793dd965e5a1d8abe28f262f34/plugins/ai-bot-resources/src/requests.ts#L96-L145), [AI Love controller](https://github.com/hcengineering/platform/blob/2a985b31e314c0793dd965e5a1d8abe28f262f34/services/ai-bot/pod-ai-bot/src/workspace/love.ts#L135-L176)). | **Blocked / excluded** | No published SDK or deterministic MCP endpoint. Do not mutate Room metadata and claim transcription has started. |
 | Read/start/stop recording | Love service starts LiveKit egress and returns before the asynchronous webhook stores a Drive file and attaches it to MeetingMinutes. There is no recording entity in @hcengineering/love ([Love service](https://github.com/hcengineering/platform/blob/2a985b31e314c0793dd965e5a1d8abe28f262f34/services/love/src/main.ts#L104-L250), [Drive attachment callback](https://github.com/hcengineering/platform/blob/2a985b31e314c0793dd965e5a1d8abe28f262f34/services/love/src/workspaceClient.ts#L57-L100)). | **Blocked** | Keep provider operations out of the MCP SDK surface. A later composed read may use a proven Drive/Attachment link, but it needs an authoritative recording marker and async completion contract. |
 | Read/write DevicesPreference | Preference fields are published. The write is a caller preference, not a LiveKit device command; the active browser session owns camera/mic state. | **Direct** (persisted preference) / **guided** (active device) | A current-account-only preference tool is implementation-ready if desired. Never list or edit another account's preference and never report a persisted toggle as a live device state change. |
-| Read/write OfficeSettings workspace defaults | Official setting UI creates/updates a singleton OfficeSettings with two default booleans ([OfficeSettings UI](https://github.com/hcengineering/platform/blob/2a985b31e314c0793dd965e5a1d8abe28f262f34/plugins/setting-resources/src/components/OfficeSettings.svelte#L20-L75)); local runtime class discovery sees the class, but installed setting declarations do not export it. | **Blocked** | Wait for a compatible published setting package and add it as an explicit dependency. Do not use a hand-written interface, untyped class ID, or TypeAny workaround. |
+| Read OfficeSettings workspace defaults | Official setting UI creates/updates a singleton OfficeSettings with two default booleans ([OfficeSettings UI](https://github.com/hcengineering/platform/blob/2a985b31e314c0793dd965e5a1d8abe28f262f34/plugins/setting-resources/src/components/OfficeSettings.svelte#L20-L75)); the declared compatible setting package now exports it. | **Direct** (read) | Implemented internally for video-room creation. Parse both booleans through the schema-owned boundary and do not expose raw setting records. |
+| Write OfficeSettings workspace defaults | The published declaration describes the record, but this implementation slice has no focused workspace-settings authorization and lifecycle contract. | **Guided / deferred** | Keep mutation separate from room creation. Do not use room creation as an implicit workspace-settings write. |
 
 ### Join, leave, and transient participant state
 
@@ -160,10 +163,10 @@ ParticipantInfo and RoomInfo are transient model documents. The server creates/r
 Read-only probes used the documented container URL override (HULY_URL=http://host.docker.internal:8087) and normal credentials. They are availability evidence, not a substitute for a write contract:
 
 - list_huly_classes found the Love classes Room, Office, Floor, MeetingMinutes, DevicesPreference, ParticipantInfo, RoomInfo, and the Meeting/MeetingSchedule mixins.
-- get_huly_class confirmed the live Room and MeetingMinutes fields/projections and confirmed that setting:class:OfficeSettings exists at runtime, while the installed package still lacks its declaration.
+- get_huly_class confirmed the live Room and MeetingMinutes fields/projections and confirmed that setting:class:OfficeSettings exists at runtime. The later direct dependency now supplies its published declaration.
 - list_calendars returned only internal writable, non-hidden calendars in this workspace and marked one computed primary. It did not prove that an external provider is configured.
 - The live workspace had one Floor, no active RoomInfo/ParticipantInfo rows, no MeetingMinutes rows, and no DevicePreferences rows at probe time. Room listing returned an unexpected runtime error, so this report does not treat room-list success as certified.
-- list_office_defaults returned current room-level default flags. This shows that the existing read path can observe durable Room defaults; it does not establish that workspace OfficeSettings is safely writable through the installed SDK.
+- list_office_defaults returned current room-level default flags. The implemented room-create path can also read workspace OfficeSettings through the published declaration; neither fact establishes a workspace-settings mutation contract.
 
 The probes were read-only. No Calendar, ExternalCalendar, PrimaryCalendar, Room, Floor, MeetingMinutes, preference, transient document, provider session, recording, or transcript was created or mutated.
 
@@ -175,7 +178,7 @@ The local integration suite can safely cover durable document paths without pret
 2. **Room/Floor:** create a disposable Floor and Room through the high-level contract, assert type-specific defaults and field updates, and remove only an empty test Room/Floor after eventual-consistency checks. Do not use direct ParticipantInfo writes as setup or cleanup.
 3. **Meeting/MeetingSchedule:** create a disposable base Event/Schedule through the composed API, assert the typed room mixin is present, update the room through the wrapper, and clean up base plus mixin using an implementation-owned cleanup port. Do not make raw mixin mechanics part of MCP input.
 4. **MeetingMinutes:** test title/description edits only on a fixture created by the supported meeting workflow. Assert status and attachment target are read-only. Avoid manufacturing a fake transcript/recording collection.
-5. **Preferences:** test current-account DevicesPreference persistence separately from active LiveKit state. OfficeSettings tests remain blocked until a compatible package is installed.
+5. **Preferences:** test current-account DevicesPreference persistence separately from active LiveKit state. Test native OfficeSettings only as the read-only source of video-room creation defaults; do not mutate workspace settings as test setup.
 6. **Provider operations:** test only an explicit unsupported/capability result until a first-party authenticated Love/AI/LiveKit test service can provide deterministic start/stop, timeout, and cleanup behavior. Do not make the normal local suite depend on LiveKit, S3, AI-bot, or asynchronous recording webhooks.
 
 All writes need finally cleanup and must account for Huly's eventual consistency. A successful document transaction is not evidence that an external provider operation completed, and an HTTP 200 from /startRecord is not evidence that a recording attachment exists.
@@ -195,7 +198,7 @@ Split the broad issue into at most these original-product follow-ups:
 - optional current-account DevicesPreference persistence if there is a concrete user need;
 - optional MeetingMinutes title/description edits, separate from meeting lifecycle.
 
-Keep OfficeSettings blocked behind a compatible published @hcengineering/setting artifact. Keep join/leave, LiveKit device/session state, transcription, recording, arbitrary MeetingMinutes creation/deletion, transcript message reads, and transient participant/room-info writes blocked or excluded. Do not mark the umbrella issue ready-for-agent; close it only after the narrow tasks and the explicit non-goals are recorded.
+The compatible published `@hcengineering/setting` artifact now supports the implemented OfficeSettings read. Keep OfficeSettings mutation, join/leave, LiveKit device/session state, transcription, recording, arbitrary MeetingMinutes creation/deletion, transcript message reads, and transient participant/room-info writes blocked, deferred, or excluded. The narrow durable tasks and explicit non-goals supersede the original umbrella issue.
 
 ## Conclusion
 
@@ -205,4 +208,3 @@ The gaps are not “all fields missing from the TypeScript interfaces.” Huly i
 - guide or block workflows whose correctness depends on account/provider state;
 - explicitly exclude transient/proprietary entities and invented RSVP/recording models;
 - do not let a technically writable generic transaction turn a server-owned field into an MCP feature.
-

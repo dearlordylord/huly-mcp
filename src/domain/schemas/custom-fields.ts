@@ -1,11 +1,13 @@
 import { Schema } from "effect"
 
+import { CustomFieldDateTimestamp } from "./custom-field-date.js"
 import { toDraft07JsonSchema, withJsonSchemaPropertyDescriptions } from "./json-schema.js"
 
 import {
   CustomFieldId,
   DocId,
   enumValuesDescription,
+  HulyEnumId,
   LimitParam,
   MAX_LIMIT,
   NonEmptyString,
@@ -85,24 +87,72 @@ export type SetCustomFieldResult = Schema.Schema.Type<typeof SetCustomFieldResul
 export const EmptyCustomFieldTypeDetailsSchema = Schema.Record(Schema.String, Schema.Never)
 export type EmptyCustomFieldTypeDetails = Schema.Schema.Type<typeof EmptyCustomFieldTypeDetailsSchema>
 
-const CustomFieldTypeDetailsRecordSchema = Schema.Record(Schema.String, Schema.Unknown)
+const CustomFieldTypeDetailsRecordSchema = Schema.Record(Schema.String, Schema.Json)
 
-export const EnumCustomFieldTypeDetailsSchema = CustomFieldTypeDetailsRecordSchema.check(
-  Schema.makeFilter((details) =>
-    Object.hasOwn(details, "enumRef") ? undefined : "enum custom field typeDetails must include enumRef"
-  )
+export type NestedCustomFieldTypeDetails = Readonly<Record<string, Schema.Json>> & {
+  readonly _class: NonEmptyString
+  readonly enumRef?: HulyEnumId
+  readonly of?: NonEmptyString | NestedCustomFieldTypeDetails
+  readonly to?: ObjectClassName
+}
+
+export type NestedCustomFieldTypeDetailsEncoded = Readonly<Record<string, Schema.Json>> & {
+  readonly _class: string
+  readonly enumRef?: string
+  readonly of?: string | NestedCustomFieldTypeDetailsEncoded
+  readonly to?: string
+}
+
+const NestedCustomFieldTypeDetailsSchema: Schema.Codec<
+  NestedCustomFieldTypeDetails,
+  NestedCustomFieldTypeDetailsEncoded
+> = Schema.StructWithRest(
+  Schema.Struct({
+    _class: NonEmptyString,
+    enumRef: Schema.optionalKey(HulyEnumId),
+    of: Schema.optionalKey(
+      Schema.Union([
+        NonEmptyString,
+        Schema.suspend(
+          (): Schema.Codec<NestedCustomFieldTypeDetails, NestedCustomFieldTypeDetailsEncoded> =>
+            NestedCustomFieldTypeDetailsSchema
+        )
+      ])
+    ),
+    to: Schema.optionalKey(ObjectClassName)
+  }),
+  [CustomFieldTypeDetailsRecordSchema]
+)
+
+const CustomFieldTypeDetailsClassField = Schema.optionalKey(NonEmptyString)
+
+export const EnumCustomFieldTypeDetailsSchema = Schema.StructWithRest(
+  Schema.Struct({
+    _class: CustomFieldTypeDetailsClassField,
+    enumRef: HulyEnumId.pipe(
+      Schema.annotateKey({ messageMissingKey: "enum custom field typeDetails must include enumRef" })
+    ),
+    of: Schema.optionalKey(HulyEnumId)
+  }),
+  [CustomFieldTypeDetailsRecordSchema]
 )
 export type EnumCustomFieldTypeDetails = Schema.Schema.Type<typeof EnumCustomFieldTypeDetailsSchema>
-export const ArrayCustomFieldTypeDetailsSchema = CustomFieldTypeDetailsRecordSchema.check(
-  Schema.makeFilter((details) =>
-    Object.hasOwn(details, "of") ? undefined : "array custom field typeDetails must include of"
-  )
+export const ArrayCustomFieldTypeDetailsSchema = Schema.StructWithRest(
+  Schema.Struct({
+    _class: CustomFieldTypeDetailsClassField,
+    of: Schema.Union([NonEmptyString, NestedCustomFieldTypeDetailsSchema]).pipe(
+      Schema.annotateKey({ messageMissingKey: "array custom field typeDetails must include of" })
+    )
+  }),
+  [CustomFieldTypeDetailsRecordSchema]
 )
 export type ArrayCustomFieldTypeDetails = Schema.Schema.Type<typeof ArrayCustomFieldTypeDetailsSchema>
-export const RefCustomFieldTypeDetailsSchema = CustomFieldTypeDetailsRecordSchema.check(
-  Schema.makeFilter((details) =>
-    Object.hasOwn(details, "to") ? undefined : "ref custom field typeDetails must include to"
-  )
+export const RefCustomFieldTypeDetailsSchema = Schema.StructWithRest(
+  Schema.Struct({
+    _class: CustomFieldTypeDetailsClassField,
+    to: ObjectClassName.pipe(Schema.annotateKey({ messageMissingKey: "ref custom field typeDetails must include to" }))
+  }),
+  [CustomFieldTypeDetailsRecordSchema]
 )
 export type RefCustomFieldTypeDetails = Schema.Schema.Type<typeof RefCustomFieldTypeDetailsSchema>
 export const UnknownCustomFieldTypeDetailsSchema = CustomFieldTypeDetailsRecordSchema
@@ -119,7 +169,27 @@ const CustomFieldInfoBaseWireFields = {
 export const CustomFieldInfoWireSchema = Schema.Union([
   Schema.Struct({
     ...CustomFieldInfoBaseWireFields,
-    type: Schema.Literals(CUSTOM_FIELD_PRIMITIVE_TYPE_NAMES),
+    type: Schema.Literal("string"),
+    typeDetails: EmptyCustomFieldTypeDetailsSchema
+  }),
+  Schema.Struct({
+    ...CustomFieldInfoBaseWireFields,
+    type: Schema.Literal("number"),
+    typeDetails: EmptyCustomFieldTypeDetailsSchema
+  }),
+  Schema.Struct({
+    ...CustomFieldInfoBaseWireFields,
+    type: Schema.Literal("boolean"),
+    typeDetails: EmptyCustomFieldTypeDetailsSchema
+  }),
+  Schema.Struct({
+    ...CustomFieldInfoBaseWireFields,
+    type: Schema.Literal("date"),
+    typeDetails: EmptyCustomFieldTypeDetailsSchema
+  }),
+  Schema.Struct({
+    ...CustomFieldInfoBaseWireFields,
+    type: Schema.Literal("markup"),
     typeDetails: EmptyCustomFieldTypeDetailsSchema
   }),
   Schema.Struct({
@@ -152,6 +222,55 @@ export const CustomFieldValueWireSchema = Schema.Struct({
   type: CustomFieldTypeNameSchema
 })
 
+const RecruitingCandidateCustomFieldValueBaseWireFields = {
+  fieldId: CustomFieldId,
+  name: Schema.String,
+  label: Schema.String,
+  ownerClassId: ObjectClassName,
+  ownerLabel: Schema.String
+} as const
+
+export const RecruitingCandidateCustomFieldValueWireSchema = Schema.Union([
+  Schema.Struct({
+    ...RecruitingCandidateCustomFieldValueBaseWireFields,
+    type: Schema.Literals(["string", "markup", "enum"]),
+    value: Schema.optionalKey(Schema.String)
+  }),
+  Schema.Struct({
+    ...RecruitingCandidateCustomFieldValueBaseWireFields,
+    type: Schema.Literal("number"),
+    value: Schema.optionalKey(Schema.Number)
+  }),
+  Schema.Struct({
+    ...RecruitingCandidateCustomFieldValueBaseWireFields,
+    type: Schema.Literal("date"),
+    value: Schema.optionalKey(CustomFieldDateTimestamp)
+  }),
+  Schema.Struct({
+    ...RecruitingCandidateCustomFieldValueBaseWireFields,
+    type: Schema.Literal("boolean"),
+    value: Schema.optionalKey(Schema.Boolean)
+  }),
+  Schema.Struct({
+    ...RecruitingCandidateCustomFieldValueBaseWireFields,
+    type: Schema.Literal("array"),
+    value: Schema.optionalKey(Schema.Array(Schema.Json))
+  }),
+  Schema.Struct({
+    ...RecruitingCandidateCustomFieldValueBaseWireFields,
+    type: Schema.Literal("ref"),
+    value: Schema.optionalKey(Schema.String)
+  }),
+  Schema.Struct({
+    ...RecruitingCandidateCustomFieldValueBaseWireFields,
+    type: Schema.Literal("unknown"),
+    value: Schema.optionalKey(Schema.Json)
+  })
+])
+export type RecruitingCandidateCustomFieldValue = Schema.Schema.Type<
+  typeof RecruitingCandidateCustomFieldValueWireSchema
+>
+
 export const SetCustomFieldResultWireSchema = Schema.Struct({
   objectId: DocId,
   fieldId: CustomFieldId,
@@ -162,6 +281,9 @@ export const SetCustomFieldResultWireSchema = Schema.Struct({
 
 export const ListCustomFieldsResultSchema = Schema.Array(CustomFieldInfoWireSchema)
 export const GetCustomFieldValuesResultSchema = Schema.Array(CustomFieldValueWireSchema)
+export const GetRecruitingCandidateCustomFieldValuesResultSchema = Schema.Array(
+  RecruitingCandidateCustomFieldValueWireSchema
+)
 
 export const listCustomFieldsParamsJsonSchema = withJsonSchemaPropertyDescriptions(
   toDraft07JsonSchema(ListCustomFieldsParamsSchema),

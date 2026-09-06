@@ -3,54 +3,94 @@
   "categories": [
     {
       "category": "draft07-structure",
-      "count": 3260,
-      "deltaSetSha256": "638eefe7e2a3cb47bd2feee8df993c8006944cb00775a484832d7be360b4c25c",
-      "issue": "#225",
-      "rationale": "Reviewed Effect 4 Draft-07 structural dialect: refs, definitions, optional/null unions, refinements, and composition wrappers."
+      "count": 16010,
+      "deltaSetSha256": "0f410cca51c85c4cd7cabdec48e09e0c8b7f4e111f72a4fa83142f9aca6b9219",
+      "issues": [
+        "#97",
+        "#225",
+        "#264",
+        "#265",
+        "#266",
+        "#267",
+        "#268"
+      ],
+      "rationale": "Reviewed Effect 4 Draft-07 structural dialect plus the post-baseline administration, Recruiting Candidate custom-field, Planner document-ToDo, Calendar-settings, virtual-office, and meeting-room schemas."
     },
     {
       "category": "schema-metadata",
-      "count": 1192,
-      "deltaSetSha256": "88a285404c8ce6655cb2b94a6888326735449b8e947b174a1063a16df62cb694",
-      "issue": "#225",
-      "rationale": "Reviewed schema metadata migration: authored descriptions are preserved and legacy generator-default metadata is replaced."
+      "count": 2328,
+      "deltaSetSha256": "7087f7cacefe42f4e381da64b54ae977506fe98c6642157022deb1a891c747d6",
+      "issues": [
+        "#97",
+        "#225",
+        "#245",
+        "#264",
+        "#265",
+        "#266",
+        "#267",
+        "#268"
+      ],
+      "rationale": "Reviewed schema metadata migration and authored descriptions for issue-assignee resolution (#245) and the post-baseline #97 and #264-#268 feature contracts."
     },
     {
       "category": "authored-constraints",
-      "count": 965,
-      "deltaSetSha256": "9f3f9c228bc8347011d889ae18ae22a998b10892c5f2a83f8469e44c28e10b60",
-      "issue": "#225",
-      "rationale": "Reviewed authored-constraint projection: pre-funnel tools remain represented and strict Draft-07/runtime agreement passes."
+      "count": 968,
+      "deltaSetSha256": "18bc6a9922c67248cccb84cc9c40aa8d1fefa375aec158656129feca9d009699",
+      "issues": [
+        "#225",
+        "#245"
+      ],
+      "rationale": "Reviewed authored-constraint projection: pre-funnel tools remain represented, #245 assignee alternative descriptions are preserved, and strict Draft-07/runtime agreement passes."
     },
     {
       "category": "issue-assignee-description",
       "count": 6,
       "deltaSetSha256": "1b96ecc02119831de41d610adc1a98b8c4346581db372a0e72901aac5b5b8b64",
-      "issue": "#245",
+      "issues": [
+        "#245"
+      ],
       "rationale": "Reviewed agent-facing issue tool and assignee input descriptions advertising exact agent UserProfile titles."
     },
     {
-      "category": "issue-97-administration",
-      "count": 19518,
-      "deltaSetSha256": "4836ddcb63dd110e9fdd3a15d328f1874869c34696a08ba2a96ed34be502d83b",
-      "issue": "#97",
-      "rationale": "Reviewed employee lifecycle, employee-position, HR-department, Staff-assignment, funnel-administration, lead mutation/collaboration and relation-locator changes, HR-request, public-holiday, HR-report, person-administration, and explicit person-merge operations with their exact schemas and ordered registry/CLI exposure."
+      "category": "post-baseline-operation-expansion",
+      "count": 10109,
+      "deltaSetSha256": "7c0e248dd082a47698dbebf8349d639fdfe8ae0b786a68bf78d57db139a67767",
+      "issues": [
+        "#97",
+        "#264",
+        "#265",
+        "#266",
+        "#267",
+        "#268"
+      ],
+      "rationale": "Reviewed the ordered operation expansion and shifted registry/CLI surfaces from #97 and #264-#267, together with post-baseline Planner (#265) and meeting-room (#268) contract changes in the affected ordered region."
     },
     {
       "category": "cli-json-diagnostic",
       "count": 6,
       "deltaSetSha256": "c7fad36fffaffa35e829dd6bf9bdf3eeaddcc03c76d82ddcaad8ccb13b6a6910",
-      "issue": "#228",
+      "issues": [
+        "#228"
+      ],
       "rationale": "Reviewed CLI JSON diagnostic: deterministic line/column context was added without changing failure classification or exit status."
     },
     {
       "category": "cli-help",
       "count": 4,
-      "deltaSetSha256": "10f91eda8481953c6feed877e8dafa212dc8aab689151e00d08d66b2c9c820ab",
-      "issue": "#228",
-      "rationale": "Reviewed concise Effect 4 CLI help rendering; employee lifecycle, funnel, lead collaboration, HR-request, public-holiday, HR-report, and person-administration routes are added without changing other route behavior."
+      "deltaSetSha256": "84e370505ba28d3eb974f52fc24e97a27041ce8a844c689763716c1ecad1de00",
+      "issues": [
+        "#97",
+        "#228",
+        "#245",
+        "#264",
+        "#265",
+        "#266",
+        "#267",
+        "#268"
+      ],
+      "rationale": "Reviewed concise Effect 4 CLI help rendering, including the #245 assignee guidance and the #97 and #264-#268 operation and contract updates represented in the complete help output."
     }
   ],
-  "formatVersion": 1,
-  "reviewedCurrentSha256": "3d54596f54a3c60423bbf49779e3aee6a65c070890802b6e53fa186fa0ab7a5a"
+  "formatVersion": 2,
+  "reviewedCurrentSha256": "13cf2b85c17ac11e4e3bd70866537d21b11c7f34b605c97c7d4a45d0db5f5b15"
 }

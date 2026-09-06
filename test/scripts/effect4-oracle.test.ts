@@ -128,7 +128,7 @@ describe("Effect 4 behavioral oracle", () => {
   })
 
   it("compiles every native and proxy public schema as Draft-07", () => {
-    expect(validateCurrentDraft07Corpora()).toEqual({ native: 594, proxy: 6 })
+    expect(validateCurrentDraft07Corpora()).toEqual({ native: 603, proxy: 6 })
   }, 60_000)
 
   it("terminates and reaps an oracle subprocess after its deadline", async () => {
@@ -152,7 +152,7 @@ describe("Effect 4 behavioral oracle", () => {
       await fs.writeFile(
         reviewPath,
         canonicalJson({
-          formatVersion: 1,
+          formatVersion: 2,
           baselineSha256: "9053d8e8efe22940ca928624fae1b62a9e7aa5e0b2bd9782ad54915b498ea53a",
           reviewedCurrentSha256: "9053d8e8efe22940ca928624fae1b62a9e7aa5e0b2bd9782ad54915b498ea53a",
           categories: []
@@ -165,7 +165,7 @@ describe("Effect 4 behavioral oracle", () => {
       await fs.writeFile(
         reviewPath,
         canonicalJson({
-          formatVersion: 1,
+          formatVersion: 2,
           baselineSha256: "0".repeat(64),
           reviewedCurrentSha256: "9053d8e8efe22940ca928624fae1b62a9e7aa5e0b2bd9782ad54915b498ea53a",
           categories: []

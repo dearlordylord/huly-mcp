@@ -10,8 +10,8 @@ import type {
 } from "@hcengineering/calendar"
 import type { Employee } from "@hcengineering/contact"
 import type { Data, DocumentUpdate, Ref, Space } from "@hcengineering/core"
-import { SortingOrder } from "@hcengineering/core"
-import type { MeetingSchedule as HulyMeetingSchedule, Room as HulyRoom } from "@hcengineering/love"
+import { generateId, SortingOrder } from "@hcengineering/core"
+import type { MeetingSchedule as HulyMeetingSchedule } from "@hcengineering/love"
 import { Effect } from "effect"
 
 import type {
@@ -44,14 +44,14 @@ import {
   DurationMinutes,
   PersonId,
   PositiveDurationMinutes,
-  RoomId,
-  RoomName,
   ScheduleId,
   Timestamp,
   TimeZoneId
 } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
+import type { Diagnostics } from "../diagnostics.js"
 import type {
+  CalendarMeetingTargetNotWritableError,
   CalendarNotAccessibleError,
   NoUpdateFieldsError,
   PersonIdentifierAmbiguousError,
@@ -60,9 +60,22 @@ import type {
 } from "../errors.js"
 import { HulyDataInvalidError, ScheduleNotFoundError } from "../errors.js"
 import { calendar, love } from "../huly-plugins.js"
+import {
+  createScheduleMeetingComposition,
+  type CreateMeetingCompositionError,
+  ensureProspectiveMeetingScheduleOwned,
+  executeScheduleMeetingMutation,
+  type MeetingRoomResolutionError,
+  type PrepareScheduleMeetingRoomUpdateError,
+  prepareScheduleMeetingRoomUpdate,
+  resolveMeetingRoom,
+  type ScheduleMeetingMutationError
+} from "./calendar-meeting-composition.js"
+import { lookupMeetingRoomReferences } from "./calendar-meeting-rooms.js"
 import { buildParticipants, resolveCalendarRef } from "./calendar-shared.js"
 import { hulyNonEmptyTextOrFallback } from "./non-empty-text.js"
 import { resolveTodoOwner } from "./planner-shared.js"
+import { snapshotScheduleUpdate } from "./calendar-meeting-snapshots.js"
 import { clampLimit, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import { mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
@@ -80,6 +93,9 @@ type CreateScheduleError =
   | PersonIdentifierAmbiguousError
   | PersonNotFoundError
   | PersonNotAnEmployeeError
+  | MeetingRoomResolutionError
+  | CreateMeetingCompositionError
+  | CalendarMeetingTargetNotWritableError
 type UpdateScheduleError =
   | HulyClientError
   | HulyDataInvalidError
@@ -89,6 +105,8 @@ type UpdateScheduleError =
   | PersonIdentifierAmbiguousError
   | PersonNotFoundError
   | PersonNotAnEmployeeError
+  | PrepareScheduleMeetingRoomUpdateError
+  | ScheduleMeetingMutationError
 type DeleteScheduleError = HulyClientError | ScheduleNotFoundError
 
 const SCHEDULE_WEEKDAY_TO_HULY_INDEX = {
@@ -151,11 +169,6 @@ const optionalTimestamp = (value: number | undefined) => (value === undefined ? 
 const optionalDescription = (value: string | undefined): string | undefined =>
   value === undefined || value.trim() === "" ? undefined : value
 
-const optionalRoomName = (value: string | undefined): RoomName | undefined => {
-  const trimmed = value?.trim() ?? ""
-  return trimmed === "" ? undefined : RoomName.make(trimmed)
-}
-
 const UNTITLED_SCHEDULE = ScheduleTitle.make("Untitled Schedule")
 
 const scheduleTitle = (title: string): ScheduleTitle =>
@@ -164,7 +177,7 @@ const scheduleTitle = (title: string): ScheduleTitle =>
 const lookupMeetingScheduleRooms = (
   client: HulyClient["Service"],
   schedules: ReadonlyArray<HulySchedule>
-): Effect.Effect<ReadonlyMap<string, RoomReference>, HulyClientError> =>
+): Effect.Effect<ReadonlyMap<string, RoomReference>, HulyClientError, Diagnostics> =>
   Effect.gen(function* () {
     const scheduleIds = schedules.map((schedule) => toRef<HulyMeetingSchedule>(schedule._id))
     if (scheduleIds.length === 0) return new Map()
@@ -172,16 +185,7 @@ const lookupMeetingScheduleRooms = (
       love.mixin.MeetingSchedule,
       hulyQuery<HulyMeetingSchedule>({ _id: { $in: scheduleIds } })
     )
-    const roomIds = [...new Set(meetingSchedules.map((schedule) => schedule.room))]
-    if (roomIds.length === 0) return new Map()
-    const rooms = yield* client.findAll<HulyRoom>(love.class.Room, hulyQuery<HulyRoom>({ _id: { $in: roomIds } }))
-    const roomsById = new Map(rooms.map((room) => [room._id, room]))
-    return new Map(
-      meetingSchedules.map((schedule) => [
-        String(schedule._id),
-        { roomId: RoomId.make(schedule.room), name: optionalRoomName(roomsById.get(schedule.room)?.name) }
-      ])
-    )
+    return yield* lookupMeetingRoomReferences(client, meetingSchedules)
   })
 
 const summarizeSchedule = (
@@ -223,7 +227,7 @@ const buildOwner = (
 
 export const listSchedules = (
   params: ListSchedulesParams
-): Effect.Effect<Array<ScheduleSummary>, ListSchedulesError, HulyClient> =>
+): Effect.Effect<Array<ScheduleSummary>, ListSchedulesError, HulyClient | Diagnostics> =>
   Effect.gen(function* () {
     const client = yield* HulyClient
     const query: StrictDocumentQuery<HulySchedule> = {}
@@ -242,7 +246,9 @@ export const listSchedules = (
     )
   })
 
-export const getSchedule = (params: GetScheduleParams): Effect.Effect<ScheduleDetails, GetScheduleError, HulyClient> =>
+export const getSchedule = (
+  params: GetScheduleParams
+): Effect.Effect<ScheduleDetails, GetScheduleError, HulyClient | Diagnostics> =>
   Effect.gen(function* () {
     const client = yield* HulyClient
     const schedule = yield* client.findOne<HulySchedule>(
@@ -312,39 +318,72 @@ const updateScheduleEntries = (client: HulyClient["Service"], params: UpdateSche
   calendarName: Effect.gen(function* () {
     if (params.calendarName === undefined) return {}
     return { calendar: yield* resolveCalendarRef(client, undefined, params.calendarName) }
-  })
+  }),
+  meetingRoom: Effect.succeed({})
 })
 
-export const createSchedule = (
+export const createSchedule = Effect.fn("Calendar.createSchedule")(function* (
   params: CreateScheduleParams
-): Effect.Effect<CreateScheduleResult, CreateScheduleError, HulyClient> =>
-  Effect.gen(function* () {
-    const client = yield* HulyClient
-    const owner = yield* resolveTodoOwner(client, params.owner)
-    const calendarRef = yield* resolveOptionalScheduleCalendar(client, params)
-    const data = createScheduleData(params, owner, calendarRef)
+): Effect.fn.Return<CreateScheduleResult, CreateScheduleError, HulyClient> {
+  const client = yield* HulyClient
+  const scheduleId = generateId<HulySchedule>()
+  const owner = yield* resolveTodoOwner(client, params.owner)
+  const meetingRoomLocator = params.meetingRoom
+  const meetingRoom =
+    meetingRoomLocator === undefined
+      ? undefined
+      : yield* Effect.gen(function* () {
+          yield* ensureProspectiveMeetingScheduleOwned(client, scheduleId, owner)
+          return yield* resolveMeetingRoom(client, meetingRoomLocator)
+        })
+  const calendarRef = yield* resolveOptionalScheduleCalendar(client, params)
+  const data = createScheduleData(params, owner, calendarRef)
 
-    const scheduleId = yield* client.createDoc(calendar.class.Schedule, toRef<Space>(calendar.space.Calendar), data)
-    return { scheduleId: ScheduleId.make(scheduleId) }
-  })
+  const scheduleSpace = toRef<Space>(calendar.space.Calendar)
+  const createdScheduleId =
+    meetingRoom === undefined
+      ? yield* client.createDoc(calendar.class.Schedule, scheduleSpace, data, scheduleId)
+      : yield* createScheduleMeetingComposition(client, {
+          scheduleId,
+          space: scheduleSpace,
+          room: meetingRoom._id,
+          createBase: () => client.createDoc(calendar.class.Schedule, scheduleSpace, data, scheduleId)
+        })
+  return { scheduleId: ScheduleId.make(createdScheduleId) }
+})
 
-export const updateSchedule = (
+export const updateSchedule = Effect.fn("Calendar.updateSchedule")(function* (
   params: UpdateScheduleParams
-): Effect.Effect<UpdateScheduleResult, UpdateScheduleError, HulyClient> =>
-  Effect.gen(function* () {
-    yield* requireUpdateFields("update_schedule", params, UPDATE_SCHEDULE_FIELDS)
-    const client = yield* HulyClient
-    const schedule = yield* client.findOne<HulySchedule>(
+): Effect.fn.Return<UpdateScheduleResult, UpdateScheduleError, HulyClient> {
+  yield* requireUpdateFields("update_schedule", params, UPDATE_SCHEDULE_FIELDS)
+  const client = yield* HulyClient
+  const meetingPlan =
+    params.meetingRoom === undefined
+      ? undefined
+      : yield* prepareScheduleMeetingRoomUpdate(client, params.scheduleId, params.meetingRoom)
+  const schedule =
+    meetingPlan?.schedule ??
+    (yield* client.findOne<HulySchedule>(
       calendar.class.Schedule,
       hulyQuery<HulySchedule>({ _id: toRef<HulySchedule>(params.scheduleId) })
-    )
-    if (schedule === undefined) return yield* new ScheduleNotFoundError({ scheduleId: params.scheduleId })
+    ))
+  if (schedule === undefined) return yield* new ScheduleNotFoundError({ scheduleId: params.scheduleId })
 
-    const entries = updateScheduleEntries(client, params)
-    const updateOps = mergeUpdateEntries(yield* Effect.all(Object.values(entries)))
-    yield* client.updateDoc(calendar.class.Schedule, schedule.space, schedule._id, updateOps)
-    return { scheduleId: params.scheduleId, updated: true }
-  })
+  const entries = updateScheduleEntries(client, params)
+  const updateOps = mergeUpdateEntries(yield* Effect.all(Object.values(entries)))
+  if (meetingPlan === undefined) {
+    if (Reflect.ownKeys(updateOps).length > 0) {
+      yield* client.updateDoc(calendar.class.Schedule, schedule.space, schedule._id, updateOps)
+    }
+  } else {
+    yield* executeScheduleMeetingMutation(client, {
+      plan: meetingPlan,
+      update: updateOps,
+      inverse: snapshotScheduleUpdate(schedule, updateOps)
+    })
+  }
+  return { scheduleId: params.scheduleId, updated: true }
+})
 
 export const deleteSchedule = (
   params: DeleteScheduleParams

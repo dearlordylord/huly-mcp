@@ -250,13 +250,13 @@ describe("Effect 4 oracle structural parity", () => {
     ).toBeUndefined()
 
     const review = createOracleDeltaReview("baseline", "current", deltas, candidateToolIdentities)
-    expect(review.categories.map(({ category, issue }) => ({ category, issue }))).toEqual([
-      { category: "draft07-structure", issue: "#225" },
-      { category: "schema-metadata", issue: "#225" },
-      { category: "authored-constraints", issue: "#225" },
-      { category: "issue-assignee-description", issue: "#245" },
-      { category: "cli-json-diagnostic", issue: "#228" },
-      { category: "cli-help", issue: "#228" }
+    expect(review.categories.map(({ category, issues }) => ({ category, issues }))).toEqual([
+      { category: "draft07-structure", issues: ["#97", "#225", "#264", "#265", "#266", "#267", "#268"] },
+      { category: "schema-metadata", issues: ["#97", "#225", "#245", "#264", "#265", "#266", "#267", "#268"] },
+      { category: "authored-constraints", issues: ["#225", "#245"] },
+      { category: "issue-assignee-description", issues: ["#245"] },
+      { category: "cli-json-diagnostic", issues: ["#228"] },
+      { category: "cli-help", issues: ["#97", "#228", "#245", "#264", "#265", "#266", "#267", "#268"] }
     ])
     expect(() =>
       createOracleDeltaReview("baseline", "current", [{ _tag: "Added", path: "/unclassified", after: true }])
@@ -343,7 +343,7 @@ describe("Effect 4 oracle structural parity", () => {
     expect(oracleDeltaReviewCategory(delta, parseCandidateToolIdentities(responses({ tools: [{}] })))).toBeUndefined()
   })
 
-  it("classifies issue-97 insertions across registry, CLI, native, and live parity surfaces", async () => {
+  it("classifies post-baseline insertions across registry, CLI, native, and live parity surfaces", async () => {
     const baselineJson = await fs.readFile(EFFECT4_ORACLE_PATH, "utf8")
     const source = Schema.decodeUnknownSync(Schema.fromJsonString(BehavioralOracleSchema))(baselineJson)
     const authored = source.registry.authoredConstraints.find((entry) => entry.toolName === "list_issues")
@@ -375,20 +375,20 @@ describe("Effect 4 oracle structural parity", () => {
         ...baseline.bundledProcesses,
         stdio: {
           ...baseline.bundledProcesses.stdio,
-          native: candidateToolResponses(["set_employee_position", "list_issues"])
+          native: candidateToolResponses(["create_office_room", "list_issues"])
         }
       },
       registry: {
         ...baseline.registry,
-        authoredConstraints: [{ ...authored, toolName: "set_employee_position" }, { ...authored }],
-        operationOrder: ["set_employee_position", "list_issues"],
-        rawOrder: ["set_employee_position", "list_issues"],
-        tools: [{ ...registryTool, name: "set_employee_position" }, { ...registryTool }]
+        authoredConstraints: [{ ...authored, toolName: "create_office_room" }, { ...authored }],
+        operationOrder: ["create_office_room", "list_issues"],
+        rawOrder: ["create_office_room", "list_issues"],
+        tools: [{ ...registryTool, name: "create_office_room" }, { ...registryTool }]
       },
       cli: {
         ...baseline.cli,
         routes: [
-          { ...route, path: ["contacts", "employees", "set-position"], toolName: "set_employee_position" },
+          { ...route, path: ["virtual-office", "rooms", "create"], toolName: "create_office_room" },
           { ...route }
         ],
         parity: {
@@ -405,14 +405,16 @@ describe("Effect 4 oracle structural parity", () => {
     const report = createOracleDeltaAuditReport("baseline", "current", baseline, current, deltas)
 
     expect(deltas.length).toBeGreaterThan(10)
-    expect(report.categories).toEqual([{ category: "issue-97-administration", deltas }])
-    expect(report.certificate.categories.find(({ category }) => category === "issue-97-administration")).toMatchObject({
-      issue: "#97",
-      rationale: expect.stringContaining("funnel-administration")
+    expect(report.categories).toEqual([{ category: "post-baseline-operation-expansion", deltas }])
+    expect(
+      report.certificate.categories.find(({ category }) => category === "post-baseline-operation-expansion")
+    ).toMatchObject({
+      issues: ["#97", "#264", "#265", "#266", "#267", "#268"],
+      rationale: expect.stringContaining("operation expansion")
     })
   })
 
-  it("classifies issue-97 tool descriptions by native tool identity without an insertion", async () => {
+  it("classifies post-baseline tool descriptions by native tool identity without an insertion", async () => {
     const baselineJson = await fs.readFile(EFFECT4_ORACLE_PATH, "utf8")
     const source = Schema.decodeUnknownSync(Schema.fromJsonString(BehavioralOracleSchema))(baselineJson)
     const native = candidateToolResponses(["set_employee_position"])
@@ -428,10 +430,43 @@ describe("Effect 4 oracle structural parity", () => {
     }
     const report = createOracleDeltaAuditReport("same", "same", oracle, oracle, [descriptionDelta])
 
-    expect(report.categories).toEqual([{ category: "issue-97-administration", deltas: [descriptionDelta] }])
+    expect(report.categories).toEqual([{ category: "post-baseline-operation-expansion", deltas: [descriptionDelta] }])
   })
 
-  it("classifies issue-97 changes to existing lead and relation tool descriptions", async () => {
+  it("classifies a native discovery response added after the baseline and rejects an out-of-range response", async () => {
+    const baselineJson = await fs.readFile(EFFECT4_ORACLE_PATH, "utf8")
+    const baseline = Schema.decodeUnknownSync(Schema.fromJsonString(BehavioralOracleSchema))(baselineJson)
+    const responseIndex = baseline.bundledProcesses.stdio.native.length
+    const current = Schema.decodeUnknownSync(BehavioralOracleSchema)({
+      ...baseline,
+      bundledProcesses: {
+        ...baseline.bundledProcesses,
+        stdio: {
+          ...baseline.bundledProcesses.stdio,
+          native: [...baseline.bundledProcesses.stdio.native, ...candidateToolResponses(["create_office_room"])]
+        }
+      }
+    })
+    const addedResponseDelta = {
+      _tag: "Added" as const,
+      path: `/bundledProcesses/stdio/native/${responseIndex}/result/tools/0/name`,
+      after: "create_office_room"
+    }
+
+    expect(
+      createOracleDeltaAuditReport("baseline", "current", baseline, current, [addedResponseDelta]).categories
+    ).toEqual([{ category: "post-baseline-operation-expansion", deltas: [addedResponseDelta] }])
+
+    const outOfRangeDelta = {
+      ...addedResponseDelta,
+      path: `/bundledProcesses/stdio/native/${responseIndex + 1}/result/tools/0/name`
+    }
+    expect(() => createOracleDeltaAuditReport("baseline", "current", baseline, current, [outOfRangeDelta])).toThrow(
+      "unclassified"
+    )
+  })
+
+  it("classifies issue-owned post-baseline tool descriptions without positional attribution", async () => {
     const baselineJson = await fs.readFile(EFFECT4_ORACLE_PATH, "utf8")
     const source = Schema.decodeUnknownSync(Schema.fromJsonString(BehavioralOracleSchema))(baselineJson)
     const native = candidateToolResponses(["get_lead", "list_relations", "create_relation", "delete_relation"])
@@ -447,7 +482,24 @@ describe("Effect 4 oracle structural parity", () => {
     }))
     const report = createOracleDeltaAuditReport("same", "same", oracle, oracle, deltas)
 
-    expect(report.categories).toEqual([{ category: "issue-97-administration", deltas }])
+    expect(report.categories).toEqual([{ category: "post-baseline-operation-expansion", deltas }])
+
+    const featureNative = candidateToolResponses([
+      "list_recruiting_candidate_custom_fields",
+      "list_calendar_settings",
+      "create_todo",
+      "create_event"
+    ])
+    const featureOracle = Schema.decodeUnknownSync(BehavioralOracleSchema)({
+      ...source,
+      bundledProcesses: {
+        ...source.bundledProcesses,
+        stdio: { ...source.bundledProcesses.stdio, native: featureNative }
+      }
+    })
+    expect(createOracleDeltaAuditReport("same", "same", featureOracle, featureOracle, deltas).categories).toEqual([
+      { category: "post-baseline-operation-expansion", deltas }
+    ])
   })
 
   it("verifies reviews when either or both oracle corpora decode for expansion classification", async () => {
@@ -476,7 +528,7 @@ describe("Effect 4 oracle structural parity", () => {
     const fixture = canonicalJson({ count: 1 })
     const review = (categories: ReadonlyArray<unknown>) =>
       Schema.decodeUnknownSync(OracleDeltaReviewSchema)({
-        formatVersion: 1,
+        formatVersion: 2,
         baselineSha256: "7b2652e71fb224bd0ee1a2a62b131782d1b78604ef51c9b08f1dc01e4e6bf67b",
         reviewedCurrentSha256: "7b2652e71fb224bd0ee1a2a62b131782d1b78604ef51c9b08f1dc01e4e6bf67b",
         categories
@@ -490,16 +542,23 @@ describe("Effect 4 oracle structural parity", () => {
       count: 1,
       deltaSetSha256: "0".repeat(64),
       rationale: "Reviewed fixture.",
-      issue: "#225"
+      issues: ["#225"]
     }
     expect(() => verifyReviewedOracleDeltas(fixture, fixture, [], review([category, category]))).toThrow("duplicate")
     expect(() => review([{ ...category, count: 0 }])).toThrow()
     expect(() => review([{ ...category, rationale: "   " }])).toThrow()
-    expect(() => review([{ ...category, issue: "issue-225" }])).toThrow()
+    expect(() => review([{ ...category, issues: [] }])).toThrow()
+    expect(() => review([{ ...category, issues: ["issue-225"] }])).toThrow()
+    expect(() => review([{ ...category, issues: ["#225", "#225"] }])).toThrow()
 
     const reviewedDelta = { _tag: "Changed", path: "/cli/errors/json/message", before: "old", after: "new" } as const
     const exactReview = createOracleDeltaReview(fixture, fixture, [reviewedDelta])
     expect(() => verifyReviewedOracleDeltas(fixture, fixture, [reviewedDelta], exactReview)).not.toThrow()
+    const staleProvenance = Schema.decodeUnknownSync(OracleDeltaReviewSchema)({
+      ...exactReview,
+      categories: exactReview.categories.map((entry) => ({ ...entry, issues: ["#225"] }))
+    })
+    expect(() => verifyReviewedOracleDeltas(fixture, fixture, [reviewedDelta], staleProvenance)).toThrow("provenance")
     expect(() => verifyReviewedOracleDeltas(fixture, fixture, [], exactReview)).toThrow("differs")
     expect(() => verifyReviewedOracleDeltas("changed", fixture, [reviewedDelta], exactReview)).toThrow("baseline")
     expect(() => verifyReviewedOracleDeltas(fixture, "changed", [reviewedDelta], exactReview)).toThrow("corpus")
@@ -595,7 +654,7 @@ describe("Effect 4 oracle structural parity", () => {
       await fs.writeFile(
         reviewPath,
         canonicalJson({
-          formatVersion: 1,
+          formatVersion: 2,
           baselineSha256: "bc237aec467eef4ad72ab44c19ed2edbed79f7b5824a2e7ebfb3faf583433e66",
           reviewedCurrentSha256: "bc237aec467eef4ad72ab44c19ed2edbed79f7b5824a2e7ebfb3faf583433e66",
           categories: []
@@ -619,7 +678,7 @@ describe("Effect 4 oracle Draft-07 validation", () => {
   const RuntimeFixtureJsonSchema = toDraft07JsonSchema(RuntimeFixture)
 
   it("compiles the complete current native and proxy corpora without CLI imports", () => {
-    expect(validateCurrentDraft07Corpora()).toEqual({ native: 594, proxy: 6 })
+    expect(validateCurrentDraft07Corpora()).toEqual({ native: 603, proxy: 6 })
   }, 60_000)
 
   it("compiles complete tool documents and rejects duplicate names or dialect leaks", () => {

@@ -3,9 +3,11 @@ import {
   type AttachedData,
   type Class,
   type DocumentUpdate,
+  type Doc,
   generateId,
   type Ref,
-  SortingOrder
+  SortingOrder,
+  type Space
 } from "@hcengineering/core"
 import {
   type ProjectToDo as HulyProjectToDo,
@@ -30,11 +32,13 @@ import type {
   TodoMutationResult,
   TodoRank,
   TodoSummary,
+  TodoVisibility,
   UnscheduleTodoParams,
   UnscheduleTodoResult,
   UpdateTodoParams
 } from "../../domain/schemas/planner.js"
 import {
+  DEFAULT_DOCUMENT_TODO_VISIBILITY,
   DEFAULT_ISSUE_TODO_VISIBILITY,
   DEFAULT_PERSONAL_TODO_VISIBILITY,
   DEFAULT_TODO_PRIORITY,
@@ -42,12 +46,19 @@ import {
 } from "../../domain/schemas/planner.js"
 import { Count, SpaceId, Timestamp, TodoId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import type { HulyDomainError, NoUpdateFieldsError, TodoWorkSlotNotFoundError } from "../errors.js"
+import type { Diagnostics } from "../diagnostics.js"
+import type {
+  HulyDataInvalidError,
+  HulyDomainError,
+  NoUpdateFieldsError,
+  TodoWorkSlotNotFoundError
+} from "../errors.js"
 import { TodoWorkSlotNotFoundError as WorkSlotMissing } from "../errors.js"
 import { time, tracker } from "../huly-plugins.js"
 import { batchGetEmailsForPersons } from "./contacts-shared.js"
 import { renderMarkdownPreservingNativeReferences } from "./native-reference-markup.js"
 import { createPlannerWorkSlot } from "./planner-scheduling.js"
+import { documentMetadataForTodos } from "./planner-document-metadata.js"
 import {
   findTodo,
   type HulyTodoWithLookup,
@@ -91,12 +102,13 @@ const descriptionForTodo = (
 const detailFromTodo = (
   client: HulyClient["Service"],
   todo: HulyTodoWithLookup
-): Effect.Effect<TodoDetail, HulyClientError> =>
+): Effect.Effect<TodoDetail, HulyClientError | HulyDataInvalidError, Diagnostics> =>
   Effect.gen(function* () {
     const emailMap = yield* batchGetEmailsForPersons(client, uniqueTodoOwnerIds([todo]))
+    const documentMetadata = yield* documentMetadataForTodos(client, [todo])
     const description = yield* descriptionForTodo(client, todo)
     return {
-      ...todoSummary(todo, emailMap),
+      ...todoSummary(todo, emailMap, documentMetadata),
       ...(description === undefined ? {} : { description }),
       ...(todo.attachedSpace === undefined ? {} : { attachedSpace: SpaceId.make(todo.attachedSpace) }),
       ...(todo.createdOn === undefined ? {} : { createdOn: Timestamp.make(todo.createdOn) }),
@@ -117,62 +129,60 @@ const uploadTodoDescription = (
     return markupRefAsTodoDescription(ref)
   })
 
-const createPersonalTodo = (
-  client: HulyClient["Service"],
+type TodoPayload = Omit<AttachedData<HulyToDo>, "attachedSpace"> & { readonly attachedSpace?: Ref<Space> }
+
+const todoPayload = (
   params: CreateTodoParams,
   owner: Ref<Employee>,
-  todoId: Ref<HulyToDo>,
   description: HulyToDo["description"],
-  rank: TodoRank
-): Effect.Effect<void, HulyClientError> => {
-  const data: AttachedData<HulyToDo> = {
+  rank: TodoRank,
+  defaultVisibility: TodoVisibility
+): TodoPayload => {
+  const data: TodoPayload = {
     workslots: 0,
     title: params.title,
     description,
     priority: stringToTodoPriority(params.priority ?? DEFAULT_TODO_PRIORITY),
-    visibility: stringToTodoVisibility(params.visibility ?? DEFAULT_PERSONAL_TODO_VISIBILITY),
+    visibility: stringToTodoVisibility(params.visibility ?? defaultVisibility),
     user: owner,
     doneOn: null,
     rank
   }
   if (params.dueDate !== undefined) data.dueDate = params.dueDate
-  return client
-    .addCollection(time.class.ToDo, time.space.ToDos, time.ids.NotAttached, time.class.ToDo, "todos", data, todoId)
-    .pipe(Effect.asVoid)
+  return data
 }
 
-const createIssueTodo = (
+const createTodoRecord = Effect.fn("Planner.createTodoRecord")(function* <T extends HulyToDo, P extends Doc>(
   client: HulyClient["Service"],
-  params: CreateTodoParams,
-  owner: Ref<Employee>,
-  issue: HulyIssue,
-  todoId: Ref<HulyProjectToDo>,
-  description: HulyToDo["description"],
-  rank: TodoRank
-): Effect.Effect<void, HulyClientError> => {
-  const data: AttachedData<HulyProjectToDo> = {
-    workslots: 0,
-    title: params.title,
-    description,
-    priority: stringToTodoPriority(params.priority ?? DEFAULT_TODO_PRIORITY),
-    visibility: stringToTodoVisibility(params.visibility ?? DEFAULT_ISSUE_TODO_VISIBILITY),
-    user: owner,
-    doneOn: null,
-    attachedSpace: issue.space,
-    rank
-  }
-  if (params.dueDate !== undefined) data.dueDate = params.dueDate
-  return client
-    .addCollection(time.class.ProjectToDo, time.space.ToDos, issue._id, tracker.class.Issue, "todos", data, todoId)
+  target: { readonly objectClass: Ref<Class<T>>; readonly attachedTo: Ref<P>; readonly attachedToClass: Ref<Class<P>> },
+  data: AttachedData<T>,
+  todoId: Ref<T>
+): Effect.fn.Return<void, HulyClientError> {
+  yield* client
+    .addCollection(
+      target.objectClass,
+      time.space.ToDos,
+      target.attachedTo,
+      target.attachedToClass,
+      "todos",
+      data,
+      todoId
+    )
     .pipe(Effect.asVoid)
-}
+})
 
-export const listTodos = (params: ListTodosParams): Effect.Effect<Array<TodoSummary>, PlannerLookupError, HulyClient> =>
+export const listTodos = (
+  params: ListTodosParams
+): Effect.Effect<Array<TodoSummary>, PlannerLookupError, HulyClient | Diagnostics> =>
   Effect.gen(function* () {
     const client = yield* HulyClient
     const owner = params.owner === undefined ? undefined : yield* resolveTodoOwner(client, params.owner)
     const attachment =
-      params.issue === undefined ? undefined : yield* resolveTodoAttachment(client, { type: "issue", ...params.issue })
+      params.issue !== undefined
+        ? yield* resolveTodoAttachment(client, { type: "issue", ...params.issue })
+        : params.document !== undefined
+          ? yield* resolveTodoAttachment(client, { type: "document", ...params.document })
+          : undefined
     const query = queryFromListFilters(owner, attachment, {
       title: params.title,
       dueFrom: params.dueFrom,
@@ -194,10 +204,13 @@ export const listTodos = (params: ListTodosParams): Effect.Effect<Array<TodoSumm
     const filtered =
       titleSearch === undefined ? todos : todos.filter((todo) => todo.title.toLowerCase().includes(titleSearch))
     const emailMap = yield* batchGetEmailsForPersons(client, uniqueTodoOwnerIds(filtered))
-    return filtered.map((todo) => todoSummary(todo, emailMap))
+    const documentMetadata = yield* documentMetadataForTodos(client, filtered)
+    return filtered.map((todo) => todoSummary(todo, emailMap, documentMetadata))
   })
 
-export const getTodo = (params: GetTodoParams): Effect.Effect<TodoDetail, PlannerLookupError, HulyClient> =>
+export const getTodo = (
+  params: GetTodoParams
+): Effect.Effect<TodoDetail, PlannerLookupError, HulyClient | Diagnostics> =>
   Effect.gen(function* () {
     const client = yield* HulyClient
     const todo = yield* findTodo(client, params.locator)
@@ -208,19 +221,57 @@ export const createTodo = (params: CreateTodoParams): Effect.Effect<CreateTodoRe
   Effect.gen(function* () {
     const client = yield* HulyClient
     const owner = yield* resolveTodoOwner(client, params.owner)
-    const attachment = yield* resolveTodoAttachment(client, params.attachedTo)
+    const attachment = yield* resolveTodoAttachment(client, params.attachedTo, { requireWritable: true })
     const rank = yield* latestOpenTodoRank(client, owner)
 
-    if (attachment.type === "issue" && attachment.issue !== undefined) {
+    if (attachment.type === "issue") {
       const todoId: Ref<HulyProjectToDo> = generateId()
       const description = yield* uploadTodoDescription(client, time.class.ProjectToDo, todoId, params.description)
-      yield* createIssueTodo(client, params, owner, attachment.issue, todoId, description, rank)
+      const data = {
+        ...todoPayload(params, owner, description, rank, DEFAULT_ISSUE_TODO_VISIBILITY),
+        attachedSpace: attachment.issue.space
+      } satisfies AttachedData<HulyProjectToDo>
+      yield* createTodoRecord(
+        client,
+        {
+          objectClass: time.class.ProjectToDo,
+          attachedTo: attachment.attachedTo,
+          attachedToClass: attachment.attachedToClass
+        },
+        data,
+        todoId
+      )
+      return { todoId: TodoId.make(todoId) }
+    }
+
+    if (attachment.type === "document") {
+      const todoId: Ref<HulyToDo> = generateId()
+      const description = yield* uploadTodoDescription(client, time.class.ToDo, todoId, params.description)
+      const data = {
+        ...todoPayload(params, owner, description, rank, DEFAULT_DOCUMENT_TODO_VISIBILITY),
+        attachedSpace: toRef<Space>(attachment.document.space)
+      } satisfies AttachedData<HulyToDo>
+      yield* createTodoRecord(
+        client,
+        {
+          objectClass: time.class.ToDo,
+          attachedTo: attachment.attachedTo,
+          attachedToClass: attachment.attachedToClass
+        },
+        data,
+        todoId
+      )
       return { todoId: TodoId.make(todoId) }
     }
 
     const todoId: Ref<HulyToDo> = generateId()
     const description = yield* uploadTodoDescription(client, time.class.ToDo, todoId, params.description)
-    yield* createPersonalTodo(client, params, owner, todoId, description, rank)
+    yield* createTodoRecord(
+      client,
+      { objectClass: time.class.ToDo, attachedTo: time.ids.NotAttached, attachedToClass: time.class.ToDo },
+      todoPayload(params, owner, description, rank, DEFAULT_PERSONAL_TODO_VISIBILITY),
+      todoId
+    )
     return { todoId: TodoId.make(todoId) }
   })
 

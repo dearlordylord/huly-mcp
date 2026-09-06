@@ -49,12 +49,12 @@ const noopStorageClient: HulyStorageOperations = {
 }
 
 describe("CATEGORY_NAMES", () => {
-  it("preserves the certified 592-operation registry cardinality", () => {
-    expect(toolRegistry.definitions).toHaveLength(592)
-    expect(toolRegistry.tools.size).toBe(592)
-    expect(operationRegistry.definitions).toHaveLength(592)
-    expect(operationRegistry.operations.size).toBe(592)
-    expect(new Set(toolRegistry.definitions.map((tool) => tool.name)).size).toBe(592)
+  it("preserves the certified 601-operation registry cardinality", () => {
+    expect(toolRegistry.definitions).toHaveLength(601)
+    expect(toolRegistry.tools.size).toBe(601)
+    expect(operationRegistry.definitions).toHaveLength(601)
+    expect(operationRegistry.operations.size).toBe(601)
+    expect(new Set(toolRegistry.definitions.map((tool) => tool.name)).size).toBe(601)
   })
 
   it.effect("contains expected categories", () =>
@@ -90,6 +90,12 @@ describe("CATEGORY_NAMES", () => {
       expect(names.has(toolName("get_office_floor"))).toBe(true)
       expect(names.has(toolName("list_office_rooms"))).toBe(true)
       expect(names.has(toolName("get_office_room"))).toBe(true)
+      expect(names.has(toolName("create_office_floor"))).toBe(true)
+      expect(names.has(toolName("create_office_room"))).toBe(true)
+      expect(names.has(toolName("update_office_room"))).toBe(true)
+      expect(toolDefinition("create_office_floor").description).toContain("durable virtual-office Floor")
+      expect(toolDefinition("create_office_room").description).toContain("exact ID or unambiguous exact name")
+      expect(toolDefinition("update_office_room").description).toContain("only name, Markdown description, access")
       expect(names.has(toolName("list_offices"))).toBe(true)
       expect(names.has(toolName("get_office"))).toBe(true)
       expect(names.has(toolName("list_active_room_info"))).toBe(true)
@@ -296,6 +302,9 @@ describe("createFilteredRegistry", () => {
         "list_recruiting_candidates",
         "get_recruiting_candidate",
         "set_recruiting_candidate_profile",
+        "list_recruiting_candidate_custom_fields",
+        "get_recruiting_candidate_custom_field_values",
+        "set_recruiting_candidate_custom_field",
         "list_recruiting_skills",
         "list_recruiting_candidate_skills",
         "add_recruiting_candidate_skill",

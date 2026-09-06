@@ -70,6 +70,11 @@ export const businessReadOnlyCliCommandCatalogA = {
     positional: ["candidate"],
     description: "Get Recruiting Candidate"
   },
+  get_recruiting_candidate_custom_field_values: {
+    path: ["recruiting", "candidate", "custom-fields", "values", "get"],
+    positional: ["candidate"],
+    description: "Get Recruiting Candidate Custom Field Values"
+  },
   get_recruiting_opinion: {
     path: ["recruiting", "opinion", "get"],
     positional: ["opinion"],
@@ -112,6 +117,11 @@ export const businessReadOnlyCliCommandCatalogA = {
     description: "List Active Room Participants"
   },
   list_calendars: { path: ["calendar", "calendars", "list"], positional: [], description: "List Calendars" },
+  list_calendar_settings: {
+    path: ["calendar", "settings", "list"],
+    positional: [],
+    description: "List Calendar Settings"
+  },
   list_card_spaces: { path: ["cards", "spaces", "list"], positional: [], description: "List Card Spaces" },
   list_card_comments: {
     path: ["cards", "comments", "list"],

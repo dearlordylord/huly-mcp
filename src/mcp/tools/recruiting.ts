@@ -18,6 +18,17 @@ import {
   VacancyDetailSchema
 } from "../../domain/schemas/recruiting-common.js"
 import {
+  ListCustomFieldsResultSchema,
+  GetRecruitingCandidateCustomFieldValuesResultSchema
+} from "../../domain/schemas/custom-fields.js"
+import {
+  RecruitingCandidateCustomFieldMutationResultSchema,
+  listRecruitingCandidateCustomFieldsParamsJsonSchema,
+  getRecruitingCandidateCustomFieldValuesParamsJsonSchema,
+  setRecruitingCandidateCustomFieldParamsJsonSchema,
+  parseListRecruitingCandidateCustomFieldsParams,
+  parseGetRecruitingCandidateCustomFieldValuesParams,
+  parseSetRecruitingCandidateCustomFieldParams,
   addRecruitingCandidateSkillParamsJsonSchema,
   archiveRecruitingVacancyParamsJsonSchema,
   createRecruitingApplicantParamsJsonSchema,
@@ -75,6 +86,12 @@ import {
   removeRecruitingCandidateSkill,
   setRecruitingCandidateProfile
 } from "../../huly/operations/recruiting-candidates.js"
+import {
+  getRecruitingCandidateCustomFieldValues,
+  listRecruitingCandidateCustomFields,
+  setRecruitingCandidateCustomField
+} from "../../huly/operations/recruiting-candidate-custom-fields.js"
+import { RECRUITING_CANDIDATE_CUSTOM_FIELD_OWNER_DESCRIPTION } from "../../huly/recruiting-candidate-custom-field-config.js"
 import {
   archiveRecruitingVacancy,
   createRecruitingVacancy,
@@ -215,13 +232,46 @@ export const recruitingTools = [
     {
       name: "set_recruiting_candidate_profile",
       description:
-        "Create or update the Recruiting Candidate profile mixin on an existing person. candidate accepts person _id, email, or exact display name. Provide at least one of title, source, onsite, remote.",
+        "Create or update the Recruiting Candidate profile mixin on an existing person. For a new candidate, call create_person first, then call this tool with the returned Person ID (or exact email/name). candidate accepts person _id, email, or exact display name. Provide at least one of title, source, onsite, remote.",
       category: CATEGORY,
       inputSchema: setRecruitingCandidateProfileParamsJsonSchema,
       resultSchema: RecruitingCandidateMutationResultSchema
     },
     parseSetRecruitingCandidateProfileParams,
     setRecruitingCandidateProfile
+  ),
+  defineTool(
+    {
+      name: "list_recruiting_candidate_custom_fields",
+      description: `List custom field definitions applicable to an existing Recruiting Candidate. candidate accepts a person _id, exact email, or exact display name. Fields owned by ${RECRUITING_CANDIDATE_CUSTOM_FIELD_OWNER_DESCRIPTION} are returned with IDs, labels, types, and owner metadata. This read never enables Recruiting; for a new person, call create_person first, then set_recruiting_candidate_profile.`,
+      category: CATEGORY,
+      inputSchema: listRecruitingCandidateCustomFieldsParamsJsonSchema,
+      resultSchema: ListCustomFieldsResultSchema
+    },
+    parseListRecruitingCandidateCustomFieldsParams,
+    listRecruitingCandidateCustomFields
+  ),
+  defineTool(
+    {
+      name: "get_recruiting_candidate_custom_field_values",
+      description: `Read all applicable custom field values for an existing Recruiting Candidate, including definitions that are currently unset. candidate accepts a person _id, exact email, or exact display name. Candidate and Person-owned fields are projected with their Huly type metadata; this read never enables Recruiting. For a new person, call create_person first, then set_recruiting_candidate_profile.`,
+      category: CATEGORY,
+      inputSchema: getRecruitingCandidateCustomFieldValuesParamsJsonSchema,
+      resultSchema: GetRecruitingCandidateCustomFieldValuesResultSchema
+    },
+    parseGetRecruitingCandidateCustomFieldValuesParams,
+    getRecruitingCandidateCustomFieldValues
+  ),
+  defineTool(
+    {
+      name: "set_recruiting_candidate_custom_field",
+      description: `Set one custom field on an existing Recruiting Candidate by field ID from list_recruiting_candidate_custom_fields. candidate accepts a person _id, exact email, or exact display name. Only isCustom fields owned by ${RECRUITING_CANDIDATE_CUSTOM_FIELD_OWNER_DESCRIPTION} are writable; array, ref, and unknown fields are rejected. Values use the documented field type wire format (numbers as numeric strings, booleans as true/false, dates as YYYY-MM-DD or canonical epoch milliseconds). This write never enables Recruiting; for a new person, call create_person first, then set_recruiting_candidate_profile.`,
+      category: CATEGORY,
+      inputSchema: setRecruitingCandidateCustomFieldParamsJsonSchema,
+      resultSchema: RecruitingCandidateCustomFieldMutationResultSchema
+    },
+    parseSetRecruitingCandidateCustomFieldParams,
+    setRecruitingCandidateCustomField
   ),
   defineTool(
     {

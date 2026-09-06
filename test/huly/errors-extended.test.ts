@@ -8,6 +8,7 @@ import {
   CardIdentifier,
   CardSpaceIdentifier,
   Count,
+  CustomFieldId,
   DocId,
   MasterTagId,
   NonEmptyString,
@@ -32,7 +33,10 @@ import {
   GenericObjectNotFoundError,
   type HulyDomainError,
   HulyDomainError as HulyDomainErrorSchema,
+  InvalidCustomFieldBooleanValueError,
   InvalidCustomFieldDateValueError,
+  InvalidCustomFieldEnumValueError,
+  InvalidCustomFieldNumberValueError,
   MasterTagNotFoundError,
   NoUpdateFieldsError,
   ProcessExecutionNotCancellableError,
@@ -136,6 +140,26 @@ describe("Extended Huly error message getters", () => {
         tag: "InvalidCustomFieldDateValueError",
         message:
           "Invalid date custom-field value '2026-07-24Z'. Use a real calendar date in YYYY-MM-DD form or a canonical non-negative epoch-millisecond string between 0 and 8640000000000000. Time-zone suffixes, date-times, signs, decimals, exponents, whitespace, and non-finite values are not accepted."
+      },
+      {
+        error: new InvalidCustomFieldNumberValueError({ value: "1x" }),
+        tag: "InvalidCustomFieldNumberValueError",
+        message: "Invalid number custom-field value '1x'. Use a finite numeric string without surrounding whitespace."
+      },
+      {
+        error: new InvalidCustomFieldBooleanValueError({ value: "yes" }),
+        tag: "InvalidCustomFieldBooleanValueError",
+        message: "Invalid boolean custom-field value 'yes'. Use 'true' or 'false'."
+      },
+      {
+        error: new InvalidCustomFieldEnumValueError({
+          fieldId: CustomFieldId.make("priority"),
+          enumRef: "enum:priority",
+          value: "Urgent",
+          allowedValues: ["Low", "High"]
+        }),
+        tag: "InvalidCustomFieldEnumValueError",
+        message: "Invalid enum custom-field value 'Urgent' for 'priority'. Expected one of: Low, High."
       }
     ])
   )
@@ -390,6 +414,14 @@ describe("Extended Huly error message getters", () => {
           objectClass: ObjectClassName.make("tracker:class:Issue")
         }),
         new InvalidCustomFieldDateValueError({ value: "" }),
+        new InvalidCustomFieldNumberValueError({ value: "1x" }),
+        new InvalidCustomFieldBooleanValueError({ value: "yes" }),
+        new InvalidCustomFieldEnumValueError({
+          fieldId: CustomFieldId.make("priority"),
+          enumRef: "enum:priority",
+          value: "Urgent",
+          allowedValues: ["Low", "High"]
+        }),
         new TestResultNotFoundError({ identifier: "RES" }),
         new DocumentEditModeError({ reason: "mixed modes" }),
         new AssociationInUseError({

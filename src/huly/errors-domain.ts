@@ -25,12 +25,7 @@ import {
   BoardViewletIdentifierAmbiguousError,
   BoardViewletNotFoundError
 } from "./errors-boards.js"
-import {
-  CalendarNotAccessibleError,
-  EventNotFoundError,
-  RecurringEventNotFoundError,
-  ScheduleNotFoundError
-} from "./errors-calendar.js"
+import { CalendarDomainError } from "./errors-domain-calendar.js"
 import {
   CardCommentNotFoundError,
   CardNotFoundError,
@@ -50,11 +45,7 @@ import {
   PersonIdentifierAmbiguousError,
   PersonNotFoundError
 } from "./errors-contacts.js"
-import {
-  CustomFieldNotFoundError,
-  CustomFieldObjectNotFoundError,
-  InvalidCustomFieldDateValueError
-} from "./errors-custom-fields.js"
+import { CustomFieldDomainError } from "./errors-domain-custom-fields.js"
 import {
   DocumentContentCorruptedError,
   DocumentEditModeError,
@@ -130,7 +121,16 @@ import {
 } from "./errors-inventory.js"
 import { LabelDomainError } from "./errors-labels.js"
 import { FunnelDomainError, LeadMutationDomainError, LeadNotFoundError } from "./errors-leads.js"
-import { FloorNotFoundError, MeetingMinutesNotFoundError, RoomNotFoundError } from "./errors-love.js"
+import {
+  FloorNotFoundError,
+  MeetingMinutesNotFoundError,
+  OfficeFloorIdentifierAmbiguousError,
+  OfficeFloorNotFoundError,
+  OfficeRoomAccessUnsupportedError,
+  OfficeRoomProtectedError,
+  OfficeSettingsMalformedError,
+  RoomNotFoundError
+} from "./errors-love.js"
 import { AdministrationDomainError } from "./errors-administration-domain.js"
 import {
   NotificationContextNotFoundError,
@@ -140,12 +140,7 @@ import {
   NotificationProviderNotFoundError,
   NotificationTypeNotFoundError
 } from "./errors-notifications.js"
-import {
-  PlannerSchedulingPrerequisiteError,
-  TodoIdentifierAmbiguousError,
-  TodoNotFoundError,
-  TodoWorkSlotNotFoundError
-} from "./errors-planner.js"
+import { PlannerDomainError } from "./errors-planner.js"
 import {
   ProcessCardIdentifierAmbiguousError,
   ProcessCardNotFoundError,
@@ -286,10 +281,7 @@ export const HulyDomainError = Schema.Union([
   MilestoneIdentifierAmbiguousError,
   MilestoneNotFoundError,
   HulyMessagingDomainError,
-  CalendarNotAccessibleError,
-  EventNotFoundError,
-  RecurringEventNotFoundError,
-  ScheduleNotFoundError,
+  CalendarDomainError,
   AttachmentNotFoundError,
   AttachmentContentTooLargeError,
   AttachmentContentTypeUnsupportedError,
@@ -319,9 +311,7 @@ export const HulyDomainError = Schema.Union([
   TestResultNotFoundError,
   TestPlanItemNotFoundError,
   ComponentNotFoundError,
-  CustomFieldNotFoundError,
-  CustomFieldObjectNotFoundError,
-  InvalidCustomFieldDateValueError,
+  CustomFieldDomainError,
   IssueTemplateNotFoundError,
   TemplateChildNotFoundError,
   NotificationNotFoundError,
@@ -335,7 +325,12 @@ export const HulyDomainError = Schema.Union([
   LeadNotFoundError,
   LeadMutationDomainError,
   FloorNotFoundError,
+  OfficeFloorNotFoundError,
+  OfficeFloorIdentifierAmbiguousError,
   RoomNotFoundError,
+  OfficeRoomProtectedError,
+  OfficeRoomAccessUnsupportedError,
+  OfficeSettingsMalformedError,
   MeetingMinutesNotFoundError,
   FileTooLargeError,
   InvalidContentTypeError,
@@ -392,10 +387,7 @@ export const HulyDomainError = Schema.Union([
   SpaceTypeCreationUnsupportedError,
   SpaceTypeNotFoundError,
   SpaceTypeIdentifierAmbiguousError,
-  TodoNotFoundError,
-  TodoIdentifierAmbiguousError,
-  TodoWorkSlotNotFoundError,
-  PlannerSchedulingPrerequisiteError,
+  PlannerDomainError,
   DriveNotFoundError,
   DriveIdentifierAmbiguousError,
   DrivePathNotFoundError,

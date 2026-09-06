@@ -6,36 +6,25 @@ import { canonicalJson } from "./effect4-oracle-canonical.js"
 import { oracleDeltaIdentity, type OracleDelta, OracleDeltaSchema } from "./effect4-oracle-delta.js"
 import {
   ISSUE_97_ADMINISTRATION_TOOL_NAMES,
-  ISSUE_97_EXISTING_TOOL_CHANGE_NAMES
+  POST_BASELINE_EXISTING_TOOL_CHANGE_NAMES,
+  POST_BASELINE_FEATURE_OPERATION_TOOL_NAMES,
+  POST_BASELINE_OPERATION_TOOL_NAMES
 } from "./effect4-oracle-issue97-tools.js"
+import {
+  ORACLE_DELTA_REVIEW_FORMAT_VERSION,
+  OracleDeltaCategoryReviewSchema,
+  REVIEW_CATEGORY_ORDER,
+  type ReviewCategory,
+  ReviewCategorySchema,
+  reviewCategoryMetadata
+} from "./effect4-oracle-review-categories.js"
 import { BehavioralOracleSchema, type BehavioralOracle, type OracleJsonRpcResponse } from "./effect4-oracle-schema.js"
 import { ToolName, type ToolName as ToolNameType } from "../src/mcp/tools/registry.js"
 
 const Sha256Schema = Schema.String.pipe(Schema.check(Schema.isPattern(/^[0-9a-f]{64}$/u)))
-const ReviewCategorySchema = Schema.Literals([
-  "draft07-structure",
-  "schema-metadata",
-  "authored-constraints",
-  "issue-assignee-description",
-  "issue-97-administration",
-  "cli-json-diagnostic",
-  "cli-help"
-])
-type ReviewCategory = Schema.Schema.Type<typeof ReviewCategorySchema>
-const PositiveCountSchema = Schema.Int.pipe(Schema.check(Schema.isGreaterThan(0)))
-const ReviewRationaleSchema = Schema.Trimmed.pipe(Schema.check(Schema.isNonEmpty()))
-const IssueReferenceSchema = Schema.String.pipe(Schema.check(Schema.isPattern(/^#[1-9]\d*$/u)))
-
-const OracleDeltaCategoryReviewSchema = Schema.Struct({
-  category: ReviewCategorySchema,
-  count: PositiveCountSchema,
-  deltaSetSha256: Sha256Schema,
-  rationale: ReviewRationaleSchema,
-  issue: IssueReferenceSchema
-})
 
 export const OracleDeltaReviewSchema = Schema.Struct({
-  formatVersion: Schema.Literal(1),
+  formatVersion: Schema.Literal(ORACLE_DELTA_REVIEW_FORMAT_VERSION),
   baselineSha256: Sha256Schema,
   reviewedCurrentSha256: Sha256Schema,
   categories: Schema.Array(OracleDeltaCategoryReviewSchema)
@@ -64,6 +53,7 @@ const CandidateListToolsResponseSchema = Schema.Struct({
 type CandidateTool = Schema.Schema.Type<typeof CandidateToolSchema>
 type CandidateToolIdentities = ReadonlyMap<string, CandidateTool>
 const EMPTY_CANDIDATE_TOOL_IDENTITIES: CandidateToolIdentities = new Map()
+const UNCLASSIFIED_DELTA_SAMPLE_LIMIT = 20
 const candidateToolIdentityKey = (responseIndex: number, toolIndex: number): string => `${responseIndex}/${toolIndex}`
 
 export const parseCandidateToolIdentities = (
@@ -104,10 +94,11 @@ const isIssueAssigneeInputDescription = (path: string, candidateToolIdentities: 
 export const oracleDeltaReviewCategory = (
   delta: OracleDelta,
   candidateToolIdentities: CandidateToolIdentities = EMPTY_CANDIDATE_TOOL_IDENTITIES,
-  isIssue97ExpansionDelta: (path: string) => boolean = () => false
+  isPostBaselineExpansionDelta: (path: string) => boolean = () => false
 ): ReviewCategory | undefined => {
-  if (isIssue97ExpansionDelta(delta.path)) return "issue-97-administration"
-  if (delta.path.startsWith("/registry/authoredConstraints/")) return "authored-constraints"
+  if (delta.path.startsWith("/registry/authoredConstraints/")) {
+    return isPostBaselineExpansionDelta(delta.path) ? "post-baseline-operation-expansion" : "authored-constraints"
+  }
   if (isIssueAssigneeInputDescription(delta.path, candidateToolIdentities)) return "issue-assignee-description"
   if (delta.path.includes("/inputSchema/") || delta.path.includes("/outputSchema/")) {
     return delta.path.endsWith("/description") || delta.path.endsWith("/title")
@@ -117,13 +108,16 @@ export const oracleDeltaReviewCategory = (
   const toolName = candidateToolName(delta.path, candidateToolIdentities)
   if (
     toolName !== undefined &&
-    (ISSUE_97_ADMINISTRATION_TOOL_NAMES.has(toolName) || ISSUE_97_EXISTING_TOOL_CHANGE_NAMES.has(toolName))
+    (ISSUE_97_ADMINISTRATION_TOOL_NAMES.has(toolName) ||
+      POST_BASELINE_FEATURE_OPERATION_TOOL_NAMES.has(toolName) ||
+      POST_BASELINE_EXISTING_TOOL_CHANGE_NAMES.has(toolName))
   ) {
-    return "issue-97-administration"
+    return "post-baseline-operation-expansion"
   }
   if (toolName !== undefined && ISSUE_ASSIGNEE_TOOL_NAMES.has(toolName)) {
     return "issue-assignee-description"
   }
+  if (isPostBaselineExpansionDelta(delta.path)) return "post-baseline-operation-expansion"
   if (delta.path.includes("/help/") || delta.path.endsWith("Help/stdout")) return "cli-help"
   if (delta.path.includes("/cli/") && delta.path.endsWith("stderr")) return "cli-json-diagnostic"
   if (delta.path.startsWith("/cli/errors/") && delta.path.endsWith("/message")) return "cli-json-diagnostic"
@@ -133,67 +127,10 @@ export const oracleDeltaReviewCategory = (
 const categoryDigest = (deltas: ReadonlyArray<OracleDelta>): string =>
   sha256(canonicalJson(deltas.map(oracleDeltaIdentity).sort()))
 
-const REVIEW_CATEGORY_ORDER: ReadonlyArray<ReviewCategory> = [
-  "draft07-structure",
-  "schema-metadata",
-  "authored-constraints",
-  "issue-assignee-description",
-  "issue-97-administration",
-  "cli-json-diagnostic",
-  "cli-help"
-]
-
-const categoryMetadata = (category: ReviewCategory): { readonly issue: string; readonly rationale: string } => {
-  switch (category) {
-    case "draft07-structure":
-      return {
-        issue: "#225",
-        rationale:
-          "Reviewed Effect 4 Draft-07 structural dialect: refs, definitions, optional/null unions, refinements, and composition wrappers."
-      }
-    case "schema-metadata":
-      return {
-        issue: "#225",
-        rationale:
-          "Reviewed schema metadata migration: authored descriptions are preserved and legacy generator-default metadata is replaced."
-      }
-    case "authored-constraints":
-      return {
-        issue: "#225",
-        rationale:
-          "Reviewed authored-constraint projection: pre-funnel tools remain represented and strict Draft-07/runtime agreement passes."
-      }
-    case "issue-assignee-description":
-      return {
-        issue: "#245",
-        rationale:
-          "Reviewed agent-facing issue tool and assignee input descriptions advertising exact agent UserProfile titles."
-      }
-    case "issue-97-administration":
-      return {
-        issue: "#97",
-        rationale:
-          "Reviewed employee lifecycle, employee-position, HR-department, Staff-assignment, funnel-administration, lead mutation/collaboration and relation-locator changes, HR-request, public-holiday, HR-report, person-administration, and explicit person-merge operations with their exact schemas and ordered registry/CLI exposure."
-      }
-    case "cli-json-diagnostic":
-      return {
-        issue: "#228",
-        rationale:
-          "Reviewed CLI JSON diagnostic: deterministic line/column context was added without changing failure classification or exit status."
-      }
-    case "cli-help":
-      return {
-        issue: "#228",
-        rationale:
-          "Reviewed concise Effect 4 CLI help rendering; employee lifecycle, funnel, lead collaboration, HR-request, public-holiday, HR-report, and person-administration routes are added without changing other route behavior."
-      }
-  }
-}
-
 const categorizeOracleDeltas = (
   deltas: ReadonlyArray<OracleDelta>,
   candidateToolIdentities: CandidateToolIdentities = EMPTY_CANDIDATE_TOOL_IDENTITIES,
-  isIssue97ExpansionDelta: (path: string) => boolean = () => false
+  isPostBaselineExpansionDelta: (path: string) => boolean = () => false
 ): {
   readonly categorized: Map<ReviewCategory, Array<OracleDelta>>
   readonly unclassified: ReadonlyArray<OracleDelta>
@@ -201,7 +138,7 @@ const categorizeOracleDeltas = (
   const categorized = new Map<ReviewCategory, Array<OracleDelta>>()
   const unclassified: Array<OracleDelta> = []
   for (const delta of deltas) {
-    const category = oracleDeltaReviewCategory(delta, candidateToolIdentities, isIssue97ExpansionDelta)
+    const category = oracleDeltaReviewCategory(delta, candidateToolIdentities, isPostBaselineExpansionDelta)
     if (category === undefined) {
       unclassified.push(delta)
       continue
@@ -218,19 +155,30 @@ export const createOracleDeltaReview = (
   currentJson: string,
   deltas: ReadonlyArray<OracleDelta>,
   candidateToolIdentities: CandidateToolIdentities = EMPTY_CANDIDATE_TOOL_IDENTITIES,
-  isIssue97ExpansionDelta: (path: string) => boolean = () => false
+  isPostBaselineExpansionDelta: (path: string) => boolean = () => false
 ): OracleDeltaReview => {
-  const { categorized, unclassified } = categorizeOracleDeltas(deltas, candidateToolIdentities, isIssue97ExpansionDelta)
+  const { categorized, unclassified } = categorizeOracleDeltas(
+    deltas,
+    candidateToolIdentities,
+    isPostBaselineExpansionDelta
+  )
   if (unclassified.length > 0) throw new Error("Cannot review unclassified oracle deltas.")
   return Schema.decodeUnknownSync(OracleDeltaReviewSchema)({
-    formatVersion: 1,
+    formatVersion: ORACLE_DELTA_REVIEW_FORMAT_VERSION,
     baselineSha256: sha256(baselineJson),
     reviewedCurrentSha256: sha256(currentJson),
     categories: REVIEW_CATEGORY_ORDER.flatMap((category) => {
       const entries = categorized.get(category) ?? []
       return entries.length === 0
         ? []
-        : [{ category, count: entries.length, deltaSetSha256: categoryDigest(entries), ...categoryMetadata(category) }]
+        : [
+            {
+              category,
+              count: entries.length,
+              deltaSetSha256: categoryDigest(entries),
+              ...reviewCategoryMetadata(category)
+            }
+          ]
     })
   })
 }
@@ -259,13 +207,13 @@ const authoredConstraintIndex = (delta: OracleDelta): number => {
 const sameToolOrder = (left: ReadonlyArray<ToolNameType>, right: ReadonlyArray<ToolNameType>): boolean =>
   left.length === right.length && left.every((name, index) => name === right[index])
 
-const issue97ExpansionStart = (
+const postBaselineExpansionStart = (
   baseline: ReadonlyArray<ToolNameType>,
   current: ReadonlyArray<ToolNameType>
 ): number | undefined => {
-  const withoutIssue97Tools = current.filter((name) => !ISSUE_97_ADMINISTRATION_TOOL_NAMES.has(name))
-  if (!sameToolOrder(baseline, withoutIssue97Tools)) return undefined
-  const start = current.findIndex((name) => ISSUE_97_ADMINISTRATION_TOOL_NAMES.has(name))
+  const withoutExpandedTools = current.filter((name) => !POST_BASELINE_OPERATION_TOOL_NAMES.has(name))
+  if (!sameToolOrder(baseline, withoutExpandedTools)) return undefined
+  const start = current.findIndex((name) => POST_BASELINE_OPERATION_TOOL_NAMES.has(name))
   return start < 0 ? undefined : start
 }
 
@@ -282,28 +230,28 @@ const nativeToolNames = (responses: ReadonlyArray<OracleJsonRpcResponse>, respon
   return Option.isSome(decoded) ? decoded.value.result.tools.map((tool) => tool.name) : []
 }
 
-const makeIssue97ExpansionClassifier = (
+const makePostBaselineExpansionClassifier = (
   baseline: BehavioralOracle,
   current: BehavioralOracle
 ): ((path: string) => boolean) => {
   const starts = {
-    authored: issue97ExpansionStart(
+    authored: postBaselineExpansionStart(
       baseline.registry.authoredConstraints.map((entry) => entry.toolName),
       current.registry.authoredConstraints.map((entry) => entry.toolName)
     ),
-    operationOrder: issue97ExpansionStart(baseline.registry.operationOrder, current.registry.operationOrder),
-    rawOrder: issue97ExpansionStart(baseline.registry.rawOrder, current.registry.rawOrder),
-    routes: issue97ExpansionStart(
+    operationOrder: postBaselineExpansionStart(baseline.registry.operationOrder, current.registry.operationOrder),
+    rawOrder: postBaselineExpansionStart(baseline.registry.rawOrder, current.registry.rawOrder),
+    routes: postBaselineExpansionStart(
       baseline.cli.routes.map((route) => route.toolName),
       current.cli.routes.map((route) => route.toolName)
     ),
-    tools: issue97ExpansionStart(
+    tools: postBaselineExpansionStart(
       baseline.registry.tools.map((entry) => entry.name),
       current.registry.tools.map((entry) => entry.name)
     )
   }
   const nativeStarts = current.bundledProcesses.stdio.native.map((_, responseIndex) =>
-    issue97ExpansionStart(
+    postBaselineExpansionStart(
       nativeToolNames(baseline.bundledProcesses.stdio.native, responseIndex),
       nativeToolNames(current.bundledProcesses.stdio.native, responseIndex)
     )
@@ -336,9 +284,19 @@ export const createOracleDeltaAuditReport = (
   deltas: ReadonlyArray<OracleDelta>
 ): OracleDeltaAuditReport => {
   const candidateToolIdentities = parseCandidateToolIdentities(current.bundledProcesses.stdio.native)
-  const isIssue97ExpansionDelta = makeIssue97ExpansionClassifier(baseline, current)
-  const { categorized, unclassified } = categorizeOracleDeltas(deltas, candidateToolIdentities, isIssue97ExpansionDelta)
-  if (unclassified.length > 0) throw new Error("Cannot report unclassified oracle deltas.")
+  const isPostBaselineExpansionDelta = makePostBaselineExpansionClassifier(baseline, current)
+  const { categorized, unclassified } = categorizeOracleDeltas(
+    deltas,
+    candidateToolIdentities,
+    isPostBaselineExpansionDelta
+  )
+  if (unclassified.length > 0) {
+    const sample = unclassified
+      .slice(0, UNCLASSIFIED_DELTA_SAMPLE_LIMIT)
+      .map((delta) => delta.path)
+      .join(", ")
+    throw new Error(`Cannot report ${unclassified.length} unclassified oracle delta(s). Sample: ${sample}`)
+  }
   const byTool = new Map<string, Array<OracleDelta>>()
   for (const delta of categorized.get("authored-constraints") ?? []) {
     const index = authoredConstraintIndex(delta)
@@ -357,7 +315,7 @@ export const createOracleDeltaAuditReport = (
       currentJson,
       deltas,
       candidateToolIdentities,
-      isIssue97ExpansionDelta
+      isPostBaselineExpansionDelta
     ),
     categories: REVIEW_CATEGORY_ORDER.flatMap((category) => {
       const entries = categorized.get(category) ?? []
@@ -391,11 +349,15 @@ export const verifyReviewedOracleDeltas = (
   const candidateToolIdentities = Option.isSome(candidate)
     ? parseCandidateToolIdentities(candidate.value.bundledProcesses.stdio.native)
     : EMPTY_CANDIDATE_TOOL_IDENTITIES
-  const isIssue97ExpansionDelta =
+  const isPostBaselineExpansionDelta =
     Option.isSome(baseline) && Option.isSome(candidate)
-      ? makeIssue97ExpansionClassifier(baseline.value, candidate.value)
+      ? makePostBaselineExpansionClassifier(baseline.value, candidate.value)
       : () => false
-  const { categorized, unclassified } = categorizeOracleDeltas(deltas, candidateToolIdentities, isIssue97ExpansionDelta)
+  const { categorized, unclassified } = categorizeOracleDeltas(
+    deltas,
+    candidateToolIdentities,
+    isPostBaselineExpansionDelta
+  )
   if (unclassified.length > 0) {
     throw new Error(`Oracle comparison contains ${unclassified.length} unclassified deltas.`)
   }
@@ -404,6 +366,13 @@ export const verifyReviewedOracleDeltas = (
     const actual = categorized.get(entry.category) ?? []
     if (actual.length !== entry.count || categoryDigest(actual) !== entry.deltaSetSha256) {
       throw new Error(`Oracle delta category ${entry.category} differs from its reviewed exact set.`)
+    }
+    const metadata = reviewCategoryMetadata(entry.category)
+    const sameIssues =
+      entry.issues.length === metadata.issues.length &&
+      entry.issues.every((issue, index) => issue === metadata.issues[index])
+    if (!sameIssues || entry.rationale !== metadata.rationale) {
+      throw new Error(`Oracle delta category ${entry.category} differs from its reviewed provenance metadata.`)
     }
     categorized.delete(entry.category)
   }

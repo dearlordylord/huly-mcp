@@ -25,6 +25,9 @@ const expectedRecruitingToolNames = [
   "list_recruiting_candidates",
   "get_recruiting_candidate",
   "set_recruiting_candidate_profile",
+  "list_recruiting_candidate_custom_fields",
+  "get_recruiting_candidate_custom_field_values",
+  "set_recruiting_candidate_custom_field",
   "list_recruiting_skills",
   "list_recruiting_candidate_skills",
   "add_recruiting_candidate_skill",
@@ -145,6 +148,18 @@ describe("Recruiting MCP Tools", () => {
       }
     })
   )
+
+  it("documents the explicit person-to-candidate setup for custom-field tools", () => {
+    for (const name of [
+      "list_recruiting_candidate_custom_fields",
+      "get_recruiting_candidate_custom_field_values",
+      "set_recruiting_candidate_custom_field"
+    ]) {
+      const tool = recruitingTools.find((candidate) => candidate.name === name)
+      expect(tool?.description).toContain("create_person")
+      expect(tool?.description).toContain("set_recruiting_candidate_profile")
+    }
+  })
 
   it.effect("encodes list vacancy success responses", () =>
     Effect.gen(function* () {

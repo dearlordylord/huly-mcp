@@ -1,18 +1,37 @@
+import { Ajv } from "ajv"
 import { describe, it } from "@effect/vitest"
-import { Effect, Schema } from "effect"
+import { Effect, Result, Schema } from "effect"
 import { expect } from "vitest"
 
 import {
   CreateTodoParamsSchema,
   parseCreateTodoParams,
+  ListTodosParamsSchema,
   parseScheduleTodoParams,
   parseUnscheduleTodoParams,
   parseUpdateTodoParams,
+  listTodosParamsJsonSchema,
   TodoPriorityValues,
+  TodoAttachmentSummarySchema,
   TodoSummarySchema,
   TodoVisibilityValues,
   updateTodoParamsJsonSchema
 } from "../../src/domain/schemas/planner.js"
+import { TodoAttachmentSummarySchema as TodoAttachmentSummaryOutputSchema } from "../../src/domain/schemas/planner-output.js"
+
+const ajv = new Ajv({ strict: false })
+
+const parserAndJsonSchemaAgree = <S extends Schema.ConstraintDecoder<unknown>>(
+  schema: S,
+  jsonSchema: object,
+  inputs: ReadonlyArray<unknown>
+): void => {
+  const validate = ajv.compile(jsonSchema)
+  for (const input of inputs) {
+    const runtimeAccepts = Result.isSuccess(Schema.decodeUnknownResult(schema, { onExcessProperty: "error" })(input))
+    expect(validate(input), JSON.stringify(input)).toBe(runtimeAccepts)
+  }
+}
 
 describe("planner schemas", () => {
   it.effect("preserves ordinary optional create fields and encoded omission", () =>
@@ -60,18 +79,55 @@ describe("planner schemas", () => {
     })
   )
 
-  it.effect("rejects unsupported attachment target variants before operation execution", () =>
+  it.effect("accepts document attachment targets before operation execution", () =>
+    Effect.gen(function* () {
+      const params = yield* parseCreateTodoParams({
+        title: "Document task",
+        attachedTo: { type: "document", teamspace: "Docs", document: "Spec" }
+      })
+
+      expect(params.attachedTo?.type).toBe("document")
+    })
+  )
+
+  it.effect("rejects list filters that combine issue and document targets", () =>
     Effect.gen(function* () {
       const result = yield* Effect.result(
-        parseCreateTodoParams({
-          title: "Document task",
-          attachedTo: { type: "document", teamspace: "Docs", document: "Spec" }
+        Schema.decodeUnknownEffect(ListTodosParamsSchema)({
+          issue: { project: "HULY", identifier: "123" },
+          document: { teamspace: "Docs", document: "Spec" }
         })
       )
 
       expect(result._tag).toBe("Failure")
     })
   )
+
+  it("describes issue and document list targets as mutually exclusive schema variants", () => {
+    expect(JSON.stringify(listTodosParamsJsonSchema)).toContain('"anyOf"')
+  })
+
+  it("keeps exact list filter optionality aligned between runtime and JSON schemas", () => {
+    parserAndJsonSchemaAgree(ListTodosParamsSchema, listTodosParamsJsonSchema, [
+      {},
+      { owner: "alice@example.com" },
+      { title: "Follow up" },
+      { titleSearch: "follow" },
+      { dueFrom: 1_800_000_000_000 },
+      { dueTo: 1_800_000_000_000 },
+      { completionState: "open" },
+      { priority: "high" },
+      { visibility: "private" },
+      { limit: 10 },
+      { owner: null },
+      { limit: null },
+      { issue: { project: "HULY", identifier: "123" } },
+      { document: { teamspace: "Docs", document: "Spec" } },
+      { issue: { project: "HULY", identifier: "123" }, document: { teamspace: "Docs", document: "Spec" } },
+      { unexpected: true }
+    ])
+    expect(Result.isFailure(Schema.decodeUnknownResult(ListTodosParamsSchema)({ title: undefined }))).toBe(true)
+  })
 
   it.effect("rejects unschedule_todo without a concrete target shape", () =>
     Effect.gen(function* () {
@@ -148,6 +204,30 @@ describe("planner schemas", () => {
     })
 
     expect(result._tag).toBe("Failure")
+  })
+
+  it("accepts document attachment output summaries", () => {
+    const result = Schema.decodeUnknownResult(TodoSummarySchema)({
+      id: "todo-1",
+      title: "Follow up",
+      priority: "high",
+      visibility: "private",
+      owner: { id: "person-1" },
+      attachedTo: {
+        type: "document",
+        id: "document-1",
+        title: "Planner Specification",
+        teamspaceId: "teamspace-1",
+        teamspaceName: "Planner Documents"
+      },
+      workslots: 0
+    })
+
+    expect(result._tag).toBe("Success")
+  })
+
+  it("uses one document attachment output schema through both planner modules", () => {
+    expect(TodoAttachmentSummaryOutputSchema).toBe(TodoAttachmentSummarySchema)
   })
 
   it("adds anyOf requirements to update_todo JSON schema", () => {

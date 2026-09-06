@@ -1,5 +1,5 @@
 import { describe, it } from "@effect/vitest"
-import { Effect } from "effect"
+import { Effect, Result, Schema } from "effect"
 import { expect } from "vitest"
 
 import {
@@ -24,12 +24,22 @@ import {
 } from "../../src/domain/schemas/recruiting-media.js"
 import { parseJsonSchemaRecord } from "../../src/domain/schemas/json-schema.js"
 import {
+  CUSTOM_FIELDS_DEFAULT_LIMIT,
+  GetRecruitingCandidateCustomFieldValuesResultSchema
+} from "../../src/domain/schemas/custom-fields.js"
+import {
+  RecruitingCandidateCustomFieldMutationResultSchema,
   parseCreateRecruitingVacancyParams,
+  parseGetRecruitingCandidateCustomFieldValuesParams,
   parseGetRecruitingApplicantParams,
   parseGetRecruitingVacancyParams,
+  parseListRecruitingCandidateCustomFieldsParams,
+  listRecruitingCandidateCustomFieldsParamsJsonSchema,
   parseListRecruitingCandidatesParams,
   parseListRecruitingSkillsParams,
+  parseSetRecruitingCandidateCustomFieldParams,
   parseSetRecruitingCandidateProfileParams,
+  setRecruitingCandidateCustomFieldParamsJsonSchema,
   parseUpdateRecruitingApplicantParams,
   parseUpdateRecruitingVacancyParams
 } from "../../src/domain/schemas/recruiting.js"
@@ -241,6 +251,93 @@ describe("Recruiting Schemas", () => {
       expect(result.title).toBe("Engineer")
     })
   )
+
+  it.effect("parses candidate custom-field locators and documents the explicit write value", () =>
+    Effect.gen(function* () {
+      const listed = yield* parseListRecruitingCandidateCustomFieldsParams({ candidate: "Ada Lovelace", limit: 10 })
+      const values = yield* parseGetRecruitingCandidateCustomFieldValuesParams({ candidate: "Ada Lovelace" })
+      const write = yield* parseSetRecruitingCandidateCustomFieldParams({
+        candidate: "Ada Lovelace",
+        fieldId: "field-1",
+        value: "2026-07-24"
+      })
+
+      expect(listed).toEqual({ candidate: "Ada Lovelace", limit: 10 })
+      expect(values).toEqual({ candidate: "Ada Lovelace" })
+      expect(write).toEqual({ candidate: "Ada Lovelace", fieldId: "field-1", value: "2026-07-24" })
+      expect(propertyDescription(setRecruitingCandidateCustomFieldParamsJsonSchema, "fieldId")).toContain(
+        "list_recruiting_candidate_custom_fields"
+      )
+      expect(propertyDescription(setRecruitingCandidateCustomFieldParamsJsonSchema, "value")).toContain(
+        "documented wire format"
+      )
+      expect(propertyDescription(listRecruitingCandidateCustomFieldsParamsJsonSchema, "limit")).toContain(
+        `default: ${CUSTOM_FIELDS_DEFAULT_LIMIT}`
+      )
+    })
+  )
+
+  it.effect("rejects candidate custom-field writes without a field ID or value", () =>
+    Effect.gen(function* () {
+      const missingField = yield* Effect.flip(
+        parseSetRecruitingCandidateCustomFieldParams({ candidate: "Ada Lovelace", value: "x" })
+      )
+      const missingValue = yield* Effect.flip(
+        parseSetRecruitingCandidateCustomFieldParams({ candidate: "Ada Lovelace", fieldId: "field-1" })
+      )
+
+      expect(missingField._tag).toBe("SchemaError")
+      expect(missingValue._tag).toBe("SchemaError")
+    })
+  )
+
+  it("keeps candidate custom-field result type/value pairs and update flags typed", () => {
+    const candidate = { id: "person-1", name: "Ada Lovelace" }
+    const getResult = Schema.decodeUnknownResult(GetRecruitingCandidateCustomFieldValuesResultSchema)
+    const mutationResult = Schema.decodeUnknownResult(RecruitingCandidateCustomFieldMutationResultSchema)
+
+    expect(
+      Result.isFailure(
+        getResult({
+          fieldId: "number-field",
+          name: "yearsExperience",
+          label: "Years Experience",
+          ownerClassId: "recruit:mixin:Candidate",
+          ownerLabel: "Candidate",
+          type: "number",
+          value: "8"
+        })
+      )
+    ).toBe(true)
+    expect(
+      Result.isFailure(
+        mutationResult({
+          candidate,
+          fieldId: "number-field",
+          name: "yearsExperience",
+          label: "Years Experience",
+          ownerClassId: "recruit:mixin:Candidate",
+          type: "number",
+          value: 8,
+          updated: false
+        })
+      )
+    ).toBe(true)
+    expect(
+      Result.isSuccess(
+        mutationResult({
+          candidate,
+          fieldId: "number-field",
+          name: "yearsExperience",
+          label: "Years Experience",
+          ownerClassId: "recruit:mixin:Candidate",
+          type: "number",
+          value: 8,
+          updated: true
+        })
+      )
+    ).toBe(true)
+  })
 
   it.effect("rejects empty candidate and skill search text", () =>
     Effect.gen(function* () {

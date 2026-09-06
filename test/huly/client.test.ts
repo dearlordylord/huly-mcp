@@ -26,7 +26,7 @@ import {
   markdownToMarkup as realMarkdownToMarkup,
   markupToMarkdown as realMarkupToMarkdown
 } from "@hcengineering/text-markdown"
-import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect"
+import { Cause, Deferred, Effect, Exit, Fiber, Layer, Ref, Schema } from "effect"
 import { TestClock } from "effect/testing"
 import { beforeEach, expect } from "vitest"
 import { HulyConfigService } from "../../src/config/config.js"
@@ -734,6 +734,12 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
     mockClose.mockResolvedValue(undefined)
     resetApplyDefaults()
     resetSdkDefaults()
+    mockGetBaseClass.mockImplementation((value: string) => value)
+    mockGetAncestors.mockReturnValue([])
+    mockGetDescendants.mockImplementation((value: string) => [value])
+    mockHierarchyIsDerived.mockImplementation((value: string, target: string) => value === target)
+    mockFindDomain.mockReturnValue("test-domain")
+    mockHierarchyIsMixin.mockReturnValue(false)
   })
 
   describe("connection", () => {
@@ -798,6 +804,48 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
       createdByPerson: sourceId
     }
     const findResult = <A>(items: Array<A>, total = items.length) => Object.assign(items, { total })
+
+    it.effect("starts a bounded reference-discovery batch before awaiting individual queries", () =>
+      Effect.gen(function* () {
+        const requiredConcurrentQueries = 2
+        const referenceClassCount = 12
+        const referenceClasses = Array.from(
+          { length: referenceClassCount },
+          (_, index) => `test:class:PersonReference${index}`
+        )
+        const batchStarted = yield* Deferred.make<void>()
+        const releaseQueries = yield* Deferred.make<void>()
+        const startedQueries = yield* Ref.make(0)
+        mockFindAllInModel.mockReturnValue([singleAttribute])
+        mockGetDescendants.mockReturnValue(referenceClasses)
+        mockFindAll.mockImplementation((concreteClass) =>
+          Effect.runPromise(
+            Effect.gen(function* () {
+              const started = yield* Ref.updateAndGet(startedQueries, (count) => count + 1)
+              if (started === requiredConcurrentQueries) yield* Deferred.succeed(batchStarted, undefined)
+              yield* Deferred.await(releaseQueries)
+              return findResult([{ ...sourceComment, _class: String(concreteClass) }])
+            })
+          )
+        )
+
+        const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
+        if (client.inspectPersonReferences === undefined) {
+          return yield* Effect.die(new Error("live HulyClient omitted person-reference inspection"))
+        }
+        const inspection = yield* Effect.forkChild(client.inspectPersonReferences(sourceId))
+
+        yield* Deferred.await(batchStarted)
+        const concurrentQueries = yield* Ref.get(startedQueries)
+        yield* Deferred.succeed(releaseQueries, undefined)
+        const impacts = yield* Fiber.join(inspection)
+
+        expect(concurrentQueries).toBeGreaterThanOrEqual(requiredConcurrentQueries)
+        expect(concurrentQueries).toBeLessThan(referenceClassCount)
+        expect(impacts).toHaveLength(referenceClassCount)
+        expect(mockFindAll.mock.calls).toHaveLength(referenceClassCount)
+      })
+    )
 
     it.effect("discovers metadata-owned references and migrates them through Huly's native updater", () =>
       Effect.gen(function* () {

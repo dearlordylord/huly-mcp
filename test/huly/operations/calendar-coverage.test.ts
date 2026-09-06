@@ -17,7 +17,7 @@ import {
   type Space,
   toFindResult
 } from "@hcengineering/core"
-import { Effect } from "effect"
+import { Effect, Layer } from "effect"
 import { expect } from "vitest"
 import { CalendarEventTitle } from "../../../src/domain/schemas/calendar.js"
 import {
@@ -29,6 +29,7 @@ import {
 } from "../../../src/domain/schemas/recurrence-primitives.js"
 import { CalendarId, Timestamp } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import { Diagnostics } from "../../../src/huly/diagnostics.js"
 import {
   createEvent,
   createRecurringEvent,
@@ -288,15 +289,18 @@ const createTestLayer = (config: MockConfig) => {
     return Effect.succeed(undefined)
   }) as HulyClientOperations["updateMarkup"]
 
-  return HulyClient.testLayer({
-    findAll: findAllImpl,
-    findOne: findOneImpl,
-    fetchMarkup: fetchMarkupImpl,
-    updateDoc: updateDocImpl,
-    addCollection: addCollectionImpl,
-    uploadMarkup: uploadMarkupImpl,
-    updateMarkup: updateMarkupImpl
-  })
+  return Layer.merge(
+    HulyClient.testLayer({
+      findAll: findAllImpl,
+      findOne: findOneImpl,
+      fetchMarkup: fetchMarkupImpl,
+      updateDoc: updateDocImpl,
+      addCollection: addCollectionImpl,
+      uploadMarkup: uploadMarkupImpl,
+      updateMarkup: updateMarkupImpl
+    }),
+    Layer.succeed(Diagnostics, { warnAgent: () => Effect.void, trail: () => Effect.void })
+  )
 }
 
 // --- ruleToHulyRule coverage (lines 106-121) ---

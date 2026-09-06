@@ -9,7 +9,7 @@
  *
  * @module
  */
-import { Cause, type Schema } from "effect"
+import { Cause, Schema } from "effect"
 
 import type { ToolWarning } from "../domain/schemas/tool-warnings.js"
 import {
@@ -18,7 +18,8 @@ import {
   type HulyDomainError,
   HulyError,
   HulyStorageConfigError,
-  HulyUnavailableError
+  HulyUnavailableError,
+  MeetingCompositionMutationError
 } from "../huly/errors.js"
 import {
   HOSTED_HULY_MIGRATION_LINKS,
@@ -120,6 +121,8 @@ const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDo
   "DocumentContentCorruptedError",
   "DocumentEditModeError",
   "DocumentReferenceError",
+  "TodoDocumentTargetAmbiguousError",
+  "TodoDocumentTargetNotWritableError",
   "CommentNotFoundError",
   "CardCommentNotFoundError",
   "LeadCommentNotFoundError",
@@ -139,11 +142,25 @@ const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDo
   "ThreadReplyNotFoundError",
   "ChatMessageAttachmentNotFoundError",
   "CalendarNotAccessibleError",
+  "CalendarSettingsIdentifierAmbiguousError",
+  "CalendarSettingsInternalCalendarHideError",
+  "CalendarSettingsTargetNotAccessibleError",
+  "CalendarSettingsTargetNotWritableError",
+  "CalendarMeetingTargetNotWritableError",
+  "MeetingRoomNotFoundError",
+  "MeetingRoomIdentifierAmbiguousError",
+  "MeetingRoomAssignmentUnsupportedError",
+  "EventMeetingMixinMissingError",
+  "ScheduleMeetingMixinMissingError",
   "EventNotFoundError",
   "RecurringEventNotFoundError",
   "ScheduleNotFoundError",
   "FloorNotFoundError",
+  "OfficeFloorNotFoundError",
+  "OfficeFloorIdentifierAmbiguousError",
   "RoomNotFoundError",
+  "OfficeRoomProtectedError",
+  "OfficeRoomAccessUnsupportedError",
   "MeetingMinutesNotFoundError",
   "ActivityMessageNotFoundError",
   "ReactionNotFoundError",
@@ -162,7 +179,12 @@ const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDo
   "ComponentNotFoundError",
   "CustomFieldNotFoundError",
   "CustomFieldObjectNotFoundError",
+  "InvalidCustomFieldBooleanValueError",
   "InvalidCustomFieldDateValueError",
+  "InvalidCustomFieldEnumValueError",
+  "InvalidCustomFieldNumberValueError",
+  "RecruitingCandidateCustomFieldOwnerError",
+  "RecruitingCandidateCustomFieldTypeUnsupportedError",
   "IssueTemplateNotFoundError",
   "TemplateChildNotFoundError",
   "NotificationNotFoundError",
@@ -269,10 +291,15 @@ const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDo
 const INTERNAL_ERROR_PREFIX: Partial<Record<HulyDomainError["_tag"], string>> = {
   FileUploadError: "File upload error",
   HulyStorageConfigError: "Storage configuration error",
-  HulyAuthError: "Authentication error"
+  HulyAuthError: "Authentication error",
+  OfficeSettingsMalformedError: "Virtual-office settings error"
 }
 
 const CONNECTION_ERROR_GUIDANCE = "Verify HULY_URL, workspace, and network connectivity before retrying."
+const encodeMeetingCompositionMutationError = Schema.encodeUnknownSync(MeetingCompositionMutationError)
+
+const meetingCompositionMutationMessage = (error: MeetingCompositionMutationError): string =>
+  `${error.message}\nRecovery record: ${JSON.stringify(encodeMeetingCompositionMutationError(error))}`
 
 /**
  * Markup operations (issue descriptions, comments) run against the collaborator service rather
@@ -303,6 +330,14 @@ export const mapDomainErrorToMcp = (
   error: HulyDomainError,
   warnings: ReadonlyArray<ToolWarning> = []
 ): McpErrorResponseWithMeta => {
+  if (error instanceof MeetingCompositionMutationError) {
+    return createErrorResponse(
+      meetingCompositionMutationMessage(error),
+      McpErrorCode.InternalError,
+      error._tag,
+      warnings
+    )
+  }
   if (error instanceof HulyUnavailableError) {
     return createErrorResponse(hulyUnavailableMessage(error), McpErrorCode.InternalError, error._tag, warnings)
   }
@@ -381,6 +416,11 @@ export const mapDomainCauseToMcp = (
   cause: Cause.Cause<HulyDomainError>,
   warnings: ReadonlyArray<ToolWarning> = []
 ): McpErrorResponseWithMeta => {
+  for (const reason of cause.reasons) {
+    if (Cause.isFailReason(reason) && reason.error instanceof MeetingCompositionMutationError) {
+      return mapDomainErrorToMcp(reason.error, warnings)
+    }
+  }
   const classification = classifyCause(cause)
   if (classification._tag === "Failure") return mapDomainErrorToMcp(classification.firstFailure, warnings)
   return createErrorResponse(

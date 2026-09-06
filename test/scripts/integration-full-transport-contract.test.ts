@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest"
 const script = readFileSync("scripts/integration_test_full.sh", "utf8")
 const hrPaginationAdapter = readFileSync("scripts/integration-hr-report-pagination-fixture.ts", "utf8")
 const cleanShellEnv = { ...process.env, LC_ALL: "C" }
+const SHELL_SCENARIO_TIMEOUT_MS = 30_000
 
 const functionBody = (name: string): string => {
   const match = script.match(new RegExp(`\\n${name}\\(\\) \\{([\\s\\S]*?)\\n\\}`))
@@ -200,13 +201,57 @@ printf 'status=%s\n' "$status"`
 
   it("keeps the command-substitution runner free of transport lifecycle mutations", () => {
     const body = functionBody("run_capture_only_fresh")
-    expect(body).toContain('result=$(call_tool "$payload")')
+    expect(body).toContain('result=$(call_tool_fresh_session "$payload")')
     expect(body).not.toContain("restart_http_transport_if_needed")
     expect(functionBody("run_capture_to_var_fresh")).toContain("run_capture_to_var_with_runner call_tool")
   })
 
+  it("uses fresh sessions for document ToDo readiness, list-after-create, and absence-after-delete", () => {
+    expect(script).toContain("if PLANNER_DOCUMENT_READ_TEXT=$(run_capture_only_fresh")
+    expect(script).toContain('"map(.id)" "$PLANNER_DOCUMENT_CLEANUP_TODO_ID" 20 1 run_capture_only_fresh')
+    expect(script).toContain('PLANNER_DOCUMENT_CLEANUP_TODO_TITLE="$PLANNER_DOCUMENT_TODO_TITLE"')
+    expect(script).toContain('PLANNER_DOCUMENT_CLEANUP_TODO_TITLE="$PLANNER_DOCUMENT_UPDATED_TODO_TITLE"')
+    expect(script).toContain(
+      String.raw`title_payload="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\"`
+    )
+    expect(script).toContain("title_id=$(printf")
+    expect(script).toContain('wait_for_tool_error_quiet "$read_payload" "not found" 8')
+    expect(script).not.toContain("'all(.[]?; .title != $title)'")
+  })
+
+  it("prioritizes writable external calendar targets and confirms visibility before primary tests", () => {
+    const selectionStart = script.indexOf("CALENDAR_SETTINGS_TARGET_ID=$(printf")
+    const selectionEnd = script.indexOf("CALENDAR_SETTINGS_INTERNAL_ID=", selectionStart)
+    expect(selectionStart).toBeGreaterThanOrEqual(0)
+    expect(selectionEnd).toBeGreaterThan(selectionStart)
+    const selection = script.slice(selectionStart, selectionEnd)
+    const visibleExternal = selection.indexOf(
+      'select(.hidden == false and (.access == "owner" or .access == "writer") and .kind == "external")'
+    )
+    const writableExternal = selection.indexOf(
+      'select((.access == "owner" or .access == "writer") and .kind == "external")'
+    )
+    const visibleWritable = selection.indexOf(
+      'select(.hidden == false and (.access == "owner" or .access == "writer"))'
+    )
+    const writable = selection.indexOf('select((.access == "owner" or .access == "writer"))')
+    expect(visibleExternal).toBeGreaterThanOrEqual(0)
+    expect(writableExternal).toBeGreaterThan(visibleExternal)
+    expect(visibleWritable).toBeGreaterThan(writableExternal)
+    expect(writable).toBeGreaterThan(visibleWritable)
+
+    const marker = script.indexOf('CALENDAR_SETTINGS_VISIBLE_TARGET_ID=""', selectionStart)
+    const firstClaim = script.indexOf('CALENDAR_SETTINGS_VISIBLE_TARGET_ID="$CALENDAR_SETTINGS_TARGET_ID"', marker)
+    expect(marker).toBeGreaterThan(selectionStart)
+    expect(firstClaim).toBeGreaterThan(marker)
+    expect(script.slice(marker, firstClaim)).toContain("list_calendar_settings(after unhide)")
+    expect(script.slice(marker, firstClaim)).toContain("CALENDAR_SETTINGS_AFTER_HIDDEN_TEXT")
+    expect(script.slice(firstClaim)).toContain("CALENDAR_SETTINGS_AFTER_TARGET_VISIBILITY_TEXT")
+  })
+
   it("uses bounded one-shot transports for fresh-session cleanup and readback", () => {
     const freshSession = functionBody("call_tool_fresh_session")
+    expect(script).toContain('TOOL_TIMEOUT="${TOOL_TIMEOUT:-30}"')
     expect(freshSession).toContain('call_tool_cli "$payload"')
     expect(freshSession).toContain('call_tool_stdio "$payload"')
     expect(freshSession).not.toContain("call_tool_http")
@@ -377,7 +422,19 @@ printf 'status=%s\n' "$status"`
     expectRestartBeforeCapture(body, "run_test")
     expect(readbackIndex).toBeGreaterThanOrEqual(0)
     expect(clearIndex).toBeGreaterThan(readbackIndex)
-    expect(body).toContain("cleanup marker retained")
+    expect(body).toContain("marker retained")
+  })
+
+  it("cleans the recruiting person in fresh sessions before clearing its marker", () => {
+    const body = functionBody("cleanup_recruiting_person")
+    const deletePathIndex = script.indexOf('run_test "delete_person(recruiting:')
+    const cleanupCallIndex = script.indexOf("cleanup_recruiting_person", deletePathIndex)
+    expect(body).toContain('read_response=$(call_tool_fresh_session "$read_payload"')
+    expect(body).toContain('&& wait_for_tool_error_quiet "$read_payload" "not found" 1')
+    expect(body).toContain("marker retained")
+    expect(deletePathIndex).toBeGreaterThanOrEqual(0)
+    expect(cleanupCallIndex).toBeGreaterThan(deletePathIndex)
+    expect(script).not.toContain('RECRUITING_PERSON_ID=""')
   })
 
   it("waits for canonical lead-person projections and idempotent mixin visibility", () => {
@@ -501,12 +558,14 @@ capture_paginated_hr_reports result 'forced pagination' department 2026-09-04 20
     expect(functionBody("wait_for_hr_staff_hierarchy_visibility").match(/call_tool_fresh_session/gu)).toHaveLength(3)
   })
 
-  it("fails closed and restores Staff through fresh authoritative confirmations when the barrier exhausts", () => {
-    const execution = spawnSync(
-      "bash",
-      [
-        "-c",
-        `${shellFunction("tool_response_succeeded")}
+  it(
+    "fails closed and restores Staff through fresh authoritative confirmations when the barrier exhausts",
+    () => {
+      const execution = spawnSync(
+        "bash",
+        [
+          "-c",
+          `${shellFunction("tool_response_succeeded")}
 ${shellFunction("restore_hr_staff_fixture")}
 ${shellFunction("cleanup_hr_artifacts")}
 ${shellFunction("wait_for_hr_staff_hierarchy_visibility")}
@@ -564,14 +623,16 @@ if ! wait_for_hr_staff_hierarchy_visibility; then
   exit 1
 fi
 call_tool_fresh_session '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_hr_table","arguments":{}},"id":2}'`
-      ],
-      { encoding: "utf8", env: cleanShellEnv }
-    )
-    expect(execution.status).toBe(1)
-    expect(execution.stdout).toContain("failed=HR Staff hierarchy visibility barrier\n")
-    expect(execution.stdout).toContain("final marker= cleanup=0\n")
-    expect(execution.stdout.match(/restore marker=employee-1 department=original-department/gu)).toHaveLength(4)
-    expect(execution.stdout).not.toContain("report-probe=")
-    expect(execution.stderr).toBe("")
-  })
+        ],
+        { encoding: "utf8", env: cleanShellEnv }
+      )
+      expect(execution.status).toBe(1)
+      expect(execution.stdout).toContain("failed=HR Staff hierarchy visibility barrier\n")
+      expect(execution.stdout).toContain("final marker= cleanup=0\n")
+      expect(execution.stdout.match(/restore marker=employee-1 department=original-department/gu)).toHaveLength(4)
+      expect(execution.stdout).not.toContain("report-probe=")
+      expect(execution.stderr).toBe("")
+    },
+    SHELL_SCENARIO_TIMEOUT_MS
+  )
 })

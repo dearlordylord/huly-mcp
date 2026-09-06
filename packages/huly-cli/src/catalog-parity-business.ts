@@ -8,7 +8,7 @@ export const parityBusinessCliCommandCatalog = {
   create_event: {
     path: ["calendar", "events", "create"],
     positional: ["title", "date"],
-    description: "Create a calendar event",
+    description: "Create a calendar event; pass --meeting-room as JSON for native room composition",
     behavior: { fileInput: { fields: ["description"] } }
   },
   create_recurring_event: {
@@ -20,18 +20,18 @@ export const parityBusinessCliCommandCatalog = {
   create_schedule: {
     path: ["calendar", "schedules", "create"],
     positional: ["title"],
-    description: "Create a calendar schedule; pass --availability as JSON"
+    description: "Create a calendar schedule; pass --availability and optional --meeting-room as JSON"
   },
   update_event: {
     path: ["calendar", "events", "update"],
     positional: ["eventId"],
-    description: "Update a calendar event",
+    description: "Update a calendar event; pass --meeting-room as JSON to change an existing Meeting room",
     behavior: { fileInput: { fields: ["description"] } }
   },
   update_schedule: {
     path: ["calendar", "schedules", "update"],
     positional: ["scheduleId"],
-    description: "Update a calendar schedule; pass --availability as JSON"
+    description: "Update a calendar schedule; pass --availability or --meeting-room as JSON"
   },
   add_drive_members: {
     path: ["drive", "members", "add"],

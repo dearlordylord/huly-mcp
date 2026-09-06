@@ -123,6 +123,8 @@ export * from "./hr-departments.js"
 export * from "./person-administration.js"
 export * from "./person-merge.js"
 export * from "./employee-lifecycle.js"
+export * from "./calendar-meeting-rooms.js"
+export * from "./virtual-office-administration.js"
 export * from "./lead-collaboration.js"
 
 export { optionalOutput } from "./output-helpers.js"
@@ -130,9 +132,12 @@ export { optionalOutput } from "./output-helpers.js"
 export {
   ApprovalRequestCountMetadataDegradedWarningCode,
   ApprovalRequestPersonMetadataDegradedWarningCode,
+  CustomFieldMetadataDegradedWarningCode,
   ExternalChannelRuntimeUnsupportedWarningCode,
   LeadCustomerMetadataDegradedWarningCode,
   MessageTemplateMetadataDegradedWarningCode,
+  PlannerDocumentMetadataDegradedWarningCode,
+  RecruitingCandidateCustomFieldMetadataDegradedWarningCode,
   SpacePreferenceMetadataDegradedWarningCode,
   SpaceRoleAssignmentsDegradedWarningCode,
   StatusMetadataUnresolvedWarningCode,
@@ -940,6 +945,8 @@ export {
 export {
   type CustomFieldInfo,
   CustomFieldInfoWireSchema,
+  type RecruitingCandidateCustomFieldValue,
+  RecruitingCandidateCustomFieldValueWireSchema,
   type CustomFieldTypeName,
   CustomFieldTypeNameSchema,
   type CustomFieldValue,
@@ -948,6 +955,7 @@ export {
   getCustomFieldValuesParamsJsonSchema,
   GetCustomFieldValuesParamsSchema,
   GetCustomFieldValuesResultSchema,
+  GetRecruitingCandidateCustomFieldValuesResultSchema,
   type ListCustomFieldsParams,
   listCustomFieldsParamsJsonSchema,
   ListCustomFieldsParamsSchema,
@@ -1833,8 +1841,12 @@ export {
 } from "./chat-message-workflows.js"
 
 export {
+  type CalendarAccess,
+  CalendarAccessSchema,
   CalendarEventTitle,
   CalendarName,
+  type CalendarSummary,
+  CalendarSummarySchema,
   type CreateEventParams,
   createEventParamsJsonSchema,
   CreateEventParamsSchema,
@@ -1846,12 +1858,16 @@ export {
   type GetEventParams,
   getEventParamsJsonSchema,
   GetEventParamsSchema,
+  type ListCalendarsParams,
+  listCalendarsParamsJsonSchema,
+  ListCalendarsParamsSchema,
   type ListEventsParams,
   listEventsParamsJsonSchema,
   ListEventsParamsSchema,
   parseCreateEventParams,
   parseDeleteEventParams,
   parseGetEventParams,
+  parseListCalendarsParams,
   parseListEventsParams,
   parseUpdateEventParams,
   type Participant,
@@ -1864,15 +1880,42 @@ export {
 } from "./calendar.js"
 
 export {
+  type CalendarSettingsKind,
+  CalendarSettingsKindSchema,
+  CalendarSettingsKindValues,
+  type CalendarSettingsSummary,
+  CalendarSettingsSummarySchema,
+  type ListCalendarSettingsParams,
+  listCalendarSettingsParamsJsonSchema,
+  ListCalendarSettingsParamsSchema,
+  parseListCalendarSettingsParams,
+  type SetPrimaryCalendarParams,
+  setPrimaryCalendarParamsJsonSchema,
+  SetPrimaryCalendarParamsSchema,
+  parseSetPrimaryCalendarParams,
+  type UpdateCalendarSettingsParams,
+  updateCalendarSettingsParamsJsonSchema,
+  UpdateCalendarSettingsParamsSchema,
+  parseUpdateCalendarSettingsParams,
+  UPDATE_CALENDAR_SETTINGS_FIELDS
+} from "./calendar-settings.js"
+
+export {
   type CreateEventResult,
   CreateEventResultSchema,
   type DeleteEventResult,
   DeleteEventResultSchema,
   GetEventResultSchema,
+  type ListCalendarSettingsResult,
+  ListCalendarSettingsResultSchema,
   ListCalendarsResultSchema,
   ListEventsResultSchema,
+  type SetPrimaryCalendarResult,
+  SetPrimaryCalendarResultSchema,
   type UpdateEventResult,
-  UpdateEventResultSchema
+  UpdateEventResultSchema,
+  type UpdateCalendarSettingsResult,
+  UpdateCalendarSettingsResultSchema
 } from "./calendar-results.js"
 
 export {
@@ -2061,6 +2104,8 @@ export {
   CreateTodoParamsSchema,
   type CreateTodoResult,
   CreateTodoResultSchema,
+  type DocumentTodoLocator,
+  DocumentTodoLocatorSchema,
   type DeleteTodoParams,
   deleteTodoParamsJsonSchema,
   DeleteTodoParamsSchema,

@@ -10,6 +10,7 @@ import { Milliseconds, runBoundedCommand } from "../../scripts/run-bounded-comma
 
 const execFileAsync = promisify(execFile)
 const COMMAND_TIMEOUT = Milliseconds.make(2_000)
+const PROCESS_TEST_TIMEOUT_MS = 30_000
 
 const processExists = (pid: number) => {
   try {
@@ -56,9 +57,11 @@ test("counts a successful command with no output", async () => {
   expect(result).toEqual({ outputLineCount: 0 })
 })
 
-test("forwards output by default while counting it", async () => {
-  const runnerUrl = new URL("../../scripts/run-bounded-command.ts", import.meta.url).href
-  const program = `
+test(
+  "forwards output by default while counting it",
+  async () => {
+    const runnerUrl = new URL("../../scripts/run-bounded-command.ts", import.meta.url).href
+    const program = `
     import { Milliseconds, runBoundedCommand } from ${JSON.stringify(runnerUrl)}
     await runBoundedCommand({
       args: ["-e", "process.stdout.write('forwarded fixture\\\\n')"],
@@ -67,10 +70,12 @@ test("forwards output by default while counting it", async () => {
       timeoutMilliseconds: Milliseconds.make(2000)
     })
   `
-  const { stdout } = await execFileAsync(process.execPath, ["--import", "tsx", "--eval", program])
+    const { stdout } = await execFileAsync(process.execPath, ["--import", "tsx", "--eval", program])
 
-  expect(stdout).toBe("forwarded fixture\n")
-})
+    expect(stdout).toBe("forwarded fixture\n")
+  },
+  PROCESS_TEST_TIMEOUT_MS
+)
 
 test("reports a nonzero command exit", async () => {
   await expect(

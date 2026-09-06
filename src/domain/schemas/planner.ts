@@ -10,6 +10,8 @@ import {
   Count,
   DEFAULT_LIMIT,
   DocId,
+  DocumentId,
+  DocumentIdentifier,
   Email,
   enumValuesDescription,
   hasAtLeastOneDefined,
@@ -21,6 +23,8 @@ import {
   PersonId,
   PersonName,
   ProjectIdentifier,
+  TeamspaceId,
+  TeamspaceIdentifier,
   SpaceId,
   Timestamp,
   TodoId,
@@ -81,12 +85,19 @@ export type TodoCompletionState = Schema.Schema.Type<typeof TodoCompletionStateS
 export const DEFAULT_TODO_PRIORITY: TodoPriority = "no-priority"
 export const DEFAULT_PERSONAL_TODO_VISIBILITY: TodoVisibility = "private"
 export const DEFAULT_ISSUE_TODO_VISIBILITY: TodoVisibility = "public"
+export const DEFAULT_DOCUMENT_TODO_VISIBILITY: TodoVisibility = "private"
 
 export const IssueTodoLocatorSchema = Schema.Struct({
   project: ProjectIdentifier.annotate({ description: "Project identifier, such as HULY." }),
   identifier: IssueIdentifier.annotate({ description: "Issue identifier, such as HULY-123 or 123." })
 })
 export type IssueTodoLocator = Schema.Schema.Type<typeof IssueTodoLocatorSchema>
+
+export const DocumentTodoLocatorSchema = Schema.Struct({
+  teamspace: TeamspaceIdentifier.annotate({ description: "Teamspace name or ID containing the document." }),
+  document: DocumentIdentifier.annotate({ description: "Document title or ID within the teamspace." })
+})
+export type DocumentTodoLocator = Schema.Schema.Type<typeof DocumentTodoLocatorSchema>
 
 export const TodoAttachmentInputSchema = Schema.Union([
   Schema.Struct({
@@ -98,10 +109,16 @@ export const TodoAttachmentInputSchema = Schema.Union([
     type: Schema.Literal("issue"),
     project: ProjectIdentifier.annotate({ description: "Project identifier containing the issue." }),
     identifier: IssueIdentifier.annotate({ description: "Issue identifier, such as HULY-123 or 123." })
+  }),
+  Schema.Struct({
+    type: Schema.Literal("document"),
+    teamspace: TeamspaceIdentifier.annotate({ description: "Teamspace name or ID containing the document." }),
+    document: DocumentIdentifier.annotate({ description: "Document title or ID within the teamspace." })
   })
 ]).annotate({
   title: "TodoAttachmentInput",
-  description: "Where to create the ToDo. Use none for personal Planner ToDos or issue for issue action items."
+  description:
+    "Where to create the ToDo. Use none for personal Planner ToDos, issue for issue action items, or document for a document action item."
 })
 export type TodoAttachmentInput = Schema.Schema.Type<typeof TodoAttachmentInputSchema>
 
@@ -127,32 +144,56 @@ export const TodoLocatorSchema = Schema.Union([
   })
 ]).annotate({
   title: "TodoLocator",
-  description: "LLM-first ToDo locator. Prefer issue/title/owner forms when you do not know the raw Huly ToDo ID."
+  description:
+    "LLM-first ToDo locator. Prefer issue/title/owner or attachedTo.type=document with teamspace/document + title when you do not know the raw Huly ToDo ID."
 })
 export type TodoLocator = Schema.Schema.Type<typeof TodoLocatorSchema>
 
-export const ListTodosParamsSchema = Schema.Struct({
-  owner: Schema.optional(
+const ListTodosFilterFields = {
+  owner: Schema.optionalKey(
     NonEmptyString.annotate({
       description: "Filter by owner exact email, exact display name, or raw person/employee ID."
     })
   ),
-  issue: Schema.optional(IssueTodoLocatorSchema.annotate({ description: "Filter ToDos attached to one issue." })),
-  title: Schema.optional(TodoTitle.annotate({ description: "Exact ToDo title filter." })),
-  titleSearch: Schema.optional(NonEmptyString.annotate({ description: "Case-insensitive title substring filter." })),
-  dueFrom: Schema.optional(Timestamp.annotate({ description: "Only ToDos due at or after this timestamp." })),
-  dueTo: Schema.optional(Timestamp.annotate({ description: "Only ToDos due at or before this timestamp." })),
-  completionState: Schema.optional(
+  title: Schema.optionalKey(TodoTitle.annotate({ description: "Exact ToDo title filter." })),
+  titleSearch: Schema.optionalKey(NonEmptyString.annotate({ description: "Case-insensitive title substring filter." })),
+  dueFrom: Schema.optionalKey(Timestamp.annotate({ description: "Only ToDos due at or after this timestamp." })),
+  dueTo: Schema.optionalKey(Timestamp.annotate({ description: "Only ToDos due at or before this timestamp." })),
+  completionState: Schema.optionalKey(
     TodoCompletionStateSchema.annotate({ description: `Completion filter. Default: ${DEFAULT_TODO_COMPLETION_STATE}.` })
   ),
-  priority: Schema.optional(TodoPrioritySchema),
-  visibility: Schema.optional(TodoVisibilitySchema),
-  limit: Schema.optional(
+  priority: Schema.optionalKey(TodoPrioritySchema),
+  visibility: Schema.optionalKey(TodoVisibilitySchema),
+  limit: Schema.optionalKey(
     LimitParam.annotate({ description: `Maximum number of ToDos to return (default: ${DEFAULT_LIMIT}).` })
   )
-}).annotate({
+}
+
+const ListTodosWithoutAttachmentSchema = Schema.Struct({
+  ...ListTodosFilterFields,
+  issue: Schema.optionalKey(Schema.Never),
+  document: Schema.optionalKey(Schema.Never)
+})
+
+const ListTodosIssueSchema = Schema.Struct({
+  ...ListTodosFilterFields,
+  issue: IssueTodoLocatorSchema.annotate({ description: "Filter ToDos attached to one issue." }),
+  document: Schema.optionalKey(Schema.Never)
+})
+
+const ListTodosDocumentSchema = Schema.Struct({
+  ...ListTodosFilterFields,
+  issue: Schema.optionalKey(Schema.Never),
+  document: DocumentTodoLocatorSchema.annotate({ description: "Filter ToDos attached to one document." })
+})
+
+export const ListTodosParamsSchema = Schema.Union([
+  ListTodosWithoutAttachmentSchema,
+  ListTodosIssueSchema,
+  ListTodosDocumentSchema
+]).annotate({
   title: "ListTodosParams",
-  description: `Parameters for listing Planner ToDos. Empty input is allowed: returns up to ${DEFAULT_LIMIT} ToDos, ordered by Huly planner order, with completionState=all.`
+  description: `Parameters for listing Planner ToDos. Empty input is allowed: returns up to ${DEFAULT_LIMIT} ToDos, ordered by Huly planner order, with completionState=all. Use either issue or document, not both.`
 })
 export type ListTodosParams = Schema.Schema.Type<typeof ListTodosParamsSchema>
 
@@ -178,15 +219,17 @@ export const CreateTodoParamsSchema = Schema.Struct({
   ),
   visibility: Schema.optional(
     TodoVisibilitySchema.annotate({
-      description: `Visibility. Default: ${DEFAULT_PERSONAL_TODO_VISIBILITY} for personal ToDos, ${DEFAULT_ISSUE_TODO_VISIBILITY} for issue ToDos.`
+      description: `Visibility. Default: ${DEFAULT_PERSONAL_TODO_VISIBILITY} for personal/document ToDos, ${DEFAULT_ISSUE_TODO_VISIBILITY} for issue ToDos.`
     })
   ),
   attachedTo: Schema.optional(
-    TodoAttachmentInputSchema.annotate({ description: "Attachment target. If omitted, creates a personal ToDo." })
+    TodoAttachmentInputSchema.annotate({
+      description: "Attachment target. If omitted, creates a personal ToDo; document targets create document ToDos."
+    })
   )
 }).annotate({
   title: "CreateTodoParams",
-  description: "Create a personal or issue-attached Planner ToDo without requiring Huly class IDs."
+  description: "Create a personal, issue-attached, or document-attached Planner ToDo without requiring Huly class IDs."
 })
 export type CreateTodoParams = Schema.Schema.Type<typeof CreateTodoParamsSchema>
 
@@ -282,25 +325,14 @@ export const UnscheduleTodoParamsSchema = Schema.Union([
 })
 export type UnscheduleTodoParams = Schema.Schema.Type<typeof UnscheduleTodoParamsSchema>
 
-export type {
-  CreateTodoResult,
-  DeleteTodoResult,
-  ScheduleTodoResult,
-  TodoAttachmentSummary,
-  TodoDetail,
-  TodoMutationResult,
-  TodoOwnerSummary,
-  TodoSummary,
-  UnscheduleTodoResult
-} from "./planner-output.js"
-
-const TodoOwnerSummarySchema = Schema.Struct({
+export const TodoOwnerSummarySchema = Schema.Struct({
   id: PersonId,
   name: Schema.optional(PersonName),
   email: Schema.optional(Email)
 })
+export type TodoOwnerSummary = Schema.Schema.Type<typeof TodoOwnerSummarySchema>
 
-const TodoAttachmentSummarySchema = Schema.Union([
+export const TodoAttachmentSummarySchema = Schema.Union([
   Schema.Struct({ type: Schema.Literal("none") }),
   Schema.Struct({
     type: Schema.Literal("issue"),
@@ -309,10 +341,18 @@ const TodoAttachmentSummarySchema = Schema.Union([
     identifier: IssueIdentifier,
     title: TodoAttachmentTitle
   }),
+  Schema.Struct({
+    type: Schema.Literal("document"),
+    id: DocumentId,
+    title: TodoAttachmentTitle,
+    teamspaceId: TeamspaceId,
+    teamspaceName: NonEmptyString
+  }),
   Schema.Struct({ type: Schema.Literal("unknown"), id: DocId, class: ObjectClassName }).annotate({
     description: "Attached to a Huly object type this Planner tool does not resolve yet."
   })
 ])
+export type TodoAttachmentSummary = Schema.Schema.Type<typeof TodoAttachmentSummarySchema>
 
 export const TodoSummarySchema = Schema.Struct({
   id: TodoId,
@@ -326,6 +366,7 @@ export const TodoSummarySchema = Schema.Struct({
   workslots: Count,
   labels: Schema.optional(Count)
 })
+export type TodoSummary = Schema.Schema.Type<typeof TodoSummarySchema>
 
 export const TodoDetailSchema = TodoSummarySchema.pipe(
   Schema.fieldsAssign({
@@ -337,15 +378,21 @@ export const TodoDetailSchema = TodoSummarySchema.pipe(
     modifiedOn: Schema.optional(Timestamp)
   })
 )
+export type TodoDetail = Schema.Schema.Type<typeof TodoDetailSchema>
 
 export const CreateTodoResultSchema = Schema.Struct({ todoId: TodoId })
+export type CreateTodoResult = Schema.Schema.Type<typeof CreateTodoResultSchema>
 export const TodoMutationResultSchema = Schema.Struct({ todoId: TodoId, updated: Schema.Boolean })
+export type TodoMutationResult = Schema.Schema.Type<typeof TodoMutationResultSchema>
 export const UpdateTodoResultSchema = TodoMutationResultSchema
 export const CompleteTodoResultSchema = TodoMutationResultSchema
 export const ReopenTodoResultSchema = TodoMutationResultSchema
 export const DeleteTodoResultSchema = Schema.Struct({ todoId: TodoId, deleted: Schema.Boolean })
+export type DeleteTodoResult = Schema.Schema.Type<typeof DeleteTodoResultSchema>
 export const ScheduleTodoResultSchema = Schema.Struct({ todoId: TodoId, workSlotId: WorkSlotId })
+export type ScheduleTodoResult = Schema.Schema.Type<typeof ScheduleTodoResultSchema>
 export const UnscheduleTodoResultSchema = Schema.Struct({ todoId: Schema.optional(TodoId), removed: Count })
+export type UnscheduleTodoResult = Schema.Schema.Type<typeof UnscheduleTodoResultSchema>
 
 export const ListTodosResultSchema = Schema.Array(TodoSummarySchema)
 

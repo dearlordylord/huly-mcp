@@ -1,6 +1,7 @@
 import { describe, it } from "@effect/vitest"
-import { Effect, Schema } from "effect"
+import { Effect, Result, Schema } from "effect"
 import { expect } from "vitest"
+import { MeetingRoomFloorIdentifier, MeetingRoomIdentifier } from "../../src/domain/schemas/calendar-meeting-rooms.js"
 import {
   MessageTemplateCategoryIdentifier,
   MessageTemplateIdentifier,
@@ -14,6 +15,7 @@ import {
   ReviewIdentifier,
   VacancyIdentifier
 } from "../../src/domain/schemas/recruiting.js"
+import { FloorIdentifier } from "../../src/domain/schemas/virtual-office-administration.js"
 import {
   AssociationId,
   AttachmentId,
@@ -22,6 +24,8 @@ import {
   ChannelIdentifier,
   CommentId,
   Count,
+  CustomFieldId,
+  CalendarId,
   DocId,
   EventId,
   FloorId,
@@ -77,7 +81,9 @@ import {
   BoardViewletIdentifierAmbiguousError,
   BoardViewletNotFoundError,
   BYTES_PER_MB,
+  CalendarMeetingTargetNotWritableError,
   CalendarNotAccessibleError,
+  CalendarSettingsTargetNotWritableError,
   CannotDirectMessageSelfError,
   CardCommentNotFoundError,
   CardNotFoundError,
@@ -89,6 +95,9 @@ import {
   ChatMessageAttachmentNotFoundError,
   CommentNotFoundError,
   ComponentNotFoundError,
+  CustomFieldMetadataMalformedError,
+  CustomFieldNotFoundError,
+  CustomFieldObjectNotFoundError,
   ContactChannelConflictError,
   ContactChannelIdentifierAmbiguousError,
   ContactChannelNotFoundError,
@@ -114,6 +123,8 @@ import {
   DrivePathAmbiguousError,
   DrivePathConflictError,
   DrivePathNotFoundError,
+  EventMeetingMixinMissingError,
+  EventSiblingConvergenceError,
   EventNotFoundError,
   FileFetchError,
   FileNotFoundError,
@@ -140,6 +151,10 @@ import {
   InvalidContactChannelValueError,
   InvalidContactProviderError,
   InvalidContentTypeError,
+  InvalidCustomFieldBooleanValueError,
+  InvalidCustomFieldDateValueError,
+  InvalidCustomFieldEnumValueError,
+  InvalidCustomFieldNumberValueError,
   InvalidFileDataError,
   InvalidPersonUuidError,
   InvalidStatusError,
@@ -160,7 +175,11 @@ import {
   LeadNotFoundError,
   LeadUpdateConflictError,
   MasterTagNotFoundError,
+  MeetingCompositionMutationError,
   MeetingMinutesNotFoundError,
+  MeetingRoomAssignmentUnsupportedError,
+  MeetingRoomIdentifierAmbiguousError,
+  MeetingRoomNotFoundError,
   MessageNotFoundError,
   MessageTemplateCategoryIdentifierAmbiguousError,
   MessageTemplateCategoryNotFoundError,
@@ -174,6 +193,11 @@ import {
   NotificationProviderNotConfigurableError,
   NotificationTypeNotFoundError,
   NoUpdateFieldsError,
+  OfficeFloorIdentifierAmbiguousError,
+  OfficeFloorNotFoundError,
+  OfficeRoomAccessUnsupportedError,
+  OfficeRoomProtectedError,
+  OfficeSettingsMalformedError,
   OrganizationIdentifierAmbiguousError,
   OrganizationNotFoundError,
   PersonIdentifierAmbiguousError,
@@ -188,6 +212,8 @@ import {
   RecruitingAttachmentNotFoundError,
   RecruitingCandidateNotFoundError,
   RecruitingCommentNotFoundError,
+  RecruitingCandidateCustomFieldOwnerError,
+  RecruitingCandidateCustomFieldTypeUnsupportedError,
   RecruitingDuplicateApplicantError,
   RecruitingIssueLocatorInvalidError,
   RecruitingModelMissingError,
@@ -209,6 +235,7 @@ import {
   RoomNotFoundError,
   SavedAttachmentNotFoundError,
   SavedMessageNotFoundError,
+  ScheduleMeetingMixinMissingError,
   ScheduleNotFoundError,
   SpaceNotTypedError,
   SpaceRoleAssignmentsMalformedError,
@@ -846,6 +873,24 @@ describe("Huly Errors", () => {
     )
   })
 
+  describe("CalendarSettingsTargetNotWritableError", () => {
+    it.effect("distinguishes a hidden primary from insufficient ACL", () =>
+      Effect.sync(function () {
+        const hidden = new CalendarSettingsTargetNotWritableError({
+          calendarId: CalendarId.make("cal-hidden"),
+          reason: "hidden-primary"
+        })
+        const insufficient = new CalendarSettingsTargetNotWritableError({
+          calendarId: CalendarId.make("cal-read-only"),
+          reason: "insufficient-access"
+        })
+
+        expect(hidden.message).toBe("Calendar 'cal-hidden' is hidden and cannot be selected as the primary calendar")
+        expect(insufficient.message).toBe("Calendar 'cal-read-only' does not grant Writer or Owner access")
+      })
+    )
+  })
+
   describe("ScheduleNotFoundError", () => {
     it.effect("generates message from fields", () =>
       Effect.sync(function () {
@@ -1118,6 +1163,47 @@ describe("Huly Errors", () => {
         expect(decoded._tag).toBe("ProjectNotFoundError")
       })
     )
+
+    it("rejects writable-target reasons belonging to the other target kind", () => {
+      const decode = Schema.decodeUnknownResult(CalendarMeetingTargetNotWritableError)
+
+      expect(
+        Result.isFailure(
+          decode({
+            _tag: "CalendarMeetingTargetNotWritableError",
+            failure: { _tag: "Event", targetId: "event-1", reason: "schedule-owned-by-another-employee" }
+          })
+        )
+      ).toBe(true)
+      expect(
+        Result.isFailure(
+          decode({
+            _tag: "CalendarMeetingTargetNotWritableError",
+            failure: { _tag: "Schedule", targetId: "schedule-1", reason: "prospective-event-not-writable" }
+          })
+        )
+      ).toBe(true)
+    })
+
+    it("derives writable-target compatibility fields from both valid target variants", () => {
+      const event = new CalendarMeetingTargetNotWritableError({
+        failure: { _tag: "Event", targetId: DocId.make("event-1"), reason: "caller-owned-writable-event-not-found" }
+      })
+      const schedule = new CalendarMeetingTargetNotWritableError({
+        failure: { _tag: "Schedule", targetId: DocId.make("schedule-1"), reason: "schedule-owned-by-another-employee" }
+      })
+
+      expect([event.target, event.targetId, event.reason]).toEqual([
+        "event",
+        "event-1",
+        "caller-owned-writable-event-not-found"
+      ])
+      expect([schedule.target, schedule.targetId, schedule.reason]).toEqual([
+        "schedule",
+        "schedule-1",
+        "schedule-owned-by-another-employee"
+      ])
+    })
   })
 
   describe("Effect integration", () => {
@@ -1282,18 +1368,52 @@ describe("Huly Errors", () => {
               return `reply:${error.replyId}`
             case "CalendarNotAccessibleError":
               return `calendar:${error.calendarId}`
+            case "CalendarSettingsIdentifierAmbiguousError":
+              return `calendar-settings-ambiguous:${error.identifier}:${error.matches}`
+            case "CalendarSettingsTargetNotAccessibleError":
+              return `calendar-settings-not-accessible:${"calendarId" in error.target ? error.target.calendarId : error.target.calendarName}`
+            case "CalendarSettingsTargetNotWritableError":
+              return `calendar-settings-not-writable:${error.calendarId}:${error.reason}`
+            case "CalendarSettingsInternalCalendarHideError":
+              return `calendar-settings-internal-hide:${error.calendarId}`
+            case "CalendarMeetingTargetNotWritableError":
+              return `calendar-meeting-not-writable:${error.target}:${error.targetId}:${error.reason}`
             case "EventNotFoundError":
               return `event:${error.eventId}`
+            case "EventMeetingMixinMissingError":
+              return `event-meeting-missing:${error.eventId}:${error.eventDocumentIds.length}`
+            case "EventSiblingConvergenceError":
+              return `event-siblings-unconfirmed:${error.eventId}:${error.reads}`
             case "RecurringEventNotFoundError":
               return `recurring:${error.eventId}`
             case "ScheduleNotFoundError":
               return `schedule:${error.scheduleId}`
+            case "ScheduleMeetingMixinMissingError":
+              return `schedule-meeting-missing:${error.scheduleId}`
             case "FloorNotFoundError":
               return `floor:${error.floorId}`
             case "RoomNotFoundError":
               return `room:${error.roomId}`
+            case "OfficeFloorNotFoundError":
+              return `office-floor:${error.identifier}`
+            case "OfficeFloorIdentifierAmbiguousError":
+              return `office-floor-ambiguous:${error.identifier}:${error.matches}`
+            case "OfficeRoomAccessUnsupportedError":
+              return `office-room-access:${error.roomId}:${error.access}`
+            case "OfficeRoomProtectedError":
+              return `office-room-protected:${error.roomId}:${error.field}`
+            case "OfficeSettingsMalformedError":
+              return `office-settings-malformed:${error.reason}`
             case "MeetingMinutesNotFoundError":
               return `meeting-minutes:${error.meetingMinutesId}`
+            case "MeetingRoomNotFoundError":
+              return `meeting-room:${error.locator.room}`
+            case "MeetingRoomIdentifierAmbiguousError":
+              return `meeting-room-ambiguous:${error.field}:${error.identifier}:${error.matches}`
+            case "MeetingRoomAssignmentUnsupportedError":
+              return `meeting-room-unsupported:${error.roomId}:${error.reason}`
+            case "MeetingCompositionMutationError":
+              return `meeting-mutation:${error.operation}:${error.recovery._tag}`
             case "ActivityMessageNotFoundError":
               return `activity:${error.messageId}`
             case "ActivityRecordInvalidError":
@@ -1338,12 +1458,24 @@ describe("Huly Errors", () => {
               return `testplanitem:${error.identifier}`
             case "ComponentNotFoundError":
               return `component:${error.identifier}`
+            case "CustomFieldMetadataMalformedError":
+              return `customfieldmetadata:${error.identifier}:${error.reason}`
             case "CustomFieldNotFoundError":
               return `customfield:${error.identifier}`
             case "CustomFieldObjectNotFoundError":
               return `customfieldobj:${error.objectId}`
             case "InvalidCustomFieldDateValueError":
               return `customfielddate:${error.value}`
+            case "InvalidCustomFieldNumberValueError":
+              return `customfieldnumber:${error.value}`
+            case "InvalidCustomFieldBooleanValueError":
+              return `customfieldboolean:${error.value}`
+            case "InvalidCustomFieldEnumValueError":
+              return `customfieldenum:${error.fieldId}:${error.value}`
+            case "RecruitingCandidateCustomFieldOwnerError":
+              return `recruiting-candidate-custom-field-owner:${error.fieldId}:${error.ownerClassId}`
+            case "RecruitingCandidateCustomFieldTypeUnsupportedError":
+              return `recruiting-candidate-custom-field-type:${error.fieldId}:${error.type}`
             case "IssueTemplateNotFoundError":
               return `template:${error.identifier}`
             case "TemplateChildNotFoundError":
@@ -1576,6 +1708,10 @@ describe("Huly Errors", () => {
               return `todo:${error.locator}`
             case "TodoIdentifierAmbiguousError":
               return `todo-ambiguous:${error.locator}:${error.matches}`
+            case "TodoDocumentTargetAmbiguousError":
+              return `todo-document-ambiguous:${error.target.type}:${error.target.identifier}:${error.matches}`
+            case "TodoDocumentTargetNotWritableError":
+              return `todo-document-not-writable:${error.teamspace}:${error.document}:${error.reason}`
             case "TodoWorkSlotNotFoundError":
               return `todo-workslot:${error.workSlotId}`
             case "PlannerSchedulingPrerequisiteError":
@@ -1750,6 +1886,50 @@ describe("Huly Errors", () => {
             }
           }
         }
+
+        expect(
+          matchError(new CustomFieldMetadataMalformedError({ identifier: "field-1", reason: "missing type" }))
+        ).toBe("customfieldmetadata:field-1:missing type")
+        expect(matchError(new CustomFieldNotFoundError({ identifier: "field-1" }))).toBe("customfield:field-1")
+        expect(
+          matchError(
+            new CustomFieldObjectNotFoundError({
+              objectId: DocId.make("doc-1"),
+              objectClass: ObjectClassName.make("tracker:class:Issue")
+            })
+          )
+        ).toBe("customfieldobj:doc-1")
+        expect(matchError(new InvalidCustomFieldDateValueError({ value: "2026-07-24Z" }))).toBe(
+          "customfielddate:2026-07-24Z"
+        )
+        expect(matchError(new InvalidCustomFieldNumberValueError({ value: "1x" }))).toBe("customfieldnumber:1x")
+        expect(matchError(new InvalidCustomFieldBooleanValueError({ value: "yes" }))).toBe("customfieldboolean:yes")
+        expect(
+          matchError(
+            new InvalidCustomFieldEnumValueError({
+              fieldId: CustomFieldId.make("field-1"),
+              enumRef: "enum:priority",
+              value: "Urgent",
+              allowedValues: ["Low", "High"]
+            })
+          )
+        ).toBe("customfieldenum:field-1:Urgent")
+        expect(
+          matchError(
+            new RecruitingCandidateCustomFieldOwnerError({
+              fieldId: CustomFieldId.make("field-1"),
+              ownerClassId: ObjectClassName.make("tracker:class:Issue")
+            })
+          )
+        ).toBe("recruiting-candidate-custom-field-owner:field-1:tracker:class:Issue")
+        expect(
+          matchError(
+            new RecruitingCandidateCustomFieldTypeUnsupportedError({
+              fieldId: CustomFieldId.make("field-1"),
+              type: "array"
+            })
+          )
+        ).toBe("recruiting-candidate-custom-field-type:field-1:array")
 
         expect(matchError(new IssueNotFoundError({ identifier: "X", project: "Y" }))).toBe("issue:X")
         expect(matchError(new HrRequestMutationUnsupportedError({ operation: "deletion" }))).toBe(
@@ -2167,6 +2347,25 @@ describe("Huly Errors", () => {
         expect(matchError(new ThreadReplyNotFoundError({ replyId: "r-1", messageId: "msg-1" }))).toBe("reply:r-1")
         expect(matchError(new CalendarNotAccessibleError({ calendarId: "cal-1" }))).toBe("calendar:cal-1")
         expect(matchError(new EventNotFoundError({ eventId: EventId.make("e-1") }))).toBe("event:e-1")
+        expect(
+          matchError(
+            new CalendarMeetingTargetNotWritableError({
+              failure: {
+                _tag: "Event",
+                targetId: DocId.make("event-doc-1"),
+                reason: "caller-owned-writable-event-not-found"
+              }
+            })
+          )
+        ).toBe("calendar-meeting-not-writable:event:event-doc-1:caller-owned-writable-event-not-found")
+        expect(
+          matchError(
+            new EventMeetingMixinMissingError({
+              eventId: EventId.make("e-1"),
+              eventDocumentIds: [DocId.make("event-doc-2")]
+            })
+          )
+        ).toBe("event-meeting-missing:e-1:1")
         expect(matchError(new RecurringEventNotFoundError({ eventId: EventId.make("re-1") }))).toBe("recurring:re-1")
         expect(matchError(new ActivityMessageNotFoundError({ messageId: "am-1" }))).toBe("activity:am-1")
         expect(
@@ -2402,8 +2601,74 @@ describe("Huly Errors", () => {
         expect(matchError(new ScheduleNotFoundError({ scheduleId: ScheduleId.make("sched-1") }))).toBe(
           "schedule:sched-1"
         )
+        expect(matchError(new ScheduleMeetingMixinMissingError({ scheduleId: ScheduleId.make("sched-1") }))).toBe(
+          "schedule-meeting-missing:sched-1"
+        )
+        expect(
+          matchError(new EventSiblingConvergenceError({ eventId: EventId.make("event-1"), reads: Count.make(5) }))
+        ).toBe("event-siblings-unconfirmed:event-1:5")
+        const meetingRoomLocator = {
+          room: MeetingRoomIdentifier.make("Focus"),
+          floor: MeetingRoomFloorIdentifier.make("Main")
+        }
+        expect(matchError(new MeetingRoomNotFoundError({ locator: meetingRoomLocator }))).toBe("meeting-room:Focus")
+        expect(
+          matchError(
+            new MeetingRoomIdentifierAmbiguousError({
+              field: "room",
+              identifier: MeetingRoomIdentifier.make("Focus"),
+              matches: Count.make(2)
+            })
+          )
+        ).toBe("meeting-room-ambiguous:room:Focus:2")
+        expect(
+          matchError(
+            new MeetingRoomAssignmentUnsupportedError({ roomId: RoomId.make("reception"), reason: "reception" })
+          )
+        ).toBe("meeting-room-unsupported:reception:reception")
+        expect(
+          matchError(
+            new MeetingCompositionMutationError({
+              failedStep: { _tag: "UpdateScheduleRoom", operation: "update_schedule" },
+              diagnostics: [{ _tag: "TypedFailure", errorTag: NonEmptyString.make("HulyConnectionError") }],
+              recovery: {
+                _tag: "Unconfirmed",
+                residuals: [
+                  {
+                    _tag: "RoomAssignment",
+                    target: "schedule",
+                    documentId: DocId.make("sched-1"),
+                    expectedRoomId: RoomId.make("room-old")
+                  }
+                ]
+              }
+            })
+          )
+        ).toBe("meeting-mutation:update_schedule:Unconfirmed")
         expect(matchError(new FloorNotFoundError({ floorId: FloorId.make("floor-1") }))).toBe("floor:floor-1")
         expect(matchError(new RoomNotFoundError({ roomId: RoomId.make("room-1") }))).toBe("room:room-1")
+        expect(matchError(new OfficeFloorNotFoundError({ identifier: FloorIdentifier.make("missing-floor") }))).toBe(
+          "office-floor:missing-floor"
+        )
+        expect(
+          matchError(
+            new OfficeFloorIdentifierAmbiguousError({
+              identifier: FloorIdentifier.make("Main"),
+              matches: Count.make(2)
+            })
+          )
+        ).toBe("office-floor-ambiguous:Main:2")
+        expect(
+          matchError(new OfficeRoomAccessUnsupportedError({ roomId: RoomId.make("office-1"), access: "open" }))
+        ).toBe("office-room-access:office-1:open")
+        expect(matchError(new OfficeRoomProtectedError({ roomId: RoomId.make("reception"), field: "name" }))).toBe(
+          "office-room-protected:reception:name"
+        )
+        expect(
+          matchError(
+            new OfficeSettingsMalformedError({ reason: "recording and transcription defaults must be boolean values" })
+          )
+        ).toBe("office-settings-malformed:recording and transcription defaults must be boolean values")
         expect(
           matchError(new MeetingMinutesNotFoundError({ meetingMinutesId: MeetingMinutesId.make("minutes-1") }))
         ).toBe("meeting-minutes:minutes-1")

@@ -41,6 +41,8 @@ const RECRUITING_FIELD_DESCRIPTIONS = {
   title: "Recruiting title or search text.",
   titleSearch: "Case-insensitive skill title search text.",
   source: "Candidate source text.",
+  fieldId: "Custom field attribute ID returned by list_recruiting_candidate_custom_fields.",
+  value: "Value in the custom field's documented wire format.",
   onsite: "Whether the candidate accepts onsite work.",
   remote: "Whether the candidate accepts remote work.",
   skill: "Skill locator.",
@@ -55,6 +57,7 @@ const toDraft07JsonSchema = (schema: Schema.Constraint): object =>
   withJsonSchemaPropertyDescriptions(toDraft07JsonSchemaBase(schema), RECRUITING_FIELD_DESCRIPTIONS)
 
 export * from "./recruiting-common.js"
+export * from "./recruiting-candidate-custom-fields.js"
 
 const RecruitingSearchText = NonEmptyString.annotateKey({ description: "Non-empty case-insensitive search text." })
 
