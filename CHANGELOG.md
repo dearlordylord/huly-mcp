@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.52.0
+
+### Minor Changes
+
+- f74bf0c: Add Candidate custom-field workflows, document-attached ToDos, Calendar settings, virtual-office Floor and Room administration, and native meeting-room composition for events and schedules. Harden person merges and live integration coverage for the expanded operations.
+
 ## 0.51.0
 
 ### Minor Changes
