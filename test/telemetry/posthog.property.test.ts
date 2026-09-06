@@ -136,6 +136,7 @@ const expectedEventProperties = (
           duration_ms: operation.props.durationMs,
           status: operation.props.status,
           tool_name: operation.props.toolName,
+          ...(operation.props.toolName === "invoke_tool" ? {} : { operation_name: operation.props.toolName }),
           ...(operation.props.clientKind === undefined ? {} : { client_kind: operation.props.clientKind }),
           ...(operation.props.editMode === undefined ? {} : { edit_mode: operation.props.editMode }),
           ...(operation.props.errorTag === undefined ? {} : { error_tag: operation.props.errorTag }),

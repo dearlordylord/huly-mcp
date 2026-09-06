@@ -1,4 +1,5 @@
 import { PostHog } from "posthog-node"
+import { Schema } from "effect"
 
 import { writeStderrLine } from "../utils/stderr.js"
 import { VERSION } from "../version.js"
@@ -15,16 +16,26 @@ type SessionStartProperties = {
   readonly toolsets: ReadonlyArray<string> | null
 }
 
-type ToolCalledProperties = {
-  readonly tool_name: string
-  readonly status: "success" | "error"
-  readonly duration_ms: number
-  readonly client_kind?: string
-  readonly resolved_mode?: string
-  readonly error_tag?: string
-  readonly input_bytes?: number
-  readonly output_bytes?: number
-  readonly edit_mode?: string
+const ToolCalledPropertiesSchema = Schema.Struct({
+  tool_name: Schema.String,
+  operation_name: Schema.optionalKey(Schema.String),
+  status: Schema.Literals(["success", "error"]),
+  duration_ms: Schema.Number,
+  client_kind: Schema.optionalKey(Schema.String),
+  resolved_mode: Schema.optionalKey(Schema.String),
+  error_tag: Schema.optionalKey(Schema.String),
+  input_bytes: Schema.optionalKey(Schema.Number),
+  output_bytes: Schema.optionalKey(Schema.Number),
+  edit_mode: Schema.optionalKey(Schema.String)
+})
+type ToolCalledProperties = Schema.Schema.Type<typeof ToolCalledPropertiesSchema>
+
+const operationProperties = (
+  toolName: string,
+  targetName: string | undefined
+): Pick<ToolCalledProperties, "operation_name"> => {
+  const operationName = targetName ?? (toolName === "invoke_tool" ? undefined : toolName)
+  return operationName === undefined ? {} : { operation_name: operationName }
 }
 
 type FirstListToolsProperties = { readonly client_kind?: string; readonly resolved_mode?: string }
@@ -127,6 +138,7 @@ export const createPostHogTelemetry = (
         event: "tool_called",
         properties: {
           tool_name: props.toolName,
+          ...operationProperties(props.toolName, props.operationName),
           status: props.status,
           duration_ms: props.durationMs,
           ...(props.clientKind !== undefined && { client_kind: props.clientKind }),

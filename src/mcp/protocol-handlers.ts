@@ -11,7 +11,7 @@ import { Clock, Effect, Exit, Option, Result, Schema } from "effect"
 import { type GetHulyContextResult, GetHulyContextResultSchema } from "../domain/schemas/index.js"
 import { HulyError } from "../huly/errors-base.js"
 import type { ClientBundle, ClientResolver } from "../runtime/client-resolver.js"
-import type { TelemetryOperations } from "../telemetry/telemetry.js"
+import type { TelemetryOperations, ToolCalledProps } from "../telemetry/telemetry.js"
 import { VERSION } from "../version.js"
 import type { McpToolResponse } from "./error-mapping.js"
 import type { McpWireResponse } from "./tool-responses.js"
@@ -140,9 +140,19 @@ export const fetchLatestNpmVersion = async (fetchImpl: typeof fetch = fetch): Pr
   }
 }
 
-const invokeToolEditMode = (args: unknown): string | undefined => {
+const proxyCallTelemetry = (
+  toolName: string,
+  args: unknown,
+  registry: ToolRegistry
+): Pick<ToolCalledProps, "operationName" | "editMode"> => {
+  if (toolName !== INVOKE_TOOL_TOOL_NAME) return {}
   const decoded = Schema.decodeUnknownResult(InvokeToolParamsSchema)(args)
-  return Result.isSuccess(decoded) ? deriveEditMode(decoded.success.toolName, decoded.success.arguments) : undefined
+  if (Result.isFailure(decoded)) return {}
+  // Only catalog names are safe analytics dimensions; arbitrary input may contain workspace data.
+  return {
+    editMode: deriveEditMode(decoded.success.toolName, decoded.success.arguments),
+    ...(registry.tools.has(decoded.success.toolName) ? { operationName: decoded.success.toolName } : {})
+  }
 }
 
 type ClientResolution =
@@ -167,9 +177,6 @@ const proxyClients = (clients: ClientBundle) => ({
   storageClient: clients.storageClient,
   ...(clients.workspaceClient === undefined ? {} : { workspaceClient: clients.workspaceClient })
 })
-
-const proxyEditMode = (toolName: NonNullable<ReturnType<typeof parseToolName>>, args: unknown): string | undefined =>
-  toolName === INVOKE_TOOL_TOOL_NAME ? invokeToolEditMode(args) : undefined
 
 const resolveProxyClients = (
   toolName: NonNullable<ReturnType<typeof parseToolName>>,
@@ -265,11 +272,12 @@ export const createMcpProtocolHandlers = (
         return responseWithNotice
       }
 
-      const returnError = (errorResponse: McpToolResponse, editMode?: string) => {
+      const returnError = (errorResponse: McpToolResponse, editMode?: string, operationName?: string) => {
         const responseWithNotice = withClaimedNotice(errorResponse)
         const durationMs = clock.currentTimeMillis() - start
         telemetry.toolCalled({
           toolName: name,
+          ...(operationName === undefined ? {} : { operationName }),
           status: "error",
           clientKind: exposure.context.clientKind,
           resolvedMode: exposure.context.resolvedMode,
@@ -337,10 +345,10 @@ export const createMcpProtocolHandlers = (
       ): Promise<McpWireResponse> => {
         if (exposure.context.resolvedMode !== "proxy") return returnError(createUnknownToolError(toolName))
 
-        const editMode = proxyEditMode(toolName, args)
+        const { editMode, operationName } = proxyCallTelemetry(toolName, args, exposure.proxyCandidateRegistry)
         const clientResolution = await resolveProxyClients(toolName, resolveClients)
         if (clientResolution?._tag === "Failure") {
-          return returnError(clientResolution.response, editMode)
+          return returnError(clientResolution.response, editMode, operationName)
         }
 
         const response = await handleProxyToolCall({
@@ -353,6 +361,7 @@ export const createMcpProtocolHandlers = (
         const durationMs = clock.currentTimeMillis() - start
         telemetry.toolCalled({
           toolName,
+          ...(operationName === undefined ? {} : { operationName }),
           status: responseStatus(responseWithNotice),
           clientKind: exposure.context.clientKind,
           resolvedMode: exposure.context.resolvedMode,

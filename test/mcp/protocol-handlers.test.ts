@@ -1555,12 +1555,40 @@ describe("createMcpProtocolHandlers — proxy mode", () => {
     expect(schema.isError).toBe(true)
     expect(invoked.isError).toBe(true)
     expect(assertAt(probe.toolCalled, 2).editMode).toBeUndefined()
+    expect(assertAt(probe.toolCalled, 2)).not.toHaveProperty("operationName")
   })
 
+  it.each([
+    { toolName: "diagnostic_probe", arguments: "{malformed", operationName: "diagnostic_probe" },
+    { toolName: "private_workspace_content", arguments: {}, operationName: undefined }
+  ])(
+    "attributes target validation failures without recording unknown target names ($toolName)",
+    async ({ arguments: args, operationName, toolName }) => {
+      const probe = createTelemetryProbe()
+      const handlers = createMcpProtocolHandlers(
+        buildStubClients(),
+        probe.telemetry,
+        protocolRegistries(diagnosticProbeRegistry),
+        makeValidContext,
+        liveNowClock,
+        () => Promise.resolve("0.0.0"),
+        proxyExposureOptions()
+      )
+      const response = await handlers.callTool({
+        params: { name: "invoke_tool", arguments: { toolName, arguments: args } }
+      })
+      expect(response.isError).toBe(true)
+      expect(probe.toolCalled).toHaveLength(1)
+      expect(probe.toolCalled[0]).toMatchObject({ toolName: "invoke_tool", status: "error" })
+      expect(assertAt(probe.toolCalled, 0).operationName).toBe(operationName)
+    }
+  )
+
   it("invokes a proxy candidate and wraps the target result with warnings", async () => {
+    const probe = createTelemetryProbe()
     const handlers = createMcpProtocolHandlers(
       buildStubClients(),
-      createTelemetryProbe().telemetry,
+      probe.telemetry,
       protocolRegistries(diagnosticProbeRegistry),
       makeValidContext,
       liveNowClock,
@@ -1576,6 +1604,12 @@ describe("createMcpProtocolHandlers — proxy mode", () => {
     })
 
     expect(response.isError).not.toBe(true)
+    expect(probe.toolCalled).toHaveLength(1)
+    expect(probe.toolCalled[0]).toMatchObject({
+      toolName: "invoke_tool",
+      operationName: "diagnostic_probe",
+      status: "success"
+    })
     expect(response.structuredContent?.result).toEqual({
       toolName: "diagnostic_probe",
       result: { subject: "proxy invoke", degraded: true },
@@ -1697,6 +1731,10 @@ describe("createMcpProtocolHandlers — proxy mode", () => {
         arguments: { toolName: "diagnostic_probe", arguments: { subject: "client failure" } }
       }
     })
+    expect(probe.toolCalled).toHaveLength(2)
+    expect(probe.toolCalled.every((call) => call.operationName === "diagnostic_probe" && call.status === "error")).toBe(
+      true
+    )
 
     expect(errorResponse.isError).toBe(true)
     expect(firstText(errorResponse.content)).toBe("Failed to initialize Huly clients")

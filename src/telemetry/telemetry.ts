@@ -19,8 +19,10 @@ export type SessionStartProps = {
   readonly toolsets: ReadonlyArray<string> | null
 }
 
+// Internal port input; the PostHog adapter schema owns the serialized event properties.
 export type ToolCalledProps = {
   readonly toolName: string
+  readonly operationName?: string | undefined
   readonly status: "success" | "error"
   readonly clientKind?: ClientKind | undefined
   readonly resolvedMode?: ToolExposureMode | undefined

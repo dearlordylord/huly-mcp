@@ -162,7 +162,7 @@ docker network connect <huly_network> <container_id>
 
 The suite uses TypeScript fixture helpers in addition to the MCP executable. If
 `node_modules` was last installed on another OS or architecture, create a
-platform-local dependency installation first. The suite checks esbuild before
+platform-local dependency installation in an isolated checkout first; do not reinstall a dependency tree shared with a host on another platform. The suite checks esbuild before
 its first durable Huly write and exits with repair guidance if the native binary
 does not match the current platform.
 

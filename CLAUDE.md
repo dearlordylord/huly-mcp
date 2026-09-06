@@ -172,6 +172,8 @@ Use short timeouts (5s) - MCP keeps connection open.
 ## Worktrees
 
 Worktrees symlink `node_modules` and `.reference` to the main tree. `.gitignore` must use `node_modules` and `.reference` (no trailing slash) — trailing slash only matches directories, not symlinks, so `git add .` will commit the symlink.
+
+When the checkout or `node_modules` is shared with another platform (for example, macOS and a Linux container), do not reinstall dependencies in the shared tree. Use an isolated checkout with its own platform-local dependencies for verification. A container reinstall can remove dependencies or replace native binaries while a host release is building.
 After creating a secondary worktree, run `bash scripts/bootstrap-worktree.sh` from that worktree. This links ignored local resources from `/workspace/typescript/hulymcp`, including `node_modules`, `.reference`, `.env.local`, and `CLAUDE.local.md`, so Effect and Huly reference material remains available outside the master checkout.
 
 Before deleting a worktree or branch, always check for uncommitted changes (`git status`) and unmerged commits (`git log <branch> --not master`) first. Never force-delete without verifying all work is integrated.

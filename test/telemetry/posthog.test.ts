@@ -117,6 +117,24 @@ describe("createPostHogTelemetry", () => {
       const call = assertAt(mockCapture.mock.calls, 0)[0]
       expect(call.event).toBe("tool_called")
       expect(call.properties).toMatchObject({ tool_name: "list_issues", status: "success", duration_ms: 42 })
+      expect(call.properties.operation_name).toBe("list_issues")
+    })
+
+    it("preserves the proxy wrapper while attributing the target operation", () => {
+      const telemetry = createTelemetry(false)
+      telemetry.toolCalled({ toolName: "invoke_tool", operationName: "list_projects", status: "error", durationMs: 42 })
+      expect(mockCapture.mock.calls).toHaveLength(1)
+      expect(assertAt(mockCapture.mock.calls, 0)[0].properties).toMatchObject({
+        tool_name: "invoke_tool",
+        operation_name: "list_projects",
+        status: "error"
+      })
+    })
+
+    it("omits operation attribution for an unresolved proxy target", () => {
+      const telemetry = createTelemetry(false)
+      telemetry.toolCalled({ toolName: "invoke_tool", status: "error", durationMs: 0 })
+      expect(assertAt(mockCapture.mock.calls, 0)[0].properties).not.toHaveProperty("operation_name")
     })
 
     it("captures client classification when provided", () => {
