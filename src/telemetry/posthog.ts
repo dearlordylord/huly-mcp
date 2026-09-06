@@ -18,7 +18,7 @@ type SessionStartProperties = {
 
 const ToolCalledPropertiesSchema = Schema.Struct({
   tool_name: Schema.String,
-  operation_name: Schema.optionalKey(Schema.String),
+  call_path: Schema.Literals(["direct", "invoke_tool"]),
   status: Schema.Literals(["success", "error"]),
   duration_ms: Schema.Number,
   client_kind: Schema.optionalKey(Schema.String),
@@ -29,14 +29,6 @@ const ToolCalledPropertiesSchema = Schema.Struct({
   edit_mode: Schema.optionalKey(Schema.String)
 })
 type ToolCalledProperties = Schema.Schema.Type<typeof ToolCalledPropertiesSchema>
-
-const operationProperties = (
-  toolName: string,
-  targetName: string | undefined
-): Pick<ToolCalledProperties, "operation_name"> => {
-  const operationName = targetName ?? (toolName === "invoke_tool" ? undefined : toolName)
-  return operationName === undefined ? {} : { operation_name: operationName }
-}
 
 type FirstListToolsProperties = { readonly client_kind?: string; readonly resolved_mode?: string }
 
@@ -138,7 +130,7 @@ export const createPostHogTelemetry = (
         event: "tool_called",
         properties: {
           tool_name: props.toolName,
-          ...operationProperties(props.toolName, props.operationName),
+          call_path: props.callPath ?? "direct",
           status: props.status,
           duration_ms: props.durationMs,
           ...(props.clientKind !== undefined && { client_kind: props.clientKind }),

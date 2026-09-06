@@ -19,10 +19,19 @@ export type SessionStartProps = {
   readonly toolsets: ReadonlyArray<string> | null
 }
 
+/**
+ * How the caller reached the operation. Distinct from the exposure mode in
+ * `resolvedMode`: a proxy-mode session calls discovery tools directly and reaches
+ * every other operation through the `invoke_tool` dispatcher.
+ */
+export type ToolCallPath = "direct" | "invoke_tool"
+
 // Internal port input; the PostHog adapter schema owns the serialized event properties.
 export type ToolCalledProps = {
+  // The underlying operation, not the dispatcher: a call routed through invoke_tool
+  // reports the resolved target here, so one dimension covers both call paths.
   readonly toolName: string
-  readonly operationName?: string | undefined
+  readonly callPath?: ToolCallPath | undefined
   readonly status: "success" | "error"
   readonly clientKind?: ClientKind | undefined
   readonly resolvedMode?: ToolExposureMode | undefined
