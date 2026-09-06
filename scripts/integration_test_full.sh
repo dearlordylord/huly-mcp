@@ -1895,8 +1895,10 @@ extract_employee_lifecycle_person_id() {
     printf '%s\n' "$text" | jq -r '.personId'
     return 0
   fi
+  # Extended regex: `\+` and `\|` are GNU-only BRE extensions that BSD sed on macOS
+  # silently fails to match, which would report a missing Person ID on a valid response.
   printf '%s\n' "$text" \
-    | sed -n "s/^Employee '\([^']\+\)' was prepared for '[^']\+', but \(sendInvite\|resendInvite\) failed after:.*$/\1/p"
+    | sed -nE "s/^Employee '([^']+)' was prepared for '[^']+', but (sendInvite|resendInvite) failed after:.*$/\1/p"
 }
 
 capture_paginated_hr_reports() {
