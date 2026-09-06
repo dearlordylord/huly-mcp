@@ -10,6 +10,8 @@
 
 **Huly MCP** is a feature-complete MCP server for [Huly](https://huly.io/) integration. Published on npm as [`@firfi/huly-mcp`](https://www.npmjs.com/package/@firfi/huly-mcp).
 
+It connects to any Huly Platform deployment, so it should also work with the [Platform Collective](https://github.com/Platform-Collective/platform) fork and [TraceX](https://tracex.co) — unofficial for now.
+
 > [!IMPORTANT]
 > **Hosted Huly is shutting down.** Huly's upstream README says shutdown is expected July 20. If you use `https://huly.app`, [export and migrate your data](https://github.com/hcengineering/platform/blob/develop/README.md) as soon as possible. See the [backup and restore guide](https://github.com/hcengineering/platform/blob/develop/docs/guides/backup-restore.en.md) and [self-hosting repository](https://github.com/hcengineering/huly-selfhost). Self-hosted deployments are not affected.
 
