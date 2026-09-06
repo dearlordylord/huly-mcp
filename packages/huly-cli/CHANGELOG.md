@@ -1,5 +1,11 @@
 # @firfi/huly-cli
 
+## 0.50.2
+
+### Patch Changes
+
+- 73fa58b: Add operation_name to tool telemetry so proxy calls can be attributed to their underlying operation while preserving tool_name and event counts. Direct MCP and CLI calls also include operation_name.
+
 ## 0.50.1
 
 ### Patch Changes
