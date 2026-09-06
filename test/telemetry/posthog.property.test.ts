@@ -46,7 +46,8 @@ const toolCalledArbitrary = fc.record(
     outputBytes: fc.integer({ min: 0, max: 10_000_000 }),
     resolvedMode: fc.constantFrom("native", "proxy"),
     status: fc.constantFrom("success", "error"),
-    toolName: fc.stringMatching(/^[a-z][a-z0-9_]{0,40}$/)
+    toolName: fc.stringMatching(/^[a-z][a-z0-9_]{0,40}$/),
+    callPath: fc.constantFrom("direct", "invoke_tool")
   },
   { requiredKeys: ["durationMs", "status", "toolName"] }
 ) satisfies fc.Arbitrary<ToolCalledProps>
@@ -136,7 +137,7 @@ const expectedEventProperties = (
           duration_ms: operation.props.durationMs,
           status: operation.props.status,
           tool_name: operation.props.toolName,
-          ...(operation.props.toolName === "invoke_tool" ? {} : { operation_name: operation.props.toolName }),
+          call_path: operation.props.callPath ?? "direct",
           ...(operation.props.clientKind === undefined ? {} : { client_kind: operation.props.clientKind }),
           ...(operation.props.editMode === undefined ? {} : { edit_mode: operation.props.editMode }),
           ...(operation.props.errorTag === undefined ? {} : { error_tag: operation.props.errorTag }),

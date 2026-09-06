@@ -117,24 +117,27 @@ describe("createPostHogTelemetry", () => {
       const call = assertAt(mockCapture.mock.calls, 0)[0]
       expect(call.event).toBe("tool_called")
       expect(call.properties).toMatchObject({ tool_name: "list_issues", status: "success", duration_ms: 42 })
-      expect(call.properties.operation_name).toBe("list_issues")
+      expect(call.properties.call_path).toBe("direct")
     })
 
-    it("preserves the proxy wrapper while attributing the target operation", () => {
+    it("reports a dispatched call under the target operation with the invoke_tool call path", () => {
       const telemetry = createTelemetry(false)
-      telemetry.toolCalled({ toolName: "invoke_tool", operationName: "list_projects", status: "error", durationMs: 42 })
+      telemetry.toolCalled({ toolName: "list_projects", callPath: "invoke_tool", status: "error", durationMs: 42 })
       expect(mockCapture.mock.calls).toHaveLength(1)
       expect(assertAt(mockCapture.mock.calls, 0)[0].properties).toMatchObject({
-        tool_name: "invoke_tool",
-        operation_name: "list_projects",
+        tool_name: "list_projects",
+        call_path: "invoke_tool",
         status: "error"
       })
     })
 
-    it("omits operation attribution for an unresolved proxy target", () => {
+    it("keeps an unresolved dispatch target attributed to the dispatcher", () => {
       const telemetry = createTelemetry(false)
-      telemetry.toolCalled({ toolName: "invoke_tool", status: "error", durationMs: 0 })
-      expect(assertAt(mockCapture.mock.calls, 0)[0].properties).not.toHaveProperty("operation_name")
+      telemetry.toolCalled({ toolName: "invoke_tool", callPath: "invoke_tool", status: "error", durationMs: 0 })
+      expect(assertAt(mockCapture.mock.calls, 0)[0].properties).toMatchObject({
+        tool_name: "invoke_tool",
+        call_path: "invoke_tool"
+      })
     })
 
     it("captures client classification when provided", () => {

@@ -140,18 +140,19 @@ export const fetchLatestNpmVersion = async (fetchImpl: typeof fetch = fetch): Pr
   }
 }
 
-const proxyCallTelemetry = (
-  toolName: string,
-  args: unknown,
-  registry: ToolRegistry
-): Pick<ToolCalledProps, "operationName" | "editMode"> => {
-  if (toolName !== INVOKE_TOOL_TOOL_NAME) return {}
+type ToolCallAttribution = Pick<ToolCalledProps, "toolName" | "callPath" | "editMode">
+
+const proxyCallTelemetry = (toolName: string, args: unknown, registry: ToolRegistry): ToolCallAttribution => {
+  if (toolName !== INVOKE_TOOL_TOOL_NAME) return { toolName, callPath: "direct" }
   const decoded = Schema.decodeUnknownResult(InvokeToolParamsSchema)(args)
-  if (Result.isFailure(decoded)) return {}
-  // Only catalog names are safe analytics dimensions; arbitrary input may contain workspace data.
+  if (Result.isFailure(decoded)) return { toolName, callPath: "invoke_tool" }
+  const target = decoded.success.toolName
+  // Only catalog names are safe analytics dimensions; arbitrary input may contain
+  // workspace data, so an unknown target stays attributed to the dispatcher.
   return {
-    editMode: deriveEditMode(decoded.success.toolName, decoded.success.arguments),
-    ...(registry.tools.has(decoded.success.toolName) ? { operationName: decoded.success.toolName } : {})
+    toolName: registry.tools.has(target) ? target : toolName,
+    callPath: "invoke_tool",
+    editMode: deriveEditMode(target, decoded.success.arguments)
   }
 }
 
@@ -272,20 +273,21 @@ export const createMcpProtocolHandlers = (
         return responseWithNotice
       }
 
-      const returnError = (errorResponse: McpToolResponse, editMode?: string, operationName?: string) => {
+      const returnError = (
+        errorResponse: McpToolResponse,
+        attribution: ToolCallAttribution = { toolName: name, callPath: "direct" }
+      ) => {
         const responseWithNotice = withClaimedNotice(errorResponse)
         const durationMs = clock.currentTimeMillis() - start
         telemetry.toolCalled({
-          toolName: name,
-          ...(operationName === undefined ? {} : { operationName }),
+          ...attribution,
           status: "error",
           clientKind: exposure.context.clientKind,
           resolvedMode: exposure.context.resolvedMode,
           errorTag: responseWithNotice._meta?.errorTag,
           durationMs,
           inputBytes,
-          outputBytes: computeOutputBytes(responseWithNotice),
-          editMode
+          outputBytes: computeOutputBytes(responseWithNotice)
         })
         return toMcpResponse(responseWithNotice)
       }
@@ -345,10 +347,10 @@ export const createMcpProtocolHandlers = (
       ): Promise<McpWireResponse> => {
         if (exposure.context.resolvedMode !== "proxy") return returnError(createUnknownToolError(toolName))
 
-        const { editMode, operationName } = proxyCallTelemetry(toolName, args, exposure.proxyCandidateRegistry)
+        const attribution = proxyCallTelemetry(toolName, args, exposure.proxyCandidateRegistry)
         const clientResolution = await resolveProxyClients(toolName, resolveClients)
         if (clientResolution?._tag === "Failure") {
-          return returnError(clientResolution.response, editMode, operationName)
+          return returnError(clientResolution.response, attribution)
         }
 
         const response = await handleProxyToolCall({
@@ -360,16 +362,14 @@ export const createMcpProtocolHandlers = (
         const responseWithNotice = withClaimedNotice(response)
         const durationMs = clock.currentTimeMillis() - start
         telemetry.toolCalled({
-          toolName,
-          ...(operationName === undefined ? {} : { operationName }),
+          ...attribution,
           status: responseStatus(responseWithNotice),
           clientKind: exposure.context.clientKind,
           resolvedMode: exposure.context.resolvedMode,
           errorTag: responseWithNotice._meta?.errorTag,
           durationMs,
           inputBytes,
-          outputBytes: computeOutputBytes(responseWithNotice),
-          editMode
+          outputBytes: computeOutputBytes(responseWithNotice)
         })
         return toMcpResponse(responseWithNotice)
       }
@@ -385,9 +385,13 @@ export const createMcpProtocolHandlers = (
         const argumentError = nativeArgumentError(tool, args)
         if (argumentError !== undefined) return returnError(argumentError)
 
-        const editMode = deriveEditMode(hulyToolName, args)
+        const attribution: ToolCallAttribution = {
+          toolName: hulyToolName,
+          callPath: "direct",
+          editMode: deriveEditMode(hulyToolName, args)
+        }
         const clientResolution = await resolveClientBundle(resolveClients)
-        if (clientResolution._tag === "Failure") return returnError(clientResolution.response, editMode)
+        if (clientResolution._tag === "Failure") return returnError(clientResolution.response, attribution)
         const { clients } = clientResolution
 
         const response = await nativeCallRegistry.handleToolCall(
@@ -398,19 +402,18 @@ export const createMcpProtocolHandlers = (
           clients.workspaceClient
         )
         const durationMs = clock.currentTimeMillis() - start
-        if (response === null) return returnError(createUnknownToolError(name), editMode)
+        if (response === null) return returnError(createUnknownToolError(name), attribution)
 
         const responseWithNotice = withClaimedNotice(response)
         telemetry.toolCalled({
-          toolName: hulyToolName,
+          ...attribution,
           status: responseStatus(responseWithNotice),
           clientKind: exposure.context.clientKind,
           resolvedMode: exposure.context.resolvedMode,
           errorTag: responseWithNotice._meta?.errorTag,
           durationMs,
           inputBytes,
-          outputBytes: computeOutputBytes(responseWithNotice),
-          editMode
+          outputBytes: computeOutputBytes(responseWithNotice)
         })
 
         return toMcpResponse(responseWithNotice)
