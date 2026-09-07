@@ -2,13 +2,30 @@ import { Schema } from "effect"
 
 import { type McpImageContent, McpImageContentSchema } from "../domain/schemas/attachments.js"
 import type { ToolWarning } from "../domain/schemas/tool-warnings.js"
+import type { HulyDomainError } from "../huly/errors.js"
 
 export const McpErrorCode = { InvalidParams: -32602, InternalError: -32603 } as const
 export type McpErrorCode = (typeof McpErrorCode)[keyof typeof McpErrorCode]
 
+/**
+ * How an error response is classified for telemetry. Domain failures report their
+ * own `_tag`; the literals cover protocol-level outcomes that have no domain error.
+ * Every error response carries one, so an absent tag cannot mean "nobody set it".
+ */
+export type McpErrorTag =
+  | HulyDomainError["_tag"]
+  | "ParseError"
+  | "UnexpectedError"
+  | "Interrupted"
+  | "UnknownTool"
+  | "ServerShuttingDown"
+  | "MissingArguments"
+  | "UnexpectedArguments"
+  | "ProxyClientsMissing"
+
 interface ErrorMetadata {
   errorCode: McpErrorCode
-  errorTag?: string | undefined
+  errorTag: McpErrorTag
 }
 
 type McpTextContent = { readonly type: "text"; readonly text: string }
@@ -55,7 +72,7 @@ const encodeJsonText = (value: unknown): string => {
 export const createErrorResponse = (
   text: string,
   errorCode: McpErrorCode,
-  errorTag?: string,
+  errorTag: McpErrorTag,
   warnings: ReadonlyArray<ToolWarning> = []
 ): McpErrorResponseWithMeta => ({
   content: [
@@ -121,7 +138,7 @@ export const SERVER_SHUTTING_DOWN_MESSAGE = "Huly MCP is shutting down; start a 
 export const createServerShuttingDownError = (): McpErrorResponseWithMeta =>
   createErrorResponse(SERVER_SHUTTING_DOWN_MESSAGE, McpErrorCode.InternalError, "ServerShuttingDown")
 
-export const createInvalidParamsError = (message: string, errorTag?: string): McpErrorResponseWithMeta =>
+export const createInvalidParamsError = (message: string, errorTag: McpErrorTag): McpErrorResponseWithMeta =>
   createErrorResponse(message, McpErrorCode.InvalidParams, errorTag)
 
 export function toMcpResponse(response: McpToolErrorResponse): McpWireErrorResponse

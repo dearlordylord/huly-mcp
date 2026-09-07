@@ -809,6 +809,7 @@ describe("Error Mapping to MCP", () => {
 
         expect(response.isError).toBe(true)
         expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+        expect(response._meta.errorTag).toBe("ParseError")
         expect(assertAt(response.content, 0).text).toBe(
           "Invalid parameters for create_issue: name: Expected string, actual 123"
         )
@@ -836,6 +837,7 @@ describe("Error Mapping to MCP", () => {
 
         expect(response.isError).toBe(true)
         expect(response._meta.errorCode).toBe(McpErrorCode.InvalidParams)
+        expect(response._meta.errorTag).toBe("ParseError")
         expect(assertAt(response.content, 0).text).toContain("Invalid parameters:")
       })
     )
@@ -1162,7 +1164,7 @@ describe("Error Mapping to MCP", () => {
       Effect.sync(function () {
         const wire = toMcpResponse({
           content: [{ type: "text", text: "ok" }],
-          _meta: { errorCode: McpErrorCode.InternalError }
+          _meta: { errorCode: McpErrorCode.InternalError, errorTag: "UnexpectedError" }
         })
 
         expect(wire).toEqual({ content: [{ type: "text", text: "ok" }] })
@@ -1174,7 +1176,7 @@ describe("Error Mapping to MCP", () => {
         const wire = toMcpResponse({
           content: [{ type: "text", text: "ok" }],
           isError: false,
-          _meta: { errorCode: McpErrorCode.InternalError }
+          _meta: { errorCode: McpErrorCode.InternalError, errorTag: "UnexpectedError" }
         })
 
         expect(wire).toEqual({ content: [{ type: "text", text: "ok" }], isError: false })

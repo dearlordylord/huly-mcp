@@ -48,7 +48,20 @@ describe("Error Mapping Branch Coverage", () => {
 
         expect(response.isError).toBe(true)
         expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
+        expect(response._meta.errorTag).toBe("UnexpectedError")
         expect(assertAt(response.content, 0).text).toBe("An unexpected error occurred")
+      })
+    )
+
+    // An interrupt is a distinct outcome from a defect, so it gets its own tag
+    // rather than sharing "UnexpectedError" or going out unclassified.
+    it.effect("tags an interrupt cause as Interrupted", () =>
+      Effect.sync(function () {
+        const response = mapParseCauseToMcp(Cause.interrupt())
+
+        expect(response.isError).toBe(true)
+        expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
+        expect(response._meta.errorTag).toBe("Interrupted")
       })
     )
   })

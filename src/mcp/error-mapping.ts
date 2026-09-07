@@ -26,9 +26,9 @@ import {
   HOSTED_HULY_SUNSET,
   isDefaultHulyCloudOrigin
 } from "../huly/unavailable-diagnostics.js"
-import { classifyCause, findRecoverableCauseFailure } from "../runtime/cause-exit.js"
+import { type CauseClassification, classifyCause, findRecoverableCauseFailure } from "../runtime/cause-exit.js"
 import { formatParseError } from "./schema-error-format.js"
-import { createErrorResponse, McpErrorCode, type McpErrorResponseWithMeta } from "./tool-responses.js"
+import { createErrorResponse, McpErrorCode, type McpErrorResponseWithMeta, type McpErrorTag } from "./tool-responses.js"
 
 export { formatParseError } from "./schema-error-format.js"
 
@@ -399,8 +399,13 @@ export const mapParseErrorToMcp = (error: Schema.SchemaError, toolName?: string)
   const prefix = toolName ? `Invalid parameters for ${toolName}: ` : "Invalid parameters: "
   const message = formatParseError(error)
 
-  return createErrorResponse(`${prefix}${message}`, McpErrorCode.InvalidParams)
+  return createErrorResponse(`${prefix}${message}`, McpErrorCode.InvalidParams, "ParseError")
 }
+
+// An interrupt is a distinct outcome from a defect, and both must stay
+// distinguishable in telemetry from an error that was never classified at all.
+const unclassifiedCauseTag = <E>(classification: CauseClassification<E>): McpErrorTag =>
+  classification._tag === "Fatal" && classification.reason === "Interrupt" ? "Interrupted" : "UnexpectedError"
 
 export const mapParseCauseToMcp = (
   cause: Cause.Cause<Schema.SchemaError>,
@@ -409,7 +414,11 @@ export const mapParseCauseToMcp = (
   const classification = classifyCause(cause)
   return classification._tag === "Failure"
     ? mapParseErrorToMcp(classification.firstFailure, toolName)
-    : createErrorResponse("An unexpected error occurred", McpErrorCode.InternalError)
+    : createErrorResponse(
+        "An unexpected error occurred",
+        McpErrorCode.InternalError,
+        unclassifiedCauseTag(classification)
+      )
 }
 
 export const mapDomainCauseToMcp = (
@@ -426,7 +435,7 @@ export const mapDomainCauseToMcp = (
   return createErrorResponse(
     "An unexpected error occurred",
     McpErrorCode.InternalError,
-    classification._tag === "Fatal" && classification.reason !== "Interrupt" ? "UnexpectedError" : undefined,
+    unclassifiedCauseTag(classification),
     warnings
   )
 }
