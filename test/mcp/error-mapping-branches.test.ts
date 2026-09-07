@@ -53,14 +53,15 @@ describe("Error Mapping Branch Coverage", () => {
       })
     )
 
-    // Interruption is not a fault worth classifying, so it stays untagged.
-    it.effect("leaves an interrupt cause untagged", () =>
+    // An interrupt is a distinct outcome from a defect, so it gets its own tag
+    // rather than sharing "UnexpectedError" or going out unclassified.
+    it.effect("tags an interrupt cause as Interrupted", () =>
       Effect.sync(function () {
         const response = mapParseCauseToMcp(Cause.interrupt())
 
         expect(response.isError).toBe(true)
         expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
-        expect(response._meta.errorTag).toBeUndefined()
+        expect(response._meta.errorTag).toBe("Interrupted")
       })
     )
   })

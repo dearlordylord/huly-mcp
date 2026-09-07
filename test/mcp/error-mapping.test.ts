@@ -1164,7 +1164,7 @@ describe("Error Mapping to MCP", () => {
       Effect.sync(function () {
         const wire = toMcpResponse({
           content: [{ type: "text", text: "ok" }],
-          _meta: { errorCode: McpErrorCode.InternalError }
+          _meta: { errorCode: McpErrorCode.InternalError, errorTag: "UnexpectedError" }
         })
 
         expect(wire).toEqual({ content: [{ type: "text", text: "ok" }] })
@@ -1176,7 +1176,7 @@ describe("Error Mapping to MCP", () => {
         const wire = toMcpResponse({
           content: [{ type: "text", text: "ok" }],
           isError: false,
-          _meta: { errorCode: McpErrorCode.InternalError }
+          _meta: { errorCode: McpErrorCode.InternalError, errorTag: "UnexpectedError" }
         })
 
         expect(wire).toEqual({ content: [{ type: "text", text: "ok" }], isError: false })

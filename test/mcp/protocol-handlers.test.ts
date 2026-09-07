@@ -640,7 +640,7 @@ const imageProxyRegistry: ToolRegistry = {
 
 const errorProxyRegistry: ToolRegistry = {
   ...diagnosticProbeRegistry,
-  handleToolCall: async () => createInvalidParamsError("target rejected arguments", "TargetRejected")
+  handleToolCall: async () => createInvalidParamsError("target rejected arguments", "ParseError")
 }
 
 const nullDispatchProxyRegistry: ToolRegistry = { ...diagnosticProbeRegistry, handleToolCall: async () => null }
@@ -1626,7 +1626,7 @@ describe("createMcpProtocolHandlers — proxy mode", () => {
       ...diagnosticProbeRegistry,
       handleToolCall: async (_toolName, args) => {
         receivedArguments.push(args)
-        return createInvalidParamsError("captured target arguments", "CapturedArguments")
+        return createInvalidParamsError("captured target arguments", "ParseError")
       }
     }
     const clients = await resolveStubClients()
