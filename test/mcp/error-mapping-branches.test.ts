@@ -48,7 +48,19 @@ describe("Error Mapping Branch Coverage", () => {
 
         expect(response.isError).toBe(true)
         expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
+        expect(response._meta.errorTag).toBe("UnexpectedError")
         expect(assertAt(response.content, 0).text).toBe("An unexpected error occurred")
+      })
+    )
+
+    // Interruption is not a fault worth classifying, so it stays untagged.
+    it.effect("leaves an interrupt cause untagged", () =>
+      Effect.sync(function () {
+        const response = mapParseCauseToMcp(Cause.interrupt())
+
+        expect(response.isError).toBe(true)
+        expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
+        expect(response._meta.errorTag).toBeUndefined()
       })
     )
   })

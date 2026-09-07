@@ -399,7 +399,7 @@ export const mapParseErrorToMcp = (error: Schema.SchemaError, toolName?: string)
   const prefix = toolName ? `Invalid parameters for ${toolName}: ` : "Invalid parameters: "
   const message = formatParseError(error)
 
-  return createErrorResponse(`${prefix}${message}`, McpErrorCode.InvalidParams)
+  return createErrorResponse(`${prefix}${message}`, McpErrorCode.InvalidParams, "ParseError")
 }
 
 export const mapParseCauseToMcp = (
@@ -409,7 +409,11 @@ export const mapParseCauseToMcp = (
   const classification = classifyCause(cause)
   return classification._tag === "Failure"
     ? mapParseErrorToMcp(classification.firstFailure, toolName)
-    : createErrorResponse("An unexpected error occurred", McpErrorCode.InternalError)
+    : createErrorResponse(
+        "An unexpected error occurred",
+        McpErrorCode.InternalError,
+        classification._tag === "Fatal" && classification.reason !== "Interrupt" ? "UnexpectedError" : undefined
+      )
 }
 
 export const mapDomainCauseToMcp = (
