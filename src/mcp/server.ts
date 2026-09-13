@@ -30,13 +30,8 @@ import {
 import { type SanitizedHulyRuntimeConfigContext, sanitizeHulyRuntimeConfigFromEnv } from "../config/config.js"
 import type { GetHulyContextResult } from "../domain/schemas/index.js"
 import type { ClientBundle, ClientResolver, HulyClientBundleError } from "../runtime/client-resolver.js"
-import type { HostedHulyMigrationInstructions } from "../huly/unavailable-diagnostics.js"
 import { TelemetryService } from "../telemetry/telemetry.js"
 import { writeStderrLine } from "../utils/stderr.js"
-import {
-  createHostedHulyMigrationNoticeProvider,
-  hostedHulyMigrationInstructionsForOrigin
-} from "./tool-call-notices.js"
 import { parseToolExposureConfig, type ToolExposureConfig } from "./tool-mode.js"
 import { resolveToolScope } from "./tool-scope.js"
 import { createScopedRegistry, toolRegistry } from "./tools/index.js"
@@ -61,7 +56,7 @@ interface McpServerConfigCallbacks {
   ) => Promise<RequestClientLease<Exit.Exit<ClientBundle, HulyClientBundleError>>>
   readonly getRuntimeConfigContext?: () => SanitizedHulyRuntimeConfigContext
   readonly getRuntimeConfigContextForHttpRequest?: (req: Request) => SanitizedHulyRuntimeConfigContext
-  readonly createServer?: (instructions?: HostedHulyMigrationInstructions) => Server
+  readonly createServer?: () => Server
   readonly createStdioTransport?: () => StdioServerTransport
   readonly closeClients?: () => Promise<void>
   readonly stdioProcess?: StdioProcessPort
@@ -225,12 +220,7 @@ export class McpServerService extends Context.Service<McpServerService, McpServe
                       registries,
                       (toolExposure) => getHulyContext(stdioRuntimeConfig, toolExposure),
                       config.createServer,
-                      sdkExposureOptions,
-                      createHostedHulyMigrationNoticeProvider({
-                        delivery: "once",
-                        hulyOrigin: stdioRuntimeConfig.huly.url.origin
-                      }),
-                      hostedHulyMigrationInstructionsForOrigin(stdioRuntimeConfig.huly.url.origin)
+                      sdkExposureOptions
                     )
                     lifecycles.add(lifecycle)
                     return server
@@ -288,12 +278,7 @@ export class McpServerService extends Context.Service<McpServerService, McpServe
                       registries,
                       (toolExposure) => getHulyContext(requestRuntimeConfig, toolExposure),
                       config.createServer,
-                      sdkExposureOptions,
-                      createHostedHulyMigrationNoticeProvider({
-                        delivery: "always",
-                        hulyOrigin: requestRuntimeConfig.huly.url.origin
-                      }),
-                      hostedHulyMigrationInstructionsForOrigin(requestRuntimeConfig.huly.url.origin)
+                      sdkExposureOptions
                     )
                     attachRequestClientLifecycle(
                       server,

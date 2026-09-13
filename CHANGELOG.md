@@ -172,13 +172,13 @@
 
 ### Patch Changes
 
-- 20aea4a: Show hosted Huly shutdown instructions only when the effective MCP configuration targets `https://huly.app`. Self-hosted deployments no longer receive the announcement during initialization, discovery, or tool calls, while affected stdio and HTTP clients continue to receive it.
+- 20aea4a: Restricted historical migration instructions to cases where the effective MCP configuration targets the former hosted service. Self-hosted deployments stopped receiving the announcement during initialization, discovery, and tool calls; affected stdio and HTTP clients continued to receive it.
 
 ## 0.44.6
 
 ### Patch Changes
 
-- 559b3e9: Warn MCP clients during initialization that hosted Huly is shutting down, with migration and self-hosting links. Affected `https://huly.app` configurations also receive a non-failing warning alongside the first stdio tool result or every stateless HTTP tool result.
+- 559b3e9: Added the former hosted service’s retirement announcement to MCP initialization, with migration and self-hosting links. Affected configurations also received a non-failing warning alongside the first stdio tool result or every stateless HTTP tool result.
 
 ## 0.44.5
 

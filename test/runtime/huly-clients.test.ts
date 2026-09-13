@@ -60,7 +60,7 @@ describe("shared Huly client runtime", () => {
   it("evicts a mixed acquisition containing unavailability so a later call can recover", async () => {
     let available = false
     const unavailable = new HulyUnavailableError({
-      endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+      endpointOrigin: normalizeHulyOrigin("https://huly.example.test"),
       failureKind: "refused"
     })
     const recoverableLayer = Layer.suspend(() =>
@@ -105,7 +105,7 @@ describe("shared Huly client runtime", () => {
   it("does not evict an unavailable failure mixed with a defect", async () => {
     let acquisitions = 0
     const unavailable = new HulyUnavailableError({
-      endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+      endpointOrigin: normalizeHulyOrigin("https://huly.example.test"),
       failureKind: "refused"
     })
     const failingLayer = Layer.suspend(() => {

@@ -347,7 +347,7 @@ describe("Main Entry Point", () => {
     it.effect("reports missing required config", () =>
       Effect.gen(function* () {
         // Missing HULY_PASSWORD
-        process.env["HULY_URL"] = "https://test.huly.app"
+        process.env["HULY_URL"] = "https://test.huly.example.test"
         process.env["HULY_EMAIL"] = "test@example.com"
         process.env["HULY_WORKSPACE"] = "test-workspace"
 

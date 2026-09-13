@@ -1,27 +1,5 @@
 import { Schema } from "effect"
 
-import { HostedHulyShutdownWarningCode, ToolWarningSchema } from "../domain/schemas/tool-warnings.js"
-
-/** Safe, agent-facing diagnostics for an unavailable Huly endpoint. */
-const DEFAULT_HULY_CLOUD_ORIGIN = "https://huly.app"
-
-export const HOSTED_HULY_SUNSET = {
-  sourceUrl: "https://github.com/hcengineering/platform/blob/develop/README.md",
-  backupRestoreUrl: "https://github.com/hcengineering/platform/blob/develop/docs/guides/backup-restore.en.md",
-  selfHostingUrl: "https://github.com/hcengineering/huly-selfhost",
-  expectedShutdown: "July 20"
-} as const
-
-export const HOSTED_HULY_MIGRATION_LINKS = `Announcement: ${HOSTED_HULY_SUNSET.sourceUrl}. Backup and restore guide: ${HOSTED_HULY_SUNSET.backupRestoreUrl}. Self-hosting: ${HOSTED_HULY_SUNSET.selfHostingUrl}.`
-
-export const HOSTED_HULY_MIGRATION_INSTRUCTIONS = `Important: Hosted Huly is shutting down. Huly's upstream README says the hosted service is being discontinued because hosting is no longer funded, with shutdown expected ${HOSTED_HULY_SUNSET.expectedShutdown}. If this MCP uses ${DEFAULT_HULY_CLOUD_ORIGIN}, export and back up important data and migrate as soon as possible. ${HOSTED_HULY_MIGRATION_LINKS} Self-hosted deployments are not affected.`
-export type HostedHulyMigrationInstructions = typeof HOSTED_HULY_MIGRATION_INSTRUCTIONS
-
-export const HOSTED_HULY_MIGRATION_WARNING = Schema.decodeUnknownSync(ToolWarningSchema)({
-  code: HostedHulyShutdownWarningCode,
-  message: HOSTED_HULY_MIGRATION_INSTRUCTIONS
-})
-
 export const HulyEndpointOriginSchema = Schema.String.pipe(
   Schema.check(
     Schema.makeFilter(
@@ -66,8 +44,6 @@ export const normalizeHulyOrigin = (url: string): HulyEndpointOrigin => {
   const parsed = new URL(url)
   return Schema.decodeUnknownSync(HulyEndpointOriginSchema)(parsed.origin.toLowerCase())
 }
-
-export const isDefaultHulyCloudOrigin = (origin: HulyEndpointOrigin): boolean => origin === DEFAULT_HULY_CLOUD_ORIGIN
 
 const errorCode = (error: unknown): string | undefined =>
   typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"

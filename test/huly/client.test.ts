@@ -628,13 +628,13 @@ describe("HulyClient Service", () => {
         const connErr = new HulyConnectionError({ message: "timeout" })
         const authErr = new HulyAuthError({ message: "invalid" })
         const unavailableErr = new HulyUnavailableError({
-          endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+          endpointOrigin: normalizeHulyOrigin("https://huly.example.test"),
           failureKind: "timeout"
         })
 
         expect(handleError(connErr)).toBe("Connection: timeout")
         expect(handleError(authErr)).toBe("Auth: invalid")
-        expect(handleError(unavailableErr)).toBe("Unavailable: https://huly.app")
+        expect(handleError(unavailableErr)).toBe("Unavailable: https://huly.example.test")
       })
     )
   })

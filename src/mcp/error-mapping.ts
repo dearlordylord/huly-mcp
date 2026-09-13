@@ -21,11 +21,6 @@ import {
   HulyUnavailableError,
   MeetingCompositionMutationError
 } from "../huly/errors.js"
-import {
-  HOSTED_HULY_MIGRATION_LINKS,
-  HOSTED_HULY_SUNSET,
-  isDefaultHulyCloudOrigin
-} from "../huly/unavailable-diagnostics.js"
 import { type CauseClassification, classifyCause, findRecoverableCauseFailure } from "../runtime/cause-exit.js"
 import { formatParseError } from "./schema-error-format.js"
 import { createErrorResponse, McpErrorCode, type McpErrorResponseWithMeta, type McpErrorTag } from "./tool-responses.js"
@@ -320,9 +315,6 @@ const hulyUnavailableMessage = (error: HulyUnavailableError): string => {
       : error.failureKind === "dns" || error.failureKind === "tls"
         ? " Verify the hostname, certificate, DNS, and proxy configuration before retrying."
         : ""
-  if (isDefaultHulyCloudOrigin(error.endpointOrigin)) {
-    return `Cannot reach hosted Huly (${error.endpointOrigin}) from this MCP server. Huly's README announces that hosted Huly is being discontinued, with shutdown expected ${HOSTED_HULY_SUNSET.expectedShutdown}; this outage may be related but is not confirmed. Export and back up your data, then migrate to a hosted alternative or self-hosted Huly. ${HOSTED_HULY_MIGRATION_LINKS} Check network/DNS/proxy access if you need one last connection; set HULY_URL to a reachable self-hosted instance after migration. Do not retry a write until connectivity is restored.${failureGuidance}`
-  }
   return `Cannot reach the configured Huly endpoint (${error.endpointOrigin}). Check with this deployment's operator, then verify HULY_URL, network/DNS/proxy access, and HULY_CONNECTION_TIMEOUT before retrying. Do not retry a write until connectivity is restored.${failureGuidance}`
 }
 

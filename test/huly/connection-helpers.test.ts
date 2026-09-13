@@ -32,7 +32,7 @@ describe("connection-helpers", () => {
   describe("connectWithRetry", () => {
     it.effect("resolves on successful connection", () =>
       Effect.gen(function* () {
-        const result = yield* connectWithRetry(() => Promise.resolve("connected"), "https://huly.app")
+        const result = yield* connectWithRetry(() => Promise.resolve("connected"), "https://huly.example.test")
         expect(result).toBe("connected")
       })
     )
@@ -44,7 +44,7 @@ describe("connection-helpers", () => {
           connectWithRetry(() => {
             callCount++
             return Promise.reject(new Error("network down"))
-          }, "https://huly.app")
+          }, "https://huly.example.test")
         )
 
         // Advance past exponential backoff: 100ms + 200ms
@@ -53,7 +53,7 @@ describe("connection-helpers", () => {
         const error = yield* Effect.flip(Fiber.join(fiber))
         expect(error).toBeInstanceOf(HulyUnavailableError)
         expect(error._tag).toBe("HulyUnavailableError")
-        if (error._tag === "HulyUnavailableError") expect(error.endpointOrigin).toBe("https://huly.app")
+        if (error._tag === "HulyUnavailableError") expect(error.endpointOrigin).toBe("https://huly.example.test")
         // 1 initial + 2 retries = 3 total calls
         expect(callCount).toBe(3)
       })
@@ -66,7 +66,7 @@ describe("connection-helpers", () => {
           connectWithRetry(() => {
             callCount++
             return Promise.reject(makePlatformError("platform:status:Unauthorized"))
-          }, "https://huly.app")
+          }, "https://huly.example.test")
         )
 
         expect(error).toBeInstanceOf(HulyAuthError)
@@ -81,7 +81,7 @@ describe("connection-helpers", () => {
         const fiber = yield* Effect.forkScoped(
           connectWithRetry(
             () => Promise.reject(Object.assign(new Error("token=secret"), { code: "ECONNREFUSED" })),
-            "https://huly.app"
+            "https://huly.example.test"
           )
         )
         yield* TestClock.adjust("500 millis")
@@ -102,7 +102,7 @@ describe("connection-helpers", () => {
               return Promise.reject(new Error("transient failure"))
             }
             return Promise.resolve("recovered")
-          }, "https://huly.app")
+          }, "https://huly.example.test")
         )
 
         yield* TestClock.adjust("500 millis")
@@ -128,7 +128,7 @@ describe("connection-helpers", () => {
 
         for (const code of authCodes) {
           const error = yield* Effect.flip(
-            connectWithRetry(() => Promise.reject(makePlatformError(code)), "https://huly.app")
+            connectWithRetry(() => Promise.reject(makePlatformError(code)), "https://huly.example.test")
           )
           expect(error).toBeInstanceOf(HulyAuthError)
         }
@@ -140,7 +140,7 @@ describe("connection-helpers", () => {
         const fiber = yield* Effect.forkScoped(
           connectWithRetry(
             () => Promise.reject(makePlatformError("platform:status:InternalServerError")),
-            "https://huly.app"
+            "https://huly.example.test"
           )
         )
 

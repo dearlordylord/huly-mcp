@@ -100,7 +100,7 @@ const publicHostnameUrlArbitrary = fc
     fc
       .stringMatching(/^[a-z](?:[a-z0-9-]{0,19}[a-z0-9])?$/)
       .filter((label) => label !== "localhost" && !label.startsWith("xn--")),
-    fc.constantFrom("example.com", "huly.app", "cdn.test")
+    fc.constantFrom("example.com", "huly.example.test", "cdn.test")
   )
   .map(([label, domain]) => `https://${label}.${domain}/file.png`)
 

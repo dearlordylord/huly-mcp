@@ -10,7 +10,10 @@ import { propertyTestParameters } from "../helpers/property.js"
 
 const secretArbitrary = fc.uuid().map((value) => `secret-${value}`)
 const hostnameArbitrary = fc
-  .tuple(fc.stringMatching(/^[a-z][a-z0-9]{0,8}$/), fc.constantFrom("example.com", "huly.app", "internal.test"))
+  .tuple(
+    fc.stringMatching(/^[a-z][a-z0-9]{0,8}$/),
+    fc.constantFrom("example.com", "huly.example.test", "internal.test")
+  )
   .map(([subdomain, domain]) => `${subdomain}.${domain}`)
 const protocolArbitrary = fc.constantFrom("http", "https")
 const validTimeoutStringArbitrary = fc.integer({ min: 1, max: Number.MAX_SAFE_INTEGER }).map(String)

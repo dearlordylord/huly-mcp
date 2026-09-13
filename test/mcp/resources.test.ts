@@ -235,7 +235,7 @@ describe("MCP resources", () => {
 
   it.effect("does not hide backend connection errors while listing resources", () =>
     Effect.gen(function* () {
-      const backendSecret = "https://user:password@example.huly.app/path?token=secret"
+      const backendSecret = "https://user:password@example.huly.example.test/path?token=secret"
       const error = yield* Effect.flip(
         listResources().pipe(
           Effect.provide(
@@ -287,7 +287,7 @@ describe("MCP resources", () => {
       "huly://projects/%FF",
       "huly://projects/HULY/extra",
       "huly://documents/DOC-1",
-      "https://huly.app/projects/HULY",
+      "https://huly.example.test/projects/HULY",
       "not-a-uri"
     ]) {
       expect(() => parseHulyResourceUri(uri)).toThrow(ProtocolError)
@@ -354,7 +354,7 @@ describe("MCP resources", () => {
 
   it.effect("does not expose backend connection error details in resource read errors", () =>
     Effect.gen(function* () {
-      const backendSecret = "https://user:password@example.huly.app/path?token=secret"
+      const backendSecret = "https://user:password@example.huly.example.test/path?token=secret"
       const error = yield* Effect.flip(
         readHulyResource("huly://projects/TEST").pipe(
           Effect.provide(

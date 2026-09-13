@@ -10,8 +10,8 @@ const validContext = {
     url: {
       configured: true,
       valid: true,
-      origin: "https://example.huly.app",
-      host: "example.huly.app",
+      origin: "https://example.huly.example.test",
+      host: "example.huly.example.test",
       protocol: "https:"
     },
     workspace: { configured: true, value: "workspace" },
@@ -92,7 +92,7 @@ describe("GetHulyContextResultSchema", () => {
           ...validContext,
           huly: {
             ...validContext.huly,
-            url: { ...validContext.huly.url, origin: "https://example.huly.app/path?token=secret" }
+            url: { ...validContext.huly.url, origin: "https://example.huly.example.test/path?token=secret" }
           }
         })
       ).toThrow()

@@ -16,7 +16,7 @@ const baseClientLayer = Layer.merge(
 
 const requestWithConfig = (workspace: string, token: string): Request =>
   new Request("http://localhost/mcp", {
-    headers: { "x-huly-url": "https://huly.app", "x-huly-workspace": workspace, "x-huly-token": token }
+    headers: { "x-huly-url": "https://huly.example.test", "x-huly-workspace": workspace, "x-huly-token": token }
   })
 
 describe("HTTP client lease resolution", () => {

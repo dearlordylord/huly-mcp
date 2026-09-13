@@ -65,7 +65,7 @@ describe("config - testLayerToken connectionTimeout explicit (line 172)", () => 
   it.effect("uses provided connectionTimeout instead of default", () =>
     Effect.gen(function* () {
       const layer = HulyConfigService.testLayerToken({
-        url: "https://test.huly.app",
+        url: "https://test.huly.example.test",
         token: "tok",
         workspace: "ws",
         connectionTimeout: 5000
@@ -83,7 +83,11 @@ describe("config - testLayerToken connectionTimeout explicit (line 172)", () => 
 
   it.effect("falls back to DEFAULT_TIMEOUT when omitted", () =>
     Effect.gen(function* () {
-      const layer = HulyConfigService.testLayerToken({ url: "https://test.huly.app", token: "tok", workspace: "ws" })
+      const layer = HulyConfigService.testLayerToken({
+        url: "https://test.huly.example.test",
+        token: "tok",
+        workspace: "ws"
+      })
 
       const config = yield* HulyConfigService.pipe(Effect.provide(layer))
 

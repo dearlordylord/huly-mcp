@@ -20,6 +20,7 @@ export const ToolWarningCodeSchema = Schema.Literals([
   "space_preference_metadata_degraded",
   "approval_request_person_metadata_degraded",
   "approval_request_count_metadata_degraded",
+  // Retain the retired code for compatibility with previously serialized tool results.
   "hosted_huly_shutdown",
   "issue_label_metadata_degraded",
   "issue_milestone_metadata_degraded",
@@ -53,7 +54,6 @@ export const ViewletDescriptorMetadataDegradedWarningCode = ToolWarningCodeSchem
 export const SpacePreferenceMetadataDegradedWarningCode = ToolWarningCodeSchema.literals[4]
 export const ApprovalRequestPersonMetadataDegradedWarningCode = ToolWarningCodeSchema.literals[5]
 export const ApprovalRequestCountMetadataDegradedWarningCode = ToolWarningCodeSchema.literals[6]
-export const HostedHulyShutdownWarningCode = ToolWarningCodeSchema.literals[7]
 export const IssueLabelMetadataDegradedWarningCode = ToolWarningCodeSchema.literals[8]
 export const IssueMilestoneMetadataDegradedWarningCode = ToolWarningCodeSchema.literals[9]
 export const NotificationMetadataDegradedWarningCode = ToolWarningCodeSchema.literals[10]

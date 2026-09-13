@@ -13,9 +13,6 @@ Use readable terminal output interactively or `--json` in scripts and coding-age
 
 Visit the [Huly CLI website](https://huly-mcp.dearlordylord.com/cli/) for focused [examples](https://huly-mcp.dearlordylord.com/cli/examples/), [automation patterns](https://huly-mcp.dearlordylord.com/cli/automation/), and a [Huly MCP vs CLI comparison](https://huly-mcp.dearlordylord.com/cli/huly-mcp-vs-cli/).
 
-> [!IMPORTANT]
-> **Hosted Huly is being discontinued.** If you use `https://huly.app`, [export and migrate your data](https://github.com/hcengineering/platform/blob/develop/README.md). See Huly's [backup and restore guide](https://github.com/hcengineering/platform/blob/develop/docs/guides/backup-restore.en.md) and [self-hosting repository](https://github.com/hcengineering/huly-selfhost). Self-hosted deployments are not affected.
-
 ## Highlights
 
 - Full operation parity with Huly MCP, enforced against the shared operation registry.

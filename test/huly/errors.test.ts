@@ -308,12 +308,12 @@ describe("Huly Errors", () => {
     it.effect("stores only the safe endpoint diagnostic", () =>
       Effect.sync(() => {
         const error = new HulyUnavailableError({
-          endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+          endpointOrigin: normalizeHulyOrigin("https://huly.example.test"),
           failureKind: "refused",
           detailCode: "ECONNREFUSED"
         })
         expect(error._tag).toBe("HulyUnavailableError")
-        expect(error.endpointOrigin).toBe("https://huly.app")
+        expect(error.endpointOrigin).toBe("https://huly.example.test")
         expect(error.detailCode).toBe("ECONNREFUSED")
       })
     )

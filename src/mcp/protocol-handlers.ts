@@ -16,7 +16,6 @@ import { VERSION } from "../version.js"
 import type { McpToolResponse } from "./error-mapping.js"
 import type { McpWireResponse } from "./tool-responses.js"
 import {
-  appendToolWarnings,
   createServerShuttingDownError,
   createSuccessResponse,
   createUnknownToolError,
@@ -52,7 +51,6 @@ import {
   proxyToolDefinitions
 } from "./proxy-tools.js"
 import { listResourceTemplates } from "./resources.js"
-import { noToolCallNoticeProvider, type ToolCallNoticeProvider } from "./tool-call-notices.js"
 import type { ToolRegistry } from "./tools/index.js"
 import type { McpClientInfoLike } from "./tool-mode.js"
 import {
@@ -217,8 +215,7 @@ export const createMcpProtocolHandlers = (
   getHulyContext: HulyContextProvider,
   clock: NowClock = liveNowClock,
   fetchLatestVersion: () => Promise<string> = fetchLatestNpmVersion,
-  exposureOptions: Partial<ProtocolExposureOptions> = {},
-  toolCallNoticeProvider: ToolCallNoticeProvider = noToolCallNoticeProvider
+  exposureOptions: Partial<ProtocolExposureOptions> = {}
 ): McpProtocolHandlers => {
   const registries = normalizeRegistries(registry)
   const defaults = defaultExposureOptions()
@@ -258,7 +255,6 @@ export const createMcpProtocolHandlers = (
   ): Promise<McpWireResponse> => {
     const lease = admission.enter()
     if (lease === null) return toMcpResponse(createServerShuttingDownError())
-    const noticeClaim = toolCallNoticeProvider.claim()
     try {
       const { arguments: args, name } = request.params
       const exposure = exposureFor(requestClientInfo)
@@ -266,30 +262,22 @@ export const createMcpProtocolHandlers = (
       const start = clock.currentTimeMillis()
       const inputBytes = JSON.stringify(args ?? {}).length
 
-      const withClaimedNotice = (response: McpToolResponse): McpToolResponse => {
-        if (noticeClaim._tag === "None") return response
-        const responseWithNotice = appendToolWarnings(response, [noticeClaim.warning])
-        noticeClaim.delivered()
-        return responseWithNotice
-      }
-
       const returnError = (
-        errorResponse: McpToolResponse,
+        response: McpToolResponse,
         attribution: ToolCallAttribution = { toolName: name, callPath: "direct" }
       ) => {
-        const responseWithNotice = withClaimedNotice(errorResponse)
         const durationMs = clock.currentTimeMillis() - start
         telemetry.toolCalled({
           ...attribution,
           status: "error",
           clientKind: exposure.context.clientKind,
           resolvedMode: exposure.context.resolvedMode,
-          errorTag: responseWithNotice._meta?.errorTag,
+          errorTag: response._meta?.errorTag,
           durationMs,
           inputBytes,
-          outputBytes: computeOutputBytes(responseWithNotice)
+          outputBytes: computeOutputBytes(response)
         })
-        return toMcpResponse(responseWithNotice)
+        return toMcpResponse(response)
       }
 
       const callVersionTool = async (): Promise<McpWireResponse> => {
@@ -302,7 +290,7 @@ export const createMcpProtocolHandlers = (
         } catch {
           return returnError(mapDomainErrorToMcp(new HulyError({ message: "Failed to build version result" })))
         }
-        const versionResponse = withClaimedNotice(createSuccessResponse(versionResult))
+        const versionResponse = createSuccessResponse(versionResult)
         const durationMs = clock.currentTimeMillis() - start
         telemetry.toolCalled({
           toolName: name,
@@ -328,7 +316,7 @@ export const createMcpProtocolHandlers = (
           return returnError(mapDomainErrorToMcp(new HulyError({ message: "Failed to build Huly context" })))
         }
 
-        const contextResponse = withClaimedNotice(createSuccessResponse(context))
+        const contextResponse = createSuccessResponse(context)
         const durationMs = clock.currentTimeMillis() - start
         telemetry.toolCalled({
           toolName: name,
@@ -359,19 +347,18 @@ export const createMcpProtocolHandlers = (
           proxyCandidateRegistry: exposure.proxyCandidateRegistry,
           ...(clientResolution?._tag === "Success" ? { clients: proxyClients(clientResolution.clients) } : {})
         })
-        const responseWithNotice = withClaimedNotice(response)
         const durationMs = clock.currentTimeMillis() - start
         telemetry.toolCalled({
           ...attribution,
-          status: responseStatus(responseWithNotice),
+          status: responseStatus(response),
           clientKind: exposure.context.clientKind,
           resolvedMode: exposure.context.resolvedMode,
-          errorTag: responseWithNotice._meta?.errorTag,
+          errorTag: response._meta?.errorTag,
           durationMs,
           inputBytes,
-          outputBytes: computeOutputBytes(responseWithNotice)
+          outputBytes: computeOutputBytes(response)
         })
-        return toMcpResponse(responseWithNotice)
+        return toMcpResponse(response)
       }
 
       const callNativeTool = async (): Promise<McpWireResponse> => {
@@ -404,28 +391,24 @@ export const createMcpProtocolHandlers = (
         const durationMs = clock.currentTimeMillis() - start
         if (response === null) return returnError(createUnknownToolError(name), attribution)
 
-        const responseWithNotice = withClaimedNotice(response)
         telemetry.toolCalled({
           ...attribution,
-          status: responseStatus(responseWithNotice),
+          status: responseStatus(response),
           clientKind: exposure.context.clientKind,
           resolvedMode: exposure.context.resolvedMode,
-          errorTag: responseWithNotice._meta?.errorTag,
+          errorTag: response._meta?.errorTag,
           durationMs,
           inputBytes,
-          outputBytes: computeOutputBytes(responseWithNotice)
+          outputBytes: computeOutputBytes(response)
         })
 
-        return toMcpResponse(responseWithNotice)
+        return toMcpResponse(response)
       }
 
       if (name === VERSION_TOOL_NAME) return await callVersionTool()
       if (name === GET_HULY_CONTEXT_TOOL_NAME) return callHulyContextTool()
       if (isProxyToolName(name)) return await callProxyTool(name)
       return await callNativeTool()
-    } catch (error) {
-      if (noticeClaim._tag === "Claimed") noticeClaim.release()
-      throw error
     } finally {
       lease.release()
     }

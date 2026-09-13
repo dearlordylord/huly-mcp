@@ -661,7 +661,7 @@ describe("Error Mapping to MCP", () => {
         Effect.sync(function () {
           const unavailable = mapClientResolutionErrorToMcp(
             new HulyUnavailableError({
-              endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+              endpointOrigin: normalizeHulyOrigin("https://huly.example.test"),
               failureKind: "refused"
             })
           )
@@ -670,7 +670,7 @@ describe("Error Mapping to MCP", () => {
           const storageConfig = mapClientResolutionErrorToMcp(new HulyStorageConfigError({ field: "FILES_URL" }))
           const resolverCause = Cause.fail(
             new HulyUnavailableError({
-              endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+              endpointOrigin: normalizeHulyOrigin("https://huly.example.test"),
               failureKind: "timeout"
             })
           )
@@ -679,23 +679,23 @@ describe("Error Mapping to MCP", () => {
             Cause.combine(Cause.fail(new Error("token=secret")), resolverCause)
           )
 
-          expect(assertAt(unavailable.content, 0).text).toContain("Cannot reach hosted Huly")
+          expect(assertAt(unavailable.content, 0).text).toContain("Cannot reach the configured Huly endpoint")
           expect(assertAt(unknown.content, 0).text).toBe("Failed to initialize Huly clients")
           expect(assertAt(auth.content, 0).text).toBe("Authentication error: secret")
           expect(assertAt(storageConfig.content, 0).text).toBe(
             "Storage configuration error: Invalid Huly server config field 'FILES_URL': expected a non-empty string"
           )
-          expect(assertAt(fromCause.content, 0).text).toContain("Cannot reach hosted Huly")
-          expect(assertAt(fromMixedCause.content, 0).text).toContain("Cannot reach hosted Huly")
+          expect(assertAt(fromCause.content, 0).text).toContain("Cannot reach the configured Huly endpoint")
+          expect(assertAt(fromMixedCause.content, 0).text).toContain("Cannot reach the configured Huly endpoint")
           expect(assertAt(fromMixedCause.content, 0).text).not.toContain("token=secret")
         })
       )
 
-      it.effect("maps default-cloud unavailability without exposing backend details", () =>
+      it.effect("maps endpoint unavailability without exposing backend details", () =>
         Effect.sync(function () {
           const response = mapDomainErrorToMcp(
             new HulyUnavailableError({
-              endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+              endpointOrigin: normalizeHulyOrigin("https://huly.example.test"),
               failureKind: "refused",
               detailCode: "ECONNREFUSED"
             })
@@ -704,11 +704,7 @@ describe("Error Mapping to MCP", () => {
           expect(response.isError).toBe(true)
           expect(response._meta.errorCode).toBe(McpErrorCode.InternalError)
           expect(response._meta.errorTag).toBe("HulyUnavailableError")
-          expect(assertAt(response.content, 0).text).toContain("shutdown expected July 20")
-          expect(assertAt(response.content, 0).text).toContain(
-            "https://github.com/hcengineering/platform/blob/develop/docs/guides/backup-restore.en.md"
-          )
-          expect(assertAt(response.content, 0).text).toContain("https://github.com/hcengineering/huly-selfhost")
+          expect(assertAt(response.content, 0).text).toContain("Cannot reach the configured Huly endpoint")
           expect(assertAt(response.content, 0).text).toContain("HULY_URL")
           expect(JSON.stringify(response)).not.toContain("ECONNREFUSED")
         })
@@ -730,16 +726,19 @@ describe("Error Mapping to MCP", () => {
         })
       )
 
-      it.effect("adds default-cloud timeout and DNS guidance", () =>
+      it.effect("adds endpoint timeout and DNS guidance", () =>
         Effect.sync(() => {
           const timeout = mapDomainErrorToMcp(
             new HulyUnavailableError({
-              endpointOrigin: normalizeHulyOrigin("https://huly.app"),
+              endpointOrigin: normalizeHulyOrigin("https://huly.example.test"),
               failureKind: "timeout"
             })
           )
           const dns = mapDomainErrorToMcp(
-            new HulyUnavailableError({ endpointOrigin: normalizeHulyOrigin("https://huly.app"), failureKind: "dns" })
+            new HulyUnavailableError({
+              endpointOrigin: normalizeHulyOrigin("https://huly.example.test"),
+              failureKind: "dns"
+            })
           )
 
           expect(assertAt(timeout.content, 0).text).toContain("HULY_CONNECTION_TIMEOUT")
@@ -1031,7 +1030,7 @@ describe("Error Mapping to MCP", () => {
 
     it.effect("appends a warning without changing a successful result", () =>
       Effect.sync(function () {
-        const warning = { code: "hosted_huly_shutdown" as const, message: "Hosted Huly is shutting down." }
+        const warning = { code: "status_metadata_unresolved" as const, message: "Some status metadata is unavailable." }
         const response = appendToolWarnings(createSuccessResponse({ ok: true }), [warning])
 
         expect(response.isError).not.toBe(true)
@@ -1044,7 +1043,10 @@ describe("Error Mapping to MCP", () => {
     it.effect("preserves existing warnings when appending a warning", () =>
       Effect.sync(function () {
         const existing = { code: "status_metadata_unresolved" as const, message: "Status metadata was degraded." }
-        const appended = { code: "hosted_huly_shutdown" as const, message: "Hosted Huly is shutting down." }
+        const appended = {
+          code: "status_metadata_unresolved" as const,
+          message: "Some status metadata is unavailable."
+        }
         const response = appendToolWarnings(createSuccessResponse({ ok: true }, [existing]), [appended])
 
         expect(response.structuredContent).toEqual({ result: { ok: true }, warnings: [existing, appended] })
@@ -1055,7 +1057,7 @@ describe("Error Mapping to MCP", () => {
 
     it.effect("appends a visible warning to an error without changing its error status", () =>
       Effect.sync(function () {
-        const warning = { code: "hosted_huly_shutdown" as const, message: "Hosted Huly is shutting down." }
+        const warning = { code: "status_metadata_unresolved" as const, message: "Some status metadata is unavailable." }
         const response = appendToolWarnings(createUnknownToolError("bogus_tool"), [warning])
 
         expect(response.isError).toBe(true)
@@ -1067,7 +1069,7 @@ describe("Error Mapping to MCP", () => {
 
     it.effect("keeps a content-only success response content-only", () =>
       Effect.sync(function () {
-        const warning = { code: "hosted_huly_shutdown" as const, message: "Hosted Huly is shutting down." }
+        const warning = { code: "status_metadata_unresolved" as const, message: "Some status metadata is unavailable." }
         const response = appendToolWarnings({ content: [{ type: "text", text: "ok" }] }, [warning])
 
         expect(response.isError).not.toBe(true)

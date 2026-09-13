@@ -25,10 +25,6 @@ import { expect } from "vitest"
 import { parseJsonSchemaRecord } from "../../src/domain/schemas/json-schema.js"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
-import {
-  HOSTED_HULY_MIGRATION_WARNING,
-  type HostedHulyMigrationInstructions
-} from "../../src/huly/unavailable-diagnostics.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
 import { HttpServerFactoryService } from "../../src/mcp/http-transport.js"
 import { createDefaultMcpSdkServer } from "../../src/mcp/sdk-server.js"
@@ -110,7 +106,7 @@ const buildTestServerLayer = (
     httpHost?: string
     mcpAuthToken?: Redacted.Redacted<string>
     authMethod?: "token" | "password"
-    createServer?: (instructions?: HostedHulyMigrationInstructions) => Server
+    createServer?: () => Server
     writeError?: (message: string) => void
   },
   layers: Layer.Layer<HulyClient | HulyStorageClient | WorkspaceClient | TelemetryService>
@@ -917,8 +913,8 @@ describe("McpServerService.layer operations", () => {
         const serverLayer = buildTestServerLayer(
           {
             transport: "stdio",
-            createServer: (instructions) => {
-              const server = createDefaultMcpSdkServer(instructions)
+            createServer: () => {
+              const server = createDefaultMcpSdkServer()
               server.connect = () => Promise.reject(new Error("connection refused"))
               return server
             },
@@ -1154,8 +1150,8 @@ describe("McpServerService.layer operations", () => {
           const serverLayer = buildTestServerLayer(
             {
               transport: "stdio",
-              createServer: (instructions) => {
-                const server = createDefaultMcpSdkServer(instructions)
+              createServer: () => {
+                const server = createDefaultMcpSdkServer()
                 server.close = () => Promise.reject(new Error("server close failed"))
                 Effect.runSync(Deferred.succeed(serverCreated, undefined))
                 return server
@@ -1281,7 +1277,7 @@ describe("McpServerService.layer operations", () => {
   describe("createMcpServer request handlers", () => {
     const buildAndRun = (
       layers: Layer.Layer<HulyClient | HulyStorageClient | WorkspaceClient | TelemetryService>,
-      createServer: (instructions?: HostedHulyMigrationInstructions) => Server = createMockServer,
+      createServer: () => Server = createMockServer,
       configValues: Record<string, string> = {}
     ) =>
       Effect.gen(function* () {
@@ -1289,8 +1285,8 @@ describe("McpServerService.layer operations", () => {
         const serverLayer = buildTestServerLayer(
           {
             transport: "stdio",
-            createServer: (instructions) => {
-              const server = createServer(instructions)
+            createServer: () => {
+              const server = createServer()
               queueMicrotask(() => Effect.runSync(Deferred.succeed(serverCreated, undefined)))
               return server
             }
@@ -1408,7 +1404,7 @@ describe("McpServerService.layer operations", () => {
         Effect.gen(function* () {
           capturedHandlers.clear()
           const originalEnv = { ...process.env }
-          process.env["HULY_URL"] = "https://user:pass@example.huly.app/path?token=query-secret"
+          process.env["HULY_URL"] = "https://user:pass@example.huly.example.test/path?token=query-secret"
           process.env["HULY_TOKEN"] = "secret-token"
           process.env["HULY_EMAIL"] = "user@example.com"
           process.env["HULY_PASSWORD"] = "secret-password"
@@ -1448,7 +1444,7 @@ describe("McpServerService.layer operations", () => {
           }
 
           expect(result.isError).toBeUndefined()
-          expect(result.structuredContent?.result?.huly?.url?.origin).toBe("https://example.huly.app")
+          expect(result.structuredContent?.result?.huly?.url?.origin).toBe("https://example.huly.example.test")
           expect(result.structuredContent?.result?.auth?.method).toBe("token")
           expect(resolveCalled).toBe(false)
           expect(toolCalledProps).not.toBeNull()
@@ -1467,12 +1463,12 @@ describe("McpServerService.layer operations", () => {
     )
 
     it.effect(
-      "stdio appends the hosted-Huly warning only to the first tool result",
+      "stdio returns tool results without unsolicited notices",
       () =>
         Effect.gen(function* () {
           capturedHandlers.clear()
           const originalEnv = { ...process.env }
-          process.env["HULY_URL"] = "https://huly.app"
+          process.env["HULY_URL"] = "https://huly.example.test"
 
           const layers = Layer.mergeAll(
             HulyClient.testLayer({}),
@@ -1502,45 +1498,13 @@ describe("McpServerService.layer operations", () => {
             callToolHandler({ params: { name: "get_huly_context", arguments: {} } })
           )
 
-          expect(first.structuredContent?.warnings).toEqual([HOSTED_HULY_MIGRATION_WARNING])
-          expect(JSON.parse(assertAt(first.content, 1).text)).toEqual({ warnings: [HOSTED_HULY_MIGRATION_WARNING] })
+          expect(first.structuredContent?.warnings).toBeUndefined()
+          expect(first.content).toHaveLength(1)
           expect(second.structuredContent?.warnings).toBeUndefined()
           expect(second.content).toHaveLength(1)
 
           process.env = originalEnv
           yield* cleanup(fiber)
-        }),
-      { timeout: 5000 }
-    )
-
-    it.effect(
-      "stdio initialization instructions apply only to the default hosted Huly origin",
-      () =>
-        Effect.gen(function* () {
-          const originalEnv = { ...process.env }
-          const seenInstructions: Array<HostedHulyMigrationInstructions | undefined> = []
-          const layers = Layer.mergeAll(
-            HulyClient.testLayer({}),
-            HulyStorageClient.testLayer({}),
-            WorkspaceClient.testLayer({}),
-            TelemetryService.testLayer()
-          )
-          const createServer = (instructions?: HostedHulyMigrationInstructions): Server => {
-            seenInstructions.push(instructions)
-            return createMockServer()
-          }
-
-          process.env["HULY_URL"] = "https://huly.app"
-          const hostedFiber = yield* buildAndRun(layers, createServer)
-          yield* cleanup(hostedFiber)
-
-          process.env["HULY_URL"] = "https://huly.example.com"
-          const selfHostedFiber = yield* buildAndRun(layers, createServer)
-          yield* cleanup(selfHostedFiber)
-
-          expect(seenInstructions).toEqual([HOSTED_HULY_MIGRATION_WARNING.message, undefined])
-
-          process.env = originalEnv
         }),
       { timeout: 5000 }
     )

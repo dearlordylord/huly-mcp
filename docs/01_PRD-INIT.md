@@ -502,7 +502,7 @@ Mock Huly API responses at the client layer boundary, not at network level.
 
 ```bash
 # Required
-HULY_URL=https://huly.app          # or http://localhost:8087 for local dev
+HULY_URL=https://huly.example.test          # or http://localhost:8087 for local dev
 HULY_EMAIL=user@example.com
 HULY_PASSWORD=secret
 HULY_WORKSPACE=default             # Default workspace
@@ -518,7 +518,7 @@ MCP_HTTP_PORT=3000                 # HTTP port if http transport; omit to use th
 Support `.hulyrc.json` for non-sensitive config:
 ```json
 {
-  "url": "https://huly.app",
+  "url": "https://huly.example.test",
   "workspace": "default",
   "connectionTimeout": 30000
 }
